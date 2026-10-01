@@ -1,0 +1,51 @@
+"use client";
+
+import type { Editor } from "@tiptap/core";
+import { useEditorState } from "@tiptap/react";
+import { Heading1, ImagePlus, ListTodo, type LucideIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+
+/** A quiet row of starters under the placeholder of an empty note. Gone as soon as you type. */
+export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () => void }) {
+  const empty = useEditorState({ editor, selector: ({ editor: e }) => e.isEmpty });
+
+  const items: { label: string; icon: LucideIcon; run: () => void }[] = [
+    { label: "Heading", icon: Heading1, run: () => editor.chain().focus("start").setNode("heading", { level: 1 }).run() },
+    { label: "Checklist", icon: ListTodo, run: () => editor.chain().focus("start").toggleTaskList().run() },
+    {
+      label: "Image",
+      icon: ImagePlus,
+      run: () => {
+        editor.commands.focus("start");
+        onImage();
+      },
+    },
+  ];
+
+  return (
+    <AnimatePresence>
+      {empty && (
+        <motion.div
+          key="quick"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0, transition: { delay: 0.12, duration: 0.25, ease: [0.22, 1, 0.36, 1] } }}
+          exit={{ opacity: 0, y: 2, transition: { duration: 0.1 } }}
+          className="absolute left-0 top-[2.35em] flex flex-wrap items-center gap-1.5 text-[15.5px]"
+        >
+          {items.map(({ label, icon: Icon, run }) => (
+            <button
+              key={label}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={run}
+              className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised/70 px-2 text-[12.5px] text-ink-3 shadow-[0_1px_0_var(--line)] transition-[color,border,background,transform] duration-150 hover:border-line-2 hover:bg-raised hover:text-ink active:scale-[0.97]"
+            >
+              <Icon className="size-3.5" strokeWidth={1.9} />
+              {label}
+            </button>
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

@@ -1,0 +1,692 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Paper, ink and one jelly accent. Everything else is neutral.
+   --------------------------------------------------------------------------- */
+:root {
+  --paper: #f4f3ee;
+  --surface: #fdfcfa;
+  --raised: #ffffff;
+  --hover: #eae8e1;
+  --ink: #1c1b18;
+  --ink-2: #4b4a44;
+  --ink-3: #8b8981;
+  --line: #e3e1d9;
+  --line-2: #d3d0c6;
+
+  --blob: #ff6a2b;
+  --blob-deep: #e04e12;
+  --blob-light: #ffb48a;
+  --blob-ink: #c2410c;
+  --blob-soft: #ffeadf;
+
+  --danger: #d23b2b;
+  --ok: #2e8b57;
+
+  --subject-ink: #3d3c37;
+  --subject-clay: #c4653e;
+  --subject-moss: #5d8a4c;
+  --subject-sky: #3f78b3;
+  --subject-plum: #8a5a9c;
+  --subject-sand: #b48e38;
+  --subject-rose: #c05475;
+  --subject-teal: #3a8c87;
+
+  --shadow-pop: 0 1px 1px rgb(28 27 24 / 0.04), 0 6px 16px -4px rgb(28 27 24 / 0.12),
+    0 18px 40px -12px rgb(28 27 24 / 0.18);
+  --shadow-card: 0 1px 0 rgb(28 27 24 / 0.03), 0 1px 3px rgb(28 27 24 / 0.06);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #141413;
+  --surface: #1a1a18;
+  --raised: #22221f;
+  --hover: #262623;
+  --ink: #edebe4;
+  --ink-2: #b6b4ab;
+  --ink-3: #7d7b73;
+  --line: #2b2a27;
+  --line-2: #3a3934;
+
+  --blob: #ff7a3d;
+  --blob-deep: #e85a1c;
+  --blob-light: #ffb48a;
+  --blob-ink: #ff9b68;
+  --blob-soft: #3a2014;
+
+  --danger: #ff6b5b;
+  --ok: #5cc28a;
+
+  --subject-ink: #c9c7bf;
+
+  --shadow-pop: 0 1px 1px rgb(0 0 0 / 0.3), 0 8px 24px -6px rgb(0 0 0 / 0.55),
+    0 24px 48px -16px rgb(0 0 0 / 0.6);
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.2), 0 1px 3px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-hover: var(--hover);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-blob: var(--blob);
+  --color-blob-deep: var(--blob-deep);
+  --color-blob-ink: var(--blob-ink);
+  --color-blob-soft: var(--blob-soft);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --shadow-pop: var(--shadow-pop);
+  --shadow-card: var(--shadow-card);
+
+  --ease-jelly: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--blob) 28%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--blob);
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+}
+
+/* Paper grain used on auth and landing stages. */
+.bg-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--ink) 14%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------------------
+   Note editor (ProseMirror)
+   --------------------------------------------------------------------------- */
+.prose-blob {
+  font-size: 16px;
+  line-height: 1.72;
+  color: var(--ink);
+  caret-color: var(--blob);
+  outline: none;
+  overflow-wrap: break-word;
+}
+
+.prose-blob > * + * {
+  margin-top: 0.6em;
+}
+
+.prose-blob > :first-child {
+  margin-top: 0;
+}
+
+/* Headings: generous air above, tight to their content below. */
+.prose-blob h1,
+.prose-blob h2,
+.prose-blob h3 {
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+  scroll-margin-top: 72px;
+}
+.prose-blob h1 {
+  font-size: 1.875em;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+.prose-blob h2 {
+  font-size: 1.45em;
+}
+.prose-blob h3 {
+  font-size: 1.17em;
+}
+.prose-blob > * + h1 {
+  margin-top: 1.5em;
+}
+.prose-blob > * + h2 {
+  margin-top: 1.35em;
+}
+.prose-blob > * + h3 {
+  margin-top: 1.15em;
+}
+.prose-blob > h1 + *,
+.prose-blob > h2 + *,
+.prose-blob > h3 + * {
+  margin-top: 0.4em;
+}
+
+/* Inline marks */
+.prose-blob strong {
+  font-weight: 650;
+}
+.prose-blob a {
+  color: var(--blob-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--blob) 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: text-decoration-color 0.15s;
+}
+.prose-blob a:hover {
+  text-decoration-color: currentColor;
+}
+.prose-blob u {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.prose-blob s {
+  text-decoration-color: var(--ink-3);
+}
+.prose-blob mark {
+  background: color-mix(in oklab, var(--blob) 26%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0.05em 0.12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.prose-blob code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line-2) 55%, transparent);
+  border-radius: 5px;
+  padding: 0.14em 0.36em;
+}
+
+/* Lists */
+.prose-blob ul,
+.prose-blob ol {
+  padding-left: 1.5em;
+}
+.prose-blob ul {
+  list-style: disc;
+}
+.prose-blob ul ul {
+  list-style: circle;
+}
+.prose-blob ul ul ul {
+  list-style: square;
+}
+.prose-blob ol {
+  list-style: decimal;
+}
+.prose-blob ol ol {
+  list-style: lower-alpha;
+}
+.prose-blob ol ol ol {
+  list-style: lower-roman;
+}
+.prose-blob li {
+  padding-left: 0.15em;
+}
+.prose-blob li > p {
+  margin: 0;
+}
+.prose-blob li + li {
+  margin-top: 0.22em;
+}
+.prose-blob li > * + * {
+  margin-top: 0.22em;
+}
+.prose-blob li::marker {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* To-do lists */
+.prose-blob ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.1em;
+}
+.prose-blob ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.6em;
+  align-items: flex-start;
+  padding-left: 0;
+}
+.prose-blob ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  height: 1.72em;
+  flex: none;
+  user-select: none;
+}
+.prose-blob ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.prose-blob ul[data-type="taskList"] input[type="checkbox"] {
+  appearance: none;
+  margin: 0;
+  width: 1.08em;
+  height: 1.08em;
+  border: 1.5px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--raised);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.25s var(--ease-jelly);
+}
+.prose-blob ul[data-type="taskList"] input[type="checkbox"]:hover {
+  border-color: var(--ink-3);
+}
+.prose-blob ul[data-type="taskList"] input[type="checkbox"]:active {
+  transform: scale(0.88);
+}
+.prose-blob ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background: var(--blob);
+  border-color: var(--blob);
+  transform: scale(1.06);
+}
+.prose-blob ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: "";
+  width: 0.55em;
+  height: 0.3em;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: translateY(-0.06em) rotate(-45deg);
+}
+.prose-blob ul[data-type="taskList"] li > div {
+  transition: color 0.2s;
+}
+.prose-blob ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-2);
+}
+
+/* Blocks */
+.prose-blob blockquote {
+  border-left: 3px solid var(--blob);
+  padding: 0.1em 0 0.1em 1em;
+  color: var(--ink-2);
+}
+.prose-blob blockquote > * + *,
+.prose-blob .blob-callout > * + * {
+  margin-top: 0.45em;
+}
+
+.prose-blob hr {
+  box-sizing: content-box;
+  border: none;
+  height: 1px;
+  padding: 0.7em 0;
+  margin: 0.6em 0;
+  background: var(--line);
+  background-clip: content-box;
+  cursor: pointer;
+}
+.prose-blob hr.ProseMirror-selectednode {
+  background-color: var(--blob);
+}
+
+.prose-blob pre {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.85em 1.1em;
+  tab-size: 2;
+  caret-color: var(--ink);
+}
+.prose-blob pre code {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+.prose-blob .blob-callout {
+  position: relative;
+  background: color-mix(in oklab, var(--blob-soft) 55%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--blob) 16%, var(--line));
+  border-radius: 10px;
+  padding: 0.7em 1em 0.7em 2.75em;
+}
+.prose-blob .blob-callout::before {
+  content: "💡";
+  position: absolute;
+  left: 0.9em;
+  top: 0.7em;
+  font-size: 1em;
+  line-height: inherit;
+}
+
+.prose-blob img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--line);
+  transition: box-shadow 0.15s;
+}
+.prose-blob img.ProseMirror-selectednode {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--blob);
+}
+
+/* Resizable images (Tiptap's ResizableNodeView) */
+.prose-blob [data-resize-container] {
+  justify-content: center;
+}
+.prose-blob [data-resize-wrapper] {
+  max-width: 100%;
+}
+.prose-blob [data-resize-wrapper] img {
+  max-width: 100%;
+  height: auto !important;
+}
+.prose-blob [data-resize-container].ProseMirror-selectednode img {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--blob);
+}
+.prose-blob [data-resize-handle] {
+  width: 18px;
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+.prose-blob [data-resize-handle]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: min(48px, 40%);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-card);
+}
+.prose-blob [data-resize-wrapper]:hover [data-resize-handle],
+.prose-blob .ProseMirror-selectednode [data-resize-handle],
+.prose-blob [data-resize-state="true"] [data-resize-handle] {
+  opacity: 1;
+}
+
+/* Sub-page link blocks (editor/PageLink.tsx) */
+.prose-blob .blob-pagelink-wrap {
+  margin-inline: -0.4em;
+}
+.prose-blob a.blob-pagelink {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.16em 0.4em;
+  border-radius: 7px;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.prose-blob a.blob-pagelink:hover {
+  background: var(--hover);
+}
+.prose-blob a.blob-pagelink.is-selected {
+  background: color-mix(in oklab, var(--blob) 14%, transparent);
+}
+.prose-blob .blob-pagelink-icon {
+  width: 1.15em;
+  height: 1.15em;
+  font-size: 1.05em;
+  flex: none;
+  color: var(--ink-3);
+}
+.prose-blob .blob-pagelink-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.prose-blob a.blob-pagelink.is-missing {
+  color: var(--ink-3);
+}
+.prose-blob .blob-pagelink-note {
+  font-size: 0.8em;
+  color: var(--ink-3);
+}
+
+/* Placeholders (decorations from editor/placeholder.ts) */
+.prose-blob p.is-empty::before,
+.prose-blob h1.is-empty::before,
+.prose-blob h2.is-empty::before,
+.prose-blob h3.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  opacity: 0.7;
+  float: left;
+  height: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.prose-blob h1.is-empty::before,
+.prose-blob h2.is-empty::before,
+.prose-blob h3.is-empty::before {
+  opacity: 0.5;
+}
+.prose-blob:not(:focus) p.is-current::before {
+  content: none;
+}
+.prose-blob:not(:focus) p.is-editor-empty::before {
+  content: "Start writing…";
+}
+
+/* Cursors & selection */
+.prose-blob .ProseMirror-gapcursor::after {
+  border-top-color: var(--ink);
+}
+.prose-blob.is-linking .blob-selection {
+  background: color-mix(in oklab, var(--blob) 24%, transparent);
+  border-radius: 2px;
+}
+.blob-dropcursor {
+  background: var(--blob);
+  border-radius: 2px;
+}
+
+/* "/" query while the slash menu is open */
+.prose-blob .blob-slash-query {
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.05em 0.1em;
+}
+.prose-blob .blob-slash-query.is-query-empty::after {
+  content: "Type to filter…";
+  color: var(--ink-3);
+  opacity: 0.7;
+  padding-left: 0.15em;
+  pointer-events: none;
+}
+
+/* Image upload preview (widget decoration) */
+.prose-blob .blob-upload {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--hover);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.prose-blob .blob-upload img {
+  max-height: 420px;
+  width: auto;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: saturate(0.6);
+  animation: blob-upload-pulse 1.6s ease-in-out infinite;
+}
+.blob-upload-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--surface) 35%, transparent);
+}
+.blob-upload-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.35em 0.8em 0.35em 0.6em;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.blob-upload-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--blob);
+  animation: blob-spin 0.7s linear infinite;
+}
+
+/* Outline jump target */
+.prose-blob .blob-flash {
+  animation: blob-flash 1.1s var(--ease-out-soft);
+  border-radius: 6px;
+}
+
+/* ---- end note editor ---- */
+
+/* ---------------------------------------------------------------------------
+   Note editor chrome (bubble menu, slash menu)
+   --------------------------------------------------------------------------- */
+.blob-bubble {
+  transform-origin: 50% 100%;
+  animation: blob-pop-in 0.26s var(--ease-jelly) both;
+}
+
+@keyframes blob-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes blob-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes blob-upload-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes blob-flash {
+  0%,
+  35% {
+    background: color-mix(in oklab, var(--blob) 16%, transparent);
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--blob) 16%, transparent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ---- end note editor chrome ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,463 @@
+"use client";
+
+import { AnimatePresence, motion } from "motion/react";
+import {
+  ChevronRight,
+  Ellipsis,
+  FilePlus2,
+  FileText,
+  House,
+  ListChecks,
+  LogOut,
+  Monitor,
+  Moon,
+  PanelLeftClose,
+  Plus,
+  Presentation,
+  Search,
+  Settings,
+  Star,
+  Sun,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BlobMark } from "@/components/blob/BlobMark";
+import { applyTheme } from "@/components/theme";
+import { Kbd } from "@/components/ui/Kbd";
+import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { SubjectMenu } from "@/components/shell/SubjectMenu";
+import { subjectColor } from "@/lib/subjects";
+import { createClient } from "@/lib/supabase/client";
+import type { PageMeta, Subject, Theme } from "@/lib/types";
+import { cn, pageTitle } from "@/lib/utils";
+
+function useStoredSet(key: string) {
+  const [set, setSet] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage after mount
+      if (raw) setSet(new Set(JSON.parse(raw)));
+    } catch {}
+  }, [key]);
+  const toggle = (id: string, value?: boolean) =>
+    setSet((prev) => {
+      const next = new Set(prev);
+      const on = value ?? !next.has(id);
+      if (on) next.add(id);
+      else next.delete(id);
+      try {
+        localStorage.setItem(key, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  return [set, toggle] as const;
+}
+
+export function PageIcon({ page, className }: { page: Pick<PageMeta, "icon" | "kind">; className?: string }) {
+  if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
+  const Icon = page.kind === "deck" ? Presentation : FileText;
+  return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
+}
+
+export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSearch: () => void }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { pages, subjects, createPage, profile, email, setProfile } = useWorkspace();
+  // Subjects start expanded; we remember the ones you fold.
+  const [folded, toggleFolded] = useStoredSet("blob-folded-subjects");
+  const [openPages, toggleOpenPage] = useStoredSet("blob-open-pages");
+
+  const tree = useMemo(() => {
+    const children = new Map<string | null, PageMeta[]>();
+    for (const p of pages) {
+      const key = p.parent_id;
+      if (!children.has(key)) children.set(key, []);
+      children.get(key)!.push(p);
+    }
+    children.forEach((list) => list.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at)));
+    return children;
+  }, [pages]);
+
+  const roots = tree.get(null) ?? [];
+  const favorites = pages.filter((p) => p.is_favorite).sort((a, b) => a.title.localeCompare(b.title));
+  const unfiled = roots.filter((p) => !p.subject_id || !subjects.some((s) => s.id === p.subject_id));
+
+  async function newPage(kind: "note" | "deck", extra: { subject_id?: string | null; parent_id?: string | null } = {}) {
+    const page = await createPage({ kind, ...extra });
+    if (!page) return;
+    if (extra.parent_id) toggleOpenPage(extra.parent_id, true);
+    if (extra.subject_id) toggleFolded(extra.subject_id, false);
+    router.push(`/p/${page.id}`);
+  }
+
+  const renderPage = (page: PageMeta, depth: number): ReactNode => {
+    const kids = tree.get(page.id) ?? [];
+    const open = openPages.has(page.id);
+    const active = pathname === `/p/${page.id}`;
+    return (
+      <div key={page.id}>
+        <div
+          className={cn(
+            "group relative flex h-7 items-center gap-1.5 rounded-md pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
+            active && "bg-hover font-medium text-ink",
+          )}
+          style={{ paddingLeft: 6 + depth * 14 }}
+        >
+          <button
+            onClick={() => toggleOpenPage(page.id)}
+            className={cn(
+              "grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink",
+              kids.length === 0 && page.kind === "deck" && "invisible",
+            )}
+            aria-label={open ? "Collapse" : "Expand"}
+          >
+            <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
+          </button>
+          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch">
+            <PageIcon page={page} />
+            <span className="truncate">{pageTitle(page.title, page.kind)}</span>
+          </Link>
+          {page.kind === "note" && (
+            <button
+              onClick={() => newPage("note", { parent_id: page.id, subject_id: page.subject_id })}
+              className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100"
+              aria-label="Add a page inside"
+              title="Add a page inside"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          )}
+        </div>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              {kids.length ? (
+                kids.map((k) => renderPage(k, depth + 1))
+              ) : (
+                <div className="flex h-7 items-center text-[12.5px] text-ink-3" style={{ paddingLeft: 30 + depth * 14 }}>
+                  No pages inside
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const renderSubject = (subject: Subject) => {
+    const items = roots.filter((p) => p.subject_id === subject.id);
+    const open = !folded.has(subject.id);
+    const active = pathname === `/subjects/${subject.id}`;
+    return (
+      <div key={subject.id}>
+        <div
+          className={cn(
+            "group flex h-7 items-center gap-1.5 rounded-md pl-1.5 pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
+            active && "bg-hover font-medium text-ink",
+          )}
+        >
+          <button
+            onClick={() => toggleFolded(subject.id)}
+            className="grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink"
+            aria-label={open ? "Collapse subject" : "Expand subject"}
+          >
+            <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
+          </button>
+          <Link href={`/subjects/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch">
+            <span className="grid size-4 shrink-0 place-items-center">
+              {subject.emoji ? (
+                <span className="text-[13px] leading-none">{subject.emoji}</span>
+              ) : (
+                <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
+              )}
+            </span>
+            <span className="truncate">{subject.name}</span>
+            {subject.emoji && <span className="ml-auto size-1.5 shrink-0 rounded-full opacity-80" style={{ background: subjectColor(subject.color) }} />}
+          </Link>
+          <div className="flex opacity-0 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100">
+            <SubjectMenu subject={subject} />
+            <Popover
+              align="start"
+              trigger={(props) => (
+                <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={`Add to ${subject.name}`} title={`Add to ${subject.name}`}>
+                  <Plus className="size-3.5" />
+                </button>
+              )}
+            >
+              {(close) => (
+                <>
+                  <MenuItem icon={<FileText />} onSelect={() => (close(), newPage("note", { subject_id: subject.id }))}>
+                    Note
+                  </MenuItem>
+                  <MenuItem icon={<Presentation />} onSelect={() => (close(), newPage("deck", { subject_id: subject.id }))}>
+                    Presentation
+                  </MenuItem>
+                </>
+              )}
+            </Popover>
+          </div>
+        </div>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              {items.length ? (
+                items.map((p) => renderPage(p, 1))
+              ) : (
+                <button
+                  onClick={() => newPage("note", { subject_id: subject.id })}
+                  className="flex h-7 w-full items-center gap-2 rounded-md pl-[34px] text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink"
+                >
+                  <Plus className="size-3.5" /> Add a note
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  return (
+    <nav className="flex h-full w-full flex-col" aria-label="Workspace">
+      <div className="flex h-12 shrink-0 items-center gap-2 px-3">
+        <Link href="/home" className="flex min-w-0 items-center gap-2 rounded-md">
+          <BlobMark size={22} />
+          <span className="font-display text-[17px] font-bold tracking-[-0.03em]">Blob</span>
+        </Link>
+        <button
+          onClick={onCollapse}
+          className="ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
+          aria-label="Hide sidebar"
+          title="Hide sidebar (Ctrl \)"
+        >
+          <PanelLeftClose className="size-4" />
+        </button>
+      </div>
+
+      <div className="space-y-0.5 px-2">
+        <button
+          onClick={onSearch}
+          className="mb-1.5 flex h-8 w-full items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink-3 shadow-card transition-colors hover:border-line-2 hover:text-ink-2"
+        >
+          <Search className="size-3.5" />
+          Search or jump to…
+          <span className="ml-auto flex gap-0.5">
+            <Kbd>⌘</Kbd>
+            <Kbd>K</Kbd>
+          </span>
+        </button>
+        <NavLink href="/home" icon={<House />} active={pathname === "/home"}>
+          Home
+        </NavLink>
+        <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
+          Tasks
+        </NavLink>
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        {favorites.length > 0 && (
+          <Section title="Favorites">
+            {favorites.map((p) => (
+              <Link
+                key={p.id}
+                href={`/p/${p.id}`}
+                className={cn(
+                  "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:bg-hover hover:text-ink",
+                  pathname === `/p/${p.id}` && "bg-hover font-medium text-ink",
+                )}
+              >
+                <Star className="size-3.5 shrink-0 fill-blob text-blob" />
+                <span className="truncate">{pageTitle(p.title, p.kind)}</span>
+              </Link>
+            ))}
+          </Section>
+        )}
+
+        <Section title="Subjects" action={<NewSubjectButton />}>
+          {subjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">Add your school subjects to keep things tidy.</p>}
+          {subjects.map(renderSubject)}
+        </Section>
+
+        <Section title="Notes">
+          {unfiled.length === 0 ? (
+            <p className="px-1.5 py-1 text-[12.5px] text-ink-3">Notes without a subject live here.</p>
+          ) : (
+            unfiled.map((p) => renderPage(p, 0))
+          )}
+        </Section>
+      </div>
+
+      <div className="shrink-0 space-y-0.5 border-t border-line px-2 py-2">
+        <div className="mb-1 grid grid-cols-2 gap-1">
+          <button
+            onClick={() => newPage("note")}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97]"
+          >
+            <FilePlus2 className="size-3.5" /> New note
+          </button>
+          <button
+            onClick={() => newPage("deck")}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97]"
+          >
+            <Presentation className="size-3.5" /> New deck
+          </button>
+        </div>
+        <NavLink href="/trash" icon={<Trash2 />} active={pathname === "/trash"}>
+          Trash
+        </NavLink>
+        <AccountMenu name={profile.full_name} email={email} theme={profile.theme} onTheme={(t) => setProfile({ theme: t })} />
+      </div>
+    </nav>
+  );
+}
+
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="mb-3">
+      <div className="group flex h-6 items-center px-1.5">
+        <span className="text-[11.5px] font-medium text-ink-3">{title}</span>
+        <span className="ml-auto opacity-0 transition-opacity group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100">{action}</span>
+      </div>
+      <div className="space-y-px">{children}</div>
+    </div>
+  );
+}
+
+function NavLink({ href, icon, active, children }: { href: string; icon: ReactNode; active?: boolean; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink [&_svg]:size-4 [&_svg]:text-ink-3",
+        active && "bg-hover font-medium text-ink [&_svg]:text-ink",
+      )}
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+function NewSubjectButton() {
+  const { createSubject } = useWorkspace();
+  const [name, setName] = useState("");
+  return (
+    <Popover
+      align="end"
+      trigger={(props) => (
+        <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink" aria-label="Add subject" title="Add subject">
+          <Plus className="size-3.5" />
+        </button>
+      )}
+      className="w-[240px] p-2"
+    >
+      {(close) => (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            const colors = ["sky", "clay", "moss", "plum", "sand", "rose", "teal"] as const;
+            await createSubject({ name, color: colors[Math.floor(Math.random() * colors.length)] });
+            setName("");
+            close();
+          }}
+        >
+          <div className="mb-1.5 px-0.5 text-[12px] font-medium text-ink-2">New subject</div>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Chemistry"
+            maxLength={60}
+            className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
+          />
+        </form>
+      )}
+    </Popover>
+  );
+}
+
+function AccountMenu({ name, email, theme, onTheme }: { name: string | null; email: string; theme: Theme; onTheme: (t: Theme) => void }) {
+  const router = useRouter();
+  const initial = (name || email || "?").trim()[0]?.toUpperCase();
+
+  function pick(t: Theme) {
+    applyTheme(t);
+    onTheme(t);
+  }
+
+  async function signOut() {
+    await createClient().auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
+
+  return (
+    <Popover
+      side="top"
+      align="start"
+      className="w-[244px]"
+      trigger={(props) => (
+        <button {...props} className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
+          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium leading-tight">{name || "You"}</span>
+            <span className="block truncate text-[11.5px] leading-tight text-ink-3">{email}</span>
+          </span>
+          <Ellipsis className="size-4 text-ink-3" />
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          <MenuLabel>Theme</MenuLabel>
+          <div className="mx-1 mb-1 grid grid-cols-3 gap-0.5 rounded-lg bg-paper p-0.5">
+            {(
+              [
+                ["light", <Sun key="l" />, "Light"],
+                ["dark", <Moon key="d" />, "Dark"],
+                ["system", <Monitor key="s" />, "Auto"],
+              ] as const
+            ).map(([value, icon, label]) => (
+              <button
+                key={value}
+                onClick={() => pick(value)}
+                className={cn(
+                  "flex h-7 items-center justify-center gap-1 rounded-md text-[12px] text-ink-3 transition-colors [&_svg]:size-3.5",
+                  theme === value ? "bg-raised font-medium text-ink shadow-card" : "hover:text-ink",
+                )}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+          <MenuSeparator />
+          <MenuItem icon={<Settings />} onSelect={() => (close(), router.push("/settings"))}>
+            Settings
+          </MenuItem>
+          <MenuItem icon={<LogOut />} onSelect={signOut}>
+            Sign out
+          </MenuItem>
+        </>
+      )}
+    </Popover>
+  );
+}
