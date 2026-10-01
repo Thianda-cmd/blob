@@ -19,7 +19,7 @@ function makeBurst(id: number, size: number): Burst {
 }
 
 /**
- * A jelly checkbox: the box squishes, an orange fill pops in with a little overshoot,
+ * A jelly checkbox: the box squishes, a purple fill pops in with a little overshoot,
  * the tick draws itself and a few droplets splash out.
  */
 export function TaskCheckbox({

@@ -20,7 +20,7 @@ export const LAYOUTS: { id: SlideLayout; label: string; hint: string }[] = [
 export const THEMES: { id: DeckTheme; label: string; hint: string }[] = [
   { id: "paper", label: "Paper", hint: "Light and calm" },
   { id: "ink", label: "Ink", hint: "Dark, high contrast" },
-  { id: "blob", label: "Blob", hint: "Bold and orange" },
+  { id: "blob", label: "Blob", hint: "Bold and purple" },
 ];
 
 /** Fixed slide palettes. Slides are content, so they never follow the app's light/dark mode. */
@@ -34,7 +34,7 @@ export const THEME_COLORS: Record<
     fg: "#1c1b18",
     fg2: "#55534c",
     fg3: "#8b8981",
-    accent: "#ff6a2b",
+    accent: "#6d3df5",
     line: "#e3e0d6",
     panel: "#eeebe2",
   },
@@ -44,12 +44,12 @@ export const THEME_COLORS: Record<
     fg: "#f1efe8",
     fg2: "#aeaca3",
     fg3: "#76746c",
-    accent: "#ff7a3d",
+    accent: "#9a78ff",
     line: "#2e2d29",
     panel: "#22221f",
   },
   blob: {
-    bg: "#ff6a2b",
+    bg: "#6d3df5",
     title: "#ffffff",
     fg: "#1c1b18",
     fg2: "#3b1d0e",

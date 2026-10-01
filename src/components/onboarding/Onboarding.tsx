@@ -5,7 +5,8 @@ import { ArrowLeft, ArrowRight, Check, CircleCheck, FileText, Folder, Plus } fro
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { FormError } from "@/components/auth/FormError";
-import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
+import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
+import { TypedText, useTypewriter } from "@/components/blob/speech";
 import { resetBoot } from "@/components/blob/BlobBoot";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { GooSpinner } from "@/components/blob/GooSpinner";
@@ -92,9 +93,12 @@ export function Onboarding({
     [],
   );
 
-  // A hello hop once everything has painted.
+  // A hello hop and a wave once everything has painted.
   useEffect(() => {
-    const t = setTimeout(() => blobDo((b) => b.jump(0.9)), 450);
+    const t = setTimeout(() => {
+      blobDo((b) => b.jump(0.9));
+      setTimeout(() => blobDo((b) => b.wave()), 500);
+    }, 450);
     return () => {
       clearTimeout(t);
       clearTimeout(flashTimer.current);
@@ -312,8 +316,8 @@ export function Onboarding({
     setPhase("done");
     setFlash("excited");
     setSpeech(`All set${firstName(name) ? `, ${firstName(name)}` : ""}! Let's go!`);
-    blobDo((b) => b.jump(1.2));
-    await sleep(900);
+    blobDo((b) => b.celebrate());
+    await sleep(1100);
     // Play the intro again as we fly into the workspace.
     resetBoot();
     delete document.documentElement.dataset.booted;
@@ -330,6 +334,8 @@ export function Onboarding({
   // --- Render ------------------------------------------------------------------------
   const busy = phase !== "steps";
   const mood: BlobMood = phase === "done" ? "excited" : phase === "creating" ? "thinking" : (flash ?? "happy");
+  const accessory: BlobAccessory | null = phase === "done" ? "cap" : phase === "creating" ? "glasses" : null;
+  const { shown: speechShown, typing } = useTypewriter(speech);
   const chips = [...SUBJECT_PRESETS, ...custom];
 
   let content: ReactNode;
@@ -531,8 +537,8 @@ export function Onboarding({
 
         {/* Phone: Blob sits on top */}
         <div className="mt-6 flex items-end gap-3 lg:hidden">
-          <Blob ref={phoneBlob} size={96} mood={mood} look={gaze} className="shrink-0" />
-          <SpeechBubble text={speech} side="left" />
+          <Blob ref={phoneBlob} size={96} mood={mood} look={gaze} talking={typing} accessory={accessory} className="shrink-0" />
+          <SpeechBubble text={speech} shown={speechShown} side="left" />
         </div>
 
         <div className="flex flex-1 items-center py-8 lg:py-12">
@@ -592,9 +598,9 @@ export function Onboarding({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pb-[2vh]">
           <div className="relative flex flex-col items-center">
             <div className="relative z-10 -mb-14 flex h-[86px] items-end justify-center">
-              <SpeechBubble text={speech} side="bottom" />
+              <SpeechBubble text={speech} shown={speechShown} side="bottom" />
             </div>
-            <Blob ref={deskBlob} size={260} mood={mood} look={gaze} />
+            <Blob ref={deskBlob} size={260} mood={mood} look={gaze} talking={typing} accessory={accessory} />
           </div>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -661,7 +667,7 @@ function Progress({ step, onJump }: { step: number; onJump: (i: number) => void 
   );
 }
 
-function SpeechBubble({ text, side }: { text: string; side: "bottom" | "left" }) {
+function SpeechBubble({ text, shown, side }: { text: string; shown: string; side: "bottom" | "left" }) {
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -677,7 +683,7 @@ function SpeechBubble({ text, side }: { text: string; side: "bottom" | "left" })
         )}
         role="status"
       >
-        {text}
+        <TypedText text={text} shown={shown} />
         {side === "bottom" && (
           <span className="absolute -bottom-[7px] left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-line bg-raised" />
         )}

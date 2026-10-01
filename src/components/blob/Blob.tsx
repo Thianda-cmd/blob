@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useImperativeHandle, useRef, type Ref } from "react";
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { cn } from "@/lib/utils";
 
 export type BlobMood =
@@ -14,6 +14,8 @@ export type BlobMood =
   | "love"
   | "surprised";
 
+export type BlobAccessory = "cap" | "glasses";
+
 export type BlobHandle = {
   /** Hop. `power` 0..1.5 */
   jump: (power?: number) => void;
@@ -23,15 +25,26 @@ export type BlobHandle = {
   poke: (angle?: number, strength?: number) => void;
   /** Shake side to side (errors). */
   shake: () => void;
+  /** Wave hello with the right arm. */
+  wave: () => void;
+  /** Both arms up and a big hop. */
+  celebrate: () => void;
 };
 
 type BlobProps = {
   size?: number;
   mood?: BlobMood;
-  /** Follow the mouse pointer with the eyes. */
+  /** Follow the mouse pointer with the eyes (and look around when it's idle). */
   track?: boolean;
   /** Fixed gaze in -1..1, overrides tracking. */
   look?: { x: number; y: number } | null;
+  /** Move the mouth like it's speaking. Pair with a typing speech bubble. */
+  talking?: boolean;
+  accessory?: BlobAccessory | null;
+  /** Little jelly arms. On by default from 72px up. */
+  arms?: boolean;
+  /** Press-and-hold squish and petting. On by default. */
+  interactive?: boolean;
   className?: string;
   title?: string;
   onClick?: () => void;
@@ -44,15 +57,21 @@ const CX = 100;
 const R = 62;
 const GROUND = 172;
 const BOTTOM = R * 0.8;
-const FACE_Y = GROUND - BOTTOM - 4;
+const BODY_Y = GROUND - BOTTOM;
+const FACE_Y = BODY_Y - 4;
+const MOUTH_Y = FACE_Y + 20;
+const ARM_X = CX + 57;
+const ARM_Y = FACE_Y + 21;
+const INK = "var(--blob-face)";
 
 // One shared pointer listener for every blob on the page.
-const pointer = { x: 0, y: 0, seen: false };
+const pointer = { x: 0, y: 0, seen: false, movedAt: 0 };
 let pointerUsers = 0;
 function onPointerMove(e: PointerEvent) {
   pointer.x = e.clientX;
   pointer.y = e.clientY;
   pointer.seen = true;
+  pointer.movedAt = performance.now();
 }
 
 function smoothPath(xs: Float32Array, ys: Float32Array) {
@@ -72,6 +91,13 @@ function smoothPath(xs: Float32Array, ys: Float32Array) {
   return d + "Z";
 }
 
+/** A talking mouth, `open` 0..1. */
+function mouthPath(open: number) {
+  const w = 9.5 - open * 2.5;
+  const h = 2.5 + open * 11;
+  return `M${CX - w},${MOUTH_Y} Q${CX},${MOUTH_Y - 1.5} ${CX + w},${MOUTH_Y} Q${CX + w * 0.9},${MOUTH_Y + h} ${CX},${MOUTH_Y + h} Q${CX - w * 0.9},${MOUTH_Y + h} ${CX - w},${MOUTH_Y} Z`;
+}
+
 const MOOD_TUNING: Record<BlobMood, { wobble: number; breathe: number; hop: number }> = {
   idle: { wobble: 0.018, breathe: 0.014, hop: 0 },
   happy: { wobble: 0.024, breathe: 0.018, hop: 0 },
@@ -84,23 +110,50 @@ const MOOD_TUNING: Record<BlobMood, { wobble: number; breathe: number; hop: numb
   surprised: { wobble: 0.03, breathe: 0.01, hop: 0 },
 };
 
+/** Arm angles in degrees, [left, right]. 0 points straight out, positive hangs down. */
+const ARM_POSE: Record<BlobMood, [number, number]> = {
+  idle: [56, 56],
+  happy: [38, 38],
+  excited: [-52, -52],
+  thinking: [60, -30],
+  sleepy: [80, 80],
+  worried: [-6, -6],
+  shy: [74, 74],
+  love: [14, 14],
+  surprised: [-64, -64],
+};
+
 export function Blob({
   size = 120,
   mood = "idle",
   track = true,
   look = null,
+  talking = false,
+  accessory = null,
+  arms,
+  interactive = true,
   className,
   title,
   onClick,
   ref,
 }: BlobProps) {
   const id = useId().replace(/:/g, "");
+  const showArms = arms ?? size >= 72;
+  const [reaction, setReaction] = useState<BlobMood | null>(null);
+  const reactionTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const shownMood = reaction ?? mood;
+
   const svgRef = useRef<SVGSVGElement>(null);
   const bodyRef = useRef<SVGPathElement>(null);
   const clipRef = useRef<SVGPathElement>(null);
   const jellyRef = useRef<SVGGElement>(null);
   const faceRef = useRef<SVGGElement>(null);
   const eyesRef = useRef<SVGGElement>(null);
+  const mouthRef = useRef<SVGPathElement>(null);
+  const armLRef = useRef<SVGGElement>(null);
+  const armRRef = useRef<SVGGElement>(null);
+  const capRef = useRef<SVGGElement>(null);
+  const tasselRef = useRef<SVGGElement>(null);
   const shadowRef = useRef<SVGEllipseElement>(null);
 
   // Mutable physics state, never rendered directly.
@@ -115,19 +168,56 @@ export function Blob({
     voff: new Float32Array(N),
     lookX: 0,
     lookY: 0,
+    idleX: 0,
+    idleY: 0,
+    nextIdleLook: 0,
     nextBlink: 0,
     blinkUntil: 0,
     nextHop: 0,
+    armL: 56,
+    armR: 56,
+    vArmL: 0,
+    vArmR: 0,
+    waveUntil: 0,
+    cheerUntil: 0,
+    tassel: 0,
+    vTassel: 0,
+    mouth: 0,
+    pressed: false,
+    pressedAt: 0,
+    pet: 0,
+    petAt: 0,
+    petCooldown: 0,
   });
-  const moodRef = useRef(mood);
+  const moodRef = useRef(shownMood);
   const lookRef = useRef(look);
   const trackRef = useRef(track);
+  const talkingRef = useRef(talking);
+  const firstMood = useRef(true);
 
   useEffect(() => {
-    moodRef.current = mood;
     lookRef.current = look;
     trackRef.current = track;
-  }, [mood, look, track]);
+    talkingRef.current = talking;
+  }, [look, track, talking]);
+
+  // A little "pop" whenever the mood changes, so transitions feel physical.
+  useEffect(() => {
+    moodRef.current = shownMood;
+    if (firstMood.current) {
+      firstMood.current = false;
+      return;
+    }
+    sim.current.vs -= 0.9;
+  }, [shownMood]);
+
+  useEffect(() => () => clearTimeout(reactionTimer.current), []);
+
+  function react(next: BlobMood, ms: number) {
+    clearTimeout(reactionTimer.current);
+    setReaction(next);
+    reactionTimer.current = setTimeout(() => setReaction(null), ms);
+  }
 
   useImperativeHandle(ref, () => ({
     jump(power = 1) {
@@ -144,13 +234,23 @@ export function Blob({
       const st = sim.current;
       for (let i = 0; i < N; i++) {
         const a = -Math.PI / 2 + (i / N) * Math.PI * 2;
-        const near = Math.cos(a - angle);
-        st.voff[i] -= Math.max(0, near) * 1.6 * strength;
+        st.voff[i] -= Math.max(0, Math.cos(a - angle)) * 1.6 * strength;
       }
       st.vs -= 0.9 * strength;
     },
     shake() {
       sim.current.vx += 520;
+    },
+    wave() {
+      sim.current.waveUntil = performance.now() + 1500;
+    },
+    celebrate() {
+      const st = sim.current;
+      st.cheerUntil = performance.now() + 1300;
+      st.vs -= 2.6;
+      setTimeout(() => {
+        if (st.y >= 0) st.vy = -720;
+      }, 80);
     },
   }));
 
@@ -185,6 +285,11 @@ export function Blob({
     st.nextBlink = last + 1500 + Math.random() * 2500;
     st.nextHop = last + 600;
 
+    const spring = (pos: number, vel: number, target: number, k: number, c: number, dt: number) => {
+      vel += (-k * (pos - target) - c * vel) * dt;
+      return [pos + vel * dt, vel] as const;
+    };
+
     function tick(now: number) {
       if (!visible) {
         raf = 0;
@@ -195,12 +300,15 @@ export function Blob({
       t += dt;
       const currentMood = moodRef.current;
       const tune = MOOD_TUNING[currentMood];
+      const isTalking = talkingRef.current;
 
       if ((frame++ & 15) === 0) rect = svg!.getBoundingClientRect();
 
+      const airborne = st.y < -0.5;
+
       if (!reduce) {
         // Excited blobs hop on their own.
-        if (tune.hop && now > st.nextHop && st.y >= 0 && st.vy === 0) {
+        if (tune.hop && now > st.nextHop && st.y >= 0 && st.vy === 0 && !st.pressed) {
           st.vs -= 1.6;
           st.vy = -480 * tune.hop;
           st.nextHop = now + 700 + Math.random() * 500;
@@ -219,17 +327,20 @@ export function Blob({
           }
         }
 
-        // Squash & stretch spring. Airborne → stretch with velocity.
-        const airborne = st.y < -0.5;
+        // Squash & stretch. Airborne stretches with velocity, pressing flattens,
+        // talking adds a gentle bob.
         const breathe = Math.sin(t * (currentMood === "sleepy" ? 1.3 : 2.1)) * tune.breathe;
-        const target = airborne ? Math.max(-0.12, Math.min(0.16, -st.vy / 4200)) : breathe;
-        st.vs += (-340 * (st.s - target) - 11 * st.vs) * dt;
-        st.s += st.vs * dt;
+        const bob = isTalking ? Math.sin(t * 9) * 0.012 : 0;
+        const target = st.pressed
+          ? -0.3
+          : airborne
+            ? Math.max(-0.12, Math.min(0.16, -st.vy / 4200))
+            : breathe + bob;
+        [st.s, st.vs] = spring(st.s, st.vs, target, st.pressed ? 520 : 340, 11, dt);
         st.s = Math.max(-0.42, Math.min(0.4, st.s));
 
         // Horizontal shake spring.
-        st.vx += (-900 * st.x - 14 * st.vx) * dt;
-        st.x += st.vx * dt;
+        [st.x, st.vx] = spring(st.x, st.vx, 0, 900, 14, dt);
 
         // Jelly membrane: springs coupled to their neighbours make waves.
         for (let i = 0; i < N; i++) {
@@ -239,6 +350,31 @@ export function Blob({
           st.voff[i] += a * dt;
         }
         for (let i = 0; i < N; i++) st.off[i] = Math.max(-0.3, Math.min(0.3, st.off[i] + st.voff[i] * dt));
+
+        // Arms: mood pose, plus gestures.
+        const pose = ARM_POSE[currentMood];
+        let tl = pose[0] + Math.sin(t * 2.1) * 3;
+        let tr = pose[1] + Math.sin(t * 2.1 + 0.7) * 3;
+        if (currentMood === "excited") {
+          tl += Math.sin(t * 11) * 14;
+          tr += Math.sin(t * 11 + Math.PI) * 14;
+        }
+        if (airborne) {
+          tl -= 34;
+          tr -= 34;
+        }
+        if (isTalking) tr += Math.sin(t * 5.3) * 12 - 10;
+        if (now < st.waveUntil) tr = -30 + Math.sin(t * 16) * 24;
+        if (now < st.cheerUntil) {
+          tl = -74 + Math.sin(t * 17) * 10;
+          tr = -74 + Math.sin(t * 17 + Math.PI) * 10;
+        }
+        if (st.pressed) {
+          tl = 4;
+          tr = 4;
+        }
+        [st.armL, st.vArmL] = spring(st.armL, st.vArmL, tl, 190, 12, dt);
+        [st.armR, st.vArmR] = spring(st.armR, st.vArmR, tr, 190, 12, dt);
       }
 
       // Body outline.
@@ -251,20 +387,13 @@ export function Blob({
         const cos = Math.cos(a);
         const bottomHalf = sin > 0;
         xs[i] = CX + cos * r * (bottomHalf ? 1.08 : 1);
-        ys[i] = GROUND - BOTTOM + sin * r * (bottomHalf ? 0.8 : 1);
+        ys[i] = BODY_Y + sin * r * (bottomHalf ? 0.8 : 1);
       }
       const d = smoothPath(xs, ys);
       bodyRef.current?.setAttribute("d", d);
       clipRef.current?.setAttribute("d", d);
 
-      const sx = 1 - st.s * 0.62;
-      const sy = 1 + st.s;
-      jellyRef.current?.setAttribute(
-        "transform",
-        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-CX} ${-GROUND})`,
-      );
-
-      // Gaze.
+      // Gaze: a fixed look, the pointer, or idle glances around the room.
       let gx = 0;
       let gy = 0;
       const fixed = lookRef.current;
@@ -276,23 +405,58 @@ export function Blob({
       } else if (fixed) {
         gx = fixed.x;
         gy = fixed.y;
-      } else if (trackRef.current && pointer.seen) {
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height * 0.55;
-        const dx = pointer.x - cx;
-        const dy = pointer.y - cy;
-        const dist = Math.hypot(dx, dy);
-        const k = 1 / (dist + 160);
-        gx = Math.max(-1, Math.min(1, dx * k * 1.25));
-        gy = Math.max(-1, Math.min(1, dy * k * 1.25));
+      } else if (trackRef.current) {
+        if (pointer.seen && now - pointer.movedAt < 2800) {
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height * 0.55;
+          const dx = pointer.x - cx;
+          const dy = pointer.y - cy;
+          const k = 1 / (Math.hypot(dx, dy) + 160);
+          gx = Math.max(-1, Math.min(1, dx * k * 1.25));
+          gy = Math.max(-1, Math.min(1, dy * k * 1.25));
+        } else if (!reduce) {
+          if (now > st.nextIdleLook) {
+            const atYou = Math.random() < 0.35;
+            st.idleX = atYou ? 0 : (Math.random() * 2 - 1) * 0.85;
+            st.idleY = atYou ? 0.05 : (Math.random() * 2 - 1) * 0.5;
+            st.nextIdleLook = now + 1100 + Math.random() * 2600;
+          }
+          gx = st.idleX;
+          gy = st.idleY;
+        }
       }
       const ease = Math.min(1, dt * 9);
       st.lookX += (gx - st.lookX) * ease;
       st.lookY += (gy - st.lookY) * ease;
+
+      // The jelly leans towards what it's looking at.
+      const lean = reduce ? 0 : -st.lookX * 4.5 + st.vx * 0.006;
+      const sx = 1 - st.s * 0.62;
+      const sy = 1 + st.s;
+      jellyRef.current?.setAttribute(
+        "transform",
+        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) skewX(${lean.toFixed(2)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-CX} ${-GROUND})`,
+      );
       faceRef.current?.setAttribute(
         "transform",
-        `translate(${(st.lookX * 11).toFixed(2)} ${(st.lookY * 7).toFixed(2)})`,
+        `translate(${(st.lookX * 11).toFixed(2)} ${(st.lookY * 7).toFixed(2)}) rotate(${(st.lookX * 4).toFixed(2)} ${CX} ${FACE_Y})`,
       );
+      armLRef.current?.setAttribute("transform", `rotate(${st.armL.toFixed(1)} ${ARM_X} ${ARM_Y})`);
+      armRRef.current?.setAttribute("transform", `rotate(${st.armR.toFixed(1)} ${ARM_X} ${ARM_Y})`);
+
+      // Graduation cap rides along with a swinging tassel.
+      if (capRef.current) {
+        // Follow the top of the jelly so the cap never floats off when it wobbles.
+        const dyTop = ys[0] - (BODY_Y - R);
+        capRef.current.setAttribute("transform", `translate(${(st.lookX * 4).toFixed(2)} ${dyTop.toFixed(2)})`);
+        [st.tassel, st.vTassel] = spring(st.tassel, st.vTassel, -lean * 2 + Math.sin(t * 1.7) * 5 - st.vy * 0.03, 60, 3, dt);
+        tasselRef.current?.setAttribute("transform", `rotate(${st.tassel.toFixed(1)} ${CX + 40} 54)`);
+      }
+
+      // Talking mouth.
+      const mouthTarget = isTalking && !reduce ? 0.2 + 0.8 * Math.abs(Math.sin(t * 13.3) * Math.sin(t * 4.9 + 1.3)) : 0;
+      st.mouth += (mouthTarget - st.mouth) * Math.min(1, dt * (isTalking ? 26 : 12));
+      mouthRef.current?.setAttribute("d", mouthPath(st.mouth));
 
       // Blinking.
       if (now > st.nextBlink) {
@@ -301,10 +465,7 @@ export function Blob({
         if (Math.random() < 0.18) st.nextBlink = now + 260; // double blink
       }
       const blink = now < st.blinkUntil ? 0.1 : 1;
-      eyesRef.current?.setAttribute(
-        "transform",
-        `translate(0 ${FACE_Y}) scale(1 ${blink}) translate(0 ${-FACE_Y})`,
-      );
+      eyesRef.current?.setAttribute("transform", `translate(0 ${FACE_Y}) scale(1 ${blink}) translate(0 ${-FACE_Y})`);
 
       // Ground shadow shrinks while airborne.
       const lift = Math.min(1, -st.y / 140);
@@ -333,12 +494,42 @@ export function Blob({
     for (let i = 0; i < N; i++) st.voff[i] += (Math.random() - 0.5) * 0.9;
   }
 
+  // Rubbing the pointer back and forth over Blob counts as petting.
+  function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    if (!interactive || e.pointerType !== "mouse") return;
+    const st = sim.current;
+    const now = performance.now();
+    st.pet = st.pet * Math.exp(-(now - st.petAt) / 500) + Math.hypot(e.movementX, e.movementY);
+    st.petAt = now;
+    if (st.pet > 320 && now > st.petCooldown) {
+      st.pet = 0;
+      st.petCooldown = now + 2400;
+      for (let i = 0; i < N; i++) st.voff[i] += (Math.random() - 0.5) * 1.2;
+      react("love", 1700);
+    }
+  }
+
+  function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    if (!interactive || e.button !== 0) return;
+    const st = sim.current;
+    st.pressed = true;
+    st.pressedAt = performance.now();
+    react("excited", 60_000);
+  }
+
+  function handlePointerUp() {
+    const st = sim.current;
+    if (!st.pressed) return;
+    st.pressed = false;
+    const held = performance.now() - st.pressedAt;
+    st.vs += held > 220 ? 4.2 : 1.6;
+    if (held > 220) setTimeout(() => st.y >= 0 && (st.vy = -560), 40);
+    react("happy", 900);
+  }
+
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const angle = Math.atan2(
-      e.clientY - (rect.top + rect.height * 0.55),
-      e.clientX - (rect.left + rect.width / 2),
-    );
+    const angle = Math.atan2(e.clientY - (rect.top + rect.height * 0.55), e.clientX - (rect.left + rect.width / 2));
     const st = sim.current;
     for (let i = 0; i < N; i++) {
       const a = -Math.PI / 2 + (i / N) * Math.PI * 2;
@@ -349,9 +540,12 @@ export function Blob({
   }
 
   const gradient = `blob-grad-${id}`;
+  const core = `blob-core-${id}`;
   const shine = `blob-shine-${id}`;
   const clip = `blob-clip-${id}`;
-  const rim = `blob-rim-${id}`;
+  const glow = `blob-glow-${id}`;
+  const rimLight = `blob-rimlight-${id}`;
+  const bodyId = `blob-body-${id}`;
 
   return (
     <svg
@@ -359,23 +553,37 @@ export function Blob({
       viewBox="0 0 200 200"
       width={size}
       height={size}
-      className={cn("select-none overflow-visible", onClick && "cursor-pointer", className)}
+      className={cn("select-none overflow-visible", (onClick || interactive) && "cursor-pointer", className)}
       role={title ? "img" : undefined}
       aria-label={title}
       aria-hidden={title ? undefined : true}
       onPointerEnter={handlePointerEnter}
+      onPointerMove={handlePointerMove}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onClick={handleClick}
     >
       <defs>
-        <radialGradient id={gradient} cx="36%" cy="28%" r="78%">
+        {/* User-space gradients so the arms share the body's lighting. */}
+        <radialGradient id={gradient} gradientUnits="userSpaceOnUse" cx={82} cy={80} r={118}>
           <stop offset="0%" style={{ stopColor: "var(--blob-light)" }} />
-          <stop offset="42%" style={{ stopColor: "var(--blob)" }} />
+          <stop offset="40%" style={{ stopColor: "var(--blob)" }} />
           <stop offset="100%" style={{ stopColor: "var(--blob-deep)" }} />
         </radialGradient>
-        <radialGradient id={rim} cx="50%" cy="92%" r="55%">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0.38" />
+        <radialGradient id={core} gradientUnits="userSpaceOnUse" cx={108} cy={134} r={46}>
+          <stop offset="0%" style={{ stopColor: "var(--blob-light)" }} stopOpacity="0.45" />
+          <stop offset="100%" style={{ stopColor: "var(--blob-light)" }} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={glow} cx="50%" cy="92%" r="55%">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.36" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id={rimLight} gradientUnits="userSpaceOnUse" x1={50} y1={60} x2={110} y2={130}>
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
         <linearGradient id={shine} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#fff" stopOpacity="0.95" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0.15" />
@@ -388,11 +596,26 @@ export function Blob({
       <ellipse ref={shadowRef} cx={CX} cy={GROUND + 3} rx={R} ry={7} fill="var(--ink)" opacity={0.16} />
 
       <g ref={jellyRef}>
-        <path ref={bodyRef} fill={`url(#${gradient})`} />
+        {showArms && (
+          <>
+            <g transform={`translate(${CX * 2} 0) scale(-1 1)`}>
+              <g ref={armLRef}>
+                <Arm gradient={gradient} />
+              </g>
+            </g>
+            <g ref={armRRef}>
+              <Arm gradient={gradient} />
+            </g>
+          </>
+        )}
+
+        <path ref={bodyRef} id={bodyId} fill={`url(#${gradient})`} />
 
         <g clipPath={`url(#${clip})`}>
+          {/* light scattered inside the jelly */}
+          <ellipse cx={108} cy={134} rx={46} ry={38} fill={`url(#${core})`} />
           {/* translucent glow at the base, like light passing through jelly */}
-          <ellipse cx={CX} cy={GROUND - 10} rx={R * 0.95} ry={R * 0.5} fill={`url(#${rim})`} />
+          <ellipse cx={CX} cy={GROUND - 10} rx={R * 0.95} ry={R * 0.5} fill={`url(#${glow})`} />
           {/* tiny suspended bubbles */}
           <g fill="#fff">
             <circle cx={CX + 34} cy={GROUND - 30} r={3.2} opacity={0.32}>
@@ -405,7 +628,7 @@ export function Blob({
               <animate attributeName="cy" values={`${GROUND - 14};${GROUND - 40};${GROUND - 14}`} dur="6s" repeatCount="indefinite" />
             </circle>
           </g>
-          {/* inner rim shading */}
+          {/* inner rim shading at the bottom */}
           <path
             d={`M ${CX - R * 1.1} ${GROUND - 4} Q ${CX} ${GROUND + 16} ${CX + R * 1.1} ${GROUND - 4}`}
             stroke="var(--blob-deep)"
@@ -413,40 +636,84 @@ export function Blob({
             fill="none"
             opacity={0.35}
           />
+          {/* glossy rim light along the upper-left edge */}
+          <use href={`#${bodyId}`} fill="none" stroke={`url(#${rimLight})`} strokeWidth={6} opacity={0.75} />
         </g>
 
         {/* glossy highlight */}
         <ellipse
           cx={CX - 26}
-          cy={GROUND - BOTTOM - 38}
+          cy={BODY_Y - 38}
           rx={17}
           ry={8.5}
-          transform={`rotate(-28 ${CX - 26} ${GROUND - BOTTOM - 38})`}
+          transform={`rotate(-28 ${CX - 26} ${BODY_Y - 38})`}
           fill={`url(#${shine})`}
           opacity={0.85}
         />
-        <circle cx={CX - 4} cy={GROUND - BOTTOM - 49} r={3.2} fill="#fff" opacity={0.75} />
+        <circle cx={CX - 4} cy={BODY_Y - 49} r={3.2} fill="#fff" opacity={0.75} />
 
         <g ref={faceRef}>
-          <Face mood={mood} eyesRef={eyesRef} />
+          <Face mood={shownMood} talking={talking} glasses={accessory === "glasses"} eyesRef={eyesRef} mouthRef={mouthRef} />
         </g>
+
+        {accessory === "cap" && (
+          <g ref={capRef}>
+            <GradCap tasselRef={tasselRef} />
+          </g>
+        )}
       </g>
 
-      <MoodExtras mood={mood} />
+      <MoodExtras mood={shownMood} />
     </svg>
   );
 }
 
-function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) {
-  const ink = "#2a1a12";
+function Arm({ gradient }: { gradient: string }) {
+  return (
+    <>
+      <ellipse cx={ARM_X + 15} cy={ARM_Y} rx={18} ry={9.5} fill={`url(#${gradient})`} />
+      <ellipse cx={ARM_X + 21} cy={ARM_Y - 3.6} rx={6.5} ry={2.2} fill="#fff" opacity={0.35} />
+    </>
+  );
+}
+
+function GradCap({ tasselRef }: { tasselRef: Ref<SVGGElement> }) {
+  // Mortarboard tilted a little to one side, sitting on top of the head.
+  return (
+    <g transform={`rotate(-9 ${CX} 60)`}>
+      <path d={`M ${CX - 22} 61 Q ${CX - 22} 74 ${CX} 75 Q ${CX + 22} 74 ${CX + 22} 61 Z`} fill={INK} />
+      <path d={`M ${CX - 44} 56 L ${CX} 42 L ${CX + 44} 56 L ${CX} 70 Z`} fill={INK} />
+      <path d={`M ${CX - 44} 56 L ${CX} 42 L ${CX + 44} 56`} stroke="#fff" strokeOpacity={0.18} strokeWidth={1.5} fill="none" />
+      <circle cx={CX} cy={56} r={2.6} fill="var(--blob-light)" />
+      <g ref={tasselRef}>
+        <path d={`M ${CX} 56 L ${CX + 40} 54 L ${CX + 40} 74`} stroke="var(--blob-light)" strokeWidth={2} fill="none" strokeLinecap="round" />
+        <path d={`M ${CX + 36} 72 L ${CX + 44} 72 L ${CX + 45} 84 L ${CX + 35} 84 Z`} fill="var(--blob-light)" />
+      </g>
+    </g>
+  );
+}
+
+function Face({
+  mood,
+  talking,
+  glasses,
+  eyesRef,
+  mouthRef,
+}: {
+  mood: BlobMood;
+  talking: boolean;
+  glasses: boolean;
+  eyesRef: Ref<SVGGElement>;
+  mouthRef: Ref<SVGPathElement>;
+}) {
   const ex = 22;
   const ey = FACE_Y;
-  const my = FACE_Y + 20;
+  const my = MOUTH_Y;
 
   const openEye = (x: number, scale = 1) => (
     <g key={x}>
-      <ellipse cx={x} cy={ey} rx={7.4 * scale} ry={9.6 * scale} fill={ink} />
-      <circle cx={x + 2.6 * scale} cy={ey - 3.4 * scale} r={2.7 * scale} fill="#fff" />
+      <ellipse cx={x} cy={ey} rx={7.4 * scale} ry={9.6 * scale} fill={INK} />
+      <circle cx={x + 2.6 * scale} cy={ey - 3.4 * scale} r={2.8 * scale} fill="#fff" />
       <circle cx={x - 2.2 * scale} cy={ey + 3.6 * scale} r={1.1 * scale} fill="#fff" opacity={0.7} />
     </g>
   );
@@ -454,23 +721,24 @@ function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) 
   let eyes: React.ReactNode;
   switch (mood) {
     case "excited":
+      eyes = (
+        <g stroke={INK} strokeWidth={4.6} strokeLinecap="round" fill="none">
+          <path d={`M ${CX - ex - 8} ${ey + 3} Q ${CX - ex} ${ey - 8} ${CX - ex + 8} ${ey + 3}`} />
+          <path d={`M ${CX + ex - 8} ${ey + 3} Q ${CX + ex} ${ey - 8} ${CX + ex + 8} ${ey + 3}`} />
+        </g>
+      );
+      break;
     case "happy":
-      eyes =
-        mood === "excited" ? (
-          <g stroke={ink} strokeWidth={4.6} strokeLinecap="round" fill="none">
-            <path d={`M ${CX - ex - 8} ${ey + 3} Q ${CX - ex} ${ey - 8} ${CX - ex + 8} ${ey + 3}`} />
-            <path d={`M ${CX + ex - 8} ${ey + 3} Q ${CX + ex} ${ey - 8} ${CX + ex + 8} ${ey + 3}`} />
-          </g>
-        ) : (
-          <>
-            {openEye(CX - ex, 1.04)}
-            {openEye(CX + ex, 1.04)}
-          </>
-        );
+      eyes = (
+        <>
+          {openEye(CX - ex, 1.06)}
+          {openEye(CX + ex, 1.06)}
+        </>
+      );
       break;
     case "sleepy":
       eyes = (
-        <g stroke={ink} strokeWidth={4} strokeLinecap="round" fill="none">
+        <g stroke={INK} strokeWidth={4} strokeLinecap="round" fill="none">
           <path d={`M ${CX - ex - 7} ${ey + 1} Q ${CX - ex} ${ey + 6} ${CX - ex + 7} ${ey + 1}`} />
           <path d={`M ${CX + ex - 7} ${ey + 1} Q ${CX + ex} ${ey + 6} ${CX + ex + 7} ${ey + 1}`} />
         </g>
@@ -478,7 +746,7 @@ function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) 
       break;
     case "shy":
       eyes = (
-        <g stroke={ink} strokeWidth={4.4} strokeLinecap="round" fill="none">
+        <g stroke={INK} strokeWidth={4.4} strokeLinecap="round" fill="none">
           <path d={`M ${CX - ex - 7} ${ey + 2} L ${CX - ex + 6} ${ey - 1}`} />
           <path d={`M ${CX + ex - 6} ${ey - 1} L ${CX + ex + 7} ${ey + 2}`} />
         </g>
@@ -486,7 +754,7 @@ function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) 
       break;
     case "love":
       eyes = (
-        <g fill="var(--blob-deep)" stroke={ink} strokeWidth={1.2}>
+        <g fill="#ff4d7e" stroke={INK} strokeWidth={1.4}>
           {[CX - ex, CX + ex].map((x) => (
             <path
               key={x}
@@ -499,8 +767,8 @@ function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) 
     case "surprised":
       eyes = (
         <>
-          {openEye(CX - ex, 1.22)}
-          {openEye(CX + ex, 1.22)}
+          {openEye(CX - ex, 1.24)}
+          {openEye(CX + ex, 1.24)}
         </>
       );
       break;
@@ -514,70 +782,86 @@ function Face({ mood, eyesRef }: { mood: BlobMood; eyesRef: Ref<SVGGElement> }) 
   }
 
   let mouth: React.ReactNode;
-  switch (mood) {
-    case "happy":
-    case "love":
-      mouth = (
-        <path
-          d={`M ${CX - 11} ${my - 2} Q ${CX} ${my + 13} ${CX + 11} ${my - 2} Q ${CX} ${my + 3} ${CX - 11} ${my - 2} Z`}
-          fill={ink}
-        />
-      );
-      break;
-    case "excited":
-      mouth = (
-        <g>
+  if (talking) {
+    mouth = (
+      <g>
+        <path ref={mouthRef} d={mouthPath(0)} fill={INK} />
+      </g>
+    );
+  } else {
+    switch (mood) {
+      case "happy":
+      case "love":
+        mouth = <path d={`M ${CX - 11} ${my - 2} Q ${CX} ${my + 13} ${CX + 11} ${my - 2} Q ${CX} ${my + 3} ${CX - 11} ${my - 2} Z`} fill={INK} />;
+        break;
+      case "excited":
+        mouth = (
+          <g>
+            <path d={`M ${CX - 13} ${my - 3} Q ${CX} ${my + 18} ${CX + 13} ${my - 3} Z`} fill={INK} />
+            <path d={`M ${CX - 6} ${my + 6} Q ${CX} ${my + 1} ${CX + 6} ${my + 6} Q ${CX} ${my + 11} ${CX - 6} ${my + 6} Z`} fill="#ff8fb0" />
+          </g>
+        );
+        break;
+      case "thinking":
+        mouth = <path d={`M ${CX - 6} ${my + 2} Q ${CX + 1} ${my - 1} ${CX + 8} ${my - 3}`} stroke={INK} strokeWidth={3.6} strokeLinecap="round" fill="none" />;
+        break;
+      case "sleepy":
+        mouth = <ellipse cx={CX + 2} cy={my + 2} rx={3.4} ry={4} fill={INK} />;
+        break;
+      case "worried":
+        mouth = (
           <path
-            d={`M ${CX - 13} ${my - 3} Q ${CX} ${my + 18} ${CX + 13} ${my - 3} Z`}
-            fill={ink}
+            d={`M ${CX - 10} ${my + 4} Q ${CX - 5} ${my - 1} ${CX} ${my + 3} Q ${CX + 5} ${my + 7} ${CX + 10} ${my + 2}`}
+            stroke={INK}
+            strokeWidth={3.4}
+            strokeLinecap="round"
+            fill="none"
           />
-          <path d={`M ${CX - 6} ${my + 6} Q ${CX} ${my + 1} ${CX + 6} ${my + 6} Q ${CX} ${my + 11} ${CX - 6} ${my + 6} Z`} fill="#ff8f8f" />
-        </g>
-      );
-      break;
-    case "thinking":
-      mouth = <path d={`M ${CX - 6} ${my + 2} Q ${CX + 1} ${my - 1} ${CX + 8} ${my - 3}`} stroke={ink} strokeWidth={3.6} strokeLinecap="round" fill="none" />;
-      break;
-    case "sleepy":
-      mouth = <ellipse cx={CX + 2} cy={my + 2} rx={3.4} ry={4} fill={ink} />;
-      break;
-    case "worried":
-      mouth = (
-        <path
-          d={`M ${CX - 10} ${my + 4} Q ${CX - 5} ${my - 1} ${CX} ${my + 3} Q ${CX + 5} ${my + 7} ${CX + 10} ${my + 2}`}
-          stroke={ink}
-          strokeWidth={3.4}
-          strokeLinecap="round"
-          fill="none"
-        />
-      );
-      break;
-    case "surprised":
-      mouth = <ellipse cx={CX} cy={my + 3} rx={5.5} ry={7} fill={ink} />;
-      break;
-    case "shy":
-      mouth = <path d={`M ${CX - 5} ${my} Q ${CX} ${my + 4} ${CX + 5} ${my}`} stroke={ink} strokeWidth={3.4} strokeLinecap="round" fill="none" />;
-      break;
-    default:
-      mouth = <path d={`M ${CX - 9} ${my} Q ${CX} ${my + 8} ${CX + 9} ${my}`} stroke={ink} strokeWidth={3.8} strokeLinecap="round" fill="none" />;
+        );
+        break;
+      case "surprised":
+        mouth = <ellipse cx={CX} cy={my + 3} rx={5.5} ry={7} fill={INK} />;
+        break;
+      case "shy":
+        mouth = <path d={`M ${CX - 5} ${my} Q ${CX} ${my + 4} ${CX + 5} ${my}`} stroke={INK} strokeWidth={3.4} strokeLinecap="round" fill="none" />;
+        break;
+      default:
+        mouth = <path d={`M ${CX - 9} ${my} Q ${CX} ${my + 8} ${CX + 9} ${my}`} stroke={INK} strokeWidth={3.8} strokeLinecap="round" fill="none" />;
+    }
   }
 
-  const blush = mood === "shy" || mood === "love" ? 0.55 : mood === "happy" || mood === "excited" ? 0.4 : 0.26;
+  const blush = mood === "shy" || mood === "love" ? 0.6 : mood === "happy" || mood === "excited" ? 0.45 : 0.3;
 
   return (
     <>
-      <g fill="#ff4f6d" opacity={blush}>
+      <g fill="#ff5c8a" opacity={blush}>
         <ellipse cx={CX - 37} cy={ey + 14} rx={8} ry={4.6} />
         <ellipse cx={CX + 37} cy={ey + 14} rx={8} ry={4.6} />
       </g>
       {mood === "worried" && (
-        <g stroke={ink} strokeWidth={3.4} strokeLinecap="round">
+        <g stroke={INK} strokeWidth={3.4} strokeLinecap="round">
           <path d={`M ${CX - ex - 8} ${ey - 15} L ${CX - ex + 6} ${ey - 19}`} />
           <path d={`M ${CX + ex - 6} ${ey - 19} L ${CX + ex + 8} ${ey - 15}`} />
         </g>
       )}
+      {mood === "thinking" && (
+        <path d={`M ${CX + ex - 8} ${ey - 17} Q ${CX + ex} ${ey - 21} ${CX + ex + 8} ${ey - 16}`} stroke={INK} strokeWidth={3} strokeLinecap="round" fill="none" />
+      )}
       <g ref={eyesRef}>{eyes}</g>
       {mouth}
+      {glasses && (
+        <g>
+          {[CX - ex, CX + ex].map((x) => (
+            <g key={x}>
+              <circle cx={x} cy={ey} r={14} fill="#fff" fillOpacity={0.14} stroke={INK} strokeWidth={3} />
+              <path d={`M ${x - 7} ${ey - 7} L ${x - 2} ${ey - 10}`} stroke="#fff" strokeOpacity={0.8} strokeWidth={2} strokeLinecap="round" />
+            </g>
+          ))}
+          <path d={`M ${CX - ex + 14} ${ey - 2} Q ${CX} ${ey - 7} ${CX + ex - 14} ${ey - 2}`} stroke={INK} strokeWidth={3} fill="none" />
+          <path d={`M ${CX - ex - 14} ${ey - 3} L ${CX - ex - 26} ${ey - 6}`} stroke={INK} strokeWidth={3} strokeLinecap="round" />
+          <path d={`M ${CX + ex + 14} ${ey - 3} L ${CX + ex + 26} ${ey - 6}`} stroke={INK} strokeWidth={3} strokeLinecap="round" />
+        </g>
+      )}
     </>
   );
 }
@@ -615,7 +899,22 @@ function MoodExtras({ mood }: { mood: BlobMood }) {
       </path>
     );
   }
-  if (mood === "love" || mood === "excited") {
+  if (mood === "love") {
+    return (
+      <g fill="#ff4d7e">
+        {[
+          [44, 58, 0],
+          [158, 50, 0.7],
+        ].map(([x, y, delay]) => (
+          <path key={x} d={`M ${x} ${y + 6} C ${x - 9} ${y} ${x - 5} ${y - 7} ${x} ${y - 2} C ${x + 5} ${y - 7} ${x + 9} ${y} ${x} ${y + 6} Z`} opacity={0}>
+            <animate attributeName="opacity" values="0;1;0" dur="1.8s" begin={`${delay}s`} repeatCount="indefinite" />
+            <animateTransform attributeName="transform" type="translate" values="0 6;0 -12" dur="1.8s" begin={`${delay}s`} repeatCount="indefinite" />
+          </path>
+        ))}
+      </g>
+    );
+  }
+  if (mood === "excited") {
     return (
       <g fill="var(--blob)">
         {[

@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 
 // Fixed palettes so each preview shows its own theme no matter which one is active.
 const PALETTES = {
-  light: { paper: "#f4f3ee", surface: "#fdfcfa", line: "#e3e1d9", ink: "#1c1b18", muted: "#d6d3c9", soft: "#ffeadf" },
-  dark: { paper: "#141413", surface: "#1e1e1c", line: "#302f2b", ink: "#edebe4", muted: "#3c3b36", soft: "#3a2014" },
+  light: { paper: "#f4f3ee", surface: "#fdfcfa", line: "#e3e1d9", ink: "#1c1b18", muted: "#d6d3c9", soft: "#efe9ff" },
+  dark: { paper: "#141413", surface: "#1e1e1c", line: "#302f2b", ink: "#edebe4", muted: "#3c3b36", soft: "#272040" },
 };
 
 const OPTIONS: { value: Theme; label: string; hint: string; icon: LucideIcon }[] = [
@@ -24,7 +24,7 @@ function Mockup({ palette }: { palette: (typeof PALETTES)["light"] }) {
     <div className="absolute inset-0 flex gap-[6%] p-[6%]" style={{ background: p.paper }}>
       <div className="flex w-[26%] flex-col gap-[9%] pt-[4%]">
         <div className="flex items-center gap-[10%]">
-          <span className="aspect-square w-[22%] rounded-full" style={{ background: "#ff6a2b" }} />
+          <span className="aspect-square w-[22%] rounded-full" style={{ background: "#6d3df5" }} />
           <span className="h-[5px] w-[50%] rounded-full" style={{ background: p.ink, opacity: 0.75 }} />
         </div>
         {[78, 60, 70, 52].map((w, i) => (
@@ -41,7 +41,7 @@ function Mockup({ palette }: { palette: (typeof PALETTES)["light"] }) {
         </div>
         <span
           className="absolute bottom-[10%] right-[8%] aspect-[1/0.85] w-[16%] rounded-[50%_50%_46%_46%]"
-          style={{ background: "#ff6a2b", boxShadow: "inset -2px -2px 0 rgb(0 0 0 / 0.12)" }}
+          style={{ background: "#6d3df5", boxShadow: "inset -2px -2px 0 rgb(0 0 0 / 0.12)" }}
         />
       </div>
     </div>

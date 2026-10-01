@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
+import { TypedText, useTypewriter } from "@/components/blob/speech";
 import { BlobMark } from "@/components/blob/BlobMark";
 import Link from "next/link";
 
@@ -33,6 +34,13 @@ export function AuthShell({ children }: { children: ReactNode }) {
   const jump = useCallback(() => blobRef.current?.jump(1), []);
   const shake = useCallback(() => blobRef.current?.shake(), []);
   const api = useMemo(() => ({ setMood, say, look: setGaze, jump, shake }), [say, jump, shake]);
+  const { shown, typing } = useTypewriter(speech);
+
+  // Say hi with a wave when the page opens.
+  useEffect(() => {
+    const t = setTimeout(() => blobRef.current?.wave(), 500);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <Ctx.Provider value={api}>
@@ -64,12 +72,12 @@ export function AuthShell({ children }: { children: ReactNode }) {
                     className="absolute top-[22px] left-1/2 z-10 w-max max-w-[300px] -translate-x-1/2 rounded-2xl border border-line bg-raised px-4 py-2.5 text-center text-[14px] leading-snug text-ink shadow-pop"
                     role="status"
                   >
-                    {speech}
+                    <TypedText text={speech} shown={shown} />
                     <span className="absolute -bottom-[7px] left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-line bg-raised" />
                   </motion.div>
                 )}
               </AnimatePresence>
-              <Blob ref={blobRef} size={300} mood={mood} look={gaze} />
+              <Blob ref={blobRef} size={300} mood={mood} look={gaze} talking={typing} />
             </div>
           </div>
         </div>

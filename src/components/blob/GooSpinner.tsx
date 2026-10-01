@@ -23,7 +23,7 @@ export function GooSpinner({ size = 64, className, label = "Loading" }: { size?:
             <circle key={i} cx="60" cy="60" r={i % 2 ? 8 : 10.5} className="goo-orbit" style={{ animationDelay: `${i * -0.42}s` }} />
           ))}
         </g>
-        <g fill="#2a1a12" className="goo-eyes">
+        <g fill="var(--blob-face)" className="goo-eyes">
           <ellipse cx="53" cy="58" rx="2.6" ry="3.4" />
           <ellipse cx="67" cy="58" rx="2.6" ry="3.4" />
         </g>

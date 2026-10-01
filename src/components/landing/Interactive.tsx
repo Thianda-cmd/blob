@@ -2,13 +2,14 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
+import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
+import { TypedText, useTypewriter } from "@/components/blob/speech";
 
-const MOODS: { mood: BlobMood; line: string }[] = [
-  { mood: "happy", line: "Hi! I'm Blob." },
-  { mood: "excited", line: "I keep your notes safe." },
-  { mood: "thinking", line: "Exam on Friday? Noted." },
-  { mood: "love", line: "Click me, I'm squishy." },
+const MOODS: { mood: BlobMood; line: string; accessory?: BlobAccessory; gesture?: "wave" | "celebrate" }[] = [
+  { mood: "happy", line: "Hi! I'm Blob.", gesture: "wave" },
+  { mood: "thinking", line: "Exam on Friday? Noted.", accessory: "glasses" },
+  { mood: "excited", line: "All homework done. Hooray!", accessory: "cap", gesture: "celebrate" },
+  { mood: "love", line: "Press and hold me. I'm squishy." },
 ];
 
 /** The big hero Blob: follows the cursor, cycles moods, jiggles when clicked. */
@@ -17,11 +18,21 @@ export function HeroBlob() {
   const [i, setI] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setI((n) => (n + 1) % MOODS.length), 3200);
+    const t = setInterval(() => setI((n) => (n + 1) % MOODS.length), 3800);
     return () => clearInterval(t);
   }, []);
 
   const current = MOODS[i];
+  const { shown, typing } = useTypewriter(current.line);
+
+  useEffect(() => {
+    const gesture = MOODS[i].gesture;
+    const t = setTimeout(() => {
+      if (gesture === "wave") ref.current?.wave();
+      if (gesture === "celebrate") ref.current?.celebrate();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [i]);
   return (
     <div className="relative mx-auto grid h-[420px] w-full max-w-[520px] place-items-center lg:h-[520px]">
       <FloatCard className="left-0 top-[12%] -rotate-6" delay={0}>
@@ -52,9 +63,9 @@ export function HeroBlob() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
             transition={{ type: "spring", stiffness: 500, damping: 26 }}
-            className="absolute left-1/2 top-[26px] z-10 w-max -translate-x-1/2 rounded-2xl border border-line bg-raised px-4 py-2 text-[14px] shadow-pop"
+            className="absolute left-1/2 top-[10px] z-10 w-max -translate-x-1/2 rounded-2xl border border-line bg-raised px-4 py-2 text-[14px] shadow-pop"
           >
-            {current.line}
+            <TypedText text={current.line} shown={shown} />
             <span className="absolute -bottom-[7px] left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-line bg-raised" />
           </motion.div>
         </AnimatePresence>
@@ -62,6 +73,8 @@ export function HeroBlob() {
           ref={ref}
           size={360}
           mood={current.mood}
+          accessory={current.accessory ?? null}
+          talking={typing}
           title="Blob, the mascot"
           onClick={() => {
             ref.current?.jump(1.2);

@@ -26,30 +26,54 @@ npm run dev                  # http://localhost:3000
 
 Other scripts: `npm run lint`, `npm run typecheck`, `npm run migrate`.
 
-## Supabase setup (one time)
+## Auth emails (blob.bojes.org)
 
-In the Supabase dashboard:
+Every auth email (confirm sign up, magic link, password reset, email change, invite) uses the branded templates in `supabase/templates/`. Their buttons open `https://blob.bojes.org/auth/confirm?...`, which verifies the link only after a click, so email scanners (common on school accounts) can't use it up, and it works on any device.
 
-1. **Authentication → URL Configuration**
-   - **Site URL**: your production URL, e.g. `https://blob-<team>.vercel.app`
-   - **Redirect URLs**: add `https://blob-<team>.vercel.app/**`, `https://*-<team>.vercel.app/**` (previews) and `http://localhost:3000/**`
-2. **Authentication → Emails → SMTP**: the built-in mailer only sends a few emails per hour. Connect your own SMTP provider (e.g. Resend) before inviting classmates.
-3. Optional, more robust email links: in the email templates, link to
-   `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next=/onboarding` (confirm signup),
-   `...&type=recovery&next=/reset-password` (reset password) and `...&type=magiclink&next=/home` (magic link).
-   These work even when the link is opened in a different browser. The default templates also work.
+`scripts/configure-auth.mjs` applies everything through the Supabase Management API: Site URL, allowed redirect URLs, templates and, optionally, SMTP.
+
+```bash
+# 1. Site URL, redirect URLs and templates (emails still go out through Supabase's built-in mailer)
+SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-auth.mjs
+
+# 2. Once the domain is verified in Resend, send from noreply@blob.bojes.org
+SUPABASE_ACCESS_TOKEN=sbp_... SMTP_PASS=re_... node scripts/configure-auth.mjs
+```
+
+Add `--dry-run` to see what would change. Create the access token at https://supabase.com/dashboard/account/tokens (you can delete it afterwards).
+
+### Sending from @blob.bojes.org with Resend
+
+1. Create an account at https://resend.com (the free plan covers 3,000 emails a month).
+2. **Domains → Add domain**: `blob.bojes.org`, region **EU (Ireland)**.
+3. Add the DNS records Resend shows at IONOS (**Domains & SSL → bojes.org → DNS → Add record**). IONOS host names are relative to `bojes.org`, so they look like this (copy the exact values from Resend):
+
+   | Type | Host name (IONOS) | Value |
+   | --- | --- | --- |
+   | TXT | `resend._domainkey.blob` | `p=MIGf...` (DKIM key from Resend) |
+   | MX | `send.blob` | `feedback-smtp.eu-west-1.amazonses.com`, priority 10 |
+   | TXT | `send.blob` | `v=spf1 include:amazonses.com ~all` |
+   | TXT | `_dmarc.blob` | `v=DMARC1; p=none;` (optional, recommended) |
+
+   These sit under `blob.bojes.org`, so they don't clash with the CNAME that points the site to Vercel.
+4. Press **Verify** in Resend (usually a few minutes).
+5. **API Keys → Create**: permission *Sending access*, domain `blob.bojes.org`. Use the `re_...` key as `SMTP_PASS` above.
+
+Doing it by hand instead? In the Supabase dashboard set **Authentication → URL Configuration** (Site URL `https://blob.bojes.org`, redirect URLs `https://blob.bojes.org/**`, `https://blob-umber.vercel.app/**`, `http://localhost:3000/**`), paste each `supabase/templates/*.html` into **Authentication → Emails → Templates**, and under **SMTP Settings** use host `smtp.resend.com`, port `465`, user `resend`, password = the Resend key, sender `noreply@blob.bojes.org`, name `Blob`.
 
 ## Project layout
 
 ```
-src/app/(auth)        sign in, sign up, password reset, check email
+src/app/(auth)        sign in, sign up, password reset, check email, email link confirmation
 src/app/(app)         the signed-in workspace (home, notes /p/[id], tasks, subjects, settings, trash)
 src/app/present       fullscreen presenter
 src/app/onboarding    first-run flow
-src/app/auth          email link callback and sign out route
+src/app/auth          PKCE callback and sign out route
 src/components/blob   the mascot, intro animation, loaders, helper and event bus
 src/lib/supabase      browser/server/admin clients and the session proxy
 supabase/migrations   SQL schema with row-level security
+supabase/templates     branded auth email templates
+scripts               build-time migrations, auth/email configuration
 ```
 
 All tables use row-level security, so every user can only read and write their own rows. Images go to the `uploads` storage bucket under the user's own folder.

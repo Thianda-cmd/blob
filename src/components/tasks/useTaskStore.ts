@@ -159,9 +159,10 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       if (done) {
         const clearedToday = isDueByToday(before, now) && !ref.current.some((t) => isDueByToday(t, now));
         if (clearedToday) {
-          blob.react("jump", "excited", 2600);
-          setTimeout(() => blob.react("jump", "love", 2600), 700);
-          blob.say(pick(ALL_CLEAR), { mood: "love", ms: 4200 });
+          // Everything due today is done: graduation cap and a victory hop.
+          blob.react("celebrate", "excited", 2600, "cap");
+          setTimeout(() => blob.react("jump", "love", 2600, "cap"), 900);
+          blob.say(pick(ALL_CLEAR), { mood: "love", ms: 4200, accessory: "cap" });
           lastSaid.current = Date.now();
         } else {
           blob.react("jump", "excited");

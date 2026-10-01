@@ -2,10 +2,11 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { FilePlus2, ListPlus, MonitorPlay, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Blob, type BlobHandle, type BlobMood } from "./Blob";
+import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "./Blob";
 import { blob, type BlobEvent } from "./bus";
+import { TypedText, useTypewriter } from "./speech";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { firstName } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const TIPS = [
 /** The little jelly in the corner: reacts to saves, completions and errors, and offers help. */
 export function BlobHelper() {
   const router = useRouter();
+  const pathname = usePathname();
   const { profile, createPage } = useWorkspace();
   const ref = useRef<BlobHandle>(null);
   const [heldMood, setHeldMood] = useState<BlobMood | null>(null);
@@ -30,6 +32,8 @@ export function BlobHelper() {
   const [open, setOpen] = useState(false);
   const [sleepy, setSleepy] = useState(false);
   const [tip, setTip] = useState(0);
+  const [flashAccessory, setFlashAccessory] = useState<BlobAccessory | null>(null);
+  const accessoryTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const speechTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -45,6 +49,11 @@ export function BlobHelper() {
         setFlashMood(e.mood);
         flashTimer.current = setTimeout(() => setFlashMood(null), e.ms ?? 2400);
       }
+      if (e.accessory) {
+        clearTimeout(accessoryTimer.current);
+        setFlashAccessory(e.accessory);
+        accessoryTimer.current = setTimeout(() => setFlashAccessory(null), (e.ms ?? 2400) + 1200);
+      }
       if (e.type === "say") {
         clearTimeout(speechTimer.current);
         setSpeech(e.text);
@@ -56,6 +65,8 @@ export function BlobHelper() {
         if (e.reaction === "squish") r?.squish(1);
         if (e.reaction === "shake") r?.shake();
         if (e.reaction === "poke") r?.poke();
+        if (e.reaction === "wave") r?.wave();
+        if (e.reaction === "celebrate") r?.celebrate();
       }
     });
   }, []);
@@ -69,6 +80,7 @@ export function BlobHelper() {
         if (was) {
           setFlashMood("surprised");
           setTimeout(() => setFlashMood(null), 900);
+          setTimeout(() => ref.current?.wave(), 700);
         }
         return false;
       });
@@ -83,7 +95,18 @@ export function BlobHelper() {
     };
   }, []);
 
+  // Wave hello shortly after the workspace opens.
+  useEffect(() => {
+    const t = setTimeout(() => ref.current?.wave(), 1600);
+    return () => clearTimeout(t);
+  }, []);
+
+  const { shown, typing } = useTypewriter(speech && !open ? speech : null);
+
   if (!profile.blob_tips) return null;
+
+  // Reading glasses while you're studying a note or presentation.
+  const accessory: BlobAccessory | null = flashAccessory ?? (pathname.startsWith("/p/") ? "glasses" : null);
 
   const mood: BlobMood = flashMood ?? heldMood ?? (sleepy ? "sleepy" : open ? "happy" : "idle");
   const name = firstName(profile.full_name);
@@ -148,7 +171,7 @@ export function BlobHelper() {
             role="status"
             aria-live="polite"
           >
-            {speech}
+            <TypedText text={speech} shown={shown} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -156,8 +179,10 @@ export function BlobHelper() {
       <div className="pointer-events-auto">
         <Blob
           ref={ref}
-          size={68}
+          size={78}
           mood={mood}
+          talking={typing}
+          accessory={accessory}
           title="Blob, your helper"
           onClick={() => {
             setOpen((o) => !o);

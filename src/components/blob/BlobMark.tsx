@@ -16,9 +16,9 @@ export function BlobMark({ size = 22, className }: { size?: number; className?: 
         fill="url(#blobmark-g)"
       />
       <ellipse cx="11.2" cy="10.4" rx="3" ry="1.5" transform="rotate(-28 11.2 10.4)" fill="#fff" opacity=".8" />
-      <ellipse cx="12.6" cy="16.8" rx="1.35" ry="1.75" fill="#2a1a12" />
-      <ellipse cx="19.4" cy="16.8" rx="1.35" ry="1.75" fill="#2a1a12" />
-      <path d="M14.3 20.3q1.7 1.4 3.4 0" stroke="#2a1a12" strokeWidth="1.1" strokeLinecap="round" fill="none" />
+      <ellipse cx="12.6" cy="16.8" rx="1.35" ry="1.75" fill="var(--blob-face)" />
+      <ellipse cx="19.4" cy="16.8" rx="1.35" ry="1.75" fill="var(--blob-face)" />
+      <path d="M14.3 20.3q1.7 1.4 3.4 0" stroke="var(--blob-face)" strokeWidth="1.1" strokeLinecap="round" fill="none" />
     </svg>
   );
 }

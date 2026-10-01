@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Your Blob sign-in link</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f4f3ee;-webkit-text-size-adjust:100%;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your one-time link to sign in to Blob.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f3ee;">
+      <tr>
+        <td align="center" style="padding:36px 16px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+            <tr>
+              <td style="padding:0 8px 14px;">
+                <img src="{{ .SiteURL }}/email/blob.png" width="105" height="79" alt="Blob" style="display:block;border:0;outline:none;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border:1px solid #e3e1d9;border-radius:16px;padding:32px 32px 28px;">
+                <h1 style="margin:0 0 10px;font:700 24px/1.25 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:-0.4px;color:#1c1b18;">Sign in to Blob</h1>
+                <p style="margin:0 0 24px;font:400 15px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#4b4a44;">{{ if .Data.full_name }}Hi {{ .Data.full_name }}!{{ else }}Hi there!{{ end }} Here's your sign-in link. It works once and expires soon.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;">
+            <tr>
+              <td style="border-radius:10px;background:#6d3df5;">
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fhome" target="_blank" style="display:inline-block;padding:13px 22px;font:600 15px/1 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#ffffff;text-decoration:none;border-radius:10px;">Sign in to Blob &rarr;</a>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:22px 0 0;font:400 12.5px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#8b8981;">
+            Button not working? Paste this link into your browser:<br />
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fhome" target="_blank" style="color:#5a2bd6;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fhome</a>
+          </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 10px 0;font:400 12px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#8b8981;">
+                Didn't ask to sign in? You can ignore this email. Your account is safe.<br />
+                <span style="color:#5a2bd6;font-weight:600;">Blob</span> &middot; your school, saved &middot;
+                <a href="{{ .SiteURL }}" target="_blank" style="color:#8b8981;">blob.bojes.org</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

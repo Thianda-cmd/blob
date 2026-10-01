@@ -51,9 +51,9 @@ export function NoteCard({ page, preview, parent, now }: { page: PageMeta; previ
 }
 
 const SLIDE_THEMES: Record<DeckTheme, { bg: string; fg: string; accent: string }> = {
-  paper: { bg: "#f4f3ee", fg: "#1c1b18", accent: "#ff6a2b" },
-  ink: { bg: "#1c1b18", fg: "#f4f3ee", accent: "#ff7a3d" },
-  blob: { bg: "#ff6a2b", fg: "#ffffff", accent: "#1c1b18" },
+  paper: { bg: "#f4f3ee", fg: "#1c1b18", accent: "#6d3df5" },
+  ink: { bg: "#1c1b18", fg: "#f4f3ee", accent: "#9a78ff" },
+  blob: { bg: "#6d3df5", fg: "#ffffff", accent: "#1c1b18" },
 };
 
 /** A tiny 16:9 rendering of the first slide. */
