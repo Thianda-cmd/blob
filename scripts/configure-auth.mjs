@@ -3,6 +3,7 @@
 //
 //   SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-auth.mjs            # apply
 //   SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-auth.mjs --dry-run  # show what would change
+//   ... --rotate-smtp-pass                                                     # also replace the stored SMTP password
 //
 // Create the access token at https://supabase.com/dashboard/account/tokens.
 // SMTP is applied when SMTP_PASS is set (for Resend: SMTP_PASS = a Resend API key).
@@ -85,7 +86,12 @@ if (!current.ok) {
 }
 const before = await current.json();
 
-const changed = Object.keys(config).filter((k) => JSON.stringify(before[k]) !== JSON.stringify(config[k]));
+// Supabase never returns the stored SMTP password, so only count it when SMTP is being set up or moved.
+const smtpMoving = !before.smtp_host || before.smtp_host !== config.smtp_host || before.smtp_user !== config.smtp_user;
+const changed = Object.keys(config).filter((k) => {
+  if (k === "smtp_pass") return smtpMoving || process.argv.includes("--rotate-smtp-pass");
+  return JSON.stringify(before[k]) !== JSON.stringify(config[k]);
+});
 console.log(`Project ${ref}`);
 console.log(`  site_url: ${before.site_url}  ->  ${config.site_url}`);
 console.log(`  smtp:     ${before.smtp_host ? `${before.smtp_host} as ${before.smtp_admin_email}` : "built-in mailer"}  ->  ${config.smtp_host ? `${config.smtp_host} as ${config.smtp_admin_email}` : "unchanged"}`);

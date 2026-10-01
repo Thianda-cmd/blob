@@ -40,7 +40,7 @@ SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-auth.mjs
 SUPABASE_ACCESS_TOKEN=sbp_... SMTP_PASS=re_... node scripts/configure-auth.mjs
 ```
 
-Add `--dry-run` to see what would change. Create the access token at https://supabase.com/dashboard/account/tokens (you can delete it afterwards).
+Add `--dry-run` to see what would change, and `--rotate-smtp-pass` after creating a new Resend key. Create the access token at https://supabase.com/dashboard/account/tokens (you can delete it afterwards).
 
 ### Sending from @blob.bojes.org with Resend
 
@@ -53,7 +53,7 @@ Add `--dry-run` to see what would change. Create the access token at https://sup
    | TXT | `resend._domainkey.blob` | `p=MIGf...` (DKIM key from Resend) |
    | MX | `send.blob` | `feedback-smtp.eu-west-1.amazonses.com`, priority 10 |
    | TXT | `send.blob` | `v=spf1 include:amazonses.com ~all` |
-   | TXT | `_dmarc.blob` | `v=DMARC1; p=none;` (optional, recommended) |
+   | TXT | `_dmarc.blob` | `v=DMARC1; p=none;` (optional: without it, the `_dmarc.bojes.org` policy applies) |
 
    These sit under `blob.bojes.org`, so they don't clash with the CNAME that points the site to Vercel.
 4. Press **Verify** in Resend (usually a few minutes).
