@@ -68,7 +68,36 @@ export type Task = {
 
 // Presentations ---------------------------------------------------------------
 
-export type SlideLayout = "title" | "bullets" | "split" | "quote" | "image" | "big";
+export type SlideLayout =
+  | "title"
+  | "section"
+  | "agenda"
+  | "bullets"
+  | "split"
+  | "media"
+  | "image"
+  | "cover"
+  | "columns"
+  | "compare"
+  | "steps"
+  | "timeline"
+  | "stats"
+  | "big"
+  | "quote"
+  | "formula"
+  | "closing";
+
+/** One card in a structured layout: a column, a step, a stat or a timeline event. */
+export type SlideItem = { head: string; text: string };
+
+/** How a slide appears. "morph" glides matching elements (title, image, …) from the previous slide. */
+export type SlideTransition = "none" | "fade" | "slide" | "push" | "zoom" | "morph";
+
+/** How list items, steps, stats and formula lines appear one click at a time. */
+export type SlideBuild = "none" | "fade-up" | "pop" | "wipe";
+
+/** Per-slide background: the accent colour, the theme inverted, or any #rrggbb colour. */
+export type SlideBackground = "accent" | "inverse" | `#${string}`;
 
 export type Slide = {
   id: string;
@@ -77,11 +106,67 @@ export type Slide = {
   body: string;
   image: string | null;
   notes: string;
+  /** Columns, compare, steps, timeline and stats. */
+  items: SlideItem[];
+  /** Formula slides: one equation per line, in the learning center's display language. */
+  math: string;
+  /** null follows the deck default. */
+  transition: SlideTransition | null;
+  build: SlideBuild;
+  /** null follows the theme. */
+  background: SlideBackground | null;
 };
 
-export type DeckTheme = "paper" | "ink" | "blob";
+export type DeckPreset = "paper" | "ink" | "blob" | "studio" | "editorial" | "sage" | "midnight" | "chalk" | "mono" | "dusk";
+export type DeckTheme = DeckPreset | "custom";
+
+export type DeckFont =
+  | "bricolage"
+  | "geist"
+  | "inter"
+  | "dm-sans"
+  | "space"
+  | "fraunces"
+  | "instrument"
+  | "playfair"
+  | "source-serif"
+  | "lora"
+  | "mono";
+
+export type DeckBackdrop = "solid" | "gradient" | "glow" | "dots" | "grid";
+
+/** A complete theme. Presets are specs too; a custom theme is stored on the deck. Colours are #rrggbb. */
+export type DeckThemeSpec = {
+  bg: string;
+  /** Second colour for the gradient backdrop. */
+  bg2: string;
+  backdrop: DeckBackdrop;
+  text: string;
+  title: string;
+  accent: string;
+  headingFont: DeckFont;
+  bodyFont: DeckFont;
+};
+
+/**
+ * What is stored in `pages.content`. Version 1 decks only had `theme` and slides with the
+ * first six fields, so everything added later is optional here; normalizeDeck fills it in.
+ */
+export type StoredSlide = Pick<Slide, "id" | "layout" | "title" | "body" | "image" | "notes"> & Partial<Slide>;
 
 export type DeckContent = {
   theme: DeckTheme;
+  /** The deck's own theme, used when `theme` is "custom" (kept when you switch back to a preset). */
+  custom?: DeckThemeSpec | null;
+  /** Default transition for slides that don't pick their own. */
+  transition?: SlideTransition;
+  slides: StoredSlide[];
+};
+
+/** A deck after normalizeDeck: every field present and valid. */
+export type Deck = {
+  theme: DeckTheme;
+  custom: DeckThemeSpec | null;
+  transition: SlideTransition;
   slides: Slide[];
 };

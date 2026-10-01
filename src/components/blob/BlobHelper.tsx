@@ -103,7 +103,8 @@ export function BlobHelper() {
 
   const { shown, typing } = useTypewriter(speech && !open ? speech : null);
 
-  if (!profile.blob_tips) return null;
+  // On learning pages Blob is already on screen as the tutor; one Blob at a time.
+  if (!profile.blob_tips || pathname.startsWith("/learn")) return null;
 
   // Reading glasses while you're studying a note or presentation.
   const accessory: BlobAccessory | null = flashAccessory ?? (pathname.startsWith("/p/") ? "glasses" : null);

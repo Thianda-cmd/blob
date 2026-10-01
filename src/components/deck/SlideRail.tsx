@@ -4,15 +4,15 @@ import { Copy, Plus, Trash2 } from "lucide-react";
 import { motion, Reorder } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Popover } from "@/components/ui/Menu";
-import type { DeckTheme, Slide, SlideLayout } from "@/lib/types";
+import type { Slide, SlideLayout } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { LAYOUTS } from "./deck";
+import { LAYOUT_GROUPS, LAYOUTS, type Palette } from "./deck";
 import { LayoutGlyph } from "./LayoutGlyph";
 import { SlideView } from "./SlideView";
 
 const THUMB_W = 150;
 
-/** Popover with a visual grid of layouts. */
+/** Popover with a visual grid of layouts, grouped. */
 export function AddSlideMenu({
   onAdd,
   trigger,
@@ -25,29 +25,33 @@ export function AddSlideMenu({
   align?: "start" | "end";
 }) {
   return (
-    <Popover side={side} align={align} className="w-[300px] p-2" trigger={trigger}>
+    <Popover side={side} align={align} className="w-[392px] p-2" trigger={trigger}>
       {(close) => (
-        <>
-          <div className="px-1 pb-2 text-[12px] font-medium text-ink-3">Add a slide</div>
-          <div className="grid grid-cols-3 gap-1">
-            {LAYOUTS.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                role="menuitem"
-                title={l.hint}
-                onClick={() => {
-                  onAdd(l.id);
-                  close();
-                }}
-                className="group rounded-lg p-1.5 text-left transition-colors hover:bg-hover focus-visible:bg-hover"
-              >
-                <LayoutGlyph layout={l.id} className="group-hover:border-line-2" />
-                <div className="mt-1.5 truncate text-[12px] text-ink-2 group-hover:text-ink">{l.label}</div>
-              </button>
-            ))}
-          </div>
-        </>
+        <div className="space-y-1.5">
+          {LAYOUT_GROUPS.map((g) => (
+            <div key={g.id}>
+              <div className="px-1.5 pb-1 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{g.label}</div>
+              <div className="grid grid-cols-5 gap-0.5">
+                {LAYOUTS.filter((l) => l.group === g.id).map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    role="menuitem"
+                    title={l.hint}
+                    onClick={() => {
+                      onAdd(l.id);
+                      close();
+                    }}
+                    className="group rounded-lg p-1.5 text-left transition-colors hover:bg-hover focus-visible:bg-hover"
+                  >
+                    <LayoutGlyph layout={l.id} className="group-hover:border-line-2" />
+                    <div className="mt-1 truncate text-[11.5px] text-ink-2 group-hover:text-ink">{l.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </Popover>
   );
@@ -56,7 +60,8 @@ export function AddSlideMenu({
 export function SlideRail({
   className = "flex",
   slides,
-  theme,
+  palette,
+  sections,
   selectedId,
   onSelect,
   onReorder,
@@ -68,7 +73,8 @@ export function SlideRail({
 }: {
   className?: string;
   slides: Slide[];
-  theme: DeckTheme;
+  palette: Palette;
+  sections: Map<string, number>;
   selectedId: string;
   onSelect: (id: string) => void;
   onReorder: (slides: Slide[]) => void;
@@ -182,7 +188,8 @@ export function SlideRail({
                 >
                   <SlideView
                     slide={slide}
-                    theme={theme}
+                    palette={palette}
+                    ordinal={sections.get(slide.id)}
                     mode="thumb"
                     width={THUMB_W}
                     frameClassName="rounded-[7px] ring-1 ring-ink/10 dark:ring-white/12"

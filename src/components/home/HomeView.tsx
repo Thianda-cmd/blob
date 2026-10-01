@@ -16,6 +16,8 @@ import { useNow } from "@/components/tasks/useNow";
 import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { subjectColor } from "@/lib/subjects";
+import { LearnSnapshot } from "@/learn/components/LearnSnapshot";
+import type { LearnDay, TopicProgress } from "@/learn/progress";
 import type { PageMeta, Task } from "@/lib/types";
 import { cn, firstName, greeting, pageTitle } from "@/lib/utils";
 import { formatDistanceStrict } from "date-fns";
@@ -30,11 +32,13 @@ export function HomeView({
   previews,
   openTasks,
   openTotal,
+  learn,
 }: {
   tasks: Task[];
   previews: Record<string, PagePreview>;
   openTasks: Record<string, number>;
   openTotal: number;
+  learn: { progress: Record<string, TopicProgress>; days: LearnDay[] };
 }) {
   const router = useRouter();
   const now = useNow();
@@ -122,6 +126,18 @@ export function HomeView({
             <motion.section initial="hidden" animate="shown" variants={rise} custom={4} className="min-w-0">
               <SectionTitle>Coming up</SectionTitle>
               <UpcomingTasks initialTasks={tasks} limit={7} days={7} />
+              <div className="mt-7">
+                <SectionTitle
+                  action={
+                    <Link href="/learn" className="text-[12.5px] font-medium text-ink-3 hover:text-ink">
+                      All topics
+                    </Link>
+                  }
+                >
+                  Keep learning
+                </SectionTitle>
+                <LearnSnapshot progress={learn.progress} days={learn.days} />
+              </div>
             </motion.section>
           </div>
 

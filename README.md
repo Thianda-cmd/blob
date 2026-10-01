@@ -9,7 +9,8 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 a
 - **Auth**: sign up with email confirmation, password sign-in, magic links, forgot/reset password, change email/password, sign out everywhere, delete account. Blob watches you type and covers its eyes for passwords.
 - **Onboarding**: name, school, subjects and theme in three steps; creates a welcome note and a first task.
 - **Notes**: Tiptap editor with `/` commands, formatting bubble, checklists, callouts, images (paste/drop/upload), sub-pages, outline, autosave.
-- **Presentations**: slide editor with six layouts, three themes, drag-to-reorder, speaker notes, and a fullscreen presenter (`/present/[id]`).
+- **Learning center** (`/learn`): 12 maths topics (Klammern auflösen, Ausmultiplizieren, Formeln umstellen, Bruchrechnung, Potenzen und Wurzeln, Prozentrechnung, Gleichungen und Ungleichungen, Lineare Gleichungssysteme, pq-Formel, Geraden, Textaufgaben, Textaufgaben mit Unbekannten). Each has a guided lesson with Blob as tutor (animated step-by-step boards, interactive widgets, checks), endless adaptive practice in three levels, a graded quick test and a printable cheat sheet. XP, daily goal, streaks and mastery are saved per topic.
+- **Presentations**: 17 layouts (incl. stats, timeline, compare, formula), 10 themes plus a custom theme editor, slide transitions (incl. morph), click-by-click builds, drag-to-reorder, and a presenter (`/present/[id]`) with speaker view, second window, overview, laser and black/white screen.
 - **Tasks**: quick add with natural dates (`Bio test fri #biology`), groups by due date, two-week heatmap, jelly check-off animation.
 - **Subjects**, **favorites**, **trash** with restore, **⌘K** search across titles and note contents, light/dark/system themes.
 - **Animations**: a physics-driven SVG mascot (squash and stretch, jiggle, eye tracking, moods), a gooey intro animation once per session, gooey loaders.
@@ -67,6 +68,8 @@ Doing it by hand instead? In the Supabase dashboard set **Authentication → URL
 src/app/(auth)        sign in, sign up, password reset, check email, email link confirmation
 src/app/(app)         the signed-in workspace (home, notes /p/[id], tasks, subjects, settings, trash)
 src/app/present       fullscreen presenter
+src/app/study         full-screen lessons, practice and tests
+src/learn             learning center: engine (maths parser, checker, display language), players, topics
 src/app/onboarding    first-run flow
 src/app/auth          PKCE callback and sign out route
 src/components/blob   the mascot, intro animation, loaders, helper and event bus
@@ -75,5 +78,9 @@ supabase/migrations   SQL schema with row-level security
 supabase/templates     branded auth email templates
 scripts               build-time migrations, auth/email configuration
 ```
+
+### Adding a learning topic
+
+Topic metadata lives in `src/learn/catalog.ts`; the content (lesson, cheat sheet and the seeded exercise generator) is one file per topic in `src/learn/topics/`. Maths is written in a small display language (`src/learn/engine/display.ts`) where tokens keep keys, so they glide between the steps of a worked solution. All student-facing text sits in those files, ready for translation.
 
 All tables use row-level security, so every user can only read and write their own rows. Images go to the `uploads` storage bucket under the user's own folder.

@@ -29,6 +29,8 @@ export type BlobHandle = {
   wave: () => void;
   /** Both arms up and a big hop. */
   celebrate: () => void;
+  /** Stretch the right arm out towards something on the right (a board, an answer). */
+  point: () => void;
 };
 
 type BlobProps = {
@@ -48,8 +50,24 @@ type BlobProps = {
   className?: string;
   title?: string;
   onClick?: () => void;
+  /** Form out of falling jelly droplets when it mounts (the app intro). */
+  intro?: boolean;
+  /** Called once the droplets have merged into Blob. */
+  onFormed?: () => void;
   ref?: Ref<BlobHandle>;
 };
+
+// Droplets for the intro: x offset, radius, delay (ms). Bigger drops grow the body more.
+const INTRO_DROPS = [
+  { dx: -6, r: 19, delay: 0 },
+  { dx: 30, r: 13, delay: 240 },
+  { dx: -34, r: 15, delay: 400 },
+  { dx: 14, r: 12, delay: 540 },
+  { dx: -16, r: 11, delay: 660 },
+];
+const INTRO_TOTAL = INTRO_DROPS.reduce((sum, d) => sum + d.r * d.r, 0);
+
+type Drop = { x: number; y: number; vy: number; r: number; fromX: number; fromY: number; startAt: number; mergeAt: number; state: 0 | 1 | 2 | 3; share: number };
 
 // Geometry (viewBox 0 0 200 200)
 const N = 12;
@@ -90,6 +108,20 @@ function smoothPath(xs: Float32Array, ys: Float32Array) {
   }
   return d + "Z";
 }
+
+/** The outline at rest, used for the server render before the physics loop starts. */
+const REST_PATH = (() => {
+  const xs = new Float32Array(N);
+  const ys = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = -Math.PI / 2 + (i / N) * Math.PI * 2;
+    const bottomHalf = Math.sin(a) > 0;
+    xs[i] = CX + Math.cos(a) * R * (bottomHalf ? 1.08 : 1);
+    ys[i] = BODY_Y + Math.sin(a) * R * (bottomHalf ? 0.8 : 1);
+  }
+  return smoothPath(xs, ys);
+})();
+const HIDDEN = `translate(${CX} ${GROUND}) scale(0) translate(${-CX} ${-GROUND})`;
 
 /** A talking mouth, `open` 0..1. */
 function mouthPath(open: number) {
@@ -135,13 +167,17 @@ export function Blob({
   className,
   title,
   onClick,
+  intro = false,
+  onFormed,
   ref,
 }: BlobProps) {
   const id = useId().replace(/:/g, "");
+  const gooId = `blob-goo-${id}`;
   const showArms = arms ?? size >= 72;
   const [reaction, setReaction] = useState<BlobMood | null>(null);
   const reactionTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const shownMood = reaction ?? mood;
+  const [forming, setForming] = useState(intro);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const bodyRef = useRef<SVGPathElement>(null);
@@ -152,6 +188,10 @@ export function Blob({
   const mouthRef = useRef<SVGPathElement>(null);
   const armLRef = useRef<SVGGElement>(null);
   const armRRef = useRef<SVGGElement>(null);
+  const gooRef = useRef<SVGGElement>(null);
+  const dropRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const introRef = useRef(intro);
+  const onFormedRef = useRef(onFormed);
   const capRef = useRef<SVGGElement>(null);
   const tasselRef = useRef<SVGGElement>(null);
   const shadowRef = useRef<SVGEllipseElement>(null);
@@ -179,6 +219,7 @@ export function Blob({
     vArmL: 0,
     vArmR: 0,
     waveUntil: 0,
+    pointUntil: 0,
     cheerUntil: 0,
     tassel: 0,
     vTassel: 0,
@@ -188,12 +229,25 @@ export function Blob({
     pet: 0,
     petAt: 0,
     petCooldown: 0,
+    // Intro: body scale grows as droplets merge in; arms pop out at the end.
+    form: intro ? 0 : 1,
+    vForm: 0,
+    formTarget: intro ? 0 : 1,
+    armScale: intro ? 0 : 1,
+    vArmScale: 0,
+    formed: !intro,
+    lastMerge: 0,
+    drops: [] as Drop[],
   });
   const moodRef = useRef(shownMood);
   const lookRef = useRef(look);
   const trackRef = useRef(track);
   const talkingRef = useRef(talking);
   const firstMood = useRef(true);
+
+  useEffect(() => {
+    onFormedRef.current = onFormed;
+  }, [onFormed]);
 
   useEffect(() => {
     lookRef.current = look;
@@ -244,6 +298,9 @@ export function Blob({
     wave() {
       sim.current.waveUntil = performance.now() + 1500;
     },
+    point() {
+      sim.current.pointUntil = performance.now() + 1800;
+    },
     celebrate() {
       const st = sim.current;
       st.cheerUntil = performance.now() + 1300;
@@ -284,6 +341,28 @@ export function Blob({
 
     st.nextBlink = last + 1500 + Math.random() * 2500;
     st.nextHop = last + 600;
+
+    if (introRef.current && !st.formed) {
+      if (reduce) {
+        st.form = st.formTarget = st.armScale = 1;
+        st.formed = true;
+        setTimeout(() => onFormedRef.current?.(), 0);
+      } else {
+        gooRef.current?.setAttribute("filter", `url(#${gooId})`);
+        st.drops = INTRO_DROPS.map((d, i) => ({
+          x: CX + d.dx,
+          y: -110 - i * 16,
+          vy: 0,
+          r: d.r,
+          fromX: 0,
+          fromY: 0,
+          startAt: last + 60 + d.delay,
+          mergeAt: 0,
+          state: 0,
+          share: (d.r * d.r) / INTRO_TOTAL,
+        }));
+      }
+    }
 
     const spring = (pos: number, vel: number, target: number, k: number, c: number, dt: number) => {
       vel += (-k * (pos - target) - c * vel) * dt;
@@ -364,6 +443,7 @@ export function Blob({
           tr -= 34;
         }
         if (isTalking) tr += Math.sin(t * 5.3) * 12 - 10;
+        if (now < st.pointUntil) tr = -14 + Math.sin(t * 6) * 3;
         if (now < st.waveUntil) tr = -30 + Math.sin(t * 16) * 24;
         if (now < st.cheerUntil) {
           tl = -74 + Math.sin(t * 17) * 10;
@@ -376,6 +456,63 @@ export function Blob({
         [st.armL, st.vArmL] = spring(st.armL, st.vArmL, tl, 190, 12, dt);
         [st.armR, st.vArmR] = spring(st.armR, st.vArmR, tr, 190, 12, dt);
       }
+
+      // Intro: droplets fall, touch the jelly and get pulled in.
+      if (st.drops.length) {
+        const rx = R * 1.04 * st.form * (1 - st.s * 0.62);
+        const ry = R * st.form * (1 + st.s);
+        const cy = GROUND - BOTTOM * st.form * (1 + st.s);
+        let done = 0;
+        st.drops.forEach((d, i) => {
+          const el = dropRefs.current[i];
+          if (d.state === 0 && now >= d.startAt) d.state = 1;
+          if (d.state === 1) {
+            d.vy += 2600 * dt;
+            d.y += d.vy * dt;
+            const dx = d.x - CX;
+            const surface = rx > 1 && Math.abs(dx) < rx ? cy - ry * Math.sqrt(1 - (dx / rx) ** 2) : GROUND;
+            if (d.y + d.r * 0.55 >= surface) {
+              d.state = 2;
+              d.mergeAt = now;
+              d.fromX = d.x;
+              d.fromY = Math.min(d.y, surface);
+              st.formTarget = Math.min(1, st.formTarget + d.share);
+              st.vs -= 1.1 + d.r * 0.03;
+              const angle = Math.atan2(d.fromY - cy, dx);
+              for (let k = 0; k < N; k++) {
+                const a = -Math.PI / 2 + (k / N) * Math.PI * 2;
+                st.voff[k] -= Math.max(0, Math.cos(a - angle)) * 0.9;
+              }
+            }
+          }
+          if (d.state === 2) {
+            const p = Math.min(1, (now - d.mergeAt) / 300);
+            const e = p * p * (3 - 2 * p);
+            d.x = d.fromX + (CX - d.fromX) * e * 0.6;
+            d.y = d.fromY + (cy - d.fromY) * e;
+            d.r = INTRO_DROPS[i].r * (1 - e);
+            if (p >= 1) {
+              d.state = 3;
+              st.lastMerge = now;
+            }
+          }
+          if (d.state === 3) done++;
+          if (el) {
+            el.setAttribute("cx", d.x.toFixed(2));
+            el.setAttribute("cy", d.y.toFixed(2));
+            el.setAttribute("r", d.state === 0 || d.state === 3 ? "0" : Math.max(0, d.r).toFixed(2));
+          }
+        });
+        if (done === st.drops.length && now - st.lastMerge > 120 && !st.formed) {
+          st.formed = true;
+          st.drops = [];
+          gooRef.current?.removeAttribute("filter");
+          setForming(false);
+          onFormedRef.current?.();
+        }
+      }
+      [st.form, st.vForm] = spring(st.form, st.vForm, st.formTarget, 170, 12, dt);
+      [st.armScale, st.vArmScale] = spring(st.armScale, st.vArmScale, st.formed ? 1 : 0, 260, 13, dt);
 
       // Body outline.
       const amp = reduce ? 0 : tune.wobble;
@@ -433,16 +570,19 @@ export function Blob({
       const lean = reduce ? 0 : -st.lookX * 4.5 + st.vx * 0.006;
       const sx = 1 - st.s * 0.62;
       const sy = 1 + st.s;
+      const form = Math.max(0, st.form);
       jellyRef.current?.setAttribute(
         "transform",
-        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) skewX(${lean.toFixed(2)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-CX} ${-GROUND})`,
+        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) skewX(${lean.toFixed(2)}) scale(${(sx * form).toFixed(4)} ${(sy * form).toFixed(4)}) translate(${-CX} ${-GROUND})`,
       );
       faceRef.current?.setAttribute(
         "transform",
         `translate(${(st.lookX * 11).toFixed(2)} ${(st.lookY * 7).toFixed(2)}) rotate(${(st.lookX * 4).toFixed(2)} ${CX} ${FACE_Y})`,
       );
-      armLRef.current?.setAttribute("transform", `rotate(${st.armL.toFixed(1)} ${ARM_X} ${ARM_Y})`);
-      armRRef.current?.setAttribute("transform", `rotate(${st.armR.toFixed(1)} ${ARM_X} ${ARM_Y})`);
+      const armK = Math.max(0, st.armScale).toFixed(3);
+      const armGrow = `translate(${ARM_X} ${ARM_Y}) scale(${armK}) translate(${-ARM_X} ${-ARM_Y})`;
+      armLRef.current?.setAttribute("transform", `rotate(${st.armL.toFixed(1)} ${ARM_X} ${ARM_Y}) ${armGrow}`);
+      armRRef.current?.setAttribute("transform", `rotate(${st.armR.toFixed(1)} ${ARM_X} ${ARM_Y}) ${armGrow}`);
 
       // Graduation cap rides along with a swinging tassel.
       if (capRef.current) {
@@ -471,8 +611,8 @@ export function Blob({
       const lift = Math.min(1, -st.y / 140);
       const shadow = shadowRef.current;
       if (shadow) {
-        shadow.setAttribute("rx", (R * 1.02 * sx * (1 - lift * 0.45)).toFixed(2));
-        shadow.setAttribute("opacity", (0.16 * (1 - lift * 0.6)).toFixed(3));
+        shadow.setAttribute("rx", (R * 1.02 * sx * form * (1 - lift * 0.45)).toFixed(2));
+        shadow.setAttribute("opacity", (0.16 * Math.min(1, form * 1.4) * (1 - lift * 0.6)).toFixed(3));
         shadow.setAttribute("cx", (CX + st.x).toFixed(2));
       }
 
@@ -487,7 +627,7 @@ export function Blob({
       pointerUsers--;
       if (pointerUsers === 0) window.removeEventListener("pointermove", onPointerMove);
     };
-  }, []);
+  }, [gooId]);
 
   function handlePointerEnter() {
     const st = sim.current;
@@ -588,14 +728,21 @@ export function Blob({
           <stop offset="0%" stopColor="#fff" stopOpacity="0.95" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0.15" />
         </linearGradient>
+        {/* Goo: blur + alpha threshold bridges the droplets into the body; the crisp body is composited on top. */}
+        <filter id={gooId} x="-40%" y="-80%" width="180%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+          <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo" />
+          <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+        </filter>
         <clipPath id={clip}>
-          <path ref={clipRef} />
+          <path ref={clipRef} d={REST_PATH} />
         </clipPath>
       </defs>
 
-      <ellipse ref={shadowRef} cx={CX} cy={GROUND + 3} rx={R} ry={7} fill="var(--ink)" opacity={0.16} />
+      <ellipse ref={shadowRef} cx={CX} cy={GROUND + 3} rx={intro ? 0 : R} ry={7} fill="var(--ink)" opacity={0.16} />
 
-      <g ref={jellyRef}>
+      <g ref={gooRef}>
+      <g ref={jellyRef} transform={intro ? HIDDEN : undefined}>
         {showArms && (
           <>
             <g transform={`translate(${CX * 2} 0) scale(-1 1)`}>
@@ -609,7 +756,7 @@ export function Blob({
           </>
         )}
 
-        <path ref={bodyRef} id={bodyId} fill={`url(#${gradient})`} />
+        <path ref={bodyRef} id={bodyId} d={REST_PATH} fill={`url(#${gradient})`} />
 
         <g clipPath={`url(#${clip})`}>
           {/* light scattered inside the jelly */}
@@ -663,7 +810,22 @@ export function Blob({
         )}
       </g>
 
-      <MoodExtras mood={shownMood} />
+      {intro &&
+        INTRO_DROPS.map((d, i) => (
+          <circle
+            key={i}
+            ref={(el) => {
+              dropRefs.current[i] = el;
+            }}
+            cx={CX + d.dx}
+            cy={-150}
+            r={0}
+            fill={`url(#${gradient})`}
+          />
+        ))}
+      </g>
+
+      {!forming && <MoodExtras mood={shownMood} />}
     </svg>
   );
 }

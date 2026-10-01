@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SubjectView } from "@/components/subjects/SubjectView";
+import { themeSpecOf } from "@/components/deck/deck";
 import type { PagePreview } from "@/components/subjects/PageCards";
+import { SubjectView } from "@/components/subjects/SubjectView";
 import { createClient } from "@/lib/supabase/server";
 import { loadTasks } from "@/lib/tasks";
-import type { DeckTheme, PageKind, Subject } from "@/lib/types";
+import type { PageKind, Subject } from "@/lib/types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/subjects/[id]">):
   return { title: subject ? subject.name : "Not found" };
 }
 
-type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null };
+type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
 
 function snippet(text: string | null) {
   const flat = (text ?? "").replace(/\s+/g, " ").trim();
@@ -36,7 +37,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
   const [pagesRes, tasks] = await Promise.all([
     supabase
       .from("pages")
-      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme")
+      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
       .eq("subject_id", id)
       .is("trashed_at", null),
     loadTasks(supabase, { subjectId: id }),
@@ -48,7 +49,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
     previews[row.id] = {
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,
-      theme: (["paper", "ink", "blob"].includes(row.deck_theme ?? "") ? row.deck_theme : null) as DeckTheme | null,
+      theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
     };
   }
 

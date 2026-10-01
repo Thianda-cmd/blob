@@ -1,38 +1,57 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Popover } from "@/components/ui/Menu";
 import type { DeckTheme, Slide } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { THEME_COLORS, THEMES } from "./deck";
+import { PRESETS, presetPalette, themeLabel, type Palette } from "./deck";
 import { SlideView } from "./SlideView";
 
-export function ThemeSwatch({ theme, className }: { theme: DeckTheme; className?: string }) {
-  const c = THEME_COLORS[theme];
+export function ThemeSwatch({ palette, className }: { palette: Palette; className?: string }) {
   return (
     <span
       aria-hidden
       className={cn("relative grid size-4 shrink-0 place-items-center rounded-full ring-1 ring-ink/15 dark:ring-white/20", className)}
-      style={{ background: c.bg }}
+      style={{ background: palette.bg }}
     >
-      <span className="size-1.5 rounded-full" style={{ background: c.accent }} />
+      <span className="size-1.5 rounded-full" style={{ background: palette.accent }} />
     </span>
   );
 }
 
-/** Top-bar theme menu with live previews of the current slide in each theme. */
-export function ThemePicker({ theme, slide, onChange }: { theme: DeckTheme; slide: Slide; onChange: (theme: DeckTheme) => void }) {
+/** Top-bar theme menu: live previews of the current slide in every preset, plus the deck's custom theme. */
+export function ThemePicker({
+  theme,
+  palette,
+  customPalette,
+  slide,
+  onChange,
+  onCustomize,
+}: {
+  theme: DeckTheme;
+  /** The deck's current palette. */
+  palette: Palette;
+  /** The deck's saved custom theme, if it has one. */
+  customPalette: Palette | null;
+  slide: Slide;
+  onChange: (theme: DeckTheme) => void;
+  onCustomize: () => void;
+}) {
+  const options: { id: DeckTheme; label: string; palette: Palette }[] = [
+    ...PRESETS.map((p) => ({ id: p.id as DeckTheme, label: p.label, palette: presetPalette(p.id) })),
+    ...(customPalette ? [{ id: "custom" as DeckTheme, label: "Custom", palette: customPalette }] : []),
+  ];
   return (
     <Popover
       align="end"
-      className="w-[268px] p-1.5"
+      className="w-[332px] p-2"
       trigger={(props) => (
         <button
           {...props}
           className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink"
-          title="Deck theme"
+          title={`Theme: ${themeLabel(theme)}`}
         >
-          <ThemeSwatch theme={theme} />
+          <ThemeSwatch palette={palette} />
           <span className="hidden sm:inline">Theme</span>
           <ChevronDown className="size-3.5 text-ink-3" />
         </button>
@@ -40,36 +59,49 @@ export function ThemePicker({ theme, slide, onChange }: { theme: DeckTheme; slid
     >
       {(close) => (
         <>
-          <div className="px-2 pb-1.5 pt-1 text-[12px] font-medium text-ink-3">Theme for every slide</div>
-          {THEMES.map((t) => {
-            const active = t.id === theme;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                onClick={() => {
-                  onChange(t.id);
-                  close();
-                }}
-                className={cn("flex w-full items-center gap-3 rounded-lg p-1.5 text-left transition-colors hover:bg-hover", active && "bg-hover/70")}
-              >
-                <SlideView
-                  slide={slide}
-                  theme={t.id}
-                  mode="thumb"
-                  width={92}
-                  frameClassName={cn("rounded-[5px] ring-1", active ? "ring-2 ring-blob" : "ring-ink/10 dark:ring-white/12")}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium text-ink">{t.label}</span>
-                  <span className="block text-[12px] text-ink-3">{t.hint}</span>
-                </span>
-                {active && <Check className="mr-1 size-4 shrink-0 text-blob" strokeWidth={2.5} />}
-              </button>
-            );
-          })}
+          <div className="px-1 pb-2 pt-0.5 text-[12px] font-medium text-ink-3">Theme for every slide</div>
+          <div className="grid max-h-[min(460px,70vh)] grid-cols-2 gap-1.5 overflow-y-auto pr-0.5">
+            {options.map((t) => {
+              const active = t.id === theme;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  onClick={() => {
+                    onChange(t.id);
+                    close();
+                  }}
+                  className={cn("group rounded-lg p-1 text-left transition-colors hover:bg-hover", active && "bg-hover/70")}
+                >
+                  <SlideView
+                    slide={slide}
+                    palette={t.palette}
+                    mode="thumb"
+                    width={146}
+                    frameClassName={cn("rounded-[5px] ring-1", active ? "ring-2 ring-blob" : "ring-ink/10 dark:ring-white/12")}
+                  />
+                  <span className="mt-1 flex items-center gap-1 px-0.5 text-[12.5px] text-ink-2 group-hover:text-ink">
+                    <span className={cn("truncate", active && "font-medium text-ink")}>{t.label}</span>
+                    {active && <Check className="ml-auto size-3.5 shrink-0 text-blob" strokeWidth={2.5} />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onCustomize();
+              close();
+            }}
+            className="mt-1.5 flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink"
+          >
+            <SlidersHorizontal className="size-4 text-ink-3" />
+            {theme === "custom" ? "Edit custom theme" : "Customize colours and fonts"}
+          </button>
         </>
       )}
     </Popover>

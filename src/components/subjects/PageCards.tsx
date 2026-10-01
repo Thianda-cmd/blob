@@ -3,9 +3,10 @@
 import { formatDistanceStrict } from "date-fns";
 import { CornerDownRight, FilePlus2, Presentation } from "lucide-react";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { FONTS, miniBackdrop, presetSpec, specPalette } from "@/components/deck/deck";
+import { deckFontVars } from "@/components/deck/fonts";
 import { PageIcon } from "@/components/shell/Sidebar";
-import type { DeckTheme, PageMeta } from "@/lib/types";
+import type { DeckThemeSpec, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
 export type PagePreview = {
@@ -13,7 +14,8 @@ export type PagePreview = {
   snippet: string;
   /** Title of the first slide (presentations). */
   slideTitle: string | null;
-  theme: DeckTheme | null;
+  /** The deck's theme (a preset's spec or its custom theme), resolved on the server. */
+  theme: DeckThemeSpec | null;
 };
 
 function edited(updatedAt: string, now: number | null) {
@@ -50,23 +52,24 @@ export function NoteCard({ page, preview, parent, now }: { page: PageMeta; previ
   );
 }
 
-const SLIDE_THEMES: Record<DeckTheme, { bg: string; fg: string; accent: string }> = {
-  paper: { bg: "#f4f3ee", fg: "#1c1b18", accent: "#6d3df5" },
-  ink: { bg: "#1c1b18", fg: "#f4f3ee", accent: "#9a78ff" },
-  blob: { bg: "#6d3df5", fg: "#ffffff", accent: "#1c1b18" },
-};
-
-/** A tiny 16:9 rendering of the first slide. */
-export function SlideThumb({ title, theme, className }: { title: string; theme: DeckTheme | null; className?: string }) {
-  const t = SLIDE_THEMES[theme ?? "paper"] ?? SLIDE_THEMES.paper;
+/** A tiny 16:9 rendering of the first slide, in the deck's theme. */
+export function SlideThumb({ title, theme, className }: { title: string; theme: DeckThemeSpec | null; className?: string }) {
+  const spec = theme ?? presetSpec("paper");
+  const p = specPalette(spec);
+  const h = FONTS[p.heading];
   return (
     <div
-      className={cn("relative aspect-video overflow-hidden rounded-lg ring-1 ring-inset ring-black/[0.06]", className)}
-      style={{ background: t.bg, color: t.fg } as CSSProperties}
+      className={cn("relative aspect-video overflow-hidden rounded-lg ring-1 ring-inset ring-black/[0.06]", deckFontVars, className)}
+      style={{ backgroundColor: p.bg, ...miniBackdrop(spec), color: p.fg }}
     >
       <div className="absolute inset-0 flex flex-col justify-center px-[9%]">
-        <span className="h-[3px] w-5 rounded-full" style={{ background: t.accent }} />
-        <span className="mt-2 line-clamp-2 font-display text-[16px] font-bold leading-[1.15] tracking-[-0.02em]">{title}</span>
+        <span className="h-[3px] w-5 rounded-full" style={{ background: p.accent }} />
+        <span
+          className="mt-2 line-clamp-2 text-[16px] leading-[1.15]"
+          style={{ fontFamily: h.family, fontWeight: h.weights[2], letterSpacing: `${-0.02 * h.track}em`, color: p.title }}
+        >
+          {title}
+        </span>
         <span className="mt-2 h-[5px] w-[46%] rounded-full bg-current opacity-15" />
       </div>
       <span className="absolute bottom-[7%] right-[6%] text-[8px] font-medium tabular-nums opacity-40">1</span>

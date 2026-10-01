@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   CornerDownLeft,
   FilePlus2,
+  GraduationCap,
   House,
   ListChecks,
   ListPlus,
@@ -22,12 +23,13 @@ import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
+import { MATHS_CATALOG } from "@/learn/catalog";
 import { cn, pageTitle } from "@/lib/utils";
 import { PageIcon } from "./Sidebar";
 
 type Item = {
   id: string;
-  group: "Actions" | "Pages" | "Found in notes" | "Subjects";
+  group: "Actions" | "Pages" | "Found in notes" | "Subjects" | "Learn";
   label: string;
   hint?: string;
   icon: ReactNode;
@@ -115,6 +117,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       { id: "new-task", group: "Actions", label: "Add a task", hint: "Homework, exams, projects", icon: <ListPlus />, run: () => go("/tasks?new=1") },
       { id: "home", group: "Actions", label: "Go to Home", icon: <House />, run: () => go("/home") },
       { id: "tasks", group: "Actions", label: "Go to Tasks", icon: <ListChecks />, run: () => go("/tasks") },
+      { id: "learn", group: "Actions", label: "Go to Learn", hint: "Maths lessons and practice", icon: <GraduationCap />, run: () => go("/learn") },
       { id: "settings", group: "Actions", label: "Settings", icon: <Settings />, run: () => go("/settings") },
       { id: "trash", group: "Actions", label: "Trash", icon: <Trash2 />, run: () => go("/trash") },
       {
@@ -168,8 +171,17 @@ function Palette({ onClose }: { onClose: () => void }) {
         run: () => go(`/subjects/${s.id}`),
       }));
 
+    const topicItems: Item[] = MATHS_CATALOG.filter((t) => q && (match(t.title) || match(t.de))).map((t) => ({
+      id: `topic-${t.slug}`,
+      group: "Learn",
+      label: t.title,
+      hint: t.de,
+      icon: <GraduationCap />,
+      run: () => go(`/learn/maths/${t.slug}`),
+    }));
+
     const filteredActions = q ? actions.filter((a) => a.id.startsWith("new") || match(a.label)) : actions.slice(0, 3);
-    return q ? [...pageItems, ...contentItems, ...subjectItems, ...filteredActions] : [...filteredActions, ...pageItems];
+    return q ? [...pageItems, ...contentItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, pages, subjects, found]);
 

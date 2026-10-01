@@ -6,6 +6,7 @@ import {
   Ellipsis,
   FilePlus2,
   FileText,
+  GraduationCap,
   House,
   ListChecks,
   LogOut,
@@ -265,6 +266,9 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
         </button>
         <NavLink href="/home" icon={<House />} active={pathname === "/home"}>
           Home
+        </NavLink>
+        <NavLink href="/learn" icon={<GraduationCap />} active={pathname.startsWith("/learn")}>
+          Learn
         </NavLink>
         <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
           Tasks

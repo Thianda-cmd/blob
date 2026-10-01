@@ -3,16 +3,27 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, PanelRight, Play, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave } from "@/components/page/useAutosave";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { createClient } from "@/lib/supabase/client";
-import type { DeckContent, DeckTheme, Page, Slide, SlideLayout } from "@/lib/types";
-import { ALLOWED_IMAGE_TYPES, deckPlainText, MAX_IMAGE_BYTES, newSlide, normalizeDeck } from "./deck";
-import { DeckInspector } from "./DeckInspector";
+import type { Deck, DeckContent, DeckTheme, DeckThemeSpec, Page, Slide, SlideLayout, SlideTransition } from "@/lib/types";
+import {
+  ALLOWED_IMAGE_TYPES,
+  deckPalette,
+  deckPlainText,
+  MAX_IMAGE_BYTES,
+  newSlide,
+  normalizeDeck,
+  presetSpec,
+  sectionNumbers,
+  specPalette,
+  switchLayout,
+} from "./deck";
+import { DeckInspector, type InspectorTab } from "./DeckInspector";
 import { AddSlideMenu, SlideRail } from "./SlideRail";
 import { SlideView } from "./SlideView";
 import { ThemePicker } from "./ThemePicker";
@@ -29,7 +40,7 @@ export function DeckEditor({ page }: { page: Page }) {
   const searchParams = useSearchParams();
   const { updatePage, userId } = useWorkspace();
 
-  const [deck, setDeck] = useState<DeckContent>(() => normalizeDeck(page.content));
+  const [deck, setDeck] = useState<Deck>(() => normalizeDeck(page.content));
   const [title, setTitle] = useState(page.title);
   const [selectedId, setSelectedId] = useState(() => {
     const n = Number(searchParams.get("slide"));
@@ -40,6 +51,7 @@ export function DeckEditor({ page }: { page: Page }) {
   const [focusNonce, setFocusNonce] = useState(0);
   // "auto" lets a container query decide (hidden when the editor is narrow).
   const [inspector, setInspector] = useState<"auto" | "open" | "closed">("auto");
+  const [tab, setTab] = useState<InspectorTab>("slide");
 
   const deckRef = useRef(deck);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -56,7 +68,7 @@ export function DeckEditor({ page }: { page: Page }) {
 
   // Every structural or content change goes through here, so the saved row always matches the screen.
   const change = useCallback(
-    (fn: (d: DeckContent) => DeckContent) => {
+    (fn: (d: Deck) => Deck) => {
       const next = fn(deckRef.current);
       if (next === deckRef.current) return;
       deckRef.current = next;
@@ -74,6 +86,9 @@ export function DeckEditor({ page }: { page: Page }) {
 
   const index = Math.max(0, deck.slides.findIndex((s) => s.id === selectedId));
   const selected = deck.slides[index];
+  const palette = useMemo(() => deckPalette(deck.theme, deck.custom), [deck.theme, deck.custom]);
+  const customPalette = useMemo(() => (deck.custom ? specPalette(deck.custom) : null), [deck.custom]);
+  const sections = useMemo(() => sectionNumbers(deck.slides), [deck.slides]);
 
   // Coming back from the presenter: we opened on ?slide=N, now tidy the URL.
   useEffect(() => {
@@ -166,7 +181,17 @@ export function DeckEditor({ page }: { page: Page }) {
     setInspector(visible ? "closed" : "open");
   };
 
-  const setTheme = (theme: DeckTheme) => change((d) => (d.theme === theme ? d : { ...d, theme }));
+  const setTheme = (theme: DeckTheme) => change((d) => (d.theme === theme || (theme === "custom" && !d.custom) ? d : { ...d, theme }));
+  const setCustom = (custom: DeckThemeSpec) => change((d) => ({ ...d, theme: "custom", custom }));
+  const setDeckTransition = (transition: SlideTransition, everywhere: boolean) =>
+    change((d) => ({ ...d, transition, slides: everywhere ? d.slides.map((s) => (s.transition === null ? s : { ...s, transition: null })) : d.slides }));
+  const setLayout = (layout: SlideLayout) => change((d) => ({ ...d, slides: d.slides.map((s) => (s.id === selected.id ? switchLayout(s, layout) : s)) }));
+
+  const customize = () => {
+    if (deck.theme !== "custom") setCustom(presetSpec(deck.theme));
+    setTab("theme");
+    if (!(bodyRef.current && bodyRef.current.offsetWidth >= INSPECTOR_MIN_WIDTH && inspector === "auto")) setInspector("open");
+  };
 
   const onTitle = (value: string) => {
     const next = value.slice(0, 200);
@@ -220,7 +245,7 @@ export function DeckEditor({ page }: { page: Page }) {
             >
               <PanelRight className="size-4" />
             </button>
-            <ThemePicker theme={deck.theme} slide={selected} onChange={setTheme} />
+            <ThemePicker theme={deck.theme} palette={palette} customPalette={customPalette} slide={selected} onChange={setTheme} onCustomize={customize} />
             <Button variant="primary" size="sm" onClick={() => void present()} title="Present (Ctrl Enter)" className="ml-1">
               <Play className="size-3 fill-current" /> Present
             </Button>
@@ -231,7 +256,8 @@ export function DeckEditor({ page }: { page: Page }) {
         <SlideRail
           className="hidden @min-[560px]/editor:flex"
           slides={deck.slides}
-          theme={deck.theme}
+          palette={palette}
+          sections={sections}
           selectedId={selected.id}
           onSelect={setSelectedId}
           onReorder={(slides) => change((d) => ({ ...d, slides }))}
@@ -298,7 +324,8 @@ export function DeckEditor({ page }: { page: Page }) {
                 <div ref={stageRef} className="aspect-video w-full">
                   <SlideView
                     slide={selected}
-                    theme={deck.theme}
+                    palette={palette}
+                    ordinal={sections.get(selected.id)}
                     mode="edit"
                     onChange={onSlideChange}
                     onUpload={onSlideUpload}
@@ -337,13 +364,20 @@ export function DeckEditor({ page }: { page: Page }) {
 
         <DeckInspector
           className={inspector === "auto" ? "hidden @min-[980px]/editor:flex" : inspector === "open" ? "flex" : "hidden"}
+          tab={tab}
+          onTab={setTab}
           deck={deck}
+          palette={palette}
+          sections={sections}
           slide={selected}
           index={index}
           uploading={uploadingId === selected.id}
-          onLayout={(layout) => updateSlide(selected.id, { layout })}
+          onLayout={setLayout}
           onChange={onSlideChange}
           onUpload={onSlideUpload}
+          onTheme={setTheme}
+          onCustom={setCustom}
+          onDeckTransition={setDeckTransition}
         />
       </div>
     </>

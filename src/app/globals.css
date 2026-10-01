@@ -89,6 +89,7 @@
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-math: var(--font-serif-math), "Times New Roman", serif;
 
   --shadow-pop: var(--shadow-pop);
   --shadow-card: var(--shadow-card);
@@ -690,4 +691,166 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Maths (learning center)
+   --------------------------------------------------------------------------- */
+.blob-math {
+  font-family: var(--font-serif-math), "Times New Roman", serif;
+  line-height: 1.25;
+  font-variant-numeric: lining-nums;
+}
+.mv-leaf {
+  display: inline-block;
+  white-space: pre;
+  border-radius: 0.18em;
+  transition:
+    background-color 0.25s,
+    color 0.25s,
+    box-shadow 0.25s;
+}
+.mv-var {
+  font-style: italic;
+  padding: 0 0.03em;
+}
+.mv-text {
+  font-family: var(--font-sans);
+  font-size: 0.78em;
+  margin: 0 0.25em;
+}
+.mv-bin {
+  margin: 0 0.24em;
+}
+.mv-rel {
+  margin: 0 0.38em;
+}
+.mv-punct {
+  margin-right: 0.35em;
+}
+.mv-lit {
+  background: color-mix(in oklab, var(--blob) 18%, transparent);
+  color: var(--blob-ink);
+  box-shadow: 0 0 0 0.1em color-mix(in oklab, var(--blob) 18%, transparent);
+}
+.mv-row {
+  display: inline-flex;
+  align-items: center;
+}
+.mv-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.14em;
+  font-size: 0.88em;
+}
+.mv-frac > .mv-row {
+  padding: 0 0.16em;
+  line-height: 1.15;
+}
+.mv-bar {
+  display: block;
+  align-self: stretch;
+  height: max(1.5px, 0.065em);
+  background: currentColor;
+  margin: 0.1em 0;
+  border-radius: 1px;
+}
+.mv-pow {
+  display: inline-flex;
+  align-items: flex-start;
+}
+.mv-sup {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.64em;
+  margin-left: 0.05em;
+  margin-top: -0.32em;
+}
+.mv-subscript {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  font-size: 0.64em;
+  margin-left: 0.03em;
+  margin-bottom: -0.28em;
+}
+.mv-sqrt {
+  display: inline-flex;
+  align-items: stretch;
+  margin: 0 0.06em;
+}
+.mv-radical {
+  display: flex;
+  width: 0.55em;
+}
+.mv-radical svg,
+.mv-fence svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.mv-radicand {
+  display: inline-flex;
+  align-items: center;
+  border-top: max(1.5px, 0.065em) solid currentColor;
+  padding: 0.1em 0.1em 0 0.06em;
+  margin-top: 0.02em;
+}
+.mv-root-index {
+  display: inline-flex;
+  font-size: 0.55em;
+  align-self: flex-start;
+  margin-right: -0.4em;
+  margin-top: 0.15em;
+}
+.mv-paren {
+  display: inline-flex;
+  align-items: stretch;
+}
+.mv-fence {
+  display: flex;
+  width: 0.36em;
+  margin: 0.06em 0;
+}
+.mv-style {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.22em;
+  transition:
+    background-color 0.3s,
+    color 0.3s;
+}
+.mv-hl {
+  background: color-mix(in oklab, var(--blob) 16%, transparent);
+  padding: 0 0.12em;
+}
+.mv-blob {
+  color: var(--blob-ink);
+}
+.mv-red {
+  color: var(--danger);
+}
+.mv-green {
+  color: var(--ok);
+}
+.mv-fade {
+  opacity: 0.35;
+}
+.mv-strike {
+  position: relative;
+}
+.mv-strike::after {
+  content: "";
+  position: absolute;
+  left: -0.08em;
+  right: -0.08em;
+  top: 52%;
+  border-top: max(1.5px, 0.07em) solid var(--danger);
+  transform: rotate(-14deg);
+}
+.mv-box {
+  outline: max(1.5px, 0.06em) solid var(--blob);
+  outline-offset: 0.12em;
 }

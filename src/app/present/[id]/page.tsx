@@ -31,5 +31,8 @@ export default async function PresentPage({ params, searchParams }: PageProps<"/
   const requested = Number(Array.isArray(query.slide) ? query.slide[0] : query.slide);
   const start = Number.isInteger(requested) ? Math.min(Math.max(requested - 1, 0), deck.slides.length - 1) : 0;
 
-  return <Presenter pageId={page.id} title={pageTitle(page.title, "deck")} deck={deck} start={start} />;
+  // ?view=speaker opens the speaker view (used for the second window).
+  const view = query.view === "speaker" ? "speaker" : "audience";
+
+  return <Presenter pageId={page.id} title={pageTitle(page.title, "deck")} deck={deck} start={start} initialView={view} />;
 }

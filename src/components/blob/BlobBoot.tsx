@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "./Blob";
 
 const KEY = "blob-booted";
@@ -28,8 +28,9 @@ export function resetBoot() {
 
 /**
  * The intro played once per browser session when the app opens:
- * jelly droplets rain down, merge into Blob (SVG goo filter), Blob wakes up,
- * then floods the screen and opens a hole onto the workspace.
+ * jelly droplets rain down and merge into Blob (inside the Blob component, so the
+ * shape never swaps), Blob wakes up and waves, then floods the screen and opens
+ * a hole onto the workspace.
  */
 export function BlobBoot({ ready = true, greeting }: { ready?: boolean; greeting?: string }) {
   // Server and hydration render the overlay (an inline script hides it when already booted).
@@ -46,16 +47,7 @@ export function BlobBoot({ ready = true, greeting }: { ready?: boolean; greeting
   return <BootSequence ready={ready} greeting={greeting} onDone={finish} />;
 }
 
-const DROPS = [
-  { x: -128, r: 13, delay: 0.05 },
-  { x: -64, r: 18, delay: 0.18 },
-  { x: 6, r: 24, delay: 0 },
-  { x: 70, r: 17, delay: 0.26 },
-  { x: 126, r: 12, delay: 0.12 },
-];
-
 function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: string; onDone: () => void }) {
-  const id = useId().replace(/:/g, "");
   const [scope, animate] = useAnimate();
   const blobRef = useRef<BlobHandle>(null);
   const [phase, setPhase] = useState<"rain" | "alive" | "exit">("rain");
@@ -64,39 +56,15 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
   const [minTimePassed, setMinTimePassed] = useState(false);
   const skipped = useRef(false);
 
-  // Droplets fall, bounce and merge.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await Promise.all(
-        DROPS.map((d, i) =>
-          animate(
-            `[data-drop="${i}"]`,
-            { cy: [-60, 196, 178, 196] },
-            { duration: 0.62, delay: d.delay, times: [0, 0.62, 0.8, 1], ease: ["easeIn", "easeOut", "easeIn"] },
-          ),
-        ),
-      );
-      if (cancelled) return;
-      await Promise.all([
-        ...DROPS.map((_, i) =>
-          animate(`[data-drop="${i}"]`, { cx: 200, cy: 176, r: 6 }, { duration: 0.42, ease: [0.6, 0, 0.3, 1] }),
-        ),
-        animate("[data-core]", { r: [0, 52] }, { duration: 0.5, ease: [0.3, 1.4, 0.5, 1] }),
-      ]);
-      if (cancelled) return;
-      setPhase("alive");
-      setTimeout(() => {
-        if (cancelled) return;
-        setMood("happy");
-        blobRef.current?.jump(0.9);
-      }, 260);
-      setTimeout(() => !cancelled && setMinTimePassed(true), 650);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [animate]);
+  // The droplets merge into Blob inside the Blob component itself, so there is no swap:
+  // when it's whole, it wakes up, hops and waves.
+  const formed = useCallback(() => {
+    setPhase("alive");
+    setMood("happy");
+    blobRef.current?.jump(0.8);
+    setTimeout(() => blobRef.current?.wave(), 450);
+    setTimeout(() => setMinTimePassed(true), 900);
+  }, []);
 
   // Cycle the status line while we wait.
   useEffect(() => {
@@ -146,8 +114,6 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
     };
   }, [animate, scope, onDone]);
 
-  const filter = `boot-goo-${id}`;
-
   return (
     <div
       ref={scope}
@@ -166,37 +132,10 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
 
       <div className="relative flex flex-col items-center" style={{ marginTop: "-8vh" }}>
         <div className="relative h-[260px] w-[400px]">
-          {/* Goo stage: droplets and the forming core */}
-          <svg viewBox="0 0 400 260" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
-            <defs>
-              <filter id={filter} x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur" />
-                <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" />
-              </filter>
-            </defs>
-            <motion.g
-              filter={`url(#${filter})`}
-              fill="var(--blob)"
-              animate={{ opacity: phase === "rain" ? 1 : 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <circle data-core cx={200} cy={170} r={0} />
-              {DROPS.map((d, i) => (
-                <circle key={i} data-drop={i} cx={200 + d.x} cy={-60} r={d.r} />
-              ))}
-            </motion.g>
-            <ellipse cx={200} cy={226} rx={54} ry={5} fill="var(--ink)" opacity={phase === "rain" ? 0.08 : 0} />
-          </svg>
-
-          {/* The living Blob takes over once the droplets have merged */}
-          <motion.div
-            className="absolute left-1/2 top-[34px] -translate-x-1/2"
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={phase === "rain" ? { opacity: 0, scale: 0.92 } : { opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Blob ref={blobRef} size={200} mood={mood} />
-          </motion.div>
+          {/* Blob forms out of falling droplets, wakes up and says hi */}
+          <div className="absolute left-1/2 top-[34px] -translate-x-1/2">
+            <Blob ref={blobRef} size={200} mood={mood} intro onFormed={formed} interactive={false} />
+          </div>
 
           {/* Flood circle used for the exit */}
           <div className="pointer-events-none absolute left-1/2 top-[150px] z-10">
