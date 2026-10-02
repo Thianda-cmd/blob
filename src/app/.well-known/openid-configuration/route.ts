@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { endpoints, issuer, SCOPES } from "@/lib/oauth/config";
+import { dataEndpoint, endpoints, issuer, SCOPES } from "@/lib/oauth/config";
 
 /** OpenID Connect discovery: everything an app needs to set up "Sign in with Blob". */
 export function GET(request: Request) {
@@ -22,6 +22,8 @@ export function GET(request: Request) {
       ui_locales_supported: ["de", "en"],
       authorization_response_iss_parameter_supported: true,
       service_documentation: `${iss}/developers`,
+      // Not part of OpenID Connect: Blob's API for apps' own data (scope "data").
+      blob_data_endpoint: dataEndpoint(iss),
     },
     { headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600" } },
   );

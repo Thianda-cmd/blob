@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, Check, Clock3, Fingerprint, Globe, Info, Mail, Pipette, Server, UserRound } from "lucide-react";
+import { BadgeCheck, Check, Clock3, Database, Fingerprint, Globe, Info, Mail, Pipette, Server, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import { FormError } from "@/components/auth/FormError";
@@ -14,14 +14,14 @@ import { Field, Input, Textarea } from "@/components/ui/Input";
 import { useMessages } from "@/i18n/client";
 import { adminText } from "@/i18n/messages/admin";
 import { oauthText } from "@/i18n/messages/oauth";
-import { SCOPE_NAMES, type AdminApp, type AppErrors, type AppField, type AppInput, type SaveResult, type ScopeName } from "@/lib/oauth/admin-types";
+import { DEFAULT_SCOPES, SCOPE_NAMES, type AdminApp, type AppErrors, type AppField, type AppInput, type SaveResult, type ScopeName } from "@/lib/oauth/admin-types";
 import { cn } from "@/lib/utils";
 import { createApp, updateApp } from "@/app/(app)/admin/actions";
 
 const SWATCHES = ["#6d3df5", "#2563eb", "#0e7490", "#0f766e", "#16a34a", "#ca8a04", "#ea580c", "#dc2626", "#db2777", "#1c1b18"];
 const DEFAULT_COLOR = "#6d3df5";
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const SCOPE_ICONS: Record<ScopeName, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, offline_access: Clock3 };
+const SCOPE_ICONS: Record<ScopeName, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, data: Database, offline_access: Clock3 };
 const FIELD_ORDER: AppField[] = ["name", "description", "homepage_url", "privacy_url", "mark", "color", "logo_url", "redirect_uris", "allowed_origins"];
 
 const valuesOf = (app?: AdminApp): AppInput => ({
@@ -34,7 +34,7 @@ const valuesOf = (app?: AdminApp): AppInput => ({
   color: app?.color ?? DEFAULT_COLOR,
   redirect_uris: app?.redirect_uris.join("\n") ?? "",
   allowed_origins: app?.allowed_origins.join("\n") ?? "",
-  scopes: app?.scopes ?? [...SCOPE_NAMES],
+  scopes: app?.scopes ?? [...DEFAULT_SCOPES],
   confidential: app?.confidential ?? false,
   trusted: app?.trusted ?? false,
 });
@@ -361,7 +361,7 @@ export function AppForm({ app, onSaved, saved, after }: { app?: AdminApp; onSave
               {SCOPE_NAMES.map((scope) => {
                 const on = scope === "openid" || values.scopes.includes(scope);
                 return (
-                  <label key={scope} className={cn("flex items-start gap-3 rounded-lg px-1 py-1.5", scope !== "openid" && "cursor-pointer hover:bg-hover/50")}>
+                  <label key={scope} className={cn("relative flex items-start gap-3 rounded-lg px-1 py-1.5", scope !== "openid" && "cursor-pointer hover:bg-hover/50")}>
                     <input
                       type="checkbox"
                       className="peer sr-only"

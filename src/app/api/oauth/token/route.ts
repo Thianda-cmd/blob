@@ -53,7 +53,7 @@ async function codeGrant(app: OAuthApp, form: URLSearchParams, iss: string, cors
   }
   if (!(await grantActive(row.user_id, app.id))) return fail("invalid_grant", "Access was revoked.");
 
-  const tokens = await issueTokens({ iss, app, userId: row.user_id, scopes: row.scopes, nonce: row.nonce, authTime: Math.floor(Date.parse(row.auth_time) / 1000) });
+  const tokens = await issueTokens({ iss, app, userId: row.user_id, scopes: row.scopes.filter((s) => app.scopes.includes(s)), nonce: row.nonce, authTime: Math.floor(Date.parse(row.auth_time) / 1000) });
   await Promise.all([
     db.from("oauth_grants").update({ last_used_at: new Date().toISOString() }).eq("user_id", row.user_id).eq("app_id", app.id),
     logEvent("token", app.id, row.user_id),
@@ -81,12 +81,13 @@ async function refreshGrant(app: OAuthApp, form: URLSearchParams, iss: string, c
   if (row.app_id !== app.id) return fail("invalid_grant", "This refresh token belongs to another app.");
   if (!(await grantActive(row.user_id, app.id))) return fail("invalid_grant", "Access was revoked.");
 
-  // Optional narrower scope (RFC 6749 §6).
-  let scopes = row.scopes;
+  // Never more than the app may still ask for (an admin may have removed a scope since).
+  let scopes = row.scopes.filter((s) => app.scopes.includes(s));
+  if (!scopes.includes("openid") && row.scopes.includes("openid")) return fail("invalid_grant", "The app's permissions changed. Sign in again.");
   const asked = form.get("scope");
   if (asked) {
     const want = asked.split(/\s+/).filter(Boolean);
-    if (want.some((s) => !row.scopes.includes(s as Scope))) return fail("invalid_scope", "Can't widen the scope on refresh.");
+    if (want.some((s) => !scopes.includes(s as Scope))) return fail("invalid_scope", "Can't widen the scope on refresh.");
     scopes = want as Scope[];
     if (!scopes.includes("offline_access")) scopes = [...scopes, "offline_access"];
   }

@@ -9,7 +9,7 @@ import { CodeBlock } from "@/components/oauth/CodeBlock";
 import { CopyField } from "@/components/oauth/Copy";
 import { developersText } from "@/i18n/messages/developers";
 import { getMessages } from "@/i18n/server";
-import { endpoints, issuer, SCOPES } from "@/lib/oauth/config";
+import { dataEndpoint, endpoints, issuer, SCOPES } from "@/lib/oauth/config";
 import { authorizeExample, curlExchange, sdkFullExample, sdkQuickStart, tokenResponse } from "@/lib/oauth/snippets";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,15 +18,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const SECTIONS = ["how", "quick", "popup", "sdk", "scopes", "endpoints", "server", "tokens", "security"] as const;
-const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "revocation_endpoint", "jwks_uri"] as const;
+const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "revocation_endpoint", "jwks_uri", "blob_data_endpoint"] as const;
 
 /** Public docs for "Sign in with Blob" (linked from the discovery document's service_documentation). */
 export default async function DevelopersPage() {
   const t = await getMessages(developersText);
   const iss = issuer();
-  const urls = endpoints(iss);
+  const urls = { ...endpoints(iss), blob_data_endpoint: dataEndpoint(iss) };
   const discovery = `${iss}/.well-known/openid-configuration`;
-  const vars = { issuer: iss, clientId: "YOUR_CLIENT_ID", redirectUri: "https://your-site.org/blob-callback.html" };
+  const vars = { issuer: iss, clientId: "YOUR_CLIENT_ID", redirectUri: t.example.redirect };
   const copy = { copyLabel: t.copy, copiedLabel: t.copied };
 
   return (
@@ -152,8 +152,8 @@ export default async function DevelopersPage() {
                 cols="sm:grid-cols-[130px_minmax(0,1fr)_minmax(0,1.3fr)]"
                 rows={SCOPES.map((s) => [
                   <code key="s" className="font-mono text-[12.5px] font-medium text-ink">{s}</code>,
-                  <code key="c" className="font-mono text-[12.5px] text-ink-2">{t.scopes.claims[s]}</code>,
-                  t.scopes.rows[s],
+                  <code key="c" className="font-mono text-[12.5px] text-ink-2">{t.scopes.claims[s] ?? ""}</code>,
+                  t.scopes.rows[s] ?? "",
                 ])}
               />
               <p className="mt-3 text-[13.5px] leading-relaxed text-ink-2">{t.scopes.note}</p>
@@ -293,10 +293,10 @@ function Rows({ head, rows, cols }: { head: string[]; rows: ReactNode[][]; cols:
 async function FlowStrip() {
   const t = await getMessages(developersText);
   const steps = [
-    { label: "your-site.org", sub: "signIn()" },
+    { label: t.example.site, sub: "signIn()" },
     { label: "Blob", sub: "/oauth/authorize" },
     { label: "blob-callback.html", sub: "?code=…&state=…" },
-    { label: "your-site.org", sub: t.toc.tokens },
+    { label: t.example.site, sub: t.popup.flowEnd },
   ];
   return (
     <ol className="flex flex-wrap items-stretch gap-2" aria-label={t.popup.title}>
@@ -307,7 +307,7 @@ async function FlowStrip() {
               {i === 1 && <BlobMark size={16} />}
               {s.label}
             </div>
-            <div className="font-mono text-[11.5px] text-ink-3">{s.sub}</div>
+            <div className={`text-[11.5px] text-ink-3 ${i < steps.length - 1 ? "font-mono" : ""}`}>{s.sub}</div>
           </div>
           {i < steps.length - 1 && <ArrowRight className="size-4 shrink-0 text-ink-3" aria-hidden />}
         </li>

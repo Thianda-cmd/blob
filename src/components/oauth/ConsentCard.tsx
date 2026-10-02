@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, Clock3, ExternalLink, Fingerprint, Lock, Mail, UserRound } from "lucide-react";
+import { Check, Clock3, CloudUpload, ExternalLink, Fingerprint, Lock, Mail, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils";
 import { decide, switchAccount } from "@/app/oauth/consent/actions";
 import { AppMark } from "./AppMark";
 
-type Scope = "openid" | "profile" | "email" | "offline_access";
+type Scope = "openid" | "profile" | "email" | "data" | "offline_access";
 type Props = {
   request: { id: string; app: PublicApp; scopes: Scope[]; redirectOrigin: string };
   account: { name: string; email: string; avatar: string | null };
 };
 
-const ICONS: Record<Scope, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, offline_access: Clock3 };
+const ICONS: Record<Scope, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, data: CloudUpload, offline_access: Clock3 };
 
 /** "Continue to LernLabor": who is signing in, what the app will see, Allow / Cancel. */
 export function ConsentCard({ request, account }: Props) {

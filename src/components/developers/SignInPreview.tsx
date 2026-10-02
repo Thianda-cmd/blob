@@ -31,7 +31,7 @@ export function SignInPreview() {
         </span>
       </div>
 
-      <div className="mt-4 grid min-h-[176px] place-items-center rounded-2xl border border-dashed border-line-2 bg-surface px-4 py-6">
+      <div className="mt-4 grid min-h-[200px] place-items-center rounded-2xl border border-dashed border-line-2 bg-surface px-4 py-6">
         <AnimatePresence mode="wait" initial={false}>
           {phase === "in" ? (
             <motion.div

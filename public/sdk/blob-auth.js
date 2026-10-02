@@ -9,6 +9,13 @@
  *   await blob.getAccessToken();          // for calling Blob's userinfo or your own API
  *   await blob.signOut();
  *
+ * With the "data" scope (scope: "openid profile email data offline_access"), the app can keep
+ * small JSON values in the person's Blob account, e.g. learning progress across devices:
+ *
+ *   const saved = await blob.data.get("progress");          // { key, value, version, updated_at } | null
+ *   await blob.data.put("progress", value, { version: saved?.version ?? 0 });  // throws code "conflict" if changed meanwhile
+ *   await blob.data.list();  await blob.data.delete("progress");
+ *
  * The redirect URI must be registered in Blob's admin panel and serve the small callback page
  * (https://blob.bojes.org/sdk/blob-callback.html) on your own domain.
  *
@@ -16,7 +23,7 @@
  * localStorage; refresh tokens rotate, guarded by a cross-tab lock.
  */
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const SCRIPT_ORIGIN = (() => {
   try {
     return new URL(import.meta.url).origin;
@@ -27,6 +34,7 @@ const SCRIPT_ORIGIN = (() => {
 const PENDING = "blob-auth:pending:";
 const CALLBACK = "blob-auth:callback";
 const SKEW = 60; // seconds before expiry we refresh
+const DATA_KEY = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 
 const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const randomString = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
@@ -49,10 +57,11 @@ function readJson(storage, key) {
 }
 
 export class BlobAuthError extends Error {
-  constructor(code, description) {
+  constructor(code, description, extra) {
     super(description || code);
     this.name = "BlobAuthError";
     this.code = code;
+    if (extra) Object.assign(this, extra);
   }
 }
 
@@ -73,6 +82,13 @@ export class BlobAuth {
     this.discovery = null;
     this.waiting = null; // the signIn() in progress: { state, resolve, reject, popup, timer }
     this.refreshing = null;
+    /** The app's own data in the person's Blob account (needs the "data" scope). */
+    this.data = {
+      list: async () => (await this.#data("GET", "")).items,
+      get: async (key) => this.#data("GET", `/${checkKey(key)}`, undefined, true),
+      put: async (key, value, opts = {}) => this.#data("PUT", `/${checkKey(key)}`, { value, version: opts.version ?? undefined }),
+      delete: async (key) => void (await this.#data("DELETE", `/${checkKey(key)}`)),
+    };
 
     window.addEventListener("message", (e) => this.#onMessage(e));
     // Another tab signed in or out (e.g. after confirming a new account's email there).
@@ -324,12 +340,52 @@ export class BlobAuth {
     return user;
   }
 
-  async #refresh() {
+  /**
+   * Calls Blob's data API. A 401 (e.g. the token was refused before its expiry) gets one forced
+   * refresh and retry; when access was removed in Blob, the refresh signs the person out here.
+   */
+  async #data(method, path, body, missingIsNull = false) {
+    const offline = (error) => new BlobAuthError("network_error", `Couldn't reach Blob (${error?.message || error}).`);
+    // No token: signed out, or (session still there) the refresh failed, e.g. while offline.
+    const noToken = () => (this.#session() ? offline("couldn't refresh the sign-in") : new BlobAuthError("signed_out", "Not signed in with Blob."));
+    const config = await this.#config().catch((error) => {
+      throw error instanceof BlobAuthError ? error : offline(error);
+    });
+    const base = (config.blob_data_endpoint || `${this.issuer}/api/v1/data`).replace(/\/+$/, "");
+    const send = (token) =>
+      fetch(base + path, {
+        method,
+        headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+        cache: "no-store",
+      }).catch((error) => {
+        throw offline(error);
+      });
+    let token = await this.getAccessToken();
+    if (!token) throw noToken();
+    let res = await send(token);
+    if (res.status === 401 && this.#session()?.refresh_token) {
+      token = await (this.refreshing ??= this.#refresh(token).finally(() => (this.refreshing = null)));
+      if (!token) throw noToken();
+      res = await send(token);
+    }
+    if (res.status === 204) return undefined;
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return data;
+    if (res.status === 404 && missingIsNull) return null;
+    const { error = "data_error", error_description, ...rest } = data;
+    if (res.status === 409) throw new BlobAuthError("conflict", "Changed elsewhere in the meantime.", { status: 409, current: rest });
+    throw new BlobAuthError(error, error_description || `${method} ${path || "/"} failed (${res.status}).`, { status: res.status });
+  }
+
+  /** Swaps the refresh token for new tokens. `stale`: force it even before expiry, unless that token was already replaced. */
+  async #refresh(stale) {
     const run = async () => {
       // Another tab may have refreshed while we waited for the lock.
       const session = this.#session();
       if (!session) return null;
-      if (session.expires_at - SKEW > now()) return session.access_token;
+      if (stale ? session.access_token !== stale : session.expires_at - SKEW > now()) return session.access_token;
+      if (!session.refresh_token) return null;
       try {
         const tokens = await this.#token({ grant_type: "refresh_token", refresh_token: session.refresh_token, client_id: this.clientId });
         const user = tokens.id_token ? await this.#checkIdToken(tokens.id_token) : session.user;
@@ -385,6 +441,11 @@ export class BlobAuth {
       if (!item || Date.now() - item.at > 1000 * 60 * 60) this.storage.removeItem(key);
     }
   }
+}
+
+function checkKey(key) {
+  if (typeof key !== "string" || !DATA_KEY.test(key)) throw new BlobAuthError("invalid_request", "A key is 1-64 characters: a-z, 0-9, and _ . - (not first).");
+  return key;
 }
 
 function sessionFrom(tokens, user, previous) {

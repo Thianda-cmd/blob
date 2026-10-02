@@ -100,7 +100,7 @@ export function AppView({ app, stats, events, connections, people, issuer, endpo
           </div>
         </motion.header>
 
-        <div role="tablist" aria-label={t.detail.tabsLabel} className="mt-7 flex gap-1 overflow-x-auto border-b border-line">
+        <div role="tablist" aria-label={t.detail.tabsLabel} className="-mx-1 mt-7 flex gap-0.5 overflow-x-auto border-b border-line px-1 sm:gap-1">
           {APP_TABS.map((id) => {
             const on = tab === id;
             return (
@@ -113,7 +113,7 @@ export function AppView({ app, stats, events, connections, people, issuer, endpo
                 aria-controls={`panel-${id}`}
                 onClick={() => pick(id)}
                 className={cn(
-                  "relative flex h-10 shrink-0 items-center gap-1.5 px-3 text-[13.5px] transition-colors",
+                  "relative flex h-10 shrink-0 items-center gap-1.5 px-2 text-[13px] transition-colors sm:px-3 sm:text-[13.5px]",
                   on ? "font-medium text-ink" : "text-ink-2 hover:text-ink",
                 )}
               >
@@ -169,7 +169,9 @@ function Overview({ stats, events, people, connected }: { stats: SignInStats; ev
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatTile icon={<Users />} label={t.detail.people} value={connected} sub={t.detail.peopleSub} />
         <StatTile icon={<LogIn />} label={t.stats.signIns} value={stats.today} sub={t.stats.signInsSub(stats.week)} delay={0.04} />
-        <StatTile icon={<TriangleAlert />} label={t.stats.errors} value={stats.errors} sub={<ErrorsNote count={stats.errors} />} delay={0.08} />
+        <div className="col-span-2 lg:col-span-1">
+          <StatTile icon={<TriangleAlert />} label={t.stats.errors} value={stats.errors} sub={<ErrorsNote count={stats.errors} />} delay={0.08} />
+        </div>
       </div>
       <SignInChart series={stats.series} />
       <Panel title={t.events.title} className="!mt-6">

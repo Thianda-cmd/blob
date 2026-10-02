@@ -6,7 +6,7 @@ import { getMessages } from "@/i18n/server";
 import { requireAdmin } from "@/lib/oauth/admin";
 import { adminAppDetail } from "@/lib/oauth/admin-data";
 import { APP_TABS } from "@/lib/oauth/admin-types";
-import { endpoints, issuer } from "@/lib/oauth/config";
+import { dataEndpoint, endpoints, issuer } from "@/lib/oauth/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,5 +27,7 @@ export default async function AdminAppPage({ params, searchParams }: PageProps<"
   if (!detail) notFound();
   const tab = APP_TABS.find((t) => t === query.tab) ?? "overview";
   const iss = issuer();
-  return <AppView {...detail} issuer={iss} endpoints={endpoints(iss)} initialTab={tab} />;
+  // The app-data API only matters to apps allowed the "data" scope.
+  const urls: Record<string, string> = { ...endpoints(iss), ...(detail.app.scopes.includes("data") ? { blob_data_endpoint: dataEndpoint(iss) } : {}) };
+  return <AppView {...detail} issuer={iss} endpoints={urls} initialTab={tab} />;
 }

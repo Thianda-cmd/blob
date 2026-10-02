@@ -12,7 +12,7 @@ import type { AdminApp } from "@/lib/oauth/admin-types";
 import { authorizeExample, curlExchange, sdkQuickStart } from "@/lib/oauth/snippets";
 import { Panel, TypeBadge } from "./parts";
 
-const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "revocation_endpoint", "jwks_uri"];
+const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "revocation_endpoint", "jwks_uri", "blob_data_endpoint"];
 
 /** The Integration tab: copy-paste setup with the real issuer and this app's client id. */
 export function AppIntegration({ app, issuer, endpoints }: { app: AdminApp; issuer: string; endpoints: Record<string, string> }) {

@@ -3,8 +3,11 @@
  * nothing here carries a secret (an app's `secret_hash` never leaves the server).
  */
 
-export type ScopeName = "openid" | "profile" | "email" | "offline_access";
-export const SCOPE_NAMES: readonly ScopeName[] = ["openid", "profile", "email", "offline_access"];
+export type ScopeName = "openid" | "profile" | "email" | "data" | "offline_access";
+/** Every scope, in the order the consent screen lists them (same as SCOPES in config.ts). */
+export const SCOPE_NAMES: readonly ScopeName[] = ["openid", "profile", "email", "data", "offline_access"];
+/** What a new app may ask for unless the admin changes it. "data" is opt-in. */
+export const DEFAULT_SCOPES: readonly ScopeName[] = ["openid", "profile", "email", "offline_access"];
 
 /** An app as the admin panel sees it: everything except the secret's hash. */
 export type AdminApp = {

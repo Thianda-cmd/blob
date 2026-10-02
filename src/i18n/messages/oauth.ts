@@ -16,6 +16,7 @@ export const oauthText = defineMessages({
         openid: { title: "That it's you", body: "A private ID so the app recognises you next time." },
         profile: { title: "Your name and profile picture", body: "As they appear in Blob." },
         email: { title: "Your email address", body: "To reach you or match your account." },
+        data: { title: "Save the app's data in your Blob account", body: "Like your progress, so it's there on every device." },
         offline_access: { title: "Stay signed in", body: "Until you sign out or remove access." },
       },
       never: (app: string) => `${app} never sees your notes, presentations, tasks or password.`,
@@ -61,7 +62,7 @@ export const oauthText = defineMessages({
       removeTitle: (app: string) => `Remove ${app}?`,
       removeBody: (app: string) => `${app} will be signed out and has to ask again next time.`,
       removed: (app: string) => `${app} no longer has access.`,
-      scopeShort: { openid: "ID", profile: "name and picture", email: "email", offline_access: "stays signed in" } as Record<string, string>,
+      scopeShort: { openid: "ID", profile: "name and picture", email: "email", data: "saves app data", offline_access: "stays signed in" } as Record<string, string>,
     },
   },
   de: {
@@ -78,6 +79,7 @@ export const oauthText = defineMessages({
         openid: { title: "Dass du es bist", body: "Eine private ID, damit die App dich wiedererkennt." },
         profile: { title: "Deinen Namen und dein Profilbild", body: "So, wie sie in Blob stehen." },
         email: { title: "Deine E-Mail-Adresse", body: "Um dich zu erreichen oder dein Konto zuzuordnen." },
+        data: { title: "Deine Daten aus der App speichern", body: "Zum Beispiel deinen Fortschritt, damit er auf jedem Gerät da ist." },
         offline_access: { title: "Angemeldet bleiben", body: "Bis du dich abmeldest oder den Zugriff entfernst." },
       },
       never: (app) => `${app} sieht nie deine Notizen, Präsentationen, Aufgaben oder dein Passwort.`,
@@ -123,7 +125,7 @@ export const oauthText = defineMessages({
       removeTitle: (app) => `${app} entfernen?`,
       removeBody: (app) => `${app} wird abgemeldet und muss beim nächsten Mal wieder fragen.`,
       removed: (app) => `${app} hat keinen Zugriff mehr.`,
-      scopeShort: { openid: "ID", profile: "Name und Bild", email: "E-Mail", offline_access: "bleibt angemeldet" } as Record<string, string>,
+      scopeShort: { openid: "ID", profile: "Name und Bild", email: "E-Mail", data: "speichert App-Daten", offline_access: "bleibt angemeldet" } as Record<string, string>,
     },
   },
 });

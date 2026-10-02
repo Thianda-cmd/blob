@@ -83,8 +83,10 @@ export const developersText = defineMessages({
         </>
       ),
     },
+    example: { site: "your-site.org", redirect: "https://your-site.org/blob-callback.html" },
     popup: {
       title: "The popup and the callback page",
+      flowEnd: "gets the user",
       paragraphs: [
         <>
           <C>signIn()</C> opens Blob in a centred popup about 480 pixels wide. People sign in there (or create an account) and allow your app. Blob then
@@ -118,6 +120,7 @@ export const developersText = defineMessages({
         ["getAccessToken()", "A valid access token for your own API, refreshed when needed, or null when signed out."],
         ["signOut()", "Signs out of your site and revokes the refresh token. Blob itself stays signed in."],
         ["button()", "A ready-made “Sign in with Blob” button that calls signIn()."],
+        ["data.list() · get(key) · put(key, value) · delete(key)", "The app's own data in the person's Blob account (needs the “data” scope). Each app only sees its own keys."],
       ] as [string, string][],
     },
     scopes: {
@@ -128,12 +131,14 @@ export const developersText = defineMessages({
         openid: "Required. A private, stable ID for the person in your app.",
         profile: "Name, first name, profile picture and language, as set in Blob.",
         email: "The email address and whether it is confirmed.",
+        data: "Lets the app keep its own data for the person in Blob (like progress), through blob.data or /api/v1/data. Only for apps the admin allowed it.",
         offline_access: "A refresh token, so people stay signed in for up to 30 days.",
       } as Record<string, string>,
       claims: {
         openid: "sub",
         profile: "name, given_name, picture, locale, updated_at",
         email: "email, email_verified",
+        data: "–",
         offline_access: "refresh_token",
       } as Record<string, string>,
       note: (
@@ -153,6 +158,7 @@ export const developersText = defineMessages({
         userinfo_endpoint: "User info",
         revocation_endpoint: "Revocation",
         jwks_uri: "Public keys (JWKS)",
+        blob_data_endpoint: "App data (scope data)",
       } as Record<string, string>,
     },
     server: {
@@ -287,8 +293,10 @@ export const developersText = defineMessages({
         </>
       ),
     },
+    example: { site: "deine-seite.de", redirect: "https://deine-seite.de/blob-callback.html" },
     popup: {
       title: "Das Pop-up und die Callback-Seite",
+      flowEnd: "kennt die Person",
       paragraphs: [
         <>
           <C>signIn()</C> öffnet Blob in einem zentrierten Pop-up, etwa 480 Pixel breit. Dort meldet man sich an (oder erstellt ein Konto) und erlaubt
@@ -323,6 +331,7 @@ export const developersText = defineMessages({
         ["getAccessToken()", "Ein gültiges Access-Token für deine eigene API, bei Bedarf erneuert, oder null, wenn niemand angemeldet ist."],
         ["signOut()", "Meldet von deiner Seite ab und widerruft das Refresh-Token. Blob selbst bleibt angemeldet."],
         ["button()", "Ein fertiger Button „Mit Blob anmelden“, der signIn() aufruft."],
+        ["data.list() · get(key) · put(key, value) · delete(key)", "Die eigenen Daten der App im Blob-Konto der Person (braucht den Scope „data“). Jede App sieht nur ihre eigenen Schlüssel."],
       ],
     },
     scopes: {
@@ -333,12 +342,14 @@ export const developersText = defineMessages({
         openid: "Pflicht. Eine private, feste ID der Person in deiner App.",
         profile: "Name, Vorname, Profilbild und Sprache, so wie sie in Blob stehen.",
         email: "Die E-Mail-Adresse und ob sie bestätigt ist.",
+        data: "Die App darf eigene Daten der Person in Blob ablegen (z. B. Fortschritt), über blob.data oder /api/v1/data. Nur für Apps, denen der Admin das erlaubt.",
         offline_access: "Ein Refresh-Token, damit man bis zu 30 Tage angemeldet bleibt.",
       } as Record<string, string>,
       claims: {
         openid: "sub",
         profile: "name, given_name, picture, locale, updated_at",
         email: "email, email_verified",
+        data: "–",
         offline_access: "refresh_token",
       } as Record<string, string>,
       note: (
@@ -359,6 +370,7 @@ export const developersText = defineMessages({
         userinfo_endpoint: "Benutzerinfo",
         revocation_endpoint: "Widerruf",
         jwks_uri: "Öffentliche Schlüssel (JWKS)",
+        blob_data_endpoint: "App-Daten (Scope data)",
       } as Record<string, string>,
     },
     server: {

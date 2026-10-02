@@ -9,7 +9,7 @@ import "server-only";
  */
 
 /** Scopes an app can ask for, in the order the consent screen lists them. */
-export const SCOPES = ["openid", "profile", "email", "offline_access"] as const;
+export const SCOPES = ["openid", "profile", "email", "data", "offline_access"] as const;
 export type Scope = (typeof SCOPES)[number];
 export const isScope = (s: string): s is Scope => (SCOPES as readonly string[]).includes(s);
 
@@ -45,3 +45,6 @@ export const endpoints = (iss: string) => ({
   revocation_endpoint: `${iss}/api/oauth/revoke`,
   jwks_uri: `${iss}/oauth/jwks`,
 });
+
+/** Where apps with the "data" scope keep their own data for a person (see lib/oauth/data.ts). */
+export const dataEndpoint = (iss: string) => `${iss}/api/v1/data`;

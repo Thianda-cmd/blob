@@ -26,11 +26,11 @@ export function StatTile({ label, value, sub, icon, delay = 0 }: { label: string
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 380, damping: 32, delay }}
-      className="min-w-0 rounded-xl border border-line bg-raised p-4 shadow-card"
+      className="h-full min-w-0 rounded-xl border border-line bg-raised p-4 shadow-card"
     >
-      <div className="flex items-center gap-1.5 text-[12.5px] text-ink-3 [&_svg]:size-3.5 [&_svg]:shrink-0">
+      <div className="flex items-start gap-1.5 text-[12.5px] leading-tight text-ink-3 [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
         {icon}
-        <span className="truncate">{label}</span>
+        <span className="min-w-0">{label}</span>
       </div>
       <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.025em] text-ink">{formatNumber(value, locale)}</div>
       {sub && <div className="mt-2 flex items-center gap-1 text-[12px] leading-snug text-ink-3">{sub}</div>}
@@ -90,12 +90,13 @@ export function SignInChart({ series, className }: { series: DayCount[]; classNa
                 const pct = (d.count / top) * 100;
                 return (
                   <div key={d.day} className="relative flex h-full min-w-0 flex-1 items-end justify-center" onPointerEnter={() => setHover(i)}>
+                    {hover === i && <div className="absolute inset-0 rounded-[4px] bg-hover/50" />}
                     {d.count > 0 && (
                       <motion.div
                         initial={{ scaleY: 0 }}
                         animate={{ scaleY: 1 }}
                         transition={{ type: "spring", stiffness: 240, damping: 30, delay: 0.1 + i * 0.012 }}
-                        className={cn("w-full max-w-[24px] rounded-t-[4px] transition-colors", hover === i ? "bg-blob-deep" : "bg-blob")}
+                        className={cn("relative w-full max-w-[24px] rounded-t-[4px] transition-colors", hover === i ? "bg-blob-deep" : "bg-blob")}
                         style={{ height: `${pct}%`, originY: 1 }}
                       />
                     )}
