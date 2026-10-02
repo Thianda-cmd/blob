@@ -161,9 +161,12 @@ export class BlobAuth {
     let resolve, reject;
     const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
     const timer = setInterval(() => {
-      if (popup.closed && this.waiting?.state === state) {
+      // Closed without an answer. (The callback page closes itself too: then the code is being
+      // swapped for tokens, which can take longer than this check.)
+      const unanswered = () => this.waiting?.state === state && !this.waiting.finishing;
+      if (popup.closed && unanswered()) {
         // Give a just-delivered message a moment to arrive.
-        setTimeout(() => this.waiting?.state === state && this.#settle(new BlobAuthError("popup_closed", "The sign-in window was closed.")), 400);
+        setTimeout(() => unanswered() && this.#settle(new BlobAuthError("popup_closed", "The sign-in window was closed.")), 400);
       }
     }, 500);
     this.waiting = { state, resolve, reject, popup, timer, promise };
@@ -264,11 +267,15 @@ export class BlobAuth {
 
   // ---------------------------------------------------------------------------------------
 
+  /** Blob's endpoints. Throws "network_error" when Blob can't be reached (offline, DNS, down), "discovery_failed" on a bad answer. */
   async #config() {
     if (this.discovery) return this.discovery;
-    const res = await fetch(`${this.issuer}/.well-known/openid-configuration`);
-    if (!res.ok) throw new BlobAuthError("discovery_failed", "Couldn't reach Blob.");
-    this.discovery = await res.json();
+    const res = await fetch(`${this.issuer}/.well-known/openid-configuration`).catch((error) => {
+      throw new BlobAuthError("network_error", `Couldn't reach Blob (${error?.message || error}).`);
+    });
+    const config = res.ok ? await res.json().catch(() => null) : null;
+    if (!config?.authorization_endpoint) throw new BlobAuthError("discovery_failed", "Couldn't reach Blob.");
+    this.discovery = config;
     return this.discovery;
   }
 
@@ -315,6 +322,7 @@ export class BlobAuth {
     if (event.origin !== location.origin || event.data?.type !== "blob-auth:callback") return;
     const url = new URL(event.data.url);
     if (!this.waiting || url.searchParams.get("state") !== this.waiting.state) return;
+    this.waiting.finishing = true;
     this.#finish(url).then(
       (user) => this.#settle(null, user),
       (error) => this.#settle(error),

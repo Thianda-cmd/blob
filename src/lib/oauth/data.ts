@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appByClientId, type OAuthApp } from "./apps";
 import { issuer } from "./config";
-import { corsFor, json } from "./http";
-import { grantActive, verifyAccessToken } from "./tokens";
+import { corsFor, corsForAnyApp, json } from "./http";
+import { activeGrant, effectiveScopes, issuedUnder, verifyAccessToken } from "./tokens";
 
 /**
  * App data: apps keep small JSON values (e.g. LernLabor's learning progress) in the person's
@@ -19,9 +19,12 @@ import { grantActive, verifyAccessToken } from "./tokens";
  */
 
 export const DATA_KEY = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
-/** Largest value, measured as UTF-8 JSON. Matches the check on oauth_app_data.size. */
+/**
+ * Largest value, measured as compact UTF-8 JSON. Matches the check on oauth_app_data.size.
+ * oauth_app_data_put also limits what Postgres stores (numbers like 1e308 are printed in full).
+ */
 export const MAX_VALUE_BYTES = 256 * 1024;
-/** Most keys one app may keep per person. */
+/** Most keys one app may keep per person. Enforced by oauth_app_data_put (0006). */
 export const MAX_KEYS = 50;
 /** Largest request body we read (the value plus its JSON wrapper, maybe pretty-printed). */
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -49,16 +52,38 @@ export async function authenticate(request: Request): Promise<DataCaller | NextR
   // CORS on errors too (an expired token must not look like a network failure to the app). An
   // unverified token only picks which app's origins may read the error; it grants nothing.
   const app = await appByClientId(claims?.client_id ?? unverifiedClientId(token));
-  const cors = corsFor(request, app);
+  const cors = app ? corsFor(request, app) : await corsForAnyApp(request);
   const invalid = () => dataError({ cors }, 401, "invalid_token", {}, { "WWW-Authenticate": 'Bearer error="invalid_token"' });
 
   if (!claims || !app || app.client_id !== claims.client_id || app.disabled) return invalid();
-  if (!(await grantActive(claims.sub, app.id))) return invalid();
-  if (!claims.scope.split(" ").includes("data") || !app.scopes.includes("data")) {
+  // Revoked, or issued before the person connected the app again: the token is dead for good.
+  const grant = await activeGrant(claims.sub, app.id);
+  if (!grant || !issuedUnder(claims, grant)) return invalid();
+  // "data" must still be in the token, in what the person allows and in what the app may ask for.
+  if (!effectiveScopes(claims, grant, app).includes("data")) {
     return dataError({ cors }, 403, "insufficient_scope", {}, { "WWW-Authenticate": 'Bearer error="insufficient_scope", scope="data"' });
   }
   return { app, userId: claims.sub, cors };
 }
+
+/**
+ * Wraps a data API handler so that unexpected failures still answer with JSON and CORS headers.
+ * Without CORS the app's browser code would only see a network error and keep retrying.
+ */
+export function guarded<R extends Request, A extends unknown[]>(handler: (request: R, ...rest: A) => Promise<Response>) {
+  return async (request: R, ...rest: A): Promise<Response> => {
+    try {
+      return await handler(request, ...rest);
+    } catch (error) {
+      console.error("data API", request.method, new URL(request.url).pathname, error);
+      return json({ error: "server_error", error_description: "Something went wrong in Blob. Try again later." }, 500, await corsForAnyApp(request));
+    }
+  };
+}
+
+/** JSON 405 for methods the data API doesn't have (instead of Next's empty answer without CORS). */
+export const methodNotAllowed = (allow: string) =>
+  guarded(async (request: Request) => json({ error: "method_not_allowed", error_description: `Allowed: ${allow}.` }, 405, { ...(await corsForAnyApp(request)), Allow: allow }));
 
 function unverifiedClientId(token: string | null): string | null {
   if (!token) return null;
@@ -145,29 +170,33 @@ export async function readPutBody(request: Request, caller: DataCaller): Promise
   }
   const size = Buffer.byteLength(serialized, "utf8");
   if (size > MAX_VALUE_BYTES) return tooLarge();
+  // Half of a UTF-16 surrogate pair (in a string or a key) has no UTF-8 form, so Postgres refuses it.
+  if (LONE_SURROGATE.test(serialized)) return bad("Text in the value must be valid Unicode (no lone surrogates).");
   return { value, version, size };
 }
+
+/**
+ * JSON.stringify writes characters raw, except control characters and lone surrogates, which it
+ * escapes as \uXXXX. So an escape \ud800–\udfff that isn't itself escaped (an odd run of
+ * backslashes before the u) is a lone surrogate.
+ */
+const LONE_SURROGATE = /(?<!\\)(?:\\\\)*\\ud[89a-f][0-9a-f]{2}/i;
 
 export type PutResult =
   | { kind: "ok"; key: string; version: number; updated_at: string }
   | { kind: "conflict"; current: { key: string; value: unknown; version: number; updated_at: string | null } }
   | { kind: "too_many_keys" }
+  | { kind: "too_large" }
   | { kind: "invalid"; description: string };
 
-/** Writes a value with optimistic concurrency (see oauth_app_data_put in 0005_oauth_app_data.sql). */
+/**
+ * Writes a value with optimistic concurrency. oauth_app_data_put (0006_oauth_app_data_limits.sql)
+ * runs one write per app and person at a time and checks the key limit and the stored size there,
+ * so parallel requests can't get past them.
+ */
 export async function putItem(caller: DataCaller, key: string, body: PutBody): Promise<PutResult> {
   const { app, userId } = caller;
-  const db = createAdminClient();
-
-  // Creating a new key? Then check the per-person limit first. (version n > 0 never creates.)
-  if (body.version === null || body.version === 0) {
-    const { data: keys, error } = await db.from("oauth_app_data").select("key").eq("app_id", app.id).eq("user_id", userId);
-    if (error) throw new Error(`oauth_app_data: ${error.message}`);
-    const existing = (keys ?? []).map((k) => k.key as string);
-    if (!existing.includes(key) && existing.length >= MAX_KEYS) return { kind: "too_many_keys" };
-  }
-
-  const { data, error } = await db.rpc("oauth_app_data_put", {
+  const { data, error } = await createAdminClient().rpc("oauth_app_data_put", {
     p_app_id: app.id,
     p_user_id: userId,
     p_key: key,
@@ -176,8 +205,11 @@ export async function putItem(caller: DataCaller, key: string, body: PutBody): P
     p_expected_version: body.version,
   });
   if (error) {
-    // Values Postgres' jsonb refuses (e.g. "\u0000" in a string) or that nest too deeply.
-    if (error.code?.startsWith("22") || error.code === "54001") return { kind: "invalid", description: "The value can't be stored as JSON." };
+    if (error.code === "BLB01") return { kind: "too_many_keys" };
+    if (error.code === "BLB02") return { kind: "too_large" };
+    // Values Postgres' jsonb refuses (e.g. "\u0000" in a string), that nest too deeply, or that
+    // PostgREST can't read as JSON.
+    if (error.code?.startsWith("22") || error.code === "54001" || error.code === "PGRST102") return { kind: "invalid", description: "The value can't be stored as JSON." };
     throw new Error(`oauth_app_data_put: ${error.message}`);
   }
   const row = (data as Row[] | null)?.[0];
@@ -186,4 +218,28 @@ export async function putItem(caller: DataCaller, key: string, body: PutBody): P
   // Someone else wrote in between (or the key doesn't exist / already exists): send the current state.
   const current = await getItem(caller, key);
   return { kind: "conflict", current: current ?? { key, value: null, version: 0, updated_at: null } };
+}
+
+/**
+ * For Settings › Connected apps: how much each app keeps for this person ({ app_id → keys, bytes }).
+ * Data stays when access is removed, so people need to see it and be able to delete it.
+ */
+export async function appDataUsage(userId: string): Promise<Map<string, { keys: number; bytes: number }>> {
+  const { data, error } = await createAdminClient().from("oauth_app_data").select("app_id, size").eq("user_id", userId);
+  if (error) throw new Error(`oauth_app_data: ${error.message}`);
+  const out = new Map<string, { keys: number; bytes: number }>();
+  for (const row of data ?? []) {
+    const entry = out.get(row.app_id) ?? { keys: 0, bytes: 0 };
+    entry.keys += 1;
+    entry.bytes += row.size as number;
+    out.set(row.app_id, entry);
+  }
+  return out;
+}
+
+/** Deletes everything one app keeps for one person (Settings › Connected apps). Returns how many keys went. */
+export async function deleteAppData(userId: string, appId: string): Promise<number> {
+  const { error, count } = await createAdminClient().from("oauth_app_data").delete({ count: "exact" }).eq("user_id", userId).eq("app_id", appId);
+  if (error) throw new Error(`oauth_app_data: ${error.message}`);
+  return count ?? 0;
 }

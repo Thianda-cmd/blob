@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fromUiLocales, isLocale, LOCALE_COOKIE, UI_LOCALE_COOKIE, UI_LOCALE_MAX_AGE } from "@/i18n/config";
 import { approve, checkAuthorizeRequest, loadRequest, needsConsent, readAuthorizeParams, redirectWith, saveRequest } from "@/lib/oauth/authorize";
 import { issuer } from "@/lib/oauth/config";
 import { sessionUser } from "@/lib/oauth/session";
@@ -37,13 +38,27 @@ async function handle(request: NextRequest, params: URLSearchParams) {
   return to(new URL(`/oauth/consent?request=${id}`, request.url).toString());
 }
 
+/**
+ * ui_locales (OIDC Core §3.1.2.1): the app's language for login, sign-up and consent, unless the
+ * person chose one in Blob. Kept in a short-lived cookie so it lasts through every page of the
+ * sign-in (also /login?next=…); a request without it goes back to the browser's language.
+ */
+function withUiLocale(response: NextResponse, request: NextRequest, params: URLSearchParams) {
+  if (isLocale(request.cookies.get(LOCALE_COOKIE)?.value)) return response;
+  const locale = fromUiLocales(params.get("ui_locales"));
+  if (locale) response.cookies.set(UI_LOCALE_COOKIE, locale, { path: "/", maxAge: UI_LOCALE_MAX_AGE, sameSite: "lax", httpOnly: true });
+  else if (request.cookies.has(UI_LOCALE_COOKIE)) response.cookies.delete(UI_LOCALE_COOKIE);
+  return response;
+}
+
 export async function GET(request: NextRequest) {
-  return handle(request, request.nextUrl.searchParams);
+  const params = request.nextUrl.searchParams;
+  return withUiLocale(await handle(request, params), request, params);
 }
 
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const params = new URLSearchParams();
   for (const [k, v] of form) if (typeof v === "string") params.set(k, v);
-  return handle(request, params);
+  return withUiLocale(await handle(request, params), request, params);
 }

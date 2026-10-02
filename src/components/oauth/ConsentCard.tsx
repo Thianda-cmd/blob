@@ -22,7 +22,7 @@ type Props = {
 
 const ICONS: Record<Scope, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, data: CloudUpload, offline_access: Clock3 };
 
-/** "Continue to LernLabor": who is signing in, what the app will see, Allow / Cancel. */
+/** "Continue to Lernpfad": who is signing in, what the app will be able to do, Allow / Cancel. Nothing is preselected. */
 export function ConsentCard({ request, account }: Props) {
   const t = useMessages(oauthText).consent;
   const router = useRouter();
@@ -146,7 +146,7 @@ export function ConsentCard({ request, account }: Props) {
         <Button variant="secondary" size="lg" onClick={() => go(false)} disabled={busy} loading={phase === "cancelled"}>
           {t.cancel}
         </Button>
-        <Button variant="blob" size="lg" onClick={() => go(true)} disabled={busy} loading={phase === "allowing"} autoFocus>
+        <Button variant="blob" size="lg" onClick={() => go(true)} disabled={busy} loading={phase === "allowing"}>
           {phase === "leaving" ? <Check className="size-4" /> : null}
           {t.allow}
         </Button>

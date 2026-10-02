@@ -1,13 +1,19 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
-import { isLocale, LOCALE_COOKIE, negotiate, type Locale } from "./config";
+import { isLocale, LOCALE_COOKIE, negotiate, UI_LOCALE_COOKIE, type Locale } from "./config";
 import type { Dict } from "./define";
 
-/** The visitor's language: their saved choice, else what their browser asks for. */
+/**
+ * The visitor's language: their saved choice, else the language an app asked for during
+ * "Sign in with Blob" (ui_locales), else what their browser asks for.
+ */
 export const getLocale = cache(async (): Promise<Locale> => {
-  const saved = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const jar = await cookies();
+  const saved = jar.get(LOCALE_COOKIE)?.value;
   if (isLocale(saved)) return saved;
+  const asked = jar.get(UI_LOCALE_COOKIE)?.value;
+  if (isLocale(asked)) return asked;
   return negotiate((await headers()).get("accept-language"));
 });
 

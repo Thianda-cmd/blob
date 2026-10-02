@@ -200,8 +200,14 @@ export async function approve(r: PendingRequest, userId: string, iss: string, au
   if (error) throw new Error(`oauth_codes: ${error.message}`);
   // Merge with what was granted before, so asking for less later doesn't drop earlier consent.
   const { data: prev } = await db.from("oauth_grants").select("scopes, revoked_at").eq("user_id", userId).eq("app_id", r.app.id).maybeSingle();
-  const scopes = [...new Set([...(prev && !prev.revoked_at ? (prev.scopes as string[]) : []), ...r.scopes])];
-  await db.from("oauth_grants").upsert({ user_id: userId, app_id: r.app.id, scopes, updated_at: now, revoked_at: null }, { onConflict: "user_id,app_id" });
+  const active = !!prev && !prev.revoked_at;
+  const scopes = [...new Set([...(active ? (prev.scopes as string[]) : []), ...r.scopes])];
+  // A new grant (also after a revoke) starts now: access tokens from before it stay invalid
+  // (issuedUnder in tokens.ts). Set here rather than by the database so it's on the same clock
+  // as the tokens' iat.
+  await db
+    .from("oauth_grants")
+    .upsert({ user_id: userId, app_id: r.app.id, scopes, updated_at: now, revoked_at: null, ...(active ? {} : { created_at: now }) }, { onConflict: "user_id,app_id" });
   await logEvent("authorize", r.app.id, userId);
   return redirectWith(r.redirectUri, { code, state: r.state }, iss);
 }

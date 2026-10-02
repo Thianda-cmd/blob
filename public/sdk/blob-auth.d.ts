@@ -25,9 +25,10 @@ export type BlobAuthOptions = {
 
 export declare class BlobAuthError extends Error {
   /**
-   * e.g. "access_denied", "popup_closed", "invalid_grant". From `blob.data`: "signed_out",
-   * "network_error", "conflict", "too_large", "too_many_keys", "invalid_request",
-   * "invalid_token", "insufficient_scope".
+   * e.g. "access_denied", "popup_closed", "invalid_grant", "network_error" (Blob can't be
+   * reached: offline, DNS, Blob down), "discovery_failed" (Blob answered, but not as expected).
+   * From `blob.data` also: "signed_out", "conflict", "too_large", "too_many_keys",
+   * "invalid_request", "invalid_token", "insufficient_scope".
    */
   code: string;
   /** HTTP status, when Blob's data API answered with an error. */

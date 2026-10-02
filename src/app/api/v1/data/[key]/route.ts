@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { authenticate, DATA_METHODS, dataError, deleteItem, getItem, MAX_KEYS, noContent, putItem, readPutBody, validKey } from "@/lib/oauth/data";
+import { authenticate, DATA_METHODS, dataError, deleteItem, getItem, guarded, MAX_KEYS, MAX_VALUE_BYTES, methodNotAllowed, noContent, putItem, readPutBody, validKey } from "@/lib/oauth/data";
 import { json, preflight } from "@/lib/oauth/http";
 
 type Ctx = RouteContext<"/api/v1/data/[key]">;
@@ -7,7 +7,7 @@ type Ctx = RouteContext<"/api/v1/data/[key]">;
 const badKey = "key must match ^[a-z0-9][a-z0-9_.-]{0,63}$.";
 
 /** One value this app keeps for the signed-in person. */
-export async function GET(request: NextRequest, ctx: Ctx) {
+export const GET = guarded(async (request: NextRequest, ctx: Ctx) => {
   const caller = await authenticate(request);
   if (caller instanceof Response) return caller;
   const { key } = await ctx.params;
@@ -15,10 +15,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const item = await getItem(caller, key);
   if (!item) return dataError(caller, 404, "not_found");
   return json(item, 200, caller.cors);
-}
+});
 
 /** Stores a value: `{ value, version? }`. version omitted = overwrite, 0 = create only, n = only if still n. */
-export async function PUT(request: NextRequest, ctx: Ctx) {
+export const PUT = guarded(async (request: NextRequest, ctx: Ctx) => {
   const caller = await authenticate(request);
   if (caller instanceof Response) return caller;
   const { key } = await ctx.params;
@@ -34,18 +34,24 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
       return dataError(caller, 409, "conflict", result.current);
     case "too_many_keys":
       return dataError(caller, 422, "too_many_keys", { error_description: `At most ${MAX_KEYS} keys per app and person.` });
+    case "too_large":
+      return dataError(caller, 413, "too_large", { error_description: `The value must be at most ${MAX_VALUE_BYTES} bytes as JSON (numbers like 1e308 count in full).` });
     case "invalid":
       return dataError(caller, 400, "invalid_request", { error_description: result.description });
   }
-}
+});
 
-export async function DELETE(request: NextRequest, ctx: Ctx) {
+export const DELETE = guarded(async (request: NextRequest, ctx: Ctx) => {
   const caller = await authenticate(request);
   if (caller instanceof Response) return caller;
   const { key } = await ctx.params;
   if (!validKey(key)) return dataError(caller, 400, "invalid_request", { error_description: badKey });
   await deleteItem(caller, key);
   return noContent(caller);
-}
+});
 
 export const OPTIONS = (request: NextRequest) => preflight(request, DATA_METHODS);
+
+const notHere = methodNotAllowed("GET, PUT, DELETE, OPTIONS");
+export const POST = notHere;
+export const PATCH = notHere;

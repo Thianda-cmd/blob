@@ -123,11 +123,41 @@ export async function verifyAccessToken(token: string, iss: string): Promise<Acc
   }
 }
 
-/** Is the person's permission for this app still in place (not revoked, app not disabled)? */
-export async function grantActive(userId: string, appId: string) {
-  const { data } = await createAdminClient().from("oauth_grants").select("revoked_at").eq("user_id", userId).eq("app_id", appId).maybeSingle();
-  return !!data && !data.revoked_at;
+/** A person's permission for an app as it stands now. `since`: when it was given (again). */
+export type ActiveGrant = { scopes: string[]; since: string };
+
+/**
+ * The person's permission for this app, or null when there is none or it was revoked.
+ * Connecting again after a revoke starts a new grant (`since` moves on, see approve()).
+ */
+export async function activeGrant(userId: string, appId: string): Promise<ActiveGrant | null> {
+  const { data, error } = await createAdminClient()
+    .from("oauth_grants")
+    .select("scopes, created_at, revoked_at")
+    .eq("user_id", userId)
+    .eq("app_id", appId)
+    .maybeSingle();
+  if (error) console.error("oauth_grants", error.message);
+  if (!data || data.revoked_at) return null;
+  return { scopes: data.scopes as string[], since: data.created_at as string };
 }
+
+/** Is the person's permission for this app still in place (not revoked)? */
+export async function grantActive(userId: string, appId: string) {
+  return !!(await activeGrant(userId, appId));
+}
+
+/**
+ * Was this access token issued under the grant as it is now? A token from before a revoke stays
+ * dead after the person connects the app again (maybe allowing less). Compared in whole seconds,
+ * like the token's iat.
+ */
+export const issuedUnder = (claims: Pick<AccessClaims, "iat">, grant: ActiveGrant) =>
+  typeof claims.iat === "number" && claims.iat >= Math.floor(Date.parse(grant.since) / 1000);
+
+/** Scopes an access token may still use: what it was issued with, minus anything the person or an admin has taken away since. */
+export const effectiveScopes = (claims: Pick<AccessClaims, "scope">, grant: ActiveGrant, app: Pick<OAuthApp, "scopes">) =>
+  claims.scope.split(" ").filter((s) => s && grant.scopes.includes(s) && app.scopes.includes(s));
 
 /** Revokes a person's permission for an app and every refresh token it holds. */
 export async function revokeGrant(userId: string, appId: string) {

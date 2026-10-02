@@ -12,19 +12,55 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 export const oauthError = (error: string, description: string, status = 400, headers: Record<string, string> = {}) =>
   json({ error, error_description: description }, status, headers);
 
+/** CORS headers for an allowed origin. The app may read WWW-Authenticate on errors too. */
+const allowOrigin = (origin: string) => ({ "Access-Control-Allow-Origin": origin, "Access-Control-Expose-Headers": "WWW-Authenticate", Vary: "Origin" });
+
 /** CORS headers when the request comes from one of the app's own origins. */
 export function corsFor(request: Request, app: Pick<OAuthApp, "redirect_uris" | "allowed_origins"> | null): Record<string, string> {
   const origin = request.headers.get("origin");
   if (!origin || !app || !appOrigins(app).includes(origin)) return {};
-  return { "Access-Control-Allow-Origin": origin, Vary: "Origin" };
+  return allowOrigin(origin);
+}
+
+/**
+ * Origins of all apps that are switched on. Kept for a minute per server instance, so
+ * preflights (which anyone can send, without a token) don't each read every app. A new
+ * redirect URI or origin can take up to a minute to pass preflights.
+ */
+const ORIGINS_TTL = 60_000;
+let origins: { at: number; set: Promise<Set<string>> } | null = null;
+
+function enabledOrigins(): Promise<Set<string>> {
+  if (origins && Date.now() - origins.at < ORIGINS_TTL) return origins.set;
+  const set = (async () => {
+    const { data, error } = await createAdminClient().from("oauth_apps").select("redirect_uris, allowed_origins").eq("disabled", false);
+    if (error) throw new Error(`oauth_apps: ${error.message}`);
+    return new Set((data ?? []).flatMap((app) => appOrigins(app)));
+  })();
+  origins = { at: Date.now(), set };
+  // Don't keep a failed lookup around.
+  set.catch(() => {
+    if (origins?.set === set) origins = null;
+  });
+  return set;
+}
+
+/**
+ * CORS headers when the origin belongs to any app that is switched on. For answers that can't
+ * know the calling app (preflights, unexpected errors); they never contain anyone's data.
+ */
+export async function corsForAnyApp(request: Request): Promise<Record<string, string>> {
+  const origin = request.headers.get("origin");
+  if (!origin) return {};
+  const known = await enabledOrigins().catch(() => new Set<string>());
+  return known.has(origin) ? allowOrigin(origin) : {};
 }
 
 /** Preflight: allowed when the origin belongs to any app that is switched on. */
 export async function preflight(request: Request, methods: string) {
   const origin = request.headers.get("origin");
   if (!origin) return new NextResponse(null, { status: 204 });
-  const { data } = await createAdminClient().from("oauth_apps").select("redirect_uris, allowed_origins").eq("disabled", false);
-  const ok = (data ?? []).some((app) => appOrigins(app).includes(origin));
+  const ok = (await enabledOrigins().catch(() => new Set<string>())).has(origin);
   if (!ok) return new NextResponse(null, { status: 204, headers: { Vary: "Origin" } });
   return new NextResponse(null, {
     status: 204,

@@ -18,7 +18,7 @@ export const authText = defineMessages({
     },
     stage: {
       hello: "Hi! I'm Blob. I keep your school stuff safe.",
-      privacy: "Your notes are private to you and protected by row-level security.",
+      privacy: "Only you can see your notes.",
       cards: {
         subject: "Biology",
         note: "Photosynthesis",
@@ -175,7 +175,7 @@ export const authText = defineMessages({
     },
     stage: {
       hello: "Hi! Ich bin Blob. Ich passe auf deinen Schulkram auf.",
-      privacy: "Deine Notizen siehst nur du. Sie sind durch Row-Level-Security geschützt.",
+      privacy: "Deine Notizen siehst nur du.",
       cards: {
         subject: "Biologie",
         note: "Fotosynthese",
