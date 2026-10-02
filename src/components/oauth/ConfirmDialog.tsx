@@ -54,10 +54,11 @@ export function ConfirmDialog({
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+          {/* Something that can't be undone starts on Cancel, so a stray Enter doesn't confirm it. */}
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading} autoFocus={tone === "danger"}>
             {cancelLabel}
           </Button>
-          <Button type="submit" variant={tone} loading={loading} autoFocus>
+          <Button type="submit" variant={tone} loading={loading} autoFocus={tone !== "danger"}>
             {confirmLabel}
           </Button>
         </div>

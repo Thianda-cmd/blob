@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { PATH_HEADER } from "@/lib/path-header";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
 const APP_PREFIXES = ["/home", "/p", "/tasks", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study", "/admin", "/oauth/consent"];
@@ -12,6 +13,8 @@ function matches(pathname: string, prefixes: string[]) {
 
 /** Refreshes the Supabase session cookie and guards app routes. */
 export async function updateSession(request: NextRequest) {
+  // For layouts and getLocale, which don't get the path.
+  request.headers.set(PATH_HEADER, request.nextUrl.pathname);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {

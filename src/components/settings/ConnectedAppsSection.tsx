@@ -35,9 +35,10 @@ export function ConnectedAppsSection({ apps }: { apps: ConnectedApp[] }) {
 
   function remove(app: ConnectedApp) {
     const withData = alsoData && !!app.data;
+    // Outside the transition, so the row changes right away rather than when the server answers.
+    // Without its data deleted, a removed app stays listed (so the data can still be deleted).
+    if (withData || !app.data) setRemoved((r) => [...r, app.app_id]);
     start(async () => {
-      // Without its data deleted, a removed app stays listed (so the data can still be deleted).
-      if (withData || !app.data) setRemoved((r) => [...r, app.app_id]);
       const result = await removeConnectedApp(app.app_id, withData).catch(() => ({ ok: false as const }));
       setConfirm(null);
       if (!result.ok) {
@@ -50,8 +51,8 @@ export function ConnectedAppsSection({ apps }: { apps: ConnectedApp[] }) {
   }
 
   function wipe(app: ConnectedApp) {
+    setWiped((w) => [...w, app.app_id]);
     start(async () => {
-      setWiped((w) => [...w, app.app_id]);
       const result = await deleteConnectedAppData(app.app_id).catch(() => ({ ok: false as const }));
       setConfirm(null);
       if (!result.ok) {
@@ -105,6 +106,7 @@ export function ConnectedAppsSection({ apps }: { apps: ConnectedApp[] }) {
         {confirm?.kind === "access" ? (
           <>
             {t.removeBody(confirm.app.name)}
+            {confirm.app.data && !alsoData && ` ${t.dataStays}`}
             {confirm.app.data && (
               <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-[13px] text-ink">
                 <input type="checkbox" className="mt-0.5 size-4 accent-[var(--blob)]" checked={alsoData} onChange={(e) => setAlsoData(e.target.checked)} />
@@ -113,7 +115,10 @@ export function ConnectedAppsSection({ apps }: { apps: ConnectedApp[] }) {
             )}
           </>
         ) : confirm ? (
-          t.deleteDataBody(confirm.app.name, size(confirm.app))
+          <>
+            {t.deleteDataBody(confirm.app.name, size(confirm.app))}
+            {confirm.app.connected && <span className="mt-2 block">{t.savesAgain(confirm.app.name)}</span>}
+          </>
         ) : null}
       </ConfirmDialog>
     </Section>
@@ -123,7 +128,7 @@ export function ConnectedAppsSection({ apps }: { apps: ConnectedApp[] }) {
 function Row({ app, size, onRemove, onDeleteData }: { app: ConnectedApp; size: string; onRemove: () => void; onDeleteData: () => void }) {
   const t = useMessages(oauthText).connected;
   const locale = useLocale();
-  const sees = app.scopes.filter((s) => s !== "openid" || app.scopes.length === 1).map((s) => t.scopeShort[s] ?? s);
+  const can = app.scopes.filter((s) => s !== "openid" || app.scopes.length === 1).map((s) => t.scopeCan[s] ?? s);
   const since = format(new Date(app.since), locale === "de" ? "d. MMM yyyy" : "d MMM yyyy", { locale: dateLocale(locale) });
   const lastUsed = app.last_used ? formatDistanceToNowStrict(new Date(app.last_used), { addSuffix: true, locale: dateLocale(locale) }) : null;
 
@@ -146,10 +151,10 @@ function Row({ app, size, onRemove, onDeleteData }: { app: ConnectedApp; size: s
           </div>
           {app.connected ? (
             <>
-              <div className="mt-0.5 text-[12.5px] text-ink-2">
-                <span className="text-ink-3">{t.sees}:</span> {sees.join(", ")}
+              <div className="mt-0.5 text-[12.5px] text-pretty text-ink-2">
+                <span className="text-ink-3">{t.can}:</span> {can.join(", ")}
               </div>
-              <div className="mt-0.5 text-[12px] text-ink-3" suppressHydrationWarning>
+              <div className="mt-0.5 text-[12px] text-pretty text-ink-3" suppressHydrationWarning>
                 {t.since(since)}
                 {lastUsed && ` · ${t.lastUsed(lastUsed)}`}
               </div>
@@ -159,14 +164,14 @@ function Row({ app, size, onRemove, onDeleteData }: { app: ConnectedApp; size: s
           )}
           {app.data && (
             <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">
-              <Database className="size-3.5 text-ink-3" /> {t.stores(size)}
+              <Database className="size-3.5 shrink-0 text-ink-3" /> {app.connected ? t.stores(size) : t.stillKeeps(size)}
             </div>
           )}
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-center">
         {app.data && (
-          <Button variant="ghost" size="sm" onClick={onDeleteData}>
+          <Button variant="ghost" size="sm" className="-ml-2.5 sm:ml-0" onClick={onDeleteData}>
             <Trash2 className="size-3.5" /> {t.deleteData}
           </Button>
         )}

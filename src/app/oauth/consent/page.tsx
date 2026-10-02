@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ConsentCard, RequestGone } from "@/components/oauth/ConsentCard";
 import { oauthText } from "@/i18n/messages/oauth";
 import { getMessages } from "@/i18n/server";
-import { loadRequest, requestView } from "@/lib/oauth/authorize";
+import { loadRequest, needsConsent, requestView } from "@/lib/oauth/authorize";
 import { sessionUser } from "@/lib/oauth/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,11 +25,16 @@ export default async function ConsentPage({ searchParams }: PageProps<"/oauth/co
   if (!user) redirect(`/login?next=${encodeURIComponent(`/oauth/continue?request=${pending.id}`)}`);
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle();
+  const [{ data: profile }, ask] = await Promise.all([
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle(),
+    needsConsent(pending.app, user.id, pending.scopes),
+  ]);
   const account = {
     name: profile?.full_name?.trim() || user.email?.split("@")[0] || "",
     email: user.email ?? "",
     avatar: profile?.avatar_url ?? null,
   };
-  return <ConsentCard request={requestView(pending)} account={account} />;
+  // Here for prompt=select_account or login (e.g. after signing out of the app) with everything
+  // already allowed: only confirm the account, no permissions to read through again.
+  return <ConsentCard request={requestView(pending)} account={account} confirmOnly={!pending.forceConsent && !ask} />;
 }

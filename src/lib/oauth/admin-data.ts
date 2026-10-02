@@ -173,7 +173,7 @@ export async function adminAppDetail(id: string) {
   const loadStorage = async () => {
     const owners = new Set<string>();
     for (let from = 0; from < 100 * PAGE; from += PAGE) {
-      const { data: rows } = await db.from("oauth_app_data").select("user_id, size").eq("app_id", id).range(from, from + PAGE - 1);
+      const { data: rows } = await db.from("oauth_app_data").select("user_id, size").eq("app_id", id).order("user_id").order("key").range(from, from + PAGE - 1);
       for (const r of rows ?? []) {
         owners.add(r.user_id as string);
         storage.keys += 1;

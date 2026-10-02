@@ -43,7 +43,10 @@ export type BlobDataKey = string;
 export type BlobDataItem<T = unknown> = {
   key: BlobDataKey;
   value: T;
-  /** Goes up by one on every write. */
+  /**
+   * Changes on every write and never goes back, also not after a delete. One counter for all of
+   * the app's keys, so not +1 per key: compare it only for equality and pass back the one you got.
+   */
   version: number;
   updated_at: string;
 };

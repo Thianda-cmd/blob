@@ -82,7 +82,6 @@ export async function removeConnectedApp(appId: unknown, deleteData?: unknown): 
   if (typeof appId !== "string" || !UUID.test(appId)) return { ok: false };
   const user = await sessionUser();
   if (!user) return { ok: false };
-  if (deleteData === true) await deleteAppData(user.id, appId);
   // Only the person's own, still active grant.
   const { data: grant } = await createAdminClient()
     .from("oauth_grants")
@@ -91,8 +90,9 @@ export async function removeConnectedApp(appId: unknown, deleteData?: unknown): 
     .eq("app_id", appId)
     .is("revoked_at", null)
     .maybeSingle();
-  if (!grant) return { ok: true };
-  await revokeGrant(user.id, appId);
+  if (grant) await revokeGrant(user.id, appId);
+  // Delete after revoking: a write already under way finishes first and goes too, later ones are refused.
+  if (deleteData === true) await deleteAppData(user.id, appId);
   revalidatePath("/settings");
   return { ok: true };
 }

@@ -11,10 +11,11 @@ export function formatNumber(n: number, locale: Locale, options?: Intl.NumberFor
   return new Intl.NumberFormat(intlLocale(locale), options).format(n);
 }
 
-/** "840 B", "12 KB", "1,2 MB" in the reader's number format. */
+/** "840 B" ("840 Byte" in German), "12 KB", "1,2 MB" in the reader's number format. */
 export function formatBytes(bytes: number, locale: Locale) {
-  if (bytes < 1024) return `${formatNumber(bytes, locale)} B`;
+  // A non-breaking space keeps number and unit on one line.
+  if (bytes < 1024) return `${formatNumber(bytes, locale)}\u00a0${locale === "de" ? "Byte" : "B"}`;
   const kb = bytes / 1024;
-  if (kb < 1024) return `${formatNumber(kb, locale, { maximumFractionDigits: kb < 10 ? 1 : 0 })} KB`;
-  return `${formatNumber(kb / 1024, locale, { maximumFractionDigits: 1 })} MB`;
+  if (kb < 1024) return `${formatNumber(kb, locale, { maximumFractionDigits: kb < 10 ? 1 : 0 })}\u00a0KB`;
+  return `${formatNumber(kb / 1024, locale, { maximumFractionDigits: 1 })}\u00a0MB`;
 }

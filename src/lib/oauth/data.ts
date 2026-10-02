@@ -145,11 +145,17 @@ export async function readPutBody(request: Request, caller: DataCaller): Promise
   if (text.length > MAX_BODY_BYTES) return tooLarge();
 
   let body: unknown;
+  // Numbers beyond what a double holds (1e400) parse to Infinity, which JSON can't store.
+  let infinite = false;
   try {
-    body = JSON.parse(text);
+    body = JSON.parse(text, (_key, v: unknown) => {
+      if (typeof v === "number" && !Number.isFinite(v)) infinite = true;
+      return v;
+    });
   } catch {
     return bad("The body must be JSON: { \"value\": …, \"version\"?: number }.");
   }
+  if (infinite) return bad("Numbers must fit in a double (1e400 doesn't).");
   if (!body || typeof body !== "object" || Array.isArray(body) || !("value" in body)) return bad("The body must be an object with a \"value\".");
   const { value, version: rawVersion } = body as { value: unknown; version?: unknown };
   // A top-level null can't be stored (DELETE the key instead); nulls inside objects are fine.
@@ -187,10 +193,11 @@ export type PutResult =
   | { kind: "conflict"; current: { key: string; value: unknown; version: number; updated_at: string | null } }
   | { kind: "too_many_keys" }
   | { kind: "too_large" }
+  | { kind: "no_access" }
   | { kind: "invalid"; description: string };
 
 /**
- * Writes a value with optimistic concurrency. oauth_app_data_put (0006_oauth_app_data_limits.sql)
+ * Writes a value with optimistic concurrency. oauth_app_data_put (0006, 0007 in supabase/migrations)
  * runs one write per app and person at a time and checks the key limit and the stored size there,
  * so parallel requests can't get past them.
  */
@@ -207,9 +214,11 @@ export async function putItem(caller: DataCaller, key: string, body: PutBody): P
   if (error) {
     if (error.code === "BLB01") return { kind: "too_many_keys" };
     if (error.code === "BLB02") return { kind: "too_large" };
+    // Access was removed while this write waited (0007_oauth_app_data_access.sql).
+    if (error.code === "BLB03") return { kind: "no_access" };
     // Values Postgres' jsonb refuses (e.g. "\u0000" in a string), that nest too deeply, or that
     // PostgREST can't read as JSON.
-    if (error.code?.startsWith("22") || error.code === "54001" || error.code === "PGRST102") return { kind: "invalid", description: "The value can't be stored as JSON." };
+    if (error.code?.startsWith("22") || error.code === "23502" || error.code === "54001" || error.code === "PGRST102") return { kind: "invalid", description: "The value can't be stored as JSON." };
     throw new Error(`oauth_app_data_put: ${error.message}`);
   }
   const row = (data as Row[] | null)?.[0];
@@ -239,7 +248,8 @@ export async function appDataUsage(userId: string): Promise<Map<string, { keys: 
 
 /** Deletes everything one app keeps for one person (Settings › Connected apps). Returns how many keys went. */
 export async function deleteAppData(userId: string, appId: string): Promise<number> {
-  const { error, count } = await createAdminClient().from("oauth_app_data").delete({ count: "exact" }).eq("user_id", userId).eq("app_id", appId);
-  if (error) throw new Error(`oauth_app_data: ${error.message}`);
-  return count ?? 0;
+  // Waits for a write that is under way (oauth_app_data_delete_all, 0007), so none lands after it.
+  const { data, error } = await createAdminClient().rpc("oauth_app_data_delete_all", { p_app_id: appId, p_user_id: userId });
+  if (error) throw new Error(`oauth_app_data_delete_all: ${error.message}`);
+  return (data as number | null) ?? 0;
 }

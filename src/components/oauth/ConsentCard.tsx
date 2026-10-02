@@ -18,12 +18,17 @@ type Scope = "openid" | "profile" | "email" | "data" | "offline_access";
 type Props = {
   request: { id: string; app: PublicApp; scopes: Scope[]; redirectOrigin: string };
   account: { name: string; email: string; avatar: string | null };
+  /** Everything asked for is already allowed: only confirm which account continues. */
+  confirmOnly?: boolean;
 };
 
 const ICONS: Record<Scope, typeof Mail> = { openid: Fingerprint, profile: UserRound, email: Mail, data: CloudUpload, offline_access: Clock3 };
 
-/** "Continue to Lernpfad": who is signing in, what the app will be able to do, Allow / Cancel. Nothing is preselected. */
-export function ConsentCard({ request, account }: Props) {
+/**
+ * "Continue to Lernpfad": who is signing in, what the app will be able to do, Allow / Cancel.
+ * Nothing is preselected. With confirmOnly (allowed before), just which account continues.
+ */
+export function ConsentCard({ request, account, confirmOnly = false }: Props) {
   const t = useMessages(oauthText).consent;
   const router = useRouter();
   const { app } = request;
@@ -79,7 +84,7 @@ export function ConsentCard({ request, account }: Props) {
       <Bridge app={app} blob={blob} mood={mood} phase={phase} />
 
       <h1 className="mt-1 text-center font-display text-[26px] font-bold leading-tight tracking-[-0.025em] text-balance">{t.title(app.name)}</h1>
-      <p className="mt-1.5 text-center text-[14px] text-ink-2">{t.subtitle(app.name)}</p>
+      <p className="mt-1.5 text-center text-[14px] text-pretty text-ink-2">{confirmOnly ? t.again(app.name) : t.subtitle(app.name)}</p>
 
       <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5">
         <Avatar name={account.name} src={account.avatar} />
@@ -104,35 +109,37 @@ export function ConsentCard({ request, account }: Props) {
         </button>
       </div>
 
-      <div className="mt-5">
-        <div className="text-[13px] font-semibold">{t.willSee(app.name)}</div>
-        <ul className="mt-3 space-y-2.5">
-          {shown.map((scope, i) => {
-            const Icon = ICONS[scope];
-            return (
-              <motion.li
-                key={scope}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.07, type: "spring", stiffness: 400, damping: 30 }}
-                className="flex items-start gap-3"
-              >
-                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-blob-soft text-blob-ink">
-                  <Icon className="size-4" />
-                </span>
-                <div className="min-w-0 leading-snug">
-                  <div className="text-[14px] font-medium">{t.scopes[scope].title}</div>
-                  <div className="text-[12.5px] text-ink-3">{t.scopes[scope].body}</div>
-                </div>
-              </motion.li>
-            );
-          })}
-        </ul>
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-hover/60 px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
-          <Lock className="mt-0.5 size-3.5 shrink-0" />
-          {t.never(app.name)}
+      {!confirmOnly && (
+        <div className="mt-5">
+          <div className="text-[13px] font-semibold">{t.willSee(app.name)}</div>
+          <ul className="mt-3 space-y-2.5">
+            {shown.map((scope, i) => {
+              const Icon = ICONS[scope];
+              return (
+                <motion.li
+                  key={scope}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25 + i * 0.07, type: "spring", stiffness: 400, damping: 30 }}
+                  className="flex items-start gap-3"
+                >
+                  <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-blob-soft text-blob-ink">
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 leading-snug">
+                    <div className="text-[14px] font-medium">{t.scopes[scope].title}</div>
+                    <div className="text-[12.5px] text-pretty text-ink-3">{t.scopes[scope].body}</div>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </ul>
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-hover/60 px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+            <Lock className="mt-0.5 size-3.5 shrink-0" />
+            {t.never(app.name)}
+          </div>
         </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {error && (
@@ -148,7 +155,7 @@ export function ConsentCard({ request, account }: Props) {
         </Button>
         <Button variant="blob" size="lg" onClick={() => go(true)} disabled={busy} loading={phase === "allowing"}>
           {phase === "leaving" ? <Check className="size-4" /> : null}
-          {t.allow}
+          {confirmOnly ? t.continue : t.allow}
         </Button>
       </div>
 
@@ -158,7 +165,7 @@ export function ConsentCard({ request, account }: Props) {
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className={cn("mt-4 text-center text-[12px]", phase === "ask" ? "text-ink-3" : "font-medium text-blob-ink")}
+          className={cn("mt-4 text-center text-[12px] text-pretty", phase === "ask" ? "text-ink-3" : "font-medium text-blob-ink")}
           role={phase === "ask" ? undefined : "status"}
         >
           {phase === "leaving" || phase === "allowing" ? t.redirecting(app.name) : phase === "cancelled" ? t.cancelled(app.name) : t.revokeHint}

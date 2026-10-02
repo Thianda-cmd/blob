@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { BlobBoot } from "@/components/blob/BlobBoot";
 import { AppShell } from "@/components/shell/AppShell";
@@ -5,6 +6,7 @@ import { WorkspaceProvider } from "@/components/workspace/WorkspaceProvider";
 import { shellText } from "@/i18n/messages/shell";
 import { getMessages } from "@/i18n/server";
 import { isAdmin } from "@/lib/oauth/admin";
+import { PATH_HEADER } from "@/lib/path-header";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { PAGE_META_COLUMNS, type PageMeta, type Profile, type Subject } from "@/lib/types";
 import { firstName } from "@/lib/utils";
@@ -23,7 +25,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   ]);
 
   const profile = profileRes.data as Profile | null;
-  if (!profile?.onboarded) redirect("/onboarding");
+  // Settings open without onboarding too: people who use Blob only to sign in to other apps
+  // (Lernpfad) manage those apps and their data there, without setting up a workspace first.
+  const path = (await headers()).get(PATH_HEADER) ?? "";
+  const settings = path === "/settings" || path.startsWith("/settings/");
+  if (!profile || (!profile.onboarded && !settings)) redirect("/onboarding");
 
   const name = firstName(profile.full_name);
   const t = await getMessages(shellText);

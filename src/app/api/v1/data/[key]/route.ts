@@ -38,6 +38,8 @@ export const PUT = guarded(async (request: NextRequest, ctx: Ctx) => {
       return dataError(caller, 413, "too_large", { error_description: `The value must be at most ${MAX_VALUE_BYTES} bytes as JSON (numbers like 1e308 count in full).` });
     case "invalid":
       return dataError(caller, 400, "invalid_request", { error_description: result.description });
+    case "no_access":
+      return dataError(caller, 401, "invalid_token", {}, { "WWW-Authenticate": 'Bearer error="invalid_token"' });
   }
 });
 
