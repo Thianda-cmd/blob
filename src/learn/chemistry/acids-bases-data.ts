@@ -70,7 +70,7 @@ const SHADES: Record<IndicatorId, Shade[]> = {
 };
 
 export const INDICATORS: { id: IndicatorId; name: Text; short: Text }[] = [
-  { id: "universal", name: tx("universal indicator", "Universalindikator"), short: tx("Universal", "Universal") },
+  { id: "universal", name: tx("universal indicator", "Universalindikator"), short: tx("Universal indicator", "Universalindikator") },
   { id: "bromothymol", name: tx("bromothymol blue", "Bromthymolblau"), short: tx("Bromothymol blue", "Bromthymolblau") },
   { id: "phenolphthalein", name: tx("phenolphthalein", "Phenolphthalein"), short: tx("Phenolphthalein", "Phenolphthalein") },
   { id: "litmus", name: tx("litmus", "Lackmus"), short: tx("Litmus", "Lackmus") },
@@ -132,17 +132,17 @@ export const PH_EXAMPLES: Everyday[] = [
 
 /** Solutions whose nature is clear-cut, for "acidic, neutral or alkaline?" tasks. */
 export const CLEAR_CUT: { name: Text; nature: Nature; why: Text }[] = [
-  { name: tx("lemon juice", "Zitronensaft"), nature: "acidic", why: tx("It contains citric acid.", "Er enthält Citronensäure.") },
-  { name: tx("vinegar", "Essig"), nature: "acidic", why: tx("It contains acetic acid.", "Er enthält Essigsäure.") },
-  { name: tx("cola", "Cola"), nature: "acidic", why: tx("It contains phosphoric acid and carbonic acid.", "Sie enthält Phosphorsäure und Kohlensäure.") },
-  { name: tx("stomach acid", "Magensaft"), nature: "acidic", why: tx("It contains hydrochloric acid.", "Er enthält Salzsäure.") },
-  { name: tx("descaler for kettles", "Entkalker für den Wasserkocher"), nature: "acidic", why: tx("It contains an acid that dissolves limescale.", "Er enthält eine Säure, die Kalk auflöst.") },
+  { name: tx("lemon juice", "Zitronensaft"), nature: "acidic", why: tx("Lemon juice contains citric acid.", "Zitronensaft enthält Citronensäure.") },
+  { name: tx("vinegar", "Essig"), nature: "acidic", why: tx("Vinegar contains acetic acid.", "Essig enthält Essigsäure.") },
+  { name: tx("cola", "Cola"), nature: "acidic", why: tx("Cola contains phosphoric acid and carbonic acid.", "Cola enthält Phosphorsäure und Kohlensäure.") },
+  { name: tx("stomach acid", "Magensaft"), nature: "acidic", why: tx("Stomach acid contains hydrochloric acid.", "Magensaft enthält Salzsäure.") },
+  { name: tx("descaler for kettles", "Entkalker für den Wasserkocher"), nature: "acidic", why: tx("Descaler contains an acid that dissolves limescale.", "Entkalker enthält eine Säure, die Kalk auflöst.") },
   { name: tx("distilled water", "destilliertes Wasser"), nature: "neutral", why: tx("Pure water has exactly as many $\\ce{H3O+}$ as $\\ce{OH-}$ ions.", "Reines Wasser hat genau gleich viele $\\ce{H3O+}$- wie $\\ce{OH-}$-Ionen.") },
   { name: tx("table salt solution", "Kochsalzlösung"), nature: "neutral", why: tx("Sodium chloride is the salt of a neutralisation: neither acid nor base is left over.", "Natriumchlorid ist das Salz einer Neutralisation: Weder Säure noch Base ist übrig.") },
   { name: tx("sugar solution", "Zuckerlösung"), nature: "neutral", why: tx("Sugar neither gives nor takes protons.", "Zucker gibt keine Protonen ab und nimmt keine auf.") },
   { name: tx("soapy water", "Seifenlauge"), nature: "alkaline", why: tx("Soap solutions contain hydroxide ions.", "Seifenlösungen enthalten Hydroxid-Ionen.") },
-  { name: tx("limewater", "Kalkwasser"), nature: "alkaline", why: tx("It is a solution of calcium hydroxide.", "Es ist eine Lösung von Calciumhydroxid.") },
-  { name: tx("drain cleaner", "Rohrreiniger"), nature: "alkaline", why: tx("It contains sodium hydroxide.", "Er enthält Natriumhydroxid.") },
+  { name: tx("limewater", "Kalkwasser"), nature: "alkaline", why: tx("Limewater is a solution of calcium hydroxide.", "Kalkwasser ist eine Lösung von Calciumhydroxid.") },
+  { name: tx("drain cleaner", "Rohrreiniger"), nature: "alkaline", why: tx("Drain cleaner contains sodium hydroxide.", "Rohrreiniger enthält Natriumhydroxid.") },
   { name: tx("glass cleaner with ammonia", "Glasreiniger mit Ammoniak"), nature: "alkaline", why: tx("Ammonia takes protons from water and forms hydroxide ions.", "Ammoniak nimmt Protonen vom Wasser auf, dabei entstehen Hydroxid-Ionen.") },
 ];
 

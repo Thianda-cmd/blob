@@ -110,8 +110,8 @@ function Charge({ at, r, q }: { at: P; r: number; q: number }) {
     <AnimatePresence>
       {q !== 0 && (
         <motion.g key={q} initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.4 }} style={{ transformBox: "fill-box", transformOrigin: "50% 50%" }}>
-          <circle cx={at.x + r * 0.85} cy={at.y - r * 0.85} r={10} fill="var(--blob)" />
-          <text x={at.x + r * 0.85} y={at.y - r * 0.85 + 4.5} textAnchor="middle" fill="white" style={{ fontSize: 15, fontWeight: 700 }}>
+          <circle cx={at.x + r + 9} cy={at.y - r * 0.55} r={10} fill="var(--blob)" />
+          <text x={at.x + r + 9} y={at.y - r * 0.55 + 4.5} textAnchor="middle" fill="white" style={{ fontSize: 15, fontWeight: 700 }}>
             {q > 0 ? "+" : "−"}
           </text>
         </motion.g>
@@ -156,6 +156,13 @@ export function AcidsBasesProtonHop() {
 
       <div className="overflow-hidden rounded-xl border border-line bg-surface px-2 py-2">
         <svg viewBox="0 0 360 214" className="mx-auto block w-full max-w-[520px]" role="img" aria-label={t(tx("A proton moves from one particle to another", "Ein Proton wandert von einem Teilchen zum anderen"))}>
+          {/* the bond the proton is leaving or joining */}
+          {phase === "done" ? (
+            <line x1={(scene.donor === "left" ? scene.right : scene.left).at.x} y1={(scene.donor === "left" ? scene.right : scene.left).at.y} x2={scene.to.x} y2={scene.to.y} stroke="var(--blob)" strokeWidth={2.5} />
+          ) : phase === "idle" ? (
+            <line x1={(scene.donor === "left" ? scene.left : scene.right).at.x} y1={(scene.donor === "left" ? scene.left : scene.right).at.y} x2={scene.from.x} y2={scene.from.y} stroke="var(--ink-3)" strokeWidth={2} />
+          ) : null}
+
           {sides.map(({ p, side }) => {
             const isDonor = side === scene.donor;
             return (
@@ -209,13 +216,6 @@ export function AcidsBasesProtonHop() {
               </g>
             );
           })}
-
-          {/* the bond the proton is leaving or joining */}
-          {phase === "done" ? (
-            <line x1={(scene.donor === "left" ? scene.right : scene.left).at.x} y1={(scene.donor === "left" ? scene.right : scene.left).at.y} x2={scene.to.x} y2={scene.to.y} stroke="var(--blob)" strokeWidth={2.5} />
-          ) : phase === "idle" ? (
-            <line x1={(scene.donor === "left" ? scene.left : scene.right).at.x} y1={(scene.donor === "left" ? scene.left : scene.right).at.y} x2={scene.from.x} y2={scene.from.y} stroke="var(--ink-3)" strokeWidth={2} />
-          ) : null}
 
           {/* the proton */}
           <motion.g
