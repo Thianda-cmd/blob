@@ -147,7 +147,7 @@ function PasswordRow() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const strength = passwordStrength(next);
+  const strength = passwordStrength(next, locale);
   const currentRef = useRef<HTMLInputElement>(null);
 
   function reset() {

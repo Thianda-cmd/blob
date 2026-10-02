@@ -39,6 +39,7 @@ export function LanguageSwitch({ compact, className }: { compact?: boolean; clas
         return (
           <button
             key={locale}
+            type="button"
             role="radio"
             aria-checked={on}
             lang={locale}

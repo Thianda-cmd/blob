@@ -106,7 +106,8 @@ export function ThemePicker({
               <Icon className={cn("hidden size-3.5 shrink-0 min-[400px]:block", selected ? "text-blob-ink" : "text-ink-3")} />
               <div className="min-w-0 flex-1">
                 <div className={cn("truncate font-medium leading-tight text-ink", size === "lg" ? "text-[14px]" : "text-[13px]")}>{label}</div>
-                {size === "lg" && <div className="truncate text-[12px] leading-tight text-ink-3">{hint}</div>}
+                {/* Hints may wrap: three cards side by side are narrow on phones. */}
+                {size === "lg" && <div className="text-pretty text-[12px] leading-tight text-ink-3">{hint}</div>}
               </div>
               <span
                 className={cn(

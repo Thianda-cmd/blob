@@ -148,7 +148,7 @@ export const settingsText = defineMessages({
       languageHint: "Blob, deine Lektionen und E-Mails wechseln in diese Sprache.",
       options: {
         light: { label: "Hell", hint: "Papierweiß" },
-        dark: { label: "Dunkel", hint: "Angenehm am Abend" },
+        dark: { label: "Dunkel", hint: "Angenehm nachts" },
         system: { label: "System", hint: "Wie dein Gerät" },
       },
     },

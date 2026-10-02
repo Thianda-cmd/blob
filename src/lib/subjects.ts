@@ -1,4 +1,3 @@
-import type { Locale } from "@/i18n/config";
 import type { SubjectColor } from "./types";
 
 /** Subject colours. Their names for people live in `subjectsText.colors` (src/i18n/messages/subjects.ts). */
@@ -38,8 +37,3 @@ export const SUBJECT_PRESETS: { name: string; de: string; emoji: string; color: 
   { name: "Philosophy", de: "Philosophie", emoji: "🦉", color: "sand" },
   { name: "Sports", de: "Sport", emoji: "🏃", color: "moss" },
 ];
-
-/** The onboarding suggestions with names in `locale` ("Mathe", "Deutsch"… in German). */
-export function subjectPresets(locale: Locale): { name: string; emoji: string; color: SubjectColor }[] {
-  return SUBJECT_PRESETS.map(({ name, de, emoji, color }) => ({ name: locale === "de" ? de : name, emoji, color }));
-}
