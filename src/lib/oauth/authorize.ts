@@ -81,6 +81,7 @@ export async function checkAuthorizeRequest(p: AuthorizeParams, iss: string): Pr
     return fail("invalid_request", "PKCE (code_challenge with S256) is required.");
   }
   const prompt = (p.prompt ?? "").split(/\s+/).filter(Boolean);
+  if (prompt.some((v) => !["none", "login", "consent", "select_account"].includes(v))) return fail("invalid_request", "Unknown prompt value.");
   if (prompt.includes("none") && prompt.length > 1) return fail("invalid_request", "prompt=none can't be combined.");
   return {
     kind: "ok",
