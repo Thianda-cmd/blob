@@ -146,6 +146,13 @@ export const learnText = defineMessages({
       answer: "Answer:",
       continue: "Continue",
       workedSolution: "See the worked solution",
+      yourAnswer: "Your answer",
+      notQuite: "Not quite",
+      noticed: [
+        "I think I see what happened. Look under your answer!",
+        "Ooh, I spotted something. Check my note below.",
+        "Hmm, let me show you what I noticed.",
+      ],
     },
 
     input: {
@@ -341,6 +348,13 @@ export const learnText = defineMessages({
       answer: "Lösung:",
       continue: "Weiter",
       workedSolution: "Lösungsweg ansehen",
+      yourAnswer: "Deine Antwort",
+      notQuite: "Nicht ganz",
+      noticed: [
+        "Ich glaub, ich weiß, was passiert ist. Schau mal unter deine Antwort!",
+        "Ooh, da ist mir was aufgefallen. Schau mal unten.",
+        "Hm, ich zeig dir, was ich gesehen habe.",
+      ],
     },
 
     input: {

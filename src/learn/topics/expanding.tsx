@@ -8,8 +8,9 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import { plainPoly, polyMul, type Poly } from "@/learn/engine/terms";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import { equivalentText } from "@/learn/engine/expr";
+import { plainPoly, polyAdd, polyMul, type Poly } from "@/learn/engine/terms";
+import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -156,14 +157,104 @@ const VARS = ["x", "x", "x", "a", "y", "b"];
 const EXPAND = tx("Expand", "Multipliziere aus");
 const EXPAND_SIMPLIFY = tx("Expand and simplify", "Multipliziere aus und fasse zusammen");
 
+/** Sum of chosen pairwise products, as a polynomial (to simulate skipped or mis-signed products). */
+function productsOf(a: Factor, b: Factor, pick: (i: number, j: number) => number): Poly {
+  let out: Poly = [0];
+  a.forEach((x, i) =>
+    b.forEach((y, j) => {
+      const k = pick(i, j);
+      if (!k) return;
+      const term: Poly = [];
+      term[x.p + y.p] = k * x.c * y.c;
+      out = polyAdd(out, Array.from(term, (c) => c ?? 0));
+    }),
+  );
+  return out;
+}
+
+/** Typical expanding slips, worked out for this task. */
+function expandMistakes(a: Factor, b: Factor, v: string, right: string, square: boolean): Mistake[] {
+  const out: Mistake[] = [];
+  const add = (p: Poly, title: Text, say: Text) => {
+    const value = plainPoly(p, v);
+    if (equivalentText(value, right) || out.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, value))) return;
+    out.push({ when: { kind: "expr", value }, title, say });
+  };
+  const sameSquare = square || (a.length === 2 && b.length === 2 && a.every((x, i) => x.c === b[i].c && x.p === b[i].p));
+  const conjugate = a.length === 2 && b.length === 2 && a[0].c === b[0].c && a[0].p === b[0].p && a[1].c === -b[1].c && a[1].p === b[1].p;
+
+  if (a.length === 1) {
+    const k = mono(a[0], v, "", true, false);
+    add(
+      polyAdd(productsOf(a, b, (_, j) => (j === 0 ? 1 : 0)), toPoly(b.slice(1))),
+      tx("Only the first term multiplied", "Nur der erste Term multipliziert"),
+      tx(
+        `The $${k}$ only reached the first term! It has to multiply **every** term in the bracket.`,
+        `Die $${k}$ hat nur den ersten Term erwischt! Sie muss **jeden** Term in der Klammer multiplizieren.`,
+      ),
+    );
+  }
+  // Minus times minus taken as minus.
+  if (a.some((x) => x.c < 0) && b.some((y) => y.c < 0)) {
+    add(
+      productsOf(a, b, (i, j) => (a[i].c < 0 && b[j].c < 0 ? -1 : 1)),
+      tx("Minus times minus", "Minus mal Minus"),
+      tx("Careful with the signs: minus times minus gives **plus**!", "Achtung bei den Vorzeichen: Minus mal Minus ergibt **Plus**!"),
+    );
+  }
+  if (a.length === 2 && b.length === 2) {
+    if (sameSquare) {
+      add(
+        productsOf(a, b, (i, j) => (i === j ? 1 : 0)),
+        tx("The middle term is missing", "Der Mittelterm fehlt"),
+        tx(
+          "The classic trap! $(a + b)^2$ is **not** $a^2 + b^2$: the middle term $2ab$ is missing. Write it as two brackets and you'll see it.",
+          "Die klassische Falle! $(a + b)^2$ ist **nicht** $a^2 + b^2$: Der Mittelterm $2ab$ fehlt. Schreib es als zwei Klammern, dann siehst du ihn.",
+        ),
+      );
+      if (a[1].c < 0) {
+        add(
+          productsOf(a, b, (i, j) => (i !== j ? -1 : 1)),
+          tx("Sign of the middle term", "Vorzeichen vom Mittelterm"),
+          tx(
+            "Nearly! With $(a - b)^2$ the middle term gets a **minus**: $a^2 - 2ab + b^2$.",
+            "Fast! Bei $(a - b)^2$ bekommt der Mittelterm ein **Minus**: $a^2 - 2ab + b^2$.",
+          ),
+        );
+      }
+    } else if (conjugate) {
+      add(
+        productsOf(a, b, (i, j) => (i === j ? (i === 1 ? -1 : 1) : 0)),
+        tx("Plus instead of minus", "Plus statt Minus"),
+        tx(
+          "Almost! The middle terms cancel out, right, but the last one is **minus**: $(a + b)(a - b) = a^2 - b^2$.",
+          "Fast! Die Mittelterme heben sich auf, stimmt, aber der letzte ist **minus**: $(a + b)(a - b) = a^2 - b^2$.",
+        ),
+      );
+    } else {
+      add(
+        productsOf(a, b, (i, j) => (i === j ? 1 : 0)),
+        tx("Only two of four products", "Nur zwei von vier Produkten"),
+        tx(
+          "You multiplied first with first and last with last. But **each** term meets **each** term: that's four products.",
+          "Du hast Erstes mal Erstes und Letztes mal Letztes gerechnet. Aber **jeder** Term trifft **jeden**: Das sind vier Produkte.",
+        ),
+      );
+    }
+  }
+  return out;
+}
+
 function make(a: Factor, b: Factor, v: string, hint: Text, square = false): Exercise {
   const p = resultPoly(a, b);
+  const value = plainPoly(p, v);
   return {
     instruction: EXPAND_SIMPLIFY,
     math: productSrc(a, b, v, false, square),
-    answer: { kind: "expr", value: plainPoly(p, v), form: "simplified" },
+    answer: { kind: "expr", value, form: "simplified" },
     hint,
     solution: expandFrames(a, b, v, { square }),
+    mistakes: expandMistakes(a, b, v, value, square),
   };
 }
 
@@ -447,6 +538,7 @@ const expanding: Topic = {
         answer: { kind: "expr", value: "8x-12", form: "simplified" },
         hint: tx("$4 \\cdot 2x$ and $4 \\cdot 3$. The minus stays.", "$4 \\cdot 2x$ und $4 \\cdot 3$. Das Minus bleibt."),
         solution: expandFrames([m(4)], [m(2, 1), m(-3)], "x"),
+        mistakes: expandMistakes([m(4)], [m(2, 1), m(-3)], "x", "8x-12", false),
       },
     },
     {
@@ -464,6 +556,7 @@ const expanding: Topic = {
         answer: { kind: "expr", value: "-10a+15", form: "simplified" },
         hint: tx("$-5 \\cdot 2a = -10a$ and $-5 \\cdot (-3) = +15$.", "$-5 \\cdot 2a = -10a$ und $-5 \\cdot (-3) = +15$."),
         solution: expandFrames([m(-5)], [m(2, 1), m(-3)], "a"),
+        mistakes: expandMistakes([m(-5)], [m(2, 1), m(-3)], "a", "-10a+15", false),
       },
     },
     {
@@ -485,6 +578,7 @@ const expanding: Topic = {
         answer: { kind: "expr", value: "x^2-3x-4", form: "simplified" },
         hint: tx("$x \\cdot x$, $x \\cdot (-4)$, $1 \\cdot x$ and $1 \\cdot (-4)$.", "$x \\cdot x$, $x \\cdot (-4)$, $1 \\cdot x$ und $1 \\cdot (-4)$."),
         solution: expandFrames([m(1, 1), m(1)], [m(1, 1), m(-4)], "x"),
+        mistakes: expandMistakes([m(1, 1), m(1)], [m(1, 1), m(-4)], "x", "x^2-3x-4", false),
       },
     },
     {
@@ -503,6 +597,7 @@ const expanding: Topic = {
         answer: { kind: "expr", value: "x^2-10x+25", form: "simplified" },
         hint: tx("$(a - b)^2 = a^2 - 2ab + b^2$ with $a = x$ and $b = 5$.", "$(a - b)^2 = a^2 - 2ab + b^2$ mit $a = x$ und $b = 5$."),
         solution: expandFrames([m(1, 1), m(-5)], [m(1, 1), m(-5)], "x", { square: true }),
+        mistakes: expandMistakes([m(1, 1), m(-5)], [m(1, 1), m(-5)], "x", "x^2-10x+25", true),
       },
     },
     {
@@ -514,6 +609,7 @@ const expanding: Topic = {
         answer: { kind: "expr", value: "4x^2-9", form: "simplified" },
         hint: tx("Same terms, different signs: that's the 3rd binomial formula.", "Gleiche Terme, verschiedene Vorzeichen: Das ist die 3. binomische Formel."),
         solution: expandFrames([m(2, 1), m(3)], [m(2, 1), m(-3)], "x"),
+        mistakes: expandMistakes([m(2, 1), m(3)], [m(2, 1), m(-3)], "x", "4x^2-9", false),
       },
     },
   ],

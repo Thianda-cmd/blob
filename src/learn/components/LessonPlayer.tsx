@@ -123,9 +123,12 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
       b?.celebrate();
       setSay(pick(t.lesson.cheers));
     } else if (event === "wrong") {
-      setMood("worried");
-      b?.shake();
-      setSay(feedback?.message ?? t.lesson.notQuite);
+      // A small slip gets a curious Blob; a real mistake a little shake. When Blob has
+      // worked out what happened, its note sits right under the answer, so it points there.
+      setMood(feedback?.partial ? "thinking" : "worried");
+      if (feedback?.partial) b?.squish(0.5);
+      else b?.shake();
+      setSay(feedback?.title ? pick(t.exercise.noticed) : (feedback?.message ?? t.lesson.notQuite));
     } else if (event === "hint") {
       setMood("thinking");
       setSay(t.lesson.hint);

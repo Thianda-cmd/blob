@@ -106,9 +106,12 @@ export function PracticePlayer({
       const cheer = pick(t.practice.cheers);
       setSay(session.combo + 1 >= 3 ? t.practice.inARow(session.combo + 1, cheer) : cheer);
     } else if (event === "wrong") {
-      setMood("worried");
-      b?.shake();
-      setSay(test ? t.practice.wrongTest : (feedback?.message ?? t.practice.notQuite));
+      // A small slip gets a curious Blob; a real mistake a little shake. When Blob has
+      // worked out what happened, its note sits right under the answer, so it points there.
+      setMood(feedback?.partial ? "thinking" : "worried");
+      if (feedback?.partial) b?.squish(0.5);
+      else b?.shake();
+      setSay(test ? t.practice.wrongTest : feedback?.title ? pick(t.exercise.noticed) : (feedback?.message ?? t.practice.notQuite));
     } else if (event === "hint") {
       setMood("thinking");
       setSay(t.practice.hint);

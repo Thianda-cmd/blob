@@ -1,6 +1,7 @@
 import type { Locale } from "@/i18n/config";
 import { resolveText, tx, type Text } from "@/i18n/text";
-import type { AnswerSpec, Feedback } from "@/learn/types";
+import type { AnswerSpec, Feedback, Mistake } from "@/learn/types";
+import { diagnoseExpr, diagnoseFraction, diagnoseInequality, diagnoseNumber, diagnosePair, diagnoseSolutions, type Diagnosis } from "./diagnose";
 import { close, equivalent, isExpanded, likeTermsCombined, parse, parseNumber, toDisplay } from "./expr";
 import { gcd } from "./rng";
 
@@ -54,7 +55,8 @@ export function numberReadings(raw: string, unit?: Text): number[] {
   return GROUPED.test(s) && !s.includes(",") ? [first, value(s.replace(/\./g, ""))] : [first];
 }
 
-export function check(spec: AnswerSpec, answer: AnswerValue): Feedback {
+/** Is the answer right? (Plus the basic messages; `check` adds Blob's diagnosis on top.) */
+function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
   switch (spec.kind) {
     case "number": {
       if (answer.kind !== "text") return { correct: false };
@@ -135,6 +137,72 @@ export function check(spec: AnswerSpec, answer: AnswerValue): Feedback {
     }
     case "choice":
       return { correct: answer.kind === "choice" && answer.index === spec.correct };
+  }
+}
+
+/**
+ * Check an answer. When it's wrong, Blob tries to understand what happened: first the
+ * exercise's own typical mistakes, then a general look at the answer (a sign flipped, a
+ * term missing, like terms not combined, values swapped…).
+ */
+export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: Mistake[] } = {}): Feedback {
+  const core = checkCore(spec, answer);
+  if (core.correct) return core;
+  const general = diagnose(spec, answer);
+  for (const m of opts.mistakes ?? []) {
+    if (m.when.kind !== spec.kind || !checkCore(m.when, answer).correct) continue;
+    return {
+      correct: false,
+      title: m.title ?? general?.title ?? tx("I see what happened", "Ich seh, was passiert ist"),
+      message: m.say,
+      mark: general?.mark ?? markOf(spec, answer),
+    };
+  }
+  if (general) return { correct: false, partial: general.close || core.partial, title: general.title, message: general.say, mark: general.mark };
+  return core;
+}
+
+function markOf(spec: AnswerSpec, answer: AnswerValue): string | undefined {
+  if (spec.kind !== "expr" || answer.kind !== "text") return undefined;
+  const p = parse(answer.text);
+  return p.ok ? toDisplay(p.ast) : undefined;
+}
+
+function diagnose(spec: AnswerSpec, answer: AnswerValue): Diagnosis | null {
+  switch (spec.kind) {
+    case "expr":
+      return answer.kind === "text" ? diagnoseExpr(spec, answer.text) : null;
+    case "number": {
+      if (answer.kind !== "text") return null;
+      const v = numberReadings(answer.text, spec.unit)[0];
+      return v === undefined ? null : diagnoseNumber(v, spec.value);
+    }
+    case "fraction": {
+      if (answer.kind !== "fraction") return null;
+      const n = parseNumber(answer.n);
+      const d = parseNumber(answer.d);
+      if (n === null || d === null || d === 0 || n === 0) return null;
+      return diagnoseFraction(n, d, spec);
+    }
+    case "solutions": {
+      if (answer.kind !== "list" || answer.none || !spec.values.length) return null;
+      const got = answer.values.map((t) => t.trim()).filter(Boolean).map(parseNumber);
+      if (!got.length || got.some((g) => g === null)) return null;
+      return diagnoseSolutions(got as number[], spec.values, spec.variable);
+    }
+    case "inequality": {
+      if (answer.kind !== "inequality") return null;
+      const v = parseNumber(answer.text);
+      return v === null || !answer.op ? null : diagnoseInequality(answer.op, v, spec);
+    }
+    case "pair": {
+      if (answer.kind !== "list") return null;
+      const nums = answer.values.map((t) => parsePlainNumber(t));
+      if (nums.some((n) => n === null)) return null;
+      return diagnosePair(nums[0]!, nums[1]!, spec);
+    }
+    case "choice":
+      return null;
   }
 }
 

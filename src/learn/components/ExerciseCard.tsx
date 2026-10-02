@@ -9,6 +9,7 @@ import { useText } from "@/i18n/useText";
 import { answerDisplay, check, type AnswerValue } from "@/learn/engine/answers";
 import type { Exercise, Feedback } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { Blob } from "@/components/blob/Blob";
 import { AnswerInput, type AnswerStatus } from "./AnswerInput";
 import { MathView } from "./MathView";
 import { Inline, Rich } from "./Rich";
@@ -83,7 +84,7 @@ export function ExerciseCard({
       animate(scopeRef.current, { x: [0, -8, 8, -5, 5, 0] }, { duration: 0.35 });
       return;
     }
-    const fb = check(exercise.answer, answer);
+    const fb = check(exercise.answer, answer, { mistakes: exercise.mistakes });
     const attempt = attempts + 1;
     setAttempts(attempt);
     setFeedback(fb);
@@ -193,11 +194,13 @@ export function ExerciseCard({
         </div>
       )}
 
-      <AnimatePresence>
-        {feedback && !done && status === "wrong" && (
-          <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-[14px] text-danger">
-            {feedback.message ? tt(feedback.message) : t.tryAgainLines[(tryOffset + attempts) % t.tryAgainLines.length]}
-          </motion.p>
+      <AnimatePresence mode="popLayout">
+        {feedback && status === "wrong" && (
+          <BlobNotice
+            key={`${attempts}`}
+            feedback={feedback}
+            fallback={t.tryAgainLines[(tryOffset + attempts) % t.tryAgainLines.length]}
+          />
         )}
       </AnimatePresence>
 
@@ -264,5 +267,45 @@ export function ExerciseCard({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * Blob's note right under the answer: what it thinks happened, with the student's own
+ * answer shown and the spots that matter highlighted.
+ */
+function BlobNotice({ feedback, fallback }: { feedback: Feedback; fallback: string }) {
+  const t = useMessages(learnText).exercise;
+  const tt = useText();
+  const close = Boolean(feedback.partial);
+  const message = feedback.message ? tt(feedback.message) : fallback;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+      transition={{ type: "spring", stiffness: 420, damping: 30 }}
+      className={cn("flex gap-3 rounded-2xl border p-3.5 sm:p-4", close ? "border-blob/30 bg-blob-soft/40" : "border-danger/25 bg-danger/[0.05]")}
+      role="status"
+    >
+      <div className="-my-1 shrink-0">
+        <Blob size={46} mood={close ? "thinking" : "worried"} interactive={false} />
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", close ? "text-blob-ink" : "text-danger")}>
+          {feedback.title ? tt(feedback.title) : t.notQuite}
+        </div>
+        {feedback.mark && (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-ink-3">
+            <span>{t.yourAnswer}</span>
+            <MathView src={feedback.mark} size="md" animate={false} className="text-ink" />
+          </div>
+        )}
+        <p className="text-[14.5px] leading-relaxed text-ink">
+          <Inline text={message} />
+        </p>
+      </div>
+    </motion.div>
   );
 }

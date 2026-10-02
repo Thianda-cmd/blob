@@ -136,11 +136,12 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
     case "op": {
       const signLike = node.v === "−" || node.v === "±";
       const unary =
-        signLike &&
+        (node.v === "+" && !prev) ||
+        (signLike &&
         (!prev ||
           (prev.type === "op" && !["!", "%", "°"].includes(prev.v) && (node.v === "−" || RELATIONS.has(prev.v))) ||
           (prev.type === "space" && prev.v === "br") ||
-          (node.v === "−" && prev.type === "text" && LABEL.test(prev.v)));
+          (node.v === "−" && prev.type === "text" && LABEL.test(prev.v))));
       const cls = RELATIONS.has(node.v) ? "mv-rel" : BINARY.has(node.v) && !unary ? "mv-bin" : node.v === "," || node.v === ";" ? "mv-punct" : "mv-op";
       return <Leaf k={node.k} ctx={ctx} className={cls}>{node.v}</Leaf>;
     }

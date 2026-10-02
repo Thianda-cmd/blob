@@ -48,7 +48,24 @@ export type AnswerSpec =
   /** Multiple choice. */
   | { kind: "choice"; options: RichText[]; correct: number };
 
-export type Feedback = { correct: boolean; message?: Text; partial?: boolean };
+export type Feedback = {
+  correct: boolean;
+  /** What Blob says about the answer. */
+  message?: Text;
+  /** Right idea, small slip (e.g. not simplified yet): counts as "close". */
+  partial?: boolean;
+  /** Short label for the feedback card ("Not simplified yet"). */
+  title?: Text;
+  /** The student's own answer (display language) with the spots that matter highlighted. */
+  mark?: string;
+};
+
+/**
+ * A typical wrong answer for this exercise and what Blob says when a student gives it,
+ * e.g. forgetting the middle term of (a + b)². Matched with the normal checker, so `when`
+ * is an AnswerSpec of the same kind ("expr" matches by value).
+ */
+export type Mistake = { when: AnswerSpec; title?: Text; say: Text };
 
 export type Exercise = {
   /** Short instruction, e.g. "Expand and simplify". */
@@ -62,6 +79,8 @@ export type Exercise = {
   hint?: RichText;
   /** Worked solution, animated frame by frame. */
   solution: Frame[];
+  /** Typical wrong answers with tailored feedback (checked before the generic diagnosis). */
+  mistakes?: Mistake[];
   /** Optional picture for the task (graph, number line…). */
   visual?: { component: ComponentType<Record<string, unknown>>; props: Record<string, unknown> };
 };

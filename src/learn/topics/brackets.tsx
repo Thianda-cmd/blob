@@ -9,7 +9,8 @@ import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
 import { showTerms, type Term } from "@/learn/engine/terms";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import { equivalentText } from "@/learn/engine/expr";
+import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // A small model of sums with brackets, rendered with stable token keys so each
@@ -206,14 +207,64 @@ function coef(rng: Rng, max = 9) {
 
 const INSTRUCTION = tx("Remove the brackets and simplify", "Löse die Klammern auf und fasse zusammen");
 
+/** Remove bracket `gid` the way a student with a misconception would. */
+function flattenWrong(items: Item[], gid: string, mode: "firstOnly" | "noFlip"): Item[] {
+  const out: Item[] = [];
+  for (const it of items) {
+    if (it.kind === "g" && it.id === gid) {
+      it.items.forEach((inner, j) => out.push(it.sign === -1 && mode === "firstOnly" && j === 0 ? flip(inner, -1) : inner));
+    } else if (it.kind === "g") out.push({ ...it, items: flattenWrong(it.items, gid, mode) });
+    else out.push(it);
+  }
+  return out;
+}
+
+/** The result a student gets with that misconception. */
+function wrongResult(start: Item[], mode: "firstOnly" | "noFlip"): string {
+  let cur = start;
+  for (let g = nextGroup(cur); g; g = nextGroup(cur)) cur = flattenWrong(cur, g.id, mode);
+  return plain(combineLike(cur)).replace(/\s+/g, "") || "0";
+}
+
+const hasMinusGroup = (items: Item[]): boolean => items.some((it) => it.kind === "g" && (it.sign === -1 || hasMinusGroup(it.items)));
+
+/** Typical slips with a minus in front of a bracket, worked out for this task. */
+function bracketMistakes(items: Item[], right: string): Mistake[] {
+  if (!hasMinusGroup(items)) return [];
+  const out: Mistake[] = [];
+  const add = (value: string, title: Text, say: Text) => {
+    if (equivalentText(value, right) || out.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, value))) return;
+    out.push({ when: { kind: "expr", value }, title, say });
+  };
+  add(
+    wrongResult(items, "firstOnly"),
+    tx("Only the first sign flipped", "Nur das erste Vorzeichen gedreht"),
+    tx(
+      "Ah, I see what happened! You flipped the first sign, but a minus in front of a bracket flips **every** sign inside, the last one too.",
+      "Ah, ich seh, was passiert ist! Du hast das erste Vorzeichen umgedreht, aber ein Minus vor der Klammer dreht **jedes** Vorzeichen darin um, auch das letzte.",
+    ),
+  );
+  add(
+    wrongResult(items, "noFlip"),
+    tx("The minus got ignored", "Minus übersehen"),
+    tx(
+      "Looks like you just dropped the brackets. But there's a minus in front! Then every sign inside has to flip.",
+      "Sieht so aus, als hättest du die Klammern einfach weggelassen. Aber davor steht ein Minus! Dann dreht sich jedes Vorzeichen in der Klammer um.",
+    ),
+  );
+  return out;
+}
+
 function exercise(items: Item[], hint: Text): Exercise {
   const { frames, result } = solve(items);
+  const value = plain(result).replace(/\s+/g, "") || "0";
   return {
     instruction: INSTRUCTION,
     math: plain(items),
-    answer: { kind: "expr", value: plain(result).replace(/\s+/g, "") || "0", form: "simplified" },
+    answer: { kind: "expr", value, form: "simplified" },
     hint,
     solution: frames,
+    mistakes: bracketMistakes(items, value),
   };
 }
 
@@ -477,6 +528,7 @@ const brackets: Topic = {
       exercise: {
         instruction: INSTRUCTION,
         math: "5a - (2a + 3)",
+        mistakes: bracketMistakes([term("a", 5, "a"), group("g", -1, [term("b", 2, "a"), term("c", 3)])], "3a-3"),
         answer: { kind: "expr", value: "3a-3", form: "simplified" },
         hint: tx("Flip both signs inside: $+2a$ becomes $-2a$, $+3$ becomes $-3$.", "Dreh beide Vorzeichen in der Klammer um: Aus $+2a$ wird $-2a$, aus $+3$ wird $-3$."),
         solution: [
@@ -498,6 +550,7 @@ const brackets: Topic = {
       exercise: {
         instruction: INSTRUCTION,
         math: "-(4 - 3y) + 2y",
+        mistakes: bracketMistakes([group("g", -1, [term("a", 4), term("b", -3, "y")]), term("c", 2, "y")], "5y-4"),
         answer: { kind: "expr", value: "5y-4", form: "simplified" },
         hint: tx("First $-(4 - 3y) = -4 + 3y$. Then combine the $y$-terms.", "Erst $-(4 - 3y) = -4 + 3y$. Dann fasst du die $y$-Terme zusammen."),
         solution: [
@@ -524,6 +577,7 @@ const brackets: Topic = {
       exercise: {
         instruction: INSTRUCTION,
         math: "12 - [x - (4 - 2x)]",
+        mistakes: bracketMistakes([term("k", 12), group("o", -1, [term("a", 1, "x"), group("i", -1, [term("b", 4), term("c", -2, "x")])], "[")], "16-3x"),
         answer: { kind: "expr", value: "16-3x", form: "simplified" },
         hint: tx("Innermost first: $x - (4 - 2x) = x - 4 + 2x = 3x - 4$.", "Die innerste zuerst: $x - (4 - 2x) = x - 4 + 2x = 3x - 4$."),
         solution: [
