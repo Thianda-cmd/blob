@@ -700,7 +700,7 @@ function storyAddTask(rng: Rng): Exercise | null {
   put(
     b,
     `${src(X)} ${op}#op ${src(Y)}`,
-    sign > 0 ? tx("Both parts together: add them.", "Beide Teile zusammen: addieren.") : tx("Take the second amount away: subtract.", "Die zweite Menge kommt weg: subtrahieren."),
+    sign > 0 ? tx("Both parts together: add them.", "Beide Teile zusammen: addieren.") : tx("Take the second amount away: subtract.", "Der zweite Teil wird weggenommen: subtrahieren."),
   );
   addSub(b, X, Y, sign, "op");
   finish(b.frames, r);
@@ -1053,6 +1053,12 @@ function generate(level: Level, rng: Rng): Exercise {
 
 type Cut = { key: string; at: number };
 
+/** Picks the English or German UI string for the current language. */
+function usePick() {
+  const de = useLocale() === "de";
+  return (en: string, deText: string) => (de ? deText : en);
+}
+
 function cutsFor(parts: number): Cut[] {
   const out: Cut[] = [];
   for (let i = 1; i < parts; i++) {
@@ -1140,6 +1146,7 @@ function sectorPath(c: number, r: number, t: number): string {
 }
 
 function FracPie({ parts, value, bg = "var(--raised)", appear = false, className }: { parts: number; value: number; bg?: string; appear?: boolean; className?: string }) {
+  const t = usePick();
   const C = 100;
   const R = 92;
   const v = useSpring(0, { stiffness: 150, damping: 22 });
@@ -1149,7 +1156,7 @@ function FracPie({ parts, value, bg = "var(--raised)", appear = false, className
   const d = useTransform(v, (t) => sectorPath(C, R, t));
   const lines: Cut[] = parts > 1 ? [{ key: "0-1", at: 0 }, ...cutsFor(parts)] : [];
   return (
-    <svg viewBox="0 0 200 200" className={cn("block", className)} role="img" aria-label={`Circle cut into ${parts} parts`}>
+    <svg viewBox="0 0 200 200" className={cn("block", className)} role="img" aria-label={t(`Circle cut into ${parts} parts`, `Kreis in ${parts} Teile geteilt`)}>
       <circle cx={C} cy={C} r={R} fill={EMPTY} />
       <motion.path d={d} fill="var(--blob)" />
       <AnimatePresence initial={appear}>
@@ -1178,10 +1185,11 @@ function FracPie({ parts, value, bg = "var(--raised)", appear = false, className
 
 /** The picture shown with "which fraction is shaded?" tasks. */
 function FractionPicture({ n, d, shape }: { n: number; d: number; shape: "bar" | "circle" }) {
+  const t = usePick();
   return (
     <div className="grid place-items-center px-2 py-4">
       {shape === "bar" ? (
-        <FracBar parts={d} segs={[{ key: "s", from: 0, to: n / d }]} bg="var(--surface)" appear height={60} className="max-w-[440px]" label={`Bar cut into ${d} parts`} />
+        <FracBar parts={d} segs={[{ key: "s", from: 0, to: n / d }]} bg="var(--surface)" appear height={60} className="max-w-[440px]" label={t(`Bar cut into ${d} parts`, `Streifen in ${d} Teile geteilt`)} />
       ) : (
         <FracPie parts={d} value={n / d} bg="var(--surface)" appear className="w-[180px]" />
       )}
@@ -1211,6 +1219,7 @@ function Segmented<T extends string>({ options, value, onChange, scope }: { opti
 }
 
 function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  const t = usePick();
   return (
     <div className="flex items-center gap-1.5">
       <span className="mr-1 text-[12.5px] text-ink-2">{label}</span>
@@ -1219,7 +1228,7 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
         className="grid size-8 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35"
-        aria-label={`Decrease ${label}`}
+        aria-label={t(`Decrease ${label}`, `${label} verkleinern`)}
       >
         <Minus className="size-3.5" />
       </button>
@@ -1231,7 +1240,7 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
         className="grid size-8 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35"
-        aria-label={`Increase ${label}`}
+        aria-label={t(`Increase ${label}`, `${label} vergrößern`)}
       >
         <Plus className="size-3.5" />
       </button>
@@ -1260,6 +1269,7 @@ function Chip({ children, onClick, disabled, title }: { children: ReactNode; onC
 type Op = { n: number; d: number; op: "x" | ":"; k: number };
 
 function FractionModel() {
+  const t = usePick();
   const scope = useId();
   const [shape, setShape] = useState<"bar" | "circle">("bar");
   const [cur, setCur] = useState({ n: 2, d: 3 });
@@ -1286,10 +1296,16 @@ function FractionModel() {
   const lit = last ? [`k${id(last)}`, `l${id(last)}`] : [];
 
   const message = !last
-    ? "Expand or simplify and watch the purple part. Does it change size?"
+    ? t("Expand or simplify and watch the purple part. Does it change size?", "Erweitere oder kürze und beobachte den lila Teil. Ändert sich seine Größe?")
     : last.op === "x"
-      ? `Every part was cut into ${last.k} smaller ones. ${last.k} times as many parts, ${last.k} times as many shaded: the same amount.`
-      : `Groups of ${last.k} parts were merged into one. Fewer, bigger parts, but still the same amount.`;
+      ? t(
+          `Every part was cut into ${last.k} smaller ones. ${last.k} times as many parts, ${last.k} times as many shaded: the same amount.`,
+          `Jedes Teil wurde in ${last.k} kleinere zerlegt. ${last.k}-mal so viele Teile und ${last.k}-mal so viele gefärbte: Der Anteil bleibt gleich.`,
+        )
+      : t(
+          `Groups of ${last.k} parts were merged into one. Fewer, bigger parts, but still the same amount.`,
+          `Je ${last.k} Teile wurden zu einem zusammengefasst. Weniger, dafür größere Teile, aber der Anteil bleibt gleich.`,
+        );
 
   return (
     <div className="space-y-5">
@@ -1297,20 +1313,20 @@ function FractionModel() {
         <Segmented
           scope={scope}
           options={[
-            ["bar", "Bar"],
-            ["circle", "Circle"],
+            ["bar", t("Bar", "Streifen")],
+            ["circle", t("Circle", "Kreis")],
           ]}
           value={shape}
           onChange={setShape}
         />
-        <Stepper label="Numerator" value={cur.n} min={1} max={cur.d} onChange={(n) => build(n, cur.d)} />
-        <Stepper label="Denominator" value={cur.d} min={1} max={24} onChange={(d) => build(cur.n, d)} />
+        <Stepper label={t("Numerator", "Zähler")} value={cur.n} min={1} max={cur.d} onChange={(n) => build(n, cur.d)} />
+        <Stepper label={t("Denominator", "Nenner")} value={cur.d} min={1} max={24} onChange={(d) => build(cur.n, d)} />
         <button
           type="button"
           onClick={() => build(2, 3)}
           className="ml-auto flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
         >
-          <RotateCcw className="size-3.5" /> Reset
+          <RotateCcw className="size-3.5" /> {t("Reset", "Zurücksetzen")}
         </button>
       </div>
 
@@ -1326,7 +1342,7 @@ function FractionModel() {
               className="grid w-full place-items-center"
             >
               {shape === "bar" ? (
-                <FracBar parts={cur.d} segs={[{ key: "s", from: 0, to: cur.n / cur.d }]} bg="var(--surface)" height={64} label={`${cur.n} of ${cur.d} parts`} />
+                <FracBar parts={cur.d} segs={[{ key: "s", from: 0, to: cur.n / cur.d }]} bg="var(--surface)" height={64} label={t(`${cur.n} of ${cur.d} parts`, `${cur.n} von ${cur.d} Teilen`)} />
               ) : (
                 <FracPie parts={cur.d} value={cur.n / cur.d} bg="var(--surface)" className="w-[190px]" />
               )}
@@ -1336,24 +1352,24 @@ function FractionModel() {
         <div className="flex flex-col items-center gap-2">
           <MathView src={formula} size="lg" scope={`${scope}-f`} highlight={lit} />
           <span className="text-[12.5px] text-ink-3">
-            {cur.n} of {cur.d} equal parts
+            {t(`${cur.n} of ${cur.d} equal parts`, `${cur.n} von ${cur.d} gleich großen Teilen`)}
           </span>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-1.5">
-          <span className="mr-1 text-[12.5px] text-ink-2">Expand</span>
+          <span className="mr-1 text-[12.5px] text-ink-2">{t("Expand", "Erweitern")}</span>
           {[2, 3, 4].map((k) => (
-            <Chip key={k} onClick={() => apply("x", k)} disabled={cur.d * k > 24} title={`Multiply top and bottom by ${k}`}>
+            <Chip key={k} onClick={() => apply("x", k)} disabled={cur.d * k > 24} title={t(`Multiply top and bottom by ${k}`, `Zähler und Nenner mit ${k} multiplizieren`)}>
               · {k}
             </Chip>
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="mr-1 text-[12.5px] text-ink-2">Simplify</span>
+          <span className="mr-1 text-[12.5px] text-ink-2">{t("Simplify", "Kürzen")}</span>
           {[2, 3, 5].map((k) => (
-            <Chip key={k} onClick={() => apply(":", k)} disabled={cur.n % k !== 0 || cur.d % k !== 0} title={`Divide top and bottom by ${k}`}>
+            <Chip key={k} onClick={() => apply(":", k)} disabled={cur.n % k !== 0 || cur.d % k !== 0} title={t(`Divide top and bottom by ${k}`, `Zähler und Nenner durch ${k} teilen`)}>
               : {k}
             </Chip>
           ))}
@@ -1364,7 +1380,7 @@ function FractionModel() {
             g === 1 ? "bg-ok/12 text-ok" : "bg-blob-soft text-blob-ink",
           )}
         >
-          {cur.n === cur.d ? "One whole" : g === 1 ? "Fully simplified" : `Can be simplified by ${g}`}
+          {cur.n === cur.d ? t("One whole", "Ein Ganzes") : g === 1 ? t("Fully simplified", "Vollständig gekürzt") : t(`Can be simplified by ${g}`, `Mit ${g} kürzbar`)}
         </span>
       </div>
       <AnimatePresence mode="wait" initial={false}>
@@ -1388,22 +1404,25 @@ const PAIRS: [number, number, number, number][] = [
   [4, 9, 1, 3],
 ];
 
-const PIECES: Record<number, string> = {
-  2: "halves",
-  3: "thirds",
-  4: "quarters",
-  5: "fifths",
-  6: "sixths",
-  8: "eighths",
-  9: "ninths",
-  10: "tenths",
-  12: "twelfths",
-  20: "twentieths",
-  24: "twenty-fourths",
+const PIECES: Record<number, [string, string]> = {
+  2: ["halves", "Halbe"],
+  3: ["thirds", "Drittel"],
+  4: ["quarters", "Viertel"],
+  5: ["fifths", "Fünftel"],
+  6: ["sixths", "Sechstel"],
+  8: ["eighths", "Achtel"],
+  9: ["ninths", "Neuntel"],
+  10: ["tenths", "Zehntel"],
+  12: ["twelfths", "Zwölftel"],
+  20: ["twentieths", "Zwanzigstel"],
+  24: ["twenty-fourths", "Vierundzwanzigstel"],
 };
-const pieces = (d: number) => PIECES[d] ?? `parts of ${d}`;
+const pieces = (d: number, de: boolean) => PIECES[d]?.[de ? 1 : 0] ?? (de ? `${d}-tel` : `parts of ${d}`);
 
 function CommonDenominator() {
+  const de = useLocale() === "de";
+  const t = (en: string, deText: string) => (de ? deText : en);
+  const P = (n: number) => pieces(n, de);
   const scope = useId();
   const [pi, setPi] = useState(0);
   const [sign, setSign] = useState<"+" | "-">("+");
@@ -1432,10 +1451,21 @@ function CommonDenominator() {
   const lit = step === 1 ? ["ak", "al", "ck", "cl"] : step === 2 ? ["ad", "cd"] : step === 3 ? ["rn"] : [];
 
   const texts = [
-    `These pieces have different sizes: ${pieces(b)} and ${pieces(d)}. You can't ${plus ? "add" : "subtract"} them yet.`,
-    `Expand: cut every piece into smaller ones until both bars have ${l} equal parts. The shaded amounts don't change.`,
-    `Now both fractions are counted in the same pieces: ${pieces(l)}. ${l} is the lowest common denominator.`,
-    plus ? `Same-sized pieces, so just count them: ${A2} + ${C2} = ${R} ${pieces(l)}.` : `Take ${C2} pieces away from ${A2}: ${R} ${pieces(l)} are left.`,
+    t(
+      `These pieces have different sizes: ${P(b)} and ${P(d)}. You can't ${plus ? "add" : "subtract"} them yet.`,
+      `Die Stücke sind verschieden groß: ${P(b)} und ${P(d)}. So kannst du sie noch nicht ${plus ? "addieren" : "subtrahieren"}.`,
+    ),
+    t(
+      `Expand: cut every piece into smaller ones until both bars have ${l} equal parts. The shaded amounts don't change.`,
+      `Erweitern: Zerlege jedes Stück in kleinere, bis beide Streifen ${l} gleich große Teile haben. Die gefärbten Anteile ändern sich nicht.`,
+    ),
+    t(
+      `Now both fractions are counted in the same pieces: ${P(l)}. ${l} is the lowest common denominator.`,
+      `Jetzt zählen beide Brüche in denselben Stücken: ${P(l)}. ${l} ist der Hauptnenner.`,
+    ),
+    plus
+      ? t(`Same-sized pieces, so just count them: ${A2} + ${C2} = ${R} ${P(l)}.`, `Gleich große Stücke, also einfach zählen: ${A2} + ${C2} = ${R} ${P(l)}.`)
+      : t(`Take ${C2} pieces away from ${A2}: ${R} ${P(l)} are left.`, `Nimm von ${A2} Stücken ${C2} weg: ${R} ${P(l)} bleiben übrig.`),
   ];
   const pieceText = texts[step];
 
@@ -1449,7 +1479,7 @@ function CommonDenominator() {
         { key: "a", from: 0, to: a / b - c / d, tone: "main", enter: [0, a / b], delay: 0.3 },
       ];
 
-  const labels = ["Start", "Expand", "Common denominator", plus ? "Add" : "Subtract"];
+  const labels = [t("Start", "Start"), t("Expand", "Erweitern"), t("Common denominator", "Hauptnenner"), plus ? t("Add", "Addieren") : t("Subtract", "Subtrahieren")];
 
   return (
     <div className="space-y-5">
@@ -1457,8 +1487,8 @@ function CommonDenominator() {
         <Segmented
           scope={scope}
           options={[
-            ["+", "Add"],
-            ["-", "Subtract"],
+            ["+", t("Add", "Addieren")],
+            ["-", t("Subtract", "Subtrahieren")],
           ]}
           value={sign}
           onChange={setSign}
@@ -1471,16 +1501,16 @@ function CommonDenominator() {
           }}
           className="ml-auto flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
         >
-          <Shuffle className="size-3.5" /> Another example
+          <Shuffle className="size-3.5" /> {t("Another example", "Neues Beispiel")}
         </button>
       </div>
 
       <div className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <BarRow label={step >= 2 ? fr(A2, l) : fr(a, b)} scope={`${scope}-la`}>
-          <FracBar parts={step >= 1 ? l : b} segs={[{ key: "a", from: 0, to: a / b }]} bg="var(--surface)" label="First fraction" />
+          <FracBar parts={step >= 1 ? l : b} segs={[{ key: "a", from: 0, to: a / b }]} bg="var(--surface)" label={t("First fraction", "Erster Bruch")} />
         </BarRow>
         <BarRow label={step >= 2 ? fr(C2, l) : fr(c, d)} scope={`${scope}-lc`}>
-          <FracBar parts={step >= 1 ? l : d} segs={[{ key: "c", from: 0, to: c / d, tone: "second" }]} bg="var(--surface)" label="Second fraction" />
+          <FracBar parts={step >= 1 ? l : d} segs={[{ key: "c", from: 0, to: c / d, tone: "second" }]} bg="var(--surface)" label={t("Second fraction", "Zweiter Bruch")} />
         </BarRow>
         <AnimatePresence initial={false}>
           {step === 3 && (
@@ -1494,7 +1524,7 @@ function CommonDenominator() {
             >
               <div className="border-t border-dashed border-line pt-3">
                 <BarRow label={fr(R, l)} scope={`${scope}-lr`}>
-                  <FracBar parts={l} segs={resultSegs} bg="var(--surface)" label="Result" />
+                  <FracBar parts={l} segs={resultSegs} bg="var(--surface)" label={t("Result", "Ergebnis")} />
                 </BarRow>
               </div>
             </motion.div>
@@ -1511,7 +1541,7 @@ function CommonDenominator() {
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
           className="grid size-9 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30"
-          aria-label="Previous step"
+          aria-label={t("Previous step", "Vorheriger Schritt")}
         >
           <ArrowLeft className="size-4" />
         </button>
@@ -1535,7 +1565,7 @@ function CommonDenominator() {
           onClick={() => setStep((s) => (s >= 3 ? 0 : s + 1))}
           className="ml-auto flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-[13px] font-semibold text-paper hover:bg-ink/88"
         >
-          {step >= 3 ? "Start again" : "Next step"} {step < 3 && <ArrowRight className="size-3.5" />}
+          {step >= 3 ? t("Start again", "Noch mal von vorn") : t("Next step", "Nächster Schritt")} {step < 3 && <ArrowRight className="size-3.5" />}
         </button>
       </div>
       <AnimatePresence mode="wait" initial={false}>
@@ -1562,50 +1592,123 @@ function BarRow({ label, scope, children }: { label: string; scope: string; chil
 // Lesson boards
 
 const meaningFrames: Frame[] = [
-  { math: "\\frac{3#n}{4#d}#f", note: "A fraction describes a part of a whole." },
-  { math: "\\frac{3#n}{4#d}#f", note: "The **denominator** (Nenner) at the bottom says into how many **equal** parts the whole is cut: $4$.", highlight: ["d"] },
-  { math: "\\frac{3#n}{4#d}#f", note: "The **numerator** (Zähler) on top says how many of these parts you take: $3$.", highlight: ["n"] },
-  { math: "3#n :#dv 4#d", note: "A fraction is also a division: the fraction bar means $:$.", highlight: ["dv"] },
-  { math: "3#n :#dv 4#d =#eq 0.75#v", note: "$3 : 4 = 0.75$. So $\\frac{3}{4}$ and $0.75$ are the same number." },
+  { math: "\\frac{3#n}{4#d}#f", note: tx("A fraction describes a part of a whole.", "Ein Bruch beschreibt einen Teil eines Ganzen.") },
+  {
+    math: "\\frac{3#n}{4#d}#f",
+    note: tx(
+      "The **denominator** (Nenner) at the bottom says into how many **equal** parts the whole is cut: $4$.",
+      "Der **Nenner** unten sagt, in wie viele **gleich große** Teile das Ganze geteilt ist: $4$.",
+    ),
+    highlight: ["d"],
+  },
+  {
+    math: "\\frac{3#n}{4#d}#f",
+    note: tx("The **numerator** (Zähler) on top says how many of these parts you take: $3$.", "Der **Zähler** oben sagt, wie viele dieser Teile du nimmst: $3$."),
+    highlight: ["n"],
+  },
+  {
+    math: "3#n :#dv 4#d",
+    note: tx("A fraction is also a division: the fraction bar means $:$.", "Ein Bruch ist auch eine Division: Der Bruchstrich bedeutet $:$."),
+    highlight: ["dv"],
+  },
+  {
+    math: tx("3#n :#dv 4#d =#eq 0.75#v", "3#n :#dv 4#d =#eq 0,75#v"),
+    note: tx("$3 : 4 = 0.75$. So $\\frac{3}{4}$ and $0.75$ are the same number.", "$3 : 4 = 0,75$. Also sind $\\frac{3}{4}$ und $0,75$ dieselbe Zahl."),
+  },
 ];
 
 const expandFrames: Frame[] = [
-  { math: "\\frac{2#n}{3#d}#f", note: "Start with $\\frac{2}{3}$." },
-  { math: "\\frac{2#n \\cdot#m1 4#k1}{3#d \\cdot#m2 4#k2}#f", note: "**Expanding** (Erweitern): multiply top **and** bottom by the same number.", highlight: ["k1", "k2"] },
-  { math: "\\frac{8#n}{12#d}#f", note: "$\\frac{2}{3} = \\frac{8}{12}$. More, smaller pieces, but the same amount." },
-  { math: "\\frac{8#n :#s1 4#k1}{12#d :#s2 4#k2}#f", note: "**Simplifying** (Kürzen) goes backwards: divide top and bottom by the same number.", highlight: ["k1", "k2"] },
-  { math: "\\frac{2#n}{3#d}#f", note: "Back to $\\frac{2}{3}$. Always simplify **fully**: divide by the greatest common factor (ggT)." },
+  { math: "\\frac{2#n}{3#d}#f", note: tx("Start with $\\frac{2}{3}$.", "Wir starten mit $\\frac{2}{3}$.") },
+  {
+    math: "\\frac{2#n \\cdot#m1 4#k1}{3#d \\cdot#m2 4#k2}#f",
+    note: tx(
+      "**Expanding** (Erweitern): multiply top **and** bottom by the same number.",
+      "**Erweitern**: Zähler **und** Nenner mit derselben Zahl multiplizieren.",
+    ),
+    highlight: ["k1", "k2"],
+  },
+  {
+    math: "\\frac{8#n}{12#d}#f",
+    note: tx("$\\frac{2}{3} = \\frac{8}{12}$. More, smaller pieces, but the same amount.", "$\\frac{2}{3} = \\frac{8}{12}$. Mehr und kleinere Stücke, aber gleich viel."),
+  },
+  {
+    math: "\\frac{8#n :#s1 4#k1}{12#d :#s2 4#k2}#f",
+    note: tx(
+      "**Simplifying** (Kürzen) goes backwards: divide top and bottom by the same number.",
+      "**Kürzen** ist der Weg zurück: Zähler und Nenner durch dieselbe Zahl teilen.",
+    ),
+    highlight: ["k1", "k2"],
+  },
+  {
+    math: "\\frac{2#n}{3#d}#f",
+    note: tx(
+      "Back to $\\frac{2}{3}$. Always simplify **fully**: divide by the greatest common factor (ggT).",
+      "Zurück bei $\\frac{2}{3}$. Kürze immer **vollständig**: durch den größten gemeinsamen Teiler (ggT).",
+    ),
+  },
 ];
 
 const addBoard = board();
-put(addBoard, "\\frac{3#an}{4#ad}#af +#op \\frac{1#bn}{6#bd}#bf", "Quarters and sixths are pieces of different sizes. You can't add them directly.");
+put(
+  addBoard,
+  "\\frac{3#an}{4#ad}#af +#op \\frac{1#bn}{6#bd}#bf",
+  tx("Quarters and sixths are pieces of different sizes. You can't add them directly.", "Viertel und Sechstel sind verschieden große Stücke. Die kannst du nicht direkt addieren."),
+);
 addSub(addBoard, kf(3, 4, "a"), kf(1, 6, "b"), 1, "op");
-appendNote(addBoard.frames, "Done: $\\frac{3}{4} + \\frac{1}{6} = \\frac{11}{12}$.");
+appendNote(addBoard.frames, tx("Done: $\\frac{3}{4} + \\frac{1}{6} = \\frac{11}{12}$.", "Fertig: $\\frac{3}{4} + \\frac{1}{6} = \\frac{11}{12}$."));
 
 const mulBoard = board();
-put(mulBoard, "\\frac{4#an}{9#ad}#af \\cdot#op \\frac{3#bn}{8#bd}#bf", "Multiplying is the easy one: top times top, bottom times bottom.");
+put(
+  mulBoard,
+  "\\frac{4#an}{9#ad}#af \\cdot#op \\frac{3#bn}{8#bd}#bf",
+  tx("Multiplying is the easy one: top times top, bottom times bottom.", "Multiplizieren ist am einfachsten: Zähler mal Zähler, Nenner mal Nenner."),
+);
 mul(mulBoard, kf(4, 9, "a"), kf(3, 8, "b"), "op");
-appendNote(mulBoard.frames, "Simplifying first kept the numbers small.");
+appendNote(mulBoard.frames, tx("Simplifying first kept the numbers small.", "Weil du vorher gekürzt hast, bleiben die Zahlen klein."));
 
 const divBoard = board();
 div(divBoard, kf(2, 3, "a"), kf(4, 5, "b"), "op");
-appendNote(divBoard.frames, "So $\\frac{2}{3} : \\frac{4}{5} = \\frac{5}{6}$.");
+appendNote(divBoard.frames, tx("So $\\frac{2}{3} : \\frac{4}{5} = \\frac{5}{6}$.", "Also ist $\\frac{2}{3} : \\frac{4}{5} = \\frac{5}{6}$."));
 
 const mixedFrames: Frame[] = [
-  { math: "2#w \\frac{3#n}{4#d}#f", note: "A **mixed number** (gemischte Zahl): $2$ wholes and $\\frac{3}{4}$ more." },
-  { math: "\\frac{2#w \\cdot#x 4#k +#p 3#n}{4#d}#f", note: "As an improper fraction: whole number times denominator, plus numerator.", highlight: ["w", "k"] },
-  { math: "\\frac{11#w}{4#d}#f", note: "$2 \\cdot 4 + 3 = 11$. So $2\\frac{3}{4} = \\frac{11}{4}$: eleven quarters." },
-  { math: "11#w :#dv 4#d =#eq 2#q \"remainder\"#rm 3#r", note: "And back again: $11 : 4 = 2$ remainder $3$." },
-  { math: "2#q \\frac{3#r}{4#d}#f", note: "$2$ wholes and $3$ quarters left over: $2\\frac{3}{4}$. In the practice tasks, type results as improper fractions." },
+  {
+    math: "2#w \\frac{3#n}{4#d}#f",
+    note: tx("A **mixed number** (gemischte Zahl): $2$ wholes and $\\frac{3}{4}$ more.", "Eine **gemischte Zahl**: $2$ Ganze und noch $\\frac{3}{4}$ dazu."),
+  },
+  {
+    math: "\\frac{2#w \\cdot#x 4#k +#p 3#n}{4#d}#f",
+    note: tx("As an improper fraction: whole number times denominator, plus numerator.", "Als unechter Bruch: ganze Zahl mal Nenner, plus Zähler."),
+    highlight: ["w", "k"],
+  },
+  {
+    math: "\\frac{11#w}{4#d}#f",
+    note: tx("$2 \\cdot 4 + 3 = 11$. So $2\\frac{3}{4} = \\frac{11}{4}$: eleven quarters.", "$2 \\cdot 4 + 3 = 11$. Also ist $2\\frac{3}{4} = \\frac{11}{4}$: elf Viertel."),
+  },
+  {
+    math: tx('11#w :#dv 4#d =#eq 2#q "remainder"#rm 3#r', '11#w :#dv 4#d =#eq 2#q "Rest"#rm 3#r'),
+    note: tx("And back again: $11 : 4 = 2$ remainder $3$.", "Und wieder zurück: $11 : 4 = 2$ Rest $3$."),
+  },
+  {
+    math: "2#q \\frac{3#r}{4#d}#f",
+    note: tx(
+      "$2$ wholes and $3$ quarters left over: $2\\frac{3}{4}$. In the practice tasks, type results as improper fractions.",
+      "$2$ Ganze und $3$ Viertel Rest: $2\\frac{3}{4}$. In den Übungsaufgaben gibst du Ergebnisse als unechte Brüche ein.",
+    ),
+  },
 ];
 
 const ofBoard = board();
 ofSteps(ofBoard, 3, 4, 20, "€");
-ofBoard.frames[0].note = "$\\frac{3}{4}$ of $20$ €. **Of** means times.";
-appendNote(ofBoard.frames, "So $\\frac{3}{4}$ of $20$ € is $15$ €.");
+ofBoard.frames[0].note = tx("$\\frac{3}{4}$ of $20$ €. **Of** means times.", "$\\frac{3}{4}$ von $20$ €. „von“ heißt **mal**.");
+appendNote(ofBoard.frames, tx("So $\\frac{3}{4}$ of $20$ € is $15$ €.", "Also sind $\\frac{3}{4}$ von $20$ € genau $15$ €."));
 
 const checkSimplify = board();
-put(checkSimplify, src(kf(18, 24, "a")), "Find the largest number that divides both $18$ and $24$. It's $6$.", { highlight: ["an", "ad"] });
+put(
+  checkSimplify,
+  src(kf(18, 24, "a")),
+  tx("Find the largest number that divides both $18$ and $24$. It's $6$.", "Such die größte Zahl, durch die $18$ und $24$ beide teilbar sind. Das ist $6$."),
+  { highlight: ["an", "ad"] },
+);
 simplify(checkSimplify, kf(18, 24, "a"));
 
 const checkSub = board();
@@ -1617,7 +1720,7 @@ div(checkDiv, kf(3, 4, "a"), kf(9, 10, "b"), "op");
 finish(checkDiv.frames, { n: 5, d: 6 });
 
 const checkOf = board();
-ofSteps(checkOf, 3, 7, 28, "students");
+ofSteps(checkOf, 3, 7, 28, STUDENTS);
 
 // ---------------------------------------------------------------------------
 
@@ -1625,38 +1728,50 @@ const fractions: Topic = {
   ...topicMeta("fractions"),
   summary: [
     {
-      title: "Expand and simplify",
-      body: "Multiply or divide top **and** bottom by the same number. The value stays the same. Simplify fully by the greatest common factor.",
+      title: tx("Expand and simplify", "Erweitern und kürzen"),
+      body: tx(
+        "Multiply or divide top **and** bottom by the same number. The value stays the same. Simplify fully by the greatest common factor.",
+        "Zähler **und** Nenner mit derselben Zahl multiplizieren oder durch dieselbe Zahl teilen. Der Wert bleibt gleich. Vollständig kürzen: durch den ggT teilen.",
+      ),
       examples: ["\\frac{2}{3} = \\frac{2 \\cdot 4}{3 \\cdot 4} = \\frac{8}{12}", "\\frac{18}{24} = \\frac{18 : 6}{24 : 6} = \\frac{3}{4}"],
       tone: "rule",
     },
     {
-      title: "Add and subtract",
-      body: "Expand both fractions to the lowest common denominator (Hauptnenner). Then add or subtract the numerators and keep the denominator.",
+      title: tx("Add and subtract", "Addieren und subtrahieren"),
+      body: tx(
+        "Expand both fractions to the lowest common denominator (Hauptnenner). Then add or subtract the numerators and keep the denominator.",
+        "Erweitere beide Brüche auf den Hauptnenner. Dann die Zähler addieren oder subtrahieren, der Nenner bleibt.",
+      ),
       examples: ["\\frac{3}{4} + \\frac{1}{6} = \\frac{9}{12} + \\frac{2}{12} = \\frac{11}{12}"],
       tone: "rule",
     },
     {
-      title: "Multiply",
-      body: "Top times top, bottom times bottom. Simplify crosswise first to keep the numbers small.",
+      title: tx("Multiply", "Multiplizieren"),
+      body: tx(
+        "Top times top, bottom times bottom. Simplify crosswise first to keep the numbers small.",
+        "Zähler mal Zähler, Nenner mal Nenner. Vorher über Kreuz kürzen, dann bleiben die Zahlen klein.",
+      ),
       examples: ["\\frac{a}{b} \\cdot \\frac{c}{d} = \\frac{a \\cdot c}{b \\cdot d}", "\\frac{4}{9} \\cdot \\frac{3}{8} = \\frac{1}{3} \\cdot \\frac{1}{2} = \\frac{1}{6}"],
       tone: "rule",
     },
     {
-      title: "Divide",
-      body: "Multiply by the reciprocal (Kehrwert) of the second fraction.",
+      title: tx("Divide", "Dividieren"),
+      body: tx("Multiply by the reciprocal (Kehrwert) of the second fraction.", "Mit dem Kehrwert des zweiten Bruchs multiplizieren."),
       examples: ["\\frac{a}{b} : \\frac{c}{d} = \\frac{a}{b} \\cdot \\frac{d}{c}", "\\frac{2}{3} : \\frac{4}{5} = \\frac{2}{3} \\cdot \\frac{5}{4} = \\frac{5}{6}"],
       tone: "rule",
     },
     {
-      title: "Mixed numbers and “of”",
-      body: "Turn mixed numbers into improper fractions before calculating. And “of” means times: divide by the denominator, then multiply by the numerator.",
-      examples: ["2\\frac{3}{4} = \\frac{2 \\cdot 4 + 3}{4} = \\frac{11}{4}", "\\frac{3}{4} \"of\" 20 = 20 : 4 \\cdot 3 = 15"],
+      title: tx("Mixed numbers and “of”", "Gemischte Zahlen und „von“"),
+      body: tx(
+        "Turn mixed numbers into improper fractions before calculating. And “of” means times: divide by the denominator, then multiply by the numerator.",
+        "Wandle gemischte Zahlen vor dem Rechnen in unechte Brüche um. Und „von“ heißt mal: durch den Nenner teilen, dann mit dem Zähler multiplizieren.",
+      ),
+      examples: ["2\\frac{3}{4} = \\frac{2 \\cdot 4 + 3}{4} = \\frac{11}{4}", tx('\\frac{3}{4} "of" 20 = 20 : 4 \\cdot 3 = 15', '\\frac{3}{4} "von" 20 = 20 : 4 \\cdot 3 = 15')],
       tone: "tip",
     },
     {
-      title: "Classic mistake",
-      body: "Never add the denominators. Find a common denominator first.",
+      title: tx("Classic mistake", "Typischer Fehler"),
+      body: tx("Never add the denominators. Find a common denominator first.", "Nenner werden nie addiert. Bring die Brüche zuerst auf einen gemeinsamen Nenner."),
       examples: ["\\frac{1}{2} + \\frac{1}{3} \\ne \\frac{2}{5}", "\\frac{1}{2} + \\frac{1}{3} = \\frac{3}{6} + \\frac{2}{6} = \\frac{5}{6}"],
       tone: "warning",
     },
@@ -1664,108 +1779,141 @@ const fractions: Topic = {
   lesson: [
     {
       type: "explain",
-      title: "What a fraction means",
-      blob: "Fractions are just pieces of a whole. Like slices of pizza!",
-      body: "Cut a pizza into $4$ equal slices and take $3$: you have $\\frac{3}{4}$ of the pizza.",
+      title: tx("What a fraction means", "Was ein Bruch bedeutet"),
+      blob: tx("Fractions are just pieces of a whole. Like slices of pizza!", "Brüche sind einfach Teile eines Ganzen. Wie Pizzastücke!"),
+      body: tx(
+        "Cut a pizza into $4$ equal slices and take $3$: you have $\\frac{3}{4}$ of the pizza.",
+        "Teil eine Pizza in $4$ gleich große Stücke und nimm $3$ davon: Dann hast du $\\frac{3}{4}$ der Pizza.",
+      ),
       frames: meaningFrames,
     },
     {
       type: "explain",
-      title: "Expanding and simplifying",
-      blob: "Same amount, different name. That's the big idea!",
-      body: "A fraction has many names: $\\frac{1}{2} = \\frac{2}{4} = \\frac{3}{6}$. Expanding and simplifying switch between them without changing the value.",
+      title: tx("Expanding and simplifying", "Erweitern und Kürzen"),
+      blob: tx("Same amount, different name. That's the big idea!", "Gleicher Wert, anderer Name. Darum geht's!"),
+      body: tx(
+        "A fraction has many names: $\\frac{1}{2} = \\frac{2}{4} = \\frac{3}{6}$. Expanding and simplifying switch between them without changing the value.",
+        "Ein Bruch hat viele Namen: $\\frac{1}{2} = \\frac{2}{4} = \\frac{3}{6}$. Mit Erweitern und Kürzen wechselst du zwischen ihnen, ohne den Wert zu ändern.",
+      ),
       frames: expandFrames,
     },
     {
       type: "widget",
-      title: "Same amount, new name",
-      blob: "Cut the pieces finer or merge them. Keep an eye on the purple part!",
-      body: "Build a fraction with the steppers. Then expand or simplify it and watch the cuts appear and disappear.",
+      title: tx("Same amount, new name", "Gleicher Wert, neuer Name"),
+      blob: tx("Cut the pieces finer or merge them. Keep an eye on the purple part!", "Zerschneide die Stücke feiner oder fass sie zusammen. Behalte den lila Teil im Blick!"),
+      body: tx(
+        "Build a fraction with the steppers. Then expand or simplify it and watch the cuts appear and disappear.",
+        "Stell mit Plus und Minus einen Bruch ein. Dann erweitere oder kürze ihn und schau zu, wie Schnitte dazukommen und verschwinden.",
+      ),
       widget: FractionModel,
     },
     {
       type: "check",
-      blob: "Your turn! Simplify as far as it goes.",
+      blob: tx("Your turn! Simplify as far as it goes.", "Du bist dran! Kürze, so weit es geht."),
       exercise: {
-        instruction: "Simplify fully",
+        instruction: tx("Simplify fully", "Kürze vollständig"),
         math: "\\frac{18}{24}",
         answer: { kind: "fraction", n: 3, d: 4, mustReduce: true },
-        hint: "Both numbers are in the $6$ times table.",
+        hint: tx("Both numbers are in the $6$ times table.", "Beide Zahlen kommen in der Sechserreihe vor."),
         solution: checkSimplify.frames,
       },
     },
     {
       type: "explain",
-      title: "Adding and subtracting",
-      blob: "You can only add pieces of the same size. So first we make them match!",
-      body: "Same denominator: add or subtract the numerators and keep the denominator, e.g. $\\frac{1}{5} + \\frac{2}{5} = \\frac{3}{5}$.\n\nDifferent denominators: expand both fractions to the **lowest common denominator** (Hauptnenner) first.",
+      title: tx("Adding and subtracting", "Addieren und Subtrahieren"),
+      blob: tx("You can only add pieces of the same size. So first we make them match!", "Addieren kannst du nur gleich große Stücke. Also machen wir sie erst passend!"),
+      body: tx(
+        "Same denominator: add or subtract the numerators and keep the denominator, e.g. $\\frac{1}{5} + \\frac{2}{5} = \\frac{3}{5}$.\n\nDifferent denominators: expand both fractions to the **lowest common denominator** (Hauptnenner) first.",
+        "Gleiche Nenner: Zähler addieren oder subtrahieren, der Nenner bleibt, z. B. $\\frac{1}{5} + \\frac{2}{5} = \\frac{3}{5}$.\n\nVerschiedene Nenner: Erweitere beide Brüche zuerst auf den **Hauptnenner**.",
+      ),
       frames: addBoard.frames,
     },
     {
       type: "widget",
-      title: "Find the common denominator",
-      blob: "Step through it and watch the bars get cut into matching pieces.",
-      body: "Press **Next step**. Both bars are cut into the same number of parts, and then the parts can simply be counted.",
+      title: tx("Find the common denominator", "Den Hauptnenner finden"),
+      blob: tx("Step through it and watch the bars get cut into matching pieces.", "Geh Schritt für Schritt durch und schau, wie die Streifen in passende Stücke zerlegt werden."),
+      body: tx(
+        "Press **Next step**. Both bars are cut into the same number of parts, and then the parts can simply be counted.",
+        "Drück auf **Nächster Schritt**. Beide Streifen werden in gleich viele Teile zerlegt, dann kannst du die Teile einfach zählen.",
+      ),
       widget: CommonDenominator,
     },
     {
       type: "check",
-      blob: "Different denominators. What's the lowest common one?",
+      blob: tx("Different denominators. What's the lowest common one?", "Verschiedene Nenner. Was ist der Hauptnenner?"),
       exercise: {
-        instruction: "Calculate and simplify",
+        instruction: CALC_SIMPLIFY,
         math: "\\frac{5}{6} - \\frac{3}{8}",
         answer: { kind: "fraction", n: 11, d: 24, mustReduce: true },
-        hint: "Multiples of $8$: $8, 16, 24$. And $6$ goes into $24$.",
+        hint: tx("Multiples of $8$: $8, 16, 24$. And $6$ goes into $24$.", "Vielfache von $8$: $8, 16, 24$. Und $24$ ist auch durch $6$ teilbar."),
         solution: checkSub.frames,
       },
     },
     {
       type: "explain",
-      title: "Multiplying fractions",
-      blob: "Good news: no common denominator needed here!",
-      body: "Top times top, bottom times bottom. A whole number counts as a fraction over $1$: $3 \\cdot \\frac{2}{7} = \\frac{3}{1} \\cdot \\frac{2}{7} = \\frac{6}{7}$.",
+      title: tx("Multiplying fractions", "Brüche multiplizieren"),
+      blob: tx("Good news: no common denominator needed here!", "Gute Nachricht: Hier brauchst du keinen gemeinsamen Nenner!"),
+      body: tx(
+        "Top times top, bottom times bottom. A whole number counts as a fraction over $1$: $3 \\cdot \\frac{2}{7} = \\frac{3}{1} \\cdot \\frac{2}{7} = \\frac{6}{7}$.",
+        "Zähler mal Zähler, Nenner mal Nenner. Eine ganze Zahl ist ein Bruch mit dem Nenner $1$: $3 \\cdot \\frac{2}{7} = \\frac{3}{1} \\cdot \\frac{2}{7} = \\frac{6}{7}$.",
+      ),
       frames: mulBoard.frames,
     },
     {
       type: "explain",
-      title: "Dividing fractions",
-      blob: "Dividing is multiplying in disguise. Flip and multiply!",
-      body: "The **reciprocal** (Kehrwert) swaps top and bottom: the reciprocal of $\\frac{4}{5}$ is $\\frac{5}{4}$.",
+      title: tx("Dividing fractions", "Brüche dividieren"),
+      blob: tx("Dividing is multiplying in disguise. Flip and multiply!", "Dividieren ist verkleidetes Multiplizieren. Umdrehen und malnehmen!"),
+      body: tx(
+        "The **reciprocal** (Kehrwert) swaps top and bottom: the reciprocal of $\\frac{4}{5}$ is $\\frac{5}{4}$.",
+        "Beim **Kehrwert** tauschen Zähler und Nenner die Plätze: Der Kehrwert von $\\frac{4}{5}$ ist $\\frac{5}{4}$.",
+      ),
       frames: divBoard.frames,
     },
     {
       type: "check",
-      blob: "Flip the second fraction, then simplify crosswise.",
+      blob: tx("Flip the second fraction, then simplify crosswise.", "Dreh den zweiten Bruch um, dann kürze über Kreuz."),
       exercise: {
-        instruction: "Calculate and simplify",
+        instruction: CALC_SIMPLIFY,
         math: "\\frac{3}{4} : \\frac{9}{10}",
         answer: { kind: "fraction", n: 5, d: 6, mustReduce: true },
-        hint: "$\\frac{3}{4} : \\frac{9}{10} = \\frac{3}{4} \\cdot \\frac{10}{9}$. Now simplify crosswise.",
+        hint: tx(
+          "$\\frac{3}{4} : \\frac{9}{10} = \\frac{3}{4} \\cdot \\frac{10}{9}$. Now simplify crosswise.",
+          "$\\frac{3}{4} : \\frac{9}{10} = \\frac{3}{4} \\cdot \\frac{10}{9}$. Jetzt über Kreuz kürzen.",
+        ),
         solution: checkDiv.frames,
       },
     },
     {
       type: "explain",
-      title: "Mixed numbers",
-      blob: "Two and three quarters pizzas. Let's write that as one fraction.",
-      body: "Fractions bigger than $1$ can be written as a mixed number or as an improper fraction (unechter Bruch). For calculating, the improper fraction is easier.",
+      title: tx("Mixed numbers", "Gemischte Zahlen"),
+      blob: tx("Two and three quarters pizzas. Let's write that as one fraction.", "Zweidreiviertel Pizzen. Das schreiben wir jetzt als einen Bruch."),
+      body: tx(
+        "Fractions bigger than $1$ can be written as a mixed number or as an improper fraction (unechter Bruch). For calculating, the improper fraction is easier.",
+        "Brüche größer als $1$ kannst du als gemischte Zahl oder als **unechten Bruch** schreiben. Zum Rechnen ist der unechte Bruch einfacher.",
+      ),
       frames: mixedFrames,
     },
     {
       type: "explain",
-      title: "A fraction of a quantity",
-      blob: "Three quarters of 20 euros. How much is that?",
-      body: "To find a fraction of an amount: divide by the denominator, then multiply by the numerator.",
+      title: tx("A fraction of a quantity", "Bruchteile von Größen"),
+      blob: tx("Three quarters of 20 euros. How much is that?", "Drei Viertel von 20 Euro. Wie viel ist das?"),
+      body: tx(
+        "To find a fraction of an amount: divide by the denominator, then multiply by the numerator.",
+        "So berechnest du einen Bruchteil einer Größe: durch den Nenner teilen, dann mit dem Zähler multiplizieren.",
+      ),
       frames: ofBoard.frames,
     },
     {
       type: "check",
-      blob: "Last one! Divide first, then multiply.",
+      blob: tx("Last one! Divide first, then multiply.", "Die letzte! Erst teilen, dann malnehmen."),
       exercise: {
-        instruction: "Word problem",
-        text: "Class 7b has 28 students. $\\frac{3}{7}$ of them have a pet. How many students have a pet?",
-        answer: { kind: "number", value: 12, unit: "students" },
-        hint: "$\\frac{1}{7}$ of $28$ is $28 : 7$. Then take $3$ of those.",
+        instruction: WORD_PROBLEM,
+        text: tx(
+          "Class 7b has 28 students. $\\frac{3}{7}$ of them have a pet. How many students have a pet?",
+          "Die Klasse 7b hat 28 Schülerinnen und Schüler. $\\frac{3}{7}$ davon haben ein Haustier. Wie viele haben ein Haustier?",
+        ),
+        answer: { kind: "number", value: 12, unit: STUDENTS },
+        hint: tx("$\\frac{1}{7}$ of $28$ is $28 : 7$. Then take $3$ of those.", "$\\frac{1}{7}$ von $28$ ist $28 : 7$. Das Ergebnis nimmst du dann mal $3$."),
         solution: checkOf.frames,
       },
     },

@@ -5,6 +5,9 @@ import { ChevronDown, Undo2, X } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useLocale, useMessages } from "@/i18n/client";
+import { dateLocale } from "@/i18n/format";
+import { tasksText } from "@/i18n/messages/tasks";
 import { dueAt, groupTasks, isDefaultTime, type TaskGroup } from "@/lib/tasks";
 import type { Subject, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -156,19 +159,23 @@ function GroupHeader({
   onShowAll: () => void;
   onMoveToToday: () => void;
 }) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
+  const fmt = { locale: dateLocale(locale) };
   const isDone = group.key === "done";
+  const label = t.group[group.key];
   const sub =
-    group.key === "today" ? format(now, "EEE, MMM d") : group.key === "tomorrow" ? format(addDays(now, 1), "EEE, MMM d") : null;
+    group.key === "today" ? format(now, t.due.header, fmt) : group.key === "tomorrow" ? format(addDays(now, 1), t.due.header, fmt) : null;
   return (
     <div className={cn("flex h-8 items-end gap-2 pb-1.5 pl-2 pr-2", !first && "mt-4")}>
       {isDone ? (
         <button onClick={onToggleDone} className="-ml-1 flex items-center gap-1 rounded-md px-1 text-[12.5px] font-semibold text-ink-3 hover:text-ink" aria-expanded={doneOpen}>
           <ChevronDown className={cn("size-3.5 transition-transform duration-200", !doneOpen && "-rotate-90")} />
-          {group.label}
+          {label}
         </button>
       ) : (
         <span className={cn("text-[12.5px] font-semibold", group.key === "overdue" ? "text-danger" : group.key === "today" ? "text-ink" : "text-ink-2")}>
-          {group.label}
+          {label}
         </span>
       )}
       <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium tabular-nums leading-[18px] text-ink-3">{group.tasks.length}</span>
@@ -176,12 +183,12 @@ function GroupHeader({
       <span className="ml-auto" />
       {group.key === "overdue" && (
         <button onClick={onMoveToToday} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
-          Move to today
+          {t.moveToToday}
         </button>
       )}
       {isDone && doneOpen && hidden > 0 && (
         <button onClick={onShowAll} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
-          Show {hidden} more
+          {t.showMore(hidden)}
         </button>
       )}
     </div>
@@ -204,6 +211,7 @@ function BoardSkeleton({ className }: { className?: string }) {
 
 /** "Task deleted · Undo" pill at the bottom of the screen. */
 export function UndoToast({ store }: { store: TaskStore }) {
+  const t = useMessages(tasksText);
   const { removed, dismissRemoved, undoRemove } = store;
   useEffect(() => {
     if (!removed) return;
@@ -224,13 +232,16 @@ export function UndoToast({ store }: { store: TaskStore }) {
           className="fixed bottom-6 left-1/2 z-[65] flex -translate-x-1/2 items-center gap-1 rounded-xl border border-line bg-raised py-1 pl-3.5 pr-1 text-[13px] text-ink shadow-pop"
           role="status"
         >
-          <span className="max-w-[260px] truncate">
-            Deleted <span className="text-ink-3">“{removed.title}”</span>
+          {/* The title shrinks, "Deleted" / "gelöscht" stays readable. */}
+          <span className="flex min-w-0 max-w-[260px] items-baseline gap-1">
+            {t.deletedBefore && <span className="shrink-0">{t.deletedBefore}</span>}
+            <span className="min-w-0 truncate text-ink-3">{t.quote(removed.title)}</span>
+            {t.deletedAfter && <span className="shrink-0">{t.deletedAfter}</span>}
           </span>
           <button onClick={undoRemove} className="ml-2 flex h-7 items-center gap-1.5 rounded-lg px-2 font-medium text-blob-ink hover:bg-blob-soft">
-            <Undo2 className="size-3.5" /> Undo
+            <Undo2 className="size-3.5" /> {t.undo}
           </button>
-          <button onClick={dismissRemoved} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label="Dismiss">
+          <button onClick={dismissRemoved} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.dismiss}>
             <X className="size-3.5" />
           </button>
         </motion.div>

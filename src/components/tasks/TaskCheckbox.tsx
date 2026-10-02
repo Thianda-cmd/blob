@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "motion/react";
 import { useState } from "react";
+import { useMessages } from "@/i18n/client";
+import { tasksText } from "@/i18n/messages/tasks";
 import { cn } from "@/lib/utils";
 
 type Drop = { x: number; y: number; r: number; delay: number };
@@ -35,6 +37,7 @@ export function TaskCheckbox({
   label?: string;
   className?: string;
 }) {
+  const t = useMessages(tasksText);
   const [scope, animate] = useAnimate<HTMLButtonElement>();
   const [bursts, setBursts] = useState<Burst[]>([]);
   const reduce = useReducedMotion();
@@ -64,7 +67,7 @@ export function TaskCheckbox({
       type="button"
       role="checkbox"
       aria-checked={checked}
-      aria-label={label ?? (checked ? "Mark as not done" : "Mark as done")}
+      aria-label={label ?? (checked ? t.markNotDoneShort : t.markDoneShort)}
       onClick={(e) => {
         e.stopPropagation();
         toggle();

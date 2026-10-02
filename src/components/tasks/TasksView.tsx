@@ -8,7 +8,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
-import { KIND_PLURAL, TASK_KINDS, dayKey, formatDue, isDueByToday, taskBucket } from "@/lib/tasks";
+import { useLocale, useMessages } from "@/i18n/client";
+import { dateLocale } from "@/i18n/format";
+import { tasksText } from "@/i18n/messages/tasks";
+import { TASK_KINDS, dayKey, formatDue, isDueByToday, taskBucket } from "@/lib/tasks";
 import type { Task, TaskKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { QuickAdd, type QuickAddHandle } from "./QuickAdd";
@@ -22,6 +25,8 @@ const NO_FILTERS: Filters = { day: null, kind: null, subject: null };
 
 /** The full Tasks page: quick add + grouped list on the left, calendar and filters on the right. */
 export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
   const store = useTaskStore(initialTasks);
   const { subjects } = useWorkspace();
   const now = useNow();
@@ -97,9 +102,10 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
   const filterDay = filters.day && filters.day !== "overdue" ? new Date(`${filters.day}T00:00:00`) : null;
 
   const chips: { key: keyof Filters; label: string }[] = [];
-  if (filters.day) chips.push({ key: "day", label: filters.day === "overdue" ? "Overdue" : `Due ${format(filterDay!, "EEE, MMM d")}` });
-  if (filters.kind) chips.push({ key: "kind", label: KIND_PLURAL[filters.kind] });
-  if (filters.subject) chips.push({ key: "subject", label: filters.subject === "none" ? "No subject" : (filterSubject?.name ?? "Subject") });
+  if (filters.day)
+    chips.push({ key: "day", label: filters.day === "overdue" ? t.group.overdue : t.dueOn(format(filterDay!, t.filterDayFormat, { locale: dateLocale(locale) })) });
+  if (filters.kind) chips.push({ key: "kind", label: t.kindPlural[filters.kind] });
+  if (filters.subject) chips.push({ key: "subject", label: filters.subject === "none" ? t.noSubject : (filterSubject?.name ?? t.subject) });
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -107,19 +113,19 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
         <section className="min-w-0">
           <header className="mb-4 flex items-end gap-3">
             <div className="min-w-0">
-              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.025em]">Tasks</h1>
+              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.025em]">{t.title}</h1>
               <p className="mt-0.5 h-5 text-[13px] text-ink-3">
                 {view && (
                   <>
-                    {view.open} open
-                    {view.dueToday > 0 && <> · <span className="text-blob-ink">{view.dueToday} due today</span></>}
-                    {view.overdue > 0 && <> · <span className="text-danger">{view.overdue} overdue</span></>}
+                    {t.open(view.open)}
+                    {view.dueToday > 0 && <> · <span className="text-blob-ink">{t.dueToday(view.dueToday)}</span></>}
+                    {view.overdue > 0 && <> · <span className="text-danger">{t.overdue(view.overdue)}</span></>}
                   </>
                 )}
               </p>
             </div>
             <span className="ml-auto hidden items-center gap-1.5 pb-1 text-[11.5px] text-ink-3 md:flex">
-              Press <Kbd>N</Kbd> to add
+              {t.pressBefore} <Kbd>N</Kbd> {t.pressAfter}
             </span>
           </header>
 
@@ -142,7 +148,7 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                 className="overflow-hidden"
               >
                 <div className="flex flex-wrap items-center gap-1.5 pt-3">
-                  <span className="text-[12px] text-ink-3">Showing</span>
+                  <span className="text-[12px] text-ink-3">{t.showing}</span>
                   {chips.map((c) => (
                     <button
                       key={c.key}
@@ -154,7 +160,7 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                     </button>
                   ))}
                   <button onClick={() => setFilters(NO_FILTERS)} className="ml-1 text-[12px] text-ink-3 hover:text-ink">
-                    Clear
+                    {t.clear}
                   </button>
                 </div>
               </motion.div>
@@ -173,14 +179,14 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                 <div className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-blob-soft/60 py-2 pl-2 pr-4">
                   <Blob size={44} mood="happy" track={false} />
                   <div className="min-w-0">
-                    <p className="text-[13.5px] font-medium text-ink">All clear for today</p>
+                    <p className="text-[13.5px] font-medium text-ink">{t.allClearToday}</p>
                     <p className="truncate text-[12.5px] text-ink-2">
                       {view.nextUp && now ? (
                         <>
-                          Next up: {view.nextUp.title} <span className="text-ink-3">· {formatDue(view.nextUp.due_at!, now)}</span>
+                          {t.nextUp} {view.nextUp.title} <span className="text-ink-3">· {formatDue(view.nextUp.due_at!, now, locale)}</span>
                         </>
                       ) : (
-                        "Nothing else on the list. Enjoy it."
+                        t.nothingElse
                       )}
                     </p>
                   </div>
@@ -196,12 +202,12 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
             subjects={subjects}
             empty={
               tasks.length === 0 ? (
-                <EmptyState onExample={(t) => quick.current?.fill(t)} />
+                <EmptyState onExample={(text) => quick.current?.fill(text)} />
               ) : (
                 <div className="mt-10 flex flex-col items-center text-center">
-                  <p className="text-[13.5px] text-ink-2">Nothing matches these filters.</p>
+                  <p className="text-[13.5px] text-ink-2">{t.nothingMatches}</p>
                   <button onClick={() => setFilters(NO_FILTERS)} className="mt-1 text-[13px] font-medium text-blob-ink hover:underline">
-                    Clear filters
+                    {t.clearFilters}
                   </button>
                 </div>
               )
@@ -212,7 +218,7 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
         <aside className="space-y-3 lg:sticky lg:top-7 lg:self-start">
           {view && now ? (
             <>
-              <Panel title="Next two weeks" action={<span className="text-[11.5px] text-ink-3">{format(now, "MMMM")}</span>}>
+              <Panel title={t.nextTwoWeeks} action={<span className="text-[11.5px] text-ink-3">{format(now, t.monthFormat, { locale: dateLocale(locale) })}</span>}>
                 <CalendarHeat
                   tasks={view.heatTasks}
                   now={now}
@@ -226,10 +232,10 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                   </div>
                 )}
               </Panel>
-              <Panel title="By type">
+              <Panel title={t.byType}>
                 <KindFilter counts={view.kindCounts} value={filters.kind} onChange={(kind) => setFilters((f) => ({ ...f, kind }))} />
               </Panel>
-              <Panel title="Subjects">
+              <Panel title={t.subjects}>
                 <SubjectFilter
                   subjects={subjects}
                   counts={view.subjectCounts}
@@ -249,18 +255,15 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
   );
 }
 
-const EXAMPLES = ["Bio test fri 8am #biology", "Essay due tomorrow #english", "History project next friday", "Bring permission slip tomorrow"];
-
 function EmptyState({ onExample }: { onExample: (text: string) => void }) {
+  const t = useMessages(tasksText);
   return (
     <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 pb-9 pt-7 text-center">
       <Blob size={96} mood="sleepy" />
-      <h2 className="mt-2 font-display text-[18px] font-semibold tracking-[-0.01em]">Nothing on your plate</h2>
-      <p className="mt-1 max-w-[400px] text-[13.5px] text-ink-2">
-        Add homework, tests and projects above. Write it like you’d say it and I’ll figure out the date.
-      </p>
+      <h2 className="mt-2 font-display text-[18px] font-semibold tracking-[-0.01em]">{t.emptyTitle}</h2>
+      <p className="mt-1 max-w-[400px] text-[13.5px] text-ink-2">{t.emptyBody}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-        {EXAMPLES.map((ex) => (
+        {t.examples.map((ex) => (
           <button
             key={ex}
             onClick={() => onExample(ex)}

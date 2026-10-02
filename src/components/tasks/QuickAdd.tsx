@@ -5,8 +5,9 @@ import { CalendarDays, CornerDownLeft, Plus } from "lucide-react";
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { blob } from "@/components/blob/bus";
 import { Kbd } from "@/components/ui/Kbd";
+import { useLocale, useMessages } from "@/i18n/client";
+import { tasksText } from "@/i18n/messages/tasks";
 import {
-  KIND_LABEL,
   dueAt,
   formatDue,
   formatTime,
@@ -33,6 +34,7 @@ type Source = "parsed" | "manual" | "preset" | "none";
 type Overrides = { due?: { day: Date; time: TimeOfDay | null } | null; kind?: TaskKind; subjectId?: string | null };
 
 let monthFirstCache: boolean | undefined;
+/** US English readers write "10/12" for October 12. */
 function prefersMonthFirst() {
   if (monthFirstCache === undefined) {
     try {
@@ -44,11 +46,10 @@ function prefersMonthFirst() {
   return monthFirstCache;
 }
 
-const EXAMPLES = ["Bio test fri 8am #biology", "Essay due tomorrow", "Read ch. 4 by monday"];
-
 /**
- * One line to add a task. Understands dates ("fri", "tomorrow", "12.10", "in 3 days"),
- * kinds ("test", "project") and "#subject", and previews what it understood as chips.
+ * One line to add a task. Understands dates ("fri", "tomorrow", "12.10", "in 3 days"; "Fr", "morgen",
+ * "in 3 Tagen"), kinds ("test", "project", "Referat", "HA") and "#subject", and previews what it
+ * understood as chips. German or English: the reader's language comes first, the other one works too.
  */
 export function QuickAdd({
   onAdd,
@@ -73,6 +74,8 @@ export function QuickAdd({
   className?: string;
   ref?: Ref<QuickAddHandle>;
 }) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
   const now = useNow();
   const inputRef = useRef<HTMLInputElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -108,10 +111,11 @@ export function QuickAdd({
   const parsed = useMemo(() => {
     if (!now || !text.trim()) return null;
     return parseQuickAdd(text, new Date(now), {
-      monthFirst: prefersMonthFirst(),
+      locale,
+      monthFirst: locale === "en" && prefersMonthFirst(),
       isSubject: (tag) => !!matchSubject(tag, subjects),
     });
-  }, [text, now, subjects]);
+  }, [text, now, subjects, locale]);
 
   const parsedSubject = parsed?.subject ? matchSubject(parsed.subject, subjects) : null;
 
@@ -213,7 +217,7 @@ export function QuickAdd({
             sm ? "size-[18px]" : "size-5",
             title ? "bg-blob text-white" : "border-[1.5px] border-dashed border-line-2 text-ink-3",
           )}
-          aria-label="Add task"
+          aria-label={t.addTask}
         >
           <Plus className={sm ? "size-3" : "size-3.5"} strokeWidth={2.6} />
         </motion.button>
@@ -284,13 +288,13 @@ export function QuickAdd({
                 } else e.currentTarget.blur();
               }
             }}
-            placeholder={placeholder ?? (sm ? "Add a task…" : "Add a task, e.g. “Bio test fri #biology”")}
+            placeholder={placeholder ?? (sm ? t.placeholderShort : t.placeholder)}
             maxLength={240}
             className={cn(
               "relative h-9 w-full bg-transparent text-ink caret-blob outline-none placeholder:text-ink-3/90",
               sm ? "text-[13.5px]" : "text-[14.5px]",
             )}
-            aria-label="New task"
+            aria-label={t.newTask}
             role="combobox"
             aria-autocomplete="list"
             aria-expanded={acOpen}
@@ -315,14 +319,14 @@ export function QuickAdd({
                 sm ? "h-7 px-2 text-[12px]" : "h-8 px-2.5 text-[12.5px]",
               )}
             >
-              Add
+              {t.add}
               <CornerDownLeft className="size-3.5 opacity-80" />
             </motion.button>
           )}
         </AnimatePresence>
         {!title && !sm && focused && (
           <span className="hidden shrink-0 items-center gap-1 text-[11.5px] text-ink-3 sm:flex">
-            <Kbd>#</Kbd> subject
+            <Kbd>#</Kbd> {t.hashSubject}
           </span>
         )}
       </div>
@@ -354,11 +358,11 @@ export function QuickAdd({
                   <Chip {...props} source={dueSource} icon={<CalendarDays />}>
                     {due && now ? (
                       <>
-                        {formatDue(due, now)}
-                        {!isDefaultTime(due, kind) && <span className="opacity-75">{formatTime(due)}</span>}
+                        {formatDue(due, now, locale)}
+                        {!isDefaultTime(due, kind) && <span className="opacity-75">{formatTime(due, locale)}</span>}
                       </>
                     ) : (
-                      "Date"
+                      t.date
                     )}
                   </Chip>
                 )}
@@ -372,7 +376,7 @@ export function QuickAdd({
                 }}
                 trigger={(props) => (
                   <Chip {...props} source={kindSource} icon={<KindIcon />}>
-                    {KIND_LABEL[kind]}
+                    {t.kind[kind]}
                   </Chip>
                 )}
               />
@@ -388,17 +392,17 @@ export function QuickAdd({
                   }}
                   trigger={(props) => (
                     <Chip {...props} source={subjectSource} icon={subject?.emoji ? <span className="text-[12px] leading-none">{subject.emoji}</span> : <SubjectDot subject={subject} />}>
-                      {subject ? subject.name : "Subject"}
+                      {subject ? subject.name : t.subject}
                     </Chip>
                   )}
                 />
               )}
               {!text && !sm && (
                 <span className="ml-auto hidden truncate text-[11.5px] text-ink-3 md:block">
-                  Try{" "}
-                  {EXAMPLES.slice(0, 2).map((ex, i) => (
+                  {t.tryBefore}{" "}
+                  {t.quickExamples.slice(0, 2).map((ex, i) => (
                     <span key={ex}>
-                      {i > 0 && " or "}
+                      {i > 0 && t.tryOr}
                       <button
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
@@ -430,9 +434,9 @@ export function QuickAdd({
             className={cn("absolute top-[calc(100%-6px)] z-30 w-[220px] rounded-xl border border-line bg-raised p-1 shadow-pop", sm ? "left-8" : "left-10")}
             role="listbox"
             id={listId}
-            aria-label="Subjects"
+            aria-label={t.subjectsLabel}
           >
-            <div className="px-2 pb-1 pt-1 text-[11px] font-medium text-ink-3">Subject</div>
+            <div className="px-2 pb-1 pt-1 text-[11px] font-medium text-ink-3">{t.subject}</div>
             {suggestions.map((s, i) => (
               <button
                 key={s.id}

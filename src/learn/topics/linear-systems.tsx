@@ -954,144 +954,232 @@ const v = (n: number, k: string) => `${n}#${k}`;
 const introFrames: Frame[] = [
   {
     math: sysSrc(stdSrc({ x: 1, y: 1, c: 5 }, "1"), stdSrc({ x: 1, y: -1, c: 1 }, "2")),
-    note: "Two equations with the same two unknowns $x$ and $y$: a **linear system** (lineares Gleichungssystem, LGS).",
+    note: tx(
+      "Two equations with the same two unknowns $x$ and $y$: a **linear system** (lineares Gleichungssystem, LGS).",
+      "Zwei Gleichungen mit denselben zwei Unbekannten $x$ und $y$: ein **lineares Gleichungssystem** (LGS).",
+    ),
   },
   {
     math: sysSrc(stdSrc({ x: 1, y: 1, c: 5 }, "1"), stdSrc({ x: 1, y: -1, c: 1 }, "2")),
     highlight: ["v1x", "s1y", "v1y", "e1", "c1c"],
-    note: `On its own, $x + y = 5$ has lots of solutions: $${pt(1, 4)}$, $${pt(2, 3)}$, $${pt(3, 2)}$ and many more.`,
+    note: tx(
+      `On its own, $x + y = 5$ has lots of solutions: $${pt(1, 4)}$, $${pt(2, 3)}$, $${pt(3, 2)}$ and many more.`,
+      `Für sich allein hat $x + y = 5$ viele Lösungen: $${pt(1, 4)}$, $${pt(2, 3)}$, $${pt(3, 2)}$ und noch viele mehr.`,
+    ),
   },
   {
     math: sysSrc(`${v(2, "v1x")} +#s1y ${v(3, "v1y")} =#e1 5#c1c`, `${v(2, "v2x")} -#s2y ${v(3, "v2y")} \\ne#e2 1#c2c`, "(I)", "(II)", ["green", "red"]),
-    note: "Try $x = 2$, $y = 3$: equation (I) is true. But (II) gives $2 - 3 = -1$, not $1$.",
+    note: tx(
+      "Try $x = 2$, $y = 3$: equation (I) is true. But (II) gives $2 - 3 = -1$, not $1$.",
+      "Probier $x = 2$, $y = 3$: Gleichung (I) stimmt. Aber (II) ergibt $2 - 3 = -1$, nicht $1$.",
+    ),
   },
   {
     math: sysSrc(`${v(3, "v1x")} +#s1y ${v(2, "v1y")} =#e1 5#c1c`, `${v(3, "v2x")} -#s2y ${v(2, "v2y")} =#e2 1#c2c`, "(I)", "(II)", ["green", "green"]),
-    note: "Try $x = 3$, $y = 2$: **both** are true!",
+    note: tx("Try $x = 3$, $y = 2$: **both** are true!", "Probier $x = 3$, $y = 2$: **Beide** stimmen!"),
   },
-  { math: resultSrc(3, 2), note: "So the solution is the pair $(3 | 2)$. We write the solution set as $L$. Next: how to find it without guessing." },
+  {
+    math: resultSrc(3, 2),
+    note: tx(
+      "So the solution is the pair $(3 | 2)$. We write the solution set as $L$. Next: how to find it without guessing.",
+      "Die Lösung ist also das Zahlenpaar $(3 | 2)$. Die Lösungsmenge schreiben wir als $L$. Gleich lernst du, wie du sie ohne Raten findest.",
+    ),
+  },
 ];
 
 const specialFrames: Frame[] = [
   ...equalization({ v: "y", m: 2, n: 1 }, { v: "y", m: 2, n: -3 }, null),
   ...substitution({ v: "y", m: 2, n: 1 }, { x: 4, y: -2, c: -2 }, null),
 ];
-specialFrames[0] = { ...specialFrames[0], note: "First system: both lines have slope $2$ but different y-intercepts. Set them equal." };
-const parallelEnd = specialFrames.findIndex((f) => f.math.startsWith("\\red"));
-specialFrames[parallelEnd + 1] = { ...specialFrames[parallelEnd + 1], note: "Second system. Equation (I) is solved for $y$, so substitute." };
+specialFrames[0] = {
+  ...specialFrames[0],
+  note: tx(
+    "First system: both lines have slope $2$ but different y-intercepts. Set them equal.",
+    "Erstes LGS: Beide Geraden haben die Steigung $2$, aber verschiedene y-Achsenabschnitte. Setze sie gleich.",
+  ),
+};
+const parallelEnd = specialFrames.findIndex((f) => srcOf(f.math).startsWith("\\red"));
+specialFrames[parallelEnd + 1] = {
+  ...specialFrames[parallelEnd + 1],
+  note: tx("Second system. Equation (I) is solved for $y$, so substitute.", "Zweites LGS: Gleichung (I) ist nach $y$ aufgelöst, also setzt du ein."),
+};
 
 const linearSystems: Topic = {
   ...topicMeta("linear-systems"),
   summary: [
     {
-      title: "What a solution is",
-      body: "A pair $(x | y)$ that makes **both** equations true. In a graph it's the point where the two lines cross.",
+      title: tx("What a solution is", "Was eine Lösung ist"),
+      body: tx(
+        "A pair $(x | y)$ that makes **both** equations true. In a graph it's the point where the two lines cross.",
+        "Ein Zahlenpaar $(x | y)$, das **beide** Gleichungen erfüllt. Im Koordinatensystem ist es der Schnittpunkt der beiden Geraden.",
+      ),
       examples: ['"(I)" x + y = 5 \\quad "(II)" x - y = 1', 'L = "{" (3 \\, | \\, 2) "}"'],
       tone: "rule",
     },
-    { title: "Equalization (Gleichsetzungsverfahren)", body: "Both equations are solved for the same variable: set the right sides equal.", examples: ["y = 2x - 1 , \\quad y = -x + 5", "2x - 1 = -x + 5"], tone: "rule" },
-    { title: "Substitution (Einsetzungsverfahren)", body: "One equation is solved for a variable: put that expression, in brackets, into the other one.", examples: ["y = 2x + 1 , \\quad 3x + y = 11", "3x + (2x + 1) = 11"], tone: "rule" },
     {
-      title: "Elimination (Additionsverfahren)",
-      body: "Add or subtract the equations so that one variable cancels. Multiply an equation first if needed.",
+      title: tx("Equalization (Gleichsetzungsverfahren)", "Gleichsetzungsverfahren"),
+      body: tx(
+        "Both equations are solved for the same variable: set the right sides equal.",
+        "Beide Gleichungen sind nach derselben Variable aufgelöst: Setze die rechten Seiten gleich.",
+      ),
+      examples: ["y = 2x - 1 , \\quad y = -x + 5", "2x - 1 = -x + 5"],
+      tone: "rule",
+    },
+    {
+      title: tx("Substitution (Einsetzungsverfahren)", "Einsetzungsverfahren"),
+      body: tx(
+        "One equation is solved for a variable: put that expression, in brackets, into the other one.",
+        "Eine Gleichung ist nach einer Variable aufgelöst: Setze diesen Term in Klammern in die andere ein.",
+      ),
+      examples: ["y = 2x + 1 , \\quad 3x + y = 11", "3x + (2x + 1) = 11"],
+      tone: "rule",
+    },
+    {
+      title: tx("Elimination (Additionsverfahren)", "Additionsverfahren"),
+      body: tx(
+        "Add or subtract the equations so that one variable cancels. Multiply an equation first if needed.",
+        "Addiere oder subtrahiere die Gleichungen so, dass eine Variable wegfällt. Multipliziere vorher eine Gleichung, falls nötig.",
+      ),
       examples: ["2x + y = 7 , \\quad 3x - y = 8", "5x = 15"],
       tone: "rule",
     },
-    { title: "Special cases", body: "Both variables vanish? A false statement like $0 = 4$ means no solution (parallel lines). A true one like $0 = 0$ means infinitely many solutions (same line).", examples: ['0 = 4 \\quad "false: no solution"', '0 = 0 \\quad "true: infinitely many"'], tone: "tip" },
-    { title: "Don't stop halfway", body: "Once you have $x$, put it back into an equation to get $y$. Then check both equations.", tone: "warning" },
+    {
+      title: tx("Special cases", "Sonderfälle"),
+      body: tx(
+        "Both variables vanish? A false statement like $0 = 4$ means no solution (parallel lines). A true one like $0 = 0$ means infinitely many solutions (same line).",
+        "Beide Variablen fallen weg? Eine falsche Aussage wie $0 = 4$ heißt: keine Lösung (parallele Geraden). Eine wahre wie $0 = 0$ heißt: unendlich viele Lösungen (identische Geraden).",
+      ),
+      examples: [tx('0 = 4 \\quad "false: no solution"', '0 = 4 \\quad "falsch: keine Lösung"'), tx('0 = 0 \\quad "true: infinitely many"', '0 = 0 \\quad "wahr: unendlich viele"')],
+      tone: "tip",
+    },
+    {
+      title: tx("Don't stop halfway", "Nicht auf halbem Weg aufhören"),
+      body: tx(
+        "Once you have $x$, put it back into an equation to get $y$. Then check both equations.",
+        "Hast du $x$, setze es in eine Gleichung ein, um $y$ zu bekommen. Mach dann die Probe mit beiden Gleichungen.",
+      ),
+      tone: "warning",
+    },
   ],
   lesson: [
     {
       type: "explain",
-      title: "Two equations, two unknowns",
-      blob: "One equation, two unknowns: too many answers. Two equations: now we can pin it down!",
-      body: "A solution of a system is a pair of numbers $(x | y)$ that makes **both** equations true at the same time.",
+      title: tx("Two equations, two unknowns", "Zwei Gleichungen, zwei Unbekannte"),
+      blob: tx(
+        "One equation, two unknowns: too many answers. Two equations: now we can pin it down!",
+        "Eine Gleichung, zwei Unbekannte: viel zu viele Antworten. Mit zwei Gleichungen kriegen wir sie!",
+      ),
+      body: tx(
+        "A solution of a system is a pair of numbers $(x | y)$ that makes **both** equations true at the same time.",
+        "Eine Lösung eines LGS ist ein Zahlenpaar $(x | y)$, das **beide** Gleichungen gleichzeitig erfüllt.",
+      ),
       frames: introFrames,
     },
     {
       type: "widget",
-      title: "Each equation is a line",
-      blob: "Change the lines and watch where they cross!",
-      body: "Solve each equation for $y$ and you get a line. A point on **both** lines solves both equations: the intersection is the solution. Try the special cases too.",
+      title: tx("Each equation is a line", "Jede Gleichung ist eine Gerade"),
+      blob: tx("Change the lines and watch where they cross!", "Verändere die Geraden und schau, wo sie sich schneiden!"),
+      body: tx(
+        "Solve each equation for $y$ and you get a line. A point on **both** lines solves both equations: the intersection is the solution. Try the special cases too.",
+        "Löst du jede Gleichung nach $y$ auf, bekommst du eine Gerade. Ein Punkt auf **beiden** Geraden löst beide Gleichungen: Der Schnittpunkt ist die Lösung. Probier auch die Sonderfälle aus.",
+      ),
       widget: SystemLab,
     },
     {
       type: "explain",
-      title: "Equalization (Gleichsetzungsverfahren)",
-      blob: "Both say what y is? Then they must be equal!",
-      body: "Use it when both equations are solved for the same variable, for example both for $y$.",
+      title: tx("Equalization (Gleichsetzungsverfahren)", "Gleichsetzungsverfahren"),
+      blob: tx("Both say what y is? Then they must be equal!", "Beide sagen, was y ist? Dann müssen sie gleich sein!"),
+      body: tx(
+        "Use it when both equations are solved for the same variable, for example both for $y$.",
+        "Nimm es, wenn beide Gleichungen nach derselben Variable aufgelöst sind, zum Beispiel beide nach $y$.",
+      ),
       frames: equalization({ v: "y", m: 2, n: -1 }, { v: "y", m: -1, n: 5 }, [2, 3]),
     },
     {
       type: "check",
-      blob: "Your turn. Set the right sides equal.",
+      blob: tx("Your turn. Set the right sides equal.", "Jetzt du! Setze die rechten Seiten gleich."),
       exercise: {
-        instruction: "Solve by equalization",
+        instruction: SOLVE_EQ,
         math: sysMath(solvedSrc({ v: "y", m: 3, n: -4 }, "1"), solvedSrc({ v: "y", m: 1, n: 2 }, "2")),
         answer: pairAnswer(3, 5),
-        hint: "$3x - 4 = x + 2$. Solve for $x$, then put it into one of the equations.",
+        hint: tx(
+          "$3x - 4 = x + 2$. Solve for $x$, then put it into one of the equations.",
+          "$3x - 4 = x + 2$. Löse nach $x$ auf und setze das Ergebnis in eine der Gleichungen ein.",
+        ),
         solution: equalization({ v: "y", m: 3, n: -4 }, { v: "y", m: 1, n: 2 }, [3, 5]),
       },
     },
     {
       type: "explain",
-      title: "Substitution (Einsetzungsverfahren)",
-      blob: "Swap in what you know. Brackets are your friend here.",
-      body: "Use it when **one** equation is solved for a variable. Put that expression into the other equation, then only one unknown is left.",
+      title: tx("Substitution (Einsetzungsverfahren)", "Einsetzungsverfahren"),
+      blob: tx("Swap in what you know. Brackets are your friend here.", "Setz ein, was du schon weißt. Klammern sind hier deine Freunde."),
+      body: tx(
+        "Use it when **one** equation is solved for a variable. Put that expression into the other equation, then only one unknown is left.",
+        "Nimm es, wenn **eine** Gleichung nach einer Variable aufgelöst ist. Setze diesen Term in die andere Gleichung ein, dann bleibt nur eine Unbekannte übrig.",
+      ),
       frames: substitution({ v: "y", m: 2, n: 1 }, { x: 3, y: 1, c: 11 }, [2, 5]),
     },
     {
       type: "check",
-      blob: "This time it's x that's on its own. Same idea!",
+      blob: tx("This time it's x that's on its own. Same idea!", "Diesmal steht x allein. Gleiche Idee!"),
       exercise: {
-        instruction: "Solve by substitution",
+        instruction: SOLVE_SUB,
         math: sysMath(solvedSrc({ v: "x", m: 3, n: -2 }, "1"), stdSrc({ x: 2, y: 1, c: 10 }, "2")),
         answer: pairAnswer(4, 2),
-        hint: "Put $(3y - 2)$ in place of $x$ in (II): $2(3y - 2) + y = 10$.",
+        hint: tx("Put $(3y - 2)$ in place of $x$ in (II): $2(3y - 2) + y = 10$.", "Setze $(3y - 2)$ für $x$ in (II) ein: $2(3y - 2) + y = 10$."),
         solution: substitution({ v: "x", m: 3, n: -2 }, { x: 2, y: 1, c: 10 }, [4, 2]),
       },
     },
     {
       type: "explain",
-      title: "Elimination (Additionsverfahren)",
-      blob: "Add two equations and watch a variable vanish. Magic? No, maths!",
-      body: "If a variable has opposite numbers in front, adding the equations makes it cancel.",
+      title: tx("Elimination (Additionsverfahren)", "Additionsverfahren"),
+      blob: tx("Add two equations and watch a variable vanish. Magic? No, maths!", "Addiere zwei Gleichungen und sieh zu, wie eine Variable verschwindet. Zauberei? Nein, Mathe!"),
+      body: tx(
+        "If a variable has opposite numbers in front, adding the equations makes it cancel.",
+        "Stehen vor einer Variable Gegenzahlen (wie $1$ und $-1$), fällt sie beim Addieren der Gleichungen weg.",
+      ),
       frames: elimination({ x: 2, y: 1, c: 7 }, { x: 3, y: -1, c: 8 }, [3, 1]),
     },
     {
       type: "explain",
-      title: "Multiply first",
-      blob: "Nothing cancels? Make it cancel!",
-      body: "Multiply an equation (every term on both sides!) so that one variable gets opposite numbers. Then add.",
+      title: tx("Multiply first", "Erst multiplizieren"),
+      blob: tx("Nothing cancels? Make it cancel!", "Nichts fällt weg? Dann sorg dafür!"),
+      body: tx(
+        "Multiply an equation (every term on both sides!) so that one variable gets opposite numbers. Then add.",
+        "Multipliziere eine Gleichung (jeden Term auf beiden Seiten!) so, dass vor einer Variable Gegenzahlen stehen. Dann addierst du.",
+      ),
       frames: elimination({ x: 1, y: 2, c: 8 }, { x: 3, y: -1, c: 3 }, [2, 3]),
     },
     {
       type: "check",
-      blob: "Which equation should you multiply, and by what?",
+      blob: tx("Which equation should you multiply, and by what?", "Welche Gleichung multiplizierst du, und womit?"),
       exercise: {
-        instruction: "Solve by elimination",
+        instruction: SOLVE_ELIM,
         math: sysMath(stdSrc({ x: 3, y: 2, c: 13 }, "1"), stdSrc({ x: 1, y: -1, c: 1 }, "2")),
         answer: pairAnswer(3, 2),
-        hint: "Multiply (II) by $2$: then the $y$-terms are $+2y$ and $-2y$.",
+        hint: tx("Multiply (II) by $2$: then the $y$-terms are $+2y$ and $-2y$.", "Multipliziere (II) mit $2$: Dann sind die $y$-Terme $+2y$ und $-2y$."),
         solution: elimination({ x: 3, y: 2, c: 13 }, { x: 1, y: -1, c: 1 }, [3, 2]),
       },
     },
     {
       type: "explain",
-      title: "No solution or infinitely many",
-      blob: "Sometimes x and y both disappear. Then read what's left!",
-      body: "If both variables vanish, look at the statement that is left. **False** (like $1 = -3$): no solution, the lines are parallel. **True** (like $-2 = -2$): infinitely many, it's the same line.",
+      title: tx("No solution or infinitely many", "Keine oder unendlich viele Lösungen"),
+      blob: tx("Sometimes x and y both disappear. Then read what's left!", "Manchmal verschwinden x und y beide. Dann lies, was übrig bleibt!"),
+      body: tx(
+        "If both variables vanish, look at the statement that is left. **False** (like $1 = -3$): no solution, the lines are parallel. **True** (like $-2 = -2$): infinitely many, it's the same line.",
+        "Fallen beide Variablen weg, schau dir die Aussage an, die übrig bleibt. **Falsch** (wie $1 = -3$): keine Lösung, die Geraden sind parallel. **Wahr** (wie $-2 = -2$): unendlich viele Lösungen, die Geraden sind identisch.",
+      ),
       frames: specialFrames,
     },
     {
       type: "check",
-      blob: "Last one! Solve it and see what's left.",
+      blob: tx("Last one! Solve it and see what's left.", "Die letzte! Löse sie und schau, was übrig bleibt."),
       exercise: {
-        instruction: "How many solutions?",
-        text: "How many solutions does the system have?",
+        instruction: HOW_MANY,
+        text: HOW_MANY_TEXT,
         math: sysMath(solvedSrc({ v: "y", m: -1, n: 4 }, "1"), stdSrc({ x: 2, y: 2, c: 8 }, "2")),
         answer: { kind: "choice", options: COUNT_OPTIONS, correct: 2 },
-        hint: "Substitute $y = -x + 4$ into (II). What happens to $x$?",
+        hint: tx("Substitute $y = -x + 4$ into (II). What happens to $x$?", "Setze $y = -x + 4$ in (II) ein. Was passiert mit $x$?"),
         solution: substitution({ v: "y", m: -1, n: 4 }, { x: 2, y: 2, c: 8 }, null),
       },
     },

@@ -1137,14 +1137,14 @@ function BalanceScale() {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-1">
-          <button onClick={undo} disabled={!past.length} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          <button onClick={undo} disabled={!past.length} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent">
             <Undo2 className="size-3.5" /> {t(tx("Undo", "Rückgängig"))}
           </button>
-          <button onClick={() => load(puzzle)} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-            <RotateCcw className="size-3.5" /> {t(tx("Reset", "Zurücksetzen"))}
+          <button onClick={() => load(puzzle)} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
+            <RotateCcw className="size-3.5" /> {t(tx("Reset", "Von vorn"))}
           </button>
-          <button onClick={() => load((puzzle + 1) % PUZZLES.length)} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <button onClick={() => load((puzzle + 1) % PUZZLES.length)} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
             <Shuffle className="size-3.5" /> {t(tx("New puzzle", "Neues Rätsel"))}
           </button>
         </div>

@@ -4,8 +4,11 @@ import { addDays, addWeeks, format, startOfDay, startOfWeek } from "date-fns";
 import { Bell, CalendarX2, Check, FolderKanban, GraduationCap, NotebookPen, Search, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Popover } from "@/components/ui/Menu";
+import { useLocale, useMessages } from "@/i18n/client";
+import { dateLocale } from "@/i18n/format";
+import { tasksText } from "@/i18n/messages/tasks";
 import { subjectColor } from "@/lib/subjects";
-import { DEFAULT_TIME, KIND_LABEL, TASK_KINDS, dueAt, isDefaultTime, type TimeOfDay } from "@/lib/tasks";
+import { DEFAULT_TIME, TASK_KINDS, dueAt, isDefaultTime, type TimeOfDay } from "@/lib/tasks";
 import type { Subject, TaskKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +23,7 @@ export const KIND_ICON: Record<TaskKind, LucideIcon> = {
 
 /** Small label for anything that isn't plain homework. Exams get the accent: they matter most. */
 export function KindBadge({ kind, className, labelClassName }: { kind: TaskKind; className?: string; labelClassName?: string }) {
+  const t = useMessages(tasksText);
   const Icon = KIND_ICON[kind];
   return (
     <span
@@ -28,10 +32,10 @@ export function KindBadge({ kind, className, labelClassName }: { kind: TaskKind;
         kind === "exam" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2",
         className,
       )}
-      title={KIND_LABEL[kind]}
+      title={t.kind[kind]}
     >
       <Icon className="size-3" strokeWidth={2.2} />
-      <span className={labelClassName}>{KIND_LABEL[kind]}</span>
+      <span className={labelClassName}>{t.kind[kind]}</span>
     </span>
   );
 }
@@ -80,14 +84,18 @@ export function DuePicker({
 }
 
 function DuePanel({ value, kind, onChange, close }: { value: string | null; kind: TaskKind; onChange: (v: string | null) => void; close: () => void }) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
+  const fmt = { locale: dateLocale(locale) };
   const due = value ? new Date(value) : null;
   const time = due ? timeOf(due, kind) : null;
   // Read once when the panel opens; fine for a popover that lives a few seconds.
   const [today] = useState(() => startOfDay(new Date()));
+  const nextWeek = startOfWeek(addWeeks(today, 1), { weekStartsOn: 1 });
   const options: { label: string; day: Date; hint: string }[] = [
-    { label: "Today", day: today, hint: format(today, "EEE") },
-    { label: "Tomorrow", day: addDays(today, 1), hint: format(addDays(today, 1), "EEE") },
-    { label: "Next week", day: startOfWeek(addWeeks(today, 1), { weekStartsOn: 1 }), hint: format(startOfWeek(addWeeks(today, 1), { weekStartsOn: 1 }), "EEE d") },
+    { label: t.due.today, day: today, hint: format(today, t.due.weekday, fmt) },
+    { label: t.due.tomorrow, day: addDays(today, 1), hint: format(addDays(today, 1), t.due.weekday, fmt) },
+    { label: t.nextWeek, day: nextWeek, hint: format(nextWeek, t.nextWeekHint, fmt) },
   ];
   const set = (day: Date, t: TimeOfDay | null = time) => onChange(dueAt(day, kind, t).toISOString());
   const dayValue = due ? format(due, "yyyy-MM-dd") : "";
@@ -96,7 +104,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
 
   return (
     <div>
-      <div className="px-1 pb-2 pt-0.5 text-[11.5px] font-medium text-ink-3">Due date</div>
+      <div className="px-1 pb-2 pt-0.5 text-[11.5px] font-medium text-ink-3">{t.dueDate}</div>
       <div className="grid grid-cols-3 gap-1">
         {options.map((o) => {
           const active = due && format(due, "yyyy-MM-dd") === format(o.day, "yyyy-MM-dd");
@@ -108,7 +116,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
                 close();
               }}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[12.5px] font-medium transition-colors",
+                "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[12.5px] font-medium leading-tight transition-colors",
                 active ? "border-blob bg-blob-soft text-blob-ink" : "border-line text-ink-2 hover:border-line-2 hover:bg-hover hover:text-ink",
               )}
             >
@@ -120,7 +128,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
       </div>
       <div className="mt-2 grid grid-cols-[1fr_116px] gap-1.5">
         <label className="block">
-          <span className="sr-only">Date</span>
+          <span className="sr-only">{t.date}</span>
           <input
             type="date"
             value={dayValue}
@@ -133,7 +141,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
           />
         </label>
         <label className="block">
-          <span className="sr-only">Time</span>
+          <span className="sr-only">{t.time}</span>
           <input
             type="time"
             value={timeValue}
@@ -146,7 +154,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
               set(day, { h, m });
             }}
             className="h-8 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink outline-none focus:border-blob"
-            title="Optional time"
+            title={t.optionalTime}
           />
         </label>
       </div>
@@ -158,7 +166,7 @@ function DuePanel({ value, kind, onChange, close }: { value: string | null; kind
           }}
           className="mt-1.5 flex h-7 w-full items-center gap-2 rounded-lg px-1.5 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink"
         >
-          <CalendarX2 className="size-3.5" /> Remove date
+          <CalendarX2 className="size-3.5" /> {t.removeDate}
         </button>
       )}
     </div>
@@ -184,6 +192,7 @@ export function SubjectPicker({
   align?: "start" | "end";
   onOpenChange?: (open: boolean) => void;
 }) {
+  const t = useMessages(tasksText);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const list = q ? subjects.filter((s) => s.name.toLowerCase().includes(q)) : subjects;
@@ -212,7 +221,7 @@ export function SubjectPicker({
                     close();
                   }
                 }}
-                placeholder="Find a subject"
+                placeholder={t.findSubject}
                 className="h-7 w-full rounded-md border border-line bg-surface pl-7 pr-2 text-[12.5px] outline-none focus:border-blob"
               />
             </div>
@@ -234,7 +243,7 @@ export function SubjectPicker({
                 </span>
               </PickRow>
             ))}
-            {list.length === 0 && <p className="px-2 py-1.5 text-[12.5px] text-ink-3">{subjects.length ? "No match" : "No subjects yet"}</p>}
+            {list.length === 0 && <p className="px-2 py-1.5 text-[12.5px] text-ink-3">{subjects.length ? t.noMatch : t.noSubjectsYet}</p>}
           </div>
           {value && (
             <>
@@ -246,7 +255,7 @@ export function SubjectPicker({
                 }}
                 icon={<SubjectDot subject={null} />}
               >
-                <span className="text-ink-3">No subject</span>
+                <span className="text-ink-3">{t.noSubject}</span>
               </PickRow>
             </>
           )}
@@ -261,13 +270,14 @@ export function SubjectPicker({
    --------------------------------------------------------------------------- */
 
 export function KindOptions({ value, onChange }: { value: TaskKind; onChange: (k: TaskKind) => void }) {
+  const t = useMessages(tasksText);
   return (
     <>
       {TASK_KINDS.map((k) => {
         const Icon = KIND_ICON[k];
         return (
           <PickRow key={k} active={value === k} onClick={() => onChange(k)} icon={<Icon className={cn("size-4", k === "exam" ? "text-blob-ink" : "text-ink-3")} />}>
-            {KIND_LABEL[k]}
+            {t.kind[k]}
           </PickRow>
         );
       })}

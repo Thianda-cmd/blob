@@ -2,9 +2,12 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { FileText, House, ListChecks } from "lucide-react";
+import { useLocale, useMessages } from "@/i18n/client";
+import { onboardingText } from "@/i18n/messages/onboarding";
 import { subjectColor } from "@/lib/subjects";
 import { cn, firstName } from "@/lib/utils";
 import type { Picked } from "./SubjectChip";
+import { WELCOME_TITLES } from "./welcome";
 
 /** A small live mock of the sidebar that fills in as you answer. */
 export function SpacePreview({
@@ -20,6 +23,8 @@ export function SpacePreview({
   picked: Picked[];
   showNote: boolean;
 }) {
+  const t = useMessages(onboardingText).preview;
+  const locale = useLocale();
   const initial = (name.trim() || "?")[0]!.toUpperCase();
   const meta = [school.trim(), grade.trim()].filter(Boolean).join(" · ");
   const shown = picked.slice(0, 6);
@@ -43,23 +48,23 @@ export function SpacePreview({
         </span>
         <span className="min-w-0">
           <span className="block truncate text-[13.5px] font-semibold leading-tight">
-            {name.trim() ? `${firstName(name)}'s space` : "Your space"}
+            {name.trim() ? t.space(firstName(name)) : t.yourSpace}
           </span>
-          <span className="block truncate text-[11.5px] leading-tight text-ink-3">{meta || "Notes, slides and homework"}</span>
+          <span className="block truncate text-[11.5px] leading-tight text-ink-3">{meta || t.tagline}</span>
         </span>
       </div>
 
       <div className="mt-2 space-y-px">
-        <PreviewRow icon={<House className="size-3.5" />}>Home</PreviewRow>
-        <PreviewRow icon={<ListChecks className="size-3.5" />}>Tasks</PreviewRow>
+        <PreviewRow icon={<House className="size-3.5" />}>{t.home}</PreviewRow>
+        <PreviewRow icon={<ListChecks className="size-3.5" />}>{t.tasks}</PreviewRow>
       </div>
 
-      <div className="mt-2.5 px-1.5 text-[11px] font-medium text-ink-3">Subjects</div>
+      <div className="mt-2.5 px-1.5 text-[11px] font-medium text-ink-3">{t.subjects}</div>
       <motion.div layout className="mt-0.5 min-h-7 space-y-px">
         <AnimatePresence initial={false}>
           {shown.map((s) => (
             <motion.div
-              key={s.name}
+              key={s.preset ?? s.name}
               layout
               initial={{ opacity: 0, x: -10, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -86,11 +91,11 @@ export function SpacePreview({
             <span className="h-1.5 w-24 rounded-full bg-line" />
           </div>
         )}
-        {more > 0 && <div className="px-1.5 pt-0.5 text-[11.5px] text-ink-3">and {more} more</div>}
+        {more > 0 && <div className="px-1.5 pt-0.5 text-[11.5px] text-ink-3">{t.more(more)}</div>}
       </motion.div>
 
       <motion.div layout className="mt-2.5 px-1.5 text-[11px] font-medium text-ink-3">
-        Notes
+        {t.notes}
       </motion.div>
       <motion.div layout className="mt-0.5">
         <AnimatePresence initial={false} mode="popLayout">
@@ -101,7 +106,7 @@ export function SpacePreview({
               animate={{ opacity: 1, y: 0 }}
               transition={{ type: "spring", stiffness: 520, damping: 30 }}
             >
-              <PreviewRow icon={<FileText className="size-3.5" />}>Welcome to Blob 👋</PreviewRow>
+              <PreviewRow icon={<FileText className="size-3.5" />}>{WELCOME_TITLES[locale]}</PreviewRow>
             </motion.div>
           ) : (
             <motion.div key="empty" exit={{ opacity: 0 }} className="flex h-7 items-center px-1.5">

@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { tasksText } from "@/i18n/messages/tasks";
 import { createClient } from "@/lib/supabase/client";
 import { isDueByToday, retimeForKind } from "@/lib/tasks";
 import type { Task, TaskKind } from "@/lib/types";
@@ -33,35 +35,21 @@ export type TaskStore = {
   dismissRemoved: () => void;
 };
 
-const CHEERS = [
-  "Nice! One less thing.",
-  "Done and dusted.",
-  "Look at you go!",
-  "Checked off. Smooth.",
-  "That's progress.",
-  "Crossed off. Feels good, right?",
-  "Boom. Next one!",
-  "Little wins add up.",
-];
-const KIND_CHEERS: Partial<Record<TaskKind, string[]>> = {
-  exam: ["Exam done? Hope it went great!", "One exam down. Proud of you."],
-  project: ["Project finished. That's a big one!", "Project wrapped up. Well played."],
-};
-const ALL_CLEAR = [
-  "That's everything for today. You're free!",
-  "Today's list: cleared. Go do something fun.",
-  "All done for today! Time to relax.",
-];
-
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
-function oops(message = "Hmm, that didn't save. Check your connection?") {
+function oops(message: string) {
   blob.say(message, { mood: "worried" });
   blob.react("shake", "worried");
 }
 
+/** Blob's lines for kinds that deserve a special cheer. */
+function kindCheers(t: (typeof tasksText)["en"], kind: TaskKind): string[] | undefined {
+  return kind === "exam" ? t.examCheers : kind === "project" ? t.projectCheers : undefined;
+}
+
 /** Client-side task list with optimistic writes to Supabase and Blob reactions. */
 export function useTaskStore(initialTasks: Task[]): TaskStore {
+  const t = useMessages(tasksText);
   const { userId } = useWorkspace();
   const [tasks, setTasks] = useState(initialTasks);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -76,7 +64,7 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
   }, []);
 
   const replace = useCallback((id: string, next: Task | null) => {
-    commit((ts) => (next ? ts.map((t) => (t.id === id ? next : t)) : ts.filter((t) => t.id !== id)));
+    commit((ts) => (next ? ts.map((x) => (x.id === id ? next : x)) : ts.filter((x) => x.id !== id)));
   }, [commit]);
 
   const add = useCallback(
@@ -112,20 +100,20 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
         .single();
       if (error || !data) {
         replace(task.id, null);
-        oops("I couldn't add that task. Try again?");
+        oops(t.errAdd);
         return null;
       }
       // Keep local edits made while the insert was in flight.
-      const local = ref.current.find((t) => t.id === task.id);
+      const local = ref.current.find((x) => x.id === task.id);
       if (local) replace(task.id, { ...(data as Task), ...pickEdits(local, task) });
       return data as Task;
     },
-    [commit, replace, userId],
+    [commit, replace, userId, t],
   );
 
   const update = useCallback(
     async (id: string, patch: TaskPatch) => {
-      const before = ref.current.find((t) => t.id === id);
+      const before = ref.current.find((x) => x.id === id);
       if (!before) return false;
       const full: TaskPatch = { ...patch };
       if (patch.kind && patch.kind !== before.kind && patch.due_at === undefined) {
@@ -138,38 +126,38 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       replace(id, { ...before, ...full, updated_at: new Date().toISOString() });
       const { error } = await createClient().from("tasks").update(full).eq("id", id);
       if (error) {
-        const current = ref.current.find((t) => t.id === id);
+        const current = ref.current.find((x) => x.id === id);
         if (current) replace(id, { ...current, ...revert(before, full) });
-        oops();
+        oops(t.errSave);
         return false;
       }
       return true;
     },
-    [replace],
+    [replace, t],
   );
 
   const setDone = useCallback(
     async (id: string, done: boolean) => {
-      const before = ref.current.find((t) => t.id === id);
+      const before = ref.current.find((x) => x.id === id);
       if (!before || before.done === done) return false;
       const now = new Date();
       const completed_at = done ? now.toISOString() : null;
       replace(id, { ...before, done, completed_at });
 
       if (done) {
-        const clearedToday = isDueByToday(before, now) && !ref.current.some((t) => isDueByToday(t, now));
+        const clearedToday = isDueByToday(before, now) && !ref.current.some((x) => isDueByToday(x, now));
         if (clearedToday) {
           // Everything due today is done: graduation cap and a victory hop.
           blob.react("celebrate", "excited", 2600, "cap");
           setTimeout(() => blob.react("jump", "love", 2600, "cap"), 900);
-          blob.say(pick(ALL_CLEAR), { mood: "love", ms: 4200, accessory: "cap" });
+          blob.say(pick(t.allClear), { mood: "love", ms: 4200, accessory: "cap" });
           lastSaid.current = Date.now();
         } else {
           blob.react("jump", "excited");
-          const special = KIND_CHEERS[before.kind];
+          const special = kindCheers(t, before.kind);
           const quiet = Date.now() - lastSaid.current < 9000;
           if (!quiet && (special || Math.random() < 0.4)) {
-            blob.say(pick(special ?? CHEERS), { mood: "happy" });
+            blob.say(pick(special ?? t.cheers), { mood: "happy" });
             lastSaid.current = Date.now();
           }
         }
@@ -177,19 +165,19 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
 
       const { error } = await createClient().from("tasks").update({ done, completed_at }).eq("id", id);
       if (error) {
-        const current = ref.current.find((t) => t.id === id);
+        const current = ref.current.find((x) => x.id === id);
         if (current) replace(id, { ...current, done: before.done, completed_at: before.completed_at });
-        oops();
+        oops(t.errSave);
         return false;
       }
       return true;
     },
-    [replace],
+    [replace, t],
   );
 
   const remove = useCallback(
     async (id: string) => {
-      const before = ref.current.find((t) => t.id === id);
+      const before = ref.current.find((x) => x.id === id);
       if (!before) return false;
       replace(id, null);
       setRemoved(before);
@@ -197,19 +185,19 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       if (error) {
         commit((ts) => [...ts, before]);
         setRemoved(null);
-        oops("I couldn't delete that task.");
+        oops(t.errDelete);
         return false;
       }
       return true;
     },
-    [commit, replace],
+    [commit, replace, t],
   );
 
   const undoRemove = useCallback(async () => {
     const task = removed;
     if (!task) return false;
     setRemoved(null);
-    commit((ts) => [...ts.filter((t) => t.id !== task.id), task]);
+    commit((ts) => [...ts.filter((x) => x.id !== task.id), task]);
     const { error } = await createClient().from("tasks").insert({
       id: task.id,
       title: task.title,
@@ -223,12 +211,12 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
     });
     if (error) {
       replace(task.id, null);
-      oops("I couldn't bring that task back.");
+      oops(t.errRestore);
       return false;
     }
     blob.react("squish", "happy");
     return true;
-  }, [commit, removed, replace]);
+  }, [commit, removed, replace, t]);
 
   const dismissRemoved = useCallback(() => setRemoved(null), []);
 

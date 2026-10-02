@@ -19,6 +19,7 @@ export const shellText = defineMessages({
       noNotes: "Notes without a subject live here.",
       newNote: "New note",
       newDeck: "New deck",
+      newDeckTitle: "New presentation",
       trash: "Trash",
       collapse: "Collapse",
       expand: "Expand",
@@ -95,7 +96,9 @@ export const shellText = defineMessages({
       noSubjects: "Füge deine Schulfächer hinzu, dann bleibt alles ordentlich.",
       noNotes: "Notizen ohne Fach landen hier.",
       newNote: "Neue Notiz",
+      // Short so it fits next to „Neue Notiz“; the tooltip says it in full.
       newDeck: "Präsentation",
+      newDeckTitle: "Neue Präsentation",
       trash: "Papierkorb",
       collapse: "Einklappen",
       expand: "Ausklappen",

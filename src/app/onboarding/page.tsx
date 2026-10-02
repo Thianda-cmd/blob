@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Onboarding } from "@/components/onboarding/Onboarding";
+import { onboardingText } from "@/i18n/messages/onboarding";
+import { getMessages } from "@/i18n/server";
 import { createClient, getUser } from "@/lib/supabase/server";
 import type { Profile, Subject } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Set up your space" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages(onboardingText)).meta };
+}
 
 export default async function OnboardingPage() {
   const user = await getUser();

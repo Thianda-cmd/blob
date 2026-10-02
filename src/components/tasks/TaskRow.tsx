@@ -2,10 +2,11 @@
 
 import { motion } from "motion/react";
 import { CalendarPlus, Ellipsis, Trash2 } from "lucide-react";
-import { format } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
-import { dueTone, formatDue, formatDueLong, formatTime, isDefaultTime } from "@/lib/tasks";
+import { useLocale, useMessages } from "@/i18n/client";
+import { tasksText } from "@/i18n/messages/tasks";
+import { dueTone, formatDue, formatDueLong, formatShortDate, formatTime, isDefaultTime } from "@/lib/tasks";
 import type { Subject, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { DuePicker, KindBadge, KindOptions, SubjectDot, SubjectPicker } from "./pickers";
@@ -31,6 +32,8 @@ export type TaskRowProps = {
 };
 
 export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hideSubject, dense, narrow }: TaskRowProps) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
   const [pending, setPending] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
@@ -68,11 +71,11 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
   const showTime = due && !isDefaultTime(due, task.kind);
 
   // Once it's done, "3 days late" is old news: show the plain date instead.
-  const dueText = due ? (done && tone === "late" ? format(due, "MMM d") : formatDue(due, now)) : "";
+  const dueText = due ? (done && tone === "late" ? formatShortDate(due, now, locale) : formatDue(due, now, locale)) : "";
   const dueLabel = due ? (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">{dueText}</span>
-      {showTime && !done && !narrow && <span className="hidden shrink-0 font-normal text-ink-3 sm:inline">{formatTime(due)}</span>}
+      {showTime && !done && !narrow && <span className="hidden shrink-0 font-normal text-ink-3 sm:inline">{formatTime(due, locale)}</span>}
     </span>
   ) : null;
 
@@ -88,7 +91,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
         dense ? "min-h-9" : "min-h-[38px] hover:bg-hover/60 [&:has([aria-expanded=true])]:bg-hover/60",
       )}
     >
-      <TaskCheckbox checked={done} onChange={toggle} size={dense ? 16 : 17} label={done ? `Mark “${task.title}” as not done` : `Mark “${task.title}” as done`} />
+      <TaskCheckbox checked={done} onChange={toggle} size={dense ? 16 : 17} label={done ? t.markNotDone(task.title) : t.markDone(task.title)} />
 
       <div className="flex min-w-0 flex-1 items-center gap-2 py-1.5">
         {editing ? (
@@ -106,7 +109,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
             }}
             maxLength={200}
             className="-my-1 h-7 min-w-0 flex-1 rounded-md bg-raised px-1.5 text-[14px] text-ink shadow-[0_0_0_1.5px_var(--blob)] outline-none"
-            aria-label="Task title"
+            aria-label={t.taskTitle}
           />
         ) : (
           <button
@@ -148,7 +151,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
             </span>
           )}
           {due && (
-            <span className={cn("min-w-[64px] text-right", dueClass)} title={formatDueLong(due)}>
+            <span className={cn("min-w-[64px] text-right", dueClass)} title={formatDueLong(due, locale)}>
               {dueText}
             </span>
           )}
@@ -168,10 +171,10 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                     subject ? "text-ink-2" : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                     done && "opacity-70",
                   )}
-                  title={subject ? `Subject: ${subject.name}` : "Add subject"}
+                  title={subject ? t.subjectIs(subject.name) : t.addSubject}
                 >
                   <SubjectDot subject={subject} />
-                  <span className="hidden truncate sm:inline">{subject ? subject.name : "Subject"}</span>
+                  <span className="hidden truncate sm:inline">{subject ? subject.name : t.subject}</span>
                 </button>
               )}
             />
@@ -188,11 +191,11 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                   narrow ? "min-w-[60px] max-w-[140px]" : "w-[84px] sm:w-[150px]",
                   due ? dueClass : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                 )}
-                title={due ? formatDueLong(due) : "Add a due date"}
+                title={due ? formatDueLong(due, locale) : t.addDueDate}
               >
                 {dueLabel ?? (
                   <>
-                    <CalendarPlus className="size-3.5" /> Date
+                    <CalendarPlus className="size-3.5" /> {t.date}
                   </>
                 )}
               </button>
@@ -205,8 +208,8 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
               <button
                 {...props}
                 className="grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-hover hover:text-ink focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
-                aria-label="Task options"
-                title="Task options"
+                aria-label={t.taskOptions}
+                title={t.taskOptions}
               >
                 <Ellipsis className="size-4" />
               </button>
@@ -214,7 +217,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
           >
             {(close) => (
               <>
-                <MenuLabel>Type</MenuLabel>
+                <MenuLabel>{t.type}</MenuLabel>
                 <KindOptions
                   value={task.kind}
                   onChange={(kind) => {
@@ -231,7 +234,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                     onDelete?.();
                   }}
                 >
-                  Delete task
+                  {t.deleteTask}
                 </MenuItem>
               </>
             )}

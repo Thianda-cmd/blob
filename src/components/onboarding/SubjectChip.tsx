@@ -6,7 +6,8 @@ import { subjectColor } from "@/lib/subjects";
 import type { SubjectColor } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type Picked = { name: string; emoji: string | null; color: SubjectColor };
+/** A subject to create. `preset` is the English name of a suggestion (its name then follows the language). */
+export type Picked = { name: string; emoji: string | null; color: SubjectColor; preset?: string };
 
 /** A squishy, toggleable subject chip. */
 export function SubjectChip({ subject, selected, onToggle }: { subject: Picked; selected: boolean; onToggle: () => void }) {

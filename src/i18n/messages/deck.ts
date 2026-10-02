@@ -225,14 +225,6 @@ export const deckText = defineMessages({
       dusk: { label: "Dusk", hint: "Plum gradient, elegant serif" },
     } satisfies Record<DeckPreset, Named>,
     backdrops: { solid: "Solid", gradient: "Gradient", glow: "Glow", dots: "Dots", grid: "Grid" } satisfies Record<DeckBackdrop, string>,
-
-    /** Text saved into a brand-new deck (for whoever creates decks: `deckText[locale].starter`). */
-    starter: {
-      title: "Your big idea",
-      subtitle: "A short subtitle, or your name",
-      heading: "Three things to know",
-      points: "First point\nSecond point\nThird point",
-    },
   },
   de: {
     untitled: "Unbenannte Präsentation",
@@ -443,12 +435,5 @@ export const deckText = defineMessages({
       dusk: { label: "Dämmerung", hint: "Pflaumenfarbener Verlauf, elegante Serifen" },
     },
     backdrops: { solid: "Einfarbig", gradient: "Verlauf", glow: "Leuchten", dots: "Punkte", grid: "Raster" },
-
-    starter: {
-      title: "Deine große Idee",
-      subtitle: "Ein kurzer Untertitel oder dein Name",
-      heading: "Drei Dinge, die du wissen solltest",
-      points: "Erster Punkt\nZweiter Punkt\nDritter Punkt",
-    },
   },
 });

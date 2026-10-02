@@ -686,6 +686,8 @@ const UNIT_PRICES: {
   many: Text;
   /** German subject for "more …, higher price". */
   more: string;
+  /** German shop for the distracting opening time. */
+  shop: string;
   cents: number[];
   a: [number, number];
   b: [number, number];
@@ -693,27 +695,27 @@ const UNIT_PRICES: {
   answer: (b: number, p: string) => Text;
 }[] = [
   {
-    one: tx("notebook", "Heft"), many: tx("notebooks", "Hefte"), more: "Hefte", cents: [110, 120, 140, 150, 160, 180], a: [2, 6], b: [3, 12],
+    one: tx("notebook", "Heft"), many: tx("notebooks", "Hefte"), more: "Hefte", shop: "Der Laden", cents: [110, 120, 140, 150, 160, 180], a: [2, 6], b: [3, 12],
     text: (a, p, b) => tx(`At the school shop, ${a} notebooks cost ${p} €. How much do ${b} notebooks cost?`, `Im Schreibwarenladen kosten ${a} Hefte ${p} €. Wie viel kosten ${b} Hefte?`),
     answer: (b, p) => tx(`${b} notebooks cost ${p} €.`, `${b} Hefte kosten ${p} €.`),
   },
   {
-    one: tx("roll", "Brötchen"), many: tx("rolls", "Brötchen"), more: "Brötchen", cents: [30, 35, 40, 45, 50, 55], a: [4, 10], b: [3, 15],
+    one: tx("roll", "Brötchen"), many: tx("rolls", "Brötchen"), more: "Brötchen", shop: "Die Bäckerei", cents: [30, 35, 40, 45, 50, 55], a: [4, 10], b: [3, 15],
     text: (a, p, b) => tx(`At the bakery, ${a} bread rolls cost ${p} €. How much do ${b} bread rolls cost?`, `In der Bäckerei kosten ${a} Brötchen ${p} €. Wie viel kosten ${b} Brötchen?`),
     answer: (b, p) => tx(`${b} bread rolls cost ${p} €.`, `${b} Brötchen kosten ${p} €.`),
   },
   {
-    one: "kg", many: "kg", more: "Äpfel", cents: [180, 220, 240, 260, 280, 320], a: [2, 5], b: [3, 8],
+    one: "kg", many: "kg", more: "Äpfel", shop: "Der Hofladen", cents: [180, 220, 240, 260, 280, 320], a: [2, 5], b: [3, 8],
     text: (a, p, b) => tx(`${a} kg of apples cost ${p} €. How much do ${b} kg of apples cost?`, `${a} kg Äpfel kosten ${p} €. Wie viel kosten ${b} kg Äpfel?`),
     answer: (b, p) => tx(`${b} kg of apples cost ${p} €.`, `${b} kg Äpfel kosten ${p} €.`),
   },
   {
-    one: "m", many: "m", more: "Stoff", cents: [400, 600, 750, 800, 1200], a: [2, 5], b: [3, 9],
+    one: "m", many: "m", more: "Stoff", shop: "Der Stoffladen", cents: [400, 600, 750, 800, 1200], a: [2, 5], b: [3, 9],
     text: (a, p, b) => tx(`${a} m of fabric cost ${p} €. How much do ${b} m of fabric cost?`, `${a} m Stoff kosten ${p} €. Wie viel kosten ${b} m Stoff?`),
     answer: (b, p) => tx(`${b} m of fabric cost ${p} €.`, `${b} m Stoff kosten ${p} €.`),
   },
   {
-    one: tx("ticket", "Fahrkarte"), many: tx("tickets", "Fahrkarten"), more: "Fahrkarten", cents: [250, 280, 320, 350], a: [2, 5], b: [3, 9],
+    one: tx("ticket", "Fahrkarte"), many: tx("tickets", "Fahrkarten"), more: "Fahrkarten", shop: "Der Kiosk", cents: [250, 280, 320, 350], a: [2, 5], b: [3, 9],
     text: (a, p, b) => tx(`${a} bus tickets cost ${p} €. How much do ${b} bus tickets cost?`, `${a} Busfahrkarten kosten ${p} €. Wie viel kosten ${b} Busfahrkarten?`),
     answer: (b, p) => tx(`${b} bus tickets cost ${p} €.`, `${b} Busfahrkarten kosten ${p} €.`),
   },
@@ -732,7 +734,7 @@ const dreisatz: Tpl = (rng) => {
   );
   if (rng.chance(0.35)) {
     const t = rng.int(7, 9);
-    text = withExtra(text, tx(`The shop opens at ${t} o'clock.`, `Der Laden öffnet um ${t} Uhr.`));
+    text = withExtra(text, tx(`The shop opens at ${t} o'clock.`, `${c.shop} öffnet um ${t} Uhr.`));
     given = cat(given, tx(" The opening time doesn't matter.", " Die Öffnungszeit spielt keine Rolle."));
   }
   return {
@@ -760,11 +762,11 @@ const dreisatz: Tpl = (rng) => {
 };
 
 const RECIPES = [
-  { what: "flour", unit: "g", per: [50, 75, 100, 125], dish: "pancakes", de: { what: "Mehl", dish: "Pfannkuchen" } },
-  { what: "milk", unit: "ml", per: [50, 75, 100, 125, 150], dish: "pancakes", de: { what: "Milch", dish: "Pfannkuchen" } },
-  { what: "pasta", unit: "g", per: [100, 125, 150], dish: "spaghetti", de: { what: "Nudeln", dish: "Spaghetti bolognese" } },
-  { what: "rice", unit: "g", per: [60, 75, 80], dish: "a rice dish", de: { what: "Reis", dish: "eine Reispfanne" } },
-  { what: "butter", unit: "g", per: [15, 20, 25, 30], dish: "a cake", de: { what: "Butter", dish: "einen Kuchen" } },
+  { what: "flour", unit: "g", per: [50, 75, 100, 125], dish: "pancakes", de: { what: "Mehl", how: "Wie viel", dish: "Pfannkuchen" } },
+  { what: "milk", unit: "ml", per: [50, 75, 100, 125, 150], dish: "pancakes", de: { what: "Milch", how: "Wie viel", dish: "Pfannkuchen" } },
+  { what: "pasta", unit: "g", per: [100, 125, 150], dish: "spaghetti", de: { what: "Nudeln", how: "Wie viele", dish: "Spaghetti bolognese" } },
+  { what: "rice", unit: "g", per: [60, 75, 80], dish: "a rice dish", de: { what: "Reis", how: "Wie viel", dish: "eine Reispfanne" } },
+  { what: "butter", unit: "g", per: [15, 20, 25, 30], dish: "a cake", de: { what: "Butter", how: "Wie viel", dish: "einen Kuchen" } },
 ];
 
 const recipe: Tpl = (rng) => {
@@ -775,7 +777,7 @@ const recipe: Tpl = (rng) => {
   if (b === a) b = a + 2;
   let text = tx(
     `A recipe for ${r.dish} for ${a} people needs ${a * per} ${r.unit} of ${r.what}. How much ${r.what} do you need for ${b} people?`,
-    `Ein Rezept für ${r.de.dish} reicht für ${a} Personen. Man braucht dafür ${a * per} ${r.unit} ${r.de.what}. Wie viel ${r.de.what} brauchst du für ${b} Personen?`,
+    `Ein Rezept für ${r.de.dish} reicht für ${a} Personen. Man braucht dafür ${a * per} ${r.unit} ${r.de.what}. ${r.de.how} ${r.de.what} brauchst du für ${b} Personen?`,
   );
   let given = tx(
     `**Given:** ${a} people need ${a * per} ${r.unit}. **Wanted:** the amount for ${b} people.`,
@@ -858,7 +860,7 @@ const speedV: Tpl = (rng) => {
     answer: num(v, "km/h"),
     hint: tx(
       "Speed = distance : time. In km/h: how many km in **one** hour?",
-      "Geschwindigkeit = Strecke : Zeit. Bei km/h heißt das: Wie viele km schaffst du in **einer** Stunde?",
+      "Geschwindigkeit = Strecke : Zeit. Bei km/h heißt das: Wie viele km sind es in **einer** Stunde?",
     ),
     solution: [
       { math: `v#V =#eq \\frac{s#s}{t#t}`, note: given },
@@ -946,7 +948,7 @@ const COUNTS: {
     text: (v, p, n) =>
       tx(
         `${n}'s way to school is ${v} km long. One step of ${n} is ${p} cm long. How many steps is the way to school?`,
-        `${gen(n)} Schulweg ist ${v} km lang. Ein Schritt von ${n} ist ${p} cm lang. Wie viele Schritte sind es bis zur Schule?`,
+        `${gen(n)} Schulweg ist ${v} km lang. ${n} macht ${p} cm lange Schritte. Wie viele Schritte sind es bis zur Schule?`,
       ),
     answer: (k) => tx(`The way to school is ${k} steps.`, `Bis zur Schule sind es ${k} Schritte.`),
   },
@@ -1162,7 +1164,7 @@ const INVERSE: {
     text: (a, va, b) =>
       tx(
         `${a} friends share the cost of a party equally. Each of them pays ${va} €. How much would each pay if ${b} friends shared the cost?`,
-        `${a} Freunde teilen sich die Kosten für eine Party gleichmäßig. Jeder bezahlt ${va} €. Wie viel müsste jeder bezahlen, wenn sich ${b} Freunde die Kosten teilen?`,
+        `${a} Freunde teilen sich die Kosten für eine Party gleichmäßig. Jeder bezahlt ${va} €. Wie viel müsste jeder bezahlen, wenn sich ${b} Freunde die Kosten teilen würden?`,
       ),
     why: (a) =>
       tx(
@@ -1423,7 +1425,7 @@ const speedMinutes: Tpl = (rng) => {
     answer: num(v, "km/h"),
     hint: tx(
       "km/h means: km in **60** minutes. Use the rule of three on the minutes.",
-      "km/h heißt: km in **60** Minuten. Rechne mit dem Dreisatz über die Minuten.",
+      "km/h heißt: km in **60** Minuten. Rechne mit dem Dreisatz von den Minuten auf 60 Minuten hoch.",
     ),
     solution: frames,
   };
@@ -2124,14 +2126,14 @@ function RatioTable() {
                 )}
                 style={{ top: rowY(i) - RH / 2, height: RH }}
               >
-                <span className="flex items-baseline justify-center gap-1.5">
+                <span className="flex min-w-0 flex-col items-center justify-center leading-none sm:flex-row sm:items-baseline sm:gap-1.5 sm:leading-normal">
                   <span className="font-math text-[22px] tabular-nums">{row.l}</span>
-                  <span className="truncate text-[13px] text-ink-2">{unitL(row.l)}</span>
+                  <span className="max-w-full truncate text-[11.5px] leading-tight text-ink-2 sm:text-[13px] sm:leading-normal">{unitL(row.l)}</span>
                 </span>
                 <span className="text-center text-ink-3">→</span>
-                <span className="flex items-baseline justify-center gap-1.5">
+                <span className="flex min-w-0 flex-col items-center justify-center leading-none sm:flex-row sm:items-baseline sm:gap-1.5 sm:leading-normal">
                   <span className={cn("font-math text-[22px] tabular-nums", last && "font-semibold text-blob-ink")}>{fmt(row.r)}</span>
-                  <span className="truncate text-[13px] text-ink-2">{say(c.unit)}</span>
+                  <span className="max-w-full truncate text-[11.5px] leading-tight text-ink-2 sm:text-[13px] sm:leading-normal">{say(c.unit)}</span>
                 </span>
               </motion.div>
             );

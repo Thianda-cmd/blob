@@ -3,7 +3,10 @@
 import { addDays, differenceInCalendarDays, format, isSameDay, startOfWeek } from "date-fns";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
-import { KIND_PLURAL, TASK_KINDS, dayKey } from "@/lib/tasks";
+import { useLocale, useMessages } from "@/i18n/client";
+import { dateLocale } from "@/i18n/format";
+import { tasksText } from "@/i18n/messages/tasks";
+import { TASK_KINDS, dayKey } from "@/lib/tasks";
 import type { Subject, Task, TaskKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { KIND_ICON, SubjectDot } from "./pickers";
@@ -39,6 +42,8 @@ export function CalendarHeat({
   onSelect: (day: string | null) => void;
   overdue: number;
 }) {
+  const t = useMessages(tasksText);
+  const locale = useLocale();
   const start = startOfWeek(now, { weekStartsOn: 1 });
   const counts = new Map<string, { total: number; exams: number }>();
   for (const t of tasks) {
@@ -54,7 +59,7 @@ export function CalendarHeat({
   return (
     <div>
       <div className="grid grid-cols-7 gap-1 pb-1">
-        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+        {t.weekdayInitials.map((d, i) => (
           <span key={i} className={cn("text-center text-[10.5px] font-medium text-ink-3", i >= 5 && "opacity-70")}>
             {d}
           </span>
@@ -75,7 +80,7 @@ export function CalendarHeat({
               whileTap={{ scale: 0.9 }}
               transition={{ type: "spring", stiffness: 600, damping: 20 }}
               onClick={() => onSelect(active ? null : key)}
-              title={`${format(d, "EEEE, MMM d")}: ${total ? `${total} task${total === 1 ? "" : "s"}${c?.exams ? `, ${c.exams} exam${c.exams === 1 ? "" : "s"}` : ""}` : "nothing due"}`}
+              title={t.dayTitle(format(d, t.dayTitleFormat, { locale: dateLocale(locale) }), total, c?.exams ?? 0)}
               aria-pressed={active}
               className={cn(
                 "relative flex h-[42px] flex-col items-center justify-center rounded-lg text-[12.5px] tabular-nums transition-colors",
@@ -99,13 +104,13 @@ export function CalendarHeat({
             onClick={() => onSelect(selected === "overdue" ? null : "overdue")}
             className={cn("rounded-md px-1.5 py-0.5 font-medium text-danger hover:bg-danger/10", selected === "overdue" && "bg-danger/10")}
           >
-            {overdue} overdue
+            {t.overdue(overdue)}
           </button>
         ) : (
-          <span>Nothing overdue</span>
+          <span>{t.nothingOverdue}</span>
         )}
         <span className="ml-auto flex items-center gap-1">
-          <span className="size-1.5 rounded-full bg-ink" /> exam
+          <span className="size-1.5 rounded-full bg-ink" /> {t.examLegend}
         </span>
         <span className="flex items-center gap-0.5">
           {HEAT.slice(1).map((h) => (
@@ -118,12 +123,13 @@ export function CalendarHeat({
 }
 
 export function WeekProgress({ done, total }: { done: number; total: number }) {
+  const t = useMessages(tasksText);
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
     <div>
       <div className="flex items-baseline justify-between text-[12px]">
         <span className="text-ink-2">
-          <span className="font-semibold text-ink tabular-nums">{done}</span> of <span className="tabular-nums">{total}</span> done this week
+          <span className="font-semibold text-ink tabular-nums">{done}</span> {t.weekOf} <span className="tabular-nums">{total}</span> {t.weekDone}
         </span>
         <span className="tabular-nums text-ink-3">{pct}%</span>
       </div>
@@ -140,6 +146,7 @@ export function WeekProgress({ done, total }: { done: number; total: number }) {
 }
 
 export function KindFilter({ counts, value, onChange }: { counts: Record<TaskKind, number>; value: TaskKind | null; onChange: (k: TaskKind | null) => void }) {
+  const t = useMessages(tasksText);
   return (
     <div className="grid grid-cols-2 gap-1">
       {TASK_KINDS.map((k) => {
@@ -161,7 +168,7 @@ export function KindFilter({ counts, value, onChange }: { counts: Record<TaskKin
                 {counts[k]}
               </span>
             </span>
-            <span className={cn("text-[11.5px] leading-none", active ? "text-paper/80" : "text-ink-3")}>{KIND_PLURAL[k]}</span>
+            <span className={cn("text-[11.5px] leading-none", active ? "text-paper/80" : "text-ink-3")}>{t.kindPlural[k]}</span>
           </button>
         );
       })}
@@ -182,6 +189,7 @@ export function SubjectFilter({
   value: string | null;
   onChange: (id: string | null) => void;
 }) {
+  const t = useMessages(tasksText);
   const row = (id: string, label: ReactNode, icon: ReactNode, count: number) => {
     const active = value === id;
     return (
@@ -205,8 +213,8 @@ export function SubjectFilter({
       {subjects.map((s) =>
         row(s.id, s.name, s.emoji ? <span className="text-[12.5px] leading-none">{s.emoji}</span> : <SubjectDot subject={s} />, counts.get(s.id) ?? 0),
       )}
-      {noSubject > 0 && row("none", <span className="text-ink-3">No subject</span>, <SubjectDot subject={null} />, noSubject)}
-      {subjects.length === 0 && <p className="px-1.5 text-[12.5px] text-ink-3">Add subjects in the sidebar to sort tasks by class.</p>}
+      {noSubject > 0 && row("none", <span className="text-ink-3">{t.noSubject}</span>, <SubjectDot subject={null} />, noSubject)}
+      {subjects.length === 0 && <p className="px-1.5 text-[12.5px] text-ink-3">{t.addSubjectsHint}</p>}
     </div>
   );
 }

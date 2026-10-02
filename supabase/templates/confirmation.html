@@ -1,14 +1,14 @@
-<!doctype html>
-<html lang="en">
+{{- $en := eq (printf "%v" .Data.locale) "en" -}}<!doctype html>
+<html lang="{{ if $en }}en{{ else }}de{{ end }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <meta name="supported-color-schemes" content="light" />
-    <title>Confirm your email for Blob</title>
+    <title>{{ if $en }}Confirm your email for Blob{{ else }}Bestätige deine E-Mail-Adresse für Blob{{ end }}</title>
   </head>
   <body style="margin:0;padding:0;background:#f4f3ee;-webkit-text-size-adjust:100%;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">One click and your Blob space is ready.</div>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{{ if $en }}One click and your Blob space is ready.{{ else }}Ein Klick und dein Blob-Bereich ist bereit.{{ end }}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f3ee;">
       <tr>
         <td align="center" style="padding:36px 16px 40px;">
@@ -20,25 +20,25 @@
             </tr>
             <tr>
               <td style="background:#ffffff;border:1px solid #e3e1d9;border-radius:16px;padding:32px 32px 28px;">
-                <h1 style="margin:0 0 10px;font:700 24px/1.25 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:-0.4px;color:#1c1b18;">Confirm your email</h1>
-                <p style="margin:0 0 24px;font:400 15px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#4b4a44;">{{ if .Data.full_name }}Hi {{ .Data.full_name }}!{{ else }}Hi there!{{ end }} I'm Blob, your new study buddy. Confirm your email address and I'll set up your space for notes, presentations and homework.</p>
+                <h1 style="margin:0 0 10px;font:700 24px/1.25 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:-0.4px;color:#1c1b18;">{{ if $en }}Confirm your email{{ else }}Bestätige deine E-Mail-Adresse{{ end }}</h1>
+                <p style="margin:0 0 24px;font:400 15px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#4b4a44;">{{ if $en }}{{ if .Data.full_name }}Hi {{ .Data.full_name }}!{{ else }}Hi there!{{ end }} I'm Blob, your new study buddy. Confirm your email address and I'll set up your space for notes, presentations and homework.{{ else }}{{ if .Data.full_name }}Hallo {{ .Data.full_name }}!{{ else }}Hallo!{{ end }} Ich bin Blob, dein neuer Lernbuddy. Bestätige deine E-Mail-Adresse und ich richte deinen Bereich für Notizen, Präsentationen und Hausaufgaben ein.{{ end }}</p>
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;">
             <tr>
               <td style="border-radius:10px;background:#6d3df5;">
-                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fonboarding" target="_blank" style="display:inline-block;padding:13px 22px;font:600 15px/1 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#ffffff;text-decoration:none;border-radius:10px;">Confirm my email &rarr;</a>
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fonboarding" target="_blank" style="display:inline-block;padding:13px 22px;font:600 15px/1 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#ffffff;text-decoration:none;border-radius:10px;">{{ if $en }}Confirm my email{{ else }}E-Mail-Adresse bestätigen{{ end }} &rarr;</a>
               </td>
             </tr>
           </table>
           <p style="margin:22px 0 0;font:400 12.5px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#8b8981;">
-            Button not working? Paste this link into your browser:<br />
+            {{ if $en }}Button not working? Paste this link into your browser:{{ else }}Der Button funktioniert nicht? Kopier diesen Link in deinen Browser:{{ end }}<br />
             <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fonboarding" target="_blank" style="color:#5a2bd6;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=%2Fonboarding</a>
           </p>
               </td>
             </tr>
             <tr>
               <td style="padding:18px 10px 0;font:400 12px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;color:#8b8981;">
-                You're getting this because someone signed up for Blob with {{ .Email }}. If that wasn't you, you can ignore this email.<br />
-                <span style="color:#5a2bd6;font-weight:600;">Blob</span> &middot; your school, saved &middot;
+                {{ if $en }}You're getting this because someone signed up for Blob with {{ .Email }}. If that wasn't you, you can ignore this email.{{ else }}Du bekommst diese E-Mail, weil sich jemand mit {{ .Email }} bei Blob registriert hat. Warst du das nicht, kannst du sie einfach ignorieren.{{ end }}<br />
+                <span style="color:#5a2bd6;font-weight:600;">Blob</span> &middot; {{ if $en }}your school, saved{{ else }}deine Schule, gespeichert{{ end }} &middot;
                 <a href="{{ .SiteURL }}" target="_blank" style="color:#8b8981;">blob.bojes.org</a>
               </td>
             </tr>

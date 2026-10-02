@@ -322,6 +322,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
           </button>
           <button
             onClick={() => newPage("deck")}
+            title={t.newDeckTitle}
             className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97]"
           >
             <Presentation className="size-3.5" /> {t.newDeck}

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useState, type ComponentType, type ReactNode } from "react";
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useLocale } from "@/i18n/client";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
@@ -240,7 +241,7 @@ function readGraphFrames(m: Frac, b: Frac, P: Pt, Q: Pt, end: "pair" | "line", t
       math: `${bPart} \\quad m#Lm =#E1 \\frac{${top}}{${dx}#dm}#fm`,
       note: tx(
         `That's $${dx}$ to the right and $${Math.abs(dy)}$ ${dy >= 0 ? "up" : "down"}: $\\Delta x = ${dx}$ and $\\Delta y = ${dy}$.`,
-        `Das sind $${dx}$ nach rechts und $${Math.abs(dy)}$ ${dy >= 0 ? "nach oben" : "nach unten"}: $\\Delta x = ${dx}$ und $\\Delta y = ${dy}$.`,
+        `Du gehst $${dx}$ nach rechts und $${Math.abs(dy)}$ ${dy >= 0 ? "nach oben" : "nach unten"}: $\\Delta x = ${dx}$ und $\\Delta y = ${dy}$.`,
       ),
     },
   ];
@@ -852,10 +853,11 @@ function SlopeSliders() {
 
 function Row({ label, children }: { label: Text; children: ReactNode }) {
   const t = useText();
+  const de = useLocale() === "de";
   return (
     <div className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1">
       {/* Wide enough for the longer German "y-Achsenabschnitt", so both rows line up. */}
-      <span className={cn("shrink-0", t(tx("w-[86px]", "w-[136px]")))}>
+      <span className={cn("shrink-0", de ? "w-[136px]" : "w-[86px]")}>
         <Caption>{t(label)}</Caption>
       </span>
       {children}
@@ -1074,7 +1076,7 @@ function ParallelLab() {
           {[false, true].map((on) => (
             <button key={String(on)} onClick={() => setPerp(on)} className={cn("relative rounded-md px-3 py-1.5 text-[13px] font-medium", perp === on ? "text-ink" : "text-ink-3 hover:text-ink")}>
               {perp === on && <motion.span layoutId={`${scope}-tab`} className="absolute inset-0 rounded-md bg-hover" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-              <span className="relative">{on ? t(tx("Perpendicular", "Orthogonal")) : t(tx("Parallel", "Parallel"))}</span>
+              <span className="relative">{on ? t(tx("Perpendicular", "Orthogonal")) : "Parallel"}</span>
             </button>
           ))}
         </div>
@@ -1122,150 +1124,295 @@ function ParallelLab() {
 // Lesson
 
 const introFrames: Frame[] = [
-  { math: "y#Y =#EQ m#cm x#vm +#sb b#cb", note: "Every straight line (Gerade) has an equation like this. For each $x$ it tells you the $y$ that belongs to it." },
-  { math: "y#Y =#EQ m#cm x#vm +#sb b#cb", highlight: ["cb"], note: `$b$ is the **y-intercept** (y-Achsenabschnitt): the line crosses the $y$-axis at $${pt(0, "b")}$.` },
-  { math: "y#Y =#EQ m#cm x#vm +#sb b#cb", highlight: ["cm"], note: "$m$ is the **slope** (Steigung): how far the line goes up for every step to the right." },
-  { math: "y#Y =#EQ 2#cm x#vm +#sb 1#cb", highlight: ["cm", "cb"], note: "Example: $y = 2x + 1$ has the slope $m = 2$ and the y-intercept $b = 1$." },
-  { math: "y#Y =#EQ 2#cm \\cdot#dot 3#vm +#sb 1#cb", highlight: ["vm"], note: "Put in any $x$, say $x = 3$ ..." },
-  { math: "y#Y =#EQ 7#cm", note: `... and you get $y = 7$. So the point $${pt(3, 7)}$ lies on the line.` },
+  {
+    math: "y#Y =#EQ m#cm x#vm +#sb b#cb",
+    note: tx(
+      "Every straight line (Gerade) has an equation like this. For each $x$ it tells you the $y$ that belongs to it.",
+      "Jede Gerade hat so eine Gleichung. Sie sagt dir zu jedem $x$, welches $y$ dazugehört.",
+    ),
+  },
+  {
+    math: "y#Y =#EQ m#cm x#vm +#sb b#cb",
+    highlight: ["cb"],
+    note: tx(
+      `$b$ is the **y-intercept** (y-Achsenabschnitt): the line crosses the $y$-axis at $${pt(0, "b")}$.`,
+      `$b$ ist der **y-Achsenabschnitt**: Die Gerade schneidet die $y$-Achse bei $${pt(0, "b")}$.`,
+    ),
+  },
+  {
+    math: "y#Y =#EQ m#cm x#vm +#sb b#cb",
+    highlight: ["cm"],
+    note: tx(
+      "$m$ is the **slope** (Steigung): how far the line goes up for every step to the right.",
+      "$m$ ist die **Steigung**: Sie sagt, wie weit die Gerade pro Schritt nach rechts nach oben geht.",
+    ),
+  },
+  {
+    math: "y#Y =#EQ 2#cm x#vm +#sb 1#cb",
+    highlight: ["cm", "cb"],
+    note: tx(
+      "Example: $y = 2x + 1$ has the slope $m = 2$ and the y-intercept $b = 1$.",
+      "Beispiel: $y = 2x + 1$ hat die Steigung $m = 2$ und den y-Achsenabschnitt $b = 1$.",
+    ),
+  },
+  { math: "y#Y =#EQ 2#cm \\cdot#dot 3#vm +#sb 1#cb", highlight: ["vm"], note: tx("Put in any $x$, say $x = 3$ ...", "Setz ein beliebiges $x$ ein, zum Beispiel $x = 3$ …") },
+  { math: "y#Y =#EQ 7#cm", note: tx(`... and you get $y = 7$. So the point $${pt(3, 7)}$ lies on the line.`, `… und du erhältst $y = 7$. Der Punkt $${pt(3, 7)}$ liegt also auf der Geraden.`) },
 ];
 
 const slopeTriangleFrames: Frame[] = [
-  { math: "m#M =#E \\frac{\\Delta#D1 y#D2}{\\Delta#D3 x#D4}#fm", note: "Slope = **rise over run**. $\\Delta y$ is how far you go up, $\\Delta x$ how far you go right. ($\\Delta$ means difference.)" },
-  { math: "m#M =#E \\frac{6#cm}{3#dm}#fm", note: `Example: from $${pt(1, 2)}$ to $${pt(4, 8)}$ you go $3$ right and $6$ up.` },
-  { math: "m#M =#E 2#cm", note: "$\\frac{6}{3} = 2$: for every step to the right the line goes $2$ up. It **rises**." },
-  { math: "m#M =#E \\frac{-#sm 2#cm}{4#dm}#fm", note: `Going **down** makes $\\Delta y$ negative. From $${pt(0, 3)}$ to $${pt(4, 1)}$: $4$ right, $2$ down.` },
-  { math: "m#M =#E -#sm \\frac{1#cm}{2#dm}#fm", note: "A negative slope: the line **falls** from left to right." },
-  { math: "m#M =#E 0#cm", note: "And $\\Delta y = 0$ gives $m = 0$: a **horizontal** line, like $y = 3$." },
+  {
+    math: "m#M =#E \\frac{\\Delta#D1 y#D2}{\\Delta#D3 x#D4}#fm",
+    note: tx(
+      "Slope = **rise over run**. $\\Delta y$ is how far you go up, $\\Delta x$ how far you go right. ($\\Delta$ means difference.)",
+      "Steigung = **hoch durch rechts**. $\\Delta y$ ist, wie weit du nach oben gehst, $\\Delta x$, wie weit nach rechts. ($\\Delta$ heißt Differenz.)",
+    ),
+  },
+  {
+    math: "m#M =#E \\frac{6#cm}{3#dm}#fm",
+    note: tx(`Example: from $${pt(1, 2)}$ to $${pt(4, 8)}$ you go $3$ right and $6$ up.`, `Beispiel: Von $${pt(1, 2)}$ nach $${pt(4, 8)}$ gehst du $3$ nach rechts und $6$ nach oben.`),
+  },
+  {
+    math: "m#M =#E 2#cm",
+    note: tx("$\\frac{6}{3} = 2$: for every step to the right the line goes $2$ up. It **rises**.", "$\\frac{6}{3} = 2$: Pro Schritt nach rechts geht die Gerade $2$ nach oben. Sie **steigt**."),
+  },
+  {
+    math: "m#M =#E \\frac{-#sm 2#cm}{4#dm}#fm",
+    note: tx(
+      `Going **down** makes $\\Delta y$ negative. From $${pt(0, 3)}$ to $${pt(4, 1)}$: $4$ right, $2$ down.`,
+      `Geht es **nach unten**, ist $\\Delta y$ negativ. Von $${pt(0, 3)}$ nach $${pt(4, 1)}$: $4$ nach rechts, $2$ nach unten.`,
+    ),
+  },
+  { math: "m#M =#E -#sm \\frac{1#cm}{2#dm}#fm", note: tx("A negative slope: the line **falls** from left to right.", "Eine negative Steigung: Die Gerade **fällt** von links nach rechts.") },
+  { math: "m#M =#E 0#cm", note: tx("And $\\Delta y = 0$ gives $m = 0$: a **horizontal** line, like $y = 3$.", "Und $\\Delta y = 0$ ergibt $m = 0$: eine **waagerechte** Gerade, wie $y = 3$.") },
 ];
 
 const lessonTwoPoints = (() => {
-  const { frames, m } = slopeFrames([1, 3], [4, 9], "Step 1, the slope: subtract the $y$-values, subtract the $x$-values, divide. Same order on top and bottom!");
-  return [...frames, ...findBFrames(m, [1, 3], "A", "Step 2, find $b$. So far we know $y = 2x + b$.")];
+  const { frames, m } = slopeFrames(
+    [1, 3],
+    [4, 9],
+    tx(
+      "Step 1, the slope: subtract the $y$-values, subtract the $x$-values, divide. Same order on top and bottom!",
+      "Schritt 1, die Steigung: $y$-Werte subtrahieren, $x$-Werte subtrahieren, teilen. Oben und unten dieselbe Reihenfolge!",
+    ),
+  );
+  return [...frames, ...findBFrames(m, [1, 3], "A", tx("Step 2, find $b$. So far we know $y = 2x + b$.", "Schritt 2, $b$ bestimmen. Bisher wissen wir: $y = 2x + b$."))];
 })();
 
 const lessonTest: Frame[] = [
-  { math: lineSrc(q(2), q(-4)), note: `Does $${pt(3, 2, "P")}$ lie on the line $y = 2x - 4$?` },
-  { math: `2#L =#EQ 2#cm \\cdot#dot 3#vm -#sb 4#cb`, note: "**Point test** (Punktprobe): put in $x = 3$ and $y = 2$." },
-  { math: "\\green{2#L =#EQ 2#cm}", note: "$6 - 4 = 2$. A true statement, so $P$ lies on the line. A false statement would mean it doesn't." },
-  ...solveFrames(ZERO, q(2), q(-4), "The **zero** (Nullstelle) is where the line crosses the $x$-axis. There $y = 0$.", (X) => `So $x = ${num(X)}$. The line crosses the $x$-axis at $${pt(X, 0, "N")}$.`),
+  { math: lineSrc(q(2), q(-4)), note: tx(`Does $${pt(3, 2, "P")}$ lie on the line $y = 2x - 4$?`, `Liegt $${pt(3, 2, "P")}$ auf der Geraden $y = 2x - 4$?`) },
+  { math: `2#L =#EQ 2#cm \\cdot#dot 3#vm -#sb 4#cb`, note: tx("**Point test** (Punktprobe): put in $x = 3$ and $y = 2$.", "**Punktprobe**: Setze $x = 3$ und $y = 2$ ein.") },
+  {
+    math: "\\green{2#L =#EQ 2#cm}",
+    note: tx(
+      "$6 - 4 = 2$. A true statement, so $P$ lies on the line. A false statement would mean it doesn't.",
+      "$6 - 4 = 2$. Eine wahre Aussage, also liegt $P$ auf der Geraden. Bei einer falschen Aussage läge $P$ nicht darauf.",
+    ),
+  },
+  ...solveFrames(
+    ZERO,
+    q(2),
+    q(-4),
+    tx(
+      "The **zero** (Nullstelle) is where the line crosses the $x$-axis. There $y = 0$.",
+      "Die **Nullstelle** ist die Stelle, an der die Gerade die $x$-Achse schneidet. Dort ist $y = 0$.",
+    ),
+    (X) => tx(`So $x = ${num(X)}$. The line crosses the $x$-axis at $${pt(X, 0, "N")}$.`, `Also ist $x = ${num(X)}$. Die Gerade schneidet die $x$-Achse in $${pt(X, 0, "N")}$.`),
+  ),
 ];
 
 const lines: Topic = {
   ...topicMeta("lines"),
   summary: [
-    { title: "The line equation", body: "$m$ is the slope (Steigung), $b$ the y-intercept (y-Achsenabschnitt): the line crosses the $y$-axis at $(0 | b)$.", examples: ["y = mx + b", "y = 2x - 3"], tone: "rule" },
     {
-      title: "Slope triangle",
-      body: "Go $\\Delta x$ to the right and $\\Delta y$ up (negative: down). $m > 0$ rises, $m < 0$ falls, $m = 0$ is horizontal.",
+      title: tx("The line equation", "Die Geradengleichung"),
+      body: tx(
+        "$m$ is the slope (Steigung), $b$ the y-intercept (y-Achsenabschnitt): the line crosses the $y$-axis at $(0 | b)$.",
+        "$m$ ist die Steigung, $b$ der y-Achsenabschnitt: Die Gerade schneidet die $y$-Achse bei $(0 | b)$.",
+      ),
+      examples: ["y = mx + b", "y = 2x - 3"],
+      tone: "rule",
+    },
+    {
+      title: tx("Slope triangle", "Steigungsdreieck"),
+      body: tx(
+        "Go $\\Delta x$ to the right and $\\Delta y$ up (negative: down). $m > 0$ rises, $m < 0$ falls, $m = 0$ is horizontal.",
+        "Geh $\\Delta x$ nach rechts und $\\Delta y$ nach oben (negativ: nach unten). $m > 0$: steigend, $m < 0$: fallend, $m = 0$: waagerecht.",
+      ),
       examples: ["m = \\frac{\\Delta y}{\\Delta x} = \\frac{y_2 - y_1}{x_2 - x_1}"],
       tone: "rule",
     },
-    { title: "Line through two points", body: "First $m$ with the slope formula. Then put one point into $y = mx + b$ and solve for $b$.", examples: [`A${pt(1, 3)} , B${pt(4, 9)}`, "m = \\frac{9 - 3}{4 - 1} = 2", "3 = 2 \\cdot 1 + b \\Rightarrow b = 1"], tone: "tip" },
-    { title: "Point test and zero", body: "Point test: put the point in and check for a true statement. Zero (Nullstelle): set $y = 0$ and solve.", examples: ["0 = 2x - 6 \\Rightarrow x = 3"], tone: "rule" },
-    { title: "Parallel and perpendicular", body: "Parallel lines have the same slope. Perpendicular lines have slopes that multiply to $-1$.", examples: ["m_1 = m_2", "m_1 \\cdot m_2 = -1"], tone: "tip" },
-    { title: "Classic mistakes", body: "Keep the same order on top and bottom of the slope formula. And $b$ is where the line meets the $y$-axis, not the $x$-axis.", examples: ['\\frac{y_2 - y_1}{x_2 - x_1} \\quad \\green{"right"}', '\\frac{y_2 - y_1}{x_1 - x_2} \\quad \\red{"wrong"}'], tone: "warning" },
+    {
+      title: tx("Line through two points", "Gerade durch zwei Punkte"),
+      body: tx(
+        "First $m$ with the slope formula. Then put one point into $y = mx + b$ and solve for $b$.",
+        "Zuerst $m$ mit der Steigungsformel. Dann einen Punkt in $y = mx + b$ einsetzen und nach $b$ auflösen.",
+      ),
+      examples: [`A${pt(1, 3)} , B${pt(4, 9)}`, "m = \\frac{9 - 3}{4 - 1} = 2", "3 = 2 \\cdot 1 + b \\Rightarrow b = 1"],
+      tone: "tip",
+    },
+    {
+      title: tx("Point test and zero", "Punktprobe und Nullstelle"),
+      body: tx(
+        "Point test: put the point in and check for a true statement. Zero (Nullstelle): set $y = 0$ and solve.",
+        "Punktprobe: Punkt einsetzen und prüfen, ob eine wahre Aussage herauskommt. Nullstelle: $y = 0$ setzen und nach $x$ auflösen.",
+      ),
+      examples: ["0 = 2x - 6 \\Rightarrow x = 3"],
+      tone: "rule",
+    },
+    {
+      title: tx("Parallel and perpendicular", "Parallel und orthogonal"),
+      body: tx(
+        "Parallel lines have the same slope. Perpendicular lines have slopes that multiply to $-1$.",
+        "Parallele Geraden haben die gleiche Steigung. Bei orthogonalen (senkrechten) Geraden ist das Produkt der Steigungen $-1$.",
+      ),
+      examples: ["m_1 = m_2", "m_1 \\cdot m_2 = -1"],
+      tone: "tip",
+    },
+    {
+      title: tx("Classic mistakes", "Typische Fehler"),
+      body: tx(
+        "Keep the same order on top and bottom of the slope formula. And $b$ is where the line meets the $y$-axis, not the $x$-axis.",
+        "Nimm in der Steigungsformel oben und unten dieselbe Reihenfolge. Und $b$ liest du an der $y$-Achse ab, nicht an der $x$-Achse.",
+      ),
+      examples: [
+        tx('\\frac{y_2 - y_1}{x_2 - x_1} \\quad \\green{"right"}', '\\frac{y_2 - y_1}{x_2 - x_1} \\quad \\green{"richtig"}'),
+        tx('\\frac{y_2 - y_1}{x_1 - x_2} \\quad \\red{"wrong"}', '\\frac{y_2 - y_1}{x_1 - x_2} \\quad \\red{"falsch"}'),
+      ],
+      tone: "warning",
+    },
   ],
   lesson: [
     {
       type: "explain",
-      title: "The equation of a line",
-      blob: "Straight lines are everywhere. Two numbers are all you need to describe one!",
-      body: "Every straight line that isn't vertical has an equation of the form $y = mx + b$.",
+      title: tx("The equation of a line", "Die Geradengleichung"),
+      blob: tx("Straight lines are everywhere. Two numbers are all you need to describe one!", "Geraden sind überall. Du brauchst nur zwei Zahlen, um eine zu beschreiben!"),
+      body: tx(
+        "Every straight line that isn't vertical has an equation of the form $y = mx + b$.",
+        "Jede Gerade, die nicht parallel zur $y$-Achse verläuft, hat eine Gleichung der Form $y = mx + b$.",
+      ),
       frames: introFrames,
     },
     {
       type: "widget",
-      title: "What m and b do",
-      blob: "Move the sliders. Which one turns the line, which one slides it?",
-      body: "Change $m$ and $b$ and watch the line. The little triangle shows the slope: go right, then up or down, and you're back on the line.",
+      title: tx("What m and b do", "Was m und b bewirken"),
+      blob: tx("Move the sliders. Which one turns the line, which one slides it?", "Beweg die Regler. Welcher dreht die Gerade, welcher verschiebt sie?"),
+      body: tx(
+        "Change $m$ and $b$ and watch the line. The little triangle shows the slope: go right, then up or down, and you're back on the line.",
+        "Ändere $m$ und $b$ und beobachte die Gerade. Das kleine Dreieck zeigt die Steigung: nach rechts, dann nach oben oder unten, und du bist wieder auf der Geraden.",
+      ),
       widget: SlopeSliders,
     },
     {
       type: "explain",
-      title: "The slope triangle",
-      blob: "Rise over run. Say it with me!",
-      body: "Pick two points on a line. From one to the other you go $\\Delta x$ to the right and $\\Delta y$ up. The slope is the ratio of the two (Steigungsdreieck).",
+      title: tx("The slope triangle", "Das Steigungsdreieck"),
+      blob: tx("Rise over run. Say it with me!", "Hoch durch rechts. Sprich mir nach!"),
+      body: tx(
+        "Pick two points on a line. From one to the other you go $\\Delta x$ to the right and $\\Delta y$ up. The slope is the ratio of the two (Steigungsdreieck).",
+        "Nimm zwei Punkte auf einer Geraden. Von einem zum anderen gehst du $\\Delta x$ nach rechts und $\\Delta y$ nach oben. Die Steigung ist der Quotient aus beiden.",
+      ),
       frames: slopeTriangleFrames,
     },
     {
       type: "check",
-      blob: "Your turn! Find b first, then walk the triangle.",
+      blob: tx("Your turn! Find b first, then walk the triangle.", "Du bist dran! Erst b ablesen, dann das Dreieck ablaufen."),
       exercise: {
-        instruction: "Slope and y-intercept",
-        text: "Read the slope $m$ and the y-intercept $b$ off the graph.",
+        instruction: I_SLOPE_B,
+        text: READ_GRAPH,
         visual: lineGraph(q(2, 3), q(-1), [
           [0, -1],
           [3, 1],
         ]),
         answer: { kind: "pair", names: ["m", "b"], values: [2 / 3, -1] },
-        hint: "The line crosses the $y$-axis at $-1$. From there go to the other marked point: how far right, how far up? You can type a fraction like 2/3.",
+        hint: tx(
+          "The line crosses the $y$-axis at $-1$. From there go to the other marked point: how far right, how far up? You can type a fraction like 2/3.",
+          "Die Gerade schneidet die $y$-Achse bei $-1$. Geh von dort zum anderen markierten Punkt: Wie weit nach rechts, wie weit nach oben? Du kannst einen Bruch wie 2/3 eintippen.",
+        ),
         solution: readGraphFrames(q(2, 3), q(-1), [0, -1], [3, 1], "pair"),
       },
     },
     {
       type: "widget",
-      title: "Drag the points",
-      blob: "Grab A or B and move them around. Everything follows!",
-      body: "Two points fix a line. Drag $A$ and $B$: the slope triangle shows $\\Delta x$ and $\\Delta y$, and the equation updates as you go.",
+      title: tx("Drag the points", "Zieh die Punkte"),
+      blob: tx("Grab A or B and move them around. Everything follows!", "Schnapp dir A oder B und verschieb sie. Alles andere folgt!"),
+      body: tx(
+        "Two points fix a line. Drag $A$ and $B$: the slope triangle shows $\\Delta x$ and $\\Delta y$, and the equation updates as you go.",
+        "Zwei Punkte legen eine Gerade fest. Zieh $A$ und $B$: Das Steigungsdreieck zeigt $\\Delta x$ und $\\Delta y$, und die Gleichung passt sich sofort an.",
+      ),
       widget: PointsLab,
     },
     {
       type: "explain",
-      title: "The line through two points",
-      blob: "Two steps: first m, then b. That's the whole trick.",
-      body: `For $A${pt(1, 3)}$ and $B${pt(4, 9)}$ we want the equation $y = mx + b$.`,
+      title: tx("The line through two points", "Die Gerade durch zwei Punkte"),
+      blob: tx("Two steps: first m, then b. That's the whole trick.", "Zwei Schritte: erst m, dann b. Das ist der ganze Trick."),
+      body: tx(`For $A${pt(1, 3)}$ and $B${pt(4, 9)}$ we want the equation $y = mx + b$.`, `Für $A${pt(1, 3)}$ und $B${pt(4, 9)}$ suchen wir die Gleichung $y = mx + b$.`),
       frames: lessonTwoPoints,
     },
     {
       type: "check",
-      blob: "Slope first, then b. You've got this!",
+      blob: tx("Slope first, then b. You've got this!", "Erst die Steigung, dann b. Du schaffst das!"),
       exercise: {
-        instruction: "Find the line equation",
-        text: `Find the equation of the line through $${pt(-1, 4, "A")}$ and $${pt(2, -2, "B")}$.`,
+        instruction: I_LINE,
+        text: tx(
+          `Find the equation of the line through $${pt(-1, 4, "A")}$ and $${pt(2, -2, "B")}$.`,
+          `Bestimme die Gleichung der Geraden durch $${pt(-1, 4, "A")}$ und $${pt(2, -2, "B")}$.`,
+        ),
         answer: { kind: "expr", value: "-2x+2", prefix: "y =", form: "expanded" },
-        hint: "$m = \\frac{-2 - 4}{2 - (-1)}$. Then put $A$ into $y = mx + b$.",
+        hint: tx("$m = \\frac{-2 - 4}{2 - (-1)}$. Then put $A$ into $y = mx + b$.", "$m = \\frac{-2 - 4}{2 - (-1)}$. Setze dann $A$ in $y = mx + b$ ein."),
         solution: (() => {
-          const { frames, m } = slopeFrames([-1, 4], [2, -2], "First the slope.");
-          return [...frames, ...findBFrames(m, [-1, 4], "A", "Now $b$: so far $y = -2x + b$.")];
+          const { frames, m } = slopeFrames([-1, 4], [2, -2], tx("First the slope.", "Zuerst die Steigung."));
+          return [...frames, ...findBFrames(m, [-1, 4], "A", tx("Now $b$: so far $y = -2x + b$.", "Jetzt $b$: Bisher gilt $y = -2x + b$."))];
         })(),
       },
     },
     {
       type: "explain",
-      title: "On the line? Where does it cross the x-axis?",
-      blob: "Two quick checks you'll need all the time.",
-      body: "A point lies on a line when its coordinates make the equation true. The zero (Nullstelle) is the point where $y = 0$.",
+      title: tx("On the line? Where does it cross the x-axis?", "Punktprobe und Nullstelle"),
+      blob: tx("Two quick checks you'll need all the time.", "Zwei schnelle Checks, die du ständig brauchst."),
+      body: tx(
+        "A point lies on a line when its coordinates make the equation true. The zero (Nullstelle) is the point where $y = 0$.",
+        "Ein Punkt liegt auf einer Geraden, wenn seine Koordinaten die Gleichung erfüllen. Die Nullstelle ist die Stelle, an der $y = 0$ ist.",
+      ),
       frames: lessonTest,
     },
     {
       type: "check",
-      blob: "Set y to zero and solve!",
+      blob: tx("Set y to zero and solve!", "Setz y gleich null und löse!"),
       exercise: {
-        instruction: "Find the zero",
-        text: "Where does the line cross the $x$-axis?",
+        instruction: I_ZERO,
+        text: Q_ZERO,
         math: "y = -2x + 5",
         answer: { kind: "number", value: 2.5, label: "x =" },
-        hint: "Solve $0 = -2x + 5$. A decimal like 2,5 is fine.",
+        hint: tx("Solve $0 = -2x + 5$. A decimal like 2,5 is fine.", "Löse $0 = -2x + 5$. Eine Kommazahl wie 2,5 ist okay."),
         solution: [
-          { math: lineSrc(q(-2), q(5)), highlight: ["Y"], note: "At the zero, $y = 0$." },
-          ...solveFrames(ZERO, q(-2), q(5), "", (X) => `So $x = ${num(X)} = 2,5$. The line crosses the $x$-axis at $${pt("2,5", 0, "N")}$.`),
+          { math: lineSrc(q(-2), q(5)), highlight: ["Y"], note: tx("At the zero, $y = 0$.", "An der Nullstelle ist $y = 0$.") },
+          ...solveFrames(ZERO, q(-2), q(5), "", (X) =>
+            tx(
+              `So $x = ${num(X)} = 2,5$. The line crosses the $x$-axis at $${pt("2,5", 0, "N")}$.`,
+              `Also ist $x = ${num(X)} = 2,5$. Die Gerade schneidet die $x$-Achse in $${pt("2,5", 0, "N")}$.`,
+            ),
+          ),
         ],
       },
     },
     {
       type: "widget",
-      title: "Parallel and perpendicular",
-      blob: "Same slope means parallel. Watch what perpendicular does to the triangle!",
-      body: "Parallel lines have the **same slope**. Perpendicular lines meet at a right angle; their slopes multiply to $-1$, so $m_h = -\\frac{1}{m_g}$.",
+      title: tx("Parallel and perpendicular", "Parallel und orthogonal"),
+      blob: tx("Same slope means parallel. Watch what perpendicular does to the triangle!", "Gleiche Steigung heißt parallel. Schau, was orthogonal mit dem Dreieck macht!"),
+      body: tx(
+        "Parallel lines have the **same slope**. Perpendicular lines meet at a right angle; their slopes multiply to $-1$, so $m_h = -\\frac{1}{m_g}$.",
+        "Parallele Geraden haben die **gleiche Steigung**. Orthogonale (senkrechte) Geraden schneiden sich im rechten Winkel. Das Produkt ihrer Steigungen ist $-1$, also $m_h = -\\frac{1}{m_g}$.",
+      ),
       widget: ParallelLab,
     },
     {
       type: "check",
-      blob: "Last one! Same slope, new point.",
+      blob: tx("Last one! Same slope, new point.", "Die letzte! Gleiche Steigung, neuer Punkt."),
       exercise: {
-        instruction: "Parallel line",
-        text: `The line $g$ has the equation $y = -\\frac{1}{2}x + 4$. Find the line $h$ through $${pt(4, 1, "P")}$ that is **parallel** to $g$.`,
+        instruction: tx("Parallel line", "Parallele Gerade"),
+        text: tx(
+          `The line $g$ has the equation $y = -\\frac{1}{2}x + 4$. Find the line $h$ through $${pt(4, 1, "P")}$ that is **parallel** to $g$.`,
+          `Die Gerade $g$ hat die Gleichung $y = -\\frac{1}{2}x + 4$. Bestimme die Gerade $h$ durch $${pt(4, 1, "P")}$, die **parallel** zu $g$ ist.`,
+        ),
         visual: graphVisual({
           xRange: [-6, 6],
           yRange: [-6, 6],
@@ -1273,10 +1420,16 @@ const lines: Topic = {
           points: [{ x: 4, y: 1, key: "P", color: "ink", label: "P" }],
         }),
         answer: { kind: "expr", value: "-(x/2)+3", prefix: "y =", form: "expanded" },
-        hint: "Parallel means the same slope: $m = -\\frac{1}{2}$. Then put $P$ into $y = -\\frac{1}{2}x + b$.",
+        hint: tx(
+          "Parallel means the same slope: $m = -\\frac{1}{2}$. Then put $P$ into $y = -\\frac{1}{2}x + b$.",
+          "Parallel heißt gleiche Steigung: $m = -\\frac{1}{2}$. Setze dann $P$ in $y = -\\frac{1}{2}x + b$ ein.",
+        ),
         solution: [
-          { math: `m#Lh _{h#Lhi}#Sh =#E m#Lg _{g#Lgi}#Sg =#E2 ${val(q(-1, 2), "m")}`, note: "Parallel lines have the **same slope**: $m_h = -\\frac{1}{2}$." },
-          ...findBFrames(q(-1, 2), [4, 1], "P", "Put the slope into $y = mx + b$. Only $b$ is missing."),
+          {
+            math: `m#Lh _{h#Lhi}#Sh =#E m#Lg _{g#Lgi}#Sg =#E2 ${val(q(-1, 2), "m")}`,
+            note: tx("Parallel lines have the **same slope**: $m_h = -\\frac{1}{2}$.", "Parallele Geraden haben die **gleiche Steigung**: $m_h = -\\frac{1}{2}$."),
+          },
+          ...findBFrames(q(-1, 2), [4, 1], "P", SLOPE_FIRST),
         ],
       },
     },

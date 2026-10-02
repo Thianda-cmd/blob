@@ -31,13 +31,6 @@ export const tasksText = defineMessages({
       longYear: "EEEE, MMM d, yyyy",
       /** For the day headers in the list ("Thu, Oct 1"). */
       header: "EEE, MMM d",
-      /** In a sentence: "today", "tomorrow", "on Fri", "Oct 12". */
-      inline: {
-        today: "today",
-        tomorrow: "tomorrow",
-        weekday: (day: string) => `on ${day}`,
-        date: (date: string) => date,
-      },
     },
 
     // Page header
@@ -69,6 +62,7 @@ export const tasksText = defineMessages({
 
     // Side panels
     nextTwoWeeks: "Next two weeks",
+    monthFormat: "MMMM",
     byType: "By type",
     subjects: "Subjects",
     weekdayInitials: ["M", "T", "W", "T", "F", "S", "S"],
@@ -84,7 +78,8 @@ export const tasksText = defineMessages({
     // Board
     moveToToday: "Move to today",
     showMore: (n: number) => `Show ${n} more`,
-    deletedBefore: "Deleted ",
+    /** "Deleted “Essay”": words before and after the quoted title (either may be empty). */
+    deletedBefore: "Deleted",
     deletedAfter: "",
     quote: (s: string) => `“${s}”`,
     undo: "Undo",
@@ -122,6 +117,7 @@ export const tasksText = defineMessages({
     placeholder: "Add a task, e.g. “Bio test fri #biology”",
     placeholderShort: "Add a task…",
     hashSubject: "subject",
+    subjectsLabel: "Subjects",
     tryBefore: "Try",
     tryOr: " or ",
     quickExamples: ["Bio test fri 8am #biology", "Essay due tomorrow", "Read ch. 4 by monday"],
@@ -189,12 +185,6 @@ export const tasksText = defineMessages({
       long: "EEEE, d. MMM",
       longYear: "EEEE, d. MMM yyyy",
       header: "EEE, d. MMM",
-      inline: {
-        today: "heute",
-        tomorrow: "morgen",
-        weekday: (day) => `am ${day}`,
-        date: (date) => `am ${date}`,
-      },
     },
 
     open: (n) => `${n} offen`,
@@ -205,7 +195,7 @@ export const tasksText = defineMessages({
 
     showing: "Filter:",
     clear: "Zurücksetzen",
-    dueOn: (day) => `Fällig ${day}`,
+    dueOn: (day) => `Fällig am ${day}`,
     filterDayFormat: "EEE, d. MMM",
     noSubject: "Kein Fach",
     subject: "Fach",
@@ -217,10 +207,11 @@ export const tasksText = defineMessages({
     nothingElse: "Sonst steht nichts an. Genieß es!",
 
     emptyTitle: "Gerade nichts zu tun",
-    emptyBody: "Trag oben Hausaufgaben, Tests und Projekte ein. Schreib sie einfach so, wie du sie sagen würdest, das Datum finde ich selbst raus.",
+    emptyBody: "Trag oben Hausaufgaben, Tests und Projekte ein. Schreib es einfach so, wie du es sagen würdest. Das Datum finde ich selbst heraus.",
     examples: ["Bio-Test Fr 8 Uhr #bio", "Aufsatz bis morgen #deutsch", "Geschichtsreferat nächsten Freitag", "Morgen Sportzeug mitbringen"],
 
     nextTwoWeeks: "Die nächsten zwei Wochen",
+    monthFormat: "MMMM",
     byType: "Nach Art",
     subjects: "Fächer",
     weekdayInitials: ["M", "D", "M", "D", "F", "S", "S"],
@@ -236,7 +227,7 @@ export const tasksText = defineMessages({
     moveToToday: "Auf heute verschieben",
     showMore: (n) => `${n} weitere anzeigen`,
     deletedBefore: "",
-    deletedAfter: " gelöscht",
+    deletedAfter: "gelöscht",
     quote: (s) => `„${s}“`,
     undo: "Rückgängig",
     dismiss: "Schließen",
@@ -250,7 +241,7 @@ export const tasksText = defineMessages({
     addSubject: "Fach hinzufügen",
     addDueDate: "Fälligkeitsdatum hinzufügen",
     date: "Datum",
-    taskOptions: "Optionen",
+    taskOptions: "Optionen für die Aufgabe",
     type: "Art",
     deleteTask: "Aufgabe löschen",
 
@@ -270,6 +261,7 @@ export const tasksText = defineMessages({
     placeholder: "Neue Aufgabe, z. B. „Bio-Test Fr #bio“",
     placeholderShort: "Neue Aufgabe…",
     hashSubject: "Fach",
+    subjectsLabel: "Fächer",
     tryBefore: "Probier mal",
     tryOr: " oder ",
     quickExamples: ["Bio-Test Fr 8 Uhr #bio", "Aufsatz bis morgen", "Kapitel 4 lesen bis Montag"],
@@ -280,12 +272,12 @@ export const tasksText = defineMessages({
     close: "Schließen",
     addATask: "Aufgabe hinzufügen",
     viewAll: "Alle ansehen",
-    allClearWeek: "Diese Woche ist alles frei",
+    allClearWeek: "Diese Woche steht nichts mehr an",
     allClearWeekBody: "In den nächsten Tagen ist nichts fällig. Stark.",
-    nothingSoon: "Bald steht nichts an",
-    nothingSoonBody: "Trag Hausaufgaben oder einen Testtermin ein, dann taucht er hier auf.",
+    nothingSoon: "Gerade steht nichts an",
+    nothingSoonBody: "Trag Hausaufgaben oder Testtermine ein, dann siehst du sie hier.",
     moreThisWeek: (n) => `+${n} weitere diese Woche`,
-    addedLater: "Hinzugefügt! Das ist noch etwas hin, du findest es unter Aufgaben.",
+    addedLater: "Hinzugefügt! Das ist noch ein bisschen hin, du findest es unter Aufgaben.",
     addedToTasks: "Steht jetzt in deinen Aufgaben.",
 
     cheers: [

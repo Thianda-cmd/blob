@@ -351,7 +351,7 @@ function SignFlipper() {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-[52px] flex-wrap items-center gap-x-5 gap-y-1">
-      <span className="w-24 shrink-0 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{label}</span>
+      <span className="w-full shrink-0 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3 sm:w-28">{label}</span>
       {children}
     </div>
   );
