@@ -10,8 +10,9 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
+import { check } from "@/learn/engine/answers";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,209 @@ const withExtra = (text: Text, extra: Text): Text => both((l) => addExtra(resolv
 type Tpl = (rng: Rng) => Exercise;
 
 // ---------------------------------------------------------------------------
+// Typical mistakes. Each one is the number a student with that misconception gets
+// from this story's data (wrong operation, unit not converted, the inverse rule of
+// three used as a proportional one, an intermediate result…); Blob's line names the
+// slip in the story's own terms.
+
+type Wrong = { v: number; title: Text; say: Text } | false;
+
+const wrong = (v: number, title: Text, say: Text): Wrong => ({ v, title, say });
+
+/**
+ * Simulated wrong results → Exercise.mistakes. Only positive values the checker rejects,
+ * no duplicates (the first explanation wins). Results like 10,666… get typed rounded, so
+ * those accept a small window around them.
+ */
+function wrongNumbers(answer: AnswerSpec, list: Wrong[]): Mistake[] {
+  if (answer.kind !== "number") return [];
+  const out: Mistake[] = [];
+  for (const w of list) {
+    if (!w || !Number.isFinite(w.v) || w.v <= 0) continue;
+    const value = Math.round(w.v * 1000) / 1000;
+    const exact = Math.abs(w.v * 100 - Math.round(w.v * 100)) < 1e-6;
+    const window = exact ? 0 : Math.min(0.051, 0.05 * value + 0.0005);
+    if (Math.abs(value - answer.value) <= Math.max(1e-6, 3 * window)) continue;
+    if (check(answer, { kind: "text", text: String(value) }).correct) continue;
+    if (out.some((m) => m.when.kind === "number" && Math.abs(m.when.value - value) < 1e-6)) continue;
+    const when: AnswerSpec = { kind: "number", value, unit: answer.unit, ...(window ? { tolerance: window / Math.max(1, value) } : {}) };
+    out.push({ when, title: w.title, say: w.say });
+  }
+  return out;
+}
+
+/** The comma of a price got lost (1,50 € taken as 150 €). */
+const commaLost = (cents: number, en: string, de: string): Text =>
+  tx(
+    `Hmm, that's a lot ${en}! I think the comma in ${eur(cents)} € got lost on the way. A rough check helps: about how much should it be?`,
+    `Hm, das ist ganz schön viel ${de}! Ich glaub, das Komma in ${eur(cents)} € ist unterwegs verloren gegangen. Ein Überschlag hilft: Wie viel sollte es ungefähr sein?`,
+  );
+
+const NOT_HOURS_100 = tx("An hour isn't 100 minutes", "Eine Stunde hat keine 100 Minuten");
+const NOT_H_MIN = tx("Not hours and minutes", "Keine Stunden und Minuten");
+
+/** A total shared equally: multiplied, not shared at all, subtracted, comma lost. */
+function shareWrongs(total: number, n: number, people: Text): Wrong[] {
+  return [
+    wrong(
+      (total * n) / 100,
+      tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+      tx(
+        `Whoa, then each of them would pay more than the whole thing costs! Sharing between ${n} means **dividing** by ${n}.`,
+        `Huch, dann würde jeder mehr bezahlen, als das Ganze kostet! Auf ${n} aufteilen heißt: **durch** ${n} **teilen**.`,
+      ),
+    ),
+    wrong(
+      total / 100,
+      tx("Not shared yet", "Noch nicht aufgeteilt"),
+      tx(
+        `Nearly! ${eur(total)} € is what it costs **altogether**. Now share it equally between the ${n} ${E(people)}.`,
+        `Fast! ${eur(total)} € kostet es **insgesamt**. Jetzt verteil das noch gleichmäßig auf die ${n} ${D(people)}.`,
+      ),
+    ),
+    wrong(
+      total / 100 - n,
+      tx("Subtracted instead of divided", "Subtrahiert statt geteilt"),
+      tx(
+        `I think I know what you did: you took ${n} away from ${eur(total)}. But the ${n} ${E(people)} **share** the cost, so divide.`,
+        `Ich glaub, ich weiß, was du gemacht hast: Du hast ${n} von ${eur(total)} abgezogen. Aber die ${n} ${D(people)} **teilen** sich die Kosten, also wird geteilt.`,
+      ),
+    ),
+    total % 100 !== 0 && wrong(total / n, tx("Comma lost", "Komma verloren"), commaLost(total, "for each of them", "pro Person")),
+  ];
+}
+
+type Ratio = {
+  a: number;
+  va: number;
+  b: number;
+  one: Text;
+  many: Text;
+  unit: Text;
+  fmt: (v: number) => string;
+  /** ["the price", "den Preis", "der Preis"] */
+  what: [string, string, string];
+  /** Also the additive slip "3 more notebooks, so 3 € more" (prices). */
+  additive?: boolean;
+};
+
+/** Proportional rule of three: one step skipped, stopped at one, adding the difference, inverse rule used. */
+function proportionalWrongs(o: Ratio): Wrong[] {
+  const v1 = o.va / o.a;
+  const diff = Math.abs(o.b - o.a);
+  const n = diff === 1 ? o.one : o.many;
+  const up = o.b > o.a;
+  // "3 more notebooks", but "3 kg more".
+  const howMany = (word: string) => (typeof o.many === "string" ? `${diff} ${E(n)} ${word}` : `${diff} ${word} ${E(n)}`);
+  return [
+    wrong(
+      o.va * o.b,
+      tx("Skipped the step to 1", "Schritt auf 1 übersprungen"),
+      tx(
+        `Ah, I see what happened! You multiplied ${o.what[0]} for **${o.a}** ${E(o.many)} by ${o.b}. Go to **1** ${E(o.one)} first, then multiply.`,
+        `Ah, ich seh, was passiert ist! Du hast ${o.what[1]} für **${o.a}** ${D(o.many)} mit ${o.b} multipliziert. Rechne zuerst auf **1** ${D(o.one)} zurück, dann multipliziere.`,
+      ),
+    ),
+    wrong(
+      v1,
+      tx("Stopped at 1", "Bei 1 stehen geblieben"),
+      tx(
+        `Nearly there! ${o.fmt(v1)} ${E(o.unit)} is ${o.what[0]} for **1** ${E(o.one)}. Now the last step up to ${o.b} ${E(o.many)}.`,
+        `Fast geschafft! ${o.fmt(v1)} ${D(o.unit)} ist ${o.what[2]} für **1** ${D(o.one)}. Jetzt noch der letzte Schritt auf ${o.b} ${D(o.many)}.`,
+      ),
+    ),
+    !!o.additive &&
+      wrong(
+        o.va + (o.b - o.a),
+        tx("Added the difference", "Unterschied addiert"),
+        up
+          ? tx(
+              `I think I know what you did: ${howMany("more")}, so ${diff} ${E(o.unit)} more? Prices don't grow by adding. Go to **1** ${E(o.one)} first, then multiply.`,
+              `Ich glaub, ich weiß, was du gemacht hast: ${diff} ${D(n)} mehr, also ${diff} ${D(o.unit)} mehr? So wächst der Preis nicht. Rechne erst auf **1** ${D(o.one)} zurück, dann multipliziere.`,
+            )
+          : tx(
+              `I think I know what you did: ${howMany(typeof o.many === "string" ? "less" : "fewer")}, so ${diff} ${E(o.unit)} less? Prices don't shrink by subtracting. Go to **1** ${E(o.one)} first, then multiply.`,
+              `Ich glaub, ich weiß, was du gemacht hast: ${diff} ${D(n)} weniger, also ${diff} ${D(o.unit)} weniger? So ändert sich der Preis nicht. Rechne erst auf **1** ${D(o.one)} zurück, dann multipliziere.`,
+            ),
+      ),
+    wrong(
+      (o.va * o.a) / o.b,
+      tx("Inverse by mistake", "Versehentlich antiproportional"),
+      tx(
+        `Hmm, I think you did the **opposite** on the right side. But here more ${E(o.many)} means **more**, not less: do the same on both sides.`,
+        `Hm, ich glaub, du hast auf der rechten Seite **umgekehrt** gerechnet. Aber hier heißt mehr ${D(o.many)} auch **mehr**: Rechne auf beiden Seiten gleich.`,
+      ),
+    ),
+  ];
+}
+
+/** Inverse rule of three: treated as proportional, stopped at one, adding/subtracting the difference. */
+function inverseWrongs(o: Omit<Ratio, "what" | "additive">): Wrong[] {
+  const P = o.va * o.a;
+  const diff = Math.abs(o.b - o.a);
+  const n = diff === 1 ? o.one : o.many;
+  return [
+    wrong(
+      (o.va * o.b) / o.a,
+      tx("Treated as proportional", "Wie proportional gerechnet"),
+      tx(
+        `Hmm, I think you did the **same** on both sides. But here more ${E(o.many)} means **less**! On the right side, do the **opposite**.`,
+        `Hm, ich glaub, du hast auf beiden Seiten dasselbe gerechnet. Aber hier heißt mehr ${D(o.many)} **weniger**! Auf der rechten Seite rechnest du **umgekehrt**.`,
+      ),
+    ),
+    wrong(
+      P,
+      tx("Stopped at 1", "Bei 1 stehen geblieben"),
+      tx(
+        `Nearly there! ${o.fmt(P)} ${E(o.unit)} is the value for **1** ${E(o.one)} alone. Now the last step to ${o.b} ${E(o.many)}.`,
+        `Fast geschafft! ${o.fmt(P)} ${D(o.unit)} ist der Wert für **1** ${D(o.one)} allein. Jetzt noch der letzte Schritt auf ${o.b} ${D(o.many)}.`,
+      ),
+    ),
+    wrong(
+      o.va - (o.b - o.a),
+      tx("Plus or minus instead", "Plus oder Minus gerechnet"),
+      o.b > o.a
+        ? tx(
+            `I think I know what you did: ${diff} more ${E(n)}, so you took ${diff} away from ${o.fmt(o.va)}? Plus and minus don't work here: go through **1** ${E(o.one)}.`,
+            `Ich glaub, ich weiß, was du gemacht hast: ${diff} ${D(n)} mehr, also ${diff} weniger als ${o.fmt(o.va)}? Mit Plus und Minus klappt das hier nicht: Rechne über **1** ${D(o.one)}.`,
+          )
+        : tx(
+            `I think I know what you did: ${diff} fewer ${E(n)}, so you added ${diff} to ${o.fmt(o.va)}? Plus and minus don't work here: go through **1** ${E(o.one)}.`,
+            `Ich glaub, ich weiß, was du gemacht hast: ${diff} ${D(n)} weniger, also ${diff} mehr als ${o.fmt(o.va)}? Mit Plus und Minus klappt das hier nicht: Rechne über **1** ${D(o.one)}.`,
+          ),
+    ),
+  ];
+}
+
+/** A fence around a rectangle: area instead of perimeter, half the way round, stopped at the metres. */
+function fenceWrongs(a: number, b: number, c: number): Wrong[] {
+  const p = 2 * a + 2 * b;
+  return [
+    wrong(
+      a * b * c,
+      tx("Area instead of perimeter", "Fläche statt Umfang"),
+      tx(
+        `Ah, you multiplied ${a} by ${b}: that's the area. But the fence goes **around** the garden, so you need the perimeter.`,
+        `Ah, du hast ${a} mal ${b} gerechnet: Das ist der Flächeninhalt. Der Zaun geht aber **rundherum**, du brauchst also den Umfang.`,
+      ),
+    ),
+    wrong(
+      (a + b) * c,
+      tx("Only halfway round", "Nur halb herum"),
+      tx(
+        `Nearly! ${a} m + ${b} m are only two sides. The fence goes all the way round: **two** lengths and **two** widths.`,
+        `Fast! ${a} m + ${b} m sind nur zwei Seiten. Der Zaun geht ganz herum: **zwei** Längen und **zwei** Breiten.`,
+      ),
+    ),
+    wrong(
+      p,
+      tx("Metres, not euros", "Meter statt Euro"),
+      tx(`Great first step: the fence is ${p} m long! Now step 2: every metre costs ${c} €.`, `Starker erster Schritt: Der Zaun ist ${p} m lang! Jetzt Schritt 2: Jeder Meter kostet ${c} €.`),
+    ),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Rule of three (Dreisatz): one line per frame, the values morph in place while
 // the operations appear on both sides.
 
@@ -144,13 +348,33 @@ const buyMany: Tpl = (rng) => {
   const p = rng.pick(g.prices);
   const total = n * p;
   const round = Math.max(1, Math.round(p / 100));
+  const answer = num(total / 100, "€");
   return {
     instruction: SOLVE,
     text: tx(
       `${name} buys ${n} ${g.many}. One ${g.one} costs ${eur(p)} €. How much does ${name} pay in total?`,
       `${name} kauft ${n} ${g.de.many}. ${g.de.a} ${g.de.one} kostet ${eur(p)} €. Wie viel bezahlt ${name} insgesamt?`,
     ),
-    answer: num(total / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        n + p / 100,
+        tx("Added instead of multiplied", "Addiert statt multipliziert"),
+        tx(
+          `Ah, I see what happened! You added ${n} and ${eur(p)}. But ${name} pays the same price **${n} times**: multiply.`,
+          `Ah, ich seh, was passiert ist! Du hast ${n} und ${eur(p)} addiert. Aber ${name} bezahlt ${n}-mal denselben Preis: **multiplizieren**.`,
+        ),
+      ),
+      wrong(
+        p / 100,
+        tx("Only one item", "Nur ein Stück"),
+        tx(
+          `Nearly! ${eur(p)} € is the price of **one** ${g.one}. But ${name} buys ${n} of them.`,
+          `Fast! ${eur(p)} € kostet **${g.de.a.toLowerCase()} ${g.de.one}**. ${name} kauft aber ${n} davon.`,
+        ),
+      ),
+      p % 100 !== 0 && wrong(total, tx("Comma lost", "Komma verloren"), commaLost(p, `for ${n} ${g.many}`, `für ${n} ${g.de.many}`)),
+    ]),
     hint: tx(
       "The same price several times: **multiply** the number of items by the price of one.",
       "Mehrmals derselbe Preis: **Multipliziere** die Anzahl mit dem Preis für ein Stück.",
@@ -192,13 +416,15 @@ const share: Tpl = (rng) => {
   const n = rng.int(3, s.max);
   const each = rng.int(6, 30) * 50;
   const total = each * n;
+  const answer = num(each / 100, "€");
   return {
     instruction: SOLVE,
     text: tx(
       `${n} friends share the cost of ${s.what} equally. Altogether it costs ${eur(total)} €. How much does each friend pay?`,
       `${n} Freunde teilen sich die Kosten für ${s.de} gleichmäßig. Das kostet insgesamt ${eur(total)} €. Wie viel bezahlt jeder?`,
     ),
-    answer: num(each / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, shareWrongs(total, n, tx("friends", "Freunde"))),
     hint: tx(
       "Shared **equally** means: divide the total by the number of friends.",
       "**Gleichmäßig** teilen heißt: Teile den Gesamtbetrag durch die Anzahl der Freunde.",
@@ -240,13 +466,44 @@ const change: Tpl = (rng) => {
   const b = rng.pick(BUYS);
   const p = rng.int(b.min / 10, b.max / 10) * 10;
   const r = b.note * 100 - p;
+  const euros = Math.floor(p / 100);
+  const cents = p % 100;
+  const answer = num(r / 100, "€");
   return {
     instruction: SOLVE,
     text: tx(
       `${name} buys ${b.what} for ${eur(p)} € and pays with a ${b.note} € note. How much change does ${name} get?`,
       `${name} kauft ${b.de} für ${eur(p)} € und bezahlt mit einem ${b.note}-Euro-Schein. Wie viel Wechselgeld bekommt ${name}?`,
     ),
-    answer: num(r / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        b.note + p / 100,
+        tx("Added instead of subtracted", "Addiert statt subtrahiert"),
+        tx(
+          `Oops, now ${name} gets back more than the ${b.note} € note! The change is what's **left over**: subtract the price.`,
+          `Huch, jetzt bekommt ${name} mehr zurück, als der ${b.note}-Euro-Schein wert ist! Das Wechselgeld ist das, was **übrig bleibt**: Zieh den Preis ab.`,
+        ),
+      ),
+      cents > 0 &&
+        wrong(
+          r / 100 + 1,
+          tx("Forgot to borrow", "Übertrag vergessen"),
+          tx(
+            `So close, it's a classic! You took the ${cents} ct from a fresh 100 ct, but that euro has to come out of the ${b.note} € as well. Count up from ${eur(p)} € to check.`,
+            `Ganz knapp, ein Klassiker! Du hast die ${cents} ct von 100 ct abgezogen, aber dieser eine Euro muss auch noch von den ${b.note} € weg. Ergänze zur Probe von ${eur(p)} € aus.`,
+          ),
+        ),
+      cents > 0 &&
+        wrong(
+          b.note - euros,
+          tx("Cents forgotten", "Cent vergessen"),
+          tx(
+            `Nearly! You took away the ${euros} €, but the price is ${eur(p)} €: the ${cents} ct have to come off too.`,
+            `Fast! Du hast die ${euros} € abgezogen, aber der Preis ist ${eur(p)} €: Die ${cents} ct müssen auch noch weg.`,
+          ),
+        ),
+    ]),
     hint: tx(
       "The change is the money that comes back: **subtract** the price from the money paid.",
       "Das Wechselgeld ist das Geld, das du zurückbekommst: **Subtrahiere** den Preis vom bezahlten Betrag.",
@@ -331,10 +588,42 @@ const duration: Tpl = (rng) => {
   const t1 = clock(start);
   const t2 = clock(end);
   const said = c.answer(d, name);
+  const answer = num(d, "min");
+  // Clock times subtracted like decimals (11:10 − 9:35 → 1110 − 935), the full hours forgotten, h,mm.
+  const hhmm = (min: number) => Math.floor(min / 60) * 100 + (min % 60);
+  const fullHours = Math.floor((d - a) / 60);
+  const endMin = end % 60;
   return {
     instruction: SOLVE,
     text: c.text(t1, t2, name),
-    answer: num(d, "min"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        hhmm(end) - hhmm(start),
+        NOT_HOURS_100,
+        tx(
+          `Ah, I see what happened! You subtracted ${t1} from ${t2} like normal numbers. But an hour has **60** minutes, not 100: count up to ${full} first.`,
+          `Ah, ich seh, was passiert ist! Du hast ${t1} von ${t2} wie normale Zahlen abgezogen. Aber eine Stunde hat **60** Minuten, nicht 100: Rechne erst bis ${full} Uhr.`,
+        ),
+      ),
+      fullHours > 0 &&
+        wrong(
+          a + endMin,
+          tx("A full hour is missing", "Eine volle Stunde fehlt"),
+          tx(
+            `Nearly! The ${a} min up to ${full} and the ${endMin} min at the end are right. But there ${fullHours === 1 ? "is a full hour" : `are ${fullHours} full hours`} in between too!`,
+            `Fast! Die ${a} min bis ${full} Uhr und die ${endMin} min am Ende stimmen. Aber dazwischen ${fullHours === 1 ? "liegt noch eine volle Stunde" : `liegen noch ${fullHours} volle Stunden`}!`,
+          ),
+        ),
+      wrong(
+        Math.floor(d / 60) + (d % 60) / 100,
+        tx("Hours and minutes mixed", "Stunden und Minuten gemischt"),
+        tx(
+          "Looks like you wrote it as hours,minutes. The question wants just **minutes**: turn the full hours into minutes too.",
+          "Sieht so aus, als hättest du Stunden,Minuten geschrieben. Gefragt sind nur **Minuten**: Rechne die vollen Stunden auch in Minuten um.",
+        ),
+      ),
+    ]),
     hint: tx("Count in two steps: first up to the next full hour, then the rest.", "Rechne in zwei Schritten: erst bis zur nächsten vollen Stunde, dann den Rest."),
     solution: [
       {
@@ -429,10 +718,68 @@ const convert: Tpl = (rng) => {
       ? { math: `1#a "${c.from}"#ua =#eq ${c.f}#b "${c.to}"#ub`, text: `$1 "${c.from}" = ${c.f} "${c.to}"$` }
       : { math: `${c.f}#a "${c.from}"#ua =#eq 1#b "${c.to}"#ub`, text: `$${c.f} "${c.from}" = 1 "${c.to}"$` };
   const said = c.answer(de(r), name);
+  const answer = num(r, c.to);
+  const big = c.dir === "mul" ? c.from : c.to;
+  const small = c.dir === "mul" ? c.to : c.from;
+  const time = c.f === 60;
+  const wf = time || c.f === 1000 ? 100 : 10;
+  const hh = Math.floor(v / 60);
+  const mm = v % 60;
   return {
     instruction: tx("Convert the units", "Rechne die Einheiten um"),
     text: c.text(de(v), name),
-    answer: num(r, c.to),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      // 1,5 h read as 1 h 50 min.
+      time &&
+        c.dir === "mul" &&
+        wrong(
+          Math.floor(v) * 60 + Math.round((v % 1) * 100),
+          tx("The comma isn't minutes", "Komma sind keine Minuten"),
+          tx(
+            `Ooh, the classic time trap! The digits after the comma in ${de(v)} h aren't minutes, they're a **part of an hour**. Multiply the whole ${de(v)} by 60.`,
+            `Die klassische Zeitfalle! Die Ziffern nach dem Komma in ${de(v)} h sind keine Minuten, sondern ein **Teil einer Stunde**. Rechne ${de(v)} als Ganzes mal 60.`,
+          ),
+        ),
+      // 90 min written as 1,30 h.
+      time &&
+        c.dir === "div" &&
+        wrong(
+          hh + mm / 100,
+          NOT_H_MIN,
+          tx(
+            `Ooh, the classic time trap! ${hh},${String(mm).padStart(2, "0")} h is **not** ${hh ? `${hh} h ` : ""}${mm} min: the digits after the comma aren't minutes. Divide the ${v} min by 60.`,
+            `Die klassische Zeitfalle! ${hh},${String(mm).padStart(2, "0")} h sind **nicht** ${hh ? `${hh} h ` : ""}${mm} min: Die Ziffern nach dem Komma sind keine Minuten. Teil die ${v} min durch 60.`,
+          ),
+        ),
+      wrong(
+        c.dir === "mul" ? v / c.f : v * c.f,
+        tx("Wrong direction", "Falsche Richtung"),
+        c.dir === "mul"
+          ? tx(
+              `Ah, I see what happened! You divided, but ${c.to} is the **smaller** unit, so you get **more** of them. Multiply by ${c.f}.`,
+              `Ah, ich seh, was passiert ist! Du hast geteilt, aber ${c.to} ist die **kleinere** Einheit, also bekommst du **mehr** davon. Multiplizier mit ${c.f}.`,
+            )
+          : tx(
+              `Oops, that got bigger! ${c.to} is the **bigger** unit, so you get **fewer** of them. Divide by ${c.f}.`,
+              `Huch, das ist ja mehr geworden! ${c.to} ist die **größere** Einheit, also bekommst du **weniger** davon. Teil durch ${c.f}.`,
+            ),
+      ),
+      wf > 0 &&
+        wrong(
+          c.dir === "mul" ? v * wf : v / wf,
+          time ? NOT_HOURS_100 : tx("Wrong conversion number", "Falsche Umrechnungszahl"),
+          time
+            ? tx(
+                "Ah, I see! You converted with 100, but time doesn't count in hundreds: an hour has **60** minutes.",
+                "Ah, ich seh's! Du hast mit 100 umgerechnet, aber die Zeit zählt nicht in Hundertern: Eine Stunde hat **60** Minuten.",
+              )
+            : tx(
+                `Right idea, wrong number! $1 "${big}" = ${c.f} "${small}"$, not ${wf}.`,
+                `Die Idee stimmt, nur die Zahl nicht! $1 "${big}" = ${c.f} "${small}"$, nicht ${wf}.`,
+              ),
+        ),
+    ]),
     hint:
       c.dir === "mul"
         ? tx(
@@ -492,13 +839,29 @@ const area: Tpl = (rng) => {
   let b = rng.int(s.b[0], s.b[1]) * s.k;
   if (b >= a) b = a - s.k;
   const ab = a * b;
+  const answer = num(ab, `${s.u}²`);
   return {
     instruction: SOLVE,
     text: tx(
       `A rectangular ${s.what} is ${a} ${s.u} long and ${b} ${s.u} wide. What is its area?`,
       `${s.de.a} ist ${a} ${s.u} lang und ${b} ${s.u} breit. Wie groß ist der Flächeninhalt?`,
     ),
-    answer: num(ab, `${s.u}²`),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        2 * a + 2 * b,
+        tx("That's the perimeter", "Das ist der Umfang"),
+        tx(
+          "Ah, you added up all four sides: that's the way **around** the edge. The area is the space **inside**: length times width.",
+          "Ah, du hast alle vier Seiten addiert: Das ist der Weg **außen herum**. Der Flächeninhalt ist die Fläche **innen drin**: Länge mal Breite.",
+        ),
+      ),
+      wrong(
+        a + b,
+        tx("Added instead of multiplied", "Addiert statt multipliziert"),
+        tx(`Nearly! You added ${a} and ${b}. For the area you **multiply** length and width.`, `Fast! Du hast ${a} und ${b} addiert. Für den Flächeninhalt **multiplizierst** du Länge und Breite.`),
+      ),
+    ]),
     hint: tx(
       "For a rectangle: area = length · width. The unit gets a little 2.",
       "Für ein Rechteck gilt: Flächeninhalt = Länge · Breite. Die Einheit bekommt eine kleine 2.",
@@ -537,13 +900,32 @@ const perimeter: Tpl = (rng) => {
   const a = rng.int(s.a[0], s.a[1]) * s.k;
   const b = rng.int(s.b[0], s.b[1]) * s.k;
   const p = 2 * a + 2 * b;
+  const answer = num(p, "m");
   return {
     instruction: SOLVE,
     text: tx(
       `A rectangular ${s.what} is ${a} m long and ${b} m wide. ${name} walks once all the way around it. How far does ${name} walk?`,
       `Ein rechteckiger ${s.de} ist ${a} m lang und ${b} m breit. ${name} läuft einmal ganz um den ${s.de} herum. Wie weit läuft ${name}?`,
     ),
-    answer: num(p, "m"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        a * b,
+        tx("That's the area", "Das ist der Flächeninhalt"),
+        tx(
+          `Ah, you multiplied: that's the area, the space **inside**. But ${name} walks along the **edge**: add up all four sides.`,
+          `Ah, du hast multipliziert: Das ist der Flächeninhalt, also die Fläche **innen drin**. ${name} läuft aber am **Rand** entlang: Addiere alle vier Seiten.`,
+        ),
+      ),
+      wrong(
+        a + b,
+        tx("Only halfway round", "Nur halb herum"),
+        tx(
+          `Nearly! With ${a} m + ${b} m, ${name} only gets halfway round. A rectangle has **two** lengths and **two** widths.`,
+          `Fast! Mit ${a} m + ${b} m kommt ${name} nur halb herum. Ein Rechteck hat **zwei** Längen und **zwei** Breiten.`,
+        ),
+      ),
+    ]),
     hint: tx(
       "All the way around means the perimeter: two lengths and two widths.",
       "Einmal ganz herum heißt: Gesucht ist der Umfang. Das sind zwei Längen und zwei Breiten.",
@@ -604,10 +986,29 @@ const distance: Tpl = (rng) => {
   const t = rng.int(c.t[0], c.t[1]);
   const s = v * t;
   const said = c.answer(s, name);
+  const answer = num(s, "km");
   return {
     instruction: SOLVE,
     text: c.text(v, t, name),
-    answer: num(s, "km"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        v / t,
+        tx("Divided instead of multiplied", "Geteilt statt multipliziert"),
+        tx(
+          `Hmm, I think you divided ${v} by ${t}. But ${v} km/h means ${v} km in **every** hour, and that for ${t} hours: multiply.`,
+          `Hm, ich glaub, du hast ${v} durch ${t} geteilt. Aber ${v} km/h heißt ${v} km in **jeder** Stunde, und das ${t} Stunden lang: multiplizieren.`,
+        ),
+      ),
+      wrong(
+        v + t,
+        tx("Added instead of multiplied", "Addiert statt multipliziert"),
+        tx(
+          `Ah, you added ${v} and ${t}. But km/h and hours don't add up: it's ${v} km in **each** hour, for ${t} hours.`,
+          `Ah, du hast ${v} und ${t} addiert. Aber km/h und Stunden kann man nicht addieren: Es sind ${v} km in **jeder** Stunde, ${t} Stunden lang.`,
+        ),
+      ),
+    ]),
     hint: tx("Distance = speed · time.", "Strecke = Geschwindigkeit · Zeit."),
     solution: [
       {
@@ -646,13 +1047,32 @@ const saving: Tpl = (rng) => {
   const total = r * w;
   const wish = rng.pick(WISHES);
   const weeks = tx("weeks", "Wochen");
+  const answer = num(w, weeks);
   return {
     instruction: SOLVE,
     text: tx(
       `${name} wants to buy ${E(wish)} for ${total} €. ${name} saves ${r} € every week. How many weeks does ${name} have to save?`,
       `${name} möchte sich ${D(wish)} für ${total} € kaufen. ${name} spart jede Woche ${r} €. Wie viele Wochen muss ${name} sparen?`,
     ),
-    answer: num(w, weeks),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        total * r,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Whoa, that's a lot of weeks! You multiplied ${total} by ${r}. The question is how often ${r} € **fit into** ${total} €: divide.`,
+          `Huch, das sind aber viele Wochen! Du hast ${total} mit ${r} multipliziert. Gefragt ist, wie oft ${r} € **in** ${total} € **passen**: teilen.`,
+        ),
+      ),
+      wrong(
+        total - r,
+        tx("Only one week", "Nur eine Woche"),
+        tx(
+          `Nearly! $${total} - ${r}$ is what's still missing after **one** week. But how many weeks does ${name} need? How often do ${r} € fit into ${total} €?`,
+          `Fast! $${total} - ${r}$ fehlen nach **einer** Woche noch. Aber wie viele Wochen braucht ${name}? Wie oft passen ${r} € in ${total} €?`,
+        ),
+      ),
+    ]),
     hint: tx(`How often do ${r} € fit into ${total} €?`, `Wie oft passen ${r} € in ${total} €?`),
     solution: [
       {
@@ -732,15 +1152,42 @@ const dreisatz: Tpl = (rng) => {
     `**Given:** ${a} ${E(c.many)} cost ${eur(a * u)} €. **Wanted:** the price of ${b} ${E(c.many)}.`,
     `**Gegeben:** ${a} ${D(c.many)} kosten ${eur(a * u)} €. **Gesucht:** der Preis für ${b} ${D(c.many)}.`,
   );
+  let extra = 0;
   if (rng.chance(0.35)) {
     const t = rng.int(7, 9);
+    extra = t;
     text = withExtra(text, tx(`The shop opens at ${t} o'clock.`, `${c.shop} öffnet um ${t} Uhr.`));
     given = cat(given, tx(" The opening time doesn't matter.", " Die Öffnungszeit spielt keine Rolle."));
   }
+  const answer = num((b * u) / 100, "€");
+  const shop = c.shop[0].toLowerCase() + c.shop.slice(1);
   return {
     instruction: SOLVE,
     text,
-    answer: num((b * u) / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      ...proportionalWrongs({
+        a,
+        va: (a * u) / 100,
+        b,
+        one: c.one,
+        many: c.many,
+        unit: "€",
+        fmt: (v) => eur(v * 100),
+        what: ["the price", "den Preis", "der Preis"],
+        additive: true,
+      }),
+      // The opening time used as the number of items.
+      extra > 0 &&
+        wrong(
+          (extra * u) / 100,
+          tx("Opening time used", "Öffnungszeit benutzt"),
+          tx(
+            `Hmm, where does the ${extra} come from? The shop opening at ${extra} o'clock has nothing to do with the price. Cross it out!`,
+            `Hm, woher kommt die ${extra}? Dass ${shop} um ${extra} Uhr öffnet, hat mit dem Preis nichts zu tun. Streich es durch!`,
+          ),
+        ),
+    ]),
     hint: tx(`Rule of three: first find the price of **one**, then multiply.`, `Dreisatz: Berechne zuerst den Preis für **1 ${D(c.one)}**, dann multipliziere.`),
     solution: ruleOfThree({
       a,
@@ -788,10 +1235,24 @@ const recipe: Tpl = (rng) => {
     text = withExtra(text, tx(`Cooking takes ${m} minutes.`, `Die Zubereitung dauert ${m} Minuten.`));
     given = cat(given, tx(" The cooking time doesn't matter.", " Die Zubereitungszeit spielt keine Rolle."));
   }
+  const answer = num(b * per, r.unit);
   return {
     instruction: SOLVE,
     text,
-    answer: num(b * per, r.unit),
+    answer,
+    mistakes: wrongNumbers(
+      answer,
+      proportionalWrongs({
+        a,
+        va: a * per,
+        b,
+        one: tx("person", "Person"),
+        many: tx("people", "Personen"),
+        unit: r.unit,
+        fmt: de,
+        what: ["the amount", "die Menge", "die Menge"],
+      }),
+    ),
     hint: tx("Rule of three: how much does **one** person need?", "Dreisatz: Wie viel braucht **1** Person?"),
     solution: ruleOfThree({
       a,
@@ -854,10 +1315,29 @@ const speedV: Tpl = (rng) => {
     given = cat(given, tx(" The temperature doesn't matter.", " Die Temperatur spielt keine Rolle."));
   }
   const who = c.who(name);
+  const answer = num(v, "km/h");
   return {
     instruction: SOLVE,
     text,
-    answer: num(v, "km/h"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        s * t,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Whoa, that's fast! You multiplied ${s} km by ${t} h. Speed means km **per** hour: share the ${s} km out over the ${t} hours.`,
+          `Huch, das ist aber schnell! Du hast ${s} km mal ${t} h gerechnet. Geschwindigkeit heißt km **pro** Stunde: Verteil die ${s} km auf die ${t} Stunden.`,
+        ),
+      ),
+      wrong(
+        t / s,
+        tx("Hours divided by km", "Stunden durch km geteilt"),
+        tx(
+          `Nearly! You divided the hours by the kilometres. km/h means km **per** hour, so the km go on top.`,
+          `Fast! Du hast die Stunden durch die Kilometer geteilt. km/h heißt km **pro** Stunde, also kommen die km nach oben.`,
+        ),
+      ),
+    ]),
     hint: tx(
       "Speed = distance : time. In km/h: how many km in **one** hour?",
       "Geschwindigkeit = Strecke : Zeit. Bei km/h heißt das: Wie viele km sind es in **einer** Stunde?",
@@ -886,13 +1366,41 @@ const speedT: Tpl = (rng) => {
   const s = v * t;
   const what = rng.pick(VEHICLES);
   const minutes = t % 1 ? tx(` That's ${Math.floor(t)} h 30 min.`, ` Das sind ${Math.floor(t)} h 30 min.`) : "";
+  const answer = num(t, "h");
   return {
     instruction: SOLVE,
     text: tx(
       `${E(what)} drives ${s} km at an average speed of ${v} km/h. How many hours does the journey take?`,
       `${D(what)} fährt ${s} km mit einer Durchschnittsgeschwindigkeit von ${v} km/h. Wie viele Stunden dauert die Fahrt?`,
     ),
-    answer: num(t, "h"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        s * v,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Whoa, that's a long trip! You multiplied ${s} km by ${v} km/h. Time = distance : speed: how often do ${v} km fit into ${s} km?`,
+          `Huch, das ist aber eine lange Fahrt! Du hast ${s} km mal ${v} km/h gerechnet. Zeit = Strecke : Geschwindigkeit: Wie oft passen ${v} km in ${s} km?`,
+        ),
+      ),
+      wrong(
+        v / s,
+        tx("Divided the wrong way round", "Andersrum geteilt"),
+        tx(
+          `Nearly! You divided ${v} by ${s}. It's the other way round: how often do the ${v} km of one hour fit into ${s} km?`,
+          `Fast! Du hast ${v} durch ${s} geteilt. Es ist andersherum: Wie oft passen die ${v} km von einer Stunde in ${s} km?`,
+        ),
+      ),
+      t % 1 !== 0 &&
+        wrong(
+          Math.floor(t) + 0.3,
+          NOT_H_MIN,
+          tx(
+            `So close! Did you mean ${Math.floor(t)} h 30 min? In decimals, 30 minutes aren't ,30 of an hour. What part of an hour are 30 minutes?`,
+            `Ganz knapp! Meinst du ${Math.floor(t)} h 30 min? Als Dezimalzahl sind 30 Minuten nicht ,30 Stunden. Welcher Teil einer Stunde sind 30 Minuten?`,
+          ),
+        ),
+    ]),
     hint: tx(
       "Time = distance : speed. How often do the km of one hour fit into the whole distance?",
       "Zeit = Strecke : Geschwindigkeit. Wie oft passen die km von einer Stunde in die ganze Strecke?",
@@ -976,10 +1484,35 @@ const unitsCount: Tpl = (rng) => {
   const total = Math.round(v * c.f);
   const n = total / p;
   const said = c.answer(n, name);
+  const answer = num(n, c.noun);
+  const wf = c.big === "km" ? 1000 : c.f === 1000 ? 100 : 10;
   return {
     instruction: SOLVE,
     text: c.text(de(v), p, name),
-    answer: num(n, c.noun),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        (v * wf) / p,
+        tx("Wrong conversion number", "Falsche Umrechnungszahl"),
+        c.big === "km"
+          ? tx(
+              "Nearly! You changed the km into **m**, but the steps are in **cm**. One more conversion: 1 m = 100 cm.",
+              "Fast! Du hast die km in **m** umgerechnet, aber die Schritte sind in **cm**. Einmal musst du noch umrechnen: 1 m = 100 cm.",
+            )
+          : tx(
+              `Right idea, converting first! But $1 "${c.big}" = ${c.f} "${c.small}"$, not ${wf}.`,
+              `Die Idee stimmt, erst umrechnen! Aber $1 "${c.big}" = ${c.f} "${c.small}"$, nicht ${wf}.`,
+            ),
+      ),
+      wrong(
+        v / p,
+        tx("Units not converted", "Nicht umgerechnet"),
+        tx(
+          `Hmm, that's tiny! You divided ${de(v)} ${c.big} by ${p} ${c.small}: two different units. Change the ${c.big} into ${c.small} first.`,
+          `Hm, das ist winzig! Du hast ${de(v)} ${c.big} durch ${p} ${c.small} geteilt, also zwei verschiedene Einheiten. Rechne zuerst ${c.big} in ${c.small} um.`,
+        ),
+      ),
+    ]),
     hint: tx(
       `Use the same unit first: change ${c.big} into ${c.small}. Then divide.`,
       `Bring zuerst alles auf dieselbe Einheit: Rechne ${c.big} in ${c.small} um. Dann dividiere.`,
@@ -1020,13 +1553,34 @@ const centsToEuro: Tpl = (rng) => {
   const c = rng.pick(g.c);
   const n = rng.int(4, 12);
   const total = n * c;
+  const answer = num(total / 100, "€");
   return {
     instruction: SOLVE,
     text: tx(
       `One ${g.one} costs ${c} ct. How much do ${n} ${g.many} cost? Give the answer in euros.`,
       `${g.de.a} ${g.de.one} kostet ${c} ct. Wie viel kosten ${n} ${g.de.many}? Gib das Ergebnis in Euro an.`,
     ),
-    answer: num(total / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        total,
+        tx("Still in cents", "Noch in Cent"),
+        tx(`Nearly! ${total} is the price in **cents**. The question wants euros: 100 ct = 1 €.`, `Fast! ${total} ist der Preis in **Cent**. Gefragt ist er aber in Euro: 100 ct = 1 €.`),
+      ),
+      wrong(
+        total / 10,
+        tx("Divided by 10", "Durch 10 geteilt"),
+        tx("Right idea to convert! But it takes **100** ct to make 1 €, not 10.", "Gute Idee, umzurechnen! Aber erst **100** ct sind 1 €, nicht 10."),
+      ),
+      wrong(
+        c / 100,
+        tx("Only one item", "Nur ein Stück"),
+        tx(
+          `Nearly! ${eur(c)} € is the price of **one** ${g.one}. But the question is about ${n} of them.`,
+          `Fast! ${eur(c)} € kostet **${g.de.a.toLowerCase()} ${g.de.one}**. Gefragt sind aber ${n} ${g.de.many}.`,
+        ),
+      ),
+    ]),
     hint: tx("Multiply first. Then change cents into euros: 100 ct = 1 €.", "Multipliziere zuerst. Rechne dann Cent in Euro um: 100 ct = 1 €."),
     solution: [
       {
@@ -1063,13 +1617,42 @@ const trainingHours: Tpl = (rng) => {
   const total = k * m;
   const h = total / 60;
   const time = tx("time", "Zeit");
+  const answer = num(h, "h");
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
   return {
     instruction: SOLVE,
     text: tx(
       `${t.who} ${t.verb} ${k} times a week for ${m} minutes each time. How many hours is that per week?`,
       `${t.de} ${k}-mal pro Woche, jedes Mal ${m} Minuten lang. Wie viele Stunden sind das pro Woche?`,
     ),
-    answer: num(h, "h"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        total,
+        tx("Still in minutes", "Noch in Minuten"),
+        tx(`Nearly! ${total} is the time in **minutes**. Now change it into hours: 60 min = 1 h.`, `Fast! ${total} ist die Zeit in **Minuten**. Rechne sie noch in Stunden um: 60 min = 1 h.`),
+      ),
+      mm > 0 &&
+        wrong(
+          hh + mm / 100,
+          NOT_H_MIN,
+          tx(
+            `So close! ${hh} h ${mm} min is right, but that isn't ${hh},${mm} h: the digits after the comma aren't minutes. What part of an hour are ${mm} minutes?`,
+            `Ganz knapp! ${hh} h ${mm} min stimmt, aber das sind nicht ${hh},${mm} h: Die Ziffern nach dem Komma sind keine Minuten. Welcher Teil einer Stunde sind ${mm} Minuten?`,
+          ),
+        ),
+      wrong(
+        total / 100,
+        NOT_HOURS_100,
+        tx(`Ah, I see! You divided ${total} by 100. But an hour has **60** minutes.`, `Ah, ich seh's! Du hast ${total} durch 100 geteilt. Aber eine Stunde hat **60** Minuten.`),
+      ),
+      wrong(
+        m / 60,
+        tx("Only one session", "Nur ein Termin"),
+        tx(`Nearly! That's just **one** time. But it's ${k} times a week.`, `Fast! Das ist nur **einmal**. Es sind aber ${k}-mal pro Woche.`),
+      ),
+    ]),
     hint: tx(
       "First the minutes per week. Then change into hours: 60 min = 1 h.",
       "Berechne zuerst die Minuten pro Woche. Rechne dann in Stunden um: 60 min = 1 h.",
@@ -1190,10 +1773,12 @@ const inverse: Tpl = (rng) => {
   const f = (v: number) => (c.money ? eur(v * 100) : de(v));
   const check = `$${a} \\cdot ${f(va)} = ${b} \\cdot ${f(vb)} = ${f(P)}$.`;
   const said = c.answer(b, f(vb));
+  const answer = num(vb, c.answerUnit);
   return {
     instruction: SOLVE,
     text: c.text(a, f(va), b),
-    answer: num(vb, c.answerUnit),
+    answer,
+    mistakes: wrongNumbers(answer, inverseWrongs({ a, va, b, one: c.one, many: c.many, unit: c.unit, fmt: f })),
     hint: tx(
       `Careful: more ${E(c.many)} means **less**. What would 1 ${E(c.one)} alone mean? Then go to ${b}.`,
       `Vorsicht: Mehr ${D(c.many)} heißt hier **weniger**. Wie wäre es bei 1 ${D(c.one)} allein? Dann rechne weiter auf ${b}.`,
@@ -1252,10 +1837,35 @@ const twoStepShopping: Tpl = (rng) => {
     given = cat(given, tx(` ${name}'s age doesn't matter.`, ` ${gen(name)} Alter spielt keine Rolle.`));
   }
   given = cat(given, tx(" Step 1: the total cost.", " Schritt 1: die Gesamtkosten."));
+  const answer = num(r / 100, "€");
+  const onePurchase = tx(
+    `Nearly! You only took off one of the two purchases. ${name} buys **both**, so add them up first.`,
+    `Fast! Du hast nur einen der beiden Einkäufe abgezogen. ${name} kauft **beides**, also rechne erst alles zusammen.`,
+  );
   return {
     instruction: SOLVE,
     text,
-    answer: num(r / 100, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        cost / 100,
+        tx("That's the cost", "Das sind die Kosten"),
+        tx(
+          `Great first step: everything costs ${eur(cost)} €! Now step 2: what's left of the ${note} €?`,
+          `Starker erster Schritt: Alles kostet ${eur(cost)} €! Jetzt Schritt 2: Was bleibt von den ${note} € übrig?`,
+        ),
+      ),
+      wrong(
+        note - (p1 + p2) / 100,
+        tx("Only one of each", "Nur je ein Stück"),
+        tx(
+          `Ah, I see what happened! You counted each item only once. But ${name} buys ${n1} ${i1.many} and ${n2} ${i2.many}: multiply first.`,
+          `Ah, ich seh, was passiert ist! Du hast jede Sorte nur einmal gerechnet. Aber ${name} kauft ${n1} ${i1.de} und ${n2} ${i2.de}: Erst multiplizieren.`,
+        ),
+      ),
+      wrong(note - c1 / 100, tx("One purchase missing", "Ein Einkauf fehlt"), onePurchase),
+      wrong(note - c2 / 100, tx("One purchase missing", "Ein Einkauf fehlt"), onePurchase),
+    ]),
     hint: tx("Two steps: first the total cost of everything, then the change.", "Zwei Schritte: erst die Kosten für alles zusammen, dann das Wechselgeld."),
     solution: [
       { math: said(COST, `=#eq ${n1}#n1 \\cdot#o1 ${eur(p1)}#p1 +#pl ${n2}#n2 \\cdot#o2 ${eur(p2)}#p2`), note: given },
@@ -1299,10 +1909,12 @@ const fenceCost: Tpl = (rng) => {
     given = cat(given, tx(" The dog's age doesn't matter.", " Das Alter des Hundes spielt keine Rolle."));
   }
   given = cat(given, tx(' Step 1: "all the way around" means the perimeter.', " Schritt 1: „rundherum“ heißt: Du brauchst den Umfang."));
+  const answer = num(p * c, "€");
   return {
     instruction: SOLVE,
     text,
-    answer: num(p * c, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, fenceWrongs(a, b, c)),
     hint: tx(
       "Two steps: the perimeter first ($u = 2 \\cdot a + 2 \\cdot b$), then the price for all the metres.",
       "Zwei Schritte: zuerst der Umfang ($u = 2 \\cdot a + 2 \\cdot b$), dann der Preis für alle Meter.",
@@ -1334,13 +1946,37 @@ const tileCost: Tpl = (rng) => {
   const c = rng.pick([15, 20, 25, 30, 40]);
   const ab = a * b;
   const room = rng.pick(ROOMS);
+  const answer = num(ab * c, "€");
   return {
     instruction: SOLVE,
     text: tx(
       `The floor of a rectangular ${E(room)} is ${a} m long and ${b} m wide. It gets new tiles. One square metre of tiles costs ${c} €. How much do the tiles cost?`,
       `Der Boden ${D(room)} ist ${a} m lang und ${b} m breit. Er bekommt neue Fliesen. Ein Quadratmeter Fliesen kostet ${c} €. Wie viel kosten die Fliesen?`,
     ),
-    answer: num(ab * c, "€"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        (2 * a + 2 * b) * c,
+        tx("Perimeter instead of area", "Umfang statt Fläche"),
+        tx(
+          "Ah, you used the way **around** the room. But the tiles cover the **whole floor**: you need the area, length times width.",
+          "Ah, du hast den Weg **um den Raum herum** genommen. Die Fliesen bedecken aber den **ganzen Boden**: Du brauchst den Flächeninhalt, Länge mal Breite.",
+        ),
+      ),
+      wrong(
+        (a + b) * c,
+        tx("Added instead of multiplied", "Addiert statt multipliziert"),
+        tx(
+          `Nearly! You added ${a} m and ${b} m. For the area of the floor you **multiply** length and width.`,
+          `Fast! Du hast ${a} m und ${b} m addiert. Für den Flächeninhalt des Bodens **multiplizierst** du Länge und Breite.`,
+        ),
+      ),
+      wrong(
+        ab,
+        tx("Square metres, not euros", "Quadratmeter statt Euro"),
+        tx(`Great first step: the floor has ${ab} m²! Now step 2: every m² costs ${c} €.`, `Starker erster Schritt: Der Boden hat ${ab} m²! Jetzt Schritt 2: Jeder m² kostet ${c} €.`),
+      ),
+    ]),
     hint: tx(
       "Two steps: the area first ($A = a \\cdot b$), then the price for all the square metres.",
       "Zwei Schritte: zuerst der Flächeninhalt ($A = a \\cdot b$), dann der Preis für alle Quadratmeter.",
@@ -1416,13 +2052,40 @@ const speedMinutes: Tpl = (rng) => {
       note: tx(`**Answer:** ${name}'s average speed is ${v} km/h.`, `**Antwort:** ${gen(name)} Durchschnittsgeschwindigkeit beträgt ${v} km/h.`),
     },
   );
+  const answer = num(v, "km/h");
   return {
     instruction: SOLVE,
     text: tx(
       `${name} cycles ${de(s)} km in ${m} minutes. What is ${name}'s average speed in km/h?`,
       `${name} fährt in ${m} Minuten ${de(s)} km mit dem Fahrrad. Wie hoch ist ${gen(name)} Durchschnittsgeschwindigkeit in km/h?`,
     ),
-    answer: num(v, "km/h"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        (100 * s) / m,
+        NOT_HOURS_100,
+        tx(
+          `Ooh, the classic trap! ${m} min isn't ${de(m / 100)} h, because an hour has **60** minutes. Use the rule of three from ${m} to 60 minutes instead.`,
+          `Die klassische Falle! ${m} min sind nicht ${de(m / 100)} h, denn eine Stunde hat **60** Minuten. Rechne lieber mit dem Dreisatz von ${m} auf 60 Minuten.`,
+        ),
+      ),
+      wrong(
+        s / m,
+        tx("Km per minute", "km pro Minute"),
+        tx(
+          `Ah, you divided ${de(s)} km by ${m} minutes: that's km per **minute**. km/h asks for km per **hour**, and an hour has 60 minutes.`,
+          `Ah, du hast ${de(s)} km durch ${m} Minuten geteilt: Das sind km pro **Minute**. Bei km/h sind km pro **Stunde** gefragt, und eine Stunde hat 60 Minuten.`,
+        ),
+      ),
+      wrong(
+        s,
+        tx("That's the distance", "Das ist die Strecke"),
+        tx(
+          `Hmm, ${de(s)} km is how far ${name} gets in ${m} minutes. km/h means: how far in a **whole hour**, so in 60 minutes?`,
+          `Hm, ${de(s)} km schafft ${name} in ${m} Minuten. km/h heißt: Wie weit in einer **ganzen Stunde**, also in 60 Minuten?`,
+        ),
+      ),
+    ]),
     hint: tx(
       "km/h means: km in **60** minutes. Use the rule of three on the minutes.",
       "km/h heißt: km in **60** Minuten. Rechne mit dem Dreisatz von den Minuten auf 60 Minuten hoch.",
@@ -1445,13 +2108,40 @@ const runMinutes: Tpl = (rng) => {
   }
   const s = (v * M) / 60;
   const th = M / 60;
+  const answer = num(M, "min");
   return {
     instruction: SOLVE,
     text: tx(
       `${name} runs ${s} km at an average speed of ${v} km/h. How many minutes does the run take?`,
       `${name} läuft ${s} km mit einer Durchschnittsgeschwindigkeit von ${v} km/h. Wie viele Minuten dauert der Lauf?`,
     ),
-    answer: num(M, "min"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        th,
+        tx("Still in hours", "Noch in Stunden"),
+        tx(
+          `Good start, ${de(th)} h is the time in **hours**! But the question wants **minutes**: 1 h = 60 min.`,
+          `Guter Anfang, ${de(th)} h ist die Zeit in **Stunden**! Gefragt sind aber **Minuten**: 1 h = 60 min.`,
+        ),
+      ),
+      wrong(
+        th * 100,
+        NOT_HOURS_100,
+        tx(
+          `Ah, I see! You turned ${de(th)} h into minutes with 100. But an hour has **60** minutes.`,
+          `Ah, ich seh's! Du hast ${de(th)} h mit 100 in Minuten umgerechnet. Aber eine Stunde hat **60** Minuten.`,
+        ),
+      ),
+      wrong(
+        (v / s) * 60,
+        tx("Formula upside down", "Formel verdreht"),
+        tx(
+          `Hmm, I think you did ${v} : ${de(s)}. Time is distance **divided by** speed, so the km go on top.`,
+          `Hm, ich glaub, du hast ${v} : ${de(s)} gerechnet. Zeit ist Strecke **geteilt durch** Geschwindigkeit, die km kommen also nach oben.`,
+        ),
+      ),
+    ]),
     hint: tx(
       "Time = distance : speed gives hours. Then change hours into minutes: 1 h = 60 min.",
       "Zeit = Strecke : Geschwindigkeit ergibt Stunden. Rechne dann Stunden in Minuten um: 1 h = 60 min.",
@@ -1499,10 +2189,42 @@ const budget: Tpl = (rng) => {
     given = cat(given, tx(" The number of members doesn't matter.", " Die Zahl der Mitglieder spielt keine Rolle."));
   }
   given = cat(given, tx(" Step 1: the money left after the net.", " Schritt 1: das Geld, das nach dem Netz übrig bleibt."));
+  const answer = num(k, balls);
+  const noNet = tx(
+    `Ah, I see what happened! You spent all ${B} € on balls. But the goal net comes first: take its ${net} € off before you buy balls.`,
+    `Ah, ich seh, was passiert ist! Du hast die ganzen ${B} € für Bälle verplant. Aber zuerst kommt das Tornetz: Zieh seine ${net} € ab, bevor du Bälle kaufst.`,
+  );
   return {
     instruction: SOLVE,
     text,
-    answer: num(k, balls),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(Math.floor(B / p), tx("Forgot the net", "Netz vergessen"), noNet),
+      wrong(B / p, tx("Forgot the net", "Netz vergessen"), noNet),
+      wrong(
+        left,
+        tx("That's the money left", "Das ist das Restgeld"),
+        tx(
+          `Great first step: ${left} € are left after the net! Now step 2: how many balls at ${p} € can the club buy with that?`,
+          `Starker erster Schritt: Nach dem Netz bleiben ${left} € übrig! Jetzt Schritt 2: Wie viele Bälle zu je ${p} € kann der Verein davon kaufen?`,
+        ),
+      ),
+      rest > 0 &&
+        wrong(
+          k + 1,
+          tx("One ball too many", "Ein Ball zu viel"),
+          tx(
+            `So close! But check it: can the club really pay for ${k + 1} balls? Multiply and compare with the money that's left.`,
+            `Ganz knapp! Aber mach die Probe: Kann der Verein ${k + 1} Bälle wirklich bezahlen? Multiplizier und vergleich mit dem Restgeld.`,
+          ),
+        ),
+      rest > 0 &&
+        wrong(
+          left / p,
+          tx("Part of a ball", "Ein Stück Ball"),
+          tx("Nearly! But the club can't buy part of a ball. How many **whole** balls fit into the money?", "Fast! Aber ein halber Ball lässt sich nicht kaufen. Wie viele **ganze** Bälle passen ins Geld?"),
+        ),
+    ]),
     hint: tx(
       "Two steps: what's left after the net? Then: how many balls fit into that?",
       "Zwei Schritte: Wie viel bleibt nach dem Netz übrig? Dann: Wie viele Bälle kann man davon kaufen?",
@@ -1544,13 +2266,38 @@ const speedInverse: Tpl = (rng) => {
   const ta = dist / va;
   const tb = dist / vb;
   const place = rng.pick(PLACES);
+  const answer = num(tb, "h");
   return {
     instruction: SOLVE,
     text: tx(
       `At ${va} km/h, the drive to ${E(place)} takes ${de(ta)} hours. How many hours does the drive take at ${vb} km/h?`,
       `Bei ${va} km/h dauert die Fahrt ${D(place)} ${stunden(ta)}. Wie viele Stunden dauert die Fahrt bei ${vb} km/h?`,
     ),
-    answer: num(tb, "h"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        (ta * vb) / va,
+        tx("Faster means less time", "Schneller heißt kürzer"),
+        tx(
+          "Hmm, I think you scaled the time just like the speed. But the faster you drive, the **less** time it takes. Work out the distance first: it stays the same.",
+          "Hm, ich glaub, du hast die Zeit genauso hochgerechnet wie die Geschwindigkeit. Aber je schneller man fährt, desto **weniger** Zeit braucht man. Berechne zuerst die Strecke: Die bleibt gleich.",
+        ),
+      ),
+      wrong(
+        dist,
+        tx("That's the distance", "Das ist die Strecke"),
+        tx(`Great first step: the drive is ${dist} km long! Now step 2: how long does it take at ${vb} km/h?`, `Starker erster Schritt: Die Strecke ist ${dist} km lang! Jetzt Schritt 2: Wie lange dauert sie bei ${vb} km/h?`),
+      ),
+      tb % 1 !== 0 &&
+        wrong(
+          Math.floor(tb) + 0.3,
+          NOT_H_MIN,
+          tx(
+            `So close! Did you mean ${Math.floor(tb)} h 30 min? In decimals, 30 minutes aren't ,30 of an hour. What part of an hour are 30 minutes?`,
+            `Ganz knapp! Meinst du ${Math.floor(tb)} h 30 min? Als Dezimalzahl sind 30 Minuten nicht ,30 Stunden. Welcher Teil einer Stunde sind 30 Minuten?`,
+          ),
+        ),
+    ]),
     hint: tx(
       "The distance stays the same. Work it out first: distance = speed · time.",
       "Die Strecke bleibt gleich. Berechne sie zuerst: Strecke = Geschwindigkeit · Zeit.",
@@ -1590,13 +2337,37 @@ const mixedArea: Tpl = (rng) => {
   const bcm = rng.pick([40, 50, 60, 80]);
   const bm = bcm / 100;
   const A = Math.round(a * bm * 100) / 100;
+  const answer = num(A, "m²");
   return {
     instruction: SOLVE,
     text: tx(
       `A rectangular ${what.en} is ${de(a)} m long and ${bcm} cm wide. What is its area in m²?`,
       `${what.de.a} ist ${de(a)} m lang und ${bcm} cm breit. Wie groß ist der Flächeninhalt in m²?`,
     ),
-    answer: num(A, "m²"),
+    answer,
+    mistakes: wrongNumbers(answer, [
+      wrong(
+        a * bcm,
+        tx("Units not converted", "Nicht umgerechnet"),
+        tx(
+          `Whoa, that's huge! You multiplied ${de(a)} m by ${bcm} cm, two different units. Change the ${bcm} cm into m first.`,
+          `Huch, das ist riesig! Du hast ${de(a)} m mit ${bcm} cm malgenommen, also zwei verschiedene Einheiten. Rechne die ${bcm} cm zuerst in m um.`,
+        ),
+      ),
+      wrong(
+        (a * bcm) / 10,
+        tx("Wrong conversion number", "Falsche Umrechnungszahl"),
+        tx(`Right idea, converting first! But 100 cm make 1 m, so ${bcm} cm aren't ${de(bcm / 10)} m.`, `Die Idee stimmt, erst umrechnen! Aber 100 cm sind 1 m, also sind ${bcm} cm nicht ${de(bcm / 10)} m.`),
+      ),
+      wrong(
+        2 * a + 2 * bm,
+        tx("That's the perimeter", "Das ist der Umfang"),
+        tx(
+          "Ah, you added up all four sides: that's the way **around** the edge. The area is length **times** width.",
+          "Ah, du hast alle vier Seiten addiert: Das ist der Weg **außen herum**. Der Flächeninhalt ist Länge **mal** Breite.",
+        ),
+      ),
+    ]),
     hint: tx(
       "Mixed units! Change the cm into m first (100 cm = 1 m), then multiply.",
       "Achtung, gemischte Einheiten! Rechne zuerst cm in m um (100 cm = 1 m), dann multipliziere.",
@@ -2377,6 +3148,7 @@ const wordProblems: Topic = {
           "Der Bus für die Klassenfahrt kostet insgesamt 375 €. Die 25 Schülerinnen und Schüler der Klasse 7a teilen sich die Kosten gleichmäßig. Wie viel bezahlt jeder?",
         ),
         answer: { kind: "number", value: 15, unit: "€" },
+        mistakes: wrongNumbers({ kind: "number", value: 15, unit: "€" }, shareWrongs(37500, 25, tx("students", "Schülerinnen und Schüler"))),
         hint: tx(
           "Shared **equally**: divide the total cost by the number of students.",
           "**Gleichmäßig** geteilt: Teile die Gesamtkosten durch die Anzahl der Schülerinnen und Schüler.",
@@ -2412,6 +3184,20 @@ const wordProblems: Topic = {
         instruction: SOLVE,
         text: tx("4 notebooks cost 6 €. How much do 7 notebooks cost?", "4 Hefte kosten 6 €. Wie viel kosten 7 Hefte?"),
         answer: { kind: "number", value: 10.5, unit: "€" },
+        mistakes: wrongNumbers(
+          { kind: "number", value: 10.5, unit: "€" },
+          proportionalWrongs({
+            a: 4,
+            va: 6,
+            b: 7,
+            one: tx("notebook", "Heft"),
+            many: tx("notebooks", "Hefte"),
+            unit: "€",
+            fmt: (v) => eur(v * 100),
+            what: ["the price", "den Preis", "der Preis"],
+            additive: true,
+          }),
+        ),
         hint: tx("1 notebook costs $6 : 4 = 1,50$ €. Now multiply by 7.", "1 Heft kostet $6 : 4 = 1,50$ €. Jetzt multipliziere mit 7."),
         solution: ruleOfThree({
           a: 4,
@@ -2455,6 +3241,10 @@ const wordProblems: Topic = {
         instruction: SOLVE,
         text: tx("3 pumps empty a swimming pool in 8 hours. How many hours do 4 pumps need?", "3 Pumpen leeren ein Schwimmbecken in 8 Stunden. Wie viele Stunden brauchen 4 Pumpen?"),
         answer: { kind: "number", value: 6, unit: "h" },
+        mistakes: wrongNumbers(
+          { kind: "number", value: 6, unit: "h" },
+          inverseWrongs({ a: 3, va: 8, b: 4, one: tx("pump", "Pumpe"), many: tx("pumps", "Pumpen"), unit: "h", fmt: de }),
+        ),
         hint: tx(
           "1 pump alone would need 3 times as long: $3 \\cdot 8 = 24$ hours. Now share that between 4 pumps.",
           "1 Pumpe allein bräuchte 3-mal so lange: $3 \\cdot 8 = 24$ Stunden. Jetzt teile das auf 4 Pumpen auf.",
@@ -2497,6 +3287,7 @@ const wordProblems: Topic = {
           "Ein rechteckiger Garten ist 12 m lang und 7 m breit. Er bekommt rundherum einen Zaun. Ein Meter Zaun kostet 8 €. Wie viel kostet der Zaun?",
         ),
         answer: { kind: "number", value: 304, unit: "€" },
+        mistakes: wrongNumbers({ kind: "number", value: 304, unit: "€" }, fenceWrongs(12, 7, 8)),
         hint: tx(
           "Step 1: the perimeter, $u = 2 \\cdot 12 + 2 \\cdot 7$. Step 2: multiply by the price per metre.",
           "Schritt 1: der Umfang, $u = 2 \\cdot 12 + 2 \\cdot 7$. Schritt 2: Multipliziere mit dem Preis pro Meter.",
