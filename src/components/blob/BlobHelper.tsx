@@ -10,7 +10,7 @@ import { TypedText, useTypewriter } from "./speech";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { blobText } from "@/i18n/messages/blob";
-import { firstName } from "@/lib/utils";
+import { cn, firstName } from "@/lib/utils";
 
 /** The little jelly in the corner: reacts to saves, completions and errors, and offers help. */
 export function BlobHelper() {
@@ -26,6 +26,8 @@ export function BlobHelper() {
   const [sleepy, setSleepy] = useState(false);
   const [tip, setTip] = useState(0);
   const [flashAccessory, setFlashAccessory] = useState<BlobAccessory | null>(null);
+  // On phones Blob slides out of the way while you scroll down, and comes back when you scroll up.
+  const [tucked, setTucked] = useState(false);
   const accessoryTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const speechTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -48,6 +50,7 @@ export function BlobHelper() {
         accessoryTimer.current = setTimeout(() => setFlashAccessory(null), (e.ms ?? 2400) + 1200);
       }
       if (e.type === "say") {
+        setTucked(false);
         clearTimeout(speechTimer.current);
         setSpeech(e.text);
         speechTimer.current = setTimeout(() => setSpeech(null), e.ms ?? Math.max(2600, e.text.length * 60));
@@ -88,6 +91,29 @@ export function BlobHelper() {
     };
   }, []);
 
+  // Any scroller in the page (capture phase sees them all): down tucks Blob away, up brings it back.
+  useEffect(() => {
+    const last = new WeakMap<object, number>();
+    const onScroll = (e: Event) => {
+      const el = e.target instanceof Element ? e.target : document.scrollingElement;
+      if (!el) return;
+      const top = el.scrollTop;
+      const prev = last.get(el) ?? 0;
+      last.set(el, top);
+      if (Math.abs(top - prev) < 6) return;
+      setTucked(top > prev && top > 24);
+    };
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
+
+  // A new page starts with Blob in view.
+  const [shownPath, setShownPath] = useState(pathname);
+  if (pathname !== shownPath) {
+    setShownPath(pathname);
+    setTucked(false);
+  }
+
   // Wave hello shortly after the workspace opens.
   useEffect(() => {
     const t = setTimeout(() => ref.current?.wave(), 1600);
@@ -112,7 +138,12 @@ export function BlobHelper() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-3 right-4 z-40 flex flex-col items-end">
+    <div
+      className={cn(
+        "pointer-events-none fixed bottom-2 right-2 z-40 flex flex-col items-end transition-transform duration-300 ease-out sm:bottom-3 sm:right-4",
+        tucked && !open && !speech && "max-sm:translate-y-[calc(100%+12px)]",
+      )}
+    >
       <AnimatePresence>
         {open && (
           <motion.div
@@ -170,7 +201,8 @@ export function BlobHelper() {
         )}
       </AnimatePresence>
 
-      <div className="pointer-events-auto">
+      {/* Smaller on phones so it covers less of the page. */}
+      <div className="pointer-events-auto origin-bottom-right max-sm:-mt-7 max-sm:scale-75">
         <Blob
           ref={ref}
           size={78}

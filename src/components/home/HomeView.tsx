@@ -66,7 +66,7 @@ export function HomeView({
     <>
       <TopBar crumbs={[{ label: t.title }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1480px] px-6 pb-16 pt-4 lg:px-10">
+        <div className="mx-auto w-full max-w-[1480px] px-6 pb-24 pt-4 sm:pb-16 lg:px-10">
           {/* Greeting */}
           <motion.section initial="hidden" animate="shown" className="flex flex-wrap items-end gap-x-6 gap-y-4">
             <motion.div variants={rise} custom={0} className="-mb-2 -ml-3 hidden sm:block">

@@ -266,8 +266,9 @@ export const tasksText = defineMessages({
     tryOr: " oder ",
     quickExamples: ["Bio-Test Fr 8 Uhr #bio", "Aufsatz bis morgen", "Kapitel 4 lesen bis Montag"],
 
-    upcoming: "Demnächst",
-    upcomingLabel: "Anstehende Aufgaben",
+    // Home shows this card under its own "Demnächst" heading, so the card says something else.
+    upcoming: "Bald fällig",
+    upcomingLabel: "Bald fällige Aufgaben",
     todayCount: (n) => `${n} heute`,
     close: "Schließen",
     addATask: "Aufgabe hinzufügen",

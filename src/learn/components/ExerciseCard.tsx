@@ -11,7 +11,7 @@ import type { Exercise, Feedback } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { AnswerInput, type AnswerStatus } from "./AnswerInput";
 import { MathView } from "./MathView";
-import { Rich } from "./Rich";
+import { Inline, Rich } from "./Rich";
 import { SolutionPlayer } from "./SolutionPlayer";
 
 export type ExerciseResult = {
@@ -222,7 +222,14 @@ export function ExerciseCard({
                 <div className="font-display text-[18px] font-semibold">{status === "correct" ? praise : t.howItWorks}</div>
                 {status !== "correct" && (
                   <div className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
-                    {t.answer} <MathView src={answerDisplay(exercise.answer, locale) || "–"} size="sm" animate={false} className="text-ink" />
+                    {t.answer}{" "}
+                    {exercise.answer.kind === "choice" ? (
+                      <span className="font-medium text-ink">
+                        <Inline text={exercise.answer.options[exercise.answer.correct]} />
+                      </span>
+                    ) : (
+                      <MathView src={answerDisplay(exercise.answer, locale) || "–"} size="sm" animate={false} className="text-ink" />
+                    )}
                   </div>
                 )}
               </div>
