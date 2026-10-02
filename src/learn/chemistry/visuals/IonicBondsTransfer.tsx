@@ -104,7 +104,7 @@ export function IonicBondsTransfer() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-surface px-2 py-3">
-        <svg viewBox={`0 0 ${W} ${TOP + SIZE + 70}`} className="mx-auto block w-full" style={{ maxWidth: setup.atoms.length * 230 }} role="img" aria-label={t(tx("Electron transfer between atoms", "Elektronenübergang zwischen Atomen"))}>
+        <svg viewBox={`0 0 ${W} ${TOP + SIZE + 72}`} className="mx-auto block w-full" style={{ maxWidth: setup.atoms.length * 230 }} role="img" aria-label={t(tx("Electron transfer between atoms", "Elektronenübergang zwischen Atomen"))}>
           {/* attraction between neighbouring ions */}
           <AnimatePresence>
             {phase === "done" &&
@@ -161,10 +161,10 @@ export function IonicBondsTransfer() {
             const noble = charges[i] !== 0 ? nobleFor(electrons) : undefined;
             return (
               <g key={`${setup.id}-label-${i}`}>
-                <text x={cx(i)} y={TOP + SIZE + 26} textAnchor="middle" className="fill-ink font-math" style={{ fontSize: 24 }}>
+                <text x={cx(i)} y={TOP + SIZE + 28} textAnchor="middle" className="fill-ink font-math" style={{ fontSize: 30 }}>
                   {supCharge(ion.symbol, charges[i])}
                 </text>
-                <text x={cx(i)} y={TOP + SIZE + 52} textAnchor="middle" className="fill-ink-3" style={{ fontSize: 15 }}>
+                <text x={cx(i)} y={TOP + SIZE + 58} textAnchor="middle" className="fill-ink-3" style={{ fontSize: 19 }}>
                   {layers.join(" · ")}
                   {noble && ` = ${noble.symbol}`}
                 </text>
