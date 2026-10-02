@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
   Clock3,
+  Database,
   ExternalLink,
   LogIn,
   RefreshCw,
@@ -24,6 +25,7 @@ import { CopyButton } from "@/components/oauth/Copy";
 import { TopBar } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/Button";
 import { useLocale, useMessages } from "@/i18n/client";
+import { formatBytes } from "@/i18n/format";
 import { adminText } from "@/i18n/messages/admin";
 import { oauthText } from "@/i18n/messages/oauth";
 import { APP_TABS, type AdminApp, type AppEvent, type AppTab, type Connection, type EventKind, type Person, type SignInStats } from "@/lib/oauth/admin-types";
@@ -46,10 +48,11 @@ type Props = {
   issuer: string;
   endpoints: Record<string, string>;
   initialTab: Tab;
+  storage: { people: number; keys: number; bytes: number };
 };
 
 /** /admin/apps/[id]: one app with Overview, Settings, People and Integration tabs. */
-export function AppView({ app, stats, events, connections, people, issuer, endpoints, initialTab }: Props) {
+export function AppView({ app, stats, events, connections, people, issuer, endpoints, initialTab, storage }: Props) {
   const t = useMessages(adminText);
   const locale = useLocale();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -137,7 +140,7 @@ export function AppView({ app, stats, events, connections, people, issuer, endpo
             transition={{ type: "spring", stiffness: 420, damping: 36 }}
             className="pt-6"
           >
-            {tab === "overview" && <Overview stats={stats} events={events} people={people} connected={active.length} />}
+            {tab === "overview" && <Overview stats={stats} events={events} people={people} connected={active.length} storage={app.scopes.includes("data") || storage.keys ? storage : null} />}
             {tab === "settings" && <AppSettings app={app} />}
             {tab === "people" && (
               <PeopleList app={app} connections={active} people={people} onRemoved={(id) => setRemoved((r) => [...r, id])} onRestore={(id) => setRemoved((r) => r.filter((x) => x !== id))} />
@@ -161,15 +164,36 @@ const EVENT_ICONS: Record<EventKind, LucideIcon> = {
   reuse: ShieldAlert,
 };
 
-function Overview({ stats, events, people, connected }: { stats: SignInStats; events: AppEvent[]; people: Record<string, Person>; connected: number }) {
+function Overview({
+  stats,
+  events,
+  people,
+  connected,
+  storage,
+}: {
+  stats: SignInStats;
+  events: AppEvent[];
+  people: Record<string, Person>;
+  connected: number;
+  storage: Props["storage"] | null;
+}) {
   const t = useMessages(adminText);
   const locale = useLocale();
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className={cn("grid grid-cols-2 gap-3", storage ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
         <StatTile icon={<Users />} label={t.detail.people} value={connected} sub={t.detail.peopleSub} />
         <StatTile icon={<LogIn />} label={t.stats.signIns} value={stats.today} sub={t.stats.signInsSub(stats.week)} delay={0.04} />
-        <div className="col-span-2 lg:col-span-1">
+        {storage && (
+          <StatTile
+            icon={<Database />}
+            label={t.detail.storage}
+            value={formatBytes(storage.bytes, locale)}
+            sub={t.detail.storageSub(storage.people, storage.keys)}
+            delay={0.06}
+          />
+        )}
+        <div className={cn(!storage && "col-span-2 lg:col-span-1")}>
           <StatTile icon={<TriangleAlert />} label={t.stats.errors} value={stats.errors} sub={<ErrorsNote count={stats.errors} />} delay={0.08} />
         </div>
       </div>

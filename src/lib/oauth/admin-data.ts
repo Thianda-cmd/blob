@@ -168,12 +168,29 @@ export async function adminAppDetail(id: string) {
     }
   };
 
+  // What the app keeps in Blob for people (scope "data"): sizes only, never the values.
+  const storage = { people: 0, keys: 0, bytes: 0 };
+  const loadStorage = async () => {
+    const owners = new Set<string>();
+    for (let from = 0; from < 100 * PAGE; from += PAGE) {
+      const { data: rows } = await db.from("oauth_app_data").select("user_id, size").eq("app_id", id).range(from, from + PAGE - 1);
+      for (const r of rows ?? []) {
+        owners.add(r.user_id as string);
+        storage.keys += 1;
+        storage.bytes += r.size as number;
+      }
+      if (!rows || rows.length < PAGE) break;
+    }
+    storage.people = owners.size;
+  };
+
   const [stats, eventsRes] = await Promise.all([
     signInStats(id),
     db.from("oauth_events").select("id, kind, user_id, detail, created_at").eq("app_id", id).order("id", { ascending: false }).limit(40),
     loadConnections(),
+    loadStorage(),
   ]);
   const events = (eventsRes.data ?? []) as AppEvent[];
   const people = await peopleInfo([...connections.map((c) => c.user_id), ...events.map((e) => e.user_id)]);
-  return { app, stats, events, connections, people };
+  return { app, stats, events, connections, people, storage };
 }

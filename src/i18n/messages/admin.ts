@@ -149,6 +149,8 @@ export const adminText = defineMessages({
       tabsLabel: "App sections",
       people: "People connected",
       peopleSub: "With access right now",
+      storage: "Stored data",
+      storageSub: (people: number, keys: number) => `${people === 1 ? "1 person" : `${people} people`} · ${keys === 1 ? "1 key" : `${keys} keys`}`,
     },
     events: {
       title: "Recent events",
@@ -390,6 +392,8 @@ export const adminText = defineMessages({
       tabsLabel: "Bereiche der App",
       people: "Verbundene Personen",
       peopleSub: "Mit Zugriff im Moment",
+      storage: "Gespeicherte Daten",
+      storageSub: (people, keys) => `${people === 1 ? "1 Person" : `${people} Personen`} · ${keys === 1 ? "1 Schlüssel" : `${keys} Schlüssel`}`,
     },
     events: {
       title: "Letzte Ereignisse",

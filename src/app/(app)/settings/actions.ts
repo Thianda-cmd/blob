@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
 import { getMessages } from "@/i18n/server";
 import { sessionUser } from "@/lib/oauth/session";
+import { deleteAppData } from "@/lib/oauth/data";
 import { revokeGrant } from "@/lib/oauth/tokens";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, getUser } from "@/lib/supabase/server";
@@ -77,10 +78,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * Settings › Connected apps: removes the signed-in person's own access for one app
  * ("Sign in with Blob"). The app is signed out and has to ask again next time.
  */
-export async function removeConnectedApp(appId: unknown): Promise<{ ok: boolean }> {
+export async function removeConnectedApp(appId: unknown, deleteData?: unknown): Promise<{ ok: boolean }> {
   if (typeof appId !== "string" || !UUID.test(appId)) return { ok: false };
   const user = await sessionUser();
   if (!user) return { ok: false };
+  if (deleteData === true) await deleteAppData(user.id, appId);
   // Only the person's own, still active grant.
   const { data: grant } = await createAdminClient()
     .from("oauth_grants")
@@ -91,6 +93,16 @@ export async function removeConnectedApp(appId: unknown): Promise<{ ok: boolean 
     .maybeSingle();
   if (!grant) return { ok: true };
   await revokeGrant(user.id, appId);
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+/** Settings › Connected apps: deletes everything one app keeps in Blob for the signed-in person. */
+export async function deleteConnectedAppData(appId: unknown): Promise<{ ok: boolean }> {
+  if (typeof appId !== "string" || !UUID.test(appId)) return { ok: false };
+  const user = await sessionUser();
+  if (!user) return { ok: false };
+  await deleteAppData(user.id, appId);
   revalidatePath("/settings");
   return { ok: true };
 }

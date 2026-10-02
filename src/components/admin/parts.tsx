@@ -19,7 +19,7 @@ export function AdminPage({ children }: { children: ReactNode }) {
   );
 }
 
-export function StatTile({ label, value, sub, icon, delay = 0 }: { label: string; value: number; sub?: ReactNode; icon: ReactNode; delay?: number }) {
+export function StatTile({ label, value, sub, icon, delay = 0 }: { label: string; value: number | string; sub?: ReactNode; icon: ReactNode; delay?: number }) {
   const locale = useLocale();
   return (
     <motion.div
@@ -32,7 +32,7 @@ export function StatTile({ label, value, sub, icon, delay = 0 }: { label: string
         {icon}
         <span className="min-w-0">{label}</span>
       </div>
-      <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.025em] text-ink">{formatNumber(value, locale)}</div>
+      <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.025em] text-ink">{typeof value === "number" ? formatNumber(value, locale) : value}</div>
       {sub && <div className="mt-2 flex items-center gap-1 text-[12px] leading-snug text-ink-3">{sub}</div>}
     </motion.div>
   );
