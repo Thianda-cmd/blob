@@ -278,9 +278,11 @@ function scaledBy(U: Poly, T: Poly): number | null {
 // ---------------------------------------------------------------------------
 // Numbers
 
-const fmtNum = (v: number) => String(Math.round(v * 1e6) / 1e6).replace(".", ",");
+const fmtEn = (v: number) => String(Math.round(v * 1e6) / 1e6);
+const fmtNum = (v: number) => fmtEn(v).replace(".", ",");
 
-export function diagnoseNumber(value: number, target: number): Diagnosis | null {
+/** `percent`: the answer is a percentage (×100 slips get a percent hint). `fraction`: a two-box fraction (no decimal point to slip). */
+export function diagnoseNumber(value: number, target: number, ctx: { percent?: boolean; fraction?: boolean } = {}): Diagnosis | null {
   if (target !== 0 && nearly(value, -target)) {
     return {
       title: tx("Wrong sign", "Falsches Vorzeichen"),
@@ -290,15 +292,30 @@ export function diagnoseNumber(value: number, target: number): Diagnosis | null 
   }
   for (const k of [1, 2, 3, -1, -2, -3]) {
     if (target !== 0 && nearly(value, target * 10 ** k)) {
-      const hundred = Math.abs(k) === 2;
+      const times = 10 ** Math.abs(k);
+      const big = k > 0;
+      if (ctx.fraction) {
+        return {
+          title: big ? tx(`${times} times too big`, `${times}-mal zu groß`) : tx(`${times} times too small`, `${times}-mal zu klein`),
+          say: tx(
+            `Your fraction is exactly ${times} times too ${big ? "big" : "small"}. Where did a factor of ${times} sneak in?`,
+            `Dein Bruch ist genau ${times}-mal zu ${big ? "groß" : "klein"}. Wo hat sich ein Faktor ${times} eingeschlichen?`,
+          ),
+          close: true,
+        };
+      }
       return {
         title: tx("Decimal point slipped", "Komma verrutscht"),
-        say: hundred
-          ? tx(
-              "Your digits are right, but it's 100 times off. Percent means per hundred: did you forget to divide (or multiply) by 100?",
-              "Deine Ziffern stimmen, aber es ist 100-mal daneben. Prozent heißt „von Hundert“: Hast du vergessen, durch 100 zu teilen (oder mal 100 zu rechnen)?",
-            )
-          : tx("Your digits are right, but the decimal point slipped. Check the place value.", "Deine Ziffern stimmen, aber das Komma ist verrutscht. Prüf die Stellenwerte."),
+        say:
+          Math.abs(k) === 2 && ctx.percent
+            ? tx(
+                "Your digits are right, but it's 100 times off. Percent means per hundred: did you forget to divide (or multiply) by 100?",
+                "Deine Ziffern stimmen, aber es ist 100-mal daneben. Prozent heißt „von Hundert“: Hast du vergessen, durch 100 zu teilen (oder mal 100 zu rechnen)?",
+              )
+            : tx(
+                `Your digits are right, but it's ${times} times too ${big ? "big" : "small"}. The decimal point slipped somewhere: check the place value.`,
+                `Deine Ziffern stimmen, aber es ist ${times}-mal zu ${big ? "groß" : "klein"}. Irgendwo ist das Komma verrutscht: Prüf die Stellenwerte.`,
+              ),
         close: true,
       };
     }
@@ -313,12 +330,13 @@ export function diagnoseNumber(value: number, target: number): Diagnosis | null 
     };
   }
   const rel = Math.abs(value - target) / Math.max(1e-9, Math.abs(target));
-  if (rel < 0.02 && !nearly(value, target)) {
+  if (rel < 0.01 && !nearly(value, target)) {
+    // Close, but a small gap can also be a real slip (19,95 instead of 20), so don't blame rounding outright.
     return {
       title: tx("Very close", "Ganz nah dran"),
       say: tx(
-        `Really close! ${fmtNum(value)} is almost it. Did you round too early? Keep more decimals until the very end.`,
-        `Echt nah dran! ${fmtNum(value)} ist fast richtig. Hast du zu früh gerundet? Rechne bis zum Schluss mit mehr Nachkommastellen.`,
+        `Really close, but not quite. Go over your last steps once more. If you rounded along the way, keep more decimals until the very end.`,
+        `Echt nah dran, aber noch nicht ganz. Geh deine letzten Schritte noch mal durch. Falls du zwischendurch gerundet hast: Rechne bis zum Schluss mit mehr Nachkommastellen.`,
       ),
       close: true,
     };
@@ -366,7 +384,7 @@ export function diagnoseFraction(n: number, d: number, spec: Extract<AnswerSpec,
       close: true,
     };
   }
-  return diagnoseNumber(value, target) ?? null;
+  return diagnoseNumber(value, target, { fraction: true }) ?? null;
 }
 
 export function diagnoseSolutions(got: number[], want: number[], variable: string): Diagnosis | null {
@@ -388,7 +406,7 @@ export function diagnoseSolutions(got: number[], want: number[], variable: strin
     return {
       title: tx("One value doesn't fit", "Ein Wert passt nicht"),
       say: tx(
-        `$${variable} = ${fmtNum(right[0])}$ works, nice! But try putting $${variable} = ${fmtNum(w)}$ back in: it doesn't come out right.`,
+        `$${variable} = ${fmtEn(right[0])}$ works, nice! But try putting $${variable} = ${fmtEn(w)}$ back in: it doesn't come out right.`,
         `$${variable} = ${fmtNum(right[0])}$ passt, super! Aber setz mal $${variable} = ${fmtNum(w)}$ ein: Das geht nicht auf.`,
       ),
       close: true,
@@ -405,7 +423,7 @@ export function diagnoseSolutions(got: number[], want: number[], variable: strin
     return {
       title: tx("One more to find", "Eine fehlt noch"),
       say: tx(
-        `$${variable} = ${fmtNum(right[0])}$ is right! But there's a second solution hiding. Don't forget the $\\pm$.`,
+        `$${variable} = ${fmtEn(right[0])}$ is right! But there's a second solution hiding. Don't forget the $\\pm$.`,
         `$${variable} = ${fmtNum(right[0])}$ stimmt! Aber da versteckt sich noch eine zweite Lösung. Denk an das $\\pm$.`,
       ),
       close: true,
@@ -472,14 +490,36 @@ export function diagnosePair(a: number, b: number, spec: Extract<AnswerSpec, { k
       close: true,
     };
   }
+  if ((x !== 0 || y !== 0) && nearly(a, -x) && nearly(b, -y)) {
+    return {
+      title: tx("Both signs flipped", "Beide Vorzeichen falsch"),
+      say: tx(
+        `The sizes are right, but both signs are the wrong way round. Where did a minus get lost?`,
+        `Die Beträge stimmen, aber beide Vorzeichen sind verdreht. Wo ist ein Minus verloren gegangen?`,
+      ),
+      close: true,
+    };
+  }
+  // A value typed rounded (0,67 for 2/3): right idea, just not exact.
+  const rounded = (got: number, want: number) => !nearly(got, want) && !Number.isInteger(want) && Math.abs(got - want) < 0.006 * Math.max(1, Math.abs(want));
+  const okA = nearly(a, x) || rounded(a, x);
+  const okB = nearly(b, y) || rounded(b, y);
+  if (okA && okB && (rounded(a, x) || rounded(b, y))) {
+    const which = rounded(a, x) ? n0 : n1;
+    return {
+      title: tx("Rounded", "Gerundet"),
+      say: tx(
+        `Nearly exact! ${name(which, "en")} is rounded, though. Type the exact value, for example as a fraction like $2/3$.`,
+        `Fast exakt! ${name(which, "de")} ist aber gerundet. Gib den genauen Wert ein, zum Beispiel als Bruch wie $2/3$.`,
+      ),
+      close: true,
+    };
+  }
   if (nearly(a, x) !== nearly(b, y)) {
     const [ok, notOk] = nearly(a, x) ? [n0, n1] : [n1, n0];
     return {
       title: tx("One is right", "Einer stimmt"),
-      say: tx(
-        `${name(ok, "en")} is right! Now check ${name(notOk, "en")} once more, e.g. by putting both back in.`,
-        `${name(ok, "de")} stimmt! Jetzt prüf ${name(notOk, "de")} noch mal, z. B. indem du beide wieder einsetzt.`,
-      ),
+      say: tx(`${name(ok, "en")} is right! Now check ${name(notOk, "en")} once more.`, `${name(ok, "de")} stimmt! Jetzt prüf ${name(notOk, "de")} noch mal.`),
       close: true,
     };
   }

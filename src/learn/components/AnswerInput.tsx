@@ -364,7 +364,8 @@ export function AnswerInput({
         <div className="grid gap-2 sm:grid-cols-2">
           {spec.options.map((opt, i) => {
             const picked = choice === i;
-            const right = status !== "idle" && i === spec.correct;
+            // After a wrong pick only the pick turns red; the right option shows once it's solved or revealed.
+            const right = i === spec.correct && (status === "correct" || (status === "wrong" && disabled));
             const wrong = status === "wrong" && picked && i !== spec.correct;
             return (
               <motion.button

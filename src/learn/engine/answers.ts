@@ -88,7 +88,7 @@ function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
     }
     case "expr": {
       if (answer.kind !== "text") return { correct: false };
-      const user = parse(answer.text);
+      const user = parse(stripPrefix(answer.text, spec.prefix));
       if (!user.ok) return { correct: false, message: user.error };
       const target = parse(spec.value);
       if (!target.ok) return { correct: false, message: tx("This exercise has a typo. Skip it.", "Diese Aufgabe hat einen Fehler. Überspring sie.") };
@@ -163,6 +163,7 @@ export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: 
     if (m.when.kind !== spec.kind || !checkCore(m.when, answer).correct) continue;
     return {
       correct: false,
+      partial: m.close ?? (general?.close || core.partial),
       title: m.title ?? general?.title ?? core.title ?? tx("I see what happened", "Ich seh, was passiert ist"),
       message: m.say,
       mark: general?.mark ?? core.mark ?? markOf(spec, answer),
@@ -172,9 +173,17 @@ export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: 
   return core;
 }
 
+/** "y = 2x + 1" typed into a box that already says "y =": drop the repeated left side. */
+function stripPrefix(text: string, prefix?: Text): string {
+  const left = resolveText(prefix, "en").match(/^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*$/);
+  if (!left) return text;
+  const m = text.match(new RegExp(`^\\s*${left[1]}\\s*=(.*)$`));
+  return m ? m[1] : text;
+}
+
 function markOf(spec: AnswerSpec, answer: AnswerValue): string | undefined {
   if (spec.kind !== "expr" || answer.kind !== "text") return undefined;
-  const p = parse(answer.text);
+  const p = parse(stripPrefix(answer.text, spec.prefix));
   return p.ok ? toDisplay(p.ast) : undefined;
 }
 
@@ -185,7 +194,7 @@ function diagnose(spec: AnswerSpec, answer: AnswerValue): Diagnosis | null {
     case "number": {
       if (answer.kind !== "text") return null;
       const v = numberReadings(answer.text, spec.unit)[0];
-      return v === undefined ? null : diagnoseNumber(v, spec.value);
+      return v === undefined ? null : diagnoseNumber(v, spec.value, { percent: resolveText(spec.unit, "en").includes("%") });
     }
     case "fraction": {
       if (answer.kind !== "fraction") return null;

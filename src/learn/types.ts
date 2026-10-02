@@ -73,7 +73,13 @@ export type Feedback = {
  * e.g. forgetting the middle term of (a + b)². Matched with the normal checker, so `when`
  * is an AnswerSpec of the same kind ("expr" matches by value).
  */
-export type Mistake = { when: AnswerSpec; title?: Text; say: Text };
+export type Mistake = {
+  when: AnswerSpec;
+  title?: Text;
+  say: Text;
+  /** A near miss (one zero missing, a rounding slip): Blob looks thoughtful instead of worried. */
+  close?: boolean;
+};
 
 export type Exercise = {
   /** Short instruction, e.g. "Expand and simplify". */
