@@ -9,7 +9,11 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 a
 - **Auth**: sign up with email confirmation, password sign-in, magic links, forgot/reset password, change email/password, sign out everywhere, delete account. Blob watches you type and covers its eyes for passwords.
 - **Onboarding**: name, school, subjects and theme in three steps; creates a welcome note and a first task.
 - **Notes**: Tiptap editor with `/` commands, formatting bubble, checklists, callouts, images (paste/drop/upload), sub-pages, outline, autosave.
-- **Learning center** (`/learn`): 12 maths topics (Klammern auflösen, Ausmultiplizieren, Formeln umstellen, Bruchrechnung, Potenzen und Wurzeln, Prozentrechnung, Gleichungen und Ungleichungen, Lineare Gleichungssysteme, pq-Formel, Geraden, Textaufgaben, Textaufgaben mit Unbekannten). Each has a guided lesson with Blob as tutor (animated step-by-step boards, interactive widgets, checks), endless adaptive practice in three levels, a graded quick test and a printable cheat sheet. XP, daily goal, streaks and mastery are saved per topic.
+- **Learning center** (`/learn`), in maths and chemistry, 12 topics each:
+  - Maths: Klammern auflösen, Ausmultiplizieren, Formeln umstellen, Bruchrechnung, Potenzen und Wurzeln, Prozentrechnung, Gleichungen und Ungleichungen, Lineare Gleichungssysteme, pq-Formel, Geraden, Textaufgaben, Textaufgaben mit Unbekannten.
+  - Chemistry: Teilchenmodell, Stoffgemische, Atombau, Periodensystem, Ionenbindung, Elektronenpaarbindung, Chemische Reaktionen, Reaktionsgleichungen, Säuren und Basen, Redoxreaktionen, Stoffmenge, Alkane.
+  - Each topic has a guided lesson with Blob as tutor (animated step-by-step boards, interactive widgets, checks), endless adaptive practice in three levels, a graded quick test and a printable cheat sheet. XP, daily goal, streaks and mastery are saved per topic.
+  - Blob reads wrong answers and says what probably went wrong ("expanded, but not simplified yet", "the 2 belongs to the whole OH group", "count the O atoms"): generic diagnoses in `src/learn/engine/diagnose.ts` and `src/learn/chemistry/check.ts`, plus each topic's typical misconceptions (`mistakes`), simulated from the task's own numbers.
 - **Presentations**: 17 layouts (incl. stats, timeline, compare, formula), 10 themes plus a custom theme editor, slide transitions (incl. morph), click-by-click builds, drag-to-reorder, and a presenter (`/present/[id]`) with speaker view, second window, overview, laser and black/white screen.
 - **Tasks**: quick add with natural dates (`Bio test fri #biology`), groups by due date, two-week heatmap, jelly check-off animation.
 - **Subjects**, **favorites**, **trash** with restore, **⌘K** search across titles and note contents, light/dark/system themes.
@@ -71,6 +75,7 @@ src/app/(app)         the signed-in workspace (home, notes /p/[id], tasks, subje
 src/app/present       fullscreen presenter
 src/app/study         full-screen lessons, practice and tests
 src/learn             learning center: engine (maths parser, checker, display language), players, topics
+src/learn/chemistry   elements, formula and equation parser, chemistry checkers, visuals, topics
 src/app/onboarding    first-run flow
 src/app/auth          PKCE callback and sign out route
 src/components/blob   the mascot, intro animation, loaders, helper and event bus
@@ -86,6 +91,6 @@ scripts               build-time migrations, auth/email configuration
 
 ### Adding a learning topic
 
-Topic metadata lives in `src/learn/catalog.ts`; the content (lesson, cheat sheet and the seeded exercise generator) is one file per topic in `src/learn/topics/`. Maths is written in a small display language (`src/learn/engine/display.ts`) where tokens keep keys, so they glide between the steps of a worked solution. All student-facing text sits in those files, ready for translation.
+Topic metadata lives in `src/learn/catalog.ts` (with its subject); the content (lesson, cheat sheet, seeded exercise generator and typical mistakes) is one file per topic in `src/learn/topics/` (maths) or `src/learn/chemistry/topics/` (chemistry). Chemical notation uses `\ce{…}` inside the display language (`\ce{2H2 + O2 -> 2H2O}`, `\ce{SO4^2-}`). Maths is written in a small display language (`src/learn/engine/display.ts`) where tokens keep keys, so they glide between the steps of a worked solution. All student-facing text sits in those files, ready for translation.
 
 All tables use row-level security, so every user can only read and write their own rows. Images go to the `uploads` storage bucket under the user's own folder.
