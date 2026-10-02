@@ -10,7 +10,7 @@ import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -451,6 +451,831 @@ function sciCalcFrames(a1: number, e1: number, a2: number, e2: number, div: bool
 }
 
 // ---------------------------------------------------------------------------
+// Typical mistakes, simulated from the task's numbers: each wrong answer is
+// exactly what a student with that misconception gets. A mistake is only kept
+// when it differs from the right answer and from the ones before it.
+
+const sameValue = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
+
+function sameAnswer(a: AnswerSpec, b: AnswerSpec): boolean {
+  if (a.kind === "number" && b.kind === "number") return sameValue(a.value, b.value, 1e-6);
+  if (a.kind === "fraction" && b.kind === "fraction") return sameValue(a.n / a.d, b.n / b.d, 1e-9);
+  if (a.kind === "pair" && b.kind === "pair") return a.values.every((v, i) => sameValue(v, b.values[i], 1e-4));
+  return false;
+}
+
+/** A value a student could actually type: finite, not absurdly big or tiny. */
+const typeable = (v: number) => Number.isFinite(v) && Math.abs(v) < 1e7 && (v === 0 || Math.abs(v) >= 1e-6);
+
+function usable(s: AnswerSpec): boolean {
+  if (s.kind === "number") return typeable(s.value);
+  if (s.kind === "fraction") return Number.isInteger(s.n) && Number.isInteger(s.d) && s.d !== 0 && Math.abs(s.n) < 1e7 && Math.abs(s.d) < 1e7;
+  if (s.kind === "pair") return s.values.every(typeable);
+  return false;
+}
+
+type AddMistake = (when: AnswerSpec, title: Text, say: Text) => void;
+
+/** The typical mistakes for one answer, in the order given (first match wins). */
+function collect(right: AnswerSpec, fill: (add: AddMistake) => void): Mistake[] {
+  const list: Mistake[] = [];
+  fill((when, title, say) => {
+    if (list.length >= 5 || !usable(when) || sameAnswer(when, right) || list.some((m) => sameAnswer(m.when, when))) return;
+    list.push({ when, title, say });
+  });
+  return list;
+}
+
+const asNum = (value: number): AnswerSpec => ({ kind: "number", value });
+const asFrac = (n: number, d: number): AnswerSpec => ({ kind: "fraction", n, d });
+const pairOf =
+  (names: [string, string]) =>
+  (a: number, b: number): AnswerSpec => ({ kind: "pair", names, values: [a, b] });
+
+// Titles and lines shared by several shapes.
+const T_BASE_TIMES = tx("Base times exponent", "Basis mal Exponent");
+const T_EXP_MUL = tx("Exponents multiplied", "Exponenten multipliziert");
+const T_EXP_ADD = tx("Added instead of subtracted", "Addiert statt subtrahiert");
+const T_EXP_DIV = tx("Exponents divided", "Exponenten dividiert");
+const T_POW_ADD = tx("Added instead of multiplied", "Addiert statt multipliziert");
+const T_ORDER = tx("Subtracted the wrong way round", "Andersrum subtrahiert");
+const T_LOST_MINUS = tx("Minus in the exponent lost", "Minus im Exponenten verloren");
+const T_MINUS_MINUS = tx("Minus a negative", "Minus minus");
+const T_COUNT_MINUS = tx("Count the minus signs", "Zähl die Minuszeichen");
+const T_NOT_NEG = tx("Not a negative number", "Keine negative Zahl");
+const T_NEG_IGNORED = tx("Negative exponent ignored", "Negativen Exponenten übersehen");
+const T_HALF = tx("A root isn't half", "Wurzel ist nicht die Hälfte");
+const T_ROOT_LEFT = tx("Root not taken yet", "Wurzel noch nicht gezogen");
+const T_PLACES = tx("Count places, not zeros", "Stellen zählen, nicht Nullen");
+const T_ZEROS = tx("Counted the zeros", "Nullen gezählt");
+const T_DIRECTION = tx("Wrong direction", "Falsche Richtung");
+
+const EXP_MUL = tx(
+  "Ah, I see what happened! You multiplied the exponents. That's the rule for a power of a power, $(a^m)^n$. Here powers are multiplied with each other, so the exponents are **added**.",
+  "Ah, ich seh, was passiert ist! Du hast die Exponenten multipliziert. Das ist die Regel für eine Potenz einer Potenz, $(a^m)^n$. Hier werden Potenzen miteinander multipliziert, also werden die Exponenten **addiert**.",
+);
+const EXP_ADD = tx(
+  "Ah, I see what happened! You added the exponents, like for a product. But here the powers are **divided**, so you subtract them.",
+  "Ah, ich seh, was passiert ist! Du hast die Exponenten addiert, wie beim Multiplizieren. Hier wird aber **dividiert**, also subtrahierst du sie.",
+);
+const EXP_DIV = tx(
+  "I think I know what you did: you divided the exponents. But when you divide powers with the same base, you **subtract** them.",
+  "Ich glaub, ich weiß, was du gemacht hast: Du hast die Exponenten geteilt. Beim Dividieren von Potenzen mit gleicher Basis werden sie aber **subtrahiert**.",
+);
+const NOT_NEG = tx(
+  "Ooh, classic trap! A negative exponent doesn't make the number negative. It means **one divided by** the power.",
+  "Ooh, die klassische Falle! Ein negativer Exponent macht die Zahl nicht negativ. Er bedeutet: **eins geteilt durch** die Potenz.",
+);
+const NOT_NEG_FLIP = tx(
+  "Careful! A negative exponent never makes the result negative. It flips the fraction, that's all.",
+  "Vorsicht! Ein negativer Exponent macht das Ergebnis nie negativ. Er dreht den Bruch um, mehr nicht.",
+);
+
+const order = (frac: boolean) =>
+  frac
+    ? tx(
+        "Nearly! You subtracted the wrong way round. It's always the exponent on top minus the exponent below.",
+        "Fast! Du hast andersrum subtrahiert. Es ist immer der Exponent oben minus der Exponent unten.",
+      )
+    : tx(
+        "Nearly! You subtracted the wrong way round. It's always the exponent of the first power minus the exponent of the second.",
+        "Fast! Du hast andersrum subtrahiert. Es ist immer der Exponent der ersten Potenz minus der Exponent der zweiten.",
+      );
+
+/** "You calculated 2 · 5. But 2^5 means 5 factors 2." */
+const baseTimes = (B: string, n: number) =>
+  tx(
+    `I think I know what you did: you calculated $${B} \\cdot ${n}$. But $${pp(B, n)}$ means $${n}$ factors $${B}$, multiplied together.`,
+    `Ich glaub, ich weiß, was du gemacht hast: Du hast $${B} \\cdot ${n}$ gerechnet. Aber $${pp(B, n)}$ bedeutet $${n}$ Faktoren $${B}$, miteinander multipliziert.`,
+  );
+
+/** Rule applied right, then b^r taken as b · r. */
+const ruleThenTimes = (b: number, r: number) =>
+  tx(
+    `The power rule worked, nice! But $${pp(b, r)}$ means $${r}$ factors $${b}$, not $${b} \\cdot ${r}$.`,
+    `Das Potenzgesetz hast du richtig angewendet, stark! Aber $${pp(b, r)}$ bedeutet $${r}$ Faktoren $${b}$, nicht $${b} \\cdot ${r}$.`,
+  );
+
+const countMinus = (n: number, B: string) =>
+  n % 2 === 0
+    ? tx(
+        `Nearly! Count the minus signs: $${n}$ factors $${B}$ means $${n}$ minus signs, and every two of them make a plus.`,
+        `Fast! Zähl die Minuszeichen: $${n}$ Faktoren $${B}$ heißt $${n}$ Minuszeichen, und je zwei davon ergeben Plus.`,
+      )
+    : tx(
+        `Nearly! Count the minus signs: $${n}$ factors $${B}$ means $${n}$ minus signs. Two at a time make a plus, but one is left over.`,
+        `Fast! Zähl die Minuszeichen: $${n}$ Faktoren $${B}$ heißt $${n}$ Minuszeichen. Je zwei ergeben Plus, aber eins bleibt übrig.`,
+      );
+
+const lostMinusAdd = (v: string, neg: number) =>
+  tx(
+    `Careful with the negative exponent! $${pp(v, neg)}$ adds $${neg}$, so the exponent goes **down** by $${-neg}$.`,
+    `Vorsicht beim negativen Exponenten! Bei $${pp(v, neg)}$ addierst du $${neg}$, der Exponent wird also um $${-neg}$ **kleiner**.`,
+  );
+
+const loneTitle = (v: string) => tx(`The lone ${v} counts too`, /^\d/.test(v) ? `Die einzelne ${v} zählt mit` : `Das einzelne ${v} zählt mit`);
+const loneSay = (v: string) =>
+  tx(
+    `Nearly! The lone $${v}$ is $${v}^1$, so it adds $1$ to the exponent too.`,
+    `Fast! ${/^\d/.test(v) ? "Die einzelne" : "Das einzelne"} $${v}$ ist $${v}^1$, also kommt beim Exponenten noch $1$ dazu.`,
+  );
+
+const powAdd = (v: string, e1: number, k: number) =>
+  tx(
+    `Ah, I see what happened! In $(${pp(v, e1)})^{${k}}$ you added the exponents. But a power of a power means $${pp(v, e1)}$ taken $${k}$ times, so the exponents are **multiplied**.`,
+    `Ah, ich seh, was passiert ist! Bei $(${pp(v, e1)})^{${k}}$ hast du die Exponenten addiert. Eine Potenz einer Potenz heißt aber: $${pp(v, e1)}$ wird $${k}$-mal mit sich selbst multipliziert, also werden die Exponenten **multipliziert**.`,
+  );
+
+const half = (x: string) =>
+  tx(
+    `Ah, I see what happened: you halved $${x}$. But the root asks which number **times itself** gives $${x}$.`,
+    `Ah, ich seh, was passiert ist: Du hast $${x}$ halbiert. Aber die Wurzel fragt, welche Zahl **mal sich selbst** $${x}$ ergibt.`,
+  );
+
+/** b^n, (−b)^n and −b^n worked out. */
+function powerValueMistakes(b: number, n: number, minusTrap: boolean): Mistake[] {
+  if (minusTrap) {
+    return collect(asNum(-(b ** n)), (add) => {
+      add(
+        asNum(b ** n),
+        tx("Minus taken into the power", "Minus mitpotenziert"),
+        tx(
+          `Ooh, classic trap! Without brackets the exponent belongs only to the $${b}$. The minus isn't raised to the power, it just stays in front.`,
+          `Ooh, die klassische Falle! Ohne Klammern gehört der Exponent nur zur $${b}$. Das Minus wird nicht mitpotenziert, es bleibt einfach davor.`,
+        ),
+      );
+      add(asNum(-b * n), T_BASE_TIMES, baseTimes(String(b), n));
+    });
+  }
+  const B = par(b);
+  return collect(asNum(b ** n), (add) => {
+    if (b < 0) add(asNum(-(b ** n)), T_COUNT_MINUS, countMinus(n, B));
+    add(asNum(b * n), T_BASE_TIMES, baseTimes(B, n));
+    if (b > 0)
+      add(
+        asNum(n ** b),
+        tx("Base and exponent swapped", "Basis und Exponent vertauscht"),
+        tx(
+          `Ah, I see what happened! You calculated $${pp(n, b)}$. In $${pp(b, n)}$ the $${b}$ is the factor, and the $${n}$ counts how often it appears.`,
+          `Ah, ich seh, was passiert ist! Du hast $${pp(n, b)}$ gerechnet. Bei $${pp(b, n)}$ ist die $${b}$ der Faktor, und die $${n}$ zählt, wie oft er vorkommt.`,
+        ),
+      );
+    if (n > 2 && Math.abs(b) !== 1)
+      add(
+        asNum(b ** (n - 1)),
+        tx("One factor short", "Ein Faktor zu wenig"),
+        tx(
+          `Nearly! That's $${pp(B, n - 1)}$: one factor is missing. $${pp(B, n)}$ has exactly $${n}$ factors $${B}$, so count them once more.`,
+          `Fast! Das ist $${pp(B, n - 1)}$: Ein Faktor fehlt. $${pp(B, n)}$ hat genau $${n}$ Faktoren $${B}$, zähl sie noch mal nach.`,
+        ),
+      );
+  });
+}
+
+/** x^a · x^b · … = x^n: find n. */
+function productMistakes(v: string, exps: number[]): Mistake[] {
+  const total = exps.reduce((s, e) => s + e, 0);
+  const lone = exps.filter((e) => e === 1).length;
+  const neg = exps.find((e) => e < 0);
+  return collect(asNum(total), (add) => {
+    add(
+      asNum(exps.reduce((p, e) => p * e, 1)),
+      T_EXP_MUL,
+      EXP_MUL,
+    );
+    if (lone) add(asNum(total - lone), loneTitle(v), loneSay(v));
+    if (neg !== undefined) add(asNum(exps.reduce((s, e) => s + Math.abs(e), 0)), T_LOST_MINUS, lostMinusAdd(v, neg));
+  });
+}
+
+/** x^e1 : x^e2 = x^n: find n. */
+function quotientMistakes(e1: number, e2: number, frac: boolean): Mistake[] {
+  return collect(asNum(e1 - e2), (add) => {
+    if (e2 > 0) add(asNum(e1 + e2), T_EXP_ADD, EXP_ADD);
+    if (e2 < 0)
+      add(
+        asNum(e1 + e2),
+        T_MINUS_MINUS,
+        tx(
+          `Careful: you're subtracting $${e2}$, a negative number. Minus a negative is **plus**: $${e1} - (${e2})$.`,
+          `Vorsicht: Du ziehst $${e2}$ ab, also eine negative Zahl. Minus minus ergibt **plus**: $${e1} - (${e2})$.`,
+        ),
+      );
+    add(asNum(e2 - e1), T_ORDER, order(frac));
+    if (e1 % e2 === 0) add(asNum(e1 / e2), T_EXP_DIV, EXP_DIV);
+    if (e1 < 0)
+      add(
+        asNum(-e1 - e2),
+        T_LOST_MINUS,
+        tx(
+          `Careful, the first exponent is $${e1}$, so it's negative! Start at $${e1}$ and then subtract.`,
+          `Vorsicht, der erste Exponent ist $${e1}$, also negativ! Fang bei $${e1}$ an und zieh dann ab.`,
+        ),
+      );
+  });
+}
+
+/** b^e1 · b^e2 or b^e1 : b^e2, worked out to a number. */
+function rulesMistakes(b: number, e1: number, e2: number, div: boolean): Mistake[] {
+  const r = div ? e1 - e2 : e1 + e2;
+  return collect(asNum(b ** r), (add) => {
+    if (div) {
+      add(
+        asNum(1),
+        tx("Bases divided too", "Basen auch geteilt"),
+        tx(
+          `Ooh, I see! You divided the bases too: $${b} : ${b} = 1$. But the base stays $${b}$, only the exponents change.`,
+          `Ooh, ich seh's! Du hast auch die Basen geteilt: $${b} : ${b} = 1$. Die Basis bleibt aber $${b}$, nur die Exponenten ändern sich.`,
+        ),
+      );
+      if (e1 % e2 === 0) add(asNum(b ** (e1 / e2)), T_EXP_DIV, EXP_DIV);
+    } else {
+      if (e1 === 1 || e2 === 1) add(asNum(b ** (r - 1)), loneTitle(String(b)), loneSay(String(b)));
+      add(
+        asNum((b * b) ** r),
+        tx("Bases multiplied too", "Basen mitmultipliziert"),
+        tx(
+          `Ah, I see what happened! You multiplied the bases too: $${b} \\cdot ${b} = ${b * b}$. But the base stays $${b}$, only the exponents are added.`,
+          `Ah, ich seh, was passiert ist! Du hast auch die Basen multipliziert: $${b} \\cdot ${b} = ${b * b}$. Die Basis bleibt aber $${b}$, nur die Exponenten werden addiert.`,
+        ),
+      );
+      add(asNum(b ** (e1 * e2)), T_EXP_MUL, EXP_MUL);
+    }
+    add(asNum(b * r), T_BASE_TIMES, ruleThenTimes(b, r));
+  });
+}
+
+/** (x^e1)^k (· x^extra) = x^n: find n. */
+function powerOfPowerMistakes(v: string, e1: number, k: number, extra: number | null): Mistake[] {
+  const x = extra ?? 0;
+  return collect(asNum(e1 * k + x), (add) => {
+    add(asNum(e1 + k + x), T_POW_ADD, powAdd(v, e1, k));
+    if (e1 > 0)
+      add(
+        asNum(e1 ** k + x),
+        tx("Exponent raised to a power", "Exponent potenziert"),
+        tx(
+          `I think I know what you did: you worked out $${pp(e1, k)}$. But $(${pp(v, e1)})^{${k}}$ means $${pp(v, e1)}$ taken $${k}$ times, so it's $${e1} \\cdot ${k}$ in the exponent.`,
+          `Ich glaub, ich weiß, was du gemacht hast: Du hast $${pp(e1, k)}$ gerechnet. Aber $(${pp(v, e1)})^{${k}}$ heißt: $${pp(v, e1)}$ wird $${k}$-mal mit sich selbst multipliziert, im Exponenten steht also $${e1} \\cdot ${k}$.`,
+        ),
+      );
+    if (extra === 1) add(asNum(e1 * k), loneTitle(v), loneSay(v));
+    else if (extra !== null)
+      add(
+        asNum(e1 * k * extra),
+        tx("Multiplied once too often", "Einmal zu viel multipliziert"),
+        tx(
+          `The bracket is right! But $${pp(v, extra)}$ is just one more factor with the same base, so its exponent is **added**, not multiplied.`,
+          `Die Klammer stimmt! Aber $${pp(v, extra)}$ ist einfach ein weiterer Faktor mit gleicher Basis, sein Exponent wird also **addiert**, nicht multipliziert.`,
+        ),
+      );
+    if (e1 < 0)
+      add(
+        asNum(-e1 * k + x),
+        T_LOST_MINUS,
+        tx(
+          `Careful with the sign: the exponent in the bracket is $${e1}$, and $${par(e1)} \\cdot ${k}$ is negative.`,
+          `Vorsicht mit dem Vorzeichen: Der Exponent in der Klammer ist $${e1}$, und $${par(e1)} \\cdot ${k}$ ist negativ.`,
+        ),
+      );
+    if (extra !== null && extra < 0) add(asNum(e1 * k - extra), T_LOST_MINUS, lostMinusAdd(v, extra));
+  });
+}
+
+/** b^{-e} as a fraction. */
+function negPowerMistakes(b: number, e: number): Mistake[] {
+  const P = b ** e;
+  return collect(asFrac(1, P), (add) => {
+    add(asFrac(-1, P), T_NOT_NEG, NOT_NEG);
+    add(
+      asFrac(P, 1),
+      T_NEG_IGNORED,
+      tx(
+        `Nearly! $${pp(b, e)}$ is the right power, but the exponent has a **minus**. That means one divided by the power.`,
+        `Fast! $${pp(b, e)}$ ist die richtige Potenz, aber der Exponent hat ein **Minus**. Das heißt: eins geteilt durch die Potenz.`,
+      ),
+    );
+    add(asFrac(-P, 1), T_NOT_NEG, NOT_NEG);
+    add(
+      asFrac(1, b * e),
+      T_BASE_TIMES,
+      tx(
+        `The **one divided by** part is right! But $${pp(b, e)}$ means $${e}$ factors $${b}$, not $${b} \\cdot ${e}$.`,
+        `Das **eins geteilt durch** stimmt! Aber $${pp(b, e)}$ bedeutet $${e}$ Faktoren $${b}$, nicht $${b} \\cdot ${e}$.`,
+      ),
+    );
+  });
+}
+
+/** 10^{-e} as a decimal. */
+function tenPowerMistakes(e: number): Mistake[] {
+  return collect(asNum(Number(`1e-${e}`)), (add) => {
+    if (e >= 2)
+      add(
+        asNum(Number(`1e-${e + 1}`)),
+        T_PLACES,
+        tx(
+          `Nearly! Count the places, not the zeros: the $1$ itself is one of the $${e}$ places after the comma.`,
+          `Fast! Zähl die Stellen, nicht die Nullen: Die $1$ selbst ist eine der $${e}$ Stellen nach dem Komma.`,
+        ),
+      );
+    add(asNum(-(10 ** e)), T_NOT_NEG, NOT_NEG);
+    add(asNum(-Number(`1e-${e}`)), T_NOT_NEG, NOT_NEG);
+    add(
+      asNum(10 ** e),
+      T_NEG_IGNORED,
+      tx(
+        `You worked out $${pp(10, e)}$, but the exponent is **negative**. A negative exponent means one divided by the power.`,
+        `Du hast $${pp(10, e)}$ ausgerechnet, aber der Exponent ist **negativ**. Ein negativer Exponent bedeutet: eins geteilt durch die Potenz.`,
+      ),
+    );
+  });
+}
+
+/** (1/b)^{-e} as a number. */
+function flipPowerMistakes(b: number, e: number): Mistake[] {
+  return collect(asNum(b ** e), (add) => {
+    add(
+      asNum(1 / b ** e),
+      T_NEG_IGNORED,
+      tx(
+        `You worked out $(\\frac{1}{${b}})^{${e}}$. But the exponent is $-${e}$, and that minus **flips** the fraction first.`,
+        `Du hast $(\\frac{1}{${b}})^{${e}}$ ausgerechnet. Aber der Exponent ist $-${e}$, und dieses Minus **dreht** den Bruch erst um.`,
+      ),
+    );
+    add(asNum(-(b ** e)), T_NOT_NEG, NOT_NEG_FLIP);
+    add(asNum(-1 / b ** e), T_NOT_NEG, NOT_NEG_FLIP);
+    add(
+      asNum(b * e),
+      T_BASE_TIMES,
+      tx(
+        `Flipping the fraction was right! But $${pp(b, e)}$ means $${e}$ factors $${b}$, not $${b} \\cdot ${e}$.`,
+        `Den Bruch umdrehen war richtig! Aber $${pp(b, e)}$ bedeutet $${e}$ Faktoren $${b}$, nicht $${b} \\cdot ${e}$.`,
+      ),
+    );
+  });
+}
+
+/** b^{-e1} · b^{e2} as a number. */
+function negProductMistakes(b: number, e1: number, e2: number): Mistake[] {
+  const r = e2 - e1;
+  return collect(asNum(b ** r), (add) => {
+    if (r === 0)
+      add(
+        asNum(0),
+        tx("Power of zero", "Hoch null"),
+        tx(
+          `Nearly! The exponent $0$ is right. But $${b}^0$ isn't $0$: think of $${b} : ${b}$, a number divided by itself.`,
+          `Fast! Der Exponent $0$ stimmt. Aber $${b}^0$ ist nicht $0$: Denk an $${b} : ${b}$, eine Zahl geteilt durch sich selbst.`,
+        ),
+      );
+    if (b ** (e1 + e2) <= 1000) add(asNum(b ** (e1 + e2)), T_LOST_MINUS, lostMinusAdd(String(b), -e1));
+    add(asNum(b * r), T_BASE_TIMES, ruleThenTimes(b, r));
+    add(asNum(-(b ** r)), T_NOT_NEG, NOT_NEG);
+  });
+}
+
+/** A number written as a · 10^n (digits like "36", exponent n). */
+function sciMistakes(digits: string, e: number): Mistake[] {
+  const mant = Number(digits) / 10 ** (digits.length - 1);
+  const at = pairOf(["a", "n"]);
+  const two = digits.length === 2;
+  return collect(at(mant, e), (add) => {
+    if (e < 0) {
+      add(
+        at(mant, -e),
+        tx("Sign of the exponent", "Vorzeichen vom Exponenten"),
+        tx(
+          "Nearly! The number is smaller than $1$ and the comma moved to the **right**, so the exponent is negative.",
+          "Fast! Die Zahl ist kleiner als $1$, und das Komma ist nach **rechts** gerutscht, also ist der Exponent negativ.",
+        ),
+      );
+      add(
+        at(mant, e + 1),
+        T_ZEROS,
+        tx(
+          `Ah, I see what happened! You counted the zeros after the comma. But the comma also has to jump over the $${digits[0]}$, so count the places it moves.`,
+          `Ah, ich seh, was passiert ist! Du hast die Nullen nach dem Komma gezählt. Aber das Komma muss auch noch über die $${digits[0]}$ springen. Zähl die Stellen, um die es rutscht.`,
+        ),
+      );
+    } else {
+      if (two)
+        add(
+          at(mant, e - 1),
+          T_ZEROS,
+          tx(
+            `Ah, I see what happened! You counted the zeros. But the comma also jumps over the $${digits[1]}$, so count the places it moves.`,
+            `Ah, ich seh, was passiert ist! Du hast die Nullen gezählt. Aber das Komma springt auch über die $${digits[1]}$. Zähl die Stellen, um die es rutscht.`,
+          ),
+        );
+      add(
+        at(mant, -e),
+        T_DIRECTION,
+        tx(
+          "Nearly! The number is big and the comma moved to the **left**, so the exponent is positive.",
+          "Fast! Die Zahl ist groß, und das Komma ist nach **links** gerutscht, also ist der Exponent positiv.",
+        ),
+      );
+    }
+    if (two)
+      add(
+        at(Number(digits), e - 1),
+        tx("a is too big", "a ist zu groß"),
+        tx(
+          `The value is right, nice! But $a$ has to be between $1$ and $10$, and $${digits}$ is too big. Move the comma one more place.`,
+          `Der Wert stimmt, stark! Aber $a$ muss zwischen $1$ und $10$ liegen, und $${digits}$ ist zu groß. Verschieb das Komma noch um eine Stelle.`,
+        ),
+      );
+  });
+}
+
+/** a · 10^e (e < 0) back to a decimal. */
+function sciBackMistakes(digits: string, mant: number, e: number): Mistake[] {
+  const k = -e;
+  return collect(asNum(Number(`${mant}e${e}`)), (add) => {
+    add(
+      asNum(Number(`${mant}e${k}`)),
+      T_DIRECTION,
+      tx(
+        "Oops, the comma went the wrong way! A negative exponent makes the number **smaller**, so the comma moves to the left.",
+        "Hoppla, das Komma ist in die falsche Richtung gerutscht! Ein negativer Exponent macht die Zahl **kleiner**, also rutscht das Komma nach links.",
+      ),
+    );
+    add(
+      asNum(Number(`${mant}e${e - 1}`)),
+      T_PLACES,
+      k === 1
+        ? tx(
+            `Nearly! The comma moves $1$ place, but that doesn't add a zero: the $${digits[0]}$ itself takes that place.`,
+            `Fast! Das Komma rutscht um $1$ Stelle, dabei kommt aber keine Null dazu: Die $${digits[0]}$ selbst belegt diese Stelle.`,
+          )
+        : tx(
+            `Nearly! The comma moves $${k}$ places, but that's not $${k}$ zeros: the $${digits[0]}$ itself takes one of the places.`,
+            `Fast! Das Komma rutscht um $${k}$ Stellen, das sind aber nicht $${k}$ Nullen: Die $${digits[0]}$ selbst belegt eine der Stellen.`,
+          ),
+    );
+  });
+}
+
+/** (k·x^e1)^j · d·x^e2, or divided by d·x^e2: c and n. */
+function bracketMistakes(v: string, k: number, e1: number, j: number, d: number, e2: number, divide: boolean): Mistake[] {
+  const K = k ** j;
+  const by = (x: number) => (divide ? x / d : x * d);
+  const n = divide ? e1 * j - e2 : e1 * j + e2;
+  const at = pairOf(["c", "n"]);
+  return collect(at(by(K), n), (add) => {
+    add(
+      at(by(k), n),
+      k === -1 ? tx("Minus left out of the power", "Minus nicht mitpotenziert") : tx("Number left out of the power", "Zahl nicht mitpotenziert"),
+      k === -1
+        ? tx(
+            `Ooh, classic trap! The exponent $${j}$ belongs to **every** factor in the bracket, so the minus in front gets it too.`,
+            `Ooh, die klassische Falle! Der Exponent $${j}$ gehört zu **jedem** Faktor in der Klammer, also auch zum Minus davor.`,
+          )
+        : tx(
+            `Ooh, classic trap! The exponent $${j}$ belongs to **every** factor in the bracket, so the number $${par(k)}$ gets it too.`,
+            `Ooh, die klassische Falle! Der Exponent $${j}$ gehört zu **jedem** Faktor in der Klammer, also auch zur Zahl $${par(k)}$.`,
+          ),
+    );
+    if (Math.abs(k) !== 1) add(at(by(k * j), n), T_BASE_TIMES, baseTimes(par(k), j));
+    if (e1 !== 1) add(at(by(K), divide ? e1 + j - e2 : e1 + j + e2), T_POW_ADD, powAdd(v, e1, j));
+    if (k < 0) add(at(by(-K), n), T_COUNT_MINUS, countMinus(j, par(k)));
+  });
+}
+
+/** √N = a√b, possibly with a number t in front: a not fully simplified, or the square itself pulled out. */
+function rootSplitSlips(N: number, t: number, add: AddMistake, at: (a: number, b: number) => AnswerSpec) {
+  const s = largestSquareRoot(N);
+  const r = N / (s * s);
+  for (let u = 2; u < s; u++) {
+    if (s % u !== 0) continue;
+    add(
+      at(t * u, N / (u * u)),
+      tx("Not finished yet", "Noch nicht fertig"),
+      tx(
+        `Good start, and the value is right! But $${N / (u * u)}$ still hides a square number. Look for the **biggest** square in $${N}$.`,
+        `Guter Anfang, und der Wert stimmt! Aber in $${N / (u * u)}$ steckt noch eine Quadratzahl. Such die **größte** Quadratzahl in $${N}$.`,
+      ),
+    );
+  }
+  add(
+    at(t * s * s, r),
+    tx("Root of the square", "Wurzel aus der Quadratzahl"),
+    tx(
+      `Nearly! You found the square $${s * s}$, great. But what comes out in front is its root, $\\sqrt{${s * s}}$, not $${s * s}$ itself.`,
+      `Fast! Die Quadratzahl $${s * s}$ hast du gefunden, super. Aber vor die Wurzel kommt ihre Wurzel, $\\sqrt{${s * s}}$, nicht die $${s * s}$ selbst.`,
+    ),
+  );
+}
+
+function rootMistakes(N: number, t = 1): Mistake[] {
+  const s = largestSquareRoot(N);
+  const r = N / (s * s);
+  const at = pairOf(["a", "b"]);
+  return collect(at(t * s, r), (add) => {
+    if (t !== 1) {
+      add(
+        at(s, r),
+        tx("The number in front", "Die Zahl davor"),
+        tx(
+          `You simplified $\\sqrt{${N}}$ correctly! But the $${t}$ in front is still there: multiply it by the number that comes out.`,
+          `$\\sqrt{${N}}$ hast du richtig vereinfacht! Aber die $${t}$ davor ist ja noch da: Multipliziere sie mit der Zahl, die herauskommt.`,
+        ),
+      );
+      add(
+        at(t + s, r),
+        T_POW_ADD,
+        tx(
+          `Nearly! The $${t}$ in front means $${t}$ **times** the root. So multiply it by the number that comes out, don't add.`,
+          `Fast! Die $${t}$ davor heißt $${t}$ **mal** die Wurzel. Multipliziere sie also mit der Zahl, die herauskommt, statt zu addieren.`,
+        ),
+      );
+    }
+    rootSplitSlips(N, t, add, at);
+  });
+}
+
+/** √a · √b = a√b: multiplied under one root, then not (fully) simplified. */
+function rootPairMistakes(a: number, b: number): Mistake[] {
+  const N = a * b;
+  const s = largestSquareRoot(N);
+  const at = pairOf(["a", "b"]);
+  return collect(at(s, N / (s * s)), (add) => {
+    add(
+      at(1, N),
+      tx("Not simplified yet", "Noch nicht vereinfacht"),
+      tx(
+        `$\\sqrt{${a}} \\cdot \\sqrt{${b}} = \\sqrt{${N}}$ is right, nice! Now simplify it: look for the biggest square in $${N}$.`,
+        `$\\sqrt{${a}} \\cdot \\sqrt{${b}} = \\sqrt{${N}}$ stimmt, stark! Jetzt noch vereinfachen: Such die größte Quadratzahl in $${N}$.`,
+      ),
+    );
+    rootSplitSlips(N, 1, add, at);
+  });
+}
+
+/** √(s1²·r) ± √(s2²·r) = a√r. */
+function rootSumMistakes(r: number, s1: number, s2: number, minus: boolean): Mistake[] {
+  const op = minus ? "-" : "+";
+  const a = minus ? s1 - s2 : s1 + s2;
+  const N1 = s1 * s1 * r;
+  const N2 = s2 * s2 * r;
+  const at = pairOf(["a", "b"]);
+  const out = (s: number) => `${s === 1 ? "" : s}\\sqrt{${r}}`;
+  const asX = (s: number) => `${s === 1 ? "" : s}x`;
+  return collect(at(a, r), (add) => {
+    const M = minus ? N1 - N2 : N1 + N2;
+    const m = largestSquareRoot(M);
+    add(
+      at(m, M / (m * m)),
+      minus ? tx("Subtracted under one root", "Unter einer Wurzel subtrahiert") : tx("Added under one root", "Unter einer Wurzel addiert"),
+      tx(
+        `Ooh, classic trap! $\\sqrt{${N1}} ${op} \\sqrt{${N2}}$ is **not** $\\sqrt{${N1} ${op} ${N2}}$. Simplify each root on its own first, then combine.`,
+        `Ooh, die klassische Falle! $\\sqrt{${N1}} ${op} \\sqrt{${N2}}$ ist **nicht** $\\sqrt{${N1} ${op} ${N2}}$. Vereinfache zuerst jede Wurzel für sich, dann fass zusammen.`,
+      ),
+    );
+    if (!minus)
+      add(
+        at(a, 2 * r),
+        tx("The root got added too", "Wurzel mitaddiert"),
+        tx(
+          `Nearly! $${out(s1)} + ${out(s2)}$ works like $${asX(s1)} + ${asX(s2)}$: the numbers in front add up, but $\\sqrt{${r}}$ stays as it is.`,
+          `Fast! $${out(s1)} + ${out(s2)}$ funktioniert wie $${asX(s1)} + ${asX(s2)}$: Die Zahlen davor werden addiert, aber $\\sqrt{${r}}$ bleibt, wie es ist.`,
+        ),
+      );
+    if (s1 === 1 || s2 === 1) {
+      const c = (s: number) => (s === 1 ? 0 : s);
+      add(
+        at(minus ? c(s1) - c(s2) : c(s1) + c(s2), r),
+        tx("The lone root counts too", "Die einzelne Wurzel zählt mit"),
+        tx(
+          `Nearly! A root on its own, $\\sqrt{${r}}$, counts as $1\\sqrt{${r}}$. Don't forget that $1$.`,
+          `Fast! Eine Wurzel ganz allein, $\\sqrt{${r}}$, zählt als $1\\sqrt{${r}}$. Vergiss diese $1$ nicht.`,
+        ),
+      );
+    }
+  });
+}
+
+/** Check by squaring: x² isn't the number under the root. */
+const squareCheck = (x: number, target: number) =>
+  tx(
+    `Nearly, the digits are right! But check by squaring: $${dec(x)}^2 = ${dec(x * x)}$, not $${dec(target)}$.`,
+    `Fast, die Ziffern stimmen! Aber mach die Probe: $${dec(x)}^2 = ${dec(x * x)}$, nicht $${dec(target)}$.`,
+  );
+
+/** √(k²/100) as a decimal. */
+function decimalRootMistakes(k: number): Mistake[] {
+  const N = (k * k) / 100;
+  const T_SQUARE = tx("Check by squaring", "Mach die Quadratprobe");
+  return collect(asNum(k / 10), (add) => {
+    add(asNum(k / 100), T_SQUARE, squareCheck(k / 100, N));
+    add(asNum(k), T_SQUARE, squareCheck(k, N));
+    add(asNum(N / 2), T_HALF, half(dec(N)));
+  });
+}
+
+/** √(a²/b²) as a fraction. */
+function fractionRootMistakes(a: number, b: number): Mistake[] {
+  return collect(asFrac(a, b), (add) => {
+    add(
+      asFrac(a, b * b),
+      tx("Only the top", "Nur der Zähler"),
+      tx(
+        "You took the root of the top, nice! But the bottom needs its root too: take the root of top **and** bottom.",
+        "Die Wurzel aus dem Zähler hast du gezogen, gut! Der Nenner braucht aber auch seine Wurzel: Zieh sie aus Zähler **und** Nenner.",
+      ),
+    );
+    add(
+      asFrac(a * a, b),
+      tx("Only the bottom", "Nur der Nenner"),
+      tx(
+        "You took the root of the bottom, nice! But the top needs its root too: take the root of top **and** bottom.",
+        "Die Wurzel aus dem Nenner hast du gezogen, gut! Der Zähler braucht aber auch seine Wurzel: Zieh sie aus Zähler **und** Nenner.",
+      ),
+    );
+  });
+}
+
+/** √a · √b or √a : √b as a whole number: put under one root, then the root forgotten or halved. */
+function rootCalcMistakes(a: number, b: number, value: number, divide: boolean): Mistake[] {
+  const inside = divide ? a / b : a * b;
+  const op = divide ? ":" : "\\cdot";
+  return collect(asNum(value), (add) => {
+    add(
+      asNum(inside),
+      T_ROOT_LEFT,
+      tx(
+        `One root for both was right: $\\sqrt{${a} ${op} ${b}}$. But then you still need the root of $${inside}$!`,
+        `Beide unter eine Wurzel, richtig: $\\sqrt{${a} ${op} ${b}}$. Aber dann musst du aus $${inside}$ noch die Wurzel ziehen!`,
+      ),
+    );
+    add(asNum(inside / 2), T_HALF, half(String(inside)));
+  });
+}
+
+/** c1·x^e1 · c2·x^e2 = c·x^n. */
+function coefProductMistakes(v: string, c1: number, c2: number, e1: number, e2: number): Mistake[] {
+  const at = pairOf(["c", "n"]);
+  const n = e1 + e2;
+  return collect(at(c1 * c2, n), (add) => {
+    add(
+      at(c1 + c2, n),
+      tx("Numbers added", "Zahlen addiert"),
+      tx(
+        "The exponent is right! But the numbers in front get **multiplied** too: it's all one big product.",
+        "Der Exponent stimmt! Aber die Zahlen davor werden auch **multipliziert**: Das ist alles ein einziges Produkt.",
+      ),
+    );
+    add(at(c1 * c2, e1 * e2), T_EXP_MUL, EXP_MUL);
+    if (e2 < 0) add(at(c1 * c2, e1 - e2), T_LOST_MINUS, lostMinusAdd(v, e2));
+  });
+}
+
+/** top·x^e1 / (d·x^e2) = c·x^n. */
+function coefQuotientMistakes(top: number, d: number, e1: number, e2: number): Mistake[] {
+  const at = pairOf(["c", "n"]);
+  const c = top / d;
+  return collect(at(c, e1 - e2), (add) => {
+    add(
+      at(top - d, e1 - e2),
+      tx("Numbers subtracted", "Zahlen subtrahiert"),
+      tx(
+        "The exponent is right! But the numbers form a fraction too, so **divide** them.",
+        "Der Exponent stimmt! Aber die Zahlen bilden auch einen Bruch, also **teilst** du sie.",
+      ),
+    );
+    add(at(c, e2 - e1), T_ORDER, order(true));
+    add(at(c, e1 + e2), T_EXP_ADD, EXP_ADD);
+    if (e1 % e2 === 0) add(at(c, e1 / e2), T_EXP_DIV, EXP_DIV);
+  });
+}
+
+/** (u^p1 w^q1)^k · u^p2 w^q2 = u^m w^n. */
+function twoVarBracketMistakes(u: string, w: string, k: number, p1: number, q1: number, p2: number, q2: number): Mistake[] {
+  const at = pairOf(["m", "n"]);
+  return collect(at(p1 * k + p2, q1 * k + q2), (add) => {
+    add(
+      at(p1 * k + p2, q1 + q2),
+      tx("Only the first factor", "Nur der erste Faktor"),
+      tx(
+        `The outer exponent $${k}$ only reached $${u}$! It belongs to **every** factor in the bracket, so to $${w}$ as well.`,
+        `Der äußere Exponent $${k}$ hat nur $${u}$ erwischt! Er gehört zu **jedem** Faktor in der Klammer, also auch zu $${w}$.`,
+      ),
+    );
+    add(
+      at(p1 + k + p2, q1 + k + q2),
+      T_POW_ADD,
+      tx(
+        `Ah, I see what happened! You added the outer $${k}$ to the exponents in the bracket. A power of a power **multiplies** the exponents.`,
+        `Ah, ich seh, was passiert ist! Du hast die äußere $${k}$ zu den Exponenten in der Klammer addiert. Bei einer Potenz einer Potenz werden die Exponenten **multipliziert**.`,
+      ),
+    );
+    add(
+      at(p1 + p2, q1 + q2),
+      tx("Outer exponent lost", "Äußerer Exponent verloren"),
+      tx(
+        `Hmm, it looks like the outer exponent $${k}$ got lost. Multiply every exponent in the bracket by $${k}$ first.`,
+        `Hm, sieht so aus, als wäre der äußere Exponent $${k}$ verloren gegangen. Multipliziere zuerst jeden Exponenten in der Klammer mit $${k}$.`,
+      ),
+    );
+  });
+}
+
+/** u^p1 w^q1 / (u^p2 w^q2) = u^m w^n. */
+function twoVarQuotientMistakes(p1: number, q1: number, p2: number, q2: number): Mistake[] {
+  const at = pairOf(["m", "n"]);
+  return collect(at(p1 - p2, q1 - q2), (add) => {
+    add(at(p2 - p1, q2 - q1), T_ORDER, order(true));
+    add(at(p1 + p2, q1 + q2), T_EXP_ADD, EXP_ADD);
+  });
+}
+
+/** (a1 · 10^e1) · or : (a2 · 10^e2) = a · 10^n. */
+function sciCalcMistakes(a1: number, e1: number, a2: number, e2: number, div: boolean): Mistake[] {
+  const at = pairOf(["a", "n"]);
+  const P = div ? a1 / a2 : a1 * a2;
+  const E = div ? e1 - e2 : e1 + e2;
+  const up = P >= 10;
+  const shift = up ? 1 : P < 1 ? -1 : 0;
+  const mant = P / 10 ** shift;
+  return collect(at(mant, E + shift), (add) => {
+    if (shift) {
+      add(
+        at(P, E),
+        up ? tx("a must be below 10", "a muss kleiner als 10 sein") : tx("a must be at least 1", "a muss mindestens 1 sein"),
+        tx(
+          `The calculation is right! But $a = ${dec(P)}$ isn't between $1$ and $10$. Move the comma and adjust $n$ so the value stays the same.`,
+          `Die Rechnung stimmt! Aber $a = ${dec(P)}$ liegt nicht zwischen $1$ und $10$. Verschieb das Komma und pass $n$ so an, dass der Wert gleich bleibt.`,
+        ),
+      );
+      add(
+        at(mant, E - shift),
+        tx("n adjusted the wrong way", "n in die falsche Richtung angepasst"),
+        up
+          ? tx(
+              "Nearly! $a$ got 10 times smaller, so $10^n$ has to get 10 times bigger to keep the value: $n$ goes **up** by one.",
+              "Fast! $a$ ist 10-mal kleiner geworden, also muss $10^n$ 10-mal größer werden, damit der Wert gleich bleibt: $n$ wird um eins **größer**.",
+            )
+          : tx(
+              "Nearly! $a$ got 10 times bigger, so $10^n$ has to get 10 times smaller to keep the value: $n$ goes **down** by one.",
+              "Fast! $a$ ist 10-mal größer geworden, also muss $10^n$ 10-mal kleiner werden, damit der Wert gleich bleibt: $n$ wird um eins **kleiner**.",
+            ),
+      );
+    }
+    if (div) {
+      add(at(mant, e2 - e1 + shift), T_ORDER, order(false));
+      add(at(mant, e1 + e2 + shift), T_EXP_ADD, EXP_ADD);
+    } else add(at(mant, e1 * e2 + shift), T_EXP_MUL, EXP_MUL);
+  });
+}
+
+/** (a/b)^{-e} as a fraction. */
+function negFractionMistakes(a: number, b: number, e: number): Mistake[] {
+  return collect(asFrac(b ** e, a ** e), (add) => {
+    add(
+      asFrac(a ** e, b ** e),
+      T_NEG_IGNORED,
+      tx(
+        `You raised the fraction to the power $${e}$, nice! But the exponent is $-${e}$, and the minus **flips** the fraction.`,
+        `Den Bruch hoch $${e}$ hast du richtig genommen, gut! Aber der Exponent ist $-${e}$, und das Minus **dreht** den Bruch um.`,
+      ),
+    );
+    add(asFrac(-(b ** e), a ** e), T_NOT_NEG, NOT_NEG_FLIP);
+    add(
+      asFrac(b ** e, a),
+      tx("Only the top", "Nur der Zähler"),
+      tx("Flipping was right! But the exponent belongs to the top **and** the bottom.", "Das Umdrehen war richtig! Aber der Exponent gilt für Zähler **und** Nenner."),
+    );
+    add(
+      asFrac(b, a),
+      tx("Exponent forgotten", "Exponent vergessen"),
+      tx(
+        `Flipping was right! But the power $${e}$ still has to go to the top and the bottom.`,
+        `Das Umdrehen war richtig! Aber Zähler und Nenner müssen noch hoch $${e}$ genommen werden.`,
+      ),
+    );
+  });
+}
+
+/** b^{-e1} / b^{-e2} as a number. */
+function negQuotientMistakes(b: number, e1: number, e2: number): Mistake[] {
+  const r = e2 - e1;
+  return collect(asNum(b ** r), (add) => {
+    if (b ** (e1 + e2) <= 1000)
+      add(
+        asNum(b ** -(e1 + e2)),
+        T_MINUS_MINUS,
+        tx(
+          `Careful: you subtract $-${e2}$, a negative number. Minus a negative is **plus**: $-${e1} - (-${e2})$.`,
+          `Vorsicht: Du ziehst $-${e2}$ ab, also eine negative Zahl. Minus minus ergibt **plus**: $-${e1} - (-${e2})$.`,
+        ),
+      );
+    add(asNum(b ** -r), T_ORDER, order(true));
+    add(asNum(b * r), T_BASE_TIMES, ruleThenTimes(b, r));
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Exercise generator. Each shape returns null for a degenerate draw (retried).
 
 const VARS = ["x", "a", "y", "b", "z"] as const;
@@ -477,12 +1302,13 @@ const ONE_ROOT_RULE = tx(
   "Schreib beide unter eine Wurzel: $\\sqrt{a} \\cdot \\sqrt{b} = \\sqrt{a \\cdot b}$.",
 );
 
-const findN = (math: string, n: number, hint: Text, solution: Frame[], instruction: Text = tx("Find the exponent n", "Bestimme den Exponenten n")): Exercise => ({
-  instruction,
+const findN = (math: string, n: number, hint: Text, solution: Frame[], mistakes?: Mistake[]): Exercise => ({
+  instruction: tx("Find the exponent n", "Bestimme den Exponenten n"),
   math,
   answer: { kind: "number", value: n, label: "n =" },
   hint,
   solution,
+  mistakes,
 });
 
 const evalPower: Shape = (rng, level) => {
@@ -495,6 +1321,7 @@ const evalPower: Shape = (rng, level) => {
       answer: { kind: "number", value: -(b ** n) },
       hint: tx("Which number does the exponent belong to? Is the minus part of the base?", "Zu welcher Zahl gehört der Exponent? Gehört das Minus zur Basis?"),
       solution: minusTrapFrames(b, n),
+      mistakes: powerValueMistakes(b, n, true),
     };
   }
   let b: number;
@@ -519,6 +1346,7 @@ const evalPower: Shape = (rng, level) => {
           )
         : tx(`$${pp(b, n)}$ means $${n}$ factors $${b}$, not $${b} \\cdot ${n}$.`, `$${pp(b, n)}$ bedeutet $${n}$ Faktoren $${b}$, nicht $${b} \\cdot ${n}$.`),
     solution: evalPowerFrames(b, n),
+    mistakes: powerValueMistakes(b, n, false),
   };
 };
 
@@ -539,7 +1367,7 @@ const productExponent: Shape = (rng, level) => {
     : exps.some((e) => e < 0)
       ? tx("Add the exponents and watch the signs: $5 + (-2) = 3$.", "Addiere die Exponenten und achte auf die Vorzeichen: $5 + (-2) = 3$.")
       : SAME_BASE_ADD;
-  return findN(`${lhs} = ${v}^{\\blob{n}}`, total, hint, productFrames(v, exps));
+  return findN(`${lhs} = ${v}^{\\blob{n}}`, total, hint, productFrames(v, exps), productMistakes(v, exps));
 };
 
 const quotientExponent: Shape = (rng, level) => {
@@ -568,7 +1396,7 @@ const quotientExponent: Shape = (rng, level) => {
     e2 < 0
       ? tx("Subtract the exponents. Minus a negative number is plus.", "Subtrahiere die Exponenten. Eine negative Zahl abziehen heißt addieren.")
       : tx("Same base, divided: subtract the exponents (top minus bottom).", "Gleiche Basis, dividiert: Subtrahiere die Exponenten (oben minus unten).");
-  return findN(`${lhs} = ${v}^{\\blob{n}}`, e1 - e2, hint, quotientFrames(v, e1, e2, frac));
+  return findN(`${lhs} = ${v}^{\\blob{n}}`, e1 - e2, hint, quotientFrames(v, e1, e2, frac), quotientMistakes(e1, e2, frac));
 };
 
 const evalWithRules: Shape = (rng) => {
@@ -599,6 +1427,7 @@ const evalWithRules: Shape = (rng) => {
     answer: { kind: "number", value: b ** r },
     hint: tx("Use a power rule first. Then calculate the small power that's left.", "Wende zuerst ein Potenzgesetz an. Dann berechne die kleine Potenz, die übrig bleibt."),
     solution: frames,
+    mistakes: rulesMistakes(b, e1, e2, kind < 2),
   };
 };
 
@@ -619,6 +1448,7 @@ const powerOfPower: Shape = (rng) => {
       "Potenz einer Potenz: Multipliziere die Exponenten. Dann addiere den Exponenten des zusätzlichen Faktors.",
     ),
     powerOfPowerFrames(v, e1, k, extra),
+    powerOfPowerMistakes(v, e1, k, extra),
   );
 };
 
@@ -634,6 +1464,7 @@ const negativeExponent: Shape = (rng) => {
       answer: { kind: "fraction", n: 1, d: b ** e },
       hint: "$a^{-n} = \\frac{1}{a^n}$.",
       solution: negativeToFractionFrames(b, e),
+      mistakes: negPowerMistakes(b, e),
     };
   }
   if (kind === 1) {
@@ -644,6 +1475,7 @@ const negativeExponent: Shape = (rng) => {
       instruction: AS_DECIMAL,
       math: `10^{-${e}}`,
       answer: { kind: "number", value },
+      mistakes: tenPowerMistakes(e),
       hint: tx(`$10^{-${e}} = \\frac{1}{10^{${e}}}$. How many places after the comma?`, `$10^{-${e}} = \\frac{1}{10^{${e}}}$. Wie viele Stellen nach dem Komma?`),
       solution: [
         { math: `10#b^{-#s ${e}#e}`, note: tx("A negative exponent means: one divided by the power.", "Ein negativer Exponent bedeutet: eins geteilt durch die Potenz.") },
@@ -666,6 +1498,7 @@ const negativeExponent: Shape = (rng) => {
       instruction: CALCULATE,
       math: `(\\frac{1}{${b}})^{-${e}}`,
       answer: { kind: "number", value: b ** e },
+      mistakes: flipPowerMistakes(b, e),
       hint: tx("A negative exponent flips the fraction.", "Ein negativer Exponent dreht den Bruch um (Kehrwert)."),
       solution: [
         {
@@ -691,6 +1524,7 @@ const negativeExponent: Shape = (rng) => {
     instruction: CALCULATE,
     math: `${b}^{-${e1}} \\cdot ${pp(b, e2)}`,
     answer: { kind: "number", value: b ** r },
+    mistakes: negProductMistakes(b, e1, e2),
     hint: tx("Same base: add the exponents first.", "Gleiche Basis: Addiere zuerst die Exponenten."),
     solution: [
       { math: `${kp(b, "b0", -e1, "e0")} \\cdot#d ${kp(b, "b1", e2, "e1")}`, note: tx(`Same base $${b}$, multiplied.`, `Gleiche Basis $${b}$, multipliziert.`) },
@@ -722,6 +1556,7 @@ const sciNotation: Shape = (rng) => {
       instruction: AS_DECIMAL,
       math: `${dec(mant)} \\cdot 10^{${e}}`,
       answer: { kind: "number", value },
+      mistakes: sciBackMistakes(digits, mant, e),
       hint: cat(
         tx(`The exponent $${e}$ means: move the comma $${-e}$ `, `Der Exponent $${e}$ bedeutet: Verschiebe das Komma um $${-e}$ `),
         places(-e),
@@ -753,6 +1588,7 @@ const sciNotation: Shape = (rng) => {
     text: tx("Write it as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Schreib die Zahl als $a \\cdot 10^n$ mit $1 \\le a < 10$."),
     math: `${kind === "big" ? grouped(raw) : raw} = \\blob{a} \\cdot 10^{\\blob{n}}`,
     answer: { kind: "pair", names: ["a", "n"], values: [mant, e] },
+    mistakes: sciMistakes(digits, e),
     hint:
       kind === "big"
         ? tx("Count how many places the comma moves to the left. That's $n$.", "Zähl, um wie viele Stellen das Komma nach links rutscht. Das ist $n$.")
@@ -770,6 +1606,7 @@ const simpleRoot: Shape = (rng) => {
       instruction: CALCULATE,
       math: `\\sqrt{${k * k}}`,
       answer: { kind: "number", value: k },
+      mistakes: collect(asNum(k), (add) => add(asNum((k * k) / 2), T_HALF, half(String(k * k)))),
       hint: which,
       solution: [
         { math: `\\sqrt{${k * k}#n}#R`, note: which },
@@ -785,6 +1622,7 @@ const simpleRoot: Shape = (rng) => {
       instruction: CALCULATE,
       math: `\\sqrt{${dec(N / 100)}}`,
       answer: { kind: "number", value: k / 10 },
+      mistakes: decimalRootMistakes(k),
       hint: tx(`Write it as a fraction: $${dec(N / 100)} = \\frac{${N}}{100}$.`, `Schreib die Zahl als Bruch: $${dec(N / 100)} = \\frac{${N}}{100}$.`),
       solution: [
         {
@@ -811,6 +1649,7 @@ const simpleRoot: Shape = (rng) => {
       instruction: AS_FRACTION,
       math: `\\sqrt{\\frac{${a * a}}{${b * b}}}`,
       answer: { kind: "fraction", n: a, d: b },
+      mistakes: fractionRootMistakes(a, b),
       hint: tx("Take the root of the top and of the bottom separately.", "Zieh die Wurzel aus Zähler und Nenner getrennt."),
       solution: [
         { math: `\\sqrt{\\frac{${a * a}#a}{${b * b}#b}#F}#R`, note: tx("The root of a fraction.", "Die Wurzel aus einem Bruch.") },
@@ -834,6 +1673,7 @@ const simpleRoot: Shape = (rng) => {
       instruction: CALCULATE,
       math: `\\sqrt{${a}} \\cdot \\sqrt{${b}}`,
       answer: { kind: "number", value },
+      mistakes: rootCalcMistakes(a, b, value, false),
       hint: "$\\sqrt{a} \\cdot \\sqrt{b} = \\sqrt{a \\cdot b}$.",
       solution: [
         { math: `\\sqrt{${a}#a}#R \\cdot#d \\sqrt{${b}#b}#R2`, note: NO_WHOLE_ROOT },
@@ -855,6 +1695,7 @@ const simpleRoot: Shape = (rng) => {
     instruction: CALCULATE,
     math: frac ? `\\frac{\\sqrt{${a}}}{\\sqrt{${b}}}` : `\\sqrt{${a}} : \\sqrt{${b}}`,
     answer: { kind: "number", value: k },
+    mistakes: rootCalcMistakes(a, b, k, true),
     hint: "$\\sqrt{a} : \\sqrt{b} = \\sqrt{a : b}$.",
     solution: [
       { math: frac ? `\\frac{\\sqrt{${a}#a}#R}{\\sqrt{${b}#b}#R2}#F` : `\\sqrt{${a}#a}#R :#dv \\sqrt{${b}#b}#R2`, note: NO_WHOLE_ROOT },
@@ -884,6 +1725,7 @@ const coefficientProduct: Shape = (rng) => {
       instruction: SIMPLIFY,
       math: `${c1}${pp(v, e1)} \\cdot ${second} = \\blob{c} ${v}^{\\blob{n}}`,
       answer: { kind: "pair", names: ["c", "n"], values: [c, n] },
+      mistakes: coefProductMistakes(v, c1, c2, e1, e2),
       hint: tx("Multiply the numbers. Add the exponents.", "Multipliziere die Zahlen. Addiere die Exponenten."),
       solution: [
         {
@@ -916,6 +1758,7 @@ const coefficientProduct: Shape = (rng) => {
     instruction: SIMPLIFY,
     math: `\\frac{${top}${pp(v, e1)}}{${d}${pp(v, e2)}} = \\blob{c} ${v}^{\\blob{n}}`,
     answer: { kind: "pair", names: ["c", "n"], values: [c, n] },
+    mistakes: coefQuotientMistakes(top, d, e1, e2),
     hint: tx("Divide the numbers. Subtract the exponents.", "Teile die Zahlen. Subtrahiere die Exponenten."),
     solution: [
       {
@@ -947,6 +1790,7 @@ const mixedTwoVars: Shape = (rng) => {
       instruction: SIMPLIFY,
       math: `(${pp(u, p1)} ${pp(w, q1)})^{${k}} \\cdot ${pp(u, p2)} ${pp(w, q2)} = ${u}^{\\blob{m}} ${w}^{\\blob{n}}`,
       answer: { kind: "pair", names: ["m", "n"], values: [m, n] },
+      mistakes: twoVarBracketMistakes(u, w, k, p1, q1, p2, q2),
       hint: tx(
         "Bracket first: multiply each exponent inside by the outer one. Then add exponents of the same letter.",
         "Zuerst die Klammer: Multipliziere jeden Exponenten darin mit dem äußeren. Dann addiere die Exponenten gleicher Buchstaben.",
@@ -994,6 +1838,7 @@ const mixedTwoVars: Shape = (rng) => {
     instruction: SIMPLIFY,
     math: `\\frac{${pp(u, p1)} ${pp(w, q1)}}{${pp(u, p2)} ${pp(w, q2)}} = ${u}^{\\blob{m}} ${w}^{\\blob{n}}`,
     answer: { kind: "pair", names: ["m", "n"], values: [m, n] },
+    mistakes: twoVarQuotientMistakes(p1, q1, p2, q2),
     hint: tx("Each letter on its own: exponent on top minus exponent below.", "Jeder Buchstabe für sich: Exponent oben minus Exponent unten."),
     solution: [
       {
@@ -1037,6 +1882,7 @@ const mixedCoefficient: Shape = (rng) => {
       instruction: SIMPLIFY,
       math: `(${head})^{${j}} \\cdot ${second} = \\blob{c} ${v}^{\\blob{n}}`,
       answer: { kind: "pair", names: ["c", "n"], values: [c, n] },
+      mistakes: bracketMistakes(v, k, e1, j, d, e2, false),
       hint: tx(`Bracket first: ${split}`, `Zuerst die Klammer: ${split}`),
       solution: bracketPowerFrames(v, k, e1, j, { d, e2 }),
     };
@@ -1053,6 +1899,7 @@ const mixedCoefficient: Shape = (rng) => {
     instruction: SIMPLIFY,
     math: `\\frac{(${head})^{${j}}}{${d}${pp(v, e2)}} = \\blob{c} ${v}^{\\blob{n}}`,
     answer: { kind: "pair", names: ["c", "n"], values: [c, n] },
+    mistakes: bracketMistakes(v, k, e1, j, d, e2, true),
     hint: tx(
       "Work out the bracket on top first. Then divide the numbers and subtract the exponents.",
       "Berechne zuerst die Klammer oben. Dann teile die Zahlen und subtrahiere die Exponenten.",
@@ -1088,6 +1935,7 @@ const partialRoot: Shape = (rng) => {
       instruction: SIMPLIFY_ROOT,
       math: `\\sqrt{${N}} = ${unknown}`,
       answer: pair(s, r),
+      mistakes: rootMistakes(N),
       hint: tx(
         `Look for the biggest square number that divides $${N}$ (like $4, 9, 16, 25, 36, …$).`,
         `Suche die größte Quadratzahl, durch die sich $${N}$ teilen lässt (zum Beispiel $4; 9; 16; 25; 36; …$).`,
@@ -1105,6 +1953,7 @@ const partialRoot: Shape = (rng) => {
       instruction: SIMPLIFY_ROOT,
       math: `${t}\\sqrt{${N}} = ${unknown}`,
       answer: pair(t * s, r),
+      mistakes: rootMistakes(N, t),
       hint: tx(`First simplify $\\sqrt{${N}}$. Then multiply by $${t}$.`, `Vereinfache zuerst $\\sqrt{${N}}$. Dann multipliziere mit $${t}$.`),
       solution: partialRootFrames(N, t),
     };
@@ -1132,6 +1981,7 @@ const partialRoot: Shape = (rng) => {
       instruction: SIMPLIFY,
       math: `\\sqrt{${N1}} ${op} \\sqrt{${N2}} = ${unknown}`,
       answer: pair(a, r),
+      mistakes: rootSumMistakes(r, s1, s2, minus),
       hint: tx(
         "Simplify each root first. Then they have the same root and can be combined.",
         "Vereinfache zuerst jede Wurzel. Dann haben beide dieselbe Wurzel und lassen sich zusammenfassen.",
@@ -1182,6 +2032,7 @@ const partialRoot: Shape = (rng) => {
     instruction: SIMPLIFY,
     math: `\\sqrt{${a}} \\cdot \\sqrt{${b}} = ${unknown}`,
     answer: pair(s, r),
+    mistakes: rootPairMistakes(a, b),
     hint: tx(
       "Put both under one root first. Then look for the biggest square factor.",
       "Schreib zuerst beide unter eine Wurzel. Dann such die größte Quadratzahl darin.",
@@ -1236,6 +2087,7 @@ const sciCalc: Shape = (rng) => {
     text: tx("Give the result as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Gib das Ergebnis als $a \\cdot 10^n$ mit $1 \\le a < 10$ an."),
     math: `${t(a1, e1)} ${div ? ":" : "\\cdot"} ${t(a2, e2)} = \\blob{a} \\cdot 10^{\\blob{n}}`,
     answer: { kind: "pair", names: ["a", "n"], values: [mant, n] },
+    mistakes: sciCalcMistakes(a1, e1, a2, e2, div),
     hint: tx(
       `${div ? "Divide" : "Multiply"} the numbers and the powers of ten separately. Check that $a$ is between $1$ and $10$.`,
       `${div ? "Teile" : "Multipliziere"} die Zahlen und die Zehnerpotenzen getrennt. Prüf, ob $a$ zwischen $1$ und $10$ liegt.`,
@@ -1254,6 +2106,7 @@ const negativeFraction: Shape = (rng) => {
       instruction: AS_FRACTION,
       math: `(\\frac{${a}}{${b}})^{-${e}}`,
       answer: { kind: "fraction", n: b ** e, d: a ** e },
+      mistakes: negFractionMistakes(a, b, e),
       hint: tx(
         "A negative exponent flips the fraction. Then the exponent is positive.",
         "Ein negativer Exponent dreht den Bruch um (Kehrwert). Dann ist der Exponent positiv.",
@@ -1284,6 +2137,7 @@ const negativeFraction: Shape = (rng) => {
     instruction: CALCULATE,
     math: `\\frac{${b}^{-${e1}}}{${b}^{-${e2}}}`,
     answer: { kind: "number", value: b ** r },
+    mistakes: negQuotientMistakes(b, e1, e2),
     hint: tx(
       "Same base: subtract the exponents. Minus a negative number is plus.",
       "Gleiche Basis: Subtrahiere die Exponenten. Eine negative Zahl abziehen heißt addieren.",
@@ -2067,6 +2921,7 @@ const powersRoots: Topic = {
         instruction: tx("Find the exponent n", "Bestimme den Exponenten n"),
         math: "x^4 \\cdot x^5 \\cdot x = x^{\\blob{n}}",
         answer: { kind: "number", value: 10, label: "n =" },
+        mistakes: productMistakes("x", [4, 5, 1]),
         hint: tx("A single $x$ counts as $x^1$.", "Ein einzelnes $x$ zählt als $x^1$."),
         solution: productFrames("x", [4, 5, 1]),
       },
@@ -2091,6 +2946,7 @@ const powersRoots: Topic = {
         instruction: tx("Write as a fraction", "Schreib als Bruch"),
         math: "2^{-3}",
         answer: { kind: "fraction", n: 1, d: 8 },
+        mistakes: negPowerMistakes(2, 3),
         hint: tx("$a^{-n} = \\frac{1}{a^n}$, so $2^{-3} = \\frac{1}{2^3}$.", "$a^{-n} = \\frac{1}{a^n}$, also ist $2^{-3} = \\frac{1}{2^3}$."),
         solution: negativeToFractionFrames(2, 3),
       },
@@ -2112,6 +2968,7 @@ const powersRoots: Topic = {
         instruction: tx("Simplify", "Vereinfache"),
         math: "(2x^3)^4 = \\blob{c} x^{\\blob{n}}",
         answer: { kind: "pair", names: ["c", "n"], values: [16, 12] },
+        mistakes: bracketMistakes("x", 2, 3, 4, 1, 0, false),
         hint: tx("Both factors get the exponent $4$: $2^4$ and $(x^3)^4$.", "Beide Faktoren bekommen den Exponenten $4$: $2^4$ und $(x^3)^4$."),
         solution: bracketPowerFrames("x", 2, 3, 4, null),
       },
@@ -2134,6 +2991,7 @@ const powersRoots: Topic = {
         text: tx("Write it as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Schreib die Zahl als $a \\cdot 10^n$ mit $1 \\le a < 10$."),
         math: "0,00036 = \\blob{a} \\cdot 10^{\\blob{n}}",
         answer: { kind: "pair", names: ["a", "n"], values: [3.6, -4] },
+        mistakes: sciMistakes("36", -4),
         hint: tx(
           "Move the comma to the right until one digit (not $0$) is in front of it. Right means negative.",
           "Verschiebe das Komma nach rechts, bis eine Ziffer (nicht $0$) davor steht. Rechts heißt negativ.",
@@ -2168,6 +3026,7 @@ const powersRoots: Topic = {
         instruction: tx("Simplify the root", "Vereinfache die Wurzel"),
         math: "\\sqrt{72} = \\blob{a} \\sqrt{\\blob{b}}",
         answer: { kind: "pair", names: ["a", "b"], values: [6, 2] },
+        mistakes: rootMistakes(72),
         hint: tx("The biggest square number that divides $72$ is $36$.", "Die größte Quadratzahl, durch die sich $72$ teilen lässt, ist $36$."),
         solution: partialRootFrames(72),
       },

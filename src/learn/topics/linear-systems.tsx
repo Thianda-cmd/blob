@@ -10,10 +10,10 @@ import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
 import { add, div, mul, sub, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { alongLine, crossing, Plane, PlaneDot, PlaneLine, PlanePath, PlaneTag, planeGeo, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
-import { graphVisual, lineSrc, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap } from "./lines";
+import { graphVisual, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap, type Msg } from "./lines";
 
 // ---------------------------------------------------------------------------
 // Equations in x and y, rendered with stable keys: equation I uses the ids
@@ -373,6 +373,372 @@ function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: Text
 }
 
 // ---------------------------------------------------------------------------
+// Typical mistakes. Each wrong pair is simulated from the task's own numbers: the slip is
+// made at the step where students make it, and the rest is worked out the way they would.
+
+type Collector = ReturnType<typeof mistakeList>;
+type Choice = Extract<AnswerSpec, { kind: "choice" }>;
+
+const XY: [string, string] = ["x", "y"];
+const xyWhen = (x: number, y: number): AnswerSpec => ({ kind: "pair", names: XY, values: [x, y] });
+/** The pair (x | y) when the variable v has the value a and the other one has b. */
+const xyOf = (v: V, a: number, b: number): AnswerSpec => (v === "x" ? xyWhen(a, b) : xyWhen(b, a));
+/** "3x", "-y" for messages. */
+const termOf = (c: number, v: string) => plain(term(c, v, "t", true));
+const wrapNum = (n: number) => (n < 0 ? `(${n})` : `${n}`);
+
+const SIGN_FLIP: Text = tx("Sign flip missing", "Vorzeichenwechsel vergessen");
+
+/** A known value is put back in, and the sign of the product m·value slips. */
+function backSign(o: V, known: number, m: number, name: string): Msg {
+  const rule =
+    m < 0 && known < 0
+      ? ["minus times minus is **plus**", "Minus mal Minus ist **Plus**"]
+      : m < 0
+        ? ["minus times plus is **minus**", "Minus mal Plus ist **Minus**"]
+        : ["plus times minus is **minus**", "Plus mal Minus ist **Minus**"];
+  return [
+    tx("Sign when putting back", "Vorzeichen beim Einsetzen"),
+    tx(
+      `$${o} = ${known}$ is right! But when you put it into ${name}, watch the sign of $${m} \\cdot ${wrapNum(known)}$: ${rule[0]}.`,
+      `$${o} = ${known}$ stimmt! Aber achte beim Einsetzen in ${name} auf das Vorzeichen von $${m} \\cdot ${wrapNum(known)}$: ${rule[1]}.`,
+    ),
+  ];
+}
+
+/** K·o = R solved with the wrong sign: dividing by a negative number. */
+function negDivide(o: V, K: number): Msg {
+  return [
+    tx("Dividing by a negative", "Geteilt durch eine negative Zahl"),
+    tx(
+      `Nearly! To get $${o}$ alone you divide by $${K}$, and dividing by a negative number flips the sign.`,
+      `Fast! Um $${o}$ allein zu bekommen, teilst du durch $${K}$, und beim Teilen durch eine negative Zahl dreht sich das Vorzeichen um.`,
+    ),
+  ];
+}
+
+/** Adds the "putting back" slip for v = m·o + n with o = known. */
+function addBackSign(mk: Collector, v: V, m: number, n: number, known: number, name: string) {
+  const prod = m * known;
+  if (prod !== 0 && (m < 0 || (known < 0 && m !== 1))) mk.add(xyOf(other(v), known, -prod + n), ...backSign(other(v), known, m, name));
+}
+
+/** Einsetzungsverfahren: (I) v = m·o + n put into (II). */
+function substitutionMistakes(s: Solved, e: Std): Mistake[] {
+  const sv = s.v;
+  const ov = other(sv);
+  const qs = e[sv];
+  const K = qs * s.m + e[ov];
+  const D = qs * s.n;
+  const known = (e.c - D) / K;
+  const via = (o: number) => xyOf(ov, o, s.m * o + s.n);
+  const mk = mistakeList(via(known));
+  const rhs = plain(rhsSrc(s, "1"));
+  // Without brackets only the o-term gets multiplied: qs·m·o + n instead of qs·m·o + qs·n.
+  if (qs !== 1) {
+    mk.add(
+      via((e.c - s.n) / K),
+      tx("Brackets forgotten", "Klammern vergessen"),
+      qs === -1
+        ? tx(
+            `Ah, I see what happened! You put $${rhs}$ in without brackets, so the minus only reached the first term. With brackets, it flips **every** sign inside.`,
+            `Ah, ich seh, was passiert ist! Du hast $${rhs}$ ohne Klammern eingesetzt, deshalb hat das Minus nur den ersten Term erwischt. Mit Klammern dreht es **jedes** Vorzeichen darin um.`,
+          )
+        : tx(
+            `Ah, I see what happened! You put $${rhs}$ in without brackets, so the $${qs}$ only reached the first term. It has to multiply **every** term in the bracket.`,
+            `Ah, ich seh, was passiert ist! Du hast $${rhs}$ ohne Klammern eingesetzt, deshalb hat die $${qs}$ nur den ersten Term erwischt. Sie muss **jeden** Term in der Klammer multiplizieren.`,
+          ),
+    );
+  }
+  if (D !== 0) {
+    mk.add(
+      via((e.c + D) / K),
+      SIGN_FLIP,
+      tx(
+        `Nearly! After multiplying out, the $${D}$ has to go to the other side, and on the way its sign flips.`,
+        `Fast! Nach dem Ausmultiplizieren muss die $${D}$ auf die andere Seite, und dabei dreht sich ihr Vorzeichen um.`,
+      ),
+    );
+  }
+  if (K < 0) mk.add(via(-known), ...negDivide(ov, K));
+  addBackSign(mk, sv, s.m, s.n, known, "(I)");
+  return mk.list;
+}
+
+/** Gleichsetzungsverfahren: m1·o + n1 = m2·o + n2. */
+function equalizationMistakes(s1: Solved, s2: Solved): Mistake[] {
+  const v = s1.v;
+  const o = other(v);
+  const K = s1.m - s2.m;
+  const known = (s2.n - s1.n) / K;
+  const via = (val: number) => xyOf(o, val, s1.m * val + s1.n);
+  const mk = mistakeList(via(known));
+  if (s2.m !== 0 && s1.m + s2.m !== 0) {
+    mk.add(
+      via((s2.n - s1.n) / (s1.m + s2.m)),
+      SIGN_FLIP,
+      tx(`Nearly! When $${termOf(s2.m, o)}$ moves to the left side, it has to change its sign.`, `Fast! Wenn $${termOf(s2.m, o)}$ auf die linke Seite wandert, muss sich sein Vorzeichen ändern.`),
+    );
+  }
+  if (s1.n !== 0) {
+    mk.add(
+      via((s2.n + s1.n) / K),
+      SIGN_FLIP,
+      tx(`Nearly! When the $${s1.n}$ moves to the right side, it has to change its sign.`, `Fast! Wenn die $${s1.n}$ auf die rechte Seite wandert, muss sich ihr Vorzeichen ändern.`),
+    );
+  }
+  if (K < 0) mk.add(via(-known), ...negDivide(o, K));
+  addBackSign(mk, v, s1.m, s1.n, known, "(I)");
+  return mk.list;
+}
+
+/** Additionsverfahren, with the same plan as the worked solution. `first`: story-specific slips. */
+function eliminationMistakes(e1: Std, e2: Std, first: [AnswerSpec, Msg][] = []): Mistake[] {
+  const { ev, m1, m2, subtract } = plan(e1, e2);
+  const ov = other(ev);
+  const sg = subtract ? -1 : 1;
+  const E1 = scale(e1, m1);
+  const E2 = scale(e2, m2);
+  const [A, B] = subtract && E1[ov] - E2[ov] < 0 ? [E2, E1] : [E1, E2];
+  const K = A[ov] + sg * B[ov];
+  const R = A.c + sg * B.c;
+  const known = R / K;
+  // Like the solution: ev comes from the equation with the simpler ev-coefficient.
+  const back = Math.abs(e2[ev]) < Math.abs(e1[ev]) ? 2 : 1;
+  const be = back === 1 ? e1 : e2;
+  const name = back === 1 ? "(I)" : "(II)";
+  const via = (o: number) => xyOf(ov, o, (be.c - be[ov] * o) / be[ev]);
+  /** ov after combining a ± b, as if the ev-terms had cancelled. */
+  const solve = (a: Std, b: Std, s: number) => (a[ov] + s * b[ov] === 0 ? NaN : (a.c + s * b.c) / (a[ov] + s * b[ov]));
+  const multiply = m1 !== 1 || m2 !== 1;
+  const t = (e: Std) => `$${termOf(e[ev], ev)}$`;
+  const wrongOp: Msg = subtract
+    ? [
+        tx("Added instead of subtracted", "Addiert statt subtrahiert"),
+        tx(
+          `Hmm, I think you added the equations. But the $${ev}$-terms are ${t(E1)} and ${t(E2)}: they only cancel if you **subtract**.`,
+          `Hm, ich glaub, du hast die Gleichungen addiert. Aber die $${ev}$-Terme sind ${t(E1)} und ${t(E2)}: Die fallen nur weg, wenn du **subtrahierst**.`,
+        ),
+      ]
+    : [
+        tx("Subtracted instead of added", "Subtrahiert statt addiert"),
+        tx(
+          `Hmm, I think you subtracted the equations. But the $${ev}$-terms are ${t(E1)} and ${t(E2)}: they only cancel if you **add**.`,
+          `Hm, ich glaub, du hast die Gleichungen subtrahiert. Aber die $${ev}$-Terme sind ${t(E1)} und ${t(E2)}: Die fallen nur weg, wenn du **addierst**.`,
+        ),
+      ];
+  const mk = mistakeList(via(known));
+  for (const [when, msg] of first) mk.add(when, ...msg);
+  if (multiply) {
+    mk.add(
+      via(solve({ ...E1, c: e1.c }, { ...E2, c: e2.c }, sg)),
+      tx("Right side not multiplied", "Rechte Seite nicht multipliziert"),
+      tx(
+        "Ah, I see what happened! You multiplied the left side, but the number on the **right side** has to be multiplied too.",
+        "Ah, ich seh, was passiert ist! Du hast die linke Seite multipliziert, aber die Zahl auf der **rechten Seite** muss auch multipliziert werden.",
+      ),
+    );
+  }
+  mk.add(via(solve(E1, E2, -sg)), ...wrongOp);
+  if (subtract) {
+    const notFlipped = tx("Not every sign flipped", "Nicht jedes Vorzeichen gedreht");
+    mk.add(
+      via((A.c + B.c) / K),
+      notFlipped,
+      tx(
+        "Close! When you subtract an equation, **every** term in it flips its sign, the number on the right side too.",
+        "Knapp! Wenn du eine Gleichung subtrahierst, dreht sich **jedes** Vorzeichen darin um, auch das der Zahl auf der rechten Seite.",
+      ),
+    );
+    if (!multiply && A[ov] + B[ov] !== 0) {
+      mk.add(
+        via(R / (A[ov] + B[ov])),
+        notFlipped,
+        tx(
+          `Close! When you subtract an equation, **every** term in it flips its sign, the $${ov}$-term too.`,
+          `Knapp! Wenn du eine Gleichung subtrahierst, dreht sich **jedes** Vorzeichen darin um, auch das vom $${ov}$-Term.`,
+        ),
+      );
+    }
+  }
+  if (K < 0) mk.add(via(-known), ...negDivide(ov, K));
+  if (!multiply && Math.abs(K) !== 1) {
+    mk.add(
+      via(R),
+      tx("Not divided yet", "Noch nicht geteilt"),
+      tx(
+        `Almost! After the $${ev}$-terms cancel, there's still $${termOf(K, ov)}$ on the left. One more step to get $${ov}$ alone.`,
+        `Fast! Nachdem die $${ev}$-Terme weggefallen sind, steht links noch $${termOf(K, ov)}$. Ein Schritt fehlt noch, bis $${ov}$ allein steht.`,
+      ),
+    );
+  }
+  if (be[ov] * known !== 0) {
+    mk.add(
+      xyOf(ov, known, (be.c + be[ov] * known) / be[ev]),
+      tx(`Sign slip solving for ${ev}`, `Vorzeichenfehler beim Auflösen nach ${ev}`),
+      tx(
+        `$${ov} = ${known}$ is right! But when you put it into ${name} and solved for $${ev}$, a term crossed to the other side without changing its sign.`,
+        `$${ov} = ${known}$ stimmt! Aber als du es in ${name} eingesetzt und nach $${ev}$ aufgelöst hast, ist ein Term ohne Vorzeichenwechsel auf die andere Seite gewandert.`,
+      ),
+    );
+  }
+  if (multiply) {
+    const only = (e: Std, k: number): Std => (ev === "x" ? { ...e, x: e.x * k } : { ...e, y: e.y * k });
+    mk.add(
+      via(solve(only(e1, m1), only(e2, m2), sg)),
+      tx("Only one term multiplied", "Nur ein Term multipliziert"),
+      tx(
+        `You got the $${ev}$-terms to cancel, nice! But multiplying an equation means **every** term on both sides, not just the $${ev}$-term.`,
+        `Die $${ev}$-Terme fallen jetzt weg, gut! Aber eine Gleichung multiplizieren heißt: **jeden** Term auf beiden Seiten, nicht nur den $${ev}$-Term.`,
+      ),
+    );
+  }
+  // The five most likely ones (in the order above) are plenty.
+  return mk.list.slice(0, 5);
+}
+
+/** Reading the solution off a graph: a point on just one of the lines instead of the crossing. */
+function graphSystemMistakes(x: number, y: number, lines: [number, number][]): Mistake[] {
+  const mk = mistakeList(xyWhen(x, y));
+  const names = ["I", "II"];
+  lines.forEach(([, n], i) =>
+    mk.add(
+      xyWhen(0, n),
+      tx("That's a y-intercept", "Das ist ein y-Achsenabschnitt"),
+      tx(
+        `Ooh, that's where line ${names[i]} crosses the $y$-axis. The solution is the point where the **two lines** cross each other.`,
+        `Ooh, da schneidet Gerade ${names[i]} die $y$-Achse. Die Lösung ist der Punkt, an dem sich **die beiden Geraden** schneiden.`,
+      ),
+    ),
+  );
+  lines.forEach(([m, n], i) => {
+    const zero = -n / m;
+    if (Number.isInteger(zero)) {
+      mk.add(
+        xyWhen(zero, 0),
+        tx("That's a zero", "Das ist eine Nullstelle"),
+        tx(
+          `Ooh, that's where line ${names[i]} crosses the $x$-axis. The solution is the point where the **two lines** cross each other.`,
+          `Ooh, da schneidet Gerade ${names[i]} die $x$-Achse. Die Lösung ist der Punkt, an dem sich **die beiden Geraden** schneiden.`,
+        ),
+      );
+    }
+  });
+  return mk.list;
+}
+
+/** Does (p0 | p1) solve (I), (II)? Options: both, only (I), only (II), neither. */
+function checkPairMistakes(e1: Std, e2: Std, p: Pt, answer: Choice): Mistake[] {
+  const eqs = [e1, e2];
+  const names = ["(I)", "(II)"];
+  const ok = eqs.map((e) => holds(e, p[0], p[1]));
+  const claims = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
+  // A slip with a negative number that would make the statement come out true.
+  const signSlip = (e: Std) => {
+    const products = [e.x * p[0], e.y * p[1]];
+    const negative = [e.x < 0 || p[0] < 0, e.y < 0 || p[1] < 0];
+    return products.some((v, i) => v !== 0 && negative[i] && products[0] + products[1] - 2 * v === e.c);
+  };
+  const mk = mistakeList(answer);
+  claims.forEach((c, k) => {
+    if (k === answer.correct) return;
+    const wrongTrue = [0, 1].find((i) => c[i] && !ok[i]);
+    const i = wrongTrue ?? [0, 1].find((j) => !c[j] && ok[j]) ?? 0;
+    const e = eqs[i];
+    const name = names[i];
+    let msg: Msg;
+    if (wrongTrue !== undefined && holds(e, p[1], p[0])) {
+      msg = [
+        tx("x and y swapped?", "x und y vertauscht?"),
+        tx(
+          `Careful in ${name}: did you put $x$ and $y$ in the right places? $x = ${p[0]}$ goes with the $x$-term and $y = ${p[1]}$ with the $y$-term.`,
+          `Vorsicht bei ${name}: Hast du $x$ und $y$ an der richtigen Stelle eingesetzt? $x = ${p[0]}$ gehört zum $x$-Term, $y = ${p[1]}$ zum $y$-Term.`,
+        ),
+      ];
+    } else if (wrongTrue !== undefined && signSlip(e)) {
+      msg = [
+        tx("Watch the signs", "Achtung, Vorzeichen"),
+        tx(
+          `Check the signs in ${name} again: minus times minus is **plus**, and plus times minus is **minus**.`,
+          `Prüf die Vorzeichen in ${name} noch mal: Minus mal Minus ist **Plus**, und Plus mal Minus ist **Minus**.`,
+        ),
+      ];
+    } else if (wrongTrue !== undefined && k === 0) {
+      msg = [
+        tx("Both have to fit", "Beide müssen passen"),
+        tx(
+          "A solution of the system has to make **both** equations true. Put the pair into each one and compare both sides exactly.",
+          "Eine Lösung des LGS muss **beide** Gleichungen erfüllen. Setz das Zahlenpaar in jede ein und vergleich beide Seiten genau.",
+        ),
+      ];
+    } else if (wrongTrue !== undefined) {
+      msg = [
+        tx(`Recheck ${name}`, `${name} noch mal prüfen`),
+        tx(`Work out the left side of ${name} once more, step by step. Does it really give $${e.c}$?`, `Rechne die linke Seite von ${name} noch mal Schritt für Schritt aus. Kommt da wirklich $${e.c}$ heraus?`),
+      ];
+    } else {
+      msg = [
+        tx(`Recheck ${name}`, `${name} noch mal prüfen`),
+        tx(
+          `Have another look at ${name}: put the numbers in again, multiply first, then add. Careful with the signs!`,
+          `Schau dir ${name} noch mal an: Setz die Zahlen noch mal ein, erst multiplizieren, dann addieren. Vorsicht bei den Vorzeichen!`,
+        ),
+      ];
+    }
+    mk.add({ ...answer, correct: k }, ...msg);
+  });
+  return mk.list;
+}
+
+const NOT_TRUE: Msg = [
+  tx("True or false?", "Wahr oder falsch?"),
+  tx(
+    "Right, both variables vanish! But that alone doesn't mean infinitely many. Look closely at the statement that's left: is it true?",
+    "Stimmt, beide Variablen fallen weg! Aber das allein heißt noch nicht unendlich viele. Schau dir die Aussage genau an, die übrig bleibt: Stimmt sie?",
+  ),
+];
+const NOT_FALSE: Msg = [
+  tx("True or false?", "Wahr oder falsch?"),
+  tx(
+    "Right, both variables vanish! But that doesn't automatically mean no solution. Is the statement that's left true or false?",
+    "Stimmt, beide Variablen fallen weg! Aber das heißt nicht automatisch keine Lösung. Ist die Aussage, die übrig bleibt, wahr oder falsch?",
+  ),
+];
+const X_DROPS: Msg = [
+  tx("x drops out", "x fällt weg"),
+  tx(
+    "Ooh, careful! Substitute and multiply out: the $x$-terms cancel completely, so there's no single value for $x$.",
+    "Ooh, Vorsicht! Setz ein und multiplizier aus: Die $x$-Terme heben sich komplett auf, es gibt also keinen einzelnen Wert für $x$.",
+  ),
+];
+const REALLY_VANISH: Msg = [
+  tx("Do they really vanish?", "Fallen sie wirklich weg?"),
+  tx("Did $x$ and $y$ really both vanish? Solve it step by step and see what comes out.", "Sind $x$ und $y$ wirklich beide weggefallen? Löse es Schritt für Schritt und schau, was herauskommt."),
+];
+
+/**
+ * One, none or infinitely many? `notOne`: why it isn't a single solution (shown when the
+ * student picks "one" for a special case); `one`: why it is (when they pick a special case).
+ */
+function specialMistakes(answer: Choice, notOne: Msg, one: Msg): Mistake[] {
+  const mk = mistakeList(answer);
+  const pick = (i: number): AnswerSpec => ({ ...answer, correct: i });
+  if (answer.correct === 0) {
+    mk.add(pick(1), ...one);
+    mk.add(pick(2), ...one);
+  } else {
+    mk.add(pick(answer.correct === 1 ? 2 : 1), ...(answer.correct === 1 ? NOT_TRUE : NOT_FALSE));
+    mk.add(pick(0), ...notOne);
+  }
+  return mk.list;
+}
+
+// ---------------------------------------------------------------------------
 // Exercise generator: always designed backwards from a whole-number solution.
 
 const sysMath = (a: string, b: string) => plain(sysSrc(a, b));
@@ -435,6 +801,7 @@ function substitutionTask(rng: Rng): Exercise {
       answer: pairAnswer(x, y),
       hint: HINT_SUB(sv),
       solution: substitution(s, e, [x, y]),
+      mistakes: substitutionMistakes(s, e),
     };
   }
 }
@@ -470,20 +837,22 @@ function checkPairTask(rng: Rng): Exercise {
     ][correct];
     const put = `$x = ${p[0]}$`;
     const putY = `$y = ${p[1]}$`;
+    const answer: Choice = {
+      kind: "choice",
+      options: [
+        tx("It solves **both** equations: it's the solution of the system.", "Es löst **beide** Gleichungen: Es ist die Lösung des LGS."),
+        tx("It solves only equation (I).", "Es löst nur Gleichung (I)."),
+        tx("It solves only equation (II).", "Es löst nur Gleichung (II)."),
+        tx("It solves **neither** equation.", "Es löst **keine** der beiden Gleichungen."),
+      ],
+      correct,
+    };
     return {
       instruction: tx("Check a solution", "Prüfe ein Zahlenpaar"),
       text: tx(`Put in ${put} and ${putY}. Which equations does this pair solve?`, `Setze ${put} und ${putY} ein. Welche Gleichungen löst dieses Zahlenpaar?`),
       math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")),
-      answer: {
-        kind: "choice",
-        options: [
-          tx("It solves **both** equations: it's the solution of the system.", "Es löst **beide** Gleichungen: Es ist die Lösung des LGS."),
-          tx("It solves only equation (I).", "Es löst nur Gleichung (I)."),
-          tx("It solves only equation (II).", "Es löst nur Gleichung (II)."),
-          tx("It solves **neither** equation.", "Es löst **keine** der beiden Gleichungen."),
-        ],
-        correct,
-      },
+      answer,
+      mistakes: checkPairMistakes(e1, e2, p, answer),
       hint: tx(
         "Put the two numbers into each equation and work out the left side. Is it equal to the right side?",
         "Setze die beiden Zahlen in jede Gleichung ein und rechne die linke Seite aus. Kommt die rechte Seite heraus?",
@@ -524,6 +893,10 @@ function graphTask(rng: Rng): Exercise {
         ],
       }),
       answer: pairAnswer(x, y),
+      mistakes: graphSystemMistakes(x, y, [
+        [m1, n1],
+        [m2, n2],
+      ]),
       hint: tx(
         "Find the point where the two lines cross. Its $x$- and $y$-coordinates are the solution.",
         "Suche den Schnittpunkt der beiden Geraden. Seine $x$- und $y$-Koordinate sind die Lösung.",
@@ -562,6 +935,7 @@ function equalizationTask(rng: Rng): Exercise {
       answer: pairAnswer(x, y),
       hint: HINT_EQ(v),
       solution: equalization(s1, s2, [x, y]),
+      mistakes: equalizationMistakes(s1, s2),
     };
   }
 }
@@ -600,6 +974,7 @@ function matchingTask(rng: Rng): Exercise {
             "Vor einer Variable steht in beiden Gleichungen dieselbe Zahl. Subtrahiere die Gleichungen.",
           ),
       solution: elimination(e1, e2, [x, y]),
+      mistakes: eliminationMistakes(e1, e2),
     };
   }
 }
@@ -622,6 +997,7 @@ function multiplyTask(rng: Rng): Exercise {
       answer: pairAnswer(x, y),
       hint: HINT_ELIM,
       solution: elimination(e1, e2, [x, y]),
+      mistakes: eliminationMistakes(e1, e2),
     };
   }
 }
@@ -637,6 +1013,8 @@ function wordTask(rng: Rng): Exercise {
     let y: number;
     let setup: Text;
     let answer: Text;
+    /** What Blob says when x and y come out swapped. */
+    let swapped: Text;
     if (kind === "tickets") {
       const pa = rng.int(8, 14);
       const pc = rng.int(4, pa - 2);
@@ -650,6 +1028,10 @@ function wordTask(rng: Rng): Exercise {
       );
       setup = tx("Set up: (I) counts the tickets, (II) counts the money.", "Aufstellen: (I) zählt die Karten, (II) das Geld.");
       answer = tx(`So it sold ${x} adult tickets and ${y} child tickets.`, `Es wurden also ${x} Erwachsenenkarten und ${y} Kinderkarten verkauft.`);
+      swapped = tx(
+        `Ha, swapped! Which tickets cost ${pa} €? $x$ counts the **adult** tickets, $y$ the child tickets.`,
+        `Ha, vertauscht! Welche Karten kosten ${pa} €? $x$ zählt die **Erwachsenenkarten**, $y$ die Kinderkarten.`,
+      );
     } else if (kind === "animals") {
       x = rng.int(3, 25);
       y = rng.int(3, 25);
@@ -664,6 +1046,10 @@ function wordTask(rng: Rng): Exercise {
         "Aufstellen: Jedes Tier hat einen Kopf, das ist (I). Ein Huhn hat 2 Beine und ein Kaninchen 4, das ist (II).",
       );
       answer = tx(`So there are ${x} chickens and ${y} rabbits.`, `Es sind also ${x} Hühner und ${y} Kaninchen.`);
+      swapped = tx(
+        "Ha, swapped! Did you give the chickens 4 legs? A chicken has 2, a rabbit 4, and $x$ counts the **chickens**.",
+        "Ha, vertauscht! Hast du den Hühnern 4 Beine gegeben? Ein Huhn hat 2, ein Kaninchen 4, und $x$ zählt die **Hühner**.",
+      );
     } else if (kind === "numbers") {
       x = rng.int(8, 40);
       y = rng.int(2, x - 1);
@@ -675,6 +1061,7 @@ function wordTask(rng: Rng): Exercise {
       );
       setup = tx("Set up: (I) is the sum, (II) the difference.", "Aufstellen: (I) ist die Summe, (II) die Differenz.");
       answer = tx(`The numbers are ${x} and ${y}.`, `Die Zahlen sind ${x} und ${y}.`);
+      swapped = tx("Ha, swapped! $x$ is the **larger** number, $y$ the smaller one.", "Ha, vertauscht! $x$ ist die **größere** Zahl, $y$ die kleinere.");
     } else {
       x = rng.int(2, 5);
       y = rng.int(2, 5);
@@ -688,6 +1075,7 @@ function wordTask(rng: Rng): Exercise {
       );
       setup = tx("Set up one equation for each sentence.", "Stell für jeden Satz eine Gleichung auf.");
       answer = tx(`So a coffee costs ${x} € and a muffin ${y} €.`, `Ein Kaffee kostet also ${x} € und ein Muffin ${y} €.`);
+      swapped = tx("Ha, swapped! $x$ is the price of **one coffee**, $y$ the price of one muffin.", "Ha, vertauscht! $x$ ist der Preis für **einen Kaffee**, $y$ der für einen Muffin.");
     }
     const p = plan(e1, e2);
     if (Math.max(p.m1, p.m2) > 6) continue;
@@ -702,6 +1090,7 @@ function wordTask(rng: Rng): Exercise {
         "Stell für jede Information eine Gleichung auf und löse dann das LGS, z. B. mit dem Additionsverfahren.",
       ),
       solution: frames,
+      mistakes: eliminationMistakes(e1, e2, [[xyWhen(y, x), [tx("Swapped", "Vertauscht"), swapped]]]),
     };
   }
 }
@@ -737,7 +1126,13 @@ function specialTask(rng: Rng): Exercise {
       if (Math.abs(n) > 9 || Math.abs(r) > 30 || qx === 0) continue;
       const s: Solved = { v: "y", m, n };
       const e: Std = { x: qx, y: qy, c: r };
-      return { ...base, math: sysMath(solvedSrc(s, "1"), stdSrc(e, "2")), hint, solution: substitution(s, e, outcome === "one" ? [x, y] : null) };
+      return {
+        ...base,
+        math: sysMath(solvedSrc(s, "1"), stdSrc(e, "2")),
+        hint,
+        solution: substitution(s, e, outcome === "one" ? [x, y] : null),
+        mistakes: specialMistakes(base.answer, X_DROPS, REALLY_VANISH),
+      };
     }
     if (variant === "solved") {
       const m = rng.nonZero(-3, 3);
@@ -747,7 +1142,24 @@ function specialTask(rng: Rng): Exercise {
       if (Math.abs(n1) > 9 || Math.abs(n2) > 9) continue;
       const s1: Solved = { v: "y", m, n: n1 };
       const s2: Solved = { v: "y", m: m2, n: n2 };
-      return { ...base, math: sysMath(solvedSrc(s1, "1"), solvedSrc(s2, "2")), hint, solution: equalization(s1, s2, outcome === "one" ? [x, y] : null) };
+      const sameSlope: Msg = [
+        tx("Same slope", "Gleiche Steigung"),
+        tx(
+          `Look at the slopes: both lines have $m = ${m}$. Lines with the same slope never cross in exactly one point.`,
+          `Schau auf die Steigungen: Beide Geraden haben $m = ${m}$. Geraden mit gleicher Steigung schneiden sich nie in genau einem Punkt.`,
+        ),
+      ];
+      const differentSlopes: Msg = [
+        tx("Same slope?", "Gleiche Steigung?"),
+        tx("Compare the slopes of the two lines: are they really the same?", "Vergleich die Steigungen der beiden Geraden: Sind sie wirklich gleich?"),
+      ];
+      return {
+        ...base,
+        math: sysMath(solvedSrc(s1, "1"), solvedSrc(s2, "2")),
+        hint,
+        solution: equalization(s1, s2, outcome === "one" ? [x, y] : null),
+        mistakes: specialMistakes(base.answer, sameSlope, differentSlopes),
+      };
     }
     const e1 = stdThrough(rng, x, y, 4);
     const k = rng.pick([2, 3]);
@@ -756,7 +1168,27 @@ function specialTask(rng: Rng): Exercise {
     if (outcome === "one") e2 = stdThrough(rng, x, y, 5);
     if (outcome === "one" && det(e1, e2) === 0) continue;
     if (Math.abs(e2.c) > 40) continue;
-    return { ...base, math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")), hint, solution: elimination(e1, e2, outcome === "one" ? [x, y] : null) };
+    const multiple: Msg = [
+      tx("A multiple of (I)", "Ein Vielfaches von (I)"),
+      tx(
+        `Look closely: the left side of (II) is exactly $${k}$ times the left side of (I). What does that mean for the lines?`,
+        `Schau genau hin: Die linke Seite von (II) ist genau das $${k}$-Fache der linken Seite von (I). Was heißt das für die Geraden?`,
+      ),
+    ];
+    const notMultiple: Msg = [
+      tx("A multiple?", "Ein Vielfaches?"),
+      tx(
+        "Is (II) really just a multiple of (I)? Check **every** number in front of $x$ and $y$, then solve it.",
+        "Ist (II) wirklich nur ein Vielfaches von (I)? Prüf **jede** Zahl vor $x$ und $y$ und löse es dann.",
+      ),
+    ];
+    return {
+      ...base,
+      math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")),
+      hint,
+      solution: elimination(e1, e2, outcome === "one" ? [x, y] : null),
+      mistakes: specialMistakes(base.answer, multiple, notMultiple),
+    };
   }
 }
 
@@ -1107,6 +1539,7 @@ const linearSystems: Topic = {
           "$3x - 4 = x + 2$. Löse nach $x$ auf und setze das Ergebnis in eine der Gleichungen ein.",
         ),
         solution: equalization({ v: "y", m: 3, n: -4 }, { v: "y", m: 1, n: 2 }, [3, 5]),
+        mistakes: equalizationMistakes({ v: "y", m: 3, n: -4 }, { v: "y", m: 1, n: 2 }),
       },
     },
     {
@@ -1128,6 +1561,7 @@ const linearSystems: Topic = {
         answer: pairAnswer(4, 2),
         hint: tx("Put $(3y - 2)$ in place of $x$ in (II): $2(3y - 2) + y = 10$.", "Setze $(3y - 2)$ für $x$ in (II) ein: $2(3y - 2) + y = 10$."),
         solution: substitution({ v: "x", m: 3, n: -2 }, { x: 2, y: 1, c: 10 }, [4, 2]),
+        mistakes: substitutionMistakes({ v: "x", m: 3, n: -2 }, { x: 2, y: 1, c: 10 }),
       },
     },
     {
@@ -1159,6 +1593,7 @@ const linearSystems: Topic = {
         answer: pairAnswer(3, 2),
         hint: tx("Multiply (II) by $2$: then the $y$-terms are $+2y$ and $-2y$.", "Multipliziere (II) mit $2$: Dann sind die $y$-Terme $+2y$ und $-2y$."),
         solution: elimination({ x: 3, y: 2, c: 13 }, { x: 1, y: -1, c: 1 }, [3, 2]),
+        mistakes: eliminationMistakes({ x: 3, y: 2, c: 13 }, { x: 1, y: -1, c: 1 }),
       },
     },
     {
@@ -1181,6 +1616,7 @@ const linearSystems: Topic = {
         answer: { kind: "choice", options: COUNT_OPTIONS, correct: 2 },
         hint: tx("Substitute $y = -x + 4$ into (II). What happens to $x$?", "Setze $y = -x + 4$ in (II) ein. Was passiert mit $x$?"),
         solution: substitution({ v: "y", m: -1, n: 4 }, { x: 2, y: 2, c: 8 }, null),
+        mistakes: specialMistakes({ kind: "choice", options: COUNT_OPTIONS, correct: 2 }, X_DROPS, REALLY_VANISH),
       },
     },
   ],

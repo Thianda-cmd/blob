@@ -10,8 +10,9 @@ import { Inline } from "@/learn/components/Rich";
 import { SolutionPlayer } from "@/learn/components/SolutionPlayer";
 import { topicMeta } from "@/learn/catalog";
 import { parseDisplay, type DNode } from "@/learn/engine/display";
+import { equivalentText } from "@/learn/engine/expr";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { emWidth, smoothFracExits } from "./equations";
 
@@ -630,6 +631,395 @@ function FormulaCard(props: Record<string, unknown>) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Typical mistakes. Blob rearranges the formula the way a student with one
+// particular misconception would (a term moved without changing its sign, only
+// one summand divided, the root forgotten…), so the wrong formula is exactly what
+// that student types, and Blob can say what happened.
+
+type Kind = "sum" | "unfrac" | "div" | "mul" | "root" | "square";
+type Trace = { kind: Kind; T: N; O: N; s: Step };
+/** What a slip does to one step: the other side afterwards (and the letter's side, if that changes too). */
+type Twist = (tr: Trace) => { t?: N; o: N } | null;
+
+/** The kind of undo step `plan` takes for this side (same branches as `plan`). */
+function kindOf(T: N): Kind {
+  if (T.t === "sum") return "sum";
+  if (T.t === "prod") return T.items.some((f) => f.t === "frac" && f.den.t === "num") ? "unfrac" : "div";
+  if (T.t === "frac") return "mul";
+  return T.t === "pow" ? "root" : "square";
+}
+
+/** Rearrange without frames. `twist` may change step `at` (the steps before it are the correct ones). */
+function solveTo(L0: N, R0: N, target: string, at = -1, twist?: Twist): { answer: N; steps: Trace[]; twisted: boolean } {
+  let L = L0;
+  let R = R0;
+  const steps: Trace[] = [];
+  let twisted = false;
+  for (let guard = 0; guard < 10; guard++) {
+    const left = has(L, target);
+    const T = left ? L : R;
+    const O = left ? R : L;
+    if (T.t === "sym") break;
+    const s = plan(T, O, target, steps.length + 1);
+    const tr: Trace = { kind: kindOf(T), T, O, s };
+    const changed = steps.length === at && twist ? twist(tr) : null;
+    steps.push(tr);
+    if (changed) twisted = true;
+    const t = changed?.t ?? s.t;
+    const o = changed?.o ?? s.o;
+    if (left) [L, R] = [t, o];
+    else [L, R] = [o, t];
+  }
+  return { answer: has(L, target) ? R : L, steps, twisted };
+}
+
+/** What a divide step divides by (same as `plan`). */
+function divisor(T: Extract<N, { t: "prod" }>, target: string): N {
+  const others = T.items.filter((f) => !has(f, target));
+  return others.length === 1 ? others[0] : { t: "prod", id: "", items: others, tight: T.tight };
+}
+
+/** The fraction with a number underneath that an "unfrac" step multiplies away (½ in ½gh). */
+const numberFraction = (T: N) => (T.t === "prod" ? (T.items.find((f) => f.t === "frac" && f.den.t === "num") as Extract<N, { t: "frac" }> | undefined) : undefined);
+
+/** The factor a multiply/divide step uses, or null when the step isn't one (or has the letter inside). */
+function factorOf(tr: Trace, target: string): N | null {
+  const { T } = tr;
+  if (tr.kind === "div" && T.t === "prod") return divisor(T, target);
+  if (tr.kind === "mul" && T.t === "frac" && !has(T.den, target)) return T.den;
+  if (tr.kind === "unfrac") return numberFraction(T)?.den ?? null;
+  return null;
+}
+
+/**
+ * "Undo in the wrong order": the student treats a(x − b) as ax − b, (x + b)/a as x/a + b, (x + b)² as
+ * x² + b, so the summand inside the bracket comes off first. Returns that misread formula.
+ */
+function flatten(node: N, target: string): { node: N; rest: SumItem[]; where: "bracket" | "fraction" } | null {
+  const inside = (child: N, where: "bracket" | "fraction") => {
+    if (child.t === "sum") {
+      const mine = child.items.find((it) => has(it.n, target));
+      if (!mine || mine.neg) return null;
+      return { node: mine.n, rest: child.items.filter((it) => it !== mine), where };
+    }
+    return flatten(child, target);
+  };
+  if (node.t === "prod") {
+    const i = node.items.findIndex((f) => has(f, target));
+    const got = inside(node.items[i], "bracket");
+    return got && { ...got, node: { ...node, items: node.items.map((f, j) => (j === i ? got.node : f)) } };
+  }
+  if (node.t === "frac" && has(node.num, target)) {
+    const got = inside(node.num, "fraction");
+    return got && { ...got, node: { ...node, num: got.node } };
+  }
+  if (node.t === "pow") {
+    const got = inside(node.base, "bracket");
+    return got && { ...got, node: { ...node, base: got.node } };
+  }
+  return null;
+}
+
+const show = (x: N) => src(x, false);
+const signedItem = (it: SumItem) => `${it.neg ? "-" : "+"} ${show(it.n)}`;
+/** A sum item on its own, with the minus only if it has one: "u", "2b", "-32". */
+const bare = (it: SumItem) => `${it.neg ? "-" : ""}${show(it.n)}`;
+const paren = (x: N) => (needsBrackets(x) ? `(${show(x)})` : show(x));
+
+function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
+  const base = solveTo(L0, R0, target);
+  const steps = base.steps;
+  if (!steps.length) return [];
+  const rightSrc = plain(right);
+  const out: Mistake[] = [];
+  const push = (answer: N | null, title: Text, say: Text) => {
+    if (!answer || out.length >= 5 || has(answer, target)) return;
+    const value = plain(answer);
+    // Must be defined for the positive test values, and different from the answer and from the other slips.
+    if (!equivalentText(value, value, { positive: true }) || equivalentText(value, rightSrc, { positive: true })) return;
+    if (out.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, value, { positive: true }))) return;
+    out.push({ when: { kind: "expr", value, positive: true }, title, say });
+  };
+  const find = (pred: (tr: Trace) => boolean, last = false) => (last ? steps.findLastIndex(pred) : steps.findIndex(pred));
+  /** The answer with step `i` done the way `twist` says. */
+  const wrong = (i: number, twist: Twist) => {
+    if (i < 0) return null;
+    const run = solveTo(L0, R0, target, i, twist);
+    return run.twisted ? run.answer : null;
+  };
+  const first = steps[0].s.short;
+  const BRACKETS = tx("Brackets missing", "Klammern fehlen");
+
+  // Undone in the wrong order: the summand inside the bracket came off first.
+  const leftSide = has(L0, target);
+  const flat = flatten(leftSide ? L0 : R0, target);
+  if (flat && flat.rest.length) {
+    const misread: N = { t: "sum", id: "", items: [{ neg: false, n: flat.node, sid: "" }, ...flat.rest] };
+    const where = flat.where === "bracket" ? tx("inside the bracket", "in der Klammer") : tx("on top of the fraction bar", "über dem Bruchstrich");
+    const inner = signedItem(flat.rest[0]);
+    push(
+      (leftSide ? solveTo(misread, R0, target) : solveTo(L0, misread, target)).answer,
+      tx("Wrong order", "Falsche Reihenfolge"),
+      txMap(
+        (t, locale) =>
+          t(
+            `I think I know what you did: you undid the $${inner}$ first. But it sits ${resolveText(where, locale)}, so it comes off **last**: first ${resolveText(first, locale)}.`,
+            `Ich glaub, ich weiß, was du gemacht hast: Du hast zuerst das $${inner}$ rückgängig gemacht. Das steht aber ${resolveText(where, locale)}, kommt also erst **zum Schluss** weg: Zuerst musst du ${resolveText(first, locale)}.`,
+          ),
+      ),
+    );
+  }
+
+  // A term moved to the other side without changing its sign.
+  const sumAt = find((tr) => tr.kind === "sum" && tr.T.t === "sum" && !tr.T.items.find((it) => has(it.n, target))?.neg);
+  const pickOf = (T: N) => (T.t === "sum" ? T.items.find((it) => !has(it.n, target)) : undefined);
+  if (sumAt >= 0) {
+    const pick = pickOf(steps[sumAt].T)!;
+    const X = show(pick.n);
+    push(
+      wrong(sumAt, ({ O }) => ({ o: appendSum(O, { ...pick, sid: "" }, 0) })),
+      tx("Sign didn't change", "Vorzeichen nicht gewechselt"),
+      tx(
+        `Ah, I see what happened! The $${signedItem(pick)}$ went over to the other side but kept its sign. To get rid of it, ${pick.neg ? "add" : "subtract"} $${X}$ on **both** sides.`,
+        `Ah, ich seh, was passiert ist! Das $${signedItem(pick)}$ ist auf die andere Seite gewandert, hat aber sein Vorzeichen behalten. Um es loszuwerden, ${pick.neg ? "addierst" : "subtrahierst"} du auf **beiden** Seiten $${X}$.`,
+      ),
+    );
+  }
+
+  // Multiplying or dividing a sum: only one summand got it.
+  const spreadAt = find((tr) => tr.kind !== "sum" && tr.O.t === "sum" && factorOf(tr, target) !== null);
+  const spread = (which: "first" | "last") => (tr: Trace) => {
+    const F = factorOf(tr, target)!;
+    if (tr.O.t !== "sum") return null;
+    const k = which === "first" ? 0 : tr.O.items.length - 1;
+    const apply = (n: N) => (tr.kind === "div" ? divideBy(n, F, 0) : multiplyBy(n, F, 0));
+    return { o: { ...tr.O, items: tr.O.items.map((it, j) => (j === k ? { ...it, n: apply(it.n) } : it)) } };
+  };
+  if (spreadAt >= 0) {
+    const tr = steps[spreadAt];
+    const F = show(factorOf(tr, target)!);
+    const items = (tr.O as Extract<N, { t: "sum" }>).items;
+    const div = tr.kind === "div";
+    push(
+      wrong(spreadAt, spread("first")),
+      div ? tx("Not every term divided", "Nicht jeden Summanden geteilt") : tx("Not every term multiplied", "Nicht jeden Summanden multipliziert"),
+      div
+        ? tx(
+            `Nearly! Only $${bare(items[0])}$ got divided by $${F}$, but $${show(items[1].n)}$ has to be divided too. Put the whole side over one fraction bar.`,
+            `Fast! Nur $${bare(items[0])}$ wurde durch $${F}$ geteilt, aber $${show(items[1].n)}$ muss auch geteilt werden. Schreib die ganze Seite über einen Bruchstrich.`,
+          )
+        : tx(
+            `Nearly! Only $${bare(items[0])}$ got multiplied by $${F}$, but $${show(items[1].n)}$ has to be multiplied too. Put the whole side in brackets.`,
+            `Fast! Nur $${bare(items[0])}$ wurde mit $${F}$ multipliziert, aber $${show(items[1].n)}$ muss auch mit. Setz die ganze Seite in Klammern.`,
+          ),
+    );
+  }
+
+  // The square root forgotten, or the root never undone.
+  const rootAt = find((tr) => tr.kind === "root");
+  const squareAt = find((tr) => tr.kind === "square");
+  if (rootAt >= 0) {
+    const b = steps[rootAt].T.t === "pow" ? paren((steps[rootAt].T as Extract<N, { t: "pow" }>).base) : "";
+    push(
+      wrong(rootAt, ({ O }) => ({ o: O })),
+      tx("Square root missing", "Wurzel vergessen"),
+      tx(
+        `So close! But $${b}$ is squared, and that square never got undone. You still need a **square root**.`,
+        `Ganz knapp! Aber $${b}$ ist quadriert, und das Quadrat hast du nicht rückgängig gemacht. Es fehlt noch eine **Wurzel**.`,
+      ),
+    );
+  }
+  if (squareAt >= 0) {
+    const T = steps[squareAt].T;
+    const body = T.t === "sqrt" ? show(T.body) : "";
+    push(
+      wrong(squareAt, ({ O }) => ({ o: O })),
+      tx("Root not undone", "Wurzel nicht aufgelöst"),
+      tx(
+        `Almost! $${body}$ sits under a square root, and that root never got undone. Square **both** sides first.`,
+        `Fast! $${body}$ steht unter einer Wurzel, und die hast du nicht rückgängig gemacht. Quadriere zuerst **beide** Seiten.`,
+      ),
+    );
+  }
+  // √(c² − b²) taken as c − b.
+  if (rootAt >= 0 && steps[rootAt].O.t === "sum") {
+    const minus = (steps[rootAt].O as Extract<N, { t: "sum" }>).items.some((it) => it.neg);
+    const ex = minus ? ["\\sqrt{25 - 9} = 4", "\\sqrt{25} - \\sqrt{9} = 2"] : ["\\sqrt{9 + 16} = 5", "\\sqrt{9} + \\sqrt{16} = 7"];
+    push(
+      wrong(rootAt, ({ O }) => (O.t === "sum" ? { o: { ...O, items: O.items.map((it) => ({ ...it, n: { t: "sqrt", id: "", body: it.n } })) } } : null)),
+      tx("Root split up", "Wurzel aufgeteilt"),
+      tx(
+        `Ooh, classic trap! A root doesn't split over plus or minus: $${ex[0]}$, but $${ex[1]}$. Keep the whole side under one root.`,
+        `Die klassische Falle! Eine Wurzel darfst du nicht über Plus oder Minus aufteilen: $${ex[0]}$, aber $${ex[1]}$. Lass die ganze Seite unter einer Wurzel.`,
+      ),
+    );
+  }
+
+  // The wrong opposite: multiplied instead of divided, or the other way round.
+  const inverseAt = find((tr) => factorOf(tr, target) !== null);
+  if (inverseAt >= 0) {
+    const tr = steps[inverseAt];
+    const F = factorOf(tr, target)!;
+    const f = show(F);
+    const answer = wrong(inverseAt, ({ O }) => ({ o: tr.kind === "div" ? multiplyBy(O, F, 0) : divideBy(O, F, 0) }));
+    if (tr.kind === "div" && tr.T.t === "prod") {
+      const kept = paren(tr.T.items.find((x) => has(x, target))!);
+      push(
+        answer,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Ah, I see what happened! $${kept}$ is **multiplied** by $${f}$, so you undo that by **dividing**, not by multiplying again.`,
+          `Ah, ich seh, was passiert ist! $${kept}$ wird mit $${f}$ **multipliziert**. Das machst du mit **Teilen** rückgängig, nicht mit noch mal Multiplizieren.`,
+        ),
+      );
+    } else if (tr.kind === "mul" && tr.T.t === "frac") {
+      const top = tr.T.num.t === "sum" ? paren(tr.T.num) : show(tr.T.num);
+      push(
+        answer,
+        tx("Divided instead of multiplied", "Geteilt statt multipliziert"),
+        tx(
+          `Ah, I see what happened! $${top}$ is **divided** by $${f}$, so you undo that by **multiplying**, not by dividing again.`,
+          `Ah, ich seh, was passiert ist! $${top}$ wird durch $${f}$ **geteilt**. Das machst du mit **Multiplizieren** rückgängig, nicht mit noch mal Teilen.`,
+        ),
+      );
+    } else {
+      const fr = show(numberFraction(tr.T)!);
+      push(
+        answer,
+        tx("Divided instead of multiplied", "Geteilt statt multipliziert"),
+        tx(
+          `Ah, the fraction! $${fr}$ means **divided by** $${f}$, so you undo it by **multiplying** by $${f}$, not by dividing.`,
+          `Ah, der Bruch! $${fr}$ heißt **geteilt durch** $${f}$. Das machst du mit **Multiplizieren** mit $${f}$ rückgängig, nicht mit Teilen.`,
+        ),
+      );
+    }
+  }
+
+  // A number in a denominator (½, : 100) simply lost.
+  const lostAt = find((tr) => tr.kind === "unfrac" || (tr.kind === "mul" && tr.T.t === "frac" && tr.T.den.t === "num"));
+  if (lostAt >= 0) {
+    const tr = steps[lostAt];
+    const M = show(factorOf(tr, target)!);
+    const without = (T: N): N | null => {
+      if (T.t === "frac") return T.num;
+      if (T.t !== "prod") return null;
+      const fr = numberFraction(T)!;
+      const items = T.items.flatMap((f) => (f !== fr ? [f] : fr.num.t === "num" && fr.num.v === "1" ? [] : [fr.num]));
+      return items.length === 1 ? items[0] : { ...T, items };
+    };
+    push(
+      wrong(lostAt, ({ T, O }) => {
+        const t = without(T);
+        return t && { t, o: O };
+      }),
+      tx("A number got lost", "Eine Zahl ist verloren gegangen"),
+      tx(
+        `Where did the $${M}$ in the denominator go? It belongs to the formula too: undo it by multiplying both sides by $${M}$.`,
+        `Wo ist die $${M}$ im Nenner geblieben? Die gehört auch zur Formel: Mach sie rückgängig, indem du beide Seiten mit $${M}$ multiplizierst.`,
+      ),
+    );
+  }
+
+  // Typed without brackets around the denominator: 100Z/Kt reads as (100Z/K)·t.
+  const divAt = find((tr) => tr.kind === "div", true);
+  if (divAt >= 0) {
+    const tr = steps[divAt];
+    const D = factorOf(tr, target)!;
+    if (tr.O.t !== "sum" && (D.t === "sum" || (D.t === "prod" && D.items.length > 1))) {
+      const head = D.t === "sum" ? D.items[0].n : (D as Extract<N, { t: "prod" }>).items[0];
+      push(
+        wrong(divAt, ({ O }) => {
+          const over: N = { t: "frac", id: "", num: O, den: head };
+          if (D.t === "sum") return { o: { t: "sum", id: "", items: [{ neg: false, n: over, sid: "" }, ...D.items.slice(1)] } };
+          return { o: { t: "prod", id: "", items: [over, ...(D as Extract<N, { t: "prod" }>).items.slice(1)] } };
+        }),
+        BRACKETS,
+        tx(
+          `I think you meant the right thing, but brackets are missing: typed like that, only $${show(head)}$ is under the fraction bar. Put the whole denominator in brackets.`,
+          `Ich glaub, du meinst das Richtige, aber es fehlen Klammern: So getippt steht nur $${show(head)}$ unter dem Bruchstrich. Setz den ganzen Nenner in Klammern.`,
+        ),
+      );
+    }
+    // Divided the wrong way round: D/O instead of O/D.
+    const d = show(D);
+    push(
+      wrong(divAt, ({ O }) => ({ o: { t: "frac", id: "", num: D, den: O } })),
+      tx("Fraction upside down", "Bruch auf dem Kopf"),
+      tx(
+        `Upside down! When you divide by $${d}$, the $${d}$ goes **under** the fraction bar, not on top.`,
+        `Andersrum! Wenn du durch $${d}$ teilst, kommt $${d}$ **unter** den Bruchstrich, nicht darüber.`,
+      ),
+    );
+  }
+
+  // Typed without brackets around a sum: u − 2b/2 only divides the 2b.
+  if (spreadAt >= 0) {
+    const tr = steps[spreadAt];
+    const F = show(factorOf(tr, target)!);
+    const items = (tr.O as Extract<N, { t: "sum" }>).items;
+    const lastX = show(items[items.length - 1].n);
+    push(
+      wrong(spreadAt, spread("last")),
+      BRACKETS,
+      tr.kind === "div"
+        ? tx(
+            `I think you meant the right thing, but brackets are missing: typed like that, only $${lastX}$ gets divided by $${F}$. Put $${show(tr.O)}$ in brackets.`,
+            `Ich glaub, du meinst das Richtige, aber es fehlen Klammern: So getippt wird nur $${lastX}$ durch $${F}$ geteilt. Setz $${show(tr.O)}$ in Klammern.`,
+          )
+        : tx(
+            `I think you meant the right thing, but brackets are missing: typed like that, only $${lastX}$ gets multiplied by $${F}$. Put $${show(tr.O)}$ in brackets.`,
+            `Ich glaub, du meinst das Richtige, aber es fehlen Klammern: So getippt wird nur $${lastX}$ mit $${F}$ multipliziert. Setz $${show(tr.O)}$ in Klammern.`,
+          ),
+    );
+  }
+
+  // Changed only one side.
+  const oneAt = find((tr) => (tr.kind === "sum" && tr === steps[sumAt]) || tr.kind === "div" || (tr.kind === "mul" && tr.T.t === "frac" && tr.T.den.t !== "num" && !has(tr.T.den, target)));
+  if (oneAt >= 0) {
+    const tr = steps[oneAt];
+    const answer = wrong(oneAt, ({ O }) => ({ o: O }));
+    if (tr.kind === "sum") {
+      push(
+        answer,
+        tx("Only one side changed", "Nur eine Seite verändert"),
+        tx(
+          `You made the $${signedItem(pickOf(tr.T)!)}$ disappear on one side, but the other side didn't change. Whatever you do, do it on **both** sides.`,
+          `Du hast das $${signedItem(pickOf(tr.T)!)}$ auf einer Seite verschwinden lassen, aber die andere Seite ist gleich geblieben. Was du machst, machst du auf **beiden** Seiten.`,
+        ),
+      );
+    } else {
+      const f = show(factorOf(tr, target)!);
+      push(
+        answer,
+        tr.kind === "div" ? tx("Only one side divided", "Nur eine Seite geteilt") : tx("Only one side multiplied", "Nur eine Seite multipliziert"),
+        tr.kind === "div"
+          ? tx(
+              `You got rid of the $${f}$ on one side, but the other side didn't change. Divide it by $${f}$ too: **both** sides always get the same step.`,
+              `Du hast $${f}$ auf einer Seite weggemacht, aber die andere Seite ist gleich geblieben. Teile sie auch durch $${f}$: **Beide** Seiten bekommen immer denselben Schritt.`,
+            )
+          : tx(
+              `You got rid of the $${f}$ in the denominator on one side, but the other side didn't change. Multiply it by $${f}$ too: **both** sides always get the same step.`,
+              `Du hast $${f}$ im Nenner auf einer Seite weggemacht, aber die andere Seite ist gleich geblieben. Multipliziere sie auch mit $${f}$: **Beide** Seiten bekommen immer denselben Schritt.`,
+            ),
+      );
+    }
+  }
+
+  // Squared instead of taking the root, or the other way round.
+  push(
+    wrong(rootAt, ({ O }) => ({ o: { t: "pow", id: "", base: O, e: 2 } })),
+    tx("Squared instead of root", "Quadriert statt Wurzel gezogen"),
+    tx("To undo a square you take the **square root**. Squaring again goes the wrong way.", "Ein Quadrat machst du mit der **Wurzel** rückgängig. Noch mal quadrieren geht in die falsche Richtung."),
+  );
+  push(
+    wrong(squareAt, ({ O }) => ({ o: { t: "sqrt", id: "", body: O } })),
+    tx("Root instead of squaring", "Wurzel statt Quadrieren"),
+    tx("A square root is undone by **squaring**. Another root goes the wrong way.", "Eine Wurzel machst du mit **Quadrieren** rückgängig. Noch eine Wurzel geht in die falsche Richtung."),
+  );
+  return out;
+}
+
 function task(f: Formula, target: string): Exercise {
   const sol = rearrange(f.L, f.R, target);
   return {
@@ -643,6 +1033,7 @@ function task(f: Formula, target: string): Exercise {
     hint: sol.hint,
     solution: sol.frames,
     visual: { component: FormulaCard, props: { src: formulaSrc(f, target) } },
+    mistakes: formulaMistakes(f.L, f.R, target, sol.answer),
   };
 }
 

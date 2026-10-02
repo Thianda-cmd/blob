@@ -10,7 +10,7 @@ import { topicMeta } from "@/learn/catalog";
 import { parseDisplay, type DNode } from "@/learn/engine/display";
 import { add, div as qdiv, frac, mul as qmul, neg as qneg, show as qshow, value as qvalue, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -586,6 +586,341 @@ export function smoothFracExits(frames: Frame[]): Frame[] {
 }
 
 // ---------------------------------------------------------------------------
+// Typical mistakes. Blob solves the task the way a student with one particular
+// misconception would (a term moved without changing its sign, only one term
+// divided, the flip forgotten…), so the wrong value is exactly what that student
+// gets, and Blob can say what happened.
+
+type Slip = {
+  /** The number on the x-side changes sides but keeps its sign: x + 3 = 11 → x = 14. */
+  numSign?: boolean;
+  /** The x-term from the other side changes sides but keeps its sign. */
+  xSign?: boolean;
+  /** Collect the x-terms on the other side than the worked solution does. */
+  other?: boolean;
+  /** Divided before the number was gone, but the number itself didn't get divided. */
+  partial?: boolean;
+  /** The number vanishes on its own side only. */
+  dropNum?: boolean;
+  /** The number in front of x vanishes on its own side only. */
+  dropCoef?: boolean;
+  /** 3x = 12 → x = 12 − 3. */
+  subCoef?: boolean;
+  /** Divided by 3 instead of −3 (or stopped at −x). */
+  dropMinus?: boolean;
+  /** Multiplied by the fraction in front of x instead of dividing by it. */
+  fracRecip?: boolean;
+  /** ⅔x = 4: multiplied by 3, but never divided by 2. */
+  fracNoNum?: boolean;
+  /** Inequalities: no flip for a negative factor, or a flip for a positive one. */
+  noFlip?: boolean;
+  flip?: boolean;
+};
+
+/** A slipped solution: the result plus the numbers Blob talks about (x-side and other side). */
+type Run = { value: Frac; rel: Rel; A: Frac; bx: Frac; ao: Frac };
+
+const qsub = (a: Frac, b: Frac) => add(a, qneg(b));
+const sameQ = (a: Frac, b: Frac) => a.n === b.n && a.d === b.d;
+
+/** Solve the expanded equation the way the worked solution does, with at most one slip. */
+function slipSolve(L: Term[], R: Term[], rel: Rel, slip: Slip = {}): Run | null {
+  const side = (list: Term[]) => [coef(list, 0), coef(list, 1), coef(list, 2)];
+  let [bL, aL, sL, bR, aR, sR] = [...side(L), ...side(R)];
+  // Several fractions: the worked solution multiplies by the common denominator first.
+  const fracs = [bL, aL, sL, bR, aR, sR].filter((q) => q.d !== 1);
+  if (fracs.length >= 2) {
+    const k = frac(fracs.reduce((m, q) => lcm(m, q.d), 1));
+    [bL, aL, sL, bR, aR, sR] = [bL, aL, sL, bR, aR, sR].map((q) => qmul(q, k));
+  }
+  // x² has to cancel, otherwise this isn't a linear equation any more.
+  if (!sameQ(sL, sR) || (isZero(aL) && isZero(aR))) return null;
+  const both = !isZero(aL) && !isZero(aR);
+  let xLeft = both ? rel !== "=" || qvalue(aL) > qvalue(aR) : !isZero(aL);
+  if (slip.other) {
+    if (!both) return null;
+    xLeft = !xLeft;
+  }
+  const [ax, bx, ao, bo] = xLeft ? [aL, bL, aR, bR] : [aR, bR, aL, bL];
+  if (slip.xSign && isZero(ao)) return null;
+  if ((slip.numSign || slip.partial || slip.dropNum) && isZero(bx)) return null;
+  const A = slip.xSign ? add(ax, ao) : qsub(ax, ao);
+  if (isZero(A)) return null;
+  const C = slip.numSign ? add(bo, bx) : slip.dropNum ? bo : qsub(bo, bx);
+  const whole = A.d === 1;
+  let value = qdiv(C, A);
+  /** Sign of what the student divides by (decides the flip). */
+  let divisor = qvalue(A);
+  if (slip.partial) {
+    if (!whole || Math.abs(A.n) === 1) return null;
+    value = qsub(qdiv(bo, A), bx);
+  } else if (slip.fracRecip) {
+    if (whole) return null;
+    value = qmul(C, A);
+  } else if (slip.fracNoNum) {
+    if (whole || Math.abs(A.n) === 1) return null;
+    value = qmul(C, frac(A.d));
+    divisor = 1;
+  } else if (slip.dropMinus) {
+    if (A.n > 0) return null;
+    value = qdiv(C, absQ(A));
+    divisor = 1;
+  } else if (slip.subCoef) {
+    if (!whole || A.n < 2 || rel !== "=") return null;
+    value = qsub(C, A);
+  } else if (slip.dropCoef) {
+    if ((A.n === 1 && A.d === 1) || rel !== "=") return null;
+    value = C;
+  }
+  let r = rel;
+  if (rel !== "=") {
+    if ((slip.noFlip && divisor > 0) || (slip.flip && divisor < 0)) return null;
+    if (divisor < 0 !== Boolean(slip.noFlip || slip.flip)) r = REL_FLIP[r];
+    // x ended up on the right: turning the inequality around mirrors the sign.
+    if (!xLeft) r = REL_FLIP[r];
+  }
+  return { value, rel: r, A, bx, ao };
+}
+
+type WrongExpand = "first" | "sign" | "no2" | "minus";
+
+/** A bracket multiplied out the way a student with a misconception would. */
+function wrongExpand(it: Item, how: WrongExpand): Term[] | null {
+  if (it.kind === "g") {
+    // 3(x + 2) → 3x + 2
+    if (how === "first" && Math.abs(it.k) !== 1) return it.items.map((x, i) => ({ ...x, c: i === 0 ? qmul(x.c, frac(it.k)) : x.c }));
+    // −(x − 4) → −x − 4, −2(x + 3) → −2x + 6
+    if (how === "sign" && it.k < 0) return it.items.map((x, i) => ({ ...x, c: qmul(x.c, frac(i === 0 ? it.k : -it.k)) }));
+    return null;
+  }
+  if (it.kind !== "pp") return null;
+  const signed = (list: Term[]) => list.map((x) => ({ ...x, c: it.sign < 0 ? qneg(x.c) : x.c }));
+  const mono = (x: Term, y: Term, k = 1) => term("", qmul(frac(k), qmul(x.c, y.c)), (x.p + y.p) as Pow);
+  // (x + 3)² → x² + 3x + 9: the middle term without its 2.
+  if (how === "no2" && it.square) return signed(it.a.flatMap((x, i) => it.a.slice(i).map((y) => mono(x, y))));
+  // (x − 2)(x − 5) with (−2)·(−5) = −10.
+  if (how === "minus" && !it.square && it.a.some((x) => x.c.n < 0) && it.b.some((y) => y.c.n < 0)) {
+    return signed(it.a.flatMap((x) => it.b.map((y) => mono(x, y, x.c.n < 0 && y.c.n < 0 ? -1 : 1))));
+  }
+  return null;
+}
+
+/** Signed number for the messages: "+ 3", "- \frac{1}{2}". */
+const signedQ = (q: Frac) => `${q.n < 0 ? "-" : "+"} ${qshow(absQ(q))}`;
+
+function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
+  const L = expandAll(e.L);
+  const R = expandAll(e.R);
+  const base = slipSolve(L, R, e.rel);
+  // Only when the simulation retraces the worked solution exactly.
+  if (!base || !sameQ(base.value, value) || base.rel !== rel) return [];
+  const ineq = rel !== "=";
+  const out: Mistake[] = [];
+  const keyOf = (r: Run) => `${ineq ? r.rel : ""} ${r.value.n}/${r.value.d}`;
+  const seen = new Set([keyOf(base)]);
+  const push = (run: Run | null, title: Text, say: (r: Run) => Text) => {
+    if (!run || out.length >= 5 || seen.has(keyOf(run))) return;
+    seen.add(keyOf(run));
+    const when: AnswerSpec = ineq
+      ? { kind: "inequality", variable: v, op: run.rel as Exclude<Rel, "=">, value: qvalue(run.value) }
+      : { kind: "solutions", variable: v, values: [qvalue(run.value)] };
+    out.push({ when, title, say: say(run) });
+  };
+  const solve = (slip: Slip, l = L, r = R) => slipSolve(l, r, e.rel, slip);
+  const xt = (q: Frac) => termSrc(term("", q, 1), v, true, false);
+  const n = (q: Frac) => qshow(q);
+
+  if (ineq) {
+    push(
+      solve({ noFlip: true }),
+      tx("Sign not flipped", "Zeichen nicht umgedreht"),
+      ({ A }) =>
+        A.n === -1 && A.d === 1
+          ? tx(
+              `Ooh, the classic trap! To turn $-${v}$ into $${v}$ you multiply by $-1$, and multiplying by a negative number **flips** the sign.`,
+              `Die klassische Falle! Um aus $-${v}$ ein $${v}$ zu machen, multiplizierst du mit $-1$, und dabei dreht sich das Relationszeichen **um**.`,
+            )
+          : tx(
+              `Ooh, the classic trap! In the last step you divide by $${n(A)}$, and dividing by a negative number **flips** the sign.`,
+              `Die klassische Falle! Im letzten Schritt teilst du durch $${n(A)}$, und beim Teilen durch eine negative Zahl dreht sich das Relationszeichen **um**.`,
+            ),
+    );
+    push(solve({ flip: true }), tx("Flipped for no reason", "Unnötig umgedreht"), ({ A }) =>
+      A.n === 1 && A.d === 1
+        ? tx(
+            "You flipped the sign, but here you never multiply or divide by a negative number. It only flips for a **negative** factor; a minus somewhere else doesn't count.",
+            "Du hast das Relationszeichen umgedreht, aber hier multiplizierst oder teilst du gar nicht mit einer negativen Zahl. Umdrehen musst du nur bei einem **negativen** Faktor, ein Minus woanders zählt nicht.",
+          )
+        : tx(
+            `You flipped the sign, but you only divide by $${n(A)}$, a positive number. It only flips for a **negative** factor; a minus somewhere else doesn't count.`,
+            `Du hast das Relationszeichen umgedreht, aber du teilst nur durch $${n(A)}$, also durch eine positive Zahl. Umdrehen musst du nur bei einem **negativen** Faktor, ein Minus woanders zählt nicht.`,
+          ),
+    );
+  }
+
+  // Brackets multiplied out wrongly, then everything else done right.
+  const brackets = [...e.L.map((it) => [it, "L"] as const), ...e.R.map((it) => [it, "R"] as const)].filter(([it]) => it.kind !== "t");
+  for (const how of ["first", "sign", "no2", "minus"] as WrongExpand[]) {
+    for (const [it, where] of brackets) {
+      const wrong = wrongExpand(it, how);
+      if (!wrong) continue;
+      const swap = (items: Item[]) => items.flatMap((x) => (x === it ? wrong : expandItem(x)));
+      const run = where === "L" ? solve({}, swap(e.L), R) : solve({}, L, swap(e.R));
+      const k = it.kind === "g" ? it.k : 0;
+      if (how === "first") {
+        push(run, tx("Only the first term multiplied", "Nur der erste Term multipliziert"), () =>
+          tx(
+            `Ah, I see what happened! The $${k}$ only reached the first term in the bracket. It has to multiply **every** term inside.`,
+            `Ah, ich seh, was passiert ist! Die $${k}$ hat nur den ersten Term in der Klammer erwischt. Sie muss **jeden** Term darin multiplizieren.`,
+          ),
+        );
+      } else if (how === "sign") {
+        push(run, tx("Only the first sign flipped", "Nur das erste Vorzeichen gedreht"), () =>
+          k === -1
+            ? tx(
+                "Ooh, careful with the minus in front of the bracket! It flips **every** sign inside, the last one too.",
+                "Achtung beim Minus vor der Klammer! Es dreht **jedes** Vorzeichen darin um, auch das letzte.",
+              )
+            : tx(
+                `Careful with the signs! The $${k}$ multiplies **every** term in the bracket, minus included, so the last sign flips too.`,
+                `Vorsicht mit den Vorzeichen! Die $${k}$ multipliziert **jeden** Term in der Klammer, samt Minus. Also dreht sich auch das letzte Vorzeichen um.`,
+              ),
+        );
+      } else if (how === "no2") {
+        push(run, tx("Middle term without the 2", "Mittelterm ohne die 2"), () =>
+          tx(
+            "Nearly! The middle term of a squared bracket is **twice** the product: $(a + b)^2 = a^2 + 2ab + b^2$. Your $2$ got lost.",
+            "Fast! Der Mittelterm einer quadrierten Klammer ist das **Doppelte** des Produkts: $(a + b)^2 = a^2 + 2ab + b^2$. Bei dir ist die $2$ verloren gegangen.",
+          ),
+        );
+      } else if (it.kind === "pp") {
+        const [p, q] = [it.a[1].c, it.b[1].c];
+        push(run, tx("Minus times minus", "Minus mal Minus"), () =>
+          tx(
+            `Careful with the signs: $${n(p)} \\cdot (${n(q)})$ is minus times minus, and that gives **plus**!`,
+            `Vorsicht mit den Vorzeichen: $${n(p)} \\cdot (${n(q)})$ ist Minus mal Minus, und das ergibt **Plus**!`,
+          ),
+        );
+      }
+    }
+  }
+
+  if (!ineq) {
+    // x/2 + x/3 taken as 2x/5.
+    for (const [list, isLeft] of [[L, true], [R, false]] as const) {
+      const units = list.filter((x) => x.p === 1 && x.c.n === 1 && x.c.d > 1);
+      if (units.length !== 2 || list.filter((x) => x.p === 1).length !== 2) continue;
+      const [a, b] = units.map((x) => x.c.d);
+      const merged = [...list.filter((x) => !units.includes(x)), term("", frac(2, a + b), 1)];
+      push(isLeft ? solve({}, merged, R) : solve({}, L, merged), tx("Tops and bottoms added", "Zähler und Nenner addiert"), () =>
+        tx(
+          `Ooh, classic trap! $\\frac{${v}}{${a}} + \\frac{${v}}{${b}}$ is **not** $\\frac{2${v}}{${a + b}}$: you can't just add tops and bottoms. Use the common denominator $${lcm(a, b)}$.`,
+          `Die klassische Falle! $\\frac{${v}}{${a}} + \\frac{${v}}{${b}}$ ist **nicht** $\\frac{2${v}}{${a + b}}$: Zähler und Nenner darfst du nicht einfach addieren. Nimm den Hauptnenner $${lcm(a, b)}$.`,
+        ),
+      );
+    }
+    // Fractions cleared, but the terms without a fraction never got multiplied.
+    const withFrac = [...L, ...R].filter((x) => x.c.d !== 1);
+    if (withFrac.length && L.length + R.length >= 3) {
+      const K = withFrac.reduce((m, x) => lcm(m, x.c.d), 1);
+      const times = (list: Term[]) => list.map((x) => (x.c.d !== 1 ? { ...x, c: qmul(x.c, frac(K)) } : x));
+      const many = withFrac.length > 1;
+      push(solve({}, times(L), times(R)), tx("Not every term multiplied", "Nicht jeden Term multipliziert"), () =>
+        tx(
+          `Ah, I see what happened! You multiplied the ${many ? "fractions" : "fraction"} by $${K}$, but not the other terms. **Every** term has to be multiplied by $${K}$.`,
+          `Ah, ich seh, was passiert ist! Du hast ${many ? "die Brüche" : "den Bruch"} mit $${K}$ multipliziert, aber nicht die anderen Terme. **Jeder** Term muss mit $${K}$ multipliziert werden.`,
+        ),
+      );
+    }
+  }
+
+  const numSign = ({ bx }: Run) =>
+    tx(
+      `Ah, I see what happened! You moved the $${signedQ(bx)}$ to the other side, but it's still $${signedQ(bx)}$ there. To get rid of it, ${bx.n > 0 ? "subtract" : "add"} $${n(absQ(bx))}$ on **both** sides.`,
+      `Ah, ich seh, was passiert ist! Du hast das $${signedQ(bx)}$ auf die andere Seite gebracht, aber dort steht es immer noch als $${signedQ(bx)}$. Um es loszuwerden, ${bx.n > 0 ? "subtrahierst" : "addierst"} du auf **beiden** Seiten $${n(absQ(bx))}$.`,
+    );
+  const xSign = ({ ao }: Run) =>
+    tx(
+      `I think I know what you did: $${xt(ao)}$ went over to the other side but kept its sign. To bring it over, ${ao.n > 0 ? "subtract" : "add"} $${xt(absQ(ao))}$ on **both** sides.`,
+      `Ich glaub, ich weiß, was du gemacht hast: $${xt(ao)}$ ist auf die andere Seite gewandert, hat aber sein Vorzeichen behalten. Um es rüberzuholen, ${ao.n > 0 ? "subtrahierst" : "addierst"} du auf **beiden** Seiten $${xt(absQ(ao))}$.`,
+    );
+  const NUM_SIGN = tx("Sign not changed", "Vorzeichen nicht gewechselt");
+  const X_SIGN = tx(`${v}-term kept its sign`, `${v}-Term ohne Vorzeichenwechsel`);
+  const dropMinus = ({ A }: Run) =>
+    A.n === -1 && A.d === 1
+      ? tx(
+          `Nearly! You stopped at $-${v}$, but we want $${v}$, not $-${v}$. One last step: multiply both sides by $-1$${ineq ? ", and that flips the sign" : ""}.`,
+          `Fast! Du bist bei $-${v}$ stehen geblieben, aber gesucht ist $${v}$, nicht $-${v}$. Ein letzter Schritt: Multipliziere beide Seiten mit $-1$${ineq ? ", dabei dreht sich das Relationszeichen um" : ""}.`,
+        )
+      : tx(
+          `Ah, I see what happened! You divided by $${n(absQ(A))}$, but the number in front of $${v}$ is $${n(A)}$. The minus belongs to it, so divide by $${n(A)}$${ineq ? ", and that flips the sign" : ""}.`,
+          `Ah, ich seh, was passiert ist! Du hast durch $${n(absQ(A))}$ geteilt, aber vor dem $${v}$ steht $${n(A)}$. Das Minus gehört dazu, also teilst du durch $${n(A)}$${ineq ? ", und dabei dreht sich das Relationszeichen um" : ""}.`,
+        );
+  const MINUS = tx("Minus sign dropped", "Minus unterschlagen");
+
+  push(solve({ numSign: true }), NUM_SIGN, numSign);
+  if (!ineq) push(solve({ dropMinus: true }), MINUS, dropMinus);
+  push(solve({ xSign: true }), X_SIGN, xSign);
+  push(solve({ numSign: true, other: true }), NUM_SIGN, numSign);
+  push(solve({ xSign: true, other: true }), X_SIGN, xSign);
+  push(solve({ partial: true }), tx("Not every term divided", "Nicht jeden Term geteilt"), ({ A, bx }) =>
+    tx(
+      `Ah, I see what happened! You divided by $${n(A)}$ while the $${signedQ(bx)}$ was still there, but the $${signedQ(bx)}$ didn't get divided. Get rid of it first, then divide.`,
+      `Ah, ich seh, was passiert ist! Du hast durch $${n(A)}$ geteilt, solange das $${signedQ(bx)}$ noch da war, aber das $${signedQ(bx)}$ hast du nicht mitgeteilt. Bring es zuerst weg und teile dann.`,
+    ),
+  );
+  if (ineq) push(solve({ dropMinus: true }), MINUS, dropMinus);
+  push(solve({ fracRecip: true }), tx("Multiplied instead of divided", "Multipliziert statt geteilt"), ({ A }) =>
+    A.n === 1
+      ? tx(
+          `Ah, I see what happened! $${v}$ is **divided** by $${A.d}$, so you undo that by **multiplying** by $${A.d}$, not by dividing again.`,
+          `Ah, ich seh, was passiert ist! $${v}$ wird durch $${A.d}$ **geteilt**. Das machst du mit **Multiplizieren** rückgängig, nicht mit noch mal Teilen.`,
+        )
+      : tx(
+          `I think I know what you did: you multiplied by $${n(A)}$ instead of dividing by it. Dividing by a fraction means multiplying by its **reciprocal**.`,
+          `Ich glaub, ich weiß, was du gemacht hast: Du hast mit $${n(A)}$ multipliziert, statt durch $${n(A)}$ zu teilen. Durch einen Bruch teilst du, indem du mit dem **Kehrwert** multiplizierst.`,
+        ),
+  );
+  push(solve({ fracNoNum: true }), tx("One step missing", "Ein Schritt fehlt"), ({ A }) =>
+    tx(
+      `Almost! Multiplying by $${A.d}$ was right, but that leaves $${A.n}${v}$, which still means $${A.n} \\cdot ${v}$. Divide by $${A.n}$ as well.`,
+      `Fast! Mit $${A.d}$ multiplizieren war richtig, aber dann steht da $${A.n}${v}$, also $${A.n} \\cdot ${v}$. Teile noch durch $${A.n}$.`,
+    ),
+  );
+  push(solve({ dropNum: true }), tx("Only one side changed", "Nur eine Seite verändert"), ({ bx }) =>
+    tx(
+      `You made the $${signedQ(bx)}$ disappear on one side, but the other side didn't change. Whatever you do, do it on **both** sides.`,
+      `Du hast das $${signedQ(bx)}$ auf einer Seite verschwinden lassen, aber die andere Seite ist gleich geblieben. Was du machst, machst du auf **beiden** Seiten.`,
+    ),
+  );
+  const coefRun = solve({ dropCoef: true });
+  const unit = coefRun && coefRun.A.n === 1 && coefRun.A.d > 1;
+  push(coefRun, unit ? tx("Only one side multiplied", "Nur eine Seite multipliziert") : tx("Only one side divided", "Nur eine Seite geteilt"), ({ A }) =>
+    unit
+      ? tx(
+          `You got rid of the $${A.d}$ under the $${v}$, but only on one side. Multiply the other side by $${A.d}$ too: **both** sides always get the same step.`,
+          `Du hast die $${A.d}$ unter dem $${v}$ weggemacht, aber nur auf einer Seite. Multipliziere auch die andere Seite mit $${A.d}$: **Beide** Seiten bekommen immer denselben Schritt.`,
+        )
+      : A.d === 1
+        ? tx(
+            `You got rid of the $${n(A)}$ in front of $${v}$, but only on one side. Divide the other side by $${n(A)}$ too: **both** sides always get the same step.`,
+            `Du hast die $${n(A)}$ vor dem $${v}$ weggemacht, aber nur auf einer Seite. Teile auch die andere Seite durch $${n(A)}$: **Beide** Seiten bekommen immer denselben Schritt.`,
+          )
+        : tx(
+            `You got rid of the $${n(A)}$ in front of $${v}$, but only on one side. **Both** sides always get the same step.`,
+            `Du hast den Bruch $${n(A)}$ vor dem $${v}$ weggemacht, aber nur auf einer Seite. **Beide** Seiten bekommen immer denselben Schritt.`,
+          ),
+  );
+  push(solve({ subCoef: true }), tx("Subtracted instead of divided", "Subtrahiert statt geteilt"), ({ A }) =>
+    tx(
+      `Ah, I see what happened! $${A.n}${v}$ means $${A.n} \\cdot ${v}$, so you undo it by **dividing** by $${A.n}$, not by subtracting.`,
+      `Ah, ich seh, was passiert ist! $${A.n}${v}$ bedeutet $${A.n} \\cdot ${v}$. Das machst du mit **Teilen** durch $${A.n}$ rückgängig, nicht mit Subtrahieren.`,
+    ),
+  );
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Exercise generator
 
 const VARS = ["x", "x", "x", "x", "x", "y", "a", "n"];
@@ -598,6 +933,7 @@ function make(e: Eq, v: string, hint: Text, check = false): Exercise {
     answer: rel === "=" ? { kind: "solutions", variable: v, values: [qvalue(value)] } : { kind: "inequality", variable: v, op: rel, value: qvalue(value) },
     hint,
     solution: frames,
+    mistakes: eqMistakes(e, v, value, rel),
   };
 }
 

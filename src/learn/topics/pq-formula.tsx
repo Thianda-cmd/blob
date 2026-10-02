@@ -7,7 +7,7 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { Graph } from "@/learn/visuals/Graph";
 import { cn } from "@/lib/utils";
 
@@ -301,6 +301,237 @@ function solutionFrames(left: Term[], right: Term[], startNote?: Text): Frame[] 
 }
 
 // ---------------------------------------------------------------------------
+// Typical mistakes, simulated: each wrong set of solutions is exactly what a
+// student with that misconception gets (roots that don't come out evenly are
+// rounded to two decimals, the way students type them). Kept only when it
+// differs from the right answer and from the mistakes before it.
+
+type Coefs = { a: number; b: number; c: number };
+
+/** left = right as a·x² + b·x + c = 0. */
+function coefsOf(left: Term[], right: Term[]): Coefs {
+  const all = [...left, ...right.map((t) => ({ ...t, c: -t.c }))];
+  const k = (p: number) => clean(all.filter((t) => t.p === p).reduce((s, t) => s + t.c, 0));
+  return { a: k(2), b: k(1), c: k(0) };
+}
+
+/** The pq formula with its middle (normally −p/2) and the part under the root (normally D). */
+function pqValues(mid: number, D: number): number[] {
+  if (D < -1e-9) return [];
+  if (Math.abs(D) < 1e-9) return [clean(mid)];
+  const r = Math.sqrt(D);
+  return [clean(mid + r), clean(mid - r)];
+}
+
+/** Solutions of a·x² + b·x + c = 0, solved correctly from there (null if it isn't quadratic). */
+function solveCoefs({ a, b, c }: Coefs): number[] | null {
+  if (Math.abs(a) < 1e-9) return null;
+  const p = b / a;
+  return pqValues(-p / 2, (p / 2) ** 2 - c / a);
+}
+
+const near = (u: number, v: number) => Math.abs(u - v) < 1e-6;
+const sameSet = (u: number[], v: number[]) => u.length === v.length && u.every((x) => v.some((y) => near(x, y)));
+/** As a student types it: two decimals at most. */
+const typed = (v: number) => clean(Math.round(v * 100) / 100);
+
+/** When the slip led to "no solution", Blob opens differently. */
+const NONE_LEAD = tx("Hmm, no solution? I think I see why. ", "Hm, keine Lösung? Ich glaub, ich weiß, warum. ");
+const T_MOVED = tx("Sign kept when moving", "Vorzeichen nicht gedreht");
+
+type WrongStart = { left: Term[]; title: Text; lead: Text; body: Text };
+
+/**
+ * Typical slips for left = right with the given solutions: brackets expanded
+ * wrongly (`wrong`), terms moved without flipping the sign, the shortcuts for
+ * q = 0 and p = 0, not dividing by a, and the classic slips inside the formula.
+ */
+function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongStart[] = []): Mistake[] {
+  const list: Mistake[] = [];
+  const add = (sol: number[] | null, title: Text, lead: Text, body: Text, part = false) => {
+    if (!sol || list.length >= 5) return;
+    const vals = [...new Set(sol.map(typed))];
+    if (sameSet(vals, values) || list.some((m) => m.when.kind === "solutions" && sameSet(m.when.values, vals))) return;
+    // Only part of the right answer: the general "one more to find" says that better.
+    if (!part && vals.length && vals.length < values.length && vals.every((v) => values.some((w) => near(v, w)))) return;
+    list.push({ when: { kind: "solutions", variable: "x", values: vals, allowNone: true }, title, say: cat(vals.length ? lead : NONE_LEAD, body) });
+  };
+
+  const { a: A, b: B, c: C } = coefsOf(left, right);
+  const p = clean(B / A);
+  const q = clean(C / A);
+  const D = clean((p / 2) ** 2 - q);
+
+  for (const w of wrong) add(solveCoefs(coefsOf(w.left, right)), w.title, w.lead, w.body);
+
+  const moving = right.filter((t) => t.c !== 0);
+  if (moving.length) {
+    const R = plainTerms(moving);
+    const one = moving.length === 1;
+    add(
+      solveCoefs(coefsOf([...left, ...moving], [])),
+      T_MOVED,
+      tx("Ah, I see what happened! ", "Ah, ich seh, was passiert ist! "),
+      one
+        ? tx(
+            `You brought $${R}$ over to the left but kept its sign. A term that changes sides flips its sign.`,
+            `Du hast $${R}$ nach links gebracht, aber das Vorzeichen behalten. Ein Term, der die Seite wechselt, ändert sein Vorzeichen.`,
+          )
+        : tx(
+            `You brought $${R}$ over to the left but kept the signs. Every term that changes sides flips its sign.`,
+            `Du hast $${R}$ nach links gebracht, aber die Vorzeichen behalten. Jeder Term, der die Seite wechselt, ändert sein Vorzeichen.`,
+          ),
+    );
+  }
+
+  const nearly = tx("Nearly! ", "Fast! ");
+  if (C === 0 && B !== 0) {
+    add(
+      [-p],
+      tx("A solution got lost", "Eine Lösung ging verloren"),
+      nearly,
+      tx(
+        "Did you divide by $x$? That quietly throws away a solution. Factor out $x$ instead: a product is $0$ when **one** of its factors is $0$.",
+        "Hast du durch $x$ geteilt? Dabei geht heimlich eine Lösung verloren. Klammere lieber $x$ aus: Ein Produkt ist $0$, wenn **einer** der Faktoren $0$ ist.",
+      ),
+      true,
+    );
+    const s = p < 0 ? "-" : "+";
+    add(
+      [0, p],
+      tx("Sign in the last step", "Vorzeichen im letzten Schritt"),
+      nearly,
+      tx(
+        `$x = 0$ is right! For the other one, $x ${s} ${dec(Math.abs(p))} = 0$: when the $${dec(Math.abs(p))}$ moves over, its sign flips.`,
+        `$x = 0$ stimmt! Für die andere gilt $x ${s} ${dec(Math.abs(p))} = 0$: Wenn die $${dec(Math.abs(p))}$ auf die andere Seite wandert, dreht sich ihr Vorzeichen.`,
+      ),
+    );
+  } else if (B === 0 && C !== 0) {
+    const rhs = -q;
+    if (rhs > 0) {
+      add(
+        [rhs / 2, -rhs / 2],
+        tx("A root isn't half", "Wurzel ist nicht die Hälfte"),
+        tx("Ah, I see what happened! ", "Ah, ich seh, was passiert ist! "),
+        tx(
+          `You halved $${dec(rhs)}$. But the root asks which number **times itself** gives $${dec(rhs)}$.`,
+          `Du hast $${dec(rhs)}$ halbiert. Aber die Wurzel fragt, welche Zahl **mal sich selbst** $${dec(rhs)}$ ergibt.`,
+        ),
+      );
+      add(
+        [],
+        T_MOVED,
+        "",
+        tx(
+          `When the $${dec(Math.abs(C))}$ moves to the other side, its sign flips. Then $x^2$ equals a **positive** number.`,
+          `Wenn die $${dec(Math.abs(C))}$ auf die andere Seite wandert, dreht sich ihr Vorzeichen. Dann ist $x^2$ gleich einer **positiven** Zahl.`,
+        ),
+      );
+      if (A !== 1 && -C > 0)
+        add(
+          [Math.sqrt(-C), -Math.sqrt(-C)],
+          tx("Not divided yet", "Noch nicht geteilt"),
+          nearly,
+          tx(
+            `Before taking the root, $x^2$ has to stand alone: divide by the $${dec(A)}$ in front first.`,
+            `Bevor du die Wurzel ziehst, muss $x^2$ allein stehen: Teile zuerst durch die $${dec(A)}$ davor.`,
+          ),
+        );
+    } else {
+      const r = Math.sqrt(q);
+      add(
+        [r, -r],
+        tx("A square is never negative", "Ein Quadrat ist nie negativ"),
+        tx("Careful! ", "Vorsicht! "),
+        tx(
+          `Put your answer back in: $${dec(clean(r))}^2 = ${dec(q)}$, but you'd need $x^2 = ${dec(rhs)}$. Can a square ever be negative?`,
+          `Setz deine Lösung mal ein: $${dec(clean(r))}^2 = ${dec(q)}$, du bräuchtest aber $x^2 = ${dec(rhs)}$. Kann ein Quadrat überhaupt negativ sein?`,
+        ),
+      );
+    }
+  } else if (A !== 1) {
+    add(
+      solveCoefs({ a: 1, b: B, c: C }),
+      tx("Not in normal form yet", "Noch nicht in Normalform"),
+      tx("Ah, I see what happened! ", "Ah, ich seh, was passiert ist! "),
+      A === -1
+        ? tx(
+            "You read off $p$ and $q$ straight away. But there's a minus in front of $x^2$! Multiply **every** term by $-1$ first.",
+            "Du hast $p$ und $q$ direkt abgelesen. Aber vor $x^2$ steht ein Minus! Multipliziere zuerst **jeden** Term mit $-1$.",
+          )
+        : A === 0.5
+          ? tx(
+              "You read off $p$ and $q$ straight away. But there's a $0,5$ in front of $x^2$! Multiply **every** term by $2$ first.",
+              "Du hast $p$ und $q$ direkt abgelesen. Aber vor $x^2$ steht $0,5$! Multipliziere zuerst **jeden** Term mit $2$.",
+            )
+          : tx(
+              `You read off $p$ and $q$ straight away. But there's a $${dec(A)}$ in front of $x^2$! Divide **every** term by $${par(A)}$ first.`,
+              `Du hast $p$ und $q$ direkt abgelesen. Aber vor $x^2$ steht eine $${dec(A)}$! Teile zuerst **jeden** Term durch $${par(A)}$.`,
+            ),
+    );
+  }
+
+  // Slips inside the formula.
+  const halfP = `-\\frac{${dec(p)}}{2} = ${dec(-p / 2)}`;
+  if (D >= 0) {
+    const flipped = pqValues(p / 2, D);
+    add(
+      flipped,
+      tx("Sign of −p/2", "Vorzeichen von −p/2"),
+      flipped.length > 1 ? tx("Nearly, just the signs are off! ", "Fast, nur die Vorzeichen stimmen nicht! ") : tx("Nearly, just the sign is off! ", "Fast, nur das Vorzeichen stimmt nicht! "),
+      tx(
+        `The formula starts with **minus** $\\frac{p}{2}$: with $p = ${dec(p)}$ that's $${halfP}$.`,
+        `Die Formel beginnt mit **minus** $\\frac{p}{2}$: Mit $p = ${dec(p)}$ ist das $${halfP}$.`,
+      ),
+    );
+  }
+  if (q !== 0)
+    add(
+      pqValues(-p / 2, (p / 2) ** 2 + q),
+      tx("Sign of q", "Vorzeichen von q"),
+      tx("Ah, I see what happened! ", "Ah, ich seh, was passiert ist! "),
+      q < 0
+        ? tx(
+            `Under the root it's $(\\frac{p}{2})^2 - q$, and with $q = ${dec(q)}$ that's minus minus, so **plus** $${dec(-q)}$. I think you subtracted it.`,
+            `Unter der Wurzel steht $(\\frac{p}{2})^2 - q$, und mit $q = ${dec(q)}$ ist das minus minus, also **plus** $${dec(-q)}$. Ich glaub, du hast $${dec(-q)}$ abgezogen.`,
+          )
+        : tx(
+            `Under the root it's $(\\frac{p}{2})^2 - q$, so you **subtract** $q = ${dec(q)}$. I think you added it.`,
+            `Unter der Wurzel steht $(\\frac{p}{2})^2 - q$, du ziehst also $q = ${dec(q)}$ **ab**. Ich glaub, du hast $${dec(q)}$ addiert.`,
+          ),
+    );
+  if (p !== 0) {
+    const close = tx("Close! ", "Knapp! ");
+    add(
+      pqValues(-p / 2, p * p - q),
+      tx("p instead of p/2", "p statt p/2"),
+      close,
+      tx(
+        "Under the root it's $(\\frac{p}{2})^2$, not $p^2$. Halve $p$ first, then square it.",
+        "Unter der Wurzel steht $(\\frac{p}{2})^2$, nicht $p^2$. Halbiere $p$ zuerst, dann quadrier es.",
+      ),
+    );
+    add(
+      pqValues(-p, D),
+      tx("p instead of p/2", "p statt p/2"),
+      close,
+      tx("The formula starts with $-\\frac{p}{2}$, not $-p$. Halve $p$ there too.", "Die Formel beginnt mit $-\\frac{p}{2}$, nicht mit $-p$. Halbiere $p$ auch dort."),
+    );
+  }
+  if (D < 0)
+    add(
+      pqValues(-p / 2, -D),
+      tx("Negative under the root", "Negativ unter der Wurzel"),
+      tx("Careful! ", "Vorsicht! "),
+      tx(
+        `Look under the root: $(\\frac{p}{2})^2 - q = ${dec(D)}$. I think you dropped its minus. Can you take the root of a negative number?`,
+        `Schau unter die Wurzel: $(\\frac{p}{2})^2 - q = ${dec(D)}$. Ich glaub, du hast das Minus weggelassen. Kann man aus einer negativen Zahl die Wurzel ziehen?`,
+      ),
+    );
+  return list;
+}
+
+// ---------------------------------------------------------------------------
 // Exercise generator: designed backwards from the solutions.
 
 type Target = { p: number; q: number; values: number[] };
@@ -364,6 +595,7 @@ function normalTask(target: Target, a: number, hint: Text): Exercise {
     answer: answer(target.values),
     hint,
     solution: solutionFrames(left, []),
+    mistakes: pqMistakes(left, [], target.values),
   };
 }
 
@@ -466,6 +698,7 @@ function bothSides(rng: Rng): Exercise | null {
     answer: answer(t.values),
     hint: tx("Bring everything to one side first, sort the terms and combine them.", "Bring zuerst alles auf eine Seite, sortiere die Terme und fasse sie zusammen."),
     solution: solutionFrames(left, right),
+    mistakes: pqMistakes(left, right, t.values),
   };
 }
 
@@ -492,6 +725,37 @@ function withBrackets(rng: Rng): Exercise | null {
         : [T("l1", 1, 2), T("l2", 2 * u, 1), T("l3", u * u, 0)];
   const [left, right] = assignIds(rawLeft, [T("r1", d, 1), T("r2", e, 0)]);
   const head = kind === "two" ? `${bracket(u)} ${bracket(v)}` : kind === "x" ? `x ${bracket(u)}` : `${bracket(u)}^2`;
+  // The same task with the brackets expanded the way a student with a misconception would.
+  const wrong: WrongStart =
+    kind === "two"
+      ? {
+          left: [T("l1", 1, 2), T("l4", u * v, 0)],
+          title: tx("Only two of four products", "Nur zwei von vier Produkten"),
+          lead: tx("Ah, I see what happened! ", "Ah, ich seh, was passiert ist! "),
+          body: tx(
+            `You multiplied first with first and last with last. But in $${head}$ **each** term meets **each** term: that's four products.`,
+            `Du hast Erstes mal Erstes und Letztes mal Letztes gerechnet. Aber bei $${head}$ trifft **jeder** Term **jeden**: Das sind vier Produkte.`,
+          ),
+        }
+      : kind === "x"
+        ? {
+            left: [T("l1", 1, 2), T("l2", u, 0)],
+            title: tx("Only the first term multiplied", "Nur der erste Term multipliziert"),
+            lead: tx("Nearly! ", "Fast! "),
+            body: tx(
+              `The $x$ in front only reached the $x$ in the bracket. It multiplies the $${Math.abs(u)}$ too.`,
+              `Das $x$ davor hat nur das $x$ in der Klammer erwischt. Es multipliziert auch die $${Math.abs(u)}$.`,
+            ),
+          }
+        : {
+            left: [T("l1", 1, 2), T("l3", u * u, 0)],
+            title: tx("Middle term missing", "Mittelterm fehlt"),
+            lead: tx("Ooh, classic trap! ", "Ooh, die klassische Falle! "),
+            body: tx(
+              `$${head}$ is **not** $x^2 + ${u * u}$: the middle term is missing. Use the binomial formula.`,
+              `$${head}$ ist **nicht** $x^2 + ${u * u}$: Der Mittelterm fehlt. Nimm die binomische Formel.`,
+            ),
+          };
   const keyedHead = kind === "two" ? `${bracket(u)}#B1 ${bracket(v)}#B2` : kind === "x" ? `x#B0 ${bracket(u)}#B1` : `${bracket(u)}#B1^{2#B1e}`;
   const expandNote =
     kind === "two"
@@ -514,6 +778,7 @@ function withBrackets(rng: Rng): Exercise | null {
       },
       ...solutionFrames(left, right, expandNote),
     ],
+    mistakes: pqMistakes(rawLeft, right, t.values, [wrong]),
   };
 }
 
@@ -954,6 +1219,7 @@ const lessonTask = (left: Term[], right: Term[], values: number[], hint: Text): 
   answer: answer(values),
   hint,
   solution: solutionFrames(...assignIds(left, right)),
+  mistakes: pqMistakes(left, right, values),
 });
 
 const pqFormula: Topic = {

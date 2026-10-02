@@ -10,9 +10,10 @@ import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { SolutionPlayer } from "@/learn/components/SolutionPlayer";
 import { topicMeta } from "@/learn/catalog";
+import { check } from "@/learn/engine/answers";
 import { evaluate, parse } from "@/learn/engine/expr";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,9 @@ function joinT(...parts: Text[]): Text {
   if (parts.every((p): p is string => typeof p === "string")) return parts.filter(Boolean).join(" ");
   return txMap((_, l) => parts.map((p) => resolveText(p, l)).filter(Boolean).join(" "));
 }
+
+const E = (t: Text) => resolveText(t, "en");
+const D = (t: Text) => resolveText(t, "de");
 
 /** German genitive of a name: "Lenas", "Jonas’", "Moritz’". */
 const deGen = (name: string) => (/[sßxz]$/.test(name) ? `${name}’` : `${name}s`);
@@ -291,6 +295,91 @@ export function solveFrames(start: Eq, startNote: Text, before: Frame[] = []): {
 }
 
 // ---------------------------------------------------------------------------
+// Typical mistakes. Each wrong number is what a student gets with that slip, worked
+// out from the story: an equation set up wrongly (5 less than x as 5 − x, "in 5 years"
+// added to one person only, consecutive numbers as x, 2x, 3x…), a balance step done
+// wrongly, or x given although another quantity was asked.
+
+type Wrong = { v: number; title: Text; say: Text; signed?: boolean } | false;
+
+const wrong = (v: number, title: Text, say: Text, signed = false): Wrong => ({ v, title, say, signed });
+
+/**
+ * Simulated wrong results → Exercise.mistakes. Only values the checker rejects (and,
+ * unless `signed`, positive ones), no duplicates: the first explanation wins. Results
+ * like 10,333… get typed rounded, so those accept a small window around them.
+ */
+function wrongNumbers(answer: AnswerSpec, list: Wrong[]): Mistake[] {
+  if (answer.kind !== "number") return [];
+  const out: Mistake[] = [];
+  for (const w of list) {
+    if (!w || !Number.isFinite(w.v) || (!w.signed && w.v <= 0)) continue;
+    const value = Math.round(w.v * 1000) / 1000;
+    const exact = Math.abs(w.v * 100 - Math.round(w.v * 100)) < 1e-6;
+    const window = exact ? 0 : Math.min(0.051, 0.05 * Math.abs(value) + 0.0005);
+    if (Math.abs(value - answer.value) <= Math.max(1e-6, 3 * window)) continue;
+    if (check(answer, { kind: "text", text: String(value) }).correct) continue;
+    if (out.some((m) => m.when.kind === "number" && Math.abs(m.when.value - value) < 1e-6)) continue;
+    const when: AnswerSpec = { kind: "number", value, unit: answer.unit, ...(window ? { tolerance: window / Math.max(1, Math.abs(value)) } : {}) };
+    out.push({ when, title: w.title, say: w.say });
+  }
+  return out;
+}
+
+/** A wrong option of "Which equation fits?", with what Blob says when it's picked. */
+type WrongEq = { eq: Eq; title: Text; say: Text };
+const opt = (eq: Eq, title: Text, say: Text): WrongEq => ({ eq, title, say });
+
+const SIGN_KEPT = tx("Sign not changed", "Vorzeichen nicht gedreht");
+const FORGOT_DIVIDE = tx("Forgot to divide", "Teilen vergessen");
+const BRACKET_MISSING = tx("Bracket missing", "Klammer vergessen");
+const WRONG_ONE = tx("Not the one asked for", "Nicht das Gesuchte");
+
+/** "+ 5" / "− 5" for messages. */
+const signStr = (v: number) => `${v < 0 ? "-" : "+"} ${de(Math.abs(v))}`;
+
+/** Undid the step on the left only, so x came out as the result c again. */
+const oneSide = (c: number, step: string): Wrong =>
+  wrong(
+    c,
+    tx("Only one side", "Nur eine Seite"),
+    tx(
+      `Hmm, that's the result from the riddle again! When you undo ${step}, do it on **both** sides, so the ${c} changes too.`,
+      `Hm, das ist ja wieder das Ergebnis aus dem Rätsel! Wenn du ${step} rückgängig machst, dann auf **beiden** Seiten, also ändert sich auch die ${c}.`,
+    ),
+  );
+
+/** kx + b = c: forgot the last division, moved b without its sign, divided first. */
+function twoStepWrongs(k: number, b: number, c: number): Wrong[] {
+  const undo = b > 0 ? tx("subtract", "subtrahierst") : tx("add", "addierst");
+  return [
+    wrong(
+      c - b,
+      FORGOT_DIVIDE,
+      tx(`So close! ${de(c - b)} is $${k}x$, not $x$ yet. One more step: divide by ${k}.`, `Ganz knapp! ${de(c - b)} ist $${k}x$, noch nicht $x$. Ein Schritt fehlt: Teil durch ${k}.`),
+    ),
+    wrong(
+      (c + b) / k,
+      SIGN_KEPT,
+      tx(
+        `Ah, I see what happened! You moved the ${de(Math.abs(b))} across but kept its sign. To undo $${signStr(b)}$, ${resolveText(undo, "en")} ${de(Math.abs(b))} on **both** sides.`,
+        `Ah, ich seh, was passiert ist! Du hast die ${de(Math.abs(b))} rübergebracht, aber ihr Vorzeichen behalten. Um $${signStr(b)}$ rückgängig zu machen, ${resolveText(undo, "de")} du ${de(Math.abs(b))} auf **beiden** Seiten.`,
+      ),
+      true,
+    ),
+    wrong(
+      c / k - b,
+      tx("Wrong order", "Falsche Reihenfolge"),
+      tx(
+        `I think you divided by ${k} first and then dealt with the ${de(Math.abs(b))}. But dividing has to hit **every** term: undo the $${signStr(b)}$ first, then divide.`,
+        `Ich glaub, du hast zuerst durch ${k} geteilt und dich dann um die ${de(Math.abs(b))} gekümmert. Aber Teilen muss **jeden** Term treffen: Mach zuerst das $${signStr(b)}$ rückgängig, dann teil.`,
+      ),
+      true,
+    ),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Stories → exercises
 
 type Story = {
@@ -307,6 +396,8 @@ type Story = {
   hint: Text;
   /** "the number", "Ben's share in €"… for multiple choice. */
   meaning: Text;
+  /** Typical wrong answers, worked out from the story. */
+  wrong?: Wrong[];
 };
 
 const SOLVE = tx("Solve with an equation", "Löse mit einer Gleichung");
@@ -318,28 +409,31 @@ function story(s: Story, instruction: Text = SOLVE): Exercise {
     const last = frames[frames.length - 1];
     frames[frames.length - 1] = { ...last, note: joinT(last.note ?? "", s.answerText) };
   }
-  return { instruction, text: s.text, answer: s.answer, hint: s.hint, solution: frames };
+  return { instruction, text: s.text, answer: s.answer, hint: s.hint, solution: frames, mistakes: wrongNumbers(s.answer, s.wrong ?? []) };
 }
 
-/** "Which equation fits the story?" with wrong options that really are wrong. */
-function choiceOf(s: Story, wrong: Eq[], rng: Rng): Exercise {
+/** "Which equation fits the story?" with wrong options that really are wrong, each with Blob's line. */
+function choiceOf(s: Story, wrongs: WrongEq[], rng: Rng): Exercise {
   const right = eqPlain(s.eq);
   const seen = new Set([right]);
-  const pool: string[] = [];
-  for (const e of wrong) {
-    const p = eqPlain(e);
-    if (seen.has(p) || holds(e, s.x)) continue;
+  const pool: (WrongEq & { p: string })[] = [];
+  for (const w of wrongs) {
+    const p = eqPlain(w.eq);
+    if (seen.has(p) || holds(w.eq, s.x)) continue;
     seen.add(p);
-    pool.push(p);
+    pool.push({ ...w, p });
   }
-  const options = rng.shuffle([right, ...rng.shuffle(pool).slice(0, 3)]);
+  const picked = rng.shuffle(pool).slice(0, 3);
+  const options = rng.shuffle([right, ...picked.map((w) => w.p)]);
+  const optionTexts = options.map((o) => `$${o}$`);
   const { frames } = solveFrames(s.eq, joinT(s.eqNote, tx("That's the equation.", "Das ist die Gleichung.")), s.define);
   const last = frames[frames.length - 1];
   frames[frames.length - 1] = { ...last, note: joinT(last.note ?? "", s.answerText) };
   return {
     instruction: tx("Which equation fits the story?", "Welche Gleichung passt zur Geschichte?"),
     text: say((N) => [`${N(s.text)}\n\nLet $x$ be ${N(s.meaning)}.`, `${N(s.text)}\n\nSei $x$ ${N(s.meaning)}.`]),
-    answer: { kind: "choice", options: options.map((o) => `$${o}$`), correct: options.indexOf(right) },
+    answer: { kind: "choice", options: optionTexts, correct: options.indexOf(right) },
+    mistakes: picked.map((w) => ({ when: { kind: "choice", options: optionTexts, correct: options.indexOf(w.p) }, title: w.title, say: w.say })),
     hint: tx(
       "Translate the story piece by piece. Which parts belong together, and do they need brackets?",
       "Übersetze die Geschichte Stück für Stück. Welche Teile gehören zusammen, und brauchen sie Klammern?",
@@ -396,8 +490,40 @@ function riddleAdd(rng: Rng, choice = false): Exercise {
     answerText: numberAnswer(x, `${x} + ${b} = ${c}`),
     hint: tx("Let $x$ be the number. Write the story as an equation, then undo the $+$.", "Sei $x$ die gesuchte Zahl. Schreib die Geschichte als Gleichung und mach dann das $+$ rückgängig."),
     meaning: THE_NUMBER,
+    wrong: [
+      wrong(
+        c + b,
+        tx("Added instead of subtracted", "Addiert statt subtrahiert"),
+        tx(
+          `Ah, I see what happened! You added the ${b} again. To undo $+ ${b}$, **subtract** ${b} on both sides.`,
+          `Ah, ich seh, was passiert ist! Du hast die ${b} noch mal addiert. Um $+ ${b}$ rückgängig zu machen, **subtrahierst** du ${b} auf beiden Seiten.`,
+        ),
+      ),
+      oneSide(c, `$+ ${b}$`),
+    ],
   };
-  if (choice) return choiceOf(s, [{ l: [X("A"), K("b", -b)], r: [K("r", c)] }, { l: [X("A", b)], r: [K("r", c)] }, { l: [X("A"), K("b", c)], r: [K("r", b)] }], rng);
+  if (choice)
+    return choiceOf(
+      s,
+      [
+        opt(
+          { l: [X("A"), K("b", -b)], r: [K("r", c)] },
+          tx("Minus instead of plus", "Minus statt Plus"),
+          tx(`Careful: the riddle **adds** ${b} to the number. Which sign does that need?`, `Vorsicht: Im Rätsel wird ${b} zur Zahl **addiert**. Welches Zeichen gehört dann dahin?`),
+        ),
+        opt(
+          { l: [X("A", b)], r: [K("r", c)] },
+          tx("Times instead of plus", "Mal statt Plus"),
+          tx(`Hmm, $${b}x$ means ${b} **times** the number. But the riddle **adds** ${b} to it.`, `Hm, $${b}x$ heißt ${b} **mal** die Zahl. Im Rätsel wird ${b} aber **addiert**.`),
+        ),
+        opt(
+          { l: [X("A"), K("b", c)], r: [K("r", b)] },
+          tx("Numbers swapped", "Zahlen vertauscht"),
+          tx(`Nearly! ${c} is the **result**, so it belongs on its own after the $=$.`, `Fast! ${c} ist das **Ergebnis**, gehört also allein hinter das $=$.`),
+        ),
+      ],
+      rng,
+    );
   return story(s);
 }
 
@@ -418,8 +544,56 @@ function riddleSub(rng: Rng, choice = false): Exercise {
     answerText: numberAnswer(x, `${x} - ${b} = ${c}`),
     hint: tx("Let $x$ be the number. Write the story as an equation, then undo the $-$.", "Sei $x$ die gesuchte Zahl. Schreib die Geschichte als Gleichung und mach dann das $-$ rückgängig."),
     meaning: THE_NUMBER,
+    wrong: [
+      wrong(
+        c - b,
+        tx("Subtracted again", "Noch mal subtrahiert"),
+        tx(
+          `Ah, I see what happened! You subtracted the ${b} again. To undo $- ${b}$, **add** ${b} on both sides.`,
+          `Ah, ich seh, was passiert ist! Du hast die ${b} noch mal abgezogen. Um $- ${b}$ rückgängig zu machen, **addierst** du ${b} auf beiden Seiten.`,
+        ),
+        true,
+      ),
+      wrong(
+        b - c,
+        tx("Order flipped", "Reihenfolge vertauscht"),
+        tx(
+          `I think you wrote $${b} - x$. But the ${b} is taken away **from the number**: the number comes first.`,
+          `Ich glaub, du hast $${b} - x$ geschrieben. Aber die ${b} wird **von der Zahl** abgezogen: Die Zahl steht vorne.`,
+        ),
+        true,
+      ),
+      oneSide(c, `$- ${b}$`),
+    ],
   };
-  if (choice) return choiceOf(s, [{ l: [X("A"), K("b", b)], r: [K("r", c)] }, { l: [K("b", b), X("A", -1)], r: [K("r", c)] }, { l: [X("A")], r: [K("r", c), K("q", -b)] }], rng);
+  if (choice)
+    return choiceOf(
+      s,
+      [
+        opt(
+          { l: [X("A"), K("b", b)], r: [K("r", c)] },
+          tx("Plus instead of minus", "Plus statt Minus"),
+          tx(`Careful: the riddle **takes** ${b} away from the number. Which sign does that need?`, `Vorsicht: Im Rätsel wird ${b} von der Zahl **abgezogen**. Welches Zeichen gehört dann dahin?`),
+        ),
+        opt(
+          { l: [K("b", b), X("A", -1)], r: [K("r", c)] },
+          tx("Order flipped", "Reihenfolge vertauscht"),
+          tx(
+            `Nearly! $${b} - x$ takes the number away from ${b}. But in the riddle, ${b} is taken away **from the number**.`,
+            `Fast! $${b} - x$ zieht die Zahl von ${b} ab. Im Rätsel wird aber ${b} **von der Zahl** abgezogen.`,
+          ),
+        ),
+        opt(
+          { l: [X("A")], r: [K("r", c), K("q", -b)] },
+          tx("Minus on the wrong side", "Minus auf der falschen Seite"),
+          tx(
+            `Hmm, this equation takes ${b} away from the **result** ${c}. In the riddle, ${b} is taken away from the **number**.`,
+            `Hm, diese Gleichung zieht ${b} vom **Ergebnis** ${c} ab. Im Rätsel wird ${b} aber von der **Zahl** abgezogen.`,
+          ),
+        ),
+      ],
+      rng,
+    );
   return story(s);
 }
 
@@ -440,8 +614,48 @@ function riddleMul(rng: Rng, choice = false): Exercise {
     answerText: numberAnswer(x, `${k} \\cdot ${x} = ${c}`),
     hint: tx(`Let $x$ be the number. Then $${k}x = ${c}$. What undoes "times ${k}"?`, `Sei $x$ die gesuchte Zahl. Dann ist $${k}x = ${c}$. Was macht „mal ${k}“ rückgängig?`),
     meaning: THE_NUMBER,
+    wrong: [
+      wrong(
+        c * k,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Ah, I see what happened! You multiplied by ${k} again. To undo "times ${k}", **divide** both sides by ${k}.`,
+          `Ah, ich seh, was passiert ist! Du hast noch mal mit ${k} multipliziert. „Mal ${k}“ machst du mit **Teilen** rückgängig: beide Seiten durch ${k}.`,
+        ),
+      ),
+      wrong(
+        c - k,
+        tx("Times read as plus", "Mal als Plus gelesen"),
+        tx(
+          `Hmm, I think you subtracted ${k}. But the number was **multiplied** by ${k}, not increased by ${k}: undo that by dividing.`,
+          `Hm, ich glaub, du hast ${k} abgezogen. Aber die Zahl wurde mit ${k} **multipliziert**, nicht um ${k} vergrößert: Das machst du mit Teilen rückgängig.`,
+        ),
+      ),
+      oneSide(c, `$\\cdot ${k}$`),
+    ],
   };
-  if (choice) return choiceOf(s, [{ l: [X("A"), K("b", k)], r: [K("r", c)] }, { l: [X("A", 1, k)], r: [K("r", c)] }, { l: [X("A"), K("b", -k)], r: [K("r", c)] }], rng);
+  if (choice)
+    return choiceOf(
+      s,
+      [
+        opt(
+          { l: [X("A"), K("b", k)], r: [K("r", c)] },
+          tx("Plus instead of times", "Plus statt Mal"),
+          tx(`Careful: the number is **multiplied** by ${k}, not increased by ${k}. How do you write that?`, `Vorsicht: Die Zahl wird mit ${k} **multipliziert**, nicht um ${k} vergrößert. Wie schreibst du das?`),
+        ),
+        opt(
+          { l: [X("A", 1, k)], r: [K("r", c)] },
+          tx("Divided instead of multiplied", "Geteilt statt multipliziert"),
+          tx(`Hmm, $\\frac{x}{${k}}$ divides the number by ${k}. But in the riddle it gets **multiplied** by ${k}.`, `Hm, $\\frac{x}{${k}}$ teilt die Zahl durch ${k}. Im Rätsel wird sie aber mit ${k} **multipliziert**.`),
+        ),
+        opt(
+          { l: [X("A"), K("b", -k)], r: [K("r", c)] },
+          tx("Minus instead of times", "Minus statt Mal"),
+          tx(`Careful: nothing is taken away in the riddle. The number is **multiplied** by ${k}.`, `Vorsicht: Im Rätsel wird nichts abgezogen. Die Zahl wird mit ${k} **multipliziert**.`),
+        ),
+      ],
+      rng,
+    );
   return story(s);
 }
 
@@ -462,8 +676,52 @@ function riddleDiv(rng: Rng, choice = false): Exercise {
       `${PART.de[d][0]} einer Zahl ist die Zahl geteilt durch ${d}. Was macht „geteilt durch ${d}“ rückgängig?`,
     ),
     meaning: THE_NUMBER,
+    wrong: [
+      wrong(
+        c / d,
+        tx("Divided again", "Noch mal geteilt"),
+        tx(
+          `Ooh, your number got smaller! But ${PART.en[d][1]} of it is ${c}, so the number is **bigger** than ${c}. Undo "divided by ${d}" by **multiplying**.`,
+          `Ooh, deine Zahl ist kleiner geworden! Aber ${PART.de[d][1]} davon ist ${c}, also ist die Zahl **größer** als ${c}. „Geteilt durch ${d}“ machst du mit **Multiplizieren** rückgängig.`,
+        ),
+      ),
+      wrong(
+        c + d,
+        tx("Plus instead of times", "Plus statt Mal"),
+        tx(
+          `Hmm, did you add ${d}? ${PART.en[d][0]} of a number is the number **divided by** ${d}, so undo that division.`,
+          `Hm, hast du ${d} addiert? ${PART.de[d][0]} einer Zahl ist die Zahl **geteilt durch** ${d}. Mach diese Division rückgängig.`,
+        ),
+      ),
+      oneSide(c, `$: ${d}$`),
+    ],
   };
-  if (choice) return choiceOf(s, [{ l: [X("A", d)], r: [K("r", c)] }, { l: [X("A"), K("b", -d)], r: [K("r", c)] }, { l: [X("A"), K("b", d)], r: [K("r", c)] }], rng);
+  const partOf = tx(`${PART.en[d][1]} of a number`, `${PART.de[d][1]} einer Zahl`);
+  if (choice)
+    return choiceOf(
+      s,
+      [
+        opt(
+          { l: [X("A", d)], r: [K("r", c)] },
+          tx("Times instead of divided", "Mal statt geteilt"),
+          tx(
+            `Ooh, close! But ${E(partOf)} is **smaller** than the number: that's dividing by ${d}, not multiplying.`,
+            `Ooh, knapp! Aber ${D(partOf)} ist **kleiner** als die Zahl: Das heißt durch ${d} teilen, nicht mal ${d}.`,
+          ),
+        ),
+        opt(
+          { l: [X("A"), K("b", -d)], r: [K("r", c)] },
+          tx("Minus instead of divided", "Minus statt geteilt"),
+          tx(`Hmm, ${E(partOf)} doesn't mean "minus ${d}". It's the number shared into ${d} equal parts.`, `Hm, ${D(partOf)} heißt nicht „minus ${d}“. Das ist die Zahl in ${d} gleiche Teile geteilt.`),
+        ),
+        opt(
+          { l: [X("A"), K("b", d)], r: [K("r", c)] },
+          tx("Plus instead of divided", "Plus statt geteilt"),
+          tx(`Hmm, ${E(partOf)} doesn't mean "plus ${d}". It's the number shared into ${d} equal parts.`, `Hm, ${D(partOf)} heißt nicht „plus ${d}“. Das ist die Zahl in ${d} gleiche Teile geteilt.`),
+        ),
+      ],
+      rng,
+    );
   return story(s);
 }
 
@@ -511,6 +769,21 @@ function contextAdd(rng: Rng): Exercise {
     answerText: answerCheck(v.answer, `${x} + ${b} = ${c}`),
     hint: START_HINT,
     meaning: v.meaning,
+    wrong: [
+      wrong(
+        c + b,
+        tx("Added instead of subtracted", "Addiert statt subtrahiert"),
+        tx(
+          `Hmm, that would be **more** than now! Before the ${b} were added, there was less: undo the $+ ${b}$.`,
+          `Hm, das wäre ja **mehr** als jetzt! Bevor die ${b} dazukamen, war es weniger: Mach das $+ ${b}$ rückgängig.`,
+        ),
+      ),
+      wrong(
+        c,
+        tx("That's the amount now", "Das ist der Stand jetzt"),
+        tx(`Nearly! ${c} is the amount **now**, after the ${b} were added. The question asks about **before**.`, `Fast! ${c} ist der Stand **jetzt**, nachdem ${b} dazugekommen sind. Gefragt ist nach **vorher**.`),
+      ),
+    ],
   });
 }
 
@@ -549,6 +822,21 @@ function contextSub(rng: Rng): Exercise {
     answerText: answerCheck(v.answer, `${x} - ${b} = ${c}`),
     hint: START_HINT,
     meaning: v.meaning,
+    wrong: [
+      wrong(
+        c - b,
+        tx("Subtracted again", "Noch mal subtrahiert"),
+        tx(
+          `Hmm, that would be even **less** than now! Before the ${b} went away, there was more: undo the $- ${b}$.`,
+          `Hm, das wäre ja noch **weniger** als jetzt! Bevor die ${b} weg waren, war es mehr: Mach das $- ${b}$ rückgängig.`,
+        ),
+      ),
+      wrong(
+        c,
+        tx("That's the amount now", "Das ist der Stand jetzt"),
+        tx(`Nearly! ${c} is what's left **now**, after the ${b} went away. The question asks about **before**.`, `Fast! ${c} ist das, was **jetzt** noch übrig ist, nachdem ${b} weg sind. Gefragt ist nach **vorher**.`),
+      ),
+    ],
   });
 }
 
@@ -570,6 +858,26 @@ function contextMul(rng: Rng): Exercise {
     answerText: answerCheck(tx(`One pack costs ${x} €.`, `Eine Packung kostet ${x} €.`), `${k} \\cdot ${x} = ${c}`),
     hint: tx(`Let $x$ be the price of one pack. Then ${k} packs cost $${k}x$.`, `Sei $x$ der Preis einer Packung. Dann kosten ${k} Packungen $${k}x$.`),
     meaning: tx("the price of one pack (in €)", "der Preis einer Packung (in €)"),
+    wrong: [
+      wrong(
+        c * k,
+        tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+        tx(
+          `Whoa, then one pack would cost more than all ${k} together! Undo "times ${k}" by **dividing**.`,
+          `Huch, dann wäre eine Packung teurer als alle ${k} zusammen! „Mal ${k}“ machst du mit **Teilen** rückgängig.`,
+        ),
+      ),
+      wrong(
+        c,
+        tx("Price of all packs", "Preis aller Packungen"),
+        tx(`Nearly! ${c} € is what all ${k} packs cost **together**. The question asks about **one** pack.`, `Fast! ${c} € kosten alle ${k} Packungen **zusammen**. Gefragt ist **eine** Packung.`),
+      ),
+      wrong(
+        c - k,
+        tx("Subtracted instead of divided", "Subtrahiert statt geteilt"),
+        tx(`Hmm, I think you took ${k} away from ${c}. But ${k} packs cost ${k} **times** as much as one: divide.`, `Hm, ich glaub, du hast ${k} von ${c} abgezogen. Aber ${k} Packungen kosten ${k}-**mal** so viel wie eine: teilen.`),
+      ),
+    ],
   });
 }
 
@@ -610,15 +918,41 @@ function riddle2(rng: Rng, choice = false): Exercise {
       `Sei $x$ die gesuchte Zahl: $${k}x ${plus ? "+" : "-"} ${b} = ${c}$. Mach zuerst das ${plus ? "Plus" : "Minus"} rückgängig, dann das Mal.`,
     ),
     meaning: THE_NUMBER,
+    wrong: twoStepWrongs(k, sb, c),
   };
   if (choice)
     return choiceOf(
       s,
       [
-        { l: [B("A", k, [X("A1"), K("A2", sb)])], r: [K("r", c)] },
-        { l: [X("A", k)], r: [K("r", c), K("q", sb)] },
-        { l: [X("A", b), K("b", plus ? k : -k)], r: [K("r", c)] },
-        { l: [X("A"), K("k", k), K("b", sb)], r: [K("r", c)] },
+        opt(
+          { l: [B("A", k, [X("A1"), K("A2", sb)])], r: [K("r", c)] },
+          tx("Bracket around too much", "Klammer um zu viel"),
+          tx(
+            `Nearly! The bracket multiplies the ${b} by ${k} too. But only the number is multiplied, and the ${b} comes **afterwards**.`,
+            `Fast! Die Klammer nimmt auch die ${b} mal ${k}. Aber nur die Zahl wird multipliziert, die ${b} kommt **danach**.`,
+          ),
+        ),
+        opt(
+          { l: [X("A", k)], r: [K("r", c), K("q", sb)] },
+          tx("Number on the wrong side", "Zahl auf der falschen Seite"),
+          tx(
+            `Hmm, here the ${b} is ${plus ? "added to" : "taken from"} the **result** ${c}. In the story it's ${plus ? "added to" : "taken from"} $${k}x$, before the $=$.`,
+            `Hm, hier wird die ${b} beim **Ergebnis** ${c} ${plus ? "addiert" : "abgezogen"}. In der Aufgabe passiert das bei $${k}x$, also vor dem $=$.`,
+          ),
+        ),
+        opt(
+          { l: [X("A", b), K("b", plus ? k : -k)], r: [K("r", c)] },
+          tx("Numbers swapped", "Zahlen vertauscht"),
+          tx(
+            `Close! But ${k} and ${b} swapped places. The number is multiplied by **${k}**, and ${b} is ${plus ? "added" : "subtracted"}.`,
+            `Knapp! Aber ${k} und ${b} haben die Plätze getauscht. Die Zahl wird mit **${k}** multipliziert, und ${b} wird ${plus ? "addiert" : "subtrahiert"}.`,
+          ),
+        ),
+        opt(
+          { l: [X("A"), K("k", k), K("b", sb)], r: [K("r", c)] },
+          tx("Plus instead of times", "Plus statt Mal"),
+          tx(`Careful: the number is **multiplied** by ${k}, not increased by ${k}.`, `Vorsicht: Die Zahl wird mit ${k} **multipliziert**, nicht um ${k} vergrößert.`),
+        ),
       ],
       rng,
     );
@@ -632,6 +966,7 @@ function riddleFrac2(rng: Rng): Exercise {
   const b = rng.int(2, 20);
   const plus = rng.chance(0.6) || m - b <= 0;
   const c = plus ? m + b : m - b;
+  const sb = plus ? b : -b;
   const pm = plus ? "plus" : "minus";
   return story({
     text: tx(
@@ -649,6 +984,41 @@ function riddleFrac2(rng: Rng): Exercise {
       `${PART.de[d][0]} von $x$ ist $\\frac{x}{${d}}$. Mach zuerst das ${plus ? "Plus" : "Minus"} rückgängig, dann multipliziere mit ${d}.`,
     ),
     meaning: THE_NUMBER,
+    wrong: [
+      wrong(
+        c - sb,
+        tx("Forgot to multiply", "Multiplizieren vergessen"),
+        tx(
+          `So close! ${c - sb} is ${PART.en[d][1]} of the number, not the number itself. One more step: multiply by ${d}.`,
+          `Ganz knapp! ${c - sb} ist ${PART.de[d][1]} der Zahl, nicht die Zahl selbst. Ein Schritt fehlt: Multiplizier mit ${d}.`,
+        ),
+      ),
+      wrong(
+        (c - sb) / d,
+        tx("Divided instead of multiplied", "Geteilt statt multipliziert"),
+        tx(
+          `Nearly! Undoing the $${signStr(sb)}$ was right, but then you divided by ${d}. To undo "divided by ${d}", **multiply**.`,
+          `Fast! Das $${signStr(sb)}$ rückgängig zu machen war richtig, aber dann hast du durch ${d} geteilt. „Geteilt durch ${d}“ machst du mit **Multiplizieren** rückgängig.`,
+        ),
+      ),
+      wrong(
+        c * d - sb,
+        tx("Only one term multiplied", "Nur ein Term multipliziert"),
+        tx(
+          `I think you multiplied by ${d} first, but only the ${c}. Multiplying has to hit **every** term: better undo the $${signStr(sb)}$ first.`,
+          `Ich glaub, du hast zuerst mit ${d} multipliziert, aber nur die ${c}. Multiplizieren muss **jeden** Term treffen: Mach lieber zuerst das $${signStr(sb)}$ rückgängig.`,
+        ),
+      ),
+      wrong(
+        d * (c + sb),
+        SIGN_KEPT,
+        tx(
+          `Ah, I see what happened! You moved the ${b} across but kept its sign. To undo $${signStr(sb)}$, ${plus ? "subtract" : "add"} ${b} on **both** sides.`,
+          `Ah, ich seh, was passiert ist! Du hast die ${b} rübergebracht, aber ihr Vorzeichen behalten. Um $${signStr(sb)}$ rückgängig zu machen, ${plus ? "subtrahierst" : "addierst"} du ${b} auf **beiden** Seiten.`,
+        ),
+        true,
+      ),
+    ],
   });
 }
 
@@ -712,7 +1082,68 @@ function consecutiveStory(kind: ConsecKind, x: number, ask: "smallest" | "middle
           ? tx("Let $x$ be the smaller number. The next one is $x + 1$.", "Sei $x$ die kleinere Zahl. Die nächste ist $x + 1$.")
           : tx("Let $x$ be the smallest number. The next ones are $x + 1$ and $x + 2$.", "Sei $x$ die kleinste Zahl. Die nächsten sind $x + 1$ und $x + 2$."),
     meaning: count === 2 ? tx("the smaller number", "die kleinere Zahl") : tx("the smallest number", "die kleinste Zahl"),
+    wrong: consecutiveWrongs(kind, nums, S, offset / step),
   };
+}
+
+/** The other numbers of the row, x, 2x, 3x, the wrong step size, just halving the sum. */
+function consecutiveWrongs(kind: ConsecKind, nums: number[], S: number, at: number): Wrong[] {
+  const count = nums.length;
+  const step = kind === "even" ? 2 : 1;
+  const posEn = count === 2 ? ["smaller", "larger"] : ["smallest", "middle", "largest"];
+  const posDe = count === 2 ? ["kleinere", "größere"] : ["kleinste", "mittlere", "größte"];
+  const others: Wrong[] = nums.map((v, i) =>
+    i === at
+      ? false
+      : wrong(
+          v,
+          WRONG_ONE,
+          i === 0
+            ? tx(
+                `Great, $x = ${v}$ is right! But $x$ is the ${posEn[0]} number, and the question asks for the **${posEn[at]}** one.`,
+                `Super, $x = ${v}$ stimmt! Aber $x$ ist die ${posDe[0]} Zahl, und gefragt ist die **${posDe[at]}**.`,
+              )
+            : tx(`You found the numbers, nice! But ${v} is the ${posEn[i]} one, and the question asks for the **${posEn[at]}**.`, `Die Zahlen hast du, stark! Aber ${v} ist die ${posDe[i]}, und gefragt ist die **${posDe[at]}**.`),
+        ),
+  );
+  // x, 2x, 3x: x = S / 6 (or S / 3 for two numbers).
+  const xm = S / (count === 2 ? 3 : 6);
+  const otherStep = 3 - step;
+  const xs = (S - otherStep * (count === 2 ? 1 : 3)) / count;
+  return [
+    ...others,
+    wrong(
+      (at + 1) * xm,
+      count === 2 ? tx("Not x and 2x", "Nicht x und 2x") : tx("Not x, 2x, 3x", "Nicht x, 2x, 3x"),
+      tx(
+        `I think you wrote the numbers as ${count === 2 ? "$x$ and $2x$" : "$x$, $2x$, $3x$"}. But ${kind === "even" ? "consecutive even numbers" : "consecutive numbers"} go up by **${step}** each time, they don't double.`,
+        `Ich glaub, du hast die Zahlen als ${count === 2 ? "$x$ und $2x$" : "$x$, $2x$, $3x$"} geschrieben. Aber ${kind === "even" ? "aufeinanderfolgende gerade Zahlen" : "aufeinanderfolgende Zahlen"} steigen jedes Mal um **${step}**, sie verdoppeln sich nicht.`,
+      ),
+    ),
+    count === 3 &&
+      wrong(
+        xs + at * otherStep,
+        step === 2 ? tx("Steps of 1", "Einerschritte") : tx("Steps of 2", "Zweierschritte"),
+        step === 2
+          ? tx(
+              "Nearly! Your numbers go up in steps of 1, but if $x$ is even, $x + 1$ isn't. Even numbers come in steps of **2**.",
+              "Fast! Deine Zahlen steigen in Einerschritten, aber wenn $x$ gerade ist, ist $x + 1$ ungerade. Gerade Zahlen kommen in **Zweierschritten**.",
+            )
+          : tx(
+              "Nearly! Your numbers go up in steps of 2, but that's for even or odd numbers. Consecutive numbers come right after each other: steps of **1**.",
+              "Fast! Deine Zahlen steigen in Zweierschritten, aber das gibt es nur bei geraden oder ungeraden Zahlen. Aufeinanderfolgende Zahlen kommen direkt hintereinander: Einerschritte.",
+            ),
+      ),
+    count === 2 &&
+      wrong(
+        S / 2,
+        tx("Just halved the sum", "Nur halbiert"),
+        tx(
+          `Hmm, ${de(S / 2)} isn't a whole number! Halving only works if both numbers were the same. Let $x$ be the smaller one: the next one is $x + 1$.`,
+          `Hm, ${de(S / 2)} ist keine ganze Zahl! Halbieren klappt nur, wenn beide Zahlen gleich wären. Sei $x$ die kleinere: Die nächste ist $x + 1$.`,
+        ),
+      ),
+  ];
 }
 
 function consecutive(rng: Rng, choice = false): Exercise {
@@ -725,17 +1156,52 @@ function consecutive(rng: Rng, choice = false): Exercise {
     return choiceOf(
       s,
       [
-        { l: [X("A"), X("B"), X("C")], r: [K("r", S)] },
-        { l: [X("A", kind === "two" ? 2 : 3), K("b", 2)], r: [K("r", S)] },
-        { l: [X("A"), B("B", 1, [X("B1"), K("B2", 2)]), B("C", 1, [X("C1"), K("C2", 4)])], r: [K("r", S)] },
-        { l: [X("A"), B("B", 1, [X("B1"), K("B2", 1)]), B("C", 1, [X("C1"), K("C2", 2)])], r: [K("r", S)] },
-        { l: [X("A"), K("b", 1), K("c", 2)], r: [K("r", S)] },
+        opt(
+          { l: [X("A"), X("B"), X("C")], r: [K("r", S)] },
+          tx("The same number three times", "Dreimal dieselbe Zahl"),
+          tx(
+            "Hmm, $x + x + x$ adds the **same** number three times. But the numbers are different: each one comes after the one before.",
+            "Hm, $x + x + x$ addiert dreimal **dieselbe** Zahl. Die Zahlen sind aber verschieden: Jede kommt nach der vorherigen.",
+          ),
+        ),
+        opt(
+          { l: [X("A", kind === "two" ? 2 : 3), K("b", 2)], r: [K("r", S)] },
+          tx("Miscounted", "Verzählt"),
+          tx("Close! Add up again what's added to $x$ in each of the numbers: that's not 2.", "Knapp! Zähl noch mal zusammen, was in jeder der Zahlen zu $x$ dazukommt: Das ist nicht 2."),
+        ),
+        opt(
+          { l: [X("A"), B("B", 1, [X("B1"), K("B2", 2)]), B("C", 1, [X("C1"), K("C2", 4)])], r: [K("r", S)] },
+          tx("Steps of 2", "Zweierschritte"),
+          tx(
+            "Nearly! Steps of 2 are for even or odd numbers. Consecutive numbers come right after each other.",
+            "Fast! Zweierschritte gibt es bei geraden oder ungeraden Zahlen. Aufeinanderfolgende Zahlen kommen direkt hintereinander.",
+          ),
+        ),
+        opt(
+          { l: [X("A"), B("B", 1, [X("B1"), K("B2", 1)]), B("C", 1, [X("C1"), K("C2", 2)])], r: [K("r", S)] },
+          tx("Steps of 1", "Einerschritte"),
+          tx("Nearly! But if $x$ is even, $x + 1$ isn't. Which step takes you from one even number to the next?", "Fast! Aber wenn $x$ gerade ist, ist $x + 1$ ungerade. Mit welchem Schritt kommst du von einer geraden Zahl zur nächsten?"),
+        ),
+        opt(
+          { l: [X("A"), K("b", 1), K("c", 2)], r: [K("r", S)] },
+          tx("x missing", "x fehlt"),
+          tx("Hmm, here only the first number contains $x$. But the next numbers are built from $x$ too.", "Hm, hier enthält nur die erste Zahl ein $x$. Die nächsten Zahlen werden aber auch aus $x$ gebaut."),
+        ),
       ],
       rng,
     );
   }
   return story(s);
 }
+
+const ONLY_TWO_SIDES = tx("Only two sides", "Nur zwei Seiten");
+const ONLY_TWO_SIDES_SAY = tx(
+  "I think you added just one width and one length. The perimeter goes all the way round: **two** widths and **two** lengths.",
+  "Ich glaub, du hast nur eine Breite und eine Länge addiert. Der Umfang geht einmal ganz herum: **zwei** Breiten und **zwei** Längen.",
+);
+const ONLY_X_DOUBLED = tx("Only x multiplied", "Nur x multipliziert");
+const onlyXDoubled = (k: number) =>
+  tx(`Ah, I see! In $2(x + ${k})$ the 2 has to multiply the ${k} as well, not just the $x$.`, `Ah, ich seh's! Bei $2(x + ${k})$ muss die 2 auch die ${k} malnehmen, nicht nur das $x$.`);
 
 const rectAnswer = (w: number, len: number, check: string) =>
   answerCheck(tx(`The rectangle is ${w} cm wide and ${len} cm long.`, `Das Rechteck ist ${w} cm breit und ${len} cm lang.`), check);
@@ -768,8 +1234,18 @@ function rectangleStory(width: number, k: number, ask: "width" | "length"): Stor
       "Sei $x$ die Breite. Dann ist die Länge $x$ plus der Unterschied. Umfang = 2 · Breite + 2 · Länge.",
     ),
     meaning: WIDTH_CM,
+    wrong: [
+      ask === "width"
+        ? wrong(len, WRONG_ONE, tx(`Nearly! ${len} cm is the **length**. The question asks how **wide** the rectangle is.`, `Fast! ${len} cm ist die **Länge**. Gefragt ist, wie **breit** das Rechteck ist.`))
+        : wrong(width, WRONG_ONE, tx(`Great, $x = ${width}$ is right! But $x$ is the width, and the question asks for the **length**.`, `Super, $x = ${width}$ stimmt! Aber $x$ ist die Breite, und gefragt ist die **Länge**.`)),
+      // x + (x + k) = P
+      wrong((P - k) / 2 + (ask === "width" ? 0 : k), ONLY_TWO_SIDES, ONLY_TWO_SIDES_SAY),
+      // 2x + 2x + k = P
+      wrong((P - k) / 4 + (ask === "width" ? 0 : k), ONLY_X_DOUBLED, onlyXDoubled(k)),
+    ],
   };
 }
+
 
 function perimeter(rng: Rng): Exercise {
   if (rng.chance(0.6)) return story(rectangleStory(rng.int(3, 15), rng.int(2, 9), rng.chance(0.5) ? "width" : "length"));
@@ -794,6 +1270,20 @@ function perimeter(rng: Rng): Exercise {
     answerText: answerCheck(tx(`The base is ${base} cm long.`, `Die Basis ist ${base} cm lang.`), `${base} + 2 \\cdot ${base + k} = ${P}`),
     hint: tx("Let $x$ be the base. The two equal sides are each $x$ plus the difference.", "Sei $x$ die Basis. Jeder der beiden Schenkel ist $x$ plus der Unterschied."),
     meaning: tx("the base in cm", "die Basis in cm"),
+    wrong: [
+      wrong(base + k, WRONG_ONE, tx(`Nearly! ${base + k} cm is one of the equal sides. The question asks for the **base**.`, `Fast! ${base + k} cm ist ein Schenkel. Gefragt ist die **Basis**.`)),
+      // x + 2x + k = P
+      wrong((P - k) / 3, ONLY_X_DOUBLED, onlyXDoubled(k)),
+      // x + (x + k) = P
+      wrong(
+        (P - k) / 2,
+        tx("One side missing", "Ein Schenkel fehlt"),
+        tx(
+          "I think you counted only one of the equal sides. The triangle has the base **and two** equal sides.",
+          "Ich glaub, du hast nur einen Schenkel gezählt. Das Dreieck hat die Basis **und zwei** Schenkel.",
+        ),
+      ),
+    ],
   });
 }
 
@@ -825,6 +1315,45 @@ function sumAgesStory(older: Text, younger: Text, x: number, k: number, ask: "yo
     ),
     hint: say((N, G) => [`Let $x$ be ${N(younger)}'s age. Then ${N(older)} is $x + ${k}$.`, `Sei $x$ ${G(younger)} Alter. Dann ist ${N(older)} $x + ${k}$.`]),
     meaning: say((N, G) => [`${N(younger)}'s age`, `${G(younger)} Alter`]),
+    wrong: [
+      ask === "younger"
+        ? wrong(
+            x + k,
+            WRONG_ONE,
+            say((N, G) => [`Nearly! ${x + k} is ${N(older)}'s age. The question asks about ${N(younger)}.`, `Fast! ${x + k} ist ${G(older)} Alter. Gefragt ist nach ${N(younger)}.`]),
+          )
+        : wrong(
+            x,
+            WRONG_ONE,
+            say((N, G) => [
+              `Great, $x = ${x}$ is right! But $x$ is ${N(younger)}'s age, and the question asks about ${N(older)}.`,
+              `Super, $x = ${x}$ stimmt! Aber $x$ ist ${G(younger)} Alter, und gefragt ist nach ${N(older)}.`,
+            ]),
+          ),
+      ask === "younger" &&
+        wrong(S - k, FORGOT_DIVIDE, tx(`So close! ${S - k} is $2x$, not $x$ yet. One more step: divide by 2.`, `Ganz knapp! ${S - k} ist $2x$, noch nicht $x$. Ein Schritt fehlt: Teil durch 2.`)),
+      wrong(
+        S / 2,
+        tx("Split equally", "Gleich aufgeteilt"),
+        say((N) => [
+          `Hmm, you split the ${S} years equally. But ${N(older)} is ${k} years older, so the two can't be the same age.`,
+          `Hm, du hast die ${S} Jahre gleichmäßig aufgeteilt. Aber ${N(older)} ist ${k} Jahre älter, die beiden können also nicht gleich alt sein.`,
+        ]),
+      ),
+      wrong(
+        S / 2 + (ask === "younger" ? -k : k),
+        tx("Difference counted twice", "Unterschied doppelt gezählt"),
+        tx(
+          `I think you halved ${S} and then moved ${k} years from one to the other. But then they're ${2 * k} years apart, not ${k}!`,
+          `Ich glaub, du hast ${S} halbiert und dann ${k} Jahre vom einen zum anderen geschoben. Dann liegen sie aber ${2 * k} Jahre auseinander, nicht ${k}!`,
+        ),
+      ),
+      wrong(
+        S,
+        tx("That's both together", "Das sind beide zusammen"),
+        say((N) => [`Hmm, ${S} years is how old they are **together**. The question asks about ${N(asked)} alone.`, `Hm, ${S} Jahre sind beide **zusammen** alt. Gefragt ist nur nach ${N(asked)}.`]),
+      ),
+    ],
   };
 }
 
@@ -835,7 +1364,33 @@ function sumAges(rng: Rng, choice = false): Exercise {
   const s = sumAgesStory(a, b, x, k, rng.chance(0.6) ? "younger" : "older");
   if (choice) {
     const S = 2 * x + k;
-    return choiceOf(s, [{ l: [X("A"), K("b", k)], r: [K("r", S)] }, { l: [X("A"), X("B", k)], r: [K("r", S)] }, { l: [X("A", 2)], r: [K("r", S), K("q", k)] }], rng);
+    return choiceOf(
+      s,
+      [
+        opt(
+          { l: [X("A"), K("b", k)], r: [K("r", S)] },
+          tx("Only one person", "Nur eine Person"),
+          say((N) => [
+            `Hmm, there's only one age in here. "Together" means **both** ages added up: ${N(b)}'s and ${N(a)}'s.`,
+            `Hm, hier steht nur ein Alter drin. „Zusammen“ heißt: **beide** Alter addiert, das von ${N(b)} und das von ${N(a)}.`,
+          ]),
+        ),
+        opt(
+          { l: [X("A"), X("B", k)], r: [K("r", S)] },
+          tx("Times instead of plus", "Mal statt Plus"),
+          tx(`Careful: "${k} years older" means **plus** ${k}, not ${k} times as old.`, `Vorsicht: „${k} Jahre älter“ heißt **plus** ${k}, nicht ${k}-mal so alt.`),
+        ),
+        opt(
+          { l: [X("A", 2)], r: [K("r", S), K("q", k)] },
+          tx("Sign of the years", "Vorzeichen der Jahre"),
+          tx(
+            `Nearly! This equation means $x + (x - ${k}) = ${S}$, so someone would be ${k} years **younger**. Check the sign of the ${k}.`,
+            `Fast! Diese Gleichung bedeutet $x + (x - ${k}) = ${S}$, also wäre jemand ${k} Jahre **jünger**. Prüf das Vorzeichen der ${k}.`,
+          ),
+        ),
+      ],
+      rng,
+    );
   }
   return story(s);
 }
@@ -859,6 +1414,35 @@ function ticketFee(rng: Rng): Exercise {
     answerText: answerCheck(tx(`One ticket costs ${x} €.`, `Eine Karte kostet ${x} €.`), `${n} \\cdot ${x} + ${f} = ${T}`),
     hint: tx(`Let $x$ be the price of one ticket. ${n} tickets plus the fee make ${T} €.`, `Sei $x$ der Preis einer Karte. ${n} Karten plus Gebühr ergeben ${T} €.`),
     meaning: tx("the price of one ticket (in €)", "der Preis einer Karte (in €)"),
+    wrong: [
+      // n(x + f) = T
+      wrong(
+        T / n - f,
+        tx("Fee counted per ticket", "Gebühr pro Karte gerechnet"),
+        tx(
+          `Ah, I see! You took the fee off **every** ticket. But the ${f} € are per **order**, so they come off only once.`,
+          `Ah, ich seh's! Du hast die Gebühr von **jeder** Karte abgezogen. Die ${f} € gelten aber pro **Bestellung**, kommen also nur einmal weg.`,
+        ),
+      ),
+      wrong(
+        T / n,
+        tx("Fee forgotten", "Gebühr vergessen"),
+        tx(
+          `Nearly! The ${T} € include the booking fee of ${f} €. Take it off before you share the rest between the ${n} tickets.`,
+          `Fast! In den ${T} € steckt noch die Servicegebühr von ${f} €. Zieh sie ab, bevor du den Rest auf die ${n} Karten verteilst.`,
+        ),
+      ),
+      wrong(
+        T - f,
+        tx("Price of all tickets", "Preis aller Karten"),
+        tx(`So close! ${T - f} € is what all ${n} tickets cost together. The question asks about **one** ticket.`, `Ganz knapp! ${T - f} € kosten alle ${n} Karten zusammen. Gefragt ist **eine** Karte.`),
+      ),
+      wrong(
+        (T + f) / n,
+        tx("Fee added", "Gebühr addiert"),
+        tx(`Hmm, I think you added the ${f} € fee. But it's already **in** the ${T} €: take it away.`, `Hm, ich glaub, du hast die ${f} € Gebühr addiert. Die stecken aber schon **in** den ${T} €: Zieh sie ab.`),
+      ),
+    ],
   });
 }
 
@@ -884,6 +1468,35 @@ function taxi(rng: Rng): Exercise {
       `Sei $x$ die Anzahl der Kilometer. Jeder km kostet ${per} €, die Grundgebühr kommt einmal dazu.`,
     ),
     meaning: tx("the length of the ride in km", "die Länge der Fahrt in km"),
+    wrong: [
+      wrong(
+        T / per,
+        tx("Start price forgotten", "Grundgebühr vergessen"),
+        tx(
+          `Nearly! The ${T} € include the start price of ${base} €. Take it off first, then see how many km the rest pays for.`,
+          `Fast! In den ${T} € steckt noch die Grundgebühr von ${base} €. Zieh sie zuerst ab, dann schau, für wie viele km der Rest reicht.`,
+        ),
+      ),
+      // (per + base) · x = T
+      wrong(
+        T / (per + base),
+        tx("Start price per km", "Grundgebühr pro km"),
+        tx(
+          `Ah, I see! You added the ${base} € to every kilometre. But the start price is paid only **once** per ride.`,
+          `Ah, ich seh's! Du hast die ${base} € auf jeden Kilometer draufgerechnet. Die Grundgebühr zahlt man aber nur **einmal** pro Fahrt.`,
+        ),
+      ),
+      wrong(
+        T - base,
+        tx("Euros, not kilometres", "Euro statt Kilometer"),
+        tx(`So close! ${T - base} € is what the kilometres cost. Now: how many km is that at ${per} € each?`, `Ganz knapp! ${T - base} € kosten die Kilometer. Jetzt noch: Wie viele km sind das bei ${per} € pro km?`),
+      ),
+      wrong(
+        (T + base) / per,
+        tx("Start price added", "Grundgebühr addiert"),
+        tx(`Hmm, I think you added the ${base} € start price. But it's already **in** the ${T} €: take it away.`, `Hm, ich glaub, du hast die ${base} € Grundgebühr addiert. Die stecken aber schon **in** den ${T} €: Zieh sie ab.`),
+      ),
+    ],
   });
 }
 
@@ -914,12 +1527,44 @@ function rectangleTimes(rng: Rng): Exercise {
     answerText: rectAnswer(w, k * w, `${w} + ${k * w} + ${w} + ${k * w} = ${P}`),
     hint: tx(`Let $x$ be the width. The length is $${k}x$. Add all four sides.`, `Sei $x$ die Breite. Die Länge ist $${k}x$. Addiere alle vier Seiten.`),
     meaning: WIDTH_CM,
+    wrong: [
+      ask === "wide"
+        ? wrong(k * w, WRONG_ONE, tx(`Nearly! ${k * w} cm is the **length**. The question asks how **wide** it is.`, `Fast! ${k * w} cm ist die **Länge**. Gefragt ist, wie **breit** es ist.`))
+        : wrong(w, WRONG_ONE, tx(`Great, $x = ${w}$ is right! But $x$ is the width, and the question asks for the **length**.`, `Super, $x = ${w}$ stimmt! Aber $x$ ist die Breite, und gefragt ist die **Länge**.`)),
+      // x + kx = P
+      wrong((ask === "wide" ? 1 : k) * (P / (1 + k)), ONLY_TWO_SIDES, ONLY_TWO_SIDES_SAY),
+      // length x + k: 2x + 2(x + k) = P
+      wrong(
+        (P - 2 * k) / 4 + (ask === "wide" ? 0 : k),
+        tx("Times read as plus", "Mal als Plus gelesen"),
+        tx(
+          `I think you wrote the length as $x + ${k}$. But "${TIMES.en[k]} as long" means **times** ${k}.`,
+          `Ich glaub, du hast die Länge als $x + ${k}$ geschrieben. Aber „${TIMES.de[k]} so lang“ heißt **mal** ${k}.`,
+        ),
+      ),
+    ],
   });
 }
 
 // ---- Level 3: ages, sharing, brackets
 
 const MUM = tx("Mum", "Mama");
+
+/** "That's the age in n years, not now." */
+const laterAge = (n: number, asked: Text): Text =>
+  say((N) => [
+    `Nearly! That's the age **in ${n} years**. The question asks how old ${N(asked)} is **now**.`,
+    `Fast! Das ist das Alter **in ${n} Jahren**. Gefragt ist, wie alt ${N(asked)} **heute** ist.`,
+  ]);
+
+/** "In your equation only one of them got older." */
+const onlyOneOlder = (n: number, aged: Text, other: Text): Text =>
+  say((N) => [
+    `I think only ${N(aged)} got ${n} years older in your equation. But time passes for **everyone**: ${N(other)} is ${n} years older too.`,
+    `Ich glaub, in deiner Gleichung ist nur ${N(aged)} ${n} Jahre älter geworden. Aber die Zeit vergeht für **alle**: ${N(other)} ist auch ${n} Jahre älter.`,
+  ]);
+const ONLY_ONE_OLDER = tx("Only one got older", "Nur einer ist älter geworden");
+const LATER = tx("That's the age later", "Das ist das Alter später");
 const DAD = tx("Dad", "Papa");
 const PARENTS: Text[] = [MUM, DAD];
 
@@ -967,6 +1612,31 @@ export function ageFutureStory(child: Text, parent: Text, k: number, m: number, 
       `Sei $x$ ${G(child)} heutiges Alter. Schreib auf, wie alt beide heute sind und wie alt beide in ${n} Jahren sind. Vorsicht mit den Klammern!`,
     ]),
     meaning: say((N, G) => [`${N(child)}'s age now`, `${G(child)} heutiges Alter`]),
+    wrong: [
+      ask === "child"
+        ? wrong(k * x, WRONG_ONE, say((N) => [`Nearly! ${k * x} is how old ${N(parent)} is. The question asks about ${N(child)}.`, `Fast! ${k * x} Jahre ist ${N(parent)} alt. Gefragt ist nach ${N(child)}.`]))
+        : wrong(
+            x,
+            WRONG_ONE,
+            say((N, G) => [
+              `Great, $x = ${x}$ is right! But $x$ is ${N(child)}'s age, and the question asks about ${N(parent)}.`,
+              `Super, $x = ${x}$ stimmt! Aber $x$ ist ${G(child)} Alter, und gefragt ist nach ${N(parent)}.`,
+            ]),
+          ),
+      wrong((ask === "child" ? x : k * x) + n, LATER, laterAge(n, asked)),
+      // kx = m(x + n): only the child got older.
+      wrong(((ask === "child" ? 1 : k) * m * n) / (k - m), ONLY_ONE_OLDER, onlyOneOlder(n, child, parent)),
+      // kx + n = mx + n gives x = 0.
+      wrong(
+        0,
+        BRACKET_MISSING,
+        say((N, G) => [
+          `Hmm, an age of 0? I think the ${m} only multiplied the $x$. But ${N(child)}'s **whole** age in ${n} years gets multiplied: brackets!`,
+          `Hm, ein Alter von 0? Ich glaub, die ${m} hat nur das $x$ malgenommen. Aber ${G(child)} **ganzes** Alter in ${n} Jahren wird multipliziert: Klammern!`,
+        ]),
+        true,
+      ),
+    ],
   };
 }
 
@@ -988,10 +1658,32 @@ function ageFuture(rng: Rng, choice = false): Exercise {
     return choiceOf(
       s,
       [
-        { l: [X("b", k), K("n2", n)], r: [X("a", m), K("n1", n)] },
-        { l: [B("y", k, [X("b"), K("n2", n)])], r: [B("z", m, [X("a"), K("n1", n)])] },
-        { l: [X("b", k)], r: [B("z", m, [X("a"), K("n1", n)])] },
-        { l: [X("b", k), K("n2", n)], r: [X("a", m)] },
+        opt(
+          { l: [X("b", k), K("n2", n)], r: [X("a", m), K("n1", n)] },
+          BRACKET_MISSING,
+          say((N, G) => [
+            `Nearly! Here only $x$ is multiplied by ${m}. But ${N(child)}'s **whole** age in ${n} years is multiplied: that needs brackets.`,
+            `Fast! Hier wird nur $x$ mit ${m} multipliziert. Aber ${G(child)} **ganzes** Alter in ${n} Jahren wird multipliziert: Das braucht Klammern.`,
+          ]),
+        ),
+        opt(
+          { l: [B("y", k, [X("b"), K("n2", n)])], r: [B("z", m, [X("a"), K("n1", n)])] },
+          tx("Too many years added", "Zu viele Jahre dazu"),
+          say((N) => [
+            `Hmm, in ${n} years ${N(parent)} is simply ${n} years **older**. $${k}(x + ${n})$ would add ${k} · ${n} years.`,
+            `Hm, in ${n} Jahren ist ${N(parent)} einfach ${n} Jahre **älter**. $${k}(x + ${n})$ würde ${k} · ${n} Jahre dazurechnen.`,
+          ]),
+        ),
+        opt(
+          { l: [X("b", k)], r: [B("z", m, [X("a"), K("n1", n)])] },
+          ONLY_ONE_OLDER,
+          say((N) => [`Nearly! Here only ${N(child)} gets ${n} years older. But time passes for **everyone**.`, `Fast! Hier wird nur ${N(child)} ${n} Jahre älter. Aber die Zeit vergeht für **alle**.`]),
+        ),
+        opt(
+          { l: [X("b", k), K("n2", n)], r: [X("a", m)] },
+          ONLY_ONE_OLDER,
+          say((N) => [`Nearly! Here only ${N(parent)} gets ${n} years older. But time passes for **everyone**.`, `Fast! Hier wird nur ${N(parent)} ${n} Jahre älter. Aber die Zeit vergeht für **alle**.`]),
+        ),
       ],
       rng,
     );
@@ -1045,6 +1737,23 @@ function ageDiff(rng: Rng): Exercise {
       `Sei $x$ ${G(child)} heutiges Alter. Dann ist ${N(parent)} $x + ${d}$. In ${n} Jahren sind **beide** ${n} Jahre älter.`,
     ]),
     meaning: say((N, G) => [`${N(child)}'s age now`, `${G(child)} heutiges Alter`]),
+    wrong: [
+      wrong(x + d, WRONG_ONE, say((N) => [`Nearly! ${x + d} is how old ${N(parent)} is now. The question asks about ${N(child)}.`, `Fast! ${x + d} Jahre ist ${N(parent)} heute alt. Gefragt ist nach ${N(child)}.`])),
+      wrong(x + n, LATER, laterAge(n, child)),
+      // x + d + n = mx + n
+      wrong(
+        d / (m - 1),
+        BRACKET_MISSING,
+        say((N, G) => [
+          `Ah, I see! The ${m} has to multiply ${N(child)}'s **whole** age in ${n} years, the ${n} too: $${m}(x + ${n})$.`,
+          `Ah, ich seh's! Die ${m} muss ${G(child)} **ganzes** Alter in ${n} Jahren malnehmen, also auch die ${n}: $${m}(x + ${n})$.`,
+        ]),
+      ),
+      // x + d + n = mx: only the parent got older.
+      wrong((d + n) / (m - 1), ONLY_ONE_OLDER, onlyOneOlder(n, parent, child)),
+      // x + d = m(x + n): only the child got older.
+      wrong((d - m * n) / (m - 1), ONLY_ONE_OLDER, onlyOneOlder(n, child, parent)),
+    ],
   });
 }
 
@@ -1122,7 +1831,77 @@ export function shareStory(who: [Text, Text, Text], kind: ShareKind, x: number, 
       `Sei $x$ ${G(A)} Anteil. Schreib die beiden anderen Anteile mit $x$ und addiere dann alle drei.`,
     ]),
     meaning: say((N, G) => [`${N(A)}'s share`, `${G(A)} Anteil`]),
+    wrong: shareWrongs(who, kind, vals, T, k, ask, u, money),
   };
+}
+
+/** Shares of three: someone else's share, split equally, sign kept, "k less" as k − x, compared with the wrong person. */
+function shareWrongs(who: [Text, Text, Text], kind: ShareKind, vals: number[], T: number, k: number, ask: 0 | 1 | 2, u: (v: number) => Text, money: boolean): Wrong[] {
+  const [A, Bn, C] = who;
+  const asked = who[ask];
+  const bc = kind === "tripleLess" ? 3 : 2;
+  const c1 = kind === "moreThanB" ? 2 : 1;
+  const ck = kind === "tripleLess" ? -k : k;
+  const coef = 1 + bc + c1;
+  const x = vals[0];
+  /** The asked share if x came out as `xw` with these shares. */
+  const askedOf = (xw: number, shares: (x: number) => number[]) => shares(xw)[ask];
+  const right = (xw: number) => [xw, bc * xw, c1 * xw + ck];
+  const others: Wrong[] = vals.map((v, j) =>
+    j === ask
+      ? false
+      : wrong(
+          v,
+          WRONG_ONE,
+          j === 0
+            ? say((N, G) => [
+                `Great, $x = ${x}$ is right! But $x$ is ${N(A)}'s share, and the question asks about ${N(asked)}.`,
+                `Super, $x = ${x}$ stimmt! Aber $x$ ist ${G(A)} Anteil, und gefragt ist nach ${N(asked)}.`,
+              ])
+            : say((N) => [`Nearly! ${N(u(v))} is what ${N(who[j])} gets. The question asks about ${N(asked)}.`, `Fast! ${N(u(v))} bekommt ${N(who[j])}. Gefragt ist nach ${N(asked)}.`]),
+        ),
+  );
+  return [
+    ...others,
+    wrong(
+      T / 3,
+      tx("Split equally", "Gleich aufgeteilt"),
+      tx(
+        "Hmm, you shared it out equally. But the three get **different** amounts: write each share with $x$ first.",
+        "Hm, du hast gleichmäßig aufgeteilt. Aber die drei bekommen **verschieden** viel: Schreib zuerst jeden Anteil mit $x$.",
+      ),
+    ),
+    ask === 0 &&
+      wrong(T - ck, FORGOT_DIVIDE, tx(`So close! ${T - ck} is $${coef}x$, not $x$ yet. One more step: divide by ${coef}.`, `Ganz knapp! ${T - ck} ist $${coef}x$, noch nicht $x$. Ein Schritt fehlt: Teil durch ${coef}.`)),
+    wrong(
+      askedOf((T + ck) / coef, right),
+      SIGN_KEPT,
+      tx(
+        `Ah, I see what happened! You moved the ${k} to the other side but kept its sign. To undo $${signStr(ck)}$, ${ck > 0 ? "subtract" : "add"} ${k} on **both** sides.`,
+        `Ah, ich seh, was passiert ist! Du hast die ${k} auf die andere Seite gebracht, aber ihr Vorzeichen behalten. Um $${signStr(ck)}$ rückgängig zu machen, ${ck > 0 ? "subtrahierst" : "addierst"} du ${k} auf **beiden** Seiten.`,
+      ),
+    ),
+    // "k less than A" written as k − x: x + 3x + (k − x) = T.
+    kind === "tripleLess" &&
+      wrong(
+        askedOf((T - k) / 3, (xw) => [xw, 3 * xw, k - xw]),
+        tx("Less than: turned around", "Weniger als: verdreht"),
+        say((N, G) => [
+          `Ooh, the classic trap! "${money ? `${k} € less` : `${k} fewer stickers`} than ${N(A)}" means ${N(A)}'s share **minus** ${k}: $x - ${k}$, not $${k} - x$.`,
+          `Die klassische Falle! „${k} ${money ? "€" : "Sticker"} weniger als ${N(A)}“ heißt: ${G(A)} Anteil **minus** ${k}, also $x - ${k}$, nicht $${k} - x$.`,
+        ]),
+      ),
+    // C compared with A instead of B: x + 2x + (x + k) = T.
+    kind === "moreThanB" &&
+      wrong(
+        askedOf((T - k) / 4, (xw) => [xw, 2 * xw, xw + k]),
+        tx("Compared with the wrong person", "Mit der falschen Person verglichen"),
+        say((N, G) => [
+          `Read it again: ${N(C)} gets ${money ? `${k} €` : `${k} stickers`} more than **${N(Bn)}**, not than ${N(A)}. So ${N(C)}'s share builds on ${N(Bn)}'s $2x$.`,
+          `Lies noch mal genau: ${N(C)} bekommt ${k} ${money ? "€" : "Sticker"} mehr als **${N(Bn)}**, nicht als ${N(A)}. ${G(C)} Anteil baut also auf ${G(Bn)} $2x$ auf.`,
+        ]),
+      ),
+  ];
 }
 
 function share(rng: Rng): Exercise {
@@ -1167,6 +1946,42 @@ function ticketsStory(na: number, nc: number, x: number, d: number, ask: "child"
       "Sei $x$ der Preis einer Kinderkarte. Eine Erwachsenenkarte kostet $x$ plus den Unterschied. Klammern!",
     ),
     meaning: tx("the price of a child ticket (in €)", "der Preis einer Kinderkarte (in €)"),
+    wrong: [
+      ask === "child"
+        ? wrong(x + d, WRONG_ONE, tx(`Nearly! ${x + d} € is the price of an **adult** ticket. The question asks about a child ticket.`, `Fast! ${x + d} € kostet eine **Erwachsenenkarte**. Gefragt ist die Kinderkarte.`))
+        : wrong(
+            x,
+            WRONG_ONE,
+            tx(
+              `Great, $x = ${x}$ is right! But $x$ is the price of a child ticket, and the question asks about an **adult** ticket.`,
+              `Super, $x = ${x}$ stimmt! Aber $x$ ist der Preis einer Kinderkarte, und gefragt ist die **Erwachsenenkarte**.`,
+            ),
+          ),
+      // nc·x + na·x + d = T
+      wrong(
+        (T - d) / (nc + na) + (ask === "child" ? 0 : d),
+        BRACKET_MISSING,
+        tx(
+          `Ah, I see! Each of the ${na} adult tickets costs ${d} € more, so the ${d} has to be multiplied by ${na} too: $${na}(x + ${d})$.`,
+          `Ah, ich seh's! Jede der ${na} Erwachsenenkarten kostet ${d} € mehr, also muss auch die ${d} mal ${na}: $${na}(x + ${d})$.`,
+        ),
+      ),
+      // (nc + na)·x = T
+      wrong(
+        T / (nc + na),
+        tx("Same price for all", "Alle gleich teuer"),
+        tx(`Hmm, I think you gave all tickets the same price. But an adult ticket costs ${d} € **more**.`, `Hm, ich glaub, du hast allen Karten denselben Preis gegeben. Eine Erwachsenenkarte kostet aber ${d} € **mehr**.`),
+      ),
+      // nc·(x + d) + na·x = T
+      wrong(
+        (T - nc * d) / (nc + na) + (ask === "child" ? 0 : d),
+        tx("Extra on the wrong tickets", "Aufpreis bei den falschen Karten"),
+        tx(
+          `Nearly! You put the extra ${d} € on the **child** tickets. It's the ${na} **adult** tickets that cost more.`,
+          `Fast! Du hast die ${d} € Aufpreis auf die **Kinderkarten** gerechnet. Teurer sind aber die ${na} **Erwachsenenkarten**.`,
+        ),
+      ),
+    ],
   };
 }
 
@@ -1182,10 +1997,29 @@ function tickets(rng: Rng, choice = false): Exercise {
     return choiceOf(
       s,
       [
-        { l: [X("A", nc), X("B", na), K("b", d)], r: [K("r", T)] },
-        { l: [X("A", nc + na)], r: [K("r", T)] },
-        { l: [X("A", nc), B("B", na, [X("B1"), K("B2", -d)])], r: [K("r", T)] },
-        { l: [B("A", nc, [X("A1"), K("A2", d)]), X("B", na)], r: [K("r", T)] },
+        opt(
+          { l: [X("A", nc), X("B", na), K("b", d)], r: [K("r", T)] },
+          BRACKET_MISSING,
+          tx(
+            `Nearly! Here the extra ${d} € is added only **once**. But each of the ${na} adult tickets costs ${d} € more.`,
+            `Fast! Hier kommen die ${d} € Aufpreis nur **einmal** dazu. Aber jede der ${na} Erwachsenenkarten kostet ${d} € mehr.`,
+          ),
+        ),
+        opt(
+          { l: [X("A", nc + na)], r: [K("r", T)] },
+          tx("Same price for all", "Alle gleich teuer"),
+          tx(`Hmm, here every ticket costs $x$. But an adult ticket costs ${d} € **more**.`, `Hm, hier kostet jede Karte $x$. Eine Erwachsenenkarte kostet aber ${d} € **mehr**.`),
+        ),
+        opt(
+          { l: [X("A", nc), B("B", na, [X("B1"), K("B2", -d)])], r: [K("r", T)] },
+          tx("Minus instead of plus", "Minus statt Plus"),
+          tx(`Careful: adult tickets cost ${d} € **more** than child tickets, not less.`, `Vorsicht: Erwachsenenkarten kosten ${d} € **mehr** als Kinderkarten, nicht weniger.`),
+        ),
+        opt(
+          { l: [B("A", nc, [X("A1"), K("A2", d)]), X("B", na)], r: [K("r", T)] },
+          tx("Extra on the wrong tickets", "Aufpreis bei den falschen Karten"),
+          tx(`Nearly! Here the **child** tickets get the extra ${d} €. It's the adult tickets that cost more.`, `Fast! Hier bekommen die **Kinderkarten** den Aufpreis. Teurer sind aber die Erwachsenenkarten.`),
+        ),
       ],
       rng,
     );
@@ -1200,6 +2034,7 @@ function riddleBrackets(rng: Rng, choice = false): Exercise {
   const x = plus ? rng.int(2, 20) : rng.int(b + 1, b + 20);
   const sb = plus ? b : -b;
   const c = k * (x + sb);
+  const whole = plus ? { en: "sum", de: "Summe" } : { en: "difference", de: "Differenz" };
   const s: Story = {
     text: plus
       ? tx(
@@ -1224,14 +2059,53 @@ function riddleBrackets(rng: Rng, choice = false): Exercise {
       `Die ${plus ? "Summe" : "Differenz"} wird als Ganzes multipliziert, also kommt sie in Klammern: $${k}(x ${plus ? "+" : "-"} ${b})$.`,
     ),
     meaning: THE_NUMBER,
+    wrong: [
+      // kx ± b = c
+      wrong(
+        (c - sb) / k,
+        BRACKET_MISSING,
+        tx(
+          `Ah, I see! You solved $${k}x ${signStr(sb)} = ${c}$. But the **whole** ${whole.en} is multiplied by ${k}: brackets!`,
+          `Ah, ich seh's! Du hast $${k}x ${signStr(sb)} = ${c}$ gelöst. Aber die **ganze** ${whole.de} wird mit ${k} multipliziert: Klammern!`,
+        ),
+        true,
+      ),
+      wrong(
+        c / k,
+        tx("One step missing", "Ein Schritt fehlt"),
+        tx(`So close! ${c / k} is $x ${signStr(sb)}$, not $x$ yet. Now undo the $${signStr(sb)}$.`, `Ganz knapp! ${c / k} ist $x ${signStr(sb)}$, noch nicht $x$. Jetzt noch das $${signStr(sb)}$ rückgängig machen.`),
+        true,
+      ),
+      wrong(
+        c / k + sb,
+        SIGN_KEPT,
+        tx(
+          `Ah, I see what happened! You moved the ${b} across but kept its sign. To undo $${signStr(sb)}$, ${plus ? "subtract" : "add"} ${b} on **both** sides.`,
+          `Ah, ich seh, was passiert ist! Du hast die ${b} rübergebracht, aber ihr Vorzeichen behalten. Um $${signStr(sb)}$ rückgängig zu machen, ${plus ? "subtrahierst" : "addierst"} du ${b} auf **beiden** Seiten.`,
+        ),
+        true,
+      ),
+    ],
   };
   if (choice)
     return choiceOf(
       s,
       [
-        { l: [X("A1", k), K("A2", sb)], r: [K("r", c)] },
-        { l: [K("k", k), B("A", 1, [X("A1"), K("A2", sb)])], r: [K("r", c)] },
-        { l: [X("A1"), K("A2", k * sb)], r: [K("r", c)] },
+        opt(
+          { l: [X("A1", k), K("A2", sb)], r: [K("r", c)] },
+          BRACKET_MISSING,
+          tx(`Nearly! Here only the number is multiplied by ${k}. But the riddle multiplies the **whole** ${whole.en}.`, `Fast! Hier wird nur die Zahl mit ${k} multipliziert. Im Rätsel wird aber die **ganze** ${whole.de} multipliziert.`),
+        ),
+        opt(
+          { l: [K("k", k), B("A", 1, [X("A1"), K("A2", sb)])], r: [K("r", c)] },
+          tx("Plus instead of times", "Plus statt Mal"),
+          tx(`Careful: the ${whole.en} is **multiplied** by ${k}, not increased by ${k}.`, `Vorsicht: Die ${whole.de} wird mit ${k} **multipliziert**, nicht um ${k} vergrößert.`),
+        ),
+        opt(
+          { l: [X("A1"), K("A2", k * sb)], r: [K("r", c)] },
+          tx("Only one part multiplied", "Nur ein Teil multipliziert"),
+          tx(`Hmm, here only the ${b} is multiplied by ${k}. But the riddle multiplies the **whole** ${whole.en}, the number too.`, `Hm, hier wird nur die ${b} mit ${k} multipliziert. Im Rätsel wird aber die **ganze** ${whole.de} multipliziert, die Zahl auch.`),
+        ),
       ],
       rng,
     );
@@ -1275,6 +2149,35 @@ function bothSides(rng: Rng): Exercise {
       "Beide Ergebnisse sind gleich. Schreib jede Seite mit $x$ und bring dann alle $x$ auf eine Seite.",
     ),
     meaning: THE_NUMBER,
+    wrong: [
+      // kx + x = e + b
+      wrong(
+        (e + b) / (k + 1),
+        tx("x moved without flipping", "x ohne Vorzeichenwechsel"),
+        tx(
+          "Ah, I see what happened! You moved the $x$ from the right to the left but kept its plus. Subtract $x$ on **both** sides instead.",
+          "Ah, ich seh, was passiert ist! Du hast das $x$ von rechts nach links gebracht, aber sein Plus behalten. Subtrahier lieber $x$ auf **beiden** Seiten.",
+        ),
+      ),
+      // kx − x = e − b
+      wrong(
+        (e - b) / (k - 1),
+        SIGN_KEPT,
+        tx(`Nearly! The $- ${b}$ changes its sign when it moves over: **add** ${b} on both sides.`, `Fast! Das $- ${b}$ ändert sein Vorzeichen, wenn es rüberwandert: **Addier** ${b} auf beiden Seiten.`),
+        true,
+      ),
+      // kx − b = e
+      wrong(
+        (e + b) / k,
+        tx("An x got lost", "Ein x ist verloren gegangen"),
+        tx(
+          "Hmm, I think the $x$ on the right side got lost. There's an $x$ on **both** sides: bring them together first.",
+          "Hm, ich glaub, das $x$ auf der rechten Seite ist verloren gegangen. Auf **beiden** Seiten steht ein $x$: Bring sie erst zusammen.",
+        ),
+      ),
+      k > 2 &&
+        wrong(e + b, FORGOT_DIVIDE, tx(`So close! ${e + b} is $${k - 1}x$, not $x$ yet. One more step: divide by ${k - 1}.`, `Ganz knapp! ${e + b} ist $${k - 1}x$, noch nicht $x$. Ein Schritt fehlt: Teil durch ${k - 1}.`)),
+    ],
   });
 }
 
@@ -1882,6 +2785,8 @@ function builtFrames(c: BuildCase, line: BuildChip[], a: [number, number, number
 
 const riddleEq: Eq = { l: [X("A", 3), K("b", 5)], r: [K("r", 26)] };
 
+const TRAP_OPTIONS = ["$2x - 7$", "$2(x - 7)$", "$x - 14$", "$7 - 2x$"];
+
 const nameFrames: Frame[] = [
   {
     math: "x#vA",
@@ -2023,7 +2928,33 @@ const unknowns: Topic = {
           "Translate into maths: **Subtract 7 from a number, then double the result.**",
           "Übersetze in einen Term: **Subtrahiere 7 von einer Zahl und verdopple dann das Ergebnis.**",
         ),
-        answer: { kind: "choice", options: ["$2x - 7$", "$2(x - 7)$", "$x - 14$", "$7 - 2x$"], correct: 1 },
+        answer: { kind: "choice", options: TRAP_OPTIONS, correct: 1 },
+        mistakes: [
+          {
+            when: { kind: "choice", options: TRAP_OPTIONS, correct: 0 },
+            title: BRACKET_MISSING,
+            say: tx(
+              "Ooh, the classic trap! In $2x - 7$ only the number gets doubled, and the 7 comes off afterwards. But the story doubles the **whole result**.",
+              "Die klassische Falle! Bei $2x - 7$ wird nur die Zahl verdoppelt, und die 7 kommt erst danach weg. Im Text wird aber das **ganze Ergebnis** verdoppelt.",
+            ),
+          },
+          {
+            when: { kind: "choice", options: TRAP_OPTIONS, correct: 2 },
+            title: tx("Only the 7 doubled", "Nur die 7 verdoppelt"),
+            say: tx(
+              "Nearly! In $x - 14$ only the 7 got doubled. The story doubles the **whole result**, the number too.",
+              "Fast! Bei $x - 14$ wurde nur die 7 verdoppelt. Im Text wird das **ganze Ergebnis** verdoppelt, die Zahl auch.",
+            ),
+          },
+          {
+            when: { kind: "choice", options: TRAP_OPTIONS, correct: 3 },
+            title: tx("Order flipped", "Reihenfolge vertauscht"),
+            say: tx(
+              'Hmm, "subtract 7 **from** a number" means you start with the number and take 7 away. $7 - 2x$ does it the other way round.',
+              "Hm, „subtrahiere 7 **von** einer Zahl“ heißt: Du startest mit der Zahl und nimmst 7 weg. $7 - 2x$ macht es andersherum.",
+            ),
+          },
+        ],
         hint: tx("What gets doubled: only the number, or the whole result?", "Was wird verdoppelt: nur die Zahl oder das ganze Ergebnis?"),
         solution: [
           { math: "x#vA", note: tx("Let $x$ be the number.", "Sei $x$ die Zahl.") },
@@ -2061,6 +2992,7 @@ const unknowns: Topic = {
         answerText: numberAnswer(20, "2 \\cdot 20 - 9 = 31"),
         hint: tx("Let $x$ be the number: $2x - 9 = 31$. Undo the minus first.", "Sei $x$ die gesuchte Zahl: $2x - 9 = 31$. Mach zuerst das Minus rückgängig."),
         meaning: THE_NUMBER,
+        wrong: twoStepWrongs(2, -9, 31),
       }),
     },
     {

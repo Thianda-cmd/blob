@@ -8,9 +8,10 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
-import { add, div, frac, mul, neg, show, sub, type Frac } from "@/learn/engine/frac";
+import { check, type AnswerValue } from "@/learn/engine/answers";
+import { add, div, eq, frac, mul, neg, show, sub, type Frac } from "@/learn/engine/frac";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { Graph, type GraphProps } from "@/learn/visuals/Graph";
 import { alongLine, crossing, Plane, PlaneDot, PlaneHandle, PlaneLine, PlanePath, PlaneTag, planeGeo, StepSlider, TONE, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
@@ -293,6 +294,591 @@ const SLOPE_FIRST = tx("Put the slope into $y = mx + b$. Only $b$ is missing.", 
 const I_SLOPE_B = tx("Slope and y-intercept", "Steigung und y-Achsenabschnitt");
 const I_LINE = tx("Find the line equation", "Bestimme die Geradengleichung");
 
+// ---------------------------------------------------------------------------
+// Typical mistakes. Each wrong answer is simulated from the task's own numbers, so it is
+// exactly what a student with that misconception gets. Shared with linear-systems.
+
+/** What a student types to give the answer `spec` (to test it against the checker). */
+function typedAnswer(spec: AnswerSpec): AnswerValue | null {
+  const typed = (v: number) => (Number.isFinite(v) && !/e/i.test(String(v)) ? String(v) : null);
+  switch (spec.kind) {
+    case "number": {
+      const s = typed(spec.value);
+      return s === null ? null : { kind: "text", text: s };
+    }
+    case "pair": {
+      const [a, b] = spec.values.map(typed);
+      return a === null || b === null ? null : { kind: "list", values: [a, b] };
+    }
+    case "expr":
+      return { kind: "text", text: spec.value };
+    case "choice":
+      return { kind: "choice", index: spec.correct };
+    default:
+      return null;
+  }
+}
+
+/** Title and Blob's line for a typical mistake. */
+export type Msg = [title: Text, say: Text];
+
+/**
+ * Typical mistakes for an exercise whose right answer is `answer`. `add` keeps a simulated
+ * wrong answer only if the checker really rejects it and no earlier mistake covers it already.
+ */
+export function mistakeList(answer: AnswerSpec) {
+  const list: Mistake[] = [];
+  const add = (when: AnswerSpec | null, title: Text, say: Text) => {
+    const typed = when && typedAnswer(when);
+    if (!when || !typed || check(answer, typed).correct || list.some((m) => check(m.when, typed).correct)) return;
+    list.push({ when, title, say });
+  };
+  return { list, add };
+}
+
+const MB: [string, string] = ["m", "b"];
+const mbPair = (m: number, b: number): AnswerSpec => ({ kind: "pair", names: MB, values: [m, b] });
+const lineWhen = (m: Frac, b: Frac): AnswerSpec => ({ kind: "expr", value: linePlain(m, b) });
+const numWhen = (v: number): AnswerSpec => ({ kind: "number", value: v });
+const isUnit = (m: Frac) => m.d === 1 && Math.abs(m.n) === 1;
+/** 1/m, or null when that is m itself (±1) or undefined (0). */
+const flipped = (m: Frac) => (m.n === 0 || Math.abs(m.n) === m.d ? null : div(ONE, m));
+/** b of the line with slope m through P. */
+const bThrough = (m: Frac, P: Pt) => sub(q(P[1]), mul(m, q(P[0])));
+/** "3x", "-x", "\frac{1}{2}x" for messages. */
+const mx = (m: Frac) => plain(term(m, "x", "m", true));
+
+const UPSIDE_GRAPH: Msg = [
+  tx("Slope upside down", "Steigung auf dem Kopf"),
+  tx(
+    "Ah, I see what happened! You did **right over up**. The slope is **up over right**: $m = \\frac{\\Delta y}{\\Delta x}$.",
+    "Ah, ich seh, was passiert ist! Du hast **rechts durch hoch** gerechnet. Die Steigung ist **hoch durch rechts**: $m = \\frac{\\Delta y}{\\Delta x}$.",
+  ),
+];
+const UPSIDE_POINTS: Msg = [
+  tx("Slope upside down", "Steigung auf dem Kopf"),
+  tx(
+    "Ah, I see what happened! The $x$-values ended up on top. It's the other way round: $m = \\frac{y_2 - y_1}{x_2 - x_1}$, the $y$-values go on top.",
+    "Ah, ich seh, was passiert ist! Die $x$-Werte sind oben gelandet. Es ist andersrum: $m = \\frac{y_2 - y_1}{x_2 - x_1}$, die $y$-Werte gehören in den Zähler.",
+  ),
+];
+const ORDER_MIXED: Msg = [
+  tx("Order mixed up", "Reihenfolge vertauscht"),
+  tx(
+    "Nearly! I think you subtracted in a different order on top and bottom. Both times the same point has to come first.",
+    "Fast! Ich glaub, du hast oben und unten in verschiedener Reihenfolge subtrahiert. Beide Male muss derselbe Punkt zuerst kommen.",
+  ),
+];
+const X_AXIS: Msg = [
+  tx("Read on the x-axis", "An der x-Achse abgelesen"),
+  tx(
+    "Ooh, classic trap! That's where the line crosses the **x**-axis. $b$ is where it crosses the **y**-axis.",
+    "Die klassische Falle! Da schneidet die Gerade die **x**-Achse. $b$ ist die Stelle, an der sie die **y**-Achse schneidet.",
+  ),
+];
+const SWAPPED_MB: Msg = [
+  tx("m and b swapped", "m und b vertauscht"),
+  tx(
+    "Ha, the right numbers in the wrong places! The slope stands in front of $x$, and $b$ is the number on its own.",
+    "Ha, die richtigen Zahlen am falschen Platz! Die Steigung steht vor dem $x$, und $b$ ist die Zahl ohne $x$.",
+  ),
+];
+/** The student gave the slope of a graph with the wrong sign. */
+const slopeSign = (m: Frac): Msg =>
+  m.n < 0
+    ? [
+        tx("The line falls", "Die Gerade fällt"),
+        tx(
+          "Look at the graph again: from left to right the line goes **down**. A falling line has a **negative** slope.",
+          "Schau noch mal auf den Graphen: Von links nach rechts geht die Gerade **nach unten**. Eine fallende Gerade hat eine **negative** Steigung.",
+        ),
+      ]
+    : [
+        tx("The line rises", "Die Gerade steigt"),
+        tx(
+          "Look at the graph again: from left to right the line goes **up**. A rising line has a **positive** slope.",
+          "Schau noch mal auf den Graphen: Von links nach rechts geht die Gerade **nach oben**. Eine steigende Gerade hat eine **positive** Steigung.",
+        ),
+      ];
+const yAsB = (name: string): Msg => [
+  tx("y-coordinate taken as b", "y-Koordinate als b genommen"),
+  tx(
+    `Ah, I see what happened! You took the $y$-coordinate of $${name}$ as $b$. But $${name}$ isn't on the $y$-axis: put it into $y = mx + b$ and solve for $b$.`,
+    `Ah, ich seh, was passiert ist! Du hast die $y$-Koordinate von $${name}$ als $b$ genommen. Aber $${name}$ liegt nicht auf der $y$-Achse: Setz den Punkt in $y = mx + b$ ein und löse nach $b$ auf.`,
+  ),
+];
+/** b = y + m·x instead of y − m·x. */
+const bSignSlip = (prod: Frac, slopeRight: boolean): Msg => [
+  tx("Sign slip finding b", "Vorzeichenfehler bei b"),
+  tx(
+    `${slopeRight ? "Nearly, the slope is right!" : "Nearly!"} But to get $b$ alone, $${num(prod)}$ has to change its sign as it moves to the other side.`,
+    `${slopeRight ? "Fast, die Steigung stimmt!" : "Fast!"} Aber wenn du $b$ allein stellst, muss $${num(prod)}$ beim Wechsel auf die andere Seite sein Vorzeichen ändern.`,
+  ),
+];
+/** x and y of a point swapped when putting it into the equation. */
+const coordsSwapped = (P: Pt, name: string): Msg => [
+  tx("x and y swapped", "x und y vertauscht"),
+  tx(
+    `Looks like you put the coordinates in the wrong way round. In $${pt(P[0], P[1], name)}$ the first number is $x$ and the second is $y$.`,
+    `Sieht so aus, als hättest du die Koordinaten vertauscht eingesetzt. In $${pt(P[0], P[1], name)}$ ist die erste Zahl $x$ und die zweite $y$.`,
+  ),
+];
+const notDivided = (m: Frac): Msg => [
+  tx("Not divided yet", "Noch nicht geteilt"),
+  tx(`Almost there! That's what $${mx(m)}$ is, not $x$ yet. One more step.`, `Fast geschafft! Das ist erst $${mx(m)}$, noch nicht $x$. Ein Schritt fehlt noch.`),
+];
+
+/** L1: m and b read off an equation. */
+function equationMistakes(m: Frac, b: Frac, form: "std" | "swap" | "nob" | "flat"): Mistake[] {
+  const M = qv(m);
+  const B = qv(b);
+  const mk = mistakeList(mbPair(M, B));
+  if (form === "flat") {
+    const noX = tx("No x-term here", "Kein x-Term da");
+    mk.add(
+      mbPair(B, 0),
+      noX,
+      tx(
+        "Ah, a number on its own is never the slope! $m$ is the number in front of $x$, and here there's no $x$-term at all.",
+        "Ah, eine Zahl ohne $x$ ist nie die Steigung! $m$ ist die Zahl vor dem $x$, und hier gibt es gar keinen $x$-Term.",
+      ),
+    );
+    mk.add(
+      mbPair(1, B),
+      noX,
+      tx(
+        "Hmm, $m = 1$ would mean there's an $x$ in the equation. Here there's no $x$-term at all: what does that say about the slope?",
+        "Hm, $m = 1$ hieße, dass ein $x$ in der Gleichung steht. Hier gibt es gar keinen $x$-Term: Was heißt das für die Steigung?",
+      ),
+    );
+  } else if (form === "swap") {
+    mk.add(
+      mbPair(B, M),
+      tx("Fooled by the order", "Reihenfolge-Falle"),
+      tx(
+        "Ah, the order tricked you! Here the number comes first, but $m$ is always the number **in front of $x$**, wherever it stands.",
+        "Ah, die Reihenfolge hat dich reingelegt! Hier steht die Zahl vorne, aber $m$ ist immer die Zahl **vor dem $x$**, egal wo sie steht.",
+      ),
+    );
+  } else if (B !== 0) mk.add(mbPair(B, M), ...SWAPPED_MB);
+  else if (!isUnit(m)) {
+    mk.add(
+      mbPair(0, M),
+      tx("No number on its own", "Keine Zahl ohne x"),
+      tx(
+        `Ah, the $${num(m)}$ is stuck to the $x$, so it's the slope! There's no number on its own here: what does that make $b$?`,
+        `Ah, die $${num(m)}$ klebt am $x$, sie ist also die Steigung! Eine Zahl ohne $x$ gibt es hier nicht: Was heißt das für $b$?`,
+      ),
+    );
+  }
+  if (M < 0 && B < 0) {
+    mk.add(
+      mbPair(-M, -B),
+      tx("Minus signs lost", "Minuszeichen verloren"),
+      tx("Nearly! $m$ and $b$ both take their signs along: each minus belongs to the number behind it.", "Fast! $m$ und $b$ nehmen beide ihr Vorzeichen mit: Jedes Minus gehört zur Zahl dahinter."),
+    );
+  }
+  if (B < 0) {
+    mk.add(
+      mbPair(M, -B),
+      tx("Minus of b lost", "Minus von b verloren"),
+      tx(`Nearly! $b$ takes its sign along: the minus in front of the $${num(neg(b))}$ belongs to $b$.`, `Fast! $b$ nimmt sein Vorzeichen mit: Das Minus vor der $${num(neg(b))}$ gehört zu $b$.`),
+    );
+  }
+  if (M < 0) {
+    mk.add(
+      mbPair(-M, B),
+      tx("Minus of m lost", "Minus von m verloren"),
+      tx("Nearly! $m$ takes its sign along: the minus in front of the $x$-term belongs to $m$.", "Fast! $m$ nimmt sein Vorzeichen mit: Das Minus vor dem $x$-Term gehört zu $m$."),
+    );
+  }
+  if (isUnit(m)) {
+    mk.add(
+      mbPair(0, B),
+      tx("x alone isn't 0", "x allein heißt nicht 0"),
+      tx(
+        "Ah, no number in front of $x$ doesn't mean $m = 0$! There's an invisible number hiding there. Which one?",
+        "Ah, keine Zahl vor dem $x$ heißt nicht $m = 0$! Da versteckt sich eine unsichtbare Zahl. Welche?",
+      ),
+    );
+  }
+  return mk.list;
+}
+
+/** L1: m and b read off a graph (answer as a pair). */
+function graphPairMistakes(m: Frac, b: Frac): Mistake[] {
+  const B = qv(b);
+  const mk = mistakeList(mbPair(qv(m), B));
+  const inv = flipped(m);
+  if (inv) mk.add(mbPair(qv(inv), B), ...UPSIDE_GRAPH);
+  mk.add(mbPair(-qv(m), B), ...slopeSign(m));
+  if (b.n !== 0) mk.add(mbPair(qv(m), qv(neg(div(b, m)))), ...X_AXIS);
+  return mk.list;
+}
+
+/** L3: the equation of a graph (answer as y = …). */
+function graphLineMistakes(m: Frac, b: Frac): Mistake[] {
+  const mk = mistakeList(lineWhen(m, b));
+  const inv = flipped(m);
+  if (inv) mk.add(lineWhen(inv, b), ...UPSIDE_GRAPH);
+  mk.add(lineWhen(neg(m), b), ...slopeSign(m));
+  if (b.n !== 0) {
+    mk.add(lineWhen(m, neg(div(b, m))), ...X_AXIS);
+    mk.add(lineWhen(b, m), ...SWAPPED_MB);
+  }
+  return mk.list;
+}
+
+/** Why a wrong option of "which equation belongs to the graph?" is wrong. */
+function optionMistake(m: Frac, b: Frac, o: [Frac, Frac]): Msg {
+  const [om, ob] = o;
+  if (eq(om, m) && eq(ob, neg(b))) {
+    return [
+      tx("Sign of b", "Vorzeichen von b"),
+      tx(
+        "Nearly! The slope fits, but check the sign of $b$: does the line cross the $y$-axis above or below $0$?",
+        "Fast! Die Steigung passt, aber prüf das Vorzeichen von $b$: Schneidet die Gerade die $y$-Achse oberhalb oder unterhalb von $0$?",
+      ),
+    ];
+  }
+  if (eq(om, m) && eq(ob, add(b, ONE))) {
+    return [
+      tx("Off by one", "Um eins daneben"),
+      tx(
+        "So close! Same slope, but this line crosses the $y$-axis one unit higher than the one in the graph.",
+        "Ganz knapp! Gleiche Steigung, aber diese Gerade schneidet die $y$-Achse eine Einheit höher als die im Bild.",
+      ),
+    ];
+  }
+  if (eq(om, m)) {
+    return [
+      tx("Check b", "b prüfen"),
+      tx(
+        "So close! Same slope, but look exactly where the line in the graph crosses the $y$-axis.",
+        "Ganz knapp! Gleiche Steigung, aber schau genau hin, wo die Gerade im Bild die $y$-Achse schneidet.",
+      ),
+    ];
+  }
+  if (eq(om, neg(m)) && eq(ob, b)) {
+    return m.n > 0
+      ? [
+          tx("Wrong direction", "Falsche Richtung"),
+          tx(
+            "Nearly! The y-intercept fits, but this line would **fall**: its slope is negative. The line in the graph rises.",
+            "Fast! Der y-Achsenabschnitt passt, aber diese Gerade würde **fallen**: Ihre Steigung ist negativ. Die Gerade im Bild steigt.",
+          ),
+        ]
+      : [
+          tx("Wrong direction", "Falsche Richtung"),
+          tx(
+            "Nearly! The y-intercept fits, but this line would **rise**: its slope is positive. The line in the graph falls.",
+            "Fast! Der y-Achsenabschnitt passt, aber diese Gerade würde **steigen**: Ihre Steigung ist positiv. Die Gerade im Bild fällt.",
+          ),
+        ];
+  }
+  if (eq(ob, b) && eq(om, div(ONE, m))) {
+    return [
+      tx("Slope upside down", "Steigung auf dem Kopf"),
+      tx(
+        "Close! The y-intercept fits, but this slope is upside down. It's **up over right**: $m = \\frac{\\Delta y}{\\Delta x}$.",
+        "Knapp! Der y-Achsenabschnitt passt, aber diese Steigung steht auf dem Kopf. Es heißt **hoch durch rechts**: $m = \\frac{\\Delta y}{\\Delta x}$.",
+      ),
+    ];
+  }
+  if (eq(om, neg(m)) && eq(ob, neg(b))) {
+    return [
+      tx("Both signs flipped", "Beide Vorzeichen falsch"),
+      tx(
+        "Both signs are flipped in this one. Does the line rise or fall? And does it cross the $y$-axis above or below $0$?",
+        "Hier sind beide Vorzeichen andersrum. Steigt oder fällt die Gerade? Und schneidet sie die $y$-Achse oberhalb oder unterhalb von $0$?",
+      ),
+    ];
+  }
+  return [
+    tx("m and b swapped", "m und b vertauscht"),
+    tx(
+      "Ooh, in this one $m$ and $b$ swapped places! The number in front of $x$ is the slope, the number on its own shows where the line meets the $y$-axis.",
+      "Ooh, hier haben $m$ und $b$ die Plätze getauscht! Die Zahl vor dem $x$ ist die Steigung, die Zahl ohne $x$ zeigt, wo die Gerade die $y$-Achse trifft.",
+    ),
+  ];
+}
+
+/** L1: y for a given x. */
+function valueMistakes(m: Frac, b: Frac, x: number): Mistake[] {
+  const prod = qv(mul(m, q(x)));
+  const B = qv(b);
+  const mk = mistakeList(numWhen(prod + B));
+  const times = `$${num(m)} \\cdot ${num(x, true)}$`;
+  if (B !== 0) {
+    mk.add(
+      numWhen(prod),
+      tx("b left out", "b vergessen"),
+      tx(`Good start with ${times}! But you stopped there: the $${num(b)}$ at the end still has to be included.`, `Guter Anfang mit ${times}! Aber da hast du aufgehört: Die $${num(b)}$ am Ende gehört noch dazu.`),
+    );
+  }
+  if (m.n < 0 || x < 0) {
+    const sign = (v: number) => (v < 0 ? "Minus" : "Plus");
+    const result = m.n < 0 && x < 0 ? "Plus" : "Minus";
+    const en = (s: string) => s.toLowerCase();
+    mk.add(
+      numWhen(-prod + B),
+      tx("Sign of the product", "Vorzeichen vom Produkt"),
+      tx(
+        `Careful with the signs: ${times} is ${en(sign(m.n))} times ${en(sign(x))}, and that gives **${en(result)}**!`,
+        `Achtung bei den Vorzeichen: ${times} ist ${sign(m.n)} mal ${sign(x)}, und das ergibt **${result}**!`,
+      ),
+    );
+  }
+  if (!isUnit(m)) {
+    mk.add(
+      numWhen(qv(m) + x + B),
+      tx("Plus instead of times", "Plus statt mal"),
+      tx(
+        `Ah, I think you added $${num(m)}$ and $${num(x)}$. But $${mx(m)}$ means $${num(m)}$ **times** $x$.`,
+        `Ah, ich glaub, du hast $${num(m)}$ und $${num(x)}$ addiert. Aber $${mx(m)}$ heißt $${num(m)}$ **mal** $x$.`,
+      ),
+    );
+  }
+  return mk.list;
+}
+
+/** L2: slope through A and B (B − A on top and bottom). */
+function slopeMistakes(A: Pt, B: Pt): Mistake[] {
+  const m = q(B[1] - A[1], B[0] - A[0]);
+  const mk = mistakeList(numWhen(qv(m)));
+  const inv = flipped(m);
+  if (inv) mk.add(numWhen(qv(inv)), ...UPSIDE_POINTS);
+  mk.add(numWhen(-qv(m)), ...ORDER_MIXED);
+  // Minus a negative coordinate taken as minus: 3 − (−2) worked out as 3 − 2.
+  if (A[0] < 0 || A[1] < 0) {
+    const dx = B[0] - Math.abs(A[0]);
+    const ex = A[1] < 0 ? `${B[1]} - (${A[1]})` : `${B[0]} - (${A[0]})`;
+    if (dx !== 0) {
+      mk.add(
+        numWhen((B[1] - Math.abs(A[1])) / dx),
+        tx("Minus a negative number", "Minus eine negative Zahl"),
+        tx(
+          `Careful with negative coordinates: subtracting a negative number means **adding**. Put it in brackets: $${ex}$.`,
+          `Vorsicht bei negativen Koordinaten: Eine negative Zahl abziehen heißt **addieren**. Setz sie in Klammern: $${ex}$.`,
+        ),
+      );
+    }
+  }
+  return mk.list;
+}
+
+/** L2: line from its slope and a point P. */
+function slopePointMistakes(m: Frac, P: Pt): Mistake[] {
+  const mk = mistakeList(lineWhen(m, bThrough(m, P)));
+  const prod = mul(m, q(P[0]));
+  mk.add(lineWhen(m, q(P[1])), ...yAsB("P"));
+  mk.add(lineWhen(m, add(q(P[1]), prod)), ...bSignSlip(prod, false));
+  mk.add(lineWhen(m, sub(q(P[0]), mul(m, q(P[1])))), ...coordsSwapped(P, "P"));
+  return mk.list;
+}
+
+/** L2: point test. Only one wrong option, so Blob guesses the slip that leads there. */
+function pointTestMistakes(m: Frac, b: Frac, P: Pt, on: boolean, answer: Extract<AnswerSpec, { kind: "choice" }>): Mistake[] {
+  const [px, py] = P;
+  const M = qv(m);
+  const B = qv(b);
+  const prod = M * px;
+  const times = `$${num(m)} \\cdot ${num(px, true)}$`;
+  const mk = mistakeList(answer);
+  const when = { ...answer, correct: on ? 1 : 0 };
+  const negative = M < 0 || px < 0;
+  if (on) {
+    if (negative) {
+      mk.add(
+        when,
+        tx("Check the calculation", "Rechnung prüfen"),
+        tx(
+          `Recheck the right side step by step: first ${times} (watch the sign!), then the rest. Compare with the left side.`,
+          `Rechne die rechte Seite noch mal Schritt für Schritt: erst ${times} (Vorzeichen beachten!), dann den Rest. Vergleich mit der linken Seite.`,
+        ),
+      );
+    } else {
+      mk.add(
+        when,
+        tx("Check the calculation", "Rechnung prüfen"),
+        tx(
+          `Did you put the numbers in the right places? $x = ${px}$ goes into $${mx(m)}$, and $y = ${py}$ is the left side.`,
+          `Hast du die Zahlen an der richtigen Stelle eingesetzt? $x = ${px}$ kommt in $${mx(m)}$, und $y = ${py}$ steht auf der linken Seite.`,
+        ),
+      );
+    }
+  } else if (M * py + B === px) {
+    mk.add(
+      when,
+      tx("x and y swapped", "x und y vertauscht"),
+      tx(
+        `Careful: it only works out if you swap $x$ and $y$. In $${pt(px, py, "P")}$, $x = ${px}$ and $y = ${py}$.`,
+        `Vorsicht: Das geht nur auf, wenn du $x$ und $y$ vertauschst. In $${pt(px, py, "P")}$ ist $x = ${px}$ und $y = ${py}$.`,
+      ),
+    );
+  } else if (negative && -prod + B === py) {
+    mk.add(
+      when,
+      tx("Watch the sign", "Achtung, Vorzeichen"),
+      tx(`Check the sign of ${times} again. With the right sign, do both sides still match?`, `Prüf das Vorzeichen von ${times} noch mal. Passen beide Seiten mit dem richtigen Vorzeichen immer noch zusammen?`),
+    );
+  } else if (!isUnit(m) && M + px + B === py) {
+    mk.add(
+      when,
+      tx("Plus instead of times", "Plus statt mal"),
+      tx(`Careful: $${mx(m)}$ means $${num(m)}$ **times** $x$, not plus. Work out the right side again.`, `Vorsicht: $${mx(m)}$ heißt $${num(m)}$ **mal** $x$, nicht plus. Rechne die rechte Seite noch mal aus.`),
+    );
+  } else {
+    mk.add(
+      when,
+      tx("Really equal?", "Wirklich gleich?"),
+      tx(`Put in $x = ${px}$ and work out the right side exactly. Does it really give $${py}$?`, `Setz $x = ${px}$ ein und rechne die rechte Seite genau aus. Kommt da wirklich $${py}$ heraus?`),
+    );
+  }
+  return mk.list;
+}
+
+/** L2: x of a point on the line with a given y. */
+function missingXMistakes(m: Frac, b: Frac, y: number): Mistake[] {
+  const M = qv(m);
+  const B = qv(b);
+  const mk = mistakeList(numWhen((y - B) / M));
+  mk.add(
+    numWhen(M * y + B),
+    tx("Put in for x", "Für x eingesetzt"),
+    tx(
+      `Ah, I see what happened! You put $${y}$ in for $x$. But $${y}$ is the $y$-coordinate: set $y = ${y}$ and solve for $x$.`,
+      `Ah, ich seh, was passiert ist! Du hast $${y}$ für $x$ eingesetzt. Aber $${y}$ ist die $y$-Koordinate: Setz $y = ${y}$ und löse nach $x$ auf.`,
+    ),
+  );
+  mk.add(
+    numWhen((y + B) / M),
+    tx("Sign of b kept", "Vorzeichen von b behalten"),
+    tx(
+      `Nearly! To get the $x$-term alone, ${B > 0 ? "subtract" : "add"} $${num(Math.abs(B))}$ on both sides. I think you did the opposite.`,
+      `Fast! Um den $x$-Term allein zu bekommen, musst du auf beiden Seiten $${num(Math.abs(B))}$ ${B > 0 ? "subtrahieren" : "addieren"}. Ich glaub, du hast das Gegenteil gemacht.`,
+    ),
+  );
+  mk.add(
+    numWhen(y / M - B),
+    tx("Divided too early", "Zu früh geteilt"),
+    tx(
+      `Close! If you divide by $${num(m)}$ first, the $${num(b)}$ has to be divided too. Easier: first get rid of the $${num(b)}$, then divide.`,
+      `Knapp! Wenn du zuerst durch $${num(m)}$ teilst, musst du die $${num(b)}$ auch teilen. Einfacher: Erst die $${num(b)}$ wegschaffen, dann teilen.`,
+    ),
+  );
+  mk.add(numWhen(y - B), ...notDivided(m));
+  return mk.list;
+}
+
+/** L2/L3: the zero −b/m. */
+function zeroMistakes(m: Frac, b: Frac): Mistake[] {
+  const mk = mistakeList(numWhen(qv(neg(div(b, m)))));
+  const line = plain(
+    side([
+      [m, "x", "m"],
+      [b, "", "b"],
+    ]),
+  );
+  mk.add(
+    numWhen(qv(div(b, m))),
+    tx("Sign of b", "Vorzeichen von b"),
+    tx(
+      `Nearly! In $0 = ${line}$, the $${num(b)}$ changes its sign when it moves to the other side.`,
+      `Fast! In $0 = ${line}$ wechselt die $${num(b)}$ ihr Vorzeichen, wenn sie auf die andere Seite kommt.`,
+    ),
+  );
+  mk.add(
+    numWhen(qv(neg(div(m, b)))),
+    tx("Divided the wrong way", "Falsch herum geteilt"),
+    tx(
+      "Ah, I think you divided the wrong way round! Divide by the number **in front of $x$**, not the other way.",
+      "Ah, ich glaub, du hast andersrum geteilt! Teile durch die Zahl **vor dem $x$**, nicht umgekehrt.",
+    ),
+  );
+  mk.add(
+    numWhen(qv(b)),
+    tx("That's the y-intercept", "Das ist der y-Achsenabschnitt"),
+    tx(
+      `Ooh, classic trap! At $${num(b)}$ the line crosses the **y**-axis. The zero is where it crosses the **x**-axis: set $y = 0$.`,
+      `Die klassische Falle! Bei $${num(b)}$ schneidet die Gerade die **y**-Achse. Die Nullstelle ist da, wo sie die **x**-Achse schneidet: Setz $y = 0$.`,
+    ),
+  );
+  if (!isUnit(m)) mk.add(numWhen(-qv(b)), ...notDivided(m));
+  return mk.list;
+}
+
+/** L3: line through A and B; `use` is the point the worked solution puts in for b. */
+function twoPointsMistakes(A: Pt, B: Pt, use: 0 | 1): Mistake[] {
+  const m = q(B[1] - A[1], B[0] - A[0]);
+  const pts: [Pt, string][] = use === 0 ? [[A, "A"], [B, "B"]] : [[B, "B"], [A, "A"]];
+  const U = pts[0][0];
+  const mk = mistakeList(lineWhen(m, bThrough(m, U)));
+  const inv = flipped(m);
+  if (inv) mk.add(lineWhen(inv, bThrough(inv, U)), ...UPSIDE_POINTS);
+  mk.add(lineWhen(neg(m), bThrough(neg(m), U)), ...ORDER_MIXED);
+  for (const [P, name] of pts) mk.add(lineWhen(m, q(P[1])), ...yAsB(name));
+  for (const [P] of pts) {
+    const prod = mul(m, q(P[0]));
+    mk.add(lineWhen(m, add(q(P[1]), prod)), ...bSignSlip(prod, true));
+  }
+  return mk.list;
+}
+
+/** L3: line h through P, parallel or perpendicular to g: y = mg·x + bg. */
+function throughPointMistakes(mg: Frac, bg: Frac, P: Pt, perp: boolean): Mistake[] {
+  const mh = perp ? neg(div(ONE, mg)) : mg;
+  const through = (s: Frac) => lineWhen(s, bThrough(s, P));
+  const mk = mistakeList(through(mh));
+  if (perp) {
+    mk.add(
+      through(neg(mg)),
+      tx("Only the sign flipped", "Nur das Vorzeichen gedreht"),
+      tx(
+        "Half of it! For perpendicular you flip the sign **and** take the reciprocal: $m_h = -\\frac{1}{m_g}$.",
+        "Die Hälfte hast du! Für orthogonal drehst du das Vorzeichen um **und** bildest den Kehrwert: $m_h = -\\frac{1}{m_g}$.",
+      ),
+    );
+    mk.add(
+      through(div(ONE, mg)),
+      tx("Sign not flipped", "Vorzeichen nicht gedreht"),
+      tx(
+        "Half of it! You took the reciprocal, but the sign has to flip too: $m_h = -\\frac{1}{m_g}$.",
+        "Die Hälfte hast du! Den Kehrwert hast du, aber das Vorzeichen muss sich auch umdrehen: $m_h = -\\frac{1}{m_g}$.",
+      ),
+    );
+    mk.add(
+      through(mg),
+      tx("That's parallel", "Das wäre parallel"),
+      tx(
+        "Hmm, with the same slope $h$ would be **parallel** to $g$. Perpendicular means $m_g \\cdot m_h = -1$.",
+        "Hm, mit der gleichen Steigung wäre $h$ **parallel** zu $g$. Orthogonal heißt $m_g \\cdot m_h = -1$.",
+      ),
+    );
+  } else {
+    mk.add(
+      lineWhen(mg, bg),
+      tx("That's g again", "Das ist wieder g"),
+      tx(
+        "Same slope, great! But that's just $g$ again. $h$ has to go through $P$, so it needs its own $b$: put $P$ in.",
+        "Gleiche Steigung, super! Aber das ist einfach wieder $g$. $h$ muss durch $P$ gehen, braucht also ein eigenes $b$: Setz $P$ ein.",
+      ),
+    );
+    mk.add(
+      through(neg(div(ONE, mg))),
+      tx("That's perpendicular", "Das wäre orthogonal"),
+      tx(
+        "Ah, $-\\frac{1}{m}$ is the slope for a **perpendicular** line. Parallel lines simply have the **same** slope.",
+        "Ah, $-\\frac{1}{m}$ ist die Steigung für eine **orthogonale** Gerade. Parallele Geraden haben einfach die **gleiche** Steigung.",
+      ),
+    );
+  }
+  mk.add(lineWhen(mh, q(P[1])), ...yAsB("P"));
+  const prod = mul(mh, q(P[0]));
+  mk.add(lineWhen(mh, add(q(P[1]), prod)), ...bSignSlip(prod, true));
+  return mk.list;
+}
+
 /** L1: read m and b from an equation. */
 function readEquation(rng: Rng): Exercise {
   const form = rng.pick(["std", "std", "std", "swap", "swap", "nob", "flat"] as const);
@@ -338,6 +924,7 @@ function readEquation(rng: Rng): Exercise {
     answer: { kind: "pair", names: ["m", "b"], values: [qv(m), qv(b)] },
     hint: HINT_MB,
     solution: frames,
+    mistakes: equationMistakes(m, b, form),
   };
 }
 
@@ -382,6 +969,7 @@ function graphTask(rng: Rng, hard: boolean): Exercise {
         "$b$: Wo schneidet die Gerade die $y$-Achse? $m$: Geh von einem markierten Punkt zum anderen. Wie weit nach rechts, wie weit nach oben oder unten?",
       ),
       solution: readGraphFrames(m, b, P, Q, "pair"),
+      mistakes: graphPairMistakes(m, b),
     };
   }
   return {
@@ -394,6 +982,7 @@ function graphTask(rng: Rng, hard: boolean): Exercise {
       "Lies $b$ dort ab, wo die Gerade die $y$-Achse schneidet. Für $m$ nimmst du ein Steigungsdreieck zwischen den markierten Punkten: $m = \\frac{\\Delta y}{\\Delta x}$.",
     ),
     solution: readGraphFrames(m, b, P, Q, "line"),
+    mistakes: graphLineMistakes(m, b),
   };
 }
 
@@ -408,6 +997,7 @@ function whichGraph(rng: Rng): Exercise {
     seen.add(key(x, y));
     wrong.push([x, y]);
   };
+  // Every wrong option is a typical misreading: slope sign, sign of b, m and b swapped, Δx/Δy…
   const candidates: [Frac, Frac][] = rng.shuffle([
     [neg(m), b],
     [m, neg(b)],
@@ -420,11 +1010,15 @@ function whichGraph(rng: Rng): Exercise {
   const options = rng.shuffle([[m, b] as [Frac, Frac], ...wrong]);
   const correct = options.findIndex(([x, y]) => key(x, y) === key(m, b));
   const letter = String.fromCharCode(65 + correct);
+  const answer = { kind: "choice" as const, options: options.map(([x, y]) => `$${plain(lineSrc(x, y))}$`), correct };
+  const mk = mistakeList(answer);
+  options.forEach((o, i) => i !== correct && mk.add({ ...answer, correct: i }, ...optionMistake(m, b, o)));
   return {
     instruction: tx("Match the graph", "Ordne den Graphen zu"),
     text: tx("Which equation belongs to the line in the graph?", "Welche Gleichung gehört zur abgebildeten Geraden?"),
     visual: lineGraph(m, b, [P, Q]),
-    answer: { kind: "choice", options: options.map(([x, y]) => `$${plain(lineSrc(x, y))}$`), correct },
+    answer,
+    mistakes: mk.list,
     hint: tx(
       "First read $b$ on the $y$-axis. Then check the slope: does the line rise or fall, and how steeply?",
       "Lies zuerst $b$ an der $y$-Achse ab. Prüf dann die Steigung: Steigt oder fällt die Gerade, und wie steil?",
@@ -459,6 +1053,7 @@ function valueAt(rng: Rng): Exercise {
     answer: { kind: "number", value: qv(y), label: "y =" },
     hint: tx(`Put $${num(x)}$ in for $x$. Multiply before you add.`, `Setze $${num(x)}$ für $x$ ein. Punkt vor Strich: erst multiplizieren, dann addieren.`),
     solution: frames,
+    mistakes: valueMistakes(m, b, x),
   };
 }
 
@@ -480,6 +1075,7 @@ function slopeTask(rng: Rng): Exercise {
       answer: { kind: "number", value: qv(m), label: "m =" },
       hint: HINT_SLOPE,
       solution: frames,
+      mistakes: slopeMistakes(A, B),
     };
   }
 }
@@ -501,6 +1097,7 @@ function slopePointTask(rng: Rng): Exercise {
       answer: { kind: "expr", value: linePlain(m, b), prefix: "y =", form: "expanded" },
       hint: HINT_B,
       solution: findBFrames(m, [px, py], "P", SLOPE_FIRST),
+      mistakes: slopePointMistakes(m, [px, py]),
     };
   }
 }
@@ -514,15 +1111,17 @@ function pointTest(rng: Rng): Exercise {
   const right = yAt(m, b, px);
   const py = on ? right : right + rng.nonZero(-3, 3);
   const P = pt(px, py, "P");
+  const answer = {
+    kind: "choice" as const,
+    options: [tx("Yes, $P$ lies on the line.", "Ja, $P$ liegt auf der Geraden."), tx("No, $P$ is not on the line.", "Nein, $P$ liegt nicht auf der Geraden.")],
+    correct: on ? 0 : 1,
+  };
   return {
     instruction: tx("Point test", "Punktprobe"),
     text: tx(`Does the point $${P}$ lie on the line?`, `Liegt der Punkt $${P}$ auf der Geraden?`),
     math: plain(lineSrc(m, b)),
-    answer: {
-      kind: "choice",
-      options: [tx("Yes, $P$ lies on the line.", "Ja, $P$ liegt auf der Geraden."), tx("No, $P$ is not on the line.", "Nein, $P$ liegt nicht auf der Geraden.")],
-      correct: on ? 0 : 1,
-    },
+    answer,
+    mistakes: pointTestMistakes(m, b, [px, py], on, answer),
     hint: tx("Put both coordinates of $P$ into the equation. Do you get a true statement?", "Setze beide Koordinaten von $P$ in die Gleichung ein. Erhältst du eine wahre Aussage?"),
     solution: [
       { math: lineSrc(m, b), note: tx("**Point test**: put both coordinates of $P$ into the equation.", "**Punktprobe**: Setze beide Koordinaten von $P$ in die Gleichung ein.") },
@@ -561,6 +1160,7 @@ function missingX(rng: Rng): Exercise {
         { math: lineSrc(m, b), highlight: ["Y"], note: tx(`Put in $y = ${y}$.`, `Setze $y = ${y}$ ein.`) },
         ...solveFrames(q(y), m, b, "", (X) => tx(`So $x = ${num(X)}$ and the point is $${pt(X, y, "P")}$.`, `Also ist $x = ${num(X)}$, und der Punkt heißt $${pt(X, y, "P")}$.`)),
       ],
+      mistakes: missingXMistakes(m, b, y),
     };
   }
 }
@@ -600,6 +1200,7 @@ function zeroTask(rng: Rng, hard: boolean): Exercise {
           ),
         ),
       ],
+      mistakes: zeroMistakes(m, b),
     };
   }
 }
@@ -630,6 +1231,7 @@ function twoPointsTask(rng: Rng): Exercise {
         "Zuerst die Steigung $m = \\frac{y_2 - y_1}{x_2 - x_1}$. Setze dann einen der Punkte in $y = mx + b$ ein, um $b$ zu bekommen.",
       ),
       solution: [...frames, ...findBFrames(m, use, use === A ? "A" : "B", tx(`Now find $b$: so far the line is $${sofar}$.`, `Jetzt fehlt $b$: Bisher heißt die Gerade $${sofar}$.`))],
+      mistakes: twoPointsMistakes(A, B, use === A ? 0 : 1),
     };
   }
 }
@@ -680,6 +1282,7 @@ function throughPointTask(rng: Rng, perp: boolean): Exercise {
           )
         : tx("Parallel lines have the same slope. Then find $b$ with $P$.", "Parallele Geraden haben die gleiche Steigung. Dann bestimmst du $b$ mit $P$."),
       solution: [...lead, ...findBFrames(mh, [px, py], "P", SLOPE_FIRST)],
+      mistakes: throughPointMistakes(mg, bg, [px, py], perp),
     };
   }
 }
@@ -1328,6 +1931,7 @@ const lines: Topic = {
           "Die Gerade schneidet die $y$-Achse bei $-1$. Geh von dort zum anderen markierten Punkt: Wie weit nach rechts, wie weit nach oben? Du kannst einen Bruch wie 2/3 eintippen.",
         ),
         solution: readGraphFrames(q(2, 3), q(-1), [0, -1], [3, 1], "pair"),
+        mistakes: graphPairMistakes(q(2, 3), q(-1)),
       },
     },
     {
@@ -1362,6 +1966,7 @@ const lines: Topic = {
           const { frames, m } = slopeFrames([-1, 4], [2, -2], tx("First the slope.", "Zuerst die Steigung."));
           return [...frames, ...findBFrames(m, [-1, 4], "A", tx("Now $b$: so far $y = -2x + b$.", "Jetzt $b$: Bisher gilt $y = -2x + b$."))];
         })(),
+        mistakes: twoPointsMistakes([-1, 4], [2, -2], 0),
       },
     },
     {
@@ -1392,6 +1997,7 @@ const lines: Topic = {
             ),
           ),
         ],
+        mistakes: zeroMistakes(q(-2), q(5)),
       },
     },
     {
@@ -1431,6 +2037,7 @@ const lines: Topic = {
           },
           ...findBFrames(q(-1, 2), [4, 1], "P", SLOPE_FIRST),
         ],
+        mistakes: throughPointMistakes(q(-1, 2), q(4), [4, 1], false),
       },
     },
   ],

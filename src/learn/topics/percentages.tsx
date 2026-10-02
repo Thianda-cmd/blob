@@ -9,7 +9,7 @@ import { tx, txMap, type Text } from "@/i18n/text";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import { gcd, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -384,6 +384,271 @@ const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
 const AS_PERCENT = tx("Write as a percentage", "Schreib in Prozent");
 const OF = (en: string) => tx(en, en.replace('"of"', '"von"'));
 
+// ---------------------------------------------------------------------------
+// Typical mistakes. Each one is simulated from the task's numbers, so the wrong
+// value is exactly what a student with that misconception gets.
+
+/** A misconception: the (unrounded) value it leads to, a title and what Blob says. */
+type Slip = [value: number, title: Text, say: Text] | null | false;
+type NumberSpec = Extract<AnswerSpec, { kind: "number" }>;
+
+/** How far a typed number may be from `v`: cents for money, whole numbers when the answer is rounded, else rounding of long decimals. */
+function slack(v: number, answer: NumberSpec): number {
+  if (answer.unit === "€") return 0.0101;
+  if ((answer.tolerance ?? 0) * Math.max(1, Math.abs(answer.value)) >= 1) return 1.01;
+  return Math.abs(r2(v) - v) < 1e-9 ? 0 : Math.min(0.051, Math.abs(v) * 0.005);
+}
+
+/** The slips as Mistakes for a number answer: only those clearly apart from the right value and from each other. */
+function mistakesFor(answer: AnswerSpec, slips: Slip[]): Mistake[] {
+  if (answer.kind !== "number") return [];
+  const taken: [number, number][] = [[answer.value, slack(answer.value, answer)]];
+  const out: Mistake[] = [];
+  for (const s of slips) {
+    if (!s) continue;
+    const [raw, title, say] = s;
+    if (!Number.isFinite(raw) || raw < 0) continue;
+    const value = answer.unit === "€" ? r2(raw) : slack(raw, answer) >= 1 ? Math.round(raw) : r6(raw);
+    const tol = slack(value, answer);
+    if (taken.some(([v, t]) => Math.abs(v - value) <= t + tol + 1e-9)) continue;
+    taken.push([value, tol]);
+    const when: NumberSpec = { kind: "number", value, ...(answer.unit ? { unit: answer.unit } : {}), ...(tol ? { tolerance: tol / Math.max(1, Math.abs(value)) } : {}) };
+    out.push({ when, title, say });
+  }
+  return out;
+}
+
+/** An amount in a sentence: "$45$ €", "$300$ g", "$24$ Schüler". */
+const amt = (f: Fmt, v: number, unit: Unit) => `$${f.a(v, unit)}$${f.uw(unit)}`;
+
+const OTHER_PART = tx("The other part", "Der andere Teil");
+const WRONG_WAY = tx("Point moved the wrong way", "Komma in die falsche Richtung");
+const FACTOR_OFF = tx("Growth factor off", "Wachstumsfaktor falsch");
+/** "1.5 instead of 1.05": a rate below 10 % written with one zero too few. */
+const factorOff = (p: number, up: boolean) =>
+  say(({ t, n }) =>
+    t(
+      `So close! For ${up ? "a rise" : "a drop"} of $${p} %$ the growth factor is $${n(1 + (up ? p : -p) / 100)}$, not $${n(1 + (up ? p : -p) / 10)}$: percent means **hundredths**.`,
+      `Ganz knapp! Bei ${up ? "einer Zunahme" : "einer Abnahme"} um $${p} %$ ist der Wachstumsfaktor $${n(1 + (up ? p : -p) / 100)}$, nicht $${n(1 + (up ? p : -p) / 10)}$: Prozent heißt **Hundertstel**.`,
+    ),
+  );
+
+/** p % of G. */
+function wSlips(p: number, G: number, unit: Unit, story = false): Slip[] {
+  const W = (G * p) / 100;
+  return [
+    story && [
+      G - W,
+      OTHER_PART,
+      say(({ t }) =>
+        t(
+          `Careful, that's the **other** part, the $${100 - p} %$. The question asks for the $${p} %$.`,
+          `Vorsicht, das ist der **andere** Teil, die $${100 - p} %$. Gefragt sind die $${p} %$.`,
+        ),
+      ),
+    ],
+    p !== 1 && [
+      G / p,
+      tx("Divided by the percent", "Durch die Prozentzahl geteilt"),
+      say(({ t }) =>
+        t(
+          `Ah, you divided by $${p}$! That only works for $10 %$, because $10 %$ is a tenth. $${p} %$ means $\\frac{${p}}{100}$, so multiply by that.`,
+          `Ah, du hast durch $${p}$ geteilt! Das klappt nur bei $10 %$, weil $10 %$ ein Zehntel ist. $${p} %$ heißt $\\frac{${p}}{100}$, damit multiplizierst du.`,
+        ),
+      ),
+    ],
+    p < 10 && [
+      (G * p) / 10,
+      tx("One zero missing", "Eine Null fehlt"),
+      say(({ t, n }) =>
+        t(
+          `Nearly! $${p} %$ is $${n(p / 100)}$, not $${n(p / 10)}$. Percent means hundredths, so the point moves **two** places.`,
+          `Fast! $${p} %$ ist $${n(p / 100)}$, nicht $${n(p / 10)}$. Prozent heißt Hundertstel, das Komma rückt also **zwei** Stellen.`,
+        ),
+      ),
+    ],
+    [
+      (G * 100) / p,
+      tx("Base value and percentage mixed up", "Grundwert und Prozentwert verwechselt"),
+      say((f) =>
+        f.t(
+          `I think I know what you did: you treated ${amt(f, G, unit)} as the part and worked out the whole. But ${amt(f, G, unit)} already **is** the whole ($100 %$), and you need $${p} %$ of it.`,
+          `Ich glaub, ich weiß, was du gemacht hast: Du hast ${amt(f, G, unit)} als Prozentwert genommen und das Ganze ausgerechnet. Aber ${amt(f, G, unit)} sind schon das Ganze ($100 %$), gesucht sind $${p} %$ davon.`,
+        ),
+      ),
+    ],
+  ];
+}
+
+/** The rate p % = W / G. */
+function pSlips(W: number, G: number, p: number, story: boolean): Slip[] {
+  return [
+    [
+      10000 / p,
+      tx("Whole divided by the part", "Ganzes durch Teil geteilt"),
+      say(({ t, n }) =>
+        t(
+          `I think I know what you did: you divided $${n(G)}$ by $${n(W)}$. It's the other way round: the part divided by the whole.`,
+          `Ich glaub, ich weiß, was du gemacht hast: Du hast $${n(G)}$ durch $${n(W)}$ geteilt. Andersrum: der Teil geteilt durch das Ganze.`,
+        ),
+      ),
+    ],
+    G !== 100 && [
+      W,
+      tx("The part isn't the rate", "Der Teil ist kein Prozentsatz"),
+      say(({ t, n }) =>
+        t(
+          `Hmm, $${n(W)}$ is the part itself, not a percentage yet. Compare it with the whole, $${n(G)}$: part divided by whole.`,
+          `Hm, $${n(W)}$ ist der Teil selbst, noch kein Prozentsatz. Vergleich ihn mit dem Ganzen, $${n(G)}$: Teil geteilt durch Ganzes.`,
+        ),
+      ),
+    ],
+    story && [
+      100 - p,
+      OTHER_PART,
+      say(({ t, n }) =>
+        t(`Careful, that's the share of the **rest**. The question asks for the share of the $${n(W)}$.`, `Vorsicht, das ist der Anteil vom **Rest**. Gefragt ist der Anteil von $${n(W)}$.`),
+      ),
+    ],
+  ];
+}
+
+/** The base value G from W = p % of G. */
+function gSlips(W: number, p: number, unit: Unit): Slip[] {
+  return [
+    [
+      (W * p) / 100,
+      tx("Percentage worked out instead", "Prozentwert statt Grundwert"),
+      say((f) =>
+        f.t(
+          `Ah, I see what happened! You worked out $${p} %$ **of** ${amt(f, W, unit)}. But ${amt(f, W, unit)} already **is** the $${p} %$, and you're looking for the whole, the $100 %$.`,
+          `Ah, ich seh, was passiert ist! Du hast $${p} %$ **von** ${amt(f, W, unit)} ausgerechnet. Aber ${amt(f, W, unit)} **sind** schon die $${p} %$. Gesucht ist das Ganze, also $100 %$.`,
+        ),
+      ),
+    ],
+    [
+      W * (1 + p / 100),
+      tx("Percent added on", "Prozente draufgerechnet"),
+      say((f) =>
+        f.t(
+          `Hmm, you added $${p} %$ on top of ${amt(f, W, unit)}. But ${amt(f, W, unit)} is only $${p} %$ of the whole: go via $1 %$ to $100 %$.`,
+          `Hm, du hast $${p} %$ auf ${amt(f, W, unit)} draufgerechnet. Aber ${amt(f, W, unit)} sind nur $${p} %$ vom Ganzen: Geh über $1 %$ zu $100 %$.`,
+        ),
+      ),
+    ],
+  ];
+}
+
+/** A rise or drop by p %: new value G · (1 ± p/100). */
+function changeSlips(G: number, p: number, up: boolean, unit: Unit, vat = false): Slip[] {
+  const money = unit === "€";
+  return [
+    [
+      (G * p) / 100,
+      vat ? tx("Only the VAT", "Nur die Mehrwertsteuer") : up ? tx("Only the increase", "Nur die Zunahme") : tx("Only the discount", "Nur der Rabatt"),
+      vat
+        ? tx(
+            "Nearly! That's just the **VAT** itself. The question asks for the price including it, so it still has to go on top.",
+            "Fast! Das ist nur die **Mehrwertsteuer** selbst. Gefragt ist der Preis mit Steuer, sie muss also noch drauf.",
+          )
+        : up
+          ? tx(
+              "Nearly! That's just the **increase**. The question asks for the new value, so it still has to go on top of the old one.",
+              "Fast! Das ist nur die **Zunahme**. Gefragt ist der neue Wert, sie muss also noch auf den alten drauf.",
+            )
+          : tx(
+              "Nearly! That's just the **discount**. The question asks for the new price, so it still has to come off the old one.",
+              "Fast! Das ist nur der **Rabatt**. Gefragt ist der neue Preis, er muss also noch vom alten weg.",
+            ),
+    ],
+    [
+      up ? G + p : G - p,
+      tx("Percent taken as a number", "Prozent als feste Zahl genommen"),
+      say(({ t }) =>
+        up
+          ? t(
+              `Ah, I see what happened! You added $${p}$${money ? " €" : ""} straight on. But $${p} %$ means $${p}$ hundredths **of** the old value.`,
+              `Ah, ich seh, was passiert ist! Du hast einfach $${p}$${money ? "\u00a0€" : ""} draufgerechnet. Aber $${p} %$ heißt $${p}$ Hundertstel **vom** alten Wert.`,
+            )
+          : t(
+              `Ah, I see what happened! You took $${p}$${money ? " €" : ""} straight off. But $${p} %$ means $${p}$ hundredths **of** the price.`,
+              `Ah, ich seh, was passiert ist! Du hast einfach $${p}$${money ? "\u00a0€" : ""} abgezogen. Aber $${p} %$ heißt $${p}$ Hundertstel **vom** Preis.`,
+            ),
+      ),
+    ],
+    p < 10 && [G * (1 + (up ? p : -p) / 10), FACTOR_OFF, factorOff(p, up)],
+  ];
+}
+
+/** Back to the old value G = N / q. */
+function reverseSlips(N: number, p: number, up: boolean, vat = false): Slip[] {
+  const q = 1 + (up ? p : -p) / 100;
+  const qWrong = 1 + (up ? -p : p) / 100;
+  return [
+    [
+      N * qWrong,
+      tx("Percent of the new price", "Prozent vom neuen Preis"),
+      vat
+        ? tx(
+            `Ooh, classic trap! You took $${p} %$ of the price **with** VAT off. But the VAT is $${p} %$ of the price **without** VAT, so divide by the growth factor instead.`,
+            `Die klassische Falle! Du hast $${p} %$ vom Preis **mit** Steuer abgezogen. Die Mehrwertsteuer beträgt aber $${p} %$ vom Preis **ohne** Steuer, also teile durch den Wachstumsfaktor.`,
+          )
+        : up
+        ? tx(
+            `Ooh, classic trap! You took $${p} %$ of the **new** price off. But the rise was $${p} %$ of the **old** price, so divide by the growth factor instead.`,
+            `Die klassische Falle! Du hast $${p} %$ vom **neuen** Preis abgezogen. Die Erhöhung betrug aber $${p} %$ vom **alten** Preis, also teile durch den Wachstumsfaktor.`,
+          )
+        : tx(
+            `Ooh, classic trap! You added $${p} %$ of the **new** price. But the discount was $${p} %$ of the **old** price, so divide by the growth factor instead.`,
+            `Die klassische Falle! Du hast $${p} %$ vom **neuen** Preis draufgerechnet. Der Rabatt betrug aber $${p} %$ vom **alten** Preis, also teile durch den Wachstumsfaktor.`,
+          ),
+    ],
+    [
+      N * q,
+      tx("Changed it once more", "Noch mal verändert"),
+      say(({ t, c, n }) =>
+        vat
+          ? t(
+              `Hmm, you added the VAT once more. But $${c(N)}$ € already includes it: undo it by dividing by $${n(q)}$.`,
+              `Hm, du hast die Mehrwertsteuer noch mal draufgerechnet. Aber in $${c(N)}$\u00a0€ ist sie schon drin: Mach sie rückgängig, indem du durch $${n(q)}$ teilst.`,
+            )
+          : up
+          ? t(
+              `Hmm, you raised the price by another $${p} %$. But $${c(N)}$ € is already the price **after** the rise: undo it by dividing by $${n(q)}$.`,
+              `Hm, du hast den Preis noch mal um $${p} %$ erhöht. Aber $${c(N)}$\u00a0€ ist schon der Preis **nach** der Erhöhung: Mach sie rückgängig, indem du durch $${n(q)}$ teilst.`,
+            )
+          : t(
+              `Hmm, you took another $${p} %$ off. But $${c(N)}$ € is already the price **after** the discount: undo it by dividing by $${n(q)}$.`,
+              `Hm, du hast noch mal $${p} %$ abgezogen. Aber $${c(N)}$\u00a0€ ist schon der Preis **nach** dem Rabatt: Mach ihn rückgängig, indem du durch $${n(q)}$ teilst.`,
+            ),
+      ),
+    ],
+    [
+      N / qWrong,
+      tx("Wrong growth factor", "Falscher Wachstumsfaktor"),
+      up
+        ? tx(
+            `Dividing is the right idea! But after a **rise** of $${p} %$ the growth factor is bigger than $1$.`,
+            `Teilen ist die richtige Idee! Aber nach einer **Erhöhung** um $${p} %$ ist der Wachstumsfaktor größer als $1$.`,
+          )
+        : tx(
+            `Dividing is the right idea! But after a **discount** of $${p} %$ the growth factor is smaller than $1$.`,
+            `Teilen ist die richtige Idee! Aber nach einem **Rabatt** von $${p} %$ ist der Wachstumsfaktor kleiner als $1$.`,
+          ),
+    ],
+    !up && [
+      (N * 100) / p,
+      tx(`New price taken as ${p} %`, `Neuer Preis als ${p}\u00a0% genommen`),
+      say(({ t, c }) =>
+        t(
+          `I think you treated $${c(N)}$ € as $${p} %$ of the old price. But after $${p} %$ off, the new price is $${100 - p} %$ of the old one.`,
+          `Ich glaub, du hast $${c(N)}$\u00a0€ als $${p} %$ vom alten Preis genommen. Nach $${p} %$ Rabatt ist der neue Preis aber $${100 - p} %$ vom alten.`,
+        ),
+      ),
+    ],
+  ];
+}
+
 // Level 1 ---------------------------------------------------------------------
 
 function wTask(rng: Rng): Exercise | null {
@@ -401,6 +666,7 @@ function wTask(rng: Rng): Exercise | null {
       ? tx("Use a shortcut, or $W = G \\cdot \\frac{p}{100}$.", "Nutze einen Rechentrick oder $W = G \\cdot \\frac{p}{100}$.")
       : say(({ t, n }) => t(`$${p} % = ${n(p / 100)}$. Multiply the base value by it.`, `$${p} % = ${n(p / 100)}$. Multipliziere den Grundwert damit.`)),
     solution: findWFrames(p, G, unit),
+    mistakes: mistakesFor(amount(W, unit), wSlips(p, G, unit)),
   };
 }
 
@@ -468,6 +734,7 @@ function wStoryTask(rng: Rng): Exercise | null {
       "Was ist das Ganze (Grundwert $G$), und wie groß ist der Prozentsatz? Dann gilt $W = G \\cdot \\frac{p}{100}$.",
     ),
     solution: findWFrames(p, G, story.unit),
+    mistakes: mistakesFor(amount(W, story.unit), wSlips(p, G, story.unit, true)),
   };
 }
 
@@ -499,6 +766,26 @@ function convertTask(rng: Rng): Exercise | null {
           highlight: ["v"],
         },
       ],
+      mistakes: mistakesFor({ kind: "number", value: r6(v) }, [
+        p < 10 && [
+          p / 10,
+          tx("One zero missing", "Eine Null fehlt"),
+          say(({ t, n }) =>
+            t(
+              `Nearly! $${n(p)} %$ is $${n(p)}$ hundredths, so you need a zero right after the point. The point moves **two** places to the left.`,
+              `Fast! $${n(p)} %$ sind $${n(p)}$ Hundertstel, direkt nach dem Komma brauchst du also eine Null. Das Komma rückt **zwei** Stellen nach links.`,
+            ),
+          ),
+        ],
+        [
+          p * 100,
+          WRONG_WAY,
+          tx(
+            "Ah, you moved the point to the **right**! From percent to decimal it moves two places to the **left**, because you divide by $100$.",
+            "Ah, du hast das Komma nach **rechts** verschoben! Von Prozent zur Dezimalzahl rückt es zwei Stellen nach **links**, weil du durch $100$ teilst.",
+          ),
+        ],
+      ]),
     };
   }
   if (kind === 1) {
@@ -521,6 +808,24 @@ function convertTask(rng: Rng): Exercise | null {
           highlight: ["p"],
         },
       ],
+      mistakes: mistakesFor(rateAnswer(p), [
+        v < 1 && [
+          Number(String(v).split(".")[1]),
+          tx("Digits copied", "Ziffern abgeschrieben"),
+          tx(
+            "I think I know what you did: you just took the digits after the point. But percent counts **hundredths**: the point moves two places to the right.",
+            "Ich glaub, ich weiß, was du gemacht hast: Du hast einfach die Ziffern nach dem Komma genommen. Aber Prozent zählt **Hundertstel**: Das Komma rückt zwei Stellen nach rechts.",
+          ),
+        ],
+        [
+          v / 100,
+          WRONG_WAY,
+          tx(
+            "Ah, you moved the point to the **left**! From decimal to percent it moves two places to the **right**, because you multiply by $100$.",
+            "Ah, du hast das Komma nach **links** verschoben! Von der Dezimalzahl zu Prozent rückt es zwei Stellen nach **rechts**, weil du mit $100$ multiplizierst.",
+          ),
+        ],
+      ]),
     };
   }
   const d = rng.pick([2, 4, 5, 10, 20, 25, 50]);
@@ -546,6 +851,24 @@ function convertTask(rng: Rng): Exercise | null {
       { math: `\\frac{${p}#n}{100#d}#f`, note: tx(`That's $${p}$ hundredths.`, `Das sind $${p}$ Hundertstel.`) },
       { math: `\\frac{${p}#n}{100#d}#f =#e ${p}#p %#pc`, note: tx(`$${p}$ hundredths are $${p} %$.`, `$${p}$ Hundertstel sind $${p} %$.`), highlight: ["p"] },
     ],
+    mistakes: mistakesFor(rateAnswer(p), [
+      [
+        n,
+        tx("Only the denominator made 100", "Nur den Nenner auf 100 gebracht"),
+        tx(
+          "Nearly! You turned the denominator into $100$, but left the numerator as it was. Expanding means top **and** bottom times the same number.",
+          "Fast! Du hast den Nenner auf $100$ gebracht, aber den Zähler so gelassen. Erweitern heißt: Zähler **und** Nenner mal dieselbe Zahl.",
+        ),
+      ],
+      [
+        n + 100 - d,
+        tx("Added instead of multiplied", "Addiert statt multipliziert"),
+        tx(
+          `Ah, I see what happened! You added $${100 - d}$ to get from $${d}$ to $100$, and the same on top. But expanding means **multiplying** top and bottom by the same number.`,
+          `Ah, ich seh, was passiert ist! Du hast $${100 - d}$ addiert, um von $${d}$ auf $100$ zu kommen, und oben dasselbe. Erweitern heißt aber: Zähler und Nenner mit derselben Zahl **multiplizieren**.`,
+        ),
+      ],
+    ]),
   };
 }
 
@@ -591,6 +914,24 @@ function gridTask(rng: Rng): Exercise | null {
           ),
     solution: frames,
     visual: { component: PercentGrid as unknown as ComponentType<Record<string, unknown>>, props: { rows, cols, k } },
+    mistakes: mistakesFor(rateAnswer(p), [
+      total !== 100 && [
+        k,
+        tx("Squares counted as percent", "Kästchen als Prozent gezählt"),
+        tx(
+          `Ah, you counted each square as $1 %$. But there are only $${total}$ squares here, not $100$, so each one is worth more.`,
+          `Ah, du hast jedes Kästchen als $1 %$ gezählt. Hier sind es aber nur $${total}$ Kästchen, nicht $100$, also ist jedes mehr wert.`,
+        ),
+      ],
+      [
+        100 - p,
+        tx("Counted the white squares", "Die weißen Kästchen gezählt"),
+        tx(
+          "Ah, I see what happened! You counted the squares that are **not** shaded. The question asks for the coloured ones.",
+          "Ah, ich seh, was passiert ist! Du hast die **nicht** gefärbten Kästchen gezählt. Gefragt sind die gefärbten.",
+        ),
+      ],
+    ]),
   };
 }
 
@@ -656,6 +997,7 @@ function pTask(rng: Rng): Exercise | null {
       "Teil durch Ganzes: $p % = \\frac{W}{G}$. Dann die Dezimalzahl in Prozent umwandeln.",
     ),
     solution: findPFrames(W, G),
+    mistakes: mistakesFor(rateAnswer(p), pSlips(W, G, p, asText)),
   };
 }
 
@@ -725,6 +1067,7 @@ function gTask(rng: Rng): Exercise | null {
       ),
     ),
     solution: findGFrames(p, W, unit),
+    mistakes: mistakesFor(amount(G, unit), gSlips(W, p, unit)),
   };
 }
 
@@ -801,6 +1144,7 @@ function changeTask(rng: Rng): Exercise | null {
         : t(`$${p} %$ off leaves $${100 - p} %$. Multiply by $${n(1 - p / 100)}$.`, `Bei $${p} %$ Rabatt bleiben $${100 - p} %$. Multipliziere mit $${n(1 - p / 100)}$.`),
     ),
     solution: changeFrames(G, p, story.up, story.unit),
+    mistakes: mistakesFor(amount(N, story.unit), changeSlips(G, p, story.up, story.unit, story.vat)),
   };
 }
 
@@ -871,6 +1215,7 @@ function reverseTask(rng: Rng): Exercise | null {
       ),
     ),
     solution: reverseFrames(N, p, story.up, "€"),
+    mistakes: mistakesFor(amount(G, "€"), reverseSlips(N, p, story.up, story.vat)),
   };
 }
 
@@ -930,7 +1275,32 @@ function chainTask(rng: Rng): Exercise | null {
         )
       : tx("One growth factor per change. Multiply the price by both.", "Ein Wachstumsfaktor pro Änderung. Multipliziere den Preis mit beiden."),
     solution: chainFrames(G, [a, b], "€"),
+    mistakes: mistakesFor(amount(N, "€"), chainSlips(G, a, b)),
   };
+}
+
+/** Two changes in a row. */
+function chainSlips(G: number, a: Change, b: Change): Slip[] {
+  const signed = (c: Change) => `${c.up ? "+" : "-"}${c.p} %`;
+  const cancel = a.p === b.p && a.up !== b.up;
+  const small = [a, b].find((c) => c.p < 10);
+  const tenths = (c: Change) => (c.p < 10 ? 1 + (c.up ? c.p : -c.p) / 10 : factorOf(c));
+  return [
+    [
+      G * (1 + ((a.up ? a.p : -a.p) + (b.up ? b.p : -b.p)) / 100),
+      cancel ? tx("Back to the start?", "Wieder am Anfang?") : tx("Percentages added", "Prozente addiert"),
+      cancel
+        ? tx(
+            `Ooh, tempting! But $${signed(a)}$ and $${signed(b)}$ don't cancel out: the second change works on the **new** price, not on the original one.`,
+            `Ooh, verlockend! Aber $${signed(a)}$ und $${signed(b)}$ heben sich nicht auf: Die zweite Änderung bezieht sich auf den **neuen** Preis, nicht auf den ursprünglichen.`,
+          )
+        : tx(
+            "Ooh, tempting! You just added up the percentages. But the second change works on the **new** price, not on the original one.",
+            "Ooh, verlockend! Du hast die Prozentsätze einfach zusammengerechnet. Die zweite Änderung bezieht sich aber auf den **neuen** Preis, nicht auf den ursprünglichen.",
+          ),
+    ],
+    small ? [G * tenths(a) * tenths(b), FACTOR_OFF, factorOff(small.p, small.up)] : null,
+  ];
 }
 
 function totalChangeTask(rng: Rng): Exercise | null {
@@ -979,6 +1349,40 @@ function totalChangeTask(rng: Rng): Exercise | null {
       "Nicht einfach die Prozentsätze addieren! Multipliziere die Wachstumsfaktoren und vergleiche dann mit $1$.",
     ),
     solution: totalFrames(changes),
+    mistakes: mistakesFor(rateAnswer(pct), [
+      kind === 0
+        ? [
+            0,
+            tx("Back to the start?", "Wieder am Anfang?"),
+            tx(
+              `Ooh, the classic trap! It feels like $+${p1} %$ and $-${p1} %$ cancel out. But the drop is $${p1} %$ of the **new**, higher price.`,
+              `Die klassische Falle! Es fühlt sich an, als würden sich $+${p1} %$ und $-${p1} %$ aufheben. Aber die Senkung beträgt $${p1} %$ vom **neuen**, höheren Preis.`,
+            ),
+          ]
+        : [
+            p1 + p2,
+            tx("Percentages added", "Prozente addiert"),
+            kind === 1
+              ? tx(
+                  `Ooh, tempting! But you can't just add the percentages: the second rise is $${p2} %$ of the **new**, higher price. Multiply the growth factors instead.`,
+                  `Ooh, verlockend! Aber Prozentsätze darfst du nicht einfach addieren: Die zweite Erhöhung beträgt $${p2} %$ vom **neuen**, höheren Preis. Multipliziere stattdessen die Wachstumsfaktoren.`,
+                )
+              : tx(
+                  `Ooh, tempting! But you can't just add the percentages: the second cut is $${p2} %$ of the **reduced** price. Multiply the growth factors instead.`,
+                  `Ooh, verlockend! Aber Prozentsätze darfst du nicht einfach addieren: Die zweite Senkung beträgt $${p2} %$ vom **reduzierten** Preis. Multipliziere stattdessen die Wachstumsfaktoren.`,
+                ),
+          ],
+      [
+        Q * 100,
+        tx("Final value, not the change", "Endwert statt Änderung"),
+        say(({ t, n }) =>
+          t(
+            `Nearly! $${n(Q * 100)} %$ is the final price compared with the original. But the question asks how much it **changed**.`,
+            `Fast! $${n(Q * 100)} %$ ist der Endpreis im Vergleich zum Anfang. Gefragt ist aber, um wie viel er sich **verändert** hat.`,
+          ),
+        ),
+      ],
+    ]),
   };
 }
 
@@ -1018,12 +1422,28 @@ function compoundTask(rng: Rng): Exercise | null {
   const p = story.up ? rng.pick([2, 3, 4, 5]) : rng.pick([10, 15, 20, 25]);
   const n = rng.int(2, 3);
   const K = story.whole ? rng.int(5, 40) * 1000 : story.up ? rng.pick([500, 1000, 2000, 2500, 5000]) : rng.pick([10000, 12000, 15000, 20000, 25000, 30000]);
-  const exact = K * (1 + (story.up ? p : -p) / 100) ** n;
+  const q = 1 + (story.up ? p : -p) / 100;
+  const exact = K * q ** n;
   const value = story.whole ? Math.round(exact) : r2(exact);
+  const answer: AnswerSpec = story.whole ? { kind: "number", value, unit: unitText(story.unit), tolerance: 1.01 / Math.max(1, value) } : amount(value, "€");
+  const linear = !story.up
+    ? tx(
+        `Ah, I see what happened! You took $${p} %$ of the **original** price off every year. But each year it loses $${p} %$ of its **current** value.`,
+        `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ vom **ursprünglichen** Preis abgezogen. Aber jedes Jahr verliert er $${p} %$ von seinem **aktuellen** Wert.`,
+      )
+    : story.whole
+      ? tx(
+          `Ah, I see what happened! You added $${p} %$ of the **original** population every year. But each year it grows by $${p} %$ of the **current** population.`,
+          `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ der **ursprünglichen** Einwohnerzahl dazugezählt. Aber jedes Jahr wächst sie um $${p} %$ der **aktuellen** Einwohnerzahl.`,
+        )
+      : tx(
+          `Ah, I see what happened! You added $${p} %$ of the **starting** amount every year. But the interest earns interest too: each year it's $${p} %$ of the **new** balance.`,
+          `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ vom **Startbetrag** draufgerechnet. Aber die Zinsen werden mitverzinst: Jedes Jahr kommen $${p} %$ vom **neuen** Kontostand dazu.`,
+        );
   return {
     instruction: WORD_PROBLEM,
     text: say((f) => story.text(f.big(String(K)), p, n, f)),
-    answer: story.whole ? { kind: "number", value, unit: unitText(story.unit), tolerance: 1.01 / Math.max(1, value) } : amount(value, "€"),
+    answer,
     hint: say(({ t, n: N }) =>
       t(
         `Growth factor $q = ${N(1 + (story.up ? p : -p) / 100)}$, once per year: multiply by $q^${n}$.`,
@@ -1031,6 +1451,24 @@ function compoundTask(rng: Rng): Exercise | null {
       ),
     ),
     solution: compoundFrames(K, p, story.up, n, story.unit, story.whole),
+    mistakes: mistakesFor(answer, [
+      [
+        K * (1 + ((story.up ? p : -p) * n) / 100),
+        story.up && !story.whole ? tx("Interest on interest forgotten", "Zinseszins vergessen") : tx("Same amount every year", "Jedes Jahr gleich viel"),
+        linear,
+      ],
+      [
+        K * q * n,
+        tx(`Times ${n} instead of to the power ${n}`, `Mal ${n} statt hoch ${n}`),
+        say(({ t, n: N }) =>
+          t(
+            `Close idea! But multiplying by $${n}$ isn't the same as multiplying by $${N(q)}$ ${n} times. Use the power $${N(q)}^${n}$.`,
+            `Gute Idee, aber mal $${n}$ ist nicht dasselbe wie ${n}-mal mit $${N(q)}$ malnehmen. Nimm die Potenz $${N(q)}^${n}$.`,
+          ),
+        ),
+      ],
+      story.up && p < 10 && [K * (1 + p / 10) ** n, FACTOR_OFF, factorOff(p, true)],
+    ]),
   };
 }
 
@@ -1061,6 +1499,14 @@ const POINT_PAIRS: [number, number][] = [
   [30, 36],
   [16, 20],
 ];
+
+const POINTS_NOT_PERCENT = tx("Points, not percent", "Prozentpunkte, nicht Prozent");
+/** Taking the difference of two percentages as the change in percent. */
+const pointsNotPercent = (a: number, what: string) =>
+  tx(
+    `Ooh, the classic trap! ${what} is the rise in **percentage points**. A change in percent compares the rise with the old value $${a} %$.`,
+    `Die klassische Falle! ${what} ist der Anstieg in **Prozentpunkten**. Eine Änderung in Prozent vergleicht den Anstieg mit dem alten Wert $${a} %$.`,
+  );
 
 /** "1 Prozentpunkt", "5 Prozentpunkte". */
 const pointsDe = (v: number | string) => `${v} ${String(v) === "1" ? "Prozentpunkt" : "Prozentpunkte"}`;
@@ -1100,10 +1546,39 @@ function pointsTask(rng: Rng): Exercise | null {
         : say(({ t, n }) => t(`It rose by ${n(rel)} percentage points.`, `Das ist ein Anstieg um ${pointsDe(n(rel))}.`)),
     ];
     const order = rng.shuffle([0, 1, 2, 3]);
+    const shown = order.map((i) => options[i]);
+    const pick = (i: number, title: Text, said: Text): Mistake => ({ when: { kind: "choice", options: shown, correct: order.indexOf(i) }, title, say: said });
     return {
       instruction: tx("Percent or percentage points?", "Prozent oder Prozentpunkte?"),
       text: tx(`${en(intro)} Which statement is correct?`, `${de(intro)} Welche Aussage stimmt?`),
-      answer: { kind: "choice", options: order.map((i) => options[i]), correct: order.indexOf(0) },
+      answer: { kind: "choice", options: shown, correct: order.indexOf(0) },
+      mistakes: [
+        pick(1, POINTS_NOT_PERCENT, pointsNotPercent(a, `$${b} % - ${a} %$`)),
+        pick(
+          2,
+          tx("That's the new value", "Das ist der neue Wert"),
+          tx(
+            `Hmm, $${b} %$ is where it ended up, not how much it rose. Look at the difference between old and new.`,
+            `Hm, $${b} %$ ist der neue Stand, nicht der Anstieg. Schau dir den Unterschied zwischen alt und neu an.`,
+          ),
+        ),
+        rel === b
+          ? pick(
+              3,
+              tx("It went up", "Es ist gestiegen"),
+              tx(`Look again: from $${a} %$ to $${b} %$ is a **rise**, not a drop.`, `Schau noch mal hin: Von $${a} %$ auf $${b} %$ ist ein **Anstieg**, kein Rückgang.`),
+            )
+          : pick(
+              3,
+              tx("Percent, not points", "Prozent, nicht Prozentpunkte"),
+              say(({ t, n }) =>
+                t(
+                  `Nearly! $${n(rel)}$ is the rise **in percent**, compared with the old value. In percentage points it's simply the difference of the two values.`,
+                  `Fast! $${n(rel)}$ ist der Anstieg **in Prozent**, verglichen mit dem alten Wert. In Prozentpunkten ist es einfach die Differenz der beiden Werte.`,
+                ),
+              ),
+            ),
+      ],
       hint: tx(
         "Subtracting two percentages gives percentage points. A change in percent compares with the old value.",
         "Die Differenz zweier Prozentsätze misst man in Prozentpunkten. Eine Änderung in Prozent vergleicht immer mit dem alten Wert.",
@@ -1115,6 +1590,25 @@ function pointsTask(rng: Rng): Exercise | null {
     instruction: WORD_PROBLEM,
     text: tx(`${en(intro)} By how many percent did it rise?`, `${de(intro)} Um wie viel Prozent ist ${story.what} gestiegen?`),
     answer: rateAnswer(rel),
+    mistakes: mistakesFor(rateAnswer(rel), [
+      [diff, POINTS_NOT_PERCENT, pointsNotPercent(a, `$${diff}$`)],
+      [
+        (diff / b) * 100,
+        tx("Compared with the new value", "Mit dem neuen Wert verglichen"),
+        tx(
+          `Nearly! You compared the rise with the **new** value $${b} %$. A change in percent always compares with the **old** value.`,
+          `Fast! Du hast den Anstieg mit dem **neuen** Wert $${b} %$ verglichen. Eine Änderung in Prozent vergleicht immer mit dem **alten** Wert.`,
+        ),
+      ],
+      [
+        (b / a) * 100,
+        tx("New value as a percentage", "Neuer Wert in Prozent"),
+        tx(
+          "Almost! That's the new value as a percentage of the old one. The rise is only the part above $100 %$.",
+          "Fast! Das ist der neue Wert in Prozent vom alten. Der Anstieg ist nur der Teil über $100 %$.",
+        ),
+      ],
+    ]),
     hint: tx(
       `It rose by $${diff}$ percentage points. But in percent, compare the rise with the old value $${a} %$.`,
       `Der Anstieg beträgt $${diff}$ ${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}. In Prozent vergleichst du den Anstieg aber mit dem alten Wert $${a} %$.`,
@@ -1820,6 +2314,7 @@ const percentages: Topic = {
         answer: amount(45, "€"),
         hint: tx("$18 % = 0.18$. Then $250 \\cdot 0.18$.", "$18 % = 0,18$. Dann $250 \\cdot 0,18$."),
         solution: findWFrames(18, 250, "€"),
+        mistakes: mistakesFor(amount(45, "€"), wSlips(18, 250, "€")),
       },
     },
     {
@@ -1847,6 +2342,7 @@ const percentages: Topic = {
           "$p % = \\frac{W}{G} = \\frac{7}{28}$. Dann die Dezimalzahl in Prozent umwandeln.",
         ),
         solution: findPFrames(7, 28),
+        mistakes: mistakesFor(rateAnswer(25), pSlips(7, 28, 25, true)),
       },
     },
     {
@@ -1881,6 +2377,7 @@ const percentages: Topic = {
         answer: amount(408, "€"),
         hint: tx("$15 %$ off leaves $85 %$. Multiply by $0.85$.", "Bei $15 %$ Rabatt bleiben $85 %$. Multipliziere mit $0,85$."),
         solution: changeFrames(480, 15, false, "€"),
+        mistakes: mistakesFor(amount(408, "€"), changeSlips(480, 15, false, "€")),
       },
     },
     {
@@ -1905,6 +2402,7 @@ const percentages: Topic = {
         answer: amount(48, "€"),
         hint: tx("The new price is $125 %$ of the old one: $G \\cdot 1.25 = 60$.", "Der neue Preis ist $125 %$ des alten: $G \\cdot 1,25 = 60$."),
         solution: reverseFrames(60, 25, true, "€"),
+        mistakes: mistakesFor(amount(48, "€"), reverseSlips(60, 25, true)),
       },
     },
     {

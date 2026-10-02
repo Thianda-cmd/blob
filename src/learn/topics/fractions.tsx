@@ -9,7 +9,7 @@ import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import { add, div as divF, frac, mul as mulF, sub, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -303,6 +303,256 @@ function fracAnswer(r: Frac): AnswerSpec {
   return r.d === 1 ? { kind: "number", value: r.n } : { kind: "fraction", n: r.n, d: r.d, mustReduce: true };
 }
 
+// ---------------------------------------------------------------------------
+// Typical mistakes. Each one is simulated from the task's numbers, so the wrong
+// value is exactly what a student with that misconception gets.
+
+/** A misconception: the value it leads to (null when it leads nowhere sensible) and what Blob says. */
+type Slip = { v: Frac | null; title: Text; say: Text } | null | false;
+
+/** A positive fraction, or null (e.g. a zero or negative denominator). */
+const fq = (n: number, d: number): Frac | null => (n > 0 && d > 0 && Number.isInteger(n) && Number.isInteger(d) ? frac(n, d) : null);
+const pos = (f: Frac | null): Frac | null => (f && f.n > 0 ? f : null);
+
+/**
+ * The slips as Mistakes for an answer made by fracAnswer(right) (or a whole-number answer
+ * with `unit`). Only kept when the value differs from the right one and from earlier slips.
+ */
+function slipsFor(right: Frac, slips: Slip[], unit?: Text): Mistake[] {
+  const out: Mistake[] = [];
+  const seen = [right.n / right.d];
+  for (const s of slips) {
+    if (!s || !s.v) continue;
+    const v = s.v.n / s.v.d;
+    if (seen.some((x) => Math.abs(x - v) < 1e-9)) continue;
+    // A number answer is typed as a number: only values with at most two decimals.
+    if (right.d === 1 && Math.abs(v * 100 - Math.round(v * 100)) > 1e-9) continue;
+    seen.push(v);
+    const when: AnswerSpec = right.d === 1 ? { kind: "number", value: v, ...(unit ? { unit } : {}) } : { kind: "fraction", n: s.v.n, d: s.v.d };
+    out.push({ when, title: s.title, say: s.say });
+  }
+  return out;
+}
+
+const NO_FLIP = tx("Forgot to flip", "Kehrwert vergessen");
+const NO_FLIP_SAY = tx(
+  "Ah, you multiplied straight away! When dividing, flip the **second** fraction first (the reciprocal), then multiply.",
+  "Ah, du hast direkt multipliziert! Beim Dividieren drehst du zuerst den **zweiten** Bruch um (Kehrwert) und multiplizierst dann.",
+);
+
+/** Top plus top over bottom plus bottom (or minus): the number one fraction mistake. */
+function numDenSlip(P: Frac, Q: Frac, sign: 1 | -1, where?: [string, string]): Slip {
+  const plus = sign > 0;
+  const [en, de] = where ?? ["", ""];
+  const who = en ? `${en}, you` : "You";
+  return {
+    v: fq(P.n + sign * Q.n, P.d + sign * Q.d),
+    title: plus ? tx("Denominators added", "Nenner addiert") : tx("Denominators subtracted", "Nenner subtrahiert"),
+    say: plus
+      ? tx(
+          `Ooh, classic trap! ${who} added the numerators **and** the denominators. Make the denominators the same first, then add only the numerators.`,
+          `Die klassische Falle! Du hast ${de}Zähler **und** Nenner addiert. Mach erst die Nenner gleich und addiere dann nur die Zähler.`,
+        )
+      : tx(
+          `Ooh, classic trap! ${who} subtracted the numerators **and** the denominators. Make the denominators the same first, then subtract only the numerators.`,
+          `Die klassische Falle! Du hast ${de}Zähler **und** Nenner subtrahiert. Mach erst die Nenner gleich und subtrahiere dann nur die Zähler.`,
+        ),
+  };
+}
+
+/** Adding or subtracting fractions with different denominators. */
+function addSubSlips(P: Frac, Q: Frac, sign: 1 | -1): Slip[] {
+  const L = lcm(P.d, Q.d);
+  const notExpanded = (den: number): Slip => ({
+    v: fq(P.n + sign * Q.n, den),
+    title: tx("Numerators not expanded", "Zähler nicht erweitert"),
+    say: tx(
+      `Nearly! $${den}$ works as a common denominator, but you only changed the denominators. Whatever you multiply a denominator by, multiply its numerator by too.`,
+      `Fast! $${den}$ passt als gemeinsamer Nenner, aber du hast nur die Nenner verändert. Womit du einen Nenner multiplizierst, damit musst du auch seinen Zähler multiplizieren.`,
+    ),
+  });
+  return [
+    numDenSlip(P, Q, sign),
+    notExpanded(L),
+    notExpanded(P.d * Q.d),
+    {
+      v: fq(P.n * Q.d + sign * Q.n * P.d, L),
+      title: tx("Expanded by the wrong number", "Mit der falschen Zahl erweitert"),
+      say: tx(
+        `I think I know what you did: you multiplied each numerator by the **other** denominator, but wrote $${L}$ underneath. Expand each fraction by the number that turns **its own** denominator into $${L}$.`,
+        `Ich glaub, ich weiß, was du gemacht hast: Du hast jeden Zähler mit dem **anderen** Nenner multipliziert, aber $${L}$ druntergeschrieben. Erweitere jeden Bruch mit der Zahl, die **seinen eigenen** Nenner zu $${L}$ macht.`,
+      ),
+    },
+  ];
+}
+
+/** Simplifying n/d, whose greatest common factor is k. */
+function simplifySlips(n: number, d: number, k: number): Slip[] {
+  // Crossing out a digit that appears on top and bottom (12/24 → 1/4).
+  const a = String(n);
+  const b = String(d);
+  const digit = [...a].find((c) => b.includes(c));
+  const cut = (s: string, c: string) => s.replace(c, "");
+  const crossed = digit && a.length > 1 && b.length > 1 ? fq(Number(cut(a, digit)), Number(cut(b, digit))) : null;
+  return [
+    {
+      v: fq(n / k, d),
+      title: tx("Only the numerator divided", "Nur den Zähler gekürzt"),
+      say: tx(
+        `Ah, I see what happened! You divided the numerator, but the denominator stayed $${d}$. Simplifying means dividing top **and** bottom by the same number.`,
+        `Ah, ich seh, was passiert ist! Du hast den Zähler geteilt, aber der Nenner ist $${d}$ geblieben. Kürzen heißt: Zähler **und** Nenner durch dieselbe Zahl teilen.`,
+      ),
+    },
+    {
+      v: fq(n, d / k),
+      title: tx("Only the denominator divided", "Nur den Nenner gekürzt"),
+      say: tx(
+        `Ah, I see what happened! You divided the denominator, but the numerator stayed $${n}$. Simplifying means dividing top **and** bottom by the same number.`,
+        `Ah, ich seh, was passiert ist! Du hast den Nenner geteilt, aber der Zähler ist $${n}$ geblieben. Kürzen heißt: Zähler **und** Nenner durch dieselbe Zahl teilen.`,
+      ),
+    },
+    {
+      v: crossed,
+      title: tx("Digits crossed out", "Ziffern gestrichen"),
+      say: tx(
+        `Ooh, sneaky! You crossed out the digit $${digit}$ on top and bottom. But you can only cancel **factors**: divide both numbers by the same number.`,
+        `Ooh, verlockend! Du hast oben und unten die Ziffer $${digit}$ gestrichen. Kürzen darfst du aber nur **Faktoren**: Teile beide Zahlen durch dieselbe Zahl.`,
+      ),
+    },
+  ];
+}
+
+/** n/d of q: divide by the denominator, multiply by the numerator. */
+function ofSlips(n: number, d: number, q: number, story: boolean): Slip[] {
+  return [
+    n > 1 && {
+      v: fq(q / d, 1),
+      title: tx("Numerator forgotten", "Zähler vergessen"),
+      say: tx(
+        `Halfway there! $${q} : ${d}$ is $\\frac{1}{${d}}$ of $${q}$. But you need $${n}$ of those parts, so multiply by the numerator too.`,
+        `Halb geschafft! $${q} : ${d}$ ist $\\frac{1}{${d}}$ von $${q}$. Du brauchst aber $${n}$ solche Teile, also noch mit dem Zähler multiplizieren.`,
+      ),
+    },
+    n > 1 && {
+      v: fq(q * n, 1),
+      title: tx("Denominator forgotten", "Nenner vergessen"),
+      say: tx(
+        `Ah, you multiplied $${q}$ by $${n}$, but forgot to divide by $${d}$. $${fr(n, d)}$ of something is **less** than the whole thing.`,
+        `Ah, du hast $${q}$ mit $${n}$ multipliziert, aber vergessen, durch $${d}$ zu teilen. $${fr(n, d)}$ von etwas ist **weniger** als das Ganze.`,
+      ),
+    },
+    n > 1
+      ? {
+          v: fq(q * d, n),
+          title: tx("Numerator and denominator swapped", "Zähler und Nenner vertauscht"),
+          say: tx(
+            `I think I know what you did: you divided by $${n}$ and multiplied by $${d}$. It's the other way round: divide by the **denominator**, multiply by the **numerator**.`,
+            `Ich glaub, ich weiß, was du gemacht hast: Du hast durch $${n}$ geteilt und mit $${d}$ multipliziert. Andersrum: durch den **Nenner** teilen, mit dem **Zähler** multiplizieren.`,
+          ),
+        }
+      : {
+          v: fq(q * d, 1),
+          title: tx("Multiplied instead of divided", "Multipliziert statt geteilt"),
+          say: tx(
+            `Ah, you multiplied by $${d}$! To find $\\frac{1}{${d}}$ of something, you **divide** by $${d}$: the part is smaller than the whole.`,
+            `Ah, du hast mit $${d}$ multipliziert! Für $\\frac{1}{${d}}$ von etwas **teilst** du durch $${d}$: Der Teil ist kleiner als das Ganze.`,
+          ),
+        },
+    story && {
+      v: fq(q - (q / d) * n, 1),
+      title: tx("The other part", "Der andere Teil"),
+      say: tx(
+        `Careful, that's the **rest**, the other part. The question asks for $${fr(n, d)}$ of $${q}$ itself.`,
+        `Vorsicht, das ist der **Rest**, also der andere Teil. Gefragt sind die $${fr(n, d)}$ von $${q}$ selbst.`,
+      ),
+    },
+  ];
+}
+
+/** Multiplying two fractions (or a whole number and a fraction). */
+function mulSlips(A: Frac, B: Frac): Slip[] {
+  const whole = A.d === 1 ? A : B.d === 1 ? B : null;
+  const flip: Slip = {
+    v: fq(A.n * B.d, A.d * B.n),
+    title: tx("Flipped like in dividing", "Umgedreht wie beim Teilen"),
+    say: tx(
+      "Ah, you flipped a fraction! That's only for **dividing**. Multiplying is simply top times top, bottom times bottom.",
+      "Ah, du hast einen Bruch umgedreht! Das macht man nur beim **Dividieren**. Multiplizieren heißt einfach: Zähler mal Zähler, Nenner mal Nenner.",
+    ),
+  };
+  if (whole) {
+    const k = whole.n;
+    const f = whole === A ? B : A;
+    return [
+      {
+        v: fq(k * f.n, k * f.d),
+        title: tx("Numerator and denominator multiplied", "Zähler und Nenner multipliziert"),
+        say: tx(
+          `Ah, I see what happened! You multiplied the numerator **and** the denominator by $${k}$. That's expanding, so the value doesn't change. A whole number only multiplies the numerator: $${k} = \\frac{${k}}{1}$.`,
+          `Ah, ich seh, was passiert ist! Du hast Zähler **und** Nenner mit $${k}$ multipliziert. Das ist Erweitern, der Wert bleibt gleich. Eine ganze Zahl multipliziert nur den Zähler: $${k} = \\frac{${k}}{1}$.`,
+        ),
+      },
+      {
+        v: fq(f.n, k * f.d),
+        title: tx("Denominator multiplied", "Nenner multipliziert"),
+        say: tx(
+          `Close, but you multiplied the **denominator** by $${k}$, so the pieces got smaller. Write $${k}$ as $\\frac{${k}}{1}$: it multiplies the numerator.`,
+          `Knapp daneben: Du hast den **Nenner** mit $${k}$ multipliziert, dadurch werden die Stücke kleiner. Schreib $${k}$ als $\\frac{${k}}{1}$: Dann wird der Zähler multipliziert.`,
+        ),
+      },
+      flip,
+    ];
+  }
+  const L = lcm(A.d, B.d);
+  return [
+    {
+      v: fq(((A.n * L) / A.d) * ((B.n * L) / B.d), L),
+      title: A.d === B.d ? tx("Denominator kept", "Nenner beibehalten") : tx("Common denominator kept", "Hauptnenner behalten"),
+      say:
+        A.d === B.d
+          ? tx(
+              "Ah, I see what happened! You kept the denominator, like when adding. When multiplying, the denominators get multiplied too: top times top, bottom times bottom.",
+              "Ah, ich seh, was passiert ist! Du hast den Nenner behalten wie beim Addieren. Beim Multiplizieren werden auch die Nenner multipliziert: Zähler mal Zähler, Nenner mal Nenner.",
+            )
+          : tx(
+              "I think I know what you did: you made a common denominator and kept it, like when adding. For multiplying you don't need one: top times top, bottom times bottom.",
+              "Ich glaub, ich weiß, was du gemacht hast: Du hast einen Hauptnenner gebildet und ihn behalten wie beim Addieren. Beim Multiplizieren brauchst du keinen: Zähler mal Zähler, Nenner mal Nenner.",
+            ),
+    },
+    flip,
+  ];
+}
+
+/** Dividing A by B (B may be a whole number). */
+function divSlips(A: Frac, B: Frac): Slip[] {
+  const k = B.d === 1 ? B.n : 0;
+  return [
+    {
+      v: fq(A.n * B.n, A.d * B.d),
+      title: NO_FLIP,
+      say: k
+        ? tx(
+            `Ah, you multiplied by $${k}$! Dividing by $${k}$ means multiplying by its reciprocal $\\frac{1}{${k}}$.`,
+            `Ah, du hast mit $${k}$ multipliziert! Durch $${k}$ teilen heißt: mit dem Kehrwert $\\frac{1}{${k}}$ multiplizieren.`,
+          )
+        : NO_FLIP_SAY,
+    },
+    {
+      v: fq(A.d * B.n, A.n * B.d),
+      title: tx("Wrong fraction flipped", "Falschen Bruch umgedreht"),
+      say: tx(
+        "So close! You flipped the **first** fraction. Only the one you divide by gets turned upside down.",
+        "Ganz knapp! Du hast den **ersten** Bruch umgedreht. Umgedreht wird nur der, durch den du teilst.",
+      ),
+    },
+    {
+      v: fq(A.d * B.d, A.n * B.n),
+      title: tx("Both flipped", "Beide umgedreht"),
+      say: tx("Nearly! You flipped **both** fractions. Only the second one becomes its reciprocal.", "Fast! Du hast **beide** Brüche umgedreht. Nur der zweite wird zum Kehrwert."),
+    },
+  ];
+}
+
 const smallestPrime = (k: number) => [2, 3, 5, 7].find((p) => k % p === 0) ?? k;
 const picture = (n: number, d: number, shape: "bar" | "circle"): Visual => ({
   component: FractionPicture as unknown as ComponentType<Record<string, unknown>>,
@@ -341,6 +591,7 @@ function simplifyTask(rng: Rng): Exercise | null {
       `Durch welche Zahl sind $${n}$ und $${d}$ beide teilbar? Du kannst auch in kleinen Schritten kürzen, z. B. zuerst durch $${smallestPrime(k)}$.`,
     ),
     solution: b.frames,
+    mistakes: slipsFor({ n: n0, d: d0 }, simplifySlips(n, d, k)),
   };
 }
 
@@ -380,6 +631,40 @@ function gapTask(rng: Rng): Exercise | null {
   );
   const deHow = expand ? "Mit welcher Zahl musst du" : "Durch welche Zahl musst du";
   const deVerb = expand ? "multiplizieren" : "teilen";
+  const [shown, gap] = gapTop ? [tx("denominator", "Nenner"), tx("numerator", "Zähler")] : [tx("numerator", "Zähler"), tx("denominator", "Nenner")];
+  const en = (t: Text) => resolveText(t, "en");
+  const de = (t: Text) => resolveText(t, "de");
+  const step = Math.abs(knownR - knownL);
+  const slips: Slip[] = [
+    // Additive thinking: the same number added (or taken away) on top and bottom.
+    {
+      v: fq(from + knownR - knownL, 1),
+      title: expand ? tx("Added instead of multiplied", "Addiert statt multipliziert") : tx("Subtracted instead of divided", "Subtrahiert statt geteilt"),
+      say: expand
+        ? tx(
+            `Ah, I see what happened! From $${knownL}$ to $${knownR}$ you added $${step}$, and then added the same to the ${en(gap)}. But expanding means **multiplying** top and bottom by the same number.`,
+            `Ah, ich seh, was passiert ist! Von $${knownL}$ zu $${knownR}$ hast du $${step}$ addiert und beim ${de(gap)} dasselbe draufgerechnet. Erweitern heißt aber: Zähler und Nenner mit derselben Zahl **multiplizieren**.`,
+          )
+        : tx(
+            `Ah, I see what happened! From $${knownL}$ to $${knownR}$ you subtracted $${step}$, and then subtracted the same from the ${en(gap)}. But simplifying means **dividing** top and bottom by the same number.`,
+            `Ah, ich seh, was passiert ist! Von $${knownL}$ zu $${knownR}$ hast du $${step}$ abgezogen und beim ${de(gap)} dasselbe abgezogen. Kürzen heißt aber: Zähler und Nenner durch dieselbe Zahl **teilen**.`,
+          ),
+    },
+    // The factor itself as the answer.
+    {
+      v: fq(k, 1),
+      title: expand ? tx("That's the factor", "Das ist der Faktor") : tx("That's the divisor", "Das ist die Kürzungszahl"),
+      say: expand
+        ? tx(
+            `Nearly! $${k}$ is the right factor: the ${en(shown)} got multiplied by it. Now multiply the ${en(gap)} by $${k}$ too.`,
+            `Fast! $${k}$ ist der richtige Faktor: Der ${de(shown)} wurde damit multipliziert. Jetzt nimm auch den ${de(gap)} mal $${k}$.`,
+          )
+        : tx(
+            `Nearly! $${k}$ is the right number: the ${en(shown)} got divided by it. Now divide the ${en(gap)} by $${k}$ too.`,
+            `Fast! $${k}$ ist die richtige Zahl: Der ${de(shown)} wurde durch sie geteilt. Jetzt teile auch den ${de(gap)} durch $${k}$.`,
+          ),
+    },
+  ];
   return {
     instruction: tx("Fill in the gap", "Ergänze die fehlende Zahl"),
     math: `${fr(ln, ld)} = \\frac{${gapTop ? "\\box{?}" : rn}}{${gapTop ? rd : "\\box{?}"}}`,
@@ -394,6 +679,7 @@ function gapTask(rng: Rng): Exercise | null {
           `Vergleiche die Zähler. ${deHow} $${ln}$ ${deVerb}, um $${rn}$ zu bekommen?`,
         ),
     solution: b.frames,
+    mistakes: slipsFor({ n: to, d: 1 }, slips),
   };
 }
 
@@ -421,6 +707,24 @@ function sameDenTask(rng: Rng): Exercise | null {
       `Gleicher Nenner: ${sign > 0 ? "Addiere" : "Subtrahiere"} die Zähler, der Nenner bleibt. Kürze dann, wenn es geht.`,
     ),
     solution: b.frames,
+    mistakes: slipsFor(r, [
+      sign > 0 && {
+        v: fq(x + y, 2 * d),
+        title: tx("Denominators added", "Nenner addiert"),
+        say: tx(
+          `Ooh, classic trap! The denominators are already the same, so they don't get added: the denominator just stays $${d}$. Only the numerators are added.`,
+          `Die klassische Falle! Die Nenner sind schon gleich, die werden nicht addiert: Der Nenner bleibt einfach $${d}$. Nur die Zähler werden addiert.`,
+        ),
+      },
+      {
+        v: fq(x + sign * y, d * d),
+        title: tx("Denominators multiplied", "Nenner multipliziert"),
+        say: tx(
+          `Ah, I see what happened! You multiplied the denominators, like when multiplying fractions. Here they're already the same, so the denominator just stays $${d}$.`,
+          `Ah, ich seh, was passiert ist! Du hast die Nenner multipliziert wie beim Multiplizieren von Brüchen. Hier sind sie schon gleich, der Nenner bleibt also einfach $${d}$.`,
+        ),
+      },
+    ]),
   };
 }
 
@@ -501,6 +805,7 @@ function ofTask(rng: Rng): Exercise | null {
       `Berechne zuerst $\\frac{1}{${d}}$ von $${q}$: Teile durch $${d}$. Multipliziere dann mit $${n}$.`,
     ),
     solution: b.frames,
+    mistakes: slipsFor({ n: (q / d) * n, d: 1 }, ofSlips(n, d, q, asText), asText ? story.unit : undefined),
   };
 }
 
@@ -533,6 +838,24 @@ function pictureTask(rng: Rng): Exercise | null {
     ),
     solution: b.frames,
     visual: picture(n, d, shape),
+    mistakes: slipsFor(r, [
+      {
+        v: fq(d - n, d),
+        title: tx("Counted the white parts", "Die weißen Teile gezählt"),
+        say: tx(
+          "Ah, I see what happened! You counted the parts that are **not** shaded. The numerator counts the coloured ones.",
+          "Ah, ich seh, was passiert ist! Du hast die **nicht** gefärbten Teile gezählt. Der Zähler zählt die gefärbten.",
+        ),
+      },
+      {
+        v: fq(n, d - n),
+        title: tx("Shaded compared with white", "Gefärbt mit weiß verglichen"),
+        say: tx(
+          "I think I know what you did: you put the shaded parts over the white ones. The denominator counts **all** the parts, shaded and white together.",
+          "Ich glaub, ich weiß, was du gemacht hast: Du hast die gefärbten Teile oben und die weißen unten hingeschrieben. Der Nenner zählt aber **alle** Teile, gefärbte und weiße zusammen.",
+        ),
+      },
+    ]),
   };
 }
 
@@ -562,6 +885,7 @@ function addTask(rng: Rng): Exercise | null {
       `Bestimme zuerst den Hauptnenner von $${P.d}$ und $${Q.d}$. Erweitere dann beide Brüche.`,
     ),
     solution: b.frames,
+    mistakes: slipsFor(r, addSubSlips(P, Q, sign)),
   };
 }
 
@@ -613,6 +937,7 @@ function mulTask(rng: Rng): Exercise | null {
           )
         : TOP_TIMES_TOP,
     solution: b.frames,
+    mistakes: slipsFor(r, mulSlips(A, B)),
   };
 }
 
@@ -648,6 +973,7 @@ function divTask(rng: Rng): Exercise | null {
           )
         : tx(`Multiply by the reciprocal: $${frf(B)}$ becomes $${fr(B.d, B.n)}$.`, `Multipliziere mit dem Kehrwert: Aus $${frf(B)}$ wird $${fr(B.d, B.n)}$.`),
     solution: b.frames,
+    mistakes: slipsFor(r, divSlips(A, B)),
   };
 }
 
@@ -713,6 +1039,7 @@ function storyAddTask(rng: Rng): Exercise | null {
       `${sign > 0 ? "Addiere" : "Subtrahiere"} die beiden Brüche. Dafür brauchst du zuerst einen gemeinsamen Nenner.`,
     ),
     solution: b.frames,
+    mistakes: slipsFor(r, addSubSlips(P, Q, sign)),
   };
 }
 
@@ -766,7 +1093,73 @@ function mixedTask(rng: Rng): Exercise | null {
       "Wandle gemischte Zahlen zuerst in unechte Brüche um: ganze Zahl mal Nenner, plus Zähler. Das Ergebnis darf ein unechter Bruch sein.",
     ),
     solution: b.frames,
+    mistakes: slipsFor(r, mixedSlips(M1, M2, op)),
   };
+}
+
+/** Mixed numbers: converting them wrongly, or working with wholes and fractions separately. */
+function mixedSlips(M1: MixedN, M2: MixedN, op: "+" | "-" | "*" | ":"): Slip[] {
+  const calc = (x: Frac, y: Frac) => (op === "+" ? add(x, y) : op === "-" ? sub(x, y) : op === "*" ? mulF(x, y) : divF(x, y));
+  const value = (m: MixedN) => frac(m.w * m.d + m.n, m.d);
+  const part = (m: MixedN) => frac(m.n, m.d);
+  const shown = M1.w ? M1 : M2;
+  const out: Slip[] = [
+    // 2 3/4 written as 5/4: the whole number added to the numerator.
+    {
+      v: pos(calc(frac(M1.w + M1.n, M1.d), frac(M2.w + M2.n, M2.d))),
+      title: tx("Mixed number converted wrongly", "Gemischte Zahl falsch umgewandelt"),
+      say: tx(
+        `I think I know what you did: you turned $${mTx(shown)}$ into $\\frac{${shown.w + shown.n}}{${shown.d}}$. But each whole is $${shown.d}$ pieces: whole number **times** denominator, plus numerator.`,
+        `Ich glaub, ich weiß, was du gemacht hast: Du hast aus $${mTx(shown)}$ den Bruch $\\frac{${shown.w + shown.n}}{${shown.d}}$ gemacht. Aber jedes Ganze sind $${shown.d}$ Stücke: ganze Zahl **mal** Nenner, plus Zähler.`,
+      ),
+    },
+  ];
+  if (op === "+") {
+    const parts = numDenSlip(part(M1), part(M2), 1, ["For the fraction parts", "bei den Brüchen "]);
+    if (parts && parts.v) out.push({ ...parts, v: add(frac(M1.w + M2.w), parts.v) });
+  } else if (op === "-" && M1.n * M2.d < M2.n * M1.d) {
+    // Smaller fraction minus bigger fraction, "fixed" by swapping them.
+    out.push({
+      v: pos(add(frac(M1.w - M2.w), sub(part(M2), part(M1)))),
+      title: tx("Fractions subtracted the wrong way", "Brüche andersrum abgezogen"),
+      say: tx(
+        `Ah, I see what happened! $${fr(M1.n, M1.d)}$ is smaller than $${fr(M2.n, M2.d)}$, so you took the small one from the big one. That turns the subtraction around: change both into improper fractions first.`,
+        `Ah, ich seh, was passiert ist! $${fr(M1.n, M1.d)}$ ist kleiner als $${fr(M2.n, M2.d)}$, also hast du den kleinen vom großen abgezogen. Damit drehst du die Rechnung um: Wandle zuerst beide in unechte Brüche um.`,
+      ),
+    });
+  } else if (op === "*") {
+    out.push(
+      M2.w
+        ? {
+            v: add(frac(M1.w * M2.w), mulF(part(M1), part(M2))),
+            title: tx("Wholes and fractions separately", "Ganze und Brüche einzeln"),
+            say: tx(
+              "Ooh, tempting! You multiplied the whole numbers and the fractions separately. That works for adding, but not for multiplying: turn the mixed numbers into improper fractions first.",
+              "Ooh, verlockend! Du hast die Ganzen und die Brüche einzeln multipliziert. Beim Addieren klappt das, beim Multiplizieren nicht: Wandle die gemischten Zahlen zuerst in unechte Brüche um.",
+            ),
+          }
+        : {
+            v: add(frac(M1.w), mulF(part(M1), part(M2))),
+            title: tx("Only the fraction part multiplied", "Nur den Bruchteil multipliziert"),
+            say: tx(
+              `Ah, you multiplied only the fraction part of $${mTx(M1)}$ and left the $${M1.w}$ as it was. The wholes have to be multiplied too: turn it into an improper fraction first.`,
+              `Ah, du hast nur den Bruchteil von $${mTx(M1)}$ multipliziert und die $${M1.w}$ stehen lassen. Die Ganzen müssen mitmultipliziert werden: Wandle zuerst in einen unechten Bruch um.`,
+            ),
+          },
+    );
+  } else if (op === ":") {
+    out.push({ v: mulF(value(M1), value(M2)), title: NO_FLIP, say: NO_FLIP_SAY });
+    if (!M2.w)
+      out.push({
+        v: add(frac(M1.w), divF(part(M1), part(M2))),
+        title: tx("Only the fraction part divided", "Nur den Bruchteil geteilt"),
+        say: tx(
+          `Ah, you divided only the fraction part of $${mTx(M1)}$ and left the $${M1.w}$ as it was. The wholes have to be divided too: turn it into an improper fraction first.`,
+          `Ah, du hast nur den Bruchteil von $${mTx(M1)}$ geteilt und die $${M1.w}$ stehen lassen. Die Ganzen müssen mitgeteilt werden: Wandle zuerst in einen unechten Bruch um.`,
+        ),
+      });
+  }
+  return out;
 }
 
 function orderTask(rng: Rng): Exercise | null {
@@ -804,6 +1197,18 @@ function orderTask(rng: Rng): Exercise | null {
     answer: fracAnswer(r),
     hint: tx(`Punkt vor Strich: work out $${frf(Y)} ${isym} ${frf(Z)}$ first.`, `Punkt vor Strich: Rechne zuerst $${frf(Y)} ${isym} ${frf(Z)}$ aus.`),
     solution: b.frames,
+    mistakes: slipsFor(r, [
+      {
+        v: pos((times ? mulF : divF)(sign > 0 ? add(X, Y) : sub(X, Y), Z)),
+        title: tx("Left to right", "Von links nach rechts gerechnet"),
+        say: tx(
+          `Ah, you worked from left to right! But multiplying and dividing come first (Punkt vor Strich): start with $${frf(Y)} ${isym} ${frf(Z)}$.`,
+          `Ah, du hast von links nach rechts gerechnet! Aber Punkt vor Strich: Fang mit $${frf(Y)} ${isym} ${frf(Z)}$ an.`,
+        ),
+      },
+      !times && { v: pos(sign > 0 ? add(X, mulF(Y, Z)) : sub(X, mulF(Y, Z))), title: NO_FLIP, say: NO_FLIP_SAY },
+      numDenSlip(X, P, sign, ["In the last step", "im letzten Schritt "]),
+    ]),
   };
 }
 
@@ -857,7 +1262,28 @@ function bracketTask(rng: Rng): Exercise | null {
     answer: fracAnswer(r),
     hint: tx("Work out the bracket first. Then multiply or divide.", "Rechne zuerst die Klammer aus. Dann multiplizieren oder dividieren."),
     solution: b.frames,
+    mistakes: slipsFor(r, bracketSlips(P, Q, Z, sign, times)),
   };
+}
+
+/** (P ± Q) · Z or (P ± Q) : Z. */
+function bracketSlips(P: Frac, Q: Frac, Z: Frac, sign: 1 | -1, times: boolean): Slip[] {
+  const inner = (x: Frac, y: Frac) => (sign > 0 ? add(x, y) : sub(x, y));
+  const outer = times ? mulF : divF;
+  const S = inner(P, Q);
+  const wrongInside = numDenSlip(P, Q, sign, ["Inside the bracket", "in der Klammer "]);
+  return [
+    {
+      v: pos(inner(P, outer(Q, Z))),
+      title: tx("Bracket skipped", "Klammer übergangen"),
+      say: tx(
+        `I think I know what you did: you ${times ? "multiplied" : "divided"} first. But the bracket comes before everything: work out $${frf(P)} ${sign > 0 ? "+" : "-"} ${frf(Q)}$ first.`,
+        `Ich glaub, ich weiß, was du gemacht hast: Du hast zuerst ${times ? "multipliziert" : "dividiert"}. Aber die Klammer kommt vor allem anderen: Rechne zuerst $${frf(P)} ${sign > 0 ? "+" : "-"} ${frf(Q)}$ aus.`,
+      ),
+    },
+    wrongInside && wrongInside.v ? { ...wrongInside, v: outer(wrongInside.v, Z) } : null,
+    !times && { v: mulF(S, Z), title: NO_FLIP, say: NO_FLIP_SAY },
+  ];
 }
 
 function doubleTask(rng: Rng): Exercise | null {
@@ -899,6 +1325,24 @@ function doubleTask(rng: Rng): Exercise | null {
       "Der lange Bruchstrich heißt geteilt: oberer Bruch $:$ unterer Bruch. Dann mit dem Kehrwert multiplizieren.",
     ),
     solution: b.frames,
+    mistakes: slipsFor(r, [
+      {
+        v: mulF(A, B),
+        title: NO_FLIP,
+        say: tx(
+          "Ah, you multiplied the two fractions! The long bar means **divide**: top fraction $:$ bottom fraction, so multiply by the reciprocal of the bottom one.",
+          "Ah, du hast die beiden Brüche multipliziert! Der lange Bruchstrich heißt **geteilt**: oberer Bruch $:$ unterer Bruch, also mit dem Kehrwert des unteren multiplizieren.",
+        ),
+      },
+      {
+        v: divF(B, A),
+        title: tx("Top and bottom swapped", "Oben und unten vertauscht"),
+        say: tx(
+          "So close! You divided the bottom fraction by the top one. The long bar means **top : bottom**, so it's the bottom fraction that gets flipped.",
+          "Ganz knapp! Du hast den unteren Bruch durch den oberen geteilt. Der lange Bruchstrich heißt **oben : unten**, umgedreht wird also der untere Bruch.",
+        ),
+      },
+    ]),
   };
 }
 
@@ -943,7 +1387,24 @@ function leftoverTask(rng: Rng): Exercise | null {
     answer: fracAnswer(r),
     hint: tx("Add the two parts. The rest is $1$ minus that sum.", "Addiere die beiden Teile. Der Rest ist $1$ minus diese Summe."),
     solution: b.frames,
+    mistakes: slipsFor(r, leftoverSlips(A, B)),
   };
+}
+
+/** What's left of a whole after two parts (1 − A − B). */
+function leftoverSlips(A: Frac, B: Frac): Slip[] {
+  const wrongSum = numDenSlip(A, B, 1, ["For the two parts", "bei den beiden Teilen "]);
+  return [
+    {
+      v: add(A, B),
+      title: tx("That's the part that's gone", "Das ist der Teil, der weg ist"),
+      say: tx(
+        "Nearly! That's how much is **gone**. The question asks what's **left**: take it away from the whole, which is $1$.",
+        "Fast! Das ist der Teil, der **weg** ist. Gefragt ist, was **übrig** bleibt: Zieh das vom Ganzen ab, also von $1$.",
+      ),
+    },
+    wrongSum && wrongSum.v ? { ...wrongSum, v: pos(sub(frac(1), wrongSum.v)) } : null,
+  ];
 }
 
 const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => Text; first: Text; second: Text }[] = [
@@ -1008,6 +1469,28 @@ function moneyLeftTask(rng: Rng): Exercise | null {
       "Rechne zuerst jeden Teil in Euro aus: durch den Nenner teilen, mit dem Zähler multiplizieren. Zieh dann beide Teile vom Gesamtbetrag ab.",
     ),
     solution: b.frames,
+    mistakes: slipsFor(
+      { n: left, d: 1 },
+      [
+        {
+          v: fq(sa + sb, 1),
+          title: tx("That's both parts together", "Das sind beide Teile zusammen"),
+          say: tx(
+            `Nearly! That's what the two parts add up to. The question asks what's **left** of the $${q}$ €.`,
+            `Fast! So viel machen die beiden Teile zusammen aus. Gefragt ist, was von den $${q}$\u00a0€ **übrig** bleibt.`,
+          ),
+        },
+        {
+          v: fq((q - sa) * (B.d - B.n), B.d),
+          title: tx("Second part of the rest", "Zweiter Teil vom Rest"),
+          say: tx(
+            `I think I know what you did: you took $${frf(B)}$ of what was left after the first part. But both fractions are of the **whole** $${q}$ €.`,
+            `Ich glaub, ich weiß, was du gemacht hast: Du hast $${frf(B)}$ vom Rest nach dem ersten Teil genommen. Aber beide Brüche beziehen sich auf die **ganzen** $${q}$\u00a0€.`,
+          ),
+        },
+      ],
+      "€",
+    ),
   };
 }
 
@@ -1816,6 +2299,7 @@ const fractions: Topic = {
         answer: { kind: "fraction", n: 3, d: 4, mustReduce: true },
         hint: tx("Both numbers are in the $6$ times table.", "Beide Zahlen kommen in der Sechserreihe vor."),
         solution: checkSimplify.frames,
+        mistakes: slipsFor({ n: 3, d: 4 }, simplifySlips(18, 24, 6)),
       },
     },
     {
@@ -1847,6 +2331,7 @@ const fractions: Topic = {
         answer: { kind: "fraction", n: 11, d: 24, mustReduce: true },
         hint: tx("Multiples of $8$: $8, 16, 24$. And $6$ goes into $24$.", "Vielfache von $8$: $8, 16, 24$. Und $24$ ist auch durch $6$ teilbar."),
         solution: checkSub.frames,
+        mistakes: slipsFor({ n: 11, d: 24 }, addSubSlips({ n: 5, d: 6 }, { n: 3, d: 8 }, -1)),
       },
     },
     {
@@ -1881,6 +2366,7 @@ const fractions: Topic = {
           "$\\frac{3}{4} : \\frac{9}{10} = \\frac{3}{4} \\cdot \\frac{10}{9}$. Jetzt über Kreuz kürzen.",
         ),
         solution: checkDiv.frames,
+        mistakes: slipsFor({ n: 5, d: 6 }, divSlips({ n: 3, d: 4 }, { n: 9, d: 10 })),
       },
     },
     {
@@ -1915,6 +2401,7 @@ const fractions: Topic = {
         answer: { kind: "number", value: 12, unit: STUDENTS },
         hint: tx("$\\frac{1}{7}$ of $28$ is $28 : 7$. Then take $3$ of those.", "$\\frac{1}{7}$ von $28$ ist $28 : 7$. Das Ergebnis nimmst du dann mal $3$."),
         solution: checkOf.frames,
+        mistakes: slipsFor({ n: 12, d: 1 }, ofSlips(3, 7, 28, true), STUDENTS),
       },
     },
   ],
