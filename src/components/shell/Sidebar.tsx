@@ -17,6 +17,7 @@ import {
   Presentation,
   Search,
   Settings,
+  ShieldCheck,
   Star,
   Sun,
   Trash2,
@@ -31,6 +32,7 @@ import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Men
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { useLocale, useMessages } from "@/i18n/client";
+import { adminText } from "@/i18n/messages/admin";
 import { shellText } from "@/i18n/messages/shell";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
@@ -66,12 +68,13 @@ export function PageIcon({ page, className }: { page: Pick<PageMeta, "icon" | "k
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }
 
-export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSearch: () => void }) {
+export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse: () => void; onSearch: () => void; isAdmin?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { pages, subjects, createPage, profile, email, setProfile } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(shellText).sidebar;
+  const adminLabel = useMessages(adminText).nav;
   // Subjects start expanded; we remember the ones you fold.
   const [folded, toggleFolded] = useStoredSet("blob-folded-subjects");
   const [openPages, toggleOpenPage] = useStoredSet("blob-open-pages");
@@ -328,6 +331,11 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
             <Presentation className="size-3.5" /> {t.newDeck}
           </button>
         </div>
+        {isAdmin && (
+          <NavLink href="/admin" icon={<ShieldCheck />} active={pathname === "/admin" || pathname.startsWith("/admin/")}>
+            {adminLabel}
+          </NavLink>
+        )}
         <NavLink href="/trash" icon={<Trash2 />} active={pathname === "/trash"}>
           {t.trash}
         </NavLink>

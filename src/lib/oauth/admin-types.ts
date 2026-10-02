@@ -28,6 +28,10 @@ export type AdminApp = {
   updated_at: string;
 };
 
+/** The tabs of /admin/apps/[id] (`?tab=`). */
+export const APP_TABS = ["overview", "settings", "people", "integration"] as const;
+export type AppTab = (typeof APP_TABS)[number];
+
 export type DayCount = { day: string; count: number };
 
 /** Sign-ins (`token` events) and problems (`error` / `reuse`) over the last days. */

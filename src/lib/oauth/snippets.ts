@@ -48,7 +48,7 @@ export const sdkFullExample = ({ issuer, clientId, redirectUri }: SnippetVars, n
   // document.body.append(blob.button());
 </script>`;
 
-export type ServerNotes = { start: string; exchange: string; refresh: string };
+export type ServerNotes = { exchange: string; refresh: string };
 
 /** Authorization request a server app sends the browser to (with PKCE, which Blob recommends for everyone). */
 export const authorizeExample = ({ issuer, clientId, redirectUri }: SnippetVars) =>

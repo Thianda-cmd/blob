@@ -1,15 +1,17 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
+import { Link2, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
 import { useMessages } from "@/i18n/client";
 import { settingsText } from "@/i18n/messages/settings";
+import type { ConnectedApp } from "@/lib/oauth/connected";
 import { cn } from "@/lib/utils";
 import { AppearanceSection } from "./AppearanceSection";
 import { BlobSection } from "./BlobSection";
+import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { DangerSection } from "./DangerSection";
 import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";
@@ -21,6 +23,7 @@ const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
   { id: "profile", icon: <UserRound /> },
   { id: "appearance", icon: <Palette /> },
   { id: "security", icon: <ShieldCheck /> },
+  { id: "connected", icon: <Link2 /> },
   { id: "blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
   { id: "danger", icon: <TriangleAlert /> },
 ];
@@ -28,7 +31,7 @@ const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
 /** How far below the top of the scroller a section has to reach to count as "current". */
 const SPY_OFFSET = 140;
 
-export function SettingsView() {
+export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] }) {
   const t = useMessages(settingsText);
   const scroller = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string>(SECTIONS[0].id);
@@ -157,6 +160,7 @@ export function SettingsView() {
               <ProfileSection />
               <AppearanceSection />
               <SecuritySection />
+              <ConnectedAppsSection apps={connectedApps} />
               <BlobSection />
               <DangerSection />
             </div>

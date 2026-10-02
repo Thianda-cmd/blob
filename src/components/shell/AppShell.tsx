@@ -13,7 +13,7 @@ type Shell = { sidebarOpen: boolean; toggleSidebar: () => void; openSearch: () =
 const ShellCtx = createContext<Shell>({ sidebarOpen: true, toggleSidebar: () => {}, openSearch: () => {} });
 export const useShell = () => useContext(ShellCtx);
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, isAdmin = false }: { children: ReactNode; isAdmin?: boolean }) {
   const pathname = usePathname();
   const { profile } = useWorkspace();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="hidden shrink-0 overflow-hidden lg:block"
         >
           <div className="h-full w-[256px]">
-            <Sidebar onCollapse={toggleSidebar} onSearch={() => setSearchOpen(true)} />
+            <Sidebar onCollapse={toggleSidebar} onSearch={() => setSearchOpen(true)} isAdmin={isAdmin} />
           </div>
         </motion.aside>
 
@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 exit={{ x: -280 }}
                 transition={{ type: "spring", stiffness: 420, damping: 38 }}
               >
-                <Sidebar onCollapse={() => setMobileNav(false)} onSearch={() => setSearchOpen(true)} />
+                <Sidebar onCollapse={() => setMobileNav(false)} onSearch={() => setSearchOpen(true)} isAdmin={isAdmin} />
               </motion.aside>
             </>
           )}
