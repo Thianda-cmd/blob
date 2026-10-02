@@ -46,7 +46,15 @@ export type AnswerSpec =
   /** A pair like the solution of a 2×2 system. */
   | { kind: "pair"; names: [Text, Text]; values: [number, number] }
   /** Multiple choice. */
-  | { kind: "choice"; options: RichText[]; correct: number };
+  | { kind: "choice"; options: RichText[]; correct: number }
+  /** Select all that apply. */
+  | { kind: "multi"; options: RichText[]; correct: number[] }
+  /** A chemical formula, compared by atoms and charge (order doesn't matter): "Al2O3", "SO4^2-". */
+  | { kind: "formula"; value: string; label?: Text }
+  /** Coefficients that balance an equation ("Fe + O2 -> Fe2O3"); empty boxes count as 1. */
+  | { kind: "balance"; equation: string; coefficients: number[] }
+  /** A word or name; any accepted spelling in either language counts. */
+  | { kind: "word"; accept: Text[]; label?: Text; placeholder?: Text };
 
 export type Feedback = {
   correct: boolean;
@@ -122,7 +130,19 @@ export type SummaryBlock = {
   tone?: "rule" | "tip" | "warning";
 };
 
-export type Area = "algebra" | "equations" | "numbers" | "functions" | "applied";
+export type Area =
+  | "algebra"
+  | "equations"
+  | "numbers"
+  | "functions"
+  | "applied"
+  // Chemistry
+  | "matter"
+  | "atoms"
+  | "bonding"
+  | "reactions"
+  | "chemcalc"
+  | "organic";
 
 export type Topic = TopicMeta & {
   summary: SummaryBlock[];
@@ -136,4 +156,10 @@ export const AREAS: Record<Area, { title: Text; blurb: Text }> = {
   equations: { title: tx("Equations", "Gleichungen"), blurb: tx("Solve for the unknown", "Finde die Unbekannte") },
   functions: { title: tx("Functions", "Funktionen"), blurb: tx("Lines and graphs", "Geraden und Graphen") },
   applied: { title: tx("Word problems", "Textaufgaben"), blurb: tx("Maths in real life", "Mathe im echten Leben") },
+  matter: { title: tx("Substances and particles", "Stoffe und Teilchen"), blurb: tx("What everything is made of", "Woraus alles besteht") },
+  atoms: { title: tx("Atoms", "Atome"), blurb: tx("Inside the atom and the periodic table", "Atombau und Periodensystem") },
+  bonding: { title: tx("Bonding", "Bindungen"), blurb: tx("How atoms stick together", "Wie Atome zusammenhalten") },
+  reactions: { title: tx("Reactions", "Reaktionen"), blurb: tx("Substances turning into new ones", "Aus Stoffen werden neue Stoffe") },
+  chemcalc: { title: tx("Calculating", "Chemisches Rechnen"), blurb: tx("Moles, masses and concentrations", "Stoffmenge, Masse und Konzentration") },
+  organic: { title: tx("Organic chemistry", "Organische Chemie"), blurb: tx("The chemistry of carbon", "Die Chemie des Kohlenstoffs") },
 };

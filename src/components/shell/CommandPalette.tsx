@@ -26,7 +26,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale, useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
 import { resolveText } from "@/i18n/text";
-import { MATHS_CATALOG } from "@/learn/catalog";
+import { CATALOG, topicHref } from "@/learn/catalog";
 import { cn, pageTitle } from "@/lib/utils";
 import { PageIcon } from "./Sidebar";
 
@@ -177,7 +177,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       }));
 
     // Match the shown title and the German name from class (and the English one, so either language finds it).
-    const topicItems: Item[] = MATHS_CATALOG.filter((topic) => q && (match(resolveText(topic.title, locale)) || match(topic.de) || match(resolveText(topic.title, "en")))).map(
+    const topicItems: Item[] = CATALOG.filter((topic) => q && (match(resolveText(topic.title, locale)) || match(topic.de) || match(resolveText(topic.title, "en")))).map(
       (topic) => ({
         id: `topic-${topic.slug}`,
         group: "learn",
@@ -185,7 +185,7 @@ function Palette({ onClose }: { onClose: () => void }) {
         // In English the German name helps students recognise it from class; in German it would repeat the title.
         hint: locale === "en" ? topic.de : undefined,
         icon: <GraduationCap />,
-        run: () => go(`/learn/maths/${topic.slug}`),
+        run: () => go(topicHref(topic)),
       }),
     );
 

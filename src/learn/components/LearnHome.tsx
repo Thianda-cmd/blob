@@ -9,32 +9,25 @@ import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
-import { MATHS_CATALOG, SUBJECTS, type TopicMeta } from "@/learn/catalog";
+import { studyHref, subjectCatalog, SUBJECTS, topicHref, upNext, type Subject, type TopicMeta } from "@/learn/catalog";
 import { DAILY_GOAL, EMPTY_PROGRESS, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useToday, useTodayXp } from "@/learn/session";
-import { AREAS, type Area } from "@/learn/types";
+import { AREAS } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 import { Ring } from "./Ring";
 import { topicNames } from "./topicNames";
 
-const AREA_ORDER: Area[] = ["algebra", "numbers", "equations", "functions", "applied"];
-
-/** Which topic to suggest: the first lesson not done yet, else the weakest topic. */
-function upNext(progress: Record<string, TopicProgress>): TopicMeta {
-  const fresh = MATHS_CATALOG.find((t) => !progress[t.slug]?.lesson_done);
-  if (fresh) return fresh;
-  return [...MATHS_CATALOG].sort((a, b) => (progress[a.slug]?.mastery ?? 0) - (progress[b.slug]?.mastery ?? 0))[0];
-}
-
-export function LearnHome({ progress, days }: { progress: Record<string, TopicProgress>; days: LearnDay[] }) {
+export function LearnHome({ subject, progress, days }: { subject: Subject; progress: Record<string, TopicProgress>; days: LearnDay[] }) {
   const today = useTodayXp(days);
-  const next = upNext(progress);
+  const catalog = subjectCatalog(subject);
+  const info = SUBJECTS.find((s) => s.slug === subject)!;
+  const next = upNext(catalog, progress);
   const nextProgress = progress[next.slug] ?? EMPTY_PROGRESS(next.slug);
   const totalXp = Object.values(progress).reduce((s, p) => s + p.xp, 0);
-  const mastered = MATHS_CATALOG.filter((t) => (progress[t.slug]?.mastery ?? 0) >= 85).length;
-  const lessons = MATHS_CATALOG.filter((t) => progress[t.slug]?.lesson_done).length;
-  const avgMastery = Math.round(MATHS_CATALOG.reduce((s, t) => s + (progress[t.slug]?.mastery ?? 0), 0) / MATHS_CATALOG.length);
+  const mastered = catalog.filter((t) => (progress[t.slug]?.mastery ?? 0) >= 85).length;
+  const lessons = catalog.filter((t) => progress[t.slug]?.lesson_done).length;
+  const avgMastery = Math.round(catalog.reduce((s, t) => s + (progress[t.slug]?.mastery ?? 0), 0) / catalog.length);
   const t = useMessages(learnText);
   const tt = useText();
 
@@ -70,28 +63,41 @@ export function LearnHome({ progress, days }: { progress: Record<string, TopicPr
           </header>
 
           <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]" aria-label={t.home.subjects}>
-            {SUBJECTS.map((s) => (
-              <span
-                key={s.slug}
-                className={cn(
-                  "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1 text-[14px] font-medium",
-                  s.live ? "text-ink" : "cursor-default text-ink-3",
-                )}
-                title={s.live ? undefined : t.home.comingSoon}
-              >
-                {tt(s.title)}
-                {!s.live && <span className="rounded-full bg-hover px-1.5 py-px text-[10.5px] font-semibold uppercase tracking-wide text-ink-3">{t.home.soon}</span>}
-                {s.live && <motion.span layoutId="learn-subject" className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-blob" />}
-              </span>
-            ))}
+            {SUBJECTS.map((s) =>
+              s.live ? (
+                <Link
+                  key={s.slug}
+                  href={`/learn/${s.slug}`}
+                  aria-current={s.slug === subject ? "page" : undefined}
+                  className={cn(
+                    "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1 text-[14px] font-medium transition-colors",
+                    s.slug === subject ? "text-ink" : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {tt(s.title)}
+                  {s.slug === subject && (
+                    <motion.span layoutId="learn-subject" transition={{ type: "spring", stiffness: 500, damping: 38 }} className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-blob" />
+                  )}
+                </Link>
+              ) : (
+                <span
+                  key={s.slug}
+                  className="relative flex shrink-0 cursor-default items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1 text-[14px] font-medium text-ink-3"
+                  title={t.home.comingSoon}
+                >
+                  {tt(s.title)}
+                  <span className="rounded-full bg-hover px-1.5 py-px text-[10.5px] font-semibold uppercase tracking-wide text-ink-3">{t.home.soon}</span>
+                </span>
+              ),
+            )}
           </nav>
 
           <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0 space-y-9">
               <UpNext topic={next} progress={nextProgress} />
 
-              {AREA_ORDER.map((area, ai) => {
-                const topics = MATHS_CATALOG.filter((t) => t.area === area);
+              {(info.areas ?? []).map((area, ai) => {
+                const topics = catalog.filter((t) => t.area === area);
                 if (!topics.length) return null;
                 return (
                   <section key={area}>
@@ -112,14 +118,14 @@ export function LearnHome({ progress, days }: { progress: Record<string, TopicPr
             <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
               <WeekCard days={days} />
               <div className="rounded-2xl border border-line bg-raised p-4 shadow-card">
-                <div className="text-[13px] font-semibold">{t.home.yourMaths}</div>
+                <div className="text-[13px] font-semibold">{t.home.yourSubject(tt(info.title))}</div>
                 <div className="mt-3 flex items-center gap-4">
                   <Ring value={avgMastery / 100} size={72} stroke={7}>
                     <span className="text-[17px] font-bold tabular-nums">{t.pct(avgMastery)}</span>
                   </Ring>
                   <div className="space-y-1 text-[13px] text-ink-2">
                     <div>
-                      <span className="font-semibold text-ink tabular-nums">{lessons}</span> {t.home.lessonsDone(MATHS_CATALOG.length)}
+                      <span className="font-semibold text-ink tabular-nums">{lessons}</span> {t.home.lessonsDone(catalog.length)}
                     </div>
                     <div>
                       <span className="font-semibold text-ink tabular-nums">{mastered}</span> {t.home.topicsMastered(mastered)}
@@ -179,14 +185,14 @@ function UpNext({ topic, progress }: { topic: TopicMeta; progress: TopicProgress
           <p className="mt-2 max-w-[520px] text-[14.5px] leading-relaxed text-ink-2">{tt(topic.blurb)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
-              href={started ? `/study/maths/${topic.slug}/practice` : `/study/maths/${topic.slug}/lesson`}
+              href={studyHref(topic, started ? "practice" : "lesson")}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-blob px-5 text-[14.5px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[transform,background] hover:bg-blob-deep active:scale-[0.97]"
             >
               {started ? <Dumbbell className="size-4" /> : <BookOpen className="size-4" />}
               {started ? t.home.practise : t.home.startLesson}
             </Link>
             <Link
-              href={`/learn/maths/${topic.slug}`}
+              href={topicHref(topic)}
               className="inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-[14px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
             >
               {t.home.openTopic} <ArrowRight className="size-4" />
@@ -210,7 +216,7 @@ function TopicCard({ topic, progress, delay }: { topic: TopicMeta; progress?: To
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, type: "spring", stiffness: 360, damping: 30 }}>
       <Link
-        href={`/learn/maths/${topic.slug}`}
+        href={topicHref(topic)}
         className="group flex h-full flex-col rounded-2xl border border-line bg-raised p-3 shadow-card transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2 hover:shadow-pop"
       >
         <div className="relative grid h-[78px] place-items-center overflow-hidden rounded-xl bg-surface transition-colors duration-300 group-hover:bg-blob-soft/60">

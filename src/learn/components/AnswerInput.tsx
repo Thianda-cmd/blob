@@ -6,6 +6,8 @@ import { useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import type { AnswerValue } from "@/learn/engine/answers";
+import { equationParts } from "@/learn/chemistry/check";
+import { parseFormula } from "@/learn/chemistry/formula";
 import { parse, toDisplay } from "@/learn/engine/expr";
 import type { AnswerSpec, Text } from "@/learn/types";
 import { cn } from "@/lib/utils";
@@ -225,6 +227,10 @@ export function AnswerInput({
   const [none, setNone] = useState(false);
   const [op, setOp] = useState<string>("");
   const [choice, setChoice] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [coefs, setCoefs] = useState<string[]>(() =>
+    spec.kind === "balance" ? Array.from({ length: equationParts(spec.equation).left.length + equationParts(spec.equation).right.length }, () => "") : [],
+  );
   const changeRef = useRef(onChange);
   useEffect(() => {
     changeRef.current = onChange;
@@ -247,6 +253,13 @@ export function AnswerInput({
         return op && text.trim() ? { kind: "inequality", op, text } : null;
       case "choice":
         return choice === null ? null : { kind: "choice", index: choice };
+      case "multi":
+        return picked.length ? { kind: "multi", indices: [...picked].sort((a, b) => a - b) } : null;
+      case "formula":
+      case "word":
+        return text.trim() ? { kind: "text", text } : null;
+      case "balance":
+        return coefs.some((c) => c.trim()) ? { kind: "list", values: coefs } : null;
     }
   })();
   const currentKey = JSON.stringify(current);
@@ -379,5 +392,197 @@ export function AnswerInput({
           })}
         </div>
       );
+    case "multi":
+      return (
+        <div className="space-y-2">
+          <div className="text-[12.5px] text-ink-3">{t.selectAll}</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {spec.options.map((opt, i) => {
+              const on = picked.includes(i);
+              const should = spec.correct.includes(i);
+              const right = status !== "idle" && on && should;
+              const wrong = status === "wrong" && on && !should;
+              return (
+                <motion.button
+                  key={i}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={disabled}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]))}
+                  className={cn(
+                    "flex min-h-14 items-center gap-3 rounded-xl border-2 bg-raised px-4 py-3 text-left text-[15px] transition-colors",
+                    on ? "border-blob bg-blob-soft/60" : "border-line hover:border-line-2",
+                    right && "border-ok bg-ok/10",
+                    wrong && "border-danger bg-danger/10",
+                  )}
+                >
+                  <span className={cn("grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors", on ? "border-blob bg-blob text-white" : "border-line-2")}>
+                    {on && (
+                      <svg viewBox="0 0 12 12" className="size-3" aria-hidden>
+                        <path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span>
+                    <Inline text={opt} />
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    case "formula":
+      return <FormulaField value={text} onChange={setText} onEnter={submitNow} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.label ? tt(spec.label) : undefined} />;
+    case "word":
+      return (
+        <div className="flex flex-wrap items-center gap-2.5">
+          {spec.label && <span className="text-[16px] text-ink-2">{tt(spec.label)}</span>}
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitNow();
+              }
+            }}
+            autoFocus={autoFocus}
+            disabled={disabled}
+            placeholder={spec.placeholder ? tt(spec.placeholder) : t.word}
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={spec.label ? tt(spec.label) : t.answer}
+            className={cn(fieldBase, tone(status), "w-full max-w-md [font-family:var(--font-sans)] text-[17px]")}
+          />
+        </div>
+      );
+    case "balance": {
+      const { left, right } = equationParts(spec.equation);
+      const box = (i: number) => (
+        <input
+          key={`b${i}`}
+          value={coefs[i] ?? ""}
+          onChange={(e) => setCoefs((c) => c.map((x, j) => (j === i ? e.target.value.replace(/[^0-9]/g, "") : x)))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitNow();
+            }
+          }}
+          autoFocus={autoFocus && i === 0}
+          disabled={disabled}
+          placeholder="1"
+          inputMode="numeric"
+          aria-label={t.coefficient(i + 1)}
+          className={cn(fieldBase, tone(status), "h-11 w-12 px-1 text-center text-[20px] placeholder:text-ink-3/40 placeholder:[font-family:var(--font-math)]")}
+        />
+      );
+      const species = (list: string[], offset: number) =>
+        list.map((sp, i) => (
+          <span key={`${offset}-${i}`} className="flex items-center gap-1.5">
+            {i > 0 && <span className="px-1 text-[22px] text-ink-2">+</span>}
+            {box(offset + i)}
+            <MathView src={`\\ce{${sp}}`} size="md" animate={false} />
+          </span>
+        ));
+      return (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2.5 rounded-2xl border border-line bg-surface px-3 py-3">
+            {species(left, 0)}
+            <span className="px-2 text-[22px] text-ink-2">→</span>
+            {species(right, left.length)}
+          </div>
+          <div className="text-[12.5px] text-ink-3">{t.balanceHint}</div>
+        </div>
+      );
+    }
   }
+}
+
+/** A text field for chemical formulas: type H2SO4, see H₂SO₄. */
+function FormulaField({
+  value,
+  onChange,
+  onEnter,
+  status,
+  autoFocus,
+  disabled,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onEnter: () => void;
+  status: AnswerStatus;
+  autoFocus?: boolean;
+  disabled?: boolean;
+  label?: string;
+}) {
+  const t = useMessages(learnText).input;
+  const tt = useText();
+  const parsed = value.trim() ? parseFormula(value) : null;
+  const ref = useRef<HTMLInputElement>(null);
+  const insert = (str: string) => {
+    const el = ref.current;
+    if (!el) return onChange(value + str);
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? value.length;
+    onChange(value.slice(0, start) + str + value.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + str.length, start + str.length);
+    });
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2.5">
+        {label && <span className="text-[16px] text-ink-2">{label}</span>}
+        <input
+          ref={ref}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onEnter();
+            }
+          }}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          placeholder={t.formula}
+          autoComplete="off"
+          spellCheck={false}
+          autoCapitalize="off"
+          aria-label={label ?? t.answer}
+          className={cn(fieldBase, tone(status), "w-full max-w-sm")}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1">
+          {["(", ")", "^", "+", "-", "·"].map((k) => (
+            <button
+              key={k}
+              type="button"
+              disabled={disabled}
+              onClick={() => insert(k)}
+              className="grid h-8 min-w-8 place-items-center rounded-lg border border-line bg-raised px-2 font-math text-[16px] text-ink-2 hover:bg-hover hover:text-ink"
+            >
+              {k === "-" ? "−" : k}
+            </button>
+          ))}
+        </div>
+        <div className="flex min-h-8 items-center gap-2 text-[12.5px] text-ink-3">
+          {parsed?.ok ? (
+            <>
+              {t.readsAs} <MathView src={`\\ce{${parsed.species.text}}`} size="md" animate={false} className="text-ink" />
+            </>
+          ) : parsed ? (
+            <span className="text-danger/80">{tt(parsed.error)}</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }

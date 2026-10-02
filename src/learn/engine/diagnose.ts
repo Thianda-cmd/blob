@@ -6,7 +6,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { AnswerSpec } from "@/learn/types";
 import { equivalent, isExpanded, parse, toDisplay, type Ast } from "./expr";
-import { difference, monoKey, monoSrc, nearly, toPoly, type Mono, type Poly } from "./poly";
+import { difference, monoSrc, nearly, toPoly, type Mono, type Poly } from "./poly";
 import { gcd } from "./rng";
 
 export type Diagnosis = {

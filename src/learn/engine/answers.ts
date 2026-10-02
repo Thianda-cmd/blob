@@ -1,6 +1,7 @@
 import type { Locale } from "@/i18n/config";
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { AnswerSpec, Feedback, Mistake } from "@/learn/types";
+import { balanceSrc, checkBalance, checkFormula, checkMulti, checkWord, wordDisplay } from "@/learn/chemistry/check";
 import { diagnoseExpr, diagnoseFraction, diagnoseInequality, diagnoseNumber, diagnosePair, diagnoseSolutions, type Diagnosis } from "./diagnose";
 import { close, equivalent, isExpanded, likeTermsCombined, parse, parseNumber, toDisplay } from "./expr";
 import { gcd } from "./rng";
@@ -11,7 +12,8 @@ export type AnswerValue =
   | { kind: "fraction"; n: string; d: string }
   | { kind: "list"; values: string[]; none?: boolean }
   | { kind: "inequality"; op: string; text: string }
-  | { kind: "choice"; index: number };
+  | { kind: "choice"; index: number }
+  | { kind: "multi"; indices: number[] };
 
 const nearly = (a: number, b: number, tol = 1e-6) => close(a, b, tol) || Math.abs(a - b) < tol;
 
@@ -137,6 +139,14 @@ function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
     }
     case "choice":
       return { correct: answer.kind === "choice" && answer.index === spec.correct };
+    case "multi":
+      return answer.kind === "multi" ? checkMulti(spec.correct, answer.indices) : { correct: false };
+    case "formula":
+      return answer.kind === "text" ? checkFormula(spec.value, answer.text) : { correct: false };
+    case "balance":
+      return answer.kind === "list" ? checkBalance(spec.equation, answer.values) : { correct: false };
+    case "word":
+      return answer.kind === "text" ? checkWord(spec.accept, answer.text) : { correct: false };
   }
 }
 
@@ -153,9 +163,9 @@ export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: 
     if (m.when.kind !== spec.kind || !checkCore(m.when, answer).correct) continue;
     return {
       correct: false,
-      title: m.title ?? general?.title ?? tx("I see what happened", "Ich seh, was passiert ist"),
+      title: m.title ?? general?.title ?? core.title ?? tx("I see what happened", "Ich seh, was passiert ist"),
       message: m.say,
-      mark: general?.mark ?? markOf(spec, answer),
+      mark: general?.mark ?? core.mark ?? markOf(spec, answer),
     };
   }
   if (general) return { correct: false, partial: general.close || core.partial, title: general.title, message: general.say, mark: general.mark };
@@ -202,6 +212,11 @@ function diagnose(spec: AnswerSpec, answer: AnswerValue): Diagnosis | null {
       return diagnosePair(nums[0]!, nums[1]!, spec);
     }
     case "choice":
+    case "multi":
+    case "formula":
+    case "balance":
+    case "word":
+      // Chemistry answers are diagnosed inside their own checkers.
       return null;
   }
 }
@@ -236,6 +251,13 @@ export function answerDisplay(spec: AnswerSpec, locale: Locale): string {
     case "pair":
       return `${t(spec.names[0])} = ${n(spec.values[0])} \\quad ${t(spec.names[1])} = ${n(spec.values[1])}`;
     case "choice":
+    case "multi":
       return "";
+    case "formula":
+      return `\\ce{${spec.value}}`;
+    case "balance":
+      return balanceSrc(spec.equation, spec.coefficients);
+    case "word":
+      return wordDisplay(spec.accept, locale);
   }
 }

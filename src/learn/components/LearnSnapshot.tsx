@@ -4,7 +4,7 @@ import { ArrowRight, Flame, Zap } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
-import { MATHS_CATALOG } from "@/learn/catalog";
+import { lastSubject, subjectCatalog, topicHref, upNext } from "@/learn/catalog";
 import { DAILY_GOAL, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { cn } from "@/lib/utils";
@@ -15,9 +15,7 @@ import { topicNames } from "./topicNames";
 /** Small learning card for the home dashboard: today's goal, streak and the suggested next topic. */
 export function LearnSnapshot({ progress, days }: { progress: Record<string, TopicProgress>; days: LearnDay[] }) {
   const today = useTodayXp(days);
-  const next =
-    MATHS_CATALOG.find((t) => !progress[t.slug]?.lesson_done) ??
-    [...MATHS_CATALOG].sort((a, b) => (progress[a.slug]?.mastery ?? 0) - (progress[b.slug]?.mastery ?? 0))[0];
+  const next = upNext(subjectCatalog(lastSubject(progress)), progress);
   const started = progress[next.slug]?.lesson_done;
   const mastery = progress[next.slug]?.mastery ?? 0;
   const t = useMessages(learnText);
@@ -26,7 +24,7 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
 
   return (
     <Link
-      href={`/learn/maths/${next.slug}`}
+      href={topicHref(next)}
       className="group block overflow-hidden rounded-2xl border border-line bg-raised shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
     >
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">

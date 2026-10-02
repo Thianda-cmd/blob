@@ -11,6 +11,7 @@ import type { Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import type { LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
+import { studyHref, topicHref } from "@/learn/catalog";
 import { getTopic } from "@/learn/topics";
 import type { Feedback, LessonStep } from "@/learn/types";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
   const step = steps[index];
   const frames = step.type === "explain" ? (step.frames ?? []) : [];
-  const exitHref = `/learn/maths/${slug}`;
+  const exitHref = topicHref(topic);
   const progress = finished ? 1 : (index + (frames.length > 1 ? frame / frames.length : 0)) / steps.length;
   const canBack = frame > 0 || (index > 0 && steps[index - 1].type !== "check" && step.type !== "check");
 
@@ -153,7 +154,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
           mastery={{ from: session.startMastery, to: session.mastery }}
           today={{ from: session.startToday, to: session.todayXp, goal: session.goal }}
         >
-          <StudyButton href={`/study/maths/${slug}/practice`} variant="blob">
+          <StudyButton href={studyHref(topic, "practice")} variant="blob">
             <Dumbbell className="size-4" /> {t.lesson.practiceNow}
           </StudyButton>
           <StudyButton href={exitHref} variant="ghost">

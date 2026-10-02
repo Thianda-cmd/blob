@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
-import { MATHS_CATALOG } from "@/learn/catalog";
+import { MATHS_CATALOG, topicHref } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
 import { cn } from "@/lib/utils";
 
@@ -171,7 +171,7 @@ export function TopicGrid() {
             transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor(i / 6) * 0.08, ease }}
           >
             <Link
-              href={`/learn/maths/${topic.slug}`}
+              href={topicHref(topic)}
               className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
             >
               <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">

@@ -8,18 +8,18 @@ import { PracticePlayer } from "@/learn/components/PracticePlayer";
 import { loadLearnState, newSeed } from "@/learn/server";
 import type { Level } from "@/learn/types";
 
-export async function generateMetadata({ params, searchParams }: PageProps<"/study/maths/[topic]/practice">): Promise<Metadata> {
-  const [{ topic }, query, locale] = await Promise.all([params, searchParams, getLocale()]);
+export async function generateMetadata({ params, searchParams }: PageProps<"/study/[subject]/[topic]/practice">): Promise<Metadata> {
+  const [{ subject, topic }, query, locale] = await Promise.all([params, searchParams, getLocale()]);
   const meta = findTopicMeta(topic);
   const t = learnText[locale].meta;
-  if (!meta) return { title: t.notFound };
+  if (meta?.subject !== subject) return { title: t.notFound };
   const title = resolveText(meta.title, locale);
   return { title: query.mode === "test" ? t.test(title) : t.practice(title) };
 }
 
-export default async function PracticePage({ params, searchParams }: PageProps<"/study/maths/[topic]/practice">) {
-  const [{ topic }, query] = await Promise.all([params, searchParams]);
-  if (!findTopicMeta(topic)) notFound();
+export default async function PracticePage({ params, searchParams }: PageProps<"/study/[subject]/[topic]/practice">) {
+  const [{ subject, topic }, query] = await Promise.all([params, searchParams]);
+  if (findTopicMeta(topic)?.subject !== subject) notFound();
   const { progress, days } = await loadLearnState();
   const mode = query.mode === "test" ? "test" : "practice";
   const requested = Number(query.level);

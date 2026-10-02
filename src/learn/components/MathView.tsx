@@ -19,7 +19,7 @@ const leafMotion = {
 
 type Ctx = { scope: string; highlight: Set<string>; animate: boolean };
 
-const RELATIONS = new Set(["=", "<", ">", "≤", "≥", "≠", "≈", "⇒", "⇔", "→", "∈"]);
+const RELATIONS = new Set(["=", "<", ">", "≤", "≥", "≠", "≈", "⇒", "⇔", "→", "⇌", "∈"]);
 const BINARY = new Set(["+", "−", "·", "×", ":", "/", "±"]);
 
 /**

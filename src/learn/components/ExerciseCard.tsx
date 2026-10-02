@@ -5,9 +5,10 @@ import { ArrowRight, Check, Lightbulb, RotateCcw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
+import { resolveText } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { answerDisplay, check, type AnswerValue } from "@/learn/engine/answers";
-import type { Exercise, Feedback } from "@/learn/types";
+import type { AnswerSpec, Exercise, Feedback } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { Blob } from "@/components/blob/Blob";
 import { AnswerInput, type AnswerStatus } from "./AnswerInput";
@@ -66,7 +67,6 @@ export function ExerciseCard({
   const m = useMessages(learnText);
   const t = m.exercise;
   const tt = useText();
-  const locale = useLocale();
   // Picked once so re-renders don't reshuffle the wording.
   const [praiseOffset] = useState(() => Math.floor(Math.random() * 1000));
   const [tryOffset] = useState(() => Math.floor(Math.random() * 1000));
@@ -226,13 +226,7 @@ export function ExerciseCard({
                 {status !== "correct" && (
                   <div className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
                     {t.answer}{" "}
-                    {exercise.answer.kind === "choice" ? (
-                      <span className="font-medium text-ink">
-                        <Inline text={exercise.answer.options[exercise.answer.correct]} />
-                      </span>
-                    ) : (
-                      <MathView src={answerDisplay(exercise.answer, locale) || "–"} size="sm" animate={false} className="text-ink" />
-                    )}
+                    <Solution spec={exercise.answer} />
                   </div>
                 )}
               </div>
@@ -293,7 +287,7 @@ function BlobNotice({ feedback, fallback }: { feedback: Feedback; fallback: stri
         <Blob size={46} mood={close ? "thinking" : "worried"} interactive={false} />
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", close ? "text-blob-ink" : "text-danger")}>
+        <div className={cn("text-[13.5px] font-semibold", close ? "text-blob-ink" : "text-danger")}>
           {feedback.title ? tt(feedback.title) : t.notQuite}
         </div>
         {feedback.mark && (
@@ -308,4 +302,30 @@ function BlobNotice({ feedback, fallback }: { feedback: Feedback; fallback: stri
       </div>
     </motion.div>
   );
+}
+
+/** The right answer, shown after a wrong attempt. */
+function Solution({ spec }: { spec: AnswerSpec }) {
+  const locale = useLocale();
+  if (spec.kind === "choice") {
+    return (
+      <span className="font-medium text-ink">
+        <Inline text={spec.options[spec.correct]} />
+      </span>
+    );
+  }
+  if (spec.kind === "multi") {
+    return (
+      <span className="font-medium text-ink">
+        {spec.correct.map((i, k) => (
+          <span key={i}>
+            {k > 0 && ", "}
+            <Inline text={spec.options[i]} />
+          </span>
+        ))}
+      </span>
+    );
+  }
+  if (spec.kind === "word") return <span className="font-medium text-ink">{resolveText(spec.accept[0], locale)}</span>;
+  return <MathView src={answerDisplay(spec, locale) || "–"} size="sm" animate={false} className="text-ink" />;
 }

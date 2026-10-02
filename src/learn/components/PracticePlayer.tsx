@@ -11,6 +11,7 @@ import type { Text } from "@/i18n/text";
 import { createRng } from "@/learn/engine/rng";
 import { levelFor, type LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
+import { topicHref } from "@/learn/catalog";
 import { getTopic } from "@/learn/topics";
 import type { Exercise, Feedback, Level, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,7 @@ export function PracticePlayer({
   const [finished, setFinished] = useState(false);
   const [mood, setMood] = useState<BlobMood>("happy");
   const [say, setSay] = useState<Text | null>(() => (test ? t.practice.introTest(total) : t.practice.intro(ROUND)));
-  const exitHref = `/learn/maths/${slug}`;
+  const exitHref = topicHref(topic);
 
   const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (e.key === "Escape") router.push(exitHref);

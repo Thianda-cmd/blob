@@ -10,6 +10,7 @@ import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import { type LearnDay, levelFor, masteryLabel, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
+import { studyHref, SUBJECTS } from "@/learn/catalog";
 import { getTopic } from "@/learn/topics";
 import type { Level, SummaryBlock } from "@/learn/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
   const tt = useText();
   const locale = useLocale();
   const names = topicNames(topic, locale);
+  const subjectName = tt(SUBJECTS.find((s) => s.slug === topic.subject)!.title);
   const levelName = (l: Level) => t.levels[l];
 
   return (
@@ -39,7 +41,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
         className="print:hidden"
         crumbs={[
           { label: t.learn, href: "/learn", icon: <GraduationCap className="size-3.5" /> },
-          { label: t.maths, href: "/learn" },
+          { label: subjectName, href: `/learn/${topic.subject}` },
           { label: names.title },
         ]}
       />
@@ -57,7 +59,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
               </motion.div>
               <div className="min-w-0">
                 <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                  {t.maths} · {names.area}
+                  {subjectName} · {names.area}
                 </div>
                 <h1 className="mt-1 font-display text-[32px] font-bold leading-tight tracking-[-0.02em]">{names.title}</h1>
                 {names.school && <div className="text-[15px] text-ink-3">{names.school}</div>}
@@ -98,7 +100,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                   )}
                 </>
               }
-              href={`/study/maths/${slug}/lesson`}
+              href={studyHref(topic, "lesson")}
               cta={progress.lesson_done ? t.topic.reviewLesson : t.topic.startLesson}
               primary={!progress.lesson_done}
             />
@@ -128,7 +130,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                   ))}
                 </div>
               }
-              href={`/study/maths/${slug}/practice${level ? `?level=${level}` : ""}`}
+              href={`${studyHref(topic, "practice")}${level ? `?level=${level}` : ""}`}
               cta={level ? t.topic.practiseLevel(levelName(level)) : t.topic.practise}
               primary={progress.lesson_done}
             />
@@ -142,7 +144,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                   <Clock className="size-3.5" /> {t.topic.aboutMinutes(6)}
                 </>
               }
-              href={`/study/maths/${slug}/practice?mode=test`}
+              href={`${studyHref(topic, "practice")}?mode=test`}
               cta={t.topic.takeTest}
             />
           </div>

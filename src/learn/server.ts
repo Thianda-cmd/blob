@@ -18,3 +18,4 @@ export async function loadLearnState() {
 export function newSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
 }
+

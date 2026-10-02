@@ -74,6 +74,116 @@ type Raw = {
   style?: StyleName;
 };
 
+/** Chemical notation inside \\ce{…}: upright element symbols, automatic subscripts and charges. */
+function chem(text: string): Raw[] {
+  const out: Raw[] = [];
+  let i = 0;
+  let speciesStart = true; // a number here is a coefficient, not a subscript
+  const last = () => out[out.length - 1];
+  const isSpecies = (r?: Raw) => !!r && (r.type === "sym" || r.type === "sub" || r.type === "paren" || r.type === "pow");
+  const charge = (raw: string) => raw.replace(/-/g, "−");
+
+  while (i < text.length) {
+    const c = text[i];
+    if (c === " ") {
+      i++;
+      speciesStart = true;
+      continue;
+    }
+    if (c === "#") {
+      let j = i + 1;
+      while (j < text.length && /[A-Za-z0-9_-]/.test(text[j])) j++;
+      const prev = last();
+      if (prev) prev.k = text.slice(i + 1, j);
+      i = j;
+      continue;
+    }
+    const three = text.slice(i, i + 3);
+    const two = text.slice(i, i + 2);
+    if (three === "<=>" || c === "⇌") {
+      out.push({ type: "op", v: "⇌" });
+      i += c === "⇌" ? 1 : 3;
+      speciesStart = true;
+      continue;
+    }
+    if (two === "->" || c === "→") {
+      out.push({ type: "op", v: "→" });
+      i += c === "→" ? 1 : 2;
+      speciesStart = true;
+      continue;
+    }
+    if (/[0-9]/.test(c)) {
+      let j = i;
+      while (j < text.length && /[0-9.,]/.test(text[j])) j++;
+      const num = text.slice(i, j);
+      i = j;
+      const prev = last();
+      if (!speciesStart && isSpecies(prev)) {
+        out.pop();
+        out.push({ type: "sub", base: [prev!], sub: [{ type: "num", v: num }] });
+      } else out.push({ type: "num", v: num });
+      continue;
+    }
+    if (/[A-Z]/.test(c) || (c === "e" && !/[a-z]/.test(text[i + 1] ?? ""))) {
+      let j = i + 1;
+      if (c !== "e") while (j < text.length && /[a-z]/.test(text[j])) j++;
+      out.push({ type: "sym", v: text.slice(i, j) });
+      i = j;
+      speciesStart = false;
+      continue;
+    }
+    if (c === "^") {
+      // explicit charge: ^2-, ^{3+}, ^+
+      i++;
+      let raw = "";
+      if (text[i] === "{") {
+        const j = text.indexOf("}", i);
+        raw = text.slice(i + 1, j < 0 ? text.length : j);
+        i = j < 0 ? text.length : j + 1;
+      } else {
+        const m = text.slice(i).match(/^[0-9]*[+-]?/);
+        raw = m ? m[0] : "";
+        i += raw.length;
+      }
+      const prev = out.pop();
+      out.push({ type: "pow", base: prev ? [prev] : [], exp: [{ type: "sym", v: charge(raw) }] });
+      continue;
+    }
+    if ((c === "+" || c === "-") && !speciesStart && isSpecies(last()) && /^(?:$|[\s)#])/.test(text.slice(i + 1, i + 2))) {
+      // trailing charge: Na+, Cl-
+      const prev = out.pop()!;
+      out.push({ type: "pow", base: [prev], exp: [{ type: "sym", v: charge(c) }] });
+      i++;
+      continue;
+    }
+    if (c === "(" || c === "[") {
+      const close = c === "(" ? ")" : "]";
+      const j = text.indexOf(close, i);
+      const inner = text.slice(i + 1, j < 0 ? text.length : j);
+      i = j < 0 ? text.length : j + 1;
+      if (/^(aq|s|l|g)$/.test(inner)) out.push({ type: "text", v: `(${inner})` });
+      else out.push({ type: "paren", open: c, close, body: chem(inner) });
+      speciesStart = false;
+      continue;
+    }
+    if (c === "*" || c === "·") {
+      out.push({ type: "op", v: "·" });
+      i++;
+      speciesStart = true;
+      continue;
+    }
+    if (c === "+" || c === "=") {
+      out.push({ type: "op", v: c });
+      i++;
+      speciesStart = true;
+      continue;
+    }
+    out.push({ type: "text", v: c });
+    i++;
+  }
+  return out;
+}
+
 export function parseDisplay(src: string): DNode[] {
   let i = 0;
 
@@ -185,6 +295,20 @@ export function parseDisplay(src: string): DNode[] {
       while (j < src.length && /[A-Za-z]/.test(src[j])) j++;
       const cmd = src.slice(i + 1, j);
       i = j;
+      if (cmd === "ce") {
+        // Chemistry: \ce{2H2 + O2 -> 2H2O}, \ce{SO4^2-}, \ce{Ca(OH)2}, \ce{Na+ (aq)}
+        skipWs();
+        if (src[i] !== "{") return [];
+        let depth = 0;
+        let j = i;
+        for (; j < src.length; j++) {
+          if (src[j] === "{") depth++;
+          else if (src[j] === "}" && --depth === 0) break;
+        }
+        const body = src.slice(i + 1, j);
+        i = j + 1;
+        return chem(body);
+      }
       if (cmd === "frac") {
         const num = argument();
         const den = argument();
