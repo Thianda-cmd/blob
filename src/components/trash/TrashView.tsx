@@ -381,8 +381,9 @@ function TrashRow({
         {deletedAgo(root.trashed_at!, locale)}
       </span>
       <div className="flex shrink-0 items-center gap-1">
-        <Button variant="secondary" size="sm" onClick={onRestore}>
-          <RotateCcw className="size-3.5" /> {t.restore}
+        {/* Icon only on phones, where "Wiederherstellen" would squeeze the title. */}
+        <Button variant="secondary" size="sm" onClick={onRestore} aria-label={t.restore}>
+          <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">{t.restore}</span>
         </Button>
         <IconButton
           label={t.deleteForever}

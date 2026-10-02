@@ -215,7 +215,7 @@ export function AnswerInput({
 }: {
   spec: AnswerSpec;
   onChange: (value: AnswerValue | null) => void;
-  onSubmit: () => void;
+  onSubmit: (value: AnswerValue | null) => void;
   status: AnswerStatus;
   disabled?: boolean;
   autoFocus?: boolean;
@@ -230,31 +230,32 @@ export function AnswerInput({
     changeRef.current = onChange;
   });
 
-  // Report the current answer upwards whenever the inputs change.
-  useEffect(() => {
-    const emit = changeRef.current;
+  // The answer as it stands right now (also handed to onSubmit, so pressing Enter straight
+  // after typing never checks the previous value).
+  const current = ((): AnswerValue | null => {
     switch (spec.kind) {
       case "number":
       case "expr":
-        emit(text.trim() ? { kind: "text", text } : null);
-        break;
+        return text.trim() ? { kind: "text", text } : null;
       case "fraction":
-        emit(parts[0].trim() && parts[1].trim() ? { kind: "fraction", n: parts[0], d: parts[1] } : null);
-        break;
+        return parts[0].trim() && parts[1].trim() ? { kind: "fraction", n: parts[0], d: parts[1] } : null;
       case "solutions":
-        emit(none ? { kind: "list", values: [], none: true } : parts.some((p) => p.trim()) ? { kind: "list", values: parts } : null);
-        break;
+        return none ? { kind: "list", values: [], none: true } : parts.some((p) => p.trim()) ? { kind: "list", values: parts } : null;
       case "pair":
-        emit(parts[0].trim() && parts[1].trim() ? { kind: "list", values: parts } : null);
-        break;
+        return parts[0].trim() && parts[1].trim() ? { kind: "list", values: parts } : null;
       case "inequality":
-        emit(op && text.trim() ? { kind: "inequality", op, text } : null);
-        break;
+        return op && text.trim() ? { kind: "inequality", op, text } : null;
       case "choice":
-        emit(choice === null ? null : { kind: "choice", index: choice });
-        break;
+        return choice === null ? null : { kind: "choice", index: choice };
     }
-  }, [spec.kind, text, parts, none, op, choice]);
+  })();
+  const currentKey = JSON.stringify(current);
+
+  // Report the current answer upwards whenever it changes.
+  useEffect(() => {
+    changeRef.current(JSON.parse(currentKey) as AnswerValue | null);
+  }, [currentKey]);
+  const submitNow = () => onSubmit(current);
 
   const setPart = (i: number, v: string) => setParts((p) => p.map((x, j) => (j === i ? v : x)));
   const t = useMessages(learnText).input;
@@ -265,18 +266,18 @@ export function AnswerInput({
       return (
         <div className="flex items-center gap-2">
           {spec.label && <MathView src={spec.label} size="md" animate={false} className="text-ink-2" />}
-          <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} keypad={false} preview={false} autoFocus={autoFocus} disabled={disabled} placeholder={t.number} className="w-56" />
+          <MathField value={text} onChange={setText} onEnter={submitNow} status={status} keypad={false} preview={false} autoFocus={autoFocus} disabled={disabled} placeholder={t.number} className="w-56" />
           {spec.unit && <span className="text-[17px] text-ink-2">{tt(spec.unit)}</span>}
         </div>
       );
     case "expr":
-      return <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.prefix} placeholder={t.example} />;
+      return <MathField value={text} onChange={setText} onEnter={submitNow} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.prefix} placeholder={t.example} />;
     case "fraction":
       return (
         <div className="inline-flex flex-col items-center gap-1.5">
-          <NumBox value={parts[0]} onChange={(v) => setPart(0, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={t.numerator} />
+          <NumBox value={parts[0]} onChange={(v) => setPart(0, v)} onEnter={submitNow} status={status} autoFocus={autoFocus} disabled={disabled} label={t.numerator} />
           <div className="h-[3px] w-32 rounded-full bg-ink" />
-          <NumBox value={parts[1]} onChange={(v) => setPart(1, v)} onEnter={onSubmit} status={status} disabled={disabled} label={t.denominator} />
+          <NumBox value={parts[1]} onChange={(v) => setPart(1, v)} onEnter={submitNow} status={status} disabled={disabled} label={t.denominator} />
         </div>
       );
     case "pair":
@@ -285,7 +286,7 @@ export function AnswerInput({
           {spec.names.map((name, i) => (
             <label key={i} className="flex items-center gap-2">
               <MathView src={`${tt(name)} =`} size="md" animate={false} />
-              <NumBox value={parts[i]} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled} label={tt(name)} />
+              <NumBox value={parts[i]} onChange={(v) => setPart(i, v)} onEnter={submitNow} status={status} autoFocus={autoFocus && i === 0} disabled={disabled} label={tt(name)} />
             </label>
           ))}
         </div>
@@ -298,7 +299,7 @@ export function AnswerInput({
             {Array.from({ length: count }, (_, i) => (
               <label key={i} className="flex items-center gap-2">
                 <MathView src={count === 1 ? `${spec.variable} =` : `${spec.variable}_${i + 1} =`} size="md" animate={false} />
-                <NumBox value={parts[i] ?? ""} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled || none} label={t.solution(i + 1)} />
+                <NumBox value={parts[i] ?? ""} onChange={(v) => setPart(i, v)} onEnter={submitNow} status={status} autoFocus={autoFocus && i === 0} disabled={disabled || none} label={t.solution(i + 1)} />
               </label>
             ))}
           </div>
@@ -342,7 +343,7 @@ export function AnswerInput({
               </button>
             ))}
           </div>
-          <NumBox value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={t.boundary} />
+          <NumBox value={text} onChange={setText} onEnter={submitNow} status={status} autoFocus={autoFocus} disabled={disabled} label={t.boundary} />
         </div>
       );
     case "choice":
@@ -359,7 +360,7 @@ export function AnswerInput({
                 disabled={disabled}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setChoice(i)}
-                onDoubleClick={onSubmit}
+                onDoubleClick={submitNow}
                 className={cn(
                   "flex min-h-14 items-center gap-3 rounded-xl border-2 bg-raised px-4 py-3 text-left text-[15px] transition-colors",
                   picked ? "border-blob bg-blob-soft/60" : "border-line hover:border-line-2",

@@ -141,7 +141,7 @@ export const presentText = defineMessages({
     lastSlide: "Letzte Folie",
     hideNotes: "Notizen ausblenden",
     popupSpeaker: "Pop-ups sind blockiert, deshalb öffnet sich die Referentenansicht hier.",
-    popupAudience: "Pop-ups sind blockiert. Erlaube sie für diese Seite, um ein zweites Fenster zu öffnen.",
+    popupAudience: "Pop-ups sind blockiert. Erlaube sie, um ein zweites Fenster zu öffnen.",
 
     jump: "springen",
     closeHint: "schließen",

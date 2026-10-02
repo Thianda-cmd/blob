@@ -144,7 +144,7 @@ export function SpeakerView({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
         <section className="flex min-h-0 flex-col" aria-label={t.currentSlide}>
           <PaneLabel>
-            <span className="font-medium text-white/85">{ended ? t.endOfPresentation : t.slideOf(index + 1, total)}</span>
+            <span className="shrink-0 whitespace-nowrap font-medium text-white/85">{ended ? t.endOfPresentation : t.slideOf(index + 1, total)}</span>
             {built > 0 && !ended && (
               <span className="flex items-center gap-1" aria-label={t.buildOf(step, built)}>
                 {Array.from({ length: built }, (_, i) => (
@@ -152,7 +152,7 @@ export function SpeakerView({
                 ))}
               </span>
             )}
-            {blank && <span className="ml-auto rounded-md bg-white/10 px-1.5 py-0.5 text-[11.5px] text-white/80">{t.blankScreen(blank)}</span>}
+            {blank && <span className="ml-auto min-w-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11.5px] leading-snug text-white/80">{t.blankScreen(blank)}</span>}
           </PaneLabel>
           <div className="relative min-h-0 flex-1">
             {ended ? (
@@ -235,7 +235,7 @@ export function SpeakerView({
 }
 
 function PaneLabel({ children }: { children: ReactNode }) {
-  return <div className="mb-2 flex h-5 shrink-0 items-center gap-2.5 text-[12.5px] tabular-nums text-white/50">{children}</div>;
+  return <div className="mb-2 flex min-h-5 shrink-0 items-center gap-2.5 text-[12.5px] tabular-nums text-white/50">{children}</div>;
 }
 
 function EndCard() {

@@ -52,7 +52,7 @@ export function ExerciseCard({
   compact?: boolean;
 }) {
   const scope = useId();
-  const [answer, setAnswer] = useState<AnswerValue | null>(null);
+  const [reported, setAnswer] = useState<AnswerValue | null>(null);
   const [status, setStatus] = useState<AnswerStatus>("idle");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -75,8 +75,10 @@ export function ExerciseCard({
     if (done) continueRef.current?.focus();
   }, [done]);
 
-  function submit() {
+  /** `latest` comes straight from the input on Enter; the Check button uses the reported answer. */
+  function submit(latest?: AnswerValue | null) {
     if (done) return;
+    const answer = latest === undefined ? reported : latest;
     if (!answer) {
       animate(scopeRef.current, { x: [0, -8, 8, -5, 5, 0] }, { duration: 0.35 });
       return;
@@ -162,7 +164,7 @@ export function ExerciseCard({
       {!done && (
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={submit}
+            onClick={() => submit()}
             className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.97]"
           >
             {t.check} <span className="text-[11px] font-normal opacity-60">{t.enter}</span>

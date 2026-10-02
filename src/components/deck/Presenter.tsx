@@ -632,7 +632,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
             <div className="w-full max-w-[760px] rounded-2xl border border-white/10 bg-[#1c1b18] shadow-pop">
               <div className="flex items-center gap-3 border-b border-white/8 px-5 py-3 text-[12.5px] text-white/50">
                 <NotebookText className="size-3.5" />
-                <span className="font-medium text-white/80">{t.speakerNotes}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-white/80">{t.speakerNotes}</span>
                 <span className="shrink-0 whitespace-nowrap tabular-nums">{ended ? t.end : t.slideOf(index + 1, total)}</span>
                 <span className="ml-auto truncate">
                   {nextSlide ? (

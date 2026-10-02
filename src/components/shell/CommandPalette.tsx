@@ -281,7 +281,7 @@ function Palette({ onClose }: { onClose: () => void }) {
                     />
                   )}
                   <span className="relative grid size-4 shrink-0 place-items-center text-ink-3 [&_svg]:size-4">{item.icon}</span>
-                  <span className={cn("relative truncate", i === active ? "text-ink" : "text-ink-2")}>{item.label}</span>
+                  <span className={cn("relative min-w-0 shrink-[0.25] truncate", i === active ? "text-ink" : "text-ink-2")}>{item.label}</span>
                   {item.hint && <span className="relative ml-auto min-w-0 max-w-[55%] truncate text-[12px] text-ink-3">{item.hint}</span>}
                   {i === active && <CornerDownLeft className="relative size-3.5 shrink-0 text-ink-3" />}
                 </button>

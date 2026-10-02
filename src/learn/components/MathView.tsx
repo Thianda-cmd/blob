@@ -57,7 +57,7 @@ export function MathView({
         ref={ref}
         className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center", className)}
         style={{ fontSize: SIZES[size] }}
-        aria-label={source.replace(/\\[a-z]+|[{}#"]/gi, " ")}
+        aria-label={spoken(source)}
         role="math"
       >
         <Children nodes={nodes} ctx={ctx} />
@@ -66,6 +66,14 @@ export function MathView({
     </LayoutGroup>
   );
 }
+
+/** Screen-reader text: drops animation keys ("7#a x#ax" → "7 x"), commands and braces. */
+const spoken = (source: string) =>
+  source
+    .replace(/#[A-Za-z0-9_-]+/g, "")
+    .replace(/\\[a-z]+|[{}#"]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** Labels like "(I)" or "a:" behave like the start of an expression: a minus after them is a sign. */
 const LABEL = /^\(.*\)$|:$/;

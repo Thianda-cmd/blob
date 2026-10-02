@@ -153,7 +153,7 @@ export const onboardingText = defineMessages({
       body: "Such dir einen Look aus. Du kannst ihn jederzeit in den Einstellungen ändern.",
       summary: "Das richte ich für dich ein",
       subjectCount: (n) => (n === 1 ? "1 Fach" : `${n} Fächer`),
-      andMore: (n) => ` und ${n} weitere`,
+      andMore: (n) => (n === 1 ? " und 1 weiteres" : ` und ${n} weitere`),
       noSubjects: "Noch keine Fächer. Du kannst sie jederzeit über die Seitenleiste hinzufügen.",
       noteBefore: "Eine ",
       note: "Willkommensnotiz",
@@ -181,7 +181,7 @@ export const onboardingText = defineMessages({
       home: "Start",
       tasks: "Aufgaben",
       subjects: "Fächer",
-      more: (n) => `und ${n} weitere`,
+      more: (n) => (n === 1 ? "und 1 weiteres" : `und ${n} weitere`),
       notes: "Notizen",
     },
     firstTask: {
