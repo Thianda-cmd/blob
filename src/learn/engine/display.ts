@@ -330,6 +330,15 @@ export function parseDisplay(src: string): DNode[] {
         i = j + 1;
         return chem(body);
       }
+      if (cmd === "text") {
+        // \text{plain words}, like "…" quotes
+        skipWs();
+        if (src[i] !== "{") return [];
+        const j = src.indexOf("}", i);
+        const v = src.slice(i + 1, j < 0 ? src.length : j);
+        i = j < 0 ? src.length : j + 1;
+        return [{ type: "text", v }];
+      }
       if (cmd === "frac") {
         const num = argument();
         const den = argument();

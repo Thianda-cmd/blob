@@ -131,7 +131,10 @@ export const ce = (formula: string) => `\\ce{${formula}}`;
 
 export type Equation = { left: Species[]; right: Species[] };
 
-/** Parse "CH4 + O2 -> CO2 + H2O" (also → and =). Coefficients in the text are ignored. */
+/** An electron in a half-equation ("Cu^2+ + 2e- -> Cu"): no atoms, charge −1. */
+const ELECTRON: Species = { counts: {}, charge: -1, text: "e-" };
+
+/** Parse "CH4 + O2 -> CO2 + H2O" (also → and =). Coefficients in the text are ignored. Electrons are written e-. */
 export function parseEquation(raw: string): Equation | null {
   const [l, r] = raw.split(/->|→|=|⟶/);
   if (r === undefined) return null;
@@ -140,7 +143,7 @@ export function parseEquation(raw: string): Equation | null {
       .split(/\s\+\s|\s\+(?=[A-Z(])/)
       .map((p) => p.trim().replace(/^[0-9]+\s*/, ""))
       .filter(Boolean)
-      .map((p) => parseFormula(p));
+      .map((p): FormulaResult => (/^e(\^?-|⁻)$/.test(p) ? { ok: true, species: ELECTRON } : parseFormula(p)));
   const left = side(l);
   const right = side(r);
   if ([...left, ...right].some((x) => !x.ok)) return null;

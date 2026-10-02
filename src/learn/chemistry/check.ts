@@ -5,7 +5,7 @@
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { Feedback } from "@/learn/types";
 import { element, type Category } from "./elements";
-import { gcdAll, parseEquation, parseFormula, sameCounts, unbalanced, type Counts } from "./formula";
+import { gcdAll, parseEquation, parseFormula, sameCounts, sideCounts, unbalanced, type Counts } from "./formula";
 
 const METALS = new Set<Category>(["alkali", "alkaline-earth", "transition", "post-transition", "lanthanide", "actinide"]);
 
@@ -144,6 +144,20 @@ export function checkBalance(equation: string, values: string[]): Feedback {
   if (!eq) return { correct: false, message: tx("This exercise has a typo. Skip it.", "Diese Aufgabe hat einen Fehler. Überspring sie.") };
   const off = unbalanced(eq, coefs);
   const mark = balanceSrc(equation, coefs);
+  const [qL, qR] = sideCounts(eq, coefs).charge;
+  if (!off.length && qL !== qR) {
+    const q = (n: number) => (n === 0 ? "0" : `${n > 0 ? "+" : "−"}${Math.abs(n)}`);
+    return {
+      correct: false,
+      partial: true,
+      title: tx("Charges aren't balanced", "Ladungen nicht ausgeglichen"),
+      message: tx(
+        `All atoms match, nice! But the charges don't: ${q(qL)} on the left, ${q(qR)} on the right. In an ionic equation the charge has to match too.`,
+        `Alle Atome passen, stark! Aber die Ladungen nicht: links ${q(qL)}, rechts ${q(qR)}. In einer Ionengleichung muss auch die Ladung auf beiden Seiten gleich sein.`,
+      ),
+      mark,
+    };
+  }
   if (!off.length) {
     const g = gcdAll(coefs);
     if (g > 1) {

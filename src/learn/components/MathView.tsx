@@ -136,7 +136,7 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
     case "op": {
       const signLike = node.v === "−" || node.v === "±";
       const unary =
-        (node.v === "+" && !prev) ||
+        (node.v === "+" && (!prev || (prev.type === "op" && RELATIONS.has(prev.v)))) ||
         (signLike &&
         (!prev ||
           (prev.type === "op" && !["!", "%", "°"].includes(prev.v) && (node.v === "−" || RELATIONS.has(prev.v))) ||
