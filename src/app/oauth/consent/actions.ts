@@ -1,7 +1,7 @@
 "use server";
 
 import { approve, deny, loadRequest } from "@/lib/oauth/authorize";
-import { issuer } from "@/lib/oauth/config";
+import { currentIssuer } from "@/lib/oauth/config";
 import { sessionUser } from "@/lib/oauth/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +12,7 @@ export async function decide(requestId: string, allow: boolean): Promise<{ url: 
   if (pending.completed) return { error: "done" };
   const user = await sessionUser();
   if (!user) return { error: "signed_out" };
-  const iss = issuer();
+  const iss = await currentIssuer();
   return { url: allow ? await approve(pending, user.id, iss, user.authTime) : await deny(pending, user.id, iss) };
 }
 

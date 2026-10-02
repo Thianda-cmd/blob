@@ -26,6 +26,18 @@ export function issuer(request?: Request): string {
   return (configured || "http://localhost:3000").replace(/\/+$/, "");
 }
 
+/** The issuer inside server actions and server components (no Request object there). */
+export async function currentIssuer(): Promise<string> {
+  const configured = process.env.BLOB_ISSUER || process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured && !/localhost|127\.0\.0\.1/.test(configured)) return configured.replace(/\/+$/, "");
+  const { headers } = await import("next/headers");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return issuer();
+  const proto = h.get("x-forwarded-proto") ?? (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 export const endpoints = (iss: string) => ({
   authorization_endpoint: `${iss}/oauth/authorize`,
   token_endpoint: `${iss}/api/oauth/token`,

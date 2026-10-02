@@ -72,7 +72,7 @@ export function ConsentCard({ request, account }: Props) {
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 320, damping: 30 }}
-      className="w-full max-w-[440px] rounded-[28px] border border-line bg-raised p-6 shadow-pop sm:p-8"
+      className="w-full max-w-[440px] rounded-[28px] border border-line bg-raised p-5 shadow-pop sm:p-7"
     >
       <div className="text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.eyebrow}</div>
 
@@ -81,7 +81,7 @@ export function ConsentCard({ request, account }: Props) {
       <h1 className="mt-1 text-center font-display text-[26px] font-bold leading-tight tracking-[-0.025em] text-balance">{t.title(app.name)}</h1>
       <p className="mt-1.5 text-center text-[14px] text-ink-2">{t.subtitle(app.name)}</p>
 
-      <div className="mt-6 flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-3">
+      <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5">
         <Avatar name={account.name} src={account.avatar} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[11.5px] text-ink-3">{t.signedInAs}</div>
@@ -104,7 +104,7 @@ export function ConsentCard({ request, account }: Props) {
         </button>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <div className="text-[13px] font-semibold">{t.willSee(app.name)}</div>
         <ul className="mt-3 space-y-2.5">
           {shown.map((scope, i) => {
@@ -142,7 +142,7 @@ export function ConsentCard({ request, account }: Props) {
         )}
       </AnimatePresence>
 
-      <div className="mt-6 grid grid-cols-2 gap-2.5">
+      <div className="mt-5 grid grid-cols-2 gap-2.5">
         <Button variant="secondary" size="lg" onClick={() => go(false)} disabled={busy} loading={phase === "cancelled"}>
           {t.cancel}
         </Button>
@@ -190,7 +190,7 @@ function Bridge({ app, blob, mood, phase }: { app: PublicApp; blob: React.RefObj
   const fast = phase === "allowing" || phase === "leaving";
   const stopped = phase === "cancelled";
   return (
-    <div className="relative mx-auto mt-3 flex h-[104px] max-w-[300px] items-center justify-between">
+    <div className="relative mx-auto mt-2 flex h-[96px] max-w-[300px] items-center justify-between">
       <div className="relative z-10 -ml-2">
         <Blob ref={blob} size={92} mood={mood} interactive={false} />
       </div>
