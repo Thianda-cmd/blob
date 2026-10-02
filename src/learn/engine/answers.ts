@@ -34,7 +34,7 @@ function cleanNumber(raw: string, unit?: Text) {
 }
 
 const value = (t: string) => Number(t.replace(",", "."));
-const GROUPED = /^[+-]?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/;
+const GROUPED = /^[+-]?[1-9]\d{0,2}(?:\.\d{3})+(?:,\d+)?$/;
 
 export function parsePlainNumber(raw: string, unit?: Text): number | null {
   const s = cleanNumber(raw, unit);

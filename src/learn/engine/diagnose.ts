@@ -286,12 +286,14 @@ export function diagnoseNumber(value: number, target: number, ctx: { percent?: b
   if (target !== 0 && nearly(value, -target)) {
     return {
       title: tx("Wrong sign", "Falsches Vorzeichen"),
-      say: tx("So close! The number is right, just the sign isn't.", "Ganz knapp! Die Zahl stimmt, nur das Vorzeichen nicht."),
+      say: tx("The size is right, but the sign isn't. Check where the minus belongs.", "Der Betrag stimmt, aber das Vorzeichen nicht. Prüf, wo das Minus hingehört."),
       close: true,
     };
   }
+  // Powers of ten (1, 10, 0,1…) match each other by coincidence ("10⁻¹ = 10"), so they get no place-value talk.
+  const tenPower = (v: number) => v !== 0 && Number.isInteger(Math.round(Math.log10(Math.abs(v)) * 1e9) / 1e9);
   for (const k of [1, 2, 3, -1, -2, -3]) {
-    if (target !== 0 && nearly(value, target * 10 ** k)) {
+    if (target !== 0 && !tenPower(target) && nearly(value, target * 10 ** k)) {
       const times = 10 ** Math.abs(k);
       const big = k > 0;
       if (ctx.fraction) {
@@ -341,7 +343,7 @@ export function diagnoseNumber(value: number, target: number, ctx: { percent?: b
       close: true,
     };
   }
-  if (Number.isInteger(value) && Number.isInteger(target) && Math.abs(target) >= 3 && Math.abs(value - target) === 1) {
+  if (Number.isInteger(value) && Number.isInteger(target) && Math.abs(target) >= 10 && Math.abs(value - target) === 1) {
     return {
       title: tx("Just one off", "Um eins daneben"),
       say: tx("Just 1 away! Count once more, carefully.", "Nur 1 daneben! Zähl noch mal ganz in Ruhe nach."),
@@ -391,7 +393,8 @@ export function diagnoseSolutions(got: number[], want: number[], variable: strin
   const has = (list: number[], v: number) => list.some((x) => nearly(x, v) || Math.abs(x - v) < 1e-4);
   const right = got.filter((g) => has(want, g));
   const wrong = got.filter((g) => !has(want, g));
-  if (want.length && got.length === want.length && got.every((g) => has(want, -g)) && !got.every((g) => has(want, g))) {
+  // With 0 among the solutions, "every sign flipped" would also match a single wrong value (−0 = 0).
+  if (want.length && got.length === want.length && !want.some((w) => nearly(w, 0)) && got.every((g) => has(want, -g)) && !got.every((g) => has(want, g))) {
     return {
       title: tx("Signs flipped", "Vorzeichen vertauscht"),
       say: tx(
@@ -420,6 +423,16 @@ export function diagnoseSolutions(got: number[], want: number[], variable: strin
     };
   }
   if (right.length && right.length < want.length && !wrong.length) {
+    if (has(want, 0) && !has(got, 0)) {
+      return {
+        title: tx("Lost a solution", "Eine Lösung verloren"),
+        say: tx(
+          `$${variable} = ${fmtEn(right[0])}$ is right! But $${variable} = 0$ works too. Did you divide by $${variable}$? That's where it got lost: factor it out instead.`,
+          `$${variable} = ${fmtNum(right[0])}$ stimmt! Aber $${variable} = 0$ passt auch. Hast du durch $${variable}$ geteilt? Da ist sie verloren gegangen: Klammer $${variable}$ lieber aus.`,
+        ),
+        close: true,
+      };
+    }
     return {
       title: tx("One more to find", "Eine fehlt noch"),
       say: tx(

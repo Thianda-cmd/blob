@@ -474,14 +474,15 @@ function usable(s: AnswerSpec): boolean {
   return false;
 }
 
-type AddMistake = (when: AnswerSpec, title: Text, say: Text) => void;
+/** `close`: a near miss (a sign, a count, not finished yet): Blob looks thoughtful instead of worried. */
+type AddMistake = (when: AnswerSpec, title: Text, say: Text, close?: boolean) => void;
 
 /** The typical mistakes for one answer, in the order given (first match wins). */
 function collect(right: AnswerSpec, fill: (add: AddMistake) => void): Mistake[] {
   const list: Mistake[] = [];
-  fill((when, title, say) => {
+  fill((when, title, say, close) => {
     if (list.length >= 5 || !usable(when) || sameAnswer(when, right) || list.some((m) => sameAnswer(m.when, when))) return;
-    list.push({ when, title, say });
+    list.push(close ? { when, title, say, close } : { when, title, say });
   });
   return list;
 }
@@ -509,6 +510,7 @@ const T_ROOT_LEFT = tx("Root not taken yet", "Wurzel noch nicht gezogen");
 const T_PLACES = tx("Count places, not zeros", "Stellen zählen, nicht Nullen");
 const T_ZEROS = tx("Counted the zeros", "Nullen gezählt");
 const T_DIRECTION = tx("Wrong direction", "Falsche Richtung");
+const T_OUTER_LOST = tx("Outer exponent lost", "Äußerer Exponent verloren");
 
 const EXP_MUL = tx(
   "Ah, I see what happened! You multiplied the exponents. That's the rule for a power of a power, $(a^m)^n$. Here powers are multiplied with each other, so the exponents are **added**.",
@@ -609,7 +611,7 @@ function powerValueMistakes(b: number, n: number, minusTrap: boolean): Mistake[]
   }
   const B = par(b);
   return collect(asNum(b ** n), (add) => {
-    if (b < 0) add(asNum(-(b ** n)), T_COUNT_MINUS, countMinus(n, B));
+    if (b < 0) add(asNum(-(b ** n)), T_COUNT_MINUS, countMinus(n, B), true);
     add(asNum(b * n), T_BASE_TIMES, baseTimes(B, n));
     if (b > 0)
       add(
@@ -628,6 +630,7 @@ function powerValueMistakes(b: number, n: number, minusTrap: boolean): Mistake[]
           `Nearly! That's $${pp(B, n - 1)}$: one factor is missing. $${pp(B, n)}$ has exactly $${n}$ factors $${B}$, so count them once more.`,
           `Fast! Das ist $${pp(B, n - 1)}$: Ein Faktor fehlt. $${pp(B, n)}$ hat genau $${n}$ Faktoren $${B}$, zähl sie noch mal nach.`,
         ),
+        true,
       );
   });
 }
@@ -643,8 +646,8 @@ function productMistakes(v: string, exps: number[]): Mistake[] {
       T_EXP_MUL,
       EXP_MUL,
     );
-    if (lone) add(asNum(total - lone), loneTitle(v), loneSay(v));
-    if (neg !== undefined) add(asNum(exps.reduce((s, e) => s + Math.abs(e), 0)), T_LOST_MINUS, lostMinusAdd(v, neg));
+    if (lone) add(asNum(total - lone), loneTitle(v), loneSay(v), true);
+    if (neg !== undefined) add(asNum(exps.reduce((s, e) => s + Math.abs(e), 0)), T_LOST_MINUS, lostMinusAdd(v, neg), true);
   });
 }
 
@@ -660,8 +663,9 @@ function quotientMistakes(e1: number, e2: number, frac: boolean): Mistake[] {
           `Careful: you're subtracting $${e2}$, a negative number. Minus a negative is **plus**: $${e1} - (${e2})$.`,
           `Vorsicht: Du ziehst $${e2}$ ab, also eine negative Zahl. Minus minus ergibt **plus**: $${e1} - (${e2})$.`,
         ),
+        true,
       );
-    add(asNum(e2 - e1), T_ORDER, order(frac));
+    add(asNum(e2 - e1), T_ORDER, order(frac), true);
     if (e1 % e2 === 0) add(asNum(e1 / e2), T_EXP_DIV, EXP_DIV);
     if (e1 < 0)
       add(
@@ -671,6 +675,7 @@ function quotientMistakes(e1: number, e2: number, frac: boolean): Mistake[] {
           `Careful, the first exponent is $${e1}$, so it's negative! Start at $${e1}$ and then subtract.`,
           `Vorsicht, der erste Exponent ist $${e1}$, also negativ! Fang bei $${e1}$ an und zieh dann ab.`,
         ),
+        true,
       );
   });
 }
@@ -690,7 +695,7 @@ function rulesMistakes(b: number, e1: number, e2: number, div: boolean): Mistake
       );
       if (e1 % e2 === 0) add(asNum(b ** (e1 / e2)), T_EXP_DIV, EXP_DIV);
     } else {
-      if (e1 === 1 || e2 === 1) add(asNum(b ** (r - 1)), loneTitle(String(b)), loneSay(String(b)));
+      if (e1 === 1 || e2 === 1) add(asNum(b ** (r - 1)), loneTitle(String(b)), loneSay(String(b)), true);
       add(
         asNum((b * b) ** r),
         tx("Bases multiplied too", "Basen mitmultipliziert"),
@@ -719,7 +724,7 @@ function powerOfPowerMistakes(v: string, e1: number, k: number, extra: number | 
           `Ich glaub, ich weiß, was du gemacht hast: Du hast $${pp(e1, k)}$ gerechnet. Aber $(${pp(v, e1)})^{${k}}$ heißt: $${pp(v, e1)}$ wird $${k}$-mal mit sich selbst multipliziert, im Exponenten steht also $${e1} \\cdot ${k}$.`,
         ),
       );
-    if (extra === 1) add(asNum(e1 * k), loneTitle(v), loneSay(v));
+    if (extra === 1) add(asNum(e1 * k), loneTitle(v), loneSay(v), true);
     else if (extra !== null)
       add(
         asNum(e1 * k * extra),
@@ -737,8 +742,17 @@ function powerOfPowerMistakes(v: string, e1: number, k: number, extra: number | 
           `Careful with the sign: the exponent in the bracket is $${e1}$, and $${par(e1)} \\cdot ${k}$ is negative.`,
           `Vorsicht mit dem Vorzeichen: Der Exponent in der Klammer ist $${e1}$, und $${par(e1)} \\cdot ${k}$ ist negativ.`,
         ),
+        true,
       );
-    if (extra !== null && extra < 0) add(asNum(e1 * k - extra), T_LOST_MINUS, lostMinusAdd(v, extra));
+    if (extra !== null && extra < 0) add(asNum(e1 * k - extra), T_LOST_MINUS, lostMinusAdd(v, extra), true);
+    add(
+      asNum(e1 + x),
+      T_OUTER_LOST,
+      tx(
+        `Hmm, it looks like the outer exponent $${k}$ got lost. $(${pp(v, e1)})^{${k}}$ means $${pp(v, e1)}$ taken $${k}$ times.`,
+        `Hm, sieht so aus, als wäre der äußere Exponent $${k}$ verloren gegangen. $(${pp(v, e1)})^{${k}}$ heißt: $${pp(v, e1)}$ wird $${k}$-mal mit sich selbst multipliziert.`,
+      ),
+    );
   });
 }
 
@@ -778,6 +792,7 @@ function tenPowerMistakes(e: number): Mistake[] {
           `Nearly! Count the places, not the zeros: the $1$ itself is one of the $${e}$ places after the comma.`,
           `Fast! Zähl die Stellen, nicht die Nullen: Die $1$ selbst ist eine der $${e}$ Stellen nach dem Komma.`,
         ),
+        true,
       );
     add(asNum(-(10 ** e)), T_NOT_NEG, NOT_NEG);
     add(asNum(-Number(`1e-${e}`)), T_NOT_NEG, NOT_NEG);
@@ -828,8 +843,9 @@ function negProductMistakes(b: number, e1: number, e2: number): Mistake[] {
           `Nearly! The exponent $0$ is right. But $${b}^0$ isn't $0$: think of $${b} : ${b}$, a number divided by itself.`,
           `Fast! Der Exponent $0$ stimmt. Aber $${b}^0$ ist nicht $0$: Denk an $${b} : ${b}$, eine Zahl geteilt durch sich selbst.`,
         ),
+        true,
       );
-    if (b ** (e1 + e2) <= 1000) add(asNum(b ** (e1 + e2)), T_LOST_MINUS, lostMinusAdd(String(b), -e1));
+    if (b ** (e1 + e2) <= 1000) add(asNum(b ** (e1 + e2)), T_LOST_MINUS, lostMinusAdd(String(b), -e1), true);
     add(asNum(b * r), T_BASE_TIMES, ruleThenTimes(b, r));
     add(asNum(-(b ** r)), T_NOT_NEG, NOT_NEG);
   });
@@ -849,6 +865,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
           "Nearly! The number is smaller than $1$ and the comma moved to the **right**, so the exponent is negative.",
           "Fast! Die Zahl ist kleiner als $1$, und das Komma ist nach **rechts** gerutscht, also ist der Exponent negativ.",
         ),
+        true,
       );
       add(
         at(mant, e + 1),
@@ -857,6 +874,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
           `Ah, I see what happened! You counted the zeros after the comma. But the comma also has to jump over the $${digits[0]}$, so count the places it moves.`,
           `Ah, ich seh, was passiert ist! Du hast die Nullen nach dem Komma gezählt. Aber das Komma muss auch noch über die $${digits[0]}$ springen. Zähl die Stellen, um die es rutscht.`,
         ),
+        true,
       );
     } else {
       if (two)
@@ -867,6 +885,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
             `Ah, I see what happened! You counted the zeros. But the comma also jumps over the $${digits[1]}$, so count the places it moves.`,
             `Ah, ich seh, was passiert ist! Du hast die Nullen gezählt. Aber das Komma springt auch über die $${digits[1]}$. Zähl die Stellen, um die es rutscht.`,
           ),
+          true,
         );
       add(
         at(mant, -e),
@@ -875,6 +894,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
           "Nearly! The number is big and the comma moved to the **left**, so the exponent is positive.",
           "Fast! Die Zahl ist groß, und das Komma ist nach **links** gerutscht, also ist der Exponent positiv.",
         ),
+        true,
       );
     }
     if (two)
@@ -885,6 +905,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
           `The value is right, nice! But $a$ has to be between $1$ and $10$, and $${digits}$ is too big. Move the comma one more place.`,
           `Der Wert stimmt, stark! Aber $a$ muss zwischen $1$ und $10$ liegen, und $${digits}$ ist zu groß. Verschieb das Komma noch um eine Stelle.`,
         ),
+        true,
       );
   });
 }
@@ -913,6 +934,7 @@ function sciBackMistakes(digits: string, mant: number, e: number): Mistake[] {
             `Nearly! The comma moves $${k}$ places, but that's not $${k}$ zeros: the $${digits[0]}$ itself takes one of the places.`,
             `Fast! Das Komma rutscht um $${k}$ Stellen, das sind aber nicht $${k}$ Nullen: Die $${digits[0]}$ selbst belegt eine der Stellen.`,
           ),
+      true,
     );
   });
 }
@@ -939,7 +961,7 @@ function bracketMistakes(v: string, k: number, e1: number, j: number, d: number,
     );
     if (Math.abs(k) !== 1) add(at(by(k * j), n), T_BASE_TIMES, baseTimes(par(k), j));
     if (e1 !== 1) add(at(by(K), divide ? e1 + j - e2 : e1 + j + e2), T_POW_ADD, powAdd(v, e1, j));
-    if (k < 0) add(at(by(-K), n), T_COUNT_MINUS, countMinus(j, par(k)));
+    if (k < 0) add(at(by(-K), n), T_COUNT_MINUS, countMinus(j, par(k)), true);
   });
 }
 
@@ -956,6 +978,7 @@ function rootSplitSlips(N: number, t: number, add: AddMistake, at: (a: number, b
         `Good start, and the value is right! But $${N / (u * u)}$ still hides a square number. Look for the **biggest** square in $${N}$.`,
         `Guter Anfang, und der Wert stimmt! Aber in $${N / (u * u)}$ steckt noch eine Quadratzahl. Such die **größte** Quadratzahl in $${N}$.`,
       ),
+      true,
     );
   }
   add(
@@ -965,6 +988,7 @@ function rootSplitSlips(N: number, t: number, add: AddMistake, at: (a: number, b
       `Nearly! You found the square $${s * s}$, great. But what comes out in front is its root, $\\sqrt{${s * s}}$, not $${s * s}$ itself.`,
       `Fast! Die Quadratzahl $${s * s}$ hast du gefunden, super. Aber vor die Wurzel kommt ihre Wurzel, $\\sqrt{${s * s}}$, nicht die $${s * s}$ selbst.`,
     ),
+    true,
   );
 }
 
@@ -981,6 +1005,7 @@ function rootMistakes(N: number, t = 1): Mistake[] {
           `You simplified $\\sqrt{${N}}$ correctly! But the $${t}$ in front is still there: multiply it by the number that comes out.`,
           `$\\sqrt{${N}}$ hast du richtig vereinfacht! Aber die $${t}$ davor ist ja noch da: Multipliziere sie mit der Zahl, die herauskommt.`,
         ),
+        true,
       );
       add(
         at(t + s, r),
@@ -1008,6 +1033,7 @@ function rootPairMistakes(a: number, b: number): Mistake[] {
         `$\\sqrt{${a}} \\cdot \\sqrt{${b}} = \\sqrt{${N}}$ is right, nice! Now simplify it: look for the biggest square in $${N}$.`,
         `$\\sqrt{${a}} \\cdot \\sqrt{${b}} = \\sqrt{${N}}$ stimmt, stark! Jetzt noch vereinfachen: Such die größte Quadratzahl in $${N}$.`,
       ),
+      true,
     );
     rootSplitSlips(N, 1, add, at);
   });
@@ -1051,6 +1077,7 @@ function rootSumMistakes(r: number, s1: number, s2: number, minus: boolean): Mis
           `Nearly! A root on its own, $\\sqrt{${r}}$, counts as $1\\sqrt{${r}}$. Don't forget that $1$.`,
           `Fast! Eine Wurzel ganz allein, $\\sqrt{${r}}$, zählt als $1\\sqrt{${r}}$. Vergiss diese $1$ nicht.`,
         ),
+        true,
       );
     }
   });
@@ -1068,8 +1095,8 @@ function decimalRootMistakes(k: number): Mistake[] {
   const N = (k * k) / 100;
   const T_SQUARE = tx("Check by squaring", "Mach die Quadratprobe");
   return collect(asNum(k / 10), (add) => {
-    add(asNum(k / 100), T_SQUARE, squareCheck(k / 100, N));
-    add(asNum(k), T_SQUARE, squareCheck(k, N));
+    add(asNum(k / 100), T_SQUARE, squareCheck(k / 100, N), true);
+    add(asNum(k), T_SQUARE, squareCheck(k, N), true);
     add(asNum(N / 2), T_HALF, half(dec(N)));
   });
 }
@@ -1108,6 +1135,7 @@ function rootCalcMistakes(a: number, b: number, value: number, divide: boolean):
         `One root for both was right: $\\sqrt{${a} ${op} ${b}}$. But then you still need the root of $${inside}$!`,
         `Beide unter eine Wurzel, richtig: $\\sqrt{${a} ${op} ${b}}$. Aber dann musst du aus $${inside}$ noch die Wurzel ziehen!`,
       ),
+      true,
     );
     add(asNum(inside / 2), T_HALF, half(String(inside)));
   });
@@ -1127,7 +1155,7 @@ function coefProductMistakes(v: string, c1: number, c2: number, e1: number, e2: 
       ),
     );
     add(at(c1 * c2, e1 * e2), T_EXP_MUL, EXP_MUL);
-    if (e2 < 0) add(at(c1 * c2, e1 - e2), T_LOST_MINUS, lostMinusAdd(v, e2));
+    if (e2 < 0) add(at(c1 * c2, e1 - e2), T_LOST_MINUS, lostMinusAdd(v, e2), true);
   });
 }
 
@@ -1144,7 +1172,7 @@ function coefQuotientMistakes(top: number, d: number, e1: number, e2: number): M
         "Der Exponent stimmt! Aber die Zahlen bilden auch einen Bruch, also **teilst** du sie.",
       ),
     );
-    add(at(c, e2 - e1), T_ORDER, order(true));
+    add(at(c, e2 - e1), T_ORDER, order(true), true);
     add(at(c, e1 + e2), T_EXP_ADD, EXP_ADD);
     if (e1 % e2 === 0) add(at(c, e1 / e2), T_EXP_DIV, EXP_DIV);
   });
@@ -1172,7 +1200,7 @@ function twoVarBracketMistakes(u: string, w: string, k: number, p1: number, q1: 
     );
     add(
       at(p1 + p2, q1 + q2),
-      tx("Outer exponent lost", "Äußerer Exponent verloren"),
+      T_OUTER_LOST,
       tx(
         `Hmm, it looks like the outer exponent $${k}$ got lost. Multiply every exponent in the bracket by $${k}$ first.`,
         `Hm, sieht so aus, als wäre der äußere Exponent $${k}$ verloren gegangen. Multipliziere zuerst jeden Exponenten in der Klammer mit $${k}$.`,
@@ -1185,7 +1213,7 @@ function twoVarBracketMistakes(u: string, w: string, k: number, p1: number, q1: 
 function twoVarQuotientMistakes(p1: number, q1: number, p2: number, q2: number): Mistake[] {
   const at = pairOf(["m", "n"]);
   return collect(at(p1 - p2, q1 - q2), (add) => {
-    add(at(p2 - p1, q2 - q1), T_ORDER, order(true));
+    add(at(p2 - p1, q2 - q1), T_ORDER, order(true), true);
     add(at(p1 + p2, q1 + q2), T_EXP_ADD, EXP_ADD);
   });
 }
@@ -1207,6 +1235,7 @@ function sciCalcMistakes(a1: number, e1: number, a2: number, e2: number, div: bo
           `The calculation is right! But $a = ${dec(P)}$ isn't between $1$ and $10$. Move the comma and adjust $n$ so the value stays the same.`,
           `Die Rechnung stimmt! Aber $a = ${dec(P)}$ liegt nicht zwischen $1$ und $10$. Verschieb das Komma und pass $n$ so an, dass der Wert gleich bleibt.`,
         ),
+        true,
       );
       add(
         at(mant, E - shift),
@@ -1220,10 +1249,11 @@ function sciCalcMistakes(a1: number, e1: number, a2: number, e2: number, div: bo
               "Nearly! $a$ got 10 times bigger, so $10^n$ has to get 10 times smaller to keep the value: $n$ goes **down** by one.",
               "Fast! $a$ ist 10-mal größer geworden, also muss $10^n$ 10-mal kleiner werden, damit der Wert gleich bleibt: $n$ wird um eins **kleiner**.",
             ),
+        true,
       );
     }
     if (div) {
-      add(at(mant, e2 - e1 + shift), T_ORDER, order(false));
+      add(at(mant, e2 - e1 + shift), T_ORDER, order(false), true);
       add(at(mant, e1 + e2 + shift), T_EXP_ADD, EXP_ADD);
     } else add(at(mant, e1 * e2 + shift), T_EXP_MUL, EXP_MUL);
   });
@@ -1269,8 +1299,9 @@ function negQuotientMistakes(b: number, e1: number, e2: number): Mistake[] {
           `Careful: you subtract $-${e2}$, a negative number. Minus a negative is **plus**: $-${e1} - (-${e2})$.`,
           `Vorsicht: Du ziehst $-${e2}$ ab, also eine negative Zahl. Minus minus ergibt **plus**: $-${e1} - (-${e2})$.`,
         ),
+        true,
       );
-    add(asNum(b ** -r), T_ORDER, order(true));
+    add(asNum(b ** -r), T_ORDER, order(true), true);
     add(asNum(b * r), T_BASE_TIMES, ruleThenTimes(b, r));
   });
 }

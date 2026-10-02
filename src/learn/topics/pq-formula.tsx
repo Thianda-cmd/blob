@@ -348,13 +348,15 @@ type WrongStart = { left: Term[]; title: Text; lead: Text; body: Text };
  */
 function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongStart[] = []): Mistake[] {
   const list: Mistake[] = [];
-  const add = (sol: number[] | null, title: Text, lead: Text, body: Text, part = false) => {
+  /** `part`: may be just one of the right solutions. `close`: a near miss, Blob looks thoughtful. */
+  const add = (sol: number[] | null, title: Text, lead: Text, body: Text, { part = false, close = false } = {}) => {
     if (!sol || list.length >= 5) return;
     const vals = [...new Set(sol.map(typed))];
     if (sameSet(vals, values) || list.some((m) => m.when.kind === "solutions" && sameSet(m.when.values, vals))) return;
     // Only part of the right answer: the general "one more to find" says that better.
     if (!part && vals.length && vals.length < values.length && vals.every((v) => values.some((w) => near(v, w)))) return;
-    list.push({ when: { kind: "solutions", variable: "x", values: vals, allowNone: true }, title, say: cat(vals.length ? lead : NONE_LEAD, body) });
+    const when = { kind: "solutions" as const, variable: "x", values: vals, allowNone: true };
+    list.push({ when, title, say: cat(vals.length ? lead : NONE_LEAD, body), ...(close ? { close } : {}) });
   };
 
   const { a: A, b: B, c: C } = coefsOf(left, right);
@@ -394,7 +396,7 @@ function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongS
         "Did you divide by $x$? That quietly throws away a solution. Factor out $x$ instead: a product is $0$ when **one** of its factors is $0$.",
         "Hast du durch $x$ geteilt? Dabei geht heimlich eine Lösung verloren. Klammere lieber $x$ aus: Ein Produkt ist $0$, wenn **einer** der Faktoren $0$ ist.",
       ),
-      true,
+      { part: true, close: true },
     );
     const s = p < 0 ? "-" : "+";
     add(
@@ -405,6 +407,7 @@ function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongS
         `$x = 0$ is right! For the other one, $x ${s} ${dec(Math.abs(p))} = 0$: when the $${dec(Math.abs(p))}$ moves over, its sign flips.`,
         `$x = 0$ stimmt! Für die andere gilt $x ${s} ${dec(Math.abs(p))} = 0$: Wenn die $${dec(Math.abs(p))}$ auf die andere Seite wandert, dreht sich ihr Vorzeichen.`,
       ),
+      { close: true },
     );
   } else if (B === 0 && C !== 0) {
     const rhs = -q;
@@ -483,6 +486,7 @@ function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongS
         `The formula starts with **minus** $\\frac{p}{2}$: with $p = ${dec(p)}$ that's $${halfP}$.`,
         `Die Formel beginnt mit **minus** $\\frac{p}{2}$: Mit $p = ${dec(p)}$ ist das $${halfP}$.`,
       ),
+      { close: true },
     );
   }
   if (q !== 0)
@@ -499,6 +503,7 @@ function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongS
             `Under the root it's $(\\frac{p}{2})^2 - q$, so you **subtract** $q = ${dec(q)}$. I think you added it.`,
             `Unter der Wurzel steht $(\\frac{p}{2})^2 - q$, du ziehst also $q = ${dec(q)}$ **ab**. Ich glaub, du hast $${dec(q)}$ addiert.`,
           ),
+      { close: true },
     );
   if (p !== 0) {
     const close = tx("Close! ", "Knapp! ");
@@ -510,12 +515,14 @@ function pqMistakes(left: Term[], right: Term[], values: number[], wrong: WrongS
         "Under the root it's $(\\frac{p}{2})^2$, not $p^2$. Halve $p$ first, then square it.",
         "Unter der Wurzel steht $(\\frac{p}{2})^2$, nicht $p^2$. Halbiere $p$ zuerst, dann quadrier es.",
       ),
+      { close: true },
     );
     add(
       pqValues(-p, D),
       tx("p instead of p/2", "p statt p/2"),
       close,
       tx("The formula starts with $-\\frac{p}{2}$, not $-p$. Halve $p$ there too.", "Die Formel beginnt mit $-\\frac{p}{2}$, nicht mit $-p$. Halbiere $p$ auch dort."),
+      { close: true },
     );
   }
   if (D < 0)

@@ -765,6 +765,14 @@ const convert: Tpl = (rng) => {
               `Huch, das ist ja mehr geworden! ${c.to} ist die **größere** Einheit, also bekommst du **weniger** davon. Teil durch ${c.f}.`,
             ),
       ),
+      wrong(
+        v,
+        tx("Not converted yet", "Noch nicht umgerechnet"),
+        tx(
+          `Hmm, that's the same number as in ${c.from}. But ${c.to} is a ${c.dir === "mul" ? "smaller" : "bigger"} unit, so the number has to change.`,
+          `Hm, das ist dieselbe Zahl wie in ${c.from}. Aber ${c.to} ist eine ${c.dir === "mul" ? "kleinere" : "größere"} Einheit, also muss sich die Zahl ändern.`,
+        ),
+      ),
       wf > 0 &&
         wrong(
           c.dir === "mul" ? v * wf : v / wf,

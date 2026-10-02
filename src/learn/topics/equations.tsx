@@ -718,13 +718,14 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
   const out: Mistake[] = [];
   const keyOf = (r: Run) => `${ineq ? r.rel : ""} ${r.value.n}/${r.value.d}`;
   const seen = new Set([keyOf(base)]);
-  const push = (run: Run | null, title: Text, say: (r: Run) => Text) => {
+  /** `close`: a near miss (right idea, one small slip), so Blob looks thoughtful and doesn't reveal the solution yet. */
+  const push = (run: Run | null, title: Text, say: (r: Run) => Text, close = false) => {
     if (!run || out.length >= 5 || seen.has(keyOf(run))) return;
     seen.add(keyOf(run));
     const when: AnswerSpec = ineq
       ? { kind: "inequality", variable: v, op: run.rel as Exclude<Rel, "=">, value: qvalue(run.value) }
       : { kind: "solutions", variable: v, values: [qvalue(run.value)] };
-    out.push({ when, title, say: say(run) });
+    out.push({ when, title, say: say(run), close });
   };
   const solve = (slip: Slip, l = L, r = R) => slipSolve(l, r, e.rel, slip);
   const xt = (q: Frac) => termSrc(term("", q, 1), v, true, false);
@@ -744,6 +745,7 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
               `Ooh, the classic trap! In the last step you divide by $${n(A)}$, and dividing by a negative number **flips** the sign.`,
               `Die klassische Falle! Im letzten Schritt teilst du durch $${n(A)}$, und beim Teilen durch eine negative Zahl dreht sich das Relationszeichen **um**.`,
             ),
+      true,
     );
     push(solve({ flip: true }), tx("Flipped for no reason", "Unnötig umgedreht"), ({ A }) =>
       A.n === 1 && A.d === 1
@@ -755,6 +757,7 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
             `You flipped the sign, but you only divide by $${n(A)}$, a positive number. It only flips for a **negative** factor; a minus somewhere else doesn't count.`,
             `Du hast das Relationszeichen umgedreht, aber du teilst nur durch $${n(A)}$, also durch eine positive Zahl. Umdrehen musst du nur bei einem **negativen** Faktor, ein Minus woanders zählt nicht.`,
           ),
+      true,
     );
   }
 
@@ -789,8 +792,8 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
       } else if (how === "no2") {
         push(run, tx("Middle term without the 2", "Mittelterm ohne die 2"), () =>
           tx(
-            "Nearly! The middle term of a squared bracket is **twice** the product: $(a + b)^2 = a^2 + 2ab + b^2$. Your $2$ got lost.",
-            "Fast! Der Mittelterm einer quadrierten Klammer ist das **Doppelte** des Produkts: $(a + b)^2 = a^2 + 2ab + b^2$. Bei dir ist die $2$ verloren gegangen.",
+            "Ooh, careful with the square! Its middle term is **twice** the product: $(a + b)^2 = a^2 + 2ab + b^2$. Your $2$ got lost.",
+            "Vorsicht beim Quadrat! Der Mittelterm ist das **Doppelte** des Produkts: $(a + b)^2 = a^2 + 2ab + b^2$. Bei dir ist die $2$ verloren gegangen.",
           ),
         );
       } else if (it.kind === "pp") {
@@ -859,7 +862,7 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
   const MINUS = tx("Minus sign dropped", "Minus unterschlagen");
 
   push(solve({ numSign: true }), NUM_SIGN, numSign);
-  if (!ineq) push(solve({ dropMinus: true }), MINUS, dropMinus);
+  if (!ineq) push(solve({ dropMinus: true }), MINUS, dropMinus, true);
   push(solve({ xSign: true }), X_SIGN, xSign);
   push(solve({ numSign: true, other: true }), NUM_SIGN, numSign);
   push(solve({ xSign: true, other: true }), X_SIGN, xSign);
@@ -869,7 +872,7 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
       `Ah, ich seh, was passiert ist! Du hast durch $${n(A)}$ geteilt, solange das $${signedQ(bx)}$ noch da war, aber das $${signedQ(bx)}$ hast du nicht mitgeteilt. Bring es zuerst weg und teile dann.`,
     ),
   );
-  if (ineq) push(solve({ dropMinus: true }), MINUS, dropMinus);
+  if (ineq) push(solve({ dropMinus: true }), MINUS, dropMinus, true);
   push(solve({ fracRecip: true }), tx("Multiplied instead of divided", "Multipliziert statt geteilt"), ({ A }) =>
     A.n === 1
       ? tx(
@@ -886,6 +889,7 @@ function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
       `Almost! Multiplying by $${A.d}$ was right, but that leaves $${A.n}${v}$, which still means $${A.n} \\cdot ${v}$. Divide by $${A.n}$ as well.`,
       `Fast! Mit $${A.d}$ multiplizieren war richtig, aber dann steht da $${A.n}${v}$, also $${A.n} \\cdot ${v}$. Teile noch durch $${A.n}$.`,
     ),
+    true,
   );
   push(solve({ dropNum: true }), tx("Only one side changed", "Nur eine Seite verändert"), ({ bx }) =>
     tx(

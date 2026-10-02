@@ -733,13 +733,14 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
   if (!steps.length) return [];
   const rightSrc = plain(right);
   const out: Mistake[] = [];
-  const push = (answer: N | null, title: Text, say: Text) => {
+  /** `close`: a near miss (right idea, one small slip), so Blob looks thoughtful and doesn't reveal the solution yet. */
+  const push = (answer: N | null, title: Text, say: Text, close = false) => {
     if (!answer || out.length >= 5 || has(answer, target)) return;
     const value = plain(answer);
     // Must be defined for the positive test values, and different from the answer and from the other slips.
     if (!equivalentText(value, value, { positive: true }) || equivalentText(value, rightSrc, { positive: true })) return;
     if (out.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, value, { positive: true }))) return;
-    out.push({ when: { kind: "expr", value, positive: true }, title, say });
+    out.push({ when: { kind: "expr", value, positive: true }, title, say, close });
   };
   const find = (pred: (tr: Trace) => boolean, last = false) => (last ? steps.findLastIndex(pred) : steps.findIndex(pred));
   /** The answer with step `i` done the way `twist` says. */
@@ -806,12 +807,12 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
       div ? tx("Not every term divided", "Nicht jeden Summanden geteilt") : tx("Not every term multiplied", "Nicht jeden Summanden multipliziert"),
       div
         ? tx(
-            `Nearly! Only $${bare(items[0])}$ got divided by $${F}$, but $${show(items[1].n)}$ has to be divided too. Put the whole side over one fraction bar.`,
-            `Fast! Nur $${bare(items[0])}$ wurde durch $${F}$ geteilt, aber $${show(items[1].n)}$ muss auch geteilt werden. Schreib die ganze Seite über einen Bruchstrich.`,
+            `Ah, I see what happened! Only $${bare(items[0])}$ got divided by $${F}$, but $${show(items[1].n)}$ has to be divided too. Put the whole side over one fraction bar.`,
+            `Ah, ich seh, was passiert ist! Nur $${bare(items[0])}$ wurde durch $${F}$ geteilt, aber $${show(items[1].n)}$ muss auch geteilt werden. Schreib die ganze Seite über einen Bruchstrich.`,
           )
         : tx(
-            `Nearly! Only $${bare(items[0])}$ got multiplied by $${F}$, but $${show(items[1].n)}$ has to be multiplied too. Put the whole side in brackets.`,
-            `Fast! Nur $${bare(items[0])}$ wurde mit $${F}$ multipliziert, aber $${show(items[1].n)}$ muss auch mit. Setz die ganze Seite in Klammern.`,
+            `Ah, I see what happened! Only $${bare(items[0])}$ got multiplied by $${F}$, but $${show(items[1].n)}$ has to be multiplied too. Put the whole side in brackets.`,
+            `Ah, ich seh, was passiert ist! Nur $${bare(items[0])}$ wurde mit $${F}$ multipliziert, aber $${show(items[1].n)}$ muss auch mit. Setz die ganze Seite in Klammern.`,
           ),
     );
   }
@@ -828,6 +829,7 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
         `So close! But $${b}$ is squared, and that square never got undone. You still need a **square root**.`,
         `Ganz knapp! Aber $${b}$ ist quadriert, und das Quadrat hast du nicht rückgängig gemacht. Es fehlt noch eine **Wurzel**.`,
       ),
+      true,
     );
   }
   if (squareAt >= 0) {
@@ -840,6 +842,7 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
         `Almost! $${body}$ sits under a square root, and that root never got undone. Square **both** sides first.`,
         `Fast! $${body}$ steht unter einer Wurzel, und die hast du nicht rückgängig gemacht. Quadriere zuerst **beide** Seiten.`,
       ),
+      true,
     );
   }
   // √(c² − b²) taken as c − b.
@@ -939,6 +942,7 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
           `I think you meant the right thing, but brackets are missing: typed like that, only $${show(head)}$ is under the fraction bar. Put the whole denominator in brackets.`,
           `Ich glaub, du meinst das Richtige, aber es fehlen Klammern: So getippt steht nur $${show(head)}$ unter dem Bruchstrich. Setz den ganzen Nenner in Klammern.`,
         ),
+        true,
       );
     }
     // Divided the wrong way round: D/O instead of O/D.
@@ -971,6 +975,7 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
             `I think you meant the right thing, but brackets are missing: typed like that, only $${lastX}$ gets multiplied by $${F}$. Put $${show(tr.O)}$ in brackets.`,
             `Ich glaub, du meinst das Richtige, aber es fehlen Klammern: So getippt wird nur $${lastX}$ mit $${F}$ multipliziert. Setz $${show(tr.O)}$ in Klammern.`,
           ),
+      true,
     );
   }
 
