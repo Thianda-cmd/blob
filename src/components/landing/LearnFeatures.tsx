@@ -1,12 +1,13 @@
 "use client";
 
 import { Flame } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
+import { useId, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
-import { MATHS_CATALOG, topicHref } from "@/learn/catalog";
+import { subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
 import { cn } from "@/lib/utils";
 
@@ -155,33 +156,57 @@ function Streak() {
 export function TopicGrid() {
   const t = useMessages(landingText).learn.topics;
   const locale = useLocale();
+  const scope = useId();
+  const [subject, setSubject] = useState<Subject>("maths");
+  const catalog = subjectCatalog(subject);
   return (
     <div className="mt-14">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em]">{t.title}</h3>
-        <p className="text-[13.5px] text-ink-3">{t.body}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em]">{t.title}</h3>
+          <p className="text-[13.5px] text-ink-3">{t.body[subject]}</p>
+        </div>
+        <div className="flex rounded-xl border border-line bg-raised p-1 shadow-card" role="tablist">
+          {(["maths", "chemistry"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={subject === s}
+              onClick={() => setSubject(s)}
+              className={cn("relative h-8 rounded-lg px-3.5 text-[13.5px] font-medium transition-colors", subject === s ? "text-white" : "text-ink-2 hover:text-ink")}
+            >
+              {subject === s && <motion.span layoutId={`${scope}-subject`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+              <span className="relative">{t.subjects[s]}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 lg:gap-3">
-        {MATHS_CATALOG.map((topic, i) => (
-          <motion.li
-            key={topic.slug}
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor(i / 6) * 0.08, ease }}
-          >
-            <Link
-              href={topicHref(topic)}
-              className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
+        <AnimatePresence mode="popLayout" initial={false}>
+          {catalog.map((topic, i) => (
+            <motion.li
+              key={topic.slug}
+              layout
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor(i / 6) * 0.08, ease }}
             >
-              <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">
-                <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />
-              </span>
-              <span className="mt-2.5 px-1 text-[13.5px] font-medium leading-snug">{resolveText(topic.title, locale)}</span>
-              <span className="mt-auto px-1 pb-0.5 pt-1 text-[12px] text-ink-3">{t.minutes(topic.minutes)}</span>
-            </Link>
-          </motion.li>
-        ))}
+              <Link
+                href={topicHref(topic)}
+                className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
+              >
+                <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">
+                  <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />
+                </span>
+                <span className="mt-2.5 px-1 text-[13.5px] font-medium leading-snug">{resolveText(topic.title, locale)}</span>
+                <span className="mt-auto px-1 pb-0.5 pt-1 text-[12px] text-ink-3">{t.minutes(topic.minutes)}</span>
+              </Link>
+            </motion.li>
+          ))}
+        </AnimatePresence>
       </ul>
     </div>
   );

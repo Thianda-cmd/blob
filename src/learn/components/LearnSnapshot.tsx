@@ -4,7 +4,8 @@ import { ArrowRight, Flame, Zap } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
-import { lastSubject, subjectCatalog, topicHref, upNext } from "@/learn/catalog";
+import { resolveText } from "@/i18n/text";
+import { lastSubject, subjectCatalog, SUBJECTS, topicHref, upNext } from "@/learn/catalog";
 import { DAILY_GOAL, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { cn } from "@/lib/utils";
@@ -47,7 +48,7 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
       </div>
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{started ? t.snapshot.keepPractising : t.snapshot.upNext}</div>
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{started ? t.snapshot.keepPractising : t.snapshot.upNext(resolveText(SUBJECTS.find((x) => x.slug === next.subject)!.title, locale))}</div>
           <div className="mt-0.5 truncate text-[15px] font-semibold">{names.title}</div>
           <div className="truncate text-[12.5px] text-ink-3">
             {names.school ?? names.area} · {masteryLabel(mastery, locale)}

@@ -205,7 +205,7 @@ export const learnText = defineMessages({
       goalReached: "Daily goal reached. Nice!",
       goalHint: "A short lesson gets you there.",
       keepPractising: "Keep practising",
-      upNext: "Up next in maths",
+      upNext: (subject: string) => `Up next in ${subject.toLowerCase()}`,
     },
 
     meta: {
@@ -412,7 +412,7 @@ export const learnText = defineMessages({
       goalReached: "Tagesziel erreicht. Stark!",
       goalHint: "Eine kurze Lektion, und du hast es.",
       keepPractising: "Weiter üben",
-      upNext: "Als Nächstes in Mathe",
+      upNext: (subject) => `Als Nächstes in ${subject}`,
     },
 
     meta: {

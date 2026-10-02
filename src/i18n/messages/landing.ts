@@ -4,9 +4,9 @@ import { defineMessages } from "../define";
 export const landingText = defineMessages({
   en: {
     meta: {
-      title: "Blob — notes, presentations, homework and maths for school",
+      title: "Blob — notes, presentations, homework, maths and chemistry for school",
       description:
-        "One calm place for school: notes, presentations, homework and step-by-step maths lessons with Blob, your jelly tutor. Free and without ads.",
+        "One calm place for school: notes, presentations, homework and step-by-step maths and chemistry lessons with Blob, your jelly tutor. Free and without ads.",
     },
     header: {
       home: "Blob, home",
@@ -17,10 +17,10 @@ export const landingText = defineMessages({
     },
     nav: { learn: "Learn", presentations: "Presentations", notes: "Notes", homework: "Homework" },
     hero: {
-      badge: "New: learn maths with Blob",
+      badge: "New: chemistry with Blob",
       titleA: "Your school,",
       titleB: "sorted.",
-      body: "Notes, presentations, homework and maths lessons in one calm place. Blob, your jelly helper, saves everything as you go and explains maths step by step.",
+      body: "Notes, presentations, homework and lessons for maths and chemistry in one calm place. Blob, your jelly helper, saves everything as you go and explains every step.",
       cta: "Create your free space",
       haveAccount: "I have an account",
       fine: "Free. No ads. Your notes stay private to you.",
@@ -43,8 +43,8 @@ export const landingText = defineMessages({
     },
     learn: {
       kicker: "New · Learn with Blob",
-      title: "Maths that finally clicks.",
-      body: "Twelve topics straight from your maths lessons. Blob explains everything step by step, then you practise until it sticks.",
+      title: "Maths and chemistry that finally click.",
+      body: "Twelve topics each, straight from your lessons. Blob explains everything step by step, spots what went wrong in your answers, and you practise until it sticks.",
       demo: {
         label: "Live demo: removing brackets, step by step",
         solution: "Worked solution",
@@ -64,15 +64,16 @@ export const landingText = defineMessages({
       },
       stages: [
         { kicker: "Understand", title: "Guided lessons with Blob", body: "Worked solutions that build step by step, and widgets to play with." },
-        { kicker: "Practise", title: "Three levels that adapt to you", body: "Hints when you're stuck and instant feedback on every answer." },
+        { kicker: "Practise", title: "Three levels that adapt to you", body: "Blob reads every answer and tells you what probably went wrong." },
         { kicker: "Test", title: "Quick tests graded like at school", body: "Eight tasks, one try each, and a grade from 1 to 6 at the end." },
         { kicker: "Revise", title: "Cheat sheets to print", body: "Every rule of a topic on one page, with examples." },
         { kicker: "Keep going", title: "XP, a daily goal and streaks", body: "A little every day adds up. Blob keeps count." },
       ],
       visuals: { level: "Level 2", correct: "Correct!", grade: "Grade", good: "Good", rule: "Minus in front" },
       topics: {
-        title: "12 topics from class",
-        body: "From brackets to the pq formula.",
+        title: "24 topics from class",
+        subjects: { maths: "Maths", chemistry: "Chemistry" },
+        body: { maths: "From brackets to the pq formula.", chemistry: "From atoms to alkanes." },
         minutes: (n: number) => `${n} min`,
       },
     },
@@ -162,9 +163,9 @@ export const landingText = defineMessages({
   },
   de: {
     meta: {
-      title: "Blob – Notizen, Präsentationen, Hausaufgaben und Mathe für die Schule",
+      title: "Blob – Notizen, Präsentationen, Hausaufgaben, Mathe und Chemie für die Schule",
       description:
-        "Ein ruhiger Ort für die Schule: Notizen, Präsentationen, Hausaufgaben und Mathe-Lektionen Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
+        "Ein ruhiger Ort für die Schule: Notizen, Präsentationen, Hausaufgaben und Lektionen in Mathe und Chemie, Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
     },
     header: {
       home: "Blob, Startseite",
@@ -175,10 +176,10 @@ export const landingText = defineMessages({
     },
     nav: { learn: "Lernen", presentations: "Präsentationen", notes: "Notizen", homework: "Hausaufgaben" },
     hero: {
-      badge: "Neu: Mathe lernen mit Blob",
+      badge: "Neu: Chemie lernen mit Blob",
       titleA: "Deine Schule",
       titleB: "im Griff.",
-      body: "Notizen, Präsentationen, Hausaufgaben und Mathe-Lektionen an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir Mathe Schritt für Schritt.",
+      body: "Notizen, Präsentationen, Hausaufgaben und Lektionen für Mathe und Chemie an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir jeden Schritt.",
       cta: "Kostenlos loslegen",
       haveAccount: "Ich habe schon ein Konto",
       fine: "Kostenlos. Ohne Werbung. Deine Notizen siehst nur du.",
@@ -201,8 +202,8 @@ export const landingText = defineMessages({
     },
     learn: {
       kicker: "Neu · Lernen mit Blob",
-      title: "Mathe, bei der es endlich Klick macht.",
-      body: "Zwölf Themen direkt aus dem Matheunterricht. Blob erklärt dir alles Schritt für Schritt, danach übst du, bis es sitzt.",
+      title: "Mathe und Chemie, bei denen es endlich Klick macht.",
+      body: "Je zwölf Themen direkt aus dem Unterricht. Blob erklärt dir alles Schritt für Schritt, merkt, wo es in deiner Antwort hakt, und du übst, bis es sitzt.",
       demo: {
         label: "Live-Demo: Klammern auflösen, Schritt für Schritt",
         solution: "Lösungsweg",
@@ -222,15 +223,16 @@ export const landingText = defineMessages({
       },
       stages: [
         { kicker: "Verstehen", title: "Geführte Lektionen mit Blob", body: "Lösungswege, die sich Schritt für Schritt aufbauen, und Widgets zum Ausprobieren." },
-        { kicker: "Üben", title: "Drei Stufen, die sich dir anpassen", body: "Tipps, wenn du hängst, und sofort Feedback zu jeder Antwort." },
+        { kicker: "Üben", title: "Drei Stufen, die sich dir anpassen", body: "Blob liest jede Antwort und sagt dir, wo es vermutlich gehakt hat." },
         { kicker: "Testen", title: "Schnelltests mit Note wie in der Schule", body: "Acht Aufgaben, je ein Versuch, am Ende eine Note von 1 bis 6." },
         { kicker: "Wiederholen", title: "Spickzettel zum Ausdrucken", body: "Alle Regeln eines Themas auf einer Seite, mit Beispielen." },
         { kicker: "Dranbleiben", title: "XP, Tagesziel und Serien", body: "Jeden Tag ein bisschen bringt mehr, als du denkst. Blob zählt mit." },
       ],
       visuals: { level: "Stufe 2", correct: "Richtig!", grade: "Note", good: "Gut", rule: "Minus davor" },
       topics: {
-        title: "12 Themen aus dem Unterricht",
-        body: "Von der Klammer bis zur pq-Formel.",
+        title: "24 Themen aus dem Unterricht",
+        subjects: { maths: "Mathe", chemistry: "Chemie" },
+        body: { maths: "Von der Klammer bis zur pq-Formel.", chemistry: "Vom Atombau bis zu den Alkanen." },
         minutes: (n) => `${n} Min.`,
       },
     },
