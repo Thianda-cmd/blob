@@ -1062,7 +1062,7 @@ const ionicBonds: Topic = {
     },
     {
       title: tx("Charge from the main group", "Ladung aus der Hauptgruppe"),
-      body: tx("Main groups I, II, III: $+1$, $+2$, $+3$. Main groups V, VI, VII: $-3$, $-2$, $-1$.", "Hauptgruppen I, II, III: $+1$, $+2$, $+3$. Hauptgruppen V, VI, VII: $-3$, $-2$, $-1$."),
+      body: tx("Main groups I, II, III: $+1, +2, +3$. Main groups V, VI, VII: $-3, -2, -1$.", "Hauptgruppen I, II, III: $+1, +2, +3$. Hauptgruppen V, VI, VII: $-3, -2, -1$."),
       examples: [`${ce("Na+")} \\quad ${ce("Mg^2+")} \\quad ${ce("Al^3+")}`, `${ce("N^3-")} \\quad ${ce("O^2-")} \\quad ${ce("Cl-")}`],
       tone: "rule",
     },

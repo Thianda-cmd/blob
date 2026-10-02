@@ -201,6 +201,20 @@ export function checkWord(accept: Text[], input: string): Feedback {
   // chlorite and chlorate are different substances.
   // A dropped or extra last letter ("chlorid" for "chloride") is a typo, not another substance.
   const sameEnding = (w: string) => u.slice(-3) === w.slice(-3) || u === w.slice(0, -1) || w === u.slice(0, -1);
+  // Roman numerals and numbers carry meaning too: Eisen(II)-oxid is not Eisen(III)-oxid.
+  const marks = (x: string) => (x.match(/\([^)]*\)|\d+/g) ?? []).join("|");
+  const romanOff = all.find((w) => marks(w) !== marks(u) && distance(u, w) <= 2);
+  if (romanOff) {
+    return {
+      correct: false,
+      partial: true,
+      title: tx("Check the number", "Prüf die Zahl"),
+      message: tx(
+        "Nearly! But look at the number again: the Roman numeral is the charge of the metal ion, so it has to match the formula.",
+        "Fast! Aber schau dir die Zahl noch mal an: Die römische Zahl ist die Ladung des Metall-Ions, sie muss zur Formel passen.",
+      ),
+    };
+  }
   if (all.some((w) => w.length >= 7 && distance(u, w) <= 1 && sameEnding(w))) return { correct: true };
   const near = all.find((w) => distance(u, w) <= Math.max(2, Math.floor(w.length / 5)));
   if (near && !sameEnding(near) && u.slice(0, -3) && near.startsWith(u.slice(0, Math.max(3, u.length - 4)))) {
