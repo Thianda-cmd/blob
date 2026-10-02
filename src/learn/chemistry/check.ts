@@ -4,7 +4,10 @@
 
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { Feedback } from "@/learn/types";
+import { element, type Category } from "./elements";
 import { gcdAll, parseEquation, parseFormula, sameCounts, unbalanced, type Counts } from "./formula";
+
+const METALS = new Set<Category>(["alkali", "alkaline-earth", "transition", "post-transition", "lanthanide", "actinide"]);
 
 // ---------------------------------------------------------------------------
 // Formulas
@@ -72,12 +75,16 @@ function diagnoseFormula(target: string, input: string): Omit<Feedback, "correct
         partial: true,
       };
     }
+    // Salts (a metal or ammonium inside) are about charges; molecules about counting atoms.
+    const salt = Object.keys(wc).some((el) => METALS.has(element(el)?.category ?? "unknown")) || /NH4/.test(target);
     return {
       title: tx("Ratio isn't right", "Verhältnis stimmt nicht"),
-      message: tx(
-        "The right elements, but the numbers don't fit. Think about the charges: in a salt the positive and negative charges add up to zero.",
-        "Die richtigen Elemente, aber die Zahlen passen nicht. Denk an die Ladungen: In einem Salz gleichen sich positive und negative Ladungen genau aus.",
-      ),
+      message: salt
+        ? tx(
+            "The right elements, but the numbers don't fit. Think about the charges: in a salt the positive and negative charges add up to zero.",
+            "Die richtigen Elemente, aber die Zahlen passen nicht. Denk an die Ladungen: In einem Salz gleichen sich positive und negative Ladungen genau aus.",
+          )
+        : tx("The right elements, but the numbers don't fit. Count the atoms of each element again.", "Die richtigen Elemente, aber die Zahlen passen nicht. Zähl die Atome jedes Elements noch mal."),
       mark,
     };
   }
@@ -205,14 +212,17 @@ export function checkWord(accept: Text[], input: string): Feedback {
   const marks = (x: string) => (x.match(/\([^)]*\)|\d+/g) ?? []).join("|");
   const romanOff = all.find((w) => marks(w) !== marks(u) && distance(u, w) <= 2);
   if (romanOff) {
+    const roman = /\(/.test(marks(romanOff) + marks(u));
     return {
       correct: false,
       partial: true,
       title: tx("Check the number", "Prüf die Zahl"),
-      message: tx(
-        "Nearly! But look at the number again: the Roman numeral is the charge of the metal ion, so it has to match the formula.",
-        "Fast! Aber schau dir die Zahl noch mal an: Die römische Zahl ist die Ladung des Metall-Ions, sie muss zur Formel passen.",
-      ),
+      message: roman
+        ? tx(
+            "Nearly! But look at the number again: the Roman numeral is the charge of the metal ion, so it has to match the formula.",
+            "Fast! Aber schau dir die Zahl noch mal an: Die römische Zahl ist die Ladung des Metall-Ions, sie muss zur Formel passen.",
+          )
+        : tx("Nearly! The words are right, but check the numbers in the name once more.", "Fast! Die Wörter stimmen, aber prüf die Zahlen im Namen noch mal."),
     };
   }
   if (all.some((w) => w.length >= 7 && distance(u, w) <= 1 && sameEnding(w))) return { correct: true };

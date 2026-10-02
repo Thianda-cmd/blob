@@ -478,7 +478,7 @@ export function AnswerInput({
           placeholder="1"
           inputMode="numeric"
           aria-label={t.coefficient(i + 1)}
-          className={cn(fieldBase, tone(status), "h-11 w-12 px-1 text-center text-[20px] placeholder:text-ink-3/40 placeholder:[font-family:var(--font-math)]")}
+          className={cn(fieldBase, tone(status), "h-11 w-14 px-1 text-center text-[20px] tabular-nums placeholder:text-ink-3/40 placeholder:[font-family:var(--font-math)]")}
         />
       );
       const species = (list: string[], offset: number) =>

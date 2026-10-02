@@ -617,6 +617,50 @@ function nameExercise(sk: Skeleton, rng: Rng | null): Exercise {
   };
 }
 
+/** "Name this alkane", typed. Wrong names with a typical slip get Blob's reading of it. */
+function nameTypedExercise(sk: Skeleton): Exercise {
+  const g = graphOf(sk);
+  const nm = nameOf(g);
+  const L = nm.chain.length;
+  const mistakes: Mistake[] = [];
+  const seen = new Set([en(nm.name)]);
+  const add = (name: Text, title: Text, say: Text, close = false) => {
+    if (seen.has(en(name))) return;
+    seen.add(en(name));
+    mistakes.push({ when: { kind: "word", accept: [name] }, title, say, ...(close ? { close: true } : {}) });
+  };
+  for (const w of wrongNames(sk)) add(w.name, WRONG_SAY[w.kind][0], WRONG_SAY[w.kind][1], w.kind === "noMultiplier" || w.kind === "oneLocant" || w.kind === "order");
+  // The numbers left out completely.
+  const parts = partsOf(nm.subs, L);
+  if (parts.groups.length) {
+    const bare = txMap((_, l) => {
+      const mult = ["", "", "di", "tri", "tetra", "penta", "hexa"];
+      const body = parts.groups.map((x) => `${mult[x.locants.length]}${x.name}`).join("");
+      const out = body + (l === "de" ? PARENT_DE[L - 1].toLowerCase() : PARENT_EN[L - 1]);
+      return l === "de" ? out.replace(/[a-z]/, (c) => c.toUpperCase()) : out;
+    });
+    add(bare, tx("Numbers missing", "Nummern fehlen"), tx("Nearly! In front of each side chain goes the number of the C atom it hangs on.", "Fast! Vor jede Seitenkette gehört die Nummer des C-Atoms, an dem sie hängt."), true);
+    // One side chain moved by one place.
+    nm.subs.forEach((x, i) => {
+      for (const d of [-1, 1]) {
+        const pos = x.pos + d;
+        if (pos < 2 || pos > L - 1) continue;
+        const moved = nm.subs.map((y, j) => (j === i ? { ...y, pos } : y));
+        add(formatName(partsOf(moved, L)), tx("Check the numbers", "Prüf die Nummern"), tx("Look closely at which C atom of the main chain each side chain hangs on. Number from the end that reaches a branch first.", "Schau genau, an welchem C-Atom der Hauptkette jede Seitenkette hängt. Nummeriere von dem Ende, das zuerst eine Verzweigung erreicht."));
+      }
+    });
+  }
+  return {
+    instruction: tx("Name the alkane", "Benenne das Alkan"),
+    text: tx("What is the IUPAC name of this alkane? Write it like 2-methylbutane.", "Wie lautet der IUPAC-Name dieses Alkans? Schreib ihn z. B. so: 2-Methylbutan."),
+    visual: draw(sk),
+    answer: { kind: "word", accept: [nm.name], placeholder: tx("IUPAC name", "IUPAC-Name") },
+    hint: tx("1. Longest chain (it may bend!). 2. Number it so the side chains get the smallest numbers. 3. Side chains alphabetically, di/tri for repeats.", "1. Längste Kette (sie darf abknicken!). 2. So nummerieren, dass die Seitenketten die kleinsten Nummern bekommen. 3. Seitenketten alphabetisch, di/tri für gleiche."),
+    solution: namingFrames(sk),
+    mistakes,
+  };
+}
+
 function locantTask(rng: Rng): Exercise {
   let sk: Skeleton = { row: 6, branches: [{ at: 3, len: 1, dir: -1 }] };
   for (let i = 0; i < 50; i++) {
@@ -915,7 +959,10 @@ function generate(level: Level, rng: Rng): Exercise {
     return seriesStepTask(rng);
   }
   if (level === 2) {
-    if (r < 0.2) return nameExercise(randomSkeleton(rng, { minRow: 4, maxRow: 7, subs: [1, 2], ethyl: false, trap: "no", maxC: 9 }), rng);
+    if (r < 0.2) {
+      const sk = randomSkeleton(rng, { minRow: 4, maxRow: 7, subs: [1, 2], ethyl: false, trap: "no", maxC: 9 });
+      return rng.chance(0.5) ? nameTypedExercise(sk) : nameExercise(sk, rng);
+    }
     if (r < 0.32) return locantTask(rng);
     if (r < 0.5) return combustion(rng.pick([1, 3, 5, 7, 9]));
     if (r < 0.6) return rng.chance(0.5) ? formulaFromName(rng.int(5, 10)) : formulaFromH(rng);
@@ -924,7 +971,10 @@ function generate(level: Level, rng: Rng): Exercise {
     if (r < 0.9) return isomerChoiceTask(rng);
     return branchedFormulaTask(rng, 2);
   }
-  if (r < 0.22) return nameExercise(randomSkeleton(rng, { minRow: 4, maxRow: 7, subs: [1, 3], ethyl: true, trap: "maybe", maxC: 10 }), rng);
+  if (r < 0.22) {
+    const sk = randomSkeleton(rng, { minRow: 4, maxRow: 7, subs: [1, 3], ethyl: true, trap: "maybe", maxC: 10 });
+    return rng.chance(0.5) ? nameTypedExercise(sk) : nameExercise(sk, rng);
+  }
   if (r < 0.42) return combustion(rng.pick([2, 4, 6, 8, 10]));
   if (r < 0.56) return longestChainTask(rng);
   if (r < 0.7) return whatsWrongTask(rng);
@@ -1083,8 +1133,8 @@ const alkanes: Topic = {
       title: tx("Build an alkane", "Bau dir ein Alkan"),
       blob: tx("Tap plus and watch the chain grow, hydrogens and all!", "Tipp auf Plus und schau, wie die Kette wächst, samt Wasserstoff!"),
       body: tx(
-        "Left you see the **structural formula** with every bond. Right: the **molecular formula** (which atoms, how many) and the **condensed structural formula** (the chain with its CH₃ and CH₂ groups).",
-        "Links siehst du die **Strukturformel** mit jeder Bindung. Rechts: die **Summenformel** (welche Atome, wie viele) und die **Halbstrukturformel** (die Kette mit ihren CH₃- und CH₂-Gruppen).",
+        "You see the **structural formula** with every bond, below it the **condensed structural formula** (the chain with its CH₃ and CH₂ groups), and next to it the **molecular formula** (which atoms, how many).",
+        "Du siehst die **Strukturformel** mit jeder Bindung, darunter die **Halbstrukturformel** (die Kette mit ihren CH₃- und CH₂-Gruppen) und daneben die **Summenformel** (welche Atome, wie viele).",
       ),
       widget: AlkanesBuilder,
     },
