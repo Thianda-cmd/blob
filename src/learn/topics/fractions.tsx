@@ -444,7 +444,7 @@ const OF_STORIES: { unit: Unit; scale: number; max: number; text: (f: string, q:
     unit: "€",
     scale: 1,
     max: 120,
-    text: (f, q) => tx(`Mia gets ${q} € for her birthday. She saves ${f} of it. How much money does she save?`, `Mia bekommt ${q} € zum Geburtstag. Sie spart ${f} davon. Wie viel Geld spart sie?`),
+    text: (f, q) => tx(`Mia gets ${q} € for her birthday. She saves ${f} of it. How much money does she save?`, `Mia bekommt ${q}\u00a0€ zum Geburtstag. Sie spart ${f} davon. Wie viel Geld spart sie?`),
   },
   {
     unit: "km",
@@ -951,7 +951,7 @@ const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => Text; first:
     text: (q, f1, f2) =>
       tx(
         `Lena gets ${q} € pocket money. She spends ${f1} of it on a book and ${f2} of it on a cinema ticket. How much money does she have left?`,
-        `Lena bekommt ${q} € Taschengeld. Sie gibt ${f1} davon für ein Buch und ${f2} für eine Kinokarte aus. Wie viel Geld hat sie noch?`,
+        `Lena bekommt ${q}\u00a0€ Taschengeld. Sie gibt ${f1} davon für ein Buch und ${f2} für eine Kinokarte aus. Wie viel Geld hat sie noch?`,
       ),
     first: tx("The book", "Das Buch"),
     second: tx("The cinema ticket", "Die Kinokarte"),
@@ -960,7 +960,7 @@ const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => Text; first:
     text: (q, f1, f2) =>
       tx(
         `A class trip costs ${q} € per student. The parents pay ${f1} of it and the school pays ${f2}. The student pays the rest. How much is that?`,
-        `Eine Klassenfahrt kostet ${q} € pro Kind. Die Eltern zahlen ${f1} davon, der Förderverein der Schule zahlt ${f2}. Den Rest zahlt jedes Kind selbst. Wie viel ist das?`,
+        `Eine Klassenfahrt kostet ${q}\u00a0€ pro Kind. Die Eltern zahlen ${f1} davon, der Förderverein der Schule zahlt ${f2}. Den Rest zahlt jedes Kind selbst. Wie viel ist das?`,
       ),
     first: tx("The parents", "Die Eltern"),
     second: tx("The school", "Der Förderverein"),
@@ -969,7 +969,7 @@ const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => Text; first:
     text: (q, f1, f2) =>
       tx(
         `Max earns ${q} € at a weekend job. He saves ${f1} of it and spends ${f2} on a video game. How much money is left?`,
-        `Max verdient mit einem Ferienjob ${q} €. Er spart ${f1} davon und gibt ${f2} für ein Videospiel aus. Wie viel Geld bleibt übrig?`,
+        `Max verdient mit einem Ferienjob ${q}\u00a0€. Er spart ${f1} davon und gibt ${f2} für ein Videospiel aus. Wie viel Geld bleibt übrig?`,
       ),
     first: tx("Saved", "Gespart"),
     second: tx("The game", "Das Spiel"),
@@ -991,12 +991,12 @@ function moneyLeftTask(rng: Rng): Exercise | null {
   const part = (n: number, d: number) => (n === 1 ? `$${q} : ${d} = ${(q / d) * n}$` : `$${q} : ${d} \\cdot ${n} = ${(q / d) * n}$`);
   const of = (en: string) => tx(en, en.replace('"of"', '"von"'));
   const b = board();
-  put(b, of(`${src(kf(A.n, A.d, "a"))} "of"#o1 ${q}#q1 "€"#u1 =#e1 ${sa}#ra "€"#ua`), txMap((_, l) => `${resolveText(story.first, l)}: ${part(A.n, A.d)} €.`));
-  put(b, of(`${src(kf(B.n, B.d, "b"))} "of"#o2 ${q}#q2 "€"#u2 =#e2 ${sb}#rb "€"#ub`), txMap((_, l) => `${resolveText(story.second, l)}: ${part(B.n, B.d)} €.`));
+  put(b, of(`${src(kf(A.n, A.d, "a"))} "of"#o1 ${q}#q1 "€"#u1 =#e1 ${sa}#ra "€"#ua`), txMap((_, l) => `${resolveText(story.first, l)}: ${part(A.n, A.d)}${l === "de" ? "\u00a0" : " "}€.`));
+  put(b, of(`${src(kf(B.n, B.d, "b"))} "of"#o2 ${q}#q2 "€"#u2 =#e2 ${sb}#rb "€"#ub`), txMap((_, l) => `${resolveText(story.second, l)}: ${part(B.n, B.d)}${l === "de" ? "\u00a0" : " "}€.`));
   put(
     b,
     `${q}#q "€"#u -#s1 ${sa}#ra "€"#ua -#s2 ${sb}#rb "€"#ub =#e3 ${left}#r "€"#ur`,
-    tx(`Subtract both parts from the total: $${left}$ € are left.`, `Zieh beide Teile vom Gesamtbetrag ab: Es bleiben $${left}$ € übrig.`),
+    tx(`Subtract both parts from the total: $${left}$ € are left.`, `Zieh beide Teile vom Gesamtbetrag ab: Es bleiben $${left}$\u00a0€ übrig.`),
     { highlight: ["r"] },
   );
   return {
@@ -1699,8 +1699,8 @@ const mixedFrames: Frame[] = [
 
 const ofBoard = board();
 ofSteps(ofBoard, 3, 4, 20, "€");
-ofBoard.frames[0].note = tx("$\\frac{3}{4}$ of $20$ €. **Of** means times.", "$\\frac{3}{4}$ von $20$ €. „von“ heißt **mal**.");
-appendNote(ofBoard.frames, tx("So $\\frac{3}{4}$ of $20$ € is $15$ €.", "Also sind $\\frac{3}{4}$ von $20$ € genau $15$ €."));
+ofBoard.frames[0].note = tx("$\\frac{3}{4}$ of $20$ €. **Of** means times.", "$\\frac{3}{4}$ von $20$\u00a0€. „von“ heißt **mal**.");
+appendNote(ofBoard.frames, tx("So $\\frac{3}{4}$ of $20$ € is $15$ €.", "Also sind $\\frac{3}{4}$ von $20$\u00a0€ genau $15$\u00a0€."));
 
 const checkSimplify = board();
 put(

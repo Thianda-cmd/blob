@@ -59,7 +59,7 @@ function fmt(t: Fmt["t"], l: Locale): Fmt {
     c: (v) => comma(cash(v)),
     a: (v, unit) => comma(unit === "€" ? cash(v) : num(v)),
     ut: (unit, key) => (unit ? ` "${unitName(unit, l)}"#${key}` : ""),
-    uw: (unit) => (unit ? ` ${unitName(unit, l)}` : ""),
+    uw: (unit) => (unit ? `${l === "de" ? "\u00a0" : " "}${unitName(unit, l)}` : ""),
     big: (s) => (l === "de" && /^\d{5,}/.test(s) ? comma(s).replace(/^\d+/, (d) => d.replace(/\B(?=(\d{3})+$)/g, " ")) : comma(s)),
   };
 }
@@ -411,7 +411,7 @@ const W_STORIES: { unit: Unit; bases: number[]; text: (p: number, G: number) => 
     text: (p, G) =>
       tx(
         `Class 8b has ${G} students. ${p} % of them come to school by bike. How many students is that?`,
-        `Die Klasse 8b hat ${G} Schülerinnen und Schüler. ${p} % davon kommen mit dem Fahrrad zur Schule. Wie viele sind das?`,
+        `Die Klasse 8b hat ${G} Schülerinnen und Schüler. ${p}\u00a0% davon kommen mit dem Fahrrad zur Schule. Wie viele sind das?`,
       ),
   },
   {
@@ -420,7 +420,7 @@ const W_STORIES: { unit: Unit; bases: number[]; text: (p: number, G: number) => 
     text: (p, G) =>
       tx(
         `A sports club has ${G} members. ${p} % of them are under 18. How many members is that?`,
-        `Ein Sportverein hat ${G} Mitglieder. ${p} % davon sind unter 18. Wie viele Mitglieder sind das?`,
+        `Ein Sportverein hat ${G} Mitglieder. ${p}\u00a0% davon sind unter 18. Wie viele Mitglieder sind das?`,
       ),
   },
   {
@@ -429,7 +429,7 @@ const W_STORIES: { unit: Unit; bases: number[]; text: (p: number, G: number) => 
     text: (p, G) =>
       tx(
         `A bag of trail mix weighs ${G} g. ${p} % of it is nuts. How many grams of nuts are in the bag?`,
-        `Eine Tüte Studentenfutter wiegt ${G} g. ${p} % davon sind Nüsse. Wie viel Gramm Nüsse sind in der Tüte?`,
+        `Eine Tüte Studentenfutter wiegt ${G} g. ${p}\u00a0% davon sind Nüsse. Wie viel Gramm Nüsse sind in der Tüte?`,
       ),
   },
   {
@@ -438,7 +438,7 @@ const W_STORIES: { unit: Unit; bases: number[]; text: (p: number, G: number) => 
     text: (p, G) =>
       tx(
         `Jonas earns ${G} € a month as an apprentice. He saves ${p} % of it. How much does he save each month?`,
-        `Jonas verdient in seiner Ausbildung ${G} € im Monat. Davon spart er ${p} %. Wie viel spart er jeden Monat?`,
+        `Jonas verdient in seiner Ausbildung ${G}\u00a0€ im Monat. Davon spart er ${p}\u00a0%. Wie viel spart er jeden Monat?`,
       ),
   },
   {
@@ -447,7 +447,7 @@ const W_STORIES: { unit: Unit; bases: number[]; text: (p: number, G: number) => 
     text: (p, G) =>
       tx(
         `A school has ${G} students. ${p} % of them take part in the sports day. How many students take part?`,
-        `Eine Schule hat ${G} Schülerinnen und Schüler. ${p} % davon machen beim Sportfest mit. Wie viele sind das?`,
+        `Eine Schule hat ${G} Schülerinnen und Schüler. ${p}\u00a0% davon machen beim Sportfest mit. Wie viele sind das?`,
       ),
   },
 ];
@@ -667,7 +667,7 @@ const G_STORIES: { unit: Unit; min: number; max: number; text: (W: string, p: nu
     text: (W, p, { t }) =>
       t(
         `Paul has saved ${W} €. That is ${p} % of the price of a new bike. How much does the bike cost?`,
-        `Paul hat ${W} € gespart. Das sind ${p} % vom Preis eines neuen Fahrrads. Wie viel kostet das Fahrrad?`,
+        `Paul hat ${W}\u00a0€ gespart. Das sind ${p}\u00a0% vom Preis eines neuen Fahrrads. Wie viel kostet das Fahrrad?`,
       ),
   },
   {
@@ -678,7 +678,7 @@ const G_STORIES: { unit: Unit; min: number; max: number; text: (W: string, p: nu
     text: (W, p, { t }) =>
       t(
         `${W} students of a school take the bus. That is ${p} % of all students. How many students go to the school?`,
-        `An einer Schule fahren ${W} Schülerinnen und Schüler mit dem Bus. Das sind ${p} % von allen. Wie viele Schülerinnen und Schüler hat die Schule?`,
+        `An einer Schule fahren ${W} Schülerinnen und Schüler mit dem Bus. Das sind ${p}\u00a0% von allen. Wie viele Schülerinnen und Schüler hat die Schule?`,
       ),
   },
   {
@@ -689,7 +689,7 @@ const G_STORIES: { unit: Unit; min: number; max: number; text: (W: string, p: nu
     text: (W, p, { t }) =>
       t(
         `Lea has read ${W} pages of her book. That is ${p} % of the book. How many pages does the book have?`,
-        `Lea hat ${W} Seiten ihres Buches gelesen. Das sind ${p} % des Buches. Wie viele Seiten hat das Buch?`,
+        `Lea hat ${W} Seiten ihres Buches gelesen. Das sind ${p}\u00a0% des Buches. Wie viele Seiten hat das Buch?`,
       ),
   },
   {
@@ -699,7 +699,7 @@ const G_STORIES: { unit: Unit; min: number; max: number; text: (W: string, p: nu
     text: (W, p, { t }) =>
       t(
         `A water tank holds ${W} L. It is ${p} % full. How many litres does the full tank hold?`,
-        `In einem Wassertank sind ${W} L. Er ist zu ${p} % gefüllt. Wie viele Liter passen in den vollen Tank?`,
+        `In einem Wassertank sind ${W} L. Er ist zu ${p}\u00a0% gefüllt. Wie viele Liter passen in den vollen Tank?`,
       ),
   },
 ];
@@ -736,7 +736,7 @@ const CHANGE_STORIES: { up: boolean; vat?: boolean; unit: Unit; base: (rng: Rng)
     text: (G, p, { t }) =>
       t(
         `A jacket costs ${G} €. In the sale, the price is reduced by ${p} %. What is the sale price?`,
-        `Eine Jacke kostet ${G} €. Im Schlussverkauf wird der Preis um ${p} % reduziert. Wie viel kostet sie jetzt?`,
+        `Eine Jacke kostet ${G}\u00a0€. Im Schlussverkauf wird der Preis um ${p}\u00a0% reduziert. Wie viel kostet sie jetzt?`,
       ),
   },
   {
@@ -746,7 +746,7 @@ const CHANGE_STORIES: { up: boolean; vat?: boolean; unit: Unit; base: (rng: Rng)
     text: (G, p, { t }) =>
       t(
         `A video game costs ${G} €. Club members get ${p} % off. How much do members pay?`,
-        `Ein Videospiel kostet ${G} €. Clubmitglieder bekommen ${p} % Rabatt. Wie viel zahlen Mitglieder?`,
+        `Ein Videospiel kostet ${G}\u00a0€. Clubmitglieder bekommen ${p}\u00a0% Rabatt. Wie viel zahlen Mitglieder?`,
       ),
   },
   {
@@ -757,7 +757,7 @@ const CHANGE_STORIES: { up: boolean; vat?: boolean; unit: Unit; base: (rng: Rng)
     text: (G, _p, { t }) =>
       t(
         `Headphones cost ${G} € before VAT. VAT (Mehrwertsteuer) is 19 %. What is the price including VAT?`,
-        `Kopfhörer kosten ohne Mehrwertsteuer ${G} €. Die Mehrwertsteuer beträgt 19 %. Wie viel kosten sie mit Mehrwertsteuer?`,
+        `Kopfhörer kosten ohne Mehrwertsteuer ${G}\u00a0€. Die Mehrwertsteuer beträgt 19\u00a0%. Wie viel kosten sie mit Mehrwertsteuer?`,
       ),
   },
   {
@@ -767,7 +767,7 @@ const CHANGE_STORIES: { up: boolean; vat?: boolean; unit: Unit; base: (rng: Rng)
     text: (G, p, { t }) =>
       t(
         `The rent for a flat is ${G} € a month. It goes up by ${p} %. What is the new rent?`,
-        `Die Miete für eine Wohnung beträgt ${G} € im Monat. Sie steigt um ${p} %. Wie hoch ist die neue Miete?`,
+        `Die Miete für eine Wohnung beträgt ${G}\u00a0€ im Monat. Sie steigt um ${p}\u00a0%. Wie hoch ist die neue Miete?`,
       ),
   },
   {
@@ -777,7 +777,7 @@ const CHANGE_STORIES: { up: boolean; vat?: boolean; unit: Unit; base: (rng: Rng)
     text: (G, p, { t }) =>
       t(
         `A town has ${G} inhabitants. In one year the population grows by ${p} %. How many inhabitants does it have now?`,
-        `Eine Stadt hat ${G} Einwohner. In einem Jahr wächst die Einwohnerzahl um ${p} %. Wie viele Einwohner hat sie jetzt?`,
+        `Eine Stadt hat ${G} Einwohner. In einem Jahr wächst die Einwohnerzahl um ${p}\u00a0%. Wie viele Einwohner hat sie jetzt?`,
       ),
   },
 ];
@@ -813,7 +813,7 @@ const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number;
     text: (N, p, { t }) =>
       t(
         `After a discount of ${p} %, a jacket costs ${N} €. What was the original price?`,
-        `Nach einem Preisnachlass von ${p} % kostet eine Jacke ${N} €. Wie hoch war der ursprüngliche Preis?`,
+        `Nach einem Preisnachlass von ${p}\u00a0% kostet eine Jacke ${N}\u00a0€. Wie hoch war der ursprüngliche Preis?`,
       ),
   },
   {
@@ -823,7 +823,7 @@ const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number;
     text: (N, _p, { t }) =>
       t(
         `A phone costs ${N} € including 19 % VAT. What is the price without VAT?`,
-        `Ein Handy kostet ${N} € inklusive 19 % Mehrwertsteuer. Wie hoch ist der Preis ohne Mehrwertsteuer?`,
+        `Ein Handy kostet ${N}\u00a0€ inklusive 19\u00a0% Mehrwertsteuer. Wie hoch ist der Preis ohne Mehrwertsteuer?`,
       ),
   },
   {
@@ -832,7 +832,7 @@ const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number;
     text: (N, p, { t }) =>
       t(
         `After a price rise of ${p} %, a concert ticket costs ${N} €. What did it cost before?`,
-        `Nach einer Preiserhöhung um ${p} % kostet ein Konzertticket ${N} €. Wie viel hat es vorher gekostet?`,
+        `Nach einer Preiserhöhung um ${p}\u00a0% kostet ein Konzertticket ${N}\u00a0€. Wie viel hat es vorher gekostet?`,
       ),
   },
   {
@@ -841,7 +841,7 @@ const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number;
     text: (N, p, { t }) =>
       t(
         `After a pay rise of ${p} %, Sara earns ${N} € a month. How much did she earn before?`,
-        `Nach einer Gehaltserhöhung um ${p} % verdient Sara ${N} € im Monat. Wie viel hat sie vorher verdient?`,
+        `Nach einer Gehaltserhöhung um ${p}\u00a0% verdient Sara ${N}\u00a0€ im Monat. Wie viel hat sie vorher verdient?`,
       ),
   },
   {
@@ -850,7 +850,7 @@ const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number;
     text: (N, p, { t }) =>
       t(
         `In the sale, everything is ${p} % off. Tom pays ${N} € for a pair of shoes. What was the normal price?`,
-        `Im Schlussverkauf ist alles um ${p} % reduziert. Tom zahlt ${N} € für ein Paar Schuhe. Wie viel haben die Schuhe vorher gekostet?`,
+        `Im Schlussverkauf ist alles um ${p}\u00a0% reduziert. Tom zahlt ${N}\u00a0€ für ein Paar Schuhe. Wie viel haben die Schuhe vorher gekostet?`,
       ),
   },
 ];
@@ -880,7 +880,7 @@ const CHAIN_STORIES: { text: (G: string, a: Change, b: Change) => Text; signs: [
     text: (G, a, b) =>
       tx(
         `A bike costs ${G} €. First the price goes up by ${a.p} %, later it is reduced by ${b.p} %. What does the bike cost now?`,
-        `Ein Fahrrad kostet ${G} €. Zuerst steigt der Preis um ${a.p} %, später wird er um ${b.p} % gesenkt. Wie viel kostet das Fahrrad jetzt?`,
+        `Ein Fahrrad kostet ${G}\u00a0€. Zuerst steigt der Preis um ${a.p}\u00a0%, später wird er um ${b.p}\u00a0% gesenkt. Wie viel kostet das Fahrrad jetzt?`,
       ),
   },
   {
@@ -888,7 +888,7 @@ const CHAIN_STORIES: { text: (G: string, a: Change, b: Change) => Text; signs: [
     text: (G, a, b) =>
       tx(
         `A share is worth ${G} €. On Monday its value rises by ${a.p} %, on Tuesday it falls by ${b.p} %. What is it worth now?`,
-        `Eine Aktie ist ${G} € wert. Am Montag steigt ihr Wert um ${a.p} %, am Dienstag fällt er um ${b.p} %. Wie viel ist sie jetzt wert?`,
+        `Eine Aktie ist ${G}\u00a0€ wert. Am Montag steigt ihr Wert um ${a.p}\u00a0%, am Dienstag fällt er um ${b.p}\u00a0%. Wie viel ist sie jetzt wert?`,
       ),
   },
   {
@@ -896,7 +896,7 @@ const CHAIN_STORIES: { text: (G: string, a: Change, b: Change) => Text; signs: [
     text: (G, a, b) =>
       tx(
         `In a sale, a TV is reduced from ${G} € by ${a.p} %. After the sale, the reduced price goes up by ${b.p} %. What does the TV cost after the sale?`,
-        `Im Angebot wird ein Fernseher von ${G} € um ${a.p} % reduziert. Nach der Aktion steigt der reduzierte Preis um ${b.p} %. Wie viel kostet der Fernseher nach der Aktion?`,
+        `Im Angebot wird ein Fernseher von ${G}\u00a0€ um ${a.p}\u00a0% reduziert. Nach der Aktion steigt der reduzierte Preis um ${b.p}\u00a0%. Wie viel kostet der Fernseher nach der Aktion?`,
       ),
   },
   {
@@ -904,7 +904,7 @@ const CHAIN_STORIES: { text: (G: string, a: Change, b: Change) => Text; signs: [
     text: (G, a, b) =>
       tx(
         `A shop raises a price of ${G} € by ${a.p} %. A month later it raises the new price by another ${b.p} %. What is the final price?`,
-        `Ein Laden erhöht einen Preis von ${G} € um ${a.p} %. Einen Monat später erhöht er den neuen Preis noch einmal um ${b.p} %. Wie hoch ist der Endpreis?`,
+        `Ein Laden erhöht einen Preis von ${G}\u00a0€ um ${a.p}\u00a0%. Einen Monat später erhöht er den neuen Preis noch einmal um ${b.p}\u00a0%. Wie hoch ist der Endpreis?`,
       ),
   },
 ];
@@ -946,7 +946,7 @@ function totalChangeTask(rng: Rng): Exercise | null {
     ];
     text = tx(
       `A price goes up by ${p1} % and later goes down by ${p1} %. By how many percent is the final price lower than the original price?`,
-      `Ein Preis steigt um ${p1} % und sinkt später wieder um ${p1} %. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
+      `Ein Preis steigt um ${p1}\u00a0% und sinkt später wieder um ${p1}\u00a0%. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
     );
   } else if (kind === 1) {
     changes = [
@@ -955,7 +955,7 @@ function totalChangeTask(rng: Rng): Exercise | null {
     ];
     text = tx(
       `A price rises by ${p1} %, and later by another ${p2} %. By how many percent has it risen in total?`,
-      `Ein Preis steigt um ${p1} % und später noch einmal um ${p2} %. Um wie viel Prozent ist er insgesamt gestiegen?`,
+      `Ein Preis steigt um ${p1}\u00a0% und später noch einmal um ${p2}\u00a0%. Um wie viel Prozent ist er insgesamt gestiegen?`,
     );
   } else {
     changes = [
@@ -964,7 +964,7 @@ function totalChangeTask(rng: Rng): Exercise | null {
     ];
     text = tx(
       `In a sale, a price is reduced by ${p1} %. On the last day, the sale price is cut by another ${p2} %. By how many percent is the final price lower than the original price?`,
-      `Im Schlussverkauf wird ein Preis um ${p1} % reduziert. Am letzten Tag wird der reduzierte Preis noch einmal um ${p2} % gesenkt. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
+      `Im Schlussverkauf wird ein Preis um ${p1}\u00a0% reduziert. Am letzten Tag wird der reduzierte Preis noch einmal um ${p2}\u00a0% gesenkt. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
     );
   }
   const Q = changes.map(factorOf).reduce((x, y) => x * y, 1);
@@ -989,7 +989,7 @@ const COMPOUND_STORIES: { up: boolean; whole?: boolean; unit: Unit; text: (K: st
     text: (K, p, n, { t }) =>
       t(
         `Mia puts ${K} € into a savings account with ${p} % interest per year. The interest stays in the account and earns interest too (Zinseszins). How much money is in the account after ${n} years? Round to the cent.`,
-        `Mia legt ${K} € auf ein Sparkonto mit ${p} % Zinsen pro Jahr. Die Zinsen bleiben auf dem Konto und werden mitverzinst (Zinseszins). Wie viel Geld ist nach ${n} Jahren auf dem Konto? Runde auf Cent.`,
+        `Mia legt ${K}\u00a0€ auf ein Sparkonto mit ${p}\u00a0% Zinsen pro Jahr. Die Zinsen bleiben auf dem Konto und werden mitverzinst (Zinseszins). Wie viel Geld ist nach ${n} Jahren auf dem Konto? Runde auf Cent.`,
       ),
   },
   {
@@ -998,7 +998,7 @@ const COMPOUND_STORIES: { up: boolean; whole?: boolean; unit: Unit; text: (K: st
     text: (K, p, n, { t }) =>
       t(
         `A new car costs ${K} €. It loses ${p} % of its value every year. What is it worth after ${n} years? Round to the cent.`,
-        `Ein Neuwagen kostet ${K} €. Er verliert jedes Jahr ${p} % seines Werts. Wie viel ist er nach ${n} Jahren noch wert? Runde auf Cent.`,
+        `Ein Neuwagen kostet ${K}\u00a0€. Er verliert jedes Jahr ${p}\u00a0% seines Werts. Wie viel ist er nach ${n} Jahren noch wert? Runde auf Cent.`,
       ),
   },
   {
@@ -1008,7 +1008,7 @@ const COMPOUND_STORIES: { up: boolean; whole?: boolean; unit: Unit; text: (K: st
     text: (K, p, n, { t }) =>
       t(
         `A town has ${K} inhabitants. The population grows by ${p} % each year. How many inhabitants will it have after ${n} years? Round to a whole number.`,
-        `Eine Stadt hat ${K} Einwohner. Die Einwohnerzahl wächst jedes Jahr um ${p} %. Wie viele Einwohner hat sie nach ${n} Jahren? Runde auf eine ganze Zahl.`,
+        `Eine Stadt hat ${K} Einwohner. Die Einwohnerzahl wächst jedes Jahr um ${p}\u00a0%. Wie viele Einwohner hat sie nach ${n} Jahren? Runde auf eine ganze Zahl.`,
       ),
   },
 ];
@@ -1039,13 +1039,13 @@ const POINT_STORIES: { intro: (a: number, b: number) => Text; what: string }[] =
     intro: (a, b) =>
       tx(
         `The share of students who cycle to school rises from ${a} % to ${b} %.`,
-        `Der Anteil der Schülerinnen und Schüler, die mit dem Rad zur Schule kommen, steigt von ${a} % auf ${b} %.`,
+        `Der Anteil der Schülerinnen und Schüler, die mit dem Rad zur Schule kommen, steigt von ${a}\u00a0% auf ${b}\u00a0%.`,
       ),
     what: "der Anteil",
   },
-  { intro: (a, b) => tx(`A bank raises its interest rate from ${a} % to ${b} %.`, `Eine Bank erhöht ihren Zinssatz von ${a} % auf ${b} %.`), what: "der Zinssatz" },
+  { intro: (a, b) => tx(`A bank raises its interest rate from ${a} % to ${b} %.`, `Eine Bank erhöht ihren Zinssatz von ${a}\u00a0% auf ${b}\u00a0%.`), what: "der Zinssatz" },
   {
-    intro: (a, b) => tx(`A party's result in an election goes up from ${a} % to ${b} %.`, `Bei einer Wahl steigt das Ergebnis einer Partei von ${a} % auf ${b} %.`),
+    intro: (a, b) => tx(`A party's result in an election goes up from ${a} % to ${b} %.`, `Bei einer Wahl steigt das Ergebnis einer Partei von ${a}\u00a0% auf ${b}\u00a0%.`),
     what: "das Ergebnis",
   },
 ];
@@ -1093,7 +1093,7 @@ function pointsTask(rng: Rng): Exercise | null {
   if (rng.chance(0.45)) {
     const options: Text[] = [
       tx(`It rose by ${diff} percentage points.`, `Das ist ein Anstieg um ${pointsDe(diff)}.`),
-      tx(`It rose by ${diff} %.`, `Das ist ein Anstieg um ${diff} %.`),
+      tx(`It rose by ${diff} %.`, `Das ist ein Anstieg um ${diff}\u00a0%.`),
       tx(`It rose by ${b} percentage points.`, `Das ist ein Anstieg um ${pointsDe(b)}.`),
       rel === b
         ? tx(`It fell by ${diff} percentage points.`, `Das ist ein Rückgang um ${pointsDe(diff)}.`)
@@ -1362,16 +1362,16 @@ type Step = Change & { id: number };
 
 const PRESETS: { label: Text; changes: Change[] }[] = [
   {
-    label: tx("+20 %, then −20 %", "+20 %, dann −20 %"),
+    label: tx("+20 %, then −20 %", "+20\u00a0%, dann −20\u00a0%"),
     changes: [
       { up: true, p: 20 },
       { up: false, p: 20 },
     ],
   },
-  { label: tx("VAT +19 %", "MwSt. +19 %"), changes: [{ up: true, p: 19 }] },
-  { label: tx("Sale −25 %", "Rabatt −25 %"), changes: [{ up: false, p: 25 }] },
+  { label: tx("VAT +19 %", "MwSt. +19\u00a0%"), changes: [{ up: true, p: 19 }] },
+  { label: tx("Sale −25 %", "Rabatt −25\u00a0%"), changes: [{ up: false, p: 25 }] },
   {
-    label: tx("3 years at +5 %", "3 Jahre je +5 %"),
+    label: tx("3 years at +5 %", "3 Jahre je +5\u00a0%"),
     changes: [
       { up: true, p: 5 },
       { up: true, p: 5 },
@@ -1411,7 +1411,7 @@ function GrowthChain() {
       ? t("Overall factor 1: back where you started.", "Gesamtfaktor 1: wieder genau am Anfang.")
       : t(
           `Overall factor ${n(r6(Q))}: the price ${Q > 1 ? "rose" : "fell"} by ${n(pct)} % in total.`,
-          `Gesamtfaktor ${n(r6(Q))}: Der Preis ist insgesamt um ${n(pct)} % ${Q > 1 ? "gestiegen" : "gesunken"}.`,
+          `Gesamtfaktor ${n(r6(Q))}: Der Preis ist insgesamt um ${n(pct)}\u00a0% ${Q > 1 ? "gestiegen" : "gesunken"}.`,
         );
   const trap =
     steps.length > 1 && signedSum === 0 && Math.abs(Q - 1) > 1e-9
@@ -1606,7 +1606,7 @@ const formulaFrames: Frame[] = [
   },
   {
     math: 'W#W =#e 200#G "€"#u \\cdot#m \\frac{15#p}{100#h}#f',
-    note: tx("Example: $15 %$ of $200$ €. Put in $G = 200$ and $p = 15$.", "Beispiel: $15 %$ von $200$ €. Setze $G = 200$ und $p = 15$ ein."),
+    note: tx("Example: $15 %$ of $200$ €. Put in $G = 200$ and $p = 15$.", "Beispiel: $15 %$ von $200$\u00a0€. Setze $G = 200$ und $p = 15$ ein."),
     highlight: ["G", "p"],
   },
   {
@@ -1616,7 +1616,7 @@ const formulaFrames: Frame[] = [
   },
   {
     math: 'W#W =#e 30#G "€"#u',
-    note: tx("$200 \\cdot 0.15 = 30$. So $15 %$ of $200$ € is $30$ €.", "$200 \\cdot 0,15 = 30$. Also sind $15 %$ von $200$ € genau $30$ €."),
+    note: tx("$200 \\cdot 0.15 = 30$. So $15 %$ of $200$ € is $30$ €.", "$200 \\cdot 0,15 = 30$. Also sind $15 %$ von $200$\u00a0€ genau $30$\u00a0€."),
   },
 ];
 
@@ -1647,11 +1647,11 @@ const rearrangeFrames: Frame[] = [
   },
   {
     math: tx('G#G =#e \\frac{30#W "€"#u}{0.2#p}#f', 'G#G =#e \\frac{30#W "€"#u}{0,2#p}#f'),
-    note: tx("Example: $30$ € are $20 %$ of a price. $20 % = 0.2$.", "Beispiel: $30$ € sind $20 %$ eines Preises. $20 % = 0,2$."),
+    note: tx("Example: $30$ € are $20 %$ of a price. $20 % = 0.2$.", "Beispiel: $30$\u00a0€ sind $20 %$ eines Preises. $20 % = 0,2$."),
   },
   {
     math: 'G#G =#e 150#W "€"#u',
-    note: tx("$30 : 0.2 = 150$. The full price is $150$ €.", "$30 : 0,2 = 150$. Der volle Preis ist $150$ €."),
+    note: tx("$30 : 0.2 = 150$. The full price is $150$ €.", "$30 : 0,2 = 150$. Der volle Preis ist $150$\u00a0€."),
   },
 ];
 
@@ -1667,7 +1667,7 @@ const factorFrames: Frame[] = [
   },
   {
     math: tx('120#G "€"#u \\cdot#t 1.19#f =#e3 142.80#r "€"#u2', '120#G "€"#u \\cdot#t 1,19#f =#e3 142,80#r "€"#u2'),
-    note: tx("One multiplication does it all: $120 \\cdot 1.19 = 142.80$ €.", "Eine einzige Multiplikation erledigt alles: $120 \\cdot 1,19 = 142,80$ €."),
+    note: tx("One multiplication does it all: $120 \\cdot 1.19 = 142.80$ €.", "Eine einzige Multiplikation erledigt alles: $120 \\cdot 1,19 = 142,80$\u00a0€."),
     highlight: ["r"],
   },
   {
@@ -1695,7 +1695,7 @@ const reverseLesson: Frame[] = [
     ),
     note: tx(
       "Classic mistake: adding $20 %$ to $64$ € gives $76.80$ €, not $80$ €. The $20 %$ belonged to the **old** price, not the new one.",
-      "Typischer Fehler: $20 %$ auf $64$ € draufrechnen ergibt $76,80$ €, nicht $80$ €. Die $20 %$ gehören zum **alten** Preis, nicht zum neuen.",
+      "Typischer Fehler: $20 %$ auf $64$\u00a0€ draufrechnen ergibt $76,80$\u00a0€, nicht $80$\u00a0€. Die $20 %$ gehören zum **alten** Preis, nicht zum neuen.",
     ),
   },
 ];
@@ -1703,7 +1703,7 @@ reverseLesson[0] = {
   ...reverseLesson[0],
   note: tx(
     "After $20 %$ off, a jacket costs $64$ €. So the old price $G$ times $0.8$ gives $64$ €.",
-    "Nach $20 %$ Rabatt kostet eine Jacke $64$ €. Der alte Preis $G$ mal $0,8$ ergibt also $64$ €.",
+    "Nach $20 %$ Rabatt kostet eine Jacke $64$\u00a0€. Der alte Preis $G$ mal $0,8$ ergibt also $64$\u00a0€.",
   ),
 };
 
@@ -1828,7 +1828,7 @@ const percentages: Topic = {
       blob: tx("Same formula, just turned around. Watch the letters move!", "Gleiche Formel, nur umgestellt. Schau, wie die Buchstaben wandern!"),
       body: tx(
         "Prefer the rule of three (Dreisatz)? For the base value: $20 % \\to 30$ €, so $1 % \\to 1.50$ € and $100 % \\to 150$ €. Same answer.",
-        "Lieber mit dem Dreisatz? Für den Grundwert: $20 % \\to 30$ €, also $1 % \\to 1,50$ € und $100 % \\to 150$ €. Gleiches Ergebnis.",
+        "Lieber mit dem Dreisatz? Für den Grundwert: $20 % \\to 30$\u00a0€, also $1 % \\to 1,50$\u00a0€ und $100 % \\to 150$\u00a0€. Gleiches Ergebnis.",
       ),
       frames: rearrangeFrames,
     },
@@ -1862,7 +1862,7 @@ const percentages: Topic = {
     {
       type: "widget",
       title: tx("One change after another", "Eine Änderung nach der anderen"),
-      blob: tx("Up 20 %, then down 20 %. Back to the start? Let's see!", "Erst 20 % rauf, dann 20 % runter. Wieder am Anfang? Mal sehen!"),
+      blob: tx("Up 20 %, then down 20 %. Back to the start? Let's see!", "Erst 20\u00a0% rauf, dann 20\u00a0% runter. Wieder am Anfang? Mal sehen!"),
       body: tx(
         "Every change is one growth factor. Several changes in a row: multiply the factors. Change the steps, or try the examples.",
         "Jede Änderung ist ein Wachstumsfaktor. Mehrere Änderungen nacheinander: Faktoren multiplizieren. Ändere die Schritte oder probier die Beispiele aus.",
@@ -1871,12 +1871,12 @@ const percentages: Topic = {
     },
     {
       type: "check",
-      blob: tx("15 % off. What's left, as a factor?", "15 % Rabatt. Was bleibt übrig, als Faktor?"),
+      blob: tx("15 % off. What's left, as a factor?", "15\u00a0% Rabatt. Was bleibt übrig, als Faktor?"),
       exercise: {
         instruction: WORD_PROBLEM,
         text: tx(
           "A bike costs 480 €. In the sale, the price is reduced by 15 %. What is the sale price?",
-          "Ein Fahrrad kostet 480 €. Im Schlussverkauf wird der Preis um 15 % reduziert. Wie viel kostet es jetzt?",
+          "Ein Fahrrad kostet 480\u00a0€. Im Schlussverkauf wird der Preis um 15\u00a0% reduziert. Wie viel kostet es jetzt?",
         ),
         answer: amount(408, "€"),
         hint: tx("$15 %$ off leaves $85 %$. Multiply by $0.85$.", "Bei $15 %$ Rabatt bleiben $85 %$. Multipliziere mit $0,85$."),
@@ -1900,7 +1900,7 @@ const percentages: Topic = {
         instruction: WORD_PROBLEM,
         text: tx(
           "After a price rise of 25 %, a video game costs 60 €. What did it cost before?",
-          "Nach einer Preiserhöhung um 25 % kostet ein Videospiel 60 €. Wie viel hat es vorher gekostet?",
+          "Nach einer Preiserhöhung um 25\u00a0% kostet ein Videospiel 60\u00a0€. Wie viel hat es vorher gekostet?",
         ),
         answer: amount(48, "€"),
         hint: tx("The new price is $125 %$ of the old one: $G \\cdot 1.25 = 60$.", "Der neue Preis ist $125 %$ des alten: $G \\cdot 1,25 = 60$."),
