@@ -19,7 +19,6 @@ import { BubbleToolbar } from "./BubbleToolbar";
 import { buildExtensions } from "./extensions";
 import { IconPicker } from "./IconPicker";
 import { IMAGE_TYPES, dropPos, imageFiles, uploadImages } from "./imageUpload";
-import styles from "./NoteEditor.module.css";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
@@ -287,7 +286,7 @@ export function NoteEditor({ page }: { page: Page }) {
   };
 
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col", styles.root)} onKeyDownCapture={onKeyDownCapture}>
+    <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture}>
       <PageTopBar pageId={page.id} saveState={saveState} />
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

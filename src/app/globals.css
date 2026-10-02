@@ -545,8 +545,9 @@
 .prose-blob:not(:focus) p.is-current::before {
   content: none;
 }
+/* The hint text comes from the editor in the reader's language. */
 .prose-blob:not(:focus) p.is-editor-empty::before {
-  content: "Start writing…";
+  content: attr(data-placeholder-idle);
 }
 
 /* Cursors & selection */
@@ -569,7 +570,7 @@
   padding: 0.05em 0.1em;
 }
 .prose-blob .blob-slash-query.is-query-empty::after {
-  content: "Type to filter…";
+  content: attr(data-decoration-content);
   color: var(--ink-3);
   opacity: 0.7;
   padding-left: 0.15em;

@@ -134,7 +134,7 @@ export const SlashCommand = Extension.create<SlashOptions>({
         allowedPrefixes: [" ", " "],
         initialItems: items(""),
         decorationClass: "blob-slash-query",
-        // Shown by CSS (NoteEditor.module.css) while the query is empty.
+        // Shown by CSS (globals.css) while the query is empty.
         decorationContent: emptyHint(),
         decorationEmptyClass: "is-query-empty",
         placement: "bottom-start",

@@ -8,7 +8,7 @@ type PlaceholderText = EditorText["placeholder"];
 /**
  * Placeholders, computed from the state that is being rendered (cheap: top-level scan only).
  * - empty note: "Start writing…" (with the slash hint while focused; the idle text comes from
- *   `data-placeholder-idle`, see NoteEditor.module.css)
+ *   `data-placeholder-idle`, see globals.css)
  * - every empty heading: "Heading 1/2/3"
  * - the empty line holding the caret: "Type '/' for commands…" (hidden by CSS when blurred)
  */
