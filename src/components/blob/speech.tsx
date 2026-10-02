@@ -5,10 +5,17 @@ import { useEffect, useState } from "react";
 
 /**
  * Types `text` out character by character. `typing` is true until it's done,
- * which is when Blob's mouth should be moving.
+ * which is when Blob's mouth should be moving. With reduced motion the text shows at once,
+ * but only after mount, so the server and the hydrating render agree.
  */
 export function useTypewriter(text: string | null | undefined, charsPerSecond = 42) {
   const reduce = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const instant = mounted && Boolean(reduce);
   const [state, setState] = useState({ text: text ?? "", count: 0 });
 
   // Restart whenever the text changes (derived-state reset during render).
@@ -27,7 +34,7 @@ export function useTypewriter(text: string | null | undefined, charsPerSecond = 
   }, [text, reduce, charsPerSecond]);
 
   const full = text ?? "";
-  const count = reduce ? full.length : state.text === full ? state.count : 0;
+  const count = instant ? full.length : state.text === full ? state.count : 0;
   return { shown: full.slice(0, count), typing: count < full.length };
 }
 
