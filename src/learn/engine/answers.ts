@@ -22,30 +22,50 @@ const PLAIN_FRACTION = new RegExp(`^([+-]?${NUM})/([+-]?${NUM})$`);
  * A typed number on its own: 12, -3,5, 2.75, 3/4, 1 000, optionally followed by the
  * unit. Calculations like "2^5" or "√144" are not accepted as the answer to "work out 2⁵".
  */
-export function parsePlainNumber(raw: string, unit?: Text): number | null {
+function cleanNumber(raw: string, unit?: Text) {
   let s = raw.trim().replace(/[−–]/g, "-").replace(/\s+/g, " ");
   const units = unit == null ? [] : typeof unit === "string" ? [unit] : [unit.de, unit.en];
   for (const u of units) if (u && s.toLowerCase().endsWith(u.toLowerCase())) s = s.slice(0, -u.length).trim();
   s = s.replace(/\s*[%€]$/, "").trim();
-  s = s.replace(/(\d) (?=\d{3}(?!\d))/g, "$1");
-  const value = (t: string) => Number(t.replace(",", "."));
+  return s.replace(/(\d) (?=\d{3}(?!\d))/g, "$1");
+}
+
+const value = (t: string) => Number(t.replace(",", "."));
+const GROUPED = /^[+-]?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/;
+
+export function parsePlainNumber(raw: string, unit?: Text): number | null {
+  const s = cleanNumber(raw, unit);
   if (PLAIN.test(s)) return value(s);
   const f = PLAIN_FRACTION.exec(s);
   if (f && value(f[2]) !== 0) return value(f[1]) / value(f[2]);
+  // German thousands dots: "1.250,50"
+  if (GROUPED.test(s) && s.includes(",")) return value(s.replace(/\./g, ""));
   return null;
+}
+
+/**
+ * Every sensible reading of a typed number. "26.523" is 26.523 in English but 26 523 in
+ * German, so both are tried against the expected value.
+ */
+export function numberReadings(raw: string, unit?: Text): number[] {
+  const first = parsePlainNumber(raw, unit);
+  if (first === null) return [];
+  const s = cleanNumber(raw, unit);
+  return GROUPED.test(s) && !s.includes(",") ? [first, value(s.replace(/\./g, ""))] : [first];
 }
 
 export function check(spec: AnswerSpec, answer: AnswerValue): Feedback {
   switch (spec.kind) {
     case "number": {
       if (answer.kind !== "text") return { correct: false };
-      const v = parsePlainNumber(answer.text, spec.unit);
+      const readings = numberReadings(answer.text, spec.unit);
+      const tol = spec.tolerance ?? 1e-6;
+      const v = readings.find((r) => Math.abs(r - spec.value) <= tol * Math.max(1, Math.abs(spec.value))) ?? readings[0] ?? null;
       if (v === null) {
         return parseNumber(answer.text) !== null
           ? { correct: false, message: tx("Work it out and type just the result as a number.", "Rechne es aus und gib nur das Ergebnis als Zahl ein.") }
           : { correct: false, message: tx("That doesn't look like a number.", "Das sieht nicht nach einer Zahl aus.") };
       }
-      const tol = spec.tolerance ?? 1e-6;
       if (Math.abs(v - spec.value) <= tol * Math.max(1, Math.abs(spec.value))) return { correct: true };
       if (Math.abs(Math.abs(v) - Math.abs(spec.value)) <= tol * Math.max(1, Math.abs(spec.value)) && spec.value !== 0)
         return { correct: false, partial: true, message: tx("So close! Check the sign.", "Ganz knapp! Prüf das Vorzeichen.") };
