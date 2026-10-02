@@ -192,8 +192,8 @@ export function ParticlesBox() {
   const marks = s.sublimes
     ? [{ at: s.mp, label: `${t(tx("sublimes", "sublimiert"))} ${degC(s.mp, locale)}` }]
     : [
-        { at: s.mp, label: `${t(tx("mp", "Smt"))} ${degC(s.mp, locale)}` },
-        { at: s.bp, label: `${t(tx("bp", "Sdt"))} ${degC(s.bp, locale)}` },
+        { at: s.mp, label: `${t(tx("m.p.", "Smt."))} ${degC(s.mp, locale)}` },
+        { at: s.bp, label: `${t(tx("b.p.", "Sdt."))} ${degC(s.bp, locale)}` },
       ];
 
   return (
