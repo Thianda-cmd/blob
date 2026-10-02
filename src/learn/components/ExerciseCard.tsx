@@ -316,10 +316,9 @@ function Solution({ spec }: { spec: AnswerSpec }) {
   }
   if (spec.kind === "multi") {
     return (
-      <span className="font-medium text-ink">
-        {spec.correct.map((i, k) => (
-          <span key={i}>
-            {k > 0 && ", "}
+      <span className="flex flex-wrap gap-1.5">
+        {spec.correct.map((i) => (
+          <span key={i} className="rounded-lg border border-line bg-raised px-2 py-0.5 font-medium text-ink">
             <Inline text={spec.options[i]} />
           </span>
         ))}

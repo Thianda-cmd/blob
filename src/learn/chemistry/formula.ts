@@ -14,6 +14,8 @@ const SUPERSCRIPTS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2",
 /** Normalise typing variants: unicode sub/superscripts, "·"/"*" for hydrates, en dashes. */
 function normalise(raw: string): string {
   let s = raw.trim().replace(/[−–]/g, "-").replace(/\s+/g, "");
+  // "Mg2+" is the ion Mg²⁺ (a lone element with a number and a sign), as chemists write it.
+  s = s.replace(/^([A-Z][a-z]?)(\d+)([+-])$/, "$1^$2$3");
   s = s.replace(/[₀-₉]/g, (c) => SUBSCRIPTS[c]);
   s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+/g, (m) => "^" + [...m].map((c) => SUPERSCRIPTS[c]).join(""));
   return s.replace(/[*•∙]/g, "·");

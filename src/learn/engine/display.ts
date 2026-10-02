@@ -74,8 +74,29 @@ type Raw = {
   style?: StyleName;
 };
 
-/** Chemical notation inside \\ce{…}: upright element symbols, automatic subscripts and charges. */
+/** A lone element with a number and a sign is an ion: "Mg2+" means Mg²⁺ (as chemists write it), not Mg₂⁺. */
+export const ionCharges = (text: string) => text.replace(/(^|[\s(+>])(\d*)([A-Z][a-z]?)(\d+)([+-])(?=$|[\s)#])/g, "$1$2$3^$4$5");
+
+/** Chemical notation inside \\ce{…}: upright element symbols, automatic subscripts and charges. Each species stays on one line. */
 function chem(text: string): Raw[] {
+  const out: Raw[] = [];
+  let run: Raw[] = [];
+  const flush = () => {
+    if (run.length > 1) out.push({ type: "style", style: "group", body: run });
+    else out.push(...run);
+    run = [];
+  };
+  for (const r of chemTokens(ionCharges(text))) {
+    if (r.type === "op") {
+      flush();
+      out.push(r);
+    } else run.push(r);
+  }
+  flush();
+  return out;
+}
+
+function chemTokens(text: string): Raw[] {
   const out: Raw[] = [];
   let i = 0;
   let speciesStart = true; // a number here is a coefficient, not a subscript
@@ -162,7 +183,7 @@ function chem(text: string): Raw[] {
       const inner = text.slice(i + 1, j < 0 ? text.length : j);
       i = j < 0 ? text.length : j + 1;
       if (/^(aq|s|l|g)$/.test(inner)) out.push({ type: "text", v: `(${inner})` });
-      else out.push({ type: "paren", open: c, close, body: chem(inner) });
+      else out.push({ type: "paren", open: c, close, body: chemTokens(inner) });
       speciesStart = false;
       continue;
     }

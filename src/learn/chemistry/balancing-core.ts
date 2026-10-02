@@ -134,11 +134,11 @@ const countsOf = (formula: string): Counts => {
   return f.ok ? f.species.counts : {};
 };
 
-/** "\ce{4Fe + 3O2 -> 2Fe2O3}" */
+/** "4Fe + 3O2 -> 2Fe2O3" as display source; each species keeps its coefficient on the same line when it wraps. */
 export function ceEquation(eq: string, coefs: number[]): string {
   const p = parts(eq);
-  const piece = (s: string, i: number) => `${coefs[i] && coefs[i] !== 1 ? coefs[i] : ""}${s}`;
-  return `\\ce{${p.left.map(piece).join(" + ")} -> ${p.right.map((s, i) => piece(s, p.left.length + i)).join(" + ")}}`;
+  const piece = (s: string, i: number) => `\\group{\\ce{${coefs[i] && coefs[i] !== 1 ? coefs[i] : ""}${s}}}`;
+  return `${p.left.map(piece).join(" + ")} -> ${p.right.map((s, i) => piece(s, p.left.length + i)).join(" + ")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -241,14 +241,14 @@ function itemsOf(r: { eq: string; units?: string[] }): Item[] {
   return items.sort((a, b) => a.prio - b.prio);
 }
 
-/** Display source with keyed coefficients: `2#k0 \ce{H2} + \ce{O2} -> 2#k2 \ce{H2O}`. A fraction shows as \frac. */
+/** Display source with keyed coefficients: `\group{2#k0 \ce{H2}} + \group{\ce{O2}} -> …`. A fraction shows as \frac. Groups keep each species on one line. */
 export function coefSrc(eq: string, coefs: (number | Q)[]): string {
   const p = parts(eq);
   const piece = (s: string, i: number) => {
     const c = coefs[i];
     const v = typeof c === "number" ? q(c) : c;
     const tok = v.d !== 1 ? `\\frac{${v.n}#k${i}n}{${v.d}#k${i}d}#k${i} ` : v.n !== 1 ? `${v.n}#k${i} ` : "";
-    return `${tok}\\ce{${s}}`;
+    return `\\group{${tok}\\ce{${s}}}`;
   };
   return `${p.left.map(piece).join(" + ")} -> ${p.right.map((s, i) => piece(s, p.left.length + i)).join(" + ")}`;
 }
@@ -307,7 +307,11 @@ export function strategy(r: { eq: string; units?: string[] }): Strategy | null {
 
   frames.push({
     math: src(),
-    note: txMap((t) => `${t("Count the atoms on each side (left | right):", "Zähl die Atome auf beiden Seiten (links | rechts):")} ${tally()}.`),
+    note: txMap((t) =>
+      items.some((it) => it.unit)
+        ? `${t("Count the atoms and groups on each side (left | right):", "Zähl die Atome und Gruppen auf beiden Seiten (links | rechts):")} ${tally()}.`
+        : `${t("Count the atoms on each side (left | right):", "Zähl die Atome auf beiden Seiten (links | rechts):")} ${tally()}.`,
+    ),
   });
 
   const done = new Set<string>();
@@ -464,6 +468,9 @@ export function exactly(coefs: number[], nl: number): string | null {
   return `${species.slice(0, nl).join(" + ")} -> ${species.slice(nl).join(" + ")}`;
 }
 
+/** Plain-text formula with subscript digits, for labels: "CO2" → "CO₂". */
+export const sub = (f: string) => f.replace(/[0-9]/g, (d) => "₀₁₂₃₄₅₆₇₈₉"[Number(d)]);
+
 const DIATOMIC = ["H2", "N2", "O2", "F2", "Cl2", "Br2", "I2"];
 const NAME: Record<string, Text> = {
   H: tx("Hydrogen", "Wasserstoff"),
@@ -508,7 +515,7 @@ export function balanceMistakes(r: { eq: string; coefs: number[]; units?: string
 
   // 1. A half got removed, but only at one species.
   const half = opts.half;
-  if (half && half.den === 2) {
+  if (half && half.den === 2 && half.num > 1) {
     const c = half.before.map((x, i) => (i === half.index ? half.num : x));
     add(
       c,
@@ -532,7 +539,7 @@ export function balanceMistakes(r: { eq: string; coefs: number[]; units?: string
     add(
       v.c,
       v.alt,
-      tx(`${s} comes in pairs`, `${s} im Doppelpack`),
+      tx(`${sub(s)} comes in pairs`, `${sub(s)} im Doppelpack`),
       txMap(
         (t, l) =>
           `${t(
@@ -559,7 +566,7 @@ export function balanceMistakes(r: { eq: string; coefs: number[]; units?: string
         add(
           v.c,
           v.alt,
-          tx(`Missed the ${el} in ${h.s}`, `${el} in ${h.s} übersehen`),
+          tx(`Missed the ${el} in ${sub(h.s)}`, `${el} in ${sub(h.s)} übersehen`),
           tx(
             `Nearly! When you counted ${el}, did you skip the ${el} in $\\ce{${h.s}}$? On that side ${el} sits in ${others.join(" and ")} **and** in $\\ce{${h.s}}$.`,
             `Fast! Hast du beim Zählen der ${el}-Atome das ${el} in $\\ce{${h.s}}$ übersehen? Auf dieser Seite steckt ${el} in ${others.join(" und ")} **und** in $\\ce{${h.s}}$.`,

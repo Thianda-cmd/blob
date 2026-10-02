@@ -1,7 +1,7 @@
 import type { Locale } from "@/i18n/config";
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { AnswerSpec, Feedback, Mistake } from "@/learn/types";
-import { balanceSrc, checkBalance, checkFormula, checkMulti, checkWord, wordDisplay } from "@/learn/chemistry/check";
+import { balanceSrc, checkBalance, checkFormula, checkMulti, checkWord, readCoefficients, wordDisplay } from "@/learn/chemistry/check";
 import { diagnoseExpr, diagnoseFraction, diagnoseInequality, diagnoseNumber, diagnosePair, diagnoseSolutions, type Diagnosis } from "./diagnose";
 import { close, equivalent, isExpanded, likeTermsCombined, parse, parseNumber, toDisplay } from "./expr";
 import { gcd } from "./rng";
@@ -160,7 +160,7 @@ export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: 
   if (core.correct) return core;
   const general = diagnose(spec, answer);
   for (const m of opts.mistakes ?? []) {
-    if (m.when.kind !== spec.kind || !checkCore(m.when, answer).correct) continue;
+    if (m.when.kind !== spec.kind || !matches(m.when, spec, answer)) continue;
     return {
       correct: false,
       partial: m.close ?? (general?.close || core.partial),
@@ -171,6 +171,16 @@ export function check(spec: AnswerSpec, answer: AnswerValue, opts: { mistakes?: 
   }
   if (general) return { correct: false, partial: general.close || core.partial, title: general.title, message: general.say, mark: general.mark };
   return core;
+}
+
+/** Does the student's answer match a mistake? Usually "would the checker accept it for `when`". */
+function matches(when: AnswerSpec, spec: AnswerSpec, answer: AnswerValue): boolean {
+  // Balancing the task's own equation: any balanced set would "pass", so compare the exact numbers.
+  if (when.kind === "balance" && spec.kind === "balance" && when.equation === spec.equation) {
+    const got = answer.kind === "list" ? readCoefficients(answer.values) : null;
+    return !!got && got.length === when.coefficients.length && got.every((c, i) => c === when.coefficients[i]);
+  }
+  return checkCore(when, answer).correct;
 }
 
 /** "y = 2x + 1" typed into a box that already says "y =": drop the repeated left side. */
@@ -232,11 +242,11 @@ function diagnose(spec: AnswerSpec, answer: AnswerValue): Diagnosis | null {
 
 /** A short human-readable version of the right answer (display language). */
 export function answerDisplay(spec: AnswerSpec, locale: Locale): string {
-  // German notation: decimal comma, and money always with two decimals.
+  // Decimal comma in German, point in English; money always with two decimals.
   const n = (v: number, unit?: string) => {
     const r = Math.round(v * 1e6) / 1e6;
     const text = unit === "€" && !Number.isInteger(r) ? r.toFixed(2) : String(r);
-    return text.replace(".", ",");
+    return locale === "de" ? text.replace(".", ",") : text;
   };
   const t = (x: Parameters<typeof resolveText>[0]) => resolveText(x, locale);
   switch (spec.kind) {

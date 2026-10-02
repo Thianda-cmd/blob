@@ -259,7 +259,7 @@ export function AtomsBuilder() {
             <Fact label={t(tx("Mass number", "Massenzahl"))}>
               A = {p} + {n} = {a}
             </Fact>
-            <Fact label={t(tx("Charge", "Ladung"))}>{q === 0 ? t(tx("neutral", "neutral")) : `${chargeLabel(q)}  (${p} − ${e})`}</Fact>
+            <Fact label={t(tx("Charge", "Ladung"))}>{q === 0 ? t(tx("neutral", "neutral")) : `${Math.abs(q)}${q > 0 ? "+" : "−"}  (${p} − ${e})`}</Fact>
             <Fact label={t(tx("Isotope", "Isotop"))}>
               {el.symbol}-{a} ·{" "}
               <span className={stable ? "text-ok" : "text-ink-3"}>{t(stable ? tx("stable", "stabil") : tx("not stable (radioactive)", "nicht stabil (radioaktiv)"))}</span>

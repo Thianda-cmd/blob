@@ -59,6 +59,15 @@ export function Nuclide({
   );
 }
 
+/** Nuclide symbol centred in a task card. */
+export function NuclideCard(props: { symbol: string; a: number; z: number; charge?: number; size?: number }) {
+  return (
+    <div className="grid place-items-center py-2">
+      <Nuclide {...props} />
+    </div>
+  );
+}
+
 /** A tile as in the periodic table: atomic number, symbol, name and atomic mass. */
 export function ElementTile({ symbol, showMass = true, className }: { symbol: string; showMass?: boolean; className?: string }) {
   const t = useText();
@@ -110,7 +119,7 @@ export function ShellPicture({ z, charge = 0, size = 210 }: { z: number; charge?
 export function LookupTable({ periods = 4, highlight = [], full = false }: { periods?: number; highlight?: string[]; full?: boolean }) {
   return (
     <div className="-mx-1 overflow-x-auto px-1 pb-1">
-      <div className={full ? "min-w-[640px]" : "min-w-[340px]"}>
+      <div className={full ? "min-w-[640px]" : "min-w-[340px] max-sm:[zoom:0.9]"}>
         <PeriodicTable mode={full ? "full" : "main"} periods={periods} shade="none" details={false} highlight={highlight} />
       </div>
     </div>

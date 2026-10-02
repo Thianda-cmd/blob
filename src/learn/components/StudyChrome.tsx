@@ -150,7 +150,8 @@ export function SessionEnd({
 
   return (
     <div className="mx-auto grid w-full max-w-[920px] items-center gap-10 px-5 py-10 md:grid-cols-[260px_minmax(0,1fr)] md:py-16">
-      <div className="relative mx-auto grid place-items-center">
+      {/* Clip the confetti so it never adds a horizontal scrollbar on phones. */}
+      <div className="relative mx-auto grid place-items-center overflow-x-clip overflow-y-visible">
         {happy && <Confetti seed={3} />}
         <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 16 }}>
           <Blob ref={blob} size={210} mood={happy ? "excited" : "happy"} accessory="cap" />

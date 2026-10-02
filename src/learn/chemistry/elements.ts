@@ -230,5 +230,17 @@ const SUBSHELLS: [number, number][] = [
   [1, 2], [2, 2], [2, 6], [3, 2], [3, 6], [4, 2], [3, 10], [4, 6], [5, 2], [4, 10], [5, 6], [6, 2], [4, 14], [5, 10], [6, 6], [7, 2], [5, 14], [6, 10], [7, 6],
 ];
 
-/** Neutrons of the most common isotope (mass number − Z), from the rounded atomic mass. */
-export const neutrons = (e: Element) => Math.round(e.mass) - e.z;
+/**
+ * Mass number of the most common isotope where it differs from the rounded atomic mass
+ * (copper is 63,55 u, but Cu-65 is rare: most copper is Cu-63).
+ */
+const COMMON_ISOTOPE: Record<string, number> = {
+  Ni: 58, Cu: 63, Zn: 64, Ga: 69, Ge: 74, Se: 80, Br: 79, Zr: 90, Mo: 98, Ru: 102, Ag: 107, Cd: 114, Sn: 120, Sb: 121, Te: 130, Xe: 132, Ba: 138,
+  Nd: 142, Sm: 152, Eu: 153, Gd: 158, Dy: 164, Er: 166, Yb: 174, Hf: 180, Os: 192, Ir: 193, Hg: 202, Tl: 205, Pb: 208,
+};
+
+/** Mass number of the most common isotope (for radioactive elements: the most stable one). */
+export const massNumber = (e: Element) => COMMON_ISOTOPE[e.symbol] ?? Math.round(e.mass);
+
+/** Neutrons of the most common isotope (mass number − Z). */
+export const neutrons = (e: Element) => massNumber(e) - e.z;

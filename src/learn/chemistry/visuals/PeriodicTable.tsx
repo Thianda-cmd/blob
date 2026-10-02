@@ -97,7 +97,7 @@ export function PeriodicTable({ mode = "main", periods, highlight = [], focus = 
         <div
           className="relative grid gap-[3px]"
           style={{
-            gridTemplateColumns: `1.6rem repeat(${cols}, minmax(${mode === "full" ? "2.1rem" : "2.25rem"}, ${mode === "full" ? "3rem" : "3.6rem"}))`,
+            gridTemplateColumns: `1.1rem repeat(${cols}, minmax(${mode === "full" ? "2.1rem" : "1.95rem"}, ${mode === "full" ? "3rem" : "3.6rem"}))`,
             minWidth: mode === "full" ? 640 : undefined,
           }}
         >

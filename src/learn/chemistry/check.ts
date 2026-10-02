@@ -197,9 +197,23 @@ export function checkWord(accept: Text[], input: string): Feedback {
   if (!u) return { correct: false, message: tx("Type your answer first.", "Gib zuerst deine Antwort ein.") };
   const all = variants(accept).map(normWord);
   if (all.includes(u)) return { correct: true };
-  // One small typo in a longer word still counts.
-  if (all.some((w) => w.length >= 7 && distance(u, w) <= 1)) return { correct: true };
+  // One small typo in a longer word still counts, but not in the ending: chloride, chlorine,
+  // chlorite and chlorate are different substances.
+  // A dropped or extra last letter ("chlorid" for "chloride") is a typo, not another substance.
+  const sameEnding = (w: string) => u.slice(-3) === w.slice(-3) || u === w.slice(0, -1) || w === u.slice(0, -1);
+  if (all.some((w) => w.length >= 7 && distance(u, w) <= 1 && sameEnding(w))) return { correct: true };
   const near = all.find((w) => distance(u, w) <= Math.max(2, Math.floor(w.length / 5)));
+  if (near && !sameEnding(near) && u.slice(0, -3) && near.startsWith(u.slice(0, Math.max(3, u.length - 4)))) {
+    return {
+      correct: false,
+      partial: true,
+      title: tx("Check the ending", "Prüf die Endung"),
+      message: tx(
+        "So close! But in chemistry the ending matters: chlor**ide**, chlor**ine**, chlor**ite** and chlor**ate** are different things.",
+        "Ganz nah dran! Aber in der Chemie zählt die Endung: Chlor**id**, Chlor, Chlor**it** und Chlor**at** sind verschiedene Stoffe.",
+      ),
+    };
+  }
   if (near) {
     return {
       correct: false,
