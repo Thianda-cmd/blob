@@ -110,7 +110,7 @@ export function SpeakerView({
     <div className="fixed inset-0 flex flex-col bg-[#0b0b0a] text-[#f1efe8]" data-theme="dark">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/8 px-4 text-[13px]">
         <span className="min-w-0 truncate font-medium text-white/85">{title}</span>
-        <span className="shrink-0 rounded-md bg-white/6 px-1.5 py-0.5 text-[11.5px] text-white/50">{t.speakerView}</span>
+        <span className="hidden shrink-0 rounded-md bg-white/6 px-1.5 py-0.5 text-[11.5px] text-white/50 sm:inline">{t.speakerView}</span>
         <div className="mx-auto flex items-center gap-1 rounded-xl border border-white/10 bg-[#161614] py-1 pl-3 pr-1">
           <span className={cn("min-w-[64px] font-mono text-[17px] tabular-nums tracking-tight", timer.since === null ? "text-white/45" : "text-white")} aria-label={t.elapsed}>
             {fmt(elapsed)}

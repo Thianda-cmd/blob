@@ -7,12 +7,14 @@ import { TaskList } from "@tiptap/extension-task-list";
 import Typography from "@tiptap/extension-typography";
 import { Selection } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
+import type { Locale } from "@/i18n/config";
+import { editorText } from "@/i18n/messages/editor";
 import { Callout } from "./Callout";
 import { ImageUploadPlaceholder } from "./imageUpload";
 import { PageLink } from "./PageLink";
 import { BlobPlaceholder } from "./placeholder";
 import { SlashCommand, type SlashController } from "./slash/SlashCommand";
-import type { SlashItem } from "./slash/items";
+import { filterSlashItems, type SlashItem } from "./slash/items";
 
 /** True when the caret is in the very first line of text, with nothing (e.g. an image) above it. */
 function inFirstTextblock(state: EditorState) {
@@ -53,15 +55,22 @@ const TitleBridge = Extension.create<{ onExitTop: () => void }>({
   },
 });
 
+/** German typing gets German quotes: "so" → „so“, 'so' → ‚so‘. */
+const GERMAN_QUOTES = { openDoubleQuote: "„", closeDoubleQuote: "“", openSingleQuote: "‚", closeSingleQuote: "‘" };
+
 export function buildExtensions({
   slash,
   runSlash,
   onExitTop,
+  getLocale,
 }: {
   slash: SlashController;
   runSlash: (item: SlashItem, editor: Editor, range: Range) => void;
   onExitTop: () => void;
+  /** The reader's language, read whenever text is shown (menus, placeholders, page links). */
+  getLocale: () => Locale;
 }): AnyExtension[] {
+  const text = () => editorText[getLocale()];
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -79,17 +88,22 @@ export function buildExtensions({
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight,
-    Typography,
+    getLocale() === "de" ? Typography.configure(GERMAN_QUOTES) : Typography,
     Image.configure({
       HTMLAttributes: { loading: "lazy" },
       resize: { enabled: true, directions: ["left", "right"], minWidth: 120, minHeight: 48, alwaysPreserveAspectRatio: true },
     }),
     Callout,
-    PageLink,
+    PageLink.configure({ untitled: () => text().untitled }),
     Selection.configure({ className: "blob-selection" }),
-    BlobPlaceholder,
+    BlobPlaceholder.configure({ text: () => text().placeholder }),
     ImageUploadPlaceholder,
-    SlashCommand.configure({ controller: slash, run: runSlash }),
+    SlashCommand.configure({
+      controller: slash,
+      run: runSlash,
+      items: (query) => filterSlashItems(query, getLocale()),
+      emptyHint: () => text().placeholder.slashQuery,
+    }),
     TitleBridge.configure({ onExitTop }),
   ];
 }

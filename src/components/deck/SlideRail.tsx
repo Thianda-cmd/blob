@@ -28,7 +28,7 @@ export function AddSlideMenu({
 }) {
   const t = useMessages(deckText);
   return (
-    <Popover side={side} align={align} className="w-[392px] p-2" trigger={trigger}>
+    <Popover side={side} align={align} className="w-[min(392px,calc(100vw-16px))] p-2" trigger={trigger}>
       {(close) => (
         <div className="space-y-1.5">
           {LAYOUT_GROUPS.map((g) => (

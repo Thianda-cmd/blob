@@ -7,6 +7,8 @@ import { CornerDownRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 import { cn, pageTitle } from "@/lib/utils";
 
 declare module "@tiptap/core" {
@@ -20,6 +22,8 @@ declare module "@tiptap/core" {
 
 /** Live link to a sub-page: shows the page's current icon and title, opens it on click. */
 function PageLinkView({ node, selected }: ReactNodeViewProps) {
+  const t = useMessages(editorText);
+  const locale = useLocale();
   const router = useRouter();
   const { pages } = useWorkspace();
   const id = node.attrs.id as string | null;
@@ -37,22 +41,26 @@ function PageLinkView({ node, selected }: ReactNodeViewProps) {
           if (href) router.push(href);
         }}
         className={cn("blob-pagelink", selected && "is-selected", !page && "is-missing")}
-        title={page ? `Open ${pageTitle(page.title, page.kind)}` : "This page was moved to the trash"}
+        title={page ? t.pageLink.open(pageTitle(page.title, page.kind, locale)) : t.pageLink.trashed}
       >
         {page ? <PageIcon page={page} className="blob-pagelink-icon" /> : <CornerDownRight className="blob-pagelink-icon" />}
-        <span className="blob-pagelink-title">{page ? pageTitle(page.title, page.kind) : (node.attrs.title as string) || "Untitled"}</span>
-        {!page && <span className="blob-pagelink-note">in trash</span>}
+        <span className="blob-pagelink-title">{page ? pageTitle(page.title, page.kind, locale) : (node.attrs.title as string) || t.untitled}</span>
+        {!page && <span className="blob-pagelink-note">{t.pageLink.inTrash}</span>}
       </a>
     </NodeViewWrapper>
   );
 }
 
-export const PageLink = Node.create({
+export const PageLink = Node.create<{ untitled: () => string }>({
   name: "pageLink",
   group: "block",
   atom: true,
   selectable: true,
   draggable: true,
+
+  addOptions() {
+    return { untitled: () => editorText.en.untitled };
+  },
 
   addAttributes() {
     return {
@@ -74,11 +82,11 @@ export const PageLink = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    return ["a", mergeAttributes(HTMLAttributes, { "data-page-link": "", href: `/p/${node.attrs.id}` }), (node.attrs.title as string) || "Untitled"];
+    return ["a", mergeAttributes(HTMLAttributes, { "data-page-link": "", href: `/p/${node.attrs.id}` }), (node.attrs.title as string) || this.options.untitled()];
   },
 
   renderText({ node }) {
-    return (node.attrs.title as string) || "Untitled";
+    return (node.attrs.title as string) || this.options.untitled();
   },
 
   addCommands() {

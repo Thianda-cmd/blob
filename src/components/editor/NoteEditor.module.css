@@ -1,0 +1,11 @@
+/*
+ * globals.css writes two editor hints as English text ("Start writing…", "Type to filter…").
+ * These rules show the translated text from the data attributes instead (they win on specificity).
+ */
+.root :global(.prose-blob:not(:focus) p.is-editor-empty[data-placeholder-idle])::before {
+  content: attr(data-placeholder-idle);
+}
+
+.root :global(.prose-blob .blob-slash-query.is-query-empty[data-decoration-content])::after {
+  content: attr(data-decoration-content);
+}

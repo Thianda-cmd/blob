@@ -857,7 +857,7 @@ function Row({ label, children }: { label: Text; children: ReactNode }) {
   return (
     <div className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1">
       {/* Wide enough for the longer German "y-Achsenabschnitt", so both rows line up. */}
-      <span className={cn("shrink-0", de ? "w-[136px]" : "w-[86px]")}>
+      <span className={cn("shrink-0", de ? "w-[154px] whitespace-nowrap" : "w-[86px]")}>
         <Caption>{t(label)}</Caption>
       </span>
       {children}

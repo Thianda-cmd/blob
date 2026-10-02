@@ -2,10 +2,13 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check, CloudOff } from "lucide-react";
+import { useMessages } from "@/i18n/client";
+import { pageText } from "@/i18n/messages/page";
 import type { SaveState } from "./useAutosave";
 
 export function SaveIndicator({ state }: { state: SaveState }) {
-  const label = state === "error" ? "Offline, retrying" : state === "saved" ? "Saved" : "Saving";
+  const t = useMessages(pageText);
+  const label = state === "error" ? t.offline : state === "saved" ? t.saved : t.saving;
   return (
     <div className="flex h-7 items-center gap-1.5 px-1.5 text-[12px] text-ink-3" aria-live="polite" title={label}>
       <AnimatePresence mode="wait" initial={false}>

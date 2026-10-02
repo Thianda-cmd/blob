@@ -3,11 +3,16 @@
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { useEditorState } from "@tiptap/react";
+import { format } from "date-fns";
 import { Check, ChevronDown, Clock, FolderInput } from "lucide-react";
 import { motion } from "motion/react";
 import { useDeferredValue, useMemo, useSyncExternalStore } from "react";
 import { MenuItem, MenuLabel, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dateLocale, formatNumber, intlLocale } from "@/i18n/format";
+import { editorText } from "@/i18n/messages/editor";
 import { subjectColor } from "@/lib/subjects";
 import type { PageMeta, Subject } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -33,30 +38,35 @@ function subscribeClock(fn: () => void) {
 const readClock = () => (clockNow ||= Date.now());
 const serverClock = () => 0;
 
-function ago(iso: string, now: number) {
+/** "Edited just now", "Edited 3 min ago", "Edited Monday", "Edited Oct 12" (German: "Bearbeitet vor 3 Min."…). */
+function editedLabel(iso: string, now: number, locale: Locale) {
+  const t = editorText[locale].meta;
   const then = new Date(iso).getTime();
   const s = Math.max(0, (now - then) / 1000);
-  if (s < 45) return "just now";
+  if (s < 45) return t.edited.justNow;
   const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
+  if (m < 60) return t.edited.minutes(m);
   const h = Math.round(m / 60);
-  if (h < 24) return `${h} hr ago`;
+  if (h < 24) return t.edited.hours(h);
   const d = new Date(then);
   const days = Math.round(h / 24);
-  if (days === 1) return "yesterday";
-  if (days < 7) return d.toLocaleDateString(undefined, { weekday: "long" });
+  if (days === 1) return t.edited.yesterday;
+  const opts = { locale: dateLocale(locale) };
+  if (days < 7) return t.edited.weekday(format(d, t.weekdayFormat, opts));
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
-  return d.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+  return t.edited.date(format(d, sameYear ? t.dateFormat : t.dateYearFormat, opts));
 }
 
 function EditedAgo({ iso }: { iso: string }) {
+  const locale = useLocale();
   const now = useSyncExternalStore(subscribeClock, readClock, serverClock);
   // Our own saves bump `updated_at` a moment after the clock last ticked.
-  const label = now ? ago(iso, Math.max(now, new Date(iso).getTime())) : null;
+  const label = now ? editedLabel(iso, Math.max(now, new Date(iso).getTime()), locale) : null;
   if (!label) return null;
+  const exact = new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long", timeStyle: "short" }).format(new Date(iso));
   return (
-    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap" title={new Date(iso).toLocaleString()}>
-      Edited {label}
+    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap" title={exact}>
+      {label}
     </motion.span>
   );
 }
@@ -73,6 +83,8 @@ function countWords(doc: PMNode) {
 }
 
 function WordStats({ editor }: { editor: Editor }) {
+  const t = useMessages(editorText).meta;
+  const locale = useLocale();
   const doc = useEditorState({ editor, selector: ({ editor: e }) => e.state.doc, equalityFn: (a, b) => a === b });
   const deferred = useDeferredValue(doc);
   const words = useMemo(() => countWords(deferred), [deferred]);
@@ -81,10 +93,10 @@ function WordStats({ editor }: { editor: Editor }) {
   return (
     <span className="flex items-center gap-1 whitespace-nowrap tabular-nums">
       <Dot />
-      {words.toLocaleString()} {words === 1 ? "word" : "words"}
+      {t.words(words, formatNumber(words, locale))}
       <span className="hidden items-center gap-1 sm:flex">
         <Dot />
-        <Clock className="size-3" /> {minutes} min read
+        <Clock className="size-3" /> {t.minRead(minutes)}
       </span>
     </span>
   );
@@ -108,6 +120,7 @@ function SubjectBadge({ subject }: { subject: Subject }) {
 }
 
 function SubjectChip({ page }: { page: PageMeta }) {
+  const t = useMessages(editorText).meta;
   const { pages, subjects, updatePage } = useWorkspace();
   // Nested pages live under their root page's subject.
   let root = page;
@@ -136,13 +149,13 @@ function SubjectChip({ page }: { page: PageMeta }) {
           {...props}
           type="button"
           className={cn(chip, subject ? "bg-hover/70 hover:bg-hover hover:text-ink" : "-ml-1.5 text-ink-3 hover:bg-hover hover:text-ink-2")}
-          title="Change subject"
+          title={t.changeSubject}
         >
           {subject ? (
             <SubjectBadge subject={subject} />
           ) : (
             <>
-              <FolderInput className="size-3.5" /> Add subject
+              <FolderInput className="size-3.5" /> {t.addSubject}
             </>
           )}
           <ChevronDown className="size-3 text-ink-3" />
@@ -151,7 +164,7 @@ function SubjectChip({ page }: { page: PageMeta }) {
     >
       {(close) => (
         <>
-          <MenuLabel>Subject</MenuLabel>
+          <MenuLabel>{t.subject}</MenuLabel>
           <div className="max-h-[240px] overflow-y-auto">
             {subjects.map((s) => (
               <MenuItem
@@ -174,7 +187,7 @@ function SubjectChip({ page }: { page: PageMeta }) {
                 close();
               }}
             >
-              No subject
+              {t.noSubject}
             </MenuItem>
           </div>
         </>

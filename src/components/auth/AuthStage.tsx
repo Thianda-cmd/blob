@@ -174,7 +174,7 @@ function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; te
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mb-7">
-      <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{title}</h1>
+      <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em] text-balance">{title}</h1>
       {subtitle && <p className="mt-1.5 text-[14px] text-ink-2">{subtitle}</p>}
     </motion.div>
   );

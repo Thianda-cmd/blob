@@ -8,6 +8,8 @@ import { PageIcon } from "@/components/shell/Sidebar";
 import { TopBar, type Crumb } from "@/components/shell/TopBar";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import { pageText } from "@/i18n/messages/page";
 import { subjectColor } from "@/lib/subjects";
 import type { PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
@@ -16,6 +18,8 @@ import type { SaveState } from "./useAutosave";
 
 /** Breadcrumbs, save state, favorite and the page menu. Shared by notes and presentations. */
 export function PageTopBar({ pageId, saveState, actions }: { pageId: string; saveState: SaveState; actions?: ReactNode }) {
+  const t = useMessages(pageText);
+  const locale = useLocale();
   const router = useRouter();
   const { pages, subjects, updatePage, trashPage } = useWorkspace();
   const page = pages.find((p) => p.id === pageId);
@@ -40,8 +44,8 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
           },
         ]
       : []),
-    ...chain.map((p) => ({ label: pageTitle(p.title, p.kind), href: `/p/${p.id}`, icon: <PageIcon page={p} className="size-3.5" /> })),
-    { label: pageTitle(page.title, page.kind), icon: <PageIcon page={page} className="size-3.5" /> },
+    ...chain.map((p) => ({ label: pageTitle(p.title, p.kind, locale), href: `/p/${p.id}`, icon: <PageIcon page={p} className="size-3.5" /> })),
+    { label: pageTitle(page.title, page.kind, locale), icon: <PageIcon page={page} className="size-3.5" /> },
   ];
 
   return (
@@ -57,8 +61,8 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
               if (!page.is_favorite) blob.react("jump", "love", 1400);
             }}
             className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
-            aria-label={page.is_favorite ? "Remove from favorites" : "Add to favorites"}
-            title={page.is_favorite ? "Remove from favorites" : "Add to favorites"}
+            aria-label={page.is_favorite ? t.removeFavorite : t.addFavorite}
+            title={page.is_favorite ? t.removeFavorite : t.addFavorite}
           >
             <Star className={cn("size-4 transition-transform", page.is_favorite && "scale-110 fill-blob text-blob")} />
           </button>
@@ -66,7 +70,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
             align="end"
             className="w-[230px]"
             trigger={(props) => (
-              <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label="Page options">
+              <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.options}>
                 <Ellipsis className="size-4" />
               </button>
             )}
@@ -77,7 +81,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                   <>
                     <MenuLabel>
                       <span className="flex items-center gap-1.5">
-                        <FolderInput className="size-3" /> Move to subject
+                        <FolderInput className="size-3" /> {t.moveToSubject}
                       </span>
                     </MenuLabel>
                     <div className="max-h-[220px] overflow-y-auto">
@@ -102,7 +106,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                           close();
                         }}
                       >
-                        No subject
+                        {t.noSubject}
                       </MenuItem>
                     </div>
                     <MenuSeparator />
@@ -112,11 +116,11 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                   icon={<Link2 />}
                   onSelect={() => {
                     navigator.clipboard?.writeText(window.location.href);
-                    blob.say("Link copied. Only you can open it.", { mood: "happy" });
+                    blob.say(t.linkCopied, { mood: "happy" });
                     close();
                   }}
                 >
-                  Copy link
+                  {t.copyLink}
                 </MenuItem>
                 <MenuItem
                   icon={<Trash2 />}
@@ -127,7 +131,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                     if (ok) router.push(page.parent_id ? `/p/${page.parent_id}` : subject ? `/subjects/${subject.id}` : "/home");
                   }}
                 >
-                  Move to trash
+                  {t.moveToTrash}
                 </MenuItem>
               </>
             )}

@@ -4,16 +4,20 @@ import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { Heading1, ImagePlus, ListTodo, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 
 /** A quiet row of starters under the placeholder of an empty note. Gone as soon as you type. */
 export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () => void }) {
+  const t = useMessages(editorText).quickStart;
   const empty = useEditorState({ editor, selector: ({ editor: e }) => e.isEmpty });
 
-  const items: { label: string; icon: LucideIcon; run: () => void }[] = [
-    { label: "Heading", icon: Heading1, run: () => editor.chain().focus("start").setNode("heading", { level: 1 }).run() },
-    { label: "Checklist", icon: ListTodo, run: () => editor.chain().focus("start").toggleTaskList().run() },
+  const items: { id: string; label: string; icon: LucideIcon; run: () => void }[] = [
+    { id: "heading", label: t.heading, icon: Heading1, run: () => editor.chain().focus("start").setNode("heading", { level: 1 }).run() },
+    { id: "checklist", label: t.checklist, icon: ListTodo, run: () => editor.chain().focus("start").toggleTaskList().run() },
     {
-      label: "Image",
+      id: "image",
+      label: t.image,
       icon: ImagePlus,
       run: () => {
         editor.commands.focus("start");
@@ -32,9 +36,9 @@ export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () =>
           exit={{ opacity: 0, y: 2, transition: { duration: 0.1 } }}
           className="absolute left-0 top-[2.35em] flex flex-wrap items-center gap-1.5 text-[15.5px]"
         >
-          {items.map(({ label, icon: Icon, run }) => (
+          {items.map(({ id, label, icon: Icon, run }) => (
             <button
-              key={label}
+              key={id}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={run}

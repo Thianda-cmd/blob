@@ -2,16 +2,20 @@ import { Extension } from "@tiptap/core";
 import { NodeSelection, Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { blob } from "@/components/blob/bus";
+import type { EditorText } from "@/i18n/messages/editor";
 import { createClient } from "@/lib/supabase/client";
+
+/** What the upload says: `editorText[locale].upload`. */
+export type UploadText = EditorText["upload"];
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 
 const uploadKey = new PluginKey<DecorationSet>("imageUpload");
 
-type UploadMeta = { add?: { id: string; pos: number; src: string }; remove?: { id: string } };
+type UploadMeta = { add?: { id: string; pos: number; src: string; label: string }; remove?: { id: string } };
 
-function placeholderDOM(src: string) {
+function placeholderDOM(src: string, label: string) {
   const wrap = document.createElement("div");
   wrap.className = "blob-upload";
   wrap.contentEditable = "false";
@@ -25,7 +29,7 @@ function placeholderDOM(src: string) {
   pill.className = "blob-upload-pill";
   const dot = document.createElement("span");
   dot.className = "blob-upload-spinner";
-  pill.append(dot, document.createTextNode("Uploading…"));
+  pill.append(dot, document.createTextNode(label));
   veil.append(pill);
   wrap.append(img, veil);
   return wrap;
@@ -47,8 +51,8 @@ export const ImageUploadPlaceholder = Extension.create({
             let next = set.map(tr.mapping, tr.doc);
             const meta = tr.getMeta(uploadKey) as UploadMeta | undefined;
             if (meta?.add) {
-              const { id, pos, src } = meta.add;
-              const deco = Decoration.widget(pos, () => placeholderDOM(src), { id, key: `upload-${id}`, side: -1 });
+              const { id, pos, src, label } = meta.add;
+              const deco = Decoration.widget(pos, () => placeholderDOM(src, label), { id, key: `upload-${id}`, side: -1 });
               next = next.add(tr.doc, [deco]);
             }
             if (meta?.remove) {
@@ -127,25 +131,25 @@ async function uploadToStorage(file: File, userId: string) {
 }
 
 /** Upload images and drop them into the document at `at` (or near the caret). */
-export function uploadImages(view: EditorView, files: File[], userId: string, at?: number) {
+export function uploadImages(view: EditorView, files: File[], userId: string, text: UploadText, at?: number) {
   for (const file of files) {
     if (!IMAGE_TYPES.includes(file.type)) {
-      blob.say("I can add PNG, JPG, GIF or WebP images.", { mood: "worried" });
+      blob.say(text.badType, { mood: "worried" });
       continue;
     }
     if (file.size > MAX_BYTES) {
-      blob.say("That image is over 10 MB. Try a smaller one?", { mood: "worried" });
+      blob.say(text.tooBig, { mood: "worried" });
       continue;
     }
-    void uploadOne(view, file, userId, at);
+    void uploadOne(view, file, userId, text, at);
   }
 }
 
-async function uploadOne(view: EditorView, file: File, userId: string, at?: number) {
+async function uploadOne(view: EditorView, file: File, userId: string, text: UploadText, at?: number) {
   const id = crypto.randomUUID();
   const preview = URL.createObjectURL(file);
   const pos = at ?? insertionPos(view.state);
-  view.dispatch(view.state.tr.setMeta(uploadKey, { add: { id, pos, src: preview } } satisfies UploadMeta));
+  view.dispatch(view.state.tr.setMeta(uploadKey, { add: { id, pos, src: preview, label: text.uploading } } satisfies UploadMeta));
 
   const url = await uploadToStorage(file, userId);
   if (url) await preload(url);
@@ -160,5 +164,5 @@ async function uploadOne(view: EditorView, file: File, userId: string, at?: numb
   }
   view.dispatch(tr);
   URL.revokeObjectURL(preview);
-  if (!url) blob.say("That upload didn't work. Check your connection and try again?", { mood: "worried" });
+  if (!url) blob.say(text.failed, { mood: "worried" });
 }

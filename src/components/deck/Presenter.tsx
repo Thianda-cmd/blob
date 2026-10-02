@@ -605,7 +605,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
             exit={{ opacity: 0, y: 6, transition: { duration: 0.25 } }}
             className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center"
           >
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#1c1b18] px-3.5 py-2 text-[12.5px] text-white/70 shadow-pop">
+            <div className="mx-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-xl border border-white/10 bg-[#1c1b18] px-3.5 py-2 text-[12.5px] text-white/70 shadow-pop">
               <Hint keys={["←", "→"]}>{t.hintMove}</Hint>
               <Hint keys={["S"]}>{t.hintSpeaker}</Hint>
               <Hint keys={["G"]}>{t.hintAll}</Hint>
@@ -633,7 +633,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
               <div className="flex items-center gap-3 border-b border-white/8 px-5 py-3 text-[12.5px] text-white/50">
                 <NotebookText className="size-3.5" />
                 <span className="font-medium text-white/80">{t.speakerNotes}</span>
-                <span className="tabular-nums">{ended ? t.end : t.slideOf(index + 1, total)}</span>
+                <span className="shrink-0 whitespace-nowrap tabular-nums">{ended ? t.end : t.slideOf(index + 1, total)}</span>
                 <span className="ml-auto truncate">
                   {nextSlide ? (
                     <>
@@ -695,7 +695,7 @@ function ChromeButton({ children, onClick, label, active }: { children: ReactNod
 
 function Hint({ keys, children }: { keys: string[]; children: ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
       <span className="flex gap-0.5">
         {keys.map((k) => (
           <Kbd key={k} className="border-white/12 bg-white/5 text-white/70 shadow-none">

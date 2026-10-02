@@ -9,6 +9,9 @@ import { blob } from "@/components/blob/bus";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave } from "@/components/page/useAutosave";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { createClient } from "@/lib/supabase/client";
 import type { Page } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
@@ -16,6 +19,7 @@ import { BubbleToolbar } from "./BubbleToolbar";
 import { buildExtensions } from "./extensions";
 import { IconPicker } from "./IconPicker";
 import { IMAGE_TYPES, dropPos, imageFiles, uploadImages } from "./imageUpload";
+import styles from "./NoteEditor.module.css";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
@@ -68,6 +72,8 @@ class Latest<T> {
 }
 
 type Live = {
+  locale: Locale;
+  text: EditorText;
   schedule: (patch: Partial<NotePatch>) => void;
   userId: string;
   openHref: (href: string) => void;
@@ -78,6 +84,8 @@ type Live = {
 };
 
 export function NoteEditor({ page }: { page: Page }) {
+  const t = useMessages(editorText);
+  const locale = useLocale();
   const router = useRouter();
   const { pages, userId, updatePage, createPage } = useWorkspace();
   const meta = pages.find((p) => p.id === page.id);
@@ -115,6 +123,8 @@ export function NoteEditor({ page }: { page: Page }) {
   const [live] = useState(() => new Latest<Live>());
   useEffect(() => {
     live.set({
+      locale,
+      text: t,
       schedule,
       userId,
       focusTitle,
@@ -127,7 +137,8 @@ export function NoteEditor({ page }: { page: Page }) {
       createSubPage: async (editor) => {
         const created = await createPage({ kind: "note", parent_id: page.id, subject_id: meta ? meta.subject_id : page.subject_id });
         if (!created || editor.isDestroyed) return;
-        editor.chain().focus().insertPageLink({ id: created.id, title: "Untitled" }).run();
+        // No stored title: the link shows the page's live title, or "Untitled" in the reader's language.
+        editor.chain().focus().insertPageLink({ id: created.id, title: "" }).run();
         blob.react("jump", "happy");
       },
     });
@@ -155,16 +166,17 @@ export function NoteEditor({ page }: { page: Page }) {
           },
         }),
       onExitTop: () => live.current?.focusTitle(),
+      getLocale: () => live.current?.locale ?? locale,
     }),
     editorProps: {
-      attributes: { class: "prose-blob", spellcheck: "true", "aria-label": "Note content" },
+      attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
       handlePaste: (view, event) => {
         const files = imageFiles(event.clipboardData?.files);
         if (!files.length || !live.current) return false;
         // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
         if (event.clipboardData?.getData("text/plain").trim()) return false;
         event.preventDefault();
-        uploadImages(view, files, live.current.userId);
+        uploadImages(view, files, live.current.userId, live.current.text.upload);
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
@@ -172,7 +184,7 @@ export function NoteEditor({ page }: { page: Page }) {
         const files = imageFiles(event.dataTransfer?.files);
         if (!files.length) return false;
         event.preventDefault();
-        uploadImages(view, files, live.current.userId, dropPos(view, event));
+        uploadImages(view, files, live.current.userId, live.current.text.upload, dropPos(view, event));
         return true;
       },
       handleClick: (view, _pos, event) => {
@@ -228,8 +240,8 @@ export function NoteEditor({ page }: { page: Page }) {
   }, [resizeTitle]);
 
   useEffect(() => {
-    document.title = `${pageTitle(title)} · Blob`;
-  }, [title]);
+    document.title = `${pageTitle(title, "note", locale)} · Blob`;
+  }, [title, locale]);
 
   const changeTitle = (value: string) => {
     const next = value.replace(/[\r\n]+/g, " ").slice(0, 300);
@@ -275,7 +287,7 @@ export function NoteEditor({ page }: { page: Page }) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" onKeyDownCapture={onKeyDownCapture}>
+    <div className={cn("flex min-h-0 flex-1 flex-col", styles.root)} onKeyDownCapture={onKeyDownCapture}>
       <PageTopBar pageId={page.id} saveState={saveState} />
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -292,8 +304,8 @@ export function NoteEditor({ page }: { page: Page }) {
                   rows={1}
                   onChange={(e) => changeTitle(e.target.value)}
                   onKeyDown={onTitleKeyDown}
-                  placeholder="Untitled"
-                  aria-label="Page title"
+                  placeholder={t.untitled}
+                  aria-label={t.titleLabel}
                   spellCheck
                   className="block w-full resize-none overflow-hidden bg-transparent font-display text-[34px] font-bold leading-[1.15] tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/45 sm:text-[40px]"
                 />
@@ -305,9 +317,7 @@ export function NoteEditor({ page }: { page: Page }) {
               {broken && (
                 <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-line bg-raised px-3.5 py-3 text-[13px] text-ink-2 shadow-card" role="status">
                   <ShieldAlert className="mt-0.5 size-4 shrink-0 text-blob-ink" />
-                  <p>
-                    Part of this note uses blocks Blob can&apos;t show yet, so editing is paused to keep the original safe. The title can still be changed.
-                  </p>
+                  <p>{t.broken}</p>
                 </div>
               )}
 
@@ -348,7 +358,7 @@ export function NoteEditor({ page }: { page: Page }) {
         onChange={(e) => {
           const files = imageFiles(e.target.files);
           e.target.value = "";
-          if (editor && files.length) uploadImages(editor.view, files, userId);
+          if (editor && files.length) uploadImages(editor.view, files, userId, t.upload);
         }}
       />
     </div>

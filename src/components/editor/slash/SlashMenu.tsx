@@ -4,6 +4,8 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Kbd } from "@/components/ui/Kbd";
+import { useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 import { cn } from "@/lib/utils";
 import type { SlashItem } from "./items";
 import type { SlashController, SlashSnapshot } from "./SlashCommand";
@@ -17,6 +19,7 @@ export function SlashMenu({ controller }: { controller: SlashController }) {
 }
 
 function SlashPanel({ controller, snap }: { controller: SlashController; snap: SlashSnapshot }) {
+  const t = useMessages(editorText).slash;
   const { items, query, placement } = snap;
   const [active, setActive] = useState(0);
   const [seenQuery, setSeenQuery] = useState(query);
@@ -63,17 +66,17 @@ function SlashPanel({ controller, snap }: { controller: SlashController; snap: S
       style={{ transformOrigin: placement === "top" ? "bottom left" : "top left" }}
       className="w-[300px] overflow-hidden rounded-xl border border-line bg-raised text-ink shadow-pop"
       role="listbox"
-      aria-label="Insert block"
+      aria-label={t.label}
       onMouseDown={(e) => e.preventDefault()}
     >
       <div ref={listRef} className="max-h-[min(340px,48vh)] scroll-py-1 overflow-y-auto overscroll-contain p-1">
         {items.length === 0 ? (
           <div className="px-3 py-5 text-center text-[13px] text-ink-3">
-            No blocks match <span className="text-ink-2">“{query}”</span>
+            {t.noMatch} <span className="text-ink-2">{t.quote(query)}</span>
           </div>
         ) : (
           items.map((item, i) => {
-            const label = item.group !== lastGroup ? item.group : null;
+            const label = item.group !== lastGroup ? t.groups[item.group] : null;
             lastGroup = item.group;
             return (
               <div key={item.id}>
@@ -87,13 +90,13 @@ function SlashPanel({ controller, snap }: { controller: SlashController; snap: S
       <div className="flex h-8 items-center gap-3 border-t border-line bg-surface/60 px-2.5 text-[11px] text-ink-3">
         <span className="flex items-center gap-1">
           <Kbd>↑</Kbd>
-          <Kbd>↓</Kbd> navigate
+          <Kbd>↓</Kbd> {t.navigate}
         </span>
         <span className="flex items-center gap-1">
-          <Kbd>↵</Kbd> insert
+          <Kbd>↵</Kbd> {t.insert}
         </span>
         <span className="ml-auto flex items-center gap-1">
-          <Kbd>esc</Kbd> close
+          <Kbd>esc</Kbd> {t.close}
         </span>
       </div>
     </motion.div>

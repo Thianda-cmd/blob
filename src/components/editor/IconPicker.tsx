@@ -3,6 +3,8 @@
 import { Shuffle, SmilePlus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { Popover } from "@/components/ui/Menu";
+import { useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 import { cn } from "@/lib/utils";
 
 export const SCHOOL_EMOJIS = [
@@ -15,10 +17,11 @@ export const SCHOOL_EMOJIS = [
 ];
 
 function Grid({ current, onPick, close }: { current: string | null; onPick: (emoji: string | null) => void; close: () => void }) {
+  const t = useMessages(editorText).icon;
   return (
     <div className="w-[332px] p-1.5">
       <div className="flex items-center justify-between px-1 pb-1.5">
-        <span className="text-[11px] font-medium text-ink-3">Pick an icon</span>
+        <span className="text-[11px] font-medium text-ink-3">{t.pick}</span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -29,7 +32,7 @@ function Grid({ current, onPick, close }: { current: string | null; onPick: (emo
             }}
             className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] text-ink-2 hover:bg-hover hover:text-ink"
           >
-            <Shuffle className="size-3.5" /> Random
+            <Shuffle className="size-3.5" /> {t.random}
           </button>
           {current && (
             <button
@@ -40,7 +43,7 @@ function Grid({ current, onPick, close }: { current: string | null; onPick: (emo
               }}
               className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] text-ink-2 hover:bg-danger/10 hover:text-danger"
             >
-              <Trash2 className="size-3.5" /> Remove
+              <Trash2 className="size-3.5" /> {t.remove}
             </button>
           )}
         </div>
@@ -60,7 +63,7 @@ function Grid({ current, onPick, close }: { current: string | null; onPick: (emo
               close();
             }}
             className={cn("grid size-8 place-items-center rounded-lg text-[19px] leading-none hover:bg-hover", current === emoji && "bg-blob-soft")}
-            aria-label={`Use ${emoji}`}
+            aria-label={t.use(emoji)}
           >
             {emoji}
           </motion.button>
@@ -72,6 +75,7 @@ function Grid({ current, onPick, close }: { current: string | null; onPick: (emo
 
 /** The big page icon above the title, or an "Add icon" affordance when there is none. */
 export function IconPicker({ icon, onChange }: { icon: string | null; onChange: (icon: string | null) => void }) {
+  const t = useMessages(editorText).icon;
   if (icon) {
     return (
       <Popover
@@ -82,8 +86,8 @@ export function IconPicker({ icon, onChange }: { icon: string | null; onChange: 
             {...props}
             type="button"
             className="-ml-1.5 grid size-[72px] place-items-center rounded-xl text-[54px] leading-none transition-[background,transform] duration-150 hover:bg-hover active:scale-95"
-            aria-label="Change icon"
-            title="Change icon"
+            aria-label={t.change}
+            title={t.change}
           >
             <motion.span key={icon} initial={{ scale: 0.4, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 520, damping: 14 }}>
               {icon}
@@ -105,7 +109,7 @@ export function IconPicker({ icon, onChange }: { icon: string | null; onChange: 
           type="button"
           className="-ml-1.5 flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] text-ink-3 opacity-0 transition-[opacity,background,color] duration-150 hover:bg-hover hover:text-ink-2 focus-visible:opacity-100 group-hover/header:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
         >
-          <SmilePlus className="size-4" /> Add icon
+          <SmilePlus className="size-4" /> {t.add}
         </button>
       )}
     >

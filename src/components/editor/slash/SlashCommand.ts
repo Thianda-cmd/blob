@@ -1,7 +1,7 @@
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
-import { SLASH_ITEMS, filterSlashItems, type SlashItem } from "./items";
+import type { SlashItem } from "./items";
 
 export type SlashSnapshot = {
   open: boolean;
@@ -109,6 +109,10 @@ export const slashPluginKey = new PluginKey("slashCommand");
 type SlashOptions = {
   controller: SlashController | null;
   run: (item: SlashItem, editor: Editor, range: Range) => void;
+  /** The commands matching what was typed after "/", in the reader's language. */
+  items: (query: string) => SlashItem[];
+  /** Hint shown after a lone "/" ("Type to filter…"). */
+  emptyHint: () => string;
 };
 
 /** "/" opens the block menu. Only at the start of a line or after a space, never in code. */
@@ -116,11 +120,11 @@ export const SlashCommand = Extension.create<SlashOptions>({
   name: "slashCommand",
 
   addOptions() {
-    return { controller: null, run: () => {} };
+    return { controller: null, run: () => {}, items: () => [], emptyHint: () => "" };
   },
 
   addProseMirrorPlugins() {
-    const { controller, run } = this.options;
+    const { controller, run, items, emptyHint } = this.options;
     if (!controller) return [];
     return [
       Suggestion<SlashItem, SlashItem>({
@@ -128,8 +132,10 @@ export const SlashCommand = Extension.create<SlashOptions>({
         pluginKey: slashPluginKey,
         char: "/",
         allowedPrefixes: [" ", " "],
-        initialItems: SLASH_ITEMS,
+        initialItems: items(""),
         decorationClass: "blob-slash-query",
+        // Shown by CSS (NoteEditor.module.css) while the query is empty.
+        decorationContent: emptyHint(),
         decorationEmptyClass: "is-query-empty",
         placement: "bottom-start",
         offset: { mainAxis: 8, crossAxis: -4 },
@@ -139,7 +145,7 @@ export const SlashCommand = Extension.create<SlashOptions>({
           if ($from.parent.type.spec.code) return false;
           return !$from.marks().some((m) => m.type.name === "code");
         },
-        items: ({ query }) => filterSlashItems(query),
+        items: ({ query }) => items(query),
         command: ({ editor, range, props }) => run(props, editor, range),
         render: controller.renderer,
       }),

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
+import { useMessages } from "@/i18n/client";
+import { pageText } from "@/i18n/messages/page";
 
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
@@ -10,16 +12,20 @@ export type SaveState = "saved" | "pending" | "saving" | "error";
  * patches are merged and written after `delay` ms of quiet. Failed writes retry.
  */
 export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promise<boolean>, delay = 700) {
+  const t = useMessages(pageText);
   const [state, setState] = useState<SaveState>("saved");
   const pending = useRef<Partial<T> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const saveRef = useRef(save);
+  // Blob's lines, kept current for the long-lived flush below.
+  const textRef = useRef(t);
   const failed = useRef(false);
   const inFlight = useRef<Promise<void> | null>(null);
   const retry = useRef<() => void>(() => {});
 
   useEffect(() => {
     saveRef.current = save;
+    textRef.current = t;
   });
 
   const flush = useCallback(async (): Promise<void> => {
@@ -34,14 +40,14 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
       if (!ok) {
         pending.current = { ...patch, ...(pending.current ?? {}) };
         setState("error");
-        if (!failed.current) blob.say("I can't reach the server. I'll keep trying.", { mood: "worried" });
+        if (!failed.current) blob.say(textRef.current.cantReach, { mood: "worried" });
         failed.current = true;
         timer.current = setTimeout(() => retry.current(), 4000);
         return;
       }
       if (failed.current) {
         failed.current = false;
-        blob.say("Back online. Everything is saved!", { mood: "happy" });
+        blob.say(textRef.current.backOnline, { mood: "happy" });
       }
       setState(pending.current ? "pending" : "saved");
     })();

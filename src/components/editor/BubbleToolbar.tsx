@@ -29,24 +29,25 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 import { cn } from "@/lib/utils";
 
 const BUBBLE_KEY = "blobBubbleMenu";
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
-const mod = isMac ? "⌘" : "Ctrl+";
-const shift = isMac ? "⇧" : "Shift+";
 
 type BlockId = "text" | "h1" | "h2" | "h3" | "bullet" | "numbered" | "todo" | "quote";
 
-const BLOCKS: { id: BlockId; label: string; icon: LucideIcon; run: (e: Editor) => void }[] = [
-  { id: "text", label: "Text", icon: Pilcrow, run: (e) => e.chain().focus().clearNodes().run() },
-  { id: "h1", label: "Heading 1", icon: Heading1, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 1 }).run() },
-  { id: "h2", label: "Heading 2", icon: Heading2, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 2 }).run() },
-  { id: "h3", label: "Heading 3", icon: Heading3, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 3 }).run() },
-  { id: "bullet", label: "Bulleted list", icon: List, run: (e) => e.chain().focus().clearNodes().toggleBulletList().run() },
-  { id: "numbered", label: "Numbered list", icon: ListOrdered, run: (e) => e.chain().focus().clearNodes().toggleOrderedList().run() },
-  { id: "todo", label: "To-do list", icon: ListTodo, run: (e) => e.chain().focus().clearNodes().toggleTaskList().run() },
-  { id: "quote", label: "Quote", icon: TextQuote, run: (e) => e.chain().focus().clearNodes().toggleBlockquote().run() },
+/** Labels come from `editorText.bubble.blocks[id]`. */
+const BLOCKS: { id: BlockId; icon: LucideIcon; run: (e: Editor) => void }[] = [
+  { id: "text", icon: Pilcrow, run: (e) => e.chain().focus().clearNodes().run() },
+  { id: "h1", icon: Heading1, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 1 }).run() },
+  { id: "h2", icon: Heading2, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 2 }).run() },
+  { id: "h3", icon: Heading3, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 3 }).run() },
+  { id: "bullet", icon: List, run: (e) => e.chain().focus().clearNodes().toggleBulletList().run() },
+  { id: "numbered", icon: ListOrdered, run: (e) => e.chain().focus().clearNodes().toggleOrderedList().run() },
+  { id: "todo", icon: ListTodo, run: (e) => e.chain().focus().clearNodes().toggleTaskList().run() },
+  { id: "quote", icon: TextQuote, run: (e) => e.chain().focus().clearNodes().toggleBlockquote().run() },
 ];
 
 function currentBlock(editor: Editor): BlockId {
@@ -77,6 +78,9 @@ export function normalizeHref(raw: string) {
 
 /** Formatting bubble that appears over a text selection. */
 export function BubbleToolbar({ editor }: { editor: Editor }) {
+  const t = useMessages(editorText).bubble;
+  const mod = isMac ? "⌘" : t.ctrl;
+  const shift = isMac ? "⇧" : t.shift;
   const [mode, setMode] = useState<"tools" | "link">("tools");
   const [blocksOpen, setBlocksOpen] = useState(false);
   const pointerDown = useRef(false);
@@ -182,32 +186,32 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
               )}
               aria-haspopup="menu"
               aria-expanded={blocksOpen}
-              title="Turn into"
+              title={t.turnInto}
             >
-              {BLOCKS.find((b) => b.id === s?.block)?.label ?? "Text"}
+              {t.blocks[s?.block ?? "text"]}
               <ChevronDown className={cn("size-3.5 text-ink-3 transition-transform duration-200", blocksOpen && "rotate-180")} />
             </button>
             <Divider />
-            <Tool label="Bold" shortcut={`${mod}B`} active={s?.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
+            <Tool label={t.bold} shortcut={`${mod}B`} active={s?.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
               <Bold />
             </Tool>
-            <Tool label="Italic" shortcut={`${mod}I`} active={s?.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            <Tool label={t.italic} shortcut={`${mod}I`} active={s?.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
               <Italic />
             </Tool>
-            <Tool label="Underline" shortcut={`${mod}U`} active={s?.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            <Tool label={t.underline} shortcut={`${mod}U`} active={s?.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
               <Underline />
             </Tool>
-            <Tool label="Strikethrough" shortcut={`${mod}${shift}S`} active={s?.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            <Tool label={t.strike} shortcut={`${mod}${shift}S`} active={s?.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
               <Strikethrough />
             </Tool>
-            <Tool label="Inline code" shortcut={`${mod}E`} active={s?.code} onClick={() => editor.chain().focus().toggleCode().run()}>
+            <Tool label={t.code} shortcut={`${mod}E`} active={s?.code} onClick={() => editor.chain().focus().toggleCode().run()}>
               <Code />
             </Tool>
-            <Tool label="Highlight" shortcut={`${mod}${shift}H`} active={s?.highlight} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+            <Tool label={t.highlight} shortcut={`${mod}${shift}H`} active={s?.highlight} onClick={() => editor.chain().focus().toggleHighlight().run()}>
               <Highlighter />
             </Tool>
             <Divider />
-            <Tool label={s?.link ? "Edit link" : "Add link"} active={s?.link} onClick={() => setMode("link")}>
+            <Tool label={s?.link ? t.editLink : t.addLink} active={s?.link} onClick={() => setMode("link")}>
               <Link2 />
             </Tool>
           </div>
@@ -224,7 +228,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
               className="absolute left-0 top-full z-10 mt-1.5 w-[188px] rounded-xl border border-line bg-raised p-1 shadow-pop"
               role="menu"
             >
-              <div className="px-2 pb-1 pt-1 text-[11px] font-medium text-ink-3">Turn into</div>
+              <div className="px-2 pb-1 pt-1 text-[11px] font-medium text-ink-3">{t.turnInto}</div>
               {BLOCKS.map((b) => {
                 const Icon = b.icon;
                 const on = s?.block === b.id;
@@ -243,7 +247,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
                     )}
                   >
                     <Icon className="size-4 text-ink-3" strokeWidth={1.8} />
-                    <span className="flex-1">{b.label}</span>
+                    <span className="flex-1">{t.blocks[b.id]}</span>
                     {on && <Check className="size-3.5 text-blob-ink" strokeWidth={2.5} />}
                   </button>
                 );
@@ -279,6 +283,7 @@ function Tool({ label, shortcut, active, onClick, children }: { label: string; s
 }
 
 function LinkForm({ editor, initial, hasLink, onDone }: { editor: Editor; initial: string; hasLink: boolean; onDone: () => void }) {
+  const t = useMessages(editorText).bubble;
   const [value, setValue] = useState(initial);
   const input = useRef<HTMLInputElement>(null);
 
@@ -319,13 +324,13 @@ function LinkForm({ editor, initial, hasLink, onDone }: { editor: Editor; initia
             onDone();
           }
         }}
-        placeholder="Paste or type a link…"
+        placeholder={t.linkPlaceholder}
         className="h-7 w-[232px] min-w-0 bg-transparent px-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
-        aria-label="Link address"
+        aria-label={t.linkAddress}
         spellCheck={false}
         autoComplete="off"
       />
-      <button type="submit" className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink" aria-label="Apply link" title="Apply">
+      <button type="submit" className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink" aria-label={t.applyLink} title={t.apply}>
         <CornerDownLeft className="size-[15px]" />
       </button>
       {hasLink && (
@@ -335,8 +340,8 @@ function LinkForm({ editor, initial, hasLink, onDone }: { editor: Editor; initia
             target={initial.startsWith("/") ? undefined : "_blank"}
             rel="noopener noreferrer"
             className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink"
-            aria-label="Open link"
-            title="Open link"
+            aria-label={t.openLink}
+            title={t.openLink}
           >
             <ExternalLink className="size-[15px]" />
           </a>
@@ -347,8 +352,8 @@ function LinkForm({ editor, initial, hasLink, onDone }: { editor: Editor; initia
               onDone();
             }}
             className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-danger/10 hover:text-danger"
-            aria-label="Remove link"
-            title="Remove link"
+            aria-label={t.removeLink}
+            title={t.removeLink}
           >
             <Unlink className="size-[15px]" />
           </button>

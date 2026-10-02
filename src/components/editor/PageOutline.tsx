@@ -3,6 +3,8 @@
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
+import { useMessages } from "@/i18n/client";
+import { editorText } from "@/i18n/messages/editor";
 import { cn } from "@/lib/utils";
 
 /** `n` is the heading's index among the note's top-level headings (in DOM order). */
@@ -30,6 +32,7 @@ function headingDOMs(editor: Editor) {
  * Re-renders only when headings change, not on every keystroke.
  */
 export function PageOutline({ editor, scroller }: { editor: Editor; scroller: HTMLElement | null }) {
+  const t = useMessages(editorText);
   const headings = useEditorState({ editor, selector: ({ editor: e }) => readHeadings(e) });
   const [active, setActive] = useState(0);
   const list = useRef<HTMLDivElement>(null);
@@ -81,7 +84,7 @@ export function PageOutline({ editor, scroller }: { editor: Editor; scroller: HT
   };
 
   return (
-    <nav aria-label="On this page" className="group/outline relative" onMouseEnter={centerActive} onFocus={centerActive}>
+    <nav aria-label={t.outline} className="group/outline relative" onMouseEnter={centerActive} onFocus={centerActive}>
       <div
         className="flex flex-col items-end justify-between py-3 pl-8 pr-1"
         style={{ height: `min(${headings.length * 13 + 22}px, 56vh)` }}
@@ -97,7 +100,7 @@ export function PageOutline({ editor, scroller }: { editor: Editor; scroller: HT
       </div>
       <div className="pointer-events-none invisible absolute right-0 top-0 w-[252px] origin-top-right translate-x-1 scale-[0.97] opacity-0 transition-[opacity,transform,visibility] duration-200 ease-out-soft group-focus-within/outline:pointer-events-auto group-focus-within/outline:visible group-focus-within/outline:translate-x-0 group-focus-within/outline:scale-100 group-focus-within/outline:opacity-100 group-hover/outline:pointer-events-auto group-hover/outline:visible group-hover/outline:translate-x-0 group-hover/outline:scale-100 group-hover/outline:opacity-100">
         <div className="rounded-xl border border-line bg-raised p-1.5 shadow-pop">
-          <div className="px-2 pb-1 pt-0.5 text-[11px] font-medium text-ink-3">On this page</div>
+          <div className="px-2 pb-1 pt-0.5 text-[11px] font-medium text-ink-3">{t.outline}</div>
           <div ref={list} className="max-h-[60vh] overflow-y-auto overscroll-contain">
             {headings.map((h, i) => (
               <button
