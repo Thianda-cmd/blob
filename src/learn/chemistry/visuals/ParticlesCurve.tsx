@@ -3,7 +3,7 @@
 // Heating curves for the "particles" topic: a static chart for tasks (temperature over time
 // with plateaus) and a lab where students heat ice and watch the curve and the particles.
 
-import { animate, AnimatePresence, motion } from "motion/react";
+import { animate, AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/i18n/client";
@@ -97,7 +97,7 @@ export function HeatingChart({ points, yMin, yMax, yStep, xMax, xStep, upTo, pla
       </text>
       {plateaus?.map((p) => (
         <motion.g key={p.label} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <text x={(px(p.x0) + px(p.x1)) / 2} y={py(p.y) - 8} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-blob-ink">
+          <text x={(px(p.x0) + px(p.x1)) / 2} y={py(p.y) - 8} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-blob-ink" stroke="var(--surface)" strokeWidth={4} paintOrder="stroke" strokeLinejoin="round">
             {p.label}
           </text>
         </motion.g>
@@ -125,6 +125,9 @@ const WATER: CurvePoint[] = [
   [TEND, 120],
 ];
 
+/** Moments to jump to when motion is reduced. */
+const STOPS = [T1, (T1 + T2) / 2, T2, T3, (T3 + T4) / 2, T4, TEND];
+
 function tempAt(time: number) {
   const pts = cut(WATER, time);
   return pts[pts.length - 1][1];
@@ -136,6 +139,7 @@ export function ParticlesHeatingLab() {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
 
+  const reduce = useReducedMotion();
   const ctrl = useRef<ReturnType<typeof animate> | null>(null);
   useEffect(() => () => ctrl.current?.stop(), []);
 
@@ -176,6 +180,11 @@ export function ParticlesHeatingLab() {
   };
   const toggle = () => {
     if (playing) return stop();
+    if (reduce) {
+      // No animation: jump to the next interesting moment.
+      setTime(STOPS.find((s) => s > time + 1e-6) ?? 0);
+      return;
+    }
     const from = time >= TEND ? 0 : time;
     setPlaying(true);
     ctrl.current = animate(from, TEND, { duration: (TEND - from) / 1.4, ease: "linear", onUpdate: setTime, onComplete: () => setPlaying(false) });

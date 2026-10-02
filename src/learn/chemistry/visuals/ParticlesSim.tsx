@@ -215,7 +215,7 @@ function step(s: State, g: Geometry, home: Pt[], live: Live, dt: number) {
   const ax = new Float32Array(n);
   const ay = new Float32Array(n);
   const amp = 0.7 + 2.6 * heat;
-  const kick = 2600 * (0.35 + heat);
+  const kick = 3000 * (0.4 + heat);
   for (let i = 0; i < n; i++) {
     const m = modes[i];
     if (m === 0) {
@@ -241,7 +241,7 @@ function step(s: State, g: Geometry, home: Pt[], live: Live, dt: number) {
       const ny = dy / d;
       let f = 0;
       if (d < d2) f = -3200 * (d2 - d);
-      else if (modes[i] === 1 && modes[j] === 1) f = 260 * (d - d2); // weak attraction keeps a liquid together
+      else if (modes[i] === 1 && modes[j] === 1) f = 70 * (d - d2); // weak attraction keeps a liquid together
       ax[i] += f * nx;
       ay[i] += f * ny;
       ax[j] -= f * nx;
@@ -345,6 +345,9 @@ export function ParticleSim({
       dots.current[i]?.setAttribute("cx", String(p.x));
       dots.current[i]?.setAttribute("cy", String(p.y));
     });
+    // Diffusion without motion: report how mixed the still picture is.
+    const left = home.map((h, i) => (h.x < width / 2 ? i : -1)).filter((i) => i >= 0);
+    mixRef.current?.(left.length ? left.filter((i) => pts[i].x > width / 2).length / left.length : 0);
   }, [reduce, modesKey, barrier, wall, width, height, n, r, cols, seed, home]);
 
   // Motion: run the simulation while the box is visible.

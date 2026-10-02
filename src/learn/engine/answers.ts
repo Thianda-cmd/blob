@@ -28,7 +28,17 @@ const PLAIN_FRACTION = new RegExp(`^([+-]?${NUM})/([+-]?${NUM})$`);
 function cleanNumber(raw: string, unit?: Text) {
   let s = raw.trim().replace(/[−–]/g, "-").replace(/\s+/g, " ");
   const units = unit == null ? [] : typeof unit === "string" ? [unit] : [unit.de, unit.en];
-  for (const u of units) if (u && s.toLowerCase().endsWith(u.toLowerCase())) s = s.slice(0, -u.length).trim();
+  // The unit typed after the number, spaces ignored ("100 °C", "100° C", "2,5 mol / L").
+  const bare = (x: string) => x.replace(/\s+/g, "").replace(/"/g, "").toLowerCase();
+  for (const u of units) {
+    const b = bare(u ?? "");
+    if (b && bare(s).endsWith(b)) {
+      const cut = s.toLowerCase().replace(/\s+(?=\S)/g, (m, i) => (bare(s.slice(i)).length <= b.length ? "" : m));
+      s = cut.slice(0, cut.length - b.length).trim() || s;
+      break;
+    }
+  }
+  if (units.some((u) => u?.includes("°C"))) s = s.replace(/\s*(?:°\s*c|grad(?:\s*celsius)?|degrees?(?:\s*celsius)?)$/i, "").trim();
   s = s.replace(/\s*[%€]$/, "").trim();
   return s.replace(/(\d) (?=\d{3}(?!\d))/g, "$1");
 }

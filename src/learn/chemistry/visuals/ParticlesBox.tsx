@@ -52,18 +52,18 @@ const BOX_SUBSTANCES: BoxSubstance[] = [
   },
 ];
 
-type Phase = { liquid: number; gas: number; label: Text; state: 0 | 1 | 2 | null };
+type Phase = { liquid: number; gas: number; label: Text; state: 0 | 1 | 2 | null; at?: Text };
 
 function phaseOf(s: BoxSubstance, t: number): Phase {
   if (s.sublimes) {
     if (t < s.mp) return { liquid: 0, gas: 0, label: tx("solid", "fest"), state: 0 };
-    if (t === s.mp) return { liquid: 0.5, gas: 0.5, label: tx("subliming: solid and gas", "sublimiert: fest und gasförmig"), state: null };
+    if (t === s.mp) return { liquid: 0.5, gas: 0.5, label: tx("solid and gas", "fest und gasförmig"), state: null, at: tx("at the sublimation point", "bei der Sublimationstemperatur") };
     return { liquid: 1, gas: 1, label: tx("gas", "gasförmig"), state: 2 };
   }
   if (t < s.mp) return { liquid: 0, gas: 0, label: tx("solid", "fest"), state: 0 };
-  if (t === s.mp) return { liquid: 0.5, gas: 0, label: tx("melting point: solid and liquid", "Schmelztemperatur: fest und flüssig"), state: null };
+  if (t === s.mp) return { liquid: 0.5, gas: 0, label: tx("solid and liquid", "fest und flüssig"), state: null, at: tx("at the melting temperature", "bei der Schmelztemperatur") };
   if (t < s.bp) return { liquid: 1, gas: 0, label: tx("liquid", "flüssig"), state: 1 };
-  if (t === s.bp) return { liquid: 1, gas: 0.5, label: tx("boiling point: liquid and gas", "Siedetemperatur: flüssig und gasförmig"), state: null };
+  if (t === s.bp) return { liquid: 1, gas: 0.5, label: tx("liquid and gas", "flüssig und gasförmig"), state: null, at: tx("at the boiling temperature", "bei der Siedetemperatur") };
   return { liquid: 1, gas: 1, label: tx("gas", "gasförmig"), state: 2 };
 }
 
@@ -214,7 +214,7 @@ export function ParticlesBox() {
 
       <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,230px)] md:items-start">
         <div className="space-y-3">
-          <div className="relative">
+          <div className="relative mx-auto max-w-[540px]">
             <ParticleSim key={sid} liquid={phase.liquid} gas={phase.gas} heat={heat} seed={sid.length + 3} label={`${t(s.name)}: ${t(phase.label)}`} />
             <AnimatePresence>
               {popup && (
@@ -252,7 +252,7 @@ export function ParticlesBox() {
                 {phase.state !== null && <span className="ml-2 font-math text-[18px] font-normal text-ink-3">({["s", "l", "g"][phase.state]})</span>}
               </motion.div>
             </AnimatePresence>
-            {phase.state !== null && <div className="text-[13.5px] text-ink-2">{t(s.called[phase.state])}</div>}
+            <div className="text-[13.5px] text-ink-2">{phase.state !== null ? t(s.called[phase.state]) : t(phase.at)}</div>
           </div>
           {facts ? (
             <dl className="space-y-1.5 text-[13px]">

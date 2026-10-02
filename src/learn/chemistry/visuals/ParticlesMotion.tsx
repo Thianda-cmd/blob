@@ -98,7 +98,7 @@ export function ParticlesZoom() {
       <div className="grid items-center gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="relative mx-auto aspect-square w-full max-w-[280px]">
           <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden>
-            <motion.g initial={false} animate={{ scale: lens ? 0.62 : 1, x: lens ? -38 : 0, y: lens ? 36 : 0 }} style={{ originX: "100px", originY: "120px" }} transition={{ type: "spring", stiffness: 160, damping: 22 }}>
+            <motion.g initial={false} animate={{ scale: lens ? 0.62 : 1, x: lens ? -38 : 0, y: lens ? 36 : 0 }} style={{ transformBox: "view-box", originX: 0.5, originY: 0.6 }} transition={{ type: "spring", stiffness: 160, damping: 22 }}>
               <path
                 d="M100 22 C100 22 46 92 46 128 C46 158 70 180 100 180 C130 180 154 158 154 128 C154 92 100 22 100 22 Z"
                 fill="color-mix(in oklab, var(--subject-sky) 30%, var(--surface))"
@@ -197,6 +197,7 @@ function Diffusion() {
       </div>
       <ParticleSim
         key={run}
+        className="mx-auto max-w-[520px]"
         liquid={1}
         gas={1}
         heat={warm ? 0.9 : 0.05}
@@ -244,6 +245,7 @@ function Syringe({ kind, push }: { kind: "air" | "water"; push: number }) {
       right={right}
       seed={kind === "air" ? 3 : 4}
       label={kind === "air" ? t(tx("Syringe with air", "Spritze mit Luft")) : t(tx("Syringe with water", "Spritze mit Wasser"))}
+      className="max-w-[600px]"
     >
       <rect x={right} y={3} width={8} height={BH - 6} rx={2} fill="var(--ink-2)" />
       <rect x={right + 8} y={BH / 2 - 4} width={BW + 40 - right} height={8} rx={2} fill="var(--ink-3)" />

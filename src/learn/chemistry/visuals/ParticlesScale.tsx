@@ -9,7 +9,7 @@ import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { degC } from "../particles-data";
 
-const W = 420;
+const W = 360;
 const H = 104;
 const L = 26;
 const R = 26;
@@ -42,8 +42,8 @@ export function ParticlesScale({ name, mp, bp, at, regions = false }: { name: Te
   ];
   return (
     <div className="space-y-1">
-      <div className="px-1 text-[13px] font-semibold text-ink">{t(name)}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`${t(name)}: ${t(tx("melting temperature", "Schmelztemperatur"))} ${degC(mp, locale)}, ${t(tx("boiling temperature", "Siedetemperatur"))} ${degC(bp, locale)}`}>
+      <div className="px-1 text-[13px] font-semibold text-ink first-letter:uppercase">{t(name)}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto block h-auto w-full max-w-[540px]" role="img" aria-label={`${t(name)}: ${t(tx("melting temperature", "Schmelztemperatur"))} ${degC(mp, locale)}, ${t(tx("boiling temperature", "Siedetemperatur"))} ${degC(bp, locale)}`}>
         {regions &&
           zones.map(([a, b, label]) => (
             <g key={t(label)}>
@@ -55,9 +55,6 @@ export function ParticlesScale({ name, mp, bp, at, regions = false }: { name: Te
           ))}
         <line x1={L - 10} x2={W - R + 10} y1={Y} y2={Y} stroke="var(--ink-3)" strokeWidth={2} strokeLinecap="round" />
         <path d={`M${W - R + 10} ${Y - 5} L${W - R + 18} ${Y} L${W - R + 10} ${Y + 5}`} fill="none" stroke="var(--ink-3)" strokeWidth={2} />
-        <text x={W - R + 18} y={Y + 26} textAnchor="end" fontSize={11.5} className="fill-ink-3">
-          °C
-        </text>
         {tick(mp, `${t(tx("m.p.", "Smt."))} ${degC(mp, locale)}`, false, close ? "end" : "middle")}
         {tick(bp, `${t(tx("b.p.", "Sdt."))} ${degC(bp, locale)}`, false, close ? "start" : "middle")}
         {at !== undefined && (
@@ -91,7 +88,7 @@ export function ParticlesTable({ rows, highlight }: { rows: { name: Text; mp: nu
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className={cn("border-t border-line", highlight === i && "bg-blob-soft/50")}>
-              <td className="px-3 py-2 font-medium text-ink">{t(r.name)}</td>
+              <td className="px-3 py-2 font-medium text-ink first-letter:uppercase">{t(r.name)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-2">{degC(r.mp, locale)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-2">{degC(r.bp, locale)}</td>
             </tr>
