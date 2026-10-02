@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
-const APP_PREFIXES = ["/home", "/p", "/tasks", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study"];
+const APP_PREFIXES = ["/home", "/p", "/tasks", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study", "/admin", "/oauth/consent"];
 const GUEST_ONLY = ["/login", "/signup", "/forgot-password"];
 
 function matches(pathname: string, prefixes: string[]) {

@@ -19,7 +19,8 @@ import { FormError } from "./FormError";
 import { StrengthMeter } from "./StrengthMeter";
 import { useFieldReactions } from "./useFieldReactions";
 
-export function SignupForm() {
+/** `next`: where to go once the account exists (e.g. back into "Sign in with Blob"); default onboarding. */
+export function SignupForm({ next }: { next?: string }) {
   const router = useRouter();
   const locale = useLocale();
   const all = useMessages(authText);
@@ -87,7 +88,7 @@ export function SignupForm() {
       options: {
         // The language goes on the account, so emails (and other devices) use it too.
         data: { full_name: name.trim(), locale },
-        emailRedirectTo: callbackUrl("/onboarding"),
+        emailRedirectTo: callbackUrl(next ?? "/onboarding"),
       },
     });
 
@@ -107,7 +108,8 @@ export function SignupForm() {
       blob.say(t.welcome);
       resetBoot();
       setTimeout(() => {
-        router.replace("/onboarding");
+        if (next?.startsWith("/oauth/")) return window.location.assign(next);
+        router.replace(next ?? "/onboarding");
         router.refresh();
       }, 600);
     } else {
@@ -170,7 +172,7 @@ export function SignupForm() {
 
         <FormError message={error}>
           {exists && (
-            <Link href="/login" className="mt-1 inline-block font-medium underline underline-offset-2">
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="mt-1 inline-block font-medium underline underline-offset-2">
               {t.signInInstead}
             </Link>
           )}
@@ -183,7 +185,7 @@ export function SignupForm() {
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
         {t.haveAccount}{" "}
-        <Link href="/login" className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
           {t.signIn}
         </Link>
       </p>

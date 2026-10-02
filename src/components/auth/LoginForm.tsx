@@ -98,6 +98,8 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
     blob.say(t.signedIn);
     resetBoot();
     setTimeout(() => {
+      // "Sign in with Blob" continues in a route handler that may leave Blob: a real navigation.
+      if (next.startsWith("/oauth/")) return window.location.assign(next);
       router.replace(next);
       router.refresh();
     }, 650);
@@ -108,7 +110,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: email.trim(),
-      options: { emailRedirectTo: callbackUrl("/onboarding") },
+      options: { emailRedirectTo: callbackUrl(next.startsWith("/oauth/") ? next : "/onboarding") },
     });
     if (error) return fail(authMessage(error, locale));
     router.push(`/check-email?email=${encodeURIComponent(email.trim())}`);
