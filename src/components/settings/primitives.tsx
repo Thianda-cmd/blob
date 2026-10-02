@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
+import { useMessages } from "@/i18n/client";
+import { settingsText } from "@/i18n/messages/settings";
 import { cn } from "@/lib/utils";
 
 /** A titled group of cards. The id doubles as the scroll-spy anchor. */
@@ -100,7 +102,8 @@ export function Reveal({ open, children }: { open: boolean; children: ReactNode 
 }
 
 /** Small "Saved" confirmation that pops in and fades. */
-export function SavedBadge({ show, children = "Saved" }: { show: boolean; children?: ReactNode }) {
+export function SavedBadge({ show, children }: { show: boolean; children?: ReactNode }) {
+  const t = useMessages(settingsText);
   return (
     <AnimatePresence>
       {show && (
@@ -113,7 +116,7 @@ export function SavedBadge({ show, children = "Saved" }: { show: boolean; childr
           role="status"
         >
           <Check className="size-3.5" strokeWidth={2.5} />
-          {children}
+          {children ?? t.saved}
         </motion.span>
       )}
     </AnimatePresence>

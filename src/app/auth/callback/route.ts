@@ -39,12 +39,11 @@ export async function GET(request: NextRequest) {
   }
 
   // PKCE links opened in another browser can't be exchanged, but the email is confirmed by then.
+  // The login page turns these codes into sentences in the reader's language (authText.linkCodes).
   if (/code verifier|code_verifier/i.test(failure ?? "")) {
-    return to(`/login?notice=${encodeURIComponent("Email confirmed! Sign in to continue.")}`);
+    return to("/login?notice=email_confirmed");
   }
 
-  const message = /expired|invalid/i.test(failure ?? "")
-    ? "That link has expired or was already used. Try again."
-    : failure || "That link didn't work. Try again.";
+  const message = /expired|invalid/i.test(failure ?? "") ? "link_expired" : failure || "link_failed";
   return to(`/login?error=${encodeURIComponent(message)}`);
 }

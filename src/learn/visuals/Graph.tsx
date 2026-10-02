@@ -2,6 +2,8 @@
 
 import { motion } from "motion/react";
 import { useId, useRef, useState } from "react";
+import type { Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 
 export type GraphColor = "blob" | "ink" | "ok" | "danger" | "sky";
@@ -17,7 +19,7 @@ const COLOR: Record<GraphColor, string> = {
 export type GraphFunction = {
   f: (x: number) => number;
   color?: GraphColor;
-  label?: string;
+  label?: Text;
   dashed?: boolean;
   /** Stable key so the curve morphs smoothly when `f` changes. */
   key?: string;
@@ -29,7 +31,7 @@ export type GraphFunction = {
 export type GraphPoint = {
   x: number;
   y: number;
-  label?: string;
+  label?: Text;
   color?: GraphColor;
   key?: string;
   /** Drag with the mouse/finger; snapped to `snap`. */
@@ -44,7 +46,7 @@ export type GraphSegment = {
   to: [number, number];
   color?: GraphColor;
   dashed?: boolean;
-  label?: string;
+  label?: Text;
   key?: string;
 };
 
@@ -60,8 +62,8 @@ export type GraphProps = {
   height?: number;
   className?: string;
   /** Axis names. */
-  xLabel?: string;
-  yLabel?: string;
+  xLabel?: Text;
+  yLabel?: Text;
 };
 
 const SAMPLES = 160;
@@ -83,6 +85,7 @@ export function Graph({
   const id = useId().replace(/:/g, "");
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  const tt = useText();
   const W = 100 * ((xRange[1] - xRange[0]) / (yRange[1] - yRange[0]));
   const H = 100;
   const sx = (x: number) => ((x - xRange[0]) / (xRange[1] - xRange[0])) * W;
@@ -185,10 +188,10 @@ export function Graph({
               </text>
             ))}
           <text x={W + 4} y={sy(0) + 1.2} fontStyle="italic" fontSize={3.8}>
-            {xLabel}
+            {tt(xLabel)}
           </text>
           <text x={sx(0) + 1.6} y={-2.6} fontStyle="italic" fontSize={3.8}>
-            {yLabel}
+            {tt(yLabel)}
           </text>
         </g>
 
@@ -231,7 +234,7 @@ export function Graph({
               fontFamily="var(--font-math)"
               textAnchor={s.from[1] === s.to[1] ? "middle" : "start"}
             >
-              {s.label}
+              {tt(s.label)}
             </motion.text>
           ))}
 
@@ -251,7 +254,7 @@ export function Graph({
                 fontFamily="var(--font-math)"
                 fontStyle="italic"
               >
-                {fn.label}
+                {tt(fn.label)}
               </motion.text>
             );
           })}
@@ -276,7 +279,7 @@ export function Graph({
               <circle r={p.draggable ? 1.6 : 1.25} fill={p.hollow ? "var(--surface)" : color} stroke={color} strokeWidth={p.hollow ? 0.55 : 0} />
               {p.label && (
                 <text x={2} y={-2} fontSize={3.3} fill="var(--ink)" fontFamily="var(--font-math)">
-                  {p.label}
+                  {tt(p.label)}
                 </text>
               )}
             </motion.g>

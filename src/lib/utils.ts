@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import type { Locale } from "@/i18n/config";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -14,18 +15,31 @@ export function safeNext(next: string | null | undefined, fallback = "/home") {
   return next;
 }
 
-export function pageTitle(title: string | null | undefined, kind: "note" | "deck" = "note") {
-  return title?.trim() || (kind === "deck" ? "Untitled presentation" : "Untitled");
+const UNTITLED: Record<Locale, Record<"note" | "deck", string>> = {
+  en: { note: "Untitled", deck: "Untitled presentation" },
+  de: { note: "Ohne Titel", deck: "Unbenannte Präsentation" },
+};
+
+/** The page's title, or "Untitled" in the reader's language. Client: pass `useLocale()`; server: `await getLocale()`. */
+export function pageTitle(title: string | null | undefined, kind: "note" | "deck", locale: Locale) {
+  return title?.trim() || UNTITLED[locale][kind];
 }
 
 export function firstName(fullName: string | null | undefined) {
   return fullName?.trim().split(/\s+/)[0] || "";
 }
 
-export function greeting(date = new Date()) {
+const GREETINGS: Record<Locale, { late: string; morning: string; afternoon: string; evening: string }> = {
+  en: { late: "Up late", morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening" },
+  de: { late: "Noch wach", morning: "Guten Morgen", afternoon: "Guten Tag", evening: "Guten Abend" },
+};
+
+/** "Good morning" / "Guten Morgen"… for the time of `date`, in `locale`. */
+export function greeting(date: Date, locale: Locale) {
+  const g = GREETINGS[locale];
   const h = date.getHours();
-  if (h < 5) return "Up late";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+  if (h < 5) return g.late;
+  if (h < 12) return g.morning;
+  if (h < 18) return g.afternoon;
+  return g.evening;
 }

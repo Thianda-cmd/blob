@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Eye, RotateCcw, Shuffle, Undo2 } from "lucide-react";
 import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import { parseDisplay, type DNode } from "@/learn/engine/display";
@@ -46,6 +48,19 @@ const REL_FLIP: Record<Rel, Rel> = { "=": "=", "<": ">", ">": "<", "≤": "≥",
 const REL_TEXT: Record<Rel, string> = { "=": "=", "<": "<", ">": ">", "≤": "\\le", "≥": "\\ge" };
 const kk = (keys: boolean, key: string) => (keys ? `#${key}` : "");
 const isZero = (q: Frac) => q.n === 0;
+
+/** Display source of a frame (the keys are the same in both languages). */
+const srcOf = (t: Text) => (typeof t === "string" ? t : t.en);
+/** Same change in both languages. */
+const mapText = (t: Text, f: (s: string) => string): Text => (typeof t === "string" ? f(t) : { en: f(t.en), de: f(t.de) });
+/** Sentences joined with a space; empty parts are skipped. */
+const joinText = (...parts: (Text | undefined)[]): Text =>
+  txMap((_, locale) =>
+    parts
+      .map((p) => resolveText(p, locale))
+      .filter(Boolean)
+      .join(" "),
+  );
 const absQ = (q: Frac) => frac(Math.abs(q.n), q.d);
 
 function signSrc(x: Term, first: boolean, keys: boolean, force = false) {
@@ -109,8 +124,9 @@ function opSrc(op: Op, n: number, v: string, keys = true) {
 const RELATION = new Set(["=", "<", ">", "≤", "≥", "≠"]);
 const BINARY_OP = new Set(["+", "−", "·", ":", "±"]);
 
-/** Rough width of display-language maths in em, to keep worked steps on one line. */
-export function emWidth(src: string): number {
+/** Rough width of display-language maths in em, to keep worked steps on one line (bilingual: the wider one). */
+export function emWidth(src: Text): number {
+  if (typeof src !== "string") return Math.max(emWidth(src.en), emWidth(src.de));
   const list = (nodes: DNode[]): number => nodes.reduce((sum, node, i) => sum + one(node, nodes[i - 1]), 0);
   const one = (node: DNode, prev?: DNode): number => {
     switch (node.type) {
@@ -173,13 +189,15 @@ function combineNote(list: Term[], v: string): string[] {
 }
 
 /** Notes for the left and right side; identical ones are said once ("… on both sides"). */
-function bothNote(left: string[], right: string[]) {
-  if (left.length === 1 && right.length === 1 && left[0] === right[0]) return `${left[0]} on both sides.`;
+function bothNote(left: string[], right: string[]): Text {
+  if (left.length === 1 && right.length === 1 && left[0] === right[0]) return tx(`${left[0]} on both sides.`, `${left[0]} auf beiden Seiten.`);
   const parts = [...left, ...right];
-  return parts.length ? `${join(parts)}.` : "";
+  return parts.length ? mapText(join(parts), (s) => `${s}.`) : "";
 }
 
-const join = (parts: string[]) => (parts.length <= 1 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`);
+const joinWith = (parts: string[], and: string) => (parts.length <= 1 ? parts.join("") : `${parts.slice(0, -1).join(", ")} ${and} ${parts[parts.length - 1]}`);
+/** "$a$, $b$ and $c$" (maths only, so just the "and" differs). */
+const join = (parts: string[]): Text => (parts.length <= 1 ? parts.join("") : tx(joinWith(parts, "and"), joinWith(parts, "und")));
 
 function expandGroup(g: Group): Term[] {
   return g.items.map((x, i) => ({
@@ -243,7 +261,7 @@ function applyFull(e: Eq, op: Op, n: number, v: string): { math: string; highlig
   };
 }
 
-function resultOp(e: Eq, op: Op, n: number, v: string): { eq: Eq; note: string; highlight?: string[] } {
+function resultOp(e: Eq, op: Op, n: number, v: string): { eq: Eq; note: Text; highlight?: string[] } {
   const L = terms(e.L);
   const R = terms(e.R);
   if (op.kind === "add") {
@@ -303,17 +321,17 @@ const expandAll = (items: Item[]) => items.flatMap(expandItem);
 // ---------------------------------------------------------------------------
 // The solver: expand, tidy, collect x-terms, collect numbers, divide.
 
-const SOLUTION_WORDS: Record<Exclude<Rel, "=">, (b: string) => string> = {
-  "<": (b) => `Every number smaller than $${b}$ is a solution.`,
-  ">": (b) => `Every number greater than $${b}$ is a solution.`,
-  "≤": (b) => `Every number smaller than or equal to $${b}$ is a solution.`,
-  "≥": (b) => `Every number greater than or equal to $${b}$ is a solution.`,
+const SOLUTION_WORDS: Record<Exclude<Rel, "=">, (b: string) => Text> = {
+  "<": (b) => tx(`Every number smaller than $${b}$ is a solution.`, `Jede Zahl kleiner als $${b}$ ist eine Lösung.`),
+  ">": (b) => tx(`Every number greater than $${b}$ is a solution.`, `Jede Zahl größer als $${b}$ ist eine Lösung.`),
+  "≤": (b) => tx(`Every number smaller than or equal to $${b}$ is a solution.`, `Jede Zahl kleiner oder gleich $${b}$ ist eine Lösung.`),
+  "≥": (b) => tx(`Every number greater than or equal to $${b}$ is a solution.`, `Jede Zahl größer oder gleich $${b}$ ist eine Lösung.`),
 };
 
 type Solved = { frames: Frame[]; value: Frac; rel: Rel };
 
 /** `maxEm`: widest step that fits on one line (about 13em in a worked solution, 18em on the lesson board). */
-export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: string; maxEm?: number } = {}): Solved {
+export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: Text; maxEm?: number } = {}): Solved {
   const frames: Frame[] = [];
   const ineq = start.rel !== "=";
   let e = start;
@@ -331,17 +349,19 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
     const intro =
       single?.kind === "g"
         ? single.k === -1
-          ? "A minus in front of the bracket: remove it and flip every sign inside."
-          : `Brackets first: multiply $${single.k}$ by each term inside.`
+          ? tx("A minus in front of the bracket: remove it and flip every sign inside.", "Ein Minus vor der Klammer: Lass die Klammer weg und dreh jedes Vorzeichen darin um.")
+          : tx(`Brackets first: multiply $${single.k}$ by each term inside.`, `Zuerst die Klammer auflösen: Multipliziere jeden Term darin mit $${single.k}$.`)
         : single
-          ? "Brackets first: multiply them out."
-          : "Brackets first: expand each one.";
-    frames.push({ math: eqSrc(e, v), highlight, arrows, note: opts.intro ? `${opts.intro} ${intro}` : intro });
+          ? tx("Brackets first: multiply them out.", "Zuerst die Klammern ausmultiplizieren.")
+          : tx("Brackets first: expand each one.", "Zuerst alle Klammern auflösen.");
+    frames.push({ math: eqSrc(e, v), highlight, arrows, note: joinText(opts.intro, intro) });
     const note = brackets.map((b) => `$${itemSrc(b, v, true, false)} = ${sideSrc(expandItem(b), v, false)}$`);
     e = { ...e, L: expandAll(e.L), R: expandAll(e.R) };
-    frames.push({ math: eqSrc(e, v), note: `${join(note)}.` });
+    frames.push({ math: eqSrc(e, v), note: mapText(join(note), (s) => `${s}.`) });
   } else {
-    const intro = ineq ? "Solve it just like an equation. Only a negative factor needs extra care." : `Goal: get $${v}$ on its own.`;
+    const intro = ineq
+      ? tx("Solve it just like an equation. Only a negative factor needs extra care.", "Löse sie genau wie eine Gleichung. Nur bei einem negativen Faktor musst du aufpassen.")
+      : tx(`Goal: get $${v}$ on its own.`, `Ziel: $${v}$ allein auf eine Seite bringen.`);
     frames.push({ math: eqSrc(e, v), note: opts.intro ?? intro });
   }
 
@@ -350,10 +370,10 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
     if (!needs(e.L) && !needs(e.R)) return;
     const parts = [...combineNote(terms(e.L), v), ...combineNote(terms(e.R), v)];
     e = { ...e, L: combine(terms(e.L)), R: combine(terms(e.R)) };
-    frames.push({ math: eqSrc(e, v), note: `Tidy up first: ${join(parts)}.` });
+    frames.push({ math: eqSrc(e, v), note: tx(`Tidy up first: ${joinWith(parts, "and")}.`, `Fasse zuerst zusammen: ${joinWith(parts, "und")}.`) });
   };
 
-  const step = (op: Op, before: string, after?: string) => {
+  const step = (op: Op, before: Text, after?: Text) => {
     n++;
     const app = applyOp(e, op, n, v, opts.maxEm ?? 13);
     frames.push({ math: app.math, highlight: app.highlight, note: before });
@@ -372,8 +392,10 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
     const products = all.map((x) => productNote(x, k, v));
     step(
       { kind: "mul", k },
-      `Clear the fractions: multiply **every** term by $${k}$, the common denominator.`,
-      all.length <= 3 ? `${join(products)}. No more fractions!` : "Work out each product. No more fractions!",
+      tx(`Clear the fractions: multiply **every** term by $${k}$, the common denominator.`, `Weg mit den Brüchen: Multipliziere **jeden** Term mit $${k}$, dem Hauptnenner.`),
+      all.length <= 3
+        ? tx(`${joinWith(products, "and")}. No more fractions!`, `${joinWith(products, "und")}. Keine Brüche mehr!`)
+        : tx("Work out each product. No more fractions!", "Rechne jedes Produkt aus. Keine Brüche mehr!"),
     );
     tidy();
   }
@@ -382,8 +404,14 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
   const sq = coef(e.R, 2);
   if (!isZero(sq) || !isZero(coef(e.L, 2))) {
     const x = term("", qneg(isZero(sq) ? coef(e.L, 2) : sq), 2);
-    const word = x.c.n < 0 ? "Subtract" : "Add";
-    step({ kind: "add", x }, `$${v}^2$ is on both sides. ${word} $${bodySrc({ ...x, c: absQ(x.c) }, v, false)}$ on both sides and it's gone.`);
+    const shown = `$${bodySrc({ ...x, c: absQ(x.c) }, v, false)}$`;
+    step(
+      { kind: "add", x },
+      tx(
+        `$${v}^2$ is on both sides. ${x.c.n < 0 ? "Subtract" : "Add"} ${shown} on both sides and it's gone.`,
+        `$${v}^2$ steht auf beiden Seiten. ${x.c.n < 0 ? "Subtrahiere" : "Addiere"} ${shown} auf beiden Seiten, dann ist es weg.`,
+      ),
+    );
   }
 
   // x-terms on both sides: bring them together.
@@ -393,8 +421,14 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
     // Equations: take away the smaller x-term, so the x stays positive. Inequalities: always collect on the left.
     const away = ineq || qvalue(xl) > qvalue(xr) ? xr : xl;
     const x = term("", qneg(away), 1);
-    const word = x.c.n < 0 ? "subtract" : "add";
-    step({ kind: "add", x }, `Bring the $${v}$-terms together: ${word} $${bodySrc({ ...x, c: absQ(x.c) }, v, false)}$ on **both** sides.`);
+    const shown = `$${bodySrc({ ...x, c: absQ(x.c) }, v, false)}$`;
+    step(
+      { kind: "add", x },
+      tx(
+        `Bring the $${v}$-terms together: ${x.c.n < 0 ? "subtract" : "add"} ${shown} on **both** sides.`,
+        `Bring die $${v}$-Terme auf eine Seite: ${x.c.n < 0 ? "Subtrahiere" : "Addiere"} ${shown} auf **beiden** Seiten.`,
+      ),
+    );
   }
 
   const xLeft = !isZero(coef(e.L, 1));
@@ -404,29 +438,40 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
   // Numbers to the other side.
   const b = coef(xSide(), 0);
   if (!isZero(b)) {
-    const word = b.n > 0 ? "subtract" : "add";
     const shown = qshow(absQ(b));
-    step({ kind: "add", x: term("", qneg(b)) }, `To get rid of the $${b.n > 0 ? "+" : "-"} ${shown}$, ${word} $${shown}$ on **both** sides.`);
+    const what = `$${b.n > 0 ? "+" : "-"} ${shown}$`;
+    step(
+      { kind: "add", x: term("", qneg(b)) },
+      tx(
+        `To get rid of the ${what}, ${b.n > 0 ? "subtract" : "add"} $${shown}$ on **both** sides.`,
+        `Damit das ${what} verschwindet, ${b.n > 0 ? "subtrahiere" : "addiere"} $${shown}$ auf **beiden** Seiten.`,
+      ),
+    );
   }
 
   // The number in front of x.
   let a = coef(xSide(), 1);
-  const flipWarning = ineq ? " Careful: a negative number **flips** the sign!" : "";
+  const flipWarning: Text = ineq ? tx("Careful: a negative number **flips** the sign!", "Achtung: Eine negative Zahl **dreht** das Relationszeichen um!") : "";
   if (a.d !== 1) {
     const k = a.d;
     const o = terms(other());
     const xt = terms(xSide());
     const before =
-      Math.abs(a.n) === 1 ? `$${v}$ is divided by $${k}$. Undo it: multiply both sides by $${k}$.` : `Multiply both sides by $${k}$ to get rid of the fraction.`;
+      Math.abs(a.n) === 1
+        ? tx(`$${v}$ is divided by $${k}$. Undo it: multiply both sides by $${k}$.`, `$${v}$ wird durch $${k}$ geteilt. Mach das rückgängig: Multipliziere beide Seiten mit $${k}$.`)
+        : tx(`Multiply both sides by $${k}$ to get rid of the fraction.`, `Multipliziere beide Seiten mit $${k}$, dann ist der Bruch weg.`);
     const after = join([...xt, ...o].map((x) => productNote(x, k, v)));
-    step({ kind: "mul", k }, before, `${after}.`);
+    step({ kind: "mul", k }, before, mapText(after, (s) => `${s}.`));
     a = coef(xSide(), 1);
   }
   if (a.n === -1 && a.d === 1) {
+    const [r0, r1] = [REL_TEXT[e.rel], REL_TEXT[REL_FLIP[e.rel]]];
     step(
       { kind: "mul", k: -1 },
-      `Only $-${v}$ is left. Multiply both sides by $-1$.${flipWarning}`,
-      ineq ? `Every sign flips, and $${REL_TEXT[e.rel]}$ becomes $${REL_TEXT[REL_FLIP[e.rel]]}$.` : "Every sign flips.",
+      joinText(tx(`Only $-${v}$ is left. Multiply both sides by $-1$.`, `Übrig ist nur $-${v}$. Multipliziere beide Seiten mit $-1$.`), flipWarning),
+      ineq
+        ? tx(`Every sign flips, and $${r0}$ becomes $${r1}$.`, `Alle Vorzeichen drehen sich um, und aus $${r0}$ wird $${r1}$.`)
+        : tx("Every sign flips.", "Alle Vorzeichen drehen sich um."),
     );
   } else if (!(a.n === 1 && a.d === 1)) {
     const k = a.n;
@@ -437,8 +482,16 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
     const calc = `$${qshow(o)} : ${ks} = ${qshow(res)}$`;
     step(
       { kind: "div", k },
-      `$${v}$ is multiplied by $${k}$. Undo it: divide both sides by $${k}$.${k < 0 ? flipWarning : ""}`,
-      k < 0 && ineq ? `The sign flips: $${REL_TEXT[rel]}$ becomes $${REL_TEXT[REL_FLIP[rel]]}$. And ${calc}.` : `${calc}.`,
+      joinText(
+        tx(`$${v}$ is multiplied by $${k}$. Undo it: divide both sides by $${k}$.`, `$${v}$ wird mit $${k}$ multipliziert. Mach das rückgängig: Teile beide Seiten durch $${k}$.`),
+        k < 0 ? flipWarning : "",
+      ),
+      k < 0 && ineq
+        ? tx(
+            `The sign flips: $${REL_TEXT[rel]}$ becomes $${REL_TEXT[REL_FLIP[rel]]}$. And ${calc}.`,
+            `Das Relationszeichen dreht sich um: Aus $${REL_TEXT[rel]}$ wird $${REL_TEXT[REL_FLIP[rel]]}$. Und ${calc}.`,
+          )
+        : `${calc}.`,
     );
   }
 
@@ -446,18 +499,20 @@ export function solveEq(start: Eq, v: string, opts: { check?: boolean; intro?: s
   const shown = qshow(value);
   if (!xLeft) {
     e = { ...e, L: e.R, R: e.L, rel: REL_FLIP[e.rel] };
-    frames.push({ math: eqSrc(e, v), note: `Turn it around: $${v} = ${shown}$.` });
+    frames.push({ math: eqSrc(e, v), note: tx(`Turn it around: $${v} = ${shown}$.`, `Seiten tauschen: $${v} = ${shown}$.`) });
   } else {
     const last = frames[frames.length - 1];
-    const end = ineq ? `So $${v} ${REL_TEXT[e.rel]} ${shown}$. ${SOLUTION_WORDS[e.rel as Exclude<Rel, "=">](shown)}` : `So $${v} = ${shown}$.`;
-    frames[frames.length - 1] = { ...last, note: last.note ? `${last.note} ${end}` : end };
+    const end = ineq
+      ? joinText(tx(`So $${v} ${REL_TEXT[e.rel]} ${shown}$.`, `Also ist $${v} ${REL_TEXT[e.rel]} ${shown}$.`), SOLUTION_WORDS[e.rel as Exclude<Rel, "=">](shown))
+      : tx(`So $${v} = ${shown}$.`, `Also ist $${v} = ${shown}$.`);
+    frames[frames.length - 1] = { ...last, note: joinText(last.note, end) };
   }
 
   if (opts.check && !ineq && ![...start.L, ...start.R].some((it) => it.kind === "pp")) {
     const both = qshow(evalSide(start.L, value));
     frames.push({
       math: `${substSide(start.L, value)} = ${substSide(start.R, value)}`,
-      note: `Check: put $${v} = ${shown}$ back in. Both sides give $${both}$. It works!`,
+      note: tx(`Check: put $${v} = ${shown}$ back in. Both sides give $${both}$. It works!`, `Probe: Setze $${v} = ${shown}$ ein. Beide Seiten ergeben $${both}$. Passt!`),
     });
   }
   return { frames: smoothFracExits(frames), value, rel: e.rel };
@@ -510,8 +565,8 @@ const baseKey = (k: string) => k.replace(/(-bar|-rad|\(|\))$/, "");
 export function smoothFracExits(frames: Frame[]): Frame[] {
   const out = [...frames];
   for (let i = 1; i < out.length; i++) {
-    const prev = fracPlaces(parseDisplay(out[i - 1].math));
-    const nextTree = parseDisplay(out[i].math);
+    const prev = fracPlaces(parseDisplay(srcOf(out[i - 1].math)));
+    const nextTree = parseDisplay(srcOf(out[i].math));
     const next = fracPlaces(nextTree);
     const nextLeaves = new Set(leafKeys(nextTree));
     const moving = new Set<string>();
@@ -524,7 +579,7 @@ export function smoothFracExits(frames: Frame[]): Frame[] {
     const swap = (k: string) => (moving.has(baseKey(k)) ? k.replace(baseKey(k), `${baseKey(k)}_${i}`) : k);
     for (let j = i; j < out.length; j++) {
       const f = out[j];
-      out[j] = { ...f, math: f.math.replace(re, `#$1_${i}`), highlight: f.highlight?.map(swap), arrows: f.arrows?.map(([a, b]) => [swap(a), swap(b)] as [string, string]) };
+      out[j] = { ...f, math: mapText(f.math, (s) => s.replace(re, `#$1_${i}`)), highlight: f.highlight?.map(swap), arrows: f.arrows?.map(([a, b]) => [swap(a), swap(b)] as [string, string]) };
     }
   }
   return out;
@@ -535,10 +590,10 @@ export function smoothFracExits(frames: Frame[]): Frame[] {
 
 const VARS = ["x", "x", "x", "x", "x", "y", "a", "n"];
 
-function make(e: Eq, v: string, hint: string, check = false): Exercise {
+function make(e: Eq, v: string, hint: Text, check = false): Exercise {
   const { frames, value, rel } = solveEq(e, v, { check });
   return {
-    instruction: rel === "=" ? "Solve the equation" : "Solve the inequality",
+    instruction: rel === "=" ? tx("Solve the equation", "Löse die Gleichung") : tx("Solve the inequality", "Löse die Ungleichung"),
     math: eqSrc(e, v, false),
     answer: rel === "=" ? { kind: "solutions", variable: v, values: [qvalue(value)] } : { kind: "inequality", variable: v, op: rel, value: qvalue(value) },
     hint,
@@ -556,17 +611,35 @@ function level1(rng: Rng): Exercise | null {
     const x = rng.nonZero(-8, 15);
     const b = rng.nonZero(-15, 15, [-x]);
     const L = rng.chance(0.3) ? [term("B", b), term("A", 1, 1)] : [term("A", 1, 1), term("B", b)];
-    return make(equation(L, "=", [term("C", x + b)]), v, `Undo the $${signed(b)}$: ${b > 0 ? "subtract" : "add"} $${Math.abs(b)}$ on both sides.`, true);
+    return make(
+      equation(L, "=", [term("C", x + b)]),
+      v,
+      tx(
+        `Undo the $${signed(b)}$: ${b > 0 ? "subtract" : "add"} $${Math.abs(b)}$ on both sides.`,
+        `Weg mit dem $${signed(b)}$: ${b > 0 ? "Subtrahiere" : "Addiere"} $${Math.abs(b)}$ auf beiden Seiten.`,
+      ),
+      true,
+    );
   }
   if (shape === "times") {
     const a = rng.pick([2, 3, 4, 5, 6, 7, 8, 9, -2, -3, -4, -5]);
     const x = rng.nonZero(-9, 12, [1]);
-    return make(equation([term("A", a, 1)], "=", [term("C", a * x)]), v, `$${a}${v}$ means $${a} \\cdot ${v}$. Divide both sides by $${a}$.`, true);
+    return make(
+      equation([term("A", a, 1)], "=", [term("C", a * x)]),
+      v,
+      tx(`$${a}${v}$ means $${a} \\cdot ${v}$. Divide both sides by $${a}$.`, `$${a}${v}$ bedeutet $${a} \\cdot ${v}$. Teile beide Seiten durch $${a}$.`),
+      true,
+    );
   }
   if (shape === "frac") {
     const a = rng.int(2, 6);
     const c = rng.nonZero(-6, 9);
-    return make(equation([term("A", frac(1, a), 1)], "=", [term("C", c)]), v, `$${v}$ is divided by $${a}$. Do the opposite on both sides.`, true);
+    return make(
+      equation([term("A", frac(1, a), 1)], "=", [term("C", c)]),
+      v,
+      tx(`$${v}$ is divided by $${a}$. Do the opposite on both sides.`, `$${v}$ wird durch $${a}$ geteilt. Wende auf beiden Seiten die Umkehrrechnung an.`),
+      true,
+    );
   }
   if (shape === "minus") {
     const a = rng.int(2, 6);
@@ -576,7 +649,7 @@ function level1(rng: Rng): Exercise | null {
     return make(
       equation([term("B", b), term("A", -a, 1)], "=", [term("C", b - a * x)]),
       v,
-      `First subtract $${b}$ on both sides. Then divide by $-${a}$, minus included.`,
+      tx(`First subtract $${b}$ on both sides. Then divide by $-${a}$, minus included.`, `Subtrahiere zuerst $${b}$ auf beiden Seiten. Teile dann durch $-${a}$, samt Minuszeichen.`),
       true,
     );
   }
@@ -585,7 +658,7 @@ function level1(rng: Rng): Exercise | null {
   const b = rng.nonZero(-15, 15);
   const c = a * x + b;
   if (c === 0 || Math.abs(c) > 90) return null;
-  const hint = `First get rid of the $${signed(b)}$, then divide by $${a}$.`;
+  const hint = tx(`First get rid of the $${signed(b)}$, then divide by $${a}$.`, `Erst muss das $${signed(b)}$ weg, dann teilst du durch $${a}$.`);
   const lhs = rng.chance(0.25) ? [term("B", b), term("A", a, 1)] : [term("A", a, 1), term("B", b)];
   if (shape === "turned") return make(equation([term("C", c)], "=", lhs), v, hint, true);
   return make(equation(lhs, "=", [term("C", c)]), v, hint, true);
@@ -603,7 +676,12 @@ function level2(rng: Rng): Exercise | null {
     if (a === c || d === 0 || d === b || Math.abs(d) > 40) return null;
     const R = rng.chance(0.3) ? [term("D", d), term("C", c, 1)] : [term("C", c, 1), term("D", d)];
     const L = rng.chance(0.2) ? [term("B", b), term("A", a, 1)] : [term("A", a, 1), term("B", b)];
-    return make(equation(L, "=", R), v, `Collect the $${v}$-terms on one side and the numbers on the other.`, true);
+    return make(
+      equation(L, "=", R),
+      v,
+      tx(`Collect the $${v}$-terms on one side and the numbers on the other.`, `Bring die $${v}$-Terme auf eine Seite und die Zahlen auf die andere.`),
+      true,
+    );
   }
   if (shape === "bracket" || shape === "bracketBoth") {
     const k = rng.chance(0.2) ? -rng.int(2, 3) : rng.int(2, 6);
@@ -616,12 +694,22 @@ function level2(rng: Rng): Exercise | null {
       const c = k * (q * x + p) + extra;
       if (c === 0 || Math.abs(c) > 80) return null;
       const L = extra ? [g, term("E", extra)] : [g];
-      return make(equation(L, "=", [term("C", c)]), v, `Expand the bracket first: multiply $${k}$ by both terms inside.`, true);
+      return make(
+        equation(L, "=", [term("C", c)]),
+        v,
+        tx(`Expand the bracket first: multiply $${k}$ by both terms inside.`, `Löse zuerst die Klammer auf: Multipliziere beide Terme darin mit $${k}$.`),
+        true,
+      );
     }
     const c = rng.int(1, 6);
     const d = k * (x + p) - c * x;
     if (c === k || d === 0 || Math.abs(d) > 40) return null;
-    return make(equation([g], "=", [term("C", c, 1), term("D", d)]), v, `Expand the bracket, then bring the $${v}$-terms together.`, true);
+    return make(
+      equation([g], "=", [term("C", c, 1), term("D", d)]),
+      v,
+      tx(`Expand the bracket, then bring the $${v}$-terms together.`, `Löse die Klammer auf, dann bring die $${v}$-Terme auf eine Seite.`),
+      true,
+    );
   }
   if (shape === "tidy") {
     const a = rng.int(2, 7);
@@ -631,7 +719,12 @@ function level2(rng: Rng): Exercise | null {
     const b = rng.nonZero(-10, 10);
     const d = s * x + b;
     if (s === 0 || d === 0 || Math.abs(d) > 60) return null;
-    return make(equation([term("A", a, 1), term("B", b), term("C", c, 1)], "=", [term("D", d)]), v, `First combine the two $${v}$-terms on the left.`, true);
+    return make(
+      equation([term("A", a, 1), term("B", b), term("C", c, 1)], "=", [term("D", d)]),
+      v,
+      tx(`First combine the two $${v}$-terms on the left.`, `Fasse zuerst die beiden $${v}$-Terme links zusammen.`),
+      true,
+    );
   }
   // inequality, positive coefficient
   const rel = rng.pick(RELS);
@@ -640,7 +733,14 @@ function level2(rng: Rng): Exercise | null {
   const b = rng.nonZero(-12, 12);
   if (rng.chance(0.5)) {
     const c = a * x0 + b;
-    return make(equation([term("A", a, 1), term("B", b)], rel, [term("C", c)]), v, "Solve it like an equation. You only divide by a positive number, so the sign stays.");
+    return make(
+      equation([term("A", a, 1), term("B", b)], rel, [term("C", c)]),
+      v,
+      tx(
+        "Solve it like an equation. You only divide by a positive number, so the sign stays.",
+        "Löse sie wie eine Gleichung. Du teilst nur durch eine positive Zahl, also bleibt das Relationszeichen, wie es ist.",
+      ),
+    );
   }
   const c = rng.int(1, a - 1);
   const d = (a - c) * x0 + b;
@@ -648,7 +748,7 @@ function level2(rng: Rng): Exercise | null {
   return make(
     equation([term("A", a, 1), term("B", b)], rel, [term("C", c, 1), term("D", d)]),
     v,
-    `Collect the $${v}$-terms on the left, the numbers on the right. Then divide.`,
+    tx(`Collect the $${v}$-terms on the left, the numbers on the right. Then divide.`, `Bring die $${v}$-Terme nach links und die Zahlen nach rechts. Dann teilst du.`),
   );
 }
 
@@ -664,7 +764,7 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([term("A", frac(p, q), 1), term("B", b)], "=", [term("C", c)]),
       v,
-      "Get the fraction on its own first. Then multiply by the denominator.",
+      tx("Get the fraction on its own first. Then multiply by the denominator.", "Bring zuerst den Bruch allein auf eine Seite. Multipliziere dann mit dem Nenner."),
     );
   }
   if (shape === "fracTwo") {
@@ -678,7 +778,7 @@ function level3(rng: Rng): Exercise | null {
       return make(
         equation([term("A", frac(1, a), 1), term("B", k)], "=", [term("C", frac(1, b), 1)]),
         v,
-        `Multiply every term by $${l}$ first. That clears both fractions.`,
+        tx(`Multiply every term by $${l}$ first. That clears both fractions.`, `Multipliziere zuerst jeden Term mit $${l}$. Dann sind beide Brüche weg.`),
       );
     }
     const s = rng.sign();
@@ -687,7 +787,7 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([term("A", frac(1, a), 1), term("B", frac(s, b), 1)], "=", [term("C", c)]),
       v,
-      `Multiply every term by $${l}$, the common denominator.`,
+      tx(`Multiply every term by $${l}$, the common denominator.`, `Multipliziere jeden Term mit $${l}$, dem Hauptnenner.`),
     );
   }
   if (shape === "ineqNeg") {
@@ -699,7 +799,10 @@ function level3(rng: Rng): Exercise | null {
       return make(
         equation([term("B", b), term("A", -a, 1)], rel, [term("C", b - a * x0)]),
         v,
-        `Subtract $${b}$ first. Then you divide by $-${a}$: that flips the sign.`,
+        tx(
+          `Subtract $${b}$ first. Then you divide by $-${a}$: that flips the sign.`,
+          `Subtrahiere zuerst $${b}$. Dann teilst du durch $-${a}$: Dabei dreht sich das Relationszeichen um.`,
+        ),
       );
     }
     const a = rng.int(1, 5);
@@ -710,7 +813,10 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([term("A", a, 1), term("B", b)], rel, [term("C", c, 1), term("D", d)]),
       v,
-      `Bring the $${v}$-terms to the left. You'll end up dividing by a negative number, so flip the sign.`,
+      tx(
+        `Bring the $${v}$-terms to the left. You'll end up dividing by a negative number, so flip the sign.`,
+        `Bring die $${v}$-Terme nach links. Am Ende teilst du durch eine negative Zahl, also dreh das Relationszeichen um.`,
+      ),
     );
   }
   if (shape === "ineqBracket") {
@@ -725,7 +831,10 @@ function level3(rng: Rng): Exercise | null {
       return make(
         equation([group("G", k, [inner(1, 1), inner(p)])], rel, [term("C", c, 1), term("D", d)]),
         v,
-        `Expand first, then collect the $${v}$-terms on the left. Watch for a negative factor at the end.`,
+        tx(
+          `Expand first, then collect the $${v}$-terms on the left. Watch for a negative factor at the end.`,
+          `Löse zuerst die Klammer auf, dann bring die $${v}$-Terme nach links. Achte am Ende auf einen negativen Faktor.`,
+        ),
       );
     }
     const k = -rng.int(2, 5);
@@ -734,7 +843,7 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([group("G", k, [inner(1, 1), inner(p)])], rel, [term("D", d)]),
       v,
-      `Expand: $${k}$ times each term. In the end you divide by a negative number.`,
+      tx(`Expand: $${k}$ times each term. In the end you divide by a negative number.`, `Klammer auflösen: $${k}$ mal jeden Term. Am Ende teilst du durch eine negative Zahl.`),
     );
   }
   if (shape === "twoBrackets") {
@@ -748,11 +857,19 @@ function level3(rng: Rng): Exercise | null {
     if (rng.chance(0.5)) {
       const c = k * (x + p) - m * (x + q);
       if (c === 0 || Math.abs(c) > 60) return null;
-      return make(equation([G, group("H", -m, [inner(1, 1), inner(q)])], "=", [term("C", c)]), v, "Expand both brackets. The minus in front of the second one flips its signs.");
+      return make(
+        equation([G, group("H", -m, [inner(1, 1), inner(q)])], "=", [term("C", c)]),
+        v,
+        tx("Expand both brackets. The minus in front of the second one flips its signs.", "Löse beide Klammern auf. Das Minus vor der zweiten dreht die Vorzeichen darin um."),
+      );
     }
     const c = k * (x + p) - m * (x + q);
     if (c === 0 || Math.abs(c) > 40) return null;
-    return make(equation([G], "=", [group("H", m, [inner(1, 1), inner(q)]), term("C", c)]), v, "Expand both brackets, then solve as usual.");
+    return make(
+      equation([G], "=", [group("H", m, [inner(1, 1), inner(q)]), term("C", c)]),
+      v,
+      tx("Expand both brackets, then solve as usual.", "Löse beide Klammern auf, dann rechne wie gewohnt weiter."),
+    );
   }
   if (shape === "minusBracket") {
     const a = rng.int(3, 9);
@@ -764,7 +881,7 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([term("A", a, 1), group("G", -1, [inner(bb, 1), inner(-c)])], "=", [term("D", d)]),
       v,
-      "A minus in front of the bracket flips every sign inside.",
+      tx("A minus in front of the bracket flips every sign inside.", "Ein Minus vor der Klammer dreht jedes Vorzeichen darin um."),
     );
   }
   // product: (x + p)(x + q) = x² + r, or (x + p)² = x² + r
@@ -778,7 +895,7 @@ function level3(rng: Rng): Exercise | null {
     return make(
       equation([prod("P", [inner(1, 1), inner(p)], [inner(1, 1), inner(q)])], "=", [term("A", 1, 2), term("C", r)]),
       v,
-      `Multiply out the brackets. The $${v}^2$ cancels, then it's a normal equation.`,
+      tx(`Multiply out the brackets. The $${v}^2$ cancels, then it's a normal equation.`, `Multipliziere die Klammern aus. Das $${v}^2$ fällt weg, dann ist es eine ganz normale Gleichung.`),
     );
   }
   const r = 2 * p * x + p * p;
@@ -786,7 +903,7 @@ function level3(rng: Rng): Exercise | null {
   return make(
     equation([prod("P", [inner(1, 1), inner(p)], [], { square: true })], "=", [term("A", 1, 2), term("C", r)]),
     v,
-    `Use $(a + b)^2 = a^2 + 2ab + b^2$. The $${v}^2$ cancels.`,
+    tx(`Use $(a + b)^2 = a^2 + 2ab + b^2$. The $${v}^2$ cancels.`, `Nutze die binomische Formel $(a + b)^2 = a^2 + 2ab + b^2$. Das $${v}^2$ fällt weg.`),
   );
 }
 
@@ -800,7 +917,7 @@ function generate(level: Level, rng: Rng): Exercise {
     if (Math.abs(value) > 30 || (a.kind === "solutions" && value === 0)) continue;
     return ex;
   }
-  return make(equation([term("A", 2, 1), term("B", 3)], "=", [term("C", 11)]), "x", "First subtract $3$, then divide by $2$.", true);
+  return make(equation([term("A", 2, 1), term("B", 3)], "=", [term("C", 11)]), "x", tx("First subtract $3$, then divide by $2$.", "Subtrahiere zuerst $3$, dann teile durch $2$."), true);
 }
 
 // ---------------------------------------------------------------------------
@@ -934,18 +1051,22 @@ function EqRow({ l, r, rel = "=", op, scope, live }: { l: string; r: string; rel
   );
 }
 
-const BALANCE_MSG: Record<BalanceMsg, string> = {
-  start: "Tap a block to take it away. The same block disappears from the other pan too.",
-  ok: "Still level. Both sides lost exactly the same weight.",
-  noN: "The other pan has no 1-weight left. Try something else.",
-  noX: "The other pan has no x-box to take away. Try something else.",
-  div: "Each pan was split into equal parts. One part stays on each side, so it's still level.",
-  solved: "Solved! One x-box balances the weights on the other side.",
-  tipped: "It tips! Only one side changed, so the two sides aren't equal any more.",
-  one: "Now tap a block on just one pan and watch the balance.",
+const BALANCE_MSG: Record<BalanceMsg, Text> = {
+  start: tx("Tap a block to take it away. The same block disappears from the other pan too.", "Tippe auf einen Block, um ihn wegzunehmen. Derselbe Block verschwindet auch aus der anderen Waagschale."),
+  ok: tx("Still level. Both sides lost exactly the same weight.", "Immer noch im Gleichgewicht. Beide Seiten haben genau gleich viel Gewicht verloren."),
+  noN: tx("The other pan has no 1-weight left. Try something else.", "In der anderen Waagschale liegt kein 1er-Gewicht mehr. Probier etwas anderes."),
+  noX: tx("The other pan has no x-box to take away. Try something else.", "In der anderen Waagschale ist keine x-Kiste zum Wegnehmen. Probier etwas anderes."),
+  div: tx(
+    "Each pan was split into equal parts. One part stays on each side, so it's still level.",
+    "Jede Waagschale wurde in gleiche Teile aufgeteilt. Auf jeder Seite bleibt ein Teil, also ist die Waage weiter im Gleichgewicht.",
+  ),
+  solved: tx("Solved! One x-box balances the weights on the other side.", "Gelöst! Eine x-Kiste wiegt so viel wie die Gewichte auf der anderen Seite:"),
+  tipped: tx("It tips! Only one side changed, so the two sides aren't equal any more.", "Sie kippt! Nur eine Seite hat sich verändert, also sind die Seiten nicht mehr gleich."),
+  one: tx("Now tap a block on just one pan and watch the balance.", "Tippe jetzt auf einen Block in nur einer Waagschale und beobachte die Waage."),
 };
 
 function BalanceScale() {
+  const t = useText();
   const scope = useId();
   const [puzzle, setPuzzle] = useState(0);
   const [mode, setMode] = useState<"both" | "one">("both");
@@ -1012,25 +1133,25 @@ function BalanceScale() {
           {(["both", "one"] as const).map((m) => (
             <button key={m} onClick={() => switchMode(m)} className={cn("relative rounded-md px-3 py-1.5 text-[13px] font-medium", mode === m ? "text-ink" : "text-ink-3 hover:text-ink")}>
               {mode === m && <motion.span layoutId={`${scope}-mode`} className="absolute inset-0 rounded-md bg-hover" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-              <span className="relative">{m === "both" ? "Both sides" : "One side only"}</span>
+              <span className="relative">{m === "both" ? t(tx("Both sides", "Beide Seiten")) : t(tx("One side only", "Nur eine Seite"))}</span>
             </button>
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button onClick={undo} disabled={!past.length} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent">
-            <Undo2 className="size-3.5" /> Undo
+            <Undo2 className="size-3.5" /> {t(tx("Undo", "Rückgängig"))}
           </button>
           <button onClick={() => load(puzzle)} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-            <RotateCcw className="size-3.5" /> Reset
+            <RotateCcw className="size-3.5" /> {t(tx("Reset", "Zurücksetzen"))}
           </button>
           <button onClick={() => load((puzzle + 1) % PUZZLES.length)} className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-            <Shuffle className="size-3.5" /> New puzzle
+            <Shuffle className="size-3.5" /> {t(tx("New puzzle", "Neues Rätsel"))}
           </button>
         </div>
       </div>
 
       <div className="rounded-xl border border-line bg-surface px-2 pt-3 pb-1">
-        <svg viewBox="0 34 520 234" className="mx-auto block w-full max-w-[540px] select-none overflow-visible" role="img" aria-label="Balance scale">
+        <svg viewBox="0 34 520 234" className="mx-auto block w-full max-w-[540px] select-none overflow-visible" role="img" aria-label={t(tx("Balance scale", "Balkenwaage"))}>
           <path d="M 260 74 L 246 254 H 274 Z" fill="color-mix(in oklab, var(--ink) 16%, transparent)" />
           <rect x={206} y={252} width={108} height={10} rx={5} fill="color-mix(in oklab, var(--ink) 22%, transparent)" />
           <PanView cx={260 - BEAM} angle={angle} side="l" pan={s.l} xValue={X} reveal={solved} onTap={tap} />
@@ -1056,7 +1177,7 @@ function BalanceScale() {
         </div>
         {mode === "both" && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">On both sides</span>
+            <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t(tx("On both sides", "Auf beiden Seiten"))}</span>
             <div className="flex gap-1.5">
               {buttons.map((b) => (
                 <button
@@ -1075,7 +1196,7 @@ function BalanceScale() {
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.p key={msg + (solved ? X : "")} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} className={cn("min-h-[1.5em] text-[14px]", tone)}>
-          {BALANCE_MSG[msg]}
+          {t(BALANCE_MSG[msg])}
           {solved && (
             <>
               {" "}
@@ -1117,6 +1238,7 @@ const subscribeNarrow = (cb: () => void) => {
 const useNarrow = () => useSyncExternalStore(subscribeNarrow, () => window.matchMedia("(max-width: 639px)").matches, () => false);
 
 function InequalityLab() {
+  const t = useText();
   const scope = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const [ex, setEx] = useState(0);
@@ -1179,7 +1301,7 @@ function InequalityLab() {
           viewBox={`0 0 ${g.w} 96`}
           className={cn("block w-full touch-none select-none", dragging ? "cursor-grabbing" : "cursor-pointer")}
           role="slider"
-          aria-label="Value of x"
+          aria-label={t(tx("Value of x", "Wert von x"))}
           aria-valuemin={NL.from}
           aria-valuemax={NL.to}
           aria-valuenow={x}
@@ -1268,12 +1390,12 @@ function InequalityLab() {
             transition={{ type: "spring", stiffness: 520, damping: 22 }}
             className={cn("rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold text-white", ok ? "bg-ok" : "bg-danger")}
           >
-            {ok ? "true" : "false"}
+            {ok ? t(tx("true", "wahr")) : t(tx("false", "falsch"))}
           </motion.span>
         </span>
         {!show && (
           <button onClick={() => setShow(true)} className="ml-auto flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-            <Eye className="size-3.5" /> Show the solution
+            <Eye className="size-3.5" /> {t(tx("Show the solution", "Lösung zeigen"))}
           </button>
         )}
       </div>
@@ -1294,11 +1416,13 @@ function InequalityLab() {
                   L = {"{"} <i>x</i> | <i>x</i> {REL_PLAIN[e.sol.rel]} {String(e.sol.at).replace("-", "−")} {"}"}
                 </div>
                 <p className="max-w-[340px] text-[13.5px] text-ink-2">
-                  {e.flips
-                    ? "Dividing by a negative number flipped the sign. Your green dots agree!"
-                    : closed
-                      ? "The boundary belongs to the solution: a filled dot."
-                      : "The boundary itself is not a solution: an open circle."}
+                  {t(
+                    e.flips
+                      ? tx("Dividing by a negative number flipped the sign. Your green dots agree!", "Beim Teilen durch eine negative Zahl hat sich das Relationszeichen umgedreht. Deine grünen Punkte zeigen es auch!")
+                      : closed
+                        ? tx("The boundary belongs to the solution: a filled dot.", "Die Grenze gehört zur Lösungsmenge: ein geschlossener Punkt.")
+                        : tx("The boundary itself is not a solution: an open circle.", "Die Grenze selbst ist keine Lösung: ein offener Punkt."),
+                  )}
                 </p>
               </div>
             </div>
@@ -1312,52 +1436,74 @@ function InequalityLab() {
 // ---------------------------------------------------------------------------
 
 const balanceFrames: Frame[] = [
-  { math: "x#x +#p 5#b =#eq 12#c", note: "On the left: $x$ and $5$. On the right: $12$. Both sides are worth the same." },
+  {
+    math: "x#x +#p 5#b =#eq 12#c",
+    note: tx("On the left: $x$ and $5$. On the right: $12$. Both sides are worth the same.", "Links: $x$ und $5$. Rechts: $12$. Beide Seiten sind gleich viel wert."),
+  },
   {
     math: "x#x +#p 5#b =#eq 12#c \\quad |#bar \\, -#o 5#on",
     highlight: ["o", "on"],
-    note: "We want $x$ alone, so the $+5$ has to go. Write the plan after a bar: $| -5$ means **subtract 5**.",
+    note: tx(
+      "We want $x$ alone, so the $+5$ has to go. Write the plan after a bar: $| -5$ means **subtract 5**.",
+      "Wir wollen $x$ allein haben, also muss das $+5$ weg. Schreib den Rechenschritt hinter einen Strich: $| -5$ heißt **5 subtrahieren**.",
+    ),
   },
   {
     math: "x#x +#p 5#b -#l 5#ln =#eq 12#c -#r 5#rn \\quad |#bar \\, -#o 5#on",
     highlight: ["l", "ln", "r", "rn"],
-    note: "Whatever you do to one side, you do to the other: subtract $5$ on **both** sides.",
+    note: tx(
+      "Whatever you do to one side, you do to the other: subtract $5$ on **both** sides.",
+      "Was du auf einer Seite machst, machst du auch auf der anderen: Subtrahiere $5$ auf **beiden** Seiten.",
+    ),
   },
-  { math: "x#x =#eq 7#c", note: "$5 - 5 = 0$ and $12 - 5 = 7$. So $x = 7$." },
-  { math: "\\green{7} + 5 = 12", note: "Check: put $7$ in for $x$. $7 + 5 = 12$. Balanced!" },
+  { math: "x#x =#eq 7#c", note: tx("$5 - 5 = 0$ and $12 - 5 = 7$. So $x = 7$.", "$5 - 5 = 0$ und $12 - 5 = 7$. Also ist $x = 7$.") },
+  { math: "\\green{7} + 5 = 12", note: tx("Check: put $7$ in for $x$. $7 + 5 = 12$. Balanced!", "Probe: Setze $7$ für $x$ ein. $7 + 5 = 12$. Im Gleichgewicht!") },
 ];
 
 const twoStep = solveEq(equation([term("A", 2, 1), term("B", 3)], "=", [term("C", 11)]), "x", {
   check: true,
   maxEm: 18,
-  intro: "$2x$ means $2 \\cdot x$. So two things happen to $x$: times $2$, then plus $3$.",
+  intro: tx(
+    "$2x$ means $2 \\cdot x$. So two things happen to $x$: times $2$, then plus $3$.",
+    "$2x$ bedeutet $2 \\cdot x$. Mit $x$ passieren also zwei Dinge: erst mal $2$, dann plus $3$.",
+  ),
 }).frames;
 
 const bothSides = solveEq(equation([term("A", 5, 1), term("B", -2)], "=", [term("C", 3, 1), term("D", 6)]), "x", {
   check: true,
   maxEm: 18,
-  intro: "Now there's an $x$ on both sides. Collect them on one side first.",
+  intro: tx("Now there's an $x$ on both sides. Collect them on one side first.", "Jetzt steht auf beiden Seiten ein $x$. Bring die $x$-Terme zuerst auf eine Seite."),
 }).frames;
 
 const withBracket = solveEq(equation([group("G", 3, [inner(1, 1), inner(-2)])], "=", [term("C", 1, 1), term("D", 4)]), "x", { check: true, maxEm: 18 }).frames;
 
 const firstInequality = solveEq(equation([term("A", 2, 1), term("B", 1)], "<", [term("C", 7)]), "x", {
   maxEm: 18,
-  intro: "An inequality: the left side is **smaller** than the right side. Solve it just like an equation.",
+  intro: tx(
+    "An inequality: the left side is **smaller** than the right side. Solve it just like an equation.",
+    "Eine Ungleichung: Die linke Seite ist **kleiner** als die rechte. Löse sie genau wie eine Gleichung.",
+  ),
 }).frames;
 
 const flipFrames: Frame[] = [
-  { math: "2#a <#rel 5#b", note: "Why is there an exception? Start with something true: $2 < 5$." },
-  { math: "2#a <#rel 5#b \\quad |#bar \\, \\cdot#o (-#os 1#on)#ob", highlight: ["bar", "o", "os", "on", "ob(", "ob)"], note: "Now multiply both sides by $-1$." },
-  { math: "-#as 2#a \\hl{?#q} -#bs 5#b", note: "We get $-2$ and $-5$. Which one is bigger?" },
+  { math: "2#a <#rel 5#b", note: tx("Why is there an exception? Start with something true: $2 < 5$.", "Warum gibt es eine Ausnahme? Fang mit einer wahren Aussage an: $2 < 5$.") },
+  {
+    math: "2#a <#rel 5#b \\quad |#bar \\, \\cdot#o (-#os 1#on)#ob",
+    highlight: ["bar", "o", "os", "on", "ob(", "ob)"],
+    note: tx("Now multiply both sides by $-1$.", "Multipliziere jetzt beide Seiten mit $-1$."),
+  },
+  { math: "-#as 2#a \\hl{?#q} -#bs 5#b", note: tx("We get $-2$ and $-5$. Which one is bigger?", "Du bekommst $-2$ und $-5$. Welche Zahl ist größer?") },
   {
     math: "-#as 2#a >#rel2 -#bs 5#b",
     highlight: ["rel2"],
-    note: "$-2$ is **bigger** than $-5$: it lies further right on the number line. The sign had to flip!",
+    note: tx(
+      "$-2$ is **bigger** than $-5$: it lies further right on the number line. The sign had to flip!",
+      "$-2$ ist **größer** als $-5$: Die Zahl liegt auf dem Zahlenstrahl weiter rechts. Das Relationszeichen musste sich umdrehen!",
+    ),
   },
   ...solveEq(equation([term("A", -3, 1)], "≤", [term("C", 12)]), "x", {
     maxEm: 18,
-    intro: "Same with $-3x \\le 12$. To get $x$ alone you divide by $-3$.",
+    intro: tx("Same with $-3x \\le 12$. To get $x$ alone you divide by $-3$.", "Genauso bei $-3x \\le 12$. Um $x$ allein zu bekommen, teilst du durch $-3$."),
   }).frames,
 ];
 
@@ -1365,38 +1511,47 @@ const equations: Topic = {
   ...topicMeta("equations"),
   summary: [
     {
-      title: "The balance rule",
-      body: "Do the same thing to **both** sides. Write each step after a bar.",
+      title: tx("The balance rule", "Die Waage-Regel"),
+      body: tx("Do the same thing to **both** sides. Write each step after a bar.", "Mach auf **beiden** Seiten dasselbe. Schreib jeden Schritt hinter einen Strich."),
       examples: ["2x + 3 = 11 \\quad | \\, -3", "2x = 8 \\quad | \\, :2", "x = 4"],
       tone: "rule",
     },
     {
-      title: "In this order",
-      body: "Expand brackets. Collect the $x$-terms on one side and the numbers on the other. Then divide by the number in front of $x$.",
+      title: tx("In this order", "In dieser Reihenfolge"),
+      body: tx(
+        "Expand brackets. Collect the $x$-terms on one side and the numbers on the other. Then divide by the number in front of $x$.",
+        "Klammern auflösen. Die $x$-Terme auf eine Seite bringen und die Zahlen auf die andere. Dann durch die Zahl vor dem $x$ teilen.",
+      ),
       examples: ["3(x - 2) = x + 4", "3x - 6 = x + 4 \\quad | \\, -x", "2x - 6 = 4 \\quad | \\, +6", "2x = 10 \\quad | \\, :2"],
       tone: "rule",
     },
     {
-      title: "Inequalities",
-      body: "Solve them like equations. The solution is a whole range of numbers, shown on a number line.",
+      title: tx("Inequalities", "Ungleichungen"),
+      body: tx(
+        "Solve them like equations. The solution is a whole range of numbers, shown on a number line.",
+        "Löse sie wie Gleichungen. Die Lösung ist ein ganzer Zahlenbereich, den du am Zahlenstrahl zeigen kannst.",
+      ),
       examples: ["2x + 1 < 7 \\quad | \\, -1", "2x < 6 \\quad | \\, :2", "x < 3"],
       tone: "rule",
     },
     {
-      title: "Negative factor: flip the sign",
-      body: "Multiplying or dividing both sides by a **negative** number turns the inequality sign around.",
+      title: tx("Negative factor: flip the sign", "Negativer Faktor: Zeichen umdrehen"),
+      body: tx(
+        "Multiplying or dividing both sides by a **negative** number turns the inequality sign around.",
+        "Bei der Multiplikation oder Division mit einer **negativen** Zahl dreht sich das Relationszeichen um.",
+      ),
       examples: ["-3x \\le 12 \\quad | \\, :(-3)", "x \\ge -4"],
       tone: "warning",
     },
     {
-      title: "Fractions",
-      body: "Multiply every term by the common denominator. The fractions disappear.",
+      title: tx("Fractions", "Brüche"),
+      body: tx("Multiply every term by the common denominator. The fractions disappear.", "Multipliziere jeden Term mit dem Hauptnenner. Dann verschwinden die Brüche."),
       examples: ["\\frac{x}{2} + \\frac{x}{3} = 5 \\quad | \\, \\cdot 6", "3x + 2x = 30"],
       tone: "tip",
     },
     {
-      title: "Check your answer",
-      body: "Put the solution back in. Both sides must give the same number.",
+      title: tx("Check your answer", "Mach die Probe"),
+      body: tx("Put the solution back in. Both sides must give the same number.", "Setz die Lösung in die Gleichung ein. Beide Seiten müssen dieselbe Zahl ergeben."),
       examples: ["2 \\cdot 4 + 3 = 11"],
       tone: "tip",
     },
@@ -1404,82 +1559,114 @@ const equations: Topic = {
   lesson: [
     {
       type: "explain",
-      title: "An equation is a balance",
-      blob: "Picture a balance that's perfectly level. That's an equation!",
-      body: "An equation says: the left side is worth exactly as much as the right side. To find $x$, we change both sides in the same way until $x$ is alone.",
+      title: tx("An equation is a balance", "Eine Gleichung ist eine Waage"),
+      blob: tx("Picture a balance that's perfectly level. That's an equation!", "Stell dir eine Waage vor, die genau im Gleichgewicht ist. Das ist eine Gleichung!"),
+      body: tx(
+        "An equation says: the left side is worth exactly as much as the right side. To find $x$, we change both sides in the same way until $x$ is alone.",
+        "Eine Gleichung sagt: Die linke Seite ist genau so viel wert wie die rechte. Um $x$ zu finden, verändern wir beide Seiten auf die gleiche Weise, bis $x$ allein dasteht.",
+      ),
       frames: balanceFrames,
     },
     {
       type: "widget",
-      title: "Keep it balanced",
-      blob: "Tap the blocks! Can you get one x-box all by itself?",
-      body: "Each purple box weighs $x$, each small block weighs $1$. Take away the same on both sides and the balance stays level. Then switch to **One side only** and see what happens.",
+      title: tx("Keep it balanced", "Halte die Waage im Gleichgewicht"),
+      blob: tx("Tap the blocks! Can you get one x-box all by itself?", "Tippe auf die Blöcke! Schaffst du es, dass eine x-Kiste ganz allein übrig bleibt?"),
+      body: tx(
+        "Each purple box weighs $x$, each small block weighs $1$. Take away the same on both sides and the balance stays level. Then switch to **One side only** and see what happens.",
+        "Jede lila Kiste wiegt $x$, jeder kleine Block wiegt $1$. Nimm auf beiden Seiten dasselbe weg, dann bleibt die Waage im Gleichgewicht. Wechsle danach zu **Nur eine Seite** und schau, was passiert.",
+      ),
       widget: BalanceScale,
     },
     {
       type: "explain",
-      title: "Two steps: first plus and minus, then divide",
-      blob: "Undo things in reverse: the plus goes first, then the times.",
-      body: "Get rid of the number that's added or subtracted first. Then divide by the number in front of $x$.",
+      title: tx("Two steps: first plus and minus, then divide", "Zwei Schritte: erst plus und minus, dann teilen"),
+      blob: tx("Undo things in reverse: the plus goes first, then the times.", "Mach alles in umgekehrter Reihenfolge rückgängig: zuerst das Plus, dann das Mal."),
+      body: tx(
+        "Get rid of the number that's added or subtracted first. Then divide by the number in front of $x$.",
+        "Bring zuerst die Zahl weg, die addiert oder subtrahiert wird. Teile dann durch die Zahl vor dem $x$.",
+      ),
       frames: twoStep,
     },
     {
       type: "check",
-      blob: "Your turn! Same two steps.",
-      exercise: make(equation([term("A", 4, 1), term("B", -7)], "=", [term("C", 13)]), "x", "First add $7$ on both sides, then divide by $4$.", true),
-    },
-    {
-      type: "explain",
-      title: "x on both sides",
-      blob: "Two teams of x? Bring them together on one side.",
-      body: "Collect all $x$-terms on one side and all numbers on the other. Tip: take away the smaller $x$-term, then $x$ stays positive.",
-      frames: bothSides,
-    },
-    {
-      type: "explain",
-      title: "Brackets? Expand first",
-      blob: "Brackets are wrapping paper. Unwrap them first!",
-      body: "Multiply out the brackets. After that it's an equation like the ones before.",
-      frames: withBracket,
-    },
-    {
-      type: "check",
-      blob: "Bracket first, then the balance steps.",
+      blob: tx("Your turn! Same two steps.", "Jetzt du! Dieselben zwei Schritte."),
       exercise: make(
-        equation([group("G", 2, [inner(1, 1), inner(4)])], "=", [term("C", 5, 1), term("D", -1)]),
+        equation([term("A", 4, 1), term("B", -7)], "=", [term("C", 13)]),
         "x",
-        "Expand: $2(x + 4) = 2x + 8$. Then bring the $x$-terms together.",
+        tx("First add $7$ on both sides, then divide by $4$.", "Addiere zuerst $7$ auf beiden Seiten, dann teile durch $4$."),
         true,
       ),
     },
     {
       type: "explain",
-      title: "Inequalities",
-      blob: "Not equal, but smaller or bigger. Same tricks!",
-      body: "$x < 3$ means $x$ is smaller than $3$. $x \\ge 3$ means greater than or equal to $3$. You solve inequalities just like equations, and the answer is a whole range of numbers.",
+      title: tx("x on both sides", "x auf beiden Seiten"),
+      blob: tx("Two teams of x? Bring them together on one side.", "Zwei x-Teams? Bring sie auf einer Seite zusammen."),
+      body: tx(
+        "Collect all $x$-terms on one side and all numbers on the other. Tip: take away the smaller $x$-term, then $x$ stays positive.",
+        "Bring alle $x$-Terme auf eine Seite und alle Zahlen auf die andere. Tipp: Zieh den kleineren $x$-Term ab, dann bleibt $x$ positiv.",
+      ),
+      frames: bothSides,
+    },
+    {
+      type: "explain",
+      title: tx("Brackets? Expand first", "Klammern? Erst auflösen"),
+      blob: tx("Brackets are wrapping paper. Unwrap them first!", "Klammern sind wie Geschenkpapier. Erst mal auspacken!"),
+      body: tx(
+        "Multiply out the brackets. After that it's an equation like the ones before.",
+        "Multipliziere die Klammern aus. Danach ist es eine Gleichung wie die davor.",
+      ),
+      frames: withBracket,
+    },
+    {
+      type: "check",
+      blob: tx("Bracket first, then the balance steps.", "Erst die Klammer, dann die Waage-Schritte."),
+      exercise: make(
+        equation([group("G", 2, [inner(1, 1), inner(4)])], "=", [term("C", 5, 1), term("D", -1)]),
+        "x",
+        tx("Expand: $2(x + 4) = 2x + 8$. Then bring the $x$-terms together.", "Klammer auflösen: $2(x + 4) = 2x + 8$. Dann bring die $x$-Terme auf eine Seite."),
+        true,
+      ),
+    },
+    {
+      type: "explain",
+      title: tx("Inequalities", "Ungleichungen"),
+      blob: tx("Not equal, but smaller or bigger. Same tricks!", "Nicht gleich, sondern kleiner oder größer. Gleiche Tricks!"),
+      body: tx(
+        "$x < 3$ means $x$ is smaller than $3$. $x \\ge 3$ means greater than or equal to $3$. You solve inequalities just like equations, and the answer is a whole range of numbers.",
+        "$x < 3$ heißt: $x$ ist kleiner als $3$. $x \\ge 3$ heißt: größer oder gleich $3$. Ungleichungen löst du genau wie Gleichungen, und die Lösung ist ein ganzer Zahlenbereich.",
+      ),
       frames: firstInequality,
     },
     {
       type: "widget",
-      title: "Test numbers on the number line",
-      blob: "Drag x around. Green means it works, red means it doesn't.",
-      body: "Move $x$ and watch whether the inequality is true. The dots remember what you tried. Then compare $2x + 1 < 7$ with $-2x < 6$: where are the solutions?",
+      title: tx("Test numbers on the number line", "Zahlen am Zahlenstrahl testen"),
+      blob: tx("Drag x around. Green means it works, red means it doesn't.", "Zieh x hin und her. Grün heißt: passt. Rot heißt: passt nicht."),
+      body: tx(
+        "Move $x$ and watch whether the inequality is true. The dots remember what you tried. Then compare $2x + 1 < 7$ with $-2x < 6$: where are the solutions?",
+        "Verschieb $x$ und schau, ob die Ungleichung wahr ist. Die Punkte merken sich, was du ausprobiert hast. Vergleich dann $2x + 1 < 7$ mit $-2x < 6$: Wo liegen die Lösungen?",
+      ),
       widget: InequalityLab,
     },
     {
       type: "explain",
-      title: "The one exception: negative numbers",
-      blob: "This is the trap in every test. Watch closely!",
-      body: "Multiply or divide both sides by a **negative** number and the inequality sign turns around. That's the only new rule.",
+      title: tx("The one exception: negative numbers", "Die eine Ausnahme: negative Zahlen"),
+      blob: tx("This is the trap in every test. Watch closely!", "Das ist die Falle in jeder Klassenarbeit. Pass gut auf!"),
+      body: tx(
+        "Multiply or divide both sides by a **negative** number and the inequality sign turns around. That's the only new rule.",
+        "Multiplizierst du beide Seiten mit einer **negativen** Zahl oder teilst durch sie, dreht sich das Relationszeichen um. Das ist die einzige neue Regel.",
+      ),
       frames: flipFrames,
     },
     {
       type: "check",
-      blob: "Last one. Remember the flip!",
+      blob: tx("Last one. Remember the flip!", "Die letzte! Denk ans Umdrehen!"),
       exercise: make(
         equation([term("A", -4, 1), term("B", 3)], ">", [term("C", 11)]),
         "x",
-        "Subtract $3$, then divide by $-4$. Dividing by a negative number flips the sign!",
+        tx(
+          "Subtract $3$, then divide by $-4$. Dividing by a negative number flips the sign!",
+          "Subtrahiere $3$, dann teile durch $-4$. Beim Teilen durch eine negative Zahl dreht sich das Relationszeichen um!",
+        ),
       ),
     },
   ],

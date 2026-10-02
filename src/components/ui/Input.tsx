@@ -2,6 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff } from "lucide-react";
+import { useMessages } from "@/i18n/client";
+import { uiText } from "@/i18n/messages/ui";
 import { useState, type InputHTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 
 export const inputClass =
@@ -20,6 +22,7 @@ export function Input({ className, icon, ref, ...props }: InputProps) {
 }
 
 export function PasswordInput({ className, icon, ref, ...props }: InputProps) {
+  const t = useMessages(uiText);
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
@@ -34,7 +37,7 @@ export function PasswordInput({ className, icon, ref, ...props }: InputProps) {
         type="button"
         onClick={() => setVisible((v) => !v)}
         className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
-        aria-label={visible ? "Hide password" : "Show password"}
+        aria-label={visible ? t.hidePassword : t.showPassword}
         tabIndex={-1}
       >
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

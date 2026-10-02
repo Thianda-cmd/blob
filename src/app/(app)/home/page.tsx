@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { themeSpecOf } from "@/components/deck/deck";
 import { HomeView } from "@/components/home/HomeView";
+import { homeText } from "@/i18n/messages/home";
+import { getMessages } from "@/i18n/server";
 import { loadLearnState } from "@/learn/server";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { createClient } from "@/lib/supabase/server";
 import { loadUpcomingTasks } from "@/lib/tasks";
 import type { PageKind } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Home" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages(homeText)).title };
+}
 
 type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
 

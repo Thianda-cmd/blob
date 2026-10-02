@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { useMessages } from "@/i18n/client";
+import { settingsText } from "@/i18n/messages/settings";
 import type { Theme } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +13,11 @@ const PALETTES = {
   dark: { paper: "#141413", surface: "#1e1e1c", line: "#302f2b", ink: "#edebe4", muted: "#3c3b36", soft: "#272040" },
 };
 
-const OPTIONS: { value: Theme; label: string; hint: string; icon: LucideIcon }[] = [
-  { value: "light", label: "Light", hint: "Paper white", icon: Sun },
-  { value: "dark", label: "Dark", hint: "Easy at night", icon: Moon },
-  { value: "system", label: "System", hint: "Match your device", icon: Monitor },
+// Labels and hints come from `settingsText.appearance.options`.
+const OPTIONS: { value: Theme; icon: LucideIcon }[] = [
+  { value: "light", icon: Sun },
+  { value: "dark", icon: Moon },
+  { value: "system", icon: Monitor },
 ];
 
 /** A tiny Blob workspace: sidebar, a note and the helper in the corner. */
@@ -72,9 +75,11 @@ export function ThemePicker({
   size?: "md" | "lg";
   className?: string;
 }) {
+  const t = useMessages(settingsText).appearance;
   return (
-    <div role="radiogroup" aria-label="Theme" className={cn("grid grid-cols-3 gap-3", size === "lg" && "gap-3.5", className)}>
-      {OPTIONS.map(({ value: option, label, hint, icon: Icon }) => {
+    <div role="radiogroup" aria-label={t.theme} className={cn("grid grid-cols-3 gap-3", size === "lg" && "gap-3.5", className)}>
+      {OPTIONS.map(({ value: option, icon: Icon }) => {
+        const { label, hint } = t.options[option];
         const selected = value === option;
         return (
           <motion.button

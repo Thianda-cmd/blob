@@ -5,6 +5,9 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { shellText } from "@/i18n/messages/shell";
+import { subjectsText } from "@/i18n/messages/subjects";
 import { SUBJECT_COLOR_KEYS, subjectColor } from "@/lib/subjects";
 import type { Subject } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,6 +17,8 @@ const EMOJIS = ["📐", "📖", "🌱", "⚗️", "🧲", "🏛️", "🗺️", 
 /** Rename, recolor, pick an emoji or delete a subject. */
 export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: "dots" | "button" }) {
   const { updateSubject, deleteSubject } = useWorkspace();
+  const t = useMessages(shellText).subjectMenu;
+  const colorNames = useMessages(subjectsText).colors;
   const router = useRouter();
   const pathname = usePathname();
   const [name, setName] = useState(subject.name);
@@ -29,11 +34,11 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
       }}
       trigger={(props) =>
         trigger === "button" ? (
-          <button {...props} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label="Subject options">
+          <button {...props} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.options}>
             <Ellipsis className="size-4" />
           </button>
         ) : (
-          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label="Subject options" title="Subject options">
+          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={t.options} title={t.options}>
             <Ellipsis className="size-3.5" />
           </button>
         )
@@ -56,10 +61,10 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
               onBlur={() => name.trim() && name.trim() !== subject.name && updateSubject(subject.id, { name: name.trim().slice(0, 60) })}
               maxLength={60}
               className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
-              aria-label="Subject name"
+              aria-label={t.name}
             />
           </form>
-          <MenuLabel>Color</MenuLabel>
+          <MenuLabel>{t.color}</MenuLabel>
           <div className="flex gap-1.5 px-2 pb-2">
             {SUBJECT_COLOR_KEYS.map((c) => (
               <button
@@ -67,13 +72,14 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
                 onClick={() => updateSubject(subject.id, { color: c })}
                 className="grid size-5 place-items-center rounded-full transition-transform hover:scale-110"
                 style={{ background: subjectColor(c) }}
-                aria-label={c}
+                aria-label={colorNames[c]}
+                title={colorNames[c]}
               >
                 {subject.color === c && <Check className="size-3 text-white" strokeWidth={3} />}
               </button>
             ))}
           </div>
-          <MenuLabel>Icon</MenuLabel>
+          <MenuLabel>{t.icon}</MenuLabel>
           <div className="grid grid-cols-9 gap-0.5 px-1 pb-1">
             {EMOJIS.map((e) => (
               <button
@@ -88,7 +94,7 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
           <MenuSeparator />
           {confirming ? (
             <div className="p-1.5">
-              <p className="mb-2 text-[12px] text-ink-2">Delete “{subject.name}”? Its notes stay, they just move to Notes.</p>
+              <p className="mb-2 text-[12px] text-ink-2">{t.confirm(subject.name)}</p>
               <div className="flex gap-1.5">
                 <button
                   onClick={async () => {
@@ -98,16 +104,16 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
                   }}
                   className="h-7 flex-1 rounded-md bg-danger text-[12.5px] font-medium text-white"
                 >
-                  Delete
+                  {t.delete}
                 </button>
                 <button onClick={() => setConfirming(false)} className="h-7 flex-1 rounded-md border border-line text-[12.5px]">
-                  Cancel
+                  {t.cancel}
                 </button>
               </div>
             </div>
           ) : (
             <MenuItem icon={<Trash2 />} danger onSelect={() => setConfirming(true)}>
-              Delete subject
+              {t.deleteSubject}
             </MenuItem>
           )}
         </div>

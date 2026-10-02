@@ -2,6 +2,9 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { workspaceText } from "@/i18n/messages/workspace";
 import { createClient } from "@/lib/supabase/client";
 import {
   PAGE_META_COLUMNS,
@@ -14,12 +17,14 @@ import {
 } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
-export function newDeckContent(title = ""): DeckContent {
+/** Starter slides for a new presentation, written in `locale`. */
+export function newDeckContent(title: string | undefined, locale: Locale): DeckContent {
+  const t = workspaceText[locale].deck;
   return {
     theme: "paper",
     slides: [
-      { id: uid(), layout: "title", title: title || "Your big idea", body: "A short subtitle, or your name", image: null, notes: "" },
-      { id: uid(), layout: "bullets", title: "Three things to know", body: "First point\nSecond point\nThird point", image: null, notes: "" },
+      { id: uid(), layout: "title", title: title || t.title, body: t.subtitle, image: null, notes: "" },
+      { id: uid(), layout: "bullets", title: t.bulletsTitle, body: t.bullets, image: null, notes: "" },
     ],
   };
 }
@@ -52,7 +57,7 @@ export function useWorkspace() {
   return ctx;
 }
 
-function oops(message = "Hmm, that didn't save. Check your connection?") {
+function oops(message: string) {
   blob.say(message, { mood: "worried" });
   blob.react("shake", "worried");
 }
@@ -90,15 +95,17 @@ export function WorkspaceProvider({
   const [profile, setProfileState] = useState(initialProfile);
   const [subjects, setSubjects] = useState(initialSubjects);
   const [pages, setPages] = useState(initialPages);
+  const locale = useLocale();
+  const t = useMessages(workspaceText);
 
   const setProfile = useCallback(
     async (patch: Partial<Profile>) => {
       setProfileState((p) => ({ ...p, ...patch }));
       const { error } = await createClient().from("profiles").update(patch).eq("id", userId);
-      if (error) oops();
+      if (error) oops(t.notSaved);
       return !error;
     },
-    [userId],
+    [userId, t],
   );
 
   const createPage = useCallback(
@@ -115,27 +122,27 @@ export function WorkspaceProvider({
           subject_id: input.subject_id ?? null,
           parent_id: input.parent_id ?? null,
           position,
-          content: kind === "deck" ? newDeckContent(input.title) : {},
+          content: kind === "deck" ? newDeckContent(input.title, locale) : {},
         })
         .select(PAGE_META_COLUMNS)
         .single();
       if (error || !data) {
-        oops("I couldn't create that page. Try again?");
+        oops(t.createFailed);
         return null;
       }
       setPages((ps) => [...ps, data as PageMeta]);
       return data as PageMeta;
     },
-    [pages],
+    [pages, locale, t],
   );
 
   const updatePage = useCallback(async (id: string, patch: Partial<PageMeta>, opts?: { local?: boolean }) => {
     setPages((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch, updated_at: new Date().toISOString() } : p)));
     if (opts?.local) return true;
     const { error } = await createClient().from("pages").update(patch).eq("id", id);
-    if (error) oops();
+    if (error) oops(t.notSaved);
     return !error;
-  }, []);
+  }, [t]);
 
   const trashPage = useCallback(
     async (id: string) => {
@@ -144,13 +151,13 @@ export function WorkspaceProvider({
       setPages((ps) => ps.filter((p) => !ids.includes(p.id)));
       const { error } = await createClient().from("pages").update({ trashed_at }).in("id", ids);
       if (error) {
-        oops();
+        oops(t.notSaved);
         return false;
       }
-      blob.say("Moved to trash. You can restore it anytime.", { mood: "idle" });
+      blob.say(t.trashed, { mood: "idle" });
       return true;
     },
-    [pages],
+    [pages, t],
   );
 
   const createSubject = useCallback(
@@ -162,30 +169,30 @@ export function WorkspaceProvider({
         .select()
         .single();
       if (error || !data) {
-        oops("I couldn't add that subject.");
+        oops(t.subjectFailed);
         return null;
       }
       setSubjects((s) => [...s, data as Subject]);
-      blob.say(`${input.name} added!`, { mood: "happy" });
+      blob.say(t.subjectAdded(input.name.trim()), { mood: "happy" });
       return data as Subject;
     },
-    [subjects],
+    [subjects, t],
   );
 
   const updateSubject = useCallback(async (id: string, patch: Partial<Subject>) => {
     setSubjects((ss) => ss.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     const { error } = await createClient().from("subjects").update(patch).eq("id", id);
-    if (error) oops();
+    if (error) oops(t.notSaved);
     return !error;
-  }, []);
+  }, [t]);
 
   const deleteSubject = useCallback(async (id: string) => {
     setSubjects((ss) => ss.filter((s) => s.id !== id));
     setPages((ps) => ps.map((p) => (p.subject_id === id ? { ...p, subject_id: null } : p)));
     const { error } = await createClient().from("subjects").delete().eq("id", id);
-    if (error) oops();
+    if (error) oops(t.notSaved);
     return !error;
-  }, []);
+  }, [t]);
 
   const upsertPages = useCallback((incoming: PageMeta[]) => {
     setPages((ps) => {

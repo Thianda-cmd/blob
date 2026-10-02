@@ -3,6 +3,8 @@
 import { AnimatePresence, motion, useSpring, useTransform } from "motion/react";
 import { ArrowLeft, ArrowRight, Minus, Plus, RotateCcw, Shuffle } from "lucide-react";
 import { useEffect, useId, useState, type ComponentType, type ReactNode } from "react";
+import { useLocale } from "@/i18n/client";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import { add, div as divF, frac, mul as mulF, sub, type Frac } from "@/learn/engine/frac";
@@ -26,14 +28,14 @@ function src(f: KF): string {
 }
 
 /** Plain display for notes and tasks: "\frac{3}{4}" or "2". */
-const tx = (n: number, d: number) => (d === 1 ? String(n) : `\\frac{${n}}{${d}}`);
-const txf = (f: { n: number; d: number }) => tx(f.n, f.d);
+const fr = (n: number, d: number) => (d === 1 ? String(n) : `\\frac{${n}}{${d}}`);
+const frf = (f: { n: number; d: number }) => fr(f.n, f.d);
 
 /** "2\frac{3}{4}" for an improper fraction. */
 function mixedTx(n: number, d: number) {
   const w = Math.floor(n / d);
   const r = n - w * d;
-  if (w === 0) return tx(n, d);
+  if (w === 0) return fr(n, d);
   return r === 0 ? String(w) : `${w}\\frac{${r}}{${d}}`;
 }
 
@@ -41,8 +43,9 @@ function mixedTx(n: number, d: number) {
 type Board = { frames: Frame[]; pre: string; post: string };
 const board = (): Board => ({ frames: [], pre: "", post: "" });
 
-function put(b: Board, body: string, note: string, extra: Omit<Frame, "math" | "note"> = {}) {
-  b.frames.push({ math: `${b.pre}${body}${b.post}`, note, ...extra });
+function put(b: Board, body: Text, note: Text, extra: Omit<Frame, "math" | "note"> = {}) {
+  const math = typeof body === "string" ? `${b.pre}${body}${b.post}` : txMap((t) => `${b.pre}${t(body.en, body.de)}${b.post}`);
+  b.frames.push({ math, note, ...extra });
 }
 
 /** Divide top and bottom by their greatest common factor. */
@@ -52,23 +55,36 @@ function simplify(b: Board, f: KF): KF {
   put(
     b,
     `\\frac{${f.n}#${f.kn} :#${f.kf}x ${g}#${f.kf}g}{${f.d}#${f.kd} :#${f.kf}y ${g}#${f.kf}h}#${f.kf}`,
-    `Simplify: divide top and bottom by $${g}$.`,
+    tx(`Simplify: divide top and bottom by $${g}$.`, `Kürzen: Teile Zähler und Nenner durch $${g}$.`),
     { highlight: [`${f.kf}g`, `${f.kf}h`] },
   );
   const r: KF = { ...f, n: f.n / g, d: f.d / g, asFrac: false };
-  put(b, src(r), r.d === 1 ? `$${f.n} : ${f.d} = ${r.n}$, a whole number.` : `Fully simplified: $${tx(f.n, f.d)} = ${tx(r.n, r.d)}$.`);
+  put(
+    b,
+    src(r),
+    r.d === 1
+      ? tx(`$${f.n} : ${f.d} = ${r.n}$, a whole number.`, `$${f.n} : ${f.d} = ${r.n}$, eine ganze Zahl.`)
+      : tx(`Fully simplified: $${fr(f.n, f.d)} = ${fr(r.n, r.d)}$.`, `Vollständig gekürzt: $${fr(f.n, f.d)} = ${fr(r.n, r.d)}$.`),
+  );
   return r;
 }
 
 /** How to find the lowest common denominator (Hauptnenner). */
-function lcdNote(a: number, b: number): string {
+function lcdNote(a: number, b: number): Text {
   const big = Math.max(a, b);
   const small = Math.min(a, b);
   const l = lcm(a, b);
-  if (big % small === 0) return `Different denominators. $${small}$ goes into $${big}$, so $${big}$ is the common denominator.`;
+  if (big % small === 0)
+    return tx(
+      `Different denominators. $${small}$ goes into $${big}$, so $${big}$ is the common denominator.`,
+      `Verschiedene Nenner. $${big}$ ist durch $${small}$ teilbar, also ist $${big}$ der Hauptnenner.`,
+    );
   const multiples: number[] = [];
   for (let m = big; m <= l; m += big) multiples.push(m);
-  return `Different denominators. Multiples of $${big}$: $${multiples.join(", ")}$. The first one that $${small}$ also goes into is $${l}$.`;
+  return tx(
+    `Different denominators. Multiples of $${big}$: $${multiples.join(", ")}$. The first one that $${small}$ also goes into is $${l}$.`,
+    `Verschiedene Nenner. Vielfache von $${big}$: $${multiples.join(", ")}$. Das erste, das auch durch $${small}$ teilbar ist, ist $${l}$.`,
+  );
 }
 
 /** Adds or subtracts two fractions: common denominator, combine numerators, simplify. Keeps A's keys. */
@@ -82,17 +98,28 @@ function addSub(b: Board, A: KF, B: KF, sign: 1 | -1, opKey: string): KF {
     const kb = l / B.d;
     const ex = (f: KF, k: number) =>
       k === 1 ? src(f) : `\\frac{${f.n}#${f.kn} \\cdot#${f.kf}p ${k}#${f.kf}k}{${f.d}#${f.kd} \\cdot#${f.kf}q ${k}#${f.kf}l}#${f.kf}`;
-    const which = [ka > 1 ? `$${src0(A)}$ by $${ka}$` : "", kb > 1 ? `$${src0(B)}$ by $${kb}$` : ""].filter(Boolean).join(" and ");
+    const which = (by: string, and: string) =>
+      [ka > 1 ? `$${src0(A)}$ ${by} $${ka}$` : "", kb > 1 ? `$${src0(B)}$ ${by} $${kb}$` : ""].filter(Boolean).join(` ${and} `);
     const lit = [...(ka > 1 ? [`${A.kf}k`, `${A.kf}l`] : []), ...(kb > 1 ? [`${B.kf}k`, `${B.kf}l`] : [])];
-    put(b, `${ex(A, ka)} ${op}#${opKey} ${ex(B, kb)}`, `Expand ${which}: multiply top and bottom by the same number.`, { highlight: lit });
+    put(
+      b,
+      `${ex(A, ka)} ${op}#${opKey} ${ex(B, kb)}`,
+      tx(
+        `Expand ${which("by", "and")}: multiply top and bottom by the same number.`,
+        `Erweitere ${which("mit", "und")}: Zähler und Nenner mit derselben Zahl multiplizieren.`,
+      ),
+      { highlight: lit },
+    );
     A = { ...A, n: A.n * ka, d: l, asFrac: true };
     B = { ...B, n: B.n * kb, d: l, asFrac: true };
-    put(b, both(A, B), `Now both fractions have the denominator $${l}$.`, { highlight: [A.kd, B.kd] });
+    put(b, both(A, B), tx(`Now both fractions have the denominator $${l}$.`, `Jetzt haben beide Brüche den Nenner $${l}$.`), { highlight: [A.kd, B.kd] });
   }
   put(
     b,
     `\\frac{${A.n}#${A.kn} ${op}#${opKey} ${B.n}#${B.kn}}{${A.d}#${A.kd}}#${A.kf}`,
-    sign > 0 ? "Same denominator: add the numerators, keep the denominator." : "Same denominator: subtract the numerators, keep the denominator.",
+    sign > 0
+      ? tx("Same denominator: add the numerators, keep the denominator.", "Gleicher Nenner: Addiere die Zähler, der Nenner bleibt.")
+      : tx("Same denominator: subtract the numerators, keep the denominator.", "Gleicher Nenner: Subtrahiere die Zähler, der Nenner bleibt."),
   );
   const r: KF = { ...A, n: A.n + sign * B.n, asFrac: false };
   put(b, src(r), `$${A.n} ${op} ${B.n} = ${r.n}$.`);
@@ -109,7 +136,12 @@ function mul(b: Board, A: KF, B: KF, opKey: string): KF {
     const w = isWhole(A) ? A : B;
     A = { ...A, asFrac: true };
     B = { ...B, asFrac: true };
-    put(b, both(A, B), `Write the whole number as a fraction: $${w.n} = \\frac{${w.n}}{1}$.`, { highlight: [w.kd] });
+    put(
+      b,
+      both(A, B),
+      tx(`Write the whole number as a fraction: $${w.n} = \\frac{${w.n}}{1}$.`, `Schreib die ganze Zahl als Bruch: $${w.n} = \\frac{${w.n}}{1}$.`),
+      { highlight: [w.kd] },
+    );
   }
   let first = true;
   for (const pass of [1, 2]) {
@@ -120,7 +152,10 @@ function mul(b: Board, A: KF, B: KF, opKey: string): KF {
     put(
       b,
       both(A, B),
-      `${first ? "Before multiplying, simplify crosswise. " : ""}$${top.n}$ and $${bottom.d}$ are both divisible by $${g}$.`,
+      tx(
+        `${first ? "Before multiplying, simplify crosswise. " : ""}$${top.n}$ and $${bottom.d}$ are both divisible by $${g}$.`,
+        `${first ? "Vor dem Multiplizieren über Kreuz kürzen. " : ""}$${top.n}$ und $${bottom.d}$ sind beide durch $${g}$ teilbar.`,
+      ),
       { highlight: [top.kn, bottom.kd] },
     );
     const nt = top.n / g;
@@ -132,66 +167,98 @@ function mul(b: Board, A: KF, B: KF, opKey: string): KF {
       B = { ...B, n: nt };
       A = { ...A, d: nb };
     }
-    put(b, both(A, B), `$${top.n} : ${g} = ${nt}$ and $${bottom.d} : ${g} = ${nb}$.`, { highlight: [top.kn, bottom.kd] });
+    put(
+      b,
+      both(A, B),
+      tx(`$${top.n} : ${g} = ${nt}$ and $${bottom.d} : ${g} = ${nb}$.`, `$${top.n} : ${g} = ${nt}$ und $${bottom.d} : ${g} = ${nb}$.`),
+      { highlight: [top.kn, bottom.kd] },
+    );
     first = false;
   }
   put(
     b,
     `\\frac{${A.n}#${A.kn} \\cdot#${opKey} ${B.n}#${B.kn}}{${A.d}#${A.kd} \\cdot#${A.kf}b ${B.d}#${B.kd}}#${A.kf}`,
-    "Top times top, bottom times bottom.",
+    TOP_TIMES_TOP,
   );
   const r: KF = { ...A, n: A.n * B.n, d: A.d * B.d, asFrac: false };
   put(
     b,
     src(r),
-    r.d === 1 ? `$${A.n} \\cdot ${B.n} = ${r.n}$ and $${A.d} \\cdot ${B.d} = 1$: a whole number.` : `$${A.n} \\cdot ${B.n} = ${r.n}$ and $${A.d} \\cdot ${B.d} = ${r.d}$.`,
+    r.d === 1
+      ? tx(
+          `$${A.n} \\cdot ${B.n} = ${r.n}$ and $${A.d} \\cdot ${B.d} = 1$: a whole number.`,
+          `$${A.n} \\cdot ${B.n} = ${r.n}$ und $${A.d} \\cdot ${B.d} = 1$: eine ganze Zahl.`,
+        )
+      : tx(`$${A.n} \\cdot ${B.n} = ${r.n}$ and $${A.d} \\cdot ${B.d} = ${r.d}$.`, `$${A.n} \\cdot ${B.n} = ${r.n}$ und $${A.d} \\cdot ${B.d} = ${r.d}$.`),
   );
   return simplify(b, r);
 }
 
+const TOP_TIMES_TOP = tx("Top times top, bottom times bottom.", "Zähler mal Zähler, Nenner mal Nenner.");
+const RECIPROCAL_LEAD = tx(
+  "To divide, multiply by the **reciprocal** (Kehrwert): flip the second fraction upside down.",
+  "Dividieren heißt: mit dem **Kehrwert** multiplizieren. Dreh dafür den zweiten Bruch um.",
+);
+
 /** Divides: multiply by the reciprocal (Kehrwert) of the second number. */
-function div(b: Board, A: KF, B: KF, opKey: string, lead?: string): KF {
-  put(b, `${src(A)} :#${opKey} ${src(B)}`, lead ?? "To divide, multiply by the **reciprocal** (Kehrwert): flip the second fraction upside down.", {
+function div(b: Board, A: KF, B: KF, opKey: string, lead?: Text): KF {
+  put(b, `${src(A)} :#${opKey} ${src(B)}`, lead ?? RECIPROCAL_LEAD, {
     highlight: [opKey],
   });
   if (isWhole(B)) {
     B = { ...B, asFrac: true };
-    put(b, `${src(A)} :#${opKey} ${src(B)}`, `Write $${B.n}$ as $\\frac{${B.n}}{1}$.`, { highlight: [B.kd] });
+    put(b, `${src(A)} :#${opKey} ${src(B)}`, tx(`Write $${B.n}$ as $\\frac{${B.n}}{1}$.`, `Schreib $${B.n}$ als $\\frac{${B.n}}{1}$.`), { highlight: [B.kd] });
   }
   const R: KF = { n: B.d, d: B.n, kn: B.kd, kd: B.kn, kf: B.kf, asFrac: true };
   const dot = `${opKey}m`;
-  put(b, `${src(A)} \\cdot#${dot} ${src(R)}`, `Flip $\\frac{${B.n}}{${B.d}}$ to $\\frac{${R.n}}{${R.d}}$ and turn $:$ into $\\cdot$.`, {
-    highlight: [R.kn, R.kd, dot],
-  });
+  put(
+    b,
+    `${src(A)} \\cdot#${dot} ${src(R)}`,
+    tx(
+      `Flip $\\frac{${B.n}}{${B.d}}$ to $\\frac{${R.n}}{${R.d}}$ and turn $:$ into $\\cdot$.`,
+      `Aus $\\frac{${B.n}}{${B.d}}$ wird der Kehrwert $\\frac{${R.n}}{${R.d}}$, und aus $:$ wird $\\cdot$.`,
+    ),
+    { highlight: [R.kn, R.kd, dot] },
+  );
   return mul(b, A, R, dot);
 }
 
+/** A quantity's unit, with the German word for word units. */
+type Unit = Text;
+
 /** "3/4 of 28 kg": divide by the denominator, multiply by the numerator. */
-function ofSteps(b: Board, n: number, d: number, q: number, unit: string) {
-  const u = unit ? ` "${unit}"#u` : "";
-  const unitText = unit ? ` ${unit}` : "";
+function ofSteps(b: Board, n: number, d: number, q: number, unit: Unit) {
+  /** A line in both languages: `u` is the unit token for the board, `w` the unit word for notes. */
+  const say = (build: (u: string, w: string) => string) =>
+    txMap((_, l) => {
+      const name = resolveText(unit, l);
+      return build(name ? ` "${name}"#u` : "", name ? ` ${name}` : "");
+    });
   const one = q / d;
-  put(b, `\\frac{${n}#n}{${d}#d}#f \\cdot#t ${q}#q${u}`, "**Of** means times.");
-  put(b, `${q}#q :#dv ${d}#d \\cdot#t ${n}#n`, "Divide by the denominator, then multiply by the numerator.", { highlight: ["dv", "d"] });
+  put(b, say((u) => `\\frac{${n}#n}{${d}#d}#f \\cdot#t ${q}#q${u}`), tx("**Of** means times.", "„von“ heißt **mal**."));
+  put(b, `${q}#q :#dv ${d}#d \\cdot#t ${n}#n`, tx("Divide by the denominator, then multiply by the numerator.", "Teile durch den Nenner, dann multipliziere mit dem Zähler."), {
+    highlight: ["dv", "d"],
+  });
   if (n === 1) {
-    put(b, `${one}#q${u}`, `$${q} : ${d} = ${one}$${unitText}.`);
+    put(b, say((u) => `${one}#q${u}`), say((_, w) => `$${q} : ${d} = ${one}$${w}.`));
     return;
   }
-  put(b, `${one}#q \\cdot#t ${n}#n`, `$${q} : ${d} = ${one}$. That's $\\frac{1}{${d}}$ of $${q}$.`);
-  put(b, `${one * n}#q${u}`, `$${one} \\cdot ${n} = ${one * n}$${unitText}.`);
+  put(b, `${one}#q \\cdot#t ${n}#n`, tx(`$${q} : ${d} = ${one}$. That's $\\frac{1}{${d}}$ of $${q}$.`, `$${q} : ${d} = ${one}$. Das ist $\\frac{1}{${d}}$ von $${q}$.`));
+  put(b, say((u) => `${one * n}#q${u}`), say((_, w) => `$${one} \\cdot ${n} = ${one * n}$${w}.`));
 }
 
 /** Adds a sentence to the note of the last frame. */
-function appendNote(frames: Frame[], text: string) {
+function appendNote(frames: Frame[], text: Text) {
   const last = frames[frames.length - 1];
-  frames[frames.length - 1] = { ...last, note: last.note ? `${last.note} ${text}` : text };
+  const prev = last.note;
+  frames[frames.length - 1] = { ...last, note: prev ? txMap((_, l) => `${resolveText(prev, l)} ${resolveText(text, l)}`) : text };
 }
 
 /** Closes a worked solution: lowest terms, and the mixed-number form of an improper result. */
 function finish(frames: Frame[], r: Frac) {
-  const last = frames[frames.length - 1].note ?? "";
-  if (r.d > 1 && !/simplified/i.test(last)) appendNote(frames, "Already in lowest terms.");
-  if (r.d > 1 && r.n > r.d) appendNote(frames, `As a mixed number: $${mixedTx(r.n, r.d)}$.`);
+  const last = resolveText(frames[frames.length - 1].note, "en");
+  if (r.d > 1 && !/simplified/i.test(last)) appendNote(frames, tx("Already in lowest terms.", "Schon vollständig gekürzt."));
+  if (r.d > 1 && r.n > r.d) appendNote(frames, tx(`As a mixed number: $${mixedTx(r.n, r.d)}$.`, `Als gemischte Zahl: $${mixedTx(r.n, r.d)}$.`));
 }
 
 // Mixed numbers (w = 0 means a plain fraction).
@@ -254,14 +321,25 @@ function simplifyTask(rng: Rng): Exercise | null {
   if (d > 90 || n < 4) return null;
   const b = board();
   const A = kf(n, d, "a");
-  put(b, src(A), `Find the largest number that divides both $${n}$ and $${d}$. Here it's $${k}$.`, { highlight: [A.kn, A.kd] });
+  put(
+    b,
+    src(A),
+    tx(
+      `Find the largest number that divides both $${n}$ and $${d}$. Here it's $${k}$.`,
+      `Such die größte Zahl, durch die $${n}$ und $${d}$ beide teilbar sind (den ggT). Hier ist es $${k}$.`,
+    ),
+    { highlight: [A.kn, A.kd] },
+  );
   simplify(b, A);
   finish(b.frames, { n: n0, d: d0 });
   return {
-    instruction: "Simplify fully",
-    math: tx(n, d),
+    instruction: tx("Simplify fully", "Kürze vollständig"),
+    math: fr(n, d),
     answer: fracAnswer({ n: n0, d: d0 }),
-    hint: `Which number divides both $${n}$ and $${d}$? You can also go in small steps, e.g. divide by $${smallestPrime(k)}$ first.`,
+    hint: tx(
+      `Which number divides both $${n}$ and $${d}$? You can also go in small steps, e.g. divide by $${smallestPrime(k)}$ first.`,
+      `Durch welche Zahl sind $${n}$ und $${d}$ beide teilbar? Du kannst auch in kleinen Schritten kürzen, z. B. zuerst durch $${smallestPrime(k)}$.`,
+    ),
     solution: b.frames,
   };
 }
@@ -282,22 +360,39 @@ function gapTask(rng: Rng): Exercise | null {
       : `\\frac{${rn}#bn}{${filled ? `${rd}#q` : "\\box{?#q}"}}#bf`;
   const [knownL, knownR] = gapTop ? [ld, rd] : [ln, rn];
   const b = board();
-  put(b, `${left()} =#eq ${right(false)}`, `From $${knownL}$ to $${knownR}$: that's $${opT} ${k}$.`, { highlight: gapTop ? ["ad", "bd"] : ["an", "bn"] });
+  put(b, `${left()} =#eq ${right(false)}`, tx(`From $${knownL}$ to $${knownR}$: that's $${opT} ${k}$.`, `Von $${knownL}$ zu $${knownR}$: Das ist $${opT} ${k}$.`), {
+    highlight: gapTop ? ["ad", "bd"] : ["an", "bn"],
+  });
   put(
     b,
     `${left("x")} =#eq ${right(false)}`,
-    expand ? "Expanding: multiply top **and** bottom by the same number." : "Simplifying: divide top **and** bottom by the same number.",
+    expand
+      ? tx("Expanding: multiply top **and** bottom by the same number.", "Erweitern: Zähler **und** Nenner mit derselben Zahl multiplizieren.")
+      : tx("Simplifying: divide top **and** bottom by the same number.", "Kürzen: Zähler **und** Nenner durch dieselbe Zahl teilen."),
     { highlight: ["ak", "dk"] },
   );
   const [from, to] = gapTop ? [ln, rn] : [ld, rd];
-  put(b, `${left()} =#eq ${right(true)}`, `$${from} ${opT} ${k} = ${to}$. So $${tx(ln, ld)} = ${tx(rn, rd)}$.`, { highlight: ["q"] });
+  put(
+    b,
+    `${left()} =#eq ${right(true)}`,
+    tx(`$${from} ${opT} ${k} = ${to}$. So $${fr(ln, ld)} = ${fr(rn, rd)}$.`, `$${from} ${opT} ${k} = ${to}$. Also ist $${fr(ln, ld)} = ${fr(rn, rd)}$.`),
+    { highlight: ["q"] },
+  );
+  const deHow = expand ? "Mit welcher Zahl musst du" : "Durch welche Zahl musst du";
+  const deVerb = expand ? "multiplizieren" : "teilen";
   return {
-    instruction: "Fill in the gap",
-    math: `${tx(ln, ld)} = \\frac{${gapTop ? "\\box{?}" : rn}}{${gapTop ? rd : "\\box{?}"}}`,
+    instruction: tx("Fill in the gap", "Ergänze die fehlende Zahl"),
+    math: `${fr(ln, ld)} = \\frac{${gapTop ? "\\box{?}" : rn}}{${gapTop ? rd : "\\box{?}"}}`,
     answer: { kind: "number", value: to },
     hint: gapTop
-      ? `Compare the denominators. What do you ${expand ? "multiply" : "divide"} $${ld}$ by to get $${rd}$?`
-      : `Compare the numerators. What do you ${expand ? "multiply" : "divide"} $${ln}$ by to get $${rn}$?`,
+      ? tx(
+          `Compare the denominators. What do you ${expand ? "multiply" : "divide"} $${ld}$ by to get $${rd}$?`,
+          `Vergleiche die Nenner. ${deHow} $${ld}$ ${deVerb}, um $${rd}$ zu bekommen?`,
+        )
+      : tx(
+          `Compare the numerators. What do you ${expand ? "multiply" : "divide"} $${ln}$ by to get $${rn}$?`,
+          `Vergleiche die Zähler. ${deHow} $${ln}$ ${deVerb}, um $${rn}$ zu bekommen?`,
+        ),
     solution: b.frames,
   };
 }
@@ -314,25 +409,77 @@ function sameDenTask(rng: Rng): Exercise | null {
   const B = kf(y, d, "b");
   const op = sign > 0 ? "+" : "-";
   const b = board();
-  put(b, `${src(A)} ${op}#op ${src(B)}`, "Both fractions have the same denominator. Good news!", { highlight: [A.kd, B.kd] });
+  put(b, `${src(A)} ${op}#op ${src(B)}`, tx("Both fractions have the same denominator. Good news!", "Beide Brüche haben denselben Nenner. Super!"), { highlight: [A.kd, B.kd] });
   addSub(b, A, B, sign, "op");
   finish(b.frames, r);
   return {
-    instruction: "Calculate and simplify",
-    math: `${tx(x, d)} ${op} ${tx(y, d)}`,
+    instruction: CALC_SIMPLIFY,
+    math: `${fr(x, d)} ${op} ${fr(y, d)}`,
     answer: fracAnswer(r),
-    hint: `Same denominator: ${sign > 0 ? "add" : "subtract"} the numerators and keep the denominator. Then simplify if you can.`,
+    hint: tx(
+      `Same denominator: ${sign > 0 ? "add" : "subtract"} the numerators and keep the denominator. Then simplify if you can.`,
+      `Gleicher Nenner: ${sign > 0 ? "Addiere" : "Subtrahiere"} die Zähler, der Nenner bleibt. Kürze dann, wenn es geht.`,
+    ),
     solution: b.frames,
   };
 }
 
-const OF_STORIES: { unit: string; scale: number; max: number; text: (f: string, q: number) => string }[] = [
-  { unit: "students", scale: 1, max: 32, text: (f, q) => `A class has ${q} students. ${f} of them come to school by bike. How many students is that?` },
-  { unit: "€", scale: 1, max: 120, text: (f, q) => `Mia gets ${q} € for her birthday. She saves ${f} of it. How much money does she save?` },
-  { unit: "km", scale: 1, max: 90, text: (f, q) => `A bike tour is ${q} km long. By the lunch break, ${f} of the tour is done. How many kilometres is that?` },
-  { unit: "g", scale: 50, max: 1000, text: (f, q) => `A bag of flour holds ${q} g. A cake needs ${f} of it. How many grams is that?` },
-  { unit: "pages", scale: 10, max: 400, text: (f, q) => `Ben's book has ${q} pages. He has read ${f} of it. How many pages has he read?` },
-  { unit: "members", scale: 1, max: 120, text: (f, q) => `A sports club has ${q} members. ${f} of them play football. How many members is that?` },
+const CALC_SIMPLIFY = tx("Calculate and simplify", "Berechne und kürze");
+const CALCULATE = tx("Calculate", "Berechne");
+const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
+const STUDENTS = tx("students", "Schüler");
+
+const OF_STORIES: { unit: Unit; scale: number; max: number; text: (f: string, q: number) => Text }[] = [
+  {
+    unit: STUDENTS,
+    scale: 1,
+    max: 32,
+    text: (f, q) =>
+      tx(
+        `A class has ${q} students. ${f} of them come to school by bike. How many students is that?`,
+        `Eine Klasse hat ${q} Schülerinnen und Schüler. ${f} davon kommen mit dem Fahrrad zur Schule. Wie viele sind das?`,
+      ),
+  },
+  {
+    unit: "€",
+    scale: 1,
+    max: 120,
+    text: (f, q) => tx(`Mia gets ${q} € for her birthday. She saves ${f} of it. How much money does she save?`, `Mia bekommt ${q} € zum Geburtstag. Sie spart ${f} davon. Wie viel Geld spart sie?`),
+  },
+  {
+    unit: "km",
+    scale: 1,
+    max: 90,
+    text: (f, q) =>
+      tx(
+        `A bike tour is ${q} km long. By the lunch break, ${f} of the tour is done. How many kilometres is that?`,
+        `Eine Radtour ist ${q} km lang. Bis zur Mittagspause ist ${f} der Strecke geschafft. Wie viele Kilometer sind das?`,
+      ),
+  },
+  {
+    unit: "g",
+    scale: 50,
+    max: 1000,
+    text: (f, q) =>
+      tx(
+        `A bag of flour holds ${q} g. A cake needs ${f} of it. How many grams is that?`,
+        `In einer Packung Mehl sind ${q} g. Für einen Kuchen braucht man ${f} davon. Wie viel Gramm sind das?`,
+      ),
+  },
+  {
+    unit: tx("pages", "Seiten"),
+    scale: 10,
+    max: 400,
+    text: (f, q) =>
+      tx(`Ben's book has ${q} pages. He has read ${f} of it. How many pages has he read?`, `Bens Buch hat ${q} Seiten. ${f} davon hat er schon gelesen. Wie viele Seiten sind das?`),
+  },
+  {
+    unit: tx("members", "Mitglieder"),
+    scale: 1,
+    max: 120,
+    text: (f, q) =>
+      tx(`A sports club has ${q} members. ${f} of them play football. How many members is that?`, `Ein Sportverein hat ${q} Mitglieder. ${f} davon spielen Fußball. Wie viele Mitglieder sind das?`),
+  },
 ];
 
 function ofTask(rng: Rng): Exercise | null {
@@ -346,10 +493,13 @@ function ofTask(rng: Rng): Exercise | null {
   const b = board();
   ofSteps(b, n, d, q, asText ? story.unit : "");
   return {
-    instruction: asText ? "Word problem" : "Calculate",
-    ...(asText ? { text: story.text(`$${tx(n, d)}$`, q) } : { math: `${tx(n, d)} "of" ${q}` }),
+    instruction: asText ? WORD_PROBLEM : CALCULATE,
+    ...(asText ? { text: story.text(`$${fr(n, d)}$`, q) } : { math: tx(`${fr(n, d)} "of" ${q}`, `${fr(n, d)} "von" ${q}`) }),
     answer: { kind: "number", value: (q / d) * n, ...(asText ? { unit: story.unit } : {}) },
-    hint: `First find $\\frac{1}{${d}}$ of $${q}$: divide by $${d}$. Then multiply by $${n}$.`,
+    hint: tx(
+      `First find $\\frac{1}{${d}}$ of $${q}$: divide by $${d}$. Then multiply by $${n}$.`,
+      `Berechne zuerst $\\frac{1}{${d}}$ von $${q}$: Teile durch $${d}$. Multipliziere dann mit $${n}$.`,
+    ),
     solution: b.frames,
   };
 }
@@ -362,14 +512,25 @@ function pictureTask(rng: Rng): Exercise | null {
   const r = frac(n, d);
   const b = board();
   const A = kf(n, d, "a");
-  put(b, src(A), `Count: $${n}$ of the $${d}$ equal parts are shaded. That's $${tx(n, d)}$.`, { highlight: [A.kn, A.kd] });
+  put(
+    b,
+    src(A),
+    tx(
+      `Count: $${n}$ of the $${d}$ equal parts are shaded. That's $${fr(n, d)}$.`,
+      `Zähle: $${n}$ von $${d}$ gleich großen Teilen sind gefärbt. Das sind $${fr(n, d)}$.`,
+    ),
+    { highlight: [A.kn, A.kd] },
+  );
   simplify(b, A);
-  if (r.d === d) appendNote(b.frames, "It can't be simplified any further.");
+  if (r.d === d) appendNote(b.frames, tx("It can't be simplified any further.", "Weiter kürzen geht nicht."));
   return {
-    instruction: "Name the shaded part",
-    text: "What fraction of the shape is shaded? Simplify fully.",
+    instruction: tx("Name the shaded part", "Gib den gefärbten Anteil an"),
+    text: tx("What fraction of the shape is shaded? Simplify fully.", "Welcher Bruchteil der Figur ist gefärbt? Kürze vollständig."),
     answer: fracAnswer(r),
-    hint: "Count all the equal parts (denominator) and the shaded ones (numerator). Then simplify.",
+    hint: tx(
+      "Count all the equal parts (denominator) and the shaded ones (numerator). Then simplify.",
+      "Zähle alle gleich großen Teile (Nenner) und die gefärbten (Zähler). Kürze dann.",
+    ),
     solution: b.frames,
     visual: picture(n, d, shape),
   };
@@ -393,10 +554,13 @@ function addTask(rng: Rng): Exercise | null {
   addSub(b, kf(P.n, P.d, "a"), kf(Q.n, Q.d, "b"), sign, "op");
   finish(b.frames, r);
   return {
-    instruction: "Calculate and simplify",
-    math: `${txf(P)} ${op} ${txf(Q)}`,
+    instruction: CALC_SIMPLIFY,
+    math: `${frf(P)} ${op} ${frf(Q)}`,
     answer: fracAnswer(r),
-    hint: `Find the lowest common denominator of $${P.d}$ and $${Q.d}$ first. Then expand both fractions.`,
+    hint: tx(
+      `Find the lowest common denominator of $${P.d}$ and $${Q.d}$ first. Then expand both fractions.`,
+      `Bestimme zuerst den Hauptnenner von $${P.d}$ und $${Q.d}$. Erweitere dann beide Brüche.`,
+    ),
     solution: b.frames,
   };
 }
@@ -427,19 +591,27 @@ function mulTask(rng: Rng): Exercise | null {
   put(
     b,
     `${src(X)} \\cdot#op ${src(Y)}`,
-    cross || withWhole ? "Multiplying fractions: no common denominator needed." : "No common denominator needed, and nothing to simplify crosswise here.",
+    cross || withWhole
+      ? tx("Multiplying fractions: no common denominator needed.", "Beim Multiplizieren brauchst du keinen gemeinsamen Nenner.")
+      : tx("No common denominator needed, and nothing to simplify crosswise here.", "Kein gemeinsamer Nenner nötig, und über Kreuz kürzen geht hier nicht."),
   );
   mul(b, X, Y, "op");
   finish(b.frames, r);
   return {
-    instruction: "Calculate and simplify",
-    math: `${txf(A)} \\cdot ${txf(B)}`,
+    instruction: CALC_SIMPLIFY,
+    math: `${frf(A)} \\cdot ${frf(B)}`,
     answer: fracAnswer(r),
     hint: withWhole
-      ? "Write the whole number as a fraction with denominator $1$. Then top times top, bottom times bottom."
+      ? tx(
+          "Write the whole number as a fraction with denominator $1$. Then top times top, bottom times bottom.",
+          "Schreib die ganze Zahl als Bruch mit dem Nenner $1$. Dann Zähler mal Zähler, Nenner mal Nenner.",
+        )
       : cross
-        ? "Simplify crosswise first: a numerator and the **other** denominator share a factor."
-        : "Top times top, bottom times bottom.",
+        ? tx(
+            "Simplify crosswise first: a numerator and the **other** denominator share a factor.",
+            "Kürze zuerst über Kreuz: Ein Zähler und der **andere** Nenner haben einen gemeinsamen Teiler.",
+          )
+        : TOP_TIMES_TOP,
     solution: b.frames,
   };
 }
@@ -465,22 +637,50 @@ function divTask(rng: Rng): Exercise | null {
   div(b, kf(A.n, A.d, "a"), kf(B.n, B.d, "b"), "op");
   finish(b.frames, r);
   return {
-    instruction: "Calculate and simplify",
-    math: `${txf(A)} : ${txf(B)}`,
+    instruction: CALC_SIMPLIFY,
+    math: `${frf(A)} : ${frf(B)}`,
     answer: fracAnswer(r),
-    hint: B.d === 1 ? `Dividing by $${B.n}$ is the same as multiplying by $\\frac{1}{${B.n}}$.` : `Multiply by the reciprocal: $${txf(B)}$ becomes $${tx(B.d, B.n)}$.`,
+    hint:
+      B.d === 1
+        ? tx(
+            `Dividing by $${B.n}$ is the same as multiplying by $\\frac{1}{${B.n}}$.`,
+            `Durch $${B.n}$ teilen ist dasselbe wie mit $\\frac{1}{${B.n}}$ multiplizieren.`,
+          )
+        : tx(`Multiply by the reciprocal: $${frf(B)}$ becomes $${fr(B.d, B.n)}$.`, `Multipliziere mit dem Kehrwert: Aus $${frf(B)}$ wird $${fr(B.d, B.n)}$.`),
     solution: b.frames,
   };
 }
 
-const SUM_STORIES: ((f1: string, f2: string) => string)[] = [
-  (f1, f2) => `Leon reads ${f1} of his book on Monday and ${f2} of it on Tuesday. What fraction of the book has he read so far?`,
-  (f1, f2) => `In a garden, ${f1} of the area is used for vegetables and ${f2} for flowers. What fraction of the garden is used?`,
-  (f1, f2) => `On a hike, Emma walks ${f1} of the route before lunch and ${f2} of it after lunch. What fraction of the route has she walked?`,
+type Story2 = (f1: string, f2: string) => Text;
+
+const SUM_STORIES: Story2[] = [
+  (f1, f2) =>
+    tx(
+      `Leon reads ${f1} of his book on Monday and ${f2} of it on Tuesday. What fraction of the book has he read so far?`,
+      `Leon liest am Montag ${f1} seines Buches und am Dienstag ${f2}. Welchen Bruchteil des Buches hat er bisher gelesen?`,
+    ),
+  (f1, f2) =>
+    tx(
+      `In a garden, ${f1} of the area is used for vegetables and ${f2} for flowers. What fraction of the garden is used?`,
+      `In einem Schrebergarten werden ${f1} der Fläche für Gemüse und ${f2} für Blumen genutzt. Welcher Bruchteil des Gartens wird genutzt?`,
+    ),
+  (f1, f2) =>
+    tx(
+      `On a hike, Emma walks ${f1} of the route before lunch and ${f2} of it after lunch. What fraction of the route has she walked?`,
+      `Bei einer Wanderung schafft Emma vor dem Mittagessen ${f1} der Strecke und danach ${f2}. Welchen Bruchteil der Strecke hat sie geschafft?`,
+    ),
 ];
-const DIFF_STORIES: ((f1: string, f2: string) => string)[] = [
-  (f1, f2) => `A jug holds ${f1} l of juice. Tim pours ${f2} l into a glass. How many litres are left in the jug?`,
-  (f1, f2) => `A path is ${f1} km long. Sara has already walked ${f2} km. How far does she still have to go (in km)?`,
+const DIFF_STORIES: Story2[] = [
+  (f1, f2) =>
+    tx(
+      `A jug holds ${f1} l of juice. Tim pours ${f2} l into a glass. How many litres are left in the jug?`,
+      `In einem Krug sind ${f1} l Saft. Tim gießt ${f2} l in ein Glas. Wie viele Liter sind noch im Krug?`,
+    ),
+  (f1, f2) =>
+    tx(
+      `A path is ${f1} km long. Sara has already walked ${f2} km. How far does she still have to go (in km)?`,
+      `Ein Weg ist ${f1} km lang. Sara ist schon ${f2} km gegangen. Wie weit muss sie noch gehen (in km)?`,
+    ),
 ];
 
 function storyAddTask(rng: Rng): Exercise | null {
@@ -497,14 +697,21 @@ function storyAddTask(rng: Rng): Exercise | null {
   const b = board();
   const X = kf(P.n, P.d, "a");
   const Y = kf(Q.n, Q.d, "b");
-  put(b, `${src(X)} ${op}#op ${src(Y)}`, sign > 0 ? "Both parts together: add them." : "Take the second amount away: subtract.");
+  put(
+    b,
+    `${src(X)} ${op}#op ${src(Y)}`,
+    sign > 0 ? tx("Both parts together: add them.", "Beide Teile zusammen: addieren.") : tx("Take the second amount away: subtract.", "Die zweite Menge kommt weg: subtrahieren."),
+  );
   addSub(b, X, Y, sign, "op");
   finish(b.frames, r);
   return {
-    instruction: "Word problem",
-    text: story(`$${txf(P)}$`, `$${txf(Q)}$`),
+    instruction: WORD_PROBLEM,
+    text: story(`$${frf(P)}$`, `$${frf(Q)}$`),
     answer: fracAnswer(r),
-    hint: `${sign > 0 ? "Add" : "Subtract"} the two fractions. You need a common denominator first.`,
+    hint: tx(
+      `${sign > 0 ? "Add" : "Subtract"} the two fractions. You need a common denominator first.`,
+      `${sign > 0 ? "Addiere" : "Subtrahiere"} die beiden Brüche. Dafür brauchst du zuerst einen gemeinsamen Nenner.`,
+    ),
     solution: b.frames,
   };
 }
@@ -534,22 +741,30 @@ function mixedTask(rng: Rng): Exercise | null {
   put(
     b,
     `${mSrc(M1)} ${sym}#op ${mSrc(M2)}`,
-    mixed.length > 1 ? "First turn both mixed numbers into improper fractions." : "First turn the mixed number into an improper fraction.",
+    mixed.length > 1
+      ? tx("First turn both mixed numbers into improper fractions.", "Wandle zuerst beide gemischten Zahlen in unechte Brüche um.")
+      : tx("First turn the mixed number into an improper fraction.", "Wandle zuerst die gemischte Zahl in einen unechten Bruch um."),
     { highlight: mixed.map((m) => `${m.id}w`) },
   );
-  put(b, `${mWork(M1)} ${sym}#op ${mWork(M2)}`, "Whole number times denominator, plus numerator.", { highlight: mixed.flatMap((m) => [`${m.id}w`, `${m.id}k`]) });
+  put(b, `${mWork(M1)} ${sym}#op ${mWork(M2)}`, tx("Whole number times denominator, plus numerator.", "Ganze Zahl mal Nenner, plus Zähler."), {
+    highlight: mixed.flatMap((m) => [`${m.id}w`, `${m.id}k`]),
+  });
   const X = mImproper(M1);
   const Y = mImproper(M2);
-  put(b, `${src(X)} ${sym}#op ${src(Y)}`, `${mixed.map((m) => `$${m.w} \\cdot ${m.d} + ${m.n} = ${m.w * m.d + m.n}$`).join(" and ")}.`);
+  const sums = (and: string) => `${mixed.map((m) => `$${m.w} \\cdot ${m.d} + ${m.n} = ${m.w * m.d + m.n}$`).join(` ${and} `)}.`;
+  put(b, `${src(X)} ${sym}#op ${src(Y)}`, tx(sums("and"), sums("und")));
   if (op === "+" || op === "-") addSub(b, X, Y, op === "+" ? 1 : -1, "op");
   else if (op === "*") mul(b, X, Y, "op");
   else div(b, X, Y, "op");
   finish(b.frames, r);
   return {
-    instruction: "Calculate",
+    instruction: CALCULATE,
     math: `${mTx(M1)} ${sym} ${mTx(M2)}`,
     answer: fracAnswer(r),
-    hint: "Turn mixed numbers into improper fractions first: whole number times denominator, plus numerator. The answer can be an improper fraction.",
+    hint: tx(
+      "Turn mixed numbers into improper fractions first: whole number times denominator, plus numerator. The answer can be an improper fraction.",
+      "Wandle gemischte Zahlen zuerst in unechte Brüche um: ganze Zahl mal Nenner, plus Zähler. Das Ergebnis darf ein unechter Bruch sein.",
+    ),
     solution: b.frames,
   };
 }
@@ -572,22 +787,27 @@ function orderTask(rng: Rng): Exercise | null {
   const YK = kf(Y.n, Y.d, "b");
   const ZK = kf(Z.n, Z.d, "c");
   const b = board();
-  put(b, `${src(XK)} ${osym}#o1 ${src(YK)} ${isym}#o2 ${src(ZK)}`, "Multiplication and division come first (**Punkt vor Strich**).", {
-    highlight: [YK.kn, YK.kd, "o2", ZK.kn, ZK.kd],
-  });
+  put(
+    b,
+    `${src(XK)} ${osym}#o1 ${src(YK)} ${isym}#o2 ${src(ZK)}`,
+    tx("Multiplication and division come first (**Punkt vor Strich**).", "**Punkt vor Strich**: Erst wird multipliziert und dividiert."),
+    { highlight: [YK.kn, YK.kd, "o2", ZK.kn, ZK.kd] },
+  );
   b.pre = `${src(XK)} ${osym}#o1 `;
   const PK = times ? mul(b, YK, ZK, "o2") : div(b, YK, ZK, "o2");
   b.pre = "";
   addSub(b, XK, PK, sign, "o1");
   finish(b.frames, r);
   return {
-    instruction: "Calculate",
-    math: `${txf(X)} ${osym} ${txf(Y)} ${isym} ${txf(Z)}`,
+    instruction: CALCULATE,
+    math: `${frf(X)} ${osym} ${frf(Y)} ${isym} ${frf(Z)}`,
     answer: fracAnswer(r),
-    hint: `Punkt vor Strich: work out $${txf(Y)} ${isym} ${txf(Z)}$ first.`,
+    hint: tx(`Punkt vor Strich: work out $${frf(Y)} ${isym} ${frf(Z)}$ first.`, `Punkt vor Strich: Rechne zuerst $${frf(Y)} ${isym} ${frf(Z)}$ aus.`),
     solution: b.frames,
   };
 }
+
+const BRACKET_GONE = tx("The bracket is a single fraction now, so the brackets can go.", "In der Klammer steht jetzt nur noch ein Bruch, die Klammern können weg.");
 
 function bracketTask(rng: Rng): Exercise | null {
   const X = randFrac(rng, [2, 3, 4, 5, 6, 8, 10]);
@@ -609,24 +829,33 @@ function bracketTask(rng: Rng): Exercise | null {
   const QK = kf(Q.n, Q.d, "b");
   const ZK = kf(Z.n, Z.d, "c");
   const b = board();
-  put(b, `(${src(PK)} ${osym}#o1 ${src(QK)})#br ${isym}#o2 ${src(ZK)}`, "Brackets first.", { highlight: ["br(", "br)"] });
+  put(b, `(${src(PK)} ${osym}#o1 ${src(QK)})#br ${isym}#o2 ${src(ZK)}`, tx("Brackets first.", "Klammer zuerst."), { highlight: ["br(", "br)"] });
   b.pre = "(";
   b.post = `)#br ${isym}#o2 ${src(ZK)}`;
   const SK = addSub(b, PK, QK, sign, "o1");
   b.pre = "";
   b.post = "";
   if (times) {
-    put(b, `${src(SK)} \\cdot#o2 ${src(ZK)}`, "The bracket is a single fraction now, so the brackets can go.");
+    put(b, `${src(SK)} \\cdot#o2 ${src(ZK)}`, BRACKET_GONE);
     mul(b, SK, ZK, "o2");
   } else {
-    div(b, SK, ZK, "o2", "The bracket is a single fraction now, so the brackets can go. To divide, multiply by the reciprocal.");
+    div(
+      b,
+      SK,
+      ZK,
+      "o2",
+      tx(
+        "The bracket is a single fraction now, so the brackets can go. To divide, multiply by the reciprocal.",
+        "In der Klammer steht jetzt nur noch ein Bruch, die Klammern können weg. Dividieren heißt: mit dem Kehrwert multiplizieren.",
+      ),
+    );
   }
   finish(b.frames, r);
   return {
-    instruction: "Calculate",
-    math: `(${txf(P)} ${osym} ${txf(Q)}) ${isym} ${txf(Z)}`,
+    instruction: CALCULATE,
+    math: `(${frf(P)} ${osym} ${frf(Q)}) ${isym} ${frf(Z)}`,
     answer: fracAnswer(r),
-    hint: "Work out the bracket first. Then multiply or divide.",
+    hint: tx("Work out the bracket first. Then multiply or divide.", "Rechne zuerst die Klammer aus. Dann multiplizieren oder dividieren."),
     solution: b.frames,
   };
 }
@@ -644,22 +873,51 @@ function doubleTask(rng: Rng): Exercise | null {
   const Y = kf(B.n, B.d, "b");
   const b = board();
   // Thin spaces make the main fraction bar visibly longer than the inner ones.
-  put(b, `\\frac{\\,\\, ${src(X)} \\,\\,}{\\,\\, ${src(Y)} \\,\\,}#big`, "A **double fraction** (Doppelbruch). The long fraction bar means: divide.", { highlight: ["big-bar"] });
-  div(b, X, Y, "op", "Write it as a division: top $:$ bottom. Then multiply by the reciprocal (Kehrwert).");
+  put(
+    b,
+    `\\frac{\\,\\, ${src(X)} \\,\\,}{\\,\\, ${src(Y)} \\,\\,}#big`,
+    tx("A **double fraction** (Doppelbruch). The long fraction bar means: divide.", "Ein **Doppelbruch**. Der lange Bruchstrich bedeutet: geteilt durch."),
+    { highlight: ["big-bar"] },
+  );
+  div(
+    b,
+    X,
+    Y,
+    "op",
+    tx(
+      "Write it as a division: top $:$ bottom. Then multiply by the reciprocal (Kehrwert).",
+      "Schreib ihn als Division: oberer Bruch $:$ unterer Bruch. Dann mit dem Kehrwert multiplizieren.",
+    ),
+  );
   finish(b.frames, r);
   return {
-    instruction: "Simplify the double fraction",
-    math: `\\frac{\\,\\, ${txf(A)} \\,\\,}{\\,\\, ${txf(B)} \\,\\,}`,
+    instruction: tx("Simplify the double fraction", "Vereinfache den Doppelbruch"),
+    math: `\\frac{\\,\\, ${frf(A)} \\,\\,}{\\,\\, ${frf(B)} \\,\\,}`,
     answer: fracAnswer(r),
-    hint: "The long bar means divide: top fraction $:$ bottom fraction. Then multiply by the reciprocal.",
+    hint: tx(
+      "The long bar means divide: top fraction $:$ bottom fraction. Then multiply by the reciprocal.",
+      "Der lange Bruchstrich heißt geteilt: oberer Bruch $:$ unterer Bruch. Dann mit dem Kehrwert multiplizieren.",
+    ),
     solution: b.frames,
   };
 }
 
-const LEFT_STORIES: ((f1: string, f2: string) => string)[] = [
-  (f1, f2) => `Tim eats ${f1} of a pizza and Ali eats ${f2} of it. What fraction of the pizza is left?`,
-  (f1, f2) => `In class 7c, ${f1} of the students walk to school and ${f2} take the bus. The rest come by bike. What fraction of the class comes by bike?`,
-  (f1, f2) => `Jana spends ${f1} of her pocket money on clothes and ${f2} on snacks. What fraction of her pocket money is left?`,
+const LEFT_STORIES: Story2[] = [
+  (f1, f2) =>
+    tx(
+      `Tim eats ${f1} of a pizza and Ali eats ${f2} of it. What fraction of the pizza is left?`,
+      `Tim isst ${f1} einer Pizza, Ali isst ${f2} davon. Welcher Bruchteil der Pizza ist übrig?`,
+    ),
+  (f1, f2) =>
+    tx(
+      `In class 7c, ${f1} of the students walk to school and ${f2} take the bus. The rest come by bike. What fraction of the class comes by bike?`,
+      `In der Klasse 7c gehen ${f1} der Kinder zu Fuß zur Schule und ${f2} fahren mit dem Bus. Der Rest kommt mit dem Fahrrad. Welcher Bruchteil der Klasse kommt mit dem Fahrrad?`,
+    ),
+  (f1, f2) =>
+    tx(
+      `Jana spends ${f1} of her pocket money on clothes and ${f2} on snacks. What fraction of her pocket money is left?`,
+      `Jana gibt ${f1} ihres Taschengelds für Kleidung aus und ${f2} für Süßigkeiten. Welcher Bruchteil ihres Taschengelds bleibt übrig?`,
+    ),
 ];
 
 function leftoverTask(rng: Rng): Exercise | null {
@@ -672,37 +930,49 @@ function leftoverTask(rng: Rng): Exercise | null {
   const X = kf(A.n, A.d, "a");
   const Y = kf(B.n, B.d, "b");
   const b = board();
-  put(b, `${src(X)} +#op ${src(Y)}`, "First add up the two parts that are gone.");
+  put(b, `${src(X)} +#op ${src(Y)}`, tx("First add up the two parts that are gone.", "Addiere zuerst die beiden Teile, die weg sind."));
   const SK = addSub(b, X, Y, 1, "op");
   const O: KF = { n: SK.d, d: SK.d, kn: "on", kd: "od", kf: "of", asFrac: true };
-  put(b, `1#on -#m ${src(SK)}`, "The whole is $1$. Subtract what's gone.");
-  put(b, `${src(O)} -#m ${src(SK)}`, `Write the whole as $1 = ${tx(SK.d, SK.d)}$.`, { highlight: ["on", "od"] });
+  put(b, `1#on -#m ${src(SK)}`, tx("The whole is $1$. Subtract what's gone.", "Das Ganze ist $1$. Zieh ab, was weg ist."));
+  put(b, `${src(O)} -#m ${src(SK)}`, tx(`Write the whole as $1 = ${fr(SK.d, SK.d)}$.`, `Schreib das Ganze als $1 = ${fr(SK.d, SK.d)}$.`), { highlight: ["on", "od"] });
   addSub(b, O, SK, -1, "m");
   finish(b.frames, r);
   return {
-    instruction: "Word problem",
-    text: rng.pick(LEFT_STORIES)(`$${txf(A)}$`, `$${txf(B)}$`),
+    instruction: WORD_PROBLEM,
+    text: rng.pick(LEFT_STORIES)(`$${frf(A)}$`, `$${frf(B)}$`),
     answer: fracAnswer(r),
-    hint: "Add the two parts. The rest is $1$ minus that sum.",
+    hint: tx("Add the two parts. The rest is $1$ minus that sum.", "Addiere die beiden Teile. Der Rest ist $1$ minus diese Summe."),
     solution: b.frames,
   };
 }
 
-const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => string; first: string; second: string }[] = [
+const MONEY_STORIES: { text: (q: number, f1: string, f2: string) => Text; first: Text; second: Text }[] = [
   {
-    text: (q, f1, f2) => `Lena gets ${q} € pocket money. She spends ${f1} of it on a book and ${f2} of it on a cinema ticket. How much money does she have left?`,
-    first: "The book",
-    second: "The cinema ticket",
+    text: (q, f1, f2) =>
+      tx(
+        `Lena gets ${q} € pocket money. She spends ${f1} of it on a book and ${f2} of it on a cinema ticket. How much money does she have left?`,
+        `Lena bekommt ${q} € Taschengeld. Sie gibt ${f1} davon für ein Buch und ${f2} für eine Kinokarte aus. Wie viel Geld hat sie noch?`,
+      ),
+    first: tx("The book", "Das Buch"),
+    second: tx("The cinema ticket", "Die Kinokarte"),
   },
   {
-    text: (q, f1, f2) => `A class trip costs ${q} € per student. The parents pay ${f1} of it and the school pays ${f2}. The student pays the rest. How much is that?`,
-    first: "The parents",
-    second: "The school",
+    text: (q, f1, f2) =>
+      tx(
+        `A class trip costs ${q} € per student. The parents pay ${f1} of it and the school pays ${f2}. The student pays the rest. How much is that?`,
+        `Eine Klassenfahrt kostet ${q} € pro Kind. Die Eltern zahlen ${f1} davon, der Förderverein der Schule zahlt ${f2}. Den Rest zahlt jedes Kind selbst. Wie viel ist das?`,
+      ),
+    first: tx("The parents", "Die Eltern"),
+    second: tx("The school", "Der Förderverein"),
   },
   {
-    text: (q, f1, f2) => `Max earns ${q} € at a weekend job. He saves ${f1} of it and spends ${f2} on a video game. How much money is left?`,
-    first: "Saved",
-    second: "The game",
+    text: (q, f1, f2) =>
+      tx(
+        `Max earns ${q} € at a weekend job. He saves ${f1} of it and spends ${f2} on a video game. How much money is left?`,
+        `Max verdient mit einem Ferienjob ${q} €. Er spart ${f1} davon und gibt ${f2} für ein Videospiel aus. Wie viel Geld bleibt übrig?`,
+      ),
+    first: tx("Saved", "Gespart"),
+    second: tx("The game", "Das Spiel"),
   },
 ];
 
@@ -719,17 +989,24 @@ function moneyLeftTask(rng: Rng): Exercise | null {
   if (left <= 0) return null;
   const story = rng.pick(MONEY_STORIES);
   const part = (n: number, d: number) => (n === 1 ? `$${q} : ${d} = ${(q / d) * n}$` : `$${q} : ${d} \\cdot ${n} = ${(q / d) * n}$`);
+  const of = (en: string) => tx(en, en.replace('"of"', '"von"'));
   const b = board();
-  put(b, `${src(kf(A.n, A.d, "a"))} "of"#o1 ${q}#q1 "€"#u1 =#e1 ${sa}#ra "€"#ua`, `${story.first}: ${part(A.n, A.d)} €.`);
-  put(b, `${src(kf(B.n, B.d, "b"))} "of"#o2 ${q}#q2 "€"#u2 =#e2 ${sb}#rb "€"#ub`, `${story.second}: ${part(B.n, B.d)} €.`);
-  put(b, `${q}#q "€"#u -#s1 ${sa}#ra "€"#ua -#s2 ${sb}#rb "€"#ub =#e3 ${left}#r "€"#ur`, `Subtract both parts from the total: $${left}$ € are left.`, {
-    highlight: ["r"],
-  });
+  put(b, of(`${src(kf(A.n, A.d, "a"))} "of"#o1 ${q}#q1 "€"#u1 =#e1 ${sa}#ra "€"#ua`), txMap((_, l) => `${resolveText(story.first, l)}: ${part(A.n, A.d)} €.`));
+  put(b, of(`${src(kf(B.n, B.d, "b"))} "of"#o2 ${q}#q2 "€"#u2 =#e2 ${sb}#rb "€"#ub`), txMap((_, l) => `${resolveText(story.second, l)}: ${part(B.n, B.d)} €.`));
+  put(
+    b,
+    `${q}#q "€"#u -#s1 ${sa}#ra "€"#ua -#s2 ${sb}#rb "€"#ub =#e3 ${left}#r "€"#ur`,
+    tx(`Subtract both parts from the total: $${left}$ € are left.`, `Zieh beide Teile vom Gesamtbetrag ab: Es bleiben $${left}$ € übrig.`),
+    { highlight: ["r"] },
+  );
   return {
-    instruction: "Word problem",
-    text: story.text(q, `$${txf(A)}$`, `$${txf(B)}$`),
+    instruction: WORD_PROBLEM,
+    text: story.text(q, `$${frf(A)}$`, `$${frf(B)}$`),
     answer: { kind: "number", value: left, unit: "€" },
-    hint: "Work out each part in euros first: divide by the denominator, multiply by the numerator. Then subtract both parts from the total.",
+    hint: tx(
+      "Work out each part in euros first: divide by the denominator, multiply by the numerator. Then subtract both parts from the total.",
+      "Rechne zuerst jeden Teil in Euro aus: durch den Nenner teilen, mit dem Zähler multiplizieren. Zieh dann beide Teile vom Gesamtbetrag ab.",
+    ),
     solution: b.frames,
   };
 }
@@ -1151,7 +1428,7 @@ function CommonDenominator() {
         ? `${expanded(a, b, ka, "a")} ${sign}#op ${expanded(c, d, kc, "c")}`
         : step === 2
           ? `${plain(A2, l, "a")} ${sign}#op ${plain(C2, l, "c")}`
-          : `\\frac{${A2}#an ${sign}#op ${C2}#cn}{${l}#ad}#af =#eq ${plain(R, l, "r")}${g > 1 ? ` =#eq2 ${tx(R / g, l / g)}` : ""}`;
+          : `\\frac{${A2}#an ${sign}#op ${C2}#cn}{${l}#ad}#af =#eq ${plain(R, l, "r")}${g > 1 ? ` =#eq2 ${fr(R / g, l / g)}` : ""}`;
   const lit = step === 1 ? ["ak", "al", "ck", "cl"] : step === 2 ? ["ad", "cd"] : step === 3 ? ["rn"] : [];
 
   const texts = [
@@ -1199,10 +1476,10 @@ function CommonDenominator() {
       </div>
 
       <div className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <BarRow label={step >= 2 ? tx(A2, l) : tx(a, b)} scope={`${scope}-la`}>
+        <BarRow label={step >= 2 ? fr(A2, l) : fr(a, b)} scope={`${scope}-la`}>
           <FracBar parts={step >= 1 ? l : b} segs={[{ key: "a", from: 0, to: a / b }]} bg="var(--surface)" label="First fraction" />
         </BarRow>
-        <BarRow label={step >= 2 ? tx(C2, l) : tx(c, d)} scope={`${scope}-lc`}>
+        <BarRow label={step >= 2 ? fr(C2, l) : fr(c, d)} scope={`${scope}-lc`}>
           <FracBar parts={step >= 1 ? l : d} segs={[{ key: "c", from: 0, to: c / d, tone: "second" }]} bg="var(--surface)" label="Second fraction" />
         </BarRow>
         <AnimatePresence initial={false}>
@@ -1216,7 +1493,7 @@ function CommonDenominator() {
               className="overflow-hidden"
             >
               <div className="border-t border-dashed border-line pt-3">
-                <BarRow label={tx(R, l)} scope={`${scope}-lr`}>
+                <BarRow label={fr(R, l)} scope={`${scope}-lr`}>
                   <FracBar parts={l} segs={resultSegs} bg="var(--surface)" label="Result" />
                 </BarRow>
               </div>

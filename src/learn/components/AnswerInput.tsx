@@ -2,9 +2,12 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
+import { useText } from "@/i18n/useText";
 import type { AnswerValue } from "@/learn/engine/answers";
 import { parse, toDisplay } from "@/learn/engine/expr";
-import type { AnswerSpec } from "@/learn/types";
+import type { AnswerSpec, Text } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 import { Inline } from "./Rich";
@@ -18,18 +21,22 @@ function tone(status: AnswerStatus) {
   return status === "correct" ? "border-ok bg-ok/5" : status === "wrong" ? "border-danger bg-danger/5" : "border-line-2";
 }
 
-const KEYS: { label: string; insert: string; title?: string }[] = [
+type KeyName = keyof (typeof learnText)["en"]["input"]["keys"];
+
+const KEYS: { label: string; insert: string; name?: KeyName }[] = [
   { label: "x", insert: "x" },
   { label: "y", insert: "y" },
-  { label: "x²", insert: "^2", title: "squared" },
-  { label: "xⁿ", insert: "^", title: "power" },
-  { label: "√", insert: "√(", title: "square root" },
-  { label: "(", insert: "(" },
-  { label: ")", insert: ")" },
-  { label: "·", insert: "·" },
-  { label: "÷", insert: "/" },
-  { label: "−", insert: "-" },
+  { label: "x²", insert: "^2", name: "squared" },
+  { label: "xⁿ", insert: "^", name: "power" },
+  { label: "√", insert: "√(", name: "root" },
+  { label: "(", insert: "(", name: "open" },
+  { label: ")", insert: ")", name: "close" },
+  { label: "·", insert: "·", name: "times" },
+  { label: "÷", insert: "/", name: "divide" },
+  { label: "−", insert: "-", name: "minus" },
 ];
+
+const OPS = ["<", ">", "≤", "≥"] as const;
 
 /** A text field for maths with a live, rendered preview and a small keypad. */
 export function MathField({
@@ -37,7 +44,7 @@ export function MathField({
   onChange,
   onEnter,
   status,
-  placeholder = "Type your answer",
+  placeholder,
   preview = true,
   keypad = true,
   autoFocus,
@@ -57,9 +64,13 @@ export function MathField({
   disabled?: boolean;
   className?: string;
   inputClassName?: string;
-  label?: string;
+  /** Shown in front of the field, e.g. "t =". */
+  label?: Text;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const t = useMessages(learnText).input;
+  const tt = useText();
+  const labelText = tt(label);
   const parsed = value.trim() ? parse(value) : null;
   const shown = parsed?.ok ? toDisplay(parsed.ast) : null;
 
@@ -92,13 +103,13 @@ export function MathField({
           }}
           autoFocus={autoFocus}
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t.placeholder}
           inputMode="text"
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
           className={cn(fieldBase, tone(status), "w-full", inputClassName)}
-          aria-label={label ? `${label} answer` : "Answer"}
+          aria-label={labelText ? t.answerFor(labelText) : t.answer}
         />
       </div>
       {(preview || keypad) && (
@@ -109,7 +120,8 @@ export function MathField({
                 <button
                   key={k.label}
                   type="button"
-                  title={k.title ?? k.label}
+                  title={k.name ? t.keys[k.name] : k.label}
+                  aria-label={k.name ? t.keys[k.name] : k.label}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insert(k.insert)}
                   className="h-8 min-w-8 rounded-lg border border-line bg-surface px-2 text-[15px] text-ink-2 transition-colors [font-family:var(--font-math)] hover:border-line-2 hover:bg-hover hover:text-ink active:scale-95"
@@ -129,13 +141,13 @@ export function MathField({
                   exit={{ opacity: 0 }}
                   className="ml-auto flex items-center gap-2 text-[12px] text-ink-3"
                 >
-                  reads as
+                  {t.readsAs}
                   <MathView src={shown} size="sm" animate={false} className="text-ink" />
                 </motion.div>
               )}
               {parsed && !parsed.ok && (
                 <motion.div key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ml-auto text-[12px] text-ink-3">
-                  {parsed.error}
+                  {tt(parsed.error)}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -245,33 +257,35 @@ export function AnswerInput({
   }, [spec.kind, text, parts, none, op, choice]);
 
   const setPart = (i: number, v: string) => setParts((p) => p.map((x, j) => (j === i ? v : x)));
+  const t = useMessages(learnText).input;
+  const tt = useText();
 
   switch (spec.kind) {
     case "number":
       return (
         <div className="flex items-center gap-2">
           {spec.label && <MathView src={spec.label} size="md" animate={false} className="text-ink-2" />}
-          <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} keypad={false} preview={false} autoFocus={autoFocus} disabled={disabled} placeholder="Your number" className="w-56" />
-          {spec.unit && <span className="text-[17px] text-ink-2">{spec.unit}</span>}
+          <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} keypad={false} preview={false} autoFocus={autoFocus} disabled={disabled} placeholder={t.number} className="w-56" />
+          {spec.unit && <span className="text-[17px] text-ink-2">{tt(spec.unit)}</span>}
         </div>
       );
     case "expr":
-      return <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.prefix} placeholder="e.g. 3x + 6" />;
+      return <MathField value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.prefix} placeholder={t.example} />;
     case "fraction":
       return (
         <div className="inline-flex flex-col items-center gap-1.5">
-          <NumBox value={parts[0]} onChange={(v) => setPart(0, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label="Numerator" />
+          <NumBox value={parts[0]} onChange={(v) => setPart(0, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={t.numerator} />
           <div className="h-[3px] w-32 rounded-full bg-ink" />
-          <NumBox value={parts[1]} onChange={(v) => setPart(1, v)} onEnter={onSubmit} status={status} disabled={disabled} label="Denominator" />
+          <NumBox value={parts[1]} onChange={(v) => setPart(1, v)} onEnter={onSubmit} status={status} disabled={disabled} label={t.denominator} />
         </div>
       );
     case "pair":
       return (
         <div className="flex flex-wrap items-center gap-4">
           {spec.names.map((name, i) => (
-            <label key={name} className="flex items-center gap-2">
-              <MathView src={`${name} =`} size="md" animate={false} />
-              <NumBox value={parts[i]} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled} label={name} />
+            <label key={i} className="flex items-center gap-2">
+              <MathView src={`${tt(name)} =`} size="md" animate={false} />
+              <NumBox value={parts[i]} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled} label={tt(name)} />
             </label>
           ))}
         </div>
@@ -284,7 +298,7 @@ export function AnswerInput({
             {Array.from({ length: count }, (_, i) => (
               <label key={i} className="flex items-center gap-2">
                 <MathView src={count === 1 ? `${spec.variable} =` : `${spec.variable}_${i + 1} =`} size="md" animate={false} />
-                <NumBox value={parts[i] ?? ""} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled || none} label={`solution ${i + 1}`} />
+                <NumBox value={parts[i] ?? ""} onChange={(v) => setPart(i, v)} onEnter={onSubmit} status={status} autoFocus={autoFocus && i === 0} disabled={disabled || none} label={t.solution(i + 1)} />
               </label>
             ))}
           </div>
@@ -298,7 +312,8 @@ export function AnswerInput({
                 none ? "border-blob bg-blob-soft text-blob-ink" : "border-line bg-surface text-ink-2 hover:border-line-2 hover:text-ink",
               )}
             >
-              {none ? "✓ " : ""}There is no solution
+              {none ? "✓ " : ""}
+              {t.noSolution}
             </button>
           )}
         </div>
@@ -309,12 +324,14 @@ export function AnswerInput({
         <div className="flex flex-wrap items-center gap-3">
           <MathView src={spec.variable} size="lg" animate={false} />
           <div className="flex gap-1 rounded-xl bg-paper p-1">
-            {["<", ">", "≤", "≥"].map((o) => (
+            {OPS.map((o) => (
               <button
                 key={o}
                 type="button"
                 disabled={disabled}
                 onClick={() => setOp(o)}
+                title={t.ops[o]}
+                aria-label={t.ops[o]}
                 className={cn(
                   "h-10 w-11 rounded-lg text-[22px] transition-all [font-family:var(--font-math)]",
                   op === o ? "bg-blob text-white shadow-card" : "text-ink-2 hover:bg-hover",
@@ -325,7 +342,7 @@ export function AnswerInput({
               </button>
             ))}
           </div>
-          <NumBox value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label="boundary" />
+          <NumBox value={text} onChange={setText} onEnter={onSubmit} status={status} autoFocus={autoFocus} disabled={disabled} label={t.boundary} />
         </div>
       );
     case "choice":

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { BlobBoot } from "@/components/blob/BlobBoot";
 import { AppShell } from "@/components/shell/AppShell";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceProvider";
+import { shellText } from "@/i18n/messages/shell";
+import { getMessages } from "@/i18n/server";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { PAGE_META_COLUMNS, type PageMeta, type Profile, type Subject } from "@/lib/types";
 import { firstName } from "@/lib/utils";
@@ -21,6 +23,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (!profile?.onboarded) redirect("/onboarding");
 
   const name = firstName(profile.full_name);
+  const t = await getMessages(shellText);
 
   return (
     <WorkspaceProvider
@@ -31,7 +34,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       initialPages={(pagesRes.data ?? []) as PageMeta[]}
     >
       <AppShell>{children}</AppShell>
-      <BlobBoot greeting={name ? `Hi ${name}, welcome back!` : "Welcome back!"} />
+      <BlobBoot greeting={t.welcomeBack(name)} />
     </WorkspaceProvider>
   );
 }

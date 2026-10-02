@@ -1,6 +1,8 @@
 // Parses, evaluates and compares the maths students type in.
 // Accepts school notation: 2x, 3(x+1), x², √9, 2,5 (decimal comma), ·, ×, :, −.
 
+import { tx, type Text } from "@/i18n/text";
+
 export type Ast =
   | { t: "num"; v: number }
   | { t: "var"; name: string }
@@ -16,11 +18,18 @@ type Tok =
   | { k: "op"; v: string }
   | { k: "fn"; v: "sqrt" };
 
-export type ParseResult = { ok: true; ast: Ast } | { ok: false; error: string };
+export type ParseResult = { ok: true; ast: Ast } | { ok: false; error: Text };
+
+/** A parse problem with a message for the student. */
+class ParseError extends Error {
+  constructor(readonly text: Text) {
+    super(typeof text === "string" ? text : text.en);
+  }
+}
 
 const FUNCTIONS = ["sqrt", "wurzel", "root"];
 
-function tokenize(input: string): Tok[] | string {
+function tokenize(input: string): Tok[] | Text {
   const src = input
     .replace(/[−–—]/g, "-")
     .replace(/[·×∙⋅*]/g, "*")
@@ -44,7 +53,7 @@ function tokenize(input: string): Tok[] | string {
       while (j < src.length && /[0-9.,]/.test(src[j])) j++;
       const raw = src.slice(i, j);
       const norm = raw.replace(",", ".");
-      if ((norm.match(/\./g) ?? []).length > 1 || norm === ".") return `I can't read the number "${raw}".`;
+      if ((norm.match(/\./g) ?? []).length > 1 || norm === ".") return tx(`I can't read the number "${raw}".`, `Die Zahl „${raw}“ kann ich nicht lesen.`);
       out.push({ k: "num", v: Number(norm), s: raw });
       i = j;
       continue;
@@ -69,15 +78,17 @@ function tokenize(input: string): Tok[] | string {
       i++;
       continue;
     }
-    return `I don't know the symbol "${c}".`;
+    return tx(`I don't know the symbol "${c}".`, `Das Zeichen „${c}“ kenne ich nicht.`);
   }
   return out;
 }
 
+const EXTRA_BRACKET = tx("There's an extra closing bracket.", "Da ist eine schließende Klammer zu viel.");
+
 export function parse(input: string): ParseResult {
   const lexed = tokenize(input);
-  if (typeof lexed === "string") return { ok: false, error: lexed };
-  if (lexed.length === 0) return { ok: false, error: "Type an answer first." };
+  if (!Array.isArray(lexed)) return { ok: false, error: lexed };
+  if (lexed.length === 0) return { ok: false, error: tx("Type an answer first.", "Gib zuerst eine Antwort ein.") };
   const toks: Tok[] = lexed;
   let p = 0;
   const peek = () => toks[p];
@@ -130,14 +141,14 @@ export function parse(input: string): ParseResult {
   }
   function atom(): Ast {
     const t = toks[p++];
-    if (!t) throw new Error("Something is missing at the end.");
+    if (!t) throw new ParseError(tx("Something is missing at the end.", "Am Ende fehlt noch etwas."));
     if (t.k === "num") return { t: "num", v: t.v };
     if (t.k === "id") return { t: "var", name: t.v };
     if (t.k === "fn") {
       if (isOp("(")) {
         p++;
         const inner = expr();
-        if (!isOp(")")) throw new Error("A bracket is missing.");
+        if (!isOp(")")) throw new ParseError(tx("A bracket is missing.", "Da fehlt eine Klammer."));
         p++;
         return { t: "sqrt", e: inner };
       }
@@ -145,22 +156,22 @@ export function parse(input: string): ParseResult {
     }
     if (t.v === "(") {
       const inner = expr();
-      if (!isOp(")")) throw new Error("A closing bracket is missing.");
+      if (!isOp(")")) throw new ParseError(tx("A closing bracket is missing.", "Eine schließende Klammer fehlt."));
       p++;
       return inner;
     }
-    throw new Error(t.v === ")" ? "There's an extra closing bracket." : `"${t.v}" can't go there.`);
+    throw new ParseError(t.v === ")" ? EXTRA_BRACKET : tx(`"${t.v}" can't go there.`, `„${t.v}“ passt hier nicht hin.`));
   }
 
   try {
     const ast = expr();
     if (p < toks.length) {
       const t = toks[p];
-      return { ok: false, error: t.k === "op" && t.v === ")" ? "There's an extra closing bracket." : "I couldn't read all of that." };
+      return { ok: false, error: t.k === "op" && t.v === ")" ? EXTRA_BRACKET : tx("I couldn't read all of that.", "Das konnte ich nicht ganz lesen.") };
     }
     return { ok: true, ast };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: e instanceof ParseError ? e.text : (e as Error).message };
   }
 }
 

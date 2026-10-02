@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { useMessages } from "@/i18n/client";
+import { trashText } from "@/i18n/messages/trash";
 
 export function ConfirmDialog({
   open,
@@ -22,6 +24,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   loading?: boolean;
 }) {
+  const t = useMessages(trashText);
   return (
     <Dialog open={open} onClose={loading ? () => {} : onClose} className="max-w-[400px]" labelledBy="trash-confirm-title">
       <form
@@ -44,7 +47,7 @@ export function ConfirmDialog({
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button type="submit" variant="danger" loading={loading} autoFocus>
             {confirmLabel}

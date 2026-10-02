@@ -3,6 +3,8 @@
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
 import type { Frame } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { MathView, type MathSize } from "./MathView";
@@ -26,6 +28,7 @@ export function SolutionPlayer({
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(autoPlay);
   const frame = frames[Math.min(i, frames.length - 1)];
+  const t = useMessages(learnText).solution;
 
   useEffect(() => {
     if (!playing) return;
@@ -54,7 +57,8 @@ export function SolutionPlayer({
             }}
             disabled={i === 0}
             className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
-            aria-label="Previous step"
+            aria-label={t.previous}
+            title={t.previous}
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -68,7 +72,8 @@ export function SolutionPlayer({
             }}
             disabled={i >= frames.length - 1}
             className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
-            aria-label="Next step"
+            aria-label={t.next}
+            title={t.next}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -78,8 +83,8 @@ export function SolutionPlayer({
               setPlaying(true);
             }}
             className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
-            aria-label="Replay"
-            title="Replay"
+            aria-label={t.replay}
+            title={t.replay}
           >
             <RotateCcw className="size-3.5" />
           </button>

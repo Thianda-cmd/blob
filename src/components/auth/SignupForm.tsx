@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { resetBoot } from "@/components/blob/BlobBoot";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, PasswordInput } from "@/components/ui/Input";
+import { useLocale, useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { passwordStrength } from "@/lib/auth/password";
 import { callbackUrl } from "@/lib/auth/redirect";
@@ -19,6 +21,10 @@ import { useFieldReactions } from "./useFieldReactions";
 
 export function SignupForm() {
   const router = useRouter();
+  const locale = useLocale();
+  const all = useMessages(authText);
+  const t = all.signup;
+  const common = all.common;
   const { textField, blob } = useFieldReactions();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,25 +33,25 @@ export function SignupForm() {
   const [exists, setExists] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pwFocused, setPwFocused] = useState(false);
-  const strength = passwordStrength(password);
+  const strength = passwordStrength(password, locale);
   const greeted = useRef("");
 
   useEffect(() => {
     blob.setMood("happy");
-    blob.say("Ooh, a new friend! Let's make your space.");
-  }, [blob]);
+    blob.say(t.hello);
+  }, [blob, t]);
 
   // Greet by name once they pause typing.
   useEffect(() => {
     const first = firstName(name);
     if (!first || first === greeted.current) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       greeted.current = first;
       blob.setMood("love");
-      blob.say(`Nice to meet you, ${first}!`);
+      blob.say(t.niceToMeet(first));
     }, 650);
-    return () => clearTimeout(t);
-  }, [name, blob]);
+    return () => clearTimeout(timer);
+  }, [name, blob, t]);
 
   // Coach while typing the password (eyes closed, of course).
   useEffect(() => {
@@ -65,61 +71,62 @@ export function SignupForm() {
     e.preventDefault();
     setError(null);
     setExists(false);
-    if (!name.trim()) return fail("What should I call you?");
-    if (!isEmail(email)) return fail("That email address doesn't look right.");
-    if (password.length < 8) return fail("Your password needs at least 8 characters.");
-    if (strength.score < 2) return fail("That password is a bit easy to guess. Add numbers or symbols.");
+    if (!name.trim()) return fail(t.askName);
+    if (!isEmail(email)) return fail(common.badEmail);
+    if (password.length < 8) return fail(t.tooShort);
+    if (strength.score < 2) return fail(t.tooEasy);
 
     setLoading(true);
     blob.setMood("thinking");
-    blob.say("Building your space…");
+    blob.say(t.building);
 
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { full_name: name.trim() },
+        // The language goes on the account, so emails (and other devices) use it too.
+        data: { full_name: name.trim(), locale },
         emailRedirectTo: callbackUrl("/onboarding"),
       },
     });
 
     if (error) {
       if (error.code === "user_already_exists" || error.code === "email_exists") setExists(true);
-      return fail(authMessage(error));
+      return fail(authMessage(error, locale));
     }
     // Supabase hides existing accounts by returning a user without identities.
     if (data.user && data.user.identities?.length === 0) {
       setExists(true);
-      return fail("There's already an account with this email.");
+      return fail(common.exists);
     }
 
     blob.setMood("excited");
     blob.jump();
     if (data.session) {
-      blob.say("Welcome to Blob!");
+      blob.say(t.welcome);
       resetBoot();
       setTimeout(() => {
         router.replace("/onboarding");
         router.refresh();
       }, 600);
     } else {
-      blob.say("Almost there! Check your email.");
+      blob.say(t.almost);
       setTimeout(() => router.push(`/check-email?email=${encodeURIComponent(email.trim())}`), 500);
     }
   }
 
   return (
     <div>
-      <AuthHeading title="Create your Blob" subtitle="Notes, presentations and homework, all saved in one place." />
+      <AuthHeading title={t.title} subtitle={t.subtitle} />
 
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Your name" htmlFor="name">
+        <Field label={t.nameLabel} htmlFor="name">
           <Input
             id="name"
             autoComplete="name"
             autoFocus
-            placeholder="Alex Morgan"
+            placeholder={t.namePlaceholder}
             icon={<User />}
             value={name}
             maxLength={80}
@@ -127,23 +134,23 @@ export function SignupForm() {
             {...textField(name)}
           />
         </Field>
-        <Field label="Email" htmlFor="email">
+        <Field label={common.email} htmlFor="email">
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="you@school.com"
+            placeholder={common.emailPlaceholder}
             icon={<Mail />}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             {...textField(email)}
           />
         </Field>
-        <Field label="Password" htmlFor="password">
+        <Field label={common.password} htmlFor="password">
           <PasswordInput
             id="password"
             autoComplete="new-password"
-            placeholder="At least 8 characters"
+            placeholder={common.atLeast8}
             icon={<Lock />}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -151,7 +158,7 @@ export function SignupForm() {
               setPwFocused(true);
               blob.setMood("shy");
               blob.look(null);
-              blob.say(password ? strength.hint : "Eyes closed. Pick something only you know.");
+              blob.say(password ? strength.hint : t.eyesClosed);
             }}
             onBlur={() => {
               setPwFocused(false);
@@ -164,20 +171,20 @@ export function SignupForm() {
         <FormError message={error}>
           {exists && (
             <Link href="/login" className="mt-1 inline-block font-medium underline underline-offset-2">
-              Sign in instead
+              {t.signInInstead}
             </Link>
           )}
         </FormError>
 
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
-          Create account <ArrowRight className="size-4" />
+          {t.submit} <ArrowRight className="size-4" />
         </Button>
       </form>
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
-        Already have an account?{" "}
+        {t.haveAccount}{" "}
         <Link href="/login" className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
-          Sign in
+          {t.signIn}
         </Link>
       </p>
     </div>

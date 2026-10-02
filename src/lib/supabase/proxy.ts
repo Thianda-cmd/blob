@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
 const APP_PREFIXES = ["/home", "/p", "/tasks", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study"];
@@ -31,6 +32,20 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
+
+  // A browser without a saved language adopts the account's (e.g. after signing in on a new
+  // device). Set on the request too, so this very render is already in the right language.
+  const accountLocale = (data?.claims?.user_metadata as { locale?: unknown } | undefined)?.locale;
+  if (isLocale(accountLocale) && !request.cookies.get(LOCALE_COOKIE)) {
+    request.cookies.set(LOCALE_COOKIE, accountLocale);
+    const next = NextResponse.next({ request });
+    response.cookies.getAll().forEach((cookie) => next.cookies.set(cookie));
+    response.headers.forEach((value, key) => {
+      if (!key.startsWith("x-middleware") && key !== "set-cookie") next.headers.set(key, value);
+    });
+    next.cookies.set(LOCALE_COOKIE, accountLocale, { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax" });
+    response = next;
+  }
 
   const redirectTo = (path: string) => {
     const url = request.nextUrl.clone();

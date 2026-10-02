@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import { resetBoot } from "@/components/blob/BlobBoot";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, PasswordInput } from "@/components/ui/Input";
+import { useLocale, useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
@@ -15,13 +17,23 @@ import { AuthHeading } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
 
+/**
+ * `initialError` and `notice` come from the URL (/login?error=…&notice=…): either a code from
+ * /auth/callback (see `authText.linkCodes`) or, for errors we can't name, Supabase's own message.
+ */
 export function LoginForm({ next, initialError, notice }: { next: string; initialError?: string; notice?: string }) {
   const router = useRouter();
+  const locale = useLocale();
+  const all = useMessages(authText);
+  const t = all.login;
+  const common = all.common;
+  const fromUrl = (value: string | undefined) => (value ? (all.linkCodes[value] ?? value) : undefined);
+  const noticeText = fromUrl(notice);
   const { textField, passwordField, blob } = useFieldReactions();
   const [mode, setMode] = useState<"password" | "magic">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(initialError ?? null);
+  const [error, setError] = useState<string | null>(fromUrl(initialError) ?? null);
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
@@ -29,15 +41,15 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
   useEffect(() => {
     if (initialError) {
       blob.setMood("worried");
-      blob.say("Hmm, that link didn't work. Let's try again.");
-    } else if (notice) {
+      blob.say(t.linkProblem);
+    } else if (noticeText) {
       blob.setMood("excited");
-      blob.say(notice);
+      blob.say(noticeText);
     } else {
       blob.setMood("happy");
-      blob.say("Welcome back! Your notes missed you.");
+      blob.say(t.hello);
     }
-  }, [blob, initialError, notice]);
+  }, [blob, initialError, noticeText, t]);
 
   function fail(message: string) {
     setError(message);
@@ -51,12 +63,12 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
     e.preventDefault();
     setError(null);
     setUnconfirmed(false);
-    if (!isEmail(email)) return fail("That email address doesn't look right.");
-    if (mode === "password" && !password) return fail("Type your password to continue.");
+    if (!isEmail(email)) return fail(common.badEmail);
+    if (mode === "password" && !password) return fail(t.needPassword);
 
     setLoading(true);
     blob.setMood("thinking");
-    blob.say("Checking your details…");
+    blob.say(t.checking);
     const supabase = createClient();
 
     if (mode === "magic") {
@@ -66,24 +78,24 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
       });
       if (error) {
         const notFound = /signups? not allowed|not found/i.test(error.message);
-        return fail(notFound ? "We couldn't find an account with that email." : authMessage(error));
+        return fail(notFound ? common.noAccount : authMessage(error, locale));
       }
       setLoading(false);
       setMagicSent(true);
       blob.setMood("love");
       blob.jump();
-      blob.say("Link sent! Check your inbox.");
+      blob.say(t.linkSent);
       return;
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
       if (error.code === "email_not_confirmed") setUnconfirmed(true);
-      return fail(authMessage(error));
+      return fail(authMessage(error, locale));
     }
     blob.setMood("excited");
     blob.jump();
-    blob.say("Yay, you're in!");
+    blob.say(t.signedIn);
     resetBoot();
     setTimeout(() => {
       router.replace(next);
@@ -98,16 +110,16 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
       email: email.trim(),
       options: { emailRedirectTo: callbackUrl("/onboarding") },
     });
-    if (error) return fail(authMessage(error));
+    if (error) return fail(authMessage(error, locale));
     router.push(`/check-email?email=${encodeURIComponent(email.trim())}`);
   }
 
   if (magicSent) {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <AuthHeading title="Check your inbox" subtitle={<>We sent a sign-in link to <b className="font-medium text-ink">{email}</b>. It works once and expires soon.</>} />
+        <AuthHeading title={common.checkInbox} subtitle={t.magicSent(<b className="font-medium text-ink">{email}</b>)} />
         <Button variant="secondary" size="lg" className="w-full" onClick={() => setMagicSent(false)}>
-          Use a different method
+          {t.otherMethod}
         </Button>
       </motion.div>
     );
@@ -115,16 +127,16 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
 
   return (
     <div>
-      <AuthHeading title="Welcome back" subtitle="Sign in to pick up where you left off." />
+      <AuthHeading title={t.title} subtitle={t.subtitle} />
 
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Email" htmlFor="email">
+        <Field label={common.email} htmlFor="email">
           <Input
             id="email"
             type="email"
             autoComplete="email"
             autoFocus
-            placeholder="you@school.com"
+            placeholder={common.emailPlaceholder}
             icon={<Mail />}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -143,11 +155,11 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
               className="overflow-hidden"
             >
               <Field
-                label="Password"
+                label={common.password}
                 htmlFor="password"
                 action={
                   <Link href="/forgot-password" className="text-[12.5px] text-ink-3 hover:text-ink">
-                    Forgot password?
+                    {t.forgot}
                   </Link>
                 }
               >
@@ -168,19 +180,19 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
         <FormError message={error}>
           {unconfirmed && (
             <button type="button" onClick={resend} className="mt-1 font-medium underline underline-offset-2">
-              Resend confirmation email
+              {t.resend}
             </button>
           )}
         </FormError>
 
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
-          {mode === "password" ? "Sign in" : "Email me a sign-in link"}
+          {mode === "password" ? t.submit : t.submitMagic}
           <ArrowRight className="size-4" />
         </Button>
       </form>
 
       <div className="my-5 flex items-center gap-3 text-[12px] text-ink-3">
-        <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+        <span className="h-px flex-1 bg-line" /> {t.or} <span className="h-px flex-1 bg-line" />
       </div>
 
       <Button
@@ -191,24 +203,24 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
           setError(null);
           setMode(mode === "password" ? "magic" : "password");
           blob.setMood("happy");
-          blob.say(mode === "password" ? "No password needed, I'll email you a magic link." : "Classic email and password it is.");
+          blob.say(mode === "password" ? t.sayMagic : t.sayPassword);
         }}
       >
         {mode === "password" ? (
           <>
-            <Wand2 className="size-4" /> Sign in with a magic link
+            <Wand2 className="size-4" /> {t.useMagic}
           </>
         ) : (
           <>
-            <Lock className="size-4" /> Sign in with password
+            <Lock className="size-4" /> {t.usePassword}
           </>
         )}
       </Button>
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
-        New to Blob?{" "}
+        {t.newHere}{" "}
         <Link href={next !== "/home" ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
-          Create an account
+          {t.createAccount}
         </Link>
       </p>
     </div>

@@ -1,4 +1,8 @@
+"use client";
+
 import { Fragment } from "react";
+import { useLocale } from "@/i18n/client";
+import { resolveText, type Text } from "@/i18n/text";
 import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 
@@ -6,8 +10,8 @@ import { MathView } from "./MathView";
  * Text with inline maths: "Multiply $3$ into $(x + 2)$." and **bold**.
  * Blank lines start a new paragraph.
  */
-export function Rich({ text, className }: { text: string; className?: string }) {
-  const paragraphs = text.split(/\n{2,}/);
+export function Rich({ text, className }: { text: Text; className?: string }) {
+  const paragraphs = resolveText(text, useLocale()).split(/\n{2,}/);
   return (
     <span className={cn("block space-y-2", className)}>
       {paragraphs.map((para, pi) => (
@@ -19,9 +23,9 @@ export function Rich({ text, className }: { text: string; className?: string }) 
   );
 }
 
-export function Inline({ text }: { text: string }) {
+export function Inline({ text }: { text: Text }) {
   // Bold first, so bold text may contain maths: "**Let $x$ be** the price".
-  const parts = text.split(/(\*\*(?:[^*]|\*(?!\*))+\*\*)/g).filter(Boolean);
+  const parts = resolveText(text, useLocale()).split(/(\*\*(?:[^*]|\*(?!\*))+\*\*)/g).filter(Boolean);
   return (
     <>
       {parts.map((part, i) =>

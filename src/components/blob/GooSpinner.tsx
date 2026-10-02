@@ -1,15 +1,20 @@
+"use client";
+
 import { useId } from "react";
+import { useMessages } from "@/i18n/client";
+import { uiText } from "@/i18n/messages/ui";
 import { cn } from "@/lib/utils";
 
 /**
  * A blob that keeps splitting into droplets and pulling them back in.
  * The metaball look comes from an SVG "goo" filter (blur + alpha threshold).
  */
-export function GooSpinner({ size = 64, className, label = "Loading" }: { size?: number; className?: string; label?: string }) {
+export function GooSpinner({ size = 64, className, label }: { size?: number; className?: string; label?: string }) {
+  const t = useMessages(uiText);
   const id = useId().replace(/:/g, "");
   const filter = `goo-${id}`;
   return (
-    <div role="status" aria-label={label} className={cn("inline-grid place-items-center", className)}>
+    <div role="status" aria-label={label ?? t.loading} className={cn("inline-grid place-items-center", className)}>
       <svg viewBox="0 0 120 120" width={size} height={size} className="overflow-visible">
         <defs>
           <filter id={filter} x="-50%" y="-50%" width="200%" height="200%">

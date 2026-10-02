@@ -2,6 +2,8 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Fragment, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLocale } from "@/i18n/client";
+import { resolveText, type Text } from "@/i18n/text";
 import { parseDisplay, type DNode, type StyleName } from "@/learn/engine/display";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +35,8 @@ export function MathView({
   animate = true,
   className,
 }: {
-  src: string;
+  /** Display-language maths; bilingual only when it contains words. */
+  src: Text;
   size?: MathSize;
   highlight?: string[];
   arrows?: [string, string][];
@@ -42,7 +45,9 @@ export function MathView({
   className?: string;
 }) {
   const auto = useId();
-  const nodes = useMemo(() => parseDisplay(src), [src]);
+  const locale = useLocale();
+  const source = resolveText(src, locale);
+  const nodes = useMemo(() => parseDisplay(source), [source]);
   const ctx: Ctx = { scope: scope ?? auto, highlight: new Set(highlight ?? []), animate };
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -52,11 +57,11 @@ export function MathView({
         ref={ref}
         className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center", className)}
         style={{ fontSize: SIZES[size] }}
-        aria-label={src.replace(/\\[a-z]+|[{}#"]/gi, " ")}
+        aria-label={source.replace(/\\[a-z]+|[{}#"]/gi, " ")}
         role="math"
       >
         <Children nodes={nodes} ctx={ctx} />
-        {arrows && arrows.length > 0 && <Arrows root={ref} arrows={arrows} signature={src} />}
+        {arrows && arrows.length > 0 && <Arrows root={ref} arrows={arrows} signature={source} />}
       </span>
     </LayoutGroup>
   );

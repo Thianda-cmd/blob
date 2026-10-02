@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useState, type ComponentType, type ReactNode } from "react";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
@@ -118,20 +120,28 @@ export const opRemove = (c: Frac | number, v = "") => (toQ(c).n > 0 ? opNote("-"
 /** Divide both sides by k (for a fraction: multiply by its reciprocal). */
 export const opDivide = (k: Frac | number) => (toQ(k).d === 1 ? opNote(":", k) : opNote("*", div(ONE, toQ(k))));
 
-/** "divide both sides by 3" / "multiply both sides by 3/2". */
-export function divideText(k: Frac): string {
-  return k.d === 1 ? `divide both sides by $${num(k)}$` : `multiply both sides by $${num(div(ONE, k))}$ (that undoes the $${num(k)}$)`;
+/** "Now divide both sides by 3." / "Then multiply both sides by 3/2 (…)." as a whole sentence. */
+export function divideText(k: Frac, when: "now" | "then" = "now"): Text {
+  const now = when === "now";
+  if (k.d === 1) return tx(`${now ? "Now" : "Then"} divide both sides by $${num(k)}$.`, `Teile ${now ? "jetzt" : "dann"} beide Seiten durch $${num(k)}$.`);
+  const r = num(div(ONE, k));
+  return tx(
+    `${now ? "Now" : "Then"} multiply both sides by $${r}$ (that undoes the $${num(k)}$).`,
+    `Multipliziere ${now ? "jetzt" : "dann"} beide Seiten mit $${r}$, dem Kehrwert von $${num(k)}$.`,
+  );
 }
+
+/** Join note parts in both languages; empty parts are dropped. */
+export const joinT = (...parts: Text[]): Text => txMap((_, l) => parts.map((p) => resolveText(p, l)).filter(Boolean).join(" "));
 
 // ---------------------------------------------------------------------------
 // Worked-solution builders
 
 /** Solve L = m·x + b for x. */
-function solveFrames(L: Frac, m: Frac, b: Frac, first: string, last: (x: Frac) => string): Frame[] {
+function solveFrames(L: Frac, m: Frac, b: Frac, first: Text, last: (x: Frac) => Text): Frame[] {
   const R = sub(L, b);
   const X = div(R, m);
   const one = m.n === 1 && m.d === 1;
-  const join = (...parts: string[]) => parts.filter(Boolean).join(" ");
   const frames: Frame[] = [];
   if (b.n !== 0) {
     frames.push({
@@ -139,18 +149,24 @@ function solveFrames(L: Frac, m: Frac, b: Frac, first: string, last: (x: Frac) =
         [m, "x", "m"],
         [b, "", "b"],
       ])}${opRemove(b)}`,
-      note: join(first, `Get the $x$-term alone: ${b.n > 0 ? "subtract" : "add"} $${num(abs(b))}$ on both sides.`),
+      note: joinT(
+        first,
+        tx(
+          `Get the $x$-term alone: ${b.n > 0 ? "subtract" : "add"} $${num(abs(b))}$ on both sides.`,
+          `Bring den $x$-Term allein auf eine Seite: ${b.n > 0 ? "Subtrahiere" : "Addiere"} auf beiden Seiten $${num(abs(b))}$.`,
+        ),
+      ),
     });
-    if (!one) frames.push({ math: `${val(R, "L")} =#EQ ${term(m, "x", "m", true)}${opDivide(m)}`, note: `Now ${divideText(m)}.` });
+    if (!one) frames.push({ math: `${val(R, "L")} =#EQ ${term(m, "x", "m", true)}${opDivide(m)}`, note: divideText(m) });
   } else {
-    frames.push({ math: `${val(L, "L")} =#EQ ${term(m, "x", "m", true)}${one ? "" : opDivide(m)}`, note: join(first, one ? "" : `Then ${divideText(m)}.`) });
+    frames.push({ math: `${val(L, "L")} =#EQ ${term(m, "x", "m", true)}${one ? "" : opDivide(m)}`, note: joinT(first, one ? "" : divideText(m, "then")) });
   }
   frames.push({ math: `x#vm =#EQ ${val(X, "L")}`, note: last(X) });
   return frames;
 }
 
 /** Find b from the slope and one point P on the line. */
-function findBFrames(m: Frac, P: Pt, name: string, first: string): Frame[] {
+function findBFrames(m: Frac, P: Pt, name: string, first: Text): Frame[] {
   const [px, py] = P;
   const prod = mul(m, q(px));
   const b = sub(q(py), prod);
@@ -158,19 +174,25 @@ function findBFrames(m: Frac, P: Pt, name: string, first: string): Frame[] {
     { math: `y#Y =#EQ ${term(m, "x", "m", true)} +#sb b#vb`, note: first },
     {
       math: `${val(py, "L")} =#EQ ${val(m, "m")} \\cdot#dot ${valWrap(px, "vm")} +#sb b#vb`,
-      note: `$${pt(px, py, name)}$ lies on the line: put in $x = ${num(px)}$ and $y = ${num(py)}$.`,
+      note: tx(
+        `$${pt(px, py, name)}$ lies on the line: put in $x = ${num(px)}$ and $y = ${num(py)}$.`,
+        `$${pt(px, py, name)}$ liegt auf der Geraden: Setze $x = ${num(px)}$ und $y = ${num(py)}$ ein.`,
+      ),
     },
     {
       math: `${val(py, "L")} =#EQ ${val(prod, "m")} +#sb b#vb${opRemove(prod)}`,
-      note: `$${num(m)} \\cdot ${num(px, true)} = ${num(prod)}$. Now get $b$ alone: ${prod.n > 0 ? "subtract" : "add"} $${num(abs(prod))}$.`,
+      note: tx(
+        `$${num(m)} \\cdot ${num(px, true)} = ${num(prod)}$. Now get $b$ alone: ${prod.n > 0 ? "subtract" : "add"} $${num(abs(prod))}$.`,
+        `$${num(m)} \\cdot ${num(px, true)} = ${num(prod)}$. Löse jetzt nach $b$ auf: ${prod.n > 0 ? "Subtrahiere" : "Addiere"} $${num(abs(prod))}$.`,
+      ),
     },
-    { math: `${val(b, "b")} =#EQ b#vb`, note: `So $b = ${num(b)}$.` },
-    { math: lineSrc(m, b), note: `Put it together: $${plain(lineSrc(m, b))}$.` },
+    { math: `${val(b, "b")} =#EQ b#vb`, note: tx(`So $b = ${num(b)}$.`, `Also ist $b = ${num(b)}$.`) },
+    { math: lineSrc(m, b), note: tx(`Put it together: $${plain(lineSrc(m, b))}$.`, `Alles zusammen: $${plain(lineSrc(m, b))}$.`) },
   ];
 }
 
 /** m = (y₂ − y₁) : (x₂ − x₁); the numbers drop into the formula, then simplify. */
-function slopeFrames(A: Pt, B: Pt, first: string): { frames: Frame[]; m: Frac } {
+function slopeFrames(A: Pt, B: Pt, first: Text): { frames: Frame[]; m: Frac } {
   const dy = B[1] - A[1];
   const dx = B[0] - A[0];
   const m = q(dy, dx);
@@ -182,37 +204,49 @@ function slopeFrames(A: Pt, B: Pt, first: string): { frames: Frame[]; m: Frac } 
     { math: fr("y#n1 _{2#n1i}#S1 -#nm y#n2 _{1#n2i}#S2", "x#d1 _{2#d1i}#S3 -#dm x#d2 _{1#d2i}#S4"), note: first },
     {
       math: fr(`${val(B[1], "n1")} -#nm ${valWrap(A[1], "n2")}`, `${val(B[0], "d1")} -#dm ${valWrap(A[0], "d2")}`),
-      note: `Put in the points: $y_2$ and $x_2$ from $${pt(B[0], B[1], "B")}$, $y_1$ and $x_1$ from $${pt(A[0], A[1], "A")}$.`,
+      note: tx(
+        `Put in the points: $y_2$ and $x_2$ from $${pt(B[0], B[1], "B")}$, $y_1$ and $x_1$ from $${pt(A[0], A[1], "A")}$.`,
+        `Setze die Punkte ein: $y_2$ und $x_2$ aus $${pt(B[0], B[1], "B")}$, $y_1$ und $x_1$ aus $${pt(A[0], A[1], "A")}$.`,
+      ),
     },
     {
       math: fr(top, bottom),
-      note: `Work out the top and the bottom: $\\Delta y = ${dy}$ and $\\Delta x = ${dx}$.${simple ? ` That can't be simplified: $m = ${num(m)}$.` : ""}`,
+      note: tx(
+        `Work out the top and the bottom: $\\Delta y = ${dy}$ and $\\Delta x = ${dx}$.${simple ? ` That can't be simplified: $m = ${num(m)}$.` : ""}`,
+        `Rechne Zähler und Nenner aus: $\\Delta y = ${dy}$ und $\\Delta x = ${dx}$.${simple ? ` Das lässt sich nicht kürzen: $m = ${num(m)}$.` : ""}`,
+      ),
     },
   ];
-  if (!simple) frames.push({ math: `m#M =#E ${val(m, "m")}`, note: `Simplify: $m = ${num(m)}$.` });
+  if (!simple) frames.push({ math: `m#M =#E ${val(m, "m")}`, note: tx(`Simplify: $m = ${num(m)}$.`, `Vereinfache: $m = ${num(m)}$.`) });
   return { frames, m };
 }
 
 /** Reading m and b off a graph with two marked grid points P and Q. */
-function readGraphFrames(m: Frac, b: Frac, P: Pt, Q: Pt, end: "pair" | "line", tail?: string): Frame[] {
+function readGraphFrames(m: Frac, b: Frac, P: Pt, Q: Pt, end: "pair" | "line", tail?: Text): Frame[] {
   const dx = Q[0] - P[0];
   const dy = Q[1] - P[1];
   const bPart = `b#Lb =#E2 ${val(b, "b")}`;
   const top = dy < 0 ? `-#sm ${-dy}#cm` : `${dy}#cm`;
   const frames: Frame[] = [
-    { math: bPart, note: `The line crosses the $y$-axis at $${pt(0, b)}$, so $b = ${num(b)}$.` },
+    { math: bPart, note: tx(`The line crosses the $y$-axis at $${pt(0, b)}$, so $b = ${num(b)}$.`, `Die Gerade schneidet die $y$-Achse bei $${pt(0, b)}$, also ist $b = ${num(b)}$.`) },
     {
       math: `${bPart} \\quad m#Lm =#E1 \\frac{\\Delta#D1 y#D2}{\\Delta#D3 x#D4}#fm`,
-      note: `For the slope, draw a slope triangle from $${pt(P[0], P[1])}$ to $${pt(Q[0], Q[1])}$.`,
+      note: tx(
+        `For the slope, draw a slope triangle from $${pt(P[0], P[1])}$ to $${pt(Q[0], Q[1])}$.`,
+        `Für die Steigung zeichnest du ein Steigungsdreieck von $${pt(P[0], P[1])}$ nach $${pt(Q[0], Q[1])}$.`,
+      ),
     },
     {
       math: `${bPart} \\quad m#Lm =#E1 \\frac{${top}}{${dx}#dm}#fm`,
-      note: `That's $${dx}$ to the right and $${Math.abs(dy)}$ ${dy >= 0 ? "up" : "down"}: $\\Delta x = ${dx}$ and $\\Delta y = ${dy}$.`,
+      note: tx(
+        `That's $${dx}$ to the right and $${Math.abs(dy)}$ ${dy >= 0 ? "up" : "down"}: $\\Delta x = ${dx}$ and $\\Delta y = ${dy}$.`,
+        `Das sind $${dx}$ nach rechts und $${Math.abs(dy)}$ ${dy >= 0 ? "nach oben" : "nach unten"}: $\\Delta x = ${dx}$ und $\\Delta y = ${dy}$.`,
+      ),
     },
   ];
-  if (!(dx === m.d && dy === m.n && m.d !== 1)) frames.push({ math: `${bPart} \\quad m#Lm =#E1 ${val(m, "m")}`, note: `Simplify: $m = ${num(m)}$.` });
-  if (end === "pair") frames.push({ math: `m#Lm =#E1 ${val(m, "m")} \\quad ${bPart}`, note: tail ?? `So $m = ${num(m)}$ and $b = ${num(b)}$.` });
-  else frames.push({ math: lineSrc(m, b), note: tail ?? `Put it together: $${plain(lineSrc(m, b))}$.` });
+  if (!(dx === m.d && dy === m.n && m.d !== 1)) frames.push({ math: `${bPart} \\quad m#Lm =#E1 ${val(m, "m")}`, note: tx(`Simplify: $m = ${num(m)}$.`, `Vereinfache: $m = ${num(m)}$.`) });
+  if (end === "pair") frames.push({ math: `m#Lm =#E1 ${val(m, "m")} \\quad ${bPart}`, note: tail ?? tx(`So $m = ${num(m)}$ and $b = ${num(b)}$.`, `Also ist $m = ${num(m)}$ und $b = ${num(b)}$.`) });
+  else frames.push({ math: lineSrc(m, b), note: tail ?? tx(`Put it together: $${plain(lineSrc(m, b))}$.`, `Alles zusammen: $${plain(lineSrc(m, b))}$.`) });
   return frames;
 }
 
@@ -242,9 +276,21 @@ const slopeFrom = (rng: Rng, fracChance: number, maxInt = 4, pool = FRACS) => (r
 const multipleOf = (rng: Rng, step: number, max: number) => step * rng.nonZero(-Math.floor(max / step), Math.floor(max / step));
 const fits = (p: Pt, r = 4) => Math.abs(p[0]) <= r && Math.abs(p[1]) <= r;
 
-const HINT_MB = "Compare with $y = mx + b$: $m$ is the number in front of $x$, $b$ is the number on its own.";
-const HINT_SLOPE = "$m = \\frac{y_2 - y_1}{x_2 - x_1}$. Put negative numbers in brackets. You can type a fraction like 2/3.";
-const HINT_B = "Put the slope into $y = mx + b$, then put in the point and solve for $b$.";
+const HINT_MB = tx(
+  "Compare with $y = mx + b$: $m$ is the number in front of $x$, $b$ is the number on its own.",
+  "Vergleiche mit $y = mx + b$: $m$ ist die Zahl vor dem $x$, $b$ die Zahl ohne $x$.",
+);
+const HINT_SLOPE = tx(
+  "$m = \\frac{y_2 - y_1}{x_2 - x_1}$. Put negative numbers in brackets. You can type a fraction like 2/3.",
+  "$m = \\frac{y_2 - y_1}{x_2 - x_1}$. Setze negative Zahlen in Klammern. Du kannst einen Bruch wie 2/3 eintippen.",
+);
+const HINT_B = tx(
+  "Put the slope into $y = mx + b$, then put in the point and solve for $b$.",
+  "Setze die Steigung in $y = mx + b$ ein, dann den Punkt, und löse nach $b$ auf.",
+);
+const SLOPE_FIRST = tx("Put the slope into $y = mx + b$. Only $b$ is missing.", "Setze die Steigung in $y = mx + b$ ein. Nur $b$ fehlt noch.");
+const I_SLOPE_B = tx("Slope and y-intercept", "Steigung und y-Achsenabschnitt");
+const I_LINE = tx("Find the line equation", "Bestimme die Geradengleichung");
 
 /** L1: read m and b from an equation. */
 function readEquation(rng: Rng): Exercise {
@@ -258,29 +304,35 @@ function readEquation(rng: Rng): Exercise {
   const given = form === "swap" ? swapped : lineSrc(m, b);
   const frames: Frame[] = [];
   if (form === "swap") {
-    frames.push({ math: swapped, note: "Here the number comes first. Sort it into the form $y = mx + b$." });
-    frames.push({ math: lineSrc(m, b), note: `Swap the two terms. Each one keeps its sign: $${plain(lineSrc(m, b))}$.` });
+    frames.push({ math: swapped, note: tx("Here the number comes first. Sort it into the form $y = mx + b$.", "Hier steht die Zahl vorne. Bring die Gleichung in die Form $y = mx + b$.") });
+    frames.push({
+      math: lineSrc(m, b),
+      note: tx(`Swap the two terms. Each one keeps its sign: $${plain(lineSrc(m, b))}$.`, `Vertausche die beiden Terme. Jeder behält sein Vorzeichen: $${plain(lineSrc(m, b))}$.`),
+    });
   } else {
-    frames.push({ math: given, note: "Compare with $y = mx + b$." });
+    frames.push({ math: given, note: tx("Compare with $y = mx + b$.", "Vergleiche mit $y = mx + b$.") });
   }
   const mNote =
     form === "flat"
-      ? "There is no $x$-term at all, so $m = 0$. The line is horizontal."
+      ? tx("There is no $x$-term at all, so $m = 0$. The line is horizontal.", "Es gibt gar keinen $x$-Term, also ist $m = 0$. Die Gerade verläuft waagerecht.")
       : m.n === 1 && m.d === 1
-        ? "No number in front of $x$ means $m = 1$."
+        ? tx("No number in front of $x$ means $m = 1$.", "Steht keine Zahl vor dem $x$, ist $m = 1$.")
         : m.n === -1 && m.d === 1
-          ? "Just a minus in front of $x$ means $m = -1$."
-          : `$m$ is the number in front of $x$, with its sign: $m = ${num(m)}$.`;
+          ? tx("Just a minus in front of $x$ means $m = -1$.", "Steht nur ein Minus vor dem $x$, ist $m = -1$.")
+          : tx(`$m$ is the number in front of $x$, with its sign: $m = ${num(m)}$.`, `$m$ ist die Zahl vor dem $x$, mit Vorzeichen: $m = ${num(m)}$.`);
   frames.push({ math: lineSrc(m, b), highlight: termKeys("m").filter((k) => k !== "vm"), note: mNote });
   frames.push({
     math: lineSrc(m, b),
     highlight: termKeys("b"),
-    note: form === "nob" ? "There is no number on its own, so $b = 0$. The line goes through the origin." : `$b$ is the number on its own, with its sign: $b = ${num(b)}$.`,
+    note:
+      form === "nob"
+        ? tx("There is no number on its own, so $b = 0$. The line goes through the origin.", "Es gibt keine Zahl ohne $x$, also ist $b = 0$. Die Gerade geht durch den Ursprung.")
+        : tx(`$b$ is the number on its own, with its sign: $b = ${num(b)}$.`, `$b$ ist die Zahl ohne $x$, mit Vorzeichen: $b = ${num(b)}$.`),
   });
-  frames.push({ math: `m#Lm =#E1 ${val(m, "m")} \\quad b#Lb =#E2 ${val(b, "b")}`, note: `So $m = ${num(m)}$ and $b = ${num(b)}$.` });
+  frames.push({ math: `m#Lm =#E1 ${val(m, "m")} \\quad b#Lb =#E2 ${val(b, "b")}`, note: tx(`So $m = ${num(m)}$ and $b = ${num(b)}$.`, `Also ist $m = ${num(m)}$ und $b = ${num(b)}$.`) });
   return {
-    instruction: "Slope and y-intercept",
-    text: "Find the slope $m$ and the y-intercept $b$.",
+    instruction: I_SLOPE_B,
+    text: tx("Find the slope $m$ and the y-intercept $b$.", "Bestimme die Steigung $m$ und den y-Achsenabschnitt $b$."),
     math: plain(given),
     answer: { kind: "pair", names: ["m", "b"], values: [qv(m), qv(b)] },
     hint: HINT_MB,
@@ -313,25 +365,33 @@ function lineGraph(m: Frac, b: Frac, marks: Pt[]) {
   });
 }
 
+const READ_GRAPH = tx("Read the slope $m$ and the y-intercept $b$ off the graph.", "Lies die Steigung $m$ und den y-Achsenabschnitt $b$ am Graphen ab.");
+
 /** L1: read m and b off a graph (pair); L3: write down the equation of the graph (expr). */
 function graphTask(rng: Rng, hard: boolean): Exercise {
   const { m, b, P, Q } = markedLine(rng, hard);
   if (!hard) {
     return {
-      instruction: "Slope and y-intercept",
-      text: "Read the slope $m$ and the y-intercept $b$ off the graph.",
+      instruction: I_SLOPE_B,
+      text: READ_GRAPH,
       visual: lineGraph(m, b, [P, Q]),
       answer: { kind: "pair", names: ["m", "b"], values: [qv(m), qv(b)] },
-      hint: "$b$: where does the line cross the $y$-axis? $m$: walk from one marked point to the other. How far right, how far up or down?",
+      hint: tx(
+        "$b$: where does the line cross the $y$-axis? $m$: walk from one marked point to the other. How far right, how far up or down?",
+        "$b$: Wo schneidet die Gerade die $y$-Achse? $m$: Geh von einem markierten Punkt zum anderen. Wie weit nach rechts, wie weit nach oben oder unten?",
+      ),
       solution: readGraphFrames(m, b, P, Q, "pair"),
     };
   }
   return {
-    instruction: "Find the line equation",
-    text: "Write down the equation of the line in the graph.",
+    instruction: I_LINE,
+    text: tx("Write down the equation of the line in the graph.", "Gib die Gleichung der abgebildeten Geraden an."),
     visual: lineGraph(m, b, [P, Q]),
     answer: { kind: "expr", value: linePlain(m, b), prefix: "y =", form: "expanded" },
-    hint: "Read $b$ where the line crosses the $y$-axis. For $m$, use a slope triangle between the marked points: $m = \\frac{\\Delta y}{\\Delta x}$.",
+    hint: tx(
+      "Read $b$ where the line crosses the $y$-axis. For $m$, use a slope triangle between the marked points: $m = \\frac{\\Delta y}{\\Delta x}$.",
+      "Lies $b$ dort ab, wo die Gerade die $y$-Achse schneidet. Für $m$ nimmst du ein Steigungsdreieck zwischen den markierten Punkten: $m = \\frac{\\Delta y}{\\Delta x}$.",
+    ),
     solution: readGraphFrames(m, b, P, Q, "line"),
   };
 }
@@ -360,12 +420,15 @@ function whichGraph(rng: Rng): Exercise {
   const correct = options.findIndex(([x, y]) => key(x, y) === key(m, b));
   const letter = String.fromCharCode(65 + correct);
   return {
-    instruction: "Match the graph",
-    text: "Which equation belongs to the line in the graph?",
+    instruction: tx("Match the graph", "Ordne den Graphen zu"),
+    text: tx("Which equation belongs to the line in the graph?", "Welche Gleichung gehört zur abgebildeten Geraden?"),
     visual: lineGraph(m, b, [P, Q]),
     answer: { kind: "choice", options: options.map(([x, y]) => `$${plain(lineSrc(x, y))}$`), correct },
-    hint: "First read $b$ on the $y$-axis. Then check the slope: does the line rise or fall, and how steeply?",
-    solution: readGraphFrames(m, b, P, Q, "line", `That's answer ${letter}: $${plain(lineSrc(m, b))}$.`),
+    hint: tx(
+      "First read $b$ on the $y$-axis. Then check the slope: does the line rise or fall, and how steeply?",
+      "Lies zuerst $b$ an der $y$-Achse ab. Prüf dann die Steigung: Steigt oder fällt die Gerade, und wie steil?",
+    ),
+    solution: readGraphFrames(m, b, P, Q, "line", tx(`That's answer ${letter}: $${plain(lineSrc(m, b))}$.`, `Das ist Antwort ${letter}: $${plain(lineSrc(m, b))}$.`)),
   };
 }
 
@@ -378,20 +441,22 @@ function valueAt(rng: Rng): Exercise {
   const prod = mul(m, q(x));
   const y = add(prod, b);
   const frames: Frame[] = [
-    { math: lineSrc(m, b), highlight: ["vm"], note: `Replace $x$ by $${num(x)}$.` },
-    { math: `y#Y =#EQ ${val(m, "m")} \\cdot#dot ${valWrap(x, "vm")} ${term(b, "", "b", false)}`, note: "Multiply first, then add." },
+    { math: lineSrc(m, b), highlight: ["vm"], note: tx(`Replace $x$ by $${num(x)}$.`, `Setze $${num(x)}$ für $x$ ein.`) },
+    { math: `y#Y =#EQ ${val(m, "m")} \\cdot#dot ${valWrap(x, "vm")} ${term(b, "", "b", false)}`, note: tx("Multiply first, then add.", "Erst multiplizieren, dann addieren.") },
     { math: `y#Y =#EQ ${val(prod, "m")} ${term(b, "", "b", false)}`, note: `$${num(m)} \\cdot ${num(x, true)} = ${num(prod)}$.` },
   ];
-  const done = `So $y = ${num(y)}$. The point $${pt(x, y, "P")}$ lies on the line.`;
+  const done = tx(`So $y = ${num(y)}$. The point $${pt(x, y, "P")}$ lies on the line.`, `Also ist $y = ${num(y)}$. Der Punkt $${pt(x, y, "P")}$ liegt auf der Geraden.`);
   if (b.n !== 0) frames.push({ math: `y#Y =#EQ ${val(y, "m")}`, note: done });
-  else frames[frames.length - 1] = { ...frames[frames.length - 1], note: `$${num(m)} \\cdot ${num(x, true)} = ${num(prod)}$. ${done}` };
+  else frames[frames.length - 1] = { ...frames[frames.length - 1], note: joinT(`$${num(m)} \\cdot ${num(x, true)} = ${num(prod)}$.`, done) };
   const ask = rng.chance(0.5);
   return {
-    instruction: "Find y",
-    text: ask ? `Find $y$ for $x = ${num(x)}$.` : `The point $${pt(x, "?", "P")}$ lies on the line. Find its $y$-coordinate.`,
+    instruction: tx("Find y", "Berechne y"),
+    text: ask
+      ? tx(`Find $y$ for $x = ${num(x)}$.`, `Berechne $y$ für $x = ${num(x)}$.`)
+      : tx(`The point $${pt(x, "?", "P")}$ lies on the line. Find its $y$-coordinate.`, `Der Punkt $${pt(x, "?", "P")}$ liegt auf der Geraden. Berechne seine $y$-Koordinate.`),
     math: plain(lineSrc(m, b)),
     answer: { kind: "number", value: qv(y), label: "y =" },
-    hint: `Put $${num(x)}$ in for $x$. Multiply before you add.`,
+    hint: tx(`Put $${num(x)}$ in for $x$. Multiply before you add.`, `Setze $${num(x)}$ für $x$ ein. Punkt vor Strich: erst multiplizieren, dann addieren.`),
     solution: frames,
   };
 }
@@ -406,10 +471,10 @@ function slopeTask(rng: Rng): Exercise {
     const A: Pt = [rng.int(-6, 6), rng.int(-6, 6)];
     const B: Pt = [A[0] + dx, A[1] + dy];
     if (!fits(B, 9) || (A[0] === 0 && A[1] === 0)) continue;
-    const { frames } = slopeFrames(A, B, "The slope formula: change in $y$ divided by change in $x$.");
+    const { frames } = slopeFrames(A, B, tx("The slope formula: change in $y$ divided by change in $x$.", "Die Steigungsformel: Änderung von $y$ geteilt durch Änderung von $x$."));
     return {
-      instruction: "Find the slope",
-      text: "Find the slope $m$ of the line through $A$ and $B$.",
+      instruction: tx("Find the slope", "Berechne die Steigung"),
+      text: tx("Find the slope $m$ of the line through $A$ and $B$.", "Berechne die Steigung $m$ der Geraden durch $A$ und $B$."),
       math: `${pt(A[0], A[1], "A")} \\quad ${pt(B[0], B[1], "B")}`,
       answer: { kind: "number", value: qv(m), label: "m =" },
       hint: HINT_SLOPE,
@@ -427,11 +492,14 @@ function slopePointTask(rng: Rng): Exercise {
     const py = yAt(m, b, px);
     if (Math.abs(py) > 12) continue;
     return {
-      instruction: "Find the line equation",
-      text: `A line has the slope $m = ${num(m)}$ and passes through $${pt(px, py, "P")}$. Find its equation.`,
+      instruction: I_LINE,
+      text: tx(
+        `A line has the slope $m = ${num(m)}$ and passes through $${pt(px, py, "P")}$. Find its equation.`,
+        `Eine Gerade hat die Steigung $m = ${num(m)}$ und geht durch $${pt(px, py, "P")}$. Bestimme ihre Gleichung.`,
+      ),
       answer: { kind: "expr", value: linePlain(m, b), prefix: "y =", form: "expanded" },
       hint: HINT_B,
-      solution: findBFrames(m, [px, py], "P", "Put the slope into $y = mx + b$. Only $b$ is missing."),
+      solution: findBFrames(m, [px, py], "P", SLOPE_FIRST),
     };
   }
 }
@@ -446,17 +514,30 @@ function pointTest(rng: Rng): Exercise {
   const py = on ? right : right + rng.nonZero(-3, 3);
   const P = pt(px, py, "P");
   return {
-    instruction: "Point test",
-    text: `Does the point $${P}$ lie on the line?`,
+    instruction: tx("Point test", "Punktprobe"),
+    text: tx(`Does the point $${P}$ lie on the line?`, `Liegt der Punkt $${P}$ auf der Geraden?`),
     math: plain(lineSrc(m, b)),
-    answer: { kind: "choice", options: ["Yes, $P$ lies on the line.", "No, $P$ is not on the line."], correct: on ? 0 : 1 },
-    hint: "Put both coordinates of $P$ into the equation. Do you get a true statement?",
+    answer: {
+      kind: "choice",
+      options: [tx("Yes, $P$ lies on the line.", "Ja, $P$ liegt auf der Geraden."), tx("No, $P$ is not on the line.", "Nein, $P$ liegt nicht auf der Geraden.")],
+      correct: on ? 0 : 1,
+    },
+    hint: tx("Put both coordinates of $P$ into the equation. Do you get a true statement?", "Setze beide Koordinaten von $P$ in die Gleichung ein. Erhältst du eine wahre Aussage?"),
     solution: [
-      { math: lineSrc(m, b), note: "**Point test**: put both coordinates of $P$ into the equation." },
-      { math: `${val(py, "Y")} =#EQ ${val(m, "m")} \\cdot#dot ${valWrap(px, "vm")} ${term(b, "", "b", false)}`, note: `$x = ${px}$ and $y = ${py}$.` },
+      { math: lineSrc(m, b), note: tx("**Point test**: put both coordinates of $P$ into the equation.", "**Punktprobe**: Setze beide Koordinaten von $P$ in die Gleichung ein.") },
+      { math: `${val(py, "Y")} =#EQ ${val(m, "m")} \\cdot#dot ${valWrap(px, "vm")} ${term(b, "", "b", false)}`, note: tx(`$x = ${px}$ and $y = ${py}$.`, `$x = ${px}$ und $y = ${py}$.`) },
       on
-        ? { math: `\\green{${val(py, "Y")} =#EQ ${val(right, "m")}}`, note: "Both sides are equal, a true statement. So $P$ lies on the line." }
-        : { math: `\\red{${val(py, "Y")} \\ne#EQ ${val(right, "m")}}`, note: `The right side gives $${right}$, not $${py}$. A false statement, so $P$ is **not** on the line.` },
+        ? {
+            math: `\\green{${val(py, "Y")} =#EQ ${val(right, "m")}}`,
+            note: tx("Both sides are equal, a true statement. So $P$ lies on the line.", "Beide Seiten sind gleich, eine wahre Aussage. Also liegt $P$ auf der Geraden."),
+          }
+        : {
+            math: `\\red{${val(py, "Y")} \\ne#EQ ${val(right, "m")}}`,
+            note: tx(
+              `The right side gives $${right}$, not $${py}$. A false statement, so $P$ is **not** on the line.`,
+              `Die rechte Seite ergibt $${right}$, nicht $${py}$. Eine falsche Aussage, also liegt $P$ **nicht** auf der Geraden.`,
+            ),
+          },
     ],
   };
 }
@@ -470,18 +551,21 @@ function missingX(rng: Rng): Exercise {
     const y = yAt(m, b, x);
     if (Math.abs(y) > 20) continue;
     return {
-      instruction: "Find x",
-      text: `The point $${pt("?", y, "P")}$ lies on the line. Find its $x$-coordinate.`,
+      instruction: tx("Find x", "Berechne x"),
+      text: tx(`The point $${pt("?", y, "P")}$ lies on the line. Find its $x$-coordinate.`, `Der Punkt $${pt("?", y, "P")}$ liegt auf der Geraden. Berechne seine $x$-Koordinate.`),
       math: plain(lineSrc(m, b)),
       answer: { kind: "number", value: x, label: "x =" },
-      hint: `Put $y = ${y}$ into the equation and solve for $x$.`,
+      hint: tx(`Put $y = ${y}$ into the equation and solve for $x$.`, `Setze $y = ${y}$ in die Gleichung ein und löse nach $x$ auf.`),
       solution: [
-        { math: lineSrc(m, b), highlight: ["Y"], note: `Put in $y = ${y}$.` },
-        ...solveFrames(q(y), m, b, "", (X) => `So $x = ${num(X)}$ and the point is $${pt(X, y, "P")}$.`),
+        { math: lineSrc(m, b), highlight: ["Y"], note: tx(`Put in $y = ${y}$.`, `Setze $y = ${y}$ ein.`) },
+        ...solveFrames(q(y), m, b, "", (X) => tx(`So $x = ${num(X)}$ and the point is $${pt(X, y, "P")}$.`, `Also ist $x = ${num(X)}$, und der Punkt heißt $${pt(X, y, "P")}$.`)),
       ],
     };
   }
 }
+
+const I_ZERO = tx("Find the zero", "Berechne die Nullstelle");
+const Q_ZERO = tx("Where does the line cross the $x$-axis?", "Wo schneidet die Gerade die $x$-Achse?");
 
 /** L2/L3: the zero (where the line meets the x-axis). */
 function zeroTask(rng: Rng, hard: boolean): Exercise {
@@ -498,14 +582,22 @@ function zeroTask(rng: Rng, hard: boolean): Exercise {
     const b = neg(mul(m, x0));
     if (b.d !== 1 || b.n === 0 || Math.abs(b.n) > 15) continue;
     return {
-      instruction: "Find the zero",
-      text: "Where does the line cross the $x$-axis?",
+      instruction: I_ZERO,
+      text: Q_ZERO,
       math: plain(lineSrc(m, b)),
       answer: { kind: "number", value: qv(x0), label: "x =" },
-      hint: "On the $x$-axis $y = 0$. Set $y = 0$ and solve for $x$. A decimal like 2,5 is fine.",
+      hint: tx(
+        "On the $x$-axis $y = 0$. Set $y = 0$ and solve for $x$. A decimal like 2,5 is fine.",
+        "Auf der $x$-Achse ist $y = 0$. Setze $y = 0$ und löse nach $x$ auf. Eine Kommazahl wie 2,5 ist okay.",
+      ),
       solution: [
-        { math: lineSrc(m, b), highlight: ["Y"], note: "At the zero the line meets the $x$-axis, so $y = 0$." },
-        ...solveFrames(ZERO, m, b, "", (X) => `The zero is $x = ${num(X)}$. The line crosses the $x$-axis at $${pt(X, 0, "N")}$.`),
+        { math: lineSrc(m, b), highlight: ["Y"], note: tx("At the zero the line meets the $x$-axis, so $y = 0$.", "An der Nullstelle trifft die Gerade die $x$-Achse, also ist $y = 0$.") },
+        ...solveFrames(ZERO, m, b, "", (X) =>
+          tx(
+            `The zero is $x = ${num(X)}$. The line crosses the $x$-axis at $${pt(X, 0, "N")}$.`,
+            `Die Nullstelle ist $x = ${num(X)}$. Die Gerade schneidet die $x$-Achse in $${pt(X, 0, "N")}$.`,
+          ),
+        ),
       ],
     };
   }
@@ -523,13 +615,20 @@ function twoPointsTask(rng: Rng): Exercise {
     const B: Pt = [Math.max(x1, x2), yAt(m, b, Math.max(x1, x2))];
     if (!fits(A, 9) || !fits(B, 9)) continue;
     const use = Math.abs(A[0]) <= Math.abs(B[0]) ? A : B;
-    const { frames } = slopeFrames(A, B, "First the slope: $m = \\frac{y_2 - y_1}{x_2 - x_1}$.");
+    const { frames } = slopeFrames(A, B, tx("First the slope: $m = \\frac{y_2 - y_1}{x_2 - x_1}$.", "Zuerst die Steigung: $m = \\frac{y_2 - y_1}{x_2 - x_1}$."));
+    const sofar = plain(`y = ${term(m, "x", "m", true)} + b`);
     return {
-      instruction: "Find the line equation",
-      text: `Find the equation of the line through $${pt(A[0], A[1], "A")}$ and $${pt(B[0], B[1], "B")}$.`,
+      instruction: I_LINE,
+      text: tx(
+        `Find the equation of the line through $${pt(A[0], A[1], "A")}$ and $${pt(B[0], B[1], "B")}$.`,
+        `Bestimme die Gleichung der Geraden durch $${pt(A[0], A[1], "A")}$ und $${pt(B[0], B[1], "B")}$.`,
+      ),
       answer: { kind: "expr", value: linePlain(m, b), prefix: "y =", form: "expanded" },
-      hint: "First the slope $m = \\frac{y_2 - y_1}{x_2 - x_1}$. Then put one of the points into $y = mx + b$ to get $b$.",
-      solution: [...frames, ...findBFrames(m, use, use === A ? "A" : "B", `Now find $b$: so far the line is $${plain(`y = ${term(m, "x", "m", true)} + b`)}$.`)],
+      hint: tx(
+        "First the slope $m = \\frac{y_2 - y_1}{x_2 - x_1}$. Then put one of the points into $y = mx + b$ to get $b$.",
+        "Zuerst die Steigung $m = \\frac{y_2 - y_1}{x_2 - x_1}$. Setze dann einen der Punkte in $y = mx + b$ ein, um $b$ zu bekommen.",
+      ),
+      solution: [...frames, ...findBFrames(m, use, use === A ? "A" : "B", tx(`Now find $b$: so far the line is $${sofar}$.`, `Jetzt fehlt $b$: Bisher heißt die Gerade $${sofar}$.`))],
     };
   }
 }
@@ -554,18 +653,32 @@ function throughPointTask(rng: Rng, perp: boolean): Exercise {
     });
     const lead: Frame[] = perp
       ? [
-          { math: "m#Lg _{g#Lgi}#Sg \\cdot#X m#Lh _{h#Lhi}#Sh =#E -#sr 1#cr", note: "Perpendicular lines: their slopes multiply to $-1$." },
-          { math: `${val(mg, "g")} \\cdot#X m#Lh _{h#Lhi}#Sh =#E -#sr 1#cr`, note: `Put in $m_g = ${num(mg)}$.` },
-          { math: `m#Lh _{h#Lhi}#Sh =#E ${val(mh, "m")}`, note: `So $m_h = ${num(mh)}$: flip $${num(mg)}$ upside down and change the sign.` },
+          { math: "m#Lg _{g#Lgi}#Sg \\cdot#X m#Lh _{h#Lhi}#Sh =#E -#sr 1#cr", note: tx("Perpendicular lines: their slopes multiply to $-1$.", "Orthogonale Geraden: Das Produkt ihrer Steigungen ist $-1$.") },
+          { math: `${val(mg, "g")} \\cdot#X m#Lh _{h#Lhi}#Sh =#E -#sr 1#cr`, note: tx(`Put in $m_g = ${num(mg)}$.`, `Setze $m_g = ${num(mg)}$ ein.`) },
+          {
+            math: `m#Lh _{h#Lhi}#Sh =#E ${val(mh, "m")}`,
+            note: tx(
+              `So $m_h = ${num(mh)}$: flip $${num(mg)}$ upside down and change the sign.`,
+              `Also ist $m_h = ${num(mh)}$: Bilde den Kehrwert von $${num(mg)}$ und dreh das Vorzeichen um.`,
+            ),
+          },
         ]
-      : [{ math: `m#Lh _{h#Lhi}#Sh =#E m#Lg _{g#Lgi}#Sg =#E2 ${val(mg, "m")}`, note: `Parallel lines have the **same slope**: $m_h = ${num(mg)}$.` }];
+      : [{ math: `m#Lh _{h#Lhi}#Sh =#E m#Lg _{g#Lgi}#Sg =#E2 ${val(mg, "m")}`, note: tx(`Parallel lines have the **same slope**: $m_h = ${num(mg)}$.`, `Parallele Geraden haben die **gleiche Steigung**: $m_h = ${num(mg)}$.`) }];
     return {
-      instruction: perp ? "Perpendicular line" : "Parallel line",
-      text: `The line $g$ has the equation $${g}$. Find the line $h$ through $${pt(px, py, "P")}$ that is **${perp ? "perpendicular" : "parallel"}** to $g$.`,
+      instruction: perp ? tx("Perpendicular line", "Orthogonale Gerade") : tx("Parallel line", "Parallele Gerade"),
+      text: tx(
+        `The line $g$ has the equation $${g}$. Find the line $h$ through $${pt(px, py, "P")}$ that is **${perp ? "perpendicular" : "parallel"}** to $g$.`,
+        `Die Gerade $g$ hat die Gleichung $${g}$. Bestimme die Gerade $h$ durch $${pt(px, py, "P")}$, die **${perp ? "orthogonal" : "parallel"}** zu $g$ ist.`,
+      ),
       visual,
       answer: { kind: "expr", value: linePlain(mh, bh), prefix: "y =", form: "expanded" },
-      hint: perp ? "Perpendicular: $m_g \\cdot m_h = -1$, so $m_h = -\\frac{1}{m_g}$. Then find $b$ with $P$." : "Parallel lines have the same slope. Then find $b$ with $P$.",
-      solution: [...lead, ...findBFrames(mh, [px, py], "P", "Put the slope into $y = mx + b$. Only $b$ is missing.")],
+      hint: perp
+        ? tx(
+            "Perpendicular: $m_g \\cdot m_h = -1$, so $m_h = -\\frac{1}{m_g}$. Then find $b$ with $P$.",
+            "Orthogonal: $m_g \\cdot m_h = -1$, also $m_h = -\\frac{1}{m_g}$. Dann bestimmst du $b$ mit $P$.",
+          )
+        : tx("Parallel lines have the same slope. Then find $b$ with $P$.", "Parallele Geraden haben die gleiche Steigung. Dann bestimmst du $b$ mit $P$."),
+      solution: [...lead, ...findBFrames(mh, [px, py], "P", SLOPE_FIRST)],
     };
   }
 }
@@ -620,15 +733,19 @@ function triangleStart(m: Frac, b: number): number {
   return 0;
 }
 
-function slopeSentence(m: Frac): string {
-  if (m.n === 0) return "Going right never changes $y$: the line is **horizontal**.";
+function slopeSentence(m: Frac): Text {
+  if (m.n === 0) return tx("Going right never changes $y$: the line is **horizontal**.", "Nach rechts ändert sich $y$ nie: Die Gerade verläuft **waagerecht**.");
   return m.n > 0
-    ? `Go $${m.d}$ to the right and $${m.n}$ up, and you're back on the line. It **rises**.`
-    : `Go $${m.d}$ to the right and $${-m.n}$ down, and you're back on the line. It **falls**.`;
+    ? tx(`Go $${m.d}$ to the right and $${m.n}$ up, and you're back on the line. It **rises**.`, `Geh $${m.d}$ nach rechts und $${m.n}$ nach oben, und du bist wieder auf der Geraden. Sie **steigt**.`)
+    : tx(`Go $${m.d}$ to the right and $${-m.n}$ down, and you're back on the line. It **falls**.`, `Geh $${m.d}$ nach rechts und $${-m.n}$ nach unten, und du bist wieder auf der Geraden. Sie **fällt**.`);
 }
+
+const L_SLOPE = tx("Slope", "Steigung");
+const L_INTERCEPT = tx("y-intercept", "y-Achsenabschnitt");
 
 /** Sliders for m and b: the line turns and slides, the slope triangle follows. */
 function SlopeSliders() {
+  const t = useText();
   const scope = useId();
   const [mi, setMi] = useState(10);
   const [b, setB] = useState(1);
@@ -654,7 +771,7 @@ function SlopeSliders() {
     <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px] rounded-xl border border-line bg-surface p-2">
         <Plane
-          label="A line with its slope triangle"
+          label={tx("A line with its slope triangle", "Eine Gerade mit ihrem Steigungsdreieck")}
           overlay={
             <>
               <PlaneTag
@@ -705,17 +822,17 @@ function SlopeSliders() {
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <Caption>Slope</Caption>
+            <Caption>{t(L_SLOPE)}</Caption>
             <MathView src={`m = ${num(m)}`} size="sm" animate={false} className="text-blob-ink" />
           </div>
-          <StepSlider value={mi} count={M_STEPS.length} onChange={setMi} zero={7} label="Slope m" valueText={`m = ${qv(m).toFixed(2)}`} />
+          <StepSlider value={mi} count={M_STEPS.length} onChange={setMi} zero={7} label={tx("Slope m", "Steigung m")} valueText={`m = ${qv(m).toFixed(2)}`} />
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <Caption>y-intercept</Caption>
+            <Caption>{t(L_INTERCEPT)}</Caption>
             <MathView src={`b = ${b}`} size="sm" animate={false} />
           </div>
-          <StepSlider value={b + 4} count={9} onChange={(i) => setB(i - 4)} zero={4} label="y-intercept b" valueText={`b = ${b}`} tone="ink" />
+          <StepSlider value={b + 4} count={9} onChange={(i) => setB(i - 4)} zero={4} label={tx("y-intercept b", "y-Achsenabschnitt b")} valueText={`b = ${b}`} tone="ink" />
         </div>
         <AnimatePresence mode="wait" initial={false}>
           <motion.p
@@ -733,11 +850,13 @@ function SlopeSliders() {
   );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, children }: { label: Text; children: ReactNode }) {
+  const t = useText();
   return (
     <div className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-1">
-      <span className="w-[86px] shrink-0">
-        <Caption>{label}</Caption>
+      {/* Wide enough for the longer German "y-Achsenabschnitt", so both rows line up. */}
+      <span className={cn("shrink-0", t(tx("w-[86px]", "w-[136px]")))}>
+        <Caption>{t(label)}</Caption>
       </span>
       {children}
     </div>
@@ -784,7 +903,7 @@ function PointsLab() {
     <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px] rounded-xl border border-line bg-surface p-2">
         <Plane
-          label="Drag the points A and B"
+          label={tx("Drag the points A and B", "Ziehe die Punkte A und B")}
           onMove={onMove}
           overlay={
             <>
@@ -824,8 +943,8 @@ function PointsLab() {
           <PlanePath shape={tri} stroke={TONE.blob} width={0.55} dashed />
           <PlaneLine through={() => [[ax.get(), ay.get()], [bx.get() - ax.get(), by.get() - ay.get()]]} width={1.1} />
           <PlaneDot at={yIntercept} tone="ink" hollow r={1.2} />
-          <PlaneHandle id="A" x={ax} y={ay} at={A} label="Point A" hint={!touched} />
-          <PlaneHandle id="B" x={bx} y={by} at={B} label="Point B" hint={!touched} />
+          <PlaneHandle id="A" x={ax} y={ay} at={A} label={tx("Point A", "Punkt A")} hint={!touched} />
+          <PlaneHandle id="B" x={bx} y={by} at={B} label={tx("Point B", "Punkt B")} hint={!touched} />
         </Plane>
       </div>
 
@@ -836,23 +955,33 @@ function PointsLab() {
         <AnimatePresence mode="wait" initial={false}>
           {m && b ? (
             <motion.div key="calc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-1">
-              <Row label="Slope">
+              <Row label={L_SLOPE}>
                 <MathView
                   src={`m = \\frac{\\Delta y}{\\Delta x} = \\frac{${dy}}{${dx}}${reduced ? ` = ${num(m)}` : ""}`}
                   size="md"
                   animate={false}
                 />
               </Row>
-              <Row label="y-intercept">
+              <Row label={L_INTERCEPT}>
                 <MathView src={`b = ${num(A[1])} - ${num(m, true)} \\cdot ${num(A[0], true)} = ${num(b)}`} size="md" animate={false} />
               </Row>
               <p className="pt-1 text-[13.5px] leading-relaxed text-ink-2">
-                <Inline text="$b$ comes from putting $A$ into $y = mx + b$: $y_A = m \cdot x_A + b$, so $b = y_A - m \cdot x_A$." />
+                <Inline
+                  text={tx(
+                    "$b$ comes from putting $A$ into $y = mx + b$: $y_A = m \\cdot x_A + b$, so $b = y_A - m \\cdot x_A$.",
+                    "$b$ bekommst du, indem du $A$ in $y = mx + b$ einsetzt: $y_A = m \\cdot x_A + b$, also $b = y_A - m \\cdot x_A$.",
+                  )}
+                />
               </p>
             </motion.div>
           ) : (
             <motion.p key="vertical" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="rounded-xl border border-danger/25 bg-danger/[0.05] px-4 py-3 text-[14px] leading-relaxed text-ink">
-              <Inline text={`$\\Delta x = 0$ and you can't divide by $0$. This is the **vertical** line $x = ${A[0]}$: it has no slope and no equation of the form $y = mx + b$.`} />
+              <Inline
+                text={tx(
+                  `$\\Delta x = 0$ and you can't divide by $0$. This is the **vertical** line $x = ${A[0]}$: it has no slope and no equation of the form $y = mx + b$.`,
+                  `$\\Delta x = 0$, und durch $0$ kann man nicht teilen. Das ist die Gerade $x = ${A[0]}$, **parallel zur $y$-Achse**: Sie hat keine Steigung und keine Gleichung der Form $y = mx + b$.`,
+                )}
+              />
             </motion.p>
           )}
         </AnimatePresence>
@@ -865,6 +994,7 @@ const G_STEPS = M_STEPS.filter((m) => m.n !== 0);
 
 /** Parallel (same slope) and perpendicular (slopes multiply to −1) through a point you drag. */
 function ParallelLab() {
+  const t = useText();
   const scope = useId();
   const [mi, setMi] = useState(G_STEPS.findIndex((m) => m.n === 1 && m.d === 2));
   const [perp, setPerp] = useState(false);
@@ -910,7 +1040,7 @@ function ParallelLab() {
     <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px] rounded-xl border border-line bg-surface p-2">
         <Plane
-          label="Line g and line h through the point P"
+          label={tx("Line g and line h through the point P", "Gerade g und Gerade h durch den Punkt P")}
           onMove={(_, p) => {
             setTouched(true);
             setP(p);
@@ -935,16 +1065,16 @@ function ParallelLab() {
           <PlaneLine through={() => [[px.get(), py.get()], dir(ah.get())]} tone="ink" width={1} />
           <PlanePath shape={corner} stroke={TONE.ink} width={0.5} opacity={perp ? 1 : 0} />
           <PlaneDot at={meet} tone="ink" r={0.9} />
-          <PlaneHandle id="P" x={px} y={py} at={P} tone="ink" label="Point P" hint={!touched} />
+          <PlaneHandle id="P" x={px} y={py} at={P} tone="ink" label={tx("Point P", "Punkt P")} hint={!touched} />
         </Plane>
       </div>
 
       <div className="space-y-4">
         <div className="flex w-fit rounded-lg border border-line p-0.5">
-          {[false, true].map((t) => (
-            <button key={String(t)} onClick={() => setPerp(t)} className={cn("relative rounded-md px-3 py-1.5 text-[13px] font-medium", perp === t ? "text-ink" : "text-ink-3 hover:text-ink")}>
-              {perp === t && <motion.span layoutId={`${scope}-tab`} className="absolute inset-0 rounded-md bg-hover" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-              <span className="relative">{t ? "Perpendicular" : "Parallel"}</span>
+          {[false, true].map((on) => (
+            <button key={String(on)} onClick={() => setPerp(on)} className={cn("relative rounded-md px-3 py-1.5 text-[13px] font-medium", perp === on ? "text-ink" : "text-ink-3 hover:text-ink")}>
+              {perp === on && <motion.span layoutId={`${scope}-tab`} className="absolute inset-0 rounded-md bg-hover" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+              <span className="relative">{on ? t(tx("Perpendicular", "Orthogonal")) : t(tx("Parallel", "Parallel"))}</span>
             </button>
           ))}
         </div>
@@ -963,17 +1093,23 @@ function ParallelLab() {
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <Caption>Slope of g</Caption>
+            <Caption>{t(tx("Slope of g", "Steigung von g"))}</Caption>
             <MathView src={`m_g = ${num(mg)}`} size="sm" animate={false} className="text-blob-ink" />
           </div>
-          <StepSlider value={mi} count={G_STEPS.length} onChange={setMi} zero={7} label="Slope of g" valueText={`m = ${qv(mg).toFixed(2)}`} />
+          <StepSlider value={mi} count={G_STEPS.length} onChange={setMi} zero={7} label={tx("Slope of g", "Steigung von g")} valueText={`m = ${qv(mg).toFixed(2)}`} />
         </div>
         <p className="text-[13.5px] leading-relaxed text-ink-2">
           <Inline
             text={
               perp
-                ? `Turn $g$: $h$ turns with it and always meets $g$ at a right angle. Rise and run swap places and the sign flips: $${num(mg)}$ turns into $${num(mh)}$.`
-                : "Same slope, same slope triangle: the lines never meet. Drag $P$ and $h$ moves along, always parallel."
+                ? tx(
+                    `Turn $g$: $h$ turns with it and always meets $g$ at a right angle. Rise and run swap places and the sign flips: $${num(mg)}$ turns into $${num(mh)}$.`,
+                    `Dreh $g$: $h$ dreht sich mit und schneidet $g$ immer im rechten Winkel. Hoch und rechts tauschen die Plätze, und das Vorzeichen dreht sich um: Aus $${num(mg)}$ wird $${num(mh)}$.`,
+                  )
+                : tx(
+                    "Same slope, same slope triangle: the lines never meet. Drag $P$ and $h$ moves along, always parallel.",
+                    "Gleiche Steigung, gleiches Steigungsdreieck: Die Geraden schneiden sich nie. Zieh $P$, und $h$ wandert mit, immer parallel.",
+                  )
             }
           />
         </p>

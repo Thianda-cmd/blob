@@ -6,13 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { settingsText } from "@/i18n/messages/settings";
 import { cn } from "@/lib/utils";
 import { Card, Section, Switch } from "./primitives";
 
-const PERKS = ["Cheers when you finish homework", "Shares tips and shortcuts", "Lets you know if something didn't save"];
-
 export function BlobSection() {
   const { profile, setProfile } = useWorkspace();
+  const t = useMessages(settingsText).blob;
   const on = profile.blob_tips;
   const ref = useRef<BlobHandle>(null);
   const [flash, setFlash] = useState<BlobMood | null>(null);
@@ -32,36 +33,34 @@ export function BlobSection() {
 
   async function toggle(value: boolean) {
     if (value) {
-      react("excited", "I'm back!");
+      react("excited", t.back);
       setTimeout(() => ref.current?.jump(1.1), 60);
     } else {
-      react("worried", "Okay, I'll nap…", 1400);
+      react("worried", t.nap, 1400);
       ref.current?.squish(1.2);
     }
     const ok = await setProfile({ blob_tips: value });
-    if (ok && value) blob.say("Hi again! Click me anytime for tips.", { mood: "happy" });
+    if (ok && value) blob.say(t.hiAgain, { mood: "happy" });
   }
 
   const mood: BlobMood = flash ?? (on ? "happy" : "sleepy");
 
   return (
-    <Section id="blob" title="Blob" description="Your jelly helper in the bottom corner.">
+    <Section id="blob" title={t.title} description={t.description}>
       <Card>
         <div className="grid sm:grid-cols-[1fr_240px]">
           <div className="p-5">
             <div className="flex items-start justify-between gap-6">
               <div>
                 <label htmlFor="blob-tips" className="text-[13.5px] font-medium">
-                  Show Blob helper
+                  {t.show}
                 </label>
-                <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">
-                  Blob sits in the corner of your workspace. Click it for quick actions and tips.
-                </p>
+                <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{t.showHint}</p>
               </div>
-              <Switch id="blob-tips" checked={on} onChange={toggle} label="Show Blob helper" />
+              <Switch id="blob-tips" checked={on} onChange={toggle} label={t.show} />
             </div>
             <ul className="mt-4 space-y-1.5">
-              {PERKS.map((perk) => (
+              {t.perks.map((perk) => (
                 <li key={perk} className={cn("flex items-center gap-2 text-[13px] transition-colors", on ? "text-ink-2" : "text-ink-3")}>
                   <span
                     className={cn(
@@ -102,11 +101,11 @@ export function BlobSection() {
                 ref={ref}
                 size={104}
                 mood={mood}
-                title="Blob preview. Click to poke."
-                onClick={() => (on ? react("love", "Hehe, that tickles!") : react("surprised", "Huh? Oh, it's you.", 1400))}
+                title={t.preview}
+                onClick={() => (on ? react("love", t.tickles) : react("surprised", t.huh, 1400))}
               />
             </motion.div>
-            <span className="relative text-[11.5px] text-ink-3">{on ? "Awake and helping" : "Napping"}</span>
+            <span className="relative text-[11.5px] text-ink-3">{on ? t.awake : t.napping}</span>
           </div>
         </div>
       </Card>

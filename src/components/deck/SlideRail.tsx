@@ -4,6 +4,8 @@ import { Copy, Plus, Trash2 } from "lucide-react";
 import { motion, Reorder } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Popover } from "@/components/ui/Menu";
+import { useMessages } from "@/i18n/client";
+import { deckText } from "@/i18n/messages/deck";
 import type { Slide, SlideLayout } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LAYOUT_GROUPS, LAYOUTS, type Palette } from "./deck";
@@ -24,20 +26,21 @@ export function AddSlideMenu({
   side?: "bottom" | "top" | "right";
   align?: "start" | "end";
 }) {
+  const t = useMessages(deckText);
   return (
     <Popover side={side} align={align} className="w-[392px] p-2" trigger={trigger}>
       {(close) => (
         <div className="space-y-1.5">
           {LAYOUT_GROUPS.map((g) => (
-            <div key={g.id}>
-              <div className="px-1.5 pb-1 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{g.label}</div>
+            <div key={g}>
+              <div className="px-1.5 pb-1 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{t.groups[g]}</div>
               <div className="grid grid-cols-5 gap-0.5">
-                {LAYOUTS.filter((l) => l.group === g.id).map((l) => (
+                {LAYOUTS.filter((l) => l.group === g).map((l) => (
                   <button
                     key={l.id}
                     type="button"
                     role="menuitem"
-                    title={l.hint}
+                    title={t.layouts[l.id].hint}
                     onClick={() => {
                       onAdd(l.id);
                       close();
@@ -45,7 +48,7 @@ export function AddSlideMenu({
                     className="group rounded-lg p-1.5 text-left transition-colors hover:bg-hover focus-visible:bg-hover"
                   >
                     <LayoutGlyph layout={l.id} className="group-hover:border-line-2" />
-                    <div className="mt-1 truncate text-[11.5px] text-ink-2 group-hover:text-ink">{l.label}</div>
+                    <div className="mt-1 truncate text-[11.5px] text-ink-2 group-hover:text-ink">{t.layouts[l.id].label}</div>
                   </button>
                 ))}
               </div>
@@ -84,6 +87,7 @@ export function SlideRail({
   onMove: (id: string, delta: number) => void;
   onEnter: () => void;
 }) {
+  const t = useMessages(deckText);
   const listRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const index = Math.max(0, slides.findIndex((s) => s.id === selectedId));
@@ -117,9 +121,9 @@ export function SlideRail({
   };
 
   return (
-    <aside className={cn("w-[206px] shrink-0 flex-col border-r border-line bg-surface", className)} aria-label="Slides">
+    <aside className={cn("w-[206px] shrink-0 flex-col border-r border-line bg-surface", className)} aria-label={t.slides}>
       <div className="flex h-10 shrink-0 items-center gap-1.5 pl-4 pr-2">
-        <span className="text-[12.5px] font-medium text-ink-2">Slides</span>
+        <span className="text-[12.5px] font-medium text-ink-2">{t.slides}</span>
         <span className="text-[12px] tabular-nums text-ink-3">{slides.length}</span>
         <div className="ml-auto">
           <AddSlideMenu
@@ -128,8 +132,8 @@ export function SlideRail({
               <button
                 {...props}
                 className="grid size-6 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink"
-                aria-label="Add a slide"
-                title="Add a slide"
+                aria-label={t.addSlide}
+                title={t.addSlide}
               >
                 <Plus className="size-4" />
               </button>
@@ -143,7 +147,7 @@ export function SlideRail({
         layoutScroll
         tabIndex={0}
         role="listbox"
-        aria-label="Slides"
+        aria-label={t.slides}
         aria-activedescendant={`slide-thumb-${selectedId}`}
         onKeyDown={onKeyDown}
         style={{ outline: "none" }}
@@ -160,7 +164,7 @@ export function SlideRail({
                 id={`slide-thumb-${slide.id}`}
                 role="option"
                 aria-selected={selected}
-                aria-label={`Slide ${i + 1}${slide.title.trim() ? `: ${slide.title.trim()}` : ""}`}
+                aria-label={t.slideAria(i + 1, slide.title.trim())}
                 onDragStart={() => setDragging(slide.id)}
                 onDragEnd={() => setDragging(null)}
                 whileDrag={{ scale: 1.04 }}
@@ -195,11 +199,11 @@ export function SlideRail({
                     frameClassName="rounded-[7px] ring-1 ring-ink/10 dark:ring-white/12"
                   />
                   <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <ThumbAction label="Duplicate slide" onClick={() => onDuplicate(slide.id)}>
+                    <ThumbAction label={t.duplicateSlide} onClick={() => onDuplicate(slide.id)}>
                       <Copy />
                     </ThumbAction>
                     <ThumbAction
-                      label={slides.length === 1 ? "A deck needs at least one slide" : "Delete slide"}
+                      label={slides.length === 1 ? t.lastSlide : t.deleteSlide}
                       disabled={slides.length === 1}
                       danger
                       onClick={() => onDelete(slide.id)}
@@ -221,7 +225,7 @@ export function SlideRail({
               {...props}
               className="ml-6 mt-2.5 flex h-9 w-[150px] items-center justify-center gap-1.5 rounded-[7px] border border-dashed border-line-2 text-[12.5px] text-ink-3 transition-colors hover:border-ink-3 hover:bg-hover/60 hover:text-ink"
             >
-              <Plus className="size-3.5" /> New slide
+              <Plus className="size-3.5" /> {t.newSlide}
             </button>
           )}
         />

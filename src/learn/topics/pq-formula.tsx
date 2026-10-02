@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useState } from "react";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
@@ -65,6 +67,11 @@ function assignIds(left: Term[], right: Term[]): [Term[], Term[]] {
 
 const normalSrc = (p: number, q: number) => `${sideSrc([T("a", 1, 2), T("p", p, 1), T("q", q, 0)])} =#eq 0#z`;
 
+/** Joins bilingual pieces, language by language. */
+const cat = (...parts: (Text | undefined)[]): Text => txMap((_, locale) => parts.map((part) => resolveText(part, locale)).join(""));
+
+const NO_SOLUTION: Text = tx('"no solution"#none', '"keine Lösung"#none');
+
 // ---------------------------------------------------------------------------
 // Worked solutions
 
@@ -80,26 +87,47 @@ function pqFrames(p: number, q: number): Frame[] {
     {
       math: normalSrc(p, q),
       highlight: Math.abs(p) === 1 ? ["sp", "vp", "sq", "cq"] : ["sp", "cp", "sq", "cq"],
-      note: `Normal form, so read off $p = ${dec(p)}$ and $q = ${dec(q)}$. The sign belongs to the number.${Math.abs(p) === 1 ? ` (A lone $x$ means $${dec(Math.abs(p))}x$.)` : ""}`,
+      note: cat(
+        tx(
+          `Normal form, so read off $p = ${dec(p)}$ and $q = ${dec(q)}$. The sign belongs to the number.`,
+          `Das ist die Normalform. Lies $p = ${dec(p)}$ und $q = ${dec(q)}$ ab. Das Vorzeichen gehört zur Zahl.`,
+        ),
+        Math.abs(p) === 1 ? tx(` (A lone $x$ means $${dec(Math.abs(p))}x$.)`, ` (Ein einzelnes $x$ bedeutet $${dec(Math.abs(p))}x$.)`) : "",
+      ),
     },
     {
       math: `${lead} -#m1 \\frac{${pTok("p")}}{2#t1}#F1 \\pm#pm \\sqrt{(\\frac{${pTok("p2")}}{2#t2}#F2)#B2^{2#two} -#m2 ${q < 0 ? `(-#sq ${dec(-q)}#cq)#B3` : `${dec(q)}#cq`}}#R`,
       highlight: ["sp", "cp", "sp2", "cp2", "sq", "cq"],
-      note: "Put $p$ and $q$ into the pq formula. Negative numbers go in brackets.",
+      note: tx("Put $p$ and $q$ into the pq formula. Negative numbers go in brackets.", "Setz $p$ und $q$ in die pq-Formel ein. Negative Zahlen kommen in Klammern."),
     },
     {
       math: `${lead} ${halfSrc} \\pm#pm \\sqrt{${dec(hq)}#hq ${q < 0 ? `+#m2 ${dec(-q)}#cq` : `-#m2 ${dec(q)}#cq`}}#R`,
-      note: `$-\\frac{${dec(p)}}{2} = ${dec(half)}$ and $(\\frac{${dec(p)}}{2})^2 = ${dec(hq)}$.${q < 0 ? ` And $-(${dec(q)}) = +${dec(-q)}$.` : ""}`,
+      note: cat(
+        tx(
+          `$-\\frac{${dec(p)}}{2} = ${dec(half)}$ and $(\\frac{${dec(p)}}{2})^2 = ${dec(hq)}$.`,
+          `$-\\frac{${dec(p)}}{2} = ${dec(half)}$ und $(\\frac{${dec(p)}}{2})^2 = ${dec(hq)}$.`,
+        ),
+        q < 0 ? tx(` And $-(${dec(q)}) = +${dec(-q)}$.`, ` Und $-(${dec(q)}) = +${dec(-q)}$.`) : "",
+      ),
     },
     {
       math: `${lead} ${halfSrc} \\pm#pm \\sqrt{${num(D, "D")}}#R`,
       highlight: ["D", "Ds"],
       note:
         D > 0
-          ? `Under the root is the discriminant $D = ${dec(D)}$. It's positive, so there are **two** solutions.`
+          ? tx(
+              `Under the root is the discriminant $D = ${dec(D)}$. It's positive, so there are **two** solutions.`,
+              `Unter der Wurzel steht die Diskriminante $D = ${dec(D)}$. Sie ist positiv, also gibt es **zwei** Lösungen.`,
+            )
           : D === 0
-            ? "The discriminant is $D = 0$. Plus or minus $0$ is the same, so there's only **one** solution."
-            : `The discriminant $D = ${dec(D)}$ is negative. There is no square root of a negative number.`,
+            ? tx(
+                "The discriminant is $D = 0$. Plus or minus $0$ is the same, so there's only **one** solution.",
+                "Die Diskriminante ist $D = 0$. Plus oder minus $0$ ist dasselbe, also gibt es nur **eine** Lösung.",
+              )
+            : tx(
+                `The discriminant $D = ${dec(D)}$ is negative. There is no square root of a negative number.`,
+                `Die Diskriminante $D = ${dec(D)}$ ist negativ. Aus einer negativen Zahl kann man keine Wurzel ziehen.`,
+              ),
     },
   ];
   if (D > 0) {
@@ -109,12 +137,15 @@ function pqFrames(p: number, q: number): Frame[] {
     frames.push({ math: `${lead} ${halfSrc} \\pm#pm ${dec(r)}#rt`, note: `$\\sqrt{${dec(D)}} = ${dec(r)}$.` });
     frames.push({
       math: `x#xx _{1#xs} =#eq ${num(x1, "h")} \\quad x#x2 _{2#x2s} =#eq2 ${num(x2, "r2")}`,
-      note: `$x_1 = ${dec(half)} + ${dec(r)} = ${dec(x1)}$ and $x_2 = ${dec(half)} - ${dec(r)} = ${dec(x2)}$.`,
+      note: tx(
+        `$x_1 = ${dec(half)} + ${dec(r)} = ${dec(x1)}$ and $x_2 = ${dec(half)} - ${dec(r)} = ${dec(x2)}$.`,
+        `$x_1 = ${dec(half)} + ${dec(r)} = ${dec(x1)}$ und $x_2 = ${dec(half)} - ${dec(r)} = ${dec(x2)}$.`,
+      ),
     });
   } else if (D === 0) {
-    frames.push({ math: `x#xx =#eq ${halfSrc}`, note: `So $x = ${dec(half)}$.` });
+    frames.push({ math: `x#xx =#eq ${halfSrc}`, note: tx(`So $x = ${dec(half)}$.`, `Also ist $x = ${dec(half)}$.`) });
   } else {
-    frames.push({ math: '"no solution"#none', note: "So the equation has **no solution**." });
+    frames.push({ math: NO_SOLUTION, note: tx("So the equation has **no solution**.", "Die Gleichung hat also **keine Lösung**: $L = \\{ \\}$.") });
   }
   return frames;
 }
@@ -123,11 +154,20 @@ function pqFrames(p: number, q: number): Frame[] {
 function qZeroFrames(p: number): Frame[] {
   const sign = p < 0 ? "-" : "+";
   return [
-    { math: normalSrc(p, 0), note: "There's no number on its own: $q = 0$. Faster than the formula: factor out $x$." },
+    {
+      math: normalSrc(p, 0),
+      note: tx(
+        "There's no number on its own: $q = 0$. Faster than the formula: factor out $x$.",
+        "Es gibt keine Zahl ohne $x$: $q = 0$. Schneller als mit der Formel: Klammere $x$ aus.",
+      ),
+    },
     { math: `x#va (x#vp ${sign}#sp ${dec(Math.abs(p))}#cp)#B =#eq 0#z`, note: `$x^2 ${sign} ${dec(Math.abs(p))}x = x \\cdot (x ${sign} ${dec(Math.abs(p))})$.` },
     {
       math: `x#xx _{1#xs} =#eq 0#r1 \\quad x#x2 _{2#x2s} =#eq2 ${num(-p, "cp")}`,
-      note: `A product is $0$ when one factor is $0$: $x = 0$ or $x ${sign} ${dec(Math.abs(p))} = 0$, so $x = ${dec(-p)}$.`,
+      note: tx(
+        `A product is $0$ when one factor is $0$: $x = 0$ or $x ${sign} ${dec(Math.abs(p))} = 0$, so $x = ${dec(-p)}$.`,
+        `Ein Produkt ist $0$, wenn ein Faktor $0$ ist: $x = 0$ oder $x ${sign} ${dec(Math.abs(p))} = 0$, also $x = ${dec(-p)}$.`,
+      ),
     },
   ];
 }
@@ -136,20 +176,47 @@ function qZeroFrames(p: number): Frame[] {
 function pZeroFrames(q: number): Frame[] {
   const rhs = -q;
   const frames: Frame[] = [
-    { math: normalSrc(0, q), note: "There's no $x$-term: $p = 0$. Faster than the formula: get $x^2$ on its own." },
-    { math: `x#va^{2#ea} =#eq ${num(rhs, "cq")}`, note: `Bring the $${dec(Math.abs(q))}$ to the other side. It changes its sign.` },
+    {
+      math: normalSrc(0, q),
+      note: tx(
+        "There's no $x$-term: $p = 0$. Faster than the formula: get $x^2$ on its own.",
+        "Es fehlt der $x$-Term: $p = 0$. Schneller als mit der Formel: Löse nach $x^2$ auf.",
+      ),
+    },
+    {
+      math: `x#va^{2#ea} =#eq ${num(rhs, "cq")}`,
+      note: tx(
+        `Bring the $${dec(Math.abs(q))}$ to the other side. It changes its sign.`,
+        `Bring die $${dec(Math.abs(q))}$ auf die andere Seite. Dabei ändert sich ihr Vorzeichen.`,
+      ),
+    },
   ];
   if (rhs > 0) {
     const r = clean(Math.sqrt(rhs));
-    frames.push({ math: `x#va =#eq \\pm#pm ${dec(r)}#cq`, note: `Take the root. Don't forget the minus: $${dec(r)}^2 = ${dec(rhs)}$ and $(-${dec(r)})^2 = ${dec(rhs)}$ too.` });
-    frames.push({ math: `x#va _{1#xs} =#eq ${dec(r)}#cq \\quad x#x2 _{2#x2s} =#eq2 -#r2s ${dec(r)}#r2`, note: `Two solutions: $x_1 = ${dec(r)}$ and $x_2 = -${dec(r)}$.` });
+    frames.push({
+      math: `x#va =#eq \\pm#pm ${dec(r)}#cq`,
+      note: tx(
+        `Take the root. Don't forget the minus: $${dec(r)}^2 = ${dec(rhs)}$ and $(-${dec(r)})^2 = ${dec(rhs)}$ too.`,
+        `Zieh die Wurzel. Vergiss das Minus nicht: $${dec(r)}^2 = ${dec(rhs)}$ und auch $(-${dec(r)})^2 = ${dec(rhs)}$.`,
+      ),
+    });
+    frames.push({
+      math: `x#va _{1#xs} =#eq ${dec(r)}#cq \\quad x#x2 _{2#x2s} =#eq2 -#r2s ${dec(r)}#r2`,
+      note: tx(`Two solutions: $x_1 = ${dec(r)}$ and $x_2 = -${dec(r)}$.`, `Zwei Lösungen: $x_1 = ${dec(r)}$ und $x_2 = -${dec(r)}$.`),
+    });
   } else {
-    frames.push({ math: '"no solution"#none', note: `A square is never negative, so $x^2 = ${dec(rhs)}$ has **no solution**.` });
+    frames.push({
+      math: NO_SOLUTION,
+      note: tx(
+        `A square is never negative, so $x^2 = ${dec(rhs)}$ has **no solution**.`,
+        `Ein Quadrat ist nie negativ, also hat $x^2 = ${dec(rhs)}$ **keine Lösung**: $L = \\{ \\}$.`,
+      ),
+    });
   }
   return frames;
 }
 
-function combineNote(ts: Term[]): string {
+function combineNote(ts: Term[]): Text {
   const parts: string[] = [];
   for (const p of [2, 1, 0] as const) {
     const list = ts.filter((t) => t.p === p && t.c !== 0);
@@ -157,29 +224,41 @@ function combineNote(ts: Term[]): string {
     const sum = clean(list.reduce((s, t) => s + t.c, 0));
     parts.push(`$${plainTerms(list)} = ${sum === 0 ? "0" : plainTerms([T("s", sum, p)])}$`);
   }
-  return parts.join(" and ");
+  return tx(parts.join(" and "), parts.length > 2 ? `${parts.slice(0, -1).join(", ")} und ${parts[parts.length - 1]}` : parts.join(" und "));
 }
 
 /**
  * The whole worked solution for left = right (ids already assigned with
  * assignIds): normal form, then the pq formula or a shortcut.
  */
-function solutionFrames(left: Term[], right: Term[], startNote?: string): Frame[] {
+function solutionFrames(left: Term[], right: Term[], startNote?: Text): Frame[] {
   const frames: Frame[] = [];
   let cur = left.filter((t) => t.c !== 0);
   const moving = right.filter((t) => t.c !== 0);
   if (moving.length) {
-    frames.push({ math: eqSrc(left, right), note: startNote ?? "First bring the equation into normal form $x^2 + px + q = 0$." });
+    frames.push({
+      math: eqSrc(left, right),
+      note: startNote ?? tx("First bring the equation into normal form $x^2 + px + q = 0$.", "Bring die Gleichung zuerst in die Normalform $x^2 + px + q = 0$."),
+    });
     cur = [...cur, ...moving.map((t) => ({ ...t, c: -t.c }))];
     frames.push({
       math: `${sideSrc(cur)} =#eq 0#z`,
-      note: "Bring everything to the left side. Terms that change sides flip their sign.",
+      note: tx(
+        "Bring everything to the left side. Terms that change sides flip their sign.",
+        "Bring alles auf die linke Seite. Terme, die die Seite wechseln, ändern ihr Vorzeichen.",
+      ),
       highlight: moving.flatMap((t) => [`s${t.id}`, `c${t.id}`]),
     });
   }
   const sorted = [...cur].sort((a, b) => b.p - a.p);
   if (sorted.some((t, i) => t.id !== cur[i].id)) {
-    frames.push({ math: `${sideSrc(sorted)} =#eq 0#z`, note: "Sort the terms: $x^2$ first, then $x$, then the numbers. Each term takes its sign along." });
+    frames.push({
+      math: `${sideSrc(sorted)} =#eq 0#z`,
+      note: tx(
+        "Sort the terms: $x^2$ first, then $x$, then the numbers. Each term takes its sign along.",
+        "Sortiere die Terme: erst $x^2$, dann $x$, dann die Zahlen. Jeder Term nimmt sein Vorzeichen mit.",
+      ),
+    });
     cur = sorted;
   }
   const combined: Term[] = [];
@@ -189,7 +268,7 @@ function solutionFrames(left: Term[], right: Term[], startNote?: string): Frame[
     else combined.push({ ...t });
   }
   if (combined.length < cur.length) {
-    frames.push({ math: `${sideSrc(combined)} =#eq 0#z`, note: `Combine like terms: ${combineNote(cur)}.` });
+    frames.push({ math: `${sideSrc(combined)} =#eq 0#z`, note: cat(tx("Combine like terms: ", "Fasse gleichartige Terme zusammen: "), combineNote(cur), ".") });
   }
   cur = combined.filter((t) => t.c !== 0);
   const coefOf = (p: number) => cur.find((t) => t.p === p)?.c ?? 0;
@@ -201,8 +280,14 @@ function solutionFrames(left: Term[], right: Term[], startNote?: string): Frame[
       highlight: ["bar", "dv", "da"],
       note:
         A === 0.5
-          ? "Multiply **every** term by $2$ (the same as dividing by $0,5$), so that $x^2$ stands alone."
-          : `There's a $${dec(A)}$ in front of $x^2$. Divide **every** term by $${par(A)}$, so that $x^2$ stands alone.`,
+          ? tx(
+              "Multiply **every** term by $2$ (the same as dividing by $0,5$), so that $x^2$ stands alone.",
+              "Multipliziere **jeden** Term mit $2$ (das ist dasselbe wie durch $0,5$ teilen), damit vor $x^2$ keine Zahl mehr steht.",
+            )
+          : tx(
+              `There's a $${dec(A)}$ in front of $x^2$. Divide **every** term by $${par(A)}$, so that $x^2$ stands alone.`,
+              `Vor $x^2$ steht eine $${dec(A)}$. Teile **jeden** Term durch $${par(A)}$, damit vor $x^2$ keine Zahl mehr steht.`,
+            ),
     });
   }
   const p = clean(coefOf(1) / A);
@@ -210,7 +295,7 @@ function solutionFrames(left: Term[], right: Term[], startNote?: string): Frame[
   const rest = q === 0 ? qZeroFrames(p) : p === 0 ? pZeroFrames(q) : pqFrames(p, q);
   // Combining often lands exactly on the normal form: show it once, with both notes.
   const last = frames[frames.length - 1];
-  if (last && last.math === rest[0].math) frames[frames.length - 1] = { ...rest[0], note: `${last.note} ${rest[0].note}` };
+  if (last && last.math === rest[0].math) frames[frames.length - 1] = { ...rest[0], note: cat(last.note, " ", rest[0].note) };
   else frames.push(rest[0]);
   return [...frames, ...rest.slice(1)];
 }
@@ -259,13 +344,22 @@ function anyTarget(rng: Rng): Target | null {
 
 const answer = (values: number[]) => ({ kind: "solutions" as const, variable: "x", values, allowNone: true });
 
-const HINT_FORMULA = "Read off $p$ and $q$ with their signs. Then $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.";
-const HINT_D = "Work out the discriminant $D = (\\frac{p}{2})^2 - q$ first. Its sign tells you how many solutions there are.";
+const HINT_FORMULA = tx(
+  "Read off $p$ and $q$ with their signs. Then $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.",
+  "Lies $p$ und $q$ mit Vorzeichen ab. Dann gilt $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.",
+);
+const HINT_D = tx(
+  "Work out the discriminant $D = (\\frac{p}{2})^2 - q$ first. Its sign tells you how many solutions there are.",
+  "Berechne zuerst die Diskriminante $D = (\\frac{p}{2})^2 - q$. Ihr Vorzeichen verrät dir, wie viele Lösungen es gibt.",
+);
+const SOLVE = tx("Solve for x", "Löse die Gleichung");
+const divideFirst = (a: number) =>
+  tx(`Divide by $${a}$ first. Then look at the discriminant.`, `Teile zuerst durch $${a}$. Dann schau dir die Diskriminante an.`);
 
-function normalTask(target: Target, a: number, hint: string): Exercise {
+function normalTask(target: Target, a: number, hint: Text): Exercise {
   const left = [T("a", a, 2), T("p", clean(a * target.p), 1), T("q", clean(a * target.q), 0)];
   return {
-    instruction: "Solve for x",
+    instruction: SOLVE,
     math: eqSrc(left, [], false),
     answer: answer(target.values),
     hint,
@@ -281,14 +375,28 @@ function level1(rng: Rng): Exercise | null {
   }
   if (roll < 0.8) {
     const t = twoRoots(rng, "odd", 8);
-    return t && normalTask(t, 1, "$p$ is odd, so $\\frac{p}{2}$ is a decimal number like $1,5$. That's fine!");
+    return (
+      t &&
+      normalTask(
+        t,
+        1,
+        tx("$p$ is odd, so $\\frac{p}{2}$ is a decimal number like $1,5$. That's fine!", "$p$ ist ungerade, also ist $\\frac{p}{2}$ eine Dezimalzahl wie $1,5$. Das ist okay!"),
+      )
+    );
   }
   if (rng.chance(0.5)) {
     const r = rng.nonZero(-12, 12);
-    return normalTask({ p: -r, q: 0, values: [0, r] }, 1, "There's no number on its own. Factor out $x$.");
+    return normalTask({ p: -r, q: 0, values: [0, r] }, 1, tx("There's no number on its own. Factor out $x$.", "Es gibt keine Zahl ohne $x$. Klammere $x$ aus."));
   }
   const r = rng.int(2, 12);
-  return normalTask({ p: 0, q: -r * r, values: [r, -r] }, 1, "There's no $x$-term. Solve for $x^2$ and take the root. Two solutions!");
+  return normalTask(
+    { p: 0, q: -r * r, values: [r, -r] },
+    1,
+    tx(
+      "There's no $x$-term. Solve for $x^2$ and take the root. Two solutions!",
+      "Es fehlt der $x$-Term. Löse nach $x^2$ auf und zieh die Wurzel. Zwei Lösungen!",
+    ),
+  );
 }
 
 function level2(rng: Rng): Exercise | null {
@@ -297,32 +405,46 @@ function level2(rng: Rng): Exercise | null {
     const t = twoRoots(rng, "any", 7, 30);
     const a = rng.pick([2, 2, 3, 4, 5, -1, -2, -3]);
     if (!t || Math.abs(a * t.q) > 80 || Math.abs(a * t.p) > 40) return null;
-    return normalTask(t, a, a === -1 ? "Multiply everything by $-1$ (or divide by $-1$) first." : `Divide every term by $${par(a)}$ first.`);
+    return normalTask(
+      t,
+      a,
+      a === -1
+        ? tx("Multiply everything by $-1$ (or divide by $-1$) first.", "Multipliziere zuerst alles mit $-1$ (oder teile durch $-1$).")
+        : tx(`Divide every term by $${par(a)}$ first.`, `Teile zuerst jeden Term durch $${par(a)}$.`),
+    );
   }
   if (roll < 0.65) {
     const t = doubleRoot(rng);
     const a = rng.pick([1, 1, 2, 3]);
     if (Math.abs(a * t.q) > 80) return null;
-    return normalTask(t, a, a === 1 ? HINT_D : `Divide by $${a}$ first. Then look at the discriminant.`);
+    return normalTask(t, a, a === 1 ? HINT_D : divideFirst(a));
   }
   if (roll < 0.8) {
     const t = noRoot(rng);
     const a = rng.pick([1, 1, 1, 2, 3]);
     if (Math.abs(a * t.q) > 80) return null;
-    return normalTask(t, a, a === 1 ? HINT_D : `Divide by $${a}$ first. Then look at the discriminant.`);
+    return normalTask(t, a, a === 1 ? HINT_D : divideFirst(a));
   }
   const a = rng.pick([2, 3, 4, 5]);
   const kind = rng.pick([0, 0, 1, 1, 2]);
   if (kind === 0) {
     const r = rng.nonZero(-8, 8);
-    return normalTask({ p: -r, q: 0, values: [0, r] }, a, "There's no number on its own. Factor out $x$, or divide first.");
+    return normalTask(
+      { p: -r, q: 0, values: [0, r] },
+      a,
+      tx("There's no number on its own. Factor out $x$, or divide first.", "Es gibt keine Zahl ohne $x$. Klammere $x$ aus oder teile vorher."),
+    );
   }
   if (kind === 1) {
     const r = rng.int(2, 6);
-    return normalTask({ p: 0, q: -r * r, values: [r, -r] }, a, "There's no $x$-term. Solve for $x^2$ and take the root.");
+    return normalTask(
+      { p: 0, q: -r * r, values: [r, -r] },
+      a,
+      tx("There's no $x$-term. Solve for $x^2$ and take the root.", "Es fehlt der $x$-Term. Löse nach $x^2$ auf und zieh die Wurzel."),
+    );
   }
   const k = rng.int(1, 9);
-  return normalTask({ p: 0, q: k, values: [] }, 1, "Solve for $x^2$. Can a square be negative?");
+  return normalTask({ p: 0, q: k, values: [] }, 1, tx("Solve for $x^2$. Can a square be negative?", "Löse nach $x^2$ auf. Kann ein Quadrat negativ sein?"));
 }
 
 /** Terms on both sides of the equation. */
@@ -339,10 +461,10 @@ function bothSides(rng: Rng): Exercise | null {
   const [left, right] = assignIds([T("l1", A + ar, 2), T("l2", bl, 1), T("l3", cl, 0)], [T("r1", ar, 2), T("r2", d, 1), T("r3", e, 0)]);
   if (left.filter((x) => x.c !== 0).length < 2) return null;
   return {
-    instruction: "Solve for x",
+    instruction: SOLVE,
     math: eqSrc(left, right, false),
     answer: answer(t.values),
-    hint: "Bring everything to one side first, sort the terms and combine them.",
+    hint: tx("Bring everything to one side first, sort the terms and combine them.", "Bring zuerst alles auf eine Seite, sortiere die Terme und fasse sie zusammen."),
     solution: solutionFrames(left, right),
   };
 }
@@ -373,16 +495,25 @@ function withBrackets(rng: Rng): Exercise | null {
   const keyedHead = kind === "two" ? `${bracket(u)}#B1 ${bracket(v)}#B2` : kind === "x" ? `x#B0 ${bracket(u)}#B1` : `${bracket(u)}#B1^{2#B1e}`;
   const expandNote =
     kind === "two"
-      ? "Expand the brackets: every term times every term."
+      ? tx("Expand the brackets: every term times every term.", "Multipliziere die Klammern aus: jeder Term mal jeder Term.")
       : kind === "x"
-        ? `Multiply the $x$ into the bracket: $x ${bracket(u)} = ${plainTerms(rawLeft)}$.`
-        : `Binomial formula: $${bracket(u)}^2 = ${plainTerms(rawLeft)}$.`;
+        ? tx(
+            `Multiply the $x$ into the bracket: $x ${bracket(u)} = ${plainTerms(rawLeft)}$.`,
+            `Multipliziere die Klammer aus: $x ${bracket(u)} = ${plainTerms(rawLeft)}$.`,
+          )
+        : tx(`Binomial formula: $${bracket(u)}^2 = ${plainTerms(rawLeft)}$.`, `Binomische Formel: $${bracket(u)}^2 = ${plainTerms(rawLeft)}$.`);
   return {
-    instruction: "Solve for x",
+    instruction: SOLVE,
     math: `${head} = ${sideSrc(right, false)}`,
     answer: answer(t.values),
-    hint: "Expand the brackets first. Then bring everything to one side.",
-    solution: [{ math: `${keyedHead} =#eq ${sideSrc(right)}`, note: "Brackets first. The pq formula only works for the normal form." }, ...solutionFrames(left, right, expandNote)],
+    hint: tx("Expand the brackets first. Then bring everything to one side.", "Multipliziere zuerst die Klammern aus. Dann bring alles auf eine Seite."),
+    solution: [
+      {
+        math: `${keyedHead} =#eq ${sideSrc(right)}`,
+        note: tx("Brackets first. The pq formula only works for the normal form.", "Erst die Klammern. Die pq-Formel funktioniert nur mit der Normalform."),
+      },
+      ...solutionFrames(left, right, expandNote),
+    ],
   };
 }
 
@@ -391,15 +522,32 @@ function decimals(rng: Rng): Exercise | null {
   const roll = rng.next();
   if (roll < 0.5) {
     const t = halfRoots(rng);
-    return t && normalTask(t, 1, "Careful with the decimals: work out $(\\frac{p}{2})^2$ first, then subtract $q$.");
+    return (
+      t &&
+      normalTask(
+        t,
+        1,
+        tx(
+          "Careful with the decimals: work out $(\\frac{p}{2})^2$ first, then subtract $q$.",
+          "Vorsicht mit den Dezimalzahlen: Berechne erst $(\\frac{p}{2})^2$, dann zieh $q$ ab.",
+        ),
+      )
+    );
   }
   if (roll < 0.75) {
     const t = halfRoots(rng);
     if (!t || Math.abs(4 * t.q) > 60) return null;
-    return normalTask(t, 4, "Divide every term by $4$ first. Decimals are fine.");
+    return normalTask(t, 4, tx("Divide every term by $4$ first. Decimals are fine.", "Teile zuerst jeden Term durch $4$. Dezimalzahlen sind okay."));
   }
   const t = twoRoots(rng, "any", 8, 30);
-  return t && normalTask(t, 0.5, "Multiply every term by $2$ first, so that $x^2$ stands alone.");
+  return (
+    t &&
+    normalTask(
+      t,
+      0.5,
+      tx("Multiply every term by $2$ first, so that $x^2$ stands alone.", "Multipliziere zuerst jeden Term mit $2$, damit vor $x^2$ keine Zahl mehr steht."),
+    )
+  );
 }
 
 function generate(level: Level, rng: Rng): Exercise {
@@ -478,14 +626,15 @@ function Slider({ name, value, min, max, onChange }: { name: string; value: numb
   );
 }
 
-const CASES = [
-  { k: 2, cond: "D > 0", label: "two solutions", pic: "Crosses the x‑axis." },
-  { k: 1, cond: "D = 0", label: "one solution", pic: "Touches the x‑axis." },
-  { k: 0, cond: "D < 0", label: "no solution", pic: "Misses the x‑axis." },
-] as const;
+const CASES: { k: number; cond: string; label: Text; pic: Text }[] = [
+  { k: 2, cond: "D > 0", label: tx("two solutions", "zwei Lösungen"), pic: tx("Crosses the x‑axis.", "Schneidet die x‑Achse.") },
+  { k: 1, cond: "D = 0", label: tx("one solution", "eine Lösung"), pic: tx("Touches the x‑axis.", "Berührt die x‑Achse.") },
+  { k: 0, cond: "D < 0", label: tx("no solution", "keine Lösung"), pic: tx("Misses the x‑axis.", "Trifft die x‑Achse nicht.") },
+];
 
 function ParabolaLab() {
   const scope = useId();
+  const t = useText();
   const [p, setP] = useState(-2);
   const [q, setQ] = useState(-3);
   const half = clean(-p / 2);
@@ -501,12 +650,12 @@ function ParabolaLab() {
 
   const eq = `${sideSrc([T("a", 1, 2), T("p", p, 1), T("q", q, 0)], false)} = 0`;
   const dSrc = `D = (\\frac{p}{2})^2 - q = ${par(clean(p / 2))}^2 - ${par(q)} = ${dec(D)}`;
-  const sol =
+  const sol: Text =
     kind === 2
       ? `x_{1,2} = ${dec(half)} \\pm \\sqrt{${dec(D)}} \\quad x_1 ${exact ? "=" : "\\approx"} ${exact ? dec(zeros[0]) : round2(zeros[0])} \\quad x_2 ${exact ? "=" : "\\approx"} ${exact ? dec(zeros[1]) : round2(zeros[1])}`
       : kind === 1
         ? `x = ${dec(half)}`
-        : `\\sqrt{${dec(D)}} "doesn't exist"`;
+        : tx(`\\sqrt{${dec(D)}} "doesn't exist"`, `\\sqrt{${dec(D)}} "gibt es nicht"`);
   const tone = kind === 2 ? "var(--blob)" : kind === 1 ? "var(--ink)" : "var(--danger)";
 
   return (
@@ -642,8 +791,8 @@ function ParabolaLab() {
               )}
               <div className="relative">
                 <MathView src={c.cond} size="sm" animate={false} className={kind === c.k ? (c.k === 0 ? "text-danger" : "text-blob-ink") : "text-ink-3"} />
-                <div className={cn("text-[13px] font-semibold", kind === c.k ? "text-ink" : "text-ink-3")}>{c.label}</div>
-                <div className={cn("text-[12px] leading-snug", kind === c.k ? "text-ink-2" : "text-ink-3/80")}>{c.pic}</div>
+                <div className={cn("text-[13px] font-semibold", kind === c.k ? "text-ink" : "text-ink-3")}>{t(c.label)}</div>
+                <div className={cn("text-[12px] leading-snug", kind === c.k ? "text-ink-2" : "text-ink-3/80")}>{t(c.pic)}</div>
               </div>
             </div>
           ))}
@@ -659,60 +808,117 @@ function ParabolaLab() {
 const spotFrames: Frame[] = [
   {
     math: "x#va^{2#ea} +#sp 6#cp x#vp +#sq 8#cq =#eq 0#z",
-    note: "A quadratic equation in **normal form**: $x^2$ with no number in front, then an $x$-term, then a number. On the right: $0$.",
+    note: tx(
+      "A quadratic equation in **normal form**: $x^2$ with no number in front, then an $x$-term, then a number. On the right: $0$.",
+      "Eine quadratische Gleichung in **Normalform**: $x^2$ ohne Zahl davor, dann ein $x$-Term, dann eine Zahl. Rechts steht $0$.",
+    ),
   },
-  { math: "x#va^{2#ea} +#sp 6#cp x#vp +#sq 8#cq =#eq 0#z", highlight: ["sp", "cp"], note: "The number in front of $x$ is called $p$. Here $p = 6$." },
-  { math: "x#va^{2#ea} +#sp 6#cp x#vp +#sq 8#cq =#eq 0#z", highlight: ["sq", "cq"], note: "The number on its own is called $q$. Here $q = 8$." },
+  {
+    math: "x#va^{2#ea} +#sp 6#cp x#vp +#sq 8#cq =#eq 0#z",
+    highlight: ["sp", "cp"],
+    note: tx("The number in front of $x$ is called $p$. Here $p = 6$.", "Die Zahl vor dem $x$ heißt $p$. Hier ist $p = 6$."),
+  },
+  {
+    math: "x#va^{2#ea} +#sp 6#cp x#vp +#sq 8#cq =#eq 0#z",
+    highlight: ["sq", "cq"],
+    note: tx("The number on its own is called $q$. Here $q = 8$.", "Die Zahl ohne $x$ heißt $q$. Hier ist $q = 8$."),
+  },
   {
     math: "x#va^{2#ea} -#sp 2#cp x#vp -#sq 15#cq =#eq 0#z",
     highlight: ["sp", "cp", "sq", "cq"],
-    note: "The sign belongs to the number! Here $p = -2$ and $q = -15$.",
+    note: tx("The sign belongs to the number! Here $p = -2$ and $q = -15$.", "Das Vorzeichen gehört zur Zahl! Hier ist $p = -2$ und $q = -15$."),
   },
 ];
 
 const FORMULA = "x#xx _{1,2#xs} =#eq -#m1 \\frac{p#P1}{2#t1}#F1 \\pm#pm \\sqrt{(\\frac{p#P2}{2#t2}#F2)#B2^{2#two} -#m2 q#Q}#R";
 
 const formulaFrames: Frame[] = [
-  { math: FORMULA, note: "This is the **pq formula**. The $\\pm$ means: once with plus, once with minus. That's where the two solutions come from." },
-  ...pqFrames(-4, -5).map((f, i) => (i === 0 ? { ...f, note: "Let's use it for $x^2 - 4x - 5 = 0$. Read off $p = -4$ and $q = -5$, with their signs." } : f)),
+  {
+    math: FORMULA,
+    note: tx(
+      "This is the **pq formula**. The $\\pm$ means: once with plus, once with minus. That's where the two solutions come from.",
+      "Das ist die **pq-Formel**. Das $\\pm$ heißt: einmal mit Plus, einmal mit Minus. Daher kommen die zwei Lösungen.",
+    ),
+  },
+  ...pqFrames(-4, -5).map((f, i) =>
+    i === 0
+      ? {
+          ...f,
+          note: tx(
+            "Let's use it for $x^2 - 4x - 5 = 0$. Read off $p = -4$ and $q = -5$, with their signs.",
+            "Wir wenden sie auf $x^2 - 4x - 5 = 0$ an. Lies $p = -4$ und $q = -5$ ab, mit Vorzeichen.",
+          ),
+        }
+      : f,
+  ),
 ];
 
 const discFrames: Frame[] = [
   {
     math: "x#xx _{1,2#xs} =#eq -#m1 \\frac{p#P1}{2#t1}#F1 \\pm#pm \\sqrt{\\hl{(\\frac{p#P2}{2#t2}#F2)#B2^{2#two} -#m2 q#Q}}#R",
-    note: "Look at the part under the root. It's called the **discriminant** $D$.",
+    note: tx(
+      "Look at the part under the root. It's called the **discriminant** $D$.",
+      "Schau dir den Teil unter der Wurzel an. Er heißt **Diskriminante** $D$.",
+    ),
   },
-  { math: "D#D =#eq (\\frac{p#P2}{2#t2}#F2)#B2^{2#two} -#m2 q#Q", note: "$D = (\\frac{p}{2})^2 - q$. Before you solve, it tells you how many solutions there are." },
+  {
+    math: "D#D =#eq (\\frac{p#P2}{2#t2}#F2)#B2^{2#two} -#m2 q#Q",
+    note: tx(
+      "$D = (\\frac{p}{2})^2 - q$. Before you solve, it tells you how many solutions there are.",
+      "$D = (\\frac{p}{2})^2 - q$. Sie verrät dir schon vor dem Lösen, wie viele Lösungen es gibt.",
+    ),
+  },
   {
     math: "x#a1^{2#a2} -#b1 6#b2 x#b3 +#c1 5#q =#e1 0#z \\quad D#D =#e2 9#h -#mm 5#q2 =#e3 4#Dv >#rel 0#z2",
     highlight: ["Dv", "rel", "z2"],
-    note: "$x^2 - 6x + 5 = 0$: $D = 9 - 5 = 4 > 0$. **Two** solutions: $x = 3 \\pm 2$, so $5$ and $1$.",
+    note: tx(
+      "$x^2 - 6x + 5 = 0$: $D = 9 - 5 = 4 > 0$. **Two** solutions: $x = 3 \\pm 2$, so $5$ and $1$.",
+      "$x^2 - 6x + 5 = 0$: $D = 9 - 5 = 4 > 0$. **Zwei** Lösungen: $x = 3 \\pm 2$, also $5$ und $1$.",
+    ),
   },
   {
     math: "x#a1^{2#a2} -#b1 6#b2 x#b3 +#c1 9#q =#e1 0#z \\quad D#D =#e2 9#h -#mm 9#q2 =#e3 0#Dv =#rel 0#z2",
     highlight: ["q", "q2", "Dv", "rel", "z2"],
-    note: "Now $q = 9$: $D = 0$. And $3 \\pm 0$ is just $3$. **One** solution.",
+    note: tx(
+      "Now $q = 9$: $D = 0$. And $3 \\pm 0$ is just $3$. **One** solution.",
+      "Jetzt ist $q = 9$: $D = 0$. Und $3 \\pm 0$ ist einfach $3$. **Eine** Lösung.",
+    ),
   },
   {
     math: "x#a1^{2#a2} -#b1 6#b2 x#b3 +#c1 13#q =#e1 0#z \\quad D#D =#e2 9#h -#mm 13#q2 =#e3 -#Dvs 4#Dv <#rel 0#z2",
     highlight: ["q", "q2", "Dv", "Dvs", "rel", "z2"],
-    note: "Now $q = 13$: $D = -4 < 0$. There's no root of a negative number. **No** solution.",
+    note: tx(
+      "Now $q = 13$: $D = -4 < 0$. There's no root of a negative number. **No** solution.",
+      "Jetzt ist $q = 13$: $D = -4 < 0$. Aus einer negativen Zahl gibt es keine Wurzel. **Keine** Lösung.",
+    ),
   },
 ];
 
 const normalFormFrames: Frame[] = [
-  { math: "3#ca x#va^{2#ea} +#sp 6#cp x#vp -#sq 24#cq =#eq 0#z", note: "A $3$ in front of $x^2$: this is not the normal form yet." },
+  {
+    math: "3#ca x#va^{2#ea} +#sp 6#cp x#vp -#sq 24#cq =#eq 0#z",
+    note: tx("A $3$ in front of $x^2$: this is not the normal form yet.", "Eine $3$ vor $x^2$: Das ist noch nicht die Normalform."),
+  },
   {
     math: "3#ca x#va^{2#ea} +#sp 6#cp x#vp -#sq 24#cq =#eq 0#z \\quad |#bar :#dv 3#da",
     highlight: ["bar", "dv", "da"],
-    note: "Divide **every** term by $3$, not just the first one.",
+    note: tx("Divide **every** term by $3$, not just the first one.", "Teile **jeden** Term durch $3$, nicht nur den ersten."),
   },
-  { math: "x#va^{2#ea} +#sp 2#cp x#vp -#sq 8#cq =#eq 0#z", note: "Normal form! Now $p = 2$ and $q = -8$." },
-  { math: "x#wa^{2#wae} =#weq 4#wcp x#wvp +#wsq 5#wcq", note: "Terms on both sides? Bring everything to the left first." },
+  {
+    math: "x#va^{2#ea} +#sp 2#cp x#vp -#sq 8#cq =#eq 0#z",
+    note: tx("Normal form! Now $p = 2$ and $q = -8$.", "Normalform! Jetzt ist $p = 2$ und $q = -8$."),
+  },
+  {
+    math: "x#wa^{2#wae} =#weq 4#wcp x#wvp +#wsq 5#wcq",
+    note: tx("Terms on both sides? Bring everything to the left first.", "Terme auf beiden Seiten? Bring zuerst alles nach links."),
+  },
   {
     math: "x#wa^{2#wae} -#wsq 4#wcp x#wvp -#wsq2 5#wcq =#weq 0#wz",
     highlight: ["wsq", "wcp", "wsq2", "wcq"],
-    note: "$4x$ and $5$ change sides, so their signs flip. Now it's normal form with $p = -4$ and $q = -5$.",
+    note: tx(
+      "$4x$ and $5$ change sides, so their signs flip. Now it's normal form with $p = -4$ and $q = -5$.",
+      "$4x$ und $5$ wechseln die Seite, also ändern sich ihre Vorzeichen. Jetzt ist es die Normalform mit $p = -4$ und $q = -5$.",
+    ),
   },
 ];
 
@@ -721,20 +927,29 @@ const shortcutFrames: Frame[] = [...qZeroFrames(-5), ...pZeroFrames(-16)];
 const vietaFrames: Frame[] = [
   {
     math: "x#s1 _{1#s1i} +#plus x#s2 _{2#s2i} =#se -#sm p#sp \\quad x#t1 _{1#t1i} \\cdot#tdot x#t2 _{2#t2i} =#te q#tq",
-    note: "Vieta's theorem: the two solutions **add up** to $-p$ and **multiply** to $q$.",
+    note: tx(
+      "Vieta's theorem: the two solutions **add up** to $-p$ and **multiply** to $q$.",
+      "Satz von Vieta: Die **Summe** der beiden Lösungen ist $-p$, ihr **Produkt** ist $q$.",
+    ),
   },
   {
     math: "5#s1 +#plus (-#s2s 1#s2)#s2b =#sr 4#sv =#se -#sm p#sp",
-    note: "For $x^2 - 4x - 5 = 0$ we found $5$ and $-1$. Their sum is $4$, and $-p = 4$. Correct!",
+    note: tx(
+      "For $x^2 - 4x - 5 = 0$ we found $5$ and $-1$. Their sum is $4$, and $-p = 4$. Correct!",
+      "Für $x^2 - 4x - 5 = 0$ haben wir $5$ und $-1$ gefunden. Ihre Summe ist $4$, und $-p = 4$. Passt!",
+    ),
   },
   {
     math: "5#t1 \\cdot#tdot (-#t2s 1#t2)#t2b =#tr -#tvs 5#tv =#te q#tq",
-    note: "Their product is $-5$, and $q = -5$. Both fit, so the solutions are right. A quick check without a calculator!",
+    note: tx(
+      "Their product is $-5$, and $q = -5$. Both fit, so the solutions are right. A quick check without a calculator!",
+      "Ihr Produkt ist $-5$, und $q = -5$. Beides passt, also stimmen die Lösungen. Eine schnelle Probe ohne Taschenrechner!",
+    ),
   },
 ];
 
-const lessonTask = (left: Term[], right: Term[], values: number[], hint: string): Exercise => ({
-  instruction: "Solve for x",
+const lessonTask = (left: Term[], right: Term[], values: number[], hint: Text): Exercise => ({
+  instruction: SOLVE,
   math: eqSrc(left, right, false),
   answer: answer(values),
   hint,
@@ -745,23 +960,52 @@ const pqFormula: Topic = {
   ...topicMeta("pq-formula"),
   summary: [
     {
-      title: "Normal form first",
-      body: "The pq formula needs $x^2 + px + q = 0$. Bring everything to one side. If there's a number in front of $x^2$, divide every term by it.",
+      title: tx("Normal form first", "Erst die Normalform"),
+      body: tx(
+        "The pq formula needs $x^2 + px + q = 0$. Bring everything to one side. If there's a number in front of $x^2$, divide every term by it.",
+        "Die pq-Formel braucht $x^2 + px + q = 0$. Bring alles auf eine Seite. Steht eine Zahl vor $x^2$, teile jeden Term durch diese Zahl.",
+      ),
       examples: ["2x^2 - 8x - 10 = 0 \\quad | : 2", "x^2 - 4x - 5 = 0"],
       tone: "rule",
     },
-    { title: "The pq formula", body: "Read off $p$ and $q$ with their signs and put them in.", examples: ["x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}"], tone: "rule" },
     {
-      title: "The discriminant",
-      body: "The part under the root decides how many solutions there are.",
-      examples: ['D = (\\frac{p}{2})^2 - q', 'D > 0 \\Rightarrow "two solutions"', 'D = 0 \\Rightarrow "one solution"', 'D < 0 \\Rightarrow "no solution"'],
+      title: tx("The pq formula", "Die pq-Formel"),
+      body: tx("Read off $p$ and $q$ with their signs and put them in.", "Lies $p$ und $q$ mit Vorzeichen ab und setz sie ein."),
+      examples: ["x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}"],
       tone: "rule",
     },
-    { title: "Faster special cases", body: "No number on its own: factor out $x$. No $x$-term: take the root.", examples: ["x^2 - 5x = 0 \\Rightarrow x(x - 5) = 0", "x^2 - 16 = 0 \\Rightarrow x = \\pm 4"], tone: "tip" },
-    { title: "Check with Vieta", body: "The solutions add up to $-p$ and multiply to $q$.", examples: ["x_1 + x_2 = -p", "x_1 \\cdot x_2 = q"], tone: "tip" },
     {
-      title: "Classic mistakes",
-      body: "The sign belongs to $p$ and $q$. And divide **every** term by the number in front of $x^2$, not just the first one.",
+      title: tx("The discriminant", "Die Diskriminante"),
+      body: tx("The part under the root decides how many solutions there are.", "Der Teil unter der Wurzel entscheidet, wie viele Lösungen es gibt."),
+      examples: [
+        "D = (\\frac{p}{2})^2 - q",
+        tx('D > 0 \\Rightarrow "two solutions"', 'D > 0 \\Rightarrow "zwei Lösungen"'),
+        tx('D = 0 \\Rightarrow "one solution"', 'D = 0 \\Rightarrow "eine Lösung"'),
+        tx('D < 0 \\Rightarrow "no solution"', 'D < 0 \\Rightarrow "keine Lösung"'),
+      ],
+      tone: "rule",
+    },
+    {
+      title: tx("Faster special cases", "Schnellere Sonderfälle"),
+      body: tx(
+        "No number on its own: factor out $x$. No $x$-term: take the root.",
+        "Keine Zahl ohne $x$: Klammere $x$ aus. Kein $x$-Term: Zieh die Wurzel.",
+      ),
+      examples: ["x^2 - 5x = 0 \\Rightarrow x(x - 5) = 0", "x^2 - 16 = 0 \\Rightarrow x = \\pm 4"],
+      tone: "tip",
+    },
+    {
+      title: tx("Check with Vieta", "Probe mit Vieta"),
+      body: tx("The solutions add up to $-p$ and multiply to $q$.", "Die Summe der Lösungen ist $-p$, ihr Produkt ist $q$."),
+      examples: ["x_1 + x_2 = -p", "x_1 \\cdot x_2 = q"],
+      tone: "tip",
+    },
+    {
+      title: tx("Classic mistakes", "Typische Fehler"),
+      body: tx(
+        "The sign belongs to $p$ and $q$. And divide **every** term by the number in front of $x^2$, not just the first one.",
+        "Das Vorzeichen gehört zu $p$ und $q$. Und teile **jeden** Term durch die Zahl vor $x^2$, nicht nur den ersten.",
+      ),
       examples: ["x^2 - 4x - 5 = 0 \\Rightarrow p = -4", "-\\frac{-4}{2} = +2"],
       tone: "warning",
     },
@@ -769,71 +1013,103 @@ const pqFormula: Topic = {
   lesson: [
     {
       type: "explain",
-      title: "Normal form: spot p and q",
-      blob: "Quadratic equations! Sounds scary, but there's a formula that does the work.",
-      body: "The pq formula (pq-Formel) solves every quadratic equation in **normal form**. First you need to find $p$ and $q$.",
+      title: tx("Normal form: spot p and q", "Normalform: p und q finden"),
+      blob: tx(
+        "Quadratic equations! Sounds scary, but there's a formula that does the work.",
+        "Quadratische Gleichungen! Klingt gruselig, aber es gibt eine Formel, die dir die Arbeit abnimmt.",
+      ),
+      body: tx(
+        "The pq formula (pq-Formel) solves every quadratic equation in **normal form**. First you need to find $p$ and $q$.",
+        "Die pq-Formel löst jede quadratische Gleichung in **Normalform**. Zuerst musst du $p$ und $q$ finden.",
+      ),
       frames: spotFrames,
     },
     {
       type: "explain",
-      title: "The pq formula",
-      blob: "Here it is! Watch how p and q slide into the formula.",
-      body: "For $x^2 + px + q = 0$ the solutions are $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.",
+      title: tx("The pq formula", "Die pq-Formel"),
+      blob: tx("Here it is! Watch how p and q slide into the formula.", "Da ist sie! Schau, wie p und q in die Formel rutschen."),
+      body: tx(
+        "For $x^2 + px + q = 0$ the solutions are $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.",
+        "Für $x^2 + px + q = 0$ sind die Lösungen $x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{(\\frac{p}{2})^2 - q}$.",
+      ),
       frames: formulaFrames,
     },
     {
       type: "check",
-      blob: "Your turn! Find p and q first.",
-      exercise: lessonTask([T("a", 1, 2), T("p", 2, 1), T("q", -8, 0)], [], [2, -4], "$p = 2$ and $q = -8$. Start with $-\\frac{p}{2} = -1$."),
+      blob: tx("Your turn! Find p and q first.", "Du bist dran! Finde zuerst p und q."),
+      exercise: lessonTask(
+        [T("a", 1, 2), T("p", 2, 1), T("q", -8, 0)],
+        [],
+        [2, -4],
+        tx("$p = 2$ and $q = -8$. Start with $-\\frac{p}{2} = -1$.", "$p = 2$ und $q = -8$. Fang mit $-\\frac{p}{2} = -1$ an."),
+      ),
     },
     {
       type: "explain",
-      title: "Two, one or no solution",
-      blob: "The number under the root is a little fortune teller.",
-      body: "Before you finish the formula, look at the part under the root.",
+      title: tx("Two, one or no solution", "Zwei, eine oder keine Lösung"),
+      blob: tx("The number under the root is a little fortune teller.", "Die Zahl unter der Wurzel ist eine kleine Wahrsagerin."),
+      body: tx(
+        "Before you finish the formula, look at the part under the root.",
+        "Bevor du die Formel zu Ende rechnest, schau auf den Teil unter der Wurzel.",
+      ),
       frames: discFrames,
     },
     {
       type: "widget",
-      title: "See it on the parabola",
-      blob: "Move p and q and watch the zeros slide. Can you make them meet?",
-      body: "The solutions are where the parabola $y = x^2 + px + q$ meets the $x$-axis. Use the sliders or drag the vertex $S$. The vertex lies exactly $D$ below the axis.",
+      title: tx("See it on the parabola", "Ein Blick auf die Parabel"),
+      blob: tx(
+        "Move p and q and watch the zeros slide. Can you make them meet?",
+        "Verschieb p und q und schau, wie die Nullstellen wandern. Schaffst du es, dass sie sich treffen?",
+      ),
+      body: tx(
+        "The solutions are where the parabola $y = x^2 + px + q$ meets the $x$-axis. Use the sliders or drag the vertex $S$. The vertex lies exactly $D$ below the axis.",
+        "Die Lösungen sind die Nullstellen der Parabel $y = x^2 + px + q$, also die Stellen, an denen sie die $x$-Achse trifft. Nutze die Regler oder zieh den Scheitelpunkt $S$. Er liegt genau $D$ unter der Achse.",
+      ),
       widget: ParabolaLab,
     },
     {
       type: "check",
-      blob: "Check the discriminant first. If there's nothing to find, there's a button for that.",
+      blob: tx(
+        "Check the discriminant first. If there's nothing to find, there's a button for that.",
+        "Prüf zuerst die Diskriminante. Gibt es keine Lösung, gibt es dafür einen eigenen Knopf.",
+      ),
       exercise: lessonTask([T("a", 1, 2), T("p", -2, 1), T("q", 5, 0)], [], [], HINT_D),
     },
     {
       type: "explain",
-      title: "Normal form first",
-      blob: "The formula is picky. It only takes the normal form!",
-      body: "A number in front of $x^2$? Divide by it. Terms on both sides? Bring them to one side.",
+      title: tx("Normal form first", "Erst die Normalform"),
+      blob: tx("The formula is picky. It only takes the normal form!", "Die Formel ist wählerisch. Sie nimmt nur die Normalform!"),
+      body: tx(
+        "A number in front of $x^2$? Divide by it. Terms on both sides? Bring them to one side.",
+        "Eine Zahl vor $x^2$? Teile durch sie. Terme auf beiden Seiten? Bring alles auf eine Seite.",
+      ),
       frames: normalFormFrames,
     },
     {
       type: "check",
-      blob: "Divide first, then the formula.",
-      exercise: lessonTask([T("a", 2, 2), T("p", -4, 1), T("q", -30, 0)], [], [5, -3], "Divide every term by $2$ first."),
+      blob: tx("Divide first, then the formula.", "Erst teilen, dann die Formel."),
+      exercise: lessonTask([T("a", 2, 2), T("p", -4, 1), T("q", -30, 0)], [], [5, -3], tx("Divide every term by $2$ first.", "Teile zuerst jeden Term durch $2$.")),
     },
     {
       type: "explain",
-      title: "Shortcuts: q = 0 or p = 0",
-      blob: "Sometimes you don't need the formula at all. Lazy is smart!",
-      body: "If $q$ or $p$ is missing, there's a quicker way. The formula still works, but this is faster.",
+      title: tx("Shortcuts: q = 0 or p = 0", "Abkürzungen: q = 0 oder p = 0"),
+      blob: tx("Sometimes you don't need the formula at all. Lazy is smart!", "Manchmal brauchst du die Formel gar nicht. Faul ist schlau!"),
+      body: tx(
+        "If $q$ or $p$ is missing, there's a quicker way. The formula still works, but this is faster.",
+        "Fehlt $q$ oder $p$, geht es schneller. Die Formel funktioniert trotzdem, aber so bist du flotter.",
+      ),
       frames: shortcutFrames,
     },
     {
       type: "explain",
-      title: "Check with Vieta",
-      blob: "A secret trick to check your answers in seconds.",
+      title: tx("Check with Vieta", "Probe mit Vieta"),
+      blob: tx("A secret trick to check your answers in seconds.", "Ein geheimer Trick, mit dem du deine Lösungen in Sekunden prüfst."),
       frames: vietaFrames,
     },
     {
       type: "check",
-      blob: "Last one! What do you do first?",
-      exercise: lessonTask([T("a", 1, 2), T("p", 3, 1)], [T("q", 10, 0)], [2, -5], "Bring the $10$ to the left first."),
+      blob: tx("Last one! What do you do first?", "Letzte Aufgabe! Was machst du zuerst?"),
+      exercise: lessonTask([T("a", 1, 2), T("p", 3, 1)], [T("q", 10, 0)], [2, -5], tx("Bring the $10$ to the left first.", "Bring zuerst die $10$ nach links.")),
     },
   ],
   generate,

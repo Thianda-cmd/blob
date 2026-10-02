@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { Blob } from "@/components/blob/Blob";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
+import { useMessages } from "@/i18n/client";
+import { presentText } from "@/i18n/messages/present";
 import type { Deck, SlideTransition } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { buildUnits, deckPalette, sectionNumbers, transitionFor } from "./deck";
@@ -29,25 +31,11 @@ type Message =
   | { t: "laser"; x: number; y: number }
   | { t: "laser-off" };
 
-const SHORTCUTS: [string[], string][] = [
-  [["→", "Space"], "Next (reveals the next item first)"],
-  [["←"], "Back"],
-  [["Home", "End"], "First / last slide"],
-  [["G"], "All slides"],
-  [["S"], "Speaker view"],
-  [["P"], "Open the other view in a new window"],
-  [["N"], "Notes overlay"],
-  [["B", "W"], "Black / white screen"],
-  [["L"], "Laser pointer"],
-  [["F"], "Full screen"],
-  [["?"], "This help"],
-  [["Esc"], "Close, or exit"],
-];
-
 /** Fullscreen slideshow. Lives outside the app shell. Two windows (audience + speaker) stay in sync. */
 export function Presenter({ pageId, title, deck, start, initialView = "audience" }: { pageId: string; title: string; deck: Deck; start: number; initialView?: View }) {
   const router = useRouter();
   const reduce = useReducedMotion();
+  const t = useMessages(presentText);
   const total = deck.slides.length;
   const palette = useMemo(() => deckPalette(deck.theme, deck.custom), [deck.theme, deck.custom]);
   const sections = useMemo(() => sectionNumbers(deck.slides), [deck.slides]);
@@ -65,8 +53,10 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
   const [laserSeen, setLaserSeen] = useState(false);
   const [help, setHelp] = useState(false);
   const [timer, setTimer] = useState<Timer>({ acc: 0, since: null });
+  const [notice, setNotice] = useState<string | null>(null);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const remoteLaserTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const swipe = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
@@ -186,10 +176,16 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
     const target: View = view === "speaker" ? "audience" : "speaker";
     const url = `/present/${pageId}?slide=${Math.min(posRef.current.index, total - 1) + 1}${target === "speaker" ? "&view=speaker" : ""}`;
     const w = window.open(url, `blob-deck-${target}`, target === "speaker" ? "popup,width=1180,height=760" : "popup,width=1280,height=760");
-    if (w) other.current = w;
-    // Pop-ups blocked: show the speaker view here instead.
-    else if (target === "speaker") setView("speaker");
-  }, [view, pageId, total]);
+    if (w) {
+      other.current = w;
+      return;
+    }
+    // Pop-ups blocked: show the speaker view here instead, and say why.
+    if (target === "speaker") setView("speaker");
+    setNotice(target === "speaker" ? t.popupSpeaker : t.popupAudience);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 5000);
+  }, [view, pageId, total, t]);
 
   // Chrome ----------------------------------------------------------------------
 
@@ -230,6 +226,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
       clearTimeout(t);
       clearTimeout(started);
       clearTimeout(remoteLaserTimer.current);
+      clearTimeout(noticeTimer.current);
     };
   }, []);
 
@@ -429,6 +426,20 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
         )}
       </AnimatePresence>
       <AnimatePresence>{help && <Help onClose={() => setHelp(false)} />}</AnimatePresence>
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.2 } }}
+            transition={{ type: "spring", stiffness: 420, damping: 32 }}
+            className="pointer-events-none fixed inset-x-0 top-16 z-[70] flex justify-center px-4"
+          >
+            <div className="max-w-[520px] rounded-xl border border-white/10 bg-[#1c1b18] px-3.5 py-2 text-center text-[13px] text-white/80 shadow-pop">{notice}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {(laser || laserSeen) && !(blank && view === "audience") && (
         <motion.div
           aria-hidden
@@ -443,7 +454,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
     return (
       <div onPointerMove={onLaserMove} style={{ cursor: laser ? "none" : undefined }}>
         <p className="sr-only" aria-live="polite">
-          {ended ? "End of presentation" : `Slide ${index + 1} of ${total}`}
+          {ended ? t.endOfPresentation : t.slideOf(index + 1, total)}
         </p>
         <SpeakerView
           deck={deck}
@@ -501,7 +512,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
       }}
     >
       <p className="sr-only" aria-live="polite">
-        {ended ? "End of presentation" : `Slide ${index + 1} of ${total}${slide.title.trim() ? `: ${slide.title.trim()}` : ""}`}
+        {ended ? t.endOfPresentation : `${t.slideOf(index + 1, total)}${slide.title.trim() ? `: ${slide.title.trim()}` : ""}`}
       </p>
 
       {/* Slides */}
@@ -540,28 +551,28 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
         onClick={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
       >
-        <ChromeButton onClick={exit} label="Exit presentation">
-          <X className="size-4" /> Exit <Kbd className="ml-0.5 border-white/10 bg-white/5 text-white/50 shadow-none">Esc</Kbd>
+        <ChromeButton onClick={exit} label={t.exitPresentation}>
+          <X className="size-4" /> {t.exit} <Kbd className="ml-0.5 border-white/10 bg-white/5 text-white/50 shadow-none">Esc</Kbd>
         </ChromeButton>
         <div className="flex gap-1.5">
-          <ChromeButton onClick={() => setNotes((v) => !v)} label="Speaker notes (N)" active={notes}>
-            <NotebookText className="size-4" /> Notes
+          <ChromeButton onClick={() => setNotes((v) => !v)} label={t.notesKey} active={notes}>
+            <NotebookText className="size-4" /> {t.notes}
           </ChromeButton>
-          <ChromeButton onClick={() => setView("speaker")} label="Speaker view (S) · P opens it in a new window">
+          <ChromeButton onClick={() => setView("speaker")} label={t.speakerViewKey}>
             <MonitorSpeaker className="size-4" />
           </ChromeButton>
-          <ChromeButton onClick={() => setOverview(Math.min(index, total - 1))} label="All slides (G)">
+          <ChromeButton onClick={() => setOverview(Math.min(index, total - 1))} label={t.allSlidesKey}>
             <LayoutGrid className="size-4" />
           </ChromeButton>
-          <ChromeButton onClick={() => setLaser((v) => !v)} label="Laser pointer (L)" active={laser}>
+          <ChromeButton onClick={() => setLaser((v) => !v)} label={t.laserKey} active={laser}>
             <span className="grid size-4 place-items-center">
               <span className={cn("size-2 rounded-full", laser ? "bg-[#ff2e55] shadow-[0_0_8px_2px_rgb(255_46_85/0.6)]" : "bg-current")} />
             </span>
           </ChromeButton>
-          <ChromeButton onClick={() => setHelp(true)} label="Keyboard shortcuts (?)">
+          <ChromeButton onClick={() => setHelp(true)} label={t.shortcutsKey}>
             <Keyboard className="size-4" />
           </ChromeButton>
-          <ChromeButton onClick={toggleFullscreen} label={fullscreen ? "Exit full screen (F)" : "Full screen (F)"}>
+          <ChromeButton onClick={toggleFullscreen} label={fullscreen ? t.exitFullscreen : t.fullscreen}>
             {fullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
           </ChromeButton>
         </div>
@@ -576,11 +587,11 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
         onClick={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), prev())} disabled={index === 0 && step === 0} aria-label="Previous" className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
+        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), prev())} disabled={index === 0 && step === 0} aria-label={t.previous} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
           <ChevronLeft className="size-4" />
         </button>
-        <span className="min-w-[56px] px-1 text-center text-[12.5px] tabular-nums text-white/80">{ended ? "End" : `${index + 1} / ${total}`}</span>
-        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), next())} disabled={ended} aria-label="Next" className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
+        <span className="min-w-[56px] px-1 text-center text-[12.5px] tabular-nums text-white/80">{ended ? t.end : `${index + 1} / ${total}`}</span>
+        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), next())} disabled={ended} aria-label={t.next} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
           <ChevronRight className="size-4" />
         </button>
       </motion.div>
@@ -595,11 +606,11 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
             className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center"
           >
             <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#1c1b18] px-3.5 py-2 text-[12.5px] text-white/70 shadow-pop">
-              <Hint keys={["←", "→"]}>move</Hint>
-              <Hint keys={["S"]}>speaker view</Hint>
-              <Hint keys={["G"]}>all slides</Hint>
-              <Hint keys={["?"]}>shortcuts</Hint>
-              <Hint keys={["Esc"]}>exit</Hint>
+              <Hint keys={["←", "→"]}>{t.hintMove}</Hint>
+              <Hint keys={["S"]}>{t.hintSpeaker}</Hint>
+              <Hint keys={["G"]}>{t.hintAll}</Hint>
+              <Hint keys={["?"]}>{t.hintShortcuts}</Hint>
+              <Hint keys={["Esc"]}>{t.hintExit}</Hint>
             </div>
           </motion.div>
         )}
@@ -621,23 +632,23 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
             <div className="w-full max-w-[760px] rounded-2xl border border-white/10 bg-[#1c1b18] shadow-pop">
               <div className="flex items-center gap-3 border-b border-white/8 px-5 py-3 text-[12.5px] text-white/50">
                 <NotebookText className="size-3.5" />
-                <span className="font-medium text-white/80">Speaker notes</span>
-                <span className="tabular-nums">{ended ? "End" : `Slide ${index + 1} of ${total}`}</span>
+                <span className="font-medium text-white/80">{t.speakerNotes}</span>
+                <span className="tabular-nums">{ended ? t.end : t.slideOf(index + 1, total)}</span>
                 <span className="ml-auto truncate">
                   {nextSlide ? (
                     <>
-                      Next: <span className="text-white/75">{nextSlide.title.trim() || `Slide ${index + 2}`}</span>
+                      {t.nextLabel} <span className="text-white/75">{nextSlide.title.trim() || t.slideAria(index + 2, "")}</span>
                     </>
                   ) : ended ? null : (
-                    "Last slide"
+                    t.lastSlide
                   )}
                 </span>
-                <button type="button" onClick={() => setNotes(false)} aria-label="Hide notes" className="-mr-2 grid size-6 place-items-center rounded-md text-white/50 hover:bg-white/10 hover:text-white">
+                <button type="button" onClick={() => setNotes(false)} aria-label={t.hideNotes} className="-mr-2 grid size-6 place-items-center rounded-md text-white/50 hover:bg-white/10 hover:text-white">
                   <X className="size-3.5" />
                 </button>
               </div>
               <div className="max-h-[34vh] overflow-y-auto px-5 py-4 text-[17px] leading-[1.6] text-white/90">
-                {!ended && slide.notes.trim() ? <p className="whitespace-pre-wrap">{slide.notes}</p> : <p className="text-white/40">{ended ? "That was the last slide." : "No notes for this slide."}</p>}
+                {!ended && slide.notes.trim() ? <p className="whitespace-pre-wrap">{slide.notes}</p> : <p className="text-white/40">{ended ? t.lastSlideWas : t.noNotes}</p>}
               </div>
             </div>
           </motion.div>
@@ -719,6 +730,7 @@ function Overview({
   onHover: (i: number) => void;
   onClose: () => void;
 }) {
+  const t = useMessages(presentText);
   useEffect(() => {
     document.getElementById(`overview-${selected}`)?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -736,13 +748,13 @@ function Overview({
     >
       <div className="flex h-14 shrink-0 items-center gap-3 px-6 text-[13px] text-white/55">
         <LayoutGrid className="size-4" />
-        <span className="font-medium text-white/85">All slides</span>
+        <span className="font-medium text-white/85">{t.allSlides}</span>
         <span className="tabular-nums">{deck.slides.length}</span>
         <span className="ml-auto hidden items-center gap-1.5 sm:flex">
-          <Kbd className="border-white/12 bg-white/5 text-white/60 shadow-none">↵</Kbd> jump
-          <Kbd className="ml-2 border-white/12 bg-white/5 text-white/60 shadow-none">Esc</Kbd> close
+          <Kbd className="border-white/12 bg-white/5 text-white/60 shadow-none">↵</Kbd> {t.jump}
+          <Kbd className="ml-2 border-white/12 bg-white/5 text-white/60 shadow-none">Esc</Kbd> {t.closeHint}
         </span>
-        <SmallButton label="Close" onClick={onClose}>
+        <SmallButton label={t.close} onClick={onClose}>
           <X />
         </SmallButton>
       </div>
@@ -761,7 +773,7 @@ function Overview({
             onClick={() => onPick(i)}
             onPointerEnter={() => onHover(i)}
             className="group text-left outline-none"
-            aria-label={`Slide ${i + 1}${s.title.trim() ? `: ${s.title.trim()}` : ""}`}
+            aria-label={t.slideAria(i + 1, s.title.trim())}
             aria-current={i === current ? "true" : undefined}
           >
             <div
@@ -775,7 +787,7 @@ function Overview({
             </div>
             <div className="mt-1.5 flex items-center gap-2 text-[12px] text-white/50">
               <span className={cn("tabular-nums", i === current && "font-semibold text-blob-ink")}>{i + 1}</span>
-              <span className="truncate group-hover:text-white/80">{s.title.trim() || "Untitled slide"}</span>
+              <span className="truncate group-hover:text-white/80">{s.title.trim() || t.untitledSlide}</span>
             </div>
           </button>
         ))}
@@ -785,6 +797,21 @@ function Overview({
 }
 
 function Help({ onClose }: { onClose: () => void }) {
+  const t = useMessages(presentText);
+  const shortcuts: [string[], string][] = [
+    [["→", t.keys.space], t.help.next],
+    [["←"], t.help.back],
+    [[t.keys.home, t.keys.end], t.help.firstLast],
+    [["G"], t.help.all],
+    [["S"], t.help.speaker],
+    [["P"], t.help.popOut],
+    [["N"], t.help.notes],
+    [["B", "W"], t.help.blank],
+    [["L"], t.help.laser],
+    [["F"], t.help.fullscreen],
+    [["?"], t.help.help],
+    [["Esc"], t.help.exit],
+  ];
   return (
     <motion.div
       className="fixed inset-0 z-[60] grid place-items-center bg-black/50 px-4"
@@ -800,7 +827,7 @@ function Help({ onClose }: { onClose: () => void }) {
     >
       <motion.div
         role="dialog"
-        aria-label="Keyboard shortcuts"
+        aria-label={t.shortcuts}
         data-theme="dark"
         className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#1c1b18] p-5 text-[#f1efe8] shadow-pop"
         initial={{ scale: 0.95, y: 8 }}
@@ -810,14 +837,14 @@ function Help({ onClose }: { onClose: () => void }) {
       >
         <div className="mb-3 flex items-center gap-2">
           <Keyboard className="size-4 text-white/55" />
-          <h2 className="text-[14px] font-medium">Keyboard shortcuts</h2>
+          <h2 className="text-[14px] font-medium">{t.shortcuts}</h2>
           <span className="ml-auto" />
-          <SmallButton label="Close" onClick={onClose}>
+          <SmallButton label={t.close} onClick={onClose}>
             <X />
           </SmallButton>
         </div>
         <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
-          {SHORTCUTS.map(([keys, what]) => (
+          {shortcuts.map(([keys, what]) => (
             <div key={what} className="contents">
               <dt className="flex justify-end gap-1">
                 {keys.map((k) => (
@@ -830,27 +857,28 @@ function Help({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </dl>
-        <p className="mt-4 text-[12px] text-white/40">Click the right half of the screen to go on, the left half to go back. Swipe on touch screens.</p>
+        <p className="mt-4 text-[12px] text-white/40">{t.helpFooter}</p>
       </motion.div>
     </motion.div>
   );
 }
 
 function EndScreen({ title, total, onRestart, onExit }: { title: string; total: number; onRestart: () => void; onExit: () => void }) {
+  const t = useMessages(presentText);
   return (
     <div className="grid size-full place-items-center px-6">
       <div className="flex flex-col items-center text-center" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
         <Blob size={120} mood="excited" />
-        <h1 className="mt-3 font-display text-[40px] font-semibold tracking-[-0.03em] text-[#f6f4ee]">That&apos;s a wrap!</h1>
+        <h1 className="mt-3 font-display text-[40px] font-semibold tracking-[-0.03em] text-[#f6f4ee]">{t.wrap}</h1>
         <p className="mt-1 max-w-[520px] truncate text-[15px] text-white/55">
-          {title} · {total} {total === 1 ? "slide" : "slides"}
+          {title} · {t.slideCount(total)}
         </p>
         <div className="mt-7 flex gap-2">
           <Button variant="secondary" onClick={onRestart}>
-            <RotateCcw className="size-4" /> Start over
+            <RotateCcw className="size-4" /> {t.startOver}
           </Button>
           <Button variant="blob" onClick={onExit}>
-            Back to editor
+            {t.backToEditor}
           </Button>
         </div>
       </div>

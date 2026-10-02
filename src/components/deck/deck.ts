@@ -25,40 +25,36 @@ export const SLIDE_H = 720;
 
 export type LayoutGroup = "essentials" | "images" | "structure" | "emphasis";
 
-export const LAYOUT_GROUPS: { id: LayoutGroup; label: string }[] = [
-  { id: "essentials", label: "Essentials" },
-  { id: "images", label: "Images" },
-  { id: "structure", label: "Structure" },
-  { id: "emphasis", label: "Emphasis" },
-];
+/** Group order in the add-slide menu. Names and hints live in `deckText` (src/i18n/messages/deck.ts). */
+export const LAYOUT_GROUPS: LayoutGroup[] = ["essentials", "images", "structure", "emphasis"];
 
-export const LAYOUTS: { id: SlideLayout; label: string; hint: string; group: LayoutGroup }[] = [
-  { id: "title", label: "Title", hint: "Big title and a subtitle", group: "essentials" },
-  { id: "section", label: "Section", hint: "A numbered chapter divider", group: "essentials" },
-  { id: "agenda", label: "Agenda", hint: "A numbered list of what's coming", group: "essentials" },
-  { id: "bullets", label: "Bullets", hint: "A heading and a list", group: "essentials" },
-  { id: "closing", label: "Closing", hint: "Thank you, questions, contact", group: "essentials" },
-  { id: "split", label: "Split", hint: "Text beside an image or text", group: "images" },
-  { id: "media", label: "Media", hint: "An image on the left, text on the right", group: "images" },
-  { id: "image", label: "Image", hint: "A picture with a caption", group: "images" },
-  { id: "cover", label: "Cover", hint: "A full-bleed image with the title on top", group: "images" },
-  { id: "columns", label: "Columns", hint: "Two or three columns of text", group: "structure" },
-  { id: "compare", label: "Compare", hint: "Pros and cons, or A versus B", group: "structure" },
-  { id: "steps", label: "Steps", hint: "Numbered steps in a row", group: "structure" },
-  { id: "timeline", label: "Timeline", hint: "Dates along a line", group: "structure" },
-  { id: "stats", label: "Stats", hint: "Two to four big numbers", group: "emphasis" },
-  { id: "big", label: "Big", hint: "One huge number or word", group: "emphasis" },
-  { id: "quote", label: "Quote", hint: "A quote and who said it", group: "emphasis" },
-  { id: "formula", label: "Formula", hint: "Maths, one line at a time", group: "emphasis" },
+export const LAYOUTS: { id: SlideLayout; group: LayoutGroup }[] = [
+  { id: "title", group: "essentials" },
+  { id: "section", group: "essentials" },
+  { id: "agenda", group: "essentials" },
+  { id: "bullets", group: "essentials" },
+  { id: "closing", group: "essentials" },
+  { id: "split", group: "images" },
+  { id: "media", group: "images" },
+  { id: "image", group: "images" },
+  { id: "cover", group: "images" },
+  { id: "columns", group: "structure" },
+  { id: "compare", group: "structure" },
+  { id: "steps", group: "structure" },
+  { id: "timeline", group: "structure" },
+  { id: "stats", group: "emphasis" },
+  { id: "big", group: "emphasis" },
+  { id: "quote", group: "emphasis" },
+  { id: "formula", group: "emphasis" },
 ];
 
 /** Layouts built from items (cards), and how many cards they take. */
-export const ITEM_LAYOUTS: Partial<Record<SlideLayout, { min: number; max: number; start: number; noun: string }>> = {
-  columns: { min: 2, max: 3, start: 2, noun: "column" },
-  compare: { min: 2, max: 2, start: 2, noun: "side" },
-  steps: { min: 2, max: 5, start: 3, noun: "step" },
-  timeline: { min: 2, max: 6, start: 4, noun: "event" },
-  stats: { min: 1, max: 4, start: 3, noun: "stat" },
+export const ITEM_LAYOUTS: Partial<Record<SlideLayout, { min: number; max: number; start: number }>> = {
+  columns: { min: 2, max: 3, start: 2 },
+  compare: { min: 2, max: 2, start: 2 },
+  steps: { min: 2, max: 5, start: 3 },
+  timeline: { min: 2, max: 6, start: 4 },
+  stats: { min: 1, max: 4, start: 3 },
 };
 
 /** Layouts with an image slot. */
@@ -69,21 +65,10 @@ export const BUILD_LAYOUTS = new Set<SlideLayout>(["bullets", "agenda", "columns
 
 // Motion ----------------------------------------------------------------------
 
-export const TRANSITIONS: { id: SlideTransition; label: string; hint: string }[] = [
-  { id: "none", label: "None", hint: "Cut straight to the slide" },
-  { id: "fade", label: "Fade", hint: "Dissolve into the slide" },
-  { id: "slide", label: "Slide", hint: "A gentle drift sideways" },
-  { id: "push", label: "Push", hint: "The new slide pushes the old one out" },
-  { id: "zoom", label: "Zoom", hint: "Zoom into the next idea" },
-  { id: "morph", label: "Morph", hint: "Matching titles, images and text glide into place" },
-];
+/** Transition and build ids in menu order. Names and hints live in `deckText`. */
+export const TRANSITIONS: SlideTransition[] = ["none", "fade", "slide", "push", "zoom", "morph"];
 
-export const BUILDS: { id: SlideBuild; label: string; hint: string }[] = [
-  { id: "none", label: "All at once", hint: "Everything is there when the slide appears" },
-  { id: "fade-up", label: "Fade up", hint: "Each item rises gently into place" },
-  { id: "pop", label: "Pop", hint: "Each item pops in with a little bounce" },
-  { id: "wipe", label: "Wipe", hint: "Each item is revealed from left to right" },
-];
+export const BUILDS: SlideBuild[] = ["none", "fade-up", "pop", "wipe"];
 
 export const DEFAULT_TRANSITION: SlideTransition = "slide";
 
@@ -210,10 +195,9 @@ export type Palette = {
   dark: boolean;
 };
 
+/** A built-in theme. Its name and hint live in `deckText.presetNames`. */
 type Preset = {
   id: DeckPreset;
-  label: string;
-  hint: string;
   spec: DeckThemeSpec;
   /** Hand-tuned secondary colours (the first three presets predate derived palettes). */
   tune?: Partial<Pick<Palette, "fg" | "fg2" | "fg3" | "line" | "panel">>;
@@ -222,65 +206,45 @@ type Preset = {
 export const PRESETS: Preset[] = [
   {
     id: "paper",
-    label: "Paper",
-    hint: "Light and calm",
     spec: { bg: "#f8f6f0", bg2: "#ece8dc", backdrop: "solid", text: "#1c1b18", title: "#1c1b18", accent: "#6d3df5", headingFont: "bricolage", bodyFont: "geist" },
     tune: { fg2: "#55534c", fg3: "#8b8981", line: "#e3e0d6", panel: "#eeebe2" },
   },
   {
     id: "ink",
-    label: "Ink",
-    hint: "Dark, high contrast",
     spec: { bg: "#161614", bg2: "#24231f", backdrop: "solid", text: "#f1efe8", title: "#f6f4ee", accent: "#9a78ff", headingFont: "bricolage", bodyFont: "geist" },
     tune: { fg2: "#aeaca3", fg3: "#76746c", line: "#2e2d29", panel: "#22221f" },
   },
   {
     id: "blob",
-    label: "Blob",
-    hint: "Bold and purple",
     spec: { bg: "#6d3df5", bg2: "#4f22d0", backdrop: "glow", text: "#f7f4ff", title: "#ffffff", accent: "#dacdff", headingFont: "bricolage", bodyFont: "geist" },
     tune: { fg2: "#e2d9ff", fg3: "#b9a3fd", line: "#8a64f8", panel: "#5d2fe2" },
   },
   {
     id: "studio",
-    label: "Studio",
-    hint: "Crisp white with cobalt",
     spec: { bg: "#ffffff", bg2: "#eef1f6", backdrop: "solid", text: "#1b1e24", title: "#0d0f13", accent: "#2b59e8", headingFont: "inter", bodyFont: "inter" },
   },
   {
     id: "editorial",
-    label: "Editorial",
-    hint: "Serif headlines on ivory",
     spec: { bg: "#f5f0e6", bg2: "#e9e1d0", backdrop: "solid", text: "#2a2620", title: "#1b1814", accent: "#a2322a", headingFont: "instrument", bodyFont: "geist" },
   },
   {
     id: "sage",
-    label: "Sage",
-    hint: "Soft green, friendly serif",
     spec: { bg: "#eff2ea", bg2: "#dde5d4", backdrop: "gradient", text: "#25302a", title: "#18221c", accent: "#357049", headingFont: "fraunces", bodyFont: "dm-sans" },
   },
   {
     id: "midnight",
-    label: "Midnight",
-    hint: "Deep navy with a soft glow",
     spec: { bg: "#0e1322", bg2: "#1b2546", backdrop: "glow", text: "#dde3f0", title: "#f5f7fc", accent: "#8aaaff", headingFont: "space", bodyFont: "inter" },
   },
   {
     id: "chalk",
-    label: "Chalk",
-    hint: "A blackboard with a grid",
     spec: { bg: "#1f2a26", bg2: "#28362f", backdrop: "grid", text: "#e6ece6", title: "#f5f8f3", accent: "#f0cd68", headingFont: "dm-sans", bodyFont: "dm-sans" },
   },
   {
     id: "mono",
-    label: "Mono",
-    hint: "Black and white, typewriter",
     spec: { bg: "#f3f2ee", bg2: "#e6e5df", backdrop: "dots", text: "#161616", title: "#0b0b0b", accent: "#161616", headingFont: "mono", bodyFont: "inter" },
   },
   {
     id: "dusk",
-    label: "Dusk",
-    hint: "Plum gradient, elegant serif",
     spec: { bg: "#1d1233", bg2: "#3d1746", backdrop: "gradient", text: "#f1eaff", title: "#ffffff", accent: "#ff9fc8", headingFont: "playfair", bodyFont: "dm-sans" },
   },
 ];
@@ -288,14 +252,9 @@ export const PRESETS: Preset[] = [
 const PRESET_BY_ID = new Map(PRESETS.map((p) => [p.id, p]));
 const THEME_IDS = new Set<string>([...PRESETS.map((p) => p.id), "custom"]);
 
-export const BACKDROPS: { id: DeckBackdrop; label: string }[] = [
-  { id: "solid", label: "Solid" },
-  { id: "gradient", label: "Gradient" },
-  { id: "glow", label: "Glow" },
-  { id: "dots", label: "Dots" },
-  { id: "grid", label: "Grid" },
-];
-const BACKDROP_IDS = new Set<string>(BACKDROPS.map((b) => b.id));
+/** Backdrop styles for custom themes. Names live in `deckText.backdrops`. */
+export const BACKDROPS: DeckBackdrop[] = ["solid", "gradient", "glow", "dots", "grid"];
+const BACKDROP_IDS = new Set<string>(BACKDROPS);
 
 function backdropCss(spec: Pick<DeckThemeSpec, "backdrop" | "bg" | "bg2" | "text" | "accent">, dark: boolean): [string | null, string | null] {
   switch (spec.backdrop) {
@@ -360,10 +319,6 @@ export function presetSpec(id: DeckPreset): DeckThemeSpec {
 
 export function presetPalette(id: DeckPreset): Palette {
   return PRESET_PALETTES.get(id) ?? PRESET_PALETTES.get("paper")!;
-}
-
-export function themeLabel(theme: DeckTheme) {
-  return theme === "custom" ? "Custom" : (PRESET_BY_ID.get(theme)?.label ?? "Paper");
 }
 
 /** The palette a deck paints with. Unknown or broken themes fall back to Paper. */
@@ -443,8 +398,8 @@ export function normalizeSpec(raw: unknown): DeckThemeSpec | null {
 // Slides ----------------------------------------------------------------------
 
 const LAYOUT_IDS = new Set<SlideLayout>(LAYOUTS.map((l) => l.id));
-const TRANSITION_IDS = new Set<SlideTransition>(TRANSITIONS.map((t) => t.id));
-const BUILD_IDS = new Set<SlideBuild>(BUILDS.map((b) => b.id));
+const TRANSITION_IDS = new Set<SlideTransition>(TRANSITIONS);
+const BUILD_IDS = new Set<SlideBuild>(BUILDS);
 
 function newId() {
   return crypto.randomUUID();
@@ -628,12 +583,6 @@ const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 /** Rough talk time: ~20s per slide plus everything on it (and in the notes) spoken at 130 wpm. */
 export function talkSeconds(deck: Pick<Deck, "slides">) {
   return deck.slides.reduce((sum, s) => sum + 20 + ((slideText(s).reduce((n, t) => n + words(t), 0) + words(s.notes)) / 130) * 60, 0);
-}
-
-export function formatTalkTime(seconds: number) {
-  if (seconds < 60) return "under a minute";
-  const min = Math.round(seconds / 60);
-  return `about ${min} min`;
 }
 
 export const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];

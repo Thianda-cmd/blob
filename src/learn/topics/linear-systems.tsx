@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Minus, Plus } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
@@ -26,6 +28,17 @@ type Std = { x: number; y: number; c: number };
 type Solved = { v: V; m: number; n: number };
 
 const other = (v: V): V => (v === "x" ? "y" : "x");
+
+/** Display source of a frame (the keys are the same in both languages). */
+const srcOf = (t: Text) => (typeof t === "string" ? t : t.en);
+/** Sentences joined with a space; empty parts are skipped. */
+const joinText = (...parts: (Text | undefined)[]): Text =>
+  txMap((_, locale) =>
+    parts
+      .map((p) => resolveText(p, locale))
+      .filter(Boolean)
+      .join(" "),
+  );
 const VARS: V[] = ["x", "y"];
 
 /** Write "y − 2x" rather than "−2x + y", so an equation doesn't start with a minus. */
@@ -74,15 +87,16 @@ function prodTerm(c: number, value: number, id: string, first: boolean): string 
 const scale = (e: Std, k: number): Std => ({ x: e.x * k, y: e.y * k, c: e.c * k });
 const holds = (e: Std, x: number, y: number) => e.x * x + e.y * y === e.c;
 
-function checkNote(e: Std, x: number, y: number, name: string): string {
-  return `Check in ${name}: $${plain(`${prodTerm(e.x, x, "a", true)} ${prodTerm(e.y, y, "b", false)}`)} = ${e.c}$. True!`;
+function checkNote(e: Std, x: number, y: number, name: string): Text {
+  const calc = `$${plain(`${prodTerm(e.x, x, "a", true)} ${prodTerm(e.y, y, "b", false)}`)} = ${e.c}$`;
+  return tx(`Check in ${name}: ${calc}. True!`, `Probe mit ${name}: ${calc}. Stimmt!`);
 }
 
 // ---------------------------------------------------------------------------
 // Worked-solution builders
 
 /** Finish K·v + D = R: take D away, divide by K. */
-function solveSteps(o: { K: number; v: V; D: number; R: number; vid: string; did: string; rid: string; eq: string; dFirst?: boolean; lead: string }): Frame[] {
+function solveSteps(o: { K: number; v: V; D: number; R: number; vid: string; did: string; rid: string; eq: string; dFirst?: boolean; lead: Text }): Frame[] {
   const { K, v, D, R, vid, did, rid, eq } = o;
   const left = (withD: boolean) => {
     const list: [number, string, string][] = [[K, v, vid]];
@@ -95,10 +109,16 @@ function solveSteps(o: { K: number; v: V; D: number; R: number; vid: string; did
   const R2 = R - D;
   const U = R2 / K;
   const frames: Frame[] = [];
-  const lead = (s: string) => (frames.length === 0 ? `${o.lead} ${s}`.trim() : s);
-  if (D !== 0) frames.push({ math: `${left(true)} =#${eq} ${val(R, rid)}${opRemove(D)}`, note: lead(`${D > 0 ? "Subtract" : "Add"} $${Math.abs(D)}$ on both sides.`) });
-  if (K !== 1) frames.push({ math: `${left(false)} =#${eq} ${val(R2, rid)}${opDivide(K)}`, note: lead(`Divide both sides by $${K}$.`) });
-  frames.push({ math: `${v}#v${vid} =#${eq} ${val(U, rid)}`, note: lead(`So $${v} = ${U}$.`) });
+  const lead = (s: Text) => (frames.length === 0 ? joinText(o.lead, s) : s);
+  if (D !== 0) {
+    const d = Math.abs(D);
+    frames.push({
+      math: `${left(true)} =#${eq} ${val(R, rid)}${opRemove(D)}`,
+      note: lead(tx(`${D > 0 ? "Subtract" : "Add"} $${d}$ on both sides.`, `${D > 0 ? "Subtrahiere" : "Addiere"} $${d}$ auf beiden Seiten.`)),
+    });
+  }
+  if (K !== 1) frames.push({ math: `${left(false)} =#${eq} ${val(R2, rid)}${opDivide(K)}`, note: lead(tx(`Divide both sides by $${K}$.`, `Teile beide Seiten durch $${K}$.`)) });
+  frames.push({ math: `${v}#v${vid} =#${eq} ${val(U, rid)}`, note: lead(tx(`So $${v} = ${U}$.`, `Also ist $${v} = ${U}$.`)) });
   return frames;
 }
 
@@ -109,17 +129,21 @@ function backSteps(e: Std, id: string, name: string, known: V, value: number): F
   const uid = `${id}${u}`;
   const first = yFirst(e) ? known === "y" : known === "x";
   const withProd = first ? `${prodTerm(e[known], value, kid, true)} ${term(e[u], u, uid, false)}` : `${term(e[u], u, uid, true)} ${prodTerm(e[known], value, kid, false)}`;
-  const put = `Put $${known} = ${value}$ into ${name}.`;
-  const rest = solveSteps({ K: e[u], v: u, D: e[known] * value, R: e.c, vid: uid, did: kid, rid: `${id}c`, eq: `e${id}`, dFirst: first, lead: "Work it out." });
+  const put = tx(`Put $${known} = ${value}$ into ${name}.`, `Setze $${known} = ${value}$ in ${name} ein.`);
+  const args = { K: e[u], v: u, D: e[known] * value, R: e.c, vid: uid, did: kid, rid: `${id}c`, eq: `e${id}`, dFirst: first };
+  const rest = solveSteps({ ...args, lead: tx("Work it out.", "Rechne aus.") });
   const shown = `${withProd} =#e${id} ${val(e.c, `${id}c`)}`;
   // With a plain value (no product to work out) the first step is already the next picture.
-  if (plain(rest[0].math).startsWith(plain(shown).trim())) return [{ ...rest[0], note: `${put} ${rest[0].note?.replace("Work it out. ", "") ?? ""}`.trim() }, ...rest.slice(1)];
+  if (plain(srcOf(rest[0].math)).startsWith(plain(shown).trim())) {
+    const bare = solveSteps({ ...args, lead: "" });
+    return [{ ...bare[0], note: joinText(put, bare[0].note) }, ...bare.slice(1)];
+  }
   return [{ math: shown, note: put }, ...rest];
 }
 
 const specialFrame = (left: string, right: string, eq: string, ok: boolean): string => `${ok ? "\\green" : "\\red"}{${left} =#${eq} ${right}}`;
-const NONE_NOTE = "**No solution**: the lines are parallel and never meet.";
-const MANY_NOTE = "**Infinitely many** solutions: both equations describe the same line.";
+const NONE_NOTE = tx("**No solution**: the lines are parallel and never meet.", "**Keine Lösung**: Die Geraden sind parallel und schneiden sich nie.");
+const MANY_NOTE = tx("**Infinitely many** solutions: both equations describe the same line.", "**Unendlich viele** Lösungen: Beide Gleichungen beschreiben dieselbe Gerade.");
 
 /** Einsetzungsverfahren: I is solved for a variable, put it into II. */
 function substitution(s: Solved, e: Std, sol: [number, number] | null): Frame[] {
@@ -146,22 +170,37 @@ function substitution(s: Solved, e: Std, sol: [number, number] | null): Frame[] 
   const D = qs * s.n;
   const right = val(e.c, "2c");
   const frames: Frame[] = [
-    { math: sysSrc(solvedSrc(s, "1"), stdSrc(e, "2")), highlight: [...termKeys(`1${ov}`), ...termKeys("1c")], note: `Equation (I) already says what $${sv}$ is.` },
-    { math: `${subbed} =#e2 ${right}`, highlight: ["br(", "br)"], note: `**Substitute**: in (II), put $(${plain(rhsSrc(s, "1"))})$ in place of $${sv}$. Keep the brackets!` },
+    {
+      math: sysSrc(solvedSrc(s, "1"), stdSrc(e, "2")),
+      highlight: [...termKeys(`1${ov}`), ...termKeys("1c")],
+      note: tx(`Equation (I) already says what $${sv}$ is.`, `Gleichung (I) ist schon nach $${sv}$ aufgelöst.`),
+    },
+    {
+      math: `${subbed} =#e2 ${right}`,
+      highlight: ["br(", "br)"],
+      note: tx(
+        `**Substitute**: in (II), put $(${plain(rhsSrc(s, "1"))})$ in place of $${sv}$. Keep the brackets!`,
+        `**Einsetzen**: Setze in (II) $(${plain(rhsSrc(s, "1"))})$ für $${sv}$ ein. Klammern nicht vergessen!`,
+      ),
+    },
     {
       math: `${side(expandedList)} =#e2 ${right}`,
       note:
         qs === 1
-          ? "A plus in front: just drop the brackets."
+          ? tx("A plus in front: just drop the brackets.", "Ein Plus davor: Lass die Klammern einfach weg.")
           : qs === -1
-            ? "A minus in front: drop the brackets and flip every sign inside."
-            : `Multiply out: $${qs}$ times each term in the bracket.`,
+            ? tx("A minus in front: drop the brackets and flip every sign inside.", "Ein Minus davor: Lass die Klammern weg und dreh jedes Vorzeichen darin um.")
+            : tx(`Multiply out: $${qs}$ times each term in the bracket.`, `Ausmultiplizieren: $${qs}$ mal jeden Term in der Klammer.`),
     },
   ];
-  const combine = `Combine the $${ov}$-terms: $${plain(side(ovTerms))} = ${plain(side([[K, ov, "k"]]))}$.`;
+  const sum = `$${plain(side(ovTerms))} = ${plain(side([[K, ov, "k"]]))}$`;
+  const combine = tx(`Combine the $${ov}$-terms: ${sum}.`, `Fasse die $${ov}$-Terme zusammen: ${sum}.`);
   if (K === 0) {
     const ok = D === e.c;
-    frames.push({ math: specialFrame(val(D, "1c"), right, "e2", ok), note: `The $${ov}$-terms cancel. ${ok ? `$${D} = ${e.c}$ is always true, whatever $${ov}$ is.` : `$${D} = ${e.c}$ is false.`} ${ok ? MANY_NOTE : NONE_NOTE}` });
+    const said = ok
+      ? tx(`The $${ov}$-terms cancel. $${D} = ${e.c}$ is always true, whatever $${ov}$ is.`, `Die $${ov}$-Terme fallen weg. $${D} = ${e.c}$ ist immer wahr, egal was $${ov}$ ist.`)
+      : tx(`The $${ov}$-terms cancel. $${D} = ${e.c}$ is false.`, `Die $${ov}$-Terme fallen weg. $${D} = ${e.c}$ ist falsch.`);
+    frames.push({ math: specialFrame(val(D, "1c"), right, "e2", ok), note: joinText(said, ok ? MANY_NOTE : NONE_NOTE) });
     return frames;
   }
   frames.push(...solveSteps({ K, v: ov, D, R: e.c, vid: ovTerms[0][2], did: "1c", rid: "2c", eq: "e2", lead: combine }));
@@ -169,30 +208,44 @@ function substitution(s: Solved, e: Std, sol: [number, number] | null): Frame[] 
   const value = s.m * known + s.n;
   frames.push({
     math: `${sv}#w1 =#e1 ${prodTerm(s.m, known, `1${ov}`, true)} ${term(s.n, "", "1c", false)} =#e3 ${val(value, "res")}`,
-    note: `Put $${ov} = ${known}$ into (I): $${sv} = ${value}$.`,
+    note: putInto(ov, known, sv, value),
   });
   const [x, y] = sv === "y" ? [known, value] : [value, known];
-  if (sol) frames.push({ math: resultSrc(x, y), note: `The solution is $x = ${x}$, $y = ${y}$. ${checkNote(e, x, y, "(II)")}` });
+  if (sol) frames.push({ math: resultSrc(x, y), note: joinText(solutionIs(x, y), checkNote(e, x, y, "(II)")) });
   return frames;
 }
+
+/** "Put y = 3 into (I): x = 5." */
+const putInto = (o: V, known: number, v: V, value: number) =>
+  tx(`Put $${o} = ${known}$ into (I): $${v} = ${value}$.`, `Setze $${o} = ${known}$ in (I) ein: $${v} = ${value}$.`);
+const solutionIs = (x: number, y: number) => tx(`The solution is $x = ${x}$, $y = ${y}$.`, `Die Lösung ist $x = ${x}$, $y = ${y}$.`);
 
 /** Gleichsetzungsverfahren: both equations are solved for the same variable. */
 function equalization(s1: Solved, s2: Solved, sol: [number, number] | null): Frame[] {
   const v = s1.v;
   const o = other(v);
-  const frames: Frame[] = [{ math: sysSrc(solvedSrc(s1, "1"), solvedSrc(s2, "2")), highlight: ["w1", "w2"], note: `Both equations are solved for $${v}$.` }];
-  const setEqual = `**Set them equal**: both right sides are equal to $${v}$, so they are equal to each other.`;
+  const frames: Frame[] = [
+    { math: sysSrc(solvedSrc(s1, "1"), solvedSrc(s2, "2")), highlight: ["w1", "w2"], note: tx(`Both equations are solved for $${v}$.`, `Beide Gleichungen sind nach $${v}$ aufgelöst.`) },
+  ];
+  const setEqual = tx(
+    `**Set them equal**: both right sides are equal to $${v}$, so they are equal to each other.`,
+    `**Gleichsetzen**: Beide rechten Seiten stehen für $${v}$, also sind sie gleich.`,
+  );
   const K = s1.m - s2.m;
   if (s2.m !== 0) {
     frames.push({
       math: `${rhsSrc(s1, "1")} =#e1 ${rhsSrc(s2, "2")}${opRemove(s2.m, o)}`,
-      note: `${setEqual} Then bring the $${o}$-terms to the left.`,
+      note: joinText(setEqual, tx(`Then bring the $${o}$-terms to the left.`, `Bring dann die $${o}$-Terme nach links.`)),
     });
   }
-  const lead = s2.m !== 0 ? `Now all $${o}$-terms are on the left.` : setEqual;
+  const lead = s2.m !== 0 ? tx(`Now all $${o}$-terms are on the left.`, `Jetzt stehen alle $${o}$-Terme links.`) : setEqual;
   if (K === 0) {
     const ok = s1.n === s2.n;
-    frames.push({ math: specialFrame(val(s1.n, "1c"), val(s2.n, "2c"), "e1", ok), note: `The $${o}$-terms cancel and $${s1.n} = ${s2.n}$ is ${ok ? "always true" : "false"}. ${ok ? MANY_NOTE : NONE_NOTE}` });
+    const said = tx(
+      `The $${o}$-terms cancel and $${s1.n} = ${s2.n}$ is ${ok ? "always true" : "false"}.`,
+      `Die $${o}$-Terme fallen weg und $${s1.n} = ${s2.n}$ ist ${ok ? "immer wahr" : "falsch"}.`,
+    );
+    frames.push({ math: specialFrame(val(s1.n, "1c"), val(s2.n, "2c"), "e1", ok), note: joinText(said, ok ? MANY_NOTE : NONE_NOTE) });
     return frames;
   }
   frames.push(...solveSteps({ K, v: o, D: s1.n, R: s2.n, vid: `1${o}`, did: "1c", rid: "2c", eq: "e1", lead }));
@@ -200,10 +253,13 @@ function equalization(s1: Solved, s2: Solved, sol: [number, number] | null): Fra
   const value = s1.m * known + s1.n;
   frames.push({
     math: `${v}#w1 =#e1 ${prodTerm(s1.m, known, `1${o}`, true)} ${term(s1.n, "", "1c", false)} =#e3 ${val(value, "res")}`,
-    note: `Put $${o} = ${known}$ into (I): $${v} = ${value}$.`,
+    note: putInto(o, known, v, value),
   });
   const [x, y] = v === "y" ? [known, value] : [value, known];
-  if (sol) frames.push({ math: resultSrc(x, y), note: `The solution is $x = ${x}$, $y = ${y}$. The lines cross at $${pt(x, y, "S")}$.` });
+  if (sol) {
+    const S = `$${pt(x, y, "S")}$`;
+    frames.push({ math: resultSrc(x, y), note: joinText(solutionIs(x, y), tx(`The lines cross at ${S}.`, `Die Geraden schneiden sich in ${S}.`)) });
+  }
   return frames;
 }
 
@@ -224,7 +280,7 @@ function plan(e1: Std, e2: Std): Plan {
 const times = (k: number, name: string) => (k === 1 ? name : `${k} · ${name}`);
 
 /** Additionsverfahren: add or subtract so one variable cancels (multiplying first if needed). */
-function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: string): Frame[] {
+function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: Text): Frame[] {
   const { ev, m1, m2, subtract } = plan(e1, e2);
   const ov = other(ev);
   const E1 = scale(e1, m1);
@@ -239,17 +295,29 @@ function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: stri
   const multiply = m1 !== 1 || m2 !== 1;
   const t = (e: Std) => plain(term(e[ev], ev, "t", true));
   const intro = multiply
-    ? `Nothing cancels yet. Multiply so that the $${ev}$-terms ${subtract ? "match" : "become opposites"}.`
+    ? tx(
+        `Nothing cancels yet. Multiply so that the $${ev}$-terms ${subtract ? "match" : "become opposites"}.`,
+        `Noch fällt nichts weg. Multipliziere so, dass ${subtract ? `die $${ev}$-Terme gleich sind` : `sich die $${ev}$-Terme nur im Vorzeichen unterscheiden`}.`,
+      )
     : subtract
-      ? `Both equations have $${t(e1)}$. **Subtract** them and the $${ev}$-terms cancel.`
-      : `The $${ev}$-terms $${t(e1)}$ and $${t(e2)}$ are opposites. **Add** the equations and they cancel.`;
-  const frames: Frame[] = [{ math: sysSrc(stdSrc(e1, "1"), stdSrc(e2, "2")), highlight: evKeys, note: lead ? `${lead} ${intro}` : intro }];
+      ? tx(`Both equations have $${t(e1)}$. **Subtract** them and the $${ev}$-terms cancel.`, `Beide Gleichungen enthalten $${t(e1)}$. **Subtrahiere** sie, dann fallen die $${ev}$-Terme weg.`)
+      : tx(
+          `The $${ev}$-terms $${t(e1)}$ and $${t(e2)}$ are opposites. **Add** the equations and they cancel.`,
+          `Die $${ev}$-Terme $${t(e1)}$ und $${t(e2)}$ unterscheiden sich nur im Vorzeichen. **Addiere** die Gleichungen, dann fallen sie weg.`,
+        );
+  const frames: Frame[] = [{ math: sysSrc(stdSrc(e1, "1"), stdSrc(e2, "2")), highlight: evKeys, note: joinText(lead, intro) }];
   if (multiply) {
-    const which = m1 !== 1 && m2 !== 1 ? `(I) by $${m1}$ and (II) by $${m2}$` : m1 !== 1 ? `(I) by $${m1}$` : `(II) by $${m2}$`;
+    const which = (by: string, and: string) =>
+      m1 !== 1 && m2 !== 1 ? `(I) ${by} $${m1}$ ${and} (II) ${by} $${m2}$` : m1 !== 1 ? `(I) ${by} $${m1}$` : `(II) ${by} $${m2}$`;
+    const now = `$${t(E1)}$`;
+    const then = `$${t(E2)}$`;
     frames.push({
       math: sysSrc(stdSrc(E1, "1"), stdSrc(E2, "2"), times(m1, "(I)"), times(m2, "(II)")),
       highlight: evKeys,
-      note: `Multiply ${which}, every term on both sides. Now the $${ev}$-terms are $${t(E1)}$ and $${t(E2)}$.`,
+      note: tx(
+        `Multiply ${which("by", "and")}, every term on both sides. Now the $${ev}$-terms are ${now} and ${then}.`,
+        `Multipliziere ${which("mit", "und")}, und zwar jeden Term auf beiden Seiten. Jetzt sind die $${ev}$-Terme ${now} und ${then}.`,
+      ),
     });
   }
   const sumLeft: [number, string, string][] = VARS.flatMap((v): [number, string, string][] => [
@@ -265,15 +333,34 @@ function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: stri
     math: `"${labelText}"#L1 ${side(sumLeft)} =#e${a} ${sumRight}`,
     highlight: evKeys,
     note: subtract
-      ? `Subtract ${swap ? "(I) from (II)" : "(II) from (I)"}: left side minus left side, right side minus right side. Careful: every sign of ${swap ? "(I)" : "(II)"} flips.`
-      : "Add the equations: left side plus left side, right side plus right side.",
+      ? tx(
+          `Subtract ${swap ? "(I) from (II)" : "(II) from (I)"}: left side minus left side, right side minus right side. Careful: every sign of ${swap ? "(I)" : "(II)"} flips.`,
+          `Subtrahiere ${swap ? "(I) von (II)" : "(II) von (I)"}: linke Seite minus linke Seite, rechte Seite minus rechte Seite. Vorsicht: Alle Vorzeichen von ${swap ? "(I)" : "(II)"} drehen sich um.`,
+        )
+      : tx("Add the equations: left side plus left side, right side plus right side.", "Addiere die Gleichungen: linke Seite plus linke Seite, rechte Seite plus rechte Seite."),
   });
   if (K === 0) {
     const ok = R === 0;
-    frames.push({ math: specialFrame(`0#z${a}`, val(R, `${a}c`), `e${a}`, ok), note: `Everything with $x$ and $y$ cancels and $0 = ${R}$ is ${ok ? "always true" : "false"}. ${ok ? MANY_NOTE : NONE_NOTE}` });
+    const said = tx(
+      `Everything with $x$ and $y$ cancels and $0 = ${R}$ is ${ok ? "always true" : "false"}.`,
+      `Alles mit $x$ und $y$ fällt weg und $0 = ${R}$ ist ${ok ? "immer wahr" : "falsch"}.`,
+    );
+    frames.push({ math: specialFrame(`0#z${a}`, val(R, `${a}c`), `e${a}`, ok), note: joinText(said, ok ? MANY_NOTE : NONE_NOTE) });
     return frames;
   }
-  frames.push(...solveSteps({ K, v: ov, D: 0, R, vid: `${a}${ov}`, did: "dz", rid: `${a}c`, eq: `e${a}`, lead: `The $${ev}$-terms cancel. Only $${ov}$ is left.` }));
+  frames.push(
+    ...solveSteps({
+      K,
+      v: ov,
+      D: 0,
+      R,
+      vid: `${a}${ov}`,
+      did: "dz",
+      rid: `${a}c`,
+      eq: `e${a}`,
+      lead: tx(`The $${ev}$-terms cancel. Only $${ov}$ is left.`, `Die $${ev}$-Terme fallen weg. Nur $${ov}$ bleibt übrig.`),
+    }),
+  );
   const known = R / K;
   // Put it back into the original equation with the simpler other coefficient.
   const back = Math.abs(e2[ev]) < Math.abs(e1[ev]) ? 2 : 1;
@@ -281,7 +368,7 @@ function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: stri
   frames.push(...backSteps(be, String(back), back === 1 ? "(I)" : "(II)", ov, known));
   const value = (be.c - be[ov] * known) / be[ev];
   const [x, y] = ov === "x" ? [known, value] : [value, known];
-  if (sol) frames.push({ math: resultSrc(x, y), note: `The solution is $x = ${x}$, $y = ${y}$. ${checkNote(back === 1 ? e2 : e1, x, y, back === 1 ? "(II)" : "(I)")}` });
+  if (sol) frames.push({ math: resultSrc(x, y), note: joinText(solutionIs(x, y), checkNote(back === 1 ? e2 : e1, x, y, back === 1 ? "(II)" : "(I)")) });
   return frames;
 }
 
@@ -307,9 +394,23 @@ function stdThrough(rng: Rng, x: number, y: number, max = 5): Std {
 }
 
 const det = (e1: Std, e2: Std) => e1.x * e2.y - e1.y * e2.x;
-const HINT_SUB = (v: V) => `Equation (I) says what $${v}$ is. Put that expression, in brackets, in place of $${v}$ in (II). Then solve for the other variable.`;
-const HINT_EQ = (v: V) => `Both right sides equal $${v}$. Set them equal, solve for the other variable, then put it back in.`;
-const HINT_ELIM = "Add or subtract the equations so that one variable cancels. If nothing cancels yet, multiply an equation first.";
+const HINT_SUB = (v: V) =>
+  tx(
+    `Equation (I) says what $${v}$ is. Put that expression, in brackets, in place of $${v}$ in (II). Then solve for the other variable.`,
+    `Gleichung (I) ist nach $${v}$ aufgelöst. Setze diesen Term in Klammern für $${v}$ in (II) ein. Löse dann nach der anderen Variable auf.`,
+  );
+const HINT_EQ = (v: V) =>
+  tx(
+    `Both right sides equal $${v}$. Set them equal, solve for the other variable, then put it back in.`,
+    `Beide rechten Seiten sind gleich $${v}$. Setze sie gleich, löse nach der anderen Variable auf und setze das Ergebnis dann ein.`,
+  );
+const HINT_ELIM = tx(
+  "Add or subtract the equations so that one variable cancels. If nothing cancels yet, multiply an equation first.",
+  "Addiere oder subtrahiere die Gleichungen so, dass eine Variable wegfällt. Fällt noch nichts weg, multipliziere vorher eine Gleichung.",
+);
+const SOLVE_SUB = tx("Solve by substitution", "Löse mit dem Einsetzungsverfahren");
+const SOLVE_EQ = tx("Solve by equalization", "Löse mit dem Gleichsetzungsverfahren");
+const SOLVE_ELIM = tx("Solve by elimination", "Löse mit dem Additionsverfahren");
 
 /** L1: one equation is already solved for a variable. */
 function substitutionTask(rng: Rng): Exercise {
@@ -329,7 +430,7 @@ function substitutionTask(rng: Rng): Exercise {
     if (Math.abs(e.c) > 40) continue;
     const s: Solved = { v: sv, m, n };
     return {
-      instruction: "Solve by substitution",
+      instruction: SOLVE_SUB,
       math: sysMath(solvedSrc(s, "1"), stdSrc(e, "2")),
       answer: pairAnswer(x, y),
       hint: HINT_SUB(sv),
@@ -362,24 +463,34 @@ function checkPairTask(rng: Rng): Exercise {
     const value = (e: Std, id: string) => val(e.x * p[0] + e.y * p[1], `${id}x`);
     const verdict = (e: Std, id: string, ok: boolean) => `${value(e, id)} ${ok ? "=" : "\\ne"}#e${id} ${val(e.c, `${id}c`)}`;
     const end = [
-      "Both statements are true, so the pair is **the** solution of the system.",
-      "Only (I) is true. A solution of the system has to make **both** equations true.",
-      "Only (II) is true. A solution of the system has to make **both** equations true.",
-      "Neither statement is true, so the pair solves neither equation.",
+      tx("Both statements are true, so the pair is **the** solution of the system.", "Beide Aussagen sind wahr, also ist das Zahlenpaar **die** Lösung des LGS."),
+      tx("Only (I) is true. A solution of the system has to make **both** equations true.", "Nur (I) ist wahr. Eine Lösung des LGS muss **beide** Gleichungen erfüllen."),
+      tx("Only (II) is true. A solution of the system has to make **both** equations true.", "Nur (II) ist wahr. Eine Lösung des LGS muss **beide** Gleichungen erfüllen."),
+      tx("Neither statement is true, so the pair solves neither equation.", "Keine der beiden Aussagen ist wahr, also löst das Zahlenpaar keine der Gleichungen."),
     ][correct];
+    const put = `$x = ${p[0]}$`;
+    const putY = `$y = ${p[1]}$`;
     return {
-      instruction: "Check a solution",
-      text: `Put in $x = ${p[0]}$ and $y = ${p[1]}$. Which equations does this pair solve?`,
+      instruction: tx("Check a solution", "Prüfe ein Zahlenpaar"),
+      text: tx(`Put in ${put} and ${putY}. Which equations does this pair solve?`, `Setze ${put} und ${putY} ein. Welche Gleichungen löst dieses Zahlenpaar?`),
       math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")),
       answer: {
         kind: "choice",
-        options: ["It solves **both** equations: it's the solution of the system.", "It solves only equation (I).", "It solves only equation (II).", "It solves **neither** equation."],
+        options: [
+          tx("It solves **both** equations: it's the solution of the system.", "Es löst **beide** Gleichungen: Es ist die Lösung des LGS."),
+          tx("It solves only equation (I).", "Es löst nur Gleichung (I)."),
+          tx("It solves only equation (II).", "Es löst nur Gleichung (II)."),
+          tx("It solves **neither** equation.", "Es löst **keine** der beiden Gleichungen."),
+        ],
         correct,
       },
-      hint: "Put the two numbers into each equation and work out the left side. Is it equal to the right side?",
+      hint: tx(
+        "Put the two numbers into each equation and work out the left side. Is it equal to the right side?",
+        "Setze die beiden Zahlen in jede Gleichung ein und rechne die linke Seite aus. Kommt die rechte Seite heraus?",
+      ),
       solution: [
-        { math: sysSrc(stdSrc(e1, "1"), stdSrc(e2, "2")), note: `Put $x = ${p[0]}$ and $y = ${p[1]}$ into both equations.` },
-        { math: sysSrc(`${lhs(e1, "1")} =#e1 ${val(e1.c, "1c")}`, `${lhs(e2, "2")} =#e2 ${val(e2.c, "2c")}`), note: "Work out each left side." },
+        { math: sysSrc(stdSrc(e1, "1"), stdSrc(e2, "2")), note: tx(`Put ${put} and ${putY} into both equations.`, `Setze ${put} und ${putY} in beide Gleichungen ein.`) },
+        { math: sysSrc(`${lhs(e1, "1")} =#e1 ${val(e1.c, "1c")}`, `${lhs(e2, "2")} =#e2 ${val(e2.c, "2c")}`), note: tx("Work out each left side.", "Rechne jeweils die linke Seite aus.") },
         { math: sysSrc(verdict(e1, "1", ok1), verdict(e2, "2", ok2), "(I)", "(II)", [ok1 ? "green" : "red", ok2 ? "green" : "red"]), note: end },
       ],
     };
@@ -401,8 +512,8 @@ function graphTask(rng: Rng): Exercise {
     const s2: Solved = { v: "y", m: m2, n: n2 };
     const sys = sysSrc(solvedSrc(s1, "1"), solvedSrc(s2, "2"));
     return {
-      instruction: "Solve graphically",
-      text: "Each equation is one of the lines. Read the solution of the system off the graph.",
+      instruction: tx("Solve graphically", "Löse grafisch"),
+      text: tx("Each equation is one of the lines. Read the solution of the system off the graph.", "Jede Gleichung gehört zu einer der Geraden. Lies die Lösung des LGS am Graphen ab."),
       math: plain(sys),
       visual: graphVisual({
         xRange: [-6, 6],
@@ -413,15 +524,18 @@ function graphTask(rng: Rng): Exercise {
         ],
       }),
       answer: pairAnswer(x, y),
-      hint: "Find the point where the two lines cross. Its $x$- and $y$-coordinates are the solution.",
+      hint: tx(
+        "Find the point where the two lines cross. Its $x$- and $y$-coordinates are the solution.",
+        "Suche den Schnittpunkt der beiden Geraden. Seine $x$- und $y$-Koordinate sind die Lösung.",
+      ),
       solution: [
-        { math: sys, note: "Each equation is a line. A point on **both** lines solves both equations." },
-        { math: `S#S ${pt(`${x}#rx`, `${y}#ry`)}`, note: `The lines cross at $${pt(x, y, "S")}$.` },
+        { math: sys, note: tx("Each equation is a line. A point on **both** lines solves both equations.", "Jede Gleichung ist eine Gerade. Ein Punkt auf **beiden** Geraden löst beide Gleichungen.") },
+        { math: `S#S ${pt(`${x}#rx`, `${y}#ry`)}`, note: tx(`The lines cross at $${pt(x, y, "S")}$.`, `Die Geraden schneiden sich in $${pt(x, y, "S")}$.`) },
         {
           math: sysSrc(`${valWrap(y, "1v")} =#e1 ${prodTerm(m1, x, "1x", true)} ${term(n1, "", "1c", false)}`, `${valWrap(y, "2v")} =#e2 ${prodTerm(m2, x, "2x", true)} ${term(n2, "", "2c", false)}`),
-          note: `Check: put $x = ${x}$ and $y = ${y}$ into both equations. Both are true.`,
+          note: tx(`Check: put $x = ${x}$ and $y = ${y}$ into both equations. Both are true.`, `Probe: Setze $x = ${x}$ und $y = ${y}$ in beide Gleichungen ein. Beide stimmen.`),
         },
-        { math: resultSrc(x, y), note: `So the solution is $x = ${x}$, $y = ${y}$.` },
+        { math: resultSrc(x, y), note: tx(`So the solution is $x = ${x}$, $y = ${y}$.`, `Die Lösung ist also $x = ${x}$, $y = ${y}$.`) },
       ],
     };
   }
@@ -443,7 +557,7 @@ function equalizationTask(rng: Rng): Exercise {
     const s1: Solved = { v, m: m1, n: n1 };
     const s2: Solved = { v, m: m2, n: n2 };
     return {
-      instruction: "Solve by equalization",
+      instruction: SOLVE_EQ,
       math: sysMath(solvedSrc(s1, "1"), solvedSrc(s2, "2")),
       answer: pairAnswer(x, y),
       hint: HINT_EQ(v),
@@ -473,10 +587,18 @@ function matchingTask(rng: Rng): Exercise {
     const p = plan(e1, e2);
     if (p.m1 !== 1 || p.m2 !== 1) continue;
     return {
-      instruction: "Solve by elimination",
+      instruction: SOLVE_ELIM,
       math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")),
       answer: pairAnswer(x, y),
-      hint: adding ? "Look at the coefficients: one variable has opposite numbers in front. Add the equations." : "One variable has the same number in front in both equations. Subtract the equations.",
+      hint: adding
+        ? tx(
+            "Look at the coefficients: one variable has opposite numbers in front. Add the equations.",
+            "Schau dir die Koeffizienten an: Vor einer Variable stehen Gegenzahlen. Addiere die Gleichungen.",
+          )
+        : tx(
+            "One variable has the same number in front in both equations. Subtract the equations.",
+            "Vor einer Variable steht in beiden Gleichungen dieselbe Zahl. Subtrahiere die Gleichungen.",
+          ),
       solution: elimination(e1, e2, [x, y]),
     };
   }
@@ -495,7 +617,7 @@ function multiplyTask(rng: Rng): Exercise {
     const small = Math.min(p.m1, p.m2);
     if (both ? small < 2 || big > 5 : small !== 1 || big < 2 || big > 4) continue;
     return {
-      instruction: "Solve the system",
+      instruction: tx("Solve the system", "Löse das Gleichungssystem"),
       math: sysMath(stdSrc(e1, "1"), stdSrc(e2, "2")),
       answer: pairAnswer(x, y),
       hint: HINT_ELIM,
@@ -508,13 +630,13 @@ function multiplyTask(rng: Rng): Exercise {
 function wordTask(rng: Rng): Exercise {
   const kind = rng.pick(["tickets", "animals", "numbers", "cafe"] as const);
   for (;;) {
-    let text: string;
+    let text: Text;
     let e1: Std;
     let e2: Std;
     let x: number;
     let y: number;
-    let setup: string;
-    let answer: string;
+    let setup: Text;
+    let answer: Text;
     if (kind === "tickets") {
       const pa = rng.int(8, 14);
       const pc = rng.int(4, pa - 2);
@@ -522,25 +644,37 @@ function wordTask(rng: Rng): Exercise {
       y = rng.int(4, 30);
       e1 = { x: 1, y: 1, c: x + y };
       e2 = { x: pa, y: pc, c: pa * x + pc * y };
-      text = `A cinema sells adult tickets for ${pa} € and child tickets for ${pc} €. On Sunday it sold ${e1.c} tickets and took ${e2.c} €. How many adult tickets ($x$) and child tickets ($y$) did it sell?`;
-      setup = "Set up: (I) counts the tickets, (II) counts the money.";
-      answer = `So it sold ${x} adult tickets and ${y} child tickets.`;
+      text = tx(
+        `A cinema sells adult tickets for ${pa} € and child tickets for ${pc} €. On Sunday it sold ${e1.c} tickets and took ${e2.c} €. How many adult tickets ($x$) and child tickets ($y$) did it sell?`,
+        `Ein Kino verkauft Karten für Erwachsene zu ${pa} € und Kinderkarten zu ${pc} €. Am Sonntag hat es ${e1.c} Karten verkauft und ${e2.c} € eingenommen. Wie viele Erwachsenenkarten ($x$) und Kinderkarten ($y$) waren das?`,
+      );
+      setup = tx("Set up: (I) counts the tickets, (II) counts the money.", "Aufstellen: (I) zählt die Karten, (II) das Geld.");
+      answer = tx(`So it sold ${x} adult tickets and ${y} child tickets.`, `Es wurden also ${x} Erwachsenenkarten und ${y} Kinderkarten verkauft.`);
     } else if (kind === "animals") {
       x = rng.int(3, 25);
       y = rng.int(3, 25);
       e1 = { x: 1, y: 1, c: x + y };
       e2 = { x: 2, y: 4, c: 2 * x + 4 * y };
-      text = `On a farm there are chickens and rabbits. Together they have ${e1.c} heads and ${e2.c} legs. How many chickens ($x$) and rabbits ($y$) are there?`;
-      setup = "Set up: every animal has one head, that's (I). A chicken has 2 legs and a rabbit 4, that's (II).";
-      answer = `So there are ${x} chickens and ${y} rabbits.`;
+      text = tx(
+        `On a farm there are chickens and rabbits. Together they have ${e1.c} heads and ${e2.c} legs. How many chickens ($x$) and rabbits ($y$) are there?`,
+        `Auf einem Bauernhof leben Hühner und Kaninchen. Zusammen haben sie ${e1.c} Köpfe und ${e2.c} Beine. Wie viele Hühner ($x$) und Kaninchen ($y$) sind es?`,
+      );
+      setup = tx(
+        "Set up: every animal has one head, that's (I). A chicken has 2 legs and a rabbit 4, that's (II).",
+        "Aufstellen: Jedes Tier hat einen Kopf, das ist (I). Ein Huhn hat 2 Beine und ein Kaninchen 4, das ist (II).",
+      );
+      answer = tx(`So there are ${x} chickens and ${y} rabbits.`, `Es sind also ${x} Hühner und ${y} Kaninchen.`);
     } else if (kind === "numbers") {
       x = rng.int(8, 40);
       y = rng.int(2, x - 1);
       e1 = { x: 1, y: 1, c: x + y };
       e2 = { x: 1, y: -1, c: x - y };
-      text = `The sum of two numbers is ${e1.c} and their difference is ${e2.c}. Find the larger number $x$ and the smaller number $y$.`;
-      setup = "Set up: (I) is the sum, (II) the difference.";
-      answer = `The numbers are ${x} and ${y}.`;
+      text = tx(
+        `The sum of two numbers is ${e1.c} and their difference is ${e2.c}. Find the larger number $x$ and the smaller number $y$.`,
+        `Die Summe zweier Zahlen ist ${e1.c}, ihre Differenz ist ${e2.c}. Bestimme die größere Zahl $x$ und die kleinere Zahl $y$.`,
+      );
+      setup = tx("Set up: (I) is the sum, (II) the difference.", "Aufstellen: (I) ist die Summe, (II) die Differenz.");
+      answer = tx(`The numbers are ${x} and ${y}.`, `Die Zahlen sind ${x} und ${y}.`);
     } else {
       x = rng.int(2, 5);
       y = rng.int(2, 5);
@@ -548,33 +682,48 @@ function wordTask(rng: Rng): Exercise {
       e1 = { x: a1, y: b1, c: a1 * x + b1 * y };
       e2 = { x: a2, y: b2, c: a2 * x + b2 * y };
       if (x === y || det(e1, e2) === 0) continue;
-      text = `${a1} coffees and ${b1} muffins cost ${e1.c} €. ${a2} coffees and ${b2} muffins cost ${e2.c} €. What does one coffee ($x$) and one muffin ($y$) cost?`;
-      setup = "Set up one equation for each sentence.";
-      answer = `So a coffee costs ${x} € and a muffin ${y} €.`;
+      text = tx(
+        `${a1} coffees and ${b1} muffins cost ${e1.c} €. ${a2} coffees and ${b2} muffins cost ${e2.c} €. What does one coffee ($x$) and one muffin ($y$) cost?`,
+        `${a1} Kaffee und ${b1} Muffins kosten ${e1.c} €. ${a2} Kaffee und ${b2} Muffins kosten ${e2.c} €. Was kosten ein Kaffee ($x$) und ein Muffin ($y$)?`,
+      );
+      setup = tx("Set up one equation for each sentence.", "Stell für jeden Satz eine Gleichung auf.");
+      answer = tx(`So a coffee costs ${x} € and a muffin ${y} €.`, `Ein Kaffee kostet also ${x} € und ein Muffin ${y} €.`);
     }
     const p = plan(e1, e2);
     if (Math.max(p.m1, p.m2) > 6) continue;
     const frames = elimination(e1, e2, [x, y], setup);
-    frames[frames.length - 1] = { ...frames[frames.length - 1], note: `${answer} ${checkNote(e2, x, y, "(II)")}` };
+    frames[frames.length - 1] = { ...frames[frames.length - 1], note: joinText(answer, checkNote(e2, x, y, "(II)")) };
     return {
-      instruction: "Word problem",
+      instruction: tx("Word problem", "Textaufgabe"),
       text,
       answer: pairAnswer(x, y),
-      hint: "Write one equation for each piece of information, then solve the system, e.g. with the elimination method.",
+      hint: tx(
+        "Write one equation for each piece of information, then solve the system, e.g. with the elimination method.",
+        "Stell für jede Information eine Gleichung auf und löse dann das LGS, z. B. mit dem Additionsverfahren.",
+      ),
       solution: frames,
     };
   }
 }
 
-const COUNT_OPTIONS = ["Exactly one solution", "No solution", "Infinitely many solutions"];
+const COUNT_OPTIONS = [
+  tx("Exactly one solution", "Genau eine Lösung"),
+  tx("No solution", "Keine Lösung"),
+  tx("Infinitely many solutions", "Unendlich viele Lösungen"),
+];
+const HOW_MANY = tx("How many solutions?", "Wie viele Lösungen?");
+const HOW_MANY_TEXT = tx("How many solutions does the system have?", "Wie viele Lösungen hat das Gleichungssystem?");
 
 /** L3: one, none or infinitely many solutions? */
 function specialTask(rng: Rng): Exercise {
   const outcome = rng.pick(["none", "none", "many", "many", "one"] as const);
   const variant = rng.pick(outcome === "many" ? (["mixed", "std"] as const) : (["mixed", "std", "solved"] as const));
   const correct = outcome === "one" ? 0 : outcome === "none" ? 1 : 2;
-  const base = { instruction: "How many solutions?", text: "How many solutions does the system have?", answer: { kind: "choice" as const, options: COUNT_OPTIONS, correct } };
-  const hint = "Try to solve it. If both variables disappear, look at what's left: a true statement or a false one?";
+  const base = { instruction: HOW_MANY, text: HOW_MANY_TEXT, answer: { kind: "choice" as const, options: COUNT_OPTIONS, correct } };
+  const hint = tx(
+    "Try to solve it. If both variables disappear, look at what's left: a true statement or a false one?",
+    "Versuch es zu lösen. Fallen beide Variablen weg, schau, was übrig bleibt: eine wahre oder eine falsche Aussage?",
+  );
   for (;;) {
     const [x, y] = pickSol(rng);
     if (variant === "mixed") {
@@ -637,13 +786,14 @@ const START: [LineState, LineState] = [
 ];
 
 function Stepper({ label, onDown, onUp, canDown, canUp }: { label: ReactNode; onDown: () => void; onUp: () => void; canDown: boolean; canUp: boolean }) {
+  const t = useText();
   return (
     <div className="flex items-center gap-1">
-      <button onClick={onDown} disabled={!canDown} className="grid size-7 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30" aria-label="Decrease">
+      <button onClick={onDown} disabled={!canDown} className="grid size-7 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30" aria-label={t(tx("Decrease", "Verringern"))}>
         <Minus className="size-3.5" />
       </button>
       <span className="min-w-6 text-center">{label}</span>
-      <button onClick={onUp} disabled={!canUp} className="grid size-7 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30" aria-label="Increase">
+      <button onClick={onUp} disabled={!canUp} className="grid size-7 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30" aria-label={t(tx("Increase", "Erhöhen"))}>
         <Plus className="size-3.5" />
       </button>
     </div>
@@ -673,6 +823,7 @@ function LineRow({ name, tone, line, onChange, scope }: { name: string; tone: "b
 }
 
 function SystemLab() {
+  const t = useText();
   const scope = useId();
   const [l1, setL1] = useState(START[0]);
   const [l2, setL2] = useState(START[1]);
@@ -703,23 +854,23 @@ function SystemLab() {
       [-6, -6 * t + w],
     ];
   };
-  const presets: { label: string; run: () => void }[] = [
+  const presets: { label: Text; run: () => void }[] = [
     {
-      label: "Crossing",
+      label: tx("Crossing", "Schnittpunkt"),
       run: () => {
         setL1(START[0]);
         setL2(START[1]);
       },
     },
-    { label: "Parallel", run: () => setL2({ m: l1.m, b: l1.b <= 1 ? l1.b + 3 : l1.b - 3 }) },
-    { label: "Same line", run: () => setL2({ ...l1 }) },
+    { label: tx("Parallel", "Parallel"), run: () => setL2({ m: l1.m, b: l1.b <= 1 ? l1.b + 3 : l1.b - 3 }) },
+    { label: tx("Same line", "Identisch"), run: () => setL2({ ...l1 }) },
   ];
 
   return (
     <div className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px] rounded-xl border border-line bg-surface p-2">
         <Plane
-          label="Two lines and their intersection"
+          label={t(tx("Two lines and their intersection", "Zwei Geraden und ihr Schnittpunkt"))}
           overlay={
             <>
               <PlaneTag at={() => alongLine(geo, [0, b1.get()], dir(a1.get()), 0.94)} dy={-13}>
@@ -750,8 +901,8 @@ function SystemLab() {
         <LineRow name="II" tone="ink" line={l2} onChange={setL2} scope={`${scope}-2`} />
         <div className="flex flex-wrap gap-1.5">
           {presets.map((p) => (
-            <button key={p.label} onClick={p.run} className="h-8 rounded-lg border border-line px-3 text-[12.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-              {p.label}
+            <button key={resolveText(p.label, "en")} onClick={p.run} className="h-8 rounded-lg border border-line px-3 text-[12.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
+              {t(p.label)}
             </button>
           ))}
         </div>
@@ -764,14 +915,29 @@ function SystemLab() {
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
             className={cn("rounded-xl border px-4 py-3", kind === "one" ? "border-blob/30 bg-blob-soft/50" : kind === "parallel" ? "border-danger/25 bg-danger/[0.05]" : "border-ok/30 bg-ok/[0.07]")}
           >
-            <div className="font-display text-[16px] font-semibold">{kind === "one" ? "Exactly one solution" : kind === "parallel" ? "No solution" : "Infinitely many solutions"}</div>
+            <div className="font-display text-[16px] font-semibold">{t(COUNT_OPTIONS[kind === "one" ? 0 : kind === "parallel" ? 1 : 2])}</div>
             <div className="mt-1 text-[13.5px] leading-relaxed text-ink-2">
               {kind === "one" && S ? (
-                <Inline text={`The lines cross at $${pt(S[0], S[1], "S")}$. ${onGrid ? "That point" : "That point (off the grid here)"} makes **both** equations true: $x = ${num(S[0])}$, $y = ${num(S[1])}$.`} />
+                <Inline
+                  text={tx(
+                    `The lines cross at $${pt(S[0], S[1], "S")}$. ${onGrid ? "That point" : "That point (off the grid here)"} makes **both** equations true: $x = ${num(S[0])}$, $y = ${num(S[1])}$.`,
+                    `Die Geraden schneiden sich in $${pt(S[0], S[1], "S")}$. ${onGrid ? "Dieser Punkt" : "Dieser Punkt (hier außerhalb des Bildes)"} erfüllt **beide** Gleichungen: $x = ${num(S[0])}$, $y = ${num(S[1])}$.`,
+                  )}
+                />
               ) : kind === "parallel" ? (
-                <Inline text="Same slope, different y-intercepts: the lines are parallel and never meet. No point is on both." />
+                <Inline
+                  text={tx(
+                    "Same slope, different y-intercepts: the lines are parallel and never meet. No point is on both.",
+                    "Gleiche Steigung, verschiedene y-Achsenabschnitte: Die Geraden sind parallel und schneiden sich nie. Kein Punkt liegt auf beiden.",
+                  )}
+                />
               ) : (
-                <Inline text="Same slope, same y-intercept: it's the same line twice. Every point on it solves both equations." />
+                <Inline
+                  text={tx(
+                    "Same slope, same y-intercept: it's the same line twice. Every point on it solves both equations.",
+                    "Gleiche Steigung, gleicher y-Achsenabschnitt: Es ist zweimal dieselbe Gerade. Jeder Punkt darauf löst beide Gleichungen.",
+                  )}
+                />
               )}
             </div>
           </motion.div>

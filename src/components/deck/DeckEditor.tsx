@@ -9,6 +9,8 @@ import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave } from "@/components/page/useAutosave";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { deckText } from "@/i18n/messages/deck";
 import { createClient } from "@/lib/supabase/client";
 import type { Deck, DeckContent, DeckTheme, DeckThemeSpec, Page, Slide, SlideLayout, SlideTransition } from "@/lib/types";
 import {
@@ -39,6 +41,7 @@ export function DeckEditor({ page }: { page: Page }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { updatePage, userId } = useWorkspace();
+  const t = useMessages(deckText);
 
   const [deck, setDeck] = useState<Deck>(() => normalizeDeck(page.content));
   const [title, setTitle] = useState(page.title);
@@ -147,7 +150,7 @@ export function DeckEditor({ page }: { page: Page }) {
   const deleteSlide = (id: string) => {
     const slides = deckRef.current.slides;
     if (slides.length <= 1) {
-      blob.say("A presentation needs at least one slide.", { mood: "thinking" });
+      blob.say(t.needsOneSlide, { mood: "thinking" });
       return;
     }
     const at = slides.findIndex((s) => s.id === id);
@@ -203,11 +206,11 @@ export function DeckEditor({ page }: { page: Page }) {
   const upload = useCallback(
     async (slideId: string, file: File) => {
       if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-        blob.say("I can only use PNG, JPG, GIF or WebP images.", { mood: "worried" });
+        blob.say(t.imageType, { mood: "worried" });
         return;
       }
       if (file.size > MAX_IMAGE_BYTES) {
-        blob.say("That image is over 10 MB. Try a smaller one?", { mood: "worried" });
+        blob.say(t.imageSize, { mood: "worried" });
         return;
       }
       setUploadingId(slideId);
@@ -216,14 +219,14 @@ export function DeckEditor({ page }: { page: Page }) {
       const { error } = await supabase.storage.from("uploads").upload(path, file, { contentType: file.type, cacheControl: "31536000" });
       setUploadingId(null);
       if (error) {
-        blob.say("That upload didn't work. Try again?", { mood: "worried" });
+        blob.say(t.uploadFailed, { mood: "worried" });
         blob.react("shake", "worried");
         return;
       }
       updateSlide(slideId, { image: supabase.storage.from("uploads").getPublicUrl(path).data.publicUrl });
       blob.react("jump", "happy");
     },
-    [userId, updateSlide],
+    [userId, updateSlide, t],
   );
 
   const onSlideChange = useCallback((patch: Partial<Slide>) => updateSlide(selected.id, patch), [updateSlide, selected.id]);
@@ -240,14 +243,14 @@ export function DeckEditor({ page }: { page: Page }) {
               type="button"
               onClick={toggleInspector}
               className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink"
-              aria-label="Toggle slide panel"
-              title="Slide panel"
+              aria-label={t.panelToggle}
+              title={t.panelTitle}
             >
               <PanelRight className="size-4" />
             </button>
             <ThemePicker theme={deck.theme} palette={palette} customPalette={customPalette} slide={selected} onChange={setTheme} onCustomize={customize} />
-            <Button variant="primary" size="sm" onClick={() => void present()} title="Present (Ctrl Enter)" className="ml-1">
-              <Play className="size-3 fill-current" /> Present
+            <Button variant="primary" size="sm" onClick={() => void present()} title={t.presentTitle} className="ml-1">
+              <Play className="size-3 fill-current" /> {t.present}
             </Button>
           </>
         }
@@ -268,7 +271,7 @@ export function DeckEditor({ page }: { page: Page }) {
           onEnter={() => setFocusNonce((n) => n + 1)}
         />
 
-        <section className="relative flex min-w-0 flex-1 flex-col bg-paper" aria-label="Slide editor">
+        <section className="relative flex min-w-0 flex-1 flex-col bg-paper" aria-label={t.editor}>
           <div className="relative min-h-0 flex-1 [container-type:size]">
             <div className="absolute inset-0 flex items-center justify-center px-8 py-6">
               <div className="flex flex-col" style={{ width: "min(100cqw - 64px, (100cqh - 48px - 56px) * 16 / 9)" }}>
@@ -283,12 +286,12 @@ export function DeckEditor({ page }: { page: Page }) {
                       }
                     }}
                     maxLength={200}
-                    placeholder="Untitled presentation"
-                    aria-label="Presentation title"
+                    placeholder={t.untitled}
+                    aria-label={t.titleLabel}
                     className="min-w-0 flex-1 truncate bg-transparent font-display text-[24px] font-semibold tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/60"
                   />
                   <span className="shrink-0 pb-1.5 text-[12px] tabular-nums text-ink-3">
-                    Slide {index + 1} of {deck.slides.length}
+                    {t.slideOf(index + 1, deck.slides.length)}
                   </span>
                   {/* Compact slide navigation when the rail is hidden (phones). */}
                   <div className="flex shrink-0 items-center pb-0.5 @min-[560px]/editor:hidden">
@@ -297,7 +300,7 @@ export function DeckEditor({ page }: { page: Page }) {
                       onClick={() => setSelectedId(deck.slides[Math.max(0, index - 1)].id)}
                       disabled={index === 0}
                       className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-40"
-                      aria-label="Previous slide"
+                      aria-label={t.prevSlide}
                     >
                       <ChevronLeft className="size-4" />
                     </button>
@@ -306,7 +309,7 @@ export function DeckEditor({ page }: { page: Page }) {
                       onClick={() => setSelectedId(deck.slides[Math.min(deck.slides.length - 1, index + 1)].id)}
                       disabled={index === deck.slides.length - 1}
                       className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-40"
-                      aria-label="Next slide"
+                      aria-label={t.nextSlide}
                     >
                       <ChevronRight className="size-4" />
                     </button>
@@ -314,7 +317,7 @@ export function DeckEditor({ page }: { page: Page }) {
                       onAdd={addSlide}
                       align="end"
                       trigger={(props) => (
-                        <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label="Add a slide">
+                        <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.addSlide}>
                           <Plus className="size-4" />
                         </button>
                       )}
@@ -348,13 +351,13 @@ export function DeckEditor({ page }: { page: Page }) {
                   className="pointer-events-auto flex items-center gap-3 rounded-xl bg-ink py-1.5 pl-3.5 pr-1.5 text-[13px] text-paper shadow-pop"
                   role="status"
                 >
-                  Slide {deleted.index + 1} deleted
+                  {t.deleted(deleted.index + 1)}
                   <button
                     type="button"
                     onClick={undoDelete}
                     className="rounded-lg px-2 py-1 font-medium text-blob transition-colors hover:bg-paper/10"
                   >
-                    Undo
+                    {t.undo}
                   </button>
                 </motion.div>
               )}

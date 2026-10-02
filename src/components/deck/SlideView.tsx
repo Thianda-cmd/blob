@@ -19,6 +19,8 @@ import {
   type Ref,
 } from "react";
 import { GooSpinner } from "@/components/blob/GooSpinner";
+import { useMessages } from "@/i18n/client";
+import { deckText } from "@/i18n/messages/deck";
 import { MathView } from "@/learn/components/MathView";
 import type { Slide, SlideItem, SlideLayout } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -84,39 +86,21 @@ type FieldCtx = {
 const SlideCtx = createContext<FieldCtx | null>(null);
 const useSlide = () => useContext(SlideCtx)!;
 
-const PLACEHOLDERS: Record<SlideLayout, { title: string; body: string }> = {
-  title: { title: "Presentation title", body: "Subtitle, or your name" },
-  section: { title: "Section title", body: "What this part is about" },
-  agenda: { title: "Agenda", body: "Add a topic" },
-  bullets: { title: "Slide title", body: "Add a point" },
-  split: { title: "Slide title", body: "Write a few sentences here, or add an image instead." },
-  media: { title: "Slide title", body: "Describe the picture, or make your point next to it." },
-  quote: { title: "A quote worth remembering", body: "Who said it" },
-  image: { title: "Caption", body: "Add a little more detail (optional)" },
-  cover: { title: "A title over your image", body: "A line of context (optional)" },
-  columns: { title: "Slide title", body: "" },
-  compare: { title: "Compare two things", body: "" },
-  steps: { title: "How it works", body: "" },
-  timeline: { title: "Timeline", body: "" },
-  stats: { title: "By the numbers", body: "" },
-  big: { title: "42", body: "What the number means" },
-  formula: { title: "Formula title", body: "What each symbol means (optional)" },
-  closing: { title: "Thank you", body: "Questions? Add your name or email" },
-};
-
-const ITEM_PLACEHOLDERS: Partial<Record<SlideLayout, { head: string[]; text: string[] }>> = {
-  columns: { head: ["First idea", "Second idea", "Third idea"], text: ["Explain it in a sentence or two."] },
-  compare: { head: ["Pros", "Cons"], text: ["A point in favour", "A point against"] },
-  steps: { head: ["Research", "Plan", "Make", "Test", "Share"], text: ["What happens in this step"] },
-  timeline: { head: ["1914", "1918", "1939", "1945", "1969", "1989"], text: ["What happened"] },
-  stats: { head: ["42%", "3×", "120", "#1"], text: ["of students agree", "faster than before", "pages of notes", "in the region"] },
-};
+type DeckText = (typeof deckText)["en"];
 
 const MATH_PLACEHOLDER = "x = \\frac{-b +- \\sqrt{b^2 - 4ac}}{2a}";
 
-function itemPlaceholder(layout: SlideLayout, i: number, field: keyof SlideItem) {
-  const list = ITEM_PLACEHOLDERS[layout]?.[field] ?? [""];
+/** Faint example text for a card (placeholders are never saved). */
+function itemPlaceholder(t: DeckText, layout: SlideLayout, i: number, field: keyof SlideItem) {
+  const all: Partial<Record<SlideLayout, { head: string[]; text: string[] }>> = t.itemPlaceholders;
+  const list = all[layout]?.[field] ?? [""];
   return list[i % list.length];
+}
+
+/** Names for a layout's cards ("Add column", "Remove this step"…). */
+function itemNames(t: DeckText, layout: SlideLayout) {
+  const all: Partial<Record<SlideLayout, { noun: string; add: string; remove: string }>> = t.items;
+  return all[layout] ?? { noun: "", add: "", remove: "" };
 }
 
 function canvasVars(p: Palette): CSSProperties {
@@ -232,6 +216,7 @@ const cols = (n: number): CSSProperties => ({ gridTemplateColumns: `repeat(${n},
 
 function SlideLayoutView({ layout }: { layout: SlideLayout }) {
   const { slide, mode, palette, ordinal, onChange } = useSlide();
+  const t = useMessages(deckText);
   const hasImage = Boolean(slide.image);
   const empty = (t: string) => mode === "present" && !t.trim();
 
@@ -277,8 +262,8 @@ function SlideLayoutView({ layout }: { layout: SlideLayout }) {
             value={slide.body}
             onValue={(body) => onChange?.({ body })}
             morph="list"
-            placeholder={PLACEHOLDERS.agenda.body}
-            label="Agenda item"
+            placeholder={t.placeholders.agenda.body}
+            label={t.agendaItem}
             fontSize={size}
             build
             className="mt-[48px]"
@@ -306,8 +291,8 @@ function SlideLayoutView({ layout }: { layout: SlideLayout }) {
             value={slide.body}
             onValue={(body) => onChange?.({ body })}
             morph="list"
-            placeholder={PLACEHOLDERS.bullets.body}
-            label="Bullet"
+            placeholder={t.placeholders.bullets.body}
+            label={t.bullet}
             fontSize={size}
             build
             className="mt-[44px]"
@@ -535,7 +520,7 @@ function SlideLayoutView({ layout }: { layout: SlideLayout }) {
     }
 
     case "big": {
-      const len = (slide.title.trim() || PLACEHOLDERS.big.title).length;
+      const len = (slide.title.trim() || t.placeholders.big.title).length;
       const size = len <= 4 ? 260 : len <= 7 ? 200 : len <= 12 ? 136 : 96;
       return (
         <div className="flex h-full flex-col items-center justify-center px-[96px] pb-[16px] text-center">
@@ -684,12 +669,13 @@ function Field({
 
 function Text({ field, className, style }: { field: "title" | "body"; className: string; style?: CSSProperties }) {
   const { slide, onChange } = useSlide();
+  const t = useMessages(deckText);
   return (
     <Field
       value={slide[field]}
-      placeholder={PLACEHOLDERS[slide.layout][field]}
+      placeholder={t.placeholders[slide.layout][field]}
       onValue={(v) => onChange?.({ [field]: v })}
-      label={field === "title" ? "Slide title" : "Slide text"}
+      label={field === "title" ? t.fieldTitle : t.fieldText}
       className={className}
       style={style}
       morph={field}
@@ -939,7 +925,9 @@ function Items({
   children: (i: number, api: ItemApi) => ReactNode;
 }) {
   const { mode, slide, onChange } = useSlide();
+  const t = useMessages(deckText);
   const spec = ITEM_LAYOUTS[slide.layout]!;
+  const names = itemNames(t, slide.layout);
   const all = slideItems(slide);
   const shown = mode === "present" ? filledItems(slide) : all;
   if (!shown.length) return null;
@@ -953,9 +941,9 @@ function Items({
         const field: ItemApi["field"] = (name, cls, style) => (
           <Field
             value={item[name]}
-            placeholder={itemPlaceholder(slide.layout, i, name)}
+            placeholder={itemPlaceholder(t, slide.layout, i, name)}
             onValue={(v) => set(i, { [name]: v })}
-            label={`${spec.noun[0].toUpperCase()}${spec.noun.slice(1)} ${i + 1} ${name === "head" ? "heading" : "text"}`}
+            label={name === "head" ? t.itemHead(names.noun, i + 1) : t.itemText(names.noun, i + 1)}
             className={cls}
             style={style}
             heading={name === "head"}
@@ -965,8 +953,8 @@ function Items({
           <LineList
             value={item.text}
             onValue={(v) => set(i, { text: v })}
-            placeholder={itemPlaceholder(slide.layout, i, "text")}
-            label={`Point on side ${i + 1}`}
+            placeholder={itemPlaceholder(t, slide.layout, i, "text")}
+            label={t.sidePoint(i + 1)}
             fontSize={bodyLines(item.text).length > 5 ? 22 : 26}
             className={cls}
             listClassName="flex flex-col gap-[14px]"
@@ -977,34 +965,34 @@ function Items({
         );
         const tools =
           editing && all.length > spec.min ? (
-            <RemoveItem noun={spec.noun} onRemove={() => onChange?.({ items: all.filter((_, j) => j !== i) })} />
+            <RemoveItem label={names.remove} onRemove={() => onChange?.({ items: all.filter((_, j) => j !== i) })} />
           ) : null;
         return <Fragment key={i}>{children(i, { field, list, tools, count: shown.length })}</Fragment>;
       })}
-      {editing && all.length < spec.max && <AddItemChip noun={spec.noun} onAdd={() => onChange?.({ items: [...all, { head: "", text: "" }] })} />}
+      {editing && all.length < spec.max && <AddItemChip label={names.add} onAdd={() => onChange?.({ items: [...all, { head: "", text: "" }] })} />}
     </div>
   );
 }
 
 /** Hover control that removes a card while editing. Cards are `group/item relative`. */
-function RemoveItem({ noun, onRemove }: { noun: string; onRemove: () => void }) {
+function RemoveItem({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <Ui origin="top right" className="absolute right-[4px] top-[4px] z-10 opacity-0 transition-opacity group-hover/item:opacity-100 group-focus-within/item:opacity-100">
-      <button type="button" className={cn(uiButton, "w-7 justify-center px-0 hover:text-danger")} onClick={onRemove} aria-label={`Remove this ${noun}`} title={`Remove this ${noun}`}>
+      <button type="button" className={cn(uiButton, "w-7 justify-center px-0 hover:text-danger")} onClick={onRemove} aria-label={label} title={label}>
         <X />
       </button>
     </Ui>
   );
 }
 
-function AddItemChip({ noun, onAdd }: { noun: string; onAdd: () => void }) {
+function AddItemChip({ label, onAdd }: { label: string; onAdd: () => void }) {
   return (
     <Ui
       origin="top right"
       className="absolute -bottom-[44px] right-0 opacity-0 transition-opacity group-hover/canvas:opacity-100 has-[button:focus-visible]:opacity-100"
     >
       <button type="button" className={uiButton} onClick={onAdd}>
-        <Plus /> Add {noun}
+        <Plus /> {label}
       </button>
     </Ui>
   );
@@ -1014,6 +1002,7 @@ function AddItemChip({ noun, onAdd }: { noun: string; onAdd: () => void }) {
 
 function Formula({ size }: { size: number }) {
   const { mode, slide, onChange } = useSlide();
+  const t = useMessages(deckText);
   const lines = mathLines(slide.math);
   const shown = lines.length ? lines : mode === "present" ? [] : [MATH_PLACEHOLDER];
   return (
@@ -1032,8 +1021,8 @@ function Formula({ size }: { size: number }) {
           <AutoTextarea
             value={slide.math}
             onValue={(math) => onChange?.({ math })}
-            placeholder={`${MATH_PLACEHOLDER}   (one line per step)`}
-            aria-label="Formula source"
+            placeholder={`${MATH_PLACEHOLDER}   ${t.mathPerLine}`}
+            aria-label={t.formulaSource}
             spellCheck={false}
             className="rounded-[14px] border-[2px] border-[var(--s-line)] bg-[var(--s-panel)] px-[22px] py-[12px] text-center font-mono text-[20px] leading-[1.55] text-[var(--s-fg2)]"
           />
@@ -1067,6 +1056,7 @@ function imageFromDrop(e: DragEvent): File | string | null {
 
 function ImageSlot({ className }: { className?: string }) {
   const { mode, slide, onChange, onUpload, uploading } = useSlide();
+  const t = useMessages(deckText);
   const [failed, setFailed] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -1114,7 +1104,7 @@ function ImageSlot({ className }: { className?: string }) {
       data-morph="image"
       data-morph-box
       tabIndex={editing ? 0 : undefined}
-      aria-label={editing ? "Slide image. Drop or paste an image here." : undefined}
+      aria-label={editing ? t.imageSlot : undefined}
       style={{ outline: "none" }}
       className={cn(
         "group/img relative overflow-hidden outline-none",
@@ -1155,7 +1145,7 @@ function ImageSlot({ className }: { className?: string }) {
                 <div className={cn("grid size-10 place-items-center rounded-full", broken ? "bg-danger/10 text-danger" : "bg-blob-soft text-blob-ink")}>
                   {broken ? <ImageOff className="size-5" /> : <ImageIcon className="size-5" />}
                 </div>
-                <p className="text-[13px] font-medium text-[var(--s-fg)]">{broken ? "That image didn't load" : "Drop, paste or upload an image"}</p>
+                <p className="text-[13px] font-medium text-[var(--s-fg)]">{broken ? t.imageBroken : t.imageDrop}</p>
                 {linking ? (
                   <LinkInput
                     onDone={(url) => {
@@ -1166,13 +1156,13 @@ function ImageSlot({ className }: { className?: string }) {
                 ) : (
                   <div className="flex gap-1.5">
                     <button type="button" className={uiButton} onClick={() => fileRef.current?.click()}>
-                      <Upload /> Upload
+                      <Upload /> {t.upload}
                     </button>
                     <button type="button" className={uiButton} onClick={() => setLinking(true)}>
-                      <Link2 /> Paste link
+                      <Link2 /> {t.pasteLink}
                     </button>
                     {broken && (
-                      <button type="button" className={uiButton} onClick={() => onChange?.({ image: null })} aria-label="Remove image">
+                      <button type="button" className={uiButton} onClick={() => onChange?.({ image: null })} aria-label={t.removeImage}>
                         <Trash2 />
                       </button>
                     )}
@@ -1195,12 +1185,12 @@ function ImageSlot({ className }: { className?: string }) {
               ) : (
                 <>
                   <button type="button" className={uiButton} onClick={() => fileRef.current?.click()}>
-                    <Upload /> Replace
+                    <Upload /> {t.replace}
                   </button>
-                  <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label="Use an image link" title="Use an image link">
+                  <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label={t.useLink} title={t.useLink}>
                     <Link2 />
                   </button>
-                  <button type="button" className={cn(uiButton, "hover:text-danger")} onClick={() => onChange?.({ image: null })} aria-label="Remove image" title="Remove image">
+                  <button type="button" className={cn(uiButton, "hover:text-danger")} onClick={() => onChange?.({ image: null })} aria-label={t.removeImage} title={t.removeImage}>
                     <Trash2 />
                   </button>
                 </>
@@ -1211,7 +1201,7 @@ function ImageSlot({ className }: { className?: string }) {
             <div className="absolute inset-0 grid place-items-center bg-[color-mix(in_oklab,var(--s-bg)_70%,transparent)]">
               <Ui>
                 <div className="grid size-16 place-items-center rounded-2xl border border-line bg-raised shadow-pop">
-                  <GooSpinner size={44} label="Uploading image" />
+                  <GooSpinner size={44} label={t.uploadingImage} />
                 </div>
               </Ui>
             </div>
@@ -1223,6 +1213,7 @@ function ImageSlot({ className }: { className?: string }) {
 }
 
 function LinkInput({ onDone }: { onDone: (url: string | null) => void }) {
+  const t = useMessages(deckText);
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState(false);
   const submit = () => {
@@ -1254,12 +1245,12 @@ function LinkInput({ onDone }: { onDone: (url: string | null) => void }) {
         }}
         onBlur={() => !value.trim() && onDone(null)}
         placeholder="https://…"
-        aria-label="Image link"
+        aria-label={t.imageLink}
         aria-invalid={invalid}
         className="h-7 w-[220px] rounded-lg border border-line bg-raised px-2.5 text-[12.5px] text-ink shadow-card outline-none placeholder:text-ink-3 focus:border-blob aria-[invalid=true]:border-danger"
       />
       <button type="submit" className={cn(uiButton, "border-transparent bg-ink text-paper hover:bg-ink/88")}>
-        Add
+        {t.add}
       </button>
     </form>
   );
@@ -1267,6 +1258,7 @@ function LinkInput({ onDone }: { onDone: (url: string | null) => void }) {
 
 function AddImageChip() {
   const { onUpload, onChange } = useSlide();
+  const t = useMessages(deckText);
   const fileRef = useRef<HTMLInputElement>(null);
   const [linking, setLinking] = useState(false);
   return (
@@ -1295,9 +1287,9 @@ function AddImageChip() {
       ) : (
         <div className="flex gap-1">
           <button type="button" className={uiButton} onClick={() => fileRef.current?.click()}>
-            <Plus /> Image
+            <Plus /> {t.image}
           </button>
-          <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label="Use an image link" title="Use an image link">
+          <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label={t.useLink} title={t.useLink}>
             <Link2 />
           </button>
         </div>

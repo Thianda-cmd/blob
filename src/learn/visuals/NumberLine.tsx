@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
+import type { Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 
 export type NumberLineRay = {
@@ -13,7 +15,7 @@ export type NumberLineRay = {
   color?: "blob" | "ok" | "danger";
 };
 
-export type NumberLineMark = { at: number; label?: string; closed?: boolean; color?: "blob" | "ok" | "danger" | "ink" };
+export type NumberLineMark = { at: number; label?: Text; closed?: boolean; color?: "blob" | "ok" | "danger" | "ink" };
 
 const COLOR = { blob: "var(--blob)", ok: "var(--ok)", danger: "var(--danger)", ink: "var(--ink)" };
 
@@ -34,6 +36,7 @@ export function NumberLine({
   className?: string;
 }) {
   const W = 200;
+  const tt = useText();
   const pad = 8;
   const x = (v: number) => pad + ((v - from) / (to - from)) * (W - pad * 2);
   const ticks: number[] = [];
@@ -88,7 +91,7 @@ export function NumberLine({
             <circle cy={16} r={2.2} fill={m.closed === false ? "var(--surface)" : color} stroke={color} strokeWidth={1} />
             {m.label && (
               <text y={8} fontSize={5} textAnchor="middle" fill={color} fontFamily="var(--font-math)" fontStyle="italic">
-                {m.label}
+                {tt(m.label)}
               </text>
             )}
           </motion.g>

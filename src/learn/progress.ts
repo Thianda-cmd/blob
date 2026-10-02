@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Locale } from "@/i18n/config";
+import { learnText } from "@/i18n/messages/learn";
 
 export type TopicProgress = {
   topic: string;
@@ -47,12 +49,18 @@ export function streak(days: LearnDay[], now = new Date()): number {
   return count;
 }
 
-export function masteryLabel(m: number) {
-  if (m >= 85) return "Mastered";
-  if (m >= 60) return "Strong";
-  if (m >= 30) return "Getting there";
-  if (m > 0) return "Started";
-  return "New";
+/** Mastery stage 0–4: new, started, getting there, strong, mastered. */
+export function masteryStage(m: number) {
+  if (m >= 85) return 4;
+  if (m >= 60) return 3;
+  if (m >= 30) return 2;
+  if (m > 0) return 1;
+  return 0;
+}
+
+/** "Getting there" / "Wird besser"… for a mastery score. */
+export function masteryLabel(m: number, locale: Locale) {
+  return learnText[locale].mastery[masteryStage(m)];
 }
 
 /** Practice level that fits a mastery score. */

@@ -3,6 +3,9 @@
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { ArrowRight, Check, Lightbulb, RotateCcw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { useLocale, useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
+import { useText } from "@/i18n/useText";
 import { answerDisplay, check, type AnswerValue } from "@/learn/engine/answers";
 import type { Exercise, Feedback } from "@/learn/types";
 import { cn } from "@/lib/utils";
@@ -19,11 +22,6 @@ export type ExerciseResult = {
 };
 
 export type ExerciseEvent = "correct" | "wrong" | "hint" | "reveal";
-
-const PRAISE = ["Nailed it!", "Exactly right.", "Perfect!", "Yes! That's it.", "Spot on.", "Beautiful work."];
-const TRY_AGAIN = ["Not quite. Have another go?", "Close, but not yet.", "Hmm, check that again.", "Almost! Look at it once more."];
-
-const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
 
 /** XP for a finished exercise: full on a clean first try, halved for a second try or a hint. */
 export function earnedXp(base: number, r: ExerciseResult) {
@@ -64,9 +62,14 @@ export function ExerciseCard({
   const [scopeRef, animate] = useAnimate();
   const continueRef = useRef<HTMLButtonElement>(null);
   const maxAttempts = mode === "test" ? 1 : 2;
+  const m = useMessages(learnText);
+  const t = m.exercise;
+  const tt = useText();
+  const locale = useLocale();
   // Picked once so re-renders don't reshuffle the wording.
-  const [praise] = useState(() => pick(PRAISE));
-  const [tryOffset] = useState(() => Math.floor(Math.random() * TRY_AGAIN.length));
+  const [praiseOffset] = useState(() => Math.floor(Math.random() * 1000));
+  const [tryOffset] = useState(() => Math.floor(Math.random() * 1000));
+  const praise = t.praise[praiseOffset % t.praise.length];
 
   useEffect(() => {
     if (done) continueRef.current?.focus();
@@ -111,9 +114,9 @@ export function ExerciseCard({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{exercise.instruction}</span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{tt(exercise.instruction)}</span>
         {level && (
-          <span className="flex gap-0.5" title={`Level ${level}`}>
+          <span className="flex gap-0.5" title={m.level(level)}>
             {[1, 2, 3].map((n) => (
               <span key={n} className={cn("size-1.5 rounded-full", n <= level ? "bg-blob" : "bg-line-2")} />
             ))}
@@ -162,7 +165,7 @@ export function ExerciseCard({
             onClick={submit}
             className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.97]"
           >
-            Check <span className="text-[11px] font-normal opacity-60">Enter</span>
+            {t.check} <span className="text-[11px] font-normal opacity-60">{t.enter}</span>
           </button>
           {mode !== "test" && exercise.hint && !hint && (
             <button
@@ -172,16 +175,16 @@ export function ExerciseCard({
               }}
               className="flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-[14px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
             >
-              <Lightbulb className="size-4" /> Hint
+              <Lightbulb className="size-4" /> {t.hint}
             </button>
           )}
           {mode !== "test" && attempts > 0 && status === "wrong" && (
             <>
               <button onClick={retry} className="flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-[14px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-                <RotateCcw className="size-4" /> Try again
+                <RotateCcw className="size-4" /> {t.tryAgain}
               </button>
               <button onClick={reveal} className="flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-[14px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-                Show solution
+                {t.showSolution}
               </button>
             </>
           )}
@@ -191,7 +194,7 @@ export function ExerciseCard({
       <AnimatePresence>
         {feedback && !done && status === "wrong" && (
           <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-[14px] text-danger">
-            {feedback.message ?? TRY_AGAIN[(tryOffset + attempts) % TRY_AGAIN.length]}
+            {feedback.message ? tt(feedback.message) : t.tryAgainLines[(tryOffset + attempts) % t.tryAgainLines.length]}
           </motion.p>
         )}
       </AnimatePresence>
@@ -214,10 +217,10 @@ export function ExerciseCard({
                 {status === "correct" ? <Check className="size-5" strokeWidth={3} /> : <X className="size-5" strokeWidth={3} />}
               </motion.span>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-[18px] font-semibold">{status === "correct" ? praise : "Here's how it works"}</div>
+                <div className="font-display text-[18px] font-semibold">{status === "correct" ? praise : t.howItWorks}</div>
                 {status !== "correct" && (
                   <div className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
-                    Answer: <MathView src={answerDisplay(exercise.answer) || "–"} size="sm" animate={false} className="text-ink" />
+                    {t.answer} <MathView src={answerDisplay(exercise.answer, locale) || "–"} size="sm" animate={false} className="text-ink" />
                   </div>
                 )}
               </div>
@@ -236,13 +239,13 @@ export function ExerciseCard({
                 onClick={() => onDone(result)}
                 className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper transition-transform hover:bg-ink/88 active:scale-[0.97]"
               >
-                Continue <ArrowRight className="size-4" />
+                {t.continue} <ArrowRight className="size-4" />
               </button>
             </div>
             {(revealed || status === "wrong") && <SolutionPlayer frames={exercise.solution} size={compact ? "md" : "lg"} />}
             {status === "correct" && exercise.solution.length > 1 && !compact && (
               <details className="group text-[13.5px] text-ink-2">
-                <summary className="cursor-pointer select-none hover:text-ink">See the worked solution</summary>
+                <summary className="cursor-pointer select-none hover:text-ink">{t.workedSolution}</summary>
                 <div className="mt-3">
                   <SolutionPlayer frames={exercise.solution} size="md" autoPlay={false} />
                 </div>

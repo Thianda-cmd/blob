@@ -2,6 +2,10 @@
 
 import { ChevronLeft, ChevronRight, Keyboard, LayoutGrid, Minus, MonitorUp, Pause, Play, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useState, type ReactNode, type Ref } from "react";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { intlLocale } from "@/i18n/format";
+import { presentText } from "@/i18n/messages/present";
 import type { Deck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { Palette } from "./deck";
@@ -23,17 +27,17 @@ function useElapsed(timer: Timer) {
   return secs;
 }
 
-function useClock() {
+function useClock(locale: Locale) {
   const [time, setTime] = useState("");
   useEffect(() => {
-    const tick = () => setTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    const tick = () => setTime(new Date().toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" }));
     const first = setTimeout(tick, 0);
     const id = setInterval(tick, 5000);
     return () => {
       clearTimeout(first);
       clearInterval(id);
     };
-  }, []);
+  }, [locale]);
   return time;
 }
 
@@ -88,6 +92,8 @@ export function SpeakerView({
   onPopOut: () => void;
   onExit: () => void;
 }) {
+  const t = useMessages(presentText);
+  const locale = useLocale();
   const total = deck.slides.length;
   const ended = index >= total;
   const slide = deck.slides[Math.min(index, total - 1)];
@@ -96,7 +102,7 @@ export function SpeakerView({
   const next = moreBuilds ? slide : deck.slides[index + 1];
   const nextStep = moreBuilds ? step + 1 : 0;
   const elapsed = useElapsed(timer);
-  const clock = useClock();
+  const clock = useClock(locale);
   const [notesSize, setNotesSize] = useState(20);
   const progress = ended ? 1 : (index + (built ? step / built : 1)) / total;
 
@@ -104,15 +110,15 @@ export function SpeakerView({
     <div className="fixed inset-0 flex flex-col bg-[#0b0b0a] text-[#f1efe8]" data-theme="dark">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/8 px-4 text-[13px]">
         <span className="min-w-0 truncate font-medium text-white/85">{title}</span>
-        <span className="shrink-0 rounded-md bg-white/6 px-1.5 py-0.5 text-[11.5px] text-white/50">Speaker view</span>
+        <span className="shrink-0 rounded-md bg-white/6 px-1.5 py-0.5 text-[11.5px] text-white/50">{t.speakerView}</span>
         <div className="mx-auto flex items-center gap-1 rounded-xl border border-white/10 bg-[#161614] py-1 pl-3 pr-1">
-          <span className={cn("min-w-[64px] font-mono text-[17px] tabular-nums tracking-tight", timer.since === null ? "text-white/45" : "text-white")} aria-label="Elapsed time">
+          <span className={cn("min-w-[64px] font-mono text-[17px] tabular-nums tracking-tight", timer.since === null ? "text-white/45" : "text-white")} aria-label={t.elapsed}>
             {fmt(elapsed)}
           </span>
-          <SmallButton label={timer.since === null ? "Resume timer" : "Pause timer"} onClick={() => onTimer("toggle")}>
+          <SmallButton label={timer.since === null ? t.resumeTimer : t.pauseTimer} onClick={() => onTimer("toggle")}>
             {timer.since === null ? <Play className="fill-current" /> : <Pause className="fill-current" />}
           </SmallButton>
-          <SmallButton label="Reset timer" onClick={() => onTimer("reset")}>
+          <SmallButton label={t.resetTimer} onClick={() => onTimer("reset")}>
             <RotateCcw />
           </SmallButton>
         </div>
@@ -120,33 +126,33 @@ export function SpeakerView({
           {clock}
         </span>
         <div className="flex shrink-0 items-center gap-1">
-          <SmallButton label={remote ? "Show slides here" : "Open the audience view in a new window (P)"} onClick={onPopOut}>
+          <SmallButton label={remote ? t.showHere : t.openAudience} onClick={onPopOut}>
             <MonitorUp />
           </SmallButton>
-          <SmallButton label="All slides (G)" onClick={onOverview}>
+          <SmallButton label={t.allSlidesKey} onClick={onOverview}>
             <LayoutGrid />
           </SmallButton>
-          <SmallButton label="Keyboard shortcuts (?)" onClick={onHelp}>
+          <SmallButton label={t.shortcutsKey} onClick={onHelp}>
             <Keyboard />
           </SmallButton>
-          <SmallButton label={remote ? "Close speaker view" : "Exit (Esc)"} onClick={onExit}>
+          <SmallButton label={remote ? t.closeSpeaker : t.exitEsc} onClick={onExit}>
             <X />
           </SmallButton>
         </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
-        <section className="flex min-h-0 flex-col" aria-label="Current slide">
+        <section className="flex min-h-0 flex-col" aria-label={t.currentSlide}>
           <PaneLabel>
-            <span className="font-medium text-white/85">{ended ? "End of presentation" : `Slide ${index + 1} of ${total}`}</span>
+            <span className="font-medium text-white/85">{ended ? t.endOfPresentation : t.slideOf(index + 1, total)}</span>
             {built > 0 && !ended && (
-              <span className="flex items-center gap-1" aria-label={`Build ${step} of ${built}`}>
+              <span className="flex items-center gap-1" aria-label={t.buildOf(step, built)}>
                 {Array.from({ length: built }, (_, i) => (
                   <span key={i} className={cn("size-1.5 rounded-full transition-colors", i < step ? "bg-blob" : "bg-white/20")} />
                 ))}
               </span>
             )}
-            {blank && <span className="ml-auto rounded-md bg-white/10 px-1.5 py-0.5 text-[11.5px] text-white/80">Audience sees a {blank} screen · press {blank === "black" ? "B" : "W"}</span>}
+            {blank && <span className="ml-auto rounded-md bg-white/10 px-1.5 py-0.5 text-[11.5px] text-white/80">{t.blankScreen(blank)}</span>}
           </PaneLabel>
           <div className="relative min-h-0 flex-1">
             {ended ? (
@@ -165,10 +171,10 @@ export function SpeakerView({
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-4" aria-label="Next and notes">
+        <aside className="flex min-h-0 flex-col gap-4" aria-label={t.nextAndNotes}>
           <div className="shrink-0">
             <PaneLabel>
-              <span>{moreBuilds ? `Next click: item ${step + 1} of ${built}` : next ? `Next: slide ${index + 2}` : ended ? "" : "Next: end"}</span>
+              <span>{moreBuilds ? t.nextClick(step + 1, built) : next ? t.nextSlide(index + 2) : ended ? "" : t.nextEnd}</span>
             </PaneLabel>
             <div className="aspect-video w-full overflow-hidden rounded-lg bg-white/[0.03]">
               {next && !ended ? (
@@ -181,23 +187,23 @@ export function SpeakerView({
                   frameClassName="rounded-lg opacity-90 ring-1 ring-white/10"
                 />
               ) : (
-                <div className="grid size-full place-items-center text-[13px] text-white/40">{ended ? "That was the last slide" : "End of presentation"}</div>
+                <div className="grid size-full place-items-center text-[13px] text-white/40">{ended ? t.thatWasLast : t.endOfPresentation}</div>
               )}
             </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-white/8 bg-[#161614]">
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-white/8 pl-4 pr-1.5 text-[12.5px] text-white/50">
-              <span className="font-medium text-white/80">Notes</span>
+              <span className="font-medium text-white/80">{t.notes}</span>
               <span className="ml-auto" />
-              <SmallButton label="Smaller notes" onClick={() => setNotesSize((s) => Math.max(14, s - 2))}>
+              <SmallButton label={t.smallerNotes} onClick={() => setNotesSize((s) => Math.max(14, s - 2))}>
                 <Minus />
               </SmallButton>
-              <SmallButton label="Larger notes" onClick={() => setNotesSize((s) => Math.min(40, s + 2))}>
+              <SmallButton label={t.largerNotes} onClick={() => setNotesSize((s) => Math.min(40, s + 2))}>
                 <Plus />
               </SmallButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 leading-[1.55] text-white/90" style={{ fontSize: notesSize }}>
-              {!ended && slide.notes.trim() ? <p className="whitespace-pre-wrap">{slide.notes}</p> : <p className="text-white/35">{ended ? "Nothing left to say." : "No notes for this slide."}</p>}
+              {!ended && slide.notes.trim() ? <p className="whitespace-pre-wrap">{slide.notes}</p> : <p className="text-white/35">{ended ? t.nothingLeft : t.noNotes}</p>}
             </div>
           </div>
         </aside>
@@ -210,7 +216,7 @@ export function SpeakerView({
           disabled={index === 0 && step === 0}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-[#1c1b18] px-3 text-[13px] text-white/80 transition-colors hover:bg-[#262623] hover:text-white disabled:opacity-35"
         >
-          <ChevronLeft className="size-4" /> Back
+          <ChevronLeft className="size-4" /> {t.back}
         </button>
         <div className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
           <div className="absolute inset-y-0 left-0 rounded-full bg-blob transition-[width] duration-300" style={{ width: `${progress * 100}%` }} />
@@ -221,7 +227,7 @@ export function SpeakerView({
           disabled={ended}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blob px-4 text-[13px] font-medium text-white transition-colors hover:bg-blob-deep disabled:opacity-35"
         >
-          {moreBuilds ? "Reveal" : "Next"} <ChevronRight className="size-4" />
+          {moreBuilds ? t.reveal : t.next} <ChevronRight className="size-4" />
         </button>
       </footer>
     </div>
@@ -233,7 +239,8 @@ function PaneLabel({ children }: { children: ReactNode }) {
 }
 
 function EndCard() {
-  return <div className="grid size-full place-items-center rounded-lg bg-white/[0.03] text-[14px] text-white/45">The audience sees the end screen</div>;
+  const t = useMessages(presentText);
+  return <div className="grid size-full place-items-center rounded-lg bg-white/[0.03] text-[14px] text-white/45">{t.endCard}</div>;
 }
 
 export function SmallButton({ label, onClick, children, active }: { label: string; onClick: () => void; children: ReactNode; active?: boolean }) {

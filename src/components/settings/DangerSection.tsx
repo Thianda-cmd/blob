@@ -11,29 +11,25 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
 import { Card, Row, Section } from "./primitives";
 
 export function DangerSection() {
+  const t = useMessages(settingsText).danger;
   const [open, setOpen] = useState(false);
   return (
-    <Section id="danger" title="Danger zone" description="Careful, these can't be undone.">
+    <Section id="danger" title={t.title} description={t.description}>
       <Card tone="danger">
-        <Row
-          title="Delete account"
-          description="Permanently delete your account with all your notes, presentations, tasks, subjects and uploaded images."
-        >
+        <Row title={t.deleteAccount} description={t.deleteAccountHint}>
           <Button variant="secondary" size="sm" className="text-danger hover:border-danger/40 hover:bg-danger/[0.06]" onClick={() => setOpen(true)}>
-            <Trash2 className="size-3.5" /> Delete account…
+            <Trash2 className="size-3.5" /> {t.deleteAccountButton}
           </Button>
         </Row>
       </Card>
       <DeleteAccountDialog open={open} onClose={() => setOpen(false)} />
     </Section>
   );
-}
-
-function plural(n: number, word: string) {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -49,12 +45,13 @@ function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => 
 
 function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: boolean) => void }) {
   const { pages, subjects } = useWorkspace();
+  const t = useMessages(settingsText).danger;
   const blobRef = useRef<BlobHandle>(null);
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<"confirm" | "deleting">("confirm");
   const [error, setError] = useState<string | null>(null);
   const [startled, setStartled] = useState(true);
-  const ready = text.trim().toLowerCase() === "delete";
+  const ready = isConfirmWord(text, t.confirmWord);
   const wasReady = useRef(false);
 
   // A little gasp when the dialog opens, then a sad face.
@@ -81,7 +78,7 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
     try {
       failure = (await deleteAccount(text))?.error;
     } catch {
-      failure = "I couldn't reach the server. Check your connection and try again.";
+      failure = t.unreachable;
     }
     if (failure) {
       onBusy(false);
@@ -95,7 +92,7 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
   const mood: BlobMood = deleting ? "sleepy" : startled ? "surprised" : "worried";
   const notes = pages.filter((p) => p.kind === "note").length;
   const decks = pages.length - notes;
-  const summary = [plural(notes, "note"), decks ? plural(decks, "presentation") : null, plural(subjects.length, "subject")]
+  const summary = [t.notes(notes), decks ? t.decks(decks) : null, t.subjects(subjects.length)]
     .filter(Boolean)
     .join(", ");
 
@@ -128,22 +125,19 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
             className="px-6 py-8 text-center"
             role="status"
           >
-            <div className="font-display text-[18px] font-semibold tracking-[-0.015em]">Packing up your things…</div>
-            <p className="mt-1 text-[13px] text-ink-2">Thanks for studying with me. Bye for now.</p>
+            <div className="font-display text-[18px] font-semibold tracking-[-0.015em]">{t.packing}</div>
+            <p className="mt-1 text-[13px] text-ink-2">{t.bye}</p>
           </motion.div>
         ) : (
           <motion.form key="form" onSubmit={submit} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="p-5" noValidate>
             <h2 id="delete-account-title" className="font-display text-[19px] font-semibold tracking-[-0.015em]">
-              Delete your account?
+              {t.dialogTitle}
             </h2>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
-              {pages.length || subjects.length
-                ? `This permanently deletes your space: ${summary}, all your tasks and uploaded images.`
-                : "This permanently deletes your account, your tasks and any uploaded images."}{" "}
-              There&apos;s no way to get them back.
+              {pages.length || subjects.length ? t.deletesSpace(summary) : t.deletesAccount} {t.noWayBack}
             </p>
             <label htmlFor="delete-confirm" className="mt-4 block text-[12.5px] font-medium text-ink-2">
-              Type <span className="rounded bg-hover px-1 py-0.5 font-mono text-[12px] text-ink">delete</span> to confirm
+              {t.typeBefore} <span className="rounded bg-hover px-1 py-0.5 font-mono text-[12px] text-ink">{t.confirmWord}</span> {t.typeAfter}
             </label>
             <Input
               id="delete-confirm"
@@ -160,10 +154,10 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onClose}>
-                Keep my account
+                {t.keep}
               </Button>
               <Button type="submit" variant="danger" disabled={!ready}>
-                Delete forever
+                {t.deleteForever}
               </Button>
             </div>
           </motion.form>

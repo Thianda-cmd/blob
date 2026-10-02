@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { authText } from "@/i18n/messages/auth";
+import { getMessages } from "@/i18n/server";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { safeNext } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sign in" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages(authText)).meta.login };
+}
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;

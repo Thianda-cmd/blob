@@ -5,6 +5,10 @@ import { ArrowLeft, ArrowRight, Dumbbell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import type { BlobHandle, BlobMood } from "@/components/blob/Blob";
+import { useLocale, useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
+import type { Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import type { LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
 import { getTopic } from "@/learn/topics";
@@ -14,19 +18,21 @@ import { earnedXp, ExerciseCard, type ExerciseEvent } from "./ExerciseCard";
 import { MathView } from "./MathView";
 import { Inline, Rich } from "./Rich";
 import { SessionEnd, StudyButton, StudyTopBar } from "./StudyChrome";
+import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
 
 const LESSON_XP = 20;
 const CHECK_XP = 10;
 
-const CHEERS = ["Yes! Exactly.", "You got it!", "Perfect!", "Brilliant, that's right.", "Look at you go!"];
+type LessonText = (typeof learnText)["en"]["lesson"];
+
 const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
 
-function openingLine(step: LessonStep) {
+function openingLine(step: LessonStep, t: LessonText): Text {
   if (step.blob) return step.blob;
-  if (step.type === "check") return "Your turn! Give it a try.";
-  if (step.type === "widget") return "Play with this a bit!";
-  return "Let's look at this together.";
+  if (step.type === "check") return t.openCheck;
+  if (step.type === "widget") return t.openWidget;
+  return t.openExplain;
 }
 
 /** A guided lesson: animated explanations, small interactive pieces and checks, with Blob as the tutor. */
@@ -39,11 +45,14 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
   const session = useStudySession({ topic: slug, mastery, todayXp: today.xp });
   const blobRef = useRef<BlobHandle>(null);
   const wide = useWide();
+  const t = useMessages(learnText);
+  const tt = useText();
+  const names = topicNames(topic, useLocale());
 
   const [index, setIndex] = useState(0);
   const [frame, setFrame] = useState(0);
   const [finished, setFinished] = useState(false);
-  const [say, setSay] = useState<string | null>(openingLine(steps[0]));
+  const [say, setSay] = useState<Text | null>(() => openingLine(steps[0], t.lesson));
   const [mood, setMood] = useState<BlobMood>("happy");
   const [dir, setDir] = useState(1);
 
@@ -59,7 +68,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
     const target = steps[to];
     setFrame(d < 0 && target.type === "explain" && target.frames ? target.frames.length - 1 : 0);
     setMood("happy");
-    setSay(openingLine(target));
+    setSay(openingLine(target, t.lesson));
   }
 
   function next() {
@@ -112,40 +121,40 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
     if (event === "correct") {
       setMood("excited");
       b?.celebrate();
-      setSay(pick(CHEERS));
+      setSay(pick(t.lesson.cheers));
     } else if (event === "wrong") {
       setMood("worried");
       b?.shake();
-      setSay(feedback?.message ?? "Not quite. Have another look!");
+      setSay(feedback?.message ?? t.lesson.notQuite);
     } else if (event === "hint") {
       setMood("thinking");
-      setSay("Here's a little hint for you.");
+      setSay(t.lesson.hint);
     } else {
       setMood("thinking");
-      setSay("No problem! Watch how it works, then carry on.");
+      setSay(t.lesson.reveal);
     }
   }
 
   if (finished) {
     return (
       <div className="min-h-dvh">
-        <StudyTopBar exitHref={exitHref} title={topic.title} progress={1} xp={session.xp} />
+        <StudyTopBar exitHref={exitHref} title={names.title} progress={1} xp={session.xp} />
         <SessionEnd
-          title="Lesson complete!"
-          subtitle={`${topic.title} · ${topic.de}. Now make it stick with a few practice tasks.`}
+          title={t.lesson.complete}
+          subtitle={t.lesson.completeText(names.title, topic.de)}
           stats={[
-            { label: "XP earned", value: session.xp, tone: "blob" },
-            { label: "Checks right", value: session.correct, suffix: ` / ${session.answered}`, tone: "ok" },
-            { label: "Steps", value: steps.length },
+            { label: t.lesson.xpEarned, value: session.xp, tone: "blob" },
+            { label: t.lesson.checksRight, value: session.correct, suffix: ` / ${session.answered}`, tone: "ok" },
+            { label: t.lesson.steps, value: steps.length },
           ]}
           mastery={{ from: session.startMastery, to: session.mastery }}
           today={{ from: session.startToday, to: session.todayXp, goal: session.goal }}
         >
           <StudyButton href={`/study/maths/${slug}/practice`} variant="blob">
-            <Dumbbell className="size-4" /> Practice now
+            <Dumbbell className="size-4" /> {t.lesson.practiceNow}
           </StudyButton>
           <StudyButton href={exitHref} variant="ghost">
-            Back to topic
+            {t.backToTopic}
           </StudyButton>
         </SessionEnd>
       </div>
@@ -156,7 +165,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <StudyTopBar exitHref={exitHref} title={topic.title} progress={progress} xp={session.xp} combo={session.combo} />
+      <StudyTopBar exitHref={exitHref} title={names.title} progress={progress} xp={session.xp} combo={session.combo} />
       <div className="mx-auto grid w-full max-w-[1360px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <Tutor say={say} mood={mood} blobRef={blobRef} size={wide ? 170 : 84} side={wide ? "left" : "top"} />
@@ -164,11 +173,9 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
         <main className="min-w-0">
           <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
-            <span>
-              Step {index + 1} of {steps.length}
-            </span>
+            <span>{t.lesson.stepOf(index + 1, steps.length)}</span>
             <span className="text-line-2">·</span>
-            <span className="text-blob-ink">{step.type === "check" ? "Your turn" : step.type === "widget" ? "Try it" : "Learn"}</span>
+            <span className="text-blob-ink">{step.type === "check" ? t.lesson.kindCheck : step.type === "widget" ? t.lesson.kindWidget : t.lesson.kindExplain}</span>
           </div>
           <AnimatePresence mode="wait" custom={dir} initial={false}>
             <motion.section
@@ -187,7 +194,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
             >
               {step.type === "check" ? (
                 <>
-                  {step.title && <h1 className="font-display text-[26px] font-bold tracking-[-0.015em]">{step.title}</h1>}
+                  {step.title && <h1 className="font-display text-[26px] font-bold tracking-[-0.015em]">{tt(step.title)}</h1>}
                   <ExerciseCard
                     exercise={step.exercise}
                     mode="lesson"
@@ -201,7 +208,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
                 </>
               ) : (
                 <>
-                  <h1 className="font-display text-[26px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{step.title}</h1>
+                  <h1 className="font-display text-[26px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>
                   {step.body && <Rich text={step.body} className="max-w-[700px] text-[16px] leading-relaxed text-ink-2" />}
 
                   {step.type === "widget" && (
@@ -224,7 +231,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
                                 key={n}
                                 onClick={() => setFrame(n)}
                                 className={cn("h-1.5 rounded-full transition-all", n === frame ? "w-5 bg-blob" : n < frame ? "w-1.5 bg-blob/50" : "w-1.5 bg-line-2")}
-                                aria-label={`Show step ${n + 1}`}
+                                aria-label={t.lesson.showStep(n + 1)}
                               />
                             ))}
                           </div>
@@ -246,15 +253,15 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
                   <div className="flex items-center gap-2 pt-1">
                     <StudyButton onClick={next} variant={frames.length && frame < frames.length - 1 ? "ink" : "blob"}>
-                      {frames.length && frame < frames.length - 1 ? "Next" : index === steps.length - 1 ? "Finish lesson" : "Continue"}
+                      {frames.length && frame < frames.length - 1 ? t.lesson.next : index === steps.length - 1 ? t.lesson.finish : t.lesson.continue}
                       <ArrowRight className="size-4" />
                     </StudyButton>
                     {canBack && (
                       <StudyButton onClick={back} variant="ghost">
-                        <ArrowLeft className="size-4" /> Back
+                        <ArrowLeft className="size-4" /> {t.lesson.back}
                       </StudyButton>
                     )}
-                    <span className="ml-auto hidden text-[12px] text-ink-3 sm:block">Use ← → to step through</span>
+                    <span className="ml-auto hidden text-[12px] text-ink-3 sm:block">{t.lesson.keys}</span>
                   </div>
                 </>
               )}

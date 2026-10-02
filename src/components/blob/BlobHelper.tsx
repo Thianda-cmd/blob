@@ -8,23 +8,16 @@ import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "./Blob
 import { blob, type BlobEvent } from "./bus";
 import { TypedText, useTypewriter } from "./speech";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { blobText } from "@/i18n/messages/blob";
 import { firstName } from "@/lib/utils";
-
-const TIPS = [
-  "Type / in a note to add headings, checklists, quotes and more.",
-  "Press ⌘K (Ctrl K) to jump to any note in a second.",
-  "Select text in a note to make it bold, highlighted or a link.",
-  "Add homework on the Tasks page. Try “Essay due friday”.",
-  "Presentations have a Present button. Use the arrow keys to move through slides.",
-  "Everything saves automatically. I keep an eye on it.",
-  "Drop an image into a note to add it.",
-];
 
 /** The little jelly in the corner: reacts to saves, completions and errors, and offers help. */
 export function BlobHelper() {
   const router = useRouter();
   const pathname = usePathname();
   const { profile, createPage } = useWorkspace();
+  const t = useMessages(blobText);
   const ref = useRef<BlobHandle>(null);
   const [heldMood, setHeldMood] = useState<BlobMood | null>(null);
   const [flashMood, setFlashMood] = useState<BlobMood | null>(null);
@@ -132,16 +125,16 @@ export function BlobHelper() {
           >
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
-                <div className="font-display text-[15px] font-semibold">Hey{name ? ` ${name}` : ""}! Need a hand?</div>
-                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{TIPS[tip % TIPS.length]}</p>
+                <div className="font-display text-[15px] font-semibold">{t.needAHand(name)}</div>
+                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{t.tips[tip % t.tips.length]}</p>
               </div>
-              <button onClick={() => setOpen(false)} className="grid size-6 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label="Close">
+              <button onClick={() => setOpen(false)} className="grid size-6 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.close}>
                 <X className="size-3.5" />
               </button>
             </div>
             <div className="grid gap-0.5">
-              <HelperAction icon={<FilePlus2 />} onClick={() => newPage("note")}>New note</HelperAction>
-              <HelperAction icon={<MonitorPlay />} onClick={() => newPage("deck")}>New presentation</HelperAction>
+              <HelperAction icon={<FilePlus2 />} onClick={() => newPage("note")}>{t.newNote}</HelperAction>
+              <HelperAction icon={<MonitorPlay />} onClick={() => newPage("deck")}>{t.newDeck}</HelperAction>
               <HelperAction
                 icon={<ListPlus />}
                 onClick={() => {
@@ -149,11 +142,11 @@ export function BlobHelper() {
                   router.push("/tasks?new=1");
                 }}
               >
-                Add homework or exam
+                {t.addTask}
               </HelperAction>
             </div>
             <button onClick={() => setTip((t) => t + 1)} className="mt-2 text-[12px] text-ink-3 hover:text-ink">
-              Another tip →
+              {t.anotherTip}
             </button>
           </motion.div>
         )}
@@ -184,7 +177,7 @@ export function BlobHelper() {
           mood={mood}
           talking={typing}
           accessory={accessory}
-          title="Blob, your helper"
+          title={t.helperTitle}
           onClick={() => {
             setOpen((o) => !o);
             setSpeech(null);

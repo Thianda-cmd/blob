@@ -5,12 +5,16 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useMessages } from "@/i18n/client";
+import { settingsText } from "@/i18n/messages/settings";
 import { Card, SavedBadge, Section } from "./primitives";
 
 type Form = { full_name: string; school: string; grade: string };
 
 export function ProfileSection() {
   const { profile, setProfile, email } = useWorkspace();
+  const all = useMessages(settingsText);
+  const t = all.profile;
   const fromProfile = (): Form => ({
     full_name: profile.full_name ?? "",
     school: profile.school ?? "",
@@ -53,20 +57,20 @@ export function ProfileSection() {
   };
 
   return (
-    <Section id="profile" title="Profile" description="How you show up in Blob.">
+    <Section id="profile" title={t.title} description={t.description}>
       <form onSubmit={save}>
         <Card
           footer={
             <>
-              <p className="mr-auto text-[12.5px] text-ink-3">Your name is used in greetings and the sidebar.</p>
+              <p className="mr-auto text-[12.5px] text-ink-3">{t.footer}</p>
               <SavedBadge show={saved && !dirty} />
               {dirty && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setForm(fromProfile())} disabled={saving}>
-                  Cancel
+                  {all.cancel}
                 </Button>
               )}
               <Button type="submit" variant="primary" size="sm" disabled={!dirty} loading={saving}>
-                Save changes
+                {t.save}
               </Button>
             </>
           }
@@ -87,26 +91,26 @@ export function ProfileSection() {
               </AnimatePresence>
             </div>
             <div className="min-w-0">
-              <div className="truncate font-display text-[16px] font-semibold tracking-[-0.01em]">{form.full_name.trim() || "Your name"}</div>
+              <div className="truncate font-display text-[16px] font-semibold tracking-[-0.01em]">{form.full_name.trim() || t.yourName}</div>
               <div className="truncate text-[12.5px] text-ink-3">{meta || email}</div>
             </div>
           </div>
           <div className="grid gap-4 px-5 pb-5 pt-5 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.2fr_0.8fr]">
-            <Field label="Full name" htmlFor="profile-name">
-              <Input id="profile-name" autoComplete="name" value={form.full_name} onChange={set("full_name")} maxLength={80} placeholder="Alex Morgan" />
+            <Field label={t.fullName} htmlFor="profile-name">
+              <Input id="profile-name" autoComplete="name" value={form.full_name} onChange={set("full_name")} maxLength={80} placeholder={t.namePlaceholder} />
             </Field>
-            <Field label="School" htmlFor="profile-school">
+            <Field label={t.school} htmlFor="profile-school">
               <Input
                 id="profile-school"
                 autoComplete="organization"
                 value={form.school}
                 onChange={set("school")}
                 maxLength={120}
-                placeholder="Optional"
+                placeholder={t.optional}
               />
             </Field>
-            <Field label="Grade or year" htmlFor="profile-grade">
-              <Input id="profile-grade" value={form.grade} onChange={set("grade")} maxLength={40} placeholder="e.g. Year 11" />
+            <Field label={t.grade} htmlFor="profile-grade">
+              <Input id="profile-grade" value={form.grade} onChange={set("grade")} maxLength={40} placeholder={t.gradePlaceholder} />
             </Field>
           </div>
         </Card>

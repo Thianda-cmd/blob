@@ -5,6 +5,8 @@ import { Flame, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
+import { useLocale, useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
 import { masteryLabel } from "@/learn/progress";
 import { cn } from "@/lib/utils";
 import { Confetti } from "./Confetti";
@@ -30,14 +32,15 @@ export function StudyTopBar({
   xp: number;
   combo?: number;
 }) {
+  const t = useMessages(learnText).chrome;
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1360px] items-center gap-4 px-4 sm:px-6">
         <Link
           href={exitHref}
           className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink"
-          aria-label="Leave"
-          title="Leave (Esc)"
+          aria-label={t.leave}
+          title={t.leaveEsc}
         >
           <X className="size-5" />
         </Link>
@@ -78,7 +81,7 @@ export function StudyTopBar({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.6 }}
               className="flex items-center gap-1 rounded-full bg-blob-soft px-2.5 py-1 text-[12.5px] font-semibold text-blob-ink"
-              title="Correct in a row"
+              title={t.inARow}
             >
               <Flame className="size-3.5" />
               <motion.span key={combo} initial={{ y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
@@ -87,7 +90,7 @@ export function StudyTopBar({
             </motion.span>
           )}
         </AnimatePresence>
-        <span className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-ink" title="XP this session">
+        <span className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-ink" title={t.sessionXp}>
           <Zap className="size-4 text-blob" />
           <CountUp value={xp} />
         </span>
@@ -142,6 +145,8 @@ export function SessionEnd({
     return () => clearTimeout(t);
   }, [happy]);
   const reachedGoal = today.from < today.goal && today.to >= today.goal;
+  const m = useMessages(learnText);
+  const locale = useLocale();
 
   return (
     <div className="mx-auto grid w-full max-w-[920px] items-center gap-10 px-5 py-10 md:grid-cols-[260px_minmax(0,1fr)] md:py-16">
@@ -193,9 +198,10 @@ export function SessionEnd({
         >
           <div>
             <div className="flex items-baseline justify-between text-[13px]">
-              <span className="font-medium text-ink">Mastery</span>
+              <span className="font-medium text-ink">{m.chrome.mastery}</span>
               <span className="text-ink-2">
-                {masteryLabel(mastery.to)} · <CountUp value={mastery.to} from={mastery.from} delay={0.7} duration={1.1} />%
+                {masteryLabel(mastery.to, locale)} · <CountUp value={mastery.to} from={mastery.from} delay={0.7} duration={1.1} />
+                {m.pctSuffix}
               </span>
             </div>
             <div className="relative mt-2 h-3 overflow-hidden rounded-full bg-line">
@@ -212,7 +218,7 @@ export function SessionEnd({
               <Zap className="size-4 text-blob" />
             </Ring>
             <div className="text-[13px] leading-tight">
-              <div className="font-medium text-ink">{reachedGoal ? "Daily goal reached!" : "Daily goal"}</div>
+              <div className="font-medium text-ink">{reachedGoal ? m.chrome.goalReached : m.dailyGoal}</div>
               <div className="tabular-nums text-ink-2">
                 <CountUp value={Math.min(today.to, today.goal * 9)} from={today.from} delay={0.8} /> / {today.goal} XP
               </div>

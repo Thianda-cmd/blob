@@ -2,6 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
+import { getMessages } from "@/i18n/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, getUser } from "@/lib/supabase/server";
 
@@ -30,14 +32,16 @@ export type DeleteAccountResult = { error: string };
 /**
  * Permanently deletes the signed-in user: their uploaded files, then the auth user
  * (profiles, subjects, pages and tasks cascade). On success it signs out and redirects to "/".
+ * `confirmation` is the word typed in the dialog: "löschen" in German, "delete" in English.
  */
 export async function deleteAccount(confirmation: string): Promise<DeleteAccountResult | undefined> {
-  if (typeof confirmation !== "string" || confirmation.trim().toLowerCase() !== "delete") {
-    return { error: "Type “delete” to confirm." };
+  const t = (await getMessages(settingsText)).danger;
+  if (typeof confirmation !== "string" || !isConfirmWord(confirmation, t.confirmWord)) {
+    return { error: t.typeToConfirm };
   }
 
   const user = await getUser();
-  if (!user) return { error: "You're signed out. Sign in again to delete your account." };
+  if (!user) return { error: t.signedOut };
 
   const admin = createAdminClient();
 
@@ -49,13 +53,13 @@ export async function deleteAccount(confirmation: string): Promise<DeleteAccount
     }
   } catch (err) {
     console.error("deleteAccount: storage cleanup failed", err);
-    return { error: "I couldn't remove your uploaded images, so your account is still here. Try again in a moment." };
+    return { error: t.storageFailed };
   }
 
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     console.error("deleteAccount: deleteUser failed", error);
-    return { error: "Something went wrong deleting your account. Try again in a moment." };
+    return { error: t.deleteFailed };
   }
 
   // The user is gone; clear the session cookies so no request treats this browser as signed in.

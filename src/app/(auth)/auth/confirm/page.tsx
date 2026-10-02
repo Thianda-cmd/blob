@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { authText } from "@/i18n/messages/auth";
+import { getMessages } from "@/i18n/server";
 import { ConfirmCard } from "@/components/auth/ConfirmCard";
 
-export const metadata: Metadata = { title: "Confirm" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages(authText)).meta.confirm };
+}
 
 export default async function ConfirmPage({ searchParams }: PageProps<"/auth/confirm">) {
   const params = await searchParams;

@@ -1,39 +1,46 @@
 import type { AuthError } from "@supabase/supabase-js";
+import type { Locale } from "@/i18n/config";
+import { authText } from "@/i18n/messages/auth";
+import { guessLocale } from "./locale";
 
-/** Turn Supabase auth errors into short, friendly sentences. */
-export function authMessage(error: AuthError | Error | null | undefined): string {
+/**
+ * Turn Supabase auth errors into short, friendly sentences in the reader's language.
+ * Client: pass `useLocale()`; server: `await getLocale()`. Without it, the page's language is used.
+ */
+export function authMessage(error: AuthError | Error | null | undefined, locale: Locale = guessLocale()): string {
   if (!error) return "";
+  const t = authText[locale];
   const code = "code" in error ? (error as AuthError).code : undefined;
   const msg = error.message?.toLowerCase() ?? "";
 
   switch (code) {
     case "invalid_credentials":
-      return "That email and password don't match.";
+      return t.errors.invalidCredentials;
     case "email_not_confirmed":
-      return "Please confirm your email first. Check your inbox for the link.";
+      return t.errors.notConfirmed;
     case "user_already_exists":
     case "email_exists":
-      return "There's already an account with this email.";
+      return t.common.exists;
     case "weak_password":
-      return "That password is too easy to guess. Try a longer one.";
+      return t.errors.weakPassword;
     case "over_email_send_rate_limit":
     case "over_request_rate_limit":
-      return "Too many tries. Wait a minute and try again.";
+      return t.errors.tooManyTries;
     case "signup_disabled":
-      return "Sign ups are turned off right now.";
+      return t.errors.signupsOff;
     case "same_password":
-      return "Your new password must be different from the old one.";
+      return t.errors.samePassword;
     case "otp_expired":
-      return "This link has expired. Request a new one.";
+      return t.errors.linkExpired;
     case "email_address_invalid":
-      return "That email address doesn't look valid.";
+      return t.errors.invalidEmail;
     case "user_not_found":
-      return "We couldn't find an account with that email.";
+      return t.common.noAccount;
   }
 
-  if (msg.includes("fetch") || msg.includes("network")) return "Can't reach the server. Check your connection.";
-  if (msg.includes("rate limit")) return "Too many tries. Wait a minute and try again.";
-  return error.message || "Something went wrong. Please try again.";
+  if (msg.includes("fetch") || msg.includes("network")) return t.errors.offline;
+  if (msg.includes("rate limit")) return t.errors.tooManyTries;
+  return error.message ? t.errors.unknown(error.message) : t.errors.generic;
 }
 
 export function isEmail(value: string) {

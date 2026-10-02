@@ -23,13 +23,16 @@ import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
+import { useLocale, useMessages } from "@/i18n/client";
+import { shellText } from "@/i18n/messages/shell";
+import { resolveText } from "@/i18n/text";
 import { MATHS_CATALOG } from "@/learn/catalog";
 import { cn, pageTitle } from "@/lib/utils";
 import { PageIcon } from "./Sidebar";
 
 type Item = {
   id: string;
-  group: "Actions" | "Pages" | "Found in notes" | "Subjects" | "Learn";
+  group: "actions" | "pages" | "found" | "subjects" | "learn";
   label: string;
   hint?: string;
   icon: ReactNode;
@@ -51,6 +54,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 function Palette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { pages, subjects, createPage } = useWorkspace();
+  const locale = useLocale();
+  const t = useMessages(shellText).palette;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [found, setFound] = useState<{ id: string; title: string; kind: "note" | "deck"; icon: string | null; text: string }[]>([]);
@@ -94,8 +99,8 @@ function Palette({ onClose }: { onClose: () => void }) {
     const actions: Item[] = [
       {
         id: "new-note",
-        group: "Actions",
-        label: q ? `New note “${q}”` : "New note",
+        group: "actions",
+        label: q ? t.newNoteNamed(q) : t.newNote,
         icon: <FilePlus2 />,
         run: async () => {
           onClose();
@@ -105,8 +110,8 @@ function Palette({ onClose }: { onClose: () => void }) {
       },
       {
         id: "new-deck",
-        group: "Actions",
-        label: q ? `New presentation “${q}”` : "New presentation",
+        group: "actions",
+        label: q ? t.newDeckNamed(q) : t.newDeck,
         icon: <Presentation />,
         run: async () => {
           onClose();
@@ -114,16 +119,16 @@ function Palette({ onClose }: { onClose: () => void }) {
           if (p) router.push(`/p/${p.id}`);
         },
       },
-      { id: "new-task", group: "Actions", label: "Add a task", hint: "Homework, exams, projects", icon: <ListPlus />, run: () => go("/tasks?new=1") },
-      { id: "home", group: "Actions", label: "Go to Home", icon: <House />, run: () => go("/home") },
-      { id: "tasks", group: "Actions", label: "Go to Tasks", icon: <ListChecks />, run: () => go("/tasks") },
-      { id: "learn", group: "Actions", label: "Go to Learn", hint: "Maths lessons and practice", icon: <GraduationCap />, run: () => go("/learn") },
-      { id: "settings", group: "Actions", label: "Settings", icon: <Settings />, run: () => go("/settings") },
-      { id: "trash", group: "Actions", label: "Trash", icon: <Trash2 />, run: () => go("/trash") },
+      { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
+      { id: "home", group: "actions", label: t.goHome, icon: <House />, run: () => go("/home") },
+      { id: "tasks", group: "actions", label: t.goTasks, icon: <ListChecks />, run: () => go("/tasks") },
+      { id: "learn", group: "actions", label: t.goLearn, hint: t.goLearnHint, icon: <GraduationCap />, run: () => go("/learn") },
+      { id: "settings", group: "actions", label: t.settings, icon: <Settings />, run: () => go("/settings") },
+      { id: "trash", group: "actions", label: t.trash, icon: <Trash2 />, run: () => go("/trash") },
       {
         id: "theme",
-        group: "Actions",
-        label: "Toggle dark mode",
+        group: "actions",
+        label: t.toggleDark,
         icon: <Moon />,
         run: () => {
           const dark = document.documentElement.dataset.theme === "dark";
@@ -134,15 +139,15 @@ function Palette({ onClose }: { onClose: () => void }) {
     ];
 
     const pageItems: Item[] = [...pages]
-      .filter((p) => match(pageTitle(p.title, p.kind)))
+      .filter((p) => match(pageTitle(p.title, p.kind, locale)))
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
       .slice(0, q ? 12 : 6)
       .map((p) => {
         const subject = subjects.find((s) => s.id === p.subject_id);
         return {
           id: `page-${p.id}`,
-          group: "Pages",
-          label: pageTitle(p.title, p.kind),
+          group: "pages",
+          label: pageTitle(p.title, p.kind, locale),
           hint: subject?.name,
           icon: <PageIcon page={p} />,
           run: () => go(`/p/${p.id}`),
@@ -154,8 +159,8 @@ function Palette({ onClose }: { onClose: () => void }) {
       .filter((f) => !titleIds.has(`page-${f.id}`))
       .map((f) => ({
         id: `found-${f.id}`,
-        group: "Found in notes",
-        label: pageTitle(f.title, f.kind),
+        group: "found",
+        label: pageTitle(f.title, f.kind, locale),
         hint: f.text,
         icon: <PageIcon page={f} />,
         run: () => go(`/p/${f.id}`),
@@ -165,25 +170,29 @@ function Palette({ onClose }: { onClose: () => void }) {
       .filter((s) => q && match(s.name))
       .map((s) => ({
         id: `subject-${s.id}`,
-        group: "Subjects",
+        group: "subjects",
         label: s.name,
         icon: <span className="grid size-4 place-items-center">{s.emoji ?? <span className="size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}</span>,
         run: () => go(`/subjects/${s.id}`),
       }));
 
-    const topicItems: Item[] = MATHS_CATALOG.filter((t) => q && (match(t.title) || match(t.de))).map((t) => ({
-      id: `topic-${t.slug}`,
-      group: "Learn",
-      label: t.title,
-      hint: t.de,
-      icon: <GraduationCap />,
-      run: () => go(`/learn/maths/${t.slug}`),
-    }));
+    // Match the shown title and the German name from class (and the English one, so either language finds it).
+    const topicItems: Item[] = MATHS_CATALOG.filter((topic) => q && (match(resolveText(topic.title, locale)) || match(topic.de) || match(resolveText(topic.title, "en")))).map(
+      (topic) => ({
+        id: `topic-${topic.slug}`,
+        group: "learn",
+        label: resolveText(topic.title, locale),
+        // In English the German name helps students recognise it from class; in German it would repeat the title.
+        hint: locale === "en" ? topic.de : undefined,
+        icon: <GraduationCap />,
+        run: () => go(`/learn/maths/${topic.slug}`),
+      }),
+    );
 
     const filteredActions = q ? actions.filter((a) => a.id.startsWith("new") || match(a.label)) : actions.slice(0, 3);
     return q ? [...pageItems, ...contentItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found]);
+  }, [q, pages, subjects, found, locale, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing
@@ -223,7 +232,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       />
       <motion.div
         role="dialog"
-        aria-label="Search"
+        aria-label={t.label}
         initial={{ opacity: 0, scale: 0.94, y: -10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
@@ -237,7 +246,7 @@ function Palette({ onClose }: { onClose: () => void }) {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search notes, presentations, subjects…"
+            placeholder={t.placeholder}
             className="h-full flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-3"
             role="combobox"
             aria-expanded="true"
@@ -248,13 +257,13 @@ function Palette({ onClose }: { onClose: () => void }) {
         </div>
 
         <div ref={listRef} id="palette-list" role="listbox" className="overflow-y-auto p-1.5">
-          {items.length === 0 && <div className="px-3 py-8 text-center text-[13px] text-ink-3">Nothing matches “{q}”.</div>}
+          {items.length === 0 && <div className="px-3 py-8 text-center text-[13px] text-ink-3">{t.nothing(q)}</div>}
           {items.map((item, i) => {
             const header = item.group !== lastGroup ? item.group : null;
             lastGroup = item.group;
             return (
               <div key={item.id}>
-                {header && <div className="px-2.5 pb-1 pt-2.5 text-[11.5px] font-medium text-ink-3">{header}</div>}
+                {header && <div className="px-2.5 pb-1 pt-2.5 text-[11.5px] font-medium text-ink-3">{t.groups[header]}</div>}
                 <button
                   id={`palette-${item.id}`}
                   role="option"
@@ -284,13 +293,13 @@ function Palette({ onClose }: { onClose: () => void }) {
         <div className="flex h-9 shrink-0 items-center gap-4 border-t border-line px-4 text-[11.5px] text-ink-3">
           <span className="flex items-center gap-1">
             <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> move
+            <Kbd>↓</Kbd> {t.move}
           </span>
           <span className="flex items-center gap-1">
-            <Kbd>↵</Kbd> open
+            <Kbd>↵</Kbd> {t.open}
           </span>
-          <span className="ml-auto flex items-center gap-1.5">
-            <Sun className="size-3" /> Tip: search finds words inside your notes too
+          <span className="ml-auto hidden min-w-0 items-center gap-1.5 sm:flex">
+            <Sun className="size-3 shrink-0" /> <span className="truncate">{t.tip}</span>
           </span>
         </div>
       </motion.div>

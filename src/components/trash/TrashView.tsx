@@ -12,6 +12,10 @@ import { TopBar } from "@/components/shell/TopBar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dateLocale } from "@/i18n/format";
+import { trashText } from "@/i18n/messages/trash";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import { PAGE_META_COLUMNS, type PageMeta } from "@/lib/types";
@@ -68,10 +72,11 @@ function withTrashedDescendants(pages: PageMeta[], ids: string[]) {
   return [...out];
 }
 
-function deletedAgo(iso: string) {
+function deletedAgo(iso: string, locale: Locale) {
+  const t = trashText[locale];
   const date = new Date(iso);
-  if (Date.now() - date.getTime() < 60_000) return "Deleted just now";
-  return `Deleted ${formatDistanceToNowStrict(date, { addSuffix: true })}`;
+  if (Date.now() - date.getTime() < 60_000) return t.deletedJustNow;
+  return t.deleted(formatDistanceToNowStrict(date, { addSuffix: true, locale: dateLocale(locale) }));
 }
 
 function chunks<T>(list: T[], size = 100) {
@@ -84,6 +89,8 @@ type Confirm = { kind: "one"; item: Item } | { kind: "all" } | null;
 
 export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
   const { pages: livePages, subjects, upsertPages, removePages } = useWorkspace();
+  const locale = useLocale();
+  const t = useMessages(trashText);
   const [trash, setTrash] = useState(initialPages);
   const [query, setQuery] = useState("");
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -93,8 +100,8 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((i) => pageTitle(i.root.title, i.root.kind).toLowerCase().includes(q));
-  }, [items, query]);
+    return items.filter((i) => pageTitle(i.root.title, i.root.kind, locale).toLowerCase().includes(q));
+  }, [items, query, locale]);
 
   function oops(message: string) {
     blob.say(message, { mood: "worried" });
@@ -134,7 +141,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setExit("restore");
     setTrash((t) => t.filter((p) => !item.ids.includes(p.id)));
     upsertPages(original.map((p) => ({ ...p, trashed_at: null, parent_id: p.id === root.id && detach ? null : p.parent_id })));
-    blob.say(`“${pageTitle(root.title, root.kind)}” is back in your sidebar.`, { mood: "happy" });
+    blob.say(t.restored(pageTitle(root.title, root.kind, locale)), { mood: "happy" });
     blob.react("jump", "happy");
 
     const supabase = createClient();
@@ -145,7 +152,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     if (!restored || restored.error || !restored.data) {
       removePages(item.ids);
       putBack(original);
-      return oops("I couldn't restore that. Try again?");
+      return oops(t.restoreFailed);
     }
     upsertPages(restored.data as PageMeta[]);
   }
@@ -160,7 +167,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     const ok = (await detachLiveChildren(ids)) && !(await createClient().from("pages").delete().in("id", ids)).error;
     if (!ok) {
       putBack(original);
-      oops("I couldn't delete that. Try again?");
+      oops(t.deleteFailed);
     }
   }
 
@@ -169,7 +176,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setConfirm(null);
     setExit("delete");
     setTrash([]);
-    blob.say("All clean! Fresh start.", { mood: "happy" });
+    blob.say(t.allClean, { mood: "happy" });
 
     const supabase = createClient();
     let ok = await detachLiveChildren(ids);
@@ -183,7 +190,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
       // Show whatever is really left.
       const { data } = await supabase.from("pages").select(PAGE_META_COLUMNS).not("trashed_at", "is", null).order("trashed_at", { ascending: false });
       if (data) setTrash(data as PageMeta[]);
-      oops("Some pages didn't delete. Try again?");
+      oops(t.someLeft);
     }
   }
 
@@ -192,7 +199,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
 
   return (
     <>
-      <TopBar crumbs={[{ label: "Trash", icon: <Trash2 className="size-3.5 text-ink-3" /> }]} />
+      <TopBar crumbs={[{ label: t.title, icon: <Trash2 className="size-3.5 text-ink-3" /> }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[920px] px-5 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
           <motion.header
@@ -202,21 +209,21 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
             className="mb-6 flex flex-wrap items-end justify-between gap-4"
           >
             <div>
-              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">Trash</h1>
-              <p className="mt-1 text-[13.5px] text-ink-2">Deleted pages wait here, so you can bring them back.</p>
+              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.title}</h1>
+              <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
             </div>
             {items.length > 0 && (
               <div className="flex items-center gap-2">
                 <Input
                   icon={<Search />}
-                  placeholder="Search the trash"
+                  placeholder={t.search}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="h-8 w-[220px] text-[13px]"
-                  aria-label="Search the trash"
+                  aria-label={t.search}
                 />
                 <Button variant="secondary" size="md" className="h-8 text-danger" onClick={() => setConfirm({ kind: "all" })}>
-                  <Trash2 className="size-3.5" /> Empty trash
+                  <Trash2 className="size-3.5" /> {t.empty}
                 </Button>
               </div>
             )}
@@ -230,26 +237,24 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
               className="flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 py-16 text-center"
             >
               <Blob size={128} mood="happy" />
-              <h2 className="mt-2 font-display text-[20px] font-semibold tracking-[-0.015em]">Nothing in the trash</h2>
+              <h2 className="mt-2 font-display text-[20px] font-semibold tracking-[-0.015em]">{t.emptyTitle}</h2>
               <p className="mt-1 max-w-[340px] text-[13.5px] text-ink-2">
-                When you delete a note or presentation, it waits here in case you change your mind.
+                {t.emptyHint}
               </p>
               <Link
                 href="/home"
                 className="mt-5 inline-flex h-8 items-center rounded-lg border border-line bg-raised px-3 text-[13px] font-medium text-ink shadow-card hover:border-line-2"
               >
-                Back to home
+                {t.backHome}
               </Link>
             </motion.div>
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between px-1 text-[12px] text-ink-3">
                 <span>
-                  {visible.length === items.length
-                    ? `${items.length} ${items.length === 1 ? "item" : "items"}`
-                    : `${visible.length} of ${items.length}`}
+                  {visible.length === items.length ? t.items(items.length) : t.filtered(visible.length, items.length)}
                 </span>
-                <span className="hidden sm:inline">Newest first</span>
+                <span className="hidden sm:inline">{t.newestFirst}</span>
               </div>
               <div className="overflow-hidden rounded-xl border border-line bg-raised shadow-card">
                 <ul className="relative">
@@ -267,7 +272,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
                   </AnimatePresence>
                 </ul>
                 {visible.length === 0 && (
-                  <div className="px-4 py-10 text-center text-[13px] text-ink-3">No deleted pages match “{query.trim()}”.</div>
+                  <div className="px-4 py-10 text-center text-[13px] text-ink-3">{t.noMatch(query.trim())}</div>
                 )}
               </div>
             </>
@@ -279,20 +284,21 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
         open={confirm?.kind === "one"}
         onClose={() => setConfirm(null)}
         onConfirm={() => pending && destroy(pending)}
-        title={pending ? `Delete “${pageTitle(pending.root.title, pending.root.kind)}” forever?` : "Delete forever?"}
-        confirmLabel="Delete forever"
+        title={pending ? t.confirmOne(pageTitle(pending.root.title, pending.root.kind, locale)) : t.confirmOneFallback}
+        confirmLabel={t.deleteForever}
       >
-        {pendingCount > 0 ? `This also deletes ${pendingCount} ${pendingCount === 1 ? "page" : "pages"} inside it. ` : ""}
-        You can&apos;t undo this.
+        {pendingCount > 0 ? t.alsoInside(pendingCount) : ""}
+        {t.cantUndo}
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm?.kind === "all"}
         onClose={() => setConfirm(null)}
         onConfirm={emptyTrash}
-        title="Empty the trash?"
-        confirmLabel="Empty trash"
+        title={t.confirmAll}
+        confirmLabel={t.empty}
       >
-        {trash.length === 1 ? "1 page" : `All ${trash.length} pages`} will be deleted for good. You can&apos;t undo this.
+        {t.allGone(trash.length)}
+        {t.cantUndo}
       </ConfirmDialog>
     </>
   );
@@ -321,8 +327,10 @@ function TrashRow({
   onDelete: () => void;
 }) {
   const { root } = item;
+  const locale = useLocale();
+  const t = useMessages(trashText);
   const inside = item.ids.length - 1;
-  const title = pageTitle(root.title, root.kind);
+  const title = pageTitle(root.title, root.kind, locale);
   return (
     <motion.li
       layout
@@ -333,7 +341,7 @@ function TrashRow({
       transition={{ type: "spring", stiffness: 500, damping: 40 }}
       className={cn("group flex items-center gap-3 bg-raised px-3 py-2.5 sm:px-4", !first && "border-t border-line")}
     >
-      <Link href={`/p/${root.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg" title="Open (read-only until restored)">
+      <Link href={`/p/${root.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg" title={t.open}>
         <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-surface">
           <PageIcon page={root} />
         </span>
@@ -348,38 +356,36 @@ function TrashRow({
                 <span className="truncate">{subject.name}</span>
               </span>
             ) : (
-              <span>{root.kind === "deck" ? "Presentation" : "Note"}</span>
+              <span>{root.kind === "deck" ? t.presentation : t.note}</span>
             )}
             {inside > 0 && (
               <>
                 <span aria-hidden>·</span>
-                <span className="shrink-0">
-                  {inside} {inside === 1 ? "page" : "pages"} inside
-                </span>
+                <span className="shrink-0">{t.inside(inside)}</span>
               </>
             )}
             <span aria-hidden className="sm:hidden">
               ·
             </span>
             <span className="truncate sm:hidden" suppressHydrationWarning>
-              {deletedAgo(root.trashed_at!)}
+              {deletedAgo(root.trashed_at!, locale)}
             </span>
           </span>
         </span>
       </Link>
       <span
         className="hidden w-[150px] shrink-0 text-right text-[12.5px] text-ink-3 sm:block"
-        title={format(new Date(root.trashed_at!), "PPp")}
+        title={format(new Date(root.trashed_at!), "PPp", { locale: dateLocale(locale) })}
         suppressHydrationWarning
       >
-        {deletedAgo(root.trashed_at!)}
+        {deletedAgo(root.trashed_at!, locale)}
       </span>
       <div className="flex shrink-0 items-center gap-1">
         <Button variant="secondary" size="sm" onClick={onRestore}>
-          <RotateCcw className="size-3.5" /> Restore
+          <RotateCcw className="size-3.5" /> {t.restore}
         </Button>
         <IconButton
-          label="Delete forever"
+          label={t.deleteForever}
           onClick={onDelete}
           className="hover:bg-danger/10 hover:text-danger"
         >

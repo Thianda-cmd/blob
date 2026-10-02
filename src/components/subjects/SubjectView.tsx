@@ -1,6 +1,6 @@
 "use client";
 
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, format, isSameYear } from "date-fns";
 import { ArrowRight, FilePlus2, Presentation } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,8 +15,11 @@ import { useNow } from "@/components/tasks/useNow";
 import { useTaskStore, type NewTask } from "@/components/tasks/useTaskStore";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dateLocale } from "@/i18n/format";
+import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
-import { formatDue } from "@/lib/tasks";
 import type { PageKind, Subject, Task } from "@/lib/types";
 import { DeckCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
 
@@ -24,6 +27,8 @@ import { DeckCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
 export function SubjectView({ subject: initial, previews, initialTasks }: { subject: Subject; previews: Record<string, PagePreview>; initialTasks: Task[] }) {
   const router = useRouter();
   const { subjects, pages, createPage } = useWorkspace();
+  const locale = useLocale();
+  const t = useMessages(subjectsText);
   // Prefer the live copy so renames, recolors and new emojis show up immediately.
   const subject = subjects.find((s) => s.id === initial.id) ?? initial;
   const store = useTaskStore(initialTasks);
@@ -55,7 +60,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
     store.add(task);
     if (task.subject_id !== subject.id) {
       const other = subjects.find((s) => s.id === task.subject_id);
-      blob.say(other ? `Added to ${other.name}.` : "Added to your Tasks.", { mood: "happy" });
+      blob.say(other ? t.addedTo(other.name) : t.addedToTasks, { mood: "happy" });
     }
   }
 
@@ -65,11 +70,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
     <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
   );
 
-  const stats = [
-    `${notes.length} ${notes.length === 1 ? "note" : "notes"}`,
-    `${decks.length} ${decks.length === 1 ? "presentation" : "presentations"}`,
-    `${open.length} open ${open.length === 1 ? "task" : "tasks"}`,
-  ];
+  const stats = [t.noteCount(notes.length), t.deckCount(decks.length), t.openTaskCount(open.length)];
 
   return (
     <>
@@ -100,24 +101,24 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                 {nextExam && now && (
                   <>
                     {" · "}
-                    <span className="text-blob-ink">Next exam {examWhen(nextExam.due_at!, now)}</span>
+                    <span className="text-blob-ink">{t.nextExam(examWhen(nextExam.due_at!, now, locale))}</span>
                   </>
                 )}
               </p>
             </div>
             <div className="flex gap-2">
               <Button variant="primary" onClick={() => create("note")} loading={creating === "note"}>
-                <FilePlus2 className="size-4" /> New note
+                <FilePlus2 className="size-4" /> {t.newNote}
               </Button>
               <Button variant="secondary" onClick={() => create("deck")} loading={creating === "deck"}>
-                <Presentation className="size-4" /> New presentation
+                <Presentation className="size-4" /> {t.newDeck}
               </Button>
             </div>
           </header>
 
           <div className="mt-8 grid gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_380px]">
             <div className="min-w-0 space-y-9">
-              <Section title="Notes" count={notes.length}>
+              <Section title={t.notes} count={notes.length}>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                   {notes.map((p) => (
                     <NoteCard key={p.id} page={p} preview={previews[p.id]} parent={p.parent_id ? byId.get(p.parent_id) : undefined} now={now} />
@@ -126,7 +127,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                 </div>
               </Section>
 
-              <Section title="Presentations" count={decks.length}>
+              <Section title={t.presentations} count={decks.length}>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                   {decks.map((p) => (
                     <DeckCard key={p.id} page={p} preview={previews[p.id]} now={now} />
@@ -138,15 +139,15 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
 
             <aside className="min-w-0 rounded-2xl border border-line bg-raised/50 p-3.5 lg:sticky lg:top-7 lg:self-start dark:bg-raised/40">
               <Section
-                title="Tasks"
+                title={t.tasks}
                 count={open.length}
                 action={
                   <Link href="/tasks" className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
-                    All tasks <ArrowRight className="size-3" />
+                    {t.allTasks} <ArrowRight className="size-3" />
                   </Link>
                 }
               >
-                <QuickAdd size="sm" onAdd={addTask} subjects={subjects} defaultSubjectId={subject.id} placeholder={`Add a task for ${subject.name}…`} />
+                <QuickAdd size="sm" onAdd={addTask} subjects={subjects} defaultSubjectId={subject.id} placeholder={t.addTaskFor(subject.name)} />
                 <TaskBoard
                   className="mt-3"
                   store={store}
@@ -159,9 +160,9 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                     <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-line-2 px-3 py-3">
                       <Blob size={48} mood="sleepy" track={false} />
                       <p className="text-[12.5px] leading-snug text-ink-2">
-                        No tasks for {subject.name}.
+                        {t.noTasksFor(subject.name)}
                         <br />
-                        <span className="text-ink-3">Add homework or a test date above.</span>
+                        <span className="text-ink-3">{t.noTasksHint}</span>
                       </p>
                     </div>
                   }
@@ -176,11 +177,16 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
   );
 }
 
-/** "today", "tomorrow", "on Fri", "Oct 12". */
-function examWhen(due: string, now: number) {
-  const s = formatDue(due, now);
-  if (s === "Today" || s === "Tomorrow") return s.toLowerCase();
-  return /^[A-Z][a-z]{2}$/.test(s) ? `on ${s}` : s;
+/** "today", "tomorrow", "on Fri", "Oct 12" (German: "heute", "morgen", "am Freitag", "am 12. Okt."). Never in the past. */
+function examWhen(due: string, now: number, locale: Locale) {
+  const t = subjectsText[locale];
+  const d = new Date(due);
+  const days = differenceInCalendarDays(d, now);
+  if (days === 0) return t.today;
+  if (days === 1) return t.tomorrow;
+  const opts = { locale: dateLocale(locale) };
+  if (days < 7) return t.onWeekday(format(d, t.weekdayFormat, opts));
+  return t.onDate(format(d, isSameYear(d, now) ? t.dateFormat : t.dateYearFormat, opts));
 }
 
 function Section({ title, count, action, children }: { title: string; count: number; action?: ReactNode; children: ReactNode }) {

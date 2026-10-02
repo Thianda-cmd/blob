@@ -5,6 +5,8 @@ import { ArrowLeft, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useLocale, useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import { authMessage } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +53,9 @@ export function Envelope() {
 }
 
 export function CheckEmail({ email }: { email: string }) {
+  const locale = useLocale();
+  const all = useMessages(authText);
+  const t = all.checkEmail;
   const { blob } = useFieldReactions();
   const [cooldown, setCooldown] = useState(30);
   const [sending, setSending] = useState(false);
@@ -59,9 +64,9 @@ export function CheckEmail({ email }: { email: string }) {
 
   useEffect(() => {
     blob.setMood("love");
-    blob.say("I sent you a little letter. Click the link inside!");
+    blob.say(t.say);
     blob.jump();
-  }, [blob]);
+  }, [blob, t]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -80,46 +85,39 @@ export function CheckEmail({ email }: { email: string }) {
     });
     setSending(false);
     if (error) {
-      setError(authMessage(error));
+      const message = authMessage(error, locale);
+      setError(message);
       blob.setMood("worried");
-      blob.say(authMessage(error));
+      blob.say(message);
       return;
     }
     setSent(true);
     setCooldown(60);
     blob.setMood("happy");
     blob.jump();
-    blob.say("Sent another one!");
+    blob.say(t.sentAgain);
   }
 
   return (
     <div>
       <Envelope />
       <AuthHeading
-        title="Confirm your email"
-        subtitle={
-          email ? (
-            <>
-              We sent a confirmation link to <b className="font-medium text-ink">{email}</b>. Open it on this device to finish signing up.
-            </>
-          ) : (
-            "We sent you a confirmation link. Open it on this device to finish signing up."
-          )
-        }
+        title={t.title}
+        subtitle={email ? t.sentTo(<b className="font-medium text-ink">{email}</b>) : t.sent}
       />
       <ul className="mb-6 space-y-1.5 text-[13px] text-ink-2">
-        <li>• Can&apos;t find it? Check your spam or promotions folder.</li>
-        <li>• The link signs you in automatically.</li>
+        <li>• {t.spam}</li>
+        <li>• {t.autoSignIn}</li>
       </ul>
       <FormError message={error} />
       <div className="mt-4 flex gap-2">
         <Button variant="secondary" size="lg" className="flex-1" onClick={resend} loading={sending} disabled={!email || cooldown > 0}>
           <RotateCcw className="size-4" />
-          {cooldown > 0 ? `Resend in ${cooldown}s` : sent ? "Resend again" : "Resend email"}
+          {cooldown > 0 ? t.resendIn(cooldown) : sent ? t.resendAgain : t.resend}
         </Button>
       </div>
       <Link href="/login" className="mt-6 inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
-        <ArrowLeft className="size-4" /> Back to sign in
+        <ArrowLeft className="size-4" /> {all.common.backToSignIn}
       </Link>
     </div>
   );

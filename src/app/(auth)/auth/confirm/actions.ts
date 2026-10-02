@@ -2,6 +2,9 @@
 
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import { authText } from "@/i18n/messages/auth";
+import { getLocale } from "@/i18n/server";
+import { authMessage } from "@/lib/auth/errors";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/utils";
 
@@ -15,14 +18,16 @@ export async function confirmEmail(_prev: { error: string | null }, form: FormDa
   const tokenHash = String(form.get("token_hash") ?? "");
   const type = String(form.get("type") ?? "") as EmailOtpType;
   let next = safeNext(String(form.get("next") ?? ""));
+  const locale = await getLocale();
+  const t = authText[locale].confirm;
 
-  if (!tokenHash || !TYPES.includes(type)) return { error: "This link is incomplete. Request a new email and try again." };
+  if (!tokenHash || !TYPES.includes(type)) return { error: t.incomplete };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
   if (error) {
     const expired = error.code === "otp_expired" || /expired|invalid/i.test(error.message);
-    return { error: expired ? "This link has expired or was already used. Request a new one." : error.message };
+    return { error: expired ? t.expired : authMessage(error, locale) };
   }
 
   if (type === "recovery") next = "/reset-password";

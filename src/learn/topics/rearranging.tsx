@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { SolutionPlayer } from "@/learn/components/SolutionPlayer";
@@ -223,10 +225,10 @@ type Step = {
   /** Both sides afterwards. */
   t: N;
   o: N;
-  before: string;
-  after: string;
+  before: Text;
+  after: Text;
   /** For hints: "divide both sides by $a$". */
-  short: string;
+  short: Text;
 };
 
 function plan(T: N, O: N, target: string, n: number): Step {
@@ -251,10 +253,15 @@ function plan(T: N, O: N, target: string, n: number): Step {
       t: rest.length === 1 && !rest[0].neg ? rest[0].n : { ...T, items: rest },
       o: appendSum(O, { neg: !pick.neg, n: Oc(pick.n), sid: `os${n}` }, n),
       before: moving
-        ? `$${target}$ comes with a minus. Add $${X}$ on both sides to bring it over.`
-        : `$${X}$ is ${pick.neg ? "subtracted" : "added"}. Undo it: ${pick.neg ? "add" : "subtract"} $${X}$ on **both** sides.`,
-      after: moving ? `Now $${target}$ is on the other side, with a plus.` : `$${pick.neg ? "-" : "+"} ${X}$ and $${flipped} ${X}$ cancel.`,
-      short: `${pick.neg ? "add" : "subtract"} $${X}$ on both sides`,
+        ? tx(`$${target}$ comes with a minus. Add $${X}$ on both sides to bring it over.`, `Vor $${target}$ steht ein Minus. Addiere $${X}$ auf beiden Seiten, dann wechselt es die Seite.`)
+        : tx(
+            `$${X}$ is ${pick.neg ? "subtracted" : "added"}. Undo it: ${pick.neg ? "add" : "subtract"} $${X}$ on **both** sides.`,
+            `$${X}$ wird ${pick.neg ? "subtrahiert" : "addiert"}. Umkehroperation: ${pick.neg ? "Addiere" : "Subtrahiere"} $${X}$ auf **beiden** Seiten.`,
+          ),
+      after: moving
+        ? tx(`Now $${target}$ is on the other side, with a plus.`, `Jetzt steht $${target}$ auf der anderen Seite, mit Plus.`)
+        : tx(`$${pick.neg ? "-" : "+"} ${X}$ and $${flipped} ${X}$ cancel.`, `$${pick.neg ? "-" : "+"} ${X}$ und $${flipped} ${X}$ heben sich auf.`),
+      short: tx(`${pick.neg ? "add" : "subtract"} $${X}$ on both sides`, `auf beiden Seiten $${X}$ ${pick.neg ? "addieren" : "subtrahieren"}`),
     };
   }
 
@@ -272,9 +279,9 @@ function plan(T: N, O: N, target: string, n: number): Step {
         oApply: multiplyBy(O, Oc(M), n),
         t: items.length === 1 ? items[0] : { ...T, items },
         o: multiplyBy(O, Oc(M), n),
-        before: `Get rid of the fraction $${p(fr)}$ first: multiply both sides by $${p(M)}$.`,
+        before: tx(`Get rid of the fraction $${p(fr)}$ first: multiply both sides by $${p(M)}$.`, `Werde zuerst den Bruch $${p(fr)}$ los: Multipliziere beide Seiten mit $${p(M)}$.`),
         after: `$${p(M)} \\cdot ${p(fr)} = ${left.length ? (left[0].t === "sum" ? `(${p(left[0])})` : p(left[0])) : "1"}$.`,
-        short: `multiply both sides by $${p(M)}$`,
+        short: tx(`multiply both sides by $${p(M)}$`, `beide Seiten mit $${p(M)}$ multiplizieren`),
       };
     }
     const ti = T.items.findIndex((f) => has(f, target));
@@ -287,9 +294,12 @@ function plan(T: N, O: N, target: string, n: number): Step {
       oApply: divideBy(O, Oc(D), n),
       t: kept,
       o: divideBy(O, Oc(D), n),
-      before: `$${p(kept)}$ is multiplied by $${p(D)}$. Undo it: divide both sides by $${p(D)}$.`,
-      after: `$\\frac{${p(T)}}{${p(D)}} = ${p(kept)}$: the $${p(D)}$ cancels.`,
-      short: `divide both sides by $${p(D)}$`,
+      before: tx(
+        `$${p(kept)}$ is multiplied by $${p(D)}$. Undo it: divide both sides by $${p(D)}$.`,
+        `$${p(kept)}$ wird mit $${p(D)}$ multipliziert. Umkehroperation: Teile beide Seiten durch $${p(D)}$.`,
+      ),
+      after: tx(`$\\frac{${p(T)}}{${p(D)}} = ${p(kept)}$: the $${p(D)}$ cancels.`, `$\\frac{${p(T)}}{${p(D)}} = ${p(kept)}$, denn $${p(D)}$ kürzt sich weg.`),
+      short: tx(`divide both sides by $${p(D)}$`, `beide Seiten durch $${p(D)}$ teilen`),
     };
   }
 
@@ -303,12 +313,21 @@ function plan(T: N, O: N, target: string, n: number): Step {
       t: T.num,
       o: multiplyBy(O, Oc(M), n),
       before: inDen
-        ? `$${target}$ is in the denominator. Multiply both sides by $${p(M)}$ to get it out.`
-        : `$${p(T.num)}$ is divided by $${p(M)}$. Undo it: multiply both sides by $${p(M)}$.`,
+        ? tx(
+            `$${target}$ is in the denominator. Multiply both sides by $${p(M)}$ to get it out.`,
+            `$${target}$ steht im Nenner. Multipliziere beide Seiten mit $${p(M)}$, dann ist der Bruch weg.`,
+          )
+        : tx(
+            `$${p(T.num)}$ is divided by $${p(M)}$. Undo it: multiply both sides by $${p(M)}$.`,
+            `$${p(T.num)}$ wird durch $${p(M)}$ geteilt. Umkehroperation: Multipliziere beide Seiten mit $${p(M)}$.`,
+          ),
       after: inDen
-        ? `$\\frac{${p(T.num)}}{${p(M)}} \\cdot ${p(M)} = ${p(T.num)}$. Now $${target}$ is on the other side, and no longer in a fraction.`
+        ? tx(
+            `$\\frac{${p(T.num)}}{${p(M)}} \\cdot ${p(M)} = ${p(T.num)}$. Now $${target}$ is on the other side, and no longer in a fraction.`,
+            `$\\frac{${p(T.num)}}{${p(M)}} \\cdot ${p(M)} = ${p(T.num)}$. Jetzt steht $${target}$ auf der anderen Seite und nicht mehr im Nenner.`,
+          )
         : `$\\frac{${p(T.num)}}{${p(M)}} \\cdot ${p(M)} = ${p(T.num)}$.`,
-      short: `multiply both sides by $${p(M)}$`,
+      short: tx(`multiply both sides by $${p(M)}$`, `beide Seiten mit $${p(M)}$ multiplizieren`),
     };
   }
 
@@ -320,9 +339,9 @@ function plan(T: N, O: N, target: string, n: number): Step {
       oApply: { t: "sqrt", id: `ro${n}`, body: O },
       t: T.base,
       o: { t: "sqrt", id: `ro${n}`, body: O },
-      before: `$${b}$ is squared. Undo it: take the square root of both sides.`,
-      after: `$\\sqrt{${b}^2} = ${b}$, because $${b}$ is positive.`,
-      short: "take the square root of both sides",
+      before: tx(`$${b}$ is squared. Undo it: take the square root of both sides.`, `$${b}$ wird quadriert. Umkehroperation: Zieh auf beiden Seiten die Wurzel.`),
+      after: tx(`$\\sqrt{${b}^2} = ${b}$, because $${b}$ is positive.`, `$\\sqrt{${b}^2} = ${b}$, weil $${b}$ positiv ist.`),
+      short: tx("take the square root of both sides", "auf beiden Seiten die Wurzel ziehen"),
     };
   }
 
@@ -335,27 +354,29 @@ function plan(T: N, O: N, target: string, n: number): Step {
       oApply: squared,
       t: T.body,
       o: squared,
-      before: `$${body}$ is under a square root. Undo it: square both sides.`,
+      before: tx(`$${body}$ is under a square root. Undo it: square both sides.`, `$${body}$ steht unter einer Wurzel. Umkehroperation: Quadriere beide Seiten.`),
       after: `$(\\sqrt{${body}})^2 = ${body}$.`,
-      short: "square both sides",
+      short: tx("square both sides", "beide Seiten quadrieren"),
     };
   }
   throw new Error(`Can't undo ${T.t}`);
 }
 
-type Solution = { frames: Frame[]; answer: N; L: N; R: N; hint: string; steps: number };
+type Solution = { frames: Frame[]; answer: N; L: N; R: N; hint: Text; steps: number };
 
 /**
  * All frames for solving `L = R` for `target`. `maxEm`: the widest step that fits on one line
  * (about 13em in a worked solution, 18em on the lesson board); wider steps only show the bar.
  */
-function rearrange(L0: N, R0: N, target: string, opts: { intro?: string; maxEm?: number } = {}): Solution {
+function rearrange(L0: N, R0: N, target: string, opts: { intro?: Text; maxEm?: number } = {}): Solution {
   let L = L0;
   let R = R0;
   const eq = (l: N, r: N, op = "", n = 0) => `${src(l, true, target)} =#eq ${src(r, true, target)}${op ? ` \\quad |#bar${n} \\, ${op}` : ""}`;
-  const frames: Frame[] = [{ math: eq(L, R), note: opts.intro ?? `We want $${target}$ on its own. Undo what happens to it, one step at a time.` }];
+  const intro = opts.intro ?? tx(`We want $${target}$ on its own. Undo what happens to it, one step at a time.`, `Wir stellen nach $${target}$ um: Mach Schritt für Schritt rückgängig, was mit $${target}$ passiert.`);
+  let lastMath = eq(L, R);
+  const frames: Frame[] = [{ math: lastMath, note: intro }];
   let n = 0;
-  let short = "";
+  let short: Text = "";
   for (let guard = 0; guard < 10; guard++) {
     const left = has(L, target);
     const T = left ? L : R;
@@ -367,7 +388,7 @@ function rearrange(L0: N, R0: N, target: string, opts: { intro?: string; maxEm?:
     const full = left ? eq(s.tApply, s.oApply, s.op, n) : eq(s.oApply, s.tApply, s.op, n);
     if (emWidth(full) <= (opts.maxEm ?? 13)) {
       // Highlight what this step adds on both sides (not the note after the bar).
-      const before = new Set(leafKeys(frames[frames.length - 1].math));
+      const before = new Set(leafKeys(lastMath));
       frames.push({ math: full, note: s.before, highlight: leafKeys(full).filter((k) => !before.has(k) && !/^(ao|ab|ae|bar)\d/.test(k) && !k.includes(`_a${n}`)) });
     } else {
       // Too wide for one line: just write the step after the bar, like in an exercise book.
@@ -376,19 +397,23 @@ function rearrange(L0: N, R0: N, target: string, opts: { intro?: string; maxEm?:
     }
     if (left) [L, R] = [s.t, s.o];
     else [L, R] = [s.o, s.t];
-    frames.push({ math: eq(L, R), note: s.after });
+    lastMath = eq(L, R);
+    frames.push({ math: lastMath, note: s.after });
   }
   const leftDone = has(L, target);
   const answer = leftDone ? R : L;
   const done = `$${target} = ${src(answer, false)}$`;
   if (!leftDone) {
     [L, R] = [R, L];
-    frames.push({ math: eq(L, R), note: `Swap the sides. Done: ${done}.` });
+    frames.push({ math: eq(L, R), note: tx(`Swap the sides. Done: ${done}.`, `Seiten tauschen. Fertig: ${done}.`) });
   } else {
     const last = frames[frames.length - 1];
-    frames[frames.length - 1] = { ...last, note: `${last.note} Done: ${done}.` };
+    frames[frames.length - 1] = { ...last, note: txMap((t, locale) => `${resolveText(last.note, locale)} ${t("Done:", "Fertig:")} ${done}.`) };
   }
-  const hint = n === 1 ? `One step does it: ${short}.` : `First step: ${short}. Then keep undoing until $${target}$ is alone.`;
+  const hint = txMap((t, locale) => {
+    const first = resolveText(short, locale);
+    return n === 1 ? t(`One step does it: ${first}.`, `Ein Schritt reicht: ${first}.`) : t(`First step: ${first}. Then keep undoing until $${target}$ is alone.`, `Erster Schritt: ${first}. Dann machst du weiter, bis $${target}$ allein steht.`);
+  });
   return { frames: smoothFracExits(frames), answer, L, R, hint, steps: n };
 }
 
@@ -397,69 +422,196 @@ function rearrange(L0: N, R0: N, target: string, opts: { intro?: string; maxEm?:
 
 type Formula = {
   key: string;
-  name: string;
+  name: Text;
   L: N;
   R: N;
   /** What the letters mean (rich text). */
-  legend: string;
+  legend: Text;
   /** Letters to solve for, with the practice level. */
   targets: Record<string, Level>;
   /** Example values for the number check in the explorer (inputs only). */
   values?: Record<string, number>;
 };
 
-function formula(key: string, name: string, L: N, R: N, legend: string, targets: Record<string, Level>, values?: Record<string, number>): Formula {
+function formula(key: string, name: Text, L: N, R: N, legend: Text, targets: Record<string, Level>, values?: Record<string, number>): Formula {
   const next = { n: 0 };
   return { key, name, L: label(L, next), R: label(R, next), legend, targets, values };
 }
 
 const FORMULAS: Formula[] = [
-  formula("rect", "Rectangle", sym("A"), mul(sym("a"), sym("b")), "Area $A$ of a rectangle with sides $a$ and $b$.", { a: 1, b: 1 }, { a: 6, b: 4 }),
-  formula("perimeter", "Perimeter", sym("u"), sum(mul(num(2), sym("a")), mul(num(2), sym("b"))), "Perimeter $u$ of a rectangle with sides $a$ and $b$.", { a: 2, b: 2 }, { a: 6, b: 4 }),
-  formula("speed", "Speed", sym("v"), over(sym("s"), sym("t")), "Speed $v$, distance $s$, time $t$.", { s: 1, t: 2 }, { s: 120, t: 2 }),
-  formula("force", "Force", sym("F"), mul(sym("m"), sym("a")), "Force $F$, mass $m$, acceleration $a$.", { m: 1, a: 1 }, { m: 5, a: 4 }),
-  formula("power", "Electric power", sym("P"), mul(sym("U"), sym("I")), "Electric power $P$, voltage $U$, current $I$.", { U: 1, I: 1 }, { U: 12, I: 3 }),
-  formula("triangle", "Triangle", sym("A"), mul(half(), sym("g"), sym("h")), "Area $A$ of a triangle with base $g$ and height $h$.", { g: 2, h: 2 }, { g: 8, h: 5 }),
+  formula(
+    "rect",
+    tx("Rectangle", "Rechteck"),
+    sym("A"),
+    mul(sym("a"), sym("b")),
+    tx("Area $A$ of a rectangle with sides $a$ and $b$.", "Flächeninhalt $A$ eines Rechtecks mit den Seiten $a$ und $b$."),
+    { a: 1, b: 1 },
+    { a: 6, b: 4 },
+  ),
+  formula(
+    "perimeter",
+    tx("Perimeter", "Umfang"),
+    sym("u"),
+    sum(mul(num(2), sym("a")), mul(num(2), sym("b"))),
+    tx("Perimeter $u$ of a rectangle with sides $a$ and $b$.", "Umfang $u$ eines Rechtecks mit den Seiten $a$ und $b$."),
+    { a: 2, b: 2 },
+    { a: 6, b: 4 },
+  ),
+  formula("speed", tx("Speed", "Geschwindigkeit"), sym("v"), over(sym("s"), sym("t")), tx("Speed $v$, distance $s$, time $t$.", "Geschwindigkeit $v$, Strecke $s$, Zeit $t$."), { s: 1, t: 2 }, { s: 120, t: 2 }),
+  formula("force", tx("Force", "Kraft"), sym("F"), mul(sym("m"), sym("a")), tx("Force $F$, mass $m$, acceleration $a$.", "Kraft $F$, Masse $m$, Beschleunigung $a$."), { m: 1, a: 1 }, { m: 5, a: 4 }),
+  formula(
+    "power",
+    tx("Electric power", "Elektrische Leistung"),
+    sym("P"),
+    mul(sym("U"), sym("I")),
+    tx("Electric power $P$, voltage $U$, current $I$.", "Elektrische Leistung $P$, Spannung $U$, Stromstärke $I$."),
+    { U: 1, I: 1 },
+    { U: 12, I: 3 },
+  ),
+  formula(
+    "triangle",
+    tx("Triangle", "Dreieck"),
+    sym("A"),
+    mul(half(), sym("g"), sym("h")),
+    tx("Area $A$ of a triangle with base $g$ and height $h$.", "Flächeninhalt $A$ eines Dreiecks mit der Grundseite $g$ und der Höhe $h$."),
+    { g: 2, h: 2 },
+    { g: 8, h: 5 },
+  ),
   formula(
     "interest",
-    "Interest",
+    tx("Interest", "Zinsen"),
     sym("Z"),
     over(mul(sym("K"), sym("p"), sym("t")), num(100)),
-    "Interest $Z$ on a capital $K$ at $p$ percent for $t$ years.",
+    tx("Interest $Z$ on a capital $K$ at $p$ percent for $t$ years.", "Zinsen $Z$ für ein Kapital $K$ bei einem Zinssatz von $p$ Prozent in $t$ Jahren."),
     { K: 2, p: 2, t: 2 },
     { K: 500, p: 4, t: 3 },
   ),
-  formula("circle", "Circle", sym("U"), tight(num(2), sym("π"), sym("r")), "Circumference $U$ of a circle with radius $r$.", {}, { r: 5 }),
-  formula("disc", "Circle area", sym("A"), tight(sym("π"), sq(sym("r"))), "Area $A$ of a circle with radius $r$.", {}, { r: 3 }),
-  formula("fall", "Accelerating", sym("s"), mul(half(), sym("a"), sq(sym("t"))), "Distance $s$ after time $t$ with constant acceleration $a$.", { a: 2, t: 3 }, { a: 10, t: 3 }),
+  formula("circle", tx("Circle", "Kreis"), sym("U"), tight(num(2), sym("π"), sym("r")), tx("Circumference $U$ of a circle with radius $r$.", "Umfang $U$ eines Kreises mit dem Radius $r$."), {}, { r: 5 }),
+  formula("disc", tx("Circle area", "Kreisfläche"), sym("A"), tight(sym("π"), sq(sym("r"))), tx("Area $A$ of a circle with radius $r$.", "Flächeninhalt $A$ eines Kreises mit dem Radius $r$."), {}, { r: 3 }),
+  formula(
+    "fall",
+    tx("Accelerating", "Beschleunigung"),
+    sym("s"),
+    mul(half(), sym("a"), sq(sym("t"))),
+    tx("Distance $s$ after time $t$ with constant acceleration $a$.", "Strecke $s$ nach der Zeit $t$ bei konstanter Beschleunigung $a$."),
+    { a: 2, t: 3 },
+    { a: 10, t: 3 },
+  ),
   formula(
     "trapezoid",
-    "Trapezoid",
+    tx("Trapezoid", "Trapez"),
     sym("A"),
     mul(over(sum(sym("a"), sym("c")), num(2)), sym("h")),
-    "Area $A$ of a trapezoid with parallel sides $a$ and $c$ and height $h$.",
+    tx("Area $A$ of a trapezoid with parallel sides $a$ and $c$ and height $h$.", "Flächeninhalt $A$ eines Trapezes mit den parallelen Seiten $a$ und $c$ und der Höhe $h$."),
     { h: 3, a: 3 },
     { a: 7, c: 3, h: 4 },
   ),
-  formula("work", "Work", sym("W"), mul(sym("F"), sym("s")), "Work $W$ done by a force $F$ along a distance $s$.", { F: 1, s: 1 }),
-  formula("ohm", "Ohm's law", sym("U"), mul(sym("R"), sym("I")), "Ohm's law: voltage $U$, resistance $R$, current $I$.", { R: 1, I: 1 }),
-  formula("current", "Current", sym("I"), over(sym("U"), sym("R")), "Current $I$, voltage $U$, resistance $R$.", { U: 1, R: 2 }),
-  formula("powerTime", "Power", sym("P"), over(sym("W"), sym("t")), "Power $P$: work $W$ done in a time $t$.", { W: 1, t: 2 }),
-  formula("cuboid", "Cuboid", sym("V"), mul(sym("a"), sym("b"), sym("c")), "Volume $V$ of a cuboid with edges $a$, $b$ and $c$.", { a: 1, c: 1 }),
-  formula("energy", "Potential energy", sym("E"), mul(sym("m"), sym("g"), sym("h")), "Potential energy $E$: mass $m$, gravity $g$, height $h$.", { m: 1, h: 1 }),
-  formula("diameter", "Diameter", sym("d"), mul(num(2), sym("r")), "Diameter $d$ and radius $r$ of a circle.", { r: 1 }),
-  formula("square", "Square", sym("u"), mul(num(4), sym("a")), "Perimeter $u$ of a square with side $a$.", { a: 1 }),
-  formula("line", "Straight line", sym("y"), sum(tight(sym("m"), sym("x")), sym("b")), "The equation of a straight line.", { b: 1, x: 2, m: 3 }),
-  formula("einstein", "Mass and energy", sym("E"), mul(sym("m"), sq(sym("c"))), "Energy $E$, mass $m$ and the speed of light $c$.", { m: 1, c: 3 }),
-  formula("prism", "Square prism", sym("V"), mul(sq(sym("a")), sym("h")), "Volume $V$ of a prism with a square base of side $a$ and height $h$.", { h: 1, a: 3 }),
-  formula("percent", "Percentages", sym("W"), over(mul(sym("G"), sym("p")), num(100)), "Percentage $W$ of a base value $G$ at $p$ percent.", { G: 2, p: 2 }),
-  formula("pyramid", "Pyramid", sym("V"), mul(over(num(1), num(3)), sym("G"), sym("h")), "Volume $V$ of a pyramid with base area $G$ and height $h$.", { G: 2, h: 2 }),
-  formula("fahrenheit", "Fahrenheit", sym("F"), sum(mul(num("1,8"), sym("C")), num(32)), "Turns degrees Celsius $C$ into degrees Fahrenheit $F$.", { C: 2 }),
-  formula("kinetic", "Kinetic energy", sym("E"), mul(half(), sym("m"), sq(sym("v"))), "Kinetic energy $E$ of a mass $m$ moving at speed $v$.", { m: 2, v: 3 }),
-  formula("centripetal", "Centripetal force", sym("F"), over(mul(sym("m"), sq(sym("v"))), sym("r")), "Force $F$ that keeps a mass $m$ on a circle of radius $r$ at speed $v$.", { m: 2, r: 2, v: 3 }),
-  formula("pythagoras", "Pythagoras", sq(sym("c")), sum(sq(sym("a")), sq(sym("b"))), "Pythagoras: legs $a$ and $b$, hypotenuse $c$.", { a: 3, b: 3 }),
-  formula("drop", "Falling speed", sym("v"), root(tight(num(2), sym("g"), sym("h"))), "Speed $v$ after falling a height $h$ ($g$ is gravity).", { h: 3, g: 3 }),
-  formula("perimeter2", "Perimeter", sym("u"), mul(num(2), sum(sym("a"), sym("b"))), "Perimeter $u$ of a rectangle, written with a bracket.", { a: 3 }),
+  formula("work", tx("Work", "Arbeit"), sym("W"), mul(sym("F"), sym("s")), tx("Work $W$ done by a force $F$ along a distance $s$.", "Arbeit $W$, die eine Kraft $F$ längs der Strecke $s$ verrichtet."), { F: 1, s: 1 }),
+  formula("ohm", tx("Ohm's law", "Ohmsches Gesetz"), sym("U"), mul(sym("R"), sym("I")), tx("Ohm's law: voltage $U$, resistance $R$, current $I$.", "Ohmsches Gesetz: Spannung $U$, Widerstand $R$, Stromstärke $I$."), { R: 1, I: 1 }),
+  formula("current", tx("Current", "Stromstärke"), sym("I"), over(sym("U"), sym("R")), tx("Current $I$, voltage $U$, resistance $R$.", "Stromstärke $I$, Spannung $U$, Widerstand $R$."), { U: 1, R: 2 }),
+  formula("powerTime", tx("Power", "Leistung"), sym("P"), over(sym("W"), sym("t")), tx("Power $P$: work $W$ done in a time $t$.", "Leistung $P$: Arbeit $W$, verrichtet in der Zeit $t$."), { W: 1, t: 2 }),
+  formula(
+    "cuboid",
+    tx("Cuboid", "Quader"),
+    sym("V"),
+    mul(sym("a"), sym("b"), sym("c")),
+    tx("Volume $V$ of a cuboid with edges $a$, $b$ and $c$.", "Volumen $V$ eines Quaders mit den Kantenlängen $a$, $b$ und $c$."),
+    { a: 1, c: 1 },
+  ),
+  formula(
+    "energy",
+    tx("Potential energy", "Lageenergie"),
+    sym("E"),
+    mul(sym("m"), sym("g"), sym("h")),
+    tx("Potential energy $E$: mass $m$, gravity $g$, height $h$.", "Lageenergie $E$: Masse $m$, Fallbeschleunigung $g$, Höhe $h$."),
+    { m: 1, h: 1 },
+  ),
+  formula("diameter", tx("Diameter", "Durchmesser"), sym("d"), mul(num(2), sym("r")), tx("Diameter $d$ and radius $r$ of a circle.", "Durchmesser $d$ und Radius $r$ eines Kreises."), { r: 1 }),
+  formula("square", tx("Square", "Quadrat"), sym("u"), mul(num(4), sym("a")), tx("Perimeter $u$ of a square with side $a$.", "Umfang $u$ eines Quadrats mit der Seitenlänge $a$."), { a: 1 }),
+  formula("line", tx("Straight line", "Gerade"), sym("y"), sum(tight(sym("m"), sym("x")), sym("b")), tx("The equation of a straight line.", "Die Gleichung einer Geraden."), { b: 1, x: 2, m: 3 }),
+  formula(
+    "einstein",
+    tx("Mass and energy", "Masse und Energie"),
+    sym("E"),
+    mul(sym("m"), sq(sym("c"))),
+    tx("Energy $E$, mass $m$ and the speed of light $c$.", "Energie $E$, Masse $m$ und Lichtgeschwindigkeit $c$."),
+    { m: 1, c: 3 },
+  ),
+  formula(
+    "prism",
+    tx("Square prism", "Quadratisches Prisma"),
+    sym("V"),
+    mul(sq(sym("a")), sym("h")),
+    tx("Volume $V$ of a prism with a square base of side $a$ and height $h$.", "Volumen $V$ eines Prismas mit quadratischer Grundfläche (Seitenlänge $a$) und der Höhe $h$."),
+    { h: 1, a: 3 },
+  ),
+  formula(
+    "percent",
+    tx("Percentages", "Prozentrechnung"),
+    sym("W"),
+    over(mul(sym("G"), sym("p")), num(100)),
+    tx("Percentage $W$ of a base value $G$ at $p$ percent.", "Prozentwert $W$ zum Grundwert $G$ bei $p$ Prozent."),
+    { G: 2, p: 2 },
+  ),
+  formula(
+    "pyramid",
+    tx("Pyramid", "Pyramide"),
+    sym("V"),
+    mul(over(num(1), num(3)), sym("G"), sym("h")),
+    tx("Volume $V$ of a pyramid with base area $G$ and height $h$.", "Volumen $V$ einer Pyramide mit der Grundfläche $G$ und der Höhe $h$."),
+    { G: 2, h: 2 },
+  ),
+  formula(
+    "fahrenheit",
+    tx("Fahrenheit", "Celsius in Fahrenheit"),
+    sym("F"),
+    sum(mul(num("1,8"), sym("C")), num(32)),
+    tx("Turns degrees Celsius $C$ into degrees Fahrenheit $F$.", "Rechnet Grad Celsius $C$ in Grad Fahrenheit $F$ um."),
+    { C: 2 },
+  ),
+  formula(
+    "kinetic",
+    tx("Kinetic energy", "Bewegungsenergie"),
+    sym("E"),
+    mul(half(), sym("m"), sq(sym("v"))),
+    tx("Kinetic energy $E$ of a mass $m$ moving at speed $v$.", "Bewegungsenergie $E$ einer Masse $m$, die sich mit der Geschwindigkeit $v$ bewegt."),
+    { m: 2, v: 3 },
+  ),
+  formula(
+    "centripetal",
+    tx("Centripetal force", "Zentripetalkraft"),
+    sym("F"),
+    over(mul(sym("m"), sq(sym("v"))), sym("r")),
+    tx(
+      "Force $F$ that keeps a mass $m$ on a circle of radius $r$ at speed $v$.",
+      "Kraft $F$, die eine Masse $m$ mit der Geschwindigkeit $v$ auf einer Kreisbahn mit dem Radius $r$ hält.",
+    ),
+    { m: 2, r: 2, v: 3 },
+  ),
+  formula(
+    "pythagoras",
+    tx("Pythagoras", "Satz des Pythagoras"),
+    sq(sym("c")),
+    sum(sq(sym("a")), sq(sym("b"))),
+    tx("Pythagoras: legs $a$ and $b$, hypotenuse $c$.", "Satz des Pythagoras: Katheten $a$ und $b$, Hypotenuse $c$."),
+    { a: 3, b: 3 },
+  ),
+  formula(
+    "drop",
+    tx("Falling speed", "Fallgeschwindigkeit"),
+    sym("v"),
+    root(tight(num(2), sym("g"), sym("h"))),
+    tx("Speed $v$ after falling a height $h$ ($g$ is gravity).", "Geschwindigkeit $v$ nach einem Fall aus der Höhe $h$ ($g$ ist die Fallbeschleunigung)."),
+    { h: 3, g: 3 },
+  ),
+  formula(
+    "perimeter2",
+    tx("Perimeter", "Umfang"),
+    sym("u"),
+    mul(num(2), sum(sym("a"), sym("b"))),
+    tx("Perimeter $u$ of a rectangle, written with a bracket.", "Umfang $u$ eines Rechtecks, mit Klammer geschrieben."),
+    { a: 3 },
+  ),
 ];
 
 const byKey = (key: string) => FORMULAS.find((f) => f.key === key)!;
@@ -481,8 +633,12 @@ function FormulaCard(props: Record<string, unknown>) {
 function task(f: Formula, target: string): Exercise {
   const sol = rearrange(f.L, f.R, target);
   return {
-    instruction: "Rearrange the formula",
-    text: f.legend ? `${f.legend} Solve for $${target}$.` : `Solve for $${target}$.`,
+    instruction: tx("Rearrange the formula", "Stelle die Formel um"),
+    text: txMap((t, locale) => {
+      const legend = resolveText(f.legend, locale);
+      const ask = t(`Solve for $${target}$.`, `Stelle nach $${target}$ um.`);
+      return legend ? `${legend} ${ask}` : ask;
+    }),
     answer: { kind: "expr", value: plain(sol.answer), prefix: `${target} =`, positive: true },
     hint: sol.hint,
     solution: sol.frames,
@@ -518,7 +674,7 @@ function algebra(level: Level, rng: Rng): Exercise {
     ],
   };
   const f = formula("algebra", "", sym(y), rng.pick(shapes[level])(), "", { [x]: level });
-  return { ...task(f, x), text: `Solve $${formulaSrc(f)}$ for $${x}$.` };
+  return { ...task(f, x), text: tx(`Solve $${formulaSrc(f)}$ for $${x}$.`, `Stelle $${formulaSrc(f)}$ nach $${x}$ um.`) };
 }
 
 function generate(level: Level, rng: Rng): Exercise {
@@ -591,6 +747,7 @@ const lettersOf = (f: Formula) => {
 };
 
 function FormulaExplorer() {
+  const t = useText();
   const scope = useId();
   const [fi, setFi] = useState(1);
   const f = byKey(EXPLORE[fi]);
@@ -617,7 +774,7 @@ function FormulaExplorer() {
           return (
             <button
               key={key}
-              title={g.name}
+              title={t(g.name)}
               onClick={() => setFi(i)}
               className={cn("relative h-10 rounded-lg border px-2.5 transition-colors", fi === i ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover")}
             >
@@ -629,7 +786,7 @@ function FormulaExplorer() {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-[13px] text-ink-2">Solve for</span>
+        <span className="text-[13px] text-ink-2">{t(tx("Solve for", "Umstellen nach"))}</span>
         <div className="flex gap-1">
           {letters.map((l) => (
             <button
@@ -639,7 +796,7 @@ function FormulaExplorer() {
                 "relative grid size-10 place-items-center rounded-full border font-math text-[20px] italic transition-colors",
                 l === target ? "border-transparent text-white" : "border-line text-ink hover:bg-hover",
               )}
-              aria-label={`Solve for ${l}`}
+              aria-label={t(tx(`Solve for ${l}`, `Nach ${l} umstellen`))}
             >
               {l === target && <motion.span layoutId={`${scope}-l`} className="absolute inset-0 rounded-full bg-blob" transition={{ type: "spring", stiffness: 500, damping: 30 }} />}
               <span className="relative">{l}</span>
@@ -661,12 +818,12 @@ function FormulaExplorer() {
           exit={{ opacity: 0, y: -4 }}
           className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-blob-soft/50 px-4 py-3"
         >
-          <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">Check with numbers</span>
+          <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{t(tx("Check with numbers", "Probe mit Zahlen"))}</span>
           <MathView src={forward} size="md" animate={false} />
           <MathView src={backward} size="md" animate={false} />
           {matches && (
             <span className="flex items-center gap-1 text-[13px] font-medium text-ok">
-              <Check className="size-4" /> matches
+              <Check className="size-4" /> {t(tx("matches", "passt"))}
             </span>
           )}
         </motion.div>
@@ -683,17 +840,26 @@ const speed = byKey("speed");
 
 const firstFrames = rearrange(rect.L, rect.R, "b", {
   maxEm: 18,
-  intro: "We know the area $A$ and the side $a$, and want $b$. A formula is an equation with letters, so the balance rules work here too.",
+  intro: tx(
+    "We know the area $A$ and the side $a$, and want $b$. A formula is an equation with letters, so the balance rules work here too.",
+    "Wir kennen den Flächeninhalt $A$ und die Seite $a$ und suchen $b$. Eine Formel ist eine Gleichung mit Buchstaben, also funktionieren hier dieselben Äquivalenzumformungen.",
+  ),
 }).frames;
 
 /** v = s/t: first for s, then carry on from s = v · t to get t. */
 const speedFrames = (() => {
-  const forS = rearrange(speed.L, speed.R, "s", { maxEm: 18, intro: "Speed $v = \\frac{s}{t}$. First we want the distance $s$." });
+  const forS = rearrange(speed.L, speed.R, "s", {
+    maxEm: 18,
+    intro: tx("Speed $v = \\frac{s}{t}$. First we want the distance $s$.", "Geschwindigkeit $v = \\frac{s}{t}$. Zuerst wollen wir die Strecke $s$."),
+  });
   const forT = rearrange(forS.L, forS.R, "t", { maxEm: 18 });
   const last = forS.frames[forS.frames.length - 1];
   return smoothFracExits([
     ...forS.frames.slice(0, -1),
-    { ...last, note: `${last.note} Now let's get the time $t$ from $s = v \\cdot t$.` },
+    {
+      ...last,
+      note: txMap((t, locale) => `${resolveText(last.note, locale)} ${t("Now let's get the time $t$ from $s = v \\cdot t$.", "Jetzt holen wir uns die Zeit $t$ aus $s = v \\cdot t$.")}`),
+    },
     ...forT.frames.slice(1),
   ]);
 })();
@@ -701,64 +867,86 @@ const speedFrames = (() => {
 const perimeter = byKey("perimeter");
 const reverseFrames = rearrange(perimeter.L, perimeter.R, "a", {
   maxEm: 18,
-  intro: "To get $u$ from $a$: first $\\cdot 2$, then $+ 2b$. So we undo it backwards: first $- 2b$, then $: 2$.",
+  intro: tx(
+    "To get $u$ from $a$: first $\\cdot 2$, then $+ 2b$. So we undo it backwards: first $- 2b$, then $: 2$.",
+    "Von $a$ zu $u$ geht es so: erst $\\cdot 2$, dann $+ 2b$. Also machen wir es in umgekehrter Reihenfolge rückgängig: erst $- 2b$, dann $: 2$.",
+  ),
 }).frames;
 
 const mistakeFrames: Frame[] = [
-  { math: "u#u -#s 2#c b#b =#eq 2#c2 a#a \\quad |#bar \\, :#o 2#on", note: "We stopped here: now divide both sides by $2$." },
-  { math: "\\frac{u#u -#s 2#c b#b}{2#d}#f =#eq a#a", highlight: ["f-bar", "d"], note: "The **whole** left side is divided by $2$. The fraction bar works like a bracket." },
+  {
+    math: "u#u -#s 2#c b#b =#eq 2#c2 a#a \\quad |#bar \\, :#o 2#on",
+    note: tx("We stopped here: now divide both sides by $2$.", "Hier waren wir stehen geblieben: Jetzt teilen wir beide Seiten durch $2$."),
+  },
+  {
+    math: "\\frac{u#u -#s 2#c b#b}{2#d}#f =#eq a#a",
+    highlight: ["f-bar", "d"],
+    note: tx("The **whole** left side is divided by $2$. The fraction bar works like a bracket.", "Die **ganze** linke Seite wird durch $2$ geteilt. Der Bruchstrich wirkt wie eine Klammer."),
+  },
   {
     math: "\\red{\\frac{u}{2} - 2b} \\ne \\frac{u - 2b}{2}",
-    note: "A classic mistake: dividing only $u$ by $2$ and forgetting the $2b$.",
+    note: tx("A classic mistake: dividing only $u$ by $2$ and forgetting the $2b$.", "Ein typischer Fehler: nur $u$ durch $2$ teilen und $2b$ dabei vergessen."),
   },
   {
     math: "\\frac{u - 2b}{2} = \\frac{u}{2} - \\frac{2b}{2} = \\frac{u}{2} - b",
-    note: "If you split the fraction, divide **every** term. Both $a = \\frac{u - 2b}{2}$ and $a = \\frac{u}{2} - b$ are right.",
+    note: tx(
+      "If you split the fraction, divide **every** term. Both $a = \\frac{u - 2b}{2}$ and $a = \\frac{u}{2} - b$ are right.",
+      "Wenn du den Bruch aufteilst, teile **jeden** Summanden. $a = \\frac{u - 2b}{2}$ und $a = \\frac{u}{2} - b$ sind beide richtig.",
+    ),
   },
 ];
 
 const fall = byKey("fall");
 const rootFrames = rearrange(fall.L, fall.R, "t", {
   maxEm: 18,
-  intro: "Distance $s = \\frac{1}{2} a t^2$. We want the time $t$, and it's squared.",
+  intro: tx("Distance $s = \\frac{1}{2} a t^2$. We want the time $t$, and it's squared.", "Strecke $s = \\frac{1}{2} a t^2$. Wir suchen die Zeit $t$, und die ist quadriert."),
 }).frames;
 
 const rearranging: Topic = {
   ...topicMeta("rearranging"),
   summary: [
     {
-      title: "Same rules as equations",
-      body: "Do the same to both sides until the letter you want is on its own. Then write it on the left.",
+      title: tx("Same rules as equations", "Gleiche Regeln wie bei Gleichungen"),
+      body: tx(
+        "Do the same to both sides until the letter you want is on its own. Then write it on the left.",
+        "Rechne auf beiden Seiten dasselbe, bis der gesuchte Buchstabe allein steht. Dann schreib ihn nach links.",
+      ),
       examples: ["A = a \\cdot b \\quad | \\, :a", "\\frac{A}{a} = b", "b = \\frac{A}{a}"],
       tone: "rule",
     },
     {
-      title: "Undo with the opposite",
-      body: "Plus is undone by minus, times by divide, a square by the square root.",
+      title: tx("Undo with the opposite", "Umkehroperationen"),
+      body: tx("Plus is undone by minus, times by divide, a square by the square root.", "Plus machst du mit Minus rückgängig, Mal mit Geteilt, ein Quadrat mit der Wurzel."),
       examples: ["v = \\frac{s}{t} \\quad | \\, \\cdot t", "v \\cdot t = s"],
       tone: "rule",
     },
     {
-      title: "Reverse order",
-      body: "Undo the last thing first. What happened to the letter last comes off first.",
+      title: tx("Reverse order", "Umgekehrte Reihenfolge"),
+      body: tx(
+        "Undo the last thing first. What happened to the letter last comes off first.",
+        "Mach das Letzte zuerst rückgängig. Was zuletzt mit dem Buchstaben passiert ist, kommt zuerst weg.",
+      ),
       examples: ["u = 2a + 2b \\quad | \\, -2b", "u - 2b = 2a \\quad | \\, :2", "a = \\frac{u - 2b}{2}"],
       tone: "rule",
     },
     {
-      title: "Letter in the denominator",
-      body: "Multiply it out of the fraction first. Then divide.",
+      title: tx("Letter in the denominator", "Buchstabe im Nenner"),
+      body: tx("Multiply it out of the fraction first. Then divide.", "Hol ihn zuerst durch Multiplizieren aus dem Bruch. Dann teilen."),
       examples: ["v = \\frac{s}{t} \\quad | \\, \\cdot t", "v \\cdot t = s \\quad | \\, :v", "t = \\frac{s}{v}"],
       tone: "tip",
     },
     {
-      title: "Squared letter",
-      body: "Take the square root at the end. Lengths, times and speeds are positive, so the positive root is the answer.",
+      title: tx("Squared letter", "Quadrierter Buchstabe"),
+      body: tx(
+        "Take the square root at the end. Lengths, times and speeds are positive, so the positive root is the answer.",
+        "Zieh am Ende die Wurzel. Längen, Zeiten und Geschwindigkeiten sind positiv, also ist die positive Wurzel die Lösung.",
+      ),
       examples: ["s = \\frac{1}{2} a t^2", "t = \\sqrt{\\frac{2s}{a}}"],
       tone: "tip",
     },
     {
-      title: "Divide every term",
-      body: "When you divide a sum, the whole sum is divided, not just one part.",
+      title: tx("Divide every term", "Jeden Summanden teilen"),
+      body: tx("When you divide a sum, the whole sum is divided, not just one part.", "Wenn du eine Summe teilst, wird die ganze Summe geteilt, nicht nur ein Teil davon."),
       examples: ["\\frac{u - 2b}{2} = \\frac{u}{2} - b", "\\frac{u - 2b}{2} \\ne \\frac{u}{2} - 2b"],
       tone: "warning",
     },
@@ -766,64 +954,79 @@ const rearranging: Topic = {
   lesson: [
     {
       type: "explain",
-      title: "A formula is an equation",
-      blob: "Formulas look scary, but they follow the same balance rules!",
-      body: "Formeln umstellen means: get a different letter on its own. You do exactly what you do with equations: the same operation on both sides.",
+      title: tx("A formula is an equation", "Eine Formel ist eine Gleichung"),
+      blob: tx("Formulas look scary, but they follow the same balance rules!", "Formeln sehen gruselig aus, aber es gelten dieselben Regeln wie bei Gleichungen!"),
+      body: tx(
+        "Formeln umstellen means: get a different letter on its own. You do exactly what you do with equations: the same operation on both sides.",
+        "Formeln umstellen heißt: Ein anderer Buchstabe soll allein stehen. Du machst genau das Gleiche wie bei Gleichungen: dieselbe Rechnung auf beiden Seiten.",
+      ),
       frames: firstFrames,
     },
     {
       type: "explain",
-      title: "Divided? Multiply!",
-      blob: "Every operation has an opposite. That's our superpower.",
-      body: "Plus is undone by minus, times by divide, and divide by times. When the letter sits in the denominator, multiply it out of the fraction first.",
+      title: tx("Divided? Multiply!", "Geteilt? Multiplizieren!"),
+      blob: tx("Every operation has an opposite. That's our superpower.", "Jede Rechenart hat eine Umkehroperation. Das ist unsere Superkraft."),
+      body: tx(
+        "Plus is undone by minus, times by divide, and divide by times. When the letter sits in the denominator, multiply it out of the fraction first.",
+        "Plus machst du mit Minus rückgängig, Mal mit Geteilt und Geteilt mit Mal. Steht der Buchstabe im Nenner, holst du ihn zuerst durch Multiplizieren aus dem Bruch.",
+      ),
       frames: speedFrames,
     },
     {
       type: "widget",
-      title: "Pick a letter",
-      blob: "Choose a formula and a letter. Watch it rearrange itself!",
-      body: "Tap a formula, then the letter you want on its own. Each step shows what is undone. The numbers at the bottom check that the new formula gives the same result.",
+      title: tx("Pick a letter", "Wähle einen Buchstaben"),
+      blob: tx("Choose a formula and a letter. Watch it rearrange itself!", "Such dir eine Formel und einen Buchstaben aus. Schau zu, wie sie sich umstellt!"),
+      body: tx(
+        "Tap a formula, then the letter you want on its own. Each step shows what is undone. The numbers at the bottom check that the new formula gives the same result.",
+        "Tippe auf eine Formel und dann auf den Buchstaben, der allein stehen soll. Jeder Schritt zeigt, was rückgängig gemacht wird. Die Zahlen unten prüfen, ob die neue Formel dasselbe Ergebnis liefert.",
+      ),
       widget: FormulaExplorer,
     },
     {
       type: "check",
-      blob: "One step is enough here.",
+      blob: tx("One step is enough here.", "Hier reicht ein Schritt."),
       exercise: task(byKey("power"), "I"),
     },
     {
       type: "explain",
-      title: "Undo in reverse order",
-      blob: "Socks first, then shoes. Taking them off? Shoes first!",
-      body: "Think about how the formula is built from your letter. Then undo those steps backwards: the last one first.",
+      title: tx("Undo in reverse order", "In umgekehrter Reihenfolge"),
+      blob: tx("Socks first, then shoes. Taking them off? Shoes first!", "Erst Socken, dann Schuhe. Und beim Ausziehen? Erst die Schuhe!"),
+      body: tx(
+        "Think about how the formula is built from your letter. Then undo those steps backwards: the last one first.",
+        "Überleg dir, wie die Formel aus deinem Buchstaben entsteht. Dann machst du diese Schritte in umgekehrter Reihenfolge rückgängig: den letzten zuerst.",
+      ),
       frames: reverseFrames,
     },
     {
       type: "explain",
-      title: "The classic mistake",
-      blob: "This one costs points in almost every test. Let's avoid it!",
-      body: "When you divide a sum by a number, **every** term gets divided.",
+      title: tx("The classic mistake", "Der typische Fehler"),
+      blob: tx("This one costs points in almost every test. Let's avoid it!", "Der kostet in fast jeder Klassenarbeit Punkte. Den vermeiden wir!"),
+      body: tx("When you divide a sum by a number, **every** term gets divided.", "Wenn du eine Summe durch eine Zahl teilst, wird **jeder** Summand geteilt."),
       frames: mistakeFrames,
     },
     {
       type: "check",
-      blob: "Get rid of the fraction first.",
+      blob: tx("Get rid of the fraction first.", "Werde zuerst den Bruch los."),
       exercise: task(byKey("triangle"), "h"),
     },
     {
       type: "explain",
-      title: "Squares need a root",
-      blob: "A squared letter is the last thing to undo.",
-      body: "If the letter is squared, take the square root at the very end. Times, lengths and speeds are positive, so we only need the positive root.",
+      title: tx("Squares need a root", "Quadrate brauchen eine Wurzel"),
+      blob: tx("A squared letter is the last thing to undo.", "Das Quadrat machst du ganz zum Schluss rückgängig."),
+      body: tx(
+        "If the letter is squared, take the square root at the very end. Times, lengths and speeds are positive, so we only need the positive root.",
+        "Ist der Buchstabe quadriert, ziehst du ganz am Ende die Wurzel. Zeiten, Längen und Geschwindigkeiten sind positiv, also brauchen wir nur die positive Wurzel.",
+      ),
       frames: rootFrames,
     },
     {
       type: "check",
-      blob: "Pythagoras! Which step comes first?",
+      blob: tx("Pythagoras! Which step comes first?", "Pythagoras! Welcher Schritt kommt zuerst?"),
       exercise: task(byKey("pythagoras"), "a"),
     },
     {
       type: "check",
-      blob: "Last one: the interest formula from maths class.",
+      blob: tx("Last one: the interest formula from maths class.", "Die letzte: die Zinsformel aus dem Matheunterricht."),
       exercise: task(byKey("interest"), "p"),
     },
   ],

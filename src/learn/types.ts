@@ -1,17 +1,20 @@
 import type { ComponentType } from "react";
+import { tx, type Text } from "@/i18n/text";
 import type { TopicMeta } from "./catalog";
 import type { Rng } from "./engine/rng";
 
 /**
  * Rich text: plain text with inline maths in $…$ (display language, see
- * engine/display.ts) and **bold**. Blank lines start paragraphs.
+ * engine/display.ts) and **bold**. Blank lines start paragraphs. Bilingual:
+ * `tx("English", "Deutsch")`; a plain string only for text without words.
  */
-export type RichText = string;
+export type RichText = Text;
+export type { Text };
 
 /** One frame of a maths animation. Tokens with the same key glide between frames. */
 export type Frame = {
-  /** Display-language maths. */
-  math: string;
+  /** Display-language maths (bilingual only if it contains words, e.g. "each"). */
+  math: Text;
   /** What Blob says about this frame. */
   note?: RichText;
   /** Token keys to highlight, e.g. ["x#1", "br("]. */
@@ -22,7 +25,7 @@ export type Frame = {
 
 export type AnswerSpec =
   /** A number. Accepts decimals with comma or point and fractions like 3/4. */
-  | { kind: "number"; value: number; tolerance?: number; unit?: string; label?: string }
+  | { kind: "number"; value: number; tolerance?: number; unit?: Text; label?: Text }
   /** An exact fraction typed as two boxes (numerator / denominator). */
   | { kind: "fraction"; n: number; d: number; mustReduce?: boolean }
   /** An algebraic expression, compared by value at random points. */
@@ -34,26 +37,26 @@ export type AnswerSpec =
       /** Test only positive values (for formulas with roots, divisions…). */
       positive?: boolean;
       /** Shown in front of the input, e.g. "t =". */
-      prefix?: string;
+      prefix?: Text;
     }
   /** Solutions of an equation in one variable. Empty array = no solution. */
   | { kind: "solutions"; variable: string; values: number[]; allowNone?: boolean }
   /** The solution set of a linear inequality, e.g. x > 3. */
   | { kind: "inequality"; variable: string; op: "<" | ">" | "≤" | "≥"; value: number }
   /** A pair like the solution of a 2×2 system. */
-  | { kind: "pair"; names: [string, string]; values: [number, number] }
+  | { kind: "pair"; names: [Text, Text]; values: [number, number] }
   /** Multiple choice. */
   | { kind: "choice"; options: RichText[]; correct: number };
 
-export type Feedback = { correct: boolean; message?: string; partial?: boolean };
+export type Feedback = { correct: boolean; message?: Text; partial?: boolean };
 
 export type Exercise = {
   /** Short instruction, e.g. "Expand and simplify". */
-  instruction: string;
+  instruction: Text;
   /** Optional text for word problems (rich text). */
   text?: RichText;
   /** The task as display-language maths, shown big. */
-  math?: string;
+  math?: Text;
   answer: AnswerSpec;
   /** A nudge without giving it away. */
   hint?: RichText;
@@ -68,34 +71,34 @@ export type Level = 1 | 2 | 3;
 export type LessonStep =
   | {
       type: "explain";
-      title: string;
+      title: Text;
       /** Shown on the card under the title. */
       body?: RichText;
       /** Animated maths board. Each "Next" advances one frame. */
       frames?: Frame[];
       /** Blob's line when the step opens. */
-      blob?: string;
+      blob?: Text;
     }
   | {
       type: "widget";
-      title: string;
+      title: Text;
       body?: RichText;
-      blob?: string;
+      blob?: Text;
       /** An interactive explanation (graph you can drag, number line…). */
       widget: ComponentType;
     }
   | {
       type: "check";
-      title?: string;
-      blob?: string;
+      title?: Text;
+      blob?: Text;
       exercise: Exercise;
     };
 
 export type SummaryBlock = {
-  title: string;
+  title: Text;
   body?: RichText;
   /** Display-language example lines. */
-  examples?: string[];
+  examples?: Text[];
   /** "rule" blocks get an accent border. */
   tone?: "rule" | "tip" | "warning";
 };
@@ -108,10 +111,10 @@ export type Topic = TopicMeta & {
   generate: (level: Level, rng: Rng) => Exercise;
 };
 
-export const AREAS: Record<Area, { title: string; blurb: string }> = {
-  algebra: { title: "Algebra basics", blurb: "Brackets, terms and formulas" },
-  numbers: { title: "Numbers", blurb: "Fractions, powers and percentages" },
-  equations: { title: "Equations", blurb: "Solve for the unknown" },
-  functions: { title: "Functions", blurb: "Lines and graphs" },
-  applied: { title: "Word problems", blurb: "Maths in real life" },
+export const AREAS: Record<Area, { title: Text; blurb: Text }> = {
+  algebra: { title: tx("Algebra basics", "Algebra-Grundlagen"), blurb: tx("Brackets, terms and formulas", "Klammern, Terme und Formeln") },
+  numbers: { title: tx("Numbers", "Zahlen"), blurb: tx("Fractions, powers and percentages", "Brüche, Potenzen und Prozente") },
+  equations: { title: tx("Equations", "Gleichungen"), blurb: tx("Solve for the unknown", "Finde die Unbekannte") },
+  functions: { title: tx("Functions", "Funktionen"), blurb: tx("Lines and graphs", "Geraden und Graphen") },
+  applied: { title: tx("Word problems", "Textaufgaben"), blurb: tx("Maths in real life", "Mathe im echten Leben") },
 };

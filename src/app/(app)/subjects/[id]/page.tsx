@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { themeSpecOf } from "@/components/deck/deck";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { SubjectView } from "@/components/subjects/SubjectView";
+import { subjectsText } from "@/i18n/messages/subjects";
+import { getMessages } from "@/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadTasks } from "@/lib/tasks";
 import type { PageKind, Subject } from "@/lib/types";
@@ -18,7 +20,7 @@ async function loadSubject(id: string) {
 
 export async function generateMetadata({ params }: PageProps<"/subjects/[id]">): Promise<Metadata> {
   const subject = await loadSubject((await params).id);
-  return { title: subject ? subject.name : "Not found" };
+  return { title: subject ? subject.name : (await getMessages(subjectsText)).notFound };
 }
 
 type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };

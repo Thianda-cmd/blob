@@ -30,6 +30,8 @@ import { Kbd } from "@/components/ui/Kbd";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
+import { useLocale, useMessages } from "@/i18n/client";
+import { shellText } from "@/i18n/messages/shell";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import type { PageMeta, Subject, Theme } from "@/lib/types";
@@ -68,6 +70,8 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
   const router = useRouter();
   const pathname = usePathname();
   const { pages, subjects, createPage, profile, email, setProfile } = useWorkspace();
+  const locale = useLocale();
+  const t = useMessages(shellText).sidebar;
   // Subjects start expanded; we remember the ones you fold.
   const [folded, toggleFolded] = useStoredSet("blob-folded-subjects");
   const [openPages, toggleOpenPage] = useStoredSet("blob-open-pages");
@@ -114,20 +118,20 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
               "grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink",
               kids.length === 0 && page.kind === "deck" && "invisible",
             )}
-            aria-label={open ? "Collapse" : "Expand"}
+            aria-label={open ? t.collapse : t.expand}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
           <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch">
             <PageIcon page={page} />
-            <span className="truncate">{pageTitle(page.title, page.kind)}</span>
+            <span className="truncate">{pageTitle(page.title, page.kind, locale)}</span>
           </Link>
           {page.kind === "note" && (
             <button
               onClick={() => newPage("note", { parent_id: page.id, subject_id: page.subject_id })}
               className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100"
-              aria-label="Add a page inside"
-              title="Add a page inside"
+              aria-label={t.addInside}
+              title={t.addInside}
             >
               <Plus className="size-3.5" />
             </button>
@@ -146,7 +150,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
                 kids.map((k) => renderPage(k, depth + 1))
               ) : (
                 <div className="flex h-7 items-center text-[12.5px] text-ink-3" style={{ paddingLeft: 30 + depth * 14 }}>
-                  No pages inside
+                  {t.noPagesInside}
                 </div>
               )}
             </motion.div>
@@ -171,7 +175,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
           <button
             onClick={() => toggleFolded(subject.id)}
             className="grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink"
-            aria-label={open ? "Collapse subject" : "Expand subject"}
+            aria-label={open ? t.collapseSubject : t.expandSubject}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
@@ -191,7 +195,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
             <Popover
               align="start"
               trigger={(props) => (
-                <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={`Add to ${subject.name}`} title={`Add to ${subject.name}`}>
+                <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={t.addTo(subject.name)} title={t.addTo(subject.name)}>
                   <Plus className="size-3.5" />
                 </button>
               )}
@@ -199,10 +203,10 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
               {(close) => (
                 <>
                   <MenuItem icon={<FileText />} onSelect={() => (close(), newPage("note", { subject_id: subject.id }))}>
-                    Note
+                    {t.note}
                   </MenuItem>
                   <MenuItem icon={<Presentation />} onSelect={() => (close(), newPage("deck", { subject_id: subject.id }))}>
-                    Presentation
+                    {t.presentation}
                   </MenuItem>
                 </>
               )}
@@ -225,7 +229,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
                   onClick={() => newPage("note", { subject_id: subject.id })}
                   className="flex h-7 w-full items-center gap-2 rounded-md pl-[34px] text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink"
                 >
-                  <Plus className="size-3.5" /> Add a note
+                  <Plus className="size-3.5" /> {t.addNote}
                 </button>
               )}
             </motion.div>
@@ -236,7 +240,7 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
   };
 
   return (
-    <nav className="flex h-full w-full flex-col" aria-label="Workspace">
+    <nav className="flex h-full w-full flex-col" aria-label={t.label}>
       <div className="flex h-12 shrink-0 items-center gap-2 px-3">
         <Link href="/home" className="flex min-w-0 items-center gap-2 rounded-md">
           <BlobMark size={22} />
@@ -245,8 +249,8 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
         <button
           onClick={onCollapse}
           className="ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
-          aria-label="Hide sidebar"
-          title="Hide sidebar (Ctrl \)"
+          aria-label={t.hide}
+          title={t.hideTitle}
         >
           <PanelLeftClose className="size-4" />
         </button>
@@ -258,26 +262,26 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
           className="mb-1.5 flex h-8 w-full items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink-3 shadow-card transition-colors hover:border-line-2 hover:text-ink-2"
         >
           <Search className="size-3.5" />
-          Search or jump to…
+          {t.search}
           <span className="ml-auto flex gap-0.5">
             <Kbd>⌘</Kbd>
             <Kbd>K</Kbd>
           </span>
         </button>
         <NavLink href="/home" icon={<House />} active={pathname === "/home"}>
-          Home
+          {t.home}
         </NavLink>
         <NavLink href="/learn" icon={<GraduationCap />} active={pathname.startsWith("/learn")}>
-          Learn
+          {t.learn}
         </NavLink>
         <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
-          Tasks
+          {t.tasks}
         </NavLink>
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {favorites.length > 0 && (
-          <Section title="Favorites">
+          <Section title={t.favorites}>
             {favorites.map((p) => (
               <Link
                 key={p.id}
@@ -288,20 +292,20 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
                 )}
               >
                 <Star className="size-3.5 shrink-0 fill-blob text-blob" />
-                <span className="truncate">{pageTitle(p.title, p.kind)}</span>
+                <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
               </Link>
             ))}
           </Section>
         )}
 
-        <Section title="Subjects" action={<NewSubjectButton />}>
-          {subjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">Add your school subjects to keep things tidy.</p>}
+        <Section title={t.subjects} action={<NewSubjectButton />}>
+          {subjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
           {subjects.map(renderSubject)}
         </Section>
 
-        <Section title="Notes">
+        <Section title={t.notes}>
           {unfiled.length === 0 ? (
-            <p className="px-1.5 py-1 text-[12.5px] text-ink-3">Notes without a subject live here.</p>
+            <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p>
           ) : (
             unfiled.map((p) => renderPage(p, 0))
           )}
@@ -314,17 +318,17 @@ export function Sidebar({ onCollapse, onSearch }: { onCollapse: () => void; onSe
             onClick={() => newPage("note")}
             className="flex h-8 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97]"
           >
-            <FilePlus2 className="size-3.5" /> New note
+            <FilePlus2 className="size-3.5" /> {t.newNote}
           </button>
           <button
             onClick={() => newPage("deck")}
             className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97]"
           >
-            <Presentation className="size-3.5" /> New deck
+            <Presentation className="size-3.5" /> {t.newDeck}
           </button>
         </div>
         <NavLink href="/trash" icon={<Trash2 />} active={pathname === "/trash"}>
-          Trash
+          {t.trash}
         </NavLink>
         <AccountMenu name={profile.full_name} email={email} theme={profile.theme} onTheme={(t) => setProfile({ theme: t })} />
       </div>
@@ -361,12 +365,13 @@ function NavLink({ href, icon, active, children }: { href: string; icon: ReactNo
 
 function NewSubjectButton() {
   const { createSubject } = useWorkspace();
+  const t = useMessages(shellText).sidebar;
   const [name, setName] = useState("");
   return (
     <Popover
       align="end"
       trigger={(props) => (
-        <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink" aria-label="Add subject" title="Add subject">
+        <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.addSubject} title={t.addSubject}>
           <Plus className="size-3.5" />
         </button>
       )}
@@ -383,12 +388,12 @@ function NewSubjectButton() {
             close();
           }}
         >
-          <div className="mb-1.5 px-0.5 text-[12px] font-medium text-ink-2">New subject</div>
+          <div className="mb-1.5 px-0.5 text-[12px] font-medium text-ink-2">{t.newSubject}</div>
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Chemistry"
+            placeholder={t.subjectPlaceholder}
             maxLength={60}
             className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
           />
@@ -400,6 +405,7 @@ function NewSubjectButton() {
 
 function AccountMenu({ name, email, theme, onTheme }: { name: string | null; email: string; theme: Theme; onTheme: (t: Theme) => void }) {
   const router = useRouter();
+  const t = useMessages(shellText).sidebar;
   const initial = (name || email || "?").trim()[0]?.toUpperCase();
 
   function pick(t: Theme) {
@@ -422,7 +428,7 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
         <button {...props} className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
           <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium leading-tight">{name || "You"}</span>
+            <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
             <span className="block truncate text-[11.5px] leading-tight text-ink-3">{email}</span>
           </span>
           <Ellipsis className="size-4 text-ink-3" />
@@ -431,13 +437,13 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
     >
       {(close) => (
         <>
-          <MenuLabel>Theme</MenuLabel>
+          <MenuLabel>{t.theme}</MenuLabel>
           <div className="mx-1 mb-1 grid grid-cols-3 gap-0.5 rounded-lg bg-paper p-0.5">
             {(
               [
-                ["light", <Sun key="l" />, "Light"],
-                ["dark", <Moon key="d" />, "Dark"],
-                ["system", <Monitor key="s" />, "Auto"],
+                ["light", <Sun key="l" />, t.light],
+                ["dark", <Moon key="d" />, t.dark],
+                ["system", <Monitor key="s" />, t.auto],
               ] as const
             ).map(([value, icon, label]) => (
               <button
@@ -455,10 +461,10 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
           </div>
           <MenuSeparator />
           <MenuItem icon={<Settings />} onSelect={() => (close(), router.push("/settings"))}>
-            Settings
+            {t.settings}
           </MenuItem>
           <MenuItem icon={<LogOut />} onSelect={signOut}>
-            Sign out
+            {t.signOut}
           </MenuItem>
         </>
       )}

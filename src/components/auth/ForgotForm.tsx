@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
+import { useLocale, useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +16,10 @@ import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
 
 export function ForgotForm() {
+  const locale = useLocale();
+  const all = useMessages(authText);
+  const t = all.forgot;
+  const common = all.common;
   const { textField, blob } = useFieldReactions();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,14 +28,14 @@ export function ForgotForm() {
 
   useEffect(() => {
     blob.setMood("idle");
-    blob.say("Forgot it? Happens to the best of us.");
-  }, [blob]);
+    blob.say(t.hello);
+  }, [blob, t]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!isEmail(email)) {
-      setError("That email address doesn't look right.");
+      setError(common.badEmail);
       blob.setMood("worried");
       blob.shake();
       return;
@@ -41,16 +47,17 @@ export function ForgotForm() {
     });
     setLoading(false);
     if (error) {
-      setError(authMessage(error));
+      const message = authMessage(error, locale);
+      setError(message);
       blob.setMood("worried");
       blob.shake();
-      blob.say(authMessage(error));
+      blob.say(message);
       return;
     }
     setSent(true);
     blob.setMood("love");
     blob.jump();
-    blob.say("Reset link is on its way!");
+    blob.say(t.onItsWay);
   }
 
   if (sent) {
@@ -58,15 +65,11 @@ export function ForgotForm() {
       <div>
         <Envelope />
         <AuthHeading
-          title="Check your inbox"
-          subtitle={
-            <>
-              If an account exists for <b className="font-medium text-ink">{email}</b>, you&apos;ll get a link to choose a new password.
-            </>
-          }
+          title={common.checkInbox}
+          subtitle={t.sent(<b className="font-medium text-ink">{email}</b>)}
         />
         <Link href="/login" className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
-          <ArrowLeft className="size-4" /> Back to sign in
+          <ArrowLeft className="size-4" /> {common.backToSignIn}
         </Link>
       </div>
     );
@@ -74,15 +77,15 @@ export function ForgotForm() {
 
   return (
     <div>
-      <AuthHeading title="Reset your password" subtitle="Enter your email and we'll send you a link to set a new one." />
+      <AuthHeading title={t.title} subtitle={t.subtitle} />
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Email" htmlFor="email">
+        <Field label={common.email} htmlFor="email">
           <Input
             id="email"
             type="email"
             autoComplete="email"
             autoFocus
-            placeholder="you@school.com"
+            placeholder={common.emailPlaceholder}
             icon={<Mail />}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -91,11 +94,11 @@ export function ForgotForm() {
         </Field>
         <FormError message={error} />
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
-          Send reset link <ArrowRight className="size-4" />
+          {t.submit} <ArrowRight className="size-4" />
         </Button>
       </form>
       <Link href="/login" className="mt-7 inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
-        <ArrowLeft className="size-4" /> Back to sign in
+        <ArrowLeft className="size-4" /> {common.backToSignIn}
       </Link>
     </div>
   );

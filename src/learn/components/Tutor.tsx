@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, type RefObject } from "react";
 import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { TypedText, useTypewriter } from "@/components/blob/speech";
+import type { Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { Inline } from "./Rich";
 
@@ -20,7 +22,7 @@ export function Tutor({
   blobRef,
   className,
 }: {
-  say: string | null;
+  say: Text | null;
   mood?: BlobMood;
   accessory?: BlobAccessory | null;
   size?: number;
@@ -30,22 +32,23 @@ export function Tutor({
 }) {
   const own = useRef<BlobHandle>(null);
   const handle = blobRef ?? own;
-  const plain = say ? toPlain(say) : null;
+  const line = useText()(say) || null;
+  const plain = line ? toPlain(line) : null;
   const { typing } = useTypewriter(plain, 48);
 
   // Point at the board whenever Blob starts explaining something new.
   useEffect(() => {
-    if (!say) return;
+    if (!line) return;
     const t = setTimeout(() => handle.current?.point(), 120);
     return () => clearTimeout(t);
-  }, [say, handle]);
+  }, [line, handle]);
 
   return (
     <div className={cn("relative flex", side === "left" ? "flex-col items-center" : "items-end gap-3", className)}>
       <AnimatePresence mode="wait">
-        {say && (
+        {line && (
           <motion.div
-            key={say}
+            key={line}
             initial={{ opacity: 0, y: 10, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.97, transition: { duration: 0.12 } }}
@@ -58,7 +61,7 @@ export function Tutor({
             role="status"
             aria-live="polite"
           >
-            <SpeechWithMath text={say} />
+            <SpeechWithMath text={line} />
             {side === "left" && <span className="absolute -bottom-[7px] left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-line bg-raised" />}
           </motion.div>
         )}

@@ -5,6 +5,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { TypedText, useTypewriter } from "@/components/blob/speech";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import Link from "next/link";
 
 type AuthBlob = {
@@ -25,9 +28,10 @@ export function useAuthBlob() {
 
 /** Split-screen frame for every auth page: the form on the left, Blob on the right. */
 export function AuthShell({ children }: { children: ReactNode }) {
+  const t = useMessages(authText).stage;
   const blobRef = useRef<BlobHandle>(null);
   const [mood, setMood] = useState<BlobMood>("happy");
-  const [speech, setSpeech] = useState<string | null>("Hi! I'm Blob. I keep your school stuff safe.");
+  const [speech, setSpeech] = useState<string | null>(t.hello);
   const [gaze, setGaze] = useState<{ x: number; y: number } | null>(null);
 
   const say = useCallback((text: string | null) => setSpeech(text), []);
@@ -46,14 +50,17 @@ export function AuthShell({ children }: { children: ReactNode }) {
     <Ctx.Provider value={api}>
       <div className="grid min-h-dvh lg:grid-cols-[minmax(440px,560px)_1fr]">
         <div className="relative flex flex-col bg-surface px-6 py-6 sm:px-12 lg:border-r lg:border-line">
-          <Link href="/" className="flex w-fit items-center gap-2 rounded-lg">
-            <BlobMark size={26} />
-            <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
-          </Link>
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="flex w-fit items-center gap-2 rounded-lg">
+              <BlobMark size={26} />
+              <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
+            </Link>
+            <LanguageSwitch compact />
+          </div>
           <div className="flex flex-1 items-center py-10">
             <div className="mx-auto w-full max-w-[360px]">{children}</div>
           </div>
-          <p className="text-[12px] text-ink-3">Your notes are private to you and protected by row-level security.</p>
+          <p className="text-[12px] text-ink-3">{t.privacy}</p>
         </div>
 
         <div className="relative hidden overflow-hidden bg-paper lg:block">
@@ -94,6 +101,7 @@ const CARDS = [
 ];
 
 function FloatingCards() {
+  const cards = useMessages(authText).stage.cards;
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {CARDS.map((card, i) => (
@@ -107,21 +115,21 @@ function FloatingCards() {
             y: { duration: 6 + i, repeat: Infinity, ease: "easeInOut", delay: card.delay },
           }}
         >
-          <MiniCard kind={card.kind} />
+          <MiniCard kind={card.kind} text={cards} />
         </motion.div>
       ))}
     </div>
   );
 }
 
-function MiniCard({ kind }: { kind: "note" | "task" | "slide" | "exam" }) {
+function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; text: (typeof authText)["en"]["stage"]["cards"] }) {
   if (kind === "note") {
     return (
       <div className="w-[220px] rounded-xl border border-line bg-raised p-3.5 shadow-card">
         <div className="mb-2 flex items-center gap-1.5 text-[11px] text-ink-3">
-          <span className="size-1.5 rounded-full" style={{ background: "var(--subject-moss)" }} /> Biology
+          <span className="size-1.5 rounded-full" style={{ background: "var(--subject-moss)" }} /> {text.subject}
         </div>
-        <div className="font-display text-[15px] font-semibold">Photosynthesis</div>
+        <div className="font-display text-[15px] font-semibold">{text.note}</div>
         <div className="mt-2 space-y-1.5">
           <div className="h-1.5 w-[92%] rounded bg-line" />
           <div className="h-1.5 w-[78%] rounded bg-line" />
@@ -138,7 +146,7 @@ function MiniCard({ kind }: { kind: "note" | "task" | "slide" | "exam" }) {
             <path d="M2.5 6.2 5 8.5 9.5 3.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
           </svg>
         </span>
-        <span className="text-[13px] text-ink-3 line-through">Math worksheet p. 42</span>
+        <span className="text-[13px] text-ink-3 line-through">{text.task}</span>
       </div>
     );
   }
@@ -147,8 +155,8 @@ function MiniCard({ kind }: { kind: "note" | "task" | "slide" | "exam" }) {
       <div className="w-[230px] rounded-xl border border-line bg-raised p-2 shadow-card">
         <div className="grid aspect-video place-items-center rounded-lg bg-ink text-center">
           <div>
-            <div className="font-display text-[15px] font-bold text-paper">The French Revolution</div>
-            <div className="mt-1 text-[10px] text-paper/60">History presentation</div>
+            <div className="font-display text-[15px] font-bold text-paper">{text.slide}</div>
+            <div className="mt-1 text-[10px] text-paper/60">{text.slideKind}</div>
           </div>
         </div>
       </div>
@@ -156,8 +164,8 @@ function MiniCard({ kind }: { kind: "note" | "task" | "slide" | "exam" }) {
   }
   return (
     <div className="w-[190px] rounded-xl border border-line bg-raised px-3 py-2.5 shadow-card">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">Exam · Fri</div>
-      <div className="mt-0.5 text-[13.5px] font-medium">Chemistry, chapter 4</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{text.exam}</div>
+      <div className="mt-0.5 text-[13.5px] font-medium">{text.examTitle}</div>
     </div>
   );
 }

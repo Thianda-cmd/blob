@@ -2,10 +2,13 @@
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useMessages } from "@/i18n/client";
+import { blobText } from "@/i18n/messages/blob";
 import { Blob, type BlobHandle, type BlobMood } from "./Blob";
 
 const KEY = "blob-booted";
-const MESSAGES = ["Waking up Blob", "Gathering your notes", "Sharpening pencils", "Almost there"];
+/** How many status lines the intro cycles through (`blobText.boot`). */
+const STEPS = blobText.en.boot.length;
 
 function subscribe() {
   return () => {};
@@ -49,6 +52,7 @@ export function BlobBoot({ ready = true, greeting }: { ready?: boolean; greeting
 
 function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: string; onDone: () => void }) {
   const [scope, animate] = useAnimate();
+  const t = useMessages(blobText);
   const blobRef = useRef<BlobHandle>(null);
   const [phase, setPhase] = useState<"rain" | "alive" | "exit">("rain");
   const [mood, setMood] = useState<BlobMood>("sleepy");
@@ -69,8 +73,8 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
   // Cycle the status line while we wait.
   useEffect(() => {
     if (phase === "exit") return;
-    const t = setInterval(() => setMessage((m) => Math.min(m + 1, MESSAGES.length - 1)), 1100);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setMessage((m) => Math.min(m + 1, STEPS - 1)), 1100);
+    return () => clearInterval(timer);
   }, [phase]);
 
   // Leave once the app is ready.
@@ -126,7 +130,7 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
         } as React.CSSProperties
       }
       aria-busy="true"
-      aria-label="Opening Blob"
+      aria-label={t.opening}
     >
       <div className="bg-dots pointer-events-none absolute inset-0 opacity-50" />
 
@@ -174,7 +178,7 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
               transition={{ duration: 0.22 }}
               className="block"
             >
-              {greeting && phase !== "rain" ? greeting : `${MESSAGES[message]}…`}
+              {greeting && phase !== "rain" ? greeting : `${t.boot[message]}…`}
             </motion.span>
           </AnimatePresence>
         </div>

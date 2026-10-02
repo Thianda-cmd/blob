@@ -3,8 +3,11 @@
 import { motion } from "motion/react";
 import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Printer, Timer } from "lucide-react";
 import Link from "next/link";
-import { TopBar } from "@/components/shell/TopBar";
 import { useState } from "react";
+import { TopBar } from "@/components/shell/TopBar";
+import { useLocale, useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
+import { useText } from "@/i18n/useText";
 import { type LearnDay, levelFor, masteryLabel, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { getTopic } from "@/learn/topics";
@@ -13,9 +16,8 @@ import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 import { Rich } from "./Rich";
 import { Ring } from "./Ring";
+import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
-
-const LEVEL_NAMES: Record<Level, string> = { 1: "Basics", 2: "Standard", 3: "Challenge" };
 
 export function TopicView({ slug, progress, days }: { slug: string; progress: TopicProgress; days: LearnDay[] }) {
   const topic = getTopic(slug)!;
@@ -25,15 +27,20 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
   const checks = topic.lesson.filter((s) => s.type === "check").length;
   const suggested = levelFor(progress.mastery);
   const tip = topic.summary.find((b) => b.tone === "tip") ?? topic.summary[0];
+  const t = useMessages(learnText);
+  const tt = useText();
+  const locale = useLocale();
+  const names = topicNames(topic, locale);
+  const levelName = (l: Level) => t.levels[l];
 
   return (
     <>
       <TopBar
         className="print:hidden"
         crumbs={[
-          { label: "Learn", href: "/learn", icon: <GraduationCap className="size-3.5" /> },
-          { label: "Maths", href: "/learn" },
-          { label: topic.title },
+          { label: t.learn, href: "/learn", icon: <GraduationCap className="size-3.5" /> },
+          { label: t.maths, href: "/learn" },
+          { label: names.title },
         ]}
       />
       <div className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
@@ -49,24 +56,28 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                 <MathView src={topic.glyph} size="lg" animate={false} className="relative" />
               </motion.div>
               <div className="min-w-0">
-                <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.02em]">{topic.title}</h1>
-                <div className="text-[15px] text-ink-3">{topic.de}</div>
-                <p className="mt-2 max-w-[560px] text-[15px] leading-relaxed text-ink-2">{topic.blurb}</p>
+                <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
+                  {t.maths} · {names.area}
+                </div>
+                <h1 className="mt-1 font-display text-[32px] font-bold leading-tight tracking-[-0.02em]">{names.title}</h1>
+                {names.school && <div className="text-[15px] text-ink-3">{names.school}</div>}
+                <p className="mt-2 max-w-[560px] text-[15px] leading-relaxed text-ink-2">{tt(topic.blurb)}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 rounded-2xl border border-line bg-raised p-4 shadow-card">
               <Ring value={progress.mastery / 100} size={84} stroke={8}>
                 <div className="text-center leading-none">
-                  <div className="text-[19px] font-bold tabular-nums">{progress.mastery}%</div>
+                  <div className="whitespace-nowrap text-[19px] font-bold tabular-nums">{t.pct(progress.mastery)}</div>
                 </div>
               </Ring>
               <div className="space-y-1 text-[13px]">
-                <div className="font-semibold text-ink">{masteryLabel(progress.mastery)}</div>
+                <div className="font-semibold text-ink">{masteryLabel(progress.mastery, locale)}</div>
                 <div className="text-ink-2">
-                  {progress.attempts} tasks{accuracy !== null && ` · ${accuracy}% right`}
+                  {t.topic.tasks(progress.attempts)}
+                  {accuracy !== null && ` · ${t.topic.right(t.pct(accuracy))}`}
                 </div>
-                <div className="text-ink-2">Best streak {progress.best_streak}</div>
-                <div className="text-ink-3">{today.xp} XP today</div>
+                <div className="text-ink-2">{t.topic.bestStreak(progress.best_streak)}</div>
+                <div className="text-ink-3">{t.topic.xpToday(today.xp)}</div>
               </div>
             </div>
           </header>
@@ -75,27 +86,27 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
             <ActionCard
               delay={0}
               icon={<BookOpen className="size-5" />}
-              title="Lesson"
-              text={`Blob explains it step by step, with ${checks} quick checks along the way.`}
+              title={t.topic.lesson}
+              text={t.topic.lessonText(checks)}
               meta={
                 <>
-                  <Clock className="size-3.5" /> {topic.minutes} min · {topic.lesson.length} steps
+                  <Clock className="size-3.5" /> {t.minutes(topic.minutes)} · {t.topic.steps(topic.lesson.length)}
                   {progress.lesson_done && (
                     <span className="ml-auto flex items-center gap-1 font-medium text-ok">
-                      <Check className="size-3.5" strokeWidth={3} /> Done
+                      <Check className="size-3.5" strokeWidth={3} /> {t.topic.done}
                     </span>
                   )}
                 </>
               }
               href={`/study/maths/${slug}/lesson`}
-              cta={progress.lesson_done ? "Review lesson" : "Start lesson"}
+              cta={progress.lesson_done ? t.topic.reviewLesson : t.topic.startLesson}
               primary={!progress.lesson_done}
             />
             <ActionCard
               delay={0.05}
               icon={<Dumbbell className="size-5" />}
-              title="Practice"
-              text="10 fresh tasks every time. They get harder as you get better."
+              title={t.topic.practice}
+              text={t.topic.practiceText}
               meta={
                 <div className="flex w-full items-center gap-1">
                   {([null, 1, 2, 3] as const).map((l) => (
@@ -109,54 +120,55 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                         "rounded-md px-2 py-1 text-[12px] font-medium transition-colors",
                         level === l ? "bg-ink text-paper" : "text-ink-2 hover:bg-hover hover:text-ink",
                       )}
-                      title={l ? LEVEL_NAMES[l] : `Adapts to you (now level ${suggested})`}
+                      title={l ? levelName(l) : t.topic.adapts(suggested)}
+                      aria-pressed={level === l}
                     >
-                      {l ? `L${l}` : "Auto"}
+                      {l ? t.topic.levelShort(l) : t.topic.auto}
                     </button>
                   ))}
                 </div>
               }
               href={`/study/maths/${slug}/practice${level ? `?level=${level}` : ""}`}
-              cta={level ? `Practise ${LEVEL_NAMES[level].toLowerCase()}` : "Practise"}
+              cta={level ? t.topic.practiseLevel(levelName(level)) : t.topic.practise}
               primary={progress.lesson_done}
             />
             <ActionCard
               delay={0.1}
               icon={<Timer className="size-5" />}
-              title="Quick test"
-              text="8 tasks from easy to hard. One try each, no hints, and you get a grade."
+              title={t.topic.quickTest}
+              text={t.topic.quickTestText}
               meta={
                 <>
-                  <Clock className="size-3.5" /> about 6 min
+                  <Clock className="size-3.5" /> {t.topic.aboutMinutes(6)}
                 </>
               }
               href={`/study/maths/${slug}/practice?mode=test`}
-              cta="Take the test"
+              cta={t.topic.takeTest}
             />
           </div>
 
           <section className="mt-10">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="font-display text-[22px] font-bold tracking-[-0.015em]">Cheat sheet</h2>
-                <p className="text-[13.5px] text-ink-3 print:hidden">Everything that matters, on one page.</p>
+                <h2 className="font-display text-[22px] font-bold tracking-[-0.015em]">{t.topic.cheatSheet}</h2>
+                <p className="text-[13.5px] text-ink-3 print:hidden">{t.topic.cheatSheetText}</p>
               </div>
               <button
                 onClick={() => window.print()}
                 className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink print:hidden"
               >
-                <Printer className="size-4" /> Print
+                <Printer className="size-4" /> {t.topic.print}
               </button>
             </div>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
               <div className="grid content-start gap-3 md:grid-cols-2">
                 {topic.summary.map((block, i) => (
-                  <SummaryCard key={block.title} block={block} delay={0.1 + i * 0.05} />
+                  <SummaryCard key={i} block={block} delay={0.1 + i * 0.05} />
                 ))}
               </div>
               <aside className="hidden xl:block print:hidden">
                 <div className="sticky top-6">
-                  <Tutor say={tip ? `${tip.title}: ${tip.body ?? ""}`.trim() : null} accessory="glasses" size={140} />
+                  <Tutor say={tip ? `${tt(tip.title)}: ${tt(tip.body)}`.trim() : null} accessory="glasses" size={140} />
                 </div>
               </aside>
             </div>
@@ -215,6 +227,8 @@ function ActionCard({
 
 function SummaryCard({ block, delay }: { block: SummaryBlock; delay: number }) {
   const tone = block.tone ?? "rule";
+  const t = useMessages(learnText);
+  const tt = useText();
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
@@ -229,18 +243,18 @@ function SummaryCard({ block, delay }: { block: SummaryBlock; delay: number }) {
     >
       {tone === "rule" && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-blob" />}
       <div className="flex items-center gap-2">
-        <h3 className="text-[14.5px] font-semibold">{block.title}</h3>
+        <h3 className="text-[14.5px] font-semibold">{tt(block.title)}</h3>
         {tone !== "rule" && (
           <span className={cn("rounded-full px-1.5 py-px text-[10.5px] font-semibold uppercase tracking-wide", tone === "tip" ? "bg-blob/15 text-blob-ink" : "bg-danger/10 text-danger")}>
-            {tone === "tip" ? "Tip" : "Watch out"}
+            {tone === "tip" ? t.topic.tip : t.topic.watchOut}
           </span>
         )}
       </div>
       {block.body && <Rich text={block.body} className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2" />}
       {block.examples && block.examples.length > 0 && (
         <div className="mt-3 space-y-1.5 rounded-xl bg-surface/80 px-3.5 py-3">
-          {block.examples.map((ex) => (
-            <div key={ex} className="overflow-x-auto">
+          {block.examples.map((ex, i) => (
+            <div key={i} className="overflow-x-auto">
               <MathView src={ex} size="sm" animate={false} />
             </div>
           ))}

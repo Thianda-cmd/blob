@@ -4,6 +4,8 @@ import { AnimatePresence, useReducedMotion } from "motion/react";
 import { Check, ChevronDown, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Popover } from "@/components/ui/Menu";
+import { useMessages } from "@/i18n/client";
+import { deckText } from "@/i18n/messages/deck";
 import type { Deck, Slide, SlideBuild, SlideTransition } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { BUILD_LAYOUTS, BUILDS, buildUnits, TRANSITIONS, type Palette } from "./deck";
@@ -33,6 +35,7 @@ export function MotionPanel({
   /** Change the deck default; `everywhere` also clears every slide's own choice. */
   onDeckTransition: (t: SlideTransition, everywhere: boolean) => void;
 }) {
+  const t = useMessages(deckText);
   const [run, setRun] = useState(0);
   const prev = index > 0 ? deck.slides[index - 1] : null;
   const effective = slide.transition ?? deck.transition;
@@ -40,8 +43,8 @@ export function MotionPanel({
   const canBuild = BUILD_LAYOUTS.has(slide.layout);
   const overrides = deck.slides.filter((s) => s.transition !== null).length;
 
-  const pickTransition = (t: SlideTransition) => {
-    onSlide({ transition: t === deck.transition ? null : t });
+  const pickTransition = (id: SlideTransition) => {
+    onSlide({ transition: id === deck.transition ? null : id });
     setRun((r) => r + 1);
   };
   const pickBuild = (b: SlideBuild) => {
@@ -52,39 +55,39 @@ export function MotionPanel({
   return (
     <>
       <Block
-        title="Preview"
+        title={t.preview}
         action={
           <button
             type="button"
             onClick={() => setRun((r) => r + 1)}
             className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-ink-3 hover:bg-hover hover:text-ink"
           >
-            <Play className="size-3 fill-current" /> Replay
+            <Play className="size-3 fill-current" /> {t.replay}
           </button>
         }
       >
         <MotionPreview key={`${run}:${slide.id}:${effective}:${slide.build}`} prev={prev} slide={slide} palette={palette} sections={sections} kind={effective} />
-        <p className="mt-2 text-[12px] text-ink-3">{prev ? `Slide ${index} to slide ${index + 1}` : "The first slide appears without a transition."}</p>
+        <p className="mt-2 text-[12px] text-ink-3">{prev ? t.previewFromTo(index, index + 1) : t.firstSlide}</p>
       </Block>
 
-      <Block title="Transition">
-        <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Transition for this slide">
-          {TRANSITIONS.map((t) => (
-            <Chip key={t.id} active={t.id === effective} onClick={() => pickTransition(t.id)} hint={t.hint} mark={t.id === deck.transition}>
-              {t.label}
+      <Block title={t.transition}>
+        <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label={t.transitionAria}>
+          {TRANSITIONS.map((id) => (
+            <Chip key={id} active={id === effective} onClick={() => pickTransition(id)} hint={t.transitions[id].hint} mark={id === deck.transition} markLabel={t.deckDefaultMark}>
+              {t.transitions[id].label}
             </Chip>
           ))}
         </div>
         <div className="mt-2.5 flex items-center gap-2 text-[12px] text-ink-3">
-          <span className="min-w-0 flex-1">{slide.transition === null ? "Uses the deck default" : "Only on this slide"}</span>
+          <span className="min-w-0 flex-1">{slide.transition === null ? t.usesDefault : t.onlyHere}</span>
           {slide.transition !== null && (
             <button type="button" onClick={() => onSlide({ transition: null })} className="shrink-0 text-ink-3 underline-offset-2 hover:text-ink hover:underline">
-              Reset
+              {t.reset}
             </button>
           )}
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <span className="text-[12.5px] text-ink-2">Deck default</span>
+          <span className="text-[12.5px] text-ink-2">{t.deckDefault}</span>
           <Popover
             align="end"
             className="w-[230px] p-1"
@@ -93,28 +96,28 @@ export function MotionPanel({
                 {...props}
                 className="ml-auto flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised px-2 text-[12.5px] text-ink transition-colors hover:border-line-2 aria-expanded:border-blob"
               >
-                {TRANSITIONS.find((t) => t.id === deck.transition)?.label}
+                {t.transitions[deck.transition].label}
                 <ChevronDown className="size-3.5 text-ink-3" />
               </button>
             )}
           >
             {(close) => (
               <>
-                {TRANSITIONS.map((t) => (
+                {TRANSITIONS.map((id) => (
                   <button
-                    key={t.id}
+                    key={id}
                     type="button"
                     role="menuitemradio"
-                    aria-checked={t.id === deck.transition}
+                    aria-checked={id === deck.transition}
                     onClick={() => {
-                      onDeckTransition(t.id, false);
+                      onDeckTransition(id, false);
                       setRun((r) => r + 1);
                       close();
                     }}
                     className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] text-ink-2 hover:bg-hover hover:text-ink"
                   >
-                    <span className="flex-1">{t.label}</span>
-                    {t.id === deck.transition && <Check className="size-3.5 text-blob" strokeWidth={2.5} />}
+                    <span className="flex-1">{t.transitions[id].label}</span>
+                    {id === deck.transition && <Check className="size-3.5 text-blob" strokeWidth={2.5} />}
                   </button>
                 ))}
                 {overrides > 0 && (
@@ -129,7 +132,7 @@ export function MotionPanel({
                       }}
                       className="flex h-8 w-full items-center rounded-lg px-2 text-left text-[12.5px] text-ink-2 hover:bg-hover hover:text-ink"
                     >
-                      Use it on every slide ({overrides} {overrides === 1 ? "differs" : "differ"})
+                      {t.useEverywhere(overrides)}
                     </button>
                   </>
                 )}
@@ -139,29 +142,39 @@ export function MotionPanel({
         </div>
       </Block>
 
-      <Block title="Build">
-        <div className={cn("grid grid-cols-2 gap-1", !canBuild && "pointer-events-none opacity-45")} role="radiogroup" aria-label="Build for this slide" aria-disabled={!canBuild}>
-          {BUILDS.map((b) => (
-            <Chip key={b.id} active={b.id === slide.build} onClick={() => pickBuild(b.id)} hint={b.hint} disabled={!canBuild}>
-              {b.label}
+      <Block title={t.build}>
+        <div className={cn("grid grid-cols-2 gap-1", !canBuild && "pointer-events-none opacity-45")} role="radiogroup" aria-label={t.buildAria} aria-disabled={!canBuild}>
+          {BUILDS.map((id) => (
+            <Chip key={id} active={id === slide.build} onClick={() => pickBuild(id)} hint={t.builds[id].hint} disabled={!canBuild}>
+              {t.builds[id].label}
             </Chip>
           ))}
         </div>
         <p className="mt-2.5 text-[12px] leading-relaxed text-ink-3">
-          {!canBuild
-            ? "Builds work on bullets, agenda, columns, compare, steps, timeline, stats and formulas."
-            : slide.build === "none"
-              ? "Pick a style to reveal items one click at a time."
-              : units === 0
-                ? "Add some items and they'll appear one by one."
-                : `${units} ${units === 1 ? "click reveals" : "clicks reveal"} everything. Back un-reveals.`}
+          {!canBuild ? t.buildUnsupported : slide.build === "none" ? t.buildPick : units === 0 ? t.buildEmpty : t.buildClicks(units)}
         </p>
       </Block>
     </>
   );
 }
 
-function Chip({ children, active, onClick, hint, mark, disabled }: { children: string; active: boolean; onClick: () => void; hint: string; mark?: boolean; disabled?: boolean }) {
+function Chip({
+  children,
+  active,
+  onClick,
+  hint,
+  mark,
+  markLabel,
+  disabled,
+}: {
+  children: string;
+  active: boolean;
+  onClick: () => void;
+  hint: string;
+  mark?: boolean;
+  markLabel?: string;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -176,7 +189,7 @@ function Chip({ children, active, onClick, hint, mark, disabled }: { children: s
       )}
     >
       {children}
-      {mark && <span className="absolute right-1 top-1 size-1 rounded-full bg-ink-3" aria-label="(deck default)" />}
+      {mark && <span className="absolute right-1 top-1 size-1 rounded-full bg-ink-3" aria-label={markLabel} />}
     </button>
   );
 }

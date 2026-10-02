@@ -2,12 +2,15 @@
 
 import { ArrowRight, Flame, Zap } from "lucide-react";
 import Link from "next/link";
+import { useLocale, useMessages } from "@/i18n/client";
+import { learnText } from "@/i18n/messages/learn";
 import { MATHS_CATALOG } from "@/learn/catalog";
 import { DAILY_GOAL, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 import { Ring } from "./Ring";
+import { topicNames } from "./topicNames";
 
 /** Small learning card for the home dashboard: today's goal, streak and the suggested next topic. */
 export function LearnSnapshot({ progress, days }: { progress: Record<string, TopicProgress>; days: LearnDay[] }) {
@@ -17,6 +20,9 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
     [...MATHS_CATALOG].sort((a, b) => (progress[a.slug]?.mastery ?? 0) - (progress[b.slug]?.mastery ?? 0))[0];
   const started = progress[next.slug]?.lesson_done;
   const mastery = progress[next.slug]?.mastery ?? 0;
+  const t = useMessages(learnText);
+  const locale = useLocale();
+  const names = topicNames(next, locale);
 
   return (
     <Link
@@ -29,13 +35,13 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
         </Ring>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[13.5px] font-semibold tabular-nums">
-            {today.xp} <span className="font-normal text-ink-3">/ {DAILY_GOAL} XP today</span>
+            {today.xp} <span className="font-normal text-ink-3">{t.snapshot.xpToday(DAILY_GOAL)}</span>
           </div>
-          <div className="text-[12px] text-ink-3">{today.xp >= DAILY_GOAL ? "Daily goal reached. Nice!" : "A short lesson gets you there."}</div>
+          <div className="text-[12px] text-ink-3">{today.xp >= DAILY_GOAL ? t.snapshot.goalReached : t.snapshot.goalHint}</div>
         </div>
         <span
           className={cn("flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold", today.streak > 0 ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-3")}
-          title="Day streak"
+          title={t.dayStreak}
         >
           <Flame className="size-3.5" />
           {today.streak}
@@ -43,10 +49,10 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
       </div>
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{started ? "Keep practising" : "Up next in maths"}</div>
-          <div className="mt-0.5 truncate text-[15px] font-semibold">{next.title}</div>
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{started ? t.snapshot.keepPractising : t.snapshot.upNext}</div>
+          <div className="mt-0.5 truncate text-[15px] font-semibold">{names.title}</div>
           <div className="truncate text-[12.5px] text-ink-3">
-            {next.de} · {masteryLabel(mastery)}
+            {names.school ?? names.area} · {masteryLabel(mastery, locale)}
           </div>
         </div>
         <div className="grid h-14 w-24 shrink-0 place-items-center rounded-xl bg-surface transition-colors group-hover:bg-blob-soft/60">

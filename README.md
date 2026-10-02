@@ -13,6 +13,7 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 a
 - **Presentations**: 17 layouts (incl. stats, timeline, compare, formula), 10 themes plus a custom theme editor, slide transitions (incl. morph), click-by-click builds, drag-to-reorder, and a presenter (`/present/[id]`) with speaker view, second window, overview, laser and black/white screen.
 - **Tasks**: quick add with natural dates (`Bio test fri #biology`), groups by due date, two-week heatmap, jelly check-off animation.
 - **Subjects**, **favorites**, **trash** with restore, **⌘K** search across titles and note contents, light/dark/system themes.
+- **German and English**: the whole site, lessons and auth emails in both languages. German is the default; the browser's language decides for new visitors, and the switch in Settings (or DE | EN on the public pages) is remembered per browser and on the account.
 - **Animations**: a physics-driven SVG mascot (squash and stretch, jiggle, eye tracking, moods), a gooey intro animation once per session, gooey loaders.
 
 ## Local development
@@ -78,6 +79,10 @@ supabase/migrations   SQL schema with row-level security
 supabase/templates     branded auth email templates
 scripts               build-time migrations, auth/email configuration
 ```
+
+### Languages
+
+`src/i18n/` holds the setup: `getLocale()` (server) reads the `blob-locale` cookie or the `Accept-Language` header; the proxy copies the account's language (`user_metadata.locale`) into the cookie on a new device. UI strings live in typed dictionaries in `src/i18n/messages/` (`defineMessages({ en, de })`, read with `useMessages` on the client and `getMessages` on the server; a missing German key is a type error). Learning content uses inline `tx("English", "Deutsch")` values instead, because it is built in code.
 
 ### Adding a learning topic
 

@@ -6,6 +6,10 @@ import Link from "next/link";
 import { FONTS, miniBackdrop, presetSpec, specPalette } from "@/components/deck/deck";
 import { deckFontVars } from "@/components/deck/fonts";
 import { PageIcon } from "@/components/shell/Sidebar";
+import { useLocale, useMessages } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dateLocale } from "@/i18n/format";
+import { subjectsText } from "@/i18n/messages/subjects";
 import type { DeckThemeSpec, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
@@ -18,35 +22,38 @@ export type PagePreview = {
   theme: DeckThemeSpec | null;
 };
 
-function edited(updatedAt: string, now: number | null) {
+function edited(updatedAt: string, now: number | null, locale: Locale) {
   if (!now) return " ";
+  const t = subjectsText[locale];
   const d = new Date(updatedAt);
-  if (now - d.getTime() < 60_000) return "Edited just now";
-  return `Edited ${formatDistanceStrict(d, now, { addSuffix: true })}`;
+  if (now - d.getTime() < 60_000) return t.editedJustNow;
+  return t.edited(formatDistanceStrict(d, now, { addSuffix: true, locale: dateLocale(locale) }));
 }
 
 const cardBase =
   "group relative flex flex-col rounded-xl border border-line bg-raised shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-2 hover:shadow-[0_1px_1px_rgb(28_27_24/0.04),0_8px_20px_-8px_rgb(28_27_24/0.18)] active:translate-y-0";
 
 export function NoteCard({ page, preview, parent, now }: { page: PageMeta; preview?: PagePreview; parent?: PageMeta; now: number | null }) {
+  const locale = useLocale();
+  const t = useMessages(subjectsText);
   const snippet = preview?.snippet?.trim();
   return (
     <Link href={`/p/${page.id}`} className={cn(cardBase, "h-[150px] p-3.5")}>
       <div className="flex min-w-0 items-center gap-2">
         <PageIcon page={page} />
-        <span className="truncate text-[14px] font-medium text-ink">{pageTitle(page.title, page.kind)}</span>
+        <span className="truncate text-[14px] font-medium text-ink">{pageTitle(page.title, page.kind, locale)}</span>
       </div>
       <p className={cn("mt-2 line-clamp-3 text-[12.5px] leading-[1.55]", snippet ? "text-ink-3" : "italic text-ink-3/70")}>
-        {snippet || "Empty note. Click to start writing."}
+        {snippet || t.emptyNote}
       </p>
       <div className="mt-auto flex min-w-0 items-center gap-2 pt-2 text-[11.5px] text-ink-3">
         {parent && (
           <span className="flex min-w-0 items-center gap-1 truncate">
             <CornerDownRight className="size-3 shrink-0" />
-            <span className="truncate">{pageTitle(parent.title, parent.kind)}</span>
+            <span className="truncate">{pageTitle(parent.title, parent.kind, locale)}</span>
           </span>
         )}
-        <span className="ml-auto shrink-0">{edited(page.updated_at, now)}</span>
+        <span className="ml-auto shrink-0">{edited(page.updated_at, now, locale)}</span>
       </div>
     </Link>
   );
@@ -78,7 +85,8 @@ export function SlideThumb({ title, theme, className }: { title: string; theme: 
 }
 
 export function DeckCard({ page, preview, now }: { page: PageMeta; preview?: PagePreview; now: number | null }) {
-  const name = pageTitle(page.title, page.kind);
+  const locale = useLocale();
+  const name = pageTitle(page.title, page.kind, locale);
   return (
     <Link href={`/p/${page.id}`} className={cn(cardBase, "p-2")}>
       <SlideThumb title={preview?.slideTitle?.trim() || name} theme={preview?.theme ?? null} className="transition-transform duration-300 group-hover:scale-[1.012]" />
@@ -86,12 +94,13 @@ export function DeckCard({ page, preview, now }: { page: PageMeta; preview?: Pag
         <PageIcon page={page} className="size-3.5" />
         <span className="truncate text-[13.5px] font-medium text-ink">{name}</span>
       </div>
-      <div className="px-1.5 pb-0.5 text-[11.5px] text-ink-3">{edited(page.updated_at, now)}</div>
+      <div className="px-1.5 pb-0.5 text-[11.5px] text-ink-3">{edited(page.updated_at, now, locale)}</div>
     </Link>
   );
 }
 
 export function NewCard({ kind, onClick, busy }: { kind: "note" | "deck"; onClick: () => void; busy?: boolean }) {
+  const t = useMessages(subjectsText);
   const Icon = kind === "deck" ? Presentation : FilePlus2;
   return (
     <button
@@ -103,7 +112,7 @@ export function NewCard({ kind, onClick, busy }: { kind: "note" | "deck"; onClic
       )}
     >
       <Icon className="size-4" />
-      {kind === "deck" ? "New presentation" : "New note"}
+      {kind === "deck" ? t.newDeck : t.newNote}
     </button>
   );
 }

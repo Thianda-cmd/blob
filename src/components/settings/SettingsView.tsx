@@ -5,6 +5,8 @@ import { Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
+import { useMessages } from "@/i18n/client";
+import { settingsText } from "@/i18n/messages/settings";
 import { cn } from "@/lib/utils";
 import { AppearanceSection } from "./AppearanceSection";
 import { BlobSection } from "./BlobSection";
@@ -12,20 +14,24 @@ import { DangerSection } from "./DangerSection";
 import { ProfileSection } from "./ProfileSection";
 import { SecuritySection } from "./SecuritySection";
 
-const SECTIONS: { id: string; label: string; icon: ReactNode }[] = [
-  { id: "profile", label: "Profile", icon: <UserRound /> },
-  { id: "appearance", label: "Appearance", icon: <Palette /> },
-  { id: "security", label: "Account & security", icon: <ShieldCheck /> },
-  { id: "blob", label: "Blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
-  { id: "danger", label: "Danger zone", icon: <TriangleAlert /> },
+type SectionId = keyof (typeof settingsText)["en"]["nav"];
+
+// Labels come from the dictionary (`t.nav[id]`), so they follow the language.
+const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
+  { id: "profile", icon: <UserRound /> },
+  { id: "appearance", icon: <Palette /> },
+  { id: "security", icon: <ShieldCheck /> },
+  { id: "blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
+  { id: "danger", icon: <TriangleAlert /> },
 ];
 
 /** How far below the top of the scroller a section has to reach to count as "current". */
 const SPY_OFFSET = 140;
 
 export function SettingsView() {
+  const t = useMessages(settingsText);
   const scroller = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(SECTIONS[0].id);
+  const [active, setActive] = useState<string>(SECTIONS[0].id);
   // While a nav click is smooth-scrolling, don't let the spy fight it.
   const steering = useRef(false);
 
@@ -40,7 +46,7 @@ export function SettingsView() {
       scrolled = false;
       if (steering.current) return;
       const top = el.getBoundingClientRect().top;
-      let current = SECTIONS[0].id;
+      let current: string = SECTIONS[0].id;
       for (const s of SECTIONS) {
         const node = document.getElementById(`settings-${s.id}`);
         if (node && node.getBoundingClientRect().top - top <= SPY_OFFSET) current = s.id;
@@ -100,7 +106,7 @@ export function SettingsView() {
 
   return (
     <>
-      <TopBar crumbs={[{ label: "Settings", icon: <Settings className="size-3.5 text-ink-3" /> }]} />
+      <TopBar crumbs={[{ label: t.title, icon: <Settings className="size-3.5 text-ink-3" /> }]} />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1080px] px-5 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
           <motion.header
@@ -109,12 +115,12 @@ export function SettingsView() {
             transition={{ duration: 0.3 }}
             className="mb-8 md:pl-[232px]"
           >
-            <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">Settings</h1>
-            <p className="mt-1 text-[13.5px] text-ink-2">Your profile, how Blob looks, and your account.</p>
+            <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.title}</h1>
+            <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
           </motion.header>
 
           <div className="flex gap-8">
-            <nav aria-label="Settings sections" className="sticky top-6 hidden w-[200px] shrink-0 self-start pt-0.5 md:block">
+            <nav aria-label={t.navLabel} className="sticky top-6 hidden w-[200px] shrink-0 self-start pt-0.5 md:block">
               <ul className="space-y-0.5">
                 {SECTIONS.map((s) => {
                   const current = active === s.id;
@@ -139,7 +145,7 @@ export function SettingsView() {
                           </motion.span>
                         )}
                         <span className={cn("relative", current ? (s.id === "danger" ? "text-danger" : "text-ink") : "text-ink-3")}>{s.icon}</span>
-                        <span className="relative truncate">{s.label}</span>
+                        <span className="relative truncate">{t.nav[s.id]}</span>
                       </button>
                     </li>
                   );

@@ -2,6 +2,8 @@
 
 import { motion, useSpring, useTransform, type MotionValue } from "motion/react";
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { tx, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -139,7 +141,7 @@ export function Plane({
   children,
   overlay,
   className,
-  label = "Coordinate plane",
+  label = tx("Coordinate plane", "Koordinatensystem"),
 }: {
   xRange?: Pt;
   yRange?: Pt;
@@ -148,8 +150,10 @@ export function Plane({
   children?: ReactNode;
   overlay?: ReactNode;
   className?: string;
-  label?: string;
+  /** Accessible name of the plane. */
+  label?: Text;
 }) {
+  const t = useText();
   const geo = planeGeo(xRange, yRange);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const svgRef = useRef<SVGSVGElement>(null);
@@ -192,7 +196,7 @@ export function Plane({
           viewBox={geo.viewBox}
           className="absolute inset-0 size-full overflow-visible"
           role="group"
-          aria-label={label}
+          aria-label={t(label)}
           onPointerMove={(e) => {
             if (!dragging || !onMove) return;
             const p = world(e);
@@ -369,7 +373,8 @@ export function PlaneDot({ at, tone = "blob", r = 1.25, hollow, pulse }: { at: (
 }
 
 /** A point the student drags around the grid (or moves with the arrow keys when focused). */
-export function PlaneHandle({ id, x, y, at, tone = "blob", label, hint }: { id: string; x: MotionValue<number>; y: MotionValue<number>; at: Pt; tone?: Tone; label: string; hint?: boolean }) {
+export function PlaneHandle({ id, x, y, at, tone = "blob", label, hint }: { id: string; x: MotionValue<number>; y: MotionValue<number>; at: Pt; tone?: Tone; label: Text; hint?: boolean }) {
+  const t = useText();
   const { geo, dragging, grab, move } = usePlane();
   const [focus, setFocus] = useState(false);
   const cx = useTransform(() => geo.sx(x.get()));
@@ -381,7 +386,7 @@ export function PlaneHandle({ id, x, y, at, tone = "blob", label, hint }: { id: 
     <g
       tabIndex={0}
       role="button"
-      aria-label={`${label}: drag it, or use the arrow keys`}
+      aria-label={t(tx(`${t(label)}: drag it, or use the arrow keys`, `${t(label)}: ziehen oder mit den Pfeiltasten verschieben`))}
       style={{ cursor: active ? "grabbing" : "grab", outline: "none" }}
       onPointerDown={(e) => grab(id, e)}
       onFocus={() => setFocus(true)}
@@ -487,12 +492,13 @@ export function StepSlider({
   value: number;
   count: number;
   onChange: (index: number) => void;
-  label: string;
+  label: Text;
   valueText?: string;
   /** Index the fill starts from (the middle for signed values). */
   zero?: number;
   tone?: "blob" | "ink";
 }) {
+  const t = useText();
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState(false);
   const pct = (i: number) => (count > 1 ? (i / (count - 1)) * 100 : 0);
@@ -514,7 +520,7 @@ export function StepSlider({
       ref={ref}
       role="slider"
       tabIndex={0}
-      aria-label={label}
+      aria-label={t(label)}
       aria-valuemin={0}
       aria-valuemax={count - 1}
       aria-valuenow={value}

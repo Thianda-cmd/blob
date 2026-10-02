@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { learnText } from "@/i18n/messages/learn";
+import { getLocale } from "@/i18n/server";
+import { resolveText } from "@/i18n/text";
 import { findTopicMeta } from "@/learn/catalog";
 import { PracticePlayer } from "@/learn/components/PracticePlayer";
 import { loadLearnState, newSeed } from "@/learn/server";
 import type { Level } from "@/learn/types";
 
 export async function generateMetadata({ params, searchParams }: PageProps<"/study/maths/[topic]/practice">): Promise<Metadata> {
-  const [{ topic }, query] = await Promise.all([params, searchParams]);
+  const [{ topic }, query, locale] = await Promise.all([params, searchParams, getLocale()]);
   const meta = findTopicMeta(topic);
-  if (!meta) return { title: "Not found" };
-  return { title: `${query.mode === "test" ? "Test" : "Practice"}: ${meta.title}` };
+  const t = learnText[locale].meta;
+  if (!meta) return { title: t.notFound };
+  const title = resolveText(meta.title, locale);
+  return { title: query.mode === "test" ? t.test(title) : t.practice(title) };
 }
 
 export default async function PracticePage({ params, searchParams }: PageProps<"/study/maths/[topic]/practice">) {

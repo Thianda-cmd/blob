@@ -15,6 +15,9 @@ import { UpcomingTasks } from "@/components/tasks/UpcomingTasks";
 import { useNow } from "@/components/tasks/useNow";
 import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useLocale, useMessages } from "@/i18n/client";
+import { dateLocale } from "@/i18n/format";
+import { homeText } from "@/i18n/messages/home";
 import { subjectColor } from "@/lib/subjects";
 import { LearnSnapshot } from "@/learn/components/LearnSnapshot";
 import type { LearnDay, TopicProgress } from "@/learn/progress";
@@ -44,6 +47,8 @@ export function HomeView({
   const now = useNow();
   const { openSearch } = useShell();
   const { profile, pages, subjects, createPage } = useWorkspace();
+  const locale = useLocale();
+  const t = useMessages(homeText);
   const blobRef = useRef<BlobHandle>(null);
   const [busy, setBusy] = useState<"note" | "deck" | null>(null);
 
@@ -59,7 +64,7 @@ export function HomeView({
 
   return (
     <>
-      <TopBar crumbs={[{ label: "Home" }]} />
+      <TopBar crumbs={[{ label: t.title }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1480px] px-6 pb-16 pt-4 lg:px-10">
           {/* Greeting */}
@@ -69,30 +74,28 @@ export function HomeView({
             </motion.div>
             <motion.div variants={rise} custom={1} className="min-w-0 flex-1 pb-1">
               <p className="h-5 text-[13px] text-ink-3" suppressHydrationWarning>
-                {now ? format(now, "EEEE, MMMM d") : ""}
+                {now ? format(now, t.dateFormat, { locale: dateLocale(locale) }) : ""}
               </p>
               <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.03em]">
-                {now ? greeting(new Date(now)) : "Hello"}
+                {now ? greeting(new Date(now), locale) : t.hello}
                 {name ? `, ${name}` : ""}
               </h1>
               <p className="mt-0.5 text-[14px] text-ink-2">
-                {openTotal === 0
-                  ? "Nothing on your plate. Enjoy it, or get ahead."
-                  : `You have ${openTotal} open ${openTotal === 1 ? "task" : "tasks"}. Let's knock one out.`}
+                {openTotal === 0 ? t.nothingOpen : t.openTasks(openTotal)}
               </p>
             </motion.div>
             <motion.div variants={rise} custom={2} className="flex flex-wrap gap-1.5 pb-1">
               <QuickAction icon={<FilePlus2 />} onClick={() => create("note")} busy={busy === "note"} primary>
-                New note
+                {t.newNote}
               </QuickAction>
               <QuickAction icon={<Presentation />} onClick={() => create("deck")} busy={busy === "deck"}>
-                New presentation
+                {t.newDeck}
               </QuickAction>
               <QuickAction icon={<ListPlus />} onClick={() => router.push("/tasks?new=1")}>
-                Add task
+                {t.addTask}
               </QuickAction>
               <QuickAction icon={<Search />} onClick={openSearch}>
-                Search
+                {t.search}
                 <span className="ml-1 flex gap-0.5">
                   <Kbd>⌘</Kbd>
                   <Kbd>K</Kbd>
@@ -104,7 +107,7 @@ export function HomeView({
           <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
             {/* Recent pages */}
             <motion.section initial="hidden" animate="shown" variants={rise} custom={3} className="min-w-0">
-              <SectionTitle>Jump back in</SectionTitle>
+              <SectionTitle>{t.recent}</SectionTitle>
               {recent.length === 0 ? (
                 <EmptyRecent onCreate={() => create("note")} />
               ) : (
@@ -124,17 +127,17 @@ export function HomeView({
 
             {/* Due soon */}
             <motion.section initial="hidden" animate="shown" variants={rise} custom={4} className="min-w-0">
-              <SectionTitle>Coming up</SectionTitle>
+              <SectionTitle>{t.comingUp}</SectionTitle>
               <UpcomingTasks initialTasks={tasks} limit={7} days={7} />
               <div className="mt-7">
                 <SectionTitle
                   action={
                     <Link href="/learn" className="text-[12.5px] font-medium text-ink-3 hover:text-ink">
-                      All topics
+                      {t.allTopics}
                     </Link>
                   }
                 >
-                  Keep learning
+                  {t.keepLearning}
                 </SectionTitle>
                 <LearnSnapshot progress={learn.progress} days={learn.days} />
               </div>
@@ -143,7 +146,7 @@ export function HomeView({
 
           {/* Subjects */}
           <motion.section initial="hidden" animate="shown" variants={rise} custom={6} className="mt-10">
-            <SectionTitle>Subjects</SectionTitle>
+            <SectionTitle>{t.subjects}</SectionTitle>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
               {subjects.map((s, i) => {
                 const notes = pages.filter((p) => p.subject_id === s.id && p.kind === "note").length;
@@ -162,15 +165,9 @@ export function HomeView({
                         <ArrowUpRight className="ml-auto size-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                       <div className="mt-auto flex gap-3 text-[12px] text-ink-3">
-                        <span>
-                          {notes} {notes === 1 ? "note" : "notes"}
-                        </span>
-                        {decks > 0 && (
-                          <span>
-                            {decks} {decks === 1 ? "deck" : "decks"}
-                          </span>
-                        )}
-                        <span className={cn(open > 0 && "font-medium text-blob-ink")}>{open} open</span>
+                        <span className="shrink-0">{t.notes(notes)}</span>
+                        {decks > 0 && <span className="min-w-0 truncate">{t.decks(decks)}</span>}
+                        <span className={cn("shrink-0", open > 0 && "font-medium text-blob-ink")}>{t.open(open)}</span>
                       </div>
                     </Link>
                   </motion.div>
@@ -223,14 +220,15 @@ function QuickAction({
 }
 
 function EmptyRecent({ onCreate }: { onCreate: () => void }) {
+  const t = useMessages(homeText);
   return (
     <div className="flex h-[150px] items-center justify-center gap-5 rounded-xl border border-dashed border-line-2 px-6">
       <Blob size={84} mood="sleepy" track={false} />
       <div>
-        <p className="font-medium">It&apos;s quiet in here.</p>
-        <p className="text-[13px] text-ink-2">Your recent notes and presentations show up here.</p>
+        <p className="font-medium">{t.quiet}</p>
+        <p className="text-[13px] text-ink-2">{t.quietHint}</p>
         <button onClick={onCreate} className="mt-2 text-[13px] font-medium text-blob-ink hover:underline">
-          Write your first note →
+          {t.firstNote}
         </button>
       </div>
     </div>
@@ -239,6 +237,7 @@ function EmptyRecent({ onCreate }: { onCreate: () => void }) {
 
 function AddSubjectCard() {
   const { createSubject } = useWorkspace();
+  const t = useMessages(homeText);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   if (!editing) {
@@ -247,7 +246,7 @@ function AddSubjectCard() {
         onClick={() => setEditing(true)}
         className="flex h-[92px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[13px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink"
       >
-        <Plus className="size-4" /> Add subject
+        <Plus className="size-4" /> {t.addSubject}
       </button>
     );
   }
@@ -269,18 +268,19 @@ function AddSubjectCard() {
         onChange={(e) => setName(e.target.value)}
         onBlur={() => !name.trim() && setEditing(false)}
         onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
-        placeholder="Subject name"
+        placeholder={t.subjectName}
         maxLength={60}
         className="h-8 rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
       />
-      <span className="text-[11.5px] text-ink-3">Press Enter to add</span>
+      <span className="text-[11.5px] text-ink-3">{t.enterToAdd}</span>
     </form>
   );
 }
 
 /** Same footprint as a NoteCard so the grid stays even. */
 function RecentDeck({ page, preview, now }: { page: PageMeta; preview?: PagePreview; now: number | null }) {
-  const name = pageTitle(page.title, page.kind);
+  const locale = useLocale();
+  const name = pageTitle(page.title, page.kind, locale);
   return (
     <Link
       href={`/p/${page.id}`}
@@ -293,7 +293,7 @@ function RecentDeck({ page, preview, now }: { page: PageMeta; preview?: PagePrev
         <PageIcon page={page} className="size-3.5" />
         <span className="truncate text-[13.5px] font-medium">{name}</span>
         <span className="ml-auto shrink-0 text-[11.5px] text-ink-3" suppressHydrationWarning>
-          {now ? formatDistanceStrict(new Date(page.updated_at), now, { addSuffix: true }) : ""}
+          {now ? formatDistanceStrict(new Date(page.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }) : ""}
         </span>
       </div>
     </Link>

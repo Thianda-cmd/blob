@@ -1,5 +1,7 @@
 "use client";
 
+import { useMessages } from "@/i18n/client";
+import { authText } from "@/i18n/messages/auth";
 import { useAuthBlob } from "./AuthStage";
 
 /**
@@ -8,6 +10,7 @@ import { useAuthBlob } from "./AuthStage";
  */
 export function useFieldReactions() {
   const blob = useAuthBlob();
+  const noPeeking = useMessages(authText).common.noPeeking;
 
   const textField = (value: string) => ({
     onFocus: () => {
@@ -21,7 +24,7 @@ export function useFieldReactions() {
     },
   });
 
-  const passwordField = (message = "Don't worry, I'm not peeking.") => ({
+  const passwordField = (message = noPeeking) => ({
     onFocus: () => {
       blob.setMood("shy");
       blob.look(null);
