@@ -1940,8 +1940,8 @@ const PROPORTIONAL: RatioCase[] = [
 const INVERSE_CASES: RatioCase[] = [
   { lHead: tx("Painters", "Maler"), rHead: tx("Time", "Zeit"), one: tx("painter", "Maler"), many: tx("painters", "Maler"), unit: tx("days", "Tage"), a: 4, va: 6, targets: [2, 3, 6, 8, 12], start: 3 },
   { lHead: tx("Pumps", "Pumpen"), rHead: tx("Time", "Zeit"), one: tx("pump", "Pumpe"), many: tx("pumps", "Pumpen"), unit: "h", a: 3, va: 8, targets: [2, 4, 6, 8, 12], start: 4 },
-  { lHead: tx("Friends", "Freunde"), rHead: tx("Each pays", "Jeder zahlt"), one: tx("friend", "Freund"), many: tx("friends", "Freunde"), unit: "€", a: 6, va: 8, targets: [2, 3, 4, 8, 12, 16], start: 4, money: true },
-  { lHead: tx("Horses", "Pferde"), rHead: tx("Hay lasts", "Heu reicht"), one: tx("horse", "Pferd"), many: tx("horses", "Pferde"), unit: tx("days", "Tage"), a: 5, va: 12, targets: [2, 3, 4, 6, 10, 12], start: 6 },
+  { lHead: tx("Friends", "Freunde"), rHead: tx("Each pays", "Pro Kopf"), one: tx("friend", "Freund"), many: tx("friends", "Freunde"), unit: "€", a: 6, va: 8, targets: [2, 3, 4, 8, 12, 16], start: 4, money: true },
+  { lHead: tx("Horses", "Pferde"), rHead: tx("Hay lasts", "Dauer"), one: tx("horse", "Pferd"), many: tx("horses", "Pferde"), unit: tx("days", "Tage"), a: 5, va: 12, targets: [2, 3, 4, 6, 10, 12], start: 6 },
 ];
 
 const RH = 54;

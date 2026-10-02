@@ -69,19 +69,19 @@ export function LearnHome({ progress, days }: { progress: Record<string, TopicPr
             </div>
           </header>
 
-          <nav className="mt-6 flex gap-1 border-b border-line" aria-label={t.home.subjects}>
+          <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]" aria-label={t.home.subjects}>
             {SUBJECTS.map((s) => (
               <span
                 key={s.slug}
                 className={cn(
-                  "relative -mb-px flex items-center gap-1.5 px-3 pb-2.5 pt-1 text-[14px] font-medium",
+                  "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1 text-[14px] font-medium",
                   s.live ? "text-ink" : "cursor-default text-ink-3",
                 )}
                 title={s.live ? undefined : t.home.comingSoon}
               >
                 {tt(s.title)}
                 {!s.live && <span className="rounded-full bg-hover px-1.5 py-px text-[10.5px] font-semibold uppercase tracking-wide text-ink-3">{t.home.soon}</span>}
-                {s.live && <motion.span layoutId="learn-subject" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-blob" />}
+                {s.live && <motion.span layoutId="learn-subject" className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-blob" />}
               </span>
             ))}
           </nav>
@@ -95,7 +95,7 @@ export function LearnHome({ progress, days }: { progress: Record<string, TopicPr
                 if (!topics.length) return null;
                 return (
                   <section key={area}>
-                    <div className="mb-3 flex items-baseline gap-3">
+                    <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                       <h2 className="font-display text-[19px] font-semibold tracking-[-0.01em]">{tt(AREAS[area].title)}</h2>
                       <span className="text-[13px] text-ink-3">{tt(AREAS[area].blurb)}</span>
                     </div>

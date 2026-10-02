@@ -382,7 +382,7 @@ export const deckText = defineMessages({
     buildClicks: (n) => `${n === 1 ? "1 Klick zeigt" : `${n} Klicks zeigen`} alles. Zurück blendet wieder aus.`,
     transitions: {
       none: { label: "Ohne", hint: "Direkt zur Folie springen" },
-      fade: { label: "Überblenden", hint: "Sanft in die Folie überblenden" },
+      fade: { label: "Einblenden", hint: "Die Folie sanft einblenden" },
       slide: { label: "Gleiten", hint: "Sanft zur Seite gleiten" },
       push: { label: "Schieben", hint: "Die neue Folie schiebt die alte hinaus" },
       zoom: { label: "Zoom", hint: "In die nächste Idee hineinzoomen" },

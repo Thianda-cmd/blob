@@ -1,12 +1,13 @@
 "use client";
 
-import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
-import { TypedText, useTypewriter } from "@/components/blob/speech";
+import { TypedText } from "@/components/blob/speech";
 import { useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { cn } from "@/lib/utils";
+import { useReducedAfterMount, useTyping } from "./useTyping";
 
 type Mood = { key: string; mood: BlobMood; accessory?: BlobAccessory; gesture?: "wave" | "celebrate" | "point" };
 
@@ -31,7 +32,7 @@ export function HeroBlob() {
 
   const current = MOODS[i];
   const line = t.lines[current.key as keyof typeof t.lines];
-  const { shown, typing } = useTypewriter(line);
+  const { shown, typing } = useTyping(line);
 
   useEffect(() => {
     const gesture = MOODS[i].gesture;
@@ -145,7 +146,7 @@ export function QuickAddDemo() {
   const t = useMessages(landingText).homework.demo;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
-  const reduce = useReducedMotion();
+  const reduce = useReducedAfterMount();
   const phrase = t.input;
   const [typed, setTyped] = useState({ phrase, count: 0 });
 
@@ -228,7 +229,7 @@ export function NotesDemo() {
   const t = useMessages(landingText).notes.demo;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
-  const reduce = useReducedMotion();
+  const reduce = useReducedAfterMount();
   const [phase, setPhase] = useState(0);
   const p = NOTE_PHASES[reduce ? 1 : phase];
 

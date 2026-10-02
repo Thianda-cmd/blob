@@ -4,7 +4,7 @@ import { Check, Pause, Play, RotateCcw } from "lucide-react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
-import { TypedText, useTypewriter } from "@/components/blob/speech";
+import { TypedText } from "@/components/blob/speech";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
@@ -12,6 +12,7 @@ import { topicMeta } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
+import { useTyping } from "./useTyping";
 
 /**
  * 7x − (3x − 5) → 7x − 3x + 5 → 4x + 5, the same frames as the real "minus in front"
@@ -46,7 +47,7 @@ export function LearnDemo({ className }: { className?: string }) {
   const frame = FRAMES[step];
   const line = t.lines[step];
   const plain = toPlain(line);
-  const { shown, typing } = useTypewriter(plain, 46);
+  const { shown, typing } = useTyping(plain, 46);
 
   useEffect(() => {
     if (!playing) return;

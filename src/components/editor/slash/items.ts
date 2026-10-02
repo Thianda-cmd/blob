@@ -16,8 +16,12 @@ import {
   TextQuote,
   type LucideIcon,
 } from "lucide-react";
+import type { Locale } from "@/i18n/config";
+import { intlLocale } from "@/i18n/format";
+import { editorText } from "@/i18n/messages/editor";
 
-export const SLASH_GROUPS = ["Basic blocks", "Lists", "Media", "Advanced"] as const;
+export const SLASH_GROUPS = ["basic", "lists", "media", "advanced"] as const;
+/** Label it with `editorText.slash.groups[group]`. */
 export type SlashGroup = (typeof SLASH_GROUPS)[number];
 
 /** Things a slash command needs from the app (uploads, page creation). */
@@ -32,111 +36,88 @@ export type SlashItem = {
   description: string;
   group: SlashGroup;
   icon: LucideIcon;
+  /** Extra words that find it. German items also answer to their English names and keywords. */
   keywords: string[];
   /** Markdown shortcut that does the same thing, shown as a hint. */
   hint?: string;
   run: (args: { editor: Editor; range: Range; ctx: SlashContext }) => void;
 };
 
+type SlashId = keyof (typeof editorText)["en"]["slash"]["items"];
+type SlashDef = Omit<SlashItem, "title" | "description" | "keywords" | "run"> & {
+  id: SlashId;
+  run: (args: { editor: Editor; range: Range; ctx: SlashContext; locale: Locale }) => void;
+};
+
 const chainAt = (editor: Editor, range: Range) => editor.chain().focus().deleteRange(range);
 
-export const SLASH_ITEMS: SlashItem[] = [
+const DEFS: SlashDef[] = [
   {
     id: "text",
-    title: "Text",
-    description: "Just start writing plain text",
-    group: "Basic blocks",
+    group: "basic",
     icon: Pilcrow,
-    keywords: ["paragraph", "plain", "body", "p"],
     run: ({ editor, range }) => chainAt(editor, range).setParagraph().run(),
   },
   {
     id: "h1",
-    title: "Heading 1",
-    description: "Big section heading",
-    group: "Basic blocks",
+    group: "basic",
     icon: Heading1,
-    keywords: ["title", "big", "large", "h1"],
     hint: "#",
     run: ({ editor, range }) => chainAt(editor, range).setNode("heading", { level: 1 }).run(),
   },
   {
     id: "h2",
-    title: "Heading 2",
-    description: "Medium section heading",
-    group: "Basic blocks",
+    group: "basic",
     icon: Heading2,
-    keywords: ["subtitle", "medium", "h2"],
     hint: "##",
     run: ({ editor, range }) => chainAt(editor, range).setNode("heading", { level: 2 }).run(),
   },
   {
     id: "h3",
-    title: "Heading 3",
-    description: "Small section heading",
-    group: "Basic blocks",
+    group: "basic",
     icon: Heading3,
-    keywords: ["subheading", "small", "h3"],
     hint: "###",
     run: ({ editor, range }) => chainAt(editor, range).setNode("heading", { level: 3 }).run(),
   },
   {
     id: "quote",
-    title: "Quote",
-    description: "Capture a quotation",
-    group: "Basic blocks",
+    group: "basic",
     icon: TextQuote,
-    keywords: ["blockquote", "citation", "cite"],
     hint: ">",
     run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleBlockquote().run(),
   },
   {
     id: "divider",
-    title: "Divider",
-    description: "Visually split sections",
-    group: "Basic blocks",
+    group: "basic",
     icon: Minus,
-    keywords: ["hr", "horizontal", "rule", "line", "separator"],
     hint: "---",
     run: ({ editor, range }) => chainAt(editor, range).setHorizontalRule().run(),
   },
   {
     id: "bullet",
-    title: "Bulleted list",
-    description: "A simple list of points",
-    group: "Lists",
+    group: "lists",
     icon: List,
-    keywords: ["unordered", "ul", "bullets", "points"],
     hint: "-",
     run: ({ editor, range }) => chainAt(editor, range).toggleBulletList().run(),
   },
   {
     id: "numbered",
-    title: "Numbered list",
-    description: "Steps in order",
-    group: "Lists",
+    group: "lists",
     icon: ListOrdered,
-    keywords: ["ordered", "ol", "numbers", "steps"],
     hint: "1.",
     run: ({ editor, range }) => chainAt(editor, range).toggleOrderedList().run(),
   },
   {
     id: "todo",
-    title: "To-do list",
-    description: "Track homework with checkboxes",
-    group: "Lists",
+    group: "lists",
     icon: ListTodo,
-    keywords: ["task", "checkbox", "checklist", "todo", "check"],
     hint: "[]",
     run: ({ editor, range }) => chainAt(editor, range).toggleTaskList().run(),
   },
   {
     id: "image",
-    title: "Image",
-    description: "Upload a picture or diagram",
-    group: "Media",
+    group: "media",
     icon: ImagePlus,
-    keywords: ["picture", "photo", "upload", "img", "diagram", "screenshot"],
     run: ({ editor, range, ctx }) => {
       chainAt(editor, range).run();
       ctx.pickImage(editor);
@@ -144,30 +125,21 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: "code",
-    title: "Code block",
-    description: "Write a snippet of code",
-    group: "Advanced",
+    group: "advanced",
     icon: Code2,
-    keywords: ["snippet", "pre", "program", "monospace"],
     hint: "```",
     run: ({ editor, range }) => chainAt(editor, range).setCodeBlock().run(),
   },
   {
     id: "callout",
-    title: "Callout",
-    description: "Make a key idea stand out",
-    group: "Advanced",
+    group: "advanced",
     icon: Lightbulb,
-    keywords: ["note", "tip", "info", "important", "box", "highlight"],
     run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout().run(),
   },
   {
     id: "subpage",
-    title: "Sub-page",
-    description: "Nest a new page inside this one",
-    group: "Advanced",
+    group: "advanced",
     icon: FilePlus2,
-    keywords: ["page", "child", "nested", "new", "link"],
     run: ({ editor, range, ctx }) => {
       chainAt(editor, range).run();
       void ctx.createSubPage(editor);
@@ -175,32 +147,59 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: "date",
-    title: "Today's date",
-    description: "Insert the current date",
-    group: "Advanced",
+    group: "advanced",
     icon: CalendarDays,
-    keywords: ["today", "now", "time", "day"],
-    run: ({ editor, range }) => {
-      const label = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    run: ({ editor, range, locale }) => {
+      const label = new Date().toLocaleDateString(intlLocale(locale), { weekday: "long", month: "long", day: "numeric", year: "numeric" });
       chainAt(editor, range).insertContent(`${label} `).run();
     },
   },
 ];
 
+function build(locale: Locale): SlashItem[] {
+  const own = editorText[locale].slash.items;
+  const en = editorText.en.slash.items;
+  return DEFS.map((def) => ({
+    ...def,
+    title: own[def.id].title,
+    description: own[def.id].description,
+    // "/heading" keeps working in German: the English name and keywords come along.
+    keywords: locale === "en" ? en[def.id].keywords : [...own[def.id].keywords, en[def.id].title.toLowerCase(), ...en[def.id].keywords],
+    run: (args) => def.run({ ...args, locale }),
+  }));
+}
+
+const BUILT: Record<Locale, SlashItem[]> = { en: build("en"), de: build("de") };
+
+/** All "/" commands, in the reader's language. */
+export function slashItems(locale: Locale): SlashItem[] {
+  return BUILT[locale];
+}
+
+/** "Überschrift" is found by "/übers", "/ubers" and "/uebers". */
+function forms(s: string) {
+  const lower = s.toLowerCase();
+  const plain = lower.replace(/ä/g, "a").replace(/ö/g, "o").replace(/ü/g, "u").replace(/ß/g, "ss");
+  const spelled = lower.replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
+  return plain === lower ? [lower] : [lower, plain, spelled];
+}
+
 function score(item: SlashItem, q: string) {
-  const title = item.title.toLowerCase();
-  if (title.startsWith(q)) return 4;
-  if (title.split(/[\s-]+/).some((w) => w.startsWith(q))) return 3;
-  if (item.keywords.some((k) => k.startsWith(q))) return 2;
-  if (title.includes(q) || item.keywords.some((k) => k.includes(q))) return 1;
+  const titles = forms(item.title);
+  const keywords = item.keywords.flatMap(forms);
+  if (titles.some((t) => t.startsWith(q))) return 4;
+  if (titles.some((t) => t.split(/[\s-]+/).some((w) => w.startsWith(q)))) return 3;
+  if (keywords.some((k) => k.startsWith(q))) return 2;
+  if (titles.some((t) => t.includes(q)) || keywords.some((k) => k.includes(q))) return 1;
   return 0;
 }
 
 /** Filter by query; results stay grouped, with the best matching group first. */
-export function filterSlashItems(query: string): SlashItem[] {
+export function filterSlashItems(query: string, locale: Locale): SlashItem[] {
+  const items = slashItems(locale);
   const q = query.trim().toLowerCase();
-  if (!q) return SLASH_ITEMS;
-  const scored = SLASH_ITEMS.map((item, index) => ({ item, index, s: score(item, q) })).filter((x) => x.s > 0);
+  if (!q) return items;
+  const scored = items.map((item, index) => ({ item, index, s: score(item, q) })).filter((x) => x.s > 0);
   const best = new Map<SlashGroup, number>();
   for (const x of scored) best.set(x.item.group, Math.max(best.get(x.item.group) ?? 0, x.s));
   return scored

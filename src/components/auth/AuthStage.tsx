@@ -153,7 +153,7 @@ function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; te
   if (kind === "slide") {
     return (
       <div className="w-[230px] rounded-xl border border-line bg-raised p-2 shadow-card">
-        <div className="grid aspect-video place-items-center rounded-lg bg-ink text-center">
+        <div className="grid aspect-video place-items-center rounded-lg bg-ink px-4 text-center">
           <div>
             <div className="font-display text-[15px] font-bold text-paper">{text.slide}</div>
             <div className="mt-1 text-[10px] text-paper/60">{text.slideKind}</div>

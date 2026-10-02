@@ -144,8 +144,9 @@ export function solve(start: Item[]): { frames: Frame[]; result: Item[] } {
   const frames: Frame[] = [];
   const push = (f: Frame) => {
     const last = frames[frames.length - 1];
-    // Same picture as the previous frame: just add the highlight and note to it.
-    if (last && last.math === f.math && !last.highlight && !last.arrows) frames[frames.length - 1] = { ...f, note: f.note ?? last.note };
+    // The opening frame and the first bracket's frame show the same picture: merge them.
+    // (Later frames keep their own notes, e.g. "tidy up inside the bracket first".)
+    if (frames.length === 1 && last.math === f.math && !last.highlight && !last.arrows) frames[0] = { ...f, note: f.note ?? last.note };
     else frames.push(f);
   };
   let cur = start;
