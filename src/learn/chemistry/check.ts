@@ -213,7 +213,23 @@ function distance(a: string, b: string): number {
 /** Every accepted spelling in both languages. */
 const variants = (accept: Text[]) => accept.flatMap((t) => (typeof t === "string" ? [t] : [t.en, t.de]));
 
-export function checkWord(accept: Text[], input: string): Feedback {
+export function checkWord(accept: Text[], input: string, exact = false): Feedback {
+  if (exact) {
+    // Sequences and genotypes: every letter counts, also upper and lower case.
+    const typed = input.replace(/\s+/g, "").trim();
+    if (!typed) return { correct: false, message: tx("Type your answer first.", "Gib zuerst deine Antwort ein.") };
+    const want = variants(accept).map((w) => w.replace(/\s+/g, ""));
+    if (want.includes(typed)) return { correct: true };
+    if (want.some((w) => w.toLowerCase() === typed.toLowerCase())) {
+      return {
+        correct: false,
+        partial: true,
+        title: tx("Check upper and lower case", "Prüf Groß- und Kleinschreibung"),
+        message: tx("The letters are right, but here capital and small letters mean different things.", "Die Buchstaben stimmen, aber hier bedeuten große und kleine Buchstaben etwas anderes."),
+      };
+    }
+    return { correct: false };
+  }
   const u = normWord(input);
   if (!u) return { correct: false, message: tx("Type your answer first.", "Gib zuerst deine Antwort ein.") };
   const all = variants(accept).map(normWord);

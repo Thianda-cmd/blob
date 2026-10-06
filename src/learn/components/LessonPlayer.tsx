@@ -240,6 +240,12 @@ export function LessonPlayer({
                     </div>
                   )}
 
+                  {step.type === "explain" && step.visual && (
+                    <div className="rounded-2xl border border-line bg-raised p-4 shadow-card sm:p-6">
+                      <step.visual.component {...step.visual.props} />
+                    </div>
+                  )}
+
                   {f && (
                     <div className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
                       <div className="relative grid min-h-[200px] place-items-center overflow-x-auto px-6 py-12 sm:min-h-[240px]">

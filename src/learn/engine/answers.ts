@@ -161,7 +161,7 @@ function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
     case "balance":
       return answer.kind === "list" ? checkBalance(spec.equation, answer.values) : { correct: false };
     case "word":
-      return answer.kind === "text" ? checkWord(spec.accept, answer.text) : { correct: false };
+      return answer.kind === "text" ? checkWord(spec.accept, answer.text, spec.exact) : { correct: false };
     case "order":
       return answer.kind === "order" ? checkOrder(spec, answer.order) : { correct: false };
     case "match":

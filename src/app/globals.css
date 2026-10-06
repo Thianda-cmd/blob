@@ -785,6 +785,10 @@
   font-family: var(--font-sans);
   font-size: 0.78em;
   margin: 0 0.25em;
+  /* Quoted words may be a whole sentence (biology solutions): wrap it instead of clipping. */
+  white-space: normal;
+  max-width: 100%;
+  text-wrap: balance;
 }
 .mv-bin {
   margin: 0 0.24em;

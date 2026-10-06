@@ -53,8 +53,11 @@ export type AnswerSpec =
   | { kind: "formula"; value: string; label?: Text }
   /** Coefficients that balance an equation ("Fe + O2 -> Fe2O3"); empty boxes count as 1. */
   | { kind: "balance"; equation: string; coefficients: number[] }
-  /** A word or name; any accepted spelling in either language counts. */
-  | { kind: "word"; accept: Text[]; label?: Text; placeholder?: Text }
+  /**
+   * A word or name; any accepted spelling in either language counts. `exact`: letters must match
+   * exactly, including case and without the one-typo tolerance (DNA sequences, genotypes like "Aa").
+   */
+  | { kind: "word"; accept: Text[]; label?: Text; placeholder?: Text; exact?: boolean }
   /**
    * Put things in the right order (phases of mitosis, the way of the blood…). `items` are
    * listed in the CORRECT order; the student sees them shuffled and sorts them.
@@ -125,6 +128,8 @@ export type LessonStep =
       body?: RichText;
       /** Animated maths board. Each "Next" advances one frame. */
       frames?: Frame[];
+      /** A picture shown above the board (a labelled drawing, a graph…), like an exercise's visual. */
+      visual?: { component: ComponentType<Record<string, unknown>>; props: Record<string, unknown> };
       /** Blob's line when the step opens. */
       blob?: Text;
     }
