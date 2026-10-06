@@ -562,9 +562,10 @@ export function PhotoThylakoid() {
             setPlaying(false);
             go(step >= 6 ? 0 : step + 1);
           }}
-          className="flex h-10 items-center gap-1 rounded-xl border border-line px-3 text-[13.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
+          aria-label={t(tx("Next step", "Nächster Schritt"))}
+          className="flex h-10 shrink-0 items-center gap-1 rounded-xl border border-line px-3 text-[13.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
         >
-          {t(tx("Next step", "Nächster Schritt"))} <ChevronRight className="size-4" />
+          <span className="hidden sm:inline">{t(tx("Next step", "Nächster Schritt"))}</span> <ChevronRight className="size-4" />
         </button>
       </div>
 

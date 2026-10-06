@@ -203,7 +203,7 @@ function graphTask(rng: Rng, fixed?: { diff: "co2" | "temp"; at: "A" | "B"; swap
           tx(`${asked}: flat`, `${asked}: flach`),
           tx(`Here more light doesn't help. But the other curve, with more ${diff === "co2" ? "CO₂" : "warmth"}, lies higher.`, `Hier hilft mehr Licht nicht mehr. Die andere Kurve mit ${diff === "co2" ? "mehr CO₂" : "höherer Temperatur"} liegt aber höher.`),
           diff === "co2" ? "CO₂" : tx("temperature", "Temperatur"),
-          tx(`So **${en(FACTOR[diff]).toLowerCase()}** is the limiting factor at ${asked}.`, `Also ist die **${de(FACTOR[diff])}** im Punkt ${asked} der begrenzende Faktor.`),
+          tx(`So **${diff === "co2" ? "CO₂ concentration" : "temperature"}** is the limiting factor at ${asked}.`, `Also ist die **${de(FACTOR[diff])}** im Punkt ${asked} der begrenzende Faktor.`),
         ),
     mistakes: list,
   };
