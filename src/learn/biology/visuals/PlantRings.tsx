@@ -55,41 +55,37 @@ export function PlantRings() {
           { id: "monocot", label: t(tx("Monocot (maize)", "Einkeimblättrig (Mais)")) },
         ]}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,250px)] lg:items-start">
-        <div>
-          {kind === "monocot" ? (
-            <PlantStemPrimary kind="monocot" mode="explore" legend="below" />
-          ) : years === 0 ? (
-            <PlantStemPrimary kind="dicot" mode="explore" legend="below" />
-          ) : (
-            <PlantStemSection widths={widths} fit={false} unit={12.5} mode="explore" legend="below" />
-          )}
-        </div>
-        <div className="space-y-4">
-          <PlantSlider label={t(tx("Age", "Alter"))} value={years} min={0} max={10} onChange={setYears} valueText={t(tx(`${years} year${years === 1 ? "" : "s"}`, `${years} ${years === 1 ? "Jahr" : "Jahre"}`))} />
-          {kind === "dicot" && years > 0 && (
-            <div className="space-y-2">
-              <div className="text-[12.5px] font-semibold text-ink-2">{t(tx("Weather in each year (tap to change)", "Wetter in jedem Jahr (zum Ändern tippen)"))}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {Array.from({ length: years }, (_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-pressed={dry[i]}
-                    aria-label={t(tx(`Year ${i + 1}: ${dry[i] ? "dry" : "good"}`, `Jahr ${i + 1}: ${dry[i] ? "trocken" : "gut"}`))}
-                    onClick={() => setDry(dry.map((d, k) => (k === i ? !d : d)))}
-                    className={cn("flex h-9 items-center gap-1 rounded-lg border px-2 text-[13px] font-semibold transition-colors", dry[i] ? "text-ink" : "border-line bg-raised text-ink-2 hover:bg-hover")}
-                    style={dry[i] ? { borderColor: "var(--bio-sun)", background: "color-mix(in oklab, var(--bio-sun) 25%, transparent)" } : undefined}
-                  >
-                    {dry[i] ? <CloudSun className="size-3.5" /> : <Droplets className="size-3.5" />}
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-start">
+        <PlantSlider label={t(tx("Age", "Alter"))} value={years} min={0} max={10} onChange={setYears} valueText={t(tx(`${years} year${years === 1 ? "" : "s"}`, `${years} ${years === 1 ? "Jahr" : "Jahre"}`))} />
+        {kind === "dicot" && years > 0 && (
+          <div className="space-y-2">
+            <div className="text-[12.5px] font-semibold text-ink-2">{t(tx("Weather in each year (tap to change)", "Wetter in jedem Jahr (zum Ändern tippen)"))}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: years }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-pressed={dry[i]}
+                  aria-label={t(tx(`Year ${i + 1}: ${dry[i] ? "dry" : "good"}`, `Jahr ${i + 1}: ${dry[i] ? "trocken" : "gut"}`))}
+                  onClick={() => setDry(dry.map((d, k) => (k === i ? !d : d)))}
+                  className={cn("flex h-9 items-center gap-1 rounded-lg border px-2 text-[13px] font-semibold transition-colors", dry[i] ? "text-ink" : "border-line bg-raised text-ink-2 hover:bg-hover")}
+                  style={dry[i] ? { borderColor: "var(--bio-sun)", background: "color-mix(in oklab, var(--bio-sun) 25%, transparent)" } : undefined}
+                >
+                  {dry[i] ? <CloudSun className="size-3.5" /> : <Droplets className="size-3.5" />}
+                  {i + 1}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+      {kind === "monocot" ? (
+        <PlantStemPrimary kind="monocot" mode="explore" />
+      ) : years === 0 ? (
+        <PlantStemPrimary kind="dicot" mode="explore" />
+      ) : (
+        <PlantStemSection widths={widths} fit={false} unit={12.5} mode="explore" />
+      )}
       <PlantNote id={`${kind}-${years}-${narrow}-${locale}`}>{t(note)}</PlantNote>
     </div>
   );

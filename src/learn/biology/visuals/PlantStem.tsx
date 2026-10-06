@@ -193,15 +193,20 @@ export function ringGeometry(widths: number[], opts: { unit?: number; fit?: numb
 }
 
 function stemParts(g: RingsInfo, marked: number | null): FigurePart[] {
+  // Tags sit in a column right of the disc (left for ray and pith), spread over its height.
+  const R = Math.max(g.bark, 120);
+  const rx = Math.min(452, SX + g.bark + 46);
+  const lx = Math.max(24, SX - g.bark - 46);
+  const ry = (i: number) => Math.max(20, Math.min(380, SY - R * 0.85 + ((R * 1.7) / 5) * i));
   const at = (r: number, deg: number): [number, number] => {
     const t = (deg * Math.PI) / 180;
     return [SX + Math.cos(t) * r * wk(t), SY + Math.sin(t) * r * wk(t)];
   };
   const parts: FigurePart[] = [
-    { id: "bark", label: tx("bark (outer bark)", "Borke"), at: at((g.bast + g.bark) / 2, -30), tag: [450, 30], info: tx("Dead tissue on the outside, made by the cork cambium. It cracks as the trunk grows thicker.", "Abgestorbenes Gewebe außen, vom Korkkambium gebildet. Sie reißt auf, wenn der Stamm dicker wird.") },
-    { id: "bast", label: tx("bast (secondary phloem)", "Bast (sekundäres Phloem)"), at: at((g.wood + g.bast) / 2, -12), tag: [450, 80], info: tx("Carries sugar solution. The cambium adds new bast on its outer side.", "Leitet Zuckerlösung. Das Kambium bildet nach außen neuen Bast.") },
-    { id: "cambium", label: tx("cambium", "Kambium"), at: at(g.wood, 8), tag: [450, 130], info: tx("A thin layer of dividing cells: wood inwards, bast outwards.", "Eine dünne Schicht teilungsfähiger Zellen: nach innen Holz, nach außen Bast.") },
-    { id: "wood", label: tx("wood (secondary xylem)", "Holz (sekundäres Xylem)"), at: at(g.pith + (g.wood - g.pith) * 0.4, 40), tag: [450, 180], info: tx("Carries water and minerals and makes the trunk strong.", "Leitet Wasser und Mineralstoffe und macht den Stamm fest.") },
+    { id: "bark", label: tx("bark (outer bark)", "Borke"), at: at((g.bast + g.bark) / 2, -30), tag: [rx, ry(0)], info: tx("Dead tissue on the outside, made by the cork cambium. It cracks as the trunk grows thicker.", "Abgestorbenes Gewebe außen, vom Korkkambium gebildet. Sie reißt auf, wenn der Stamm dicker wird.") },
+    { id: "bast", label: tx("bast (secondary phloem)", "Bast (sekundäres Phloem)"), at: at((g.wood + g.bast) / 2, -12), tag: [rx, ry(1)], info: tx("Carries sugar solution. The cambium adds new bast on its outer side.", "Leitet Zuckerlösung. Das Kambium bildet nach außen neuen Bast.") },
+    { id: "cambium", label: tx("cambium", "Kambium"), at: at(g.wood, 8), tag: [rx, ry(2)], info: tx("A thin layer of dividing cells: wood inwards, bast outwards.", "Eine dünne Schicht teilungsfähiger Zellen: nach innen Holz, nach außen Bast.") },
+    { id: "wood", label: tx("wood (secondary xylem)", "Holz (sekundäres Xylem)"), at: at(g.pith + (g.wood - g.pith) * 0.4, 40), tag: [rx, ry(3)], info: tx("Carries water and minerals and makes the trunk strong.", "Leitet Wasser und Mineralstoffe und macht den Stamm fest.") },
   ];
   if (marked !== null) {
     const outer = g.radii[marked];
@@ -209,13 +214,13 @@ function stemParts(g: RingsInfo, marked: number | null): FigurePart[] {
     const lateR = outer - (outer - inner) * 0.15;
     const earlyR = inner + (outer - inner) * 0.4;
     parts.push(
-      { id: "early", label: tx("early wood", "Frühholz"), at: at(earlyR, 70), tag: [450, 230], info: tx("Formed in spring: wide, thin-walled cells, light in colour. Lots of water for the new leaves.", "Im Frühjahr gebildet: weite, dünnwandige Zellen, hell. Viel Wasser für den Austrieb.") },
-      { id: "late", label: tx("late wood", "Spätholz"), at: at(lateR, 85), tag: [450, 280], info: tx("Formed in summer: narrow, thick-walled cells, dark. Where it meets next year's early wood you see the ring boundary.", "Im Sommer gebildet: enge, dickwandige Zellen, dunkel. Wo es an das Frühholz des nächsten Jahres grenzt, siehst du die Jahresgrenze.") },
+      { id: "early", label: tx("early wood", "Frühholz"), at: at(earlyR, 70), tag: [rx, ry(4)], info: tx("Formed in spring: wide, thin-walled cells, light in colour. Lots of water for the new leaves.", "Im Frühjahr gebildet: weite, dünnwandige Zellen, hell. Viel Wasser für den Austrieb.") },
+      { id: "late", label: tx("late wood", "Spätholz"), at: at(lateR, 85), tag: [rx, ry(5)], info: tx("Formed in summer: narrow, thick-walled cells, dark. Where it meets next year's early wood you see the ring boundary.", "Im Sommer gebildet: enge, dickwandige Zellen, dunkel. Wo es an das Frühholz des nächsten Jahres grenzt, siehst du die Jahresgrenze.") },
     );
   }
   parts.push(
-    { id: "ray", label: tx("wood ray", "Holzstrahl"), at: at(g.pith + (g.wood - g.pith) * 0.6, 202.5), tag: [22, 330], info: tx("Carries substances sideways, from the inside to the outside, and stores food.", "Leitet Stoffe quer von innen nach außen und speichert Nährstoffe.") },
-    { id: "pith", label: tx("pith", "Mark"), at: [SX, SY], tag: [22, 380], info: tx("Ground tissue in the centre, left over from the young shoot.", "Grundgewebe in der Mitte, ein Rest aus der Jugend des Sprosses.") },
+    { id: "ray", label: tx("wood ray", "Holzstrahl"), at: at(g.pith + (g.wood - g.pith) * 0.6, 202.5), tag: [lx, Math.min(380, SY + R * 0.55)], info: tx("Carries substances sideways, from the inside to the outside, and stores food.", "Leitet Stoffe quer von innen nach außen und speichert Nährstoffe.") },
+    { id: "pith", label: tx("pith", "Mark"), at: [SX, SY], tag: [lx, Math.min(390, SY + R * 0.85)], info: tx("Ground tissue in the centre, left over from the young shoot.", "Grundgewebe in der Mitte, ein Rest aus der Jugend des Sprosses.") },
   );
   return parts;
 }

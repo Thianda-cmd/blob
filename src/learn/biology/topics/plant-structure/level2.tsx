@@ -427,7 +427,7 @@ function vaselineTask(rng: Rng, fixed?: "conclude"): Exercise {
     ]);
     return {
       instruction: tx("Interpret the experiment", "Werte den Versuch aus"),
-      text: tx("Four leaves of the same size were coated with Vaseline in different ways and weighed again after three days. What does the result show?", "Vier gleich große Blätter wurden unterschiedlich mit Vaseline bestrichen und nach drei Tagen wieder gewogen. Was zeigt das Ergebnis?"),
+      text: tx("Four leaves of the same size were coated with Vaseline in different ways (grey = coated side) and weighed again after three days. What does the result show?", "Vier gleich große Blätter wurden unterschiedlich mit Vaseline bestrichen (grau = bestrichene Seite) und nach drei Tagen wieder gewogen. Was zeigt das Ergebnis?"),
       visual: visual(PlantVaselineChart, { values, coat: order }),
       answer,
       hint: tx("Vaseline seals the side it covers. Which coating reduces the water loss the most?", "Vaseline dichtet die Seite ab, die sie bedeckt. Welches Bestreichen senkt den Wasserverlust am stärksten?"),
@@ -455,7 +455,7 @@ function vaselineTask(rng: Rng, fixed?: "conclude"): Exercise {
   const L = "ABCD"[hide];
   return {
     instruction: tx("Vaseline experiment", "Vaseline-Versuch"),
-    text: tx(`Four leaves were treated with Vaseline in different ways and weighed after three days. How was leaf **${L}** treated?`, `Vier Blätter wurden unterschiedlich mit Vaseline behandelt und nach drei Tagen gewogen. Wie wurde Blatt **${L}** behandelt?`),
+    text: tx(`Four leaves were treated with Vaseline in different ways (grey = coated side) and weighed after three days. How was leaf **${L}** treated?`, `Vier Blätter wurden unterschiedlich mit Vaseline behandelt (grau = bestrichene Seite) und nach drei Tagen gewogen. Wie wurde Blatt **${L}** behandelt?`),
     visual: visual(PlantVaselineChart, { values, coat }),
     answer,
     hint: tx("Most stomata are on the underside. Coating it stops most of the water loss.", "Die meisten Spaltöffnungen liegen unten. Wird die Unterseite bestrichen, stoppt der meiste Wasserverlust."),
