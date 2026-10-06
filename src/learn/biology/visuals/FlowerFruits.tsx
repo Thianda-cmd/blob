@@ -208,7 +208,7 @@ const FRUITS: Record<FruitId, FruitInfo> = {
     parts: [
       { id: "nutlets", label: tx("nutlets (the real fruits)", "Nüsschen (die eigentlichen Früchte)"), at: [263, 150], tag: [324, 150], info: tx("Each nutlet is a tiny nut with one seed.", "Jedes Nüsschen ist eine winzige Nuss mit einem Samen.") },
       { id: "receptacle", label: tx("receptacle (fleshy, red)", "Blütenboden (fleischig, rot)"), at: [214, 196], tag: [318, 236], info: tx("Grows big and juicy after fertilisation.", "Wird nach der Befruchtung groß und saftig.") },
-      { id: "sepals", label: tx("sepals", "Kelchblätter"), at: [134, 60], tag: [40, 50], info: tx("The green leaves on top.", "Die grünen Blättchen oben.") },
+      { id: "sepals", label: tx("sepals", "Kelchblätter"), at: [212, 63], tag: [316, 40], info: tx("The green leaves on top.", "Die grünen Blättchen oben.") },
     ],
     draw: (
       <>
