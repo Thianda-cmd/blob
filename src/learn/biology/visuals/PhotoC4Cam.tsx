@@ -173,7 +173,7 @@ function C4({ t }: { t: (x: Text) => string }) {
 
 function Cam({ t, day }: { t: (x: Text) => string; day: boolean }) {
   const malate = day ? 3 : 12;
-  const spots: Pt[] = Array.from({ length: 12 }, (_, i) => [130 + (i % 4) * 34 + (Math.floor(i / 4) % 2) * 14, 112 + Math.floor(i / 4) * 30]);
+  const spots: Pt[] = Array.from({ length: 12 }, (_, i) => [134 + (i % 4) * 34 + (Math.floor(i / 4) % 2) * 14, 108 + Math.floor(i / 4) * 26]);
   return (
     <g>
       <rect x={0} y={250} width={600} height={22} fill="var(--bio-cell)" stroke="var(--bio-wall-deep)" strokeWidth={1.2} />
@@ -190,13 +190,13 @@ function Cam({ t, day }: { t: (x: Text) => string; day: boolean }) {
           </motion.g>
         ))}
       </AnimatePresence>
-      <Word x={200} y={204} size={10.5} weight={500}>
+      <Word x={200} y={194} size={10.5} weight={500}>
         {day ? t(tx("little malic acid, pH higher", "wenig Äpfelsäure, pH höher")) : t(tx("malic acid stored: acidic", "Äpfelsäure gespeichert: sauer"))}
       </Word>
       <ellipse cx={420} cy={142} rx={92} ry={58} fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.8} />
       <MiniCycle x={440} y={142} label="Calvin" active={day} />
       <Pill x={360} y={196} label="Rubisco" fill="var(--bio-leaf)" w={64} />
-      <Pill x={108} y={226} label={t(tx("PEP carboxylase", "PEP-Carboxylase"))} fill="var(--bio-petal)" w={118} />
+      <Pill x={120} y={220} label={t(tx("PEP carboxylase", "PEP-Carboxylase"))} fill="var(--bio-petal)" w={118} />
       {!day && (
         <>
           <Loop path={[[30, 300], [90, 262], [104, 236], [132, 196], [168, 160]]} dur={2.8}>
@@ -220,8 +220,18 @@ function Cam({ t, day }: { t: (x: Text) => string; day: boolean }) {
           </Loop>
         </>
       )}
-      <g transform="translate(560 40)">
-        <circle r={18} fill={day ? "var(--bio-sun)" : "var(--bio-nucleus-deep)"} stroke={OUT} strokeWidth={1.4} />
+      <g transform="translate(562 40)">
+        {day ? (
+          <g>
+            {Array.from({ length: 8 }, (_, i) => {
+              const a = (i / 8) * Math.PI * 2;
+              return <line key={i} x1={Math.cos(a) * 17} y1={Math.sin(a) * 17} x2={Math.cos(a) * 24} y2={Math.sin(a) * 24} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
+            })}
+            <circle r={13} fill="var(--bio-sun)" stroke={OUT} strokeWidth={1.4} />
+          </g>
+        ) : (
+          <path d="M 4 -18 A 18 18 0 1 0 18 6 A 14 14 0 1 1 4 -18 Z" fill="var(--bio-sun)" stroke={OUT} strokeWidth={1.4} />
+        )}
       </g>
     </g>
   );

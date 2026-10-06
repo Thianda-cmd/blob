@@ -62,7 +62,7 @@ export function VertebrateSorter() {
           className="rounded-xl border border-line bg-surface"
         >
           <div className="flex items-baseline justify-between gap-2 border-b border-line px-4 py-2.5">
-            <h3 className="font-display text-[22px] font-bold leading-tight">{t(a.name)}</h3>
+            <h3 className="font-display text-[22px] font-bold leading-tight first-letter:uppercase">{t(a.name)}</h3>
             <span className="text-[12.5px] text-ink-3">{t(tx("Which class am I?", "Welche Klasse bin ich?"))}</span>
           </div>
           <ul className="divide-y divide-line">

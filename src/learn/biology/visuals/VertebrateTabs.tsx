@@ -19,7 +19,7 @@ function Tabs({ tabs }: { tabs: { label: Text; view: ComponentType }[] }) {
   const View = tabs[i].view;
   return (
     <div className="space-y-3">
-      <div className="flex w-fit max-w-full flex-wrap rounded-full border border-line bg-surface p-0.5 text-[13.5px] font-semibold" role="tablist">
+      <div className="flex w-fit max-w-full flex-wrap rounded-[20px] border border-line bg-surface p-0.5 text-[13.5px] font-semibold" role="tablist">
         {tabs.map((tab, k) => (
           <button key={k} type="button" role="tab" aria-selected={k === i} onClick={() => setI(k)} className={cn("rounded-full px-3.5 py-1 transition-colors", k === i ? "bg-ink text-paper" : "text-ink-2 hover:text-ink")}>
             {t(tab.label)}

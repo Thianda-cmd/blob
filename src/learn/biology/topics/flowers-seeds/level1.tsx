@@ -419,7 +419,7 @@ const BECOMES: Becomes[] = [
     wrong: [
       { text: tx("The seed", "Der Samen"), title: tx("Ovary vs ovule", "Fruchtknoten oder Samenanlage?"), say: tx("The seed grows from the small ovule **inside** the ovary. What does the whole ovary around it become?", "Der Samen wächst aus der kleinen Samenanlage **im** Fruchtknoten. Was wird aus dem ganzen Fruchtknoten drumherum?") },
       { text: tx("Nothing, it falls off", "Nichts, er fällt ab"), title: tx("It stays!", "Er bleibt!"), say: tx("The petals fall off, but the ovary stays on the stalk and grows.", "Die Kronblätter fallen ab, aber der Fruchtknoten bleibt am Stiel und wächst.") },
-      { text: tx("The pollen", "Der Pollen") },
+      { text: tx("The pollen", "Der Pollen"), title: tx("Pollen is male", "Pollen ist männlich"), say: tx("Pollen is made in the anthers, not in the ovary. Think about what the thick part in the middle grows into.", "Pollen entsteht in den Staubbeuteln, nicht im Fruchtknoten. Überleg, wozu der dicke Teil in der Mitte heranwächst.") },
     ],
     note: tx("The ovary grows into the **fruit**. The ovule inside becomes the seed.", "Der Fruchtknoten wächst zur **Frucht** heran. Die Samenanlage darin wird zum Samen."),
     picture: ["ovary"],
@@ -429,8 +429,8 @@ const BECOMES: Becomes[] = [
     right: tx("The seed", "Der Samen"),
     wrong: [
       { text: tx("The fruit", "Die Frucht"), title: tx("Ovule vs ovary", "Samenanlage oder Fruchtknoten?"), say: tx("The fruit grows from the whole ovary. The small ovule inside it becomes something else.", "Die Frucht entsteht aus dem ganzen Fruchtknoten. Die kleine Samenanlage darin wird zu etwas anderem.") },
-      { text: tx("The flesh of the fruit", "Das Fruchtfleisch") },
-      { text: tx("The pollen", "Der Pollen") },
+      { text: tx("The flesh of the fruit", "Das Fruchtfleisch"), title: tx("Flesh is fruit wall", "Fruchtfleisch ist Fruchtwand"), say: tx("The flesh grows from the wall of the ovary around the ovule. The ovule itself becomes something smaller inside.", "Das Fruchtfleisch wächst aus der Wand des Fruchtknotens um die Samenanlage herum. Die Samenanlage selbst wird zu etwas Kleinerem darin.") },
+      { text: tx("The pollen", "Der Pollen"), title: tx("Pollen is male", "Pollen ist männlich"), say: tx("Pollen comes from the anthers. The ovule is female: it holds the egg cell.", "Pollen kommt aus den Staubbeuteln. Die Samenanlage ist weiblich: Sie enthält die Eizelle.") },
     ],
     note: tx("The ovule with the fertilised egg cell becomes the **seed**.", "Die Samenanlage mit der befruchteten Eizelle wird zum **Samen**."),
     picture: ["ovule"],
@@ -451,7 +451,7 @@ const BECOMES: Becomes[] = [
     wrong: [
       { text: tx("From the ovary", "Aus dem Fruchtknoten"), title: tx("That's the fruit", "Das ist die Frucht"), say: tx("The whole ovary becomes the fruit. The seed comes from a smaller part inside it.", "Der ganze Fruchtknoten wird zur Frucht. Der Samen kommt aus einem kleineren Teil darin.") },
       { text: tx("From the pollen", "Aus dem Pollen"), title: tx("Pollen only brings the sperm", "Pollen bringt nur die Spermazelle"), say: tx("The pollen only delivers the sperm cell. The seed grows from the part that holds the egg cell.", "Der Pollen liefert nur die Spermazelle. Der Samen wächst aus dem Teil, der die Eizelle enthält.") },
-      { text: tx("From the stigma", "Aus der Narbe") },
+      { text: tx("From the stigma", "Aus der Narbe"), title: tx("The stigma dries up", "Die Narbe vertrocknet"), say: tx("The stigma only catches pollen and then dries up. The seed grows deep inside the ovary.", "Die Narbe fängt nur den Pollen auf und vertrocknet dann. Der Samen wächst tief im Fruchtknoten.") },
     ],
     note: tx("The seed grows from the **ovule**, which holds the egg cell.", "Der Samen wächst aus der **Samenanlage**, die die Eizelle enthält."),
   },
@@ -461,7 +461,7 @@ const BECOMES: Becomes[] = [
     wrong: [
       { text: tx("They grow into the fruit", "Sie wachsen zur Frucht heran"), title: tx("Petals fall off", "Kronblätter fallen ab"), say: tx("Many think so, but the fruit grows from the ovary. The petals have done their job of attracting insects.", "Das denken viele, aber die Frucht wächst aus dem Fruchtknoten. Die Kronblätter haben ihre Aufgabe, Insekten anzulocken, erledigt.") },
       { text: tx("They become the seed", "Sie werden zum Samen"), title: tx("Seeds come from ovules", "Samen kommen aus Samenanlagen"), say: tx("Seeds grow from the ovules inside the ovary, not from petals.", "Samen wachsen aus den Samenanlagen im Fruchtknoten, nicht aus Kronblättern.") },
-      { text: tx("They turn into sepals", "Sie werden zu Kelchblättern") },
+      { text: tx("They turn into sepals", "Sie werden zu Kelchblättern"), title: tx("No transformation", "Keine Verwandlung"), say: tx("Petals don't turn into anything. Once insects have visited, they are no longer needed.", "Kronblätter verwandeln sich in nichts. Sind die Insekten da gewesen, werden sie nicht mehr gebraucht.") },
     ],
     note: tx("Their job is done: the petals **wilt and fall off**.", "Ihre Aufgabe ist erledigt: Die Kronblätter **welken und fallen ab**."),
   },
@@ -471,7 +471,7 @@ const BECOMES: Becomes[] = [
     wrong: [
       { text: tx("From the petals", "Aus den Kronblättern"), title: tx("Petals fall off", "Kronblätter fallen ab"), say: tx("Juicy petals? They wilt and fall off. The flesh grows from the part that surrounds the ovule.", "Saftige Kronblätter? Die welken und fallen ab. Das Fruchtfleisch wächst aus dem Teil, der die Samenanlage umgibt.") },
       { text: tx("From the ovule", "Aus der Samenanlage"), title: tx("That's the seed", "Das ist der Samen"), say: tx("The ovule becomes the seed inside the stone, not the flesh.", "Die Samenanlage wird zum Samen im Steinkern, nicht zum Fruchtfleisch.") },
-      { text: tx("From the nectar", "Aus dem Nektar") },
+      { text: tx("From the nectar", "Aus dem Nektar"), title: tx("Nectar is a reward", "Nektar ist eine Belohnung"), say: tx("Nectar is sweet juice for insects, not a part that grows. The flesh comes from a part of the pistil.", "Nektar ist süßer Saft für Insekten, kein Teil, der wächst. Das Fruchtfleisch kommt aus einem Teil des Stempels.") },
     ],
     note: tx("The wall of the ovary becomes the fruit wall: skin, flesh and the hard stone.", "Die Wand des Fruchtknotens wird zur Fruchtwand: Haut, Fruchtfleisch und der harte Steinkern."),
   },
@@ -481,7 +481,7 @@ const BECOMES: Becomes[] = [
     wrong: [
       { text: tx("Spread through the flesh", "Im Fruchtfleisch verteilt"), title: tx("That's a berry", "Das wäre eine Beere"), say: tx("Tomatoes have seeds in their flesh. In a cherry, the seed is protected by something hard.", "Tomaten haben Samen im Fruchtfleisch. Bei der Kirsche ist der Samen von etwas Hartem geschützt.") },
       { text: tx("Cherries have no seed", "Kirschen haben keinen Samen"), title: tx("Every fruit has seeds", "Jede Frucht hat Samen"), say: tx("A fruit grows to protect and spread seeds. Crack a cherry stone and you'll find it.", "Eine Frucht schützt und verbreitet Samen. Knack mal einen Kirschkern auf, dann findest du ihn.") },
-      { text: tx("In the stalk", "Im Stiel") },
+      { text: tx("In the stalk", "Im Stiel"), title: tx("Look inside", "Schau ins Innere"), say: tx("The stalk only holds the cherry. The seed is protected deep inside the fruit.", "Der Stiel hält die Kirsche nur fest. Der Samen liegt gut geschützt tief in der Frucht.") },
     ],
     note: tx("The cherry stone is the hard inner fruit wall. The **seed** lies inside it.", "Der Kirschkern ist die harte innere Fruchtwand. Darin liegt der **Samen**."),
   },
@@ -593,7 +593,7 @@ export function windTask(rng: Rng): Exercise {
         say: tx("Colourful petals are an advert for insects. The wind doesn't need to be attracted, so wind flowers save the effort.", "Bunte Kronblätter sind Werbung für Insekten. Den Wind muss man nicht anlocken, deshalb sparen sich Windblüten das."),
       },
       { text: tx("A strong scent and lots of nectar", "Starker Duft und viel Nektar"), title: tx("That's for insects", "Das ist für Insekten"), say: tx("Scent and nectar attract and reward insects. The wind doesn't care about either.", "Duft und Nektar locken Insekten an und belohnen sie. Dem Wind ist beides egal.") },
-      { text: tx("Very little, sticky pollen", "Sehr wenig, klebriger Pollen") },
+      { text: tx("Very little, sticky pollen", "Sehr wenig, klebriger Pollen"), title: tx("That's for insects", "Das ist für Insekten"), say: tx("Sticky pollen clings to insects. The wind needs huge amounts of light, dry pollen, because most of it gets lost.", "Klebriger Pollen haftet an Insekten. Der Wind braucht riesige Mengen leichten, trockenen Pollen, weil das meiste verloren geht.") },
     ]);
     return {
       instruction: tx("Wind flowers", "Windblüten"),

@@ -187,8 +187,8 @@ function Photon({ from, to, at }: { from: Pt; to: Pt; at: number }) {
   );
 }
 
-const E = () => <PhotoIon label="e⁻" fill="var(--bio-nerve)" r={8} />;
-const HP = () => <PhotoIon label="H⁺" fill="var(--bio-water)" r={8} />;
+const E = () => <PhotoIon label="e⁻" fill="var(--bio-nerve)" r={10} />;
+const HP = () => <PhotoIon label="H⁺" fill="var(--bio-water)" r={10} />;
 
 /** Protons waiting in the lumen (shown up to the step's count). */
 const LUMEN_H: Pt[] = [
@@ -309,10 +309,10 @@ function StepParticles({ step }: { step: number }) {
               <HP />
             </Mover>
           ))}
-          <Mover path={[[470, 20], [500, 40], [524, 58]]} at={0.3} dur={0.9}>
+          <Mover path={[[440, 24], [476, 34], [506, 44]]} at={0.3} dur={0.9}>
             <PhotoPill label="ADP + P" fill="var(--bio-cell)" w={52} />
           </Mover>
-          <Mover path={[[528, 56], [510, 30], [480, 14]]} at={1.5} dur={1} stay>
+          <Mover path={[[506, 44], [480, 26], [446, 14]]} at={1.5} dur={1} stay>
             <PhotoPill label="ATP" fill="var(--bio-mito)" w={38} />
           </Mover>
         </g>
@@ -396,7 +396,7 @@ function ZScheme({ step }: { step: number }) {
       {ZPTS.map((p) => (
         <g key={p.id}>
           <circle cx={p.x} cy={zy(p.e)} r={3.6} fill="var(--raised)" stroke="var(--ink-2)" strokeWidth={1.4} />
-          <text x={p.x + (p.id === "nadp" ? -2 : 5)} y={zy(p.e) + (p.id.endsWith("s") ? -7 : 14)} textAnchor={p.id === "nadp" ? "end" : "start"} fontSize={10} className="fill-ink-2">
+          <text x={p.x + (p.id === "nadp" ? 2 : 5)} y={zy(p.e) + (p.id.endsWith("s") || p.id === "fd" ? -7 : 15)} textAnchor={p.id === "nadp" ? "end" : "start"} fontSize={10.5} className="fill-ink-2">
             {p.label}
           </text>
         </g>

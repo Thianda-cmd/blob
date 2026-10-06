@@ -45,10 +45,10 @@ function Pool({ x, y, label, n, kind, lit }: { x: number; y: number; label: Text
   return (
     <g>
       <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={12} fill="var(--raised)" stroke={lit ? "var(--blob)" : "var(--line-2)"} strokeWidth={lit ? 2.4 : 1.4} />
-      <text x={x - w / 2 + 10} y={y - h / 2 + 15} fontSize={12} fontWeight={700} className="fill-ink">
+      <text x={x - w / 2 + 10} y={y - h / 2 + 16} fontSize={13} fontWeight={700} className="fill-ink">
         {t(label)}
       </text>
-      <text x={x + w / 2 - 10} y={y - h / 2 + 15} fontSize={12} fontWeight={700} textAnchor="end" className="fill-blob-ink tabular-nums">
+      <text x={x + w / 2 - 10} y={y - h / 2 + 16} fontSize={13} fontWeight={700} textAnchor="end" className="fill-blob-ink tabular-nums">
         {n}×
       </text>
       <AnimatePresence>
@@ -175,7 +175,7 @@ export function PhotoCalvin() {
         <div className="rounded-xl border border-line bg-surface">
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={t(tx("The Calvin cycle", "Der Calvin-Zyklus"))}>
             <defs>
-              <marker id="photo-calvin-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <marker id="photo-calvin-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto-start-reverse">
                 <path d="M0 0 L 10 5 L 0 10 z" fill="var(--ink-2)" />
               </marker>
             </defs>
@@ -187,7 +187,7 @@ export function PhotoCalvin() {
             ].map((a, i) => (
               <g key={i}>
                 <path d={a.d} fill="none" stroke={a.on ? "var(--blob)" : "var(--ink-3)"} strokeWidth={a.on ? 5 : 3} markerEnd="url(#photo-calvin-arrow)" strokeLinecap="round" />
-                <text x={a.at[0]} y={a.at[1]} textAnchor="middle" fontSize={13} fontWeight={700} className={a.on ? "fill-blob-ink" : "fill-ink-2"}>
+                <text x={a.at[0]} y={a.at[1]} textAnchor="middle" fontSize={14} fontWeight={700} className={a.on ? "fill-blob-ink" : "fill-ink-2"}>
                   {t(a.label)}
                 </text>
               </g>

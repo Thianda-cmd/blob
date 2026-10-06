@@ -304,7 +304,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     wrong: [
       { text: tx("Egg cells and sperm cells", "Eizellen und Spermazellen"), title: tx("Plants aren't animals", "Pflanzen sind keine Tiere"), say: tx("In animals meiosis makes gametes directly. In plants it makes spores; gametes come later by mitosis in the gametophyte.", "Bei Tieren bildet die Meiose direkt Gameten. Bei Pflanzen bildet sie Sporen; die Gameten entstehen später durch Mitose im Gametophyten.") },
       { text: tx("Zygotes", "Zygoten"), title: tx("That's fertilisation", "Das ist Befruchtung"), say: tx("A zygote arises from the fusion of two gametes, not from meiosis.", "Eine Zygote entsteht durch Verschmelzung zweier Gameten, nicht durch Meiose.") },
-      { text: tx("Endosperm cells", "Endospermzellen") },
+      { text: tx("Endosperm cells", "Endospermzellen"), title: tx("That's fertilisation", "Das ist Befruchtung"), say: tx("Endosperm arises from the second fertilisation (3n), not from meiosis.", "Endosperm entsteht durch die zweite Befruchtung (3n), nicht durch Meiose.") },
     ],
     note: tx("Meiosis in the anther gives microspores, in the ovule megaspores. Both are spores.", "Die Meiose im Staubbeutel liefert Mikrosporen, in der Samenanlage Megasporen. Beides sind Sporen."),
   },
@@ -315,7 +315,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     wrong: [
       { text: tx("The egg cell", "Die Eizelle"), title: tx("Gamete ≠ gametophyte", "Gamet ≠ Gametophyt"), say: tx("The egg cell is the gamete. The gametophyte is the haploid structure that makes it.", "Die Eizelle ist der Gamet. Der Gametophyt ist das haploide Gebilde, das ihn bildet.") },
       { text: tx("The ovule", "Die Samenanlage"), title: tx("Too big", "Zu groß"), say: tx("The ovule also contains diploid tissue of the mother plant (integuments, nucellus). Only the part inside is haploid.", "Die Samenanlage enthält auch diploides Gewebe der Mutterpflanze (Integumente, Nucellus). Haploid ist nur der Teil darin.") },
-      { text: tx("The ovary", "Der Fruchtknoten") },
+      { text: tx("The ovary", "Der Fruchtknoten"), title: tx("Far too big", "Viel zu groß"), say: tx("The ovary is diploid tissue of the mother plant. The gametophyte is a tiny haploid structure inside the ovule.", "Der Fruchtknoten ist diploides Gewebe der Mutterpflanze. Der Gametophyt ist ein winziges haploides Gebilde in der Samenanlage.") },
     ],
     note: tx("The embryo sac (7 cells, 8 nuclei) is the haploid female gametophyte.", "Der Embryosack (7 Zellen, 8 Kerne) ist der haploide weibliche Gametophyt."),
   },
@@ -326,7 +326,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     wrong: [
       { text: tx("The anther", "Der Staubbeutel"), title: tx("That's the sporangium", "Das ist das Sporangium"), say: tx("The anther is diploid tissue of the sporophyte; its pollen sacs are the sporangia. The gametophytes develop inside.", "Der Staubbeutel ist diploides Gewebe des Sporophyten; seine Pollensäcke sind die Sporangien. Die Gametophyten entstehen darin.") },
       { text: tx("The sperm cell", "Die Spermazelle"), title: tx("Gamete ≠ gametophyte", "Gamet ≠ Gametophyt"), say: tx("The sperm cell is the gamete. The gametophyte is the structure that produces it.", "Die Spermazelle ist der Gamet. Der Gametophyt ist das Gebilde, das sie hervorbringt.") },
-      { text: tx("The stamen", "Das Staubblatt") },
+      { text: tx("The stamen", "Das Staubblatt"), title: tx("Sporophyte organ", "Organ des Sporophyten"), say: tx("The stamen is a diploid organ of the sporophyte. The male gametophytes develop inside its anther.", "Das Staubblatt ist ein diploides Organ des Sporophyten. In seinem Staubbeutel entstehen die männlichen Gametophyten.") },
     ],
     note: tx("The pollen grain (2 to 3 cells) is the haploid male gametophyte.", "Das Pollenkorn (2 bis 3 Zellen) ist der haploide männliche Gametophyt."),
   },
@@ -337,7 +337,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     wrong: [
       { text: tx("Ferns", "Farne"), title: tx("Fern plant = sporophyte", "Farnpflanze = Sporophyt"), say: tx("The fern plant you know carries sporangia: it's the sporophyte. Its gametophyte is the small prothallus.", "Die Farnpflanze, die du kennst, trägt Sporangien: Sie ist der Sporophyt. Ihr Gametophyt ist der kleine Vorkeim.") },
       { text: tx("Flowering plants", "Blütenpflanzen"), title: tx("Reduced", "Reduziert"), say: tx("In flowering plants the gametophyte is reduced to a few cells (pollen grain, embryo sac).", "Bei Blütenpflanzen ist der Gametophyt auf wenige Zellen reduziert (Pollenkorn, Embryosack).") },
-      { text: tx("Conifers", "Nadelbäume") },
+      { text: tx("Conifers", "Nadelbäume"), title: tx("Seed plants too", "Auch Samenpflanzen"), say: tx("Conifers are seed plants: the tree is the sporophyte, the gametophytes are tiny.", "Nadelbäume sind Samenpflanzen: Der Baum ist der Sporophyt, die Gametophyten sind winzig.") },
     ],
     note: tx("In mosses the green moss plant is the haploid gametophyte; the sporophyte (spore capsule) lives on it.", "Bei Moosen ist das grüne Moospflänzchen der haploide Gametophyt; der Sporophyt (Sporenkapsel) lebt auf ihm."),
   },
@@ -348,7 +348,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     wrong: [
       { text: tx("By meiosis in the diploid sporophyte", "Durch Meiose im diploiden Sporophyten"), title: tx("Meiosis makes spores", "Meiose bildet Sporen"), say: tx("In plants meiosis gives spores. The gametophyte that grows from them is already haploid, so it can only use mitosis.", "Bei Pflanzen liefert die Meiose Sporen. Der Gametophyt, der daraus wächst, ist schon haploid und kann nur noch Mitosen nutzen.") },
       { text: tx("By meiosis in the gametophyte", "Durch Meiose im Gametophyten"), title: tx("Already haploid", "Schon haploid"), say: tx("The gametophyte is haploid: a meiosis can't halve a single set again.", "Der Gametophyt ist haploid: Einen einfachen Satz kann eine Meiose nicht noch einmal halbieren.") },
-      { text: tx("By fusion of two spores", "Durch Verschmelzung zweier Sporen") },
+      { text: tx("By fusion of two spores", "Durch Verschmelzung zweier Sporen"), title: tx("Spores don't fuse", "Sporen verschmelzen nicht"), say: tx("Spores grow on their own into gametophytes. Only gametes fuse.", "Sporen wachsen allein zu Gametophyten heran. Verschmelzen tun nur Gameten.") },
     ],
     note: tx("Spores (n) grow by mitosis into gametophytes (n), which make gametes (n) by mitosis.", "Sporen (n) wachsen durch Mitosen zu Gametophyten (n), die durch Mitose Gameten (n) bilden."),
   },
@@ -358,7 +358,7 @@ const ALT: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[] =
     short: tx("pollen tube", "Pollenschlauch"),
     wrong: [
       { text: tx("Their sperm cells swim especially fast.", "Ihre Spermazellen schwimmen besonders schnell."), title: tx("No flagella", "Keine Geißeln"), say: tx("Sperm cells of flowering plants have no flagella and can't swim at all.", "Spermazellen der Blütenpflanzen haben keine Geißeln und können gar nicht schwimmen.") },
-      { text: tx("They reproduce only vegetatively.", "Sie vermehren sich nur ungeschlechtlich.") },
+      { text: tx("They reproduce only vegetatively.", "Sie vermehren sich nur ungeschlechtlich."), title: tx("They do have sex", "Sie vermehren sich geschlechtlich"), say: tx("Seed plants reproduce sexually: seeds come from fertilisation. The trick lies in how the sperm reaches the egg.", "Samenpflanzen vermehren sich geschlechtlich: Samen entstehen durch Befruchtung. Der Trick liegt darin, wie die Spermazelle zur Eizelle kommt.") },
       { text: tx("The wind carries the egg cells to the pollen.", "Der Wind trägt die Eizellen zum Pollen."), title: tx("The egg stays put", "Die Eizelle bleibt"), say: tx("The egg cell stays in the embryo sac inside the ovule. The pollen comes to it.", "Die Eizelle bleibt im Embryosack in der Samenanlage. Der Pollen kommt zu ihr.") },
     ],
     note: tx("Pollen and pollen tube made seed plants independent of water: a key to conquering dry land.", "Pollen und Pollenschlauch machten Samenpflanzen unabhängig vom Wasser: ein Schlüssel zur Eroberung des trockenen Landes."),
@@ -679,7 +679,7 @@ const ETHYLENE: { text: Text; right: Text; short: Text; wrong: Opt[]; note: Text
     wrong: [
       { text: tx("The apple gives off heat that speeds up ripening.", "Der Apfel gibt Wärme ab, die die Reifung beschleunigt."), title: tx("Not the heat", "Nicht die Wärme"), say: tx("The bag is at room temperature either way. A signal substance is at work: a gaseous hormone.", "Die Tüte hat so oder so Zimmertemperatur. Hier wirkt ein Signalstoff: ein gasförmiges Hormon.") },
       { text: tx("The apple gives off carbon dioxide, which makes fruit ripen.", "Der Apfel gibt Kohlenstoffdioxid ab, das Früchte reifen lässt."), title: tx("CO₂ slows ripening", "CO₂ bremst die Reifung"), say: tx("Respiration does release CO₂, but CO₂ rather slows ripening (that's how fruit is stored). The active gas is a different one.", "Bei der Zellatmung entsteht zwar CO₂, aber CO₂ bremst die Reifung eher (so wird Obst gelagert). Das wirksame Gas ist ein anderes.") },
-      { text: tx("The bananas absorb sugar from the apple.", "Die Bananen nehmen Zucker aus dem Apfel auf.") },
+      { text: tx("The bananas absorb sugar from the apple.", "Die Bananen nehmen Zucker aus dem Apfel auf."), title: tx("No contact needed", "Kein Kontakt nötig"), say: tx("The fruits don't exchange any substances by touching. Something spreads through the air in the bag.", "Die Früchte tauschen durch Berührung keine Stoffe aus. Etwas verteilt sich durch die Luft in der Tüte.") },
     ],
     note: tx("Ethylene (ethene, C₂H₄) is the ripening hormone. Climacteric fruits like apples, bananas and tomatoes produce a lot of it while ripening.", "Ethylen (Ethen, C₂H₄) ist das Reifehormon. Klimakterische Früchte wie Äpfel, Bananen und Tomaten bilden beim Reifen viel davon."),
   },
@@ -693,7 +693,7 @@ const ETHYLENE: { text: Text; right: Text; short: Text; wrong: Opt[]; note: Text
     wrong: [
       { text: tx("1-MCP makes tomatoes ripen faster.", "1-MCP lässt Tomaten schneller reifen."), title: tx("Compare A and C", "Vergleich A und C"), say: tx("With 1-MCP only 22 % turned red, about as few as without an apple. It blocks the effect.", "Mit 1-MCP wurden nur 22 % rot, fast so wenige wie ohne Apfel. Es blockiert die Wirkung.") },
       { text: tx("Tomatoes don't need ethylene: they also ripen in box B.", "Tomaten brauchen kein Ethylen: Sie reifen auch in Kiste B."), title: tx("Own ethylene", "Eigenes Ethylen"), say: tx("In B some tomatoes ripen with their own ethylene. But the big difference between A and C shows the effect of the hormone.", "In B reifen einige Tomaten mit ihrem eigenen Ethylen. Der große Unterschied zwischen A und C zeigt aber die Wirkung des Hormons.") },
-      { text: tx("The apple speeds up ripening by giving off heat.", "Der Apfel beschleunigt die Reifung durch Wärme.") },
+      { text: tx("The apple speeds up ripening by giving off heat.", "Der Apfel beschleunigt die Reifung durch Wärme."), title: tx("Look at box C", "Schau auf Kiste C"), say: tx("Box C has the same warm apple, but with blocked ethylene receptors the effect is gone. So it isn't heat.", "Kiste C hat denselben warmen Apfel, aber mit blockierten Ethylen-Rezeptoren ist der Effekt weg. Wärme ist es also nicht.") },
     ],
     note: tx("A vs B: the apple speeds up ripening. A vs C: if the ethylene receptors are blocked, the effect is gone. So ethylene is the signal.", "A gegen B: Der Apfel beschleunigt die Reifung. A gegen C: Sind die Ethylen-Rezeptoren blockiert, ist der Effekt weg. Also ist Ethylen das Signal."),
   },
@@ -704,7 +704,7 @@ const ETHYLENE: { text: Text; right: Text; short: Text; wrong: Opt[]; note: Text
     wrong: [
       { text: tx("Ethylene slows down the ripening of the neighbours.", "Ethylen hemmt die Reifung der Nachbarn."), title: tx("The opposite", "Das Gegenteil"), say: tx("Ethylene promotes ripening. Think of the bananas in the bag with the apple.", "Ethylen fördert die Reifung. Denk an die Bananen mit dem Apfel in der Tüte.") },
       { text: tx("The neighbouring fruits only absorb the ethylene without making any.", "Die Nachbarfrüchte nehmen nur Ethylen auf, ohne selbst welches zu bilden."), title: tx("It spreads like an avalanche", "Es breitet sich lawinenartig aus"), say: tx("If they only absorbed it, the effect would fade. But each ripening fruit starts making ethylene itself.", "Würden sie es nur aufnehmen, ließe der Effekt nach. Aber jede reifende Frucht bildet selbst Ethylen.") },
-      { text: tx("The apple passes on bacteria that cause ripening.", "Der Apfel überträgt Bakterien, die die Reifung auslösen.") },
+      { text: tx("The apple passes on bacteria that cause ripening.", "Der Apfel überträgt Bakterien, die die Reifung auslösen."), title: tx("Ripening isn't rotting", "Reifen ist nicht Faulen"), say: tx("Ripening is controlled by the plant itself, with a hormone. Bacteria would make the fruit rot.", "Die Reifung steuert die Pflanze selbst, mit einem Hormon. Bakterien würden die Früchte faulen lassen.") },
     ],
     note: tx("Ethylene triggers its own synthesis: ripening spreads like an avalanche. That's why ripe fruit should be stored separately.", "Ethylen löst seine eigene Bildung aus: Die Reifung breitet sich lawinenartig aus. Deshalb lagert man reifes Obst getrennt."),
   },

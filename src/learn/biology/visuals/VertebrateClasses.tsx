@@ -88,7 +88,7 @@ export function VertebrateClassCards() {
               const a = ANIMALS.find((x) => x.id === id)!;
               const tricky = SURPRISE.has(id);
               return (
-                <span key={id} className={cn("rounded-full px-2.5 py-0.5 text-[13px]", tricky ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}>
+                <span key={id} className={cn("rounded-full px-2.5 py-0.5 text-[13px] first-letter:uppercase", tricky ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}>
                   {t(a.name)}
                 </span>
               );

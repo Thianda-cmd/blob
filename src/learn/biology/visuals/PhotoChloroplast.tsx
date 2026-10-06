@@ -8,8 +8,8 @@ import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 
 export const CHLORO_PARTS: FigurePart[] = [
-  { id: "outer", label: tx("outer membrane", "äußere Membran"), at: [118, 52], tag: [96, 18], info: tx("Part of the double envelope. It's freely permeable to small molecules.", "Teil der Doppelmembran (Hüllmembran). Sie ist für kleine Moleküle gut durchlässig.") },
-  { id: "inner", label: tx("inner membrane", "innere Membran"), at: [196, 41], tag: [214, 12], info: tx("Controls what enters and leaves the stroma, with transport proteins.", "Kontrolliert mit Transportproteinen, was ins Stroma hinein- und hinausgeht.") },
+  { id: "outer", label: tx("outer membrane", "äußere Membran"), at: [118, 61], tag: [96, 18], info: tx("Part of the double envelope. It's freely permeable to small molecules.", "Teil der Doppelmembran (Hüllmembran). Sie ist für kleine Moleküle gut durchlässig.") },
+  { id: "inner", label: tx("inner membrane", "innere Membran"), at: [196, 50], tag: [214, 12], info: tx("Controls what enters and leaves the stroma, with transport proteins.", "Kontrolliert mit Transportproteinen, was ins Stroma hinein- und hinausgeht.") },
   { id: "stroma", label: tx("stroma", "Stroma"), at: [394, 96], info: tx("The fluid inside: the Calvin cycle runs here, with the enzyme Rubisco.", "Die Grundsubstanz: Hier läuft der Calvin-Zyklus ab, mit dem Enzym Rubisco.") },
   { id: "granum", label: tx("granum (stack of thylakoids)", "Granum (Thylakoidstapel)"), at: [180, 152], info: tx("Stacked thylakoids: lots of membrane for the light reactions.", "Gestapelte Thylakoide: viel Membranfläche für die Lichtreaktionen.") },
   { id: "thylakoid", label: tx("thylakoid membrane", "Thylakoidmembran"), at: [306, 129], tag: [318, 18], info: tx("Holds the pigments, photosystems, electron transport chain and ATP synthase.", "Trägt die Pigmente, Fotosysteme, die Elektronentransportkette und die ATP-Synthase.") },

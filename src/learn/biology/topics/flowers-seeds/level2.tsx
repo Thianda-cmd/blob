@@ -155,7 +155,7 @@ const SC_WHY: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[
     wrong: [
       { text: tx("No pollinator is needed.", "Es ist kein Bestäuber nötig."), title: tx("Swapped", "Vertauscht"), say: tx("That's the advantage of self-pollination. Cross-pollination needs wind or animals to carry the pollen to another plant.", "Das ist der Vorteil der Selbstbestäubung. Fremdbestäubung braucht Wind oder Tiere, die den Pollen zu einer anderen Pflanze tragen.") },
       { text: tx("All offspring are exactly the same.", "Alle Nachkommen sind genau gleich."), title: tx("The opposite", "Das Gegenteil"), say: tx("Mixing the genes of two plants makes the offspring different from each other.", "Werden die Erbanlagen zweier Pflanzen gemischt, werden die Nachkommen verschieden.") },
-      { text: tx("The plant doesn't need flowers any more.", "Die Pflanze braucht keine Blüten mehr.") },
+      { text: tx("The plant doesn't need flowers any more.", "Die Pflanze braucht keine Blüten mehr."), title: tx("Flowers are needed", "Blüten sind nötig"), say: tx("Pollination of any kind needs flowers. The advantage lies in the offspring.", "Jede Bestäubung braucht Blüten. Der Vorteil liegt bei den Nachkommen.") },
     ],
     note: tx("New combinations of genes make the offspring varied, so some may cope better with change.", "Neue Kombinationen von Erbanlagen machen die Nachkommen vielfältig. Manche kommen dann mit Veränderungen besser zurecht."),
   },
@@ -165,7 +165,7 @@ const SC_WHY: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[
     short: tx("works alone", "klappt allein"),
     wrong: [
       { text: tx("The offspring are especially varied.", "Die Nachkommen sind besonders vielfältig."), title: tx("Swapped", "Vertauscht"), say: tx("Variety comes from mixing the genes of two different plants. With self-pollination there is hardly any new mixing.", "Vielfalt entsteht durch Mischen der Erbanlagen zweier verschiedener Pflanzen. Bei Selbstbestäubung wird kaum neu gemischt.") },
-      { text: tx("The plant doesn't need stamens.", "Die Pflanze braucht keine Staubblätter.") },
+      { text: tx("The plant doesn't need stamens.", "Die Pflanze braucht keine Staubblätter."), title: tx("Its own pollen", "Eigener Pollen"), say: tx("Self-pollination uses the plant's own pollen, so it definitely needs stamens.", "Selbstbestäubung nutzt den eigenen Pollen, also braucht die Pflanze auf jeden Fall Staubblätter.") },
       { text: tx("The seeds are spread further.", "Die Samen werden weiter verbreitet."), title: tx("That's dispersal", "Das ist Verbreitung"), say: tx("How far seeds travel depends on the fruit, not on the kind of pollination.", "Wie weit Samen reisen, hängt von der Frucht ab, nicht von der Art der Bestäubung.") },
     ],
     note: tx("Self-pollination is safe: it works even for a lonely plant or in bad weather. But it hardly creates variety.", "Selbstbestäubung ist sicher: Sie klappt auch bei einer einzelnen Pflanze oder bei schlechtem Wetter. Vielfalt entsteht dabei aber kaum."),
@@ -176,8 +176,8 @@ const SC_WHY: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[
     short: tx("cross-pollination favoured", "Fremdbestäubung gefördert"),
     wrong: [
       { text: tx("Self-pollination is favoured.", "Selbstbestäubung wird gefördert."), title: tx("Bad timing for selfing", "Schlechtes Timing für Selbstbestäubung"), say: tx("When the pollen is ripe, the stigma of the same flower isn't ready yet. So its own pollen can hardly be used.", "Wenn der Pollen reif ist, ist die Narbe derselben Blüte noch nicht bereit. Der eigene Pollen kann also kaum genutzt werden.") },
-      { text: tx("The pollen is spread by the wind.", "Der Pollen wird vom Wind verbreitet.") },
-      { text: tx("The flower no longer needs insects.", "Die Blüte braucht keine Insekten mehr.") },
+      { text: tx("The pollen is spread by the wind.", "Der Pollen wird vom Wind verbreitet."), title: tx("Sage is an insect flower", "Salbei ist eine Insektenblüte"), say: tx("Sage is pollinated by bumblebees. The timing is about whose pollen ends up on the stigma.", "Salbei wird von Hummeln bestäubt. Beim Timing geht es darum, wessen Pollen auf der Narbe landet.") },
+      { text: tx("The flower no longer needs insects.", "Die Blüte braucht keine Insekten mehr."), title: tx("Still needs carriers", "Braucht weiter Transporteure"), say: tx("If its own pollen can't be used, foreign pollen has to be brought: by the bumblebees.", "Wenn der eigene Pollen nicht genutzt werden kann, muss fremder gebracht werden: von den Hummeln.") },
     ],
     note: tx("Stamens and stigma ripen at different times, so the flower's own pollen comes too early: cross-pollination wins.", "Staubbeutel und Narbe reifen zu verschiedenen Zeiten, der eigene Pollen kommt zu früh: So setzt sich die Fremdbestäubung durch."),
   },
@@ -187,7 +187,7 @@ const SC_WHY: { ask: Text; right: Text; short: Text; wrong: Opt[]; note: Text }[
     short: tx("only cross-pollination", "nur Fremdbestäubung"),
     wrong: [
       { text: tx("Only self-pollination is possible.", "Es ist nur Selbstbestäubung möglich."), title: tx("Think about the female plant", "Denk an die weibliche Pflanze"), say: tx("A female willow has no stamens and so no pollen of its own. Where must its pollen come from?", "Eine weibliche Weide hat keine Staubblätter und damit keinen eigenen Pollen. Woher muss ihr Pollen also kommen?") },
-      { text: tx("Willows don't need pollination.", "Weiden brauchen keine Bestäubung.") },
+      { text: tx("Willows don't need pollination.", "Weiden brauchen keine Bestäubung."), title: tx("Seeds need pollen", "Samen brauchen Pollen"), say: tx("Willows form seeds, and for that pollen must reach the female flowers.", "Weiden bilden Samen, und dafür muss Pollen zu den weiblichen Blüten gelangen.") },
       { text: tx("Every willow forms fruits.", "Jede Weide bildet Früchte."), title: tx("Only the females", "Nur die weiblichen"), say: tx("Fruits grow from ovaries, and only the female plants have them.", "Früchte entstehen aus Fruchtknoten, und die haben nur die weiblichen Pflanzen.") },
     ],
     note: tx("A female willow has no pollen of its own: it always gets pollen from a male plant.", "Eine weibliche Weide hat keinen eigenen Pollen: Sie bekommt ihn immer von einer männlichen Pflanze."),
@@ -475,8 +475,8 @@ export function germExperimentTask(rng: Rng, fixedKind?: number): Exercise {
       right: tx("Light is not needed for germination.", "Licht ist zum Keimen nicht nötig."),
       wrong: [
         { text: tx("Seeds need light to germinate.", "Samen brauchen zum Keimen Licht."), title: tx("Both germinated", "Beide haben gekeimt"), say: tx("E was dark and still germinated. So light can't be necessary.", "E stand im Dunkeln und hat trotzdem gekeimt. Licht kann also nicht nötig sein.") },
-        { text: tx("Seeds need warmth.", "Samen brauchen Wärme.") },
-        { text: tx("Seeds need oxygen.", "Samen brauchen Sauerstoff.") },
+        { text: tx("Seeds need warmth.", "Samen brauchen Wärme."), title: tx("Same temperature", "Gleiche Temperatur"), say: tx("B and E are both at 20 °C. A comparison only tells you about the condition that differs.", "B und E stehen beide bei 20 °C. Ein Vergleich sagt nur etwas über die Bedingung, die sich unterscheidet.") },
+        { text: tx("Seeds need oxygen.", "Samen brauchen Sauerstoff."), title: tx("Same air", "Gleiche Luft"), say: tx("Both dishes have air. Look for the one condition in which B and E differ.", "Beide Schalen haben Luft. Such die eine Bedingung, in der sich B und E unterscheiden.") },
       ],
       note: tx("B and E differ only in light, and both germinate: light isn't needed. (In the soil it's dark, too.)", "B und E unterscheiden sich nur im Licht, und beide keimen: Licht ist nicht nötig. (Im Boden ist es ja auch dunkel.)"),
     },
@@ -486,7 +486,7 @@ export function germExperimentTask(rng: Rng, fixedKind?: number): Exercise {
       wrong: [
         { text: tx("It's too cold.", "Es ist zu kalt."), title: tx("20 °C is warm enough", "20 °C sind warm genug"), say: tx("Dish D is at 20 °C, just like B. The difference is something else.", "Schale D steht bei 20 °C, genau wie B. Der Unterschied ist ein anderer.") },
         { text: tx("They get too much light.", "Sie bekommen zu viel Licht."), title: tx("Light doesn't matter", "Licht spielt keine Rolle"), say: tx("Light neither helps nor stops germination here: B is just as light.", "Licht hilft und stört hier nicht: B steht genauso hell.") },
-        { text: tx("Water makes the seed coat too hard.", "Wasser macht die Samenschale zu hart.") },
+        { text: tx("Water makes the seed coat too hard.", "Wasser macht die Samenschale zu hart."), title: tx("Water softens", "Wasser weicht auf"), say: tx("Water makes the seed coat soft, not hard: in B it bursts open. What is missing under water?", "Wasser macht die Samenschale weich, nicht hart: In B platzt sie auf. Was fehlt unter Wasser?") },
       ],
       note: tx("Seeds respire while germinating: they need oxygen. Under water, hardly any reaches them.", "Beim Keimen atmen die Samen: Sie brauchen Sauerstoff. Unter Wasser kommt kaum welcher an."),
     },
@@ -520,6 +520,8 @@ export function germOrderTask(rng: Rng): Exercise {
   const mistakes: Mistake[] = [];
   if (idx.includes(1) && idx.includes(2))
     mistakes.push({ when: { kind: "order", items: [GERM_CHAIN[2], GERM_CHAIN[1]] }, title: tx("Root first", "Erst die Wurzel"), say: tx("The root comes out first: the seedling needs water and a hold before the shoot pushes up.", "Die Wurzel kommt zuerst: Der Keimling braucht Wasser und Halt, bevor der Spross nach oben drängt.") });
+  if (idx.includes(2) && idx.includes(3))
+    mistakes.push({ when: { kind: "order", items: [GERM_CHAIN[3], GERM_CHAIN[2]] }, title: tx("The hook pulls them up", "Der Haken zieht sie hoch"), say: tx("The cotyledons can't climb out by themselves: the hooked stem pulls them out of the soil first.", "Die Keimblätter kommen nicht allein heraus: Erst zieht sie der hakenförmige Stängel aus der Erde.") });
   if (idx.includes(4) && idx.includes(5))
     mistakes.push({ when: { kind: "order", items: [GERM_CHAIN[5], GERM_CHAIN[4]] }, title: tx("Stores until the leaves work", "Speicher, bis die Blätter arbeiten"), say: tx("The cotyledons feed the seedling until the true leaves can make food. Only then do they shrivel.", "Die Keimblätter ernähren den Keimling, bis die Laubblätter selbst Nährstoffe herstellen. Erst dann schrumpfen sie.") });
   if (idx.includes(0) && idx.includes(1))

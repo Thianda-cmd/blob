@@ -11,7 +11,7 @@ import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 
 const g = (x: number, mu: number, s: number) => Math.exp(-((x - mu) ** 2) / (2 * s * s));
-const edge = (l: number) => Math.min(1, Math.max(0, (l - 395) / 15)) * Math.min(1, Math.max(0, (715 - l) / 20));
+const edge = (l: number) => Math.min(1, Math.max(0, (l - 395) / 15)) * Math.min(1, Math.max(0, (712 - l) / 22));
 
 export type Pigment = "chlA" | "chlB" | "car" | "action";
 
@@ -19,7 +19,7 @@ export const SPECTRA: Record<Pigment, (l: number) => number> = {
   chlA: (l) => 0.98 * g(l, 430, 17) + 0.12 * g(l, 615, 16) + 0.78 * g(l, 662, 12) + 0.03,
   chlB: (l) => 0.95 * g(l, 455, 15) + 0.08 * g(l, 595, 15) + 0.55 * g(l, 642, 12) + 0.02,
   car: (l) => (0.55 * g(l, 425, 14) + 0.85 * g(l, 452, 14) + 0.75 * g(l, 482, 13)) * (l < 530 ? 1 : 0.2),
-  action: (l) => (0.9 * g(l, 438, 28) + 0.55 * g(l, 482, 18) + 0.92 * g(l, 672, 20) + 0.28) * edge(l) / 1.12,
+  action: (l) => ((0.9 * g(l, 438, 28) + 0.55 * g(l, 482, 18) + 0.95 * g(l, 672, 16) + 0.28) * edge(l)) / 1.12,
 };
 
 /** Spectrum colours from the palette, by wavelength. */
@@ -88,7 +88,7 @@ export function PhotoSpectraGraph({ show = ["chlA", "chlB", "car"], cursor, labe
   const top = 14;
   const h = 150;
   return (
-    <svg viewBox={`0 0 ${W} 200`} className="mx-auto block h-auto w-full max-w-[640px]" role="img" aria-label={t(tx("Absorption spectra and action spectrum", "Absorptionsspektren und Wirkungsspektrum"))}>
+    <svg viewBox={`0 0 ${W} 206`} className="mx-auto block h-auto w-full max-w-[640px]" role="img" aria-label={t(tx("Absorption spectra and action spectrum", "Absorptionsspektren und Wirkungsspektrum"))}>
       <SpectrumAxes top={top} h={h} />
       {CURVES.filter((c) => show.includes(c.id)).map((c) => (
         <path key={c.id} d={curvePath(SPECTRA[c.id], top, h)} fill="none" stroke={c.color} strokeWidth={c.width} strokeDasharray={c.dash} strokeLinecap="round" />
@@ -97,7 +97,7 @@ export function PhotoSpectraGraph({ show = ["chlA", "chlB", "car"], cursor, labe
       {labels && (
         <g>
           {CURVES.filter((c) => show.includes(c.id)).map((c, i) => (
-            <g key={c.id} transform={`translate(${X1 - 150} ${top + 12 + i * 16})`}>
+            <g key={c.id} transform={`translate(${lx(526)} ${top + 14 + i * 16})`}>
               <line x1={0} x2={22} y1={0} y2={0} stroke={c.color} strokeWidth={c.width} strokeDasharray={c.dash} />
               <text x={28} y={4} fontSize={11.5} className="fill-ink-2">
                 {t(c.label)}
@@ -132,8 +132,8 @@ function SpectrumAxes({ top, h }: { top: number; h: number }) {
       <rect x={X0} y={top + h + 2} width={X1 - X0} height={7} rx={2} fill="url(#photo-spectrum-band)" />
       <line x1={X0} x2={X1} y1={top + h} y2={top + h} stroke="var(--ink-2)" strokeWidth={1.2} />
       <line x1={X0} x2={X0} y1={top - 4} y2={top + h} stroke="var(--ink-2)" strokeWidth={1.2} />
-      <text x={X0 - 6} y={top + 6} textAnchor="end" fontSize={11} className="fill-ink-2">
-        {t(tx("high", "hoch"))}
+      <text x={X0 + 6} y={top + 4} fontSize={11} className="fill-ink-2">
+        {t(tx("absorption / rate", "Absorption / Rate"))}
       </text>
       <text x={X1} y={top + h + 36} textAnchor="end" fontSize={11} className="fill-ink-2">
         {t(tx("wavelength in nm", "Wellenlänge in nm"))}
