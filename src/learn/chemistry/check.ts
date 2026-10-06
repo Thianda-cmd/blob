@@ -247,8 +247,8 @@ export function checkWord(accept: Text[], input: string): Feedback {
       partial: true,
       title: tx("Check the ending", "Prüf die Endung"),
       message: tx(
-        "So close! But in chemistry the ending matters: chlor**ide**, chlor**ine**, chlor**ite** and chlor**ate** are different things.",
-        "Ganz nah dran! Aber in der Chemie zählt die Endung: Chlor**id**, Chlor, Chlor**it** und Chlor**at** sind verschiedene Stoffe.",
+        "So close! Check the ending: with technical terms a different ending usually means something different.",
+        "Ganz nah dran! Prüf die Endung: Bei Fachbegriffen bedeutet eine andere Endung meistens etwas anderes.",
       ),
     };
   }
