@@ -20,7 +20,7 @@ const FA = { x: 8, y: 54 };
 const FB = { x: 344, y: 54 };
 /** After pollination the view zooms in on the pistil of flower B. */
 const FULL = `0 0 ${W} ${H}`;
-const ZOOM = `${FB.x + 240 * S - 160} ${FB.y + 78 * S} 320 148`;
+const ZOOM = `${FB.x + 240 * S - 160} ${FB.y + 60 * S} 320 148`;
 const at = (f: { x: number; y: number }, x: number, y: number) => [f.x + x * S, f.y + y * S] as const;
 
 const BEE_START = [W / 2, 30] as const;

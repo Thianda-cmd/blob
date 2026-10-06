@@ -97,7 +97,7 @@ export function EvolutionDrift() {
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={t(tx("Allele frequency of A over 80 generations in six populations", "Allelfrequenz von A über 80 Generationen in sechs Populationen"))}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto block h-auto w-full max-w-[620px]" role="img" aria-label={t(tx("Allele frequency of A over 80 generations in six populations", "Allelfrequenz von A über 80 Generationen in sechs Populationen"))}>
         {[0, 0.25, 0.5, 0.75, 1].map((v) => (
           <g key={v}>
             <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="var(--line)" strokeWidth={1} />

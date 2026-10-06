@@ -59,7 +59,7 @@ function Chrom({ x, y, idx, mark }: { x: number; y: number; idx: number; mark?: 
   return (
     <g>
       {[-1, 1].map((s) => {
-        const cx = x + s * 2.7;
+        const cx = x + s * 2.3;
         const top = y - p;
         const seg = (a: number, b: number) => {
           // A band from share a to b, skipping the centromere gap.
@@ -97,7 +97,7 @@ export function DivisionKaryogram({ karyotype = "46,XX", mark = false }: { karyo
   return (
     <svg viewBox={`0 0 ${W} 340`} className="mx-auto block h-auto w-full" style={{ maxWidth: 640 }} role="img" aria-label={t(title)}>
       {ROWS.map((row, r) => {
-        const items = row.map((c) => (c === "sex" ? Math.max(2, sex.length) * 15 + 10 : c === 0 ? gapGroup : slot));
+        const items = row.map((c) => (c === "sex" ? Math.max(2, sex.length) * 17 + 10 : c === 0 ? gapGroup : slot));
         const total = items.reduce((a, b) => a + b, 0);
         let x = (W - total) / 2;
         const y = ROW_Y[r];
@@ -116,7 +116,7 @@ export function DivisionKaryogram({ karyotype = "46,XX", mark = false }: { karyo
                 return (
                   <g key="sex">
                     {sex.map((s, i) => {
-                      const cx = x0 + wSlot / 2 + (i - (n - 1) / 2) * 15;
+                      const cx = x0 + wSlot / 2 + (i - (n - 1) / 2) * 17;
                       return (
                         <g key={i}>
                           <Chrom x={cx} y={y} idx={s === "X" ? 22 : 23} />
@@ -132,7 +132,7 @@ export function DivisionKaryogram({ karyotype = "46,XX", mark = false }: { karyo
               return (
                 <g key={c}>
                   {Array.from({ length: n }, (_, i) => (
-                    <Chrom key={i} x={x0 + wSlot / 2 + (i - (n - 1) / 2) * 15} y={y} idx={c - 1} mark={mark && n === 3 && i === 2} />
+                    <Chrom key={i} x={x0 + wSlot / 2 + (i - (n - 1) / 2) * 17} y={y} idx={c - 1} mark={mark && n === 3 && i === 2} />
                   ))}
                   {label(x0 + wSlot / 2, labelY, String(c), `l${c}`, mark && n === 3)}
                 </g>

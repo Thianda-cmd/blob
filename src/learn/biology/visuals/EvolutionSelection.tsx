@@ -166,7 +166,7 @@ export function EvolutionSelection() {
         ))}
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={t(info.name)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto block h-auto w-full max-w-[620px]" role="img" aria-label={t(info.name)}>
         {AGAINST[form](1).map(([a, b], i) => (
           <g key={i}>
             <rect x={X(a)} y={T} width={X(b) - X(a)} height={H - B - T} fill="color-mix(in oklab, var(--bio-blood) 10%, transparent)" />

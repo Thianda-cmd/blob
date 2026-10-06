@@ -121,7 +121,9 @@ export function EvolutionHardyWeinberg() {
         <div className="min-w-0 space-y-3">
           <div className="space-y-1.5 overflow-x-auto rounded-xl border border-line bg-surface px-4 py-3">
             {lines.map((l, i) => (
-              <MathView key={i} src={l} size="sm" scope={`${scope}-l${i}`} animate={false} />
+              <div key={i}>
+                <MathView src={l} size="sm" scope={`${scope}-l${i}`} animate={false} />
+              </div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">

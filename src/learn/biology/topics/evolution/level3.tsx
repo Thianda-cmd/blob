@@ -72,12 +72,12 @@ function hwTask(rng: Rng, fixed?: { c: HwCase; ask: HwAsk }): Exercise {
   const answer: AnswerSpec = {
     kind: "number",
     value,
-    tolerance: 0.012,
+    tolerance: 0.025,
     unit: ask === "carriers" || ask === "dominant" ? "%" : ask === "count" ? (c.people ? tx("people", "Menschen") : tx("animals", "Tiere")) : undefined,
     label: ask === "q" ? "q =" : ask === "p" ? "p =" : undefined,
   };
   const m = mistakes(answer);
-  const num = (v: number) => ({ kind: "number" as const, value: round(v, 6), tolerance: 0.012 });
+  const num = (v: number) => ({ kind: "number" as const, value: round(v, 6), tolerance: 0.025 });
   if (ask === "q") {
     m.add(num(q2), tx("The root is missing", "Die Wurzel fehlt"), tx("That's q², the share of aa individuals. The allele frequency q is its square root.", "Das ist q², der Anteil der aa-Individuen. Die Allelfrequenz q ist die Wurzel daraus."));
     m.add(num(p), tx("That's p", "Das ist p"), tx("That's the frequency of the dominant allele A. Asked is q, the recessive allele a.", "Das ist die Frequenz des dominanten Allels A. Gefragt ist q, das rezessive Allel a."));
@@ -117,8 +117,8 @@ function hwTask(rng: Rng, fixed?: { c: HwCase; ask: HwAsk }): Exercise {
 
   const d6 = q2 < 0.001 ? 6 : 4;
   const frames: Frame[] = [
-    { math: line((n) => `q^2 = ${n(q2, d6)}#q2`), note: tx("The individuals with the recessive trait are aa: their share is q².", "Die Individuen mit dem rezessiven Merkmal sind aa: Ihr Anteil ist q².") },
-    { math: line((n) => `q = \\sqrt{${n(q2, d6)}} = ${n(qv, 3)}#q`), note: tx("The allele frequency q is the square root.", "Die Allelfrequenz q ist die Wurzel daraus."), highlight: ask === "q" ? ["q"] : undefined },
+    { math: line((n) => `q^2 = ${n(q2, d6)}#v`), note: tx("The individuals with the recessive trait are aa: their share is q².", "Die Individuen mit dem rezessiven Merkmal sind aa: Ihr Anteil ist q².") },
+    { math: line((n) => `q = \\sqrt{${n(q2, d6)}#v} = ${n(qv, 3)}#q`), note: tx("The allele frequency q is the square root.", "Die Allelfrequenz q ist die Wurzel daraus."), highlight: ask === "q" ? ["q"] : undefined },
   ];
   if (ask !== "q") frames.push({ math: line((n) => `p = 1 - ${n(qv, 3)} = ${n(p, 3)}#p`), note: tx("Only two alleles: p + q = 1.", "Es gibt nur zwei Allele: p + q = 1."), highlight: ask === "p" ? ["p"] : undefined });
   if (ask === "carriers") frames.push({ math: line((n) => `2pq = 2 \\cdot ${n(p, 3)} \\cdot ${n(qv, 3)} = ${n(pq2, 4)} = ${n(pq2 * 100, 2)}#r "%"`), note: tx("Heterozygous carriers: 2pq.", "Heterozygote Überträger: 2pq."), highlight: ["r"] });

@@ -435,7 +435,7 @@ function meiosisKeys(n2: ModelSize, crossing: boolean, variant: DivisionVariant,
       [462, EY],
       [462, EY],
     ]),
-    spin: spin(0.2, 0),
+    spin: spin(0, 0),
     cts: info.map((i) => {
       const c = CELL[slotI(i.k)];
       return ct(i, cellX(i.k) + c.dx * 0.9, EY + c.dy * 0.9, c.a, 2.7, 6, 0.85, { swap: swapOn(i) });
