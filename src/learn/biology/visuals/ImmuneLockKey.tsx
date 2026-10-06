@@ -210,18 +210,18 @@ export function ImmuneLockKey() {
 export function ImmuneLockKeyPicture({ shape, options, same = -1 }: { shape: Epitope; options: Epitope[]; same?: number }) {
   const t = useText();
   return (
-    <svg viewBox="0 0 440 200" className="mx-auto block h-auto w-full max-w-[460px]" role="img" aria-label={t(tx("Antigen and four antibodies", "Antigen und vier Antikörper"))}>
+    <svg viewBox="0 0 440 210" className="mx-auto block h-auto w-full max-w-[460px]" role="img" aria-label={t(tx("Antigen and four antibodies", "Antigen und vier Antikörper"))}>
       {/* a piece of the pathogen's surface with its antigens pointing down */}
       <rect x={110} y={-40} width={220} height={84} rx={26} fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={2} />
       {[165, 220, 275].map((x) => (
-        <path key={x} d={bumpPath(shape, S + 1)} transform={`translate(${x} 43) rotate(180)`} fill={PAINT.virus.stroke} />
+        <path key={x} d={bumpPath(shape, S * 2)} transform={`translate(${x} 43) rotate(180)`} fill={PAINT.virus.stroke} />
       ))}
       {options.map((o, i) => {
         const x = 70 + i * 100;
         return (
-          <g key={i} transform={`translate(${x} 126) scale(1.6)`}>
+          <g key={i} transform={`translate(${x} 128) scale(2)`}>
             {i === same ? <SameShape shape={o} /> : <Antibody shape={o} s={S} color={AB_COLOR} />}
-            <text x={0} y={AB.stem + 14} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink)" style={{ fontFamily: "var(--font-sans)" }}>
+            <text x={0} y={AB.stem + 12} textAnchor="middle" fontSize={9.5} fontWeight={700} fill="var(--ink)" style={{ fontFamily: "var(--font-sans)" }}>
               {"ABCD"[i]}
             </text>
           </g>

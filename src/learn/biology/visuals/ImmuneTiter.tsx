@@ -322,7 +322,7 @@ function TiterLinear({ level }: { level: 1 | 2 }) {
                     <text x={X(b, 14)} y={Y(b, 0.26) - 8} textAnchor="middle">
                       {t(tx("primary", "primär"))}
                     </text>
-                    <text x={X(b, 57)} y={Y(b, 0.82) - 6} textAnchor="start">
+                    <text x={X(b, 48)} y={b.y0 + 2} textAnchor="start">
                       {t(tx("secondary response", "Sekundärreaktion"))}
                     </text>
                   </>
@@ -438,7 +438,7 @@ function TiterLog() {
           </defs>
           <Axes b={b} yLabel={tx("antibody titre", "Antikörpertiter")} xLabel={tx("time in days", "Zeit in Tagen")} ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80]} />
           <EventMark b={b} day={0} label={tx("antigen A", "Antigen A")} color="var(--bio-water-deep)" />
-          <EventMark b={b} day={40} label={second === "A" ? tx("antigen A", "Antigen A") : tx("antigen B", "Antigen B")} color={second === "A" ? "var(--bio-water-deep)" : "var(--bio-mito-deep)"} />
+          <EventMark b={b} day={40} label={second === "A" ? tx("antigen A", "Antigen A") : tx("antigen B", "Antigen B")} color={second === "A" ? "var(--bio-water-deep)" : "var(--bio-mito-deep)"} left />
           <g clipPath={`url(#${id}-clip)`}>
             {curve(aM, "var(--bio-water-deep)", true, `am-${second}`)}
             {curve(aG, "var(--bio-water-deep)", false, `ag-${second}`)}
@@ -509,16 +509,16 @@ export function ImmuneTiterGraph({ preset, swap = false, p1 = 2, p2 = 4 }: { pre
   const ticks = Array.from({ length: days / 10 + 1 }, (_, i) => i * 10);
   const c1 = "var(--bio-water-deep)";
   const c2 = "var(--bio-mito-deep)";
-  const curves: { fn: Fn; color: string; dashed?: boolean; label?: string; at: number }[] = [];
+  const curves: { fn: Fn; color: string; dashed?: boolean; label?: string; at: number; dx?: number; dy?: number }[] = [];
   const labels = swap ? ["2", "1"] : ["1", "2"];
   if (preset === "overlay") {
     curves.push({ fn: wave({ at: 0, lag: 5, up: 9, peak: 0.36, floor: 0.35, down: 8 }), color: c1, label: labels[0], at: 16 });
-    curves.push({ fn: wave({ at: 0, lag: 1.5, up: 5, peak: 0.95, floor: 0.6, down: 10 }), color: c2, label: labels[1], at: 7 });
+    curves.push({ fn: wave({ at: 0, lag: 1.5, up: 5, peak: 0.95, floor: 0.6, down: 10 }), color: c2, label: labels[1], at: 4, dx: -20, dy: 0 });
   } else if (preset === "activePassive") {
     curves.push({ fn: wave({ at: 0, lag: 5, up: 10, peak: 0.62, floor: 0.75, down: 30 }), color: c1, label: labels[0], at: 40 });
-    curves.push({ fn: serum(0, 0.85, 10), color: c2, label: labels[1], at: 8 });
+    curves.push({ fn: serum(0, 0.85, 10), color: c2, label: labels[1], at: 10 });
   } else if (preset === "igm") {
-    curves.push({ fn: max(PRIM_M(0), SEC_M(40)), color: c1, dashed: true, label: labels[0], at: 8 });
+    curves.push({ fn: max(PRIM_M(0), SEC_M(40)), color: c1, dashed: true, label: labels[0], at: 48 });
     curves.push({ fn: max(PRIM_G(0), SEC_G(40)), color: c2, label: labels[1], at: 50 });
   } else if (preset === "log") {
     const prim = wave({ at: 0, lag: 5, up: 9, peak: p1, floor: 0.6, down: 10 });
@@ -553,12 +553,12 @@ export function ImmuneTiterGraph({ preset, swap = false, p1 = 2, p2 = 4 }: { pre
     <svg viewBox="0 0 580 270" className="mx-auto block h-auto w-full max-w-[580px]" role="img" aria-label={t(tx("Antibody concentration over time", "Antikörperkonzentration im Zeitverlauf"))}>
       <Axes b={b} yLabel={log ? tx("antibody titre", "Antikörpertiter") : tx("antibody concentration", "Antikörperkonzentration")} xLabel={tx("time in days", "Zeit in Tagen")} ticks={ticks} />
       {events.map((e) => (
-        <EventMark key={e.day} b={b} day={e.day} label={e.label} />
+        <EventMark key={e.day} b={b} day={e.day} label={e.label} left={e.day > 0} />
       ))}
       {curves.map((c, i) => (
         <path key={i} d={pathOf(b, c.fn)} fill="none" stroke={c.color} strokeWidth={c.dashed ? 2.6 : 3.2} strokeDasharray={c.dashed ? "6 5" : undefined} strokeLinecap="round" />
       ))}
-      {curves.map((c, i) => (c.label && c.at >= 0 ? <Tag key={`t${i}`} x={X(b, c.at) + 14} y={Y(b, c.fn(c.at)) - 16} label={c.label} color={c.color} /> : null))}
+      {curves.map((c, i) => (c.label && c.at >= 0 ? <Tag key={`t${i}`} x={X(b, c.at) + (c.dx ?? 14)} y={Y(b, c.fn(c.at)) + (c.dy ?? -16)} label={c.label} color={c.color} /> : null))}
     </svg>
   );
 }

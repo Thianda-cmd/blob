@@ -49,8 +49,8 @@ function buildStages(): Stage[] {
         "Start: Die kleine Untereinheit findet das Startcodon AUG. Die erste tRNA (Anticodon UAC) bringt Methionin, dann kommt die große Untereinheit dazu.",
       ),
       noteSites: tx(
-        "Initiation: the small subunit binds the mRNA and finds the start codon AUG. The initiator tRNA with methionine (anticodon UAC) sits in the P site. Then the large subunit joins.",
-        "Initiation: Die kleine Untereinheit bindet die mRNA und sucht das Startcodon AUG. Die Start-tRNA mit Methionin (Anticodon UAC) sitzt an der P-Stelle. Dann lagert sich die große Untereinheit an.",
+        "The small subunit binds the mRNA and finds the start codon AUG. The initiator tRNA with methionine (anticodon UAC) sits in the P site. Then the large subunit joins.",
+        "Die kleine Untereinheit bindet die mRNA und sucht das Startcodon AUG. Die Start-tRNA mit Methionin (Anticodon UAC) sitzt an der P-Stelle. Dann lagert sich die große Untereinheit an.",
       ),
     },
   ];
@@ -88,8 +88,8 @@ function buildStages(): Stage[] {
         `Peptidbindung: Die Kette wird mit ${abbr(j)} verknüpft. Jetzt hängt sie an der neuen tRNA.`,
       ),
       noteSites: tx(
-        `Peptide bond: the ribosome links the chain from the P site to ${abbr(j)} in the A site. The tRNA in the P site is now empty.`,
-        `Peptidbindung: Das Ribosom verknüpft die Kette von der P-Stelle mit ${abbr(j)} an der A-Stelle. Die tRNA an der P-Stelle ist jetzt leer.`,
+        `The ribosome links the chain from the P site to ${abbr(j)} in the A site. The tRNA in the P site is now empty.`,
+        `Das Ribosom verknüpft die Kette von der P-Stelle mit ${abbr(j)} an der A-Stelle. Die tRNA an der P-Stelle ist jetzt leer.`,
       ),
     });
     out.push({
@@ -103,8 +103,8 @@ function buildStages(): Stage[] {
       phase: tx("Elongation: translocation", "Elongation: Translokation"),
       note: tx("The ribosome moves on by one codon (one triplet). The empty tRNA leaves and can pick up a new amino acid.", "Das Ribosom rückt um ein Codon (ein Triplett) weiter. Die leere tRNA löst sich und kann eine neue Aminosäure holen."),
       noteSites: tx(
-        "Translocation: the ribosome moves one codon towards the 3′ end. The empty tRNA goes to the E site and leaves; the tRNA with the chain is now in the P site, the A site is free.",
-        "Translokation: Das Ribosom rückt ein Codon in Richtung 3′-Ende. Die leere tRNA gelangt an die E-Stelle und verlässt das Ribosom; die tRNA mit der Kette sitzt jetzt an der P-Stelle, die A-Stelle ist frei.",
+        "The ribosome moves one codon towards the 3′ end. The empty tRNA goes to the E site and leaves; the tRNA with the chain is now in the P site, the A site is free.",
+        "Das Ribosom rückt ein Codon in Richtung 3′-Ende. Die leere tRNA gelangt an die E-Stelle und verlässt das Ribosom; die tRNA mit der Kette sitzt jetzt an der P-Stelle, die A-Stelle ist frei.",
       ),
     });
   }
@@ -119,8 +119,8 @@ function buildStages(): Stage[] {
     phase: tx("Termination", "Termination"),
     note: tx(`Stop codon ${stop}: no tRNA fits. A release factor binds instead.`, `Stoppcodon ${stop}: Keine tRNA passt. Stattdessen bindet ein Freisetzungsfaktor.`),
     noteSites: tx(
-      `Termination: the stop codon ${stop} reaches the A site. No tRNA has a matching anticodon; a release factor binds.`,
-      `Termination: Das Stoppcodon ${stop} erreicht die A-Stelle. Keine tRNA hat ein passendes Anticodon; ein Freisetzungsfaktor bindet.`,
+      `The stop codon ${stop} reaches the A site. No tRNA has a matching anticodon; a release factor binds.`,
+      `Das Stoppcodon ${stop} erreicht die A-Stelle. Keine tRNA hat ein passendes Anticodon; ein Freisetzungsfaktor bindet.`,
     ),
   });
   out.push({

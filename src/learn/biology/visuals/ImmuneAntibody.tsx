@@ -17,7 +17,7 @@ export const ANTIBODY_PARTS: FigurePart[] = [
   { id: "constant", label: tx("constant region", "konstante Region"), at: [254, 262], tag: [320, 292], info: tx("The same in all antibodies of one class. The stem binds to phagocytes or mast cells.", "Bei allen Antikörpern einer Klasse gleich. Der Stamm bindet an Fresszellen oder Mastzellen.") },
   { id: "disulfide", label: tx("disulphide bridges", "Disulfidbrücken"), at: [240, 196], tag: [314, 200], info: tx("Covalent S–S bonds that hold the four chains together.", "Kovalente S–S-Bindungen, die die vier Ketten zusammenhalten.") },
   { id: "site", label: tx("antigen-binding site", "Antigenbindungsstelle"), at: [366, 54], tag: [436, 40], info: tx("Fits one antigen like a lock fits a key. Each antibody has two identical ones.", "Passt zu einem Antigen wie ein Schloss zum Schlüssel. Jeder Antikörper hat zwei identische.") },
-  { id: "antigen", label: tx("antigen", "Antigen"), at: [84, 36], tag: [36, 70], info: tx("The structure on the pathogen that the antibody recognises.", "Die Struktur auf dem Erreger, die der Antikörper erkennt.") },
+  { id: "antigen", label: tx("antigen", "Antigen"), at: [88, 38], tag: [36, 72], info: tx("The structure on the pathogen that the antibody recognises.", "Die Struktur auf dem Erreger, die der Antikörper erkennt.") },
 ];
 
 // Arm geometry: hinge (240, 190), tips (114, 64) and (366, 64).
@@ -41,7 +41,8 @@ export function ImmuneAntibodyStructure({ mode = "names", show, ask, highlight, 
     <Figure title={tx("Structure of an antibody (IgG)", "Bau eines Antikörpers (IgG)")} width={480} height={340} parts={ANTIBODY_PARTS} mode={mode} show={show} ask={ask} highlight={highlight} legend={legend}>
       <g data-part="constant">
         <rect x={204} y={206} width={72} height={124} rx={18} fill="none" stroke="var(--bio-water-deep)" strokeWidth={1.6} strokeDasharray="5 4" />
-        <path d="M 213 170 L 158 115 M 267 170 L 322 115" fill="none" stroke="var(--bio-water-deep)" strokeWidth={34} strokeLinecap="round" opacity={0.12} />
+        <rect x={-42} y={-24} width={84} height={48} rx={16} transform="translate(191.5 141.5) rotate(45)" fill="none" stroke="var(--bio-water-deep)" strokeWidth={1.6} strokeDasharray="5 4" />
+        <rect x={-42} y={-24} width={84} height={48} rx={16} transform="translate(288.5 141.5) rotate(-45)" fill="none" stroke="var(--bio-water-deep)" strokeWidth={1.6} strokeDasharray="5 4" />
       </g>
       <g data-part="heavy">
         <Chain d={HEAVY_L} color="var(--bio-water)" deep="var(--bio-water-deep)" w={16} />
@@ -68,8 +69,8 @@ export function ImmuneAntibodyStructure({ mode = "names", show, ask, highlight, 
         <circle cx={366} cy={56} r={14} fill="none" stroke="var(--bio-nerve-deep)" strokeWidth={1.4} strokeDasharray="3 3" />
       </g>
       <g data-part="antigen">
-        <circle cx={80} cy={30} r={18} fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={2} />
-        <path d={bumpPath("tri", 7)} transform="translate(92.7 42.7) rotate(135)" fill={PAINT.virus.stroke} />
+        <path d={bumpPath("tri", 7)} transform="translate(104.7 54.7) rotate(135)" fill={PAINT.virus.stroke} />
+        <circle cx={92} cy={42} r={18} fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={2} />
       </g>
     </Figure>
   );
