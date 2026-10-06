@@ -144,7 +144,7 @@ export function GeneticsPunnettGrid({ kind, g1, g2, ask, hidden, className }: { 
   );
 }
 
-/** Ratio of counts in a fixed order, reduced: [2, 2] → "1 : 1". */
+/** Ratio of counts in a fixed order, reduced: [2, 2] → "1 : 1". */
 function reduced(counts: number[]) {
   const g = counts.reduce((a, b) => {
     let x = a;
@@ -174,14 +174,14 @@ function crossNote(kind: PunnettKind, g1: string, g2: string): Text {
   if (genos.size === 1) return tx("Both parents are pure-breeding and the same: the offspring look exactly like them.", "Beide Eltern sind reinerbig und gleich: Die Nachkommen sehen genauso aus wie sie.");
   if (!homo(g1) && !homo(g2))
     return kind === "mirabilis"
-      ? tx("**Splitting rule**: red : pink : white = 1 : 2 : 1. Here the phenotype ratio equals the genotype ratio.", "**Spaltungsregel**: rot : rosa : weiß = 1 : 2 : 1. Hier ist das Phänotypverhältnis gleich dem Genotypverhältnis.")
-      : tx("**Splitting rule** (2nd law): phenotypes 3 : 1, genotypes 1 : 2 : 1. The recessive trait is back!", "**Spaltungsregel** (2. Mendelsche Regel): Phänotypen 3 : 1, Genotypen 1 : 2 : 1. Das rezessive Merkmal ist wieder da!");
+      ? tx("**Splitting rule**: red : pink : white = 1 : 2 : 1. Here the phenotype ratio equals the genotype ratio.", "**Spaltungsregel**: rot : rosa : weiß = 1 : 2 : 1. Hier ist das Phänotypverhältnis gleich dem Genotypverhältnis.")
+      : tx("**Splitting rule** (2nd law): phenotypes 3 : 1, genotypes 1 : 2 : 1. The recessive trait is back!", "**Spaltungsregel** (2. Mendelsche Regel): Phänotypen 3 : 1, Genotypen 1 : 2 : 1. Das rezessive Merkmal ist wieder da!");
   if (phenos.size === 2)
     return kind === "mirabilis"
-      ? tx("Half and half: 1 : 1. One parent is heterozygous, the other pure-breeding.", "Halb und halb: 1 : 1. Ein Elternteil ist mischerbig, der andere reinerbig.")
+      ? tx("Half and half: 1 : 1. One parent is heterozygous, the other pure-breeding.", "Halb und halb: 1 : 1. Ein Elternteil ist mischerbig, der andere reinerbig.")
       : (homo(g1) && g1 === g1.toLowerCase()) || (homo(g2) && g2 === g2.toLowerCase())
-        ? tx("**Test cross**: crossed with the recessive homozygote, a 1 : 1 ratio shows that the other parent is heterozygous.", "**Rückkreuzung**: Mit dem rezessiv Reinerbigen gekreuzt, verrät ein Verhältnis von 1 : 1, dass der andere Elternteil mischerbig ist.")
-        : tx("Half and half: 1 : 1.", "Halb und halb: 1 : 1.");
+        ? tx("**Test cross**: crossed with the recessive homozygote, a 1 : 1 ratio shows that the other parent is heterozygous.", "**Rückkreuzung**: Mit dem rezessiv Reinerbigen gekreuzt, verrät ein Verhältnis von 1 : 1, dass der andere Elternteil mischerbig ist.")
+        : tx("Half and half: 1 : 1.", "Halb und halb: 1 : 1.");
   return tx("All offspring show the dominant trait, but not all have the same genotype.", "Alle Nachkommen zeigen das dominante Merkmal, haben aber nicht alle denselben Genotyp.");
 }
 

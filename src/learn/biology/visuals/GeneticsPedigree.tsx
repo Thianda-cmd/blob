@@ -16,7 +16,7 @@ const SLOT = 50;
 const PADL = 42;
 const PADR = 16;
 const TOP = 30;
-const ROW = 104;
+const ROW = 108;
 const R = 14;
 const ROMAN = ["I", "II", "III", "IV"];
 
@@ -52,7 +52,7 @@ export function GeneticsPedigreeChart({
   const { people } = ped;
   const gens = Math.max(...people.map((p) => p.gen)) + 1;
   const W = PADL + ped.width * SLOT + PADR;
-  const H = TOP + (gens - 1) * ROW + R + (labels ? 44 : 28);
+  const H = TOP + (gens - 1) * ROW + R + (labels ? 48 : 32);
   const X = (i: number) => PADL + people[i].x * SLOT;
   const Y = (i: number) => TOP + people[i].gen * ROW;
   const isCarrierP = (i: number) => people[i].carrier || carriers?.includes(i);
@@ -94,12 +94,12 @@ export function GeneticsPedigreeChart({
           const half = !p.affected && isCarrierP(i);
           return (
             <g key={i} opacity={faded ? 0.3 : 1} style={{ transition: "opacity .25s" }}>
-              {lit && <circle cx={x} cy={y} r={R + 8} fill="var(--blob-soft)" stroke="var(--blob)" strokeWidth={2.4} />}
+              {lit && <circle cx={x} cy={y} r={R + 5} fill="var(--blob-soft)" stroke="var(--blob)" strokeWidth={2.4} />}
               {ask === i && !reduce && (
                 <motion.circle
                   cx={x}
                   cy={y}
-                  r={R + 8}
+                  r={R + 5}
                   fill="none"
                   stroke="var(--blob)"
                   strokeWidth={2}
@@ -127,11 +127,11 @@ export function GeneticsPedigreeChart({
                   ?
                 </text>
               )}
-              <text x={x} y={y + R + 14} textAnchor="middle" fontSize={14} fontWeight={lit ? 700 : 500} fill={lit ? "var(--blob)" : "var(--ink-2)"} style={{ fontFamily: "var(--font-sans)" }}>
+              <text x={x} y={y + R + 19} textAnchor="middle" fontSize={14} fontWeight={lit ? 700 : 500} fill={lit ? "var(--blob)" : "var(--ink-2)"} style={{ fontFamily: "var(--font-sans)" }}>
                 {i + 1}
               </text>
               {labels?.[i] && (
-                <text x={x} y={y + R + 31} textAnchor="middle" fontSize={12.5} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
+                <text x={x} y={y + R + 35} textAnchor="middle" fontSize={12.5} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
                   <SvgGeno g={labels[i]!} fontSize={12.5} />
                 </text>
               )}

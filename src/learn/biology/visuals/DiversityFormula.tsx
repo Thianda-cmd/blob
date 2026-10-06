@@ -305,7 +305,7 @@ export function FloralDiagram({ id, lit, className }: { id: DiagramId; lit?: str
 type Slot = { key: "sym" | "K" | "C" | "P" | "A" | "G"; options: string[]; why: Text };
 type Build = { id: DiagramId; name: Text; plant: Text; code: string; slots: Slot[] };
 
-/** Option codes: "*" / "v" for symmetry; "K4", "C(2+3)", "G(2)o" for the rest. */
+/** Option codes: "*" / "v" for symmetry; "K4", "C(2+3)", "G(2)o" for the rest. The first option of every slot is the right one. */
 export const BUILDS: Build[] = [
   {
     id: "brassicaceae",
@@ -326,7 +326,7 @@ export const BUILDS: Build[] = [
     plant: tx("dead-nettle", "Taubnessel"),
     code: "vK(5)C(2+3)A2+2G(2)o",
     slots: [
-      { key: "sym", options: ["*", "v"], why: tx("Upper lip and lower lip: only one plane of symmetry, so zygomorphic (↓).", "Ober- und Unterlippe: nur eine Symmetrieebene, also zygomorph (↓).") },
+      { key: "sym", options: ["v", "*"], why: tx("Upper lip and lower lip: only one plane of symmetry, so zygomorphic (↓).", "Ober- und Unterlippe: nur eine Symmetrieebene, also zygomorph (↓).") },
       { key: "K", options: ["K(5)", "K5", "K(4)", "K2"], why: tx("5 sepals joined into a tube (the ring): K(5).", "5 Kelchblätter zu einer Röhre verwachsen (der Ring): K(5).") },
       { key: "C", options: ["C(2+3)", "C2+3", "C5", "C(4)"], why: tx("All 5 petals are fused: 2 form the upper lip, 3 the lower lip. Brackets round everything: C(2+3).", "Alle 5 Kronblätter sind verwachsen: 2 bilden die Oberlippe, 3 die Unterlippe. Klammer um alles: C(2+3).") },
       { key: "A", options: ["A2+2", "A5", "A(4)", "A2+4"], why: tx("4 stamens, 2 long and 2 short (the fifth is missing): A2+2, often also written A4.", "4 Staubblätter, 2 lange und 2 kurze (das fünfte fehlt): A2+2, oft auch A4 geschrieben.") },
@@ -339,7 +339,7 @@ export const BUILDS: Build[] = [
     plant: tx("pea", "Erbse"),
     code: "vK(5)C1+2+(2)A(9)+1G1o",
     slots: [
-      { key: "sym", options: ["*", "v"], why: tx("Standard, wings and keel: only one plane of symmetry, zygomorphic (↓).", "Fahne, Flügel und Schiffchen: nur eine Symmetrieebene, zygomorph (↓).") },
+      { key: "sym", options: ["v", "*"], why: tx("Standard, wings and keel: only one plane of symmetry, zygomorphic (↓).", "Fahne, Flügel und Schiffchen: nur eine Symmetrieebene, zygomorph (↓).") },
       { key: "K", options: ["K(5)", "K5", "K4", "K(2+3)"], why: tx("5 sepals fused into a cup: K(5).", "5 Kelchblätter zu einem Becher verwachsen: K(5).") },
       { key: "C", options: ["C1+2+(2)", "C(5)", "C1+2+2", "C5"], why: tx("1 standard + 2 wings + 2 fused keel petals: C1+2+(2).", "1 Fahne + 2 Flügel + 2 verwachsene Schiffchenblätter: C1+2+(2).") },
       { key: "A", options: ["A(9)+1", "A10", "A(10)", "A9"], why: tx("10 stamens: 9 fused into a tube, 1 free on top: A(9)+1.", "10 Staubblätter: 9 zu einer Röhre verwachsen, 1 frei obendrauf: A(9)+1.") },
