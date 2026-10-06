@@ -32,6 +32,12 @@ const RIBOSOMES: [number, number][] = [
   [100, 140], [112, 92], [140, 160], [158, 100], [176, 160], [182, 90], [248, 92], [256, 162], [272, 140], [286, 112], [292, 160], [320, 148], [336, 120], [342, 96], [132, 128], [96, 112], [230, 164], [322, 168],
 ];
 
+/** A pill-shaped (fully rounded) rectangle as a path, so layers can be drawn as rings. */
+function pill(x: number, y: number, w: number, h: number) {
+  const r = h / 2;
+  return `M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} H ${x + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`;
+}
+
 function BacteriumDrawing() {
   const pili = [
     [96, 70, 84, 46],
@@ -54,10 +60,11 @@ function BacteriumDrawing() {
         ))}
       </g>
       <g data-part="capsule">
-        <rect x={50} y={52} width={330} height={146} rx={73} fill="var(--bio-vacuole)" stroke="var(--bio-water-deep)" strokeWidth={1.4} strokeDasharray="5 4" />
+        <path d={`${pill(50, 52, 330, 146)} ${pill(62, 64, 306, 122)}`} fillRule="evenodd" fill="var(--bio-vacuole)" />
+        <path d={pill(50, 52, 330, 146)} fill="none" stroke="var(--bio-water-deep)" strokeWidth={1.4} strokeDasharray="5 4" />
       </g>
       <g data-part="wall">
-        <rect x={62} y={64} width={306} height={122} rx={61} fill="var(--bio-wall)" stroke="var(--bio-wall-deep)" strokeWidth={2.2} />
+        <path d={`${pill(62, 64, 306, 122)} ${pill(72, 74, 286, 102)}`} fillRule="evenodd" fill="var(--bio-wall)" stroke="var(--bio-wall-deep)" strokeWidth={2.2} />
       </g>
       <g data-part="cytoplasm">
         <rect x={73} y={75} width={284} height={100} rx={50} fill="var(--bio-cell)" />
@@ -227,7 +234,7 @@ function SizeScale() {
       <g transform="translate(60 70)">
         <rect x={0} y={-36} width={300} height={72} rx={36} fill="var(--bio-wall)" stroke="var(--bio-wall-deep)" strokeWidth={2} />
         <rect x={8} y={-28} width={284} height={56} rx={28} fill="var(--bio-cell)" stroke="var(--bio-membrane)" strokeWidth={2} />
-        <path d="M 110 0 c 10 -16 30 -14 40 -4 c 12 -12 34 -8 30 8 c -6 14 -28 12 -36 4 c -12 10 -36 8 -34 -8 Z" fill="none" stroke="var(--bio-nucleus-deep)" strokeWidth={1.8} />
+        <path d="M 112 -2 c 6 -14 26 -16 34 -6 c 6 -10 30 -10 30 4 c 10 2 8 18 -6 18 c -4 8 -24 10 -30 0 c -10 8 -30 2 -28 -10 c -6 -2 -4 -10 0 -6 Z" fill="none" stroke="var(--bio-nucleus-deep)" strokeWidth={1.8} strokeLinejoin="round" />
       </g>
       <motion.g initial={{ scale: 8, opacity: 0.4 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 70, damping: 16, delay: 0.2 }} style={{ transformBox: "fill-box", transformOrigin: "center" }}>
         <circle cx={430} cy={70} r={7.5} fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1.6} />

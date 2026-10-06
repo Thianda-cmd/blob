@@ -36,26 +36,12 @@ function others(rng: Rng, id: PartId, n: number): PartId[] {
 function partSolution(id: PartId): Frame[] {
   const p = PARTS[id];
   return [
-    { math: q(p.name, "a"), note: tx(`It's the **${en(p.name)}**. ${en(p.where)}`, `Das ist ${articleDe(id)} **${de(p.name)}**. ${de(p.where)}`) },
+    { math: q(p.name, "a"), note: p.where },
     { math: join(q(p.name, "a"), ":", q(p.job, "j")), note: tx(`Its job: it ${en(p.job)}.`, `Aufgabe: ${cap(de(p.job))}.`), highlight: ["j"] },
   ];
 }
 
-const ARTICLE: Record<PartId, string> = {
-  sepal: "das",
-  petal: "das",
-  anther: "der",
-  filament: "der",
-  pollen: "der",
-  stigma: "die",
-  style: "der",
-  ovary: "der",
-  ovule: "die",
-  nectar: "der",
-  receptacle: "der",
-  stalk: "der",
-};
-const articleDe = (id: PartId) => ARTICLE[id];
+
 
 export function nameTask(rng: Rng, fixed?: PartId): Exercise {
   const id = fixed ?? rng.pick(ASK_PARTS);
@@ -413,7 +399,7 @@ export function chainTask(rng: Rng, from?: number, len?: number): Exercise {
     hint: tx("Pollen has to reach the stigma before anything else can happen in the flower.", "Erst muss Pollen auf die Narbe gelangen, bevor in der Blüte etwas anderes passieren kann."),
     solution: [
       {
-        math: tx(short.map((s, k) => `${k + 1}. ${en(s)}`).join(" \\\\ "), short.map((s, k) => `${k + 1}. ${de(s)}`).join(" \\\\ ")),
+        math: tx(short.map((s, k) => `"${k + 1}."#k${k} ${en(s)}`).join(" \\\\ "), short.map((s, k) => `"${k + 1}."#k${k} ${de(s)}`).join(" \\\\ ")),
         note: tx("Pollination, then the pollen tube, then fertilisation: only then fruit and seed can form.", "Bestäubung, dann der Pollenschlauch, dann die Befruchtung: Erst danach entstehen Frucht und Samen."),
       },
     ],

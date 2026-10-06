@@ -13,16 +13,19 @@ import { Bee, Bold, CherryFlower, PollenGrain } from "./FlowerKit";
 // with the egg cell (fertilisation). Drag the bee or use the button.
 
 const W = 640;
-const H = 290;
+const H = 296;
 const S = 0.6;
 /** Where each flower's drawing starts (its 480 × 360 drawing is scaled by S). */
-const FA = { x: 8, y: 66 };
-const FB = { x: 344, y: 66 };
+const FA = { x: 8, y: 54 };
+const FB = { x: 344, y: 54 };
+/** After pollination the view zooms in on the pistil of flower B. */
+const FULL = `0 0 ${W} ${H}`;
+const ZOOM = `${FB.x + 240 * S - 160} ${FB.y + 78 * S} 320 148`;
 const at = (f: { x: number; y: number }, x: number, y: number) => [f.x + x * S, f.y + y * S] as const;
 
-const BEE_START = [W / 2, 34] as const;
+const BEE_START = [W / 2, 30] as const;
 const BEE_A = at(FA, 262, 112);
-const BEE_B = at(FB, 262, 98);
+const BEE_B = at(FB, 282, 78);
 const BEE_AWAY = [W - 52, 30] as const;
 
 /** The pollen tube in flower B (drawing units): from a grain on the stigma down the style to the ovule. */
@@ -125,7 +128,14 @@ export function FlowerPollination({ start = 0 }: { start?: Stage }) {
       </div>
 
       <div ref={box} className="relative mx-auto w-full touch-none select-none" style={{ maxWidth: 680, aspectRatio: `${W} / ${H}` }}>
-        <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 size-full" role="img" aria-label={t(tx("Two cherry blossoms on different trees and a bee", "Zwei Kirschblüten an verschiedenen Bäumen und eine Biene"))}>
+        <motion.svg
+          viewBox={FULL}
+          initial={false}
+          animate={{ viewBox: stage >= 3 ? ZOOM : FULL }}
+          transition={reduce ? { duration: 0 } : { duration: 1.1, ease: "easeInOut" }}
+          className="absolute inset-0 size-full"
+          role="img" aria-label={t(tx("Two cherry blossoms on different trees and a bee", "Zwei Kirschblüten an verschiedenen Bäumen und eine Biene"))}
+        >
           {/* flower A */}
           <g transform={`translate(${FA.x} ${FA.y}) scale(${S})`}>
             <CherryFlower part={false} />
@@ -153,7 +163,7 @@ export function FlowerPollination({ start = 0 }: { start?: Stage }) {
                 strokeLinejoin="round"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: reduce ? 0 : 1.8, ease: "easeInOut" }}
+                transition={{ duration: reduce ? 0 : 1.8, delay: reduce ? 0 : 0.9, ease: "easeInOut" }}
               />
             )}
             {stage >= 4 && (
@@ -184,17 +194,17 @@ export function FlowerPollination({ start = 0 }: { start?: Stage }) {
             [FA.x + 240 * S, tx("Cherry tree A", "Kirschbaum A")],
             [FB.x + 240 * S, tx("Cherry tree B", "Kirschbaum B")],
           ].map(([x, label]) => (
-            <text key={String(x)} x={x as number} y={H - 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+            <text key={String(x)} x={x as number} y={H - 3} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
               {t(label as Text)}
             </text>
           ))}
-        </svg>
+        </motion.svg>
 
         {/* the bee: an HTML layer so it can be dragged with mouse or finger */}
         <motion.div
           className="absolute z-10 -ml-8 -mt-6 w-16 cursor-grab active:cursor-grabbing"
           initial={false}
-          animate={{ left: `${(bee[0] / W) * 100}%`, top: `${(bee[1] / H) * 100}%` }}
+          animate={{ left: `${(bee[0] / W) * 100}%`, top: `${(bee[1] / H) * 100}%`, opacity: stage >= 3 ? 0 : 1 }}
           transition={{ type: "spring", stiffness: 90, damping: 15 }}
           drag={stage < 2}
           dragSnapToOrigin

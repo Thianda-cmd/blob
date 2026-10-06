@@ -239,7 +239,7 @@ export function tubeOrderTask(rng: Rng, from?: number, len?: number): Exercise {
     hint: tx("Follow the sperm cell: it travels inside the pollen tube from the stigma to the egg cell.", "Folge der Spermazelle: Sie reist im Pollenschlauch von der Narbe bis zur Eizelle."),
     solution: [
       {
-        math: tx(lines.map((l, k) => `${k + 1}. ${en(l)}`).join(" \\\\ "), lines.map((l, k) => `${k + 1}. ${de(l)}`).join(" \\\\ ")),
+        math: tx(lines.map((l, k) => `"${k + 1}."#k${k} ${en(l)}`).join(" \\\\ "), lines.map((l, k) => `"${k + 1}."#k${k} ${de(l)}`).join(" \\\\ ")),
         note: tx("The pollen tube carries the sperm cell through the style and the micropyle to the egg cell. Only then comes fertilisation.", "Der Pollenschlauch bringt die Spermazelle durch Griffel und Mikropyle zur Eizelle. Erst dann folgt die Befruchtung."),
       },
     ],
