@@ -30,12 +30,16 @@ const INSIDE: [number, number][] = [
   [222, 140],
   [342, 140],
   [414, 170],
+  [178, 222],
+  [430, 222],
 ];
 const OUTSIDE: [number, number][] = [
   [92, 52],
   [196, 24],
   [372, 26],
   [478, 58],
+  [36, 118],
+  [528, 132],
 ];
 const COPIES: [number, number][] = [
   [148, 192],
@@ -148,12 +152,14 @@ export function ImmuneVirusCycle({ hiv = false }: { hiv?: boolean }) {
           {/* copies and proteins */}
           {COPIES.map(([x, y], i) => (
             <motion.g key={`c${i}`} initial={{ x: hiv ? 300 : CX - 40, y: hiv ? 262 : 176, opacity: 0, scale: 0.4 }} animate={showCopies ? { x, y, opacity: 1, scale: 1 } : built ? { x: INSIDE[i][0], y: INSIDE[i][1], opacity: 0, scale: 0.4 } : { x: hiv ? 300 : CX - 40, y: hiv ? 262 : 176, opacity: 0, scale: 0.4 }} transition={{ ...spring, delay: showCopies ? i * 0.15 : 0 }}>
-              <Strand color="var(--bio-u)" double={hiv} />
+              <g transform="scale(1.4)">
+                <Strand color="var(--bio-u)" double={hiv} />
+              </g>
             </motion.g>
           ))}
           {PROTEINS.map(([x, y], i) => (
-            <motion.g key={`p${i}`} initial={{ x, y, opacity: 0, scale: 0.3 }} animate={{ x: built ? INSIDE[i % 4][0] : x, y: built ? INSIDE[i % 4][1] : y, opacity: showProteins ? 1 : 0, scale: showProteins ? 1 : 0.3 }} transition={{ ...spring, delay: showProteins ? 0.5 + i * 0.12 : 0 }}>
-              {i % 2 ? <path d={bumpPath(shape, 5)} fill={PAINT.virus.stroke} /> : <path d="M -7 -6 L 7 -6 L 9 2 L 0 8 L -9 2 Z" fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={1.4} />}
+            <motion.g key={`p${i}`} initial={{ x, y, opacity: 0, scale: 0.3 }} animate={{ x: built ? INSIDE[i % INSIDE.length][0] : x, y: built ? INSIDE[i % INSIDE.length][1] : y, opacity: showProteins ? 1 : 0, scale: showProteins ? 1 : 0.3 }} transition={{ ...spring, delay: showProteins ? 0.5 + i * 0.12 : 0 }}>
+              {i % 2 ? <path d={bumpPath(shape, 8)} fill={PAINT.virus.stroke} /> : <path d="M -10 -8 L 10 -8 L 13 3 L 0 11 L -13 3 Z" fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={1.6} />}
             </motion.g>
           ))}
           {/* the new viruses */}

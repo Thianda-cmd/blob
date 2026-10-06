@@ -14,8 +14,8 @@ import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { AB, AB_COLOR, Antibody, bumpPath, clump, Macrophage, PAINT, VirusParticle, type ClumpLink, type Epitope } from "./ImmuneCells";
 
-const RP = 20;
-const S = 4.5;
+const RP = 21;
+const S = 5.2;
 
 // ---------------------------------------------------------------------------
 // The clump: a chain of viruses with an antibody bridging each neighbouring pair.
@@ -85,7 +85,7 @@ export function ImmuneLockKey() {
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-line bg-surface p-1.5 sm:p-3">
-        <svg viewBox="0 0 560 300" className="mx-auto block h-auto w-full max-w-[600px]" role="img" aria-label={t(tx("Antibodies and antigens", "Antikörper und Antigene"))}>
+        <svg viewBox="50 10 460 270" className="mx-auto block h-auto w-full max-w-[620px]" role="img" aria-label={t(tx("Antibodies and antigens", "Antikörper und Antigene"))}>
           {CLUMP.pathogens.map((v, i) => {
             const free = FREE[i];
             return (

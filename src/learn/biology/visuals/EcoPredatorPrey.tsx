@@ -87,10 +87,16 @@ export function LVChart({ pts, T, yMax = 100, upTo, labels, colors = { prey: PRE
   const line = (list: LVPoint[], k: "prey" | "pred") => path(list.map((p) => [px(p.t), py(Math.min(p[k], yMax))]));
   const last = shown[shown.length - 1];
   const labelAt = (k: "prey" | "pred") => {
-    // put the curve name at its first maximum
-    const pk = peaks(pts, k)[0] ?? 0;
-    const p = pts.find((x) => x.t >= pk) ?? pts[0];
-    return { x: px(p.t), y: py(Math.min(p[k], yMax)) - 9 };
+    // prey: above its first maximum; predator: below its first minimum (there the curves are far apart)
+    if (k === "prey") {
+      const pk = peaks(pts, "prey")[0] ?? 0;
+      const p = pts.find((x) => x.t >= pk) ?? pts[0];
+      return { x: px(p.t), y: py(Math.min(p.prey, yMax)) - 9 };
+    }
+    let i = 1;
+    while (i < pts.length - 1 && !(pts[i].pred < pts[i - 1].pred && pts[i].pred <= pts[i + 1].pred)) i++;
+    const p = pts[Math.min(i, pts.length - 1)];
+    return { x: px(p.t), y: py(Math.min(p.pred, yMax)) + 19 };
   };
   return (
     <svg viewBox={`0 0 ${BOX.W} ${BOX.H}`} className="mx-auto block h-auto w-full" style={{ maxWidth: 560 }} role="img" aria-label={t(tx("Population sizes of predator and prey over time", "Populationsgrößen von Räuber und Beute im Lauf der Zeit"))}>

@@ -125,7 +125,7 @@ export function ImmunePhagocyte({ level = 2 }: { level?: 1 | 2 }) {
             stroke={PAINT.macro.stroke}
             strokeWidth={1.8}
             initial={{ opacity: 0, fillOpacity: 0 }}
-            animate={{ opacity: s >= 2 && s < 4 ? 1 : s >= 4 ? 0.5 : 0, fillOpacity: s >= 3 ? 0.35 : 0.06 }}
+            animate={{ opacity: s >= 2 && s < 4 ? 1 : 0, fillOpacity: s >= 3 ? 0.35 : 0.06 }}
             transition={{ duration: 0.8, delay: s === 2 ? 0.6 : 0 }}
           />
           {/* the bacterium, whole */}
@@ -149,7 +149,7 @@ export function ImmunePhagocyte({ level = 2 }: { level?: 1 | 2 }) {
                 animate={{ ...target, opacity: s < 3 ? 0 : out && s >= 4 ? 0.45 : 1, rotate: out ? 0 : (PRESENT[i - 3] ?? 0) + 90 }}
                 transition={{ ...spring, delay: s >= 4 ? 0.1 * i : 0.3 }}
               >
-                <path d={bumpPath("tri", 5)} fill={PAINT.bact.stroke} />
+                <path d={bumpPath("tri", 7)} fill={PAINT.bact.stroke} />
               </motion.g>
             );
           })}
@@ -161,7 +161,7 @@ export function ImmunePhagocyte({ level = 2 }: { level?: 1 | 2 }) {
               return (
                 <motion.path
                   key={a}
-                  d="M -9 0 L -9 -9 M 9 0 L 9 -9"
+                  d="M -11 1 L -11 -11 M 11 1 L 11 -11"
                   stroke="var(--bio-u)"
                   strokeWidth={3}
                   strokeLinecap="round"
