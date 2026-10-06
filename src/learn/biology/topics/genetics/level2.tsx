@@ -829,8 +829,8 @@ export const level2: LevelLesson = {
       title: tx("Intermediate inheritance", "Intermediärer Erbgang"),
       blob: tx("Sometimes nobody wins and you get pink!", "Manchmal gewinnt keiner, und es wird rosa!"),
       body: tx(
-        "Not every pair of alleles has a winner. In the four o'clock flower (*Mirabilis jalapa*) red × white gives pink: the heterozygote shows an in-between form. This is **intermediate inheritance**. Both alleles get capitals: $R$ (red) and $W$ (white).",
-        "Nicht jedes Allelpaar hat einen Gewinner. Bei der Wunderblume (*Mirabilis jalapa*) ergibt rot × weiß rosa: Die Mischerbigen zeigen eine Zwischenform. Das ist der **intermediäre Erbgang**. Beide Allele bekommen Großbuchstaben: $R$ (rot) und $W$ (weiß).",
+        "Not every pair of alleles has a winner. In the four o'clock flower (Mirabilis jalapa) red × white gives pink: the heterozygote shows an in-between form. This is **intermediate inheritance**. Both alleles get capitals: $R$ (red) and $W$ (white).",
+        "Nicht jedes Allelpaar hat einen Gewinner. Bei der Wunderblume (Mirabilis jalapa) ergibt rot × weiß rosa: Die Mischerbigen zeigen eine Zwischenform. Das ist der **intermediäre Erbgang**. Beide Allele bekommen Großbuchstaben: $R$ (rot) und $W$ (weiß).",
       ),
       frames: [
         { math: tx('"P:" \\; RR#a \\times WW#b', '"P:" \\; RR#a \\times WW#b'), note: tx("Red × white, both pure-breeding.", "Rot × weiß, beide reinerbig.") },

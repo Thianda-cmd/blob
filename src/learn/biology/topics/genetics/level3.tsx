@@ -580,7 +580,7 @@ function rfExercise(data: TestCrossData): Exercise {
   return {
     instruction: tx("Calculate the recombination frequency", "Berechne die Rekombinationshäufigkeit"),
     text: data.genes[0] === "b"
-      ? tx("Morgan-style experiment with *Drosophila*: a fly heterozygous for body colour ($b^+$ grey, $b$ black) and wing shape ($vg^+$ normal, $vg$ vestigial) is test-crossed with a black fly with vestigial wings. Calculate the recombination frequency between $b$ and $vg$ (one decimal place).", "Versuch nach Morgan mit *Drosophila*: Eine für Körperfarbe ($b^+$ grau, $b$ schwarz) und Flügelform ($vg^+$ normal, $vg$ Stummelflügel) mischerbige Fliege wird mit einer schwarzen Fliege mit Stummelflügeln rückgekreuzt. Berechne die Rekombinationshäufigkeit zwischen $b$ und $vg$ (eine Nachkommastelle).")
+      ? tx("Morgan-style experiment with Drosophila: a fly heterozygous for body colour ($b^+$ grey, $b$ black) and wing shape ($vg^+$ normal, $vg$ vestigial) is test-crossed with a black fly with vestigial wings. Calculate the recombination frequency between $b$ and $vg$ (one decimal place).", "Versuch nach Morgan mit Drosophila: Eine für Körperfarbe ($b^+$ grau, $b$ schwarz) und Flügelform ($vg^+$ normal, $vg$ Stummelflügel) mischerbige Fliege wird mit einer schwarzen Fliege mit Stummelflügeln rückgekreuzt. Berechne die Rekombinationshäufigkeit zwischen $b$ und $vg$ (eine Nachkommastelle).")
       : tx("A plant with $A$ and $B$ on one chromosome and $a$ and $b$ on the homologous one ($AB/ab$) is test-crossed with $aabb$. Calculate the recombination frequency between the genes (one decimal place).", "Eine Pflanze mit $A$ und $B$ auf einem Chromosom und $a$ und $b$ auf dem homologen ($AB/ab$) wird mit $aabb$ rückgekreuzt. Berechne die Rekombinationshäufigkeit zwischen den Genen (eine Nachkommastelle)."),
     visual: visual(GeneticsCountTable, { rows: data.rows, title: tx("Offspring of the test cross", "Nachkommen der Rückkreuzung") }),
     answer,
@@ -821,7 +821,7 @@ const FACTS: Fact[] = [
     ],
     hint: tx("Genes on one chromosome are inherited together.", "Gene auf einem Chromosom werden gemeinsam vererbt."),
     math: tx('2n = 8 \\Rightarrow 4 "linkage groups"', '2n = 8 \\Rightarrow 4 "Kopplungsgruppen"'),
-    note: tx("Number of linkage groups = number of chromosome pairs: 4 in *Drosophila*, 23 in humans.", "Zahl der Kopplungsgruppen = Zahl der Chromosomenpaare: 4 bei *Drosophila*, 23 beim Menschen."),
+    note: tx("Number of linkage groups = number of chromosome pairs: 4 in Drosophila, 23 in humans.", "Zahl der Kopplungsgruppen = Zahl der Chromosomenpaare: 4 bei Drosophila, 23 beim Menschen."),
   },
 ];
 
@@ -965,8 +965,8 @@ export const level3: LevelLesson = {
       title: tx("Gene linkage and crossing-over", "Genkopplung und Crossing-over"),
       blob: tx("Mendel's 3rd law has a catch. Morgan found it in fruit flies.", "Mendels 3. Regel hat einen Haken. Morgan fand ihn bei Taufliegen."),
       body: tx(
-        "The independence rule only holds for genes on different chromosomes. Genes on the **same** chromosome are inherited together: they are **linked** and form a **linkage group** (as many as there are chromosome pairs). Thomas Hunt Morgan discovered this around 1910 in the fruit fly *Drosophila*.",
-        "Die Unabhängigkeitsregel gilt nur für Gene auf verschiedenen Chromosomen. Gene auf **demselben** Chromosom werden gemeinsam vererbt: Sie sind **gekoppelt** und bilden eine **Kopplungsgruppe** (so viele wie Chromosomenpaare). Thomas Hunt Morgan entdeckte das um 1910 an der Taufliege *Drosophila*.",
+        "The independence rule only holds for genes on different chromosomes. Genes on the **same** chromosome are inherited together: they are **linked** and form a **linkage group** (as many as there are chromosome pairs). Thomas Hunt Morgan discovered this around 1910 in the fruit fly Drosophila.",
+        "Die Unabhängigkeitsregel gilt nur für Gene auf verschiedenen Chromosomen. Gene auf **demselben** Chromosom werden gemeinsam vererbt: Sie sind **gekoppelt** und bilden eine **Kopplungsgruppe** (so viele wie Chromosomenpaare). Thomas Hunt Morgan entdeckte das um 1910 an der Taufliege Drosophila.",
       ),
       frames: [
         { math: "AB/ab \\times ab/ab", note: tx("Test cross of a fly with $A$ and $B$ on one chromosome and $a$ and $b$ on the homologous one.", "Rückkreuzung einer Fliege mit $A$ und $B$ auf einem Chromosom und $a$ und $b$ auf dem homologen.") },
@@ -980,7 +980,7 @@ export const level3: LevelLesson = {
       type: "widget",
       title: tx("Crossing-over and gene maps", "Crossing-over und Genkarten"),
       blob: tx("Run some meioses and then draw a map!", "Lass ein paar Meiosen laufen und zeichne dann eine Karte!"),
-      body: tx("Tab 1: simulate meioses and watch the recombination frequency follow the distance. Tab 2: find the gene order from recombination frequencies, with real *Drosophila* data.", "Reiter 1: Simuliere Meiosen und beobachte, wie die Rekombinationshäufigkeit dem Abstand folgt. Reiter 2: Finde die Genreihenfolge aus Rekombinationshäufigkeiten, mit echten *Drosophila*-Daten."),
+      body: tx("Tab 1: simulate meioses and watch the recombination frequency follow the distance. Tab 2: find the gene order from recombination frequencies, with real Drosophila data.", "Reiter 1: Simuliere Meiosen und beobachte, wie die Rekombinationshäufigkeit dem Abstand folgt. Reiter 2: Finde die Genreihenfolge aus Rekombinationshäufigkeiten, mit echten Drosophila-Daten."),
       widget: GeneticsGeneMap,
     },
     { type: "check", blob: tx("Last one: Morgan's own kind of data!", "Die letzte: Daten wie bei Morgan!"), exercise: rfExercise(campbellData()) },
