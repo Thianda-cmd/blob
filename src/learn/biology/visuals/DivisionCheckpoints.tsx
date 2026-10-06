@@ -20,12 +20,12 @@ const RING = 30;
 const ARCS: { id: string; from: number; to: number; fill: string; label: string }[] = [
   { id: "g1", from: 0, to: 150, fill: "var(--bio-leaf)", label: "G1" },
   { id: "s", from: 150, to: 250, fill: "var(--bio-nucleus)", label: "S" },
-  { id: "g2", from: 250, to: 310, fill: "var(--bio-vacuole)", label: "G2" },
-  { id: "m", from: 310, to: 360, fill: "var(--bio-petal)", label: "M" },
+  { id: "g2", from: 250, to: 300, fill: "var(--bio-vacuole)", label: "G2" },
+  { id: "m", from: 300, to: 360, fill: "var(--bio-petal)", label: "M" },
 ];
 /** Where the cell sits after each step. */
-const POS = [70, 150, 200, 280, 310, 322, 336, 352];
-const CHECKS = [150, 310, 336];
+const POS = [70, 150, 200, 275, 300, 316, 340, 354];
+const CHECKS = [150, 300, 340];
 
 const pt = (deg: number, r: number) => [C + r * Math.sin((deg * Math.PI) / 180), C - r * Math.cos((deg * Math.PI) / 180)] as const;
 function arc(from: number, to: number) {
@@ -115,7 +115,7 @@ export function DivisionCheckpoints() {
     <div className="grid gap-5 md:grid-cols-[minmax(0,260px)_minmax(0,1fr)] md:items-start">
       <svg viewBox="0 0 260 260" className="mx-auto block h-auto w-full max-w-[280px]" role="img" aria-label={t(tx("The cell cycle with its checkpoints", "Der Zellzyklus mit seinen Kontrollpunkten"))}>
         {ARCS.map((a) => {
-          const [lx, ly] = pt((a.from + a.to) / 2, R);
+          const [lx, ly] = pt(a.id === "m" ? 322 : (a.from + a.to) / 2, R);
           return (
             <g key={a.id}>
               <path d={arc(a.from, a.to)} fill={a.fill} stroke="var(--raised)" strokeWidth={2} />
@@ -132,11 +132,11 @@ export function DivisionCheckpoints() {
           return <line key={d} x1={x1} y1={y1} x2={x2} y2={y2} stroke={stop ? "var(--danger)" : "var(--blob)"} strokeWidth={stop ? 5 : 3.5} strokeLinecap="round" />;
         })}
         {/* G0: cells that leave the cycle (e.g. nerve cells). */}
-        <circle cx={44} cy={30} r={17} fill="var(--raised)" stroke="var(--line-2)" strokeWidth={1.5} strokeDasharray="3 3" />
-        <text x={44} y={30} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+        <circle cx={226} cy={26} r={17} fill="var(--raised)" stroke="var(--line-2)" strokeWidth={1.5} strokeDasharray="3 3" />
+        <text x={226} y={26} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
           G0
         </text>
-        <path d="M60 38 Q 92 40 112 58" fill="none" stroke="var(--line-2)" strokeWidth={1.5} strokeDasharray="3 3" />
+        <path d="M209 28 Q 192 26 178 36" fill="none" stroke="var(--line-2)" strokeWidth={1.5} strokeDasharray="3 3" />
         <text x={C} y={C - 10} textAnchor="middle" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
           {t(tx("cells", "Zellen"))}
         </text>

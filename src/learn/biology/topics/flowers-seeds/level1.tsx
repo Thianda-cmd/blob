@@ -906,7 +906,7 @@ export const level1: LevelLesson = fitLevel({
     {
       title: tx("From flower to fruit", "Von der Blüte zur Frucht"),
       body: tx("After fertilisation, petals and stamens fall off.", "Nach der Befruchtung fallen Kronblätter und Staubblätter ab."),
-      examples: [tx('"ovary" \\to "fruit" \\quad "ovule" \\to "seed"', '"Fruchtknoten" \\to "Frucht" \\quad "Samenanlage" \\to "Samen"')],
+      examples: [tx('"ovary" \\to "fruit"', '"Fruchtknoten" \\to "Frucht"'), tx('"ovule" \\to "seed"', '"Samenanlage" \\to "Samen"')],
       tone: "rule",
     },
     {
