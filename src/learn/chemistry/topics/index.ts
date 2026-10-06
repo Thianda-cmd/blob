@@ -1,29 +1,17 @@
-import type { Topic } from "@/learn/types";
-import acidsBases from "./acids-bases";
-import alkanes from "./alkanes";
-import atoms from "./atoms";
-import balancing from "./balancing";
-import covalentBonds from "./covalent-bonds";
-import ionicBonds from "./ionic-bonds";
-import mixtures from "./mixtures";
-import moles from "./moles";
-import particles from "./particles";
-import periodicTable from "./periodic-table";
-import reactions from "./reactions";
-import redox from "./redox";
+import type { SingleLessonTopic, Topic } from "@/learn/types";
 
-/** Chemistry topics in the order they're suggested (same order as CHEMISTRY_CATALOG). */
-export const CHEMISTRY: Topic[] = [
-  particles,
-  mixtures,
-  atoms,
-  periodicTable,
-  ionicBonds,
-  covalentBonds,
-  reactions,
-  balancing,
-  acidsBases,
-  redox,
-  moles,
-  alkanes,
-];
+/** Chemistry topics, each loaded when first needed (same order as CHEMISTRY_CATALOG). */
+export const CHEMISTRY_LOADERS: Record<string, () => Promise<{ default: Topic | SingleLessonTopic }>> = {
+  particles: () => import("./particles"),
+  mixtures: () => import("./mixtures"),
+  atoms: () => import("./atoms"),
+  "periodic-table": () => import("./periodic-table"),
+  "ionic-bonds": () => import("./ionic-bonds"),
+  "covalent-bonds": () => import("./covalent-bonds"),
+  reactions: () => import("./reactions"),
+  balancing: () => import("./balancing"),
+  "acids-bases": () => import("./acids-bases"),
+  redox: () => import("./redox"),
+  moles: () => import("./moles"),
+  alkanes: () => import("./alkanes"),
+};

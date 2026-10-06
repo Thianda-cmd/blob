@@ -7,10 +7,12 @@ import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import type { AnswerValue } from "@/learn/engine/answers";
 import { equationParts } from "@/learn/chemistry/check";
+import { orderStart } from "@/learn/engine/arrange";
 import { parseFormula } from "@/learn/chemistry/formula";
 import { parse, toDisplay } from "@/learn/engine/expr";
 import type { AnswerSpec, Text } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { MatchField, OrderField } from "./ArrangeInputs";
 import { MathView } from "./MathView";
 import { Inline } from "./Rich";
 
@@ -231,6 +233,8 @@ export function AnswerInput({
   const [coefs, setCoefs] = useState<string[]>(() =>
     spec.kind === "balance" ? Array.from({ length: equationParts(spec.equation).left.length + equationParts(spec.equation).right.length }, () => "") : [],
   );
+  const [order, setOrder] = useState<number[]>(() => (spec.kind === "order" ? orderStart(spec) : []));
+  const [picks, setPicks] = useState<(number | null)[]>(() => (spec.kind === "match" ? spec.pairs.map(() => null) : []));
   const changeRef = useRef(onChange);
   useEffect(() => {
     changeRef.current = onChange;
@@ -260,6 +264,10 @@ export function AnswerInput({
         return text.trim() ? { kind: "text", text } : null;
       case "balance":
         return coefs.some((c) => c.trim()) ? { kind: "list", values: coefs } : null;
+      case "order":
+        return { kind: "order", order };
+      case "match":
+        return picks.every((p) => p !== null) ? { kind: "match", picks } : null;
     }
   })();
   const currentKey = JSON.stringify(current);
@@ -435,6 +443,10 @@ export function AnswerInput({
           </div>
         </div>
       );
+    case "order":
+      return <OrderField spec={spec} order={order} onChange={setOrder} status={status} disabled={disabled} />;
+    case "match":
+      return <MatchField spec={spec} picks={picks} onChange={setPicks} status={status} disabled={disabled} />;
     case "formula":
       return <FormulaField value={text} onChange={setText} onEnter={submitNow} status={status} autoFocus={autoFocus} disabled={disabled} label={spec.label ? tt(spec.label) : undefined} />;
     case "word":

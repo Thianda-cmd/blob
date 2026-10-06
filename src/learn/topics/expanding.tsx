@@ -10,7 +10,7 @@ import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
 import { equivalentText } from "@/learn/engine/expr";
 import { plainPoly, polyAdd, polyMul, type Poly } from "@/learn/engine/terms";
-import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------

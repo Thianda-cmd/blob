@@ -54,7 +54,17 @@ export type AnswerSpec =
   /** Coefficients that balance an equation ("Fe + O2 -> Fe2O3"); empty boxes count as 1. */
   | { kind: "balance"; equation: string; coefficients: number[] }
   /** A word or name; any accepted spelling in either language counts. */
-  | { kind: "word"; accept: Text[]; label?: Text; placeholder?: Text };
+  | { kind: "word"; accept: Text[]; label?: Text; placeholder?: Text }
+  /**
+   * Put things in the right order (phases of mitosis, the way of the blood…). `items` are
+   * listed in the CORRECT order; the student sees them shuffled and sorts them.
+   */
+  | { kind: "order"; items: RichText[]; label?: Text }
+  /**
+   * Match each item on the left with one on the right (organelle → job). `pairs` are the
+   * correct pairs; the right side is shown shuffled. Extra wrong options (`distractors`) are allowed.
+   */
+  | { kind: "match"; pairs: [RichText, RichText][]; distractors?: RichText[]; label?: Text };
 
 export type Feedback = {
   correct: boolean;
@@ -99,7 +109,13 @@ export type Exercise = {
   visual?: { component: ComponentType<Record<string, unknown>>; props: Record<string, unknown> };
 };
 
+/**
+ * How deep a topic goes: 1 beginner (Einsteiger), 2 intermediate (Fortgeschritten),
+ * 3 expert (Experte, up to Abitur and first university steps). Every topic has its own
+ * depth per level (see LevelMeta.depth). Practice at a level uses generate(level).
+ */
 export type Level = 1 | 2 | 3;
+export const LEVELS: Level[] = [1, 2, 3];
 
 export type LessonStep =
   | {
@@ -148,9 +164,33 @@ export type Area =
   | "bonding"
   | "reactions"
   | "chemcalc"
-  | "organic";
+  | "organic"
+  // Biology
+  | "cells"
+  | "botany"
+  | "zoology"
+  | "human"
+  | "genetics"
+  | "evolution"
+  | "ecology";
 
+/** One level's lesson and cheat sheet. */
+export type LevelLesson = {
+  lesson: LessonStep[];
+  summary: SummaryBlock[];
+};
+
+/**
+ * A topic: lessons and cheat sheets per level (a level without one shows "coming soon")
+ * and practice tasks for every level.
+ */
 export type Topic = TopicMeta & {
+  lessons: Partial<Record<Level, LevelLesson>>;
+  generate: (level: Level, rng: Rng) => Exercise;
+};
+
+/** A topic written before levels: one lesson, placed at the level its catalog entry names. */
+export type SingleLessonTopic = TopicMeta & {
   summary: SummaryBlock[];
   lesson: LessonStep[];
   generate: (level: Level, rng: Rng) => Exercise;
@@ -168,4 +208,11 @@ export const AREAS: Record<Area, { title: Text; blurb: Text }> = {
   reactions: { title: tx("Reactions", "Reaktionen"), blurb: tx("Substances turning into new ones", "Aus Stoffen werden neue Stoffe") },
   chemcalc: { title: tx("Calculating", "Chemisches Rechnen"), blurb: tx("Moles, masses and concentrations", "Stoffmenge, Masse und Konzentration") },
   organic: { title: tx("Organic chemistry", "Organische Chemie"), blurb: tx("The chemistry of carbon", "Die Chemie des Kohlenstoffs") },
+  cells: { title: tx("Cells", "Zellbiologie"), blurb: tx("The building blocks of life", "Die Bausteine des Lebens") },
+  botany: { title: tx("Plants", "Botanik"), blurb: tx("How plants are built, feed and reproduce", "Wie Pflanzen gebaut sind, sich ernähren und vermehren") },
+  zoology: { title: tx("Animals", "Zoologie"), blurb: tx("The diversity of animals", "Die Vielfalt der Tiere") },
+  human: { title: tx("The human body", "Mensch und Gesundheit"), blurb: tx("Organs, systems and staying healthy", "Organe, Organsysteme und Gesundheit") },
+  genetics: { title: tx("Genetics", "Genetik"), blurb: tx("Genes, DNA and inheritance", "Gene, DNA und Vererbung") },
+  evolution: { title: tx("Evolution", "Evolution"), blurb: tx("How life changes over time", "Wie sich das Leben verändert") },
+  ecology: { title: tx("Ecology", "Ökologie"), blurb: tx("Living things and their environment", "Lebewesen und ihre Umwelt") },
 };

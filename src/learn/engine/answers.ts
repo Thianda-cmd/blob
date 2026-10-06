@@ -2,6 +2,7 @@ import type { Locale } from "@/i18n/config";
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { AnswerSpec, Feedback, Mistake } from "@/learn/types";
 import { balanceSrc, checkBalance, checkFormula, checkMulti, checkWord, readCoefficients, wordDisplay } from "@/learn/chemistry/check";
+import { checkMatch, checkOrder, matchShowsMistake, orderShowsMistake } from "./arrange";
 import { diagnoseExpr, diagnoseFraction, diagnoseInequality, diagnoseNumber, diagnosePair, diagnoseSolutions, type Diagnosis } from "./diagnose";
 import { close, equivalent, isExpanded, likeTermsCombined, parse, parseNumber, toDisplay } from "./expr";
 import { gcd } from "./rng";
@@ -13,7 +14,11 @@ export type AnswerValue =
   | { kind: "list"; values: string[]; none?: boolean }
   | { kind: "inequality"; op: string; text: string }
   | { kind: "choice"; index: number }
-  | { kind: "multi"; indices: number[] };
+  | { kind: "multi"; indices: number[] }
+  /** Item indices (in spec.items) in the order the student arranged them. */
+  | { kind: "order"; order: number[] }
+  /** For each left item, the index of the chosen partner in matchOptions(spec). */
+  | { kind: "match"; picks: (number | null)[] };
 
 const nearly = (a: number, b: number, tol = 1e-6) => close(a, b, tol) || Math.abs(a - b) < tol;
 
@@ -157,6 +162,10 @@ function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
       return answer.kind === "list" ? checkBalance(spec.equation, answer.values) : { correct: false };
     case "word":
       return answer.kind === "text" ? checkWord(spec.accept, answer.text) : { correct: false };
+    case "order":
+      return answer.kind === "order" ? checkOrder(spec, answer.order) : { correct: false };
+    case "match":
+      return answer.kind === "match" ? checkMatch(spec, answer.picks) : { correct: false };
   }
 }
 
@@ -190,6 +199,9 @@ function matches(when: AnswerSpec, spec: AnswerSpec, answer: AnswerValue): boole
     const got = answer.kind === "list" ? readCoefficients(answer.values) : null;
     return !!got && got.length === when.coefficients.length && got.every((c, i) => c === when.coefficients[i]);
   }
+  // Orders and matchings: the mistake names the wrong arrangement (or the wrong pairs) in words.
+  if (when.kind === "order" && spec.kind === "order") return answer.kind === "order" && orderShowsMistake(spec, answer.order, when);
+  if (when.kind === "match" && spec.kind === "match") return answer.kind === "match" && matchShowsMistake(spec, answer.picks, when);
   return checkCore(when, answer).correct;
 }
 
@@ -245,7 +257,9 @@ function diagnose(spec: AnswerSpec, answer: AnswerValue): Diagnosis | null {
     case "formula":
     case "balance":
     case "word":
-      // Chemistry answers are diagnosed inside their own checkers.
+    case "order":
+    case "match":
+      // Chemistry answers, orders and matchings are diagnosed inside their own checkers.
       return null;
   }
 }
@@ -288,5 +302,9 @@ export function answerDisplay(spec: AnswerSpec, locale: Locale): string {
       return balanceSrc(spec.equation, spec.coefficients);
     case "word":
       return wordDisplay(spec.accept, locale);
+    case "order":
+    case "match":
+      // Shown as cards by the exercise card.
+      return "";
   }
 }

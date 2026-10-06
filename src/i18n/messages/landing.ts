@@ -72,8 +72,8 @@ export const landingText = defineMessages({
       visuals: { level: "Level 2", correct: "Correct!", grade: "Grade", good: "Good", rule: "Minus in front" },
       topics: {
         title: "24 topics from class",
-        subjects: { maths: "Maths", chemistry: "Chemistry" },
-        body: { maths: "From brackets to the pq formula.", chemistry: "From atoms to alkanes." },
+        subjects: { maths: "Maths", chemistry: "Chemistry", biology: "Biology" },
+        body: { maths: "From brackets to the pq formula.", chemistry: "From atoms to alkanes.", biology: "From the cell to whole ecosystems, in three levels." },
         minutes: (n: number) => `${n} min`,
       },
     },
@@ -231,8 +231,8 @@ export const landingText = defineMessages({
       visuals: { level: "Stufe 2", correct: "Richtig!", grade: "Note", good: "Gut", rule: "Minus davor" },
       topics: {
         title: "24 Themen aus dem Unterricht",
-        subjects: { maths: "Mathe", chemistry: "Chemie" },
-        body: { maths: "Von der Klammer bis zur pq-Formel.", chemistry: "Vom Atombau bis zu den Alkanen." },
+        subjects: { maths: "Mathe", chemistry: "Chemie", biology: "Biologie" },
+        body: { maths: "Von der Klammer bis zur pq-Formel.", chemistry: "Vom Atombau bis zu den Alkanen.", biology: "Von der Zelle bis zum Ökosystem, in drei Stufen." },
         minutes: (n) => `${n} Min.`,
       },
     },

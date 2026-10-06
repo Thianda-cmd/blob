@@ -11,6 +11,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LearnPage() {
-  const { progress, days } = await loadLearnState();
-  return <LearnHome subject={lastSubject(progress)} progress={progress} days={days} />;
+  const { progress, levels, days } = await loadLearnState();
+  return <LearnHome subject={lastSubject(progress)} progress={progress} levels={levels} days={days} />;
 }

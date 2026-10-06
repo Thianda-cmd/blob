@@ -9,7 +9,7 @@ import { lastSubject, subjectCatalog, SUBJECTS, topicHref, upNext } from "@/lear
 import { DAILY_GOAL, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { cn } from "@/lib/utils";
-import { MathView } from "./MathView";
+import { TopicGlyph } from "./TopicGlyph";
 import { Ring } from "./Ring";
 import { topicNames } from "./topicNames";
 
@@ -55,7 +55,7 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
           </div>
         </div>
         <div className="grid h-14 w-24 shrink-0 place-items-center rounded-xl bg-surface transition-colors group-hover:bg-blob-soft/60">
-          <MathView src={next.glyph} size="sm" animate={false} />
+          <TopicGlyph topic={next} size="sm" />
         </div>
         <ArrowRight className="size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
       </div>

@@ -11,7 +11,7 @@ import { topicMeta } from "@/learn/catalog";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { add, div, eq, frac, mul, neg, show, sub, type Frac } from "@/learn/engine/frac";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { Graph, type GraphProps } from "@/learn/visuals/Graph";
 import { alongLine, crossing, Plane, PlaneDot, PlaneHandle, PlaneLine, PlanePath, PlaneTag, planeGeo, StepSlider, TONE, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";

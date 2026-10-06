@@ -5,7 +5,7 @@ import { resolveText, tx, type Text } from "@/i18n/text";
 import { topicMeta } from "@/learn/catalog";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { createRng, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { decText } from "@/learn/chemistry/format";
 import { CASES, EXAMPLES, LOOKALIKES, METHODS, MIX_TYPES, PROPS, PURE, type Case, type Method, type MixType, type Prop } from "@/learn/chemistry/mixtures-data";
 import { STEPS, namesOf, run, scenario, whyNot, type Scenario, type Step } from "@/learn/chemistry/mixtures-lab";

@@ -5,8 +5,8 @@ import { getLocale } from "@/i18n/server";
 import { resolveText } from "@/i18n/text";
 import { findTopicMeta } from "@/learn/catalog";
 import { PracticePlayer } from "@/learn/components/PracticePlayer";
+import { levelProgress, parseLevel, suggestedLevel } from "@/learn/levels";
 import { loadLearnState, newSeed } from "@/learn/server";
-import type { Level } from "@/learn/types";
 
 export async function generateMetadata({ params, searchParams }: PageProps<"/study/[subject]/[topic]/practice">): Promise<Metadata> {
   const [{ subject, topic }, query, locale] = await Promise.all([params, searchParams, getLocale()]);
@@ -20,10 +20,21 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/stu
 export default async function PracticePage({ params, searchParams }: PageProps<"/study/[subject]/[topic]/practice">) {
   const [{ subject, topic }, query] = await Promise.all([params, searchParams]);
   if (findTopicMeta(topic)?.subject !== subject) notFound();
-  const { progress, days } = await loadLearnState();
+  const meta = findTopicMeta(topic)!;
+  const { progress, levels, days } = await loadLearnState();
   const mode = query.mode === "test" ? "test" : "practice";
-  const requested = Number(query.level);
-  const level = requested === 1 || requested === 2 || requested === 3 ? (requested as Level) : undefined;
+  const level = parseLevel(query.level) ?? suggestedLevel(meta, progress[topic], levels);
   const seed = newSeed();
-  return <PracticePlayer key={seed} slug={topic} mode={mode} level={level} mastery={progress[topic]?.mastery ?? 0} days={days} seed={seed} />;
+  return (
+    <PracticePlayer
+      key={seed}
+      slug={topic}
+      mode={mode}
+      level={level}
+      mastery={progress[topic]?.mastery ?? 0}
+      levelMastery={levelProgress(topic, level, progress[topic], levels).mastery}
+      days={days}
+      seed={seed}
+    />
+  );
 }

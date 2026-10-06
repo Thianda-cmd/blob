@@ -9,7 +9,7 @@ import { atomIon, ionFormula } from "@/learn/chemistry/ionic-bonds-ions";
 import { bondPairs, CovalentBondsLewisVisual, lonePairs, MOLECULES, valenceTotal } from "@/learn/chemistry/visuals/CovalentBondsLewis";
 import { bondKind, CovalentBondsPolarity, deltaEn, en1, IONIC_MIN, NONPOLAR_MAX, type BondKind } from "@/learn/chemistry/visuals/CovalentBondsPolarity";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, RichText, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, RichText, SingleLessonTopic as Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // Helpers

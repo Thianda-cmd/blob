@@ -11,7 +11,7 @@ import { AtomsShellFiller } from "@/learn/chemistry/visuals/AtomsShellFiller";
 import { ElementTile, LookupTable, NuclideCard, visual } from "@/learn/chemistry/visuals/AtomsVisuals";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { createRng, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // Notation and names

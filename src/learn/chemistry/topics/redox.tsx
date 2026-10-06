@@ -4,7 +4,7 @@ import type { Locale } from "@/i18n/config";
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { balanceMistakes, coefSrc, solve, strategy } from "../balancing-core";
 import { element } from "../elements";
 import { HALVES, LAB_METALS, OX_CHANGES, metal, metalSwap, oxidationNumbers, reacts, roman, signed, type Half, type Metal, type OxChange } from "../redox-data";

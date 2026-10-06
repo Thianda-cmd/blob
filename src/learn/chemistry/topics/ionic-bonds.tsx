@@ -31,7 +31,7 @@ import { IonicBondsBuilder } from "@/learn/chemistry/visuals/IonicBondsBuilder";
 import { IonicBondsLattice } from "@/learn/chemistry/visuals/IonicBondsLattice";
 import { IonicBondsAtom, IonicBondsTransfer } from "@/learn/chemistry/visuals/IonicBondsTransfer";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, RichText, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, RichText, SingleLessonTopic as Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // Small helpers

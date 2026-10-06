@@ -10,7 +10,7 @@ import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
 import { showTerms, type Term } from "@/learn/engine/terms";
 import { equivalentText } from "@/learn/engine/expr";
-import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // A small model of sums with brackets, rendered with stable token keys so each

@@ -17,6 +17,6 @@ export async function generateMetadata({ params }: PageProps<"/learn/[subject]">
 export default async function SubjectPage({ params }: PageProps<"/learn/[subject]">) {
   const { subject } = await params;
   if (!isSubject(subject)) notFound();
-  const { progress, days } = await loadLearnState();
-  return <LearnHome subject={subject} progress={progress} days={days} />;
+  const { progress, levels, days } = await loadLearnState();
+  return <LearnHome subject={subject} progress={progress} levels={levels} days={days} />;
 }

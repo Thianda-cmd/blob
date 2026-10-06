@@ -10,7 +10,7 @@ import { topicMeta } from "@/learn/catalog";
 import { parseDisplay, type DNode } from "@/learn/engine/display";
 import { add, div as qdiv, frac, mul as qmul, neg as qneg, show as qshow, value as qvalue, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------

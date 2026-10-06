@@ -15,6 +15,14 @@ export type TopicProgress = {
 
 export type LearnDay = { day: string; xp: number };
 
+/**
+ * Progress rows per level are stored next to the topic's row as "<slug>@<level>". The topic row
+ * keeps the totals (XP, overall mastery, "a lesson is done"); the level rows say which level's
+ * lesson is done and how well that level's practice goes.
+ */
+export const levelKey = (slug: string, level: number) => `${slug}@${level}`;
+export const isLevelKey = (key: string) => key.includes("@");
+
 export const DAILY_GOAL = 60;
 
 export const EMPTY_PROGRESS = (topic: string): TopicProgress => ({
@@ -63,8 +71,6 @@ export function masteryLabel(m: number, locale: Locale) {
   return learnText[locale].mastery[masteryStage(m)];
 }
 
-/** Practice level that fits a mastery score. */
-export const levelFor = (mastery: number): 1 | 2 | 3 => (mastery < 30 ? 1 : mastery < 65 ? 2 : 3);
 
 /** New mastery after one answer at a level (1–3). */
 export function nextMastery(m: number, correct: boolean, level: number) {
@@ -74,7 +80,18 @@ export function nextMastery(m: number, correct: boolean, level: number) {
 
 export async function record(
   supabase: SupabaseClient,
-  input: { topic: string; xp: number; attempts: number; correct: number; mastery: number; streak: number; lesson?: boolean },
+  input: {
+    topic: string;
+    xp: number;
+    attempts: number;
+    correct: number;
+    mastery: number;
+    streak: number;
+    lesson?: boolean;
+    /** The level this was at; its own row gets the same numbers and `levelMastery`. */
+    level?: number;
+    levelMastery?: number;
+  },
 ) {
   const { error } = await supabase.rpc("learn_record", {
     p_topic: input.topic,
@@ -85,6 +102,7 @@ export async function record(
     p_mastery: input.mastery,
     p_streak: input.streak,
     p_lesson: input.lesson ?? false,
+    ...(input.level ? { p_level: input.level, p_level_mastery: input.levelMastery ?? input.mastery } : {}),
   });
   return !error;
 }

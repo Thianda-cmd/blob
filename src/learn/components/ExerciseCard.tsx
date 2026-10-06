@@ -326,5 +326,36 @@ function Solution({ spec }: { spec: AnswerSpec }) {
     );
   }
   if (spec.kind === "word") return <span className="font-medium text-ink">{resolveText(spec.accept[0], locale)}</span>;
+  if (spec.kind === "order") {
+    return (
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {spec.items.map((item, i) => (
+          <li key={i} className="flex items-center gap-1.5">
+            {i > 0 && <span className="text-ink-3">→</span>}
+            <span className="rounded-lg border border-line bg-raised px-2 py-0.5 font-medium text-ink">
+              <Inline text={item} />
+            </span>
+          </li>
+        ))}
+      </ol>
+    );
+  }
+  if (spec.kind === "match") {
+    return (
+      <ul className="grid gap-1">
+        {spec.pairs.map(([left, right], i) => (
+          <li key={i} className="flex flex-wrap items-center gap-1.5">
+            <span className="font-medium text-ink">
+              <Inline text={left} />
+            </span>
+            <span className="text-ink-3">→</span>
+            <span className="rounded-lg border border-line bg-raised px-2 py-0.5 text-ink">
+              <Inline text={right} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
   return <MathView src={answerDisplay(spec, locale) || "–"} size="sm" animate={false} className="text-ink" />;
 }

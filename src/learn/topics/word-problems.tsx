@@ -12,7 +12,7 @@ import { Inline } from "@/learn/components/Rich";
 import { topicMeta } from "@/learn/catalog";
 import { check } from "@/learn/engine/answers";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------

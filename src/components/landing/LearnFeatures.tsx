@@ -7,8 +7,9 @@ import { useId, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
-import { subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
+import { firstLessonMinutes, subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
+import { TopicGlyph } from "@/learn/components/TopicGlyph";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -152,7 +153,7 @@ function Streak() {
   );
 }
 
-/** The 12 maths topics as compact tiles with their glyphs. */
+/** Each subject's topics as compact tiles with their glyphs. */
 export function TopicGrid() {
   const t = useMessages(landingText).learn.topics;
   const locale = useLocale();
@@ -167,7 +168,7 @@ export function TopicGrid() {
           <p className="text-[13.5px] text-ink-3">{t.body[subject]}</p>
         </div>
         <div className="flex rounded-xl border border-line bg-raised p-1 shadow-card" role="tablist">
-          {(["maths", "chemistry"] as const).map((s) => (
+          {(["maths", "chemistry", "biology"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -199,10 +200,10 @@ export function TopicGrid() {
                 className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
               >
                 <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">
-                  <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />
+                  {topic.icon ? <TopicGlyph topic={topic} size="sm" /> : <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />}
                 </span>
                 <span className="mt-2.5 px-1 text-[13.5px] font-medium leading-snug">{resolveText(topic.title, locale)}</span>
-                <span className="mt-auto px-1 pb-0.5 pt-1 text-[12px] text-ink-3">{t.minutes(topic.minutes)}</span>
+                <span className="mt-auto px-1 pb-0.5 pt-1 text-[12px] text-ink-3">{t.minutes(firstLessonMinutes(topic))}</span>
               </Link>
             </motion.li>
           ))}

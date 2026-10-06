@@ -38,6 +38,42 @@
   --shadow-pop: 0 1px 1px rgb(28 27 24 / 0.04), 0 6px 16px -4px rgb(28 27 24 / 0.12),
     0 18px 40px -12px rgb(28 27 24 / 0.18);
   --shadow-card: 0 1px 0 rgb(28 27 24 / 0.03), 0 1px 3px rgb(28 27 24 / 0.06);
+
+  /* Biology drawings (src/learn/biology): soft textbook colours, fill + a deeper outline. */
+  --bio-outline: #3d3a33;
+  --bio-cell: #fbf1d6;
+  --bio-membrane: #d9a441;
+  --bio-wall: #8fbf6a;
+  --bio-wall-deep: #4f7d35;
+  --bio-leaf: #9ccc74;
+  --bio-leaf-deep: #4a7d2f;
+  --bio-chloro: #6fae45;
+  --bio-nucleus: #c7b6f2;
+  --bio-nucleus-deep: #6b52b8;
+  --bio-mito: #f2b38a;
+  --bio-mito-deep: #c0663b;
+  --bio-vacuole: #cfe6f5;
+  --bio-water: #6aaee0;
+  --bio-water-deep: #2f6fa6;
+  --bio-blood: #d9443a;
+  --bio-blood-low: #6b72c9;
+  --bio-flesh: #f3c9b8;
+  --bio-flesh-deep: #c4806a;
+  --bio-bone: #efe6cf;
+  --bio-wood: #b5875a;
+  --bio-wood-deep: #7a5431;
+  --bio-soil: #a98260;
+  --bio-sun: #f4c542;
+  --bio-petal: #f19ec0;
+  --bio-petal-deep: #c4527f;
+  --bio-pollen: #f2b632;
+  --bio-nerve: #f0b45b;
+  --bio-nerve-deep: #b8741c;
+  --bio-a: #e8664f;
+  --bio-t: #4fa3e0;
+  --bio-g: #57b26a;
+  --bio-c: #f2c045;
+  --bio-u: #9b7be0;
   color-scheme: light;
 }
 
@@ -66,6 +102,36 @@
   --shadow-pop: 0 1px 1px rgb(0 0 0 / 0.3), 0 8px 24px -6px rgb(0 0 0 / 0.55),
     0 24px 48px -16px rgb(0 0 0 / 0.6);
   --shadow-card: 0 1px 0 rgb(0 0 0 / 0.2), 0 1px 3px rgb(0 0 0 / 0.3);
+
+  --bio-outline: #d8d4c8;
+  --bio-cell: #3a3424;
+  --bio-membrane: #c9963a;
+  --bio-wall: #5d8a43;
+  --bio-wall-deep: #9fd07c;
+  --bio-leaf: #4f7a35;
+  --bio-leaf-deep: #a6d884;
+  --bio-chloro: #6fae45;
+  --bio-nucleus: #4b3f78;
+  --bio-nucleus-deep: #b4a1f0;
+  --bio-mito: #8a5236;
+  --bio-mito-deep: #f0a77c;
+  --bio-vacuole: #2b4252;
+  --bio-water: #4f8fc2;
+  --bio-water-deep: #9ccbf0;
+  --bio-blood: #c9463c;
+  --bio-blood-low: #7178cf;
+  --bio-flesh: #6b4a40;
+  --bio-flesh-deep: #e0a28c;
+  --bio-bone: #5c5444;
+  --bio-wood: #7d5c3c;
+  --bio-wood-deep: #d6a777;
+  --bio-soil: #6e5640;
+  --bio-sun: #e8b931;
+  --bio-petal: #a8587a;
+  --bio-petal-deep: #f2a3c4;
+  --bio-pollen: #d9a12a;
+  --bio-nerve: #a87430;
+  --bio-nerve-deep: #f2bf72;
   color-scheme: dark;
 }
 

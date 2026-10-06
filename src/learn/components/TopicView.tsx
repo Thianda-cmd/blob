@@ -1,39 +1,62 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Printer, Timer } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, Printer, Timer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
-import { type LearnDay, levelFor, masteryLabel, type TopicProgress } from "@/learn/progress";
+import { type LearnDay, masteryLabel, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
-import { studyHref, SUBJECTS } from "@/learn/catalog";
-import { getTopic } from "@/learn/topics";
-import type { Level, SummaryBlock } from "@/learn/types";
+import { studyHref, SUBJECTS, topicHref } from "@/learn/catalog";
+import { levelProgress, type LevelRows, suggestedLevel } from "@/learn/levels";
+import { useTopic } from "@/learn/topics";
+import { LEVELS, type Level, type SummaryBlock } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { MathView } from "./MathView";
 import { Rich } from "./Rich";
 import { Ring } from "./Ring";
+import { TopicGlyph } from "./TopicGlyph";
 import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
 
-export function TopicView({ slug, progress, days }: { slug: string; progress: TopicProgress; days: LearnDay[] }) {
-  const topic = getTopic(slug)!;
+export function TopicView({
+  slug,
+  progress,
+  levels: rows,
+  days,
+  initialLevel,
+}: {
+  slug: string;
+  progress: TopicProgress;
+  levels: LevelRows;
+  days: LearnDay[];
+  initialLevel?: Level;
+}) {
+  const topic = useTopic(slug);
   const today = useTodayXp(days);
-  const [level, setLevel] = useState<Level | null>(null);
+  const [level, setLevel] = useState<Level>(() => initialLevel ?? suggestedLevel(topic, progress, rows));
   const accuracy = progress.attempts ? Math.round((progress.correct / progress.attempts) * 100) : null;
-  const checks = topic.lesson.filter((s) => s.type === "check").length;
-  const suggested = levelFor(progress.mastery);
-  const tip = topic.summary.find((b) => b.tone === "tip") ?? topic.summary[0];
   const t = useMessages(learnText);
   const tt = useText();
   const locale = useLocale();
   const names = topicNames(topic, locale);
   const subjectName = tt(SUBJECTS.find((s) => s.slug === topic.subject)!.title);
-  const levelName = (l: Level) => t.levels[l];
+
+  const meta = topic.levels[level];
+  const content = topic.lessons[level];
+  const state = levelProgress(slug, level, progress, rows);
+  const checks = content?.lesson.filter((s) => s.type === "check").length ?? 0;
+  const summary = content?.summary ?? [];
+  const tip = summary.find((b) => b.tone === "tip") ?? summary[0];
+
+  function choose(l: Level) {
+    setLevel(l);
+    // Keep the level in the address, so going back from a lesson lands on the same level.
+    window.history.replaceState(null, "", topicHref(topic, l));
+  }
 
   return (
     <>
@@ -55,7 +78,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                 className="relative grid h-[120px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised shadow-card sm:w-[200px]"
               >
                 <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
-                <MathView src={topic.glyph} size="lg" animate={false} className="relative" />
+                <TopicGlyph topic={topic} size="lg" className="relative" />
               </motion.div>
               <div className="min-w-0">
                 <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
@@ -84,55 +107,74 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
             </div>
           </header>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-3 print:hidden">
-            <ActionCard
-              delay={0}
-              icon={<BookOpen className="size-5" />}
-              title={t.topic.lesson}
-              text={t.topic.lessonText(checks)}
-              meta={
-                <>
-                  <Clock className="size-3.5" /> {t.minutes(topic.minutes)} · {t.topic.steps(topic.lesson.length)}
-                  {progress.lesson_done && (
-                    <span className="ml-auto flex items-center gap-1 font-medium text-ok">
-                      <Check className="size-3.5" strokeWidth={3} /> {t.topic.done}
-                    </span>
-                  )}
-                </>
-              }
-              href={studyHref(topic, "lesson")}
-              cta={progress.lesson_done ? t.topic.reviewLesson : t.topic.startLesson}
-              primary={!progress.lesson_done}
-            />
+          <section className="mt-8 print:hidden" aria-labelledby="topic-levels">
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <h2 id="topic-levels" className="font-display text-[19px] font-semibold tracking-[-0.01em]">
+                {t.topic.levelsTitle}
+              </h2>
+              <span className="text-[13px] text-ink-3">{t.topic.levelsText}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="tablist" aria-labelledby="topic-levels">
+              {LEVELS.map((l) => (
+                <LevelTab
+                  key={l}
+                  level={l}
+                  name={t.levels[l]}
+                  depth={tt(topic.levels[l].depth)}
+                  written={!!topic.lessons[l] && !!topic.levels[l].minutes}
+                  state={levelProgress(slug, l, progress, rows)}
+                  selected={l === level}
+                  onSelect={() => choose(l)}
+                />
+              ))}
+            </div>
+            {meta.blurb && (
+              <motion.p key={level} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-3 max-w-[760px] text-[14px] leading-relaxed text-ink-2">
+                {tt(meta.blurb)}
+              </motion.p>
+            )}
+          </section>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3 print:hidden">
+            {content && meta.minutes ? (
+              <ActionCard
+                delay={0}
+                icon={<BookOpen className="size-5" />}
+                title={t.topic.lesson}
+                text={t.topic.lessonText(checks)}
+                meta={
+                  <>
+                    <Clock className="size-3.5" /> {t.minutes(meta.minutes)} · {t.topic.steps(content.lesson.length)}
+                    {state.lesson_done && (
+                      <span className="ml-auto flex items-center gap-1 font-medium text-ok">
+                        <Check className="size-3.5" strokeWidth={3} /> {t.topic.done}
+                      </span>
+                    )}
+                  </>
+                }
+                href={studyHref(topic, "lesson", level)}
+                cta={state.lesson_done ? t.topic.reviewLesson : t.topic.startLesson}
+                primary={!state.lesson_done}
+              />
+            ) : (
+              <SoonCard delay={0} title={t.topic.lesson} text={t.topic.lessonSoon} badge={t.topic.comingSoon} />
+            )}
             <ActionCard
               delay={0.05}
               icon={<Dumbbell className="size-5" />}
               title={t.topic.practice}
               text={t.topic.practiceText}
               meta={
-                <div className="flex w-full items-center gap-1">
-                  {([null, 1, 2, 3] as const).map((l) => (
-                    <button
-                      key={String(l)}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setLevel(l);
-                      }}
-                      className={cn(
-                        "rounded-md px-2 py-1 text-[12px] font-medium transition-colors",
-                        level === l ? "bg-ink text-paper" : "text-ink-2 hover:bg-hover hover:text-ink",
-                      )}
-                      title={l ? levelName(l) : t.topic.adapts(suggested)}
-                      aria-pressed={level === l}
-                    >
-                      {l ? t.topic.levelShort(l) : t.topic.auto}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <span className="h-1.5 w-16 overflow-hidden rounded-full bg-line">
+                    <span className="block h-full rounded-full bg-blob" style={{ width: `${state.mastery}%` }} />
+                  </span>
+                  {t.topic.levelMastery(masteryLabel(state.mastery, locale))}
+                </>
               }
-              href={`${studyHref(topic, "practice")}${level ? `?level=${level}` : ""}`}
-              cta={level ? t.topic.practiseLevel(levelName(level)) : t.topic.practise}
-              primary={progress.lesson_done}
+              href={studyHref(topic, "practice", level)}
+              cta={t.topic.practise}
+              primary={!!content && state.lesson_done}
             />
             <ActionCard
               delay={0.1}
@@ -144,7 +186,7 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
                   <Clock className="size-3.5" /> {t.topic.aboutMinutes(6)}
                 </>
               }
-              href={`${studyHref(topic, "practice")}?mode=test`}
+              href={`${studyHref(topic, "practice", level)}&mode=test`}
               cta={t.topic.takeTest}
             />
           </div>
@@ -152,19 +194,23 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
           <section className="mt-10">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="font-display text-[22px] font-bold tracking-[-0.015em]">{t.topic.cheatSheet}</h2>
-                <p className="text-[13.5px] text-ink-3 print:hidden">{t.topic.cheatSheetText}</p>
+                <h2 className="font-display text-[22px] font-bold tracking-[-0.015em]">
+                  {t.topic.cheatSheet} <span className="font-medium text-ink-3">· {t.levels[level]}</span>
+                </h2>
+                <p className="text-[13.5px] text-ink-3 print:hidden">{summary.length ? t.topic.cheatSheetText : t.topic.cheatSheetSoon}</p>
               </div>
-              <button
-                onClick={() => window.print()}
-                className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink print:hidden"
-              >
-                <Printer className="size-4" /> {t.topic.print}
-              </button>
+              {summary.length > 0 && (
+                <button
+                  onClick={() => window.print()}
+                  className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink print:hidden"
+                >
+                  <Printer className="size-4" /> {t.topic.print}
+                </button>
+              )}
             </div>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="grid content-start gap-3 md:grid-cols-2">
-                {topic.summary.map((block, i) => (
+              <div key={level} className="grid content-start gap-3 md:grid-cols-2">
+                {summary.map((block, i) => (
                   <SummaryCard key={i} block={block} delay={0.1 + i * 0.05} />
                 ))}
               </div>
@@ -178,6 +224,89 @@ export function TopicView({ slug, progress, days }: { slug: string; progress: To
         </div>
       </div>
     </>
+  );
+}
+
+/** Three little bars, filled up to the level: one for beginner, three for expert. */
+export function LevelBars({ level, className }: { level: Level; className?: string }) {
+  return (
+    <span className={cn("flex items-end gap-[2px]", className)} aria-hidden>
+      {LEVELS.map((l) => (
+        <span key={l} className={cn("w-[3px] rounded-full", l <= level ? "bg-current" : "bg-current opacity-25")} style={{ height: 4 + l * 3 }} />
+      ))}
+    </span>
+  );
+}
+
+function LevelTab({
+  level,
+  name,
+  depth,
+  written,
+  state,
+  selected,
+  onSelect,
+}: {
+  level: Level;
+  name: string;
+  depth: string;
+  written: boolean;
+  state: TopicProgress;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const t = useMessages(learnText);
+  const locale = useLocale();
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={cn(
+        "relative flex min-w-0 flex-col items-start rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background,box-shadow] sm:px-4 sm:py-3",
+        selected ? "border-blob/50 bg-blob-soft/45 shadow-card" : "border-line bg-raised hover:border-line-2",
+      )}
+    >
+      <span className={cn("flex items-center gap-1.5 text-[13.5px] font-semibold sm:text-[15px]", selected ? "text-blob-ink" : "text-ink")}>
+        <LevelBars level={level} />
+        <span className="truncate">{name}</span>
+      </span>
+      <span className="mt-0.5 truncate text-[11.5px] text-ink-3 sm:text-[12.5px]">{depth}</span>
+      <span className="mt-1.5 flex items-center gap-1 text-[11.5px] font-medium sm:text-[12px]">
+        {!written ? (
+          <span className="flex items-center gap-1 text-ink-3">
+            <Hourglass className="size-3" /> <span className="truncate">{t.topic.comingSoon}</span>
+          </span>
+        ) : state.lesson_done ? (
+          <span className="flex items-center gap-1 text-ok">
+            <Check className="size-3.5" strokeWidth={3} /> <span className="truncate">{t.topic.lessonDone}</span>
+          </span>
+        ) : (
+          <span className={cn("truncate", state.mastery > 0 ? "text-blob-ink" : "text-ink-3")}>{masteryLabel(state.mastery, locale)}</span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+function SoonCard({ title, text, badge, delay }: { title: string; text: string; badge: string; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, type: "spring", stiffness: 360, damping: 30 }}
+      className="flex flex-col rounded-2xl border border-dashed border-line-2 p-4"
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-9 place-items-center rounded-xl bg-hover text-ink-3">
+          <BookOpen className="size-5" />
+        </span>
+        <span className="font-display text-[17px] font-semibold text-ink-2">{title}</span>
+        <span className="ml-auto rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-3">{badge}</span>
+      </div>
+      <p className="mt-2.5 text-[13.5px] leading-relaxed text-ink-2">{text}</p>
+    </motion.div>
   );
 }
 

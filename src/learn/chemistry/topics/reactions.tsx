@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { REACTIONS } from "../balancing-core";
 import { dec } from "../format";
 import { EnergyDiagram, ReactionsEnergy, type EnergyKind } from "../visuals/ReactionsEnergy";

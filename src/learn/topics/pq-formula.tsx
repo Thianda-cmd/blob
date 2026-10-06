@@ -7,7 +7,7 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { Graph } from "@/learn/visuals/Graph";
 import { cn } from "@/lib/utils";
 

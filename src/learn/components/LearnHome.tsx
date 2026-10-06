@@ -9,16 +9,27 @@ import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
-import { studyHref, subjectCatalog, SUBJECTS, topicHref, upNext, type Subject, type TopicMeta } from "@/learn/catalog";
+import { firstLessonMinutes, studyHref, subjectCatalog, SUBJECTS, topicHref, upNext, type Subject, type TopicMeta } from "@/learn/catalog";
+import { levelProgress, type LevelRows, suggestedLevel } from "@/learn/levels";
 import { DAILY_GOAL, EMPTY_PROGRESS, masteryLabel, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useToday, useTodayXp } from "@/learn/session";
-import { AREAS } from "@/learn/types";
+import { AREAS, LEVELS } from "@/learn/types";
 import { cn } from "@/lib/utils";
-import { MathView } from "./MathView";
 import { Ring } from "./Ring";
+import { TopicGlyph } from "./TopicGlyph";
 import { topicNames } from "./topicNames";
 
-export function LearnHome({ subject, progress, days }: { subject: Subject; progress: Record<string, TopicProgress>; days: LearnDay[] }) {
+export function LearnHome({
+  subject,
+  progress,
+  levels,
+  days,
+}: {
+  subject: Subject;
+  progress: Record<string, TopicProgress>;
+  levels: LevelRows;
+  days: LearnDay[];
+}) {
   const today = useTodayXp(days);
   const catalog = subjectCatalog(subject);
   const info = SUBJECTS.find((s) => s.slug === subject)!;
@@ -94,7 +105,7 @@ export function LearnHome({ subject, progress, days }: { subject: Subject; progr
 
           <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0 space-y-9">
-              <UpNext topic={next} progress={nextProgress} />
+              <UpNext topic={next} progress={nextProgress} levels={levels} />
 
               {(info.areas ?? []).map((area, ai) => {
                 const topics = catalog.filter((t) => t.area === area);
@@ -107,7 +118,7 @@ export function LearnHome({ subject, progress, days }: { subject: Subject; progr
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {topics.map((t, i) => (
-                        <TopicCard key={t.slug} topic={t} progress={progress[t.slug]} delay={ai * 0.05 + i * 0.04} />
+                        <TopicCard key={t.slug} topic={t} progress={progress[t.slug]} levels={levels} delay={ai * 0.05 + i * 0.04} />
                       ))}
                     </div>
                   </section>
@@ -158,9 +169,10 @@ function StatChip({ icon, label, value, hot }: { icon: React.ReactNode; label: s
   );
 }
 
-function UpNext({ topic, progress }: { topic: TopicMeta; progress: TopicProgress }) {
+function UpNext({ topic, progress, levels }: { topic: TopicMeta; progress: TopicProgress; levels: LevelRows }) {
   const blob = useRef<BlobHandle>(null);
-  const started = progress.lesson_done;
+  const level = suggestedLevel(topic, progress, levels);
+  const started = levelProgress(topic.slug, level, progress, levels).lesson_done || !topic.levels[level].minutes;
   const t = useMessages(learnText);
   const tt = useText();
   const names = topicNames(topic, useLocale());
@@ -185,14 +197,14 @@ function UpNext({ topic, progress }: { topic: TopicMeta; progress: TopicProgress
           <p className="mt-2 max-w-[520px] text-[14.5px] leading-relaxed text-ink-2">{tt(topic.blurb)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
-              href={studyHref(topic, started ? "practice" : "lesson")}
+              href={studyHref(topic, started ? "practice" : "lesson", level)}
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-blob px-5 text-[14.5px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[transform,background] hover:bg-blob-deep active:scale-[0.97]"
             >
               {started ? <Dumbbell className="size-4" /> : <BookOpen className="size-4" />}
               {started ? t.home.practise : t.home.startLesson}
             </Link>
             <Link
-              href={topicHref(topic)}
+              href={topicHref(topic, level)}
               className="inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-[14px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
             >
               {t.home.openTopic} <ArrowRight className="size-4" />
@@ -200,14 +212,14 @@ function UpNext({ topic, progress }: { topic: TopicMeta; progress: TopicProgress
           </div>
         </div>
         <div className="hidden place-items-center rounded-2xl border border-line bg-surface/70 px-8 py-6 lg:grid">
-          <MathView src={topic.glyph} size="lg" animate={false} />
+          <TopicGlyph topic={topic} size="lg" />
         </div>
       </div>
     </motion.section>
   );
 }
 
-function TopicCard({ topic, progress, delay }: { topic: TopicMeta; progress?: TopicProgress; delay: number }) {
+function TopicCard({ topic, progress, levels, delay }: { topic: TopicMeta; progress?: TopicProgress; levels: LevelRows; delay: number }) {
   const mastery = progress?.mastery ?? 0;
   const t = useMessages(learnText);
   const tt = useText();
@@ -222,13 +234,9 @@ function TopicCard({ topic, progress, delay }: { topic: TopicMeta; progress?: To
         <div className="relative grid h-[78px] place-items-center overflow-hidden rounded-xl bg-surface transition-colors duration-300 group-hover:bg-blob-soft/60">
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" />
           <div className="relative transition-transform duration-300 group-hover:scale-[1.06]">
-            <MathView src={topic.glyph} size="md" animate={false} />
+            <TopicGlyph topic={topic} size="md" />
           </div>
-          {progress?.lesson_done && (
-            <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-full bg-ok text-white" title={t.home.lessonDone}>
-              <Check className="size-3" strokeWidth={3} />
-            </span>
-          )}
+          <LevelDots topic={topic} progress={progress} levels={levels} />
         </div>
         <div className="flex flex-1 flex-col px-1 pb-0.5 pt-3">
           <div className="text-[15px] font-semibold leading-snug">{names.title}</div>
@@ -246,12 +254,38 @@ function TopicCard({ topic, progress, delay }: { topic: TopicMeta; progress?: To
             <span className={cn("text-[11.5px] font-medium", mastery >= 85 ? "text-ok" : mastery > 0 ? "text-blob-ink" : "text-ink-3")}>{masteryLabel(mastery, locale)}</span>
             <span className="flex items-center gap-0.5 text-[11.5px] text-ink-3">
               <Clock className="size-3" />
-              {t.home.minutesShort(topic.minutes)}
+              {t.home.minutesShort(firstLessonMinutes(topic))}
             </span>
           </div>
         </div>
       </Link>
     </motion.div>
+  );
+}
+
+/** One dot per level: green when its lesson is done, purple ring when ready, dashed when coming soon. */
+function LevelDots({ topic, progress, levels }: { topic: TopicMeta; progress?: TopicProgress; levels: LevelRows }) {
+  const t = useMessages(learnText);
+  return (
+    <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-raised/85 px-1.5 py-1 shadow-card">
+      {LEVELS.map((l) => {
+        const written = !!topic.levels[l].minutes;
+        const done = written && levelProgress(topic.slug, l, progress, levels).lesson_done;
+        const name = t.levels[l];
+        return (
+          <span
+            key={l}
+            title={done ? t.home.levelDone(name) : written ? t.home.levelOpen(name) : t.home.levelSoon(name)}
+            className={cn(
+              "grid size-3.5 place-items-center rounded-full",
+              done ? "bg-ok text-white" : written ? "border-[1.5px] border-blob/70" : "border-[1.5px] border-dashed border-line-2",
+            )}
+          >
+            {done && <Check className="size-2.5" strokeWidth={3.5} />}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 

@@ -5,7 +5,7 @@ import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { topicMeta } from "@/learn/catalog";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { createRng, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { CHANGES, REVERSE, STATE_NAMES, SUBSTANCES, deAdj, degText, dePronoun, stateAt, substance, type Change, type State, type Substance } from "@/learn/chemistry/particles-data";
 import { ParticlesBox } from "@/learn/chemistry/visuals/ParticlesBox";
 import { HeatingChart, ParticlesHeatingLab, type CurvePoint } from "@/learn/chemistry/visuals/ParticlesCurve";

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, ArrowRight, Dumbbell } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Dumbbell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import type { BlobHandle, BlobMood } from "@/components/blob/Blob";
@@ -12,8 +12,8 @@ import { useText } from "@/i18n/useText";
 import type { LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
 import { studyHref, topicHref } from "@/learn/catalog";
-import { getTopic } from "@/learn/topics";
-import type { Feedback, LessonStep } from "@/learn/types";
+import { useTopic } from "@/learn/topics";
+import type { Feedback, LessonStep, Level } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent } from "./ExerciseCard";
 import { MathView } from "./MathView";
@@ -37,13 +37,25 @@ function openingLine(step: LessonStep, t: LessonText): Text {
 }
 
 /** A guided lesson: animated explanations, small interactive pieces and checks, with Blob as the tutor. */
-export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: number; days: LearnDay[] }) {
-  const topic = getTopic(slug)!;
-  const steps = topic.lesson;
+export function LessonPlayer({
+  slug,
+  level,
+  mastery,
+  levelMastery,
+  days,
+}: {
+  slug: string;
+  level: Level;
+  mastery: number;
+  levelMastery: number;
+  days: LearnDay[];
+}) {
+  const topic = useTopic(slug);
+  const steps = topic.lessons[level]!.lesson;
   const router = useRouter();
   const scope = useId();
   const today = useTodayXp(days);
-  const session = useStudySession({ topic: slug, mastery, todayXp: today.xp });
+  const session = useStudySession({ topic: slug, level, mastery, levelMastery, todayXp: today.xp });
   const blobRef = useRef<BlobHandle>(null);
   const wide = useWide();
   const t = useMessages(learnText);
@@ -59,7 +71,9 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
   const step = steps[index];
   const frames = step.type === "explain" ? (step.frames ?? []) : [];
-  const exitHref = topicHref(topic);
+  const exitHref = topicHref(topic, level);
+  const nextLevel = ([2, 3] as Level[]).find((l) => l > level && topic.lessons[l] && topic.levels[l].minutes);
+  const title = `${names.title} · ${t.levels[level]}`;
   const progress = finished ? 1 : (index + (frames.length > 1 ? frame / frames.length : 0)) / steps.length;
   const canBack = frame > 0 || (index > 0 && steps[index - 1].type !== "check" && step.type !== "check");
 
@@ -142,7 +156,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
   if (finished) {
     return (
       <div className="min-h-dvh">
-        <StudyTopBar exitHref={exitHref} title={names.title} progress={1} xp={session.xp} />
+        <StudyTopBar exitHref={exitHref} title={title} progress={1} xp={session.xp} />
         <SessionEnd
           title={t.lesson.complete}
           subtitle={t.lesson.completeText(names.title, topic.de)}
@@ -151,12 +165,17 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
             { label: t.lesson.checksRight, value: session.correct, suffix: ` / ${session.answered}`, tone: "ok" },
             { label: t.lesson.steps, value: steps.length },
           ]}
-          mastery={{ from: session.startMastery, to: session.mastery }}
+          mastery={{ from: session.startLevelMastery, to: session.levelMastery }}
           today={{ from: session.startToday, to: session.todayXp, goal: session.goal }}
         >
-          <StudyButton href={studyHref(topic, "practice")} variant="blob">
+          <StudyButton href={studyHref(topic, "practice", level)} variant="blob">
             <Dumbbell className="size-4" /> {t.lesson.practiceNow}
           </StudyButton>
+          {nextLevel && (
+            <StudyButton href={studyHref(topic, "lesson", nextLevel)} variant="ink">
+              <BookOpen className="size-4" /> {t.lesson.nextLevel(t.levels[nextLevel])}
+            </StudyButton>
+          )}
           <StudyButton href={exitHref} variant="ghost">
             {t.backToTopic}
           </StudyButton>
@@ -169,7 +188,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <StudyTopBar exitHref={exitHref} title={names.title} progress={progress} xp={session.xp} combo={session.combo} />
+      <StudyTopBar exitHref={exitHref} title={title} progress={progress} xp={session.xp} combo={session.combo} />
       <div className="mx-auto grid w-full max-w-[1360px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <Tutor say={say} mood={mood} blobRef={blobRef} size={wide ? 170 : 84} side={wide ? "left" : "top"} />
@@ -205,7 +224,7 @@ export function LessonPlayer({ slug, mastery, days }: { slug: string; mastery: n
                     xp={CHECK_XP}
                     onEvent={(e, info) => react(e, info.feedback)}
                     onDone={(r) => {
-                      session.answer({ correct: r.correct && !r.revealed, xp: earnedXp(CHECK_XP, r), level: 1 });
+                      session.answer({ correct: r.correct && !r.revealed, xp: earnedXp(CHECK_XP, r), level });
                       next();
                     }}
                   />

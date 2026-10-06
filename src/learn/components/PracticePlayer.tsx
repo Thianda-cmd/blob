@@ -9,10 +9,10 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import type { Text } from "@/i18n/text";
 import { createRng } from "@/learn/engine/rng";
-import { levelFor, type LearnDay } from "@/learn/progress";
+import type { LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
 import { topicHref } from "@/learn/catalog";
-import { getTopic } from "@/learn/topics";
+import { useTopic } from "@/learn/topics";
 import type { Exercise, Feedback, Level, Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent, type ExerciseResult } from "./ExerciseCard";
@@ -21,8 +21,7 @@ import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
 
 const ROUND = 10;
-/** A quick test climbs from easy to hard. */
-const TEST_LEVELS: Level[] = [1, 1, 2, 2, 2, 3, 3, 3];
+const TEST_TASKS = 8;
 
 const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
 
@@ -47,47 +46,48 @@ function grade(pct: number): number {
   return 6;
 }
 
-/** Practice round (adaptive, hints, retries) or a quick test (one try, graded). */
+/** Practice round at one level (hints, retries) or a quick test at that level (one try, graded). */
 export function PracticePlayer({
   slug,
   mode,
-  level: forced,
+  level,
   mastery,
+  levelMastery,
   days,
   seed,
 }: {
   slug: string;
   mode: "practice" | "test";
-  level?: Level;
+  level: Level;
   mastery: number;
+  levelMastery: number;
   days: LearnDay[];
   seed: number;
 }) {
-  const topic = getTopic(slug)!;
+  const topic = useTopic(slug);
   const router = useRouter();
   const wide = useWide();
   const today = useTodayXp(days);
-  const session = useStudySession({ topic: slug, mastery, todayXp: today.xp });
+  const session = useStudySession({ topic: slug, level, mastery, levelMastery, todayXp: today.xp });
   const blobRef = useRef<BlobHandle>(null);
   const test = mode === "test";
-  const total = test ? TEST_LEVELS.length : ROUND;
-  const firstLevel = test ? TEST_LEVELS[0] : (forced ?? levelFor(mastery));
+  const total = test ? TEST_TASKS : ROUND;
   const t = useMessages(learnText);
   const names = topicNames(topic, useLocale());
+  const levelName = t.levels[level];
 
   const [round, setRound] = useState(0);
   const [index, setIndex] = useState(0);
-  const [level, setLevel] = useState<Level>(firstLevel);
   const [history, setHistory] = useState<string[]>([]);
-  const [exercise, setExercise] = useState(() => make(topic, firstLevel, seed, []));
+  const [exercise, setExercise] = useState(() => make(topic, level, seed, []));
   const [results, setResults] = useState<SegmentState[]>(() => Array.from({ length: total }, (_, i) => (i === 0 ? "current" : "todo")));
   const [roundStats, setRoundStats] = useState({ right: 0, xp: 0, startXp: 0 });
   const [streakUp, setStreakUp] = useState(0);
-  const [streakDown, setStreakDown] = useState(0);
+  const [suggested, setSuggested] = useState(false);
   const [finished, setFinished] = useState(false);
   const [mood, setMood] = useState<BlobMood>("happy");
   const [say, setSay] = useState<Text | null>(() => (test ? t.practice.introTest(total) : t.practice.intro(ROUND)));
-  const exitHref = topicHref(topic);
+  const exitHref = topicHref(topic, level);
 
   const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (e.key === "Escape") router.push(exitHref);
@@ -135,49 +135,36 @@ export function PracticePlayer({
       return;
     }
 
-    // Adapt: two clean answers in a row → harder; two misses → easier.
-    let nextLevel = level;
+    // Four clean answers in a row below expert: Blob suggests the next level (once per round).
     let line: string | null = null;
-    let leveledUp = false;
-    if (test) nextLevel = TEST_LEVELS[nextIndex];
-    else {
+    if (!test) {
       const clean = right && r.firstTry && !r.usedHint;
       const up = clean ? streakUp + 1 : 0;
-      const down = right ? 0 : streakDown + 1;
-      if (up >= 2 && level < 3) {
-        nextLevel = (level + 1) as Level;
-        line = t.practice.levelUp(nextLevel);
-        leveledUp = true;
-        setStreakUp(0);
-      } else setStreakUp(up);
-      if (down >= 2 && level > 1) {
-        nextLevel = (level - 1) as Level;
-        line = t.practice.levelDown;
-        setStreakDown(0);
-      } else setStreakDown(down);
+      setStreakUp(up);
+      if (up >= 4 && level < 3 && !suggested) {
+        line = t.practice.readyNext(t.levels[level + 1]);
+        setSuggested(true);
+      }
     }
     const nextHistory = [...history, sig(exercise)];
     setHistory(nextHistory);
-    setLevel(nextLevel);
-    setExercise(make(topic, nextLevel, seed + round * 7919 + nextIndex * 31, nextHistory));
+    setExercise(make(topic, level, seed + round * 7919 + nextIndex * 31, nextHistory));
     setIndex(nextIndex);
     setMood("happy");
     setSay(line);
-    if (leveledUp) blobRef.current?.jump(1);
+    if (line) blobRef.current?.jump(1);
   }
 
   function restart() {
     const r = round + 1;
-    const lvl = test ? TEST_LEVELS[0] : levelFor(session.mastery);
     setRound(r);
     setIndex(0);
-    setLevel(lvl);
     setHistory([]);
-    setExercise(make(topic, lvl, seed + r * 7919, []));
+    setExercise(make(topic, level, seed + r * 7919, []));
     setResults(Array.from({ length: total }, (_, i) => (i === 0 ? "current" : "todo")));
     setRoundStats({ right: 0, xp: 0, startXp: session.xp });
     setStreakUp(0);
-    setStreakDown(0);
+    setSuggested(false);
     setFinished(false);
     setMood("happy");
     setSay(test ? t.practice.againTest : t.practice.again);
@@ -188,7 +175,7 @@ export function PracticePlayer({
     const g = grade(pct);
     return (
       <div className="min-h-dvh">
-        <StudyTopBar exitHref={exitHref} title={names.title} segments={results} xp={session.xp} />
+        <StudyTopBar exitHref={exitHref} title={`${names.title} · ${levelName}`} segments={results} xp={session.xp} />
         <SessionEnd
           title={
             test
@@ -201,7 +188,7 @@ export function PracticePlayer({
                 ? t.practice.roundGreat
                 : t.practice.roundDone
           }
-          subtitle={`${names.title} · ${names.school ?? names.area}`}
+          subtitle={`${names.title} · ${levelName}`}
           happy={pct >= 0.5}
           badge={
             test ? (
@@ -227,7 +214,7 @@ export function PracticePlayer({
             { label: t.practice.correct, value: roundStats.right, suffix: ` / ${total}`, tone: "ok" },
             { label: t.practice.bestStreak, value: session.bestCombo },
           ]}
-          mastery={{ from: session.startMastery, to: session.mastery }}
+          mastery={{ from: session.startLevelMastery, to: session.levelMastery }}
           today={{ from: session.startToday, to: session.todayXp, goal: session.goal }}
         >
           <StudyButton onClick={restart} variant="blob">
@@ -243,7 +230,13 @@ export function PracticePlayer({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <StudyTopBar exitHref={exitHref} title={test ? `${names.title} · ${t.practice.test}` : names.title} segments={results} xp={session.xp} combo={session.combo} />
+      <StudyTopBar
+        exitHref={exitHref}
+        title={`${names.title} · ${levelName}${test ? ` · ${t.practice.test}` : ""}`}
+        segments={results}
+        xp={session.xp}
+        combo={session.combo}
+      />
       <div className="mx-auto grid w-full max-w-[1360px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <Tutor say={say} mood={mood} blobRef={blobRef} size={wide ? 170 : 84} side={wide ? "left" : "top"} />
@@ -252,7 +245,7 @@ export function PracticePlayer({
           <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
             <span>{t.practice.taskOf(index + 1, total)}</span>
             <span className="text-line-2">·</span>
-            <span className="text-blob-ink">{test ? t.practice.test : t.level(level)}</span>
+            <span className="text-blob-ink">{test ? `${t.practice.test} · ${levelName}` : levelName}</span>
           </div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.section

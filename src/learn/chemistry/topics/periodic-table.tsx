@@ -7,7 +7,7 @@ import { LookupTable, visual } from "@/learn/chemistry/visuals/AtomsVisuals";
 import { eqn, PeriodicTableExplorer, PeriodicTableFamilies, PeriodicTableNobleGas, ROMAN } from "@/learn/chemistry/visuals/PeriodicTableWidgets";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { createRng, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // Names and helpers

@@ -5,6 +5,7 @@ import { getLocale } from "@/i18n/server";
 import { resolveText } from "@/i18n/text";
 import { findTopicMeta, SUBJECTS } from "@/learn/catalog";
 import { TopicView } from "@/learn/components/TopicView";
+import { parseLevel } from "@/learn/levels";
 import { EMPTY_PROGRESS } from "@/learn/progress";
 import { loadLearnState } from "@/learn/server";
 
@@ -18,9 +19,19 @@ export async function generateMetadata({ params }: PageProps<"/learn/[subject]/[
   return { title: t.topic(resolveText(meta.title, locale), resolveText(info.title, locale)) };
 }
 
-export default async function TopicPage({ params }: PageProps<"/learn/[subject]/[topic]">) {
-  const { subject, topic } = await params;
+export default async function TopicPage({ params, searchParams }: PageProps<"/learn/[subject]/[topic]">) {
+  const [{ subject, topic }, query] = await Promise.all([params, searchParams]);
   if (findTopicMeta(topic)?.subject !== subject) notFound();
-  const { progress, days } = await loadLearnState();
-  return <TopicView slug={topic} progress={progress[topic] ?? EMPTY_PROGRESS(topic)} days={days} />;
+  const { progress, levels, days } = await loadLearnState();
+  return (
+    <TopicView
+      // A new level from the address (back from a lesson) starts the view fresh.
+      key={String(query.level ?? "")}
+      slug={topic}
+      progress={progress[topic] ?? EMPTY_PROGRESS(topic)}
+      levels={levels}
+      days={days}
+      initialLevel={parseLevel(query.level)}
+    />
+  );
 }
