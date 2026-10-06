@@ -207,7 +207,7 @@ function Results({ kind, g1, g2 }: { kind: PunnettKind; g1: string; g2: string }
           {genos.map((g, i) => (
             <span key={g} className="flex items-center gap-1.5">
               {i > 0 && <span className="text-ink-3">:</span>}
-              <span className="font-math tabular-nums">{gRatio[i]}</span>
+              <span className={genos.length === 1 ? "text-[15px]" : "font-math tabular-nums"}>{genos.length === 1 ? t(tx("all", "alle")) : gRatio[i]}</span>
               <Geno g={g} />
             </span>
           ))}
@@ -233,7 +233,7 @@ function Results({ kind, g1, g2 }: { kind: PunnettKind; g1: string; g2: string }
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[14px] text-ink">
           {phenos.map((p, i) => (
             <span key={p.key} className="flex items-center gap-1">
-              <span className="font-math text-[17px] tabular-nums">{pRatio[i]}</span> {t(p.label)}
+              {phenos.length === 1 ? t(tx("all", "alle")) : <span className="font-math text-[17px] tabular-nums">{pRatio[i]}</span>} {t(p.label)}
               {i < phenos.length - 1 && <span className="ml-2 text-ink-3">:</span>}
             </span>
           ))}
