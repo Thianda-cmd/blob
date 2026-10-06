@@ -171,7 +171,7 @@ function Dynamic({ t, poison, simple }: View) {
   );
 
   // Split products: choline goes back into the end bulb, acetate drifts away.
-  if (released && poison !== "e605" && t >= 6.5) {
+  if (released && !simple && poison !== "e605" && t >= 6.5) {
     for (let n = 0; n < 12; n++) {
       const e: Pt = [EX[n % 3] + ((n % 2) * 2 - 1) * 2.5, 227];
       const cho = t < 7 ? moving(t, 6.5, 6.95, e, [e[0] + ((n % 4) - 1.5) * 4, 221]) : moving(t, 7 + (n % 4) * 0.08, 7.8, [e[0] + ((n % 4) - 1.5) * 4, 221], [CHT + ((n % 3) - 1) * 6, 194 - (n % 4) * 5]);
@@ -250,16 +250,14 @@ export function NerveSynapse({ mode = "names", show, ask, highlight, legend, t =
           </g>
         ))}
       </g>
-      {!simple && (
-        <g data-part="ache">
-          {EX.map((ex) => (
-            <g key={ex}>
-              <path d={`M${ex} ${POST_Y - 5} L${ex - 4} ${POST_Y - 11} A7 7 0 1 0 ${ex + 4} ${POST_Y - 11} Z`} fill="var(--bio-u)" stroke="var(--bio-outline)" strokeWidth={1} strokeLinejoin="round" />
-              {poison === "e605" && <rect x={ex - 3} y={POST_Y - 13} width={6} height={6} rx={1} fill="var(--ink)" />}
-            </g>
-          ))}
-        </g>
-      )}
+      <g data-part="ache">
+        {EX.map((ex) => (
+          <g key={ex}>
+            <path d={`M${ex} ${POST_Y - 5} L${ex - 4} ${POST_Y - 11} A7 7 0 1 0 ${ex + 4} ${POST_Y - 11} Z`} fill="var(--bio-u)" stroke="var(--bio-outline)" strokeWidth={1} strokeLinejoin="round" />
+            {poison === "e605" && <rect x={ex - 3} y={POST_Y - 13} width={6} height={6} rx={1} fill="var(--ink)" />}
+          </g>
+        ))}
+      </g>
       {poison === "botox" &&
         DOCK.map(([vx]) => (
           <path key={vx} d={`M${vx - 5} ${PRE_Y - 9} l10 10 m0 -10 l-10 10`} stroke="var(--ink)" strokeWidth={2.4} strokeLinecap="round" />

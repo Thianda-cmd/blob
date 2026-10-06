@@ -39,8 +39,8 @@ const PARTS: FigurePart[] = [
   {
     id: "homologs",
     label: tx("homologous chromosomes", "homologe Chromosomen"),
-    at: [362, 34],
-    tag: [362, 14],
+    at: [369, 72],
+    tag: [369, 22],
     info: tx("A pair: one from the mother (red), one from the father (blue). Same size, same centromere position, same genes.", "Ein Paar: eins von der Mutter (rot), eins vom Vater (blau). Gleiche Größe, gleiche Lage des Zentromers, gleiche Gene."),
   },
   {

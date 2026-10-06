@@ -40,51 +40,52 @@ export function NerveReaction() {
   const [fallen, setFallen] = useState(0); // cm
   const [times, setTimes] = useState<number[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const frame = useRef<number | null>(null);
   const start = useRef(0);
 
-  const stopAll = () => {
+  const stopTimer = () => {
     if (timer.current) clearTimeout(timer.current);
-    if (frame.current) cancelAnimationFrame(frame.current);
     timer.current = null;
-    frame.current = null;
   };
-  useEffect(() => stopAll, []);
+  useEffect(() => stopTimer, []);
 
-  const tick = () => {
-    const s = (performance.now() - start.current) / 1000;
-    const d = 0.5 * G * s * s;
-    if (d >= MISS) {
-      setFallen(MISS + 6);
-      setPhase("missed");
-      frame.current = null;
-      return;
-    }
-    setFallen(d);
-    frame.current = requestAnimationFrame(tick);
-  };
+  // While the ruler falls, move it every frame (free fall: d = ½ g t²).
+  useEffect(() => {
+    if (phase !== "fall") return;
+    let id = 0;
+    const loop = () => {
+      const s = (performance.now() - start.current) / 1000;
+      const d = 0.5 * G * s * s;
+      if (d >= MISS) {
+        setFallen(MISS + 6);
+        setPhase("missed");
+        return;
+      }
+      setFallen(d);
+      id = requestAnimationFrame(loop);
+    };
+    id = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(id);
+  }, [phase]);
 
   const press = () => {
     if (phase === "idle" || phase === "caught" || phase === "missed" || phase === "early") {
-      stopAll();
+      stopTimer();
       setFallen(0);
       setPhase("wait");
       const delay = 1100 + Math.random() * 2200;
       timer.current = setTimeout(() => {
         start.current = performance.now();
         setPhase("fall");
-        frame.current = requestAnimationFrame(tick);
       }, delay);
       return;
     }
     if (phase === "wait") {
-      stopAll();
+      stopTimer();
       setPhase("early");
       return;
     }
     if (phase === "fall") {
       const s = (performance.now() - start.current) / 1000;
-      stopAll();
       const d = Math.min(MISS, 0.5 * G * s * s);
       setFallen(d);
       setPhase("caught");

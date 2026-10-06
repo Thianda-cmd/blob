@@ -166,13 +166,21 @@ export function EnzymeStarchLab() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-line bg-surface p-3">
-        <div className="relative mx-auto flex max-w-[460px] items-end justify-around gap-2 pt-1">
-          <div className="pointer-events-none absolute inset-x-0 bottom-[44px] top-[78px] rounded-xl" style={{ background: "color-mix(in oklab, var(--bio-water) 18%, transparent)" }} />
+        <div className="relative mx-auto max-w-[460px] pt-1">
+          <div className="pointer-events-none absolute inset-x-0 top-[62px] h-[100px] rounded-xl" style={{ background: "color-mix(in oklab, var(--bio-water) 18%, transparent)" }} />
+          <div className="relative flex justify-around gap-2">
+            {tubes.map((tb) => (
+              <div key={tb.label} className="flex w-[112px] justify-center">
+                <Tube colour={tb.colour} size={0.78} label={tb.label} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mx-auto mt-1.5 flex max-w-[460px] justify-around gap-2">
           {tubes.map((tb) => (
-            <div key={tb.label} className="relative flex w-[112px] flex-col items-center gap-1.5 text-center">
-              <Tube colour={tb.colour} size={0.78} label={tb.label} />
-              <span className="min-h-[2.6em] text-[12.5px] leading-snug text-ink-2">{t(tb.content)}</span>
-            </div>
+            <span key={tb.label} className="w-[112px] text-center text-[12.5px] leading-snug text-ink-2">
+              {t(tb.content)}
+            </span>
           ))}
         </div>
         <div className="mt-1 text-center text-[12px] text-ink-3">{t(tx("water bath at 37 °C", "Wasserbad mit 37 °C"))}</div>

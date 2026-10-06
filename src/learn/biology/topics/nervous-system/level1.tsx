@@ -6,6 +6,7 @@
 
 import { resolveText, tx, type Text } from "@/i18n/text";
 import { NerveBlindSpot } from "@/learn/biology/visuals/NerveBlindSpot";
+import { NerveEar } from "@/learn/biology/visuals/NerveEar";
 import { EYE_BASIC, NerveEye, NerveEyeLab } from "@/learn/biology/visuals/NerveEye";
 import { NerveReaction } from "@/learn/biology/visuals/NerveReaction";
 import { createRng, type Rng } from "@/learn/engine/rng";
@@ -361,6 +362,71 @@ function pathTask(rng: Rng, kind: "light" | "sound"): Exercise {
 }
 
 // ---------------------------------------------------------------------------
+// The ear
+
+type EarPart = { id: string; name: Text; the: Text; accept: Text[]; job: Text };
+const EAR: EarPart[] = [
+  { id: "pinna", name: tx("outer ear (pinna)", "Ohrmuschel"), the: tx("the outer ear (pinna)", "die Ohrmuschel"), accept: [tx("outer ear", "Ohrmuschel"), "pinna", "auricle"], job: tx("catches the sound like a funnel", "fängt den Schall auf wie ein Trichter") },
+  { id: "canal", name: tx("ear canal", "Gehörgang"), the: tx("the ear canal", "der Gehörgang"), accept: [tx("ear canal", "Gehörgang"), "äußerer Gehörgang"], job: tx("leads the sound to the eardrum", "leitet den Schall zum Trommelfell") },
+  { id: "eardrum", name: tx("eardrum", "Trommelfell"), the: tx("the eardrum", "das Trommelfell"), accept: [tx("eardrum", "Trommelfell")], job: tx("is made to vibrate by the sound", "wird vom Schall in Schwingung versetzt") },
+  { id: "ossicles", name: tx("ossicles", "Gehörknöchelchen"), the: tx("the ossicles (hammer, anvil, stirrup)", "die Gehörknöchelchen (Hammer, Amboss, Steigbügel)"), accept: [tx("ossicles", "Gehörknöchelchen"), "middle ear bones", "Hammer, Amboss und Steigbügel"], job: tx("pass the vibrations on to the inner ear", "übertragen die Schwingungen aufs Innenohr") },
+  { id: "cochlea", name: tx("cochlea", "Schnecke"), the: tx("the cochlea", "die Schnecke"), accept: [tx("cochlea", "Schnecke"), "Hörschnecke"], job: tx("contains the sensory cells for hearing", "enthält die Hörsinneszellen") },
+  { id: "canals", name: tx("semicircular canals", "Bogengänge"), the: tx("the semicircular canals", "die Bogengänge"), accept: [tx("semicircular canals", "Bogengänge"), "Bogengang", "Gleichgewichtsorgan", "organ of balance"], job: tx("sense turning movements of the head", "melden Drehbewegungen des Kopfes") },
+  { id: "nerve", name: tx("auditory nerve", "Hörnerv"), the: tx("the auditory nerve", "der Hörnerv"), accept: [tx("auditory nerve", "Hörnerv")], job: tx("carries the signals to the brain", "leitet die Erregungen zum Gehirn") },
+  { id: "tube", name: tx("Eustachian tube", "Ohrtrompete"), the: tx("the Eustachian tube", "die Ohrtrompete"), accept: [tx("Eustachian tube", "Ohrtrompete"), "Eustachische Röhre", "Eustachi-Röhre", "Tube"], job: tx("evens out the air pressure", "gleicht den Luftdruck aus") },
+];
+const PLURAL = new Set(["ossicles", "canals"]);
+function earMix(want: string, got: string): { title: Text; say: Text } | null {
+  const M: Record<string, { title: Text; say: Text }> = {
+    "cochlea>canals": { title: tx("That's for balance", "Das ist fürs Gleichgewicht"), say: tx("The loops of the semicircular canals belong to the organ of balance. The coiled 'snail shell' with the hearing cells is the **cochlea**.", "Die Schlaufen der Bogengänge gehören zum Gleichgewichtsorgan. Der aufgewundene „Schneckengang“ mit den Hörsinneszellen ist die **Schnecke**.") },
+    "canals>cochlea": { title: tx("That's for hearing", "Das ist fürs Hören"), say: tx("The coiled cochlea is for hearing. The three loops above it, the **semicircular canals**, sense turning movements: balance.", "Die aufgewundene Schnecke ist fürs Hören. Die drei Schlaufen darüber, die **Bogengänge**, melden Drehbewegungen: Gleichgewicht.") },
+    "eardrum>ossicles": { title: tx("The skin, not the bones", "Die Haut, nicht die Knochen"), say: tx("The ossicles are the three tiny bones behind it. The thin skin at the end of the ear canal is the **eardrum**.", "Die Gehörknöchelchen sind die drei winzigen Knochen dahinter. Die dünne Haut am Ende des Gehörgangs ist das **Trommelfell**.") },
+    "ossicles>eardrum": { title: tx("The bones, not the skin", "Die Knochen, nicht die Haut"), say: tx("The eardrum is the thin skin. The three tiny bones behind it (hammer, anvil, stirrup) are the **ossicles**.", "Das Trommelfell ist die dünne Haut. Die drei winzigen Knochen dahinter (Hammer, Amboss, Steigbügel) sind die **Gehörknöchelchen**.") },
+    "tube>canal": { title: tx("Inside, not outside", "Innen, nicht außen"), say: tx("The ear canal leads from outside to the eardrum. The tube from the middle ear down to the throat is the **Eustachian tube**.", "Der Gehörgang führt von außen zum Trommelfell. Der Gang vom Mittelohr hinunter zum Rachen ist die **Ohrtrompete**.") },
+    "canal>tube": { title: tx("Outside, not inside", "Außen, nicht innen"), say: tx("The Eustachian tube runs from the middle ear to the throat. The passage from the outer ear to the eardrum is the **ear canal**.", "Die Ohrtrompete läuft vom Mittelohr zum Rachen. Der Gang von der Ohrmuschel zum Trommelfell ist der **Gehörgang**.") },
+  };
+  return M[`${want}>${got}`] ?? null;
+}
+
+function earNameTask(rng: Rng): Exercise {
+  const part = rng.pick(EAR);
+  const wrong = EAR.filter((e) => e.id !== part.id && earMix(part.id, e.id)).map((e) => ({ accept: e.accept, ...earMix(part.id, e.id)! }));
+  const w = word(part.accept, wrong, tx("name of the part", "Name des Teils"));
+  return {
+    instruction: tx("Name the part of the ear", "Benenne den Teil des Ohrs"),
+    text: tx("What is the part of the ear marked with **?** called?", "Wie heißt der mit **?** markierte Teil des Ohrs?"),
+    visual: pic(NerveEar, { mode: "numbers", ask: part.id, legend: "none" }),
+    answer: w.answer,
+    hint: tx("Follow the sound: outer ear, ear canal, eardrum, ossicles, cochlea, auditory nerve.", "Folge dem Schall: Ohrmuschel, Gehörgang, Trommelfell, Gehörknöchelchen, Schnecke, Hörnerv."),
+    solution: [answerFrame(part.name, tx(`That's **${en(part.the)}**. ${PLURAL.has(part.id) ? "They" : "It"} ${en(part.job)}.`, `Das ist **${de(part.the)}**. ${de(part.the).startsWith("der") ? "Er" : de(part.the).startsWith("das") ? "Es" : "Sie"} ${de(part.job)}.`))],
+    mistakes: w.mistakes,
+  };
+}
+
+function earMatchTask(rng: Rng): Exercise {
+  const chosen = some(rng, EAR, 4);
+  const pairs: [Text, Text][] = chosen.map((e) => [e.name, e.job]);
+  const rest = EAR.filter((e) => !chosen.includes(e));
+  const wrong: { pairs: [Text, Text][]; title: Text; say: Text }[] = [];
+  chosen.forEach((a) =>
+    chosen.forEach((b) => {
+      const mix = a !== b ? earMix(a.id, b.id) : null;
+      if (mix) wrong.push({ pairs: [[b.name, a.job]], ...mix });
+    }),
+  );
+  const m = match(pairs, [rng.pick(rest).job], wrong);
+  return {
+    instruction: tx("Match the parts of the ear to their jobs", "Ordne den Teilen des Ohrs ihre Aufgaben zu"),
+    text: tx("What does each part of the ear do? One job is left over.", "Was macht welcher Teil des Ohrs? Eine Aufgabe bleibt übrig."),
+    visual: pic(NerveEar, { mode: "names", show: chosen.map((e) => e.id), legend: "below" }),
+    answer: m.answer,
+    hint: tx("Outer ear: catch and lead. Middle ear: pass on. Inner ear: sense.", "Außenohr: auffangen und leiten. Mittelohr: weitergeben. Innenohr: wahrnehmen."),
+    solution: [{ math: cat(...pairs.flatMap(([n, j], i) => [q(n), "\\to", q(j), i < pairs.length - 1 ? "\\\\" : ""]).filter(Boolean)), note: tx("Outer ear and middle ear carry the sound; the sensory cells sit in the inner ear.", "Außen- und Mittelohr leiten den Schall weiter; die Sinneszellen sitzen im Innenohr.") }],
+    mistakes: m.mistakes,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Pupil and reflexes
 
 const PUPIL_SCENES: { text: Text; bright: boolean }[] = [
@@ -608,6 +674,8 @@ export function generate1(rng: Rng): Exercise {
     [1, () => eyeMatchTask(rng)],
     [0.9, () => pathTask(rng, "light")],
     [0.6, () => pathTask(rng, "sound")],
+    [0.7, () => earNameTask(rng)],
+    [0.5, () => earMatchTask(rng)],
     [0.8, () => pupilTask(rng)],
     [1, () => reflexOrNotTask(rng)],
     [0.8, () => reflexMultiTask(rng)],

@@ -681,7 +681,6 @@ function countTask(rng: Rng): Exercise {
     const m = mistakes(right);
     m.add({ kind: "number", value: 0 }, USED_UP, tx("Ah, you thought the enzymes were used up. They come out of every reaction **unchanged**, so they're all still there.", "Ah, du dachtest, die Enzyme werden verbraucht. Sie gehen aber **unverändert** aus jeder Reaktion hervor, sind also alle noch da."));
     m.add({ kind: "number", value: sub }, tx("That's the substrate", "Das ist das Substrat"), tx("That's the number of substrate particles at the start. The question asks about the enzyme molecules.", "Das ist die Zahl der Substratteilchen am Anfang. Gefragt sind die Enzymmoleküle."));
-    m.add({ kind: "number", value: Math.max(0, enz - sub) }, USED_UP, tx("You took one enzyme away for each substrate. But each enzyme can convert many substrates and stays unchanged.", "Du hast für jedes Substrat ein Enzym abgezogen. Jedes Enzym kann aber viele Substrate umsetzen und bleibt unverändert."));
     return {
       instruction: tx("Think it through", "Denk es durch"),
       text: txMap((tt) =>

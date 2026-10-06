@@ -84,14 +84,6 @@ const CELL = [
   { dx: 26, dy: -24, a: 330 },
   { dx: 0, dy: 2, a: 270 },
 ];
-/** Gametes: chromatids in a small nucleus. */
-const FIN = [
-  { dx: -9, dy: -9, a: 215 },
-  { dx: 10, dy: 8, a: 20 },
-  { dx: 12, dy: -13, a: 300 },
-  { dx: -12, dy: 12, a: 120 },
-];
-
 /** Static facts about every chromatid of the model (two per chromosome, the sister s = 1 only exists after S phase). */
 function infoOf(n2: ModelSize): Info[] {
   const sc = SCALE[n2];
@@ -533,12 +525,14 @@ function meiosisKeys(n2: ModelSize, crossing: boolean, variant: DivisionVariant,
     ]),
     spin: spin(0, 0),
     cts: info.map((i) => {
+      // Gametes: the chromatids stand side by side in the nucleus, so you can compare the four cells.
       const g = gamete(i);
-      const slot = fin(g).indexOf(i);
-      const f = FIN[slot % FIN.length];
+      const here = fin(g);
+      const slot = here.indexOf(i);
       const cx = g < 2 ? LEFT : RIGHT;
       const cy = g % 2 ? 232 : 88;
-      return { x: cx + f.dx, y: cy + f.dy, pa: f.a, qa: f.a + 180, cond: 0.62, op: 1, swap: swapOn(i), att: 0, pole: 0 };
+      const a = 270 + (slot % 2 ? 6 : -6);
+      return { x: cx + (slot - (here.length - 1) / 2) * 12, y: cy - 3, pa: a, qa: a + 180, cond: 0.62, op: 1, swap: swapOn(i), att: 0, pole: 0 };
     }),
     chi: 0,
   });

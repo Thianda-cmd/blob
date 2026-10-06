@@ -359,31 +359,66 @@ function questionTask(rng: Rng): Exercise {
 
 type Stmt = { text: Text; mito: boolean; meio: boolean; trap?: [Text, Text] };
 const STMTS: Stmt[] = [
-  { text: tx("Two daughter cells form.", "Es entstehen zwei Tochterzellen."), mito: true, meio: false },
-  { text: tx("Four daughter cells form.", "Es entstehen vier Tochterzellen."), mito: false, meio: true },
+  {
+    text: tx("Two daughter cells form.", "Es entstehen zwei Tochterzellen."),
+    mito: true,
+    meio: false,
+    trap: [tx("Meiosis divides twice", "Die Meiose teilt zweimal"), tx("Meiosis consists of two divisions, so at the end there are four cells.", "Die Meiose besteht aus zwei Teilungen, am Ende sind es also vier Zellen.")],
+  },
+  {
+    text: tx("Four daughter cells form.", "Es entstehen vier Tochterzellen."),
+    mito: false,
+    meio: true,
+    trap: [tx("Mitosis divides once", "Die Mitose teilt einmal"), tx("Mitosis is a single division: one mother cell, two daughter cells.", "Die Mitose ist eine einzige Teilung: eine Mutterzelle, zwei Tochterzellen.")],
+  },
   {
     text: tx("The daughter cells are genetically identical.", "Die Tochterzellen sind erbgleich."),
     mito: true,
     meio: false,
     trap: [tx("Meiosis mixes", "Die Meiose mischt"), tx("Meiosis doesn't make identical cells: crossing over and the random distribution of the homologues make every sex cell different.", "Die Meiose macht keine identischen Zellen: Crossing-over und die zufällige Verteilung der Homologen machen jede Keimzelle anders.")],
   },
-  { text: tx("The daughter cells are genetically different.", "Die Tochterzellen sind genetisch verschieden."), mito: false, meio: true },
+  {
+    text: tx("The daughter cells are genetically different.", "Die Tochterzellen sind genetisch verschieden."),
+    mito: false,
+    meio: true,
+    trap: [tx("Mitosis copies exactly", "Die Mitose kopiert genau"), tx("In mitosis every daughter cell gets an exact copy of every chromosome: they are genetically identical.", "Bei der Mitose bekommt jede Tochterzelle eine genaue Kopie jedes Chromosoms: Sie sind erbgleich.")],
+  },
   {
     text: tx("The chromosome set is halved (2n → n).", "Der Chromosomensatz wird halbiert (2n → n)."),
     mito: false,
     meio: true,
     trap: [tx("Mitosis doesn't halve", "Mitose halbiert nicht"), tx("The classic trap! In mitosis the chromosome set stays the same: 2n → 2n.", "Die klassische Falle! Bei der Mitose bleibt der Chromosomensatz gleich: 2n → 2n.")],
   },
-  { text: tx("The chromosome set stays the same (2n → 2n).", "Der Chromosomensatz bleibt gleich (2n → 2n)."), mito: true, meio: false },
+  {
+    text: tx("The chromosome set stays the same (2n → 2n).", "Der Chromosomensatz bleibt gleich (2n → 2n)."),
+    mito: true,
+    meio: false,
+    trap: [tx("Meiosis halves", "Die Meiose halbiert"), tx("Meiosis makes haploid sex cells: the chromosome set is halved from 2n to n.", "Die Meiose bildet haploide Keimzellen: Der Chromosomensatz wird von 2n auf n halbiert.")],
+  },
   {
     text: tx("Homologous chromosomes pair up.", "Homologe Chromosomen paaren sich."),
     mito: false,
     meio: true,
     trap: [tx("No pairs in mitosis", "Keine Paare in der Mitose"), tx("In mitosis the homologous chromosomes don't pair up: each chromosome lines up on its own.", "In der Mitose paaren sich die homologen Chromosomen nicht: Jedes Chromosom ordnet sich einzeln an.")],
   },
-  { text: tx("There are two divisions, one after the other.", "Es gibt zwei Teilungen nacheinander."), mito: false, meio: true },
-  { text: tx("It serves growth and the renewal of tissues.", "Sie dient dem Wachstum und der Erneuerung von Geweben."), mito: true, meio: false },
-  { text: tx("It makes sex cells.", "Sie bildet Keimzellen."), mito: false, meio: true },
+  {
+    text: tx("There are two divisions, one after the other.", "Es gibt zwei Teilungen nacheinander."),
+    mito: false,
+    meio: true,
+    trap: [tx("Mitosis divides once", "Die Mitose teilt einmal"), tx("Mitosis is one single division. Two divisions in a row are typical of meiosis.", "Die Mitose ist eine einzige Teilung. Zwei Teilungen nacheinander sind typisch für die Meiose.")],
+  },
+  {
+    text: tx("It serves growth and the renewal of tissues.", "Sie dient dem Wachstum und der Erneuerung von Geweben."),
+    mito: true,
+    meio: false,
+    trap: [tx("That's mitosis", "Das ist die Mitose"), tx("Growth and renewal need identical cells: that's the job of mitosis. Meiosis makes sex cells.", "Für Wachstum und Erneuerung braucht man erbgleiche Zellen: Das ist die Aufgabe der Mitose. Die Meiose bildet Keimzellen.")],
+  },
+  {
+    text: tx("It makes sex cells.", "Sie bildet Keimzellen."),
+    mito: false,
+    meio: true,
+    trap: [tx("That's meiosis", "Das ist die Meiose"), tx("Sex cells are made by meiosis. Mitosis makes body cells for growth and renewal.", "Keimzellen entstehen durch die Meiose. Die Mitose bildet Körperzellen für Wachstum und Erneuerung.")],
+  },
   { text: tx("The DNA is replicated before it starts.", "Vorher wird die DNA repliziert."), mito: true, meio: true },
   { text: tx("Sister chromatids are separated from each other.", "Schwesterchromatiden werden voneinander getrennt."), mito: true, meio: true },
 ];
@@ -392,9 +427,7 @@ function compareExercise(rng: Rng, which: "mito" | "meio"): Exercise {
   const yes = STMTS.filter((s) => s[which]);
   const no = STMTS.filter((s) => !s[which]);
   const k = rng.int(2, 3);
-  const trapNo = no.filter((s) => s.trap);
-  const pickedNo = [rng.pick(trapNo), ...some(rng, no.filter((s) => !s.trap), 5 - k - 1)];
-  const picked = rng.shuffle([...some(rng, yes, k), ...pickedNo]);
+  const picked = rng.shuffle([...some(rng, yes, k), ...some(rng, no, 5 - k)]);
   const options = picked.map((s) => s.text);
   const correct = picked.map((s, i) => (s[which] ? i : -1)).filter((i) => i >= 0);
   const right: AnswerSpec = { kind: "multi", options, correct };
@@ -410,7 +443,7 @@ function compareExercise(rng: Rng, which: "mito" | "meio"): Exercise {
     hint: tx("Mitosis: 1 division, 2 identical cells, 2n → 2n. Meiosis: 2 divisions, 4 different cells, 2n → n.", "Mitose: 1 Teilung, 2 erbgleiche Zellen, 2n → 2n. Meiose: 2 Teilungen, 4 verschiedene Zellen, 2n → n."),
     solution: [
       { math: tx('"mitosis:" \\; 2n \\to 2n , 2n', '"Mitose:" \\; 2n \\to 2n , 2n'), note: tx("Mitosis: one division, two genetically identical diploid cells, for growth and renewal.", "Mitose: eine Teilung, zwei erbgleiche diploide Zellen, für Wachstum und Erneuerung.") },
-      { math: tx('"meiosis:" \\; 2n \\to n , n , n , n', '"Meiose:" \\; 2n \\to n , n , n , n'), note: tx("Meiosis: two divisions, four genetically different haploid sex cells. The homologues pair up and are separated.", "Meiose: zwei Teilungen, vier genetisch verschiedene haploide Keimzellen. Die Homologen paaren sich und werden getrennt.") },
+      { math: tx('"meiosis:"#e0 \\; 2#e1 n#e2 \\to#e3 n#e4 , n#e5 , n#e6 , n#e7', '"Meiose:"#e0 \\; 2#e1 n#e2 \\to#e3 n#e4 , n#e5 , n#e6 , n#e7'), note: tx("Meiosis: two divisions, four genetically different haploid sex cells. The homologues pair up and are separated.", "Meiose: zwei Teilungen, vier genetisch verschiedene haploide Keimzellen. Die Homologen paaren sich und werden getrennt.") },
     ],
     mistakes: m.list,
   };
