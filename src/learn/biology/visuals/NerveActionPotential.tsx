@@ -387,6 +387,11 @@ function SingleAp() {
         <span className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-full" style={{ background: "var(--bio-t)" }} /> {t(tx("K⁺ channels", "K⁺-Kanäle"))} <Pill on={k === "open"}>{t(gateText(k))}</Pill>
         </span>
+        <span className="ml-auto">
+          <GhostButton pressed={refr} onClick={() => setRefr(!refr)}>
+            {t(refr ? tx("Hide refractory period", "Refraktärzeit ausblenden") : tx("Show refractory period", "Refraktärzeit zeigen"))}
+          </GhostButton>
+        </span>
       </div>
       <div className="overflow-hidden rounded-xl border border-line">
         <NerveMembraneStrip t={time} stim={stim} />
@@ -409,7 +414,7 @@ function SingleAp() {
         <Slider value={stim} onChange={(s) => setStim(Math.round(s * 20) / 20)} label={tx("Stimulus strength", "Reizstärke")} left={t(tx("weak stimulus", "schwacher Reiz"))} right={t(tx("strong", "stark"))} />
         <div className="flex flex-wrap items-center gap-2">
           <ActionButton onClick={play}>
-            <Play className="size-4" /> {t(time > 0 && time < AP.T ? tx("Continue", "Weiter") : tx("Stimulate", "Reizen"))}
+            <Play className="size-4" /> {t(time > 0 && time < AP.T ? tx("Resume", "Fortsetzen") : tx("Stimulate", "Reizen"))}
           </ActionButton>
           <GhostButton
             label={t(tx("Start again", "Von vorn"))}
@@ -419,9 +424,6 @@ function SingleAp() {
             }}
           >
             <RotateCcw className="size-4" />
-          </GhostButton>
-          <GhostButton pressed={refr} onClick={() => setRefr(!refr)}>
-            {t(tx("Refractory period", "Refraktärzeit"))}
           </GhostButton>
           <input
             type="range"

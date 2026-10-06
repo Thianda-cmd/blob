@@ -476,7 +476,7 @@ export function NerveSynapseLab({ simple = false }: { simple?: boolean }) {
           />
         </div>
       )}
-      <NerveSynapse mode={labels ? "names" : "plain"} t={t} poison={poison} simple={simple} highlight={hit ? P.lit : t > 0 ? step.lit : []} />
+      <NerveSynapse mode={labels ? "names" : "plain"} legend="below" t={t} poison={poison} simple={simple} highlight={hit ? P.lit : t > 0 ? step.lit : []} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-2">
         {[
           { c: "var(--bio-a)", l: simple ? tx("transmitter", "Transmitter") : tx("acetylcholine", "Acetylcholin") },
