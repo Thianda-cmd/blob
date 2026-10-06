@@ -11,6 +11,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { BacteriumRod, bumpPath, PAINT } from "./ImmuneCells";
+import { cos, sin } from "@/lib/stableMath";
 
 const CX = 220;
 const CY = 140;
@@ -19,7 +20,7 @@ const f = (v: number) => Math.round(v * 10) / 10;
 
 /** The cell outline (radius by angle) for each stage; pseudopodia are two bumps around angle 0. */
 function radius(theta: number, stage: number) {
-  let r = 82 + 5 * Math.sin(3 * theta + 1) + 3 * Math.sin(5 * theta + 2);
+  let r = 82 + 5 * sin(3 * theta + 1) + 3 * sin(5 * theta + 2);
   const deg = ((theta * 180) / Math.PI + 540) % 360 - 180;
   const g = (c: number, s: number) => Math.exp(-((deg - c) ** 2) / (2 * s * s));
   if (stage === 1) r += 16 * (g(14, 9) + g(-14, 9));
@@ -32,7 +33,7 @@ function outline(stage: number) {
   const pts = Array.from({ length: N }, (_, i) => {
     const t = (i / N) * Math.PI * 2;
     const r = radius(t, stage);
-    return [CX + r * Math.cos(t), CY + r * Math.sin(t)];
+    return [CX + r * cos(t), CY + r * sin(t)];
   });
   let d = `M ${f(pts[0][0])} ${f(pts[0][1])}`;
   for (let i = 0; i < N; i++) {
@@ -141,7 +142,7 @@ export function ImmunePhagocyte({ level = 2 }: { level?: 1 | 2 }) {
                 ? { x: PHAGO[0] + dx, y: PHAGO[1] + dy }
                 : out
                   ? { x: CX - 150 - i * 12, y: CY + 70 + i * 8 }
-                  : { x: CX + (radius(ang, 3) + 1) * Math.cos(ang), y: CY + (radius(ang, 3) + 1) * Math.sin(ang) };
+                  : { x: CX + (radius(ang, 3) + 1) * cos(ang), y: CY + (radius(ang, 3) + 1) * sin(ang) };
             return (
               <motion.g
                 key={i}
@@ -165,7 +166,7 @@ export function ImmunePhagocyte({ level = 2 }: { level?: 1 | 2 }) {
                   stroke="var(--bio-u)"
                   strokeWidth={3}
                   strokeLinecap="round"
-                  transform={`translate(${f(CX + r * Math.cos(ang))} ${f(CY + r * Math.sin(ang))}) rotate(${a + 90})`}
+                  transform={`translate(${f(CX + r * cos(ang))} ${f(CY + r * sin(ang))}) rotate(${a + 90})`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: present ? 1 : 0 }}
                   transition={{ duration: 0.6, delay: present ? 0.8 : 0 }}

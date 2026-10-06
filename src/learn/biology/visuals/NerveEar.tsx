@@ -7,6 +7,7 @@
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { pathOf, r1, type Pt } from "./NerveKit";
+import { cos, sin } from "@/lib/stableMath";
 
 const W = 540;
 const H = 300;
@@ -24,7 +25,7 @@ function spiral(cx: number, cy: number, r0: number, turns: number): Pt[] {
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * turns * 2 * Math.PI;
     const r = r0 * (1 - (0.82 * i) / n);
-    pts.push([r1(cx + r * Math.cos(a)), r1(cy + r * Math.sin(a))]);
+    pts.push([r1(cx + r * cos(a)), r1(cy + r * sin(a))]);
   }
   return pts;
 }

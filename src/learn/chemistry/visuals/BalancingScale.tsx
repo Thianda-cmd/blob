@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { gcdOf, parts } from "../balancing-core";
 import { dec } from "../format";
 import { molarMass, parseEquation, sideCounts } from "../formula";
+import { cos, sin } from "@/lib/stableMath";
 
 // A balancing playground: steppers for each coefficient, live atom counters per element,
 // and a beam balance holding the atoms of each side. It only levels out when every kind
@@ -168,10 +169,10 @@ export function BalancingScale() {
   const C = { x: 200, y: 34 };
   const HALF = 130;
   const rad = (a: number) => (a * Math.PI) / 180;
-  const lx = useTransform(angle, (a) => C.x - HALF * Math.cos(rad(a)));
-  const ly = useTransform(angle, (a) => C.y - HALF * Math.sin(rad(a)));
-  const rx = useTransform(angle, (a) => C.x + HALF * Math.cos(rad(a)));
-  const ry = useTransform(angle, (a) => C.y + HALF * Math.sin(rad(a)));
+  const lx = useTransform(angle, (a) => C.x - HALF * cos(rad(a)));
+  const ly = useTransform(angle, (a) => C.y - HALF * sin(rad(a)));
+  const rx = useTransform(angle, (a) => C.x + HALF * cos(rad(a)));
+  const ry = useTransform(angle, (a) => C.y + HALF * sin(rad(a)));
 
   const choose = (i: number) => {
     setPick(i);

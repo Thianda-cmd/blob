@@ -14,6 +14,7 @@ import { dec } from "@/learn/chemistry/format";
 import { cn } from "@/lib/utils";
 import { HeartArt, type HeartState } from "./HeartSection";
 import { MainButton, monotone, polyPath, svgText, type Pt } from "./HeartShared";
+import { sin } from "@/lib/stableMath";
 
 export const CYCLE = 0.8;
 export const EVENTS = { avShut: 0.2, slOpen: 0.25, slShut: 0.5, avOpen: 0.58 };
@@ -74,7 +75,7 @@ export const PHASES: Record<Phase, { name: Text; part: Text; text: Text }> = {
 
 /** The heart drawing's state at time t. */
 export function cycleHeart(t: number): HeartState {
-  const atria = t > 0.05 && t < 0.17 ? Math.sin(((t - 0.05) / 0.12) * Math.PI) : 0;
+  const atria = t > 0.05 && t < 0.17 ? sin(((t - 0.05) / 0.12) * Math.PI) : 0;
   const vol = F.vol(t);
   const ventricles = Math.max(0, Math.min(1, (130 - vol) / 70));
   const av = t < EVENTS.avShut - 0.005 || t > EVENTS.avOpen + 0.005 ? 1 : 0;

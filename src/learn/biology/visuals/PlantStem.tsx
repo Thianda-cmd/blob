@@ -7,6 +7,7 @@
 import { useId } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 const WALL = "var(--bio-wall-deep)";
 const CELL = "var(--bio-cell)";
@@ -34,7 +35,7 @@ function cellPattern(id: string) {
 function OpenBundle({ a, r }: { a: number; r: number }) {
   const deg = (a * 180) / Math.PI;
   return (
-    <g transform={`translate(${CX + Math.cos(a) * r} ${CY + Math.sin(a) * r}) rotate(${deg + 90})`}>
+    <g transform={`translate(${CX + cos(a) * r} ${CY + sin(a) * r}) rotate(${deg + 90})`}>
       <path d="M-15 -16 Q0 -30 15 -16 L12 -4 L-12 -4 Z" fill="var(--bio-mito)" stroke="var(--bio-mito-deep)" strokeWidth={1.2} />
       <path d="M-14 -16 Q0 -25 14 -16" fill="none" stroke="var(--raised)" strokeWidth={4} opacity={0.6} />
       <path d="M-12 -4 Q0 -2 12 -4 L9 18 Q0 26 -9 18 Z" fill="var(--bio-wood)" fillOpacity={0.35} stroke="var(--bio-wood-deep)" strokeWidth={1.2} />
@@ -77,7 +78,7 @@ const SCATTER = (() => {
     for (let i = 0; i < g.n; i++) {
       const a = (i / g.n) * Math.PI * 2 + gi * 0.37 + ((i * 7) % 5) * 0.03;
       const rr = g.r + (((i * 13 + gi) % 5) - 2) * 3;
-      out.push({ x: CX + Math.cos(a) * rr, y: CY + Math.sin(a) * rr, s: g.s, a });
+      out.push({ x: CX + cos(a) * rr, y: CY + sin(a) * rr, s: g.s, a });
     }
   });
   return out;
@@ -158,7 +159,7 @@ const SX = 200;
 const SY = 200;
 
 /** How far a ring reaches at angle t (all rings share the shape, like real wood). */
-const wk = (t: number) => 1 + 0.014 * Math.sin(3 * t + 1) + 0.01 * Math.sin(5 * t + 2.2) + 0.006 * Math.sin(8 * t + 0.4);
+const wk = (t: number) => 1 + 0.014 * sin(3 * t + 1) + 0.01 * sin(5 * t + 2.2) + 0.006 * sin(8 * t + 0.4);
 
 /** A slightly irregular circle. */
 function wobble(r: number) {
@@ -166,7 +167,7 @@ function wobble(r: number) {
   let d = "";
   for (let i = 0; i < n; i++) {
     const t = (i / n) * Math.PI * 2;
-    d += `${i ? "L" : "M"}${(SX + Math.cos(t) * r * wk(t)).toFixed(1)} ${(SY + Math.sin(t) * r * wk(t)).toFixed(1)} `;
+    d += `${i ? "L" : "M"}${(SX + cos(t) * r * wk(t)).toFixed(1)} ${(SY + sin(t) * r * wk(t)).toFixed(1)} `;
   }
   return `${d}Z`;
 }
@@ -200,7 +201,7 @@ function stemParts(g: RingsInfo, marked: number | null): FigurePart[] {
   const ry = (i: number) => Math.max(20, Math.min(380, SY - R * 0.85 + ((R * 1.7) / 5) * i));
   const at = (r: number, deg: number): [number, number] => {
     const t = (deg * Math.PI) / 180;
-    return [SX + Math.cos(t) * r * wk(t), SY + Math.sin(t) * r * wk(t)];
+    return [SX + cos(t) * r * wk(t), SY + sin(t) * r * wk(t)];
   };
   const parts: FigurePart[] = [
     { id: "bark", label: tx("bark (outer bark)", "Borke"), at: at((g.bast + g.bark) / 2, -30), tag: [rx, ry(0)], info: tx("Dead tissue on the outside, made by the cork cambium. It cracks as the trunk grows thicker.", "Abgestorbenes Gewebe außen, vom Korkkambium gebildet. Sie reißt auf, wenn der Stamm dicker wird.") },
@@ -266,7 +267,7 @@ export function PlantStemSection({
           {Array.from({ length: 28 }, (_, i) => {
             const t = (i / 28) * Math.PI * 2 + 0.05 * (i % 3);
             const r0 = g.bast + (g.bark - g.bast) * (0.25 + 0.2 * (i % 2));
-            return <line key={i} x1={SX + Math.cos(t) * r0 * wk(t)} y1={SY + Math.sin(t) * r0 * wk(t)} x2={SX + Math.cos(t) * g.bark * wk(t)} y2={SY + Math.sin(t) * g.bark * wk(t)} />;
+            return <line key={i} x1={SX + cos(t) * r0 * wk(t)} y1={SY + sin(t) * r0 * wk(t)} x2={SX + cos(t) * g.bark * wk(t)} y2={SY + sin(t) * g.bark * wk(t)} />;
           })}
         </g>
       </g>
@@ -294,7 +295,7 @@ export function PlantStemSection({
       <g data-part="ray" stroke="var(--bio-wood-deep)" strokeWidth={1} opacity={0.5}>
         {Array.from({ length: 16 }, (_, i) => {
           const t = ((i * 22.5 + 0) * Math.PI) / 180;
-          return <line key={i} x1={SX + Math.cos(t) * g.pith} y1={SY + Math.sin(t) * g.pith} x2={SX + Math.cos(t) * g.wood} y2={SY + Math.sin(t) * g.wood} />;
+          return <line key={i} x1={SX + cos(t) * g.pith} y1={SY + sin(t) * g.pith} x2={SX + cos(t) * g.wood} y2={SY + sin(t) * g.wood} />;
         })}
       </g>
       <g data-part="pith">
@@ -302,13 +303,13 @@ export function PlantStemSection({
       </g>
       {firstYear !== undefined && (
         <g>
-          <line x1={SX} y1={SY} x2={SX + Math.cos((-ann * Math.PI) / 180) * g.wood * wk((-ann * Math.PI) / 180)} y2={SY + Math.sin((-ann * Math.PI) / 180) * g.wood * wk((-ann * Math.PI) / 180)} stroke="var(--ink)" strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
+          <line x1={SX} y1={SY} x2={SX + cos((-ann * Math.PI) / 180) * g.wood * wk((-ann * Math.PI) / 180)} y2={SY + sin((-ann * Math.PI) / 180) * g.wood * wk((-ann * Math.PI) / 180)} stroke="var(--ink)" strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
           {rings.map((r, i) => {
             const inner = i ? rings[i - 1].outer : g.pith;
             const mid = (inner + r.outer) / 2;
             const t = (-ann * Math.PI) / 180;
-            const x = SX + Math.cos(t) * mid * wk(t);
-            const y = SY + Math.sin(t) * mid * wk(t);
+            const x = SX + cos(t) * mid * wk(t);
+            const y = SY + sin(t) * mid * wk(t);
             return (
               <g key={i}>
                 <rect x={x - 15} y={y - 8} width={30} height={15} rx={4} fill="var(--raised)" stroke="var(--line-2)" strokeWidth={0.8} />

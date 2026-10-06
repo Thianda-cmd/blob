@@ -5,6 +5,7 @@
 
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export const MICROSCOPE_PARTS: FigurePart[] = [
   { id: "eyepiece", label: tx("eyepiece", "Okular"), at: [170, 58], tag: [34, 58], info: tx("The lens you look through (from Latin oculus, eye). It magnifies the image again, usually 10×.", "Die Linse, durch die du schaust (lateinisch oculus: Auge). Sie vergrößert das Bild noch einmal, meist 10-fach.") },
@@ -41,7 +42,7 @@ function Knob({ x, y, r }: { x: number; y: number; r: number }) {
       <circle cx={x} cy={y} r={r} fill={BODY} stroke={OUT} strokeWidth={2} />
       {Array.from({ length: ridges }, (_, i) => {
         const a = (i / ridges) * 2 * Math.PI;
-        return <line key={i} x1={x + (r - 4) * Math.cos(a)} y1={y + (r - 4) * Math.sin(a)} x2={x + r * Math.cos(a)} y2={y + r * Math.sin(a)} stroke={OUT} strokeWidth={1.1} />;
+        return <line key={i} x1={x + (r - 4) * cos(a)} y1={y + (r - 4) * sin(a)} x2={x + r * cos(a)} y2={y + r * sin(a)} stroke={OUT} strokeWidth={1.1} />;
       })}
       <circle cx={x} cy={y} r={r * 0.38} fill="var(--ink-3)" stroke={OUT} strokeWidth={1.4} />
     </g>

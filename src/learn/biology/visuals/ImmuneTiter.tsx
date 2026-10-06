@@ -13,6 +13,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { CellIcon } from "./ImmuneCells";
+import { pow } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Curve model
@@ -30,7 +31,7 @@ const wave = (w: Wave) => (t: number) => {
   return w.peak * (w.floor + (1 - w.floor) * Math.exp(-(x * x) / (1 + x)));
 };
 /** Ready-made antibodies (serum): there at once, then broken down. */
-const serum = (at: number, peak: number, half: number) => (t: number) => (t < at ? 0 : peak * Math.min(1, (t - at) / 0.6) * Math.pow(0.5, (t - at) / half));
+const serum = (at: number, peak: number, half: number) => (t: number) => (t < at ? 0 : peak * Math.min(1, (t - at) / 0.6) * pow(0.5, (t - at) / half));
 type Fn = (t: number) => number;
 const sum =
   (...fs: Fn[]): Fn =>

@@ -9,6 +9,7 @@ import { useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type ConiferId = "spruce" | "fir" | "pine" | "larch" | "yew";
 export type Season = "summer" | "autumn" | "winter";
@@ -204,7 +205,7 @@ export function ConiferTwig({ id, season = "summer", className, title }: { id: C
                 return (
                   <path
                     key={k}
-                    d={`M7 0L${r1(7 + len * Math.cos((a * Math.PI) / 180))} ${r1(len * Math.sin((a * Math.PI) / 180))}`}
+                    d={`M7 0L${r1(7 + len * cos((a * Math.PI) / 180))} ${r1(len * sin((a * Math.PI) / 180))}`}
                     stroke={larchDeep}
                     strokeWidth={2.4}
                     strokeLinecap="round"
@@ -216,7 +217,7 @@ export function ConiferTwig({ id, season = "summer", className, title }: { id: C
               Array.from({ length: 19 }, (_, k) => {
                 const a = -76 + (152 * k) / 18;
                 const len = 17 + ((k * 7) % 6);
-                return <path key={`c${k}`} d={`M7 0L${r1(7 + len * Math.cos((a * Math.PI) / 180))} ${r1(len * Math.sin((a * Math.PI) / 180))}`} stroke={larchColour} strokeWidth={1.2} strokeLinecap="round" />;
+                return <path key={`c${k}`} d={`M7 0L${r1(7 + len * cos((a * Math.PI) / 180))} ${r1(len * sin((a * Math.PI) / 180))}`} stroke={larchColour} strokeWidth={1.2} strokeLinecap="round" />;
               })}
           </g>
         ))}

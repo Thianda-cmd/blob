@@ -6,6 +6,7 @@
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { Ribosomes } from "./CellOrganelles";
+import { cos, sin } from "@/lib/stableMath";
 
 
 // The folded, ring-shaped chromosome: one closed loop with many twists.
@@ -13,8 +14,8 @@ const NUCLEOID = (() => {
   const pts: string[] = [];
   for (let i = 0; i <= 160; i++) {
     const t = (i / 160) * 2 * Math.PI;
-    const x = 272 + 64 * Math.cos(t) + 11 * Math.cos(7 * t) + 4 * Math.sin(13 * t);
-    const y = 130 + 20 * Math.sin(t) + 9 * Math.sin(8 * t) + 3 * Math.cos(11 * t);
+    const x = 272 + 64 * cos(t) + 11 * cos(7 * t) + 4 * sin(13 * t);
+    const y = 130 + 20 * sin(t) + 9 * sin(8 * t) + 3 * cos(11 * t);
     pts.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return `M ${pts.join(" L ")} Z`;
@@ -44,7 +45,7 @@ const FLAGELLUM = (() => {
   const pts: string[] = [];
   for (let x = 452; x <= 554; x += 2) {
     const amp = Math.min(11, (x - 452) * 0.35);
-    pts.push(`${x} ${(130 + amp * Math.sin((x - 452) / 9)).toFixed(1)}`);
+    pts.push(`${x} ${(130 + amp * sin((x - 452) / 9)).toFixed(1)}`);
   }
   return `M 443 130 L ${pts.join(" L ")}`;
 })();

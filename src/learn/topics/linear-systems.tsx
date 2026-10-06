@@ -14,6 +14,7 @@ import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as 
 import { alongLine, crossing, Plane, PlaneDot, PlaneLine, PlanePath, PlaneTag, planeGeo, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
 import { graphVisual, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap, type Msg } from "./lines";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Equations in x and y, rendered with stable keys: equation I uses the ids
@@ -1274,7 +1275,7 @@ function SystemLab() {
   const b1 = useSpringTo(l1.b);
   const b2 = useSpringTo(l2.b);
   const geo = planeGeo([-5, 5], [-5, 5]);
-  const dir = (a: number): Pt => [Math.cos(a), Math.sin(a)];
+  const dir = (a: number): Pt => [cos(a), sin(a)];
   const meet = () => crossing([0, b1.get()], dir(a1.get()), [0, b2.get()], dir(a2.get()));
   const band = (): Pt[] => {
     const t = Math.tan(a1.get());

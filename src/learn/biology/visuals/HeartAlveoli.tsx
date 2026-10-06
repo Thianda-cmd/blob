@@ -11,6 +11,7 @@ import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { bloodMix, noise, SoftButton, svgText } from "./HeartShared";
+import { sin } from "@/lib/stableMath";
 
 const W = 520;
 const H = 300;
@@ -37,13 +38,13 @@ function particle(i: number, t: number, kind: "o2" | "co2") {
   const drift = 50; // blood carries particles to the right
   if (kind === "o2") {
     // 0–0.45 wander in the air towards the wall, 0.45–0.6 cross, 0.6–1 ride with the blood
-    if (ph < 0.45) return { x: x0 + Math.sin(ph * 9 + i) * 6, y: yAir + (186 - yAir) * (ph / 0.45) * 0.85, o: Math.min(1, ph * 8) };
+    if (ph < 0.45) return { x: x0 + sin(ph * 9 + i) * 6, y: yAir + (186 - yAir) * (ph / 0.45) * 0.85, o: Math.min(1, ph * 8) };
     if (ph < 0.6) return { x: x0, y: 186 - 2 + ((ph - 0.45) / 0.15) * (yBlood - 184), o: 1 };
     return { x: x0 + ((ph - 0.6) / 0.4) * drift, y: yBlood, o: ph > 0.9 ? (1 - ph) * 10 : 1 };
   }
   if (ph < 0.4) return { x: x0 - drift * (1 - ph / 0.4), y: yBlood, o: Math.min(1, ph * 8) };
   if (ph < 0.55) return { x: x0, y: yBlood - ((ph - 0.4) / 0.15) * (yBlood - 182), o: 1 };
-  return { x: x0 + Math.sin(ph * 9 + i) * 6, y: 182 - ((ph - 0.55) / 0.45) * (182 - yAir), o: ph > 0.9 ? (1 - ph) * 10 : 1 };
+  return { x: x0 + sin(ph * 9 + i) * 6, y: 182 - ((ph - 0.55) / 0.45) * (182 - yAir), o: ph > 0.9 ? (1 - ph) * 10 : 1 };
 }
 
 function Particles({ playing }: { playing: boolean }) {

@@ -9,6 +9,7 @@ import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { sin } from "@/lib/stableMath";
 
 const g = (x: number, mu: number, s: number) => Math.exp(-((x - mu) ** 2) / (2 * s * s));
 const edge = (l: number) => Math.min(1, Math.max(0, (l - 395) / 15)) * Math.min(1, Math.max(0, (712 - l) / 22));
@@ -41,7 +42,7 @@ const lx = (l: number) => X0 + ((l - 400) / 300) * (X1 - X0);
 
 /** Deterministic pseudo-random numbers for the bacteria (no Math.random during render). */
 const rand = (i: number, k: number) => {
-  const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
+  const v = sin(i * 127.1 + k * 311.7) * 43758.5453;
   return v - Math.floor(v);
 };
 

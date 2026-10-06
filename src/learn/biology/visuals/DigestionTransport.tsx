@@ -14,6 +14,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type FigurePart } from "@/learn/biology/Figure";
 import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type TransportPart = "microvilli" | "junction" | "sglt" | "aa" | "glut" | "carrier" | "pump" | "er" | "blood" | "lymph";
 
@@ -64,7 +65,7 @@ const Micelle = () => (
     <circle r={13} fill="color-mix(in oklab, var(--bio-sun) 35%, var(--raised))" />
     {Array.from({ length: 10 }, (_, i) => {
       const a = (i / 10) * Math.PI * 2;
-      return <circle key={i} cx={13 * Math.cos(a)} cy={13 * Math.sin(a)} r={2.6} fill="var(--bio-leaf)" stroke={OUT} strokeWidth={0.6} />;
+      return <circle key={i} cx={13 * cos(a)} cy={13 * sin(a)} r={2.6} fill="var(--bio-leaf)" stroke={OUT} strokeWidth={0.6} />;
     })}
   </g>
 );

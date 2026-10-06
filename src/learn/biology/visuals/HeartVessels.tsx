@@ -7,6 +7,7 @@ import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { svgText } from "./HeartShared";
+import { cos, sin } from "@/lib/stableMath";
 
 const W = 540;
 const H = 340;
@@ -25,8 +26,8 @@ function ring(cx: number, cy: number, r: number, amp: number, n: number) {
   let d = "";
   for (let i = 0; i <= 72; i++) {
     const a = (i / 72) * Math.PI * 2;
-    const rr = r + Math.sin(a * n) * amp;
-    d += `${i ? "L" : "M"}${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)} `;
+    const rr = r + sin(a * n) * amp;
+    d += `${i ? "L" : "M"}${(cx + rr * cos(a)).toFixed(1)} ${(cy + rr * sin(a)).toFixed(1)} `;
   }
   return `${d}Z`;
 }
@@ -36,8 +37,8 @@ function blob(cx: number, cy: number, rx: number, ry: number, wob: number) {
   let d = "";
   for (let i = 0; i <= 72; i++) {
     const a = (i / 72) * Math.PI * 2;
-    const k = 1 + Math.sin(a * 3 + 0.7) * wob + Math.cos(a * 2) * wob * 0.6;
-    d += `${i ? "L" : "M"}${(cx + rx * k * Math.cos(a)).toFixed(1)} ${(cy + ry * k * Math.sin(a)).toFixed(1)} `;
+    const k = 1 + sin(a * 3 + 0.7) * wob + cos(a * 2) * wob * 0.6;
+    d += `${i ? "L" : "M"}${(cx + rx * k * cos(a)).toFixed(1)} ${(cy + ry * k * sin(a)).toFixed(1)} `;
   }
   return `${d}Z`;
 }

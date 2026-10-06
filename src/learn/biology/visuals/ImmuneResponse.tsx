@@ -33,6 +33,7 @@ import {
   VirusParticle,
   type CellKind,
 } from "./ImmuneCells";
+import { cos, sin } from "@/lib/stableMath";
 
 const RP = 13;
 const S = 3.4;
@@ -67,7 +68,7 @@ const TH_REST: [number, number] = [334, 226];
 const dockX = (cx: number, edge: number) => cx + edge + 20 + 4 + cupHeight(S);
 const TH_DOCK: [number, number] = [dockX(MAC[0], blobRadius(MAC_R, MACRO_WOBBLE, 0)), MAC[1]];
 const TK_DOCK: [number, number] = [dockX(BODY[0], blobRadius(BODY_R, BODY_WOBBLE, 0)), BODY[1]];
-const VB: [number, number] = [B[0] + 49 * Math.cos((-120 * Math.PI) / 180), B[1] + 49 * Math.sin((-120 * Math.PI) / 180)];
+const VB: [number, number] = [B[0] + 49 * cos((-120 * Math.PI) / 180), B[1] + 49 * sin((-120 * Math.PI) / 180)];
 const PLASMA: [number, number][] = [
   [528, 58],
   [586, 124],

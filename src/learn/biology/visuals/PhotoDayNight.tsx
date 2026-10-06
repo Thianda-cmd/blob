@@ -10,11 +10,12 @@ import { useEffect, useRef, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { sin } from "@/lib/stableMath";
 
 const RISE = 5;
 const SET = 21;
 const RESP = 10;
-const light = (h: number) => Math.max(0, Math.sin((Math.PI * (h - RISE)) / (SET - RISE)));
+const light = (h: number) => Math.max(0, sin((Math.PI * (h - RISE)) / (SET - RISE)));
 const photo = (h: number) => 50 * light(h) ** 0.9;
 /** The hours when photosynthesis just equals respiration (morning and evening). */
 const COMP = (() => {

@@ -7,6 +7,7 @@
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { useId } from "react";
+import { cos, sin } from "@/lib/stableMath";
 
 export type VillusPart = "villus" | "epithelium" | "microvilli" | "blood" | "lymph" | "goblet";
 
@@ -32,7 +33,7 @@ function outline(cx: number, half: number, top: number, base: number, step: numb
   const n = Math.round(arc / step);
   for (let i = 0; i <= n; i++) {
     const a = Math.PI + (Math.PI * i) / n;
-    pts.push({ x: cx + half * Math.cos(a), y: top + half * Math.sin(a), nx: Math.cos(a), ny: Math.sin(a) });
+    pts.push({ x: cx + half * cos(a), y: top + half * sin(a), nx: cos(a), ny: sin(a) });
   }
   for (let y = top + step; y <= base; y += step) pts.push({ x: cx + half, y, nx: 1, ny: 0 });
   return pts;

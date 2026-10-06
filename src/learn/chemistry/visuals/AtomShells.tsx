@@ -5,6 +5,7 @@ import { useId } from "react";
 import { useText } from "@/i18n/useText";
 import { tx } from "@/i18n/text";
 import { byNumber, neutrons, shells } from "../elements";
+import { cos, sin } from "@/lib/stableMath";
 
 type Props = {
   /** Atomic number (protons). */
@@ -95,7 +96,7 @@ export function AtomShells({ z, charge = 0, size = 220, spin = true, highlightOu
                       key={`${id}-e-${i}-${k}`}
                       r={dot}
                       initial={{ cx: c, cy: c, opacity: 0 }}
-                      animate={{ cx: round(c + r * Math.cos(a)), cy: round(c + r * Math.sin(a)), opacity: 1 }}
+                      animate={{ cx: round(c + r * cos(a)), cy: round(c + r * sin(a)), opacity: 1 }}
                       exit={{ opacity: 0, scale: 0 }}
                       transition={{ type: "spring", stiffness: 180, damping: 20, delay: k * 0.02 }}
                       fill={outer && highlightOuter ? "var(--blob)" : "var(--ink-2)"}

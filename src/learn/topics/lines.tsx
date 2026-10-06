@@ -15,6 +15,7 @@ import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as 
 import { Graph, type GraphProps } from "@/learn/visuals/Graph";
 import { alongLine, crossing, Plane, PlaneDot, PlaneHandle, PlaneLine, PlanePath, PlaneTag, planeGeo, StepSlider, TONE, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Exact numbers and keyed maths. Shared with the linear-systems topic.
@@ -1415,7 +1416,7 @@ function SlopeSliders() {
             width={0.55}
             dashed
           />
-          <PlaneLine through={() => [[0, bS.get()], [Math.cos(angle.get()), Math.sin(angle.get())]]} width={1.1} />
+          <PlaneLine through={() => [[0, bS.get()], [cos(angle.get()), sin(angle.get())]]} width={1.1} />
           <PlaneDot at={() => [0, bS.get()]} tone="ink" hollow r={1.3} pulse={b} />
         </Plane>
       </div>
@@ -1615,7 +1616,7 @@ function ParallelLab() {
   const px = useSpringTo(P[0]);
   const py = useSpringTo(P[1]);
   const geo = planeGeo([-5, 5], [-5, 5]);
-  const dir = (a: number): Pt => [Math.cos(a), Math.sin(a)];
+  const dir = (a: number): Pt => [cos(a), sin(a)];
   const meet = () => crossing([0, bg], dir(ag.get()), [px.get(), py.get()], dir(ah.get()));
   const corner = (): Pt[] | null => {
     const s = meet();

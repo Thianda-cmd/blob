@@ -6,6 +6,7 @@ import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { sin } from "@/lib/stableMath";
 
 // The ionic lattice of sodium chloride as a 2D slice. A hammer blow shifts the layers so
 // that equal charges meet (brittle); melting frees the ions so they can carry current.
@@ -25,7 +26,7 @@ const R_AN = 18;
 
 /** Deterministic pseudo-random number in [0, 1) for ion i, draw k (same on server and client). */
 const rand = (i: number, k: number) => {
-  const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  const v = sin(i * 12.9898 + k * 78.233) * 43758.5453;
   return Math.round((v - Math.floor(v)) * 1000) / 1000;
 };
 

@@ -9,6 +9,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { SPECIMENS, SpecimenField, type Specimen } from "./CellSpecimen";
+import { cos, sin } from "@/lib/stableMath";
 
 const OBJECTIVES = [
   { mag: 4, ring: "var(--bio-blood)", zoom: 0.1, blurPer: 0.09 },
@@ -55,7 +56,7 @@ export function CellKnob({ label, value, onChange, perPixel, keyStep, size, min,
           <circle r={46} fill="var(--bio-bone)" stroke="var(--bio-outline)" strokeWidth={3} />
           {Array.from({ length: ridges }, (_, i) => {
             const a = (i / ridges) * 2 * Math.PI;
-            return <line key={i} x1={38 * Math.cos(a)} y1={38 * Math.sin(a)} x2={46 * Math.cos(a)} y2={46 * Math.sin(a)} stroke="var(--bio-outline)" strokeWidth={2.2} />;
+            return <line key={i} x1={38 * cos(a)} y1={38 * sin(a)} x2={46 * cos(a)} y2={46 * sin(a)} stroke="var(--bio-outline)" strokeWidth={2.2} />;
           })}
           <circle r={17} fill="var(--ink-3)" stroke="var(--bio-outline)" strokeWidth={2.5} />
           <circle cx={0} cy={-29} r={4} fill="var(--blob)" />

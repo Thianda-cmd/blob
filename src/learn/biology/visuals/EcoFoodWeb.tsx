@@ -25,6 +25,7 @@ import {
   type OrgId,
   type Web,
 } from "@/learn/biology/topics/ecosystems/data";
+import { cos, sin } from "@/lib/stableMath";
 
 const NW = 106;
 const NH = 30;
@@ -44,15 +45,15 @@ function Arrow({ from, to, faded, extra, animateIn }: { from: { x: number; y: nu
   const [x1, y1] = edgePoint(to.x, to.y, from.x, from.y, 5);
   const ang = Math.atan2(y1 - y0, x1 - x0);
   const len = 9;
-  const head = `${x1},${y1} ${x1 - len * Math.cos(ang - 0.42)},${y1 - len * Math.sin(ang - 0.42)} ${x1 - len * Math.cos(ang + 0.42)},${y1 - len * Math.sin(ang + 0.42)}`;
+  const head = `${x1},${y1} ${x1 - len * cos(ang - 0.42)},${y1 - len * sin(ang - 0.42)} ${x1 - len * cos(ang + 0.42)},${y1 - len * sin(ang + 0.42)}`;
   const color = faded ? "var(--line-2)" : "var(--bio-outline)";
   return (
     <motion.g initial={animateIn ? { opacity: 0 } : false} animate={{ opacity: faded ? 0.5 : 1 }} transition={{ duration: 0.3 }}>
       <motion.line
         x1={x0}
         y1={y0}
-        x2={x1 - 6 * Math.cos(ang)}
-        y2={y1 - 6 * Math.sin(ang)}
+        x2={x1 - 6 * cos(ang)}
+        y2={y1 - 6 * sin(ang)}
         stroke={color}
         strokeWidth={1.8}
         strokeDasharray={extra ? "5 4" : undefined}

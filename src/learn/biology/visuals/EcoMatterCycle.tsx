@@ -9,12 +9,13 @@ import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 const CX = 260;
 const CY = 178;
 const R = 112;
 const rad = (deg: number) => (deg * Math.PI) / 180;
-const pt = (deg: number, r = R): [number, number] => [CX + r * Math.cos(rad(deg)), CY + r * Math.sin(rad(deg))];
+const pt = (deg: number, r = R): [number, number] => [CX + r * cos(rad(deg)), CY + r * sin(rad(deg))];
 
 type Station = "producer" | "consumer" | "remains" | "decomposer" | "minerals";
 const STEPS: { at: Station; angle: number; title: Text; text: Text }[] = [
@@ -89,7 +90,7 @@ function ArcArrow({ a0, a1, lit }: { a0: number; a1: number; lit: boolean }) {
   const [x1, y1] = pt(a1);
   const tang = rad(a1 + 90);
   const l = 11;
-  const head = `${x1},${y1} ${x1 - l * Math.cos(tang - 0.45)},${y1 - l * Math.sin(tang - 0.45)} ${x1 - l * Math.cos(tang + 0.45)},${y1 - l * Math.sin(tang + 0.45)}`;
+  const head = `${x1},${y1} ${x1 - l * cos(tang - 0.45)},${y1 - l * sin(tang - 0.45)} ${x1 - l * cos(tang + 0.45)},${y1 - l * sin(tang + 0.45)}`;
   const c = lit ? "var(--blob)" : "var(--ink-3)";
   return (
     <g style={{ transition: "opacity .25s" }}>
@@ -105,8 +106,8 @@ export function EcoMatterCycle() {
   const [step, setStep] = useState(0);
   const [lap, setLap] = useState(0);
   const angle = useMotionValue(STEPS[0].angle);
-  const tx0 = useTransform(angle, (a) => CX + R * Math.cos(rad(a)));
-  const ty0 = useTransform(angle, (a) => CY + R * Math.sin(rad(a)));
+  const tx0 = useTransform(angle, (a) => CX + R * cos(rad(a)));
+  const ty0 = useTransform(angle, (a) => CY + R * sin(rad(a)));
 
   const go = (dir: 1 | -1) => {
     let next = step + dir;
@@ -138,7 +139,7 @@ export function EcoMatterCycle() {
             <circle cx={60} cy={52} r={22} fill="var(--bio-sun)" stroke="var(--bio-nerve-deep)" strokeWidth={1.5} />
             {Array.from({ length: 8 }, (_, i) => {
               const a = (i * Math.PI) / 4;
-              return <line key={i} x1={60 + 28 * Math.cos(a)} y1={52 + 28 * Math.sin(a)} x2={60 + 36 * Math.cos(a)} y2={52 + 36 * Math.sin(a)} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
+              return <line key={i} x1={60 + 28 * cos(a)} y1={52 + 28 * sin(a)} x2={60 + 36 * cos(a)} y2={52 + 36 * sin(a)} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
             })}
             <path d="M96 62 Q150 48 196 58" fill="none" stroke="var(--bio-sun)" strokeWidth={3} strokeDasharray="2 6" strokeLinecap="round" />
             <polygon points="204,60 192,53 194,65" fill="var(--bio-sun)" />

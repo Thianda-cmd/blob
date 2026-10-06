@@ -8,6 +8,7 @@ import { useText } from "@/i18n/useText";
 import { createRng } from "@/learn/engine/rng";
 import { cn } from "@/lib/utils";
 import { Anther, Bee, CHERRY, mirror } from "./FlowerKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // Insect flower or wind flower? One flower morphs between the two: big coloured petals with
 // scent and nectar and a few sticky pollen grains, or tiny green husks, dangling anthers,
@@ -235,7 +236,7 @@ export function FlowerWindInsect({ start = "insect" }: { start?: Kind }) {
                   return (
                     <path
                       key={i}
-                      d={`M ${(Math.cos(a - 0.12) * 24).toFixed(1)} ${(Math.sin(a - 0.12) * 24).toFixed(1)} L ${(Math.cos(a) * 33).toFixed(1)} ${(Math.sin(a) * 33).toFixed(1)} L ${(Math.cos(a + 0.12) * 24).toFixed(1)} ${(Math.sin(a + 0.12) * 24).toFixed(1)} Z`}
+                      d={`M ${(cos(a - 0.12) * 24).toFixed(1)} ${(sin(a - 0.12) * 24).toFixed(1)} L ${(cos(a) * 33).toFixed(1)} ${(sin(a) * 33).toFixed(1)} L ${(cos(a + 0.12) * 24).toFixed(1)} ${(sin(a + 0.12) * 24).toFixed(1)} Z`}
                       fill="var(--bio-membrane)"
                     />
                   );

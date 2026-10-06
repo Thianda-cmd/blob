@@ -6,6 +6,7 @@
 import { useId, type ReactNode } from "react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export type TissueId = "meristem" | "parenchyma" | "collenchyma" | "sclerenchyma" | "epidermis" | "vascular";
 
@@ -79,7 +80,7 @@ function hexCentres(r: number) {
 function roundHex(x: number, y: number, r: number, c: number) {
   const pts = Array.from({ length: 6 }, (_, i) => {
     const a = ((60 * i - 90) * Math.PI) / 180;
-    return [x + Math.cos(a) * r, y + Math.sin(a) * r];
+    return [x + cos(a) * r, y + sin(a) * r];
   });
   const lerp = (a: number[], b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   const f = c / r;
@@ -133,8 +134,8 @@ function Parenchyma() {
         <g key={i}>
           <path d={roundHex(x, y, 27.5, 7)} fill={CELL} stroke={WALL} strokeWidth={1.3} />
           <path d={roundHex(x, y, 19, 7)} fill="var(--bio-vacuole)" />
-          <circle cx={x + 13 * Math.cos(i * 1.7)} cy={y + 13 * Math.sin(i * 1.7)} r={4.2} fill={NUC} stroke={NUC_D} strokeWidth={0.9} />
-          <ellipse cx={x - 14 * Math.cos(i * 1.7)} cy={y - 14 * Math.sin(i * 1.7)} rx={3} ry={2} fill="var(--bio-chloro)" />
+          <circle cx={x + 13 * cos(i * 1.7)} cy={y + 13 * sin(i * 1.7)} r={4.2} fill={NUC} stroke={NUC_D} strokeWidth={0.9} />
+          <ellipse cx={x - 14 * cos(i * 1.7)} cy={y - 14 * sin(i * 1.7)} rx={3} ry={2} fill="var(--bio-chloro)" />
         </g>
       ))}
     </g>
@@ -169,7 +170,7 @@ function Sclerenchyma() {
           <g stroke="var(--bio-wood-deep)" strokeWidth={1}>
             {[0, 1, 2, 3, 4, 5].map((k) => {
               const a = ((60 * k + 15 * (i % 3)) * Math.PI) / 180;
-              return <line key={k} x1={x + Math.cos(a) * 4} y1={y + Math.sin(a) * 4} x2={x + Math.cos(a) * 18} y2={y + Math.sin(a) * 18} />;
+              return <line key={k} x1={x + cos(a) * 4} y1={y + sin(a) * 4} x2={x + cos(a) * 18} y2={y + sin(a) * 18} />;
             })}
           </g>
           <circle cx={x} cy={y} r={4.2} fill="var(--raised)" stroke="var(--bio-wood-deep)" strokeWidth={1} />

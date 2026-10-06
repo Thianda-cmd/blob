@@ -7,6 +7,7 @@ import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { Golgi, Lysosome, Mitochondrion, Nucleus, Ribosomes, RoughER, SmoothER, Vesicle } from "./CellOrganelles";
 import type { CellDetail } from "./CellPlantCell";
+import { cos, sin } from "@/lib/stableMath";
 
 const NX = 242;
 const NY = 178;
@@ -34,14 +35,14 @@ export const ANIMAL_PARTS_EM: FigurePart[] = [
 const MEMBRANE = "M 70 160 C 66 98, 128 50, 218 44 C 310 38, 402 54, 444 108 C 482 156, 474 246, 420 294 C 364 342, 238 340, 152 314 C 84 292, 74 222, 70 160 Z";
 
 function arc(r: number, a0: number, a1: number) {
-  const p = (a: number) => [NX + r * Math.cos((a * Math.PI) / 180), NY + r * Math.sin((a * Math.PI) / 180)].map((v) => v.toFixed(1)).join(" ");
+  const p = (a: number) => [NX + r * cos((a * Math.PI) / 180), NY + r * sin((a * Math.PI) / 180)].map((v) => v.toFixed(1)).join(" ");
   return `M ${p(a0)} A ${r} ${r} 0 0 1 ${p(a1)}`;
 }
 const ER_PATHS = [arc(63, -48, 46), arc(72, -44, 42), arc(81, -40, 38)];
 const ER_DOTS: [number, number][] = [66.6, 75.6, 84.6].flatMap((r, k) =>
   Array.from({ length: 10 }, (_, i) => {
     const a = ((-44 + k * 3 + i * 9) * Math.PI) / 180;
-    return [NX + r * Math.cos(a), NY + r * Math.sin(a)] as [number, number];
+    return [NX + r * cos(a), NY + r * sin(a)] as [number, number];
   }),
 );
 const SER_PATHS = [
@@ -151,8 +152,8 @@ function Pores() {
     <g>
       {Array.from({ length: PORES }, (_, k) => {
         const a = ((k + 1) * SEG - GAP / 2) / NR;
-        const x = NX + NR * Math.cos(a);
-        const y = NY + NR * Math.sin(a);
+        const x = NX + NR * cos(a);
+        const y = NY + NR * sin(a);
         return <circle key={k} cx={x} cy={y} r={2.6} fill="none" stroke="var(--bio-nucleus-deep)" strokeWidth={1} opacity={0.7} />;
       })}
     </g>

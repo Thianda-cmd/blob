@@ -12,6 +12,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type Stencil = "strip" | "circle" | "star";
 export type LeafStage = "green" | "foil" | "pale" | "iodine";
@@ -29,7 +30,7 @@ function starPath(cx: number, cy: number, R: number, r: number) {
     Array.from({ length: 10 }, (_, i) => {
       const a = -Math.PI / 2 + (i * Math.PI) / 5;
       const rad = i % 2 ? r : R;
-      return `${i ? "L" : "M"}${(cx + rad * Math.cos(a)).toFixed(1)} ${(cy + rad * Math.sin(a)).toFixed(1)}`;
+      return `${i ? "L" : "M"}${(cx + rad * cos(a)).toFixed(1)} ${(cy + rad * sin(a)).toFixed(1)}`;
     }).join(" ") + " Z"
   );
 }
@@ -109,7 +110,7 @@ function LeafArt({ stencil, variegated, stage }: { stencil: Stencil; variegated:
         <path d={MIDRIB} strokeWidth={2} />
         {[0.2, 0.36, 0.52, 0.68, 0.84].map((k) => {
           const x = 60 + 270 * k;
-          const y = 130 - 8 * Math.sin(Math.PI * k) - 8 * k;
+          const y = 130 - 8 * sin(Math.PI * k) - 8 * k;
           return (
             <g key={k}>
               <path d={`M ${x} ${y} q 14 -30 40 -52`} />
@@ -362,7 +363,7 @@ function Prop({ kind }: { kind: Step["prop"] }) {
                 <g>
                   {Array.from({ length: 10 }, (_, i) => {
                     const a = (i / 10) * Math.PI * 2;
-                    return <line key={i} x1={50 + Math.cos(a) * 26} y1={50 + Math.sin(a) * 26} x2={50 + Math.cos(a) * 40} y2={50 + Math.sin(a) * 40} stroke="var(--bio-sun)" strokeWidth={5} strokeLinecap="round" />;
+                    return <line key={i} x1={50 + cos(a) * 26} y1={50 + sin(a) * 26} x2={50 + cos(a) * 40} y2={50 + sin(a) * 40} stroke="var(--bio-sun)" strokeWidth={5} strokeLinecap="round" />;
                   })}
                   <circle cx={50} cy={50} r={21} fill="var(--bio-sun)" stroke="var(--bio-outline)" strokeWidth={2} />
                 </g>

@@ -8,6 +8,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { DIG_LAYERS, FOSSILS, type FossilId } from "@/learn/biology/topics/evolution/data";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // Rock layers with fossils: a widget where you dig down layer by layer (deeper = older), and a
 // labelled rock column for tasks ("Which fossil is the oldest?").
@@ -33,7 +34,7 @@ function spiral(turns: number, r0: number, r1: number) {
   for (let i = 0; i <= n; i++) {
     const a = (i / 28) * Math.PI * 2;
     const r = r0 + ((r1 - r0) * i) / n;
-    pts.push(`${(Math.cos(a) * r).toFixed(1)} ${(Math.sin(a) * r).toFixed(1)}`);
+    pts.push(`${(cos(a) * r).toFixed(1)} ${(sin(a) * r).toFixed(1)}`);
   }
   return `M${pts.join(" L")}`;
 }
@@ -65,7 +66,7 @@ export const FOSSIL_ART: Record<FossilId, () => ReactNode> = {
     <g>
       {/* feather impressions of wings and tail */}
       {[-50, -35, -20, -5, 10].map((a, i) => (
-        <path key={`w${i}`} d={`M-4 -6 l${(Math.cos((a * Math.PI) / 180) * 30).toFixed(1)} ${(Math.sin((a * Math.PI) / 180) * 30 - 6).toFixed(1)}`} stroke={OUT} strokeWidth={1} opacity={0.55} />
+        <path key={`w${i}`} d={`M-4 -6 l${(cos((a * Math.PI) / 180) * 30).toFixed(1)} ${(sin((a * Math.PI) / 180) * 30 - 6).toFixed(1)}`} stroke={OUT} strokeWidth={1} opacity={0.55} />
       ))}
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <path key={`t${i}`} d={`M${-8 - i * 4} ${6 + i * 1.6} l-5 ${i % 2 ? 7 : -7}`} stroke={OUT} strokeWidth={1} opacity={0.55} />
@@ -93,7 +94,7 @@ export const FOSSIL_ART: Record<FossilId, () => ReactNode> = {
       <path d={spiral(2.6, 2, 18)} fill="none" stroke={OUT} strokeWidth={1.4} />
       {Array.from({ length: 16 }, (_, i) => {
         const a = (i / 16) * Math.PI * 2;
-        return <line key={i} x1={Math.cos(a) * 13} y1={Math.sin(a) * 13} x2={Math.cos(a) * 19.5} y2={Math.sin(a) * 19.5} stroke={OUT} strokeWidth={0.9} opacity={0.6} />;
+        return <line key={i} x1={cos(a) * 13} y1={sin(a) * 13} x2={cos(a) * 19.5} y2={sin(a) * 19.5} stroke={OUT} strokeWidth={0.9} opacity={0.6} />;
       })}
     </g>
   ),
@@ -162,7 +163,7 @@ const LAYER_FILL = [
 /** A wavy boundary between layers (deterministic per index). */
 function wave(y: number, i: number, x0: number, x1: number) {
   const pts: string[] = [];
-  for (let x = x0; x <= x1; x += 16) pts.push(`${x} ${(y + Math.sin(x / 37 + i * 1.7) * 3.2 + Math.sin(x / 13 + i) * 1.2).toFixed(1)}`);
+  for (let x = x0; x <= x1; x += 16) pts.push(`${x} ${(y + sin(x / 37 + i * 1.7) * 3.2 + sin(x / 13 + i) * 1.2).toFixed(1)}`);
   return pts;
 }
 

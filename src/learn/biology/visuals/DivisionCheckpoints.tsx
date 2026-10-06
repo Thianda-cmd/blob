@@ -9,6 +9,7 @@ import { useEffect, useReducer, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 type Damage = "none" | "light" | "severe";
 type Status = "run" | "arrest" | "dead";
@@ -27,7 +28,7 @@ const ARCS: { id: string; from: number; to: number; fill: string; label: string 
 const POS = [70, 150, 200, 275, 300, 316, 340, 354];
 const CHECKS = [150, 300, 340];
 
-const pt = (deg: number, r: number) => [C + r * Math.sin((deg * Math.PI) / 180), C - r * Math.cos((deg * Math.PI) / 180)] as const;
+const pt = (deg: number, r: number) => [C + r * sin((deg * Math.PI) / 180), C - r * cos((deg * Math.PI) / 180)] as const;
 function arc(from: number, to: number) {
   const [x1, y1] = pt(from, R + RING / 2);
   const [x2, y2] = pt(to, R + RING / 2);

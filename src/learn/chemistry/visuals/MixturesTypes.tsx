@@ -10,6 +10,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { MIX_TYPES, type MixType, type State } from "../mixtures-data";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Particle pictures
@@ -64,7 +65,7 @@ function clump(cx: number, cy: number, k: number, round: boolean): { x: number; 
   const out: { x: number; y: number }[] = [];
   if (round) {
     out.push({ x: cx, y: cy });
-    for (let i = 0; i < Math.min(6, k - 1); i++) out.push({ x: r1(cx + d * Math.cos((i * Math.PI) / 3)), y: r1(cy + d * Math.sin((i * Math.PI) / 3)) });
+    for (let i = 0; i < Math.min(6, k - 1); i++) out.push({ x: r1(cx + d * cos((i * Math.PI) / 3)), y: r1(cy + d * sin((i * Math.PI) / 3)) });
   } else {
     const side = Math.ceil(Math.sqrt(k));
     for (let i = 0; i < k; i++) out.push({ x: r1(cx + ((i % side) - (side - 1) / 2) * d), y: r1(cy + (Math.floor(i / side) - (side - 1) / 2) * d) });

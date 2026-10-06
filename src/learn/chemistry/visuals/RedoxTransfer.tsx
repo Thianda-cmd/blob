@@ -9,6 +9,7 @@ import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
 import { ionText, roman } from "../redox-data";
+import { cos, sin } from "@/lib/stableMath";
 
 // Electrons travel from the reducing agent to the oxidising agent. The oxidation numbers
 // (Roman numerals, as in German school books) update, and the half-equations appear.
@@ -150,7 +151,7 @@ export function RedoxTransfer() {
     const q = byId(to);
     const angle = Math.atan2(q.at[1] - p.at[1], q.at[0] - p.at[0]) + spread;
     const r0 = p.r[0] + 7;
-    return { from: [p.at[0] + Math.cos(angle) * r0, p.at[1] + Math.sin(angle) * r0] as [number, number], to: q, k };
+    return { from: [p.at[0] + cos(angle) * r0, p.at[1] + sin(angle) * r0] as [number, number], to: q, k };
   });
 
   return (

@@ -6,6 +6,7 @@
 import { useId } from "react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export const PLANT_PARTS: FigurePart[] = [
   {
@@ -80,7 +81,7 @@ export function PlantLeafShape({ x, y, angle, len, width, veins = true }: { x: n
           {sides.map((f) => {
             const sx = p + b * f;
             const ex = p + b * (f + 0.17);
-            const w = width * 0.62 * Math.sin(Math.PI * Math.min(0.95, f + 0.17));
+            const w = width * 0.62 * sin(Math.PI * Math.min(0.95, f + 0.17));
             return <path key={f} d={`M${sx} 0 Q${sx + b * 0.08} ${-w * 0.5} ${ex} ${-w} M${sx} 0 Q${sx + b * 0.08} ${w * 0.5} ${ex} ${w}`} />;
           })}
         </g>
@@ -126,7 +127,7 @@ function hairsOf(r: RootLine, salt: number) {
     const dy = 2 * (1 - t) * (c[1] - p0[1]) + 2 * t * (p1[1] - c[1]);
     const l = Math.hypot(dx, dy) || 1;
     const side = k % 2 ? 1 : -1;
-    const len = 3.2 + ((Math.sin((k + 1) * 12.9898 + salt) * 43758.5453) % 1 + 1) % 1 * 2.6;
+    const len = 3.2 + ((sin((k + 1) * 12.9898 + salt) * 43758.5453) % 1 + 1) % 1 * 2.6;
     const nx = (-dy / l) * side;
     const ny = (dx / l) * side;
     out.push(`M${(x + nx * r.w * 0.5).toFixed(1)} ${(y + ny * r.w * 0.5).toFixed(1)} l${(nx * len + (dx / l) * 0.8).toFixed(1)} ${(ny * len + (dy / l) * 0.8).toFixed(1)}`);
@@ -275,7 +276,7 @@ export function PlantBody({ clip, inset = true }: { clip: string; inset?: boolea
         ))}
         <circle cx={238} cy={60} r={8.5} fill="var(--bio-pollen)" stroke="var(--bio-nerve-deep)" strokeWidth={1.3} />
         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-          <circle key={`a${i}`} cx={238 + Math.cos((i * Math.PI) / 4) * 5} cy={60 + Math.sin((i * Math.PI) / 4) * 5} r={1.4} fill="var(--bio-nerve-deep)" />
+          <circle key={`a${i}`} cx={238 + cos((i * Math.PI) / 4) * 5} cy={60 + sin((i * Math.PI) / 4) * 5} r={1.4} fill="var(--bio-nerve-deep)" />
         ))}
       </g>
 

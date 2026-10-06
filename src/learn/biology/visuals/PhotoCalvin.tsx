@@ -12,6 +12,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { PhotoCO2, PhotoPill } from "./PhotoMolecules";
+import { cos, sin } from "@/lib/stableMath";
 
 const OUT = "var(--bio-outline)";
 const W = 600;
@@ -19,7 +20,7 @@ const H = 400;
 const CX = 300;
 const CY = 200;
 const R = 106;
-const pt = (deg: number): [number, number] => [CX + R * Math.cos((deg * Math.PI) / 180), CY + R * Math.sin((deg * Math.PI) / 180)];
+const pt = (deg: number): [number, number] => [CX + R * cos((deg * Math.PI) / 180), CY + R * sin((deg * Math.PI) / 180)];
 
 /** A molecule as a chain of carbon beads with phosphate groups. */
 function Chain({ c, p }: { c: number; p: "one" | "both" }) {

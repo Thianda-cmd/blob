@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // Lamarck and Darwin side by side, explaining the giraffe's long neck in four steps.
 
@@ -16,7 +17,7 @@ const ANGLE = (68 * Math.PI) / 180;
 
 type G = { id: string; x: number; neck: number; s?: number; faded?: boolean; stretch?: boolean };
 
-const neckTop = (L: number) => [16 + L * Math.cos(ANGLE), -66 - L * Math.sin(ANGLE)] as const;
+const neckTop = (L: number) => [16 + L * cos(ANGLE), -66 - L * sin(ANGLE)] as const;
 
 /** One giraffe standing on the ground at (0, 0), facing right. The neck length glides smoothly. */
 function Giraffe({ g }: { g: G }) {
@@ -27,8 +28,8 @@ function Giraffe({ g }: { g: G }) {
     else L.set(g.neck);
   }, [L, g.neck, reduce]);
   // the neck runs from the shoulders up and forward; p is the direction across the neck
-  const px = Math.sin(ANGLE);
-  const py = Math.cos(ANGLE);
+  const px = sin(ANGLE);
+  const py = cos(ANGLE);
   const neckD = useTransform(L, (l) => {
     const [x2, y2] = neckTop(l);
     return `M${17 - px * 7} ${-62 - py * 7} L${x2 - px * 3.5} ${y2 - py * 3.5} L${x2 + px * 3.5} ${y2 + py * 3.5} L${17 + px * 7} ${-62 + py * 7} Z`;

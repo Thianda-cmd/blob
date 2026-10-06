@@ -1,4 +1,5 @@
 "use client";
+import { cos, sin } from "@/lib/stableMath";
 
 // Chromosome drawing for the "cell-division" topic. A chromatid is two arms (short p arm and
 // long q arm) that meet at the centromere, where the chromatid is pinched. Arms are stroked
@@ -47,8 +48,8 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** The points of one arm, from near the centromere to its tip. */
 function armPoints(x: number, y: number, angle: number, start: number, length: number, amp: number, seed: number) {
-  const ux = Math.cos(rad(angle));
-  const uy = Math.sin(rad(angle));
+  const ux = cos(rad(angle));
+  const uy = sin(rad(angle));
   const vx = -uy;
   const vy = ux;
   const pts: [number, number][] = [];
@@ -56,7 +57,7 @@ function armPoints(x: number, y: number, angle: number, start: number, length: n
   for (let i = 0; i <= steps; i++) {
     const s = (length * i) / steps;
     const env = Math.min(1, s / 5);
-    const off = amp * env * (0.75 * Math.sin((2 * Math.PI * s) / 8 + seed) + 0.35 * Math.sin((2 * Math.PI * s) / 3.1 + 2.3 * seed));
+    const off = amp * env * (0.75 * sin((2 * Math.PI * s) / 8 + seed) + 0.35 * sin((2 * Math.PI * s) / 3.1 + 2.3 * seed));
     pts.push([x + ux * (start + s) + vx * off, y + uy * (start + s) + vy * off]);
   }
   return pts;
@@ -85,10 +86,10 @@ export function Chromatid({ x, y, pa, qa, len, cf, cond, fill, other, swap = 0, 
     const onQ = b > 0;
     const ang = rad(onQ ? qa : pa);
     const d = gap + Math.abs(b) * (onQ ? qLen : pLen);
-    const bx = x + Math.cos(ang) * d;
-    const by = y + Math.sin(ang) * d;
-    const nx = -Math.sin(ang) * w * 0.5;
-    const ny = Math.cos(ang) * w * 0.5;
+    const bx = x + cos(ang) * d;
+    const by = y + sin(ang) * d;
+    const nx = -sin(ang) * w * 0.5;
+    const ny = cos(ang) * w * 0.5;
     return `M${r1(bx - nx)} ${r1(by - ny)}L${r1(bx + nx)} ${r1(by + ny)}`;
   };
   return (
@@ -141,8 +142,8 @@ export function Chromosome({
   const other = PARENT_FILL[1 - parent];
   if (chromatids === 1) return <Chromatid x={x} y={y} pa={angle} qa={angle + 180} len={L} cf={spec.cf} cond={cond} fill={fill} bands={bands} scale={scale} />;
   const d = 2.9 * scale;
-  const nx = Math.cos(rad(angle + 90));
-  const ny = Math.sin(rad(angle + 90));
+  const nx = cos(rad(angle + 90));
+  const ny = sin(rad(angle + 90));
   return (
     <g>
       {[-1, 1].map((s) => (

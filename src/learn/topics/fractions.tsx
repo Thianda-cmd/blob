@@ -11,6 +11,7 @@ import { add, div as divF, frac, mul as mulF, sub, type Frac } from "@/learn/eng
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Fractions on the board. Every fraction carries its own token keys (numerator,
@@ -1623,8 +1624,8 @@ function sectorPath(c: number, r: number, t: number): string {
   if (t <= 0.0005) return "M 0 0";
   if (t >= 0.9995) return `M ${c} ${c - r} A ${r} ${r} 0 1 1 ${c} ${c + r} A ${r} ${r} 0 1 1 ${c} ${c - r} Z`;
   const a = 2 * Math.PI * t - Math.PI / 2;
-  const x = (c + r * Math.cos(a)).toFixed(2);
-  const y = (c + r * Math.sin(a)).toFixed(2);
+  const x = (c + r * cos(a)).toFixed(2);
+  const y = (c + r * sin(a)).toFixed(2);
   return `M ${c} ${c} L ${c} ${c - r} A ${r} ${r} 0 ${t > 0.5 ? 1 : 0} 1 ${x} ${y} Z`;
 }
 
@@ -1648,7 +1649,7 @@ function FracPie({ parts, value, bg = "var(--raised)", appear = false, className
           return (
             <motion.path
               key={c.key}
-              d={`M ${C} ${C} L ${(C + (R + 2) * Math.cos(a)).toFixed(2)} ${(C + (R + 2) * Math.sin(a)).toFixed(2)}`}
+              d={`M ${C} ${C} L ${(C + (R + 2) * cos(a)).toFixed(2)} ${(C + (R + 2) * sin(a)).toFixed(2)}`}
               stroke={bg}
               strokeWidth={3}
               strokeLinecap="round"

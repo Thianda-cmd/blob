@@ -15,6 +15,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { bloodMix, Chip, joinPolys, MainButton, pointAt, polyLength, polyPath, SoftButton, svgText, type Pt } from "./HeartShared";
+import { cos, sin } from "@/lib/stableMath";
 
 const W = 480;
 const H = 492;
@@ -40,7 +41,7 @@ function wavy(x0: number, x1: number, y: number, amp = 4, waves = 3): Pt[] {
   const pts: Pt[] = [];
   for (let i = 0; i <= 36; i++) {
     const f = i / 36;
-    pts.push([x0 + (x1 - x0) * f, y + Math.sin(f * Math.PI * 2 * waves) * amp * Math.sin(f * Math.PI)]);
+    pts.push([x0 + (x1 - x0) * f, y + sin(f * Math.PI * 2 * waves) * amp * sin(f * Math.PI)]);
   }
   return pts;
 }
@@ -108,7 +109,7 @@ const segStart = (pieces: Pt[][]) => pieces.reduce((s, p) => s + polyLength(p), 
 
 /** A scalloped outline (lung tissue made of many alveoli). */
 function scallop(cx: number, cy: number, rx: number, ry: number, n: number) {
-  const at = (k: number, f = 1): Pt => [cx + rx * f * Math.cos((k / n) * Math.PI * 2), cy + ry * f * Math.sin((k / n) * Math.PI * 2)];
+  const at = (k: number, f = 1): Pt => [cx + rx * f * cos((k / n) * Math.PI * 2), cy + ry * f * sin((k / n) * Math.PI * 2)];
   let d = `M${at(0).map((v) => v.toFixed(1)).join(" ")}`;
   for (let i = 0; i < n; i++) {
     const c = at(i + 0.5, 1.13);

@@ -5,6 +5,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { element, valenceElectrons } from "../elements";
+import { cos, sin } from "@/lib/stableMath";
 
 // Lewis structures (Lewis-Formeln / Valenzstrichformeln) drawn as SVG: element symbols,
 // bonding pairs as lines or dots, lone pairs as dots or short strokes. The same molecule can
@@ -138,7 +139,7 @@ const SPREAD = 1.75;
 const DOT = 0.052;
 
 /** Distance from an atom's centre to its lone pairs / bond ends: wider sideways for two-letter symbols. */
-const reach = (el: string, angle: number, base: number) => base + (el.length > 1 ? 0.13 : 0.03) * Math.abs(Math.cos(rad(angle)));
+const reach = (el: string, angle: number, base: number) => base + (el.length > 1 ? 0.13 : 0.03) * Math.abs(cos(rad(angle)));
 
 const spring = { type: "spring" as const, stiffness: 170, damping: 22 };
 
@@ -210,8 +211,8 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
   const minusC = centreOf(1);
 
   const dotsFor = (cxp: number, cyp: number, angle: number, sep: number) => {
-    const px = -Math.sin(rad(angle));
-    const py = Math.cos(rad(angle));
+    const px = -sin(rad(angle));
+    const py = cos(rad(angle));
     return [
       { x: cxp + px * sep, y: cyp + py * sep },
       { x: cxp - px * sep, y: cyp - py * sep },
@@ -253,7 +254,7 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
         return (
           <motion.g key={`ring-${i}`} initial={false} animate={{ opacity: octet && bonded ? 1 : 0 }} transition={{ duration: 0.35, delay: octet ? 0.15 + i * 0.08 : 0 }}>
             <circle cx={X(p.x)} cy={Y(p.y)} r={r * unit} fill="color-mix(in oklab, var(--blob) 7%, transparent)" stroke="var(--blob)" strokeOpacity={0.55} strokeWidth={1.5} strokeDasharray="5 5" />
-            <g transform={`translate(${X(p.x + Math.cos(rad(labelAngle[i])) * r)} ${Y(p.y + Math.sin(rad(labelAngle[i])) * r)})`}>
+            <g transform={`translate(${X(p.x + cos(rad(labelAngle[i])) * r)} ${Y(p.y + sin(rad(labelAngle[i])) * r)})`}>
               <circle r={0.17 * unit} fill="var(--blob)" />
               <text textAnchor="middle" dominantBaseline="central" className="fill-white font-semibold" style={{ fontSize: 0.2 * unit }}>
                 {n}
@@ -268,8 +269,8 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
         const pa = pos(bd.a, false);
         const pb = pos(bd.b, false);
         const ang = (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI;
-        const ux = Math.cos(rad(ang));
-        const uy = Math.sin(rad(ang));
+        const ux = cos(rad(ang));
+        const uy = sin(rad(ang));
         const ga = reach(m.atoms[bd.a].el, ang, 0.24);
         const gb = reach(m.atoms[bd.b].el, ang, 0.24);
         const showLines = bonded && pairStyle !== "dots";
@@ -309,8 +310,8 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
             const pa = pos(atom, apart);
             const pb = pos(other, apart);
             const ang = (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI;
-            const ux = Math.cos(rad(ang));
-            const uy = Math.sin(rad(ang));
+            const ux = cos(rad(ang));
+            const uy = sin(rad(ang));
             let x: number;
             let y: number;
             if (apart) {
@@ -342,7 +343,7 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
         a.lone.map((angle, k) => {
           const p = pos(i, apart);
           const rr = reach(a.el, angle, 0.33);
-          const c = { x: p.x + Math.cos(rad(angle)) * rr, y: p.y + Math.sin(rad(angle)) * rr };
+          const c = { x: p.x + cos(rad(angle)) * rr, y: p.y + sin(rad(angle)) * rr };
           const dots = dotsFor(c.x, c.y, angle, 0.075);
           const asLine = bonded && pairStyle === "lines";
           const visible = showLone;
@@ -382,8 +383,8 @@ export function LewisStructure({ mol, bonded = true, pairStyle = "lewis", lonePa
               {a.el}
             </text>
             <motion.text
-              x={r2(Math.cos(rad(labelAngle[i])) * (a.el.length > 1 ? 0.56 : 0.5) * unit)}
-              y={r2(Math.sin(rad(labelAngle[i])) * 0.5 * unit)}
+              x={r2(cos(rad(labelAngle[i])) * (a.el.length > 1 ? 0.56 : 0.5) * unit)}
+              y={r2(sin(rad(labelAngle[i])) * 0.5 * unit)}
               textAnchor="middle"
               dominantBaseline="central"
               className="fill-blob-ink font-math"

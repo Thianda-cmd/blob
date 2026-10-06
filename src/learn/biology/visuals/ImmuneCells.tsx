@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 import { tx, type Text } from "@/i18n/text";
+import { cos, sin } from "@/lib/stableMath";
 
 export type Epitope = "tri" | "round" | "square" | "trap" | "step" | "wave";
 export const EPITOPES: Epitope[] = ["tri", "round", "square", "trap", "step", "wave"];
@@ -16,7 +17,7 @@ export const rad = (deg: number) => (deg * Math.PI) / 180;
 /** Rotate a point by `deg` (clockwise on screen, like SVG's rotate). */
 export const turn = ([x, y]: [number, number], deg: number): [number, number] => {
   const a = rad(deg);
-  return [f(x * Math.cos(a) - y * Math.sin(a)), f(x * Math.sin(a) + y * Math.cos(a))];
+  return [f(x * cos(a) - y * sin(a)), f(x * sin(a) + y * cos(a))];
 };
 
 /** The bump's outline from (−s, 0) over the top to (s, 0), without the leading M. */
@@ -76,7 +77,7 @@ export const AB = { arm: 15, stem: 16, ang: 40 };
 /** Where an antibody's binding end sits in its own frame (hinge at 0,0, arms up): origin and rotation of the cup. */
 export function abCup(side: -1 | 1, s: number, arm = AB.arm) {
   const a = rad(AB.ang);
-  const d: [number, number] = [side * Math.sin(a), -Math.cos(a)];
+  const d: [number, number] = [side * sin(a), -cos(a)];
   const L = arm + cupHeight(s);
   return { at: [f(d[0] * L), f(d[1] * L)] as [number, number], rot: side === -1 ? 140 : -140, dir: d };
 }
@@ -97,12 +98,12 @@ export function clump(links: ClumpLink[], rp: number, s: number, center: [number
   const P: [number, number][] = [[0, 0]];
   for (const l of links) {
     const r = rad(l.beta);
-    P[l.b] = [P[l.a][0] + D * Math.cos(r), P[l.a][1] + D * Math.sin(r)];
+    P[l.b] = [P[l.a][0] + D * cos(r), P[l.a][1] + D * sin(r)];
   }
   const abs = links.map((l) => {
     const r = rad(l.beta);
     const mid: [number, number] = [(P[l.a][0] + P[l.b][0]) / 2, (P[l.a][1] + P[l.b][1]) / 2];
-    return { H: [mid[0] - l.side * lift * Math.sin(r), mid[1] + l.side * lift * Math.cos(r)] as [number, number], rot: l.beta + (l.side === 1 ? 0 : 180) };
+    return { H: [mid[0] - l.side * lift * sin(r), mid[1] + l.side * lift * cos(r)] as [number, number], rot: l.beta + (l.side === 1 ? 0 : 180) };
   });
   const bound: number[][] = P.map(() => []);
   abs.forEach((ab, i) => {
@@ -148,7 +149,7 @@ export function Antibody({
   stem?: number;
 }) {
   const a = rad(AB.ang);
-  const tip = (side: -1 | 1): [number, number] => [f(side * arm * Math.sin(a)), f(-arm * Math.cos(a))];
+  const tip = (side: -1 | 1): [number, number] => [f(side * arm * sin(a)), f(-arm * cos(a))];
   return (
     <g>
       <path d={`M 0 ${stem} L 0 0 L ${tip(-1)[0]} ${tip(-1)[1]} M 0 0 L ${tip(1)[0]} ${tip(1)[1]}`} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
@@ -211,7 +212,7 @@ export function BacteriumRod({ w = 22, h = 10, flagellum = true, shape, spots = 
 /** Radius of a blob outline at angle t (radians). */
 export function blobRadius(r: number, wobble: number[], t: number) {
   let k = 1;
-  wobble.forEach((w, j) => (k += w * Math.sin((j + 2) * t + j * 1.7)));
+  wobble.forEach((w, j) => (k += w * sin((j + 2) * t + j * 1.7)));
   return r * k;
 }
 
@@ -221,7 +222,7 @@ export function blobPath(r: number, wobble: number[], n = 48): string {
   for (let i = 0; i < n; i++) {
     const t = (i / n) * Math.PI * 2;
     const k = blobRadius(r, wobble, t);
-    pts.push([f(k * Math.cos(t)), f(k * Math.sin(t))]);
+    pts.push([f(k * cos(t)), f(k * sin(t))]);
   }
   return `M ${pts.map((p) => p.join(" ")).join(" L ")} Z`;
 }

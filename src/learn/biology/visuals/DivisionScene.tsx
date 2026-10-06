@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Chromatid, PAIRS, PARENT_FILL } from "./DivisionChromatid";
+import { cos, sin } from "@/lib/stableMath";
 
 export type DivisionKind = "mitosis" | "meiosis";
 /** "ndj1": the first pair does not separate in meiosis I; "ndj2": its sister chromatids stay together in meiosis II (left cell). */
@@ -98,8 +99,8 @@ function infoOf(n2: ModelSize): Info[] {
 
 /** Chromatid of a chromosome lying at (X, Y) with its p arm towards `a`, sisters `d` apart from the middle. */
 function ct(info: Info, X: number, Y: number, a: number, d: number, splay: number, cond: number, extra: Partial<CT> = {}): CT {
-  const nx = Math.cos(rad(a + 90));
-  const ny = Math.sin(rad(a + 90));
+  const nx = cos(rad(a + 90));
+  const ny = sin(rad(a + 90));
   return {
     x: X + info.s * d * nx,
     y: Y + info.s * d * ny,
@@ -384,8 +385,8 @@ function meiosisKeys(n2: ModelSize, crossing: boolean, variant: DivisionVariant,
       const b = BIV[i.pair];
       const a = b.a;
       const h = (i.par === 0 ? -1 : 1) * o(i.pair) * 6.4;
-      const X = EX + b.dx + h * Math.cos(rad(a + 90));
-      const Y = EY + b.dy + h * Math.sin(rad(a + 90));
+      const X = EX + b.dx + h * cos(rad(a + 90));
+      const Y = EY + b.dy + h * sin(rad(a + 90));
       return ct(i, X, Y, a, 2.8, 4, 1, { swap: swapOn(i) });
     }),
     chi: crossing ? 1 : 0,
@@ -649,7 +650,7 @@ function Spindle({ a, b, op }: { a: Cent; b: Cent; op: number }) {
   ] as const) {
     for (const ang of [-70, -35, 0, 35, 70, 120, -120]) {
       const base = Math.atan2(uy * dir, ux * dir) + rad(ang);
-      lines.push(`M${r1(p.x + Math.cos(base) * 5)} ${r1(p.y + Math.sin(base) * 5)}L${r1(p.x + Math.cos(base) * 15)} ${r1(p.y + Math.sin(base) * 15)}`);
+      lines.push(`M${r1(p.x + cos(base) * 5)} ${r1(p.y + sin(base) * 5)}L${r1(p.x + cos(base) * 15)} ${r1(p.y + sin(base) * 15)}`);
     }
   }
   return <path d={lines.join("")} fill="none" stroke="var(--bio-outline)" strokeOpacity={0.3 * op} strokeWidth={1} strokeLinecap="round" />;
@@ -678,7 +679,7 @@ export function SceneSvg({ scene, title, className }: { scene: Scene; title: Tex
           const c = cts[j];
           const inf = info[j];
           const d = inf.len * (1 - inf.cf) * inf.swapAt + 2;
-          return [c.x + Math.cos(rad(c.qa)) * d, c.y + Math.sin(rad(c.qa)) * d];
+          return [c.x + cos(rad(c.qa)) * d, c.y + sin(rad(c.qa)) * d];
         });
         return { x: (pts[0][0] + pts[1][0]) / 2, y: (pts[0][1] + pts[1][1]) / 2 };
       }).filter((p): p is { x: number; y: number } => !!p)

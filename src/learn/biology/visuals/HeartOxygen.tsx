@@ -11,6 +11,7 @@ import { useText } from "@/i18n/useText";
 import { dec } from "@/learn/chemistry/format";
 import { cn } from "@/lib/utils";
 import { Chip, Slider, svgText } from "./HeartShared";
+import { pow } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Model (Hill equation)
@@ -20,16 +21,16 @@ export type CurveKind = "adult" | "fetal" | "myo";
 export function p50(kind: CurveKind, pH = 7.4) {
   if (kind === "myo") return 2.8;
   const base = kind === "fetal" ? 19 : 26.8;
-  return base * Math.pow(10, -0.48 * (pH - 7.4));
+  return base * pow(10, -0.48 * (pH - 7.4));
 }
 /** Oxygen saturation in % at pO2 (mmHg). */
 export function saturation(pO2: number, kind: CurveKind = "adult", pH = 7.4) {
   const n = kind === "myo" ? 1 : 2.7;
   const p = Math.max(0, pO2);
-  return (100 * Math.pow(p, n)) / (Math.pow(p, n) + Math.pow(p50(kind, pH), n));
+  return (100 * pow(p, n)) / (pow(p, n) + pow(p50(kind, pH), n));
 }
 /** CO2 partial pressure (mmHg) that goes with a pH (bicarbonate 24 mmol/l, Henderson-Hasselbalch). */
-export const pco2For = (pH: number) => 24 / (0.03 * Math.pow(10, pH - 6.1));
+export const pco2For = (pH: number) => 24 / (0.03 * pow(10, pH - 6.1));
 
 // ---------------------------------------------------------------------------
 // Chart

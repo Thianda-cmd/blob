@@ -9,6 +9,7 @@ import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figu
 import { BASE_NAME, PAIR } from "@/learn/biology/topics/dna/data";
 import { cn } from "@/lib/utils";
 import { BASE_COLOR, StepButton } from "./DnaKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // The twisting double helix (lesson widget, level 1)
@@ -36,8 +37,8 @@ function backbone(side: 1 | -1, u: number): Seg[] {
   for (let s = -0.6; s <= N - 1 + 0.6 + 1e-9; s += 0.05) {
     const th = angle(s, u);
     const x = X0 + s * DX;
-    const y = CY - side * R * Math.cos(th);
-    const f = side * Math.sin(th) >= -1e-6;
+    const y = CY - side * R * cos(th);
+    const f = side * sin(th) >= -1e-6;
     if (front !== null && f !== front) {
       pts.push(`${r2(x)},${r2(y)}`);
       segs.push({ d: `M${pts.join(" L")}`, front });
@@ -85,8 +86,8 @@ export function DnaHelix() {
         {[...TOP].map((b, i) => {
           const th = angle(i, u);
           const x = X0 + i * DX;
-          const y1 = CY - R * Math.cos(th);
-          const y2 = CY + R * Math.cos(th);
+          const y1 = CY - R * cos(th);
+          const y2 = CY + R * cos(th);
           const half = (from: number, to: number, base: string, key: string) => {
             const top = Math.min(from, to);
             const h = Math.abs(to - from);
@@ -142,7 +143,7 @@ export function DnaHelix() {
                 return (
                   <g key={`${side}-${i}`}>
                     <polygon
-                      points={[0, 1, 2, 3, 4].map((k) => `${r2(x + p * Math.sin((k * 2 * Math.PI) / 5))},${r2(y - p * Math.cos((k * 2 * Math.PI) / 5))}`).join(" ")}
+                      points={[0, 1, 2, 3, 4].map((k) => `${r2(x + p * sin((k * 2 * Math.PI) / 5))},${r2(y - p * cos((k * 2 * Math.PI) / 5))}`).join(" ")}
                       fill="var(--bio-sun)"
                       stroke="var(--bio-outline)"
                       strokeWidth={1.2}
@@ -228,7 +229,7 @@ const LADDER_PARTS: FigurePart[] = [
 /** Five rungs of the DNA ladder: rails of sugar and phosphate, rungs of base pairs. */
 export function DnaLadderFigure({ mode = "names", show, ask, highlight, legend }: DrawingProps) {
   const pent = (x: number, y: number, p = 9) =>
-    [0, 1, 2, 3, 4].map((k) => `${r2(x + p * Math.sin((k * 2 * Math.PI) / 5))},${r2(y - p * Math.cos((k * 2 * Math.PI) / 5))}`).join(" ");
+    [0, 1, 2, 3, 4].map((k) => `${r2(x + p * sin((k * 2 * Math.PI) / 5))},${r2(y - p * cos((k * 2 * Math.PI) / 5))}`).join(" ");
   const half = (x: number, y: number, h: number, b: string) => (
     <g>
       <rect x={x - 14} y={y} width={28} height={h} rx={5} fill={BASE_COLOR[b]} stroke="var(--bio-outline)" strokeWidth={1.5} />

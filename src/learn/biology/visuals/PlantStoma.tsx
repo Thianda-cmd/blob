@@ -9,6 +9,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useId } from "react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 const CX = 180;
 const CY = 130;
@@ -89,13 +90,13 @@ const WALLS = (() => {
     let d = `M${r1(x0)} ${r1(y0)}`;
     for (let i = 1; i <= n; i++) {
       const t = i / n;
-      const w = Math.sin(t * Math.PI * 2 * waves) * amp * Math.sin(t * Math.PI);
+      const w = sin(t * Math.PI * 2 * waves) * amp * sin(t * Math.PI);
       d += ` L${r1(x0 + dx * t + nx * w)} ${r1(y0 + dy * t + ny * w)}`;
     }
     return d;
   };
   const out: string[] = [];
-  const ring = (deg: number, rx: number, ry: number) => [CX + Math.cos((deg * Math.PI) / 180) * rx, CY + Math.sin((deg * Math.PI) / 180) * ry];
+  const ring = (deg: number, rx: number, ry: number) => [CX + cos((deg * Math.PI) / 180) * rx, CY + sin((deg * Math.PI) / 180) * ry];
   const spokes = [-80, -35, 12, 58, 100, 145, 192, 238];
   // walls from the stoma outwards
   for (const d of spokes) {
@@ -124,7 +125,7 @@ const WALLS = (() => {
 const ION_DY = [-40, -26, -12, 2, 16, 30, 42];
 const ionOut = (s: -1 | 1, i: number) => {
   const deg = (s < 0 ? 180 : 0) + (i - 3) * 17;
-  return { x: r1(CX + Math.cos((deg * Math.PI) / 180) * (88 + (i % 2) * 12)), y: r1(CY + Math.sin((deg * Math.PI) / 180) * (86 + (i % 2) * 10)) };
+  return { x: r1(CX + cos((deg * Math.PI) / 180) * (88 + (i % 2) * 12)), y: r1(CY + sin((deg * Math.PI) / 180) * (86 + (i % 2) * 10)) };
 };
 
 export type StomaOverlay = {

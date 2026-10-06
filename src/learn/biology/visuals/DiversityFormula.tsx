@@ -11,6 +11,7 @@ import { useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type Whorl = { letter: "K" | "C" | "P" | "A" | "G"; body: string; pos?: "o" | "u" | "m" };
 export type Parsed = { sym: "*" | "v"; whorls: Whorl[] };
@@ -81,7 +82,7 @@ export function FloralFormula({ code, size = "md", lit, className }: { code: str
 export type DiagramId = "brassicaceae" | "lamiaceae" | "fabaceae" | "rosaceae" | "liliaceae";
 
 const rad = (a: number) => ((a - 90) * Math.PI) / 180;
-const pol = (r: number, a: number): [number, number] => [r * Math.cos(rad(a)), r * Math.sin(rad(a))];
+const pol = (r: number, a: number): [number, number] => [r * cos(rad(a)), r * sin(rad(a))];
 const f1 = (v: number) => Math.round(v * 10) / 10;
 
 /** A crescent around the centre at radius r, centred on angle a, spanning w degrees, thickness th. */

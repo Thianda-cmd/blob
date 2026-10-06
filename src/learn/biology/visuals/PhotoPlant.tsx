@@ -5,6 +5,7 @@
 
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export const PLANT_PARTS: FigurePart[] = [
   { id: "sun", label: tx("sunlight", "Sonnenlicht"), at: [62, 58], info: tx("Supplies the energy. Light is energy, not a substance.", "Liefert die Energie. Licht ist Energie, kein Stoff.") },
@@ -38,7 +39,7 @@ export function PhotoPlant({ mode = "names", show, ask, highlight, legend }: Dra
       <g data-part="sun">
         {Array.from({ length: 10 }, (_, i) => {
           const a = (i / 10) * Math.PI * 2;
-          return <line key={i} x1={62 + Math.cos(a) * 32} y1={58 + Math.sin(a) * 32} x2={62 + Math.cos(a) * 44} y2={58 + Math.sin(a) * 44} stroke="var(--bio-sun)" strokeWidth={4} strokeLinecap="round" />;
+          return <line key={i} x1={62 + cos(a) * 32} y1={58 + sin(a) * 32} x2={62 + cos(a) * 44} y2={58 + sin(a) * 44} stroke="var(--bio-sun)" strokeWidth={4} strokeLinecap="round" />;
         })}
         <circle cx={62} cy={58} r={26} fill="var(--bio-sun)" stroke={OUT} strokeWidth={1.8} />
         {[0, 1, 2].map((i) => (
@@ -74,7 +75,7 @@ export function PhotoPlant({ mode = "names", show, ask, highlight, legend }: Dra
         <path d="M246 170 Q 340 126 452 86" fill="none" stroke="var(--bio-leaf-deep)" strokeWidth={1.6} />
         {[0.3, 0.5, 0.7].map((t) => {
           const x = 246 + (452 - 246) * t;
-          const y = 170 + (86 - 170) * t - 22 * Math.sin(Math.PI * t);
+          const y = 170 + (86 - 170) * t - 22 * sin(Math.PI * t);
           return (
             <g key={t} stroke="var(--bio-leaf-deep)" strokeWidth={1.1} fill="none">
               <path d={`M ${x} ${y} q 10 -18 26 -24`} />

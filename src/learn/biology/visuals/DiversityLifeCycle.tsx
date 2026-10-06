@@ -11,6 +11,7 @@ import { useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type CyclePlant = "moss" | "fern";
 export type Stage = { id: string; name: Text; ploidy: "n" | "2n"; at: number; info: Text; big?: boolean };
@@ -48,7 +49,7 @@ export const CYCLES: Record<CyclePlant, { stages: Stage[]; meiosis: number; fert
 const CX = 260;
 const CY = 226;
 const R = 158;
-const pos = (deg: number, r = R): [number, number] => [CX + r * Math.sin((deg * Math.PI) / 180), CY - r * Math.cos((deg * Math.PI) / 180)];
+const pos = (deg: number, r = R): [number, number] => [CX + r * sin((deg * Math.PI) / 180), CY - r * cos((deg * Math.PI) / 180)];
 function arc(from: number, to: number, r = R) {
   const [x1, y1] = pos(from, r);
   const [x2, y2] = pos(to, r);
@@ -255,7 +256,7 @@ export function LifeCycleRing({ plant, selected, onSelect, quiz = false, ask }: 
       ].map(([deg, label]) => {
         const d = deg as number;
         const [x, y] = pos(d, R);
-        const right = Math.sin((d * Math.PI) / 180) > 0;
+        const right = sin((d * Math.PI) / 180) > 0;
         return (
           <g key={String(deg)}>
             <rect x={x - 5} y={y - 14} width={10} height={28} rx={3} fill="var(--ink)" transform={`rotate(${d} ${x} ${y})`} />

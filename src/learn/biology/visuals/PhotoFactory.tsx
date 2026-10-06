@@ -11,6 +11,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { PhotoCO2, PhotoDrop, PhotoGlucose, PhotoO2, PhotoStarchChain } from "./PhotoMolecules";
+import { cos, sin } from "@/lib/stableMath";
 
 type Input = "light" | "water" | "co2" | "chloro";
 
@@ -138,7 +139,7 @@ export function PhotoFactory() {
         <motion.g animate={{ opacity: on.light ? 1 : 0.22 }} transition={{ duration: 0.4 }}>
           {Array.from({ length: 10 }, (_, i) => {
             const a = (i / 10) * Math.PI * 2;
-            return <line key={i} x1={66 + Math.cos(a) * 33} y1={60 + Math.sin(a) * 33} x2={66 + Math.cos(a) * 45} y2={60 + Math.sin(a) * 45} stroke="var(--bio-sun)" strokeWidth={4} strokeLinecap="round" />;
+            return <line key={i} x1={66 + cos(a) * 33} y1={60 + sin(a) * 33} x2={66 + cos(a) * 45} y2={60 + sin(a) * 45} stroke="var(--bio-sun)" strokeWidth={4} strokeLinecap="round" />;
           })}
           <circle cx={66} cy={60} r={27} fill="var(--bio-sun)" stroke="var(--bio-outline)" strokeWidth={1.8} />
         </motion.g>
@@ -181,7 +182,7 @@ export function PhotoFactory() {
         <path d="M246 182 Q 380 136 520 58" fill="none" stroke={veins} strokeWidth={1.8} />
         {[0.25, 0.45, 0.65, 0.82].map((k) => {
           const x = 246 + (520 - 246) * k;
-          const y = 182 + (58 - 182) * k - 26 * Math.sin(Math.PI * k);
+          const y = 182 + (58 - 182) * k - 26 * sin(Math.PI * k);
           return (
             <g key={k} stroke={veins} strokeWidth={1.2} fill="none">
               <path d={`M ${x} ${y} q 12 -20 30 -28`} />

@@ -13,6 +13,7 @@ import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { PlantChip } from "./PlantUi";
+import { cos, sin } from "@/lib/stableMath";
 
 export const LEAF_SECTION_PARTS: FigurePart[] = [
   {
@@ -163,7 +164,7 @@ const SPONGY = (() => {
 /** A few cells of the bundle sheath around the vein. */
 const SHEATH = Array.from({ length: 14 }, (_, i) => {
   const t = (i / 14) * Math.PI * 2;
-  return { x: BUNDLE.x + Math.cos(t) * BUNDLE.rx, y: BUNDLE.y + Math.sin(t) * BUNDLE.ry };
+  return { x: BUNDLE.x + cos(t) * BUNDLE.rx, y: BUNDLE.y + sin(t) * BUNDLE.ry };
 });
 
 const at = (dx: number, dy: number, r: number): [number, number, number] => [BUNDLE.x + dx, BUNDLE.y + dy, r];
@@ -260,7 +261,7 @@ export function PlantLeafSectionBody({ uid, flows = [], sun = false }: { uid: st
             <g key={i} transform={`translate(${c.x} ${c.y}) rotate(${c.a})`}>
               <ellipse rx={c.rx} ry={c.ry} fill={CELL} stroke={WALL} strokeWidth={1.5} />
               {[0.6, 2.3, 3.9].map((t, k) => (
-                <ellipse key={k} cx={Math.cos(t + i) * c.rx * 0.62} cy={Math.sin(t + i) * c.ry * 0.55} rx={3.2} ry={2.2} fill={CHLORO} stroke={CHLORO_D} strokeWidth={0.6} />
+                <ellipse key={k} cx={cos(t + i) * c.rx * 0.62} cy={sin(t + i) * c.ry * 0.55} rx={3.2} ry={2.2} fill={CHLORO} stroke={CHLORO_D} strokeWidth={0.6} />
               ))}
             </g>
           ))}

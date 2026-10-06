@@ -9,6 +9,7 @@ import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type OsmoCell = "plant" | "rbc";
 export type OsmoSolution = "water" | "iso" | "salt";
@@ -52,9 +53,9 @@ function blob(cx: number, cy: number, a: number, b: number, n: number, wobble = 
   const pts: string[] = [];
   for (let i = 0; i < 72; i++) {
     const t = (i / 72) * 2 * Math.PI;
-    const c = Math.cos(t);
-    const s = Math.sin(t);
-    const r = 1 + wobble * Math.sin(k * t);
+    const c = cos(t);
+    const s = sin(t);
+    const r = 1 + wobble * sin(k * t);
     const x = cx + a * r * Math.sign(c) * Math.abs(c) ** (2 / n);
     const y = cy + b * r * Math.sign(s) * Math.abs(s) ** (2 / n);
     pts.push(`${x.toFixed(1)} ${y.toFixed(1)}`);

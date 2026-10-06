@@ -12,6 +12,7 @@ import { add, div as qdiv, frac, mul as qmul, neg as qneg, show as qshow, value 
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // A small model of linear equations and inequalities. Every token gets a stable
@@ -1334,8 +1335,8 @@ const BEAM = 160;
 function PanView({ cx, angle, side, pan, xValue, reveal, onTap }: { cx: number; angle: number; side: Side; pan: Pan; xValue: number; reveal: boolean; onTap: (side: Side, kind: "x" | "n") => void }) {
   const rad = (angle * Math.PI) / 180;
   const dir = side === "l" ? -1 : 1;
-  const dx = -dir * BEAM * (1 - Math.cos(rad));
-  const dy = dir * BEAM * Math.sin(rad);
+  const dx = -dir * BEAM * (1 - cos(rad));
+  const dy = dir * BEAM * sin(rad);
   return (
     <motion.g initial={false} animate={{ x: dx, y: dy }} transition={SWING}>
       <path d={`M ${cx} 70 L ${cx - 76} 224 M ${cx} 70 L ${cx + 76} 224`} stroke="var(--ink-3)" strokeWidth={1.4} fill="none" opacity={0.7} />

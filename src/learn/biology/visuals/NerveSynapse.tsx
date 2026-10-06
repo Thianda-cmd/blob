@@ -14,6 +14,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { ActionButton, GhostButton, lerp, Note, r1, Segmented, span, type Pt } from "./NerveKit";
+import { sin } from "@/lib/stableMath";
 
 const W = 560;
 const H = 360;
@@ -162,7 +163,7 @@ function Dynamic({ t, poison, simple }: View) {
       else if (t < 6) p = moving(t, 4 + (n % 4) * 0.08, 4.85, cleft, target);
       else if (poison === "e605") {
         // The enzyme is blocked: ACh keeps falling off and binding again.
-        const w = Math.abs(Math.sin((t - 6) * Math.PI * 1.5 + n));
+        const w = Math.abs(sin((t - 6) * Math.PI * 1.5 + n));
         p = [r1(lerp(target[0], enzyme[0], w * 0.6)), r1(lerp(target[1], enzyme[1] - 6, w))];
       } else if (t < 6.6) p = moving(t, 6, 6.55, target, enzyme);
       else return;
@@ -274,7 +275,7 @@ function potential(t: number, poison: Poison): number {
   if (poison !== "none" && poison !== "e605") return -70;
   if (t < 5) return -70;
   if (t < 5.25) return lerp(-70, 30, span(t, 5, 5.25));
-  if (poison === "e605") return t < 5.7 ? lerp(30, -35, span(t, 5.25, 5.7)) : -35 + 3 * Math.sin((t - 5.7) * 9);
+  if (poison === "e605") return t < 5.7 ? lerp(30, -35, span(t, 5.25, 5.7)) : -35 + 3 * sin((t - 5.7) * 9);
   if (t < 5.7) return lerp(30, -78, span(t, 5.25, 5.7));
   if (t < 6.3) return lerp(-78, -70, span(t, 5.7, 6.3));
   return -70;

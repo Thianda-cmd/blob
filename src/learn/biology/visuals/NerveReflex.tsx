@@ -13,6 +13,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { ActionButton, chain, cubic, GhostButton, Note, pathOf, r1, span, track, type Pt } from "./NerveKit";
+import { cos, sin } from "@/lib/stableMath";
 
 const W = 560;
 const H = 380;
@@ -76,7 +77,7 @@ const rot = ([x, y]: Pt, a: number): Pt => {
   const r = (a * Math.PI) / 180;
   const dx = x - KNEE[0];
   const dy = y - KNEE[1];
-  return [r1(KNEE[0] + dx * Math.cos(r) - dy * Math.sin(r)), r1(KNEE[1] + dx * Math.sin(r) + dy * Math.cos(r))];
+  return [r1(KNEE[0] + dx * cos(r) - dy * sin(r)), r1(KNEE[1] + dx * sin(r) + dy * cos(r))];
 };
 
 function Impulse({ path, at, color }: { path: ReturnType<typeof track>; at?: number; color: string }) {

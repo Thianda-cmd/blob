@@ -13,6 +13,7 @@ import { useLocale } from "@/i18n/client";
 import { PlantLeafShape } from "./PlantWhole";
 import { PlantStomaBody } from "./PlantStoma";
 import { PlantChip, PlantMeter, PlantNote, PlantSlider } from "./PlantUi";
+import { cos, pow, sin } from "@/lib/stableMath";
 
 type Pt = [number, number];
 
@@ -34,7 +35,7 @@ const ROOT_TIPS: Pt[] = [
 const leafPoint = (k: number, f: number): Pt => {
   const L = LEAVES[k];
   const a = (L.angle * Math.PI) / 180;
-  return [STEM_X + Math.cos(a) * L.len * f, L.y + Math.sin(a) * L.len * f];
+  return [STEM_X + cos(a) * L.len * f, L.y + sin(a) * L.len * f];
 };
 
 /** The way of one water particle: root tip → shoot axis → leaf vein → stoma. */
@@ -98,7 +99,7 @@ function WindStreak({ phase, i, strength }: { phase: MotionValue<number>; i: num
 const es = (t: number) => 0.611 * Math.exp((17.27 * t) / (t + 237.3));
 
 export function transpirationModel(light: number, temp: number, wind: number, humidity: number, wet: boolean) {
-  const aperture = wet ? 0.05 + 0.95 * Math.pow(light / 100, 0.6) : 0.07;
+  const aperture = wet ? 0.05 + 0.95 * pow(light / 100, 0.6) : 0.07;
   const boundary = 0.3 + 1.2 * (wind / 100);
   const g = 1 / (1 / Math.max(0.01, aperture) + 1 / boundary) + 0.025;
   const vpd = es(temp) * (1 - humidity / 100);
@@ -187,7 +188,7 @@ export function PlantTranspiration() {
           <circle cx={52} cy={52} r={sunR} fill="var(--bio-sun)" />
           {Array.from({ length: 8 }, (_, i) => {
             const a = (i * Math.PI) / 4;
-            return <line key={i} x1={52 + Math.cos(a) * (sunR + 5)} y1={52 + Math.sin(a) * (sunR + 5)} x2={52 + Math.cos(a) * (sunR + 5 + 9 * (light / 100))} y2={52 + Math.sin(a) * (sunR + 5 + 9 * (light / 100))} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
+            return <line key={i} x1={52 + cos(a) * (sunR + 5)} y1={52 + sin(a) * (sunR + 5)} x2={52 + cos(a) * (sunR + 5 + 9 * (light / 100))} y2={52 + sin(a) * (sunR + 5 + 9 * (light / 100))} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
           })}
         </motion.g>
         {light < 15 && <circle cx={52} cy={52} r={13} fill="var(--ink-3)" opacity={0.25} />}

@@ -9,6 +9,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { petalPath } from "./DiversityShapes";
+import { cos, sin } from "@/lib/stableMath";
 
 export type MonoDiFeature = "seedling" | "veins" | "stem" | "flower" | "roots";
 export type Group = "mono" | "di";
@@ -64,7 +65,7 @@ function Drawing({ f, group }: { f: MonoDiFeature; group: Group }) {
         </>
       );
     case "stem": {
-      const ring = Array.from({ length: 10 }, (_, i) => [60 + 30 * Math.cos((i * Math.PI) / 5), 52 + 30 * Math.sin((i * Math.PI) / 5)]);
+      const ring = Array.from({ length: 10 }, (_, i) => [60 + 30 * cos((i * Math.PI) / 5), 52 + 30 * sin((i * Math.PI) / 5)]);
       const scattered = [
         [44, 30],
         [66, 26],

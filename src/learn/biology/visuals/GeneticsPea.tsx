@@ -5,6 +5,7 @@ import { Fragment } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Genotype text: "Aa", "X^A X^a", "A0" (letters italic, superscripts small)
@@ -76,8 +77,8 @@ export function PeaSeed({ cx, cy, r, shape = "round", colour = "yellow" }: { cx:
   const n = 18;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    const rr = r * (0.86 + 0.1 * Math.sin(a * 5 + 0.7) + 0.04 * Math.cos(a * 3));
-    pts.push(`${(cx + rr * Math.cos(a)).toFixed(2)} ${(cy + rr * Math.sin(a)).toFixed(2)}`);
+    const rr = r * (0.86 + 0.1 * sin(a * 5 + 0.7) + 0.04 * cos(a * 3));
+    pts.push(`${(cx + rr * cos(a)).toFixed(2)} ${(cy + rr * sin(a)).toFixed(2)}`);
   }
   return (
     <g>
@@ -123,9 +124,9 @@ export function MirabilisFlower({ x, y, r = 22, colour = "red" }: { x: number; y
     const a0 = -Math.PI / 2 + (i / 5) * Math.PI * 2;
     const a1 = a0 + (Math.PI * 2) / 5;
     const am = (a0 + a1) / 2;
-    const p0 = [x + r * 0.78 * Math.cos(a0), y + r * 0.78 * Math.sin(a0)];
-    const c = [x + r * 1.18 * Math.cos(am), y + r * 1.18 * Math.sin(am)];
-    const p1 = [x + r * 0.78 * Math.cos(a1), y + r * 0.78 * Math.sin(a1)];
+    const p0 = [x + r * 0.78 * cos(a0), y + r * 0.78 * sin(a0)];
+    const c = [x + r * 1.18 * cos(am), y + r * 1.18 * sin(am)];
+    const p1 = [x + r * 0.78 * cos(a1), y + r * 0.78 * sin(a1)];
     if (i === 0) pts.push(`M ${p0[0].toFixed(2)} ${p0[1].toFixed(2)}`);
     pts.push(`Q ${c[0].toFixed(2)} ${c[1].toFixed(2)} ${p1[0].toFixed(2)} ${p1[1].toFixed(2)}`);
   }
@@ -134,7 +135,7 @@ export function MirabilisFlower({ x, y, r = 22, colour = "red" }: { x: number; y
       <path d={`${pts.join(" ")} Z`} fill={fill} stroke="var(--bio-outline)" strokeWidth={1.5} strokeLinejoin="round" />
       {[0, 1, 2, 3, 4].map((i) => {
         const a = -Math.PI / 2 + ((i + 0.5) / 5) * Math.PI * 2;
-        return <line key={i} x1={x} y1={y} x2={x + r * 0.75 * Math.cos(a)} y2={y + r * 0.75 * Math.sin(a)} stroke="var(--bio-outline)" strokeOpacity={0.25} strokeWidth={1} />;
+        return <line key={i} x1={x} y1={y} x2={x + r * 0.75 * cos(a)} y2={y + r * 0.75 * sin(a)} stroke="var(--bio-outline)" strokeOpacity={0.25} strokeWidth={1} />;
       })}
       <circle cx={x} cy={y} r={r * 0.2} fill="var(--bio-pollen)" stroke="var(--bio-outline)" strokeWidth={1} />
     </g>

@@ -1,3 +1,5 @@
+import { cos, pow, sin } from "@/lib/stableMath";
+
 // Geometry for the "plant-diversity" drawings: smooth leaf outlines from a few control points,
 // saw teeth and lobes along the margin, polar outlines for palmate leaves, and a few path helpers.
 // Pure functions (no React), so the same shapes serve lesson widgets and task pictures.
@@ -94,7 +96,7 @@ export type Lobes = {
 };
 
 /** A saw tooth whose sharp point faces the tip. */
-const saw = (u: number) => (u < 0.78 ? Math.pow(u / 0.78, 1.35) : (1 - u) / 0.22);
+const saw = (u: number) => (u < 0.78 ? pow(u / 0.78, 1.35) : (1 - u) / 0.22);
 
 /** Offsets a margin outwards (teeth) or inwards (lobes). */
 function shapeMargin(poly: Pt[], side: 1 | -1, teeth?: Teeth, lobes?: Lobes): Pt[] {
@@ -109,7 +111,7 @@ function shapeMargin(poly: Pt[], side: 1 | -1, teeth?: Teeth, lobes?: Lobes): Pt
       const u = ((f - lobes.from) / (lobes.to - lobes.from)) * lobes.n + (lobes.phase ?? 0);
       const v = u - Math.floor(u);
       // Rounded lobes, narrow rounded bays.
-      const lobe = Math.pow(Math.sin(Math.PI * v), 0.5);
+      const lobe = pow(sin(Math.PI * v), 0.5);
       // Fade the bays in and out at the ends.
       const edge = Math.min(1, (f - lobes.from) / 0.04, (lobes.to - f) / 0.06);
       const k = lobes.byWidth ? Math.min(1, (1.25 * Math.abs(p[0])) / widest) : 1;
@@ -127,8 +129,8 @@ function shapeMargin(poly: Pt[], side: 1 | -1, teeth?: Teeth, lobes?: Lobes): Pt
         else if (teeth.kind === "double") {
           const w = u * 3 - Math.floor(u * 3);
           t = 0.72 * saw(v) + 0.42 * saw(w);
-        } else if (teeth.kind === "crenate") t = Math.pow(Math.sin(Math.PI * v), 0.6);
-        else t = 0.5 - 0.5 * Math.cos(2 * Math.PI * v);
+        } else if (teeth.kind === "crenate") t = pow(sin(Math.PI * v), 0.6);
+        else t = 0.5 - 0.5 * cos(2 * Math.PI * v);
         off += teeth.amp * t * edge;
       }
     }
@@ -202,17 +204,17 @@ export function polarLeaf(bumps: PolarLobe[], opts: { base: number; notch: numbe
   for (let i = 0; i < n; i++) {
     const phi = -180 + (360 * i) / n;
     const a = Math.abs(phi);
-    let r = opts.base * (1 - opts.notch * Math.exp(-Math.pow((a - 180) / opts.notchWidth, 2)));
+    let r = opts.base * (1 - opts.notch * Math.exp(-pow((a - 180) / opts.notchWidth, 2)));
     for (const b of bumps) {
       let d = Math.abs(phi - b.at);
       if (d > 180) d = 360 - d;
       if (d < b.width) {
-        const v = opts.base + (b.len - opts.base) * Math.pow(1 - d / b.width, b.sharp ?? 1.4);
+        const v = opts.base + (b.len - opts.base) * pow(1 - d / b.width, b.sharp ?? 1.4);
         if (v > r) r = v;
       }
     }
     const rad = (phi * Math.PI) / 180;
-    pts.push([r * Math.sin(rad), -r * Math.cos(rad)]);
+    pts.push([r * sin(rad), -r * cos(rad)]);
   }
   return pts;
 }
@@ -220,16 +222,16 @@ export function polarLeaf(bumps: PolarLobe[], opts: { base: number; notch: numbe
 /** Points of a polyline transformed: rotate by deg around (0,0), scale, then move. */
 export function place(pts: Pt[], dx: number, dy: number, deg = 0, k = 1): Pt[] {
   const a = (deg * Math.PI) / 180;
-  const c = Math.cos(a);
-  const s = Math.sin(a);
+  const c = cos(a);
+  const s = sin(a);
   return pts.map(([x, y]) => [dx + k * (x * c - y * s), dy + k * (x * s + y * c)]);
 }
 
 /** A regular "flower" of n petals around (cx, cy): petal tip radius R, petal width w (for icons). */
 export function petalPath(cx: number, cy: number, len: number, width: number, deg: number, notch = 0): string {
   const a = (deg * Math.PI) / 180;
-  const ux = Math.sin(a);
-  const uy = -Math.cos(a);
+  const ux = sin(a);
+  const uy = -cos(a);
   const px = -uy;
   const py = ux;
   const tipX = cx + ux * len;

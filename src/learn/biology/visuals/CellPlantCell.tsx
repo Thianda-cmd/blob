@@ -6,6 +6,7 @@
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { Chloroplast, Golgi, Mitochondrion, Nucleus, Ribosomes, RoughER } from "./CellOrganelles";
+import { cos, sin } from "@/lib/stableMath";
 
 export type CellDetail = "lm" | "em";
 
@@ -46,14 +47,14 @@ const NX = 150;
 const NY = 172;
 
 function arc(r: number, a0: number, a1: number) {
-  const p = (a: number) => [NX + r * Math.cos((a * Math.PI) / 180), NY + r * Math.sin((a * Math.PI) / 180)].map((v) => v.toFixed(1)).join(" ");
+  const p = (a: number) => [NX + r * cos((a * Math.PI) / 180), NY + r * sin((a * Math.PI) / 180)].map((v) => v.toFixed(1)).join(" ");
   return `M ${p(a0)} A ${r} ${r} 0 0 1 ${p(a1)}`;
 }
 const ER_PATHS = [arc(52, -42, 48), arc(61, -38, 44), arc(70, -34, 40)];
 const ER_DOTS: [number, number][] = [55.6, 64.6, 73.6].flatMap((r, k) =>
   Array.from({ length: 9 }, (_, i) => {
     const a = ((-36 + k * 3 + i * 9.4) * Math.PI) / 180;
-    return [NX + r * Math.cos(a), NY + r * Math.sin(a)] as [number, number];
+    return [NX + r * cos(a), NY + r * sin(a)] as [number, number];
   }),
 );
 const FREE_RIBOSOMES: [number, number][] = [

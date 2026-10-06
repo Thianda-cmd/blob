@@ -12,6 +12,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { GhostButton, lerp, Note, Pill, r1, Segmented, Slider } from "./NerveKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Geometry (viewBox 540 × 320, eye centre C, all radii in viewBox units)
@@ -30,7 +31,7 @@ const FOVEA_X = CX + R3;
 
 const deg = Math.PI / 180;
 // Rounded, so server and browser render the same numbers.
-const onCircle = (r: number, a: number): [number, number] => [r1(CX + r * Math.cos(a * deg)), r1(CY + r * Math.sin(a * deg))];
+const onCircle = (r: number, a: number): [number, number] => [r1(CX + r * cos(a * deg)), r1(CY + r * sin(a * deg))];
 const f1 = (v: number) => v.toFixed(1);
 
 /** An annular band between radii r1 > r2, from angle -a to +a through the back of the eye. */
@@ -210,7 +211,7 @@ export function NerveEyeFront({ pupil, size = 150 }: { pupil: number; size?: num
         <circle cx={70} cy={45} r={30} fill="var(--bio-wood)" />
         {Array.from({ length: 24 }, (_, i) => {
           const a = (i / 24) * Math.PI * 2;
-          return <line key={i} x1={r1(70 + Math.cos(a) * (r + 2))} y1={r1(45 + Math.sin(a) * (r + 2))} x2={r1(70 + Math.cos(a) * 29)} y2={r1(45 + Math.sin(a) * 29)} stroke="var(--bio-wood-deep)" strokeWidth={1.1} opacity={0.75} />;
+          return <line key={i} x1={r1(70 + cos(a) * (r + 2))} y1={r1(45 + sin(a) * (r + 2))} x2={r1(70 + cos(a) * 29)} y2={r1(45 + sin(a) * 29)} stroke="var(--bio-wood-deep)" strokeWidth={1.1} opacity={0.75} />;
         })}
         <circle cx={70} cy={45} r={30} fill="none" stroke="var(--bio-wood-deep)" strokeWidth={1.6} />
         <motion.circle cx={70} cy={45} initial={false} animate={{ r }} transition={{ type: "spring", stiffness: 140, damping: 18 }} fill="var(--bio-outline)" />
@@ -257,7 +258,7 @@ export function NerveEyeLab() {
       <g transform="translate(22 160)" opacity={0.35 + 0.65 * light}>
         <circle r={9} fill="var(--bio-sun)" />
         {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
-          <line key={a} x1={r1(Math.cos((a * Math.PI) / 180) * 12)} y1={r1(Math.sin((a * Math.PI) / 180) * 12)} x2={r1(Math.cos((a * Math.PI) / 180) * 17)} y2={r1(Math.sin((a * Math.PI) / 180) * 17)} stroke="var(--bio-sun)" strokeWidth={2.2} strokeLinecap="round" />
+          <line key={a} x1={r1(cos((a * Math.PI) / 180) * 12)} y1={r1(sin((a * Math.PI) / 180) * 12)} x2={r1(cos((a * Math.PI) / 180) * 17)} y2={r1(sin((a * Math.PI) / 180) * 17)} stroke="var(--bio-sun)" strokeWidth={2.2} strokeLinecap="round" />
         ))}
       </g>
       <motion.path initial={false} animate={{ d: `M${IRIS_X} ${f1(CY - p + 2)} L${FOVEA_X - 2} ${CY} L${IRIS_X} ${f1(CY + p - 2)} Z` }} transition={{ type: "spring", stiffness: 140, damping: 18 }} fill="var(--bio-sun)" opacity={beam} />
@@ -367,7 +368,7 @@ export function NerveEyeFocus() {
           <line x1={0} y1={CY + 5} x2={0} y2={CY + 40} stroke="var(--bio-leaf-deep)" strokeWidth={2.5} strokeLinecap="round" />
           <path d={`M0 ${CY + 26} Q-12 ${CY + 18} -14 ${CY + 28} Q-4 ${CY + 32} 0 ${CY + 26}`} fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1} />
           {[0, 72, 144, 216, 288].map((a) => (
-            <circle key={a} cx={r1(Math.cos(((a - 90) * Math.PI) / 180) * 6)} cy={r1(CY + Math.sin(((a - 90) * Math.PI) / 180) * 6)} r={5} fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={0.8} />
+            <circle key={a} cx={r1(cos(((a - 90) * Math.PI) / 180) * 6)} cy={r1(CY + sin(((a - 90) * Math.PI) / 180) * 6)} r={5} fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={0.8} />
           ))}
           <circle cx={0} cy={CY} r={3.6} fill="var(--bio-pollen)" />
         </motion.g>

@@ -11,6 +11,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { PlantChip, PlantNote } from "./PlantUi";
+import { cos, sin } from "@/lib/stableMath";
 
 export type Conditions = { water: boolean; warm: boolean; oxygen: boolean; light: boolean };
 export type Outcome = "none" | "swell" | "germ" | "pale";
@@ -90,7 +91,7 @@ function Scene({ c, day }: { c: Conditions; day: number }) {
           <path d="M226 6 L294 6 L310 30 L210 30 Z" fill="var(--ink-3)" opacity={0.85} />
           <ellipse cx={260} cy={32} rx={22} ry={6} fill="var(--bio-sun)" />
           {[-60, -30, 0, 30, 60].map((a) => (
-            <line key={a} x1={260 + Math.sin((a * Math.PI) / 180) * 30} y1={44} x2={260 + Math.sin((a * Math.PI) / 180) * 70} y2={70} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
+            <line key={a} x1={260 + sin((a * Math.PI) / 180) * 30} y1={44} x2={260 + sin((a * Math.PI) / 180) * 70} y2={70} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
           ))}
         </g>
       ) : (
@@ -304,7 +305,7 @@ function Icon({ kind, on, x, y, warmText }: { kind: keyof Conditions; on: boolea
           <g>
             <circle r={4} fill="var(--bio-sun)" stroke={col} strokeWidth={1.2} />
             {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <line key={i} x1={Math.cos((i * Math.PI) / 4) * 6} y1={Math.sin((i * Math.PI) / 4) * 6} x2={Math.cos((i * Math.PI) / 4) * 8.5} y2={Math.sin((i * Math.PI) / 4) * 8.5} stroke={col} strokeWidth={1.2} strokeLinecap="round" />
+              <line key={i} x1={cos((i * Math.PI) / 4) * 6} y1={sin((i * Math.PI) / 4) * 6} x2={cos((i * Math.PI) / 4) * 8.5} y2={sin((i * Math.PI) / 4) * 8.5} stroke={col} strokeWidth={1.2} strokeLinecap="round" />
             ))}
           </g>
         ) : (

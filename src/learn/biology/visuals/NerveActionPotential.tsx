@@ -14,6 +14,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { ActionButton, GhostButton, lerp, Note, Pill, r1, Segmented, Slider, span, SvgLabel } from "./NerveKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // The model (times in ms, potentials in mV)
@@ -34,9 +35,9 @@ export function apV(t: number, stim = 1): number {
   }
   if (t < fire) return rest + (threshold - rest) * span(t, start, fire) ** 1.5;
   if (t < top) return threshold + (peak - threshold) * (1 - (1 - span(t, fire, top)) ** 2.2);
-  if (t < back) return peak - (peak - rest) * (1 - Math.cos(Math.PI * span(t, top, back))) / 2;
-  if (t < low) return rest - (rest - hyper) * Math.sin((Math.PI / 2) * span(t, back, low));
-  if (t < end) return hyper + (rest - hyper) * (1 - Math.cos(Math.PI * span(t, low, end))) / 2;
+  if (t < back) return peak - (peak - rest) * (1 - cos(Math.PI * span(t, top, back))) / 2;
+  if (t < low) return rest - (rest - hyper) * sin((Math.PI / 2) * span(t, back, low));
+  if (t < end) return hyper + (rest - hyper) * (1 - cos(Math.PI * span(t, low, end))) / 2;
   return rest;
 }
 

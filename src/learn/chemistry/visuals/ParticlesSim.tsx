@@ -9,6 +9,7 @@
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 export type SimProps = {
   /** Fraction of particles that are no longer solid (0 = all solid, 1 = all liquid or gas). */
@@ -195,8 +196,8 @@ function createState(start: Pt[], seed: number, w: number): State {
     s.x[i] = p.x;
     s.y[i] = p.y;
     const a = rnd() * Math.PI * 2;
-    s.vx[i] = Math.cos(a) * 60;
-    s.vy[i] = Math.sin(a) * 60;
+    s.vx[i] = cos(a) * 60;
+    s.vy[i] = sin(a) * 60;
     s.side[i] = p.x < w / 2 ? -1 : 1;
     s.ph[2 * i] = rnd() * 6.28;
     s.ph[2 * i + 1] = rnd() * 6.28;
@@ -219,8 +220,8 @@ function step(s: State, g: Geometry, home: Pt[], live: Live, dt: number) {
   for (let i = 0; i < n; i++) {
     const m = modes[i];
     if (m === 0) {
-      const tx = home[i].x + amp * Math.sin(s.w[2 * i] * s.t + s.ph[2 * i]);
-      const ty = home[i].y + amp * Math.sin(s.w[2 * i + 1] * s.t + s.ph[2 * i + 1]);
+      const tx = home[i].x + amp * sin(s.w[2 * i] * s.t + s.ph[2 * i]);
+      const ty = home[i].y + amp * sin(s.w[2 * i + 1] * s.t + s.ph[2 * i + 1]);
       ax[i] += 320 * (tx - s.x[i]) - 26 * s.vx[i];
       ay[i] += 320 * (ty - s.y[i]) - 26 * s.vy[i];
     } else if (m === 1) {

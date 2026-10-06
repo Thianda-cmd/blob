@@ -8,6 +8,7 @@ import { Figure, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { OV, OvuleWalls, SacAntipodes, SacEgg, SacPolar, SacSynergids } from "./FlowerEmbryoSac";
 import { shiftParts, StepCaption, StepControls } from "./FlowerKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // Double fertilisation in angiosperms: the pollen tube enters through the micropyle and bursts
 // into a synergid; one sperm cell fuses with the egg cell (zygote, 2n), the other with the
@@ -142,8 +143,8 @@ export function FlowerDoubleFert({ start = 0 }: { start?: number }) {
           {Array.from({ length: 26 }, (_, i) => {
             const a = i * 2.39996;
             const r = 16 + (i % 7) * 13;
-            const x = 190 + Math.cos(a) * r * 0.62;
-            const y = 186 + Math.sin(a) * r * 1.05;
+            const x = 190 + cos(a) * r * 0.62;
+            const y = 186 + sin(a) * r * 1.05;
             return y > 228 && Math.abs(x - 190) < 24 ? null : <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)} r={4.2} fill="var(--bio-sun)" stroke="var(--bio-membrane)" strokeWidth={0.8} />;
           })}
         </motion.g>

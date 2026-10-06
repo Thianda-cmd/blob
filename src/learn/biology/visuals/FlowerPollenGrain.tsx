@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { tx, type Text } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 // The male gametophyte: a mature (two-celled) pollen grain with exine, intine and aperture,
 // the large vegetative cell and the generative cell inside it. Plus its development from the
@@ -17,7 +18,7 @@ function bumps(n: number, r: number, skipFrom: number, skipTo: number) {
     const a = (i / n) * Math.PI * 2;
     const deg = (a * 180) / Math.PI;
     if (deg > skipFrom && deg < skipTo) continue;
-    out.push([C.x + Math.cos(a) * r, C.y + Math.sin(a) * r]);
+    out.push([C.x + cos(a) * r, C.y + sin(a) * r]);
   }
   return out;
 }

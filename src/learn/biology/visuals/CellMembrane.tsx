@@ -7,6 +7,7 @@
 import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export const MEMBRANE_PARTS: FigurePart[] = [
   { id: "heads", label: tx("hydrophilic head", "hydrophiler Kopf"), at: [175, 110], tag: [175, 30], info: tx("The polar phosphate head likes water: the heads face the water on both sides.", "Der polare Kopf mit der Phosphatgruppe ist wasserliebend: Die Köpfe zeigen auf beiden Seiten zum Wasser.") },
@@ -69,7 +70,7 @@ function SugarChain({ x, y, len }: { x: number; y: number; len: number }) {
 const hexagon = (cx: number, cy: number, r: number) =>
   Array.from({ length: 6 }, (_, k) => {
     const a = (Math.PI / 3) * k + Math.PI / 6;
-    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+    return `${(cx + r * cos(a)).toFixed(1)},${(cy + r * sin(a)).toFixed(1)}`;
   }).join(" ");
 
 export function CellMembrane({ mode = "names", show, ask, highlight, legend }: DrawingProps) {

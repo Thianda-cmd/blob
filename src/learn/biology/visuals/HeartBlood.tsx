@@ -11,6 +11,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { Chip, noise, SoftButton, svgText } from "./HeartShared";
+import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------
 // Blood cells
@@ -108,8 +109,8 @@ function GroupCell({ x, y, r, group }: { x: number; y: number; r: number; group:
         Array.from({ length: n }, (_, i) => {
           const a = (i / n) * Math.PI * 2 + 0.3;
           const kind = ag.length === 2 ? ag[i % 2] : ag[0];
-          const cx = x + Math.cos(a) * (r + 2.5);
-          const cy = y + Math.sin(a) * (r + 2.5);
+          const cx = x + cos(a) * (r + 2.5);
+          const cy = y + sin(a) * (r + 2.5);
           const deg = (a * 180) / Math.PI + 90;
           return kind === "A" ? (
             <path key={i} d={`M${cx} ${cy - 4.2} L${cx + 3.8} ${cy + 2.6} L${cx - 3.8} ${cy + 2.6} Z`} transform={`rotate(${deg} ${cx} ${cy})`} fill={A_COL} stroke="var(--bio-outline)" strokeWidth={0.8} />
@@ -215,7 +216,7 @@ export function HeartBloodGroupsWidget() {
           Array.from({ length: 8 }, (_, i) => {
             const kind = abs.length === 2 ? abs[i % 2] : abs[0];
             const a = (i / 8) * Math.PI * 2;
-            return <Antibody key={i} x={240 + Math.cos(a) * (22 + (i % 3) * 9)} y={86 + Math.sin(a) * (22 + (i % 3) * 9)} rot={(i * 47) % 360} kind={kind} />;
+            return <Antibody key={i} x={240 + cos(a) * (22 + (i % 3) * 9)} y={86 + sin(a) * (22 + (i % 3) * 9)} rot={(i * 47) % 360} kind={kind} />;
           })
         )}
         <text x={326} y={92} textAnchor="middle" fontSize={22} fill="var(--ink-3)">→</text>
@@ -305,8 +306,8 @@ function Well({ x, clumped, label, seed }: { x: number; clumped: boolean; label:
           {Array.from({ length: 11 }, (_, i) => {
             const a = noise(i, seed) * Math.PI * 2;
             const d = 6 + noise(i, seed + 1) * 26;
-            const cx = x + Math.cos(a) * d;
-            const cy = 62 + Math.sin(a) * d;
+            const cx = x + cos(a) * d;
+            const cy = 62 + sin(a) * d;
             const r = 3 + noise(i, seed + 2) * 4;
             return (
               <g key={i}>

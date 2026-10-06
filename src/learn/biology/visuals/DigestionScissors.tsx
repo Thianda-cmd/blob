@@ -11,6 +11,7 @@ import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 type Sub = "starch" | "protein" | "fat";
 type Tool = "amylase" | "maltase" | "pepsin" | "trypsin" | "peptidase" | "lipase" | "bile";
@@ -113,14 +114,14 @@ function layout(n: number, groups: number[], unit: number, gap: number) {
 const hex = (r: number) =>
   Array.from({ length: 6 }, (_, k) => {
     const a = (Math.PI / 3) * k + Math.PI / 6;
-    return `${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
+    return `${(r * cos(a)).toFixed(1)},${(r * sin(a)).toFixed(1)}`;
   }).join(" ");
 
 function Starch({ stage }: { stage: number }) {
   const n = 8;
   const groups = stage === 0 ? [8] : stage === 1 ? [2, 2, 2, 2] : [1, 1, 1, 1, 1, 1, 1, 1];
   const xs = layout(n, groups, 48, stage === 2 ? 14 : 30);
-  const ys = Array.from({ length: n }, (_, i) => 84 + (stage === 0 ? Math.sin(i * 0.9) * 10 : stage === 2 ? [-14, 10, -6, 14, -10, 6, -14, 10][i] : (i % 2 ? 4 : -4)));
+  const ys = Array.from({ length: n }, (_, i) => 84 + (stage === 0 ? sin(i * 0.9) * 10 : stage === 2 ? [-14, 10, -6, 14, -10, 6, -14, 10][i] : (i % 2 ? 4 : -4)));
   const linked = (i: number) => (stage === 0 ? true : stage === 1 ? i % 2 === 0 : false);
   return (
     <g>

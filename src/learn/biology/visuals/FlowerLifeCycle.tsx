@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 // Alternation of generations: diploid sporophyte → (meiosis) → haploid spores → gametophyte →
 // (mitosis) → gametes → (fertilisation) → zygote → sporophyte. Compare moss, fern and seed plant:
@@ -64,7 +65,7 @@ const GROUPS: Record<Group, { name: Text; size: Record<NodeId, number>; text: Re
 const CX = 210;
 const CY = 190;
 const RING = 126;
-const pos = (deg: number, r = RING) => [CX + Math.cos((deg * Math.PI) / 180) * r, CY + Math.sin((deg * Math.PI) / 180) * r] as const;
+const pos = (deg: number, r = RING) => [CX + cos((deg * Math.PI) / 180) * r, CY + sin((deg * Math.PI) / 180) * r] as const;
 
 function arc(a1: number, a2: number, r = RING) {
   const [x1, y1] = pos(a1, r);
@@ -174,12 +175,12 @@ export function FlowerLifeCycle({ start = "seed" }: { start?: Group }) {
                 </text>
                 {(() => {
                   const top = n.angle === -90;
-                  const c = Math.cos((n.angle * Math.PI) / 180);
+                  const c = cos((n.angle * Math.PI) / 180);
                   const [lx, ly] = top ? [x, y - r - 11] : pos(n.angle, RING + r + 9);
                   return (
                     <text
                       x={lx}
-                      y={ly + (!top && Math.sin((n.angle * Math.PI) / 180) > 0.5 ? 6 : 0)}
+                      y={ly + (!top && sin((n.angle * Math.PI) / 180) > 0.5 ? 6 : 0)}
                       textAnchor={top ? "middle" : c > 0.3 ? "start" : c < -0.3 ? "end" : "middle"}
                       dominantBaseline="central"
                       fontSize={13.5}

@@ -10,6 +10,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 const f = (v: number) => Math.round(v * 100) / 100;
 
@@ -120,7 +121,7 @@ const SPIKES = Array.from({ length: 14 }, (_, i) => i * (360 / 14) + 6);
 function VirusDrawing() {
   const hex = Array.from({ length: 6 }, (_, i) => {
     const a = ((i * 60 - 90) * Math.PI) / 180;
-    return [f(VC[0] + 60 * Math.cos(a)), f(VC[1] + 60 * Math.sin(a))];
+    return [f(VC[0] + 60 * cos(a)), f(VC[1] + 60 * sin(a))];
   });
   return (
     <>

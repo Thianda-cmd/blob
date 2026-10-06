@@ -12,6 +12,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { PhotoCO2 } from "./PhotoMolecules";
+import { cos, sin } from "@/lib/stableMath";
 
 const OUT = "var(--bio-outline)";
 type Kind = "c3" | "c4" | "cam";
@@ -225,7 +226,7 @@ function Cam({ t, day }: { t: (x: Text) => string; day: boolean }) {
           <g>
             {Array.from({ length: 8 }, (_, i) => {
               const a = (i / 8) * Math.PI * 2;
-              return <line key={i} x1={Math.cos(a) * 17} y1={Math.sin(a) * 17} x2={Math.cos(a) * 24} y2={Math.sin(a) * 24} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
+              return <line key={i} x1={cos(a) * 17} y1={sin(a) * 17} x2={cos(a) * 24} y2={sin(a) * 24} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />;
             })}
             <circle r={13} fill="var(--bio-sun)" stroke={OUT} strokeWidth={1.4} />
           </g>

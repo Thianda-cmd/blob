@@ -13,6 +13,7 @@ import { useLocale } from "@/i18n/client";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { Inline } from "@/learn/components/Rich";
 import { PlantNote, PlantSeg } from "./PlantUi";
+import { cos, sin } from "@/lib/stableMath";
 
 export type LeafKind = "xero" | "hygro" | "hydro" | "rolled";
 
@@ -86,7 +87,7 @@ function Bundle({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
     <g transform={`translate(${x} ${y}) scale(${s})`}>
       {Array.from({ length: 10 }, (_, i) => {
         const a = (i / 10) * Math.PI * 2;
-        return <circle key={i} cx={Math.cos(a) * 17} cy={Math.sin(a) * 15} r={5.5} fill={CELL} stroke={WALL} strokeWidth={1} />;
+        return <circle key={i} cx={cos(a) * 17} cy={sin(a) * 15} r={5.5} fill={CELL} stroke={WALL} strokeWidth={1} />;
       })}
       <circle cx={-5} cy={-4} r={4} fill="var(--bio-vacuole)" stroke="var(--bio-wood-deep)" strokeWidth={1.6} />
       <circle cx={5} cy={-5} r={3.3} fill="var(--bio-vacuole)" stroke="var(--bio-wood-deep)" strokeWidth={1.6} />
@@ -229,7 +230,7 @@ function Hydro() {
 
 function Rolled() {
   const C = [260, 158];
-  const pol = (r: number, deg: number): [number, number] => [C[0] + Math.cos((deg * Math.PI) / 180) * r, C[1] + Math.sin((deg * Math.PI) / 180) * r];
+  const pol = (r: number, deg: number): [number, number] => [C[0] + cos((deg * Math.PI) / 180) * r, C[1] + sin((deg * Math.PI) / 180) * r];
   const arc = (r: number, a0: number, a1: number) => {
     const [x0, y0] = pol(r, a0);
     const [x1, y1] = pol(r, a1);
@@ -310,9 +311,9 @@ const PARTS: Record<LeafKind, FigurePart[]> = {
     { id: "lower", label: tx("lower epidermis without stomata", "untere Epidermis ohne Spaltöffnungen"), at: [330, 188], tag: [330, 222], info: tx("It lies on the water: no stomata and only a thin cuticle.", "Sie liegt auf dem Wasser: keine Spaltöffnungen und nur eine dünne Cuticula.") },
   ],
   rolled: [
-    { id: "outer", label: tx("outer side: thick cuticle, no stomata", "Außenseite: dicke Cuticula, keine Spaltöffnungen"), at: [260 + 141 * Math.cos(Math.PI * 0.25), 158 + 141 * Math.sin(Math.PI * 0.25)], tag: [470, 280], info: tx("Facing the dry wind: a thick wax layer and supporting fibres, no stomata.", "Zum trockenen Wind hin: dicke Wachsschicht und Festigungsfasern, keine Spaltöffnungen.") },
-    { id: "grooves", label: tx("stomata in the grooves", "Spaltöffnungen in den Rinnen"), at: [260 + 108 * Math.cos((-72 + 36) * (Math.PI / 180)), 158 + 108 * Math.sin((-72 + 36) * (Math.PI / 180))], tag: [470, 30], info: tx("The stomata lie deep in the grooves on the inside of the rolled leaf.", "Die Spaltöffnungen liegen tief in den Rinnen auf der Innenseite des eingerollten Blattes.") },
-    { id: "hairs", label: tx("hairs", "Haare"), at: [260 + 86 * Math.cos(Math.PI), 158], tag: [30, 158], info: tx("Hairs on the ribs slow down the air inside.", "Haare an den Rippen bremsen die Luft im Inneren.") },
+    { id: "outer", label: tx("outer side: thick cuticle, no stomata", "Außenseite: dicke Cuticula, keine Spaltöffnungen"), at: [260 + 141 * cos(Math.PI * 0.25), 158 + 141 * sin(Math.PI * 0.25)], tag: [470, 280], info: tx("Facing the dry wind: a thick wax layer and supporting fibres, no stomata.", "Zum trockenen Wind hin: dicke Wachsschicht und Festigungsfasern, keine Spaltöffnungen.") },
+    { id: "grooves", label: tx("stomata in the grooves", "Spaltöffnungen in den Rinnen"), at: [260 + 108 * cos((-72 + 36) * (Math.PI / 180)), 158 + 108 * sin((-72 + 36) * (Math.PI / 180))], tag: [470, 30], info: tx("The stomata lie deep in the grooves on the inside of the rolled leaf.", "Die Spaltöffnungen liegen tief in den Rinnen auf der Innenseite des eingerollten Blattes.") },
+    { id: "hairs", label: tx("hairs", "Haare"), at: [260 + 86 * cos(Math.PI), 158], tag: [30, 158], info: tx("Hairs on the ribs slow down the air inside.", "Haare an den Rippen bremsen die Luft im Inneren.") },
     { id: "space", label: tx("still, moist inner space", "windstiller, feuchter Innenraum"), at: [260, 158], tag: [30, 280], info: tx("Rolled up in drought: the air inside stays moist, so little water escapes.", "Bei Trockenheit eingerollt: Die Luft innen bleibt feucht, also entweicht wenig Wasser.") },
   ],
 };

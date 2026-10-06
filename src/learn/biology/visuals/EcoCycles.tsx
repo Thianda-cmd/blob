@@ -9,6 +9,7 @@ import { useState, type ReactNode } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 type Pt = [number, number];
 /** An arrow: 2 points (line) or 3 points (quadratic curve). */
@@ -26,10 +27,10 @@ function ArrowShape({ a, lit, dim }: { a: Arr; lit: boolean; dim: boolean }) {
   const prev = a[a.length - 2];
   const ang = Math.atan2(end[1] - prev[1], end[0] - prev[0]);
   const l = 11;
-  const head = `${end[0]},${end[1]} ${end[0] - l * Math.cos(ang - 0.42)},${end[1] - l * Math.sin(ang - 0.42)} ${end[0] - l * Math.cos(ang + 0.42)},${end[1] - l * Math.sin(ang + 0.42)}`;
+  const head = `${end[0]},${end[1]} ${end[0] - l * cos(ang - 0.42)},${end[1] - l * sin(ang - 0.42)} ${end[0] - l * cos(ang + 0.42)},${end[1] - l * sin(ang + 0.42)}`;
   const c = lit ? "var(--blob)" : "var(--ink-2)";
   // stop the line a bit before the tip so the head stays sharp
-  const shortened: Arr = [...a.slice(0, -1), [end[0] - 6 * Math.cos(ang), end[1] - 6 * Math.sin(ang)]];
+  const shortened: Arr = [...a.slice(0, -1), [end[0] - 6 * cos(ang), end[1] - 6 * sin(ang)]];
   return (
     <g style={{ opacity: dim ? 0.28 : 1, transition: "opacity .25s" }}>
       <path d={d(shortened)} fill="none" stroke={c} strokeWidth={lit ? 3.4 : 2.4} strokeLinecap="round" />

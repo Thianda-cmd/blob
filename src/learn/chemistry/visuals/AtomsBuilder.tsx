@@ -10,6 +10,7 @@ import { STABLE } from "../atoms-data";
 import { byNumber } from "../elements";
 import { AtomShells } from "./AtomShells";
 import { chargeLabel, Nuclide } from "./AtomsVisuals";
+import { cos, sin } from "@/lib/stableMath";
 
 /** Ions students meet in school (symbol charge), for the "this ion really exists" note. */
 const REAL_IONS = new Set(["1:1", "1:-1", "3:1", "4:2", "11:1", "12:2", "13:3", "19:1", "20:2", "7:-3", "8:-2", "9:-1", "15:-3", "16:-2", "17:-1"]);
@@ -38,8 +39,8 @@ function Nucleus({ p, n, size }: { p: number; n: number; size: number }) {
     const a = i * 2.39996;
     balls.push({
       key: proton ? `p${pi++}` : `n${ni++}`,
-      x: Math.round((c + r * Math.cos(a)) * 100) / 100,
-      y: Math.round((c + r * Math.sin(a)) * 100) / 100,
+      x: Math.round((c + r * cos(a)) * 100) / 100,
+      y: Math.round((c + r * sin(a)) * 100) / 100,
       proton,
     });
   }

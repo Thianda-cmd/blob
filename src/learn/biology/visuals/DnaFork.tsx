@@ -7,6 +7,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { StepButton, StepDots } from "./DnaKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // The replication fork step by step: helicase, primase, DNA polymerase III, polymerase I and ligase.
 // Top template: 3′ (left) … 5′ (right) → its new strand grows towards the fork: leading strand.
@@ -173,7 +174,7 @@ function EnzymeShape({ e }: { e: Enzyme }) {
   if (e.id === "helicase")
     return (
       <polygon
-        points={[0, 1, 2, 3, 4, 5].map((k) => `${Math.round((e.x + 17 * Math.cos((k * Math.PI) / 3)) * 10) / 10},${Math.round((e.y + 17 * Math.sin((k * Math.PI) / 3)) * 10) / 10}`).join(" ")}
+        points={[0, 1, 2, 3, 4, 5].map((k) => `${Math.round((e.x + 17 * cos((k * Math.PI) / 3)) * 10) / 10},${Math.round((e.y + 17 * sin((k * Math.PI) / 3)) * 10) / 10}`).join(" ")}
         fill={s.fill}
         stroke={s.stroke}
         strokeWidth={2}

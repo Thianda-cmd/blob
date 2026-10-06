@@ -9,6 +9,7 @@ import { createRng } from "@/learn/engine/rng";
 import { DISPERSAL, MODES, plantById, type DispersalPlant, type Mode } from "@/learn/biology/topics/flowers-seeds/data";
 import { cn } from "@/lib/utils";
 import { mirror } from "./FlowerKit";
+import { cos, sin } from "@/lib/stableMath";
 
 // How fruits and seeds travel: small schematic drawings of each fruit and a sorter where the
 // student decides for each plant whether wind, animals, water or the plant itself spreads it.
@@ -21,12 +22,12 @@ function Spines({ cx, cy, r, n }: { cx: number; cy: number; r: number; n: number
   const out: ReactNode[] = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    const x1 = cx + Math.cos(a) * (r - 2);
-    const y1 = cy + Math.sin(a) * (r - 2);
-    const x2 = cx + Math.cos(a) * (r + 8);
-    const y2 = cy + Math.sin(a) * (r + 8);
-    const hx = x2 + Math.cos(a + 1.9) * 3;
-    const hy = y2 + Math.sin(a + 1.9) * 3;
+    const x1 = cx + cos(a) * (r - 2);
+    const y1 = cy + sin(a) * (r - 2);
+    const x2 = cx + cos(a) * (r + 8);
+    const y2 = cy + sin(a) * (r + 8);
+    const hx = x2 + cos(a + 1.9) * 3;
+    const hy = y2 + sin(a + 1.9) * 3;
     out.push(<path key={i} d={`M ${x1.toFixed(1)} ${y1.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)} L ${hx.toFixed(1)} ${hy.toFixed(1)}`} fill="none" stroke={WD} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />);
   }
   return <>{out}</>;
@@ -37,8 +38,8 @@ const ICONS: Record<string, ReactNode> = {
     <g>
       {Array.from({ length: 11 }, (_, i) => {
         const a = ((-75 + i * 15) * Math.PI) / 180;
-        const x = 40 + Math.sin(a) * 27;
-        const y = 30 - Math.cos(a) * 22;
+        const x = 40 + sin(a) * 27;
+        const y = 30 - cos(a) * 22;
         return (
           <g key={i}>
             <line x1={40} y1={30} x2={x.toFixed(1)} y2={y.toFixed(1)} stroke={O} strokeWidth={0.9} opacity={0.7} />

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
+import { cos, sin } from "@/lib/stableMath";
 
 type Stage = { name: Text; when: Text; breath: Text; food: Text; move: Text; home: Text };
 
@@ -111,7 +112,7 @@ function Leg({ side, k, front, cx, cy, rx, ry, color, line }: { side: 1 | -1; k:
       {toes.map((a, i) => {
         const dir = base + a * 0.6;
         const len = (front ? 7 : 12) * k;
-        return <line key={i} x1={fx} y1={fy} x2={fx + Math.cos(dir) * len} y2={fy + side * Math.sin(dir) * len} stroke={line} strokeWidth={2} strokeLinecap="round" />;
+        return <line key={i} x1={fx} y1={fy} x2={fx + cos(dir) * len} y2={fy + side * sin(dir) * len} stroke={line} strokeWidth={2} strokeLinecap="round" />;
       })}
     </motion.g>
   );

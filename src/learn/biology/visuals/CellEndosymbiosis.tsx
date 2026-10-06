@@ -11,6 +11,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { Chloroplast, Mitochondrion } from "./CellOrganelles";
+import { cos, sin } from "@/lib/stableMath";
 
 const W = 540;
 const H = 330;
@@ -24,20 +25,20 @@ function host(cup: number, at: number) {
   const pts: string[] = [];
   for (let i = 0; i < 96; i++) {
     const th = (i / 96) * 2 * Math.PI;
-    const r0 = (A * B) / Math.sqrt((B * Math.cos(th)) ** 2 + (A * Math.sin(th)) ** 2);
+    const r0 = (A * B) / Math.sqrt((B * cos(th)) ** 2 + (A * sin(th)) ** 2);
     let d = th - at;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
+    d = Math.atan2(sin(d), cos(d));
     const arms = Math.exp(-((d - 0.27) ** 2) / (2 * 0.085 ** 2)) + Math.exp(-((d + 0.27) ** 2) / (2 * 0.085 ** 2));
     const dent = Math.exp(-(d ** 2) / (2 * 0.12 ** 2));
     const r = r0 + cup * (46 * arms - 14 * dent);
-    pts.push(`${(CX + r * Math.cos(th)).toFixed(1)} ${(CY + r * Math.sin(th)).toFixed(1)}`);
+    pts.push(`${(CX + r * cos(th)).toFixed(1)} ${(CY + r * sin(th)).toFixed(1)}`);
   }
   return `M ${pts.join(" L ")} Z`;
 }
 
 const AT_BACT = -0.32;
 const AT_CYANO = 0.42;
-const pos = (at: number, r: number) => ({ x: CX + r * Math.cos(at), y: CY + r * Math.sin(at) });
+const pos = (at: number, r: number) => ({ x: CX + r * cos(at), y: CY + r * sin(at) });
 
 type Step = { title: Text; body: Text; cup: number; at: number; bact: { x: number; y: number }; bactRing: boolean; mito: boolean; cyano: { x: number; y: number } | null; cyanoRing: boolean; chloro: boolean };
 

@@ -6,6 +6,7 @@
 
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 export const LEAF_SECTION_PARTS: FigurePart[] = [
   { id: "cuticle", label: tx("cuticle", "Cuticula"), at: [96, 25], tag: [60, 12], info: tx("A thin wax layer. It stops the leaf drying out and lets light through.", "Eine dünne Wachsschicht. Sie schützt vor Austrocknung und lässt Licht durch.") },
@@ -95,7 +96,7 @@ export function PhotoLeafSection({ mode = "names", show, ask, highlight, legend 
         <circle cx={300} cy={192} r={50} fill="var(--bio-cell)" stroke={WALL} strokeWidth={1.4} />
         {Array.from({ length: 16 }, (_, i) => {
           const a = (i / 16) * Math.PI * 2;
-          return <circle key={i} cx={300 + Math.cos(a) * 44} cy={192 + Math.sin(a) * 44} r={7.5} fill="var(--bio-cell)" stroke={WALL} strokeWidth={1.2} />;
+          return <circle key={i} cx={300 + cos(a) * 44} cy={192 + sin(a) * 44} r={7.5} fill="var(--bio-cell)" stroke={WALL} strokeWidth={1.2} />;
         })}
         {/* xylem: wide, thick-walled vessels towards the upper side */}
         {[

@@ -7,6 +7,7 @@ import { useText } from "@/i18n/useText";
 import { AMINO, aminoLetter, RNA_BASES } from "@/learn/biology/topics/dna/data";
 import { cn } from "@/lib/utils";
 import { BASE_COLOR, baseTint } from "./DnaKit";
+import { cos, sin } from "@/lib/stableMath";
 
 const S = 460;
 const C = S / 2;
@@ -17,7 +18,7 @@ const RINGS = [
 ] as const;
 const LABEL_R = 174;
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const pt = (r: number, a: number): [number, number] => [r2(C + r * Math.sin((a * Math.PI) / 180)), r2(C - r * Math.cos((a * Math.PI) / 180))];
+const pt = (r: number, a: number): [number, number] => [r2(C + r * sin((a * Math.PI) / 180)), r2(C - r * cos((a * Math.PI) / 180))];
 
 function sector(r0: number, r1: number, a0: number, a1: number) {
   const large = a1 - a0 > 180 ? 1 : 0;

@@ -6,6 +6,7 @@
 import { useId } from "react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 const BONE = "var(--bio-bone)";
 const LINE = "var(--bio-outline)";
@@ -183,11 +184,11 @@ const VANE_LINE = "var(--bio-nucleus-deep)";
 
 /** Points of the contour feather (rachis from (90,270) to (330,30)). */
 function featherGeom() {
-  const R = (t: number) => [90 + 240 * t, 270 - 240 * t + 18 * Math.sin(Math.PI * t)];
+  const R = (t: number) => [90 + 240 * t, 270 - 240 * t + 18 * sin(Math.PI * t)];
   const nx = -0.707;
   const ny = -0.707;
-  const w1 = (t: number) => (t < 0.18 ? 0 : 34 * Math.sin((Math.PI * (t - 0.18)) / 0.82) ** 0.6);
-  const w2 = (t: number) => (t < 0.18 ? 0 : 58 * Math.sin((Math.PI * (t - 0.18)) / 0.82) ** 0.55);
+  const w1 = (t: number) => (t < 0.18 ? 0 : 34 * sin((Math.PI * (t - 0.18)) / 0.82) ** 0.6);
+  const w2 = (t: number) => (t < 0.18 ? 0 : 58 * sin((Math.PI * (t - 0.18)) / 0.82) ** 0.55);
   const pts = (side: 1 | -1, w: (t: number) => number) => {
     const out: string[] = [];
     for (let t = 0.18; t <= 1.0001; t += 0.02) {
@@ -294,8 +295,8 @@ export function VertebrateFeather({ mode = "names", show, ask, highlight, legend
           <g stroke={VANE_LINE} strokeWidth={1.3} fill="none" opacity={0.85}>
             {[-70, -45, -20, 0, 20, 45, 70, -100, 100].map((a, i) => {
               const r = (a * Math.PI) / 180;
-              const ex = 512 + Math.sin(r) * 38;
-              const ey = 292 - Math.cos(r) * 32;
+              const ex = 512 + sin(r) * 38;
+              const ey = 292 - cos(r) * 32;
               return <path key={i} d={`M512 292 Q ${(512 + ex) / 2 + (i % 2 ? 8 : -8)} ${(292 + ey) / 2}, ${ex.toFixed(1)} ${ey.toFixed(1)}`} />;
             })}
           </g>

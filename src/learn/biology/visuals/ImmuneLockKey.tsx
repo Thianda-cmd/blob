@@ -13,6 +13,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { AB, AB_COLOR, Antibody, bumpPath, clump, Macrophage, PAINT, VirusParticle, type ClumpLink, type Epitope } from "./ImmuneCells";
+import { cos, sin } from "@/lib/stableMath";
 
 const RP = 21;
 const S = 5.2;
@@ -234,7 +235,7 @@ export function ImmuneLockKeyPicture({ shape, options, same = -1 }: { shape: Epi
 /** A Y whose tips carry the antigen's own shape as a bump: looks similar, but can't bind. */
 function SameShape({ shape }: { shape: Epitope }) {
   const a = (AB.ang * Math.PI) / 180;
-  const tip = (side: -1 | 1): [number, number] => [side * AB.arm * Math.sin(a), -AB.arm * Math.cos(a)];
+  const tip = (side: -1 | 1): [number, number] => [side * AB.arm * sin(a), -AB.arm * cos(a)];
   return (
     <g>
       <path d={`M 0 ${AB.stem} L 0 0 L ${tip(-1)[0]} ${tip(-1)[1]} M 0 0 L ${tip(1)[0]} ${tip(1)[1]}`} fill="none" stroke={AB_COLOR} strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" />

@@ -11,6 +11,7 @@ import { resolveText, tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { Axes, Tag, path, scales, type Box } from "./EcoChart";
+import { pow } from "@/lib/stableMath";
 
 export type Curve = { min: number; opt: number; max: number };
 
@@ -19,7 +20,7 @@ export function vitality(c: Curve, x: number) {
   if (x <= c.min || x >= c.max) return 0;
   const q = 1.4;
   const p = (q * (c.opt - c.min)) / (c.max - c.opt);
-  return Math.pow((x - c.min) / (c.opt - c.min), p) * Math.pow((c.max - x) / (c.max - c.opt), q);
+  return pow((x - c.min) / (c.opt - c.min), p) * pow((c.max - x) / (c.max - c.opt), q);
 }
 
 /** Where the curve crosses `level` on the left and right of the optimum. */

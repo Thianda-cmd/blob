@@ -1,4 +1,5 @@
 "use client";
+import { cos, sin } from "@/lib/stableMath";
 
 // Tiny molecule glyphs for the photosynthesis drawings, each drawn around (0, 0) so a parent
 // <motion.g> can move it. Oxygen atoms are red, carbon dark, hydrogen light, as in school models.
@@ -52,7 +53,7 @@ export function PhotoO2({ s = 1 }: { s?: number }) {
 const hex = (r: number) =>
   Array.from({ length: 6 }, (_, i) => {
     const a = (Math.PI / 3) * i + Math.PI / 6;
-    return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`;
+    return `${(r * cos(a)).toFixed(2)},${(r * sin(a)).toFixed(2)}`;
   }).join(" ");
 
 /** Glucose (Traubenzucker) as a ring, the way school books draw sugar. */

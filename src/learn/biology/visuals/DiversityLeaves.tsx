@@ -11,6 +11,7 @@ import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { leaf, pathOf, polarLeaf, sideVeins, veinsTo, type Leaf } from "./DiversityShapes";
+import { cos, sin } from "@/lib/stableMath";
 
 export type TreeId = "oak" | "beech" | "maple" | "lime" | "birch" | "chestnut" | "ash";
 
@@ -170,7 +171,7 @@ type Geo = {
 
 const veinsOf = (l: Leaf, ts: number[], reach?: number, lead?: number) => sideVeins(l, ts, reach, lead);
 const deg = (a: number) => (a * Math.PI) / 180;
-const ray = (len: number, a: number) => `M0 0L${(len * Math.sin(deg(a))).toFixed(1)} ${(-len * Math.cos(deg(a))).toFixed(1)}`;
+const ray = (len: number, a: number) => `M0 0L${(len * sin(deg(a))).toFixed(1)} ${(-len * cos(deg(a))).toFixed(1)}`;
 
 function geometry(id: TreeId): Geo {
   switch (id) {

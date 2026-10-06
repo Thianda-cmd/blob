@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { petalPath } from "./DiversityShapes";
 import { FloralFormula } from "./DiversityFormula";
+import { cos, sin } from "@/lib/stableMath";
 
 export type FamilyId = "brassicaceae" | "lamiaceae" | "fabaceae" | "rosaceae" | "asteraceae" | "poaceae";
 
@@ -256,8 +257,8 @@ function Rose() {
           const r = 27 + (i % 3) * 3;
           return (
             <g key={i}>
-              <path d={`M${cx + r0 * Math.cos(a)} ${cy + r0 * Math.sin(a)}L${cx + r * Math.cos(a)} ${cy + r * Math.sin(a)}`} stroke="var(--bio-wood-deep)" strokeWidth={0.9} />
-              <circle cx={cx + r * Math.cos(a)} cy={cy + r * Math.sin(a)} r={2.6} fill="var(--bio-pollen)" stroke="var(--bio-wood-deep)" strokeWidth={0.6} />
+              <path d={`M${cx + r0 * cos(a)} ${cy + r0 * sin(a)}L${cx + r * cos(a)} ${cy + r * sin(a)}`} stroke="var(--bio-wood-deep)" strokeWidth={0.9} />
+              <circle cx={cx + r * cos(a)} cy={cy + r * sin(a)} r={2.6} fill="var(--bio-pollen)" stroke="var(--bio-wood-deep)" strokeWidth={0.6} />
             </g>
           );
         })}
@@ -266,7 +267,7 @@ function Rose() {
         <circle cx={cx} cy={cy} r={13} fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.2} />
         {Array.from({ length: 9 }, (_, i) => {
           const a = (i * 2 * Math.PI) / 9;
-          return <circle key={i} cx={cx + 7 * Math.cos(a)} cy={cy + 7 * Math.sin(a)} r={2.4} fill="var(--bio-sun)" stroke="var(--bio-wood-deep)" strokeWidth={0.6} />;
+          return <circle key={i} cx={cx + 7 * cos(a)} cy={cy + 7 * sin(a)} r={2.4} fill="var(--bio-sun)" stroke="var(--bio-wood-deep)" strokeWidth={0.6} />;
         })}
       </g>
     </>
@@ -289,7 +290,7 @@ function Daisy() {
   const discs = Array.from({ length: 90 }, (_, i) => {
     const r = 2.9 * Math.sqrt(i);
     const a = i * 2.39996;
-    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    return [cx + r * cos(a), cy + r * sin(a)];
   });
   return (
     <>
@@ -311,7 +312,7 @@ function Daisy() {
       </g>
       <g data-part="disc">
         {[272, 282, 292, 302, 312, 322, 332, 342].map((x, i) => (
-          <path key={x} d={`M${x} ${84 - Math.sin((i / 7) * Math.PI) * 6}l0 -10`} stroke="var(--bio-sun)" strokeWidth={6} strokeLinecap="round" />
+          <path key={x} d={`M${x} ${84 - sin((i / 7) * Math.PI) * 6}l0 -10`} stroke="var(--bio-sun)" strokeWidth={6} strokeLinecap="round" />
         ))}
       </g>
       <g data-part="base">

@@ -8,6 +8,7 @@
 import { motion, useAnimationFrame, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "motion/react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 const XYLEM_INFO = tx("Wood part: dead, lignified tubes (vessels). Carries water and minerals upwards.", "Holzteil: tote, verholzte Röhren (Gefäße). Leitet Wasser und Mineralstoffe nach oben.");
 const PHLOEM_INFO = tx("Bast part: living sieve tubes with companion cells. Carries sugar solution up and down.", "Siebteil: lebende Siebröhren mit Geleitzellen. Leitet Zuckerlösung nach oben und nach unten.");
@@ -75,21 +76,21 @@ function Cross({ closed }: { closed: boolean }) {
       <g fill={CELL} stroke={WALL} strokeWidth={1} opacity={0.75}>
         {Array.from({ length: 22 }, (_, i) => {
           const a = (i / 22) * Math.PI * 2;
-          return <circle key={i} cx={160 + Math.cos(a) * 112} cy={182 + Math.sin(a) * 124} r={15} />;
+          return <circle key={i} cx={160 + cos(a) * 112} cy={182 + sin(a) * 124} r={15} />;
         })}
       </g>
       {closed ? (
         <g data-part="fibers">
           {Array.from({ length: 34 }, (_, i) => {
             const a = (i / 34) * Math.PI * 2;
-            return <circle key={i} cx={160 + Math.cos(a) * 88} cy={182 + Math.sin(a) * 104} r={6.4} fill="var(--raised)" stroke={WALL} strokeWidth={4} />;
+            return <circle key={i} cx={160 + cos(a) * 88} cy={182 + sin(a) * 104} r={6.4} fill="var(--raised)" stroke={WALL} strokeWidth={4} />;
           })}
         </g>
       ) : (
         <g data-part="fibers">
           {Array.from({ length: 13 }, (_, i) => {
             const a = Math.PI * (0.12 + (0.76 * i) / 12);
-            return <circle key={i} cx={160 + Math.cos(a) * 66} cy={238 + Math.sin(a) * 40} r={6.2} fill="var(--raised)" stroke={WALL} strokeWidth={4} />;
+            return <circle key={i} cx={160 + cos(a) * 66} cy={238 + sin(a) * 40} r={6.2} fill="var(--raised)" stroke={WALL} strokeWidth={4} />;
           })}
         </g>
       )}

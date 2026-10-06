@@ -6,6 +6,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { tx } from "@/i18n/text";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
+import { cos, sin } from "@/lib/stableMath";
 
 const CX = 262;
 const CY = 140;
@@ -14,8 +15,8 @@ const B = 70;
 
 /** A point of the outline: an oval, narrower at the back, with the oral groove dented into the lower side. */
 function outline(t: number): [number, number] {
-  const c = Math.cos(t);
-  const s = Math.sin(t);
+  const c = cos(t);
+  const s = sin(t);
   const x = CX + A * c;
   let y = CY + B * s * (c > 0 ? 1 - 0.3 * c * c : 1 - 0.06 * c * c);
   if (s > 0) y -= 17 * Math.exp(-(((x - 196) / 62) ** 2)) * s;

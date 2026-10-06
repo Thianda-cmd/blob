@@ -7,6 +7,7 @@
 import { useId } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
+import { cos, pow, sin } from "@/lib/stableMath";
 
 export type Specimen = "onion" | "cheek" | "elodea" | "cork";
 
@@ -42,7 +43,7 @@ export const SPECIMENS: Record<Specimen, { name: Text; what: Text }> = {
 };
 
 // Small seeded wobble so tiles don't look machine-made (deterministic, the same on server and client).
-const wob = (i: number, k = 1) => (((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1) + 1) % 1;
+const wob = (i: number, k = 1) => (((sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1) + 1) % 1;
 
 const ONION = { w: 450, h: 120 };
 const ONION_ROWS = [0, 70, 25, 108];
@@ -110,7 +111,7 @@ function cheekPath(cx: number, cy: number, r: number, rot: number, seed: number)
   const pts = Array.from({ length: n }, (_, k) => {
     const a = rot + (k / n) * 2 * Math.PI;
     const rr = r * (0.78 + wob(seed * 9 + k) * 0.35);
-    return [cx + rr * Math.cos(a), cy + rr * Math.sin(a) * 0.86];
+    return [cx + rr * cos(a), cy + rr * sin(a) * 0.86];
   });
   // rounded polygon: quadratic curves through the edge midpoints
   const mid = (p: number[], q: number[]) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -152,7 +153,7 @@ function CorkTile({ sw }: { sw: number }) {
   const hex = (cx: number, cy: number, r: number) =>
     Array.from({ length: 6 }, (_, k) => {
       const a = (Math.PI / 3) * k;
-      return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+      return `${(cx + r * cos(a)).toFixed(1)},${(cy + r * sin(a)).toFixed(1)}`;
     }).join(" ");
   const cells: [number, number][] = [];
   for (let c = -1; c <= 3; c++) for (let r = -1; r <= 2; r++) cells.push([c * 45, r * 51.96 + (c % 2 ? 25.98 : 0)]);
@@ -171,7 +172,7 @@ export function SpecimenField({ kind, zoom = 1, blur = 0, brightness = 1, contra
   const id = `spec-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const size = kind === "onion" ? ONION : kind === "elodea" ? ELODEA : kind === "cheek" ? CHEEK : CORK;
   // Lines stay visible when zoomed out and don't get too fat when zoomed in.
-  const sw = 1.3 / Math.pow(zoom, 0.55);
+  const sw = 1.3 / pow(zoom, 0.55);
   const filter = [blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "", brightness !== 1 ? `brightness(${brightness.toFixed(2)})` : "", contrast !== 1 ? `contrast(${contrast.toFixed(2)})` : ""].filter(Boolean).join(" ");
   return (
     <div className={className ?? "relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-full border-[6px] border-ink/80 bg-raised shadow-card"}>
