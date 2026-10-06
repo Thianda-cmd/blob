@@ -7,7 +7,7 @@ import { useText } from "@/i18n/useText";
 import { Figure, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 import { OV, OvuleWalls, SacAntipodes, SacEgg, SacPolar, SacSynergids } from "./FlowerEmbryoSac";
-import { StepCaption, StepControls } from "./FlowerKit";
+import { shiftParts, StepCaption, StepControls } from "./FlowerKit";
 
 // Double fertilisation in angiosperms: the pollen tube enters through the micropyle and bursts
 // into a synergid; one sperm cell fuses with the egg cell (zygote, 2n), the other with the
@@ -120,11 +120,17 @@ export function FlowerDoubleFert({ start = 0 }: { start?: number }) {
   const fused = step >= 4;
   const seed = step >= 5;
   const s = STEPS[step];
-  const partsNow = PARTS.filter((p) => s.show.includes(p.id)).map((p) => (p.id === "sperm" ? { ...p, at: [SPERM[step][1][0], SPERM[step][1][1]] as [number, number] } : p));
+  const partsNow = shiftParts(
+    PARTS.filter((p) => s.show.includes(p.id)).map((p) => (p.id === "sperm" ? { ...p, at: [SPERM[step][1][0], SPERM[step][1][1]] as [number, number] } : p)),
+    60,
+    26,
+    190,
+  );
 
   return (
     <div className="space-y-3">
-      <Figure title={tx("Double fertilisation in the embryo sac", "Doppelte Befruchtung im Embryosack")} width={400} height={440} parts={partsNow} mode="names">
+      <Figure title={tx("Double fertilisation in the embryo sac", "Doppelte Befruchtung im Embryosack")} width={520} height={440} parts={partsNow} mode="names">
+        <g transform="translate(60 0)">
         <OvuleWalls />
         <g data-part="coat">
           <motion.ellipse {...OV.outer} initial={false} animate={{ opacity: seed ? 0.85 : 0 }} transition={tr} fill="var(--bio-wood)" stroke="var(--bio-wood-deep)" strokeWidth={2} />
@@ -207,6 +213,7 @@ export function FlowerDoubleFert({ start = 0 }: { start?: number }) {
               transition={{ duration: reduce ? 0 : 1, repeat: reduce ? 0 : 2 }}
             />
           ))}
+        </g>
       </Figure>
       <div className="flex flex-wrap gap-1.5">
         {s.chips.map(([label, ploidy]) => (

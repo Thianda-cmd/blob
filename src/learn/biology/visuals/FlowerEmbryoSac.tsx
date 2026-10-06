@@ -6,7 +6,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
-import { StepCaption, StepControls, Tube } from "./FlowerKit";
+import { shiftParts, StepCaption, StepControls, Tube } from "./FlowerKit";
 import { FlowerPollenGrain, POLLEN_STEPS, PollenDevelopment } from "./FlowerPollenGrain";
 
 // The female gametophyte: an (anatropous) ovule with integuments, nucellus and the mature
@@ -125,6 +125,8 @@ export const SAC_PARTS: FigurePart[] = [
   { id: "chalaza", label: tx("chalaza", "Chalaza"), at: [190, 60], tag: [300, 24], info: tx("Base of the ovule opposite the micropyle, where the vascular bundle ends.", "Basis der Samenanlage gegenüber der Mikropyle, hier endet das Leitbündel.") },
 ];
 
+const SAC_PARTS_WIDE = shiftParts(SAC_PARTS, 60, 26, 190);
+
 export function EmbryoSacDrawing() {
   return (
     <>
@@ -145,8 +147,10 @@ export function EmbryoSacDrawing() {
 
 export function FlowerEmbryoSac({ mode = "names", show, ask, highlight, legend }: DrawingProps) {
   return (
-    <Figure title={tx("Ovule with mature embryo sac", "Samenanlage mit reifem Embryosack")} width={400} height={430} parts={SAC_PARTS} mode={mode} show={show} ask={ask} highlight={highlight} legend={legend}>
-      <EmbryoSacDrawing />
+    <Figure title={tx("Ovule with mature embryo sac", "Samenanlage mit reifem Embryosack")} width={520} height={430} parts={SAC_PARTS_WIDE} mode={mode} show={show} ask={ask} highlight={highlight} legend={legend}>
+      <g transform="translate(60 0)">
+        <EmbryoSacDrawing />
+      </g>
     </Figure>
   );
 }
@@ -168,15 +172,15 @@ export const SAC_STEPS: { title: Text; note: Text }[] = [
     note: tx("Three megaspores die. Only the one at the chalazal end survives and grows.", "Drei Megasporen gehen zugrunde. Nur die am chalazalen Ende überlebt und wächst."),
   },
   {
-    title: tx("Mitosis 1: two nuclei", "1. Mitose: zwei Kerne"),
+    title: tx("First mitosis: two nuclei", "Erste Mitose: zwei Kerne"),
     note: tx("Its nucleus divides by **mitosis**, without a new cell wall. One nucleus moves to each pole.", "Ihr Kern teilt sich durch **Mitose**, ohne neue Zellwand. Je ein Kern wandert an einen Pol."),
   },
   {
-    title: tx("Mitosis 2: four nuclei", "2. Mitose: vier Kerne"),
+    title: tx("Second mitosis: four nuclei", "Zweite Mitose: vier Kerne"),
     note: tx("Another mitosis: two nuclei at each pole.", "Noch eine Mitose: zwei Kerne an jedem Pol."),
   },
   {
-    title: tx("Mitosis 3: eight nuclei", "3. Mitose: acht Kerne"),
+    title: tx("Third mitosis: eight nuclei", "Dritte Mitose: acht Kerne"),
     note: tx("After the third mitosis there are **eight** haploid nuclei, four at each pole.", "Nach der dritten Mitose gibt es **acht** haploide Kerne, vier an jedem Pol."),
   },
   {

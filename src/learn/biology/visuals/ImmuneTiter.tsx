@@ -132,7 +132,7 @@ const PATHOGEN: Record<Scenario, Fn> = {
 const ANTIBODY: Record<Scenario, Fn> = {
   none: wave({ at: INFECTION, lag: 4, up: 9, peak: 0.42, floor: 0.3, down: 10 }),
   vaccine: sum(wave({ at: 0, lag: 4, up: 10, peak: 0.26, floor: 0.3, down: 9 }), wave({ at: INFECTION, lag: 1, up: 5, peak: 0.9, floor: 0.6, down: 12 })),
-  serum: sum(serum(37, 0.78, 12), wave({ at: INFECTION, lag: 5, up: 9, peak: 0.1, floor: 0.3, down: 8 })),
+  serum: serum(37, 0.8, 8),
 };
 
 /** Days on which the pathogens are above the "sick" line, as [from, to]. */

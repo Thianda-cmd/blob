@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { Figure, type FigurePart } from "@/learn/biology/Figure";
-import { StepCaption, StepControls } from "./FlowerKit";
+import { shiftParts, StepCaption, StepControls } from "./FlowerKit";
 
 // The pistil close up: a pollen grain germinates on the stigma, the pollen tube grows down the
 // style and through the micropyle into the ovule, the sperm cell fuses with the egg cell, and
@@ -91,7 +91,8 @@ export function FlowerPollenTube({ start = 0 }: { start?: number }) {
 
   return (
     <div className="space-y-3">
-      <Figure title={tx("Pistil with pollen tube", "Stempel mit Pollenschlauch")} width={360} height={420} parts={partsFor(step).filter((p) => STEPS[step].show.includes(p.id))} mode="names">
+      <Figure title={tx("Pistil with pollen tube", "Stempel mit Pollenschlauch")} width={480} height={420} parts={shiftParts(partsFor(step).filter((p) => STEPS[step].show.includes(p.id)), 60, 34, 180)} mode="names">
+        <g transform="translate(60 0)">
         {/* ovary with its cavity */}
         <motion.ellipse
           data-part="ovary"
@@ -182,6 +183,7 @@ export function FlowerPollenTube({ start = 0 }: { start?: number }) {
             transition={{ duration: reduce ? 0 : 1, repeat: reduce ? 0 : 2 }}
           />
         )}
+        </g>
       </Figure>
       <StepCaption n={step + 1} title={STEPS[step].title} note={STEPS[step].note} />
       <StepControls step={step} onStep={setStep} titles={STEPS.map((s) => s.title)} />

@@ -4,11 +4,23 @@ import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
+import type { FigurePart } from "@/learn/biology/Figure";
 import { cn } from "@/lib/utils";
 
 // Shared drawing pieces for the topic "flowers-seeds": the cherry blossom in longitudinal
 // section (used by the labelled figure, the pollination widget and the flower-to-fruit
 // morph), a stamen, a tube-like stroke and the bee. Colours only from the biology palette.
+
+/**
+ * Move a figure's parts right by `dx` (when the drawing is wrapped in translate(dx 0) to widen the
+ * viewBox) and push the label bubbles `spread` further away from the centre line `cx`.
+ */
+export const shiftParts = (parts: FigurePart[], dx: number, spread = 0, cx = 0): FigurePart[] =>
+  parts.map((p) => ({
+    ...p,
+    at: [p.at[0] + dx, p.at[1]] as [number, number],
+    ...(p.tag ? { tag: [p.tag[0] + dx + (p.tag[0] < cx ? -spread : p.tag[0] > cx ? spread : 0), p.tag[1]] as [number, number] } : {}),
+  }));
 
 /** Mirror a left-hand shape to the right side of a drawing that is `w` wide. */
 export const mirror = (w = 480) => `translate(${w} 0) scale(-1 1)`;
