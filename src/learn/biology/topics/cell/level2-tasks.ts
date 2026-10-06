@@ -191,7 +191,7 @@ function bacteriumNameTask(rng: Rng): Exercise {
   for (const w of BACT_WRONG[id] ?? []) m.add({ kind: "word", accept: w.accept }, w.title, w.say);
   return {
     instruction: tx("The bacterial cell", "Die Bakterienzelle"),
-    text: tx("What is the structure with the **?** called?", "Wie heißt der Bestandteil mit dem **?**?"),
+    text: tx("What is the structure marked **?** called?", "Wie heißt der mit **?** markierte Bestandteil?"),
     visual: visual(CellBacterium, { mode: "numbers", ask: id, show: [id], legend: "none" }),
     answer,
     hint: tx("From outside in: capsule, cell wall, membrane. Inside: DNA rings and ribosomes. Outside: hairs and a long thread.", "Von außen nach innen: Kapsel, Zellwand, Membran. Innen: DNA-Ringe und Ribosomen. Außen: Härchen und ein langer Faden."),

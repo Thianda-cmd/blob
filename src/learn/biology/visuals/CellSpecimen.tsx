@@ -33,7 +33,7 @@ export const SPECIMENS: Record<Specimen, { name: Text; what: Text }> = {
     ),
   },
   cork: {
-    name: tx("thin slice of cork", "dünne Korkscheibe"),
+    name: tx("slice of cork", "Korkscheibe"),
     what: tx(
       "Cork: only empty cell walls are left, like a honeycomb. Robert Hooke saw this in 1665 and called the chambers 'cells'.",
       "Kork: Übrig sind nur leere Zellwände, wie Waben. Robert Hooke sah das 1665 und nannte die Kämmerchen „Zellen“.",

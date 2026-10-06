@@ -52,16 +52,18 @@ export function GrowthChart({ n0, r, K, T, yMax, yStep, xStep, show, points, kLi
   const n = 160;
   const logPts: [number, number][] = [];
   const expPts: [number, number][] = [];
+  let expDone = false;
   for (let i = 0; i <= n; i++) {
     const tt = (T * i) / n;
     logPts.push([px(tt), py(logN(n0, r, K, tt))]);
+    if (expDone) continue;
     const e = expN(n0, r, tt);
-    if (e <= yMax * 1.02) expPts.push([px(tt), py(e)]);
+    if (e <= yMax) expPts.push([px(tt), py(e)]);
     else {
       // stop exactly at the top edge
       const tEdge = Math.log(yMax / n0) / r;
       expPts.push([px(tEdge), py(yMax)]);
-      break;
+      expDone = true;
     }
   }
   const fmt = (v: number) => (locale === "de" ? String(v).replace(".", ",") : String(v));

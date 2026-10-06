@@ -69,7 +69,7 @@ export function CellMicroscopeLab() {
   const t = useText();
   const [spec, setSpec] = useState<Specimen>("onion");
   const [obj, setObj] = useState(0);
-  const [h, setH] = useState(30);
+  const [h, setH] = useState(20);
   const [coarseTurn, setCoarseTurn] = useState(0);
   const [fineTurn, setFineTurn] = useState(0);
   const [diaphragm, setDiaphragm] = useState(85);
@@ -103,7 +103,7 @@ export function CellMicroscopeLab() {
       ),
     };
   else if (diaphragm < 22) tip = { tone: "info", text: tx("Too dark: open the diaphragm a little.", "Zu dunkel: Öffne die Blende etwas.") };
-  else if (blur > 3) tip = { tone: "info", text: obj === 2 ? tx("Very blurry. Go back to a smaller objective and focus there first.", "Sehr unscharf. Geh zurück zu einem kleineren Objektiv und stell dort erst scharf.") : tx("Blurry: turn the coarse focus knob until you can make something out.", "Unscharf: Dreh am Grobtrieb, bis du etwas erkennst.") };
+  else if (off > 6) tip = { tone: "info", text: obj === 2 ? tx("Very blurry. Go back to a smaller objective and focus there first.", "Sehr unscharf. Geh zurück zu einem kleineren Objektiv und stell dort erst scharf.") : tx("Blurry: turn the coarse focus knob until you can make something out.", "Unscharf: Dreh am Grobtrieb, bis du etwas erkennst.") };
   else if (!sharp) tip = { tone: "info", text: tx("Nearly! Now the fine focus knob.", "Fast! Jetzt mit dem Feintrieb.") };
   else if (diaphragm > 80 && spec === "onion") tip = { tone: "info", text: tx("Sharp, but pale. Close the diaphragm a bit for more contrast.", "Scharf, aber blass. Schließ die Blende etwas für mehr Kontrast.") };
   else if (obj < 2) tip = { tone: "ok", text: tx("Sharp! Now swing in the next bigger objective. It stays almost sharp.", "Scharf! Jetzt kannst du das nächstgrößere Objektiv einschwenken. Es bleibt fast scharf.") };
@@ -131,7 +131,7 @@ export function CellMicroscopeLab() {
                 onClick={() => {
                   setSpec(k);
                   setObj(0);
-                  setH(30);
+                  setH(20);
                   setWarned(false);
                 }}
                 className={cn("h-9 rounded-lg px-3 text-[13px] font-medium transition-colors", spec === k ? "bg-blob text-white" : "border border-line text-ink-2 hover:bg-hover hover:text-ink")}

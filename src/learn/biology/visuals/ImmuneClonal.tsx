@@ -22,7 +22,8 @@ const GRID: [number, number][] = [195, 265, 335, 405].flatMap((x) => [
 ]);
 const MEMORY = new Set([2, 5]);
 const ANTIGENS: Epitope[] = ["tri", "square", "wave"];
-const S = 3.6;
+const S = 4.6;
+const FOUR = [-90, 0, 90, 180];
 
 type Step = { name: Text; text: Text };
 const STEPS: Step[] = [
@@ -41,7 +42,7 @@ export function ImmuneClonal() {
   const [s, setS] = useState(0);
   const pick = EPITOPES.indexOf(antigen);
   const px = xOf(pick);
-  const virusTop = ROW_Y - 20 - 5 - 12 - 14;
+  const virusTop = ROW_Y - 20 - 5 - 13 - 14;
 
   return (
     <div className="space-y-3">
@@ -59,7 +60,7 @@ export function ImmuneClonal() {
             aria-label={t(tx("Choose this antigen", "Dieses Antigen wählen"))}
           >
             <svg viewBox="-22 -22 44 44" width={34} height={34} aria-hidden>
-              <VirusParticle r={13} s={S} shape={a} />
+              <VirusParticle r={12} s={5.4} shape={a} angles={[0, 60, 120, 180, 240, 300]} />
             </svg>
           </button>
         ))}
@@ -77,7 +78,7 @@ export function ImmuneClonal() {
                 animate={{ x: moved ? CENTER[0] : xOf(i), y: moved ? CENTER[1] : ROW_Y, opacity: s >= 1 && !chosen ? 0.4 : moved && s >= 3 ? 0 : 1 }}
                 transition={spring}
               >
-                <BCell r={20} shape={e} s={S} angles={[-90, -30, 30, 90, 150, 210]} glow={chosen && s <= 2} />
+                <BCell r={20} shape={e} s={S} angles={FOUR} glow={chosen && s <= 2} />
               </motion.g>
             );
           })}
@@ -105,7 +106,7 @@ export function ImmuneClonal() {
             return (
               <motion.g key={`g${i}-${antigen}`} initial={{ x: CENTER[0], y: CENTER[1], opacity: 0, scale: 0.4 }} animate={s >= 3 ? { x, y, opacity: 1, scale: 1 } : { x: CENTER[0], y: CENTER[1], opacity: 0, scale: 0.4 }} transition={{ ...spring, delay: s === 3 ? i * 0.12 : 0 }}>
                 <motion.g animate={{ opacity: diff ? 0 : 1 }}>
-                  <BCell r={18} shape={antigen} s={S} angles={[-90, -30, 30, 90, 150, 210]} />
+                  <BCell r={16} shape={antigen} s={S} angles={FOUR} />
                 </motion.g>
                 <motion.g initial={{ opacity: 0 }} animate={{ opacity: diff ? 1 : 0 }} transition={{ delay: diff ? 0.3 + i * 0.08 : 0 }}>
                   {mem ? <MemoryCell r={16} shape={antigen} kind="b" glow /> : <PlasmaCell r={19} />}

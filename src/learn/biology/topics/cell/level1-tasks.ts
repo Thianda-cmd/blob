@@ -54,7 +54,7 @@ function nameStructureTask(rng: Rng, fixed?: { plant: boolean; id: string }): Ex
   }
   return {
     instruction: tx("Name the structure", "Benenne den Bestandteil"),
-    text: plant ? tx("A plant cell under the light microscope. What is the part with the **?** called?", "Eine Pflanzenzelle unter dem Lichtmikroskop. Wie heißt der Bestandteil mit dem **?**?") : tx("An animal cell under the light microscope. What is the part with the **?** called?", "Eine Tierzelle unter dem Lichtmikroskop. Wie heißt der Bestandteil mit dem **?**?"),
+    text: plant ? tx("A plant cell under the light microscope. What is the part marked **?** called?", "Eine Pflanzenzelle unter dem Lichtmikroskop. Wie heißt der mit **?** markierte Bestandteil?") : tx("An animal cell under the light microscope. What is the part marked **?** called?", "Eine Tierzelle unter dem Lichtmikroskop. Wie heißt der mit **?** markierte Bestandteil?"),
     visual: plant ? visual(CellPlantCell, { mode: "numbers", ask: id, show: [id], legend: "none" }) : visual(CellAnimalCell, { mode: "numbers", ask: id, show: [id], legend: "none" }),
     answer,
     hint: tx("Is it on the outside or inside? Thick or thin, big or small, green or not?", "Liegt es außen oder innen? Ist es dick oder dünn, groß oder klein, grün oder nicht?"),
@@ -214,7 +214,7 @@ function scopePartTask(rng: Rng): Exercise {
   const { answer, mistakes: list } = choice(rng, opts);
   return {
     instruction: tx("Parts of the microscope", "Teile des Mikroskops"),
-    text: tx("What is the part with the **?** called?", "Wie heißt das Teil mit dem **?**?"),
+    text: tx("What is the part marked **?** called?", "Wie heißt das mit **?** markierte Teil?"),
     visual: visual(CellMicroscope, { mode: "numbers", ask: id, show: [id], legend: "none" }),
     answer,
     hint: tx("Follow the light: lamp, diaphragm, specimen, objective, tube, eyepiece. The knobs move the stage.", "Folge dem Licht: Lampe, Blende, Präparat, Objektiv, Tubus, Okular. Die Drehknöpfe bewegen den Tisch."),
@@ -579,7 +579,7 @@ function parameciumTask(rng: Rng): Exercise {
     const { answer, mistakes: list } = choice(rng, opts);
     return {
       instruction: tx("The slipper animalcule", "Das Pantoffeltierchen"),
-      text: tx("What is the part with the **?** called?", "Wie heißt der Bestandteil mit dem **?**?"),
+      text: tx("What is the part marked **?** called?", "Wie heißt der mit **?** markierte Bestandteil?"),
       visual: visual(CellParamecium, { mode: "numbers", ask: id, show: [id], legend: "none" }),
       answer,
       hint: tx(`Think about what it does: ${en(P.job)}.`, `Überleg, was es tut: ${de(P.job)}.`),

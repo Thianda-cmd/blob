@@ -78,8 +78,10 @@ type ChartProps = {
   yName: Text;
 };
 
-export function LVChart({ pts, T, yMax = 100, upTo, labels, colors = { prey: PREY_COLOR, pred: PRED_COLOR }, means, cutAt, xName, yName }: ChartProps) {
+export function LVChart({ pts, T, yMax: yMaxProp, upTo, labels, colors = { prey: PREY_COLOR, pred: PRED_COLOR }, means, cutAt, xName, yName }: ChartProps) {
   const t = useText();
+  const top = Math.max(...pts.map((p) => Math.max(p.prey, p.pred)));
+  const yMax = yMaxProp ?? Math.max(100, Math.ceil((top * 1.05) / 20) * 20);
   const { px, py } = scales(BOX, [0, T], [0, yMax]);
   const xTicks = Array.from({ length: Math.floor(T / 5) + 1 }, (_, i) => i * 5);
   const yTicks = Array.from({ length: Math.floor(yMax / 20) + 1 }, (_, i) => i * 20);

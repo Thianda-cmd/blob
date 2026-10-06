@@ -112,7 +112,7 @@ export const level1: LevelLesson = {
       blob: tx("Plants and animals look so different. Are their cells different too?", "Pflanzen und Tiere sehen so verschieden aus. Sind es ihre Zellen auch?"),
       frames: [
         {
-          math: tx('"animal cell"#t = "membrane"#m + "cytoplasm"#p + "nucleus"#k', '"Tierzelle"#t = "Zellmembran"#m + "Zellplasma"#p + "Zellkern"#k'),
+          math: tx('"animal cell"#t = "membrane"#m \\\\ + "cytoplasm"#p + "nucleus"#k', '"Tierzelle"#t = "Zellmembran"#m \\\\ + "Zellplasma"#p + "Zellkern"#k'),
           note: tx("Every animal cell has a thin **cell membrane** as its boundary, **cytoplasm** as its filling and a **nucleus** as its control centre.", "Jede Tierzelle hat eine dünne **Zellmembran** als Grenze, **Zellplasma** als Füllung und einen **Zellkern** als Steuerzentrale."),
         },
         {

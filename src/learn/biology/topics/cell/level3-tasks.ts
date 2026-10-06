@@ -521,7 +521,7 @@ function membraneNameTask(rng: Rng): Exercise {
   }
   return {
     instruction: tx("The fluid mosaic model", "Das Flüssig-Mosaik-Modell"),
-    text: tx("What is the component with the **?** called?", "Wie heißt der Bestandteil mit dem **?**?"),
+    text: tx("What is the component marked **?** called?", "Wie heißt der mit **?** markierte Bestandteil?"),
     visual: visual(CellMembrane, { mode: "numbers", ask: id, show: [id], legend: "none" }),
     answer,
     hint: tx("Is it a lipid or a protein? Does it span the membrane, sit on it, or form a tunnel?", "Ist es ein Lipid oder ein Protein? Durchspannt es die Membran, sitzt es nur auf, oder bildet es einen Tunnel?"),

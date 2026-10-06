@@ -474,7 +474,7 @@ function NitrogenArt() {
       </g>
       <circle cx={425} cy={211} r={1.6} fill="var(--bio-outline)" />
       <circle cx={362} cy={226} r={5} fill="var(--bio-bone)" stroke="var(--bio-wood-deep)" strokeWidth={1.2} />
-      <Label x={392} y={178} size={11.5}>
+      <Label x={392} y={166} size={11.5}>
         {t(tx("animal: proteins", "Tier: Proteine"))}
       </Label>
       {/* dead matter */}

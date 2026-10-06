@@ -119,17 +119,17 @@ export function ImmuneMHC() {
       </div>
 
       <div className="rounded-xl border border-line bg-surface p-1.5 sm:p-3">
-        <svg viewBox="0 0 600 300" className="mx-auto block h-auto w-full max-w-[620px]" role="img" aria-label={t(tx("Antigen presentation on MHC", "Antigenpräsentation über MHC"))}>
+        <svg viewBox="40 22 540 262" className="mx-auto block h-auto w-full max-w-[640px]" role="img" aria-label={t(tx("Antigen presentation on MHC", "Antigenpräsentation über MHC"))}>
           <motion.g key={`${mode}-${healthy}`} initial={{ x: C[0], y: C[1], opacity: 0 }} animate={{ x: C[0], y: C[1], opacity: killed ? 0.45 : 1, scale: killed ? 0.9 : 1 }} transition={{ duration: killed ? 1.2 : 0.4, delay: killed ? 1.8 : 0 }}>
             {one ? (
               <BodyCell r={R} infected={!healthy} dying={killed} />
             ) : (
               <Macrophage r={R}>
-                <circle cx={-6} cy={-34} r={20} fill="var(--bio-mito-deep)" fillOpacity={0.25} stroke={PAINT.macro.stroke} strokeWidth={1.6} />
+                <circle cx={40} cy={-4} r={17} fill="var(--bio-mito-deep)" fillOpacity={0.25} stroke={PAINT.macro.stroke} strokeWidth={1.6} />
                 {[
-                  [-12, -38],
-                  [0, -30],
-                  [-4, -42],
+                  [34, -8],
+                  [46, 0],
+                  [40, -14],
                 ].map(([x, y], i) => (
                   <path key={i} d={bumpPath("square", 4)} transform={`translate(${x} ${y}) rotate(${i * 50})`} fill={PAINT.bact.stroke} />
                 ))}
