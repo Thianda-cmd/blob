@@ -64,11 +64,11 @@ const MAIN: [number, number][] = [
   [44, 258],
 ];
 const AT_A: [number, number][] = [
-  [262, 92],
-  [298, 80],
-  [330, 98],
-  [282, 116],
-  [318, 120],
+  [254, 96],
+  [290, 80],
+  [324, 92],
+  [272, 120],
+  [312, 124],
 ];
 const AT_B: [number, number][] = [
   [446, 66],
@@ -246,8 +246,8 @@ export function EvolutionIslands() {
         <AnimatePresence>
           {stage === 4 && (
             <motion.g initial={reduce ? false : { opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ delay: reduce ? 0 : 0.9 }} style={{ transformBox: "fill-box", transformOrigin: "center" }}>
-              <circle cx={350} cy={82} r={9.5} fill="var(--raised)" stroke="var(--danger)" strokeWidth={1.8} />
-              <path d="M345 84 L355 84 M345 80 L355 80 M352 75 L348 89" stroke="var(--danger)" strokeWidth={1.8} strokeLinecap="round" />
+              <circle cx={358} cy={60} r={9.5} fill="var(--raised)" stroke="var(--danger)" strokeWidth={1.8} />
+              <path d="M353 62 L363 62 M353 58 L363 58 M360 53 L356 67" stroke="var(--danger)" strokeWidth={1.8} strokeLinecap="round" />
             </motion.g>
           )}
         </AnimatePresence>

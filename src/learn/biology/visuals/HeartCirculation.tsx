@@ -360,7 +360,7 @@ const STATIONS: Station[] = [
     text: tx("Pumped through the semilunar valve into the pulmonary artery. An artery, yet the blood is oxygen-poor!", "Durch die Taschenklappe in die Lungenarterie gepumpt. Eine Arterie, und trotzdem ist das Blut sauerstoffarm!"),
   },
   {
-    at: cum(SEG.heartR, SEG.pa) + polyLength(SEG.lung) * 0.5,
+    at: cum(SEG.heartR, SEG.pa) + polyLength(SEG.lung) * 0.85,
     part: "lungs",
     title: tx("Lung capillaries", "Lungenkapillaren"),
     text: tx("Gas exchange: carbon dioxide leaves the blood, oxygen enters. Now the blood is oxygen-rich.", "Gasaustausch: Kohlenstoffdioxid geht aus dem Blut heraus, Sauerstoff hinein. Jetzt ist das Blut sauerstoffreich."),
@@ -390,7 +390,7 @@ const STATIONS: Station[] = [
     text: tx("Through the semilunar valve into the aorta, the main artery. It branches into ever smaller arteries.", "Durch die Taschenklappe in die Aorta, die Hauptschlagader. Sie verzweigt sich in immer kleinere Arterien."),
   },
   {
-    at: cum(SEG.heartR, SEG.pa, SEG.lung, SEG.pv, SEG.heartL, SEG.aorta, SEG.art("muscle")) + polyLength(SEG.bed("muscle")) * 0.5,
+    at: cum(SEG.heartR, SEG.pa, SEG.lung, SEG.pv, SEG.heartL, SEG.aorta, SEG.art("muscle")) + polyLength(SEG.bed("muscle")) * 0.85,
     part: "body",
     title: tx("Body capillaries", "Körperkapillaren"),
     text: tx("In the organs the blood gives oxygen and nutrients to the cells and takes up carbon dioxide. Now it is oxygen-poor.", "In den Organen gibt das Blut Sauerstoff und Nährstoffe an die Zellen ab und nimmt Kohlenstoffdioxid auf. Jetzt ist es sauerstoffarm."),
