@@ -84,7 +84,7 @@ export function DigestionPyramid() {
         {/* the pyramid */}
         <div className="flex flex-col items-center gap-1.5" aria-label={t(tx("Food pyramid", "Ernährungspyramide"))}>
           {ROWS.map((row, r) => (
-            <div key={r} className="flex items-center gap-1.5">
+            <div key={r} className="relative flex items-center gap-1.5">
               {row.flatMap((g) =>
                 Array.from({ length: GROUPS[g].target }, (_, i) => {
                   const filled = i < counts[g];
@@ -111,7 +111,7 @@ export function DigestionPyramid() {
                 }),
               )}
               {row.some((g) => counts[g] > GROUPS[g].target) && (
-                <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-1 rounded-full bg-danger px-2 py-0.5 text-[11.5px] font-bold text-white tabular-nums">
+                <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute left-full ml-2 rounded-full bg-danger px-2 py-0.5 text-[11.5px] font-bold text-white tabular-nums">
                   +{row.reduce((s, g) => s + Math.max(0, counts[g] - GROUPS[g].target), 0)}
                 </motion.span>
               )}

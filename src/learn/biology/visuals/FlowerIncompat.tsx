@@ -114,8 +114,11 @@ export function FlowerIncompat({ startMode = "gameto", startDonor = "S1S3" }: { 
           {/* style and stigma with the genotype S1S2 */}
           <path d="M 167 262 L 168 70 L 192 70 L 193 262 Z" fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.8} />
           <path d="M 96 64 C 96 40, 264 40, 264 64 C 240 74, 120 74, 96 64 Z" fill="var(--bio-chloro)" stroke="var(--bio-leaf-deep)" strokeWidth={1.8} />
-          <text x={180} y={216} textAnchor="middle" fontSize={13} fontWeight={700} fill="var(--ink)" style={{ fontFamily: "var(--font-sans)" }} transform="rotate(-90 180 216)">
-            {t(tx("style S₁S₂", "Griffel S₁S₂"))}
+          <text x={199} y={226} fontSize={12} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+            {t(tx("style", "Griffel"))}
+          </text>
+          <text x={199} y={242} fontSize={12} fontWeight={700} fill="var(--ink)" style={{ fontFamily: "var(--font-sans)" }}>
+            S₁S₂
           </text>
           {/* tubes */}
           {grains.map((a, i) => (

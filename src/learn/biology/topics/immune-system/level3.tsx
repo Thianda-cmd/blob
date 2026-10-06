@@ -250,9 +250,9 @@ function factorTask(rng: Rng): Exercise {
   const value = 10 ** (p2 - p1);
   const answer: AnswerSpec = { kind: "number", value };
   const m = mistakes(answer);
-  m.add({ kind: "number", value: p2 - p1 }, tx("Log scale!", "Logarithmische Achse!"), tx(`The axis is logarithmic: each grid line is ten times the one below. ${p2 - p1} lines higher means 10^${p2 - p1} times as much.`, `Die Achse ist logarithmisch: Jede Gitterlinie ist das Zehnfache der darunter. ${p2 - p1} Linien höher heißt 10^${p2 - p1}-mal so viel.`));
+  m.add({ kind: "number", value: p2 - p1 }, tx("Log scale!", "Logarithmische Achse!"), tx(`The axis is logarithmic: each grid line is ten times the one below. ${p2 - p1} lines higher means $10^{${p2 - p1}}$ times as much.`, `Die Achse ist logarithmisch: Jede Gitterlinie ist das Zehnfache der darunter. ${p2 - p1} Linien höher heißt $10^{${p2 - p1}}$-mal so viel.`));
   m.add({ kind: "number", value: 10 ** p2 - 10 ** p1 }, tx("Factor, not difference", "Faktor, nicht Differenz"), tx("You subtracted. The question asks for the factor: divide the two peak values.", "Du hast subtrahiert. Gefragt ist der Faktor: Teil die beiden Maxima durcheinander."));
-  m.add({ kind: "number", value: p2 / p1, tolerance: 0.001 }, tx("Exponents divided", "Exponenten geteilt"), tx("On a log scale you subtract the exponents: 10^a ÷ 10^b = 10^(a−b).", "Auf der logarithmischen Achse subtrahiert man die Exponenten: 10^a : 10^b = 10^(a−b)."));
+  m.add({ kind: "number", value: p2 / p1, tolerance: 0.001 }, tx("Exponents divided", "Exponenten geteilt"), tx("On a log scale you subtract the exponents: $10^a : 10^b = 10^{a - b}$.", "Auf der logarithmischen Achse subtrahiert man die Exponenten: $10^a : 10^b = 10^{a - b}$."));
   return {
     instruction: tx("Read the graph", "Lies das Diagramm ab"),
     text: tx("The graph shows the antibody titre after a first and a second contact with the same antigen (logarithmic axis). By what factor is the peak of the secondary response higher than that of the primary response?", "Das Diagramm zeigt den Antikörpertiter nach einem ersten und einem zweiten Kontakt mit demselben Antigen (logarithmische Achse). Um welchen Faktor ist das Maximum der Sekundärantwort höher als das der Primärantwort?"),
@@ -260,7 +260,7 @@ function factorTask(rng: Rng): Exercise {
     answer,
     hint: tx("Read off both peaks as powers of ten, then divide.", "Lies beide Maxima als Zehnerpotenzen ab und teile dann."),
     solution: [
-      { math: `10^{${p1}}#a \\quad 10^{${p2}}#b`, note: tx(`Primary peak: 10^${p1}. Secondary peak: 10^${p2}.`, `Maximum primär: 10^${p1}. Maximum sekundär: 10^${p2}.`) },
+      { math: `10^{${p1}}#a \\quad 10^{${p2}}#b`, note: tx(`Primary peak: $10^{${p1}}$. Secondary peak: $10^{${p2}}$.`, `Maximum primär: $10^{${p1}}$. Maximum sekundär: $10^{${p2}}$.`) },
       { math: `\\frac{10^{${p2}}}{10^{${p1}}} = 10^{${p2 - p1}} = ${value}#r`, note: tx(`The secondary response is **${value}** times higher, thanks to the memory cells.`, `Die Sekundärantwort ist **${value}**-mal höher, dank der Gedächtniszellen.`), highlight: ["r"] },
     ],
     mistakes: m.list,

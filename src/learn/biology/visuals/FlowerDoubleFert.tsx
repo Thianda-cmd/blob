@@ -77,8 +77,8 @@ const PARTS: FigurePart[] = [
   { id: "micropyle", label: tx("micropyle", "Mikropyle"), at: [190, 344], tag: [80, 392] },
   { id: "tube", label: tx("pollen tube", "Pollenschlauch"), at: [190, 400], tag: [372, 404] },
   { id: "sperm", label: tx("sperm cells (n)", "Spermazellen (n)"), at: [190, 318], tag: [30, 300] },
-  { id: "zygote", label: tx("zygote (2n)", "Zygote (2n)"), at: [190, 250], tag: [366, 240] },
-  { id: "endonucleus", label: tx("primary endosperm nucleus (3n)", "primärer Endospermkern (3n)"), at: [190, 195], tag: [366, 175] },
+  { id: "zygote", label: tx("zygote (2n)", "Zygote (2n)"), at: [206, 252], tag: [366, 240] },
+  { id: "endonucleus", label: tx("primary endosperm nucleus (3n)", "primärer Endospermkern (3n)"), at: [202, 192], tag: [366, 175] },
   { id: "embryo", label: tx("embryo (2n)", "Embryo (2n)"), at: [190, 252], tag: [366, 240] },
   { id: "endosperm", label: tx("endosperm (3n)", "Endosperm (3n)"), at: [214, 150], tag: [366, 110] },
   { id: "coat", label: tx("seed coat from the integuments (2n)", "Samenschale aus den Integumenten (2n)"), at: [80, 236], tag: [26, 270] },
@@ -180,7 +180,7 @@ export function FlowerDoubleFert({ start = 0 }: { start?: number }) {
         </motion.g>
         {/* the pollen tube */}
         <g data-part="tube">
-          <motion.path d={TUBE} fill="none" stroke="var(--bio-pollen)" strokeWidth={8} strokeLinecap="round" initial={false} animate={{ pathLength: step >= 1 ? 1 : 0, opacity: step >= 1 && !seed ? 1 : 0 }} transition={reduce ? { duration: 0 } : { duration: 1.2 }} />
+          <motion.path d={TUBE} fill="none" stroke="var(--bio-pollen)" strokeWidth={8} strokeLinecap="round" initial={false} animate={{ pathLength: step >= 1 ? 1 : 0, opacity: step >= 1 && !fused ? 1 : fused && !seed ? 0.3 : 0 }} transition={reduce ? { duration: 0 } : { duration: 1.2 }} />
         </g>
         {/* sperm cells */}
         <g data-part="sperm">

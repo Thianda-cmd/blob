@@ -335,7 +335,7 @@ export function DigestionTransport() {
           </button>
         ))}
       </div>
-      <Figure title={tx("Absorption through a cell of the gut lining", "Resorption durch eine Zelle der Darmschleimhaut")} width={560} height={366} parts={TRANSPORT_PARTS} mode="names" highlight={st.parts} legend="below">
+      <Figure title={tx("Absorption through a cell of the gut lining", "Resorption durch eine Zelle der Darmschleimhaut")} width={560} height={366} parts={TRANSPORT_PARTS} mode="names" highlight={st.parts}>
         <TransportCell />
         <g key={`${mode}-${step}`}>{st.show}</g>
       </Figure>

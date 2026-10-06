@@ -258,7 +258,7 @@ export function chromosomeTask(rng: Rng, fixedSpecies?: number, fixedStructure?:
   }
   return {
     instruction: tx("Count the chromosomes", "Bestimme die Chromosomenzahl"),
-    text: tx(`In ${en(sp.name)}, the body cells have $2n = ${sp.n2}$ chromosomes. How many chromosomes does **${en(st.obj)}** have?`, `Die Körperzellen von ${de(sp.name)} haben $2n = ${sp.n2}$ Chromosomen. Wie viele Chromosomen hat **${de(st.obj)}**?`),
+    text: tx(`Species: **${en(sp.name)}**. Its body cells have $2n = ${sp.n2}$ chromosomes. How many chromosomes does **${en(st.obj)}** have?`, `Art: **${de(sp.name)}**. Ihre Körperzellen haben $2n = ${sp.n2}$ Chromosomen. Wie viele Chromosomen hat **${de(st.obj)}**?`),
     answer: { kind: "number", value, unit: tx("chromosomes", "Chromosomen") },
     hint: tx("First decide: n, 2n or 3n? Then calculate with n = 2n : 2.", "Entscheide zuerst: n, 2n oder 3n? Dann rechne mit n = 2n : 2."),
     solution: [

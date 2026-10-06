@@ -210,7 +210,7 @@ export function ImmuneLockKey() {
 export function ImmuneLockKeyPicture({ shape, options, same = -1 }: { shape: Epitope; options: Epitope[]; same?: number }) {
   const t = useText();
   return (
-    <svg viewBox="0 0 440 210" className="mx-auto block h-auto w-full max-w-[460px]" role="img" aria-label={t(tx("Antigen and four antibodies", "Antigen und vier Antikörper"))}>
+    <svg viewBox="0 0 440 210" className="mx-auto block h-auto w-full max-w-[560px]" role="img" aria-label={t(tx("Antigen and four antibodies", "Antigen und vier Antikörper"))}>
       {/* a piece of the pathogen's surface with its antigens pointing down */}
       <rect x={110} y={-40} width={220} height={84} rx={26} fill={PAINT.virus.fill} stroke={PAINT.virus.stroke} strokeWidth={2} />
       {[165, 220, 275].map((x) => (
