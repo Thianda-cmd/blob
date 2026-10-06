@@ -144,6 +144,56 @@ export function MonoDiDrawing({ f, group, className }: { f: MonoDiFeature; group
   );
 }
 
+/** Naked or enclosed ovules: a cone scale and a pistil, side by side. */
+function SeedCompare() {
+  const t = useText();
+  return (
+    <div className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-surface px-3 py-2.5">
+      <div className="space-y-1 text-center">
+        <svg viewBox="0 0 120 96" className="mx-auto block h-auto w-full max-w-[150px]" role="img" aria-label={t(tx("Cone scale with two open ovules", "Samenschuppe mit zwei freien Samenanlagen"))}>
+          <path d="M60 90L60 70" stroke="var(--bio-wood-deep)" strokeWidth={4} strokeLinecap="round" />
+          <path d="M60 72C30 70 14 52 18 30C34 22 86 22 102 30C106 52 90 70 60 72Z" fill="var(--bio-wood)" stroke="var(--bio-wood-deep)" strokeWidth={1.8} />
+          {[44, 76].map((x) => (
+            <g key={x}>
+              <ellipse cx={x} cy={44} rx={9} ry={12} fill="var(--bio-cell)" stroke="var(--bio-wood-deep)" strokeWidth={1.4} />
+              <ellipse cx={x} cy={46} rx={4} ry={6} fill="var(--bio-nucleus)" />
+            </g>
+          ))}
+        </svg>
+        <div className="text-[13px] font-semibold text-ink">{t(tx("Gymnosperms", "Nacktsamer"))}</div>
+        <p className="text-[12.5px] leading-snug text-ink-2">{t(tx("ovules lie open on a scale: no ovary, no fruit", "Samenanlagen liegen frei auf einer Schuppe: kein Fruchtknoten, keine Frucht"))}</p>
+      </div>
+      <div className="space-y-1 text-center">
+        <svg viewBox="0 0 120 96" className="mx-auto block h-auto w-full max-w-[150px]" role="img" aria-label={t(tx("Pistil with ovules inside the ovary", "Stempel mit Samenanlagen im Fruchtknoten"))}>
+          <path d="M60 90L60 80" stroke="var(--bio-leaf-deep)" strokeWidth={4} strokeLinecap="round" />
+          <path d="M60 80C34 80 30 56 40 44C48 36 54 34 56 22L64 22C66 34 72 36 80 44C90 56 86 80 60 80Z" fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.8} />
+          <path d="M56 22L56 10M64 22L64 10" stroke="var(--bio-leaf-deep)" strokeWidth={1.6} />
+          <ellipse cx={60} cy={9} rx={10} ry={4} fill="var(--bio-leaf-deep)" />
+          <path d="M60 76L60 46" stroke="var(--bio-leaf-deep)" strokeWidth={1.2} />
+          {[52, 62, 72].map((y) => (
+            <g key={y}>
+              <ellipse cx={52} cy={y} rx={5} ry={4} fill="var(--bio-cell)" stroke="var(--bio-leaf-deep)" strokeWidth={1} />
+              <ellipse cx={68} cy={y} rx={5} ry={4} fill="var(--bio-cell)" stroke="var(--bio-leaf-deep)" strokeWidth={1} />
+            </g>
+          ))}
+        </svg>
+        <div className="text-[13px] font-semibold text-ink">{t(tx("Angiosperms", "Bedecktsamer"))}</div>
+        <p className="text-[12.5px] leading-snug text-ink-2">{t(tx("ovules enclosed in the ovary, which becomes the fruit", "Samenanlagen im Fruchtknoten eingeschlossen, aus ihm wird die Frucht"))}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Lesson widget: gymnosperms vs angiosperms, then monocots vs dicots feature by feature. */
+export function DiversitySeedPlants() {
+  return (
+    <div className="space-y-4">
+      <SeedCompare />
+      <DiversityMonoDi />
+    </div>
+  );
+}
+
 /** Lesson widget: compare monocots and dicots feature by feature. */
 export function DiversityMonoDi() {
   const t = useText();

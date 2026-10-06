@@ -7,7 +7,7 @@
 import { tx, type Text } from "@/i18n/text";
 import { BARS, DiversityCladogram, DiversityCladogramPicture, TIPS, type CladeTip } from "@/learn/biology/visuals/DiversityCladogram";
 import { CYCLES, DiversityCyclePicture, DiversityLifeCycle, type CyclePlant } from "@/learn/biology/visuals/DiversityLifeCycle";
-import { DiversityMonoDi, DiversityMonoDiPicture, FEATURES, type Group, type MonoDiFeature } from "@/learn/biology/visuals/DiversityMonoDi";
+import { DiversityMonoDiPicture, DiversitySeedPlants, FEATURES, type Group, type MonoDiFeature } from "@/learn/biology/visuals/DiversityMonoDi";
 import { createRng, type Rng } from "@/learn/engine/rng";
 import type { Exercise, LevelLesson, Mistake } from "@/learn/types";
 import { capT, choice, de, en, join, multi, pickSome, q, visual, type MultiOpt, type Opt } from "./kit";
@@ -813,9 +813,9 @@ export const level3: LevelLesson = {
     {
       type: "widget",
       title: tx("Seed plants: naked and enclosed seeds", "Samenpflanzen: nackte und bedeckte Samen"),
-      blob: tx("Open the rows and compare the two big groups of flowering plants.", "Öffne die Zeilen und vergleich die beiden großen Gruppen der Blütenpflanzen."),
+      blob: tx("Naked or wrapped up? Then open the rows and compare monocots and dicots.", "Nackt oder eingepackt? Dann öffne die Zeilen und vergleich Ein- und Zweikeimblättrige."),
       body: tx("**Gymnosperms** (conifers, ginkgo) carry their ovules openly on scales; they form no fruits. **Angiosperms** enclose their ovules in an ovary that becomes the fruit. Angiosperms are divided into **monocots** and **dicots**. (Modern systematics replaces the dicots by the true dicots, the eudicots, because a few old lineages don't fit.)", "**Nacktsamer** (Nadelbäume, Ginkgo) tragen ihre Samenanlagen frei auf Schuppen; sie bilden keine Früchte. **Bedecktsamer** schließen ihre Samenanlagen in einen Fruchtknoten ein, aus dem die Frucht wird. Die Bedecktsamer teilt man in **Einkeimblättrige** und **Zweikeimblättrige**. (Die moderne Systematik ersetzt die Zweikeimblättrigen durch die „echten Zweikeimblättrigen“, die Eudikotyledonen, weil einige alte Linien nicht passen.)"),
-      widget: DiversityMonoDi,
+      widget: DiversitySeedPlants,
     },
     {
       type: "explain",

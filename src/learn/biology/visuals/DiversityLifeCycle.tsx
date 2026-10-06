@@ -31,7 +31,7 @@ export const CYCLES: Record<CyclePlant, { stages: Stage[]; meiosis: number; fert
     ],
   },
   fern: {
-    meiosis: -95,
+    meiosis: -82,
     fertilisation: 86,
     stages: [
       { id: "spore", name: tx("spores", "Sporen"), ploidy: "n", at: -56, info: tx("Formed by meiosis in the sporangia, spread by the wind.", "Entsteht durch Meiose in den Sporangien und wird vom Wind verbreitet.") },
@@ -259,7 +259,7 @@ export function LifeCycleRing({ plant, selected, onSelect, quiz = false, ask }: 
         return (
           <g key={String(deg)}>
             <rect x={x - 5} y={y - 14} width={10} height={28} rx={3} fill="var(--ink)" transform={`rotate(${d} ${x} ${y})`} />
-            <text x={right ? x + 14 : x - 14} y={y + 30} textAnchor={right ? "start" : "end"} fill="var(--ink)" fontWeight={700} style={fz(13)}>
+            <text x={right ? x + 22 : x - 22} y={y + 5} textAnchor={right ? "start" : "end"} fill="var(--ink)" fontWeight={700} style={fz(13)}>
               {t(label as Text)}
             </text>
           </g>
