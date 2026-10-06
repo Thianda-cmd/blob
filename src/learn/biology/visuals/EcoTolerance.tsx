@@ -100,7 +100,7 @@ export function ToleranceChart({ curves, xMin, xMax, xStep, xName, zones, points
         <g>
           <Tag x={(px(c0.min) + px(p1)) / 2} y={BOX.t + 12} size={10.5}>{t(tx("pessimum", "Pessimum"))}</Tag>
           <Tag x={(px(p2) + px(c0.max)) / 2} y={BOX.t + 12} size={10.5}>{t(tx("pessimum", "Pessimum"))}</Tag>
-          <Tag x={(px(o1) + px(o2)) / 2} y={py(1) + 18} size={10.5}>{t(tx("optimum", "Optimum"))}</Tag>
+          <Tag x={(px(o1) + px(o2)) / 2} y={py(0.45)} size={10.5}>{t(tx("optimum", "Optimum"))}</Tag>
         </g>
       )}
       {limits && (

@@ -258,17 +258,18 @@ function CarbonArt() {
         <circle cx={112} cy={184} r={34} />
         <circle cx={112} cy={222} r={26} />
       </g>
-      <Label x={112} y={168} size={11.5}>
+      <Label x={112} y={232} size={11.5}>
         {t(tx("plants", "Pflanzen"))}
       </Label>
       {/* roe deer */}
       <g fill="var(--bio-wood)" stroke="var(--bio-wood-deep)" strokeWidth={1.8} strokeLinejoin="round">
         <path d="M268 230 q8 -14 36 -12 q22 2 28 12 q4 10 -4 16 q-24 8 -56 0 q-8 -6 -4 -16 z" />
-        <path d="M322 222 l8 -26 q2 -6 8 -6 l10 2 q4 2 0 6 l-8 4 l-6 22 z" />
-        <path d="M338 190 l-2 -12 l5 10 M344 190 l3 -11 l-1 12" fill="none" />
+        <path d="M318 224 q4 -14 12 -24 l8 4 q-6 10 -8 22 z" />
+        <path d="M328 202 q2 -10 12 -10 q8 0 14 8 q2 4 -2 5 l-12 1 q-8 2 -12 -4 z" />
+        <path d="M334 194 l-4 -10 l7 7 M340 192 l1 -11 l3 10" />
         <path d="M274 244 l-2 34 M284 246 l1 32 M314 246 l-1 32 M324 244 l3 34" fill="none" strokeWidth={4} strokeLinecap="round" />
       </g>
-      <circle cx={343} cy={196} r={1.4} fill="var(--bio-outline)" />
+      <circle cx={343} cy={198} r={1.5} fill="var(--bio-outline)" />
       <Label x={300} y={206} size={11.5}>
         {t(tx("animals", "Tiere"))}
       </Label>
