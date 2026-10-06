@@ -79,16 +79,17 @@ const PENGUINS: Peng[] = [
 
 function Penguin({ x, h }: { x: number; h: number }) {
   const H = h * 170;
-  const W = H * 0.42;
+  const W = H * 0.44;
   const base = 210;
   return (
     <motion.g initial={{ scaleY: 0.2, opacity: 0 }} animate={{ scaleY: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 160, damping: 18 }} style={{ transformOrigin: `${x}px ${base}px` }}>
-      <ellipse cx={x} cy={base - H * 0.45} rx={W / 2} ry={H * 0.45} fill="var(--bio-outline)" />
-      <ellipse cx={x} cy={base - H * 0.4} rx={W * 0.32} ry={H * 0.36} fill="var(--raised)" />
-      <circle cx={x} cy={base - H * 0.86} r={W * 0.3} fill="var(--bio-outline)" />
-      <path d={`M${x - W * 0.08} ${base - H * 0.86} L ${x - W * 0.45} ${base - H * 0.83} L ${x - W * 0.08} ${base - H * 0.8} Z`} fill="var(--bio-sun)" />
+      <ellipse cx={x + W * 0.05} cy={base - H * 0.44} rx={W / 2} ry={H * 0.44} fill="var(--bio-outline)" />
+      <ellipse cx={x - W * 0.1} cy={base - H * 0.38} rx={W * 0.3} ry={H * 0.33} fill="var(--raised)" />
+      <path d={`M${x + W * 0.32} ${base - H * 0.62} C ${x + W * 0.62} ${base - H * 0.45}, ${x + W * 0.6} ${base - H * 0.28}, ${x + W * 0.5} ${base - H * 0.2}`} fill="none" stroke="var(--bio-outline)" strokeWidth={Math.max(3, W * 0.14)} strokeLinecap="round" />
+      <circle cx={x - W * 0.02} cy={base - H * 0.86} r={W * 0.3} fill="var(--bio-outline)" />
+      <path d={`M${x - W * 0.25} ${base - H * 0.87} L ${x - W * 0.58} ${base - H * 0.84} L ${x - W * 0.25} ${base - H * 0.81} Z`} fill="var(--bio-sun)" />
       <circle cx={x - W * 0.12} cy={base - H * 0.9} r={Math.max(1.4, W * 0.05)} fill="var(--raised)" />
-      <path d={`M${x - W * 0.25} ${base} l -6 3 M${x + W * 0.25} ${base} l 6 3`} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />
+      <path d={`M${x - W * 0.22} ${base} l -7 2 M${x + W * 0.2} ${base} l -7 2`} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />
     </motion.g>
   );
 }
@@ -97,7 +98,7 @@ function Bergmann() {
   const t = useText();
   const grad = `vt-berg-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-[640px] space-y-3">
       <svg viewBox="0 0 520 230" className="block h-auto w-full" style={{ maxWidth: 640 }} role="img" aria-label={t(tx("Four penguin species from the Antarctic to the equator", "Vier Pinguinarten von der Antarktis bis zum Äquator"))}>
         <defs>
           <linearGradient id={grad} x1="0" x2="1">
@@ -107,7 +108,7 @@ function Bergmann() {
         </defs>
         <rect x={0} y={212} width={520} height={14} rx={7} fill={`url(#${grad})`} />
         {PENGUINS.map((p, i) => (
-          <Penguin key={i} x={70 + i * 126} h={p.h} />
+          <Penguin key={i} x={65 + i * 130} h={p.h} />
         ))}
       </svg>
       <div className="grid grid-cols-4 gap-1 text-center">
@@ -162,10 +163,10 @@ function FoxHead({ x, ear, color }: { x: number; ear: number; color: string }) {
 function Allen() {
   const t = useText();
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-[640px] space-y-3">
       <svg viewBox="0 0 520 200" className="block h-auto w-full" style={{ maxWidth: 640 }} role="img" aria-label={t(tx("Arctic fox, red fox and fennec", "Polarfuchs, Rotfuchs und Fennek"))}>
         {FOXES.map((f, i) => (
-          <FoxHead key={i} x={90 + i * 170} ear={f.ear} color={f.color} />
+          <FoxHead key={i} x={87 + i * 173} ear={f.ear} color={f.color} />
         ))}
       </svg>
       <div className="grid grid-cols-3 gap-1 text-center">
@@ -192,7 +193,7 @@ export function VertebrateBergmann({ withEnergy = false }: { withEnergy?: boolea
   const t = useText();
   const [tab, setTab] = useState(0);
   const views: { label: Text; view: () => JSX.Element }[] = [
-    ...(withEnergy ? [{ label: tx("Energy use", "Energieumsatz"), view: VertebrateEnergyWidget }] : []),
+    ...(withEnergy ? [{ label: tx("Endo- and ectothermic", "Endotherm und ektotherm"), view: VertebrateEnergyWidget }] : []),
     { label: tx("Surface and volume", "Oberfläche und Volumen"), view: Cube },
     { label: tx("Bergmann: penguins", "Bergmann: Pinguine"), view: Bergmann },
     { label: tx("Allen: foxes", "Allen: Füchse"), view: Allen },

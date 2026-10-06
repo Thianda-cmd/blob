@@ -14,7 +14,7 @@ import { ImmuneVirusCycle } from "@/learn/biology/visuals/ImmuneVirusCycle";
 import { createRng, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, LevelLesson, Mistake } from "@/learn/types";
 import { ALLERGY, AUTOIMMUNE, CLONAL, DISORDER_NAMES, DISORDERS, ELISA, HIV_CYCLE, HUMORAL, IG_CLASSES, MHC_PAIRS, PRESENTERS, type Disorder, type Presenter } from "./data";
-import { capT, choice, de, en, join, listFrame, matchSlip, mistakes, orderSlip, q, solve, some, visual, type Opt } from "./kit";
+import { capT, choice, de, en, join, keysOf, listFrame, matchSlip, mistakes, orderSlip, q, solve, some, visual, type Opt } from "./kit";
 
 // ---------------------------------------------------------------------------
 // Antigen presentation
@@ -131,7 +131,7 @@ function antibodyFigureTask(rng: Rng, id = rng.pick(ANTIBODY_PARTS).id): Exercis
     visual: visual(ImmuneAntibodyStructure, { mode: "numbers", ask: id, legend: "none" }),
     answer,
     hint: tx("Two heavy and two light chains; variable regions at the tips, constant region in the stem.", "Zwei schwere und zwei leichte Ketten; variable Regionen an den Spitzen, konstante Region im Stamm."),
-    solution: [{ math: q(capT(part.label), "a"), note: tx(`${id === "disulfide" ? "Those are" : "That's"} the **${en(part.label)}**. ${en(part.info!)}`, `${id === "disulfide" ? "Das sind die" : id === "antigen" ? "Das ist das" : "Das ist die"} **${de(part.label)}**. ${de(part.info!)}`), highlight: ["a"] }],
+    solution: [{ math: q(capT(part.label), "a"), note: tx(`${id === "disulfide" ? "Those are" : "That's"} the **${en(part.label)}**. ${en(part.info!)}`, `${id === "disulfide" ? "Das sind die" : id === "antigen" ? "Das ist das" : "Das ist die"} **${de(part.label)}**. ${de(part.info!)}`), highlight: keysOf(capT(part.label), "a") }],
     mistakes: list,
   };
 }
@@ -406,7 +406,7 @@ function hivTask(rng: Rng, form = rng.int(0, 4)): Exercise {
     hint: tx("HIV is a retrovirus that uses the CD4 receptor of T helper cells.", "HIV ist ein Retrovirus, das den CD4-Rezeptor der T-Helferzellen nutzt."),
     solution: [
       { math: tx('"HIV"#h \\to "CD4"#c \\to "T helper cells"#t', '"HIV"#h \\to "CD4"#c \\to "T-Helferzellen"#t'), note: tx("HIV infects T helper cells via CD4 and destroys them over years.", "HIV befällt über CD4 die T-Helferzellen und zerstört sie über Jahre.") },
-      { math: q(f.a, "a"), note: f.note, highlight: ["a"] },
+      { math: q(f.a, "a"), note: f.note, highlight: keysOf(f.a, "a") },
     ],
     mistakes: list,
   };
@@ -480,7 +480,7 @@ function allergyTask(rng: Rng, form = rng.int(0, 2)): Exercise {
     hint: tx("Allergen, IgE, mast cell, histamine.", "Allergen, IgE, Mastzelle, Histamin."),
     solution: [
       { math: tx('"allergen"#a \\to "IgE"#e \\to "mast cell"#m \\to "histamine"#h', '"Allergen"#a \\to "IgE"#e \\to "Mastzelle"#m \\to "Histamin"#h'), note: tx("An allergy is an overreaction to a harmless substance.", "Eine Allergie ist eine Überreaktion auf einen harmlosen Stoff.") },
-      { math: q(f.a, "x"), note: f.note, highlight: ["x"] },
+      { math: q(f.a, "x"), note: f.note, highlight: keysOf(f.a, "x") },
     ],
     mistakes: list,
   };
@@ -592,7 +592,7 @@ function termTask(rng: Rng, term: Term = rng.pick(TERMS)): Exercise {
     text: term.clue,
     answer,
     hint: tx(`It starts with “${en(term.accept[0]).charAt(0).toUpperCase()}”.`, `Er beginnt mit „${de(term.accept[0]).charAt(0).toUpperCase()}“.`),
-    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: ["a"] }],
+    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: keysOf(term.accept[0], "a") }],
     mistakes: m.list,
   };
 }

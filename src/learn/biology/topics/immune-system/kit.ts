@@ -18,20 +18,25 @@ export function visual<P extends object>(component: ComponentType<P>, props: P):
   return { component: component as unknown as ComponentType<Record<string, unknown>>, props: props as Record<string, unknown> };
 }
 
-/** A quoted word for display-language frames: `"Grippe"#k`. */
-export const q = (t: Text, k: string): Text => tx(`"${en(t)}"#${k}`, `"${de(t)}"#${k}`);
+const words = (s: string) => s.split(/\s+/).filter(Boolean);
+/** A phrase as display tokens, one per word so that long phrases wrap: `"Fleisch"#k "gut"#k-1 …`. */
+const phrase = (s: string, k: string) => words(s).map((w, i) => `"${w}"#${i ? `${k}-${i}` : k}`).join(" ");
+/** Quoted text for display-language frames (keyed `k`, `k-1`, `k-2`… per word). */
+export const q = (t: Text, k: string): Text => tx(phrase(en(t), k), phrase(de(t), k));
+/** All token keys of a phrase made with q(), e.g. to highlight it. */
+export const keysOf = (t: Text, k: string): string[] => Array.from({ length: Math.max(words(en(t)).length, words(de(t)).length) }, (_, i) => (i ? `${k}-${i}` : k));
 /** Join display-language pieces (each may be bilingual) with spaces. */
 export const join = (...parts: Text[]): Text => tx(parts.map(en).join(" "), parts.map(de).join(" "));
 /** A two-frame solution: what we look at, then the answer (highlighted) with Blob's reason. */
 export function solve(premise: Text, premiseNote: Text, answer: Text, answerNote: Text): Frame[] {
   return [
     { math: q(premise, "p"), note: premiseNote },
-    { math: join(q(premise, "p"), "\\Rightarrow#r", q(answer, "a")), note: answerNote, highlight: ["a"] },
+    { math: join(q(premise, "p"), "\\Rightarrow#r", q(answer, "a")), note: answerNote, highlight: keysOf(answer, "a") },
   ];
 }
 /** A list of items as one frame, each keyed, e.g. the right order or the right pairs. */
 export const listFrame = (items: Text[], sep = " \\to "): Text =>
-  tx(items.map((it, i) => `"${en(it)}"#i${i}`).join(sep), items.map((it, i) => `"${de(it)}"#i${i}`).join(sep));
+  tx(items.map((it, i) => phrase(en(it), `i${i}`)).join(sep), items.map((it, i) => phrase(de(it), `i${i}`)).join(sep));
 
 function asAnswer(a: AnswerSpec): AnswerValue | null {
   switch (a.kind) {

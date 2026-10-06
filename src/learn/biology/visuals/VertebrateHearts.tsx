@@ -54,7 +54,8 @@ const BLUE = "var(--bio-blood-low)";
 const mix = (p: number) => `color-mix(in oklab, var(--bio-blood) ${p}%, var(--bio-blood-low))`;
 
 const P = {
-  lungs: { id: "lungs", label: tx("lungs (and skin)", "Lunge (und Haut)"), at: [280, 47] as [number, number], info: tx("Capillaries where the blood takes up oxygen.", "Kapillaren, in denen das Blut Sauerstoff aufnimmt.") },
+  lungs: { id: "lungs", label: tx("lungs", "Lunge"), at: [280, 47] as [number, number], info: tx("Lung capillaries: the blood takes up oxygen.", "Lungenkapillaren: Das Blut nimmt Sauerstoff auf.") },
+  lungsSkin: { id: "lungs", label: tx("lungs and skin", "Lunge und Haut"), at: [280, 47] as [number, number], info: tx("Capillaries in the lungs and the skin: the blood takes up oxygen.", "Kapillaren in Lunge und Haut: Das Blut nimmt Sauerstoff auf.") },
   gills: { id: "lungs", label: tx("gills", "Kiemen"), at: [280, 47] as [number, number], info: tx("Gill capillaries: the blood takes up oxygen from the water.", "Kiemenkapillaren: Das Blut nimmt Sauerstoff aus dem Wasser auf.") },
   body: { id: "body", label: tx("body", "Körper"), at: [280, 293] as [number, number], info: tx("Body capillaries: the blood gives off oxygen to the organs.", "Körperkapillaren: Das Blut gibt Sauerstoff an die Organe ab.") },
   ra: { id: "ra", label: tx("right atrium", "rechter Vorhof"), at: [205, 134] as [number, number], info: tx("Receives oxygen-poor blood from the body.", "Empfängt sauerstoffarmes Blut aus dem Körper.") },
@@ -64,7 +65,7 @@ const P = {
 
 const PARTS: Record<HeartType, FigurePart[]> = {
   fish: [P.gills, P.body, P.atrium, { id: "v", label: tx("ventricle", "Kammer"), at: [245, 197], info: tx("Pumps the oxygen-poor blood to the gills.", "Pumpt das sauerstoffarme Blut zu den Kiemen.") }],
-  amph: [P.lungs, P.body, P.ra, P.la, { id: "v", label: tx("ventricle (mixed blood)", "Kammer (Mischblut)"), at: [280, 197], info: tx("Only one ventricle: oxygen-rich and oxygen-poor blood partly mix.", "Nur eine Kammer: Sauerstoffreiches und sauerstoffarmes Blut mischen sich teilweise.") }],
+  amph: [P.lungsSkin, P.body, P.ra, P.la, { id: "v", label: tx("ventricle (mixed blood)", "Kammer (Mischblut)"), at: [280, 197], info: tx("Only one ventricle: oxygen-rich and oxygen-poor blood partly mix.", "Nur eine Kammer: Sauerstoffreiches und sauerstoffarmes Blut mischen sich teilweise.") }],
   rept: [P.lungs, P.body, P.ra, P.la, { id: "v", label: tx("ventricle", "Kammer"), at: [230, 205], info: tx("One ventricle, but divided in part.", "Eine Kammer, aber teilweise unterteilt.") }, { id: "septum", label: tx("incomplete septum", "unvollständige Scheidewand"), at: [280, 210], tag: [462, 214], info: tx("Separates the two kinds of blood in large part.", "Trennt die beiden Blutsorten größtenteils.") }],
   mammal: [
     P.lungs,

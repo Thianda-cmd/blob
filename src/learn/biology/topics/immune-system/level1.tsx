@@ -12,7 +12,7 @@ import { ImmuneTiter } from "@/learn/biology/visuals/ImmuneTiter";
 import { createRng, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, LevelLesson, Mistake } from "@/learn/types";
 import { BARRIERS, DISEASES, KINDS, ROUTES, SITUATIONS, type Disease, type Kind, type Route, type Situation } from "./data";
-import { capT, choice, de, en, join, listFrame, matchSlip, mistakes, multiOf, orderSlip, q, solve, some, visual, type Opt } from "./kit";
+import { capT, choice, de, en, join, keysOf, listFrame, matchSlip, mistakes, multiOf, orderSlip, q, solve, some, visual, type Opt } from "./kit";
 
 // ---------------------------------------------------------------------------
 // Which kind of pathogen?
@@ -189,7 +189,7 @@ function routeTask(rng: Rng, s: Situation = rng.pick(SITUATIONS)): Exercise {
     text: tx(`${en(s.text)} How could pathogens get to you here?`, `${de(s.text)} Wie könnten Erreger hier zu dir gelangen?`),
     answer,
     hint: tx("Through the air, via hands and objects, with food and water, or through an animal?", "Durch die Luft, über Hände und Gegenstände, mit Nahrung und Wasser oder durch ein Tier?"),
-    solution: [{ math: q(ROUTES[s.route], "a"), note: tx(`Here ${en(ROUTE_HOW[s.route])}: that's a **${en(ROUTES[s.route]).toLowerCase()}**.`, `Hier gilt: ${de(ROUTE_HOW[s.route])}. Das ist **${de(ROUTES[s.route])}**.`), highlight: ["a"] }],
+    solution: [{ math: q(ROUTES[s.route], "a"), note: tx(`Here ${en(ROUTE_HOW[s.route])}: that's a **${en(ROUTES[s.route]).toLowerCase()}**.`, `Hier gilt: ${de(ROUTE_HOW[s.route])}. Das ist **${de(ROUTES[s.route])}**.`), highlight: keysOf(ROUTES[s.route], "a") }],
     mistakes: list,
   };
 }
@@ -440,7 +440,7 @@ function vaccineTask(rng: Rng, form = rng.int(0, 2)): Exercise {
     hint: tx("A vaccination lets the body get to know a pathogen without getting ill.", "Bei einer Impfung lernt der Körper einen Erreger kennen, ohne krank zu werden."),
     solution: [
       { math: q(f.frames[0], "v"), note: tx("The vaccine contains harmless (weakened or dead) pathogens or parts of them.", "Der Impfstoff enthält harmlose (abgeschwächte oder tote) Erreger oder Teile davon.") },
-      { math: join(q(f.frames[0], "v"), "\\to", q(f.frames[1], "m")), note: tx("The body gets to know the pathogen and remembers it. If the real pathogen comes later, it reacts at once.", "Der Körper lernt den Erreger kennen und merkt ihn sich. Kommt später der echte Erreger, reagiert er sofort."), highlight: ["m"] },
+      { math: join(q(f.frames[0], "v"), "\\to", q(f.frames[1], "m")), note: tx("The body gets to know the pathogen and remembers it. If the real pathogen comes later, it reacts at once.", "Der Körper lernt den Erreger kennen und merkt ihn sich. Kommt später der echte Erreger, reagiert er sofort."), highlight: keysOf(f.frames[1], "m") },
     ],
     mistakes: list,
   };
@@ -540,7 +540,7 @@ function termTask(rng: Rng, term: Term = rng.pick(TERMS)): Exercise {
     text: term.clue,
     answer,
     hint: tx(`It starts with “${en(term.accept[0]).charAt(0).toUpperCase()}”.`, `Er beginnt mit „${de(term.accept[0]).charAt(0).toUpperCase()}“.`),
-    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: ["a"] }],
+    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: keysOf(term.accept[0], "a") }],
     mistakes: m.list,
   };
 }

@@ -17,7 +17,7 @@ import { EPITOPES, type Epitope } from "@/learn/biology/visuals/ImmuneCells";
 import { createRng, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, LevelLesson, Mistake } from "@/learn/types";
 import { ACTIVE_CASES, CELLS, DEFENCES, IMMUNISATION_CLAIMS, PASSIVE_CASES, RESPONSE, VIRUS_CYCLE, type CellId } from "./data";
-import { capT, choice, de, en, join, listFrame, matchSlip, mistakes, multiOf, orderSlip, q, solve, some, visual, type Opt } from "./kit";
+import { capT, choice, de, en, join, keysOf, listFrame, matchSlip, mistakes, multiOf, orderSlip, q, solve, some, visual, type Opt } from "./kit";
 
 // ---------------------------------------------------------------------------
 // Structure of bacterium and virus
@@ -52,7 +52,7 @@ function bacteriumTask(rng: Rng, id = rng.pick(BACTERIUM_PARTS).id): Exercise {
     visual: visual(ImmuneBacterium, { mode: "numbers", ask: id, legend: "none" }),
     answer,
     hint: tx("Bacteria: capsule outside, then cell wall, cell membrane, cytoplasm with a DNA ring, plasmids and ribosomes.", "Bakterium: außen die Kapsel, dann Zellwand, Zellmembran, Cytoplasma mit DNA-Ring, Plasmiden und Ribosomen."),
-    solution: [{ math: q(capT(part.label), "a"), note: tx(`That's the **${en(part.label)}**. ${en(part.info!)}`, `Das ist **${de(part.label)}**. ${de(part.info!)}`), highlight: ["a"] }],
+    solution: [{ math: q(capT(part.label), "a"), note: tx(`That's the **${en(part.label)}**. ${en(part.info!)}`, `Das ist **${de(part.label)}**. ${de(part.info!)}`), highlight: keysOf(capT(part.label), "a") }],
     mistakes: list,
   };
 }
@@ -80,7 +80,7 @@ function virusTask(rng: Rng, id = rng.pick(VIRUS_PARTS).id): Exercise {
     visual: visual(ImmuneVirus, { mode: "numbers", ask: id, legend: "none" }),
     answer,
     hint: tx("From the inside out: genetic material, capsid, envelope with surface proteins.", "Von innen nach außen: Erbinformation, Kapsid, Hülle mit Oberflächenproteinen."),
-    solution: [{ math: q(capT(part.label), "a"), note: tx(`That's the **${en(part.label)}**. ${en(part.info!)}`, `Das ist **${de(part.label)}**. ${de(part.info!)}`), highlight: ["a"] }],
+    solution: [{ math: q(capT(part.label), "a"), note: tx(`That's the **${en(part.label)}**. ${en(part.info!)}`, `Das ist **${de(part.label)}**. ${de(part.info!)}`), highlight: keysOf(capT(part.label), "a") }],
     mistakes: list,
   };
 }
@@ -454,7 +454,7 @@ function vaccineTask(rng: Rng, form = rng.int(0, 1)): Exercise {
     hint: tx("An active vaccine shows the body the antigen; it must make the antibodies itself.", "Ein aktiver Impfstoff zeigt dem Körper das Antigen; die Antikörper muss er selbst bilden."),
     solution: [
       { math: q(tx("vaccine", "Impfstoff"), "v"), note: tx("Active immunisation: the vaccine imitates an infection without the illness.", "Aktive Immunisierung: Der Impfstoff ahmt eine Infektion nach, ohne die Krankheit.") },
-      { math: join(q(tx("vaccine", "Impfstoff"), "v"), "\\to", q(f.a, "a")), note: f.note, highlight: ["a"] },
+      { math: join(q(tx("vaccine", "Impfstoff"), "v"), "\\to", q(f.a, "a")), note: f.note, highlight: keysOf(f.a, "a") },
     ],
     mistakes: list,
   };
@@ -594,7 +594,7 @@ function termTask(rng: Rng, term: Term = rng.pick(TERMS)): Exercise {
     text: term.clue,
     answer,
     hint: tx(`It starts with “${en(term.accept[0]).charAt(0).toUpperCase()}”.`, `Er beginnt mit „${de(term.accept[0]).charAt(0).toUpperCase()}“.`),
-    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: ["a"] }],
+    solution: [{ math: q(term.accept[0], "a"), note: tx(`The term is **${en(term.accept[0])}**.`, `Der Fachbegriff ist **${de(term.accept[0])}**.`), highlight: keysOf(term.accept[0], "a") }],
     mistakes: m.list,
   };
 }

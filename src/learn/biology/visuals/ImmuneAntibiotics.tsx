@@ -34,7 +34,7 @@ const SPOTS: { x: number; y: number; rot: number }[] = (() => {
     const r = Math.sqrt(rnd()) * 80;
     const x = Math.round(C + r * Math.cos(a));
     const y = Math.round(C + r * Math.sin(a));
-    if (out.every((p) => Math.hypot(p.x - x, p.y - y) > 30)) out.push({ x, y, rot: Math.round(rnd() * 180) });
+    if (out.every((p) => Math.hypot(p.x - x, p.y - y) > 32)) out.push({ x, y, rot: Math.round(rnd() * 180) });
   }
   return out;
 })();
@@ -67,12 +67,12 @@ const MESSAGES: Record<Phase, Text> = {
     "Ohne Hilfe teilen sich die Bakterien: Aus einem werden zwei. Die Viren befallen immer mehr Zellen und vermehren sich darin.",
   ),
   treated: tx(
-    "The antibiotic kills almost all bacteria. One survives: by a random change in its genetic material it is insensitive (resistant). The viruses aren't affected at all: they have no cell wall and no metabolism for the antibiotic to attack.",
-    "Das Antibiotikum tötet fast alle Bakterien. Eins überlebt: Durch eine zufällige Veränderung im Erbgut ist es unempfindlich (resistent). Den Viren macht es gar nichts: Sie haben keine Zellwand und keinen Stoffwechsel, den das Antibiotikum angreifen könnte.",
+    "The antibiotic kills almost all bacteria. Only the few that are insensitive (resistant) by a random change in their genetic material survive. The viruses aren't affected at all: they have no cell wall and no metabolism for the antibiotic to attack.",
+    "Das Antibiotikum tötet fast alle Bakterien. Nur die wenigen, die durch eine zufällige Veränderung im Erbgut unempfindlich (resistent) sind, überleben. Den Viren macht es gar nichts: Sie haben keine Zellwand und keinen Stoffwechsel, den das Antibiotikum angreifen könnte.",
   ),
   regrown: tx(
-    "The resistant bacterium multiplies, and all its offspring are resistant too.",
-    "Das resistente Bakterium vermehrt sich, und alle seine Nachkommen sind ebenfalls resistent.",
+    "The resistant bacteria multiply, and all their offspring are resistant too.",
+    "Die resistenten Bakterien vermehren sich, und alle ihre Nachkommen sind ebenfalls resistent.",
   ),
   useless: tx(
     "Now the antibiotic doesn't work any more: the bacteria are resistant. That's why antibiotics are only used against bacteria, only when a doctor prescribes them, and exactly as prescribed.",
@@ -147,8 +147,8 @@ export function ImmuneAntibiotics() {
                   transition={{ type: "spring", stiffness: 120, damping: 16 }}
                 >
                   <g style={shownRes && b.res ? { filter: "drop-shadow(0 0 3px var(--blob))" } : undefined}>
-                    <BacteriumRod w={12} h={6.5} flagellum={false} />
-                    {shownRes && b.res && <rect x={-12} y={-6.5} width={24} height={13} rx={6.5} fill="none" stroke="var(--blob)" strokeWidth={2} />}
+                    <BacteriumRod w={14} h={7.5} flagellum={false} />
+                    {shownRes && b.res && <rect x={-14} y={-7.5} width={28} height={15} rx={7.5} fill="none" stroke="var(--blob)" strokeWidth={2} />}
                   </g>
                 </motion.g>
               );

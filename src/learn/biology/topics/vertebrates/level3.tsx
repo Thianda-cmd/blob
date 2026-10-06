@@ -218,7 +218,7 @@ const TREE_Q: TreeQ[] = [
     q: tx("Which group are crocodiles most closely related to?", "Mit welcher Gruppe sind Krokodile am nächsten verwandt?"),
     right: tx("Birds", "Vögel"),
     wrong: [
-      { t: tx("Lizards and snakes", "Echsen und Schlangen"), say: tx("They look alike, but in the tree crocodiles and birds share the youngest common ancestor (G).", "Sie sehen sich ähnlich, aber im Stammbaum teilen Krokodile und Vögel den jüngsten gemeinsamen Vorfahren (G).") },
+      { t: tx("Lizards and snakes", "Echsen und Schlangen"), say: tx("They look alike, but looks don't measure relationship. Find the youngest branching point the crocodiles share with another group.", "Sie sehen sich ähnlich, aber Aussehen ist kein Maß für Verwandtschaft. Such den jüngsten Verzweigungspunkt, den die Krokodile mit einer anderen Gruppe teilen.") },
       { t: tx("Amphibians", "Amphibien"), say: tx("Living in water and on land says nothing about relationship. Amphibians branch off much earlier (D).", "Im Wasser und an Land leben sagt nichts über Verwandtschaft. Amphibien zweigen viel früher ab (D).") },
       { t: tx("Mammals", "Säugetiere"), say: tx("Mammals branch off at E. Look for the youngest shared branching point.", "Säugetiere zweigen bei E ab. Such den jüngsten gemeinsamen Verzweigungspunkt.") },
     ],
