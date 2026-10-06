@@ -83,12 +83,12 @@ function Penguin({ x, h }: { x: number; h: number }) {
   const base = 210;
   return (
     <motion.g initial={{ scaleY: 0.2, opacity: 0 }} animate={{ scaleY: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 160, damping: 18 }} style={{ transformOrigin: `${x}px ${base}px` }}>
-      <ellipse cx={x + W * 0.05} cy={base - H * 0.44} rx={W / 2} ry={H * 0.44} fill="var(--bio-outline)" />
-      <ellipse cx={x - W * 0.1} cy={base - H * 0.38} rx={W * 0.3} ry={H * 0.33} fill="var(--raised)" />
-      <path d={`M${x + W * 0.32} ${base - H * 0.62} C ${x + W * 0.62} ${base - H * 0.45}, ${x + W * 0.6} ${base - H * 0.28}, ${x + W * 0.5} ${base - H * 0.2}`} fill="none" stroke="var(--bio-outline)" strokeWidth={Math.max(3, W * 0.14)} strokeLinecap="round" />
-      <circle cx={x - W * 0.02} cy={base - H * 0.86} r={W * 0.3} fill="var(--bio-outline)" />
+      <ellipse cx={x + W * 0.05} cy={base - H * 0.44} rx={W / 2} ry={H * 0.44} fill="var(--bio-plumage)" stroke="var(--bio-outline)" strokeWidth={1} />
+      <ellipse cx={x - W * 0.1} cy={base - H * 0.38} rx={W * 0.3} ry={H * 0.33} fill="var(--bio-plumage-light)" />
+      <path d={`M${x + W * 0.32} ${base - H * 0.62} C ${x + W * 0.62} ${base - H * 0.45}, ${x + W * 0.6} ${base - H * 0.28}, ${x + W * 0.5} ${base - H * 0.2}`} fill="none" stroke="var(--bio-plumage)" strokeWidth={Math.max(3, W * 0.14)} strokeLinecap="round" />
+      <circle cx={x - W * 0.02} cy={base - H * 0.86} r={W * 0.3} fill="var(--bio-plumage)" stroke="var(--bio-outline)" strokeWidth={1} />
       <path d={`M${x - W * 0.25} ${base - H * 0.87} L ${x - W * 0.58} ${base - H * 0.84} L ${x - W * 0.25} ${base - H * 0.81} Z`} fill="var(--bio-sun)" />
-      <circle cx={x - W * 0.12} cy={base - H * 0.9} r={Math.max(1.4, W * 0.05)} fill="var(--raised)" />
+      <circle cx={x - W * 0.12} cy={base - H * 0.9} r={Math.max(1.4, W * 0.05)} fill="var(--bio-plumage-light)" />
       <path d={`M${x - W * 0.22} ${base} l -7 2 M${x + W * 0.2} ${base} l -7 2`} stroke="var(--bio-sun)" strokeWidth={3} strokeLinecap="round" />
     </motion.g>
   );

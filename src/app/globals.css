@@ -74,6 +74,9 @@
   --bio-g: #57b26a;
   --bio-c: #f2c045;
   --bio-u: #9b7be0;
+  /* Colours with a fixed meaning that must not flip in dark mode (a penguin's back stays dark). */
+  --bio-plumage: #2f2d36;
+  --bio-plumage-light: #f7f4ec;
   color-scheme: light;
 }
 
@@ -132,6 +135,8 @@
   --bio-pollen: #d9a12a;
   --bio-nerve: #a87430;
   --bio-nerve-deep: #f2bf72;
+  --bio-plumage: #3b3944;
+  --bio-plumage-light: #ece8dd;
   color-scheme: dark;
 }
 
