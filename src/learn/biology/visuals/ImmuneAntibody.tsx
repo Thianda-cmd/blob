@@ -12,7 +12,7 @@ import { bumpPath, PAINT } from "./ImmuneCells";
 
 export const ANTIBODY_PARTS: FigurePart[] = [
   { id: "heavy", label: tx("heavy chain", "schwere Kette"), at: [226, 290], tag: [170, 296], info: tx("Two identical long chains. They form the stem and the inner half of each arm.", "Zwei identische lange Ketten. Sie bilden den Stamm und die innere Hälfte jedes Arms.") },
-  { id: "light", label: tx("light chain", "leichte Kette"), at: [146, 108], tag: [78, 150], info: tx("Two identical short chains on the outer side of the arms.", "Zwei identische kurze Ketten an der Außenseite der Arme.") },
+  { id: "light", label: tx("light chain", "leichte Kette"), at: [168, 132], tag: [96, 170], info: tx("Two identical short chains on the outer side of the arms.", "Zwei identische kurze Ketten an der Außenseite der Arme.") },
   { id: "variable", label: tx("variable region", "variable Region"), at: [348, 84], tag: [420, 128], info: tx("Differs from antibody to antibody. Parts of a heavy and a light chain together form the antigen-binding site.", "Ist bei jedem Antikörper anders. Teile einer schweren und einer leichten Kette bilden zusammen die Antigenbindungsstelle.") },
   { id: "constant", label: tx("constant region", "konstante Region"), at: [254, 262], tag: [320, 292], info: tx("The same in all antibodies of one class. The stem binds to phagocytes or mast cells.", "Bei allen Antikörpern einer Klasse gleich. Der Stamm bindet an Fresszellen oder Mastzellen.") },
   { id: "disulfide", label: tx("disulphide bridges", "Disulfidbrücken"), at: [240, 196], tag: [314, 200], info: tx("Covalent S–S bonds that hold the four chains together.", "Kovalente S–S-Bindungen, die die vier Ketten zusammenhalten.") },
