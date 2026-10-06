@@ -153,7 +153,7 @@ export function EcoPyramidFill() {
                     className="h-8 w-[84px] rounded-md border border-line bg-raised px-2 text-center font-math text-[15px] text-ink outline-none focus:border-[var(--blob)]"
                   />
                   <span className="text-[13px] text-ink-2">kJ</span>
-                  <button type="submit" aria-label={t(tx("Check", "Prüfen"))} className="grid size-8 place-items-center rounded-md bg-blob text-white">
+                  <button type="submit" aria-label={t(tx("Check this level", "Stufe prüfen"))} className="grid size-8 place-items-center rounded-md bg-blob text-white">
                     <Check className="size-4" />
                   </button>
                 </form>

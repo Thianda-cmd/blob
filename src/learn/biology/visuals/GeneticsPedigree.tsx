@@ -12,7 +12,7 @@ import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
 import { SvgGeno } from "./GeneticsPea";
 
-const SLOT = 54;
+const SLOT = 50;
 const PADL = 42;
 const PADR = 16;
 const TOP = 30;
@@ -127,12 +127,12 @@ export function GeneticsPedigreeChart({
                   ?
                 </text>
               )}
-              <text x={x} y={y + R + 13} textAnchor="middle" fontSize={12.5} fontWeight={lit ? 700 : 500} fill={lit ? "var(--blob)" : "var(--ink-2)"} style={{ fontFamily: "var(--font-sans)" }}>
+              <text x={x} y={y + R + 14} textAnchor="middle" fontSize={14} fontWeight={lit ? 700 : 500} fill={lit ? "var(--blob)" : "var(--ink-2)"} style={{ fontFamily: "var(--font-sans)" }}>
                 {i + 1}
               </text>
               {labels?.[i] && (
-                <text x={x} y={y + R + 29} textAnchor="middle" fontSize={12} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
-                  <SvgGeno g={labels[i]!} fontSize={12} />
+                <text x={x} y={y + R + 31} textAnchor="middle" fontSize={12.5} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
+                  <SvgGeno g={labels[i]!} fontSize={12.5} />
                 </text>
               )}
             </g>
