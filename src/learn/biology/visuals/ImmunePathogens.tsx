@@ -291,13 +291,12 @@ export function ImmuneCompare({ explore = false }: { explore?: boolean }) {
 
       {tab === "compare" && (
         <>
-          <div className="flex flex-wrap gap-1.5" role="tablist">
+          <div className="flex flex-wrap gap-1.5">
             {FEATURES.map((x) => (
               <button
                 key={x.id}
                 type="button"
-                role="tab"
-                aria-selected={fid === x.id}
+                aria-pressed={fid === x.id}
                 onClick={() => setFid(x.id)}
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
@@ -318,7 +317,7 @@ export function ImmuneCompare({ explore = false }: { explore?: boolean }) {
               {(["bact", "virus"] as const).map((k) => (
                 <div key={k} className="min-w-0 rounded-xl border border-line bg-surface p-2.5">
                   <div className="mb-1 px-1 text-[12.5px] font-semibold uppercase tracking-wide text-ink-3">{k === "bact" ? t(tx("Bacterium", "Bakterium")) : t(tx("Virus", "Virus"))}</div>
-                  <div className="mx-auto max-w-[300px]">{k === "bact" ? <ImmuneBacterium mode="plain" highlight={feat.hb} /> : <ImmuneVirus mode="plain" highlight={feat.hv} />}</div>
+                  <div className="mx-auto max-w-[360px]">{k === "bact" ? <ImmuneBacterium mode="plain" highlight={feat.hb} /> : <ImmuneVirus mode="plain" highlight={feat.hv} />}</div>
                 </div>
               ))}
             </div>
