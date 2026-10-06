@@ -218,20 +218,22 @@ export function VertebrateForelimbs() {
   const toggle = (b: BoneId) => setLit(lit === b ? null : b);
   return (
     <div className="space-y-4">
-      <svg viewBox="0 0 640 360" className="block h-auto w-full" style={{ maxWidth: 680 }} role="img" aria-label={t(tx("Forelimbs of human, whale, bat and mole", "Vordergliedmaßen von Mensch, Wal, Fledermaus und Maulwurf"))}>
+      <div className="mx-auto w-full max-w-[720px]">
+      <svg viewBox="0 0 640 360" className="block h-auto w-full" role="img" aria-label={t(tx("Forelimbs of human, whale, bat and mole", "Vordergliedmaßen von Mensch, Wal, Fledermaus und Maulwurf"))}>
         {LIMB_IDS.map((id) => (
           <g key={id} transform={`translate(${LIMBS[id].x} 0)`}>
             <Limb id={id} lit={lit} onPick={toggle} />
           </g>
         ))}
       </svg>
-      <div className="grid grid-cols-4 gap-1 text-center">
+      <div className="grid gap-1 text-center" style={{ gridTemplateColumns: LIMB_IDS.map((id) => `${LIMBS[id].w}fr`).join(" ") }}>
         {LIMB_IDS.map((id) => (
           <div key={id} className="min-w-0">
             <div className="text-[13px] font-semibold text-ink sm:text-[14.5px]">{t(LIMBS[id].name)}</div>
             <div className="text-[11.5px] leading-tight text-ink-3 sm:text-[12.5px]">{t(LIMBS[id].use)}</div>
           </div>
         ))}
+      </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {BONE_IDS.map((b) => (

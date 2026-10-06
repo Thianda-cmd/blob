@@ -384,7 +384,7 @@ function heartMixTask(rng: Rng): Exercise {
     text: tx("In which heart do oxygen-rich and oxygen-poor blood mix the most?", "In welchem Herzen mischen sich sauerstoffreiches und sauerstoffarmes Blut am stärksten?"),
     answer,
     hint: tx("Where do two atria empty into one undivided ventricle?", "Wo münden zwei Vorhöfe in eine ungeteilte Kammer?"),
-    solution: [{ math: join(q(tx("2 atria + 1 ventricle", "2 Vorhöfe + 1 Kammer"), "a"), "\\Rightarrow#r", q(tx("amphibian", "Amphib"), "b")), note: HEART_INFO.amph.mix, highlight: ["b"] }],
+    solution: [{ math: join(q(tx("2 atria + 1 ventricle", "2 Vorhöfe + 1 Kammer"), "a"), "\\Rightarrow#r", q(tx("amphibians", "Amphibien"), "b")), note: HEART_INFO.amph.mix, highlight: ["b"] }],
     mistakes: list,
   };
 }

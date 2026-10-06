@@ -38,16 +38,16 @@ export function VertebrateGills() {
         ))}
       </div>
       <svg viewBox="0 0 560 220" className="block h-auto w-full" style={{ maxWidth: 640 }} role="img" aria-label={t(tx("Gill lamella: water and blood", "Kiemenblättchen: Wasser und Blut"))}>
-        <text x={X0} y={24} fontSize={15} fill="var(--ink)" style={font}>
+        <text x={X0} y={24} fontSize={17} fill="var(--ink)" style={font}>
           {t(tx("water", "Wasser"))}
         </text>
-        <text x={X0} y={210} fontSize={15} fill="var(--ink)" style={font}>
+        <text x={X0} y={210} fontSize={17} fill="var(--ink)" style={font}>
           {t(tx("blood in the gill capillaries", "Blut in den Kiemenkapillaren"))}
         </text>
         {m.water.map((v, i) => (
           <g key={`w${i}`}>
             <motion.rect x={X0 + i * SEG} y={36} width={SEG - 2} height={52} initial={false} animate={{ fill: mixWater(v) }} transition={{ duration: 0.5 }} rx={i === 0 ? 10 : 2} />
-            <text x={X0 + i * SEG + SEG / 2} y={67} textAnchor="middle" fontSize={17} fontWeight={700} fill="var(--ink)" style={font}>
+            <text x={X0 + i * SEG + SEG / 2} y={67} textAnchor="middle" fontSize={19} fontWeight={700} fill="var(--ink)" style={font}>
               {v} %
             </text>
           </g>
@@ -56,7 +56,7 @@ export function VertebrateGills() {
           <g key={`b${i}`}>
             <motion.rect x={X0 + i * SEG} y={132} width={SEG - 2} height={52} initial={false} animate={{ fill: mixBlood(v) }} transition={{ duration: 0.5 }} rx={2} />
             <rect x={X0 + i * SEG + SEG / 2 - 26} y={146} width={52} height={24} rx={12} fill="var(--raised)" opacity={0.9} />
-            <text x={X0 + i * SEG + SEG / 2} y={163} textAnchor="middle" fontSize={17} fontWeight={700} fill="var(--ink)" style={font}>
+            <text x={X0 + i * SEG + SEG / 2} y={163} textAnchor="middle" fontSize={19} fontWeight={700} fill="var(--ink)" style={font}>
               {v} %
             </text>
             {/* diffusion arrow: thicker for a bigger difference */}

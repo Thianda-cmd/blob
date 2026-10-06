@@ -24,7 +24,7 @@ export const HEART_INFO: Record<HeartType, { name: Text; group: Text; chambers: 
     result: tx("after the gill capillaries the pressure is low: the body is supplied slowly", "nach den Kiemenkapillaren ist der Druck niedrig: Der Körper wird nur langsam versorgt"),
   },
   amph: {
-    name: tx("Amphibian", "Amphib"),
+    name: tx("Amphibian", "Amphibie"),
     group: tx("Amphibians", "Amphibien"),
     chambers: tx("2 atria + 1 ventricle (three-chambered heart)", "2 Vorhöfe + 1 Kammer (dreikammeriges Herz)"),
     circ: tx("double: pulmonary (and skin) circulation and body circulation", "doppelt: Lungen- (und Haut-)Kreislauf und Körperkreislauf"),

@@ -110,7 +110,7 @@ function Grass({ x, y }: { x: number; y: number }) {
 
 function Moss({ x, y, n }: { x: number; y: number; n: number }) {
   let d = `M${x} ${y}`;
-  for (let i = 0; i < n; i++) d += ` q5 -10 10 0`;
+  for (let i = 0; i < n; i++) d += ` q6 -15 12 0`;
   d += " z";
   return <path d={d} fill="var(--bio-chloro)" stroke="var(--bio-leaf-deep)" strokeWidth={1.4} strokeLinejoin="round" />;
 }
@@ -217,9 +217,10 @@ export function EcoForestLayers({ mode = "names", show, ask, highlight, legend }
       </g>
 
       <g data-part="moss">
-        <Moss x={14} y={300} n={6} />
-        <Moss x={238} y={300} n={4} />
-        <Moss x={424} y={300} n={5} />
+        <Moss x={14} y={300} n={5} />
+        <Moss x={134} y={300} n={3} />
+        <Moss x={236} y={300} n={4} />
+        <Moss x={416} y={300} n={5} />
         {/* mushroom */}
         <path d="M352 300 v-10 q0 -3 3 -3 h4 q3 0 3 3 v10 z" fill="var(--bio-bone)" stroke="var(--bio-outline)" strokeWidth={1.2} />
         <path d="M344 290 q13 -18 26 0 z" fill="var(--bio-mito-deep)" stroke="var(--bio-outline)" strokeWidth={1.2} />

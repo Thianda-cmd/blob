@@ -37,7 +37,7 @@ export const CLASSES: Record<ClassId, VClass> = {
   },
   amph: {
     name: tx("Amphibians", "Amphibien"),
-    one: tx("an amphibian", "ein Amphib"),
+    one: tx("an amphibian", "eine Amphibie"),
     accept: [tx("amphibians", "Amphibien"), tx("amphibian", "Amphibie"), "Amphib", "Lurche", "Lurch"],
     skin: tx("moist, bare skin with many glands, no scales", "feuchte, nackte Haut mit vielen Drüsen, ohne Schuppen"),
     breath: tx("larva: gills; adult: lungs and skin", "Larve: Kiemen; erwachsen: Lungen und Haut"),
@@ -219,7 +219,7 @@ export const ANIMALS: Animal[] = [
       ),
       amph: tx(
         "Living in water and on land doesn't make an animal an amphibian. A seal has fur, is warm-blooded and suckles its pup.",
-        "Im Wasser und an Land leben macht ein Tier noch nicht zum Amphib. Ein Seehund hat Fell, ist gleichwarm und säugt sein Junges.",
+        "Im Wasser und an Land leben macht ein Tier noch nicht zur Amphibie. Ein Seehund hat Fell, ist gleichwarm und säugt sein Junges.",
       ),
     },
   },
@@ -325,7 +325,7 @@ export const ANIMALS: Animal[] = [
     traps: {
       amph: tx(
         "'Amphibian' doesn't mean 'lives in water and on land'! A crocodile has dry skin with horny scales and lays eggs with a hard shell on land.",
-        "„Amphib“ heißt nicht „lebt im Wasser und an Land“! Ein Krokodil hat trockene Haut mit Hornschuppen und legt Eier mit harter Schale an Land.",
+        "„Amphibie“ heißt nicht „lebt im Wasser und an Land“! Ein Krokodil hat trockene Haut mit Hornschuppen und legt Eier mit harter Schale an Land.",
       ),
     },
     clues: [
@@ -345,7 +345,7 @@ export const ANIMALS: Animal[] = [
     traps: {
       amph: tx(
         "It lives in the sea but crawls onto the beach to lay its eggs with a shell in the sand. Horny plates, lungs: a reptile feature list.",
-        "Sie lebt im Meer, kriecht aber an den Strand und legt ihre Eier mit Schale in den Sand. Hornplatten, Lungen: Das ist kein Amphib.",
+        "Sie lebt im Meer, kriecht aber an den Strand und legt ihre Eier mit Schale in den Sand. Hornplatten, Lungen: Das ist keine Amphibie.",
       ),
       fish: tx("A sea turtle surfaces to breathe with its lungs and lays its eggs on land. No gills, no fish.", "Eine Meeresschildkröte taucht zum Atmen mit ihren Lungen auf und legt ihre Eier an Land. Keine Kiemen, kein Fisch."),
     },
@@ -369,7 +369,7 @@ export const ANIMALS: Animal[] = [
       { text: tx("cold-blooded: rigid in winter", "wechselwarm: im Winter starr"), fits: COLD },
     ],
   },
-  { id: "lizard", name: tx("sand lizard", "Zauneidechse"), art: "die", cls: "rept", note: tx("basks in the sun", "sonnt sich gern"), traps: { amph: tx("A sand lizard has dry skin with horny scales and lays eggs with a shell in the sand. That's not an amphibian.", "Eine Zauneidechse hat trockene Haut mit Hornschuppen und legt Eier mit Schale in den Sand. Das ist kein Amphib.") } },
+  { id: "lizard", name: tx("sand lizard", "Zauneidechse"), art: "die", cls: "rept", note: tx("basks in the sun", "sonnt sich gern"), traps: { amph: tx("A sand lizard has dry skin with horny scales and lays eggs with a shell in the sand. That's not an amphibian.", "Eine Zauneidechse hat trockene Haut mit Hornschuppen und legt Eier mit Schale in den Sand. Das ist keine Amphibie.") } },
   { id: "grasssnake", name: tx("grass snake", "Ringelnatter"), art: "die", cls: "rept", note: tx("swims well", "schwimmt gut"), traps: { amph: tx("A grass snake swims well, but its skin is dry with horny scales and it lays eggs with a shell on land.", "Eine Ringelnatter schwimmt gut, aber ihre Haut ist trocken mit Hornschuppen, und sie legt Eier mit Schale an Land.") } },
   { id: "adder", name: tx("adder", "Kreuzotter"), art: "die", cls: "rept", note: tx("is venomous", "ist giftig") },
   { id: "chameleon", name: tx("chameleon", "Chamäleon"), art: "das", cls: "rept", note: tx("changes colour", "wechselt die Farbe") },
@@ -403,7 +403,7 @@ export const ANIMALS: Animal[] = [
     traps: {
       fish: tx(
         "It keeps its feathery gills and stays in the water, but it has moist skin without scales and four legs. An axolotl is an amphibian that stays a larva.",
-        "Er behält seine fedrigen Kiemen und bleibt im Wasser, aber er hat feuchte Haut ohne Schuppen und vier Beine. Der Axolotl ist ein Amphib, das Larve bleibt.",
+        "Er behält seine fedrigen Kiemen und bleibt im Wasser, aber er hat feuchte Haut ohne Schuppen und vier Beine. Der Axolotl ist eine Amphibie, die Larve bleibt.",
       ),
     },
     clues: [

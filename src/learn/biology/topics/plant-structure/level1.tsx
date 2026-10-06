@@ -67,7 +67,7 @@ function organSay(right: Organ, picked: Organ, job: Text): Text {
   if (picked === "root" && right === "leaf")
     return tx("Roots sit in the dark soil and aren't green. Making sugar needs light and the green pigment chlorophyll. Where does the plant catch light?", "Wurzeln stecken im dunklen Boden und sind nicht grün. Zuckerherstellung braucht Licht und den grünen Farbstoff Chlorophyll. Wo fängt die Pflanze Licht ein?");
   if (picked === "root" && right === "stem")
-    return tx("The root takes the water in, right. But who carries it up to the leaves? That's the job of the part in between.", "Die Wurzel nimmt das Wasser auf, stimmt. Aber wer leitet es bis zu den Blättern hinauf? Das macht das Teil dazwischen.");
+    return tx("The root takes the water in, right. But who carries it up to the leaves? That's the job of the part in between.", "Die Wurzel nimmt das Wasser auf, stimmt. Aber wer leitet es bis zu den Blättern hinauf? Das macht der Teil dazwischen.");
   if (picked === "stem" && right === "root")
     return tx("The shoot axis transports water upwards, but it doesn't take it in. That happens underground.", "Die Sprossachse leitet Wasser nach oben, nimmt es aber nicht auf. Das passiert unter der Erde.");
   if (picked === "leaf" && right === "flower")
@@ -94,7 +94,7 @@ function organTask(rng: Rng, fixed?: { organ: Organ; job: number }): Exercise {
   ]);
   return {
     instruction: tx("Which organ does this?", "Welches Organ macht das?"),
-    text: tx(`Which part of a flowering plant **${en(job)}**?`, `Welches Teil einer Blütenpflanze **${de(job)}**?`),
+    text: tx(`Which part of a flowering plant **${en(job)}**?`, `Welcher Teil einer Blütenpflanze **${de(job)}**?`),
     answer,
     hint: tx("Think from bottom to top: root in the soil, shoot axis, leaves, flower.", "Geh von unten nach oben: Wurzel im Boden, Sprossachse, Blätter, Blüte."),
     solution: [
@@ -168,7 +168,7 @@ const PART_WORDS: Record<string, { accept: Text[]; wrong: { accept: Text[]; titl
     accept: [tx("shoot axis", "Sprossachse"), tx("stem", "Stängel"), "Stengel", "Stamm", "trunk", "stalk"],
     wrong: [
       { accept: [tx("shoot", "Spross")], title: tx("Nearly, just the axis", "Fast, nur die Achse"), say: tx("The shoot is the axis together with leaves and flowers. The axis on its own has a longer name.", "Der Spross ist die Achse samt Blättern und Blüten. Die Achse allein hat einen längeren Namen."), close: true },
-      { accept: [tx("root", "Wurzel")], title: tx("Above the ground", "Über der Erde"), say: tx("This part is above the ground and carries the leaves. The root is below the soil line.", "Dieses Teil steht über der Erde und trägt die Blätter. Die Wurzel liegt unter der Bodenlinie.") },
+      { accept: [tx("root", "Wurzel")], title: tx("Above the ground", "Über der Erde"), say: tx("This part is above the ground and carries the leaves. The root is below the soil line.", "Dieser Teil steht über der Erde und trägt die Blätter. Die Wurzel liegt unter der Bodenlinie.") },
     ],
     why: tx("It carries leaves and flowers: the shoot axis (in herbs the stem, in trees the trunk).", "Sie trägt Blätter und Blüten: die Sprossachse (bei Kräutern Stängel, bei Bäumen Stamm)."),
   },
@@ -202,8 +202,8 @@ function nameTask(rng: Rng): Exercise {
   const m = mistakes(answer);
   for (const w of P.wrong) m.add({ kind: "word", accept: w.accept }, w.title, w.say, w.close);
   return {
-    instruction: tx("Name the part", "Benenne das Teil"),
-    text: tx("What is the part with the question mark called?", "Wie heißt das Teil mit dem Fragezeichen?"),
+    instruction: tx("Name the part", "Benenne den Teil"),
+    text: tx("What is the part with the question mark called?", "Wie heißt der Teil mit dem Fragezeichen?"),
     visual: visual(PlantWhole, { mode: "numbers", ask: part, legend: "none" }),
     answer,
     hint: tx("Is it above or below the ground? What does it look like?", "Liegt es über oder unter der Erde? Wie sieht es aus?"),
@@ -768,8 +768,8 @@ export const level1: LevelLesson = {
     {
       type: "widget",
       title: tx("Explore the plant", "Erkunde die Pflanze"),
-      blob: tx("Tap the numbers. Each part has its own job!", "Tipp auf die Nummern. Jedes Teil hat seine eigene Aufgabe!"),
-      body: tx("Tap a number or a name to see what that part does. The magnifier shows the tip of a root.", "Tipp auf eine Nummer oder einen Namen, dann siehst du, was das Teil leistet. Die Lupe zeigt eine Wurzelspitze."),
+      blob: tx("Tap the numbers. Each part has its own job!", "Tipp auf die Nummern. Jeder Teil hat seine eigene Aufgabe!"),
+      body: tx("Tap a number or a name to see what that part does. The magnifier shows the tip of a root.", "Tipp auf eine Nummer oder einen Namen, dann siehst du, was der Teil leistet. Die Lupe zeigt eine Wurzelspitze."),
       widget: () => <PlantWhole mode="explore" />,
     },
     {

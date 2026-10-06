@@ -696,7 +696,7 @@ const tissueFrames: Frame[] = [
     note: tx("The **cambium** is a lateral meristem: it makes stem and root grow **thicker** (secondary growth).", "Das **Kambium** ist ein seitliches Bildungsgewebe: Es lässt Sprossachse und Wurzel in die **Dicke** wachsen (sekundäres Wachstum)."),
   },
   {
-    math: tx('"permanent tissues:"#d \\\\ "ground, supporting, dermal, vascular"#g', '"Dauergewebe:"#d \\\\ "Grund-, Festigungs-, Abschluss-, Leitgewebe"#g'),
+    math: tx('"permanent tissues:"#d \\\\ "ground"#g1 , "supporting"#g2 , \\\\ "dermal"#g3 , "vascular tissue"#g4', '"Dauergewebe:"#d \\\\ "Grund-"#g1 , "Festigungs-"#g2 , \\\\ "Abschluss-"#g3 , "Leitgewebe"#g4'),
     note: tx("Permanent tissues: **ground tissue** (parenchyma), **supporting tissue** (collenchyma, sclerenchyma), **dermal tissue** (epidermis, cork) and **vascular tissue** (xylem, phloem).", "Die Dauergewebe: **Grundgewebe** (Parenchym), **Festigungsgewebe** (Kollenchym, Sklerenchym), **Abschlussgewebe** (Epidermis, Kork) und **Leitgewebe** (Xylem, Phloem)."),
   },
   {
@@ -742,17 +742,17 @@ const stomaFrames: Frame[] = [
     highlight: ["k"],
   },
   {
-    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Wasser strömt ein (Osmose)"#w'),
+    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Osmose: Wasser strömt ein"#w'),
     note: tx("The concentration of dissolved particles in the vacuole rises. Water flows in from the neighbouring cells by **osmosis**.", "Die Konzentration gelöster Teilchen in der Vakuole steigt. Wasser strömt durch **Osmose** aus den Nachbarzellen nach."),
     highlight: ["w"],
   },
   {
-    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w \\to "turgor rises"#t', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Wasser strömt ein (Osmose)"#w \\to "Turgor steigt"#t'),
+    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w \\to "turgor rises"#t', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Osmose: Wasser strömt ein"#w \\to "Turgor steigt"#t'),
     note: tx("The **turgor** (pressure inside the cell) rises, the guard cells swell.", "Der **Turgor** (Zellinnendruck) steigt, die Schließzellen schwellen an."),
     highlight: ["t"],
   },
   {
-    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w \\to "turgor rises"#t \\\\ \\to "pore opens"#o', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Wasser strömt ein (Osmose)"#w \\to "Turgor steigt"#t \\\\ \\to "Spalt öffnet sich"#o'),
+    math: tx('"light"#l \\to "proton pump"#p \\to "K⁺ flows in"#k \\\\ \\to "water flows in (osmosis)"#w \\to "turgor rises"#t \\\\ \\to "pore opens"#o', '"Licht"#l \\to "Protonenpumpe"#p \\to "K⁺ strömt ein"#k \\\\ \\to "Osmose: Wasser strömt ein"#w \\to "Turgor steigt"#t \\\\ \\to "Spalt öffnet sich"#o'),
     note: tx("The wall along the pore is thicker and less stretchy, and cellulose fibres run out from the pore like rays. So the swelling guard cells bend outwards: the **pore opens**.", "Die Wand am Spalt ist dicker und weniger dehnbar, und Cellulosefasern laufen strahlenförmig vom Spalt weg. Darum krümmen sich die anschwellenden Schließzellen nach außen: Der **Spalt öffnet sich**."),
     highlight: ["o"],
   },

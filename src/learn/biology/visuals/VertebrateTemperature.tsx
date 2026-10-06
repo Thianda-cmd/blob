@@ -175,22 +175,22 @@ function Chart({ series, ymax, yTicks, yLabel, at, zone, decimals = 0 }: { serie
       {yTicks.map((v) => (
         <g key={v}>
           <line x1={X0} x2={X1} y1={sy(v)} y2={sy(v)} stroke="var(--line)" strokeWidth={1} />
-          <text x={X0 - 8} y={sy(v)} textAnchor="end" dominantBaseline="central" fontSize={14} fill="var(--ink-2)" style={font}>
+          <text x={X0 - 8} y={sy(v)} textAnchor="end" dominantBaseline="central" fontSize={16} fill="var(--ink-2)" style={font}>
             {t(decText(v, decimals))}
           </text>
         </g>
       ))}
       {[0, 10, 20, 30, 40].map((v) => (
-        <text key={v} x={sx(v)} y={Y0 + 18} textAnchor="middle" fontSize={14} fill="var(--ink-2)" style={font}>
+        <text key={v} x={sx(v)} y={Y0 + 18} textAnchor="middle" fontSize={16} fill="var(--ink-2)" style={font}>
           {v}
         </text>
       ))}
       <line x1={X0} x2={X1} y1={Y0} y2={Y0} stroke="var(--ink-2)" strokeWidth={1.5} />
       <line x1={X0} x2={X0} y1={Y0} y2={Y1 - 6} stroke="var(--ink-2)" strokeWidth={1.5} />
-      <text x={(X0 + X1) / 2} y={H - 4} textAnchor="middle" fontSize={14} fill="var(--ink)" style={font}>
+      <text x={(X0 + X1) / 2} y={H - 4} textAnchor="middle" fontSize={16} fill="var(--ink)" style={font}>
         {t(tx("outside temperature in °C", "Außentemperatur in °C"))}
       </text>
-      <text x={14} y={(Y0 + Y1) / 2} textAnchor="middle" fontSize={14} fill="var(--ink)" style={font} transform={`rotate(-90 14 ${(Y0 + Y1) / 2})`}>
+      <text x={14} y={(Y0 + Y1) / 2} textAnchor="middle" fontSize={16} fill="var(--ink)" style={font} transform={`rotate(-90 14 ${(Y0 + Y1) / 2})`}>
         {t(yLabel)}
       </text>
       <g clipPath={`url(#${uid}-plot)`}>

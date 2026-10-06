@@ -107,13 +107,10 @@ export function LabTube({ color, from, drops, run = 0 }: { color: string; from?:
           ))}
         </g>
       )}
-      <motion.path
-        key={`liq${run}`}
-        d="M21 100 L21 160 A19 19 0 0 0 59 160 L59 100 Z"
-        initial={animated ? { fill: from } : false}
-        animate={{ fill: color }}
-        transition={{ duration: 0.7, delay: animated ? 0.95 : 0 }}
-      />
+      <path d="M21 100 L21 160 A19 19 0 0 0 59 160 L59 100 Z" style={{ fill: animated ? from : color }} />
+      {animated && (
+        <motion.path key={`liq${run}`} d="M21 100 L21 160 A19 19 0 0 0 59 160 L59 100 Z" style={{ fill: color }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.95 }} />
+      )}
       <rect x={27} y={108} width={5} height={52} rx={2.5} fill="var(--raised)" opacity={0.35} />
       <path d="M19 34 L19 160 A21 21 0 0 0 61 160 L61 34" fill="none" stroke={OUT} strokeWidth={2.2} strokeLinecap="round" />
       <path d="M14 34 L66 34" stroke={OUT} strokeWidth={2.4} strokeLinecap="round" />
@@ -129,7 +126,8 @@ export function LabStrip({ color, from, run = 0 }: { color: string; from?: strin
     <svg viewBox="0 0 80 190" className="h-[150px] w-auto" aria-hidden>
       <motion.g key={run} initial={animated ? { y: 40 } : false} animate={{ y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}>
         <rect x={31} y={14} width={18} height={150} rx={3} fill="var(--raised)" stroke={OUT} strokeWidth={1.6} />
-        <motion.rect x={33} y={136} width={14} height={20} rx={2} initial={animated ? { fill: from } : false} animate={{ fill: color }} transition={{ duration: 0.7, delay: animated ? 1 : 0 }} stroke={OUT} strokeWidth={1} />
+        <rect x={33} y={136} width={14} height={20} rx={2} style={{ fill: animated ? from : color }} stroke={OUT} strokeWidth={1} />
+        {animated && <motion.rect x={33} y={136} width={14} height={20} rx={2} style={{ fill: color }} stroke={OUT} strokeWidth={1} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 1 }} />}
       </motion.g>
     </svg>
   );

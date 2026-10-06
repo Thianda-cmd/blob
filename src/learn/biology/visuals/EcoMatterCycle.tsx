@@ -185,7 +185,7 @@ export function EcoMatterCycle() {
             <path d="M-24 16 h48" stroke="var(--bio-soil)" strokeWidth={3} strokeLinecap="round" />
           </g>
           <Label x={CX + 44} y={CY + R + 34} text={t(tx("Decomposers", "Destruenten"))} lit={lit("decomposer")} anchor="start" />
-          <Label x={CX + R - 6} y={CY + R - 46} text={t(tx("dead remains", "tote Reste"))} lit={lit("remains")} anchor="start" />
+          <Label x={CX + R - 14} y={CY + R - 22} text={t(tx("dead remains", "tote Reste"))} lit={lit("remains")} anchor="start" />
 
           {/* minerals in the soil */}
           <g transform={`translate(${CX - R} ${CY})`}>

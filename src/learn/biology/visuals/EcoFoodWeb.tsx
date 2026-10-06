@@ -162,6 +162,8 @@ function WebSvg({
   label: string;
 }) {
   const t = useText();
+  const [focused, setFocused] = useState<OrgId | null>(null);
+  const [keyboard, setKeyboard] = useState(false);
   const pos = (id: OrgId) => web.nodes.find((n) => n.id === id)!;
   const from = drag ? pos(drag.from) : null;
   return (
@@ -174,6 +176,8 @@ function WebSvg({
       aria-label={label}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerDownCapture={() => setKeyboard(false)}
+      onKeyDownCapture={() => setKeyboard(true)}
     >
       {arrows.map(([a, b]) => (
         <Arrow key={key(a, b)} from={pos(a)} to={pos(b)} extra={extraKeys?.has(key(a, b))} faded={states?.[a] === "gone" || states?.[b] === "gone"} animateIn={fresh === key(a, b)} />
@@ -185,8 +189,10 @@ function WebSvg({
           role={onKey ? "button" : undefined}
           tabIndex={onKey ? 0 : undefined}
           aria-label={onKey ? t(ORGS[n.id].name) : undefined}
-          className={cn(onPointerDown && "cursor-pointer")}
+          className={cn(onPointerDown && "cursor-pointer", "outline-none")}
           style={onPointerDown ? { touchAction: "none" } : undefined}
+          onFocus={onKey ? () => setFocused(n.id) : undefined}
+          onBlur={onKey ? () => setFocused(null) : undefined}
           onPointerDown={onPointerDown ? (e) => onPointerDown(n.id, e) : undefined}
           onKeyDown={
             onKey
@@ -199,7 +205,7 @@ function WebSvg({
               : undefined
           }
         >
-          <Node id={n.id} x={n.x} y={n.y} label={t(ORGS[n.id].name)} state={states?.[n.id]} effect={effects?.get(n.id)?.effect} ask={ask === n.id} />
+          <Node id={n.id} x={n.x} y={n.y} label={t(ORGS[n.id].name)} state={states?.[n.id] ?? (focused === n.id && keyboard ? "lit" : undefined)} effect={effects?.get(n.id)?.effect} ask={ask === n.id} />
         </g>
       ))}
     </svg>

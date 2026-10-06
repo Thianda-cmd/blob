@@ -24,18 +24,19 @@ export const LEAVES: Leaf[] = [
 
 export type Node = { id: string; name: Text; feature: Text; bridge?: Text; x: number; kids: [string, string] };
 export const NODES: Node[] = [
-  { id: "A", name: tx("Jawed vertebrates", "Kiefermäuler"), feature: tx("backbone, skull and jaws", "Wirbelsäule, Schädel und Kiefer"), x: 40, kids: ["shark", "B"] },
-  { id: "B", name: tx("Bony fish (in the wide sense)", "Knochenfische (im weiteren Sinn)"), feature: tx("skeleton of bone; lung or swim bladder (the two are homologous)", "Skelett aus Knochen; Lunge bzw. Schwimmblase (beide sind homolog)"), x: 78, kids: ["ray", "C"] },
-  { id: "C", name: tx("Lobe-finned fish", "Fleischflosser"), feature: tx("fleshy fins with bones that match upper arm, ulna and radius", "fleischige Flossen mit Knochen, die Oberarm, Elle und Speiche entsprechen"), bridge: tx("Living coelacanth (Latimeria); fossil Eusthenopteron", "Heute lebender Quastenflosser (Latimeria); fossil Eusthenopteron"), x: 116, kids: ["lobe", "D"] },
-  { id: "D", name: tx("Tetrapods (four-limbed vertebrates)", "Tetrapoden (Landwirbeltiere)"), feature: tx("four limbs with fingers and toes", "vier Gliedmaßen mit Fingern und Zehen"), bridge: tx("Tiktaalik (about 375 million years ago): gills and scales, but a neck, lungs and fins with wrist bones", "Tiktaalik (vor etwa 375 Millionen Jahren): Kiemen und Schuppen, aber ein Hals, Lungen und Flossen mit Handwurzelknochen"), x: 154, kids: ["amph", "E"] },
-  { id: "E", name: tx("Amniotes", "Amnioten"), feature: tx("the amniotic egg: breeding on land, independent of water", "das Amnion-Ei: Fortpflanzung an Land, unabhängig vom Wasser"), bridge: tx("Seymouria: a mosaic of amphibian and reptile features", "Seymouria: eine Mosaikform aus Amphibien- und Reptilienmerkmalen"), x: 192, kids: ["mammal", "F"] },
-  { id: "F", name: tx("Sauropsids (reptiles and birds)", "Sauropsiden (Reptilien und Vögel)"), feature: tx("horny scales of a special keratin; birds' feathers developed from them", "Hornschuppen aus besonderem Keratin; die Federn der Vögel entstanden daraus"), x: 230, kids: ["squamate", "G"] },
-  { id: "G", name: tx("Archosaurs", "Archosaurier"), feature: tx("crocodiles and dinosaurs, including birds", "Krokodile und Dinosaurier, einschließlich der Vögel"), bridge: tx("Archaeopteryx: feathers, wings and wishbone, but teeth, claws on the fingers and a long bony tail", "Archaeopteryx: Federn, Flügel und Gabelbein, aber Zähne, Krallen an den Fingern und eine lange Schwanzwirbelsäule"), x: 268, kids: ["croc", "bird"] },
+  { id: "A", name: tx("Jawed vertebrates", "Kiefermäuler"), feature: tx("backbone, skull and jaws", "Wirbelsäule, Schädel und Kiefer"), x: 14, kids: ["shark", "B"] },
+  { id: "B", name: tx("Bony fish (in the wide sense)", "Knochenfische (im weiteren Sinn)"), feature: tx("skeleton of bone; lung or swim bladder (the two are homologous)", "Skelett aus Knochen; Lunge bzw. Schwimmblase (beide sind homolog)"), x: 36, kids: ["ray", "C"] },
+  { id: "C", name: tx("Lobe-finned fish", "Fleischflosser"), feature: tx("fleshy fins with bones that match upper arm, ulna and radius", "fleischige Flossen mit Knochen, die Oberarm, Elle und Speiche entsprechen"), bridge: tx("Living coelacanth (Latimeria); fossil Eusthenopteron", "Heute lebender Quastenflosser (Latimeria); fossil Eusthenopteron"), x: 58, kids: ["lobe", "D"] },
+  { id: "D", name: tx("Tetrapods (four-limbed vertebrates)", "Tetrapoden (Landwirbeltiere)"), feature: tx("four limbs with fingers and toes", "vier Gliedmaßen mit Fingern und Zehen"), bridge: tx("Tiktaalik (about 375 million years ago): gills and scales, but a neck, lungs and fins with wrist bones", "Tiktaalik (vor etwa 375 Millionen Jahren): Kiemen und Schuppen, aber ein Hals, Lungen und Flossen mit Handwurzelknochen"), x: 80, kids: ["amph", "E"] },
+  { id: "E", name: tx("Amniotes", "Amnioten"), feature: tx("the amniotic egg: breeding on land, independent of water", "das Amnion-Ei: Fortpflanzung an Land, unabhängig vom Wasser"), bridge: tx("Seymouria: a mosaic of amphibian and reptile features", "Seymouria: eine Mosaikform aus Amphibien- und Reptilienmerkmalen"), x: 102, kids: ["mammal", "F"] },
+  { id: "F", name: tx("Sauropsids (reptiles and birds)", "Sauropsiden (Reptilien und Vögel)"), feature: tx("horny scales of a special keratin; birds' feathers developed from them", "Hornschuppen aus besonderem Keratin; die Federn der Vögel entstanden daraus"), x: 124, kids: ["squamate", "G"] },
+  { id: "G", name: tx("Archosaurs", "Archosaurier"), feature: tx("crocodiles and dinosaurs, including birds", "Krokodile und Dinosaurier, einschließlich der Vögel"), bridge: tx("Archaeopteryx: feathers, wings and wishbone, but teeth, claws on the fingers and a long bony tail", "Archaeopteryx: Federn, Flügel und Gabelbein, aber Zähne, Krallen an den Fingern und eine lange Schwanzwirbelsäule"), x: 146, kids: ["croc", "bird"] },
 ];
 
 const ROW = 40;
-const TOP = 26;
-const LEAF_X = 300;
+const TOP = 20;
+const LEAF_X = 170;
+const SVG_W = 176;
 const leafY = (i: number) => TOP + i * ROW;
 
 function layout() {
@@ -51,53 +52,61 @@ const under = (id: string): string[] => {
   return n ? [...under(n.kids[0]), ...under(n.kids[1])] : [id];
 };
 
-/** The tree on its own (also a task picture). `mark` lights up a node's group. */
+/**
+ * The tree on its own (also a task picture). The branches are drawn in a fixed-size SVG and the
+ * group names are HTML rows of the same height beside it, so they stay readable on phones.
+ */
 export function VertebrateTreeDiagram({ sel = null, onSelect }: { sel?: string | null; onSelect?: (id: string | null) => void }) {
   const t = useText();
   const lit = sel ? under(sel) : [];
   /** A node is lit when its whole group lies inside the selected group. */
   const nodeLit = (id: string) => !!sel && under(id).length > 1 && under(id).every((l) => lit.includes(l));
   const font = { fontFamily: "var(--font-sans)" };
-  const h = TOP + (LEAVES.length - 1) * ROW + 26;
+  const h = LEAVES.length * ROW;
   return (
-    <svg viewBox={`0 0 600 ${h}`} className="block h-auto w-full" style={{ maxWidth: 640 }} role="img" aria-label={t(tx("Family tree of the vertebrates", "Stammbaum der Wirbeltiere"))}>
-      <line x1={12} x2={NODES[0].x} y1={Y.A} y2={Y.A} stroke="var(--ink-2)" strokeWidth={2.4} />
-      {NODES.map((n) => {
-        const on = nodeLit(n.id);
-        return (
-          <g key={n.id}>
-            <line x1={n.x} x2={n.x} y1={Y[n.kids[0]]} y2={Y[n.kids[1]]} stroke={on ? "var(--blob)" : "var(--ink-2)"} strokeWidth={on ? 3.4 : 2.4} />
-            {n.kids.map((k) => (
-              <line key={k} x1={n.x} x2={X[k]} y1={Y[k]} y2={Y[k]} stroke={on ? "var(--blob)" : "var(--ink-2)"} strokeWidth={on ? 3.4 : 2.4} />
-            ))}
-          </g>
-        );
-      })}
-      {LEAVES.map((l) => {
-        const on = lit.includes(l.id) || sel === l.id;
-        return (
-          <g key={l.id} onClick={onSelect ? () => onSelect(sel === l.id ? null : l.id) : undefined} className={onSelect ? "cursor-pointer" : undefined}>
-            <rect x={LEAF_X - 4} y={Y[l.id] - 16} width={296} height={32} rx={9} fill={on ? "var(--blob-soft)" : "transparent"} />
-            <circle cx={LEAF_X} cy={Y[l.id]} r={4.5} fill={on ? "var(--blob)" : "var(--ink-2)"} />
-            <text x={LEAF_X + 12} y={Y[l.id]} dominantBaseline="central" fontSize={15} fontWeight={on ? 700 : 500} fill="var(--ink)" style={font}>
+    <div className="flex items-start" role="img" aria-label={t(tx("Family tree of the vertebrates", "Stammbaum der Wirbeltiere"))}>
+      <svg width={SVG_W} height={h} viewBox={`0 0 ${SVG_W} ${h}`} className="shrink-0" aria-hidden>
+        <line x1={2} x2={NODES[0].x} y1={Y.A} y2={Y.A} stroke="var(--ink-2)" strokeWidth={2.4} />
+        {NODES.map((n) => {
+          const on = nodeLit(n.id);
+          return (
+            <g key={n.id}>
+              <line x1={n.x} x2={n.x} y1={Y[n.kids[0]]} y2={Y[n.kids[1]]} stroke={on ? "var(--blob)" : "var(--ink-2)"} strokeWidth={on ? 3.4 : 2.4} />
+              {n.kids.map((k) => (
+                <line key={k} x1={n.x} x2={X[k] + (LEAVES.some((l) => l.id === k) ? 6 : 0)} y1={Y[k]} y2={Y[k]} stroke={on ? "var(--blob)" : "var(--ink-2)"} strokeWidth={on ? 3.4 : 2.4} />
+              ))}
+            </g>
+          );
+        })}
+        {NODES.map((n) => {
+          const on = sel === n.id;
+          return (
+            <g key={n.id} onClick={onSelect ? () => onSelect(on ? null : n.id) : undefined} className={onSelect ? "cursor-pointer" : undefined}>
+              {on && <motion.circle cx={n.x} cy={Y[n.id]} r={14} fill="none" stroke="var(--blob)" strokeWidth={2} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} />}
+              <circle cx={n.x} cy={Y[n.id]} r={10} fill={on ? "var(--blob)" : "var(--raised)"} stroke={on ? "var(--blob)" : "var(--ink)"} strokeWidth={1.6} />
+              <text x={n.x} y={Y[n.id]} textAnchor="middle" dominantBaseline="central" fontSize={11.5} fontWeight={700} fill={on ? "var(--paper)" : "var(--ink)"} style={{ ...font, pointerEvents: "none" }}>
+                {n.id}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="min-w-0 flex-1">
+        {LEAVES.map((l) => {
+          const on = lit.includes(l.id) || sel === l.id;
+          const cls = cn("flex w-full items-center rounded-lg px-2 text-left text-[13.5px] leading-tight transition-colors sm:text-[15px]", on ? "bg-blob-soft font-semibold text-ink" : "text-ink-2");
+          return onSelect ? (
+            <button key={l.id} type="button" onClick={() => onSelect(sel === l.id ? null : l.id)} className={cn(cls, "hover:bg-hover hover:text-ink")} style={{ height: ROW }}>
               {t(l.name)}
-            </text>
-          </g>
-        );
-      })}
-      {NODES.map((n) => {
-        const on = sel === n.id;
-        return (
-          <g key={n.id} onClick={onSelect ? () => onSelect(on ? null : n.id) : undefined} className={onSelect ? "cursor-pointer" : undefined}>
-            {on && <motion.circle cx={n.x} cy={Y[n.id]} r={16} fill="none" stroke="var(--blob)" strokeWidth={2} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} />}
-            <circle cx={n.x} cy={Y[n.id]} r={11} fill={on ? "var(--blob)" : "var(--raised)"} stroke={on ? "var(--blob)" : "var(--ink)"} strokeWidth={1.6} />
-            <text x={n.x} y={Y[n.id]} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700} fill={on ? "var(--paper)" : "var(--ink)"} style={{ ...font, pointerEvents: "none" }}>
-              {n.id}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+            </button>
+          ) : (
+            <div key={l.id} className={cls} style={{ height: ROW }}>
+              {t(l.name)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

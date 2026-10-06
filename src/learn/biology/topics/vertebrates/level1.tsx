@@ -31,7 +31,7 @@ function classSay(a: Animal, c: ClassId): { title: Text; say: Text } {
   if (trap) {
     const title =
       c === "amph" && (a.cls === "rept" || a.cls === "mammal")
-        ? tx("'Amphibian' isn't a habitat", "„Amphib“ ist kein Lebensraum")
+        ? tx("'Amphibian' isn't a habitat", "„Amphibie“ ist kein Lebensraum")
         : c === "fish" && a.cls === "mammal"
           ? tx("Habitat doesn't decide", "Der Lebensraum entscheidet nicht")
           : c === "bird" && a.cls === "mammal"
@@ -285,7 +285,7 @@ const TRUE_ST: Statement[] = [
 const FALSE_ST: Statement[] = [
   { text: tx("Whales are fish because they live in the sea.", "Wale sind Fische, weil sie im Meer leben."), why: tx("Habitat doesn't decide the class: whales breathe with lungs and suckle their young.", "Der Lebensraum entscheidet nicht über die Klasse: Wale atmen mit Lungen und säugen ihre Jungen.") },
   { text: tx("Bats are birds because they can fly.", "Fledermäuse sind Vögel, weil sie fliegen können."), why: tx("Flying isn't a class feature: bats have fur and suckle their young.", "Fliegen ist kein Klassenmerkmal: Fledermäuse haben Fell und säugen ihre Jungen.") },
-  { text: tx("Crocodiles are amphibians because they live in water and on land.", "Krokodile sind Amphibien, weil sie im Wasser und an Land leben."), why: tx("'Amphibian' is a class, not a habitat. Crocodiles have horny scales and lay eggs with a shell: reptiles.", "„Amphib“ ist eine Klasse, kein Lebensraum. Krokodile haben Hornschuppen und legen Eier mit Schale.") },
+  { text: tx("Crocodiles are amphibians because they live in water and on land.", "Krokodile sind Amphibien, weil sie im Wasser und an Land leben."), why: tx("'Amphibian' is a class, not a habitat. Crocodiles have horny scales and lay eggs with a shell: reptiles.", "„Amphibie“ ist eine Klasse, kein Lebensraum. Krokodile haben Hornschuppen und legen Eier mit Schale.") },
   { text: tx("Cold-blooded animals are always cold.", "Wechselwarme Tiere sind immer kalt."), why: tx("On a hot day a lizard can be as warm as you. Its temperature simply follows the surroundings.", "An einem heißen Tag kann eine Eidechse so warm sein wie du. Ihre Temperatur folgt einfach der Umgebung.") },
   { text: tx("All mammals give birth to live young.", "Alle Säugetiere bringen lebende Junge zur Welt."), why: tx("The platypus and the echidna lay eggs.", "Schnabeltier und Ameisenigel legen Eier.") },
   { text: tx("All birds can fly.", "Alle Vögel können fliegen."), why: tx("Penguins, ostriches and kiwis can't fly.", "Pinguine, Strauße und Kiwis können nicht fliegen.") },
@@ -450,7 +450,9 @@ export function generate1(rng: Rng): Exercise {
                         ? tempKindTask(rng)
                         : roll === 10
                           ? bodyTempTask(rng)
-                          : pictureClassTask(rng);
+                          : rng.chance(0.4)
+                            ? pictureClassTask(rng)
+                            : classOfTask(rng);
     if (ex) return ex;
   }
   return classOfTask(rng);
@@ -507,7 +509,7 @@ const trapFrames: Frame[] = [
   { math: tx('"whale"#a \\Rightarrow#r "mammal"#b', '"Wal"#a \\Rightarrow#r "Säugetier"#b'), note: tx("The whale lives in the sea and is shaped like a fish. But it breathes with lungs, is warm-blooded and suckles its calf. **Habitat doesn't decide the class!**", "Der Wal lebt im Meer und hat eine Fischform. Aber er atmet mit Lungen, ist gleichwarm und säugt sein Junges. **Der Lebensraum entscheidet nicht über die Klasse!**") },
   { math: tx('"bat"#a \\Rightarrow#r "mammal"#b', '"Fledermaus"#a \\Rightarrow#r "Säugetier"#b'), note: tx("It flies, but it has fur instead of feathers and suckles its young.", "Sie fliegt, hat aber Fell statt Federn und säugt ihre Jungen.") },
   { math: tx('"penguin"#a \\Rightarrow#r "bird"#b', '"Pinguin"#a \\Rightarrow#r "Vogel"#b'), note: tx("It can't fly, but it has feathers and a beak and lays eggs with a lime shell.", "Er kann nicht fliegen, hat aber Federn und einen Schnabel und legt Eier mit Kalkschale.") },
-  { math: tx('"crocodile"#a \\Rightarrow#r "reptile"#b', '"Krokodil"#a \\Rightarrow#r "Reptil"#b'), note: tx("It lives in water and on land, but it's no amphibian: dry skin with horny scales, eggs with a shell on land. 'Amphibian' is a class, not a description of the habitat.", "Es lebt im Wasser und an Land, ist aber kein Amphib: trockene Haut mit Hornschuppen, Eier mit Schale an Land. „Amphib“ ist eine Klasse, keine Beschreibung des Lebensraums.") },
+  { math: tx('"crocodile"#a \\Rightarrow#r "reptile"#b', '"Krokodil"#a \\Rightarrow#r "Reptil"#b'), note: tx("It lives in water and on land, but it's no amphibian: dry skin with horny scales, eggs with a shell on land. 'Amphibian' is a class, not a description of the habitat.", "Es lebt im Wasser und an Land, ist aber keine Amphibie: trockene Haut mit Hornschuppen, Eier mit Schale an Land. „Amphibie“ ist eine Klasse, keine Beschreibung des Lebensraums.") },
   { math: tx('"platypus"#a \\Rightarrow#r "mammal"#b', '"Schnabeltier"#a \\Rightarrow#r "Säugetier"#b'), note: tx("It lays eggs and has a bill. Still, fur and milk make it a mammal: a rare exception.", "Es legt Eier und hat einen Schnabel. Trotzdem machen Fell und Milch es zum Säugetier: eine seltene Ausnahme.") },
 ];
 

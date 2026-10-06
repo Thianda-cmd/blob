@@ -191,7 +191,7 @@ export function FlowerABC({ start = "wt" }: { start?: Mutant }) {
             <div className="grid grid-cols-[3rem_repeat(4,minmax(0,1fr))] border-b border-line bg-surface text-center font-semibold text-ink-2">
               <div className="py-1.5" />
               {[1, 2, 3, 4].map((w) => (
-                <div key={w} className="py-1.5">
+                <div key={w} className="px-0.5 py-1.5 text-[12px] leading-tight">
                   {t(tx(`Whorl ${w}`, `Wirtel ${w}`))}
                 </div>
               ))}
@@ -215,7 +215,7 @@ export function FlowerABC({ start = "wt" }: { start?: Mutant }) {
             <div className="grid grid-cols-[3rem_repeat(4,minmax(0,1fr))] items-start bg-surface text-center">
               <div className="py-1.5" />
               {IDENTITY[mutant].map((o, w) => (
-                <div key={`${w}-${o}`} className="px-0.5 py-1.5 text-[11.5px] font-semibold leading-tight text-ink">
+                <div key={`${w}-${o}`} className="hyphens-auto break-words px-0.5 py-1.5 text-[11px] font-semibold leading-tight text-ink">
                   {t(ORGAN_NAME[o])}
                 </div>
               ))}

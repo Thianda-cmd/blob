@@ -58,7 +58,7 @@ export function DnaSplicing() {
     <div className="space-y-4">
       <div className="rounded-xl border border-line bg-surface px-3 py-5">
         <div className="flex items-center gap-1">
-          <span className="w-5 shrink-0 text-[12px] font-semibold text-ink-3">5′</span>
+          <span className="w-4 shrink-0 text-[12px] font-semibold text-ink-3">5′</span>
           <AnimatePresence initial={false}>
             {i >= 1 && (
               <motion.span
@@ -84,7 +84,7 @@ export function DnaSplicing() {
                   animate={{ opacity: 1, scaleY: 1 }}
                   exit={{ opacity: 0, y: -24, scale: 0.6 }}
                   transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                  className={cn("grid h-9 min-w-[30px] place-items-center text-[11.5px] font-bold text-ink", s.exon ? "rounded-md border-2" : "rounded-sm border border-line-2")}
+                  className={cn("grid h-9 min-w-[22px] place-items-center text-[11px] font-bold text-ink sm:min-w-[30px] sm:text-[11.5px]", s.exon ? "rounded-md border-2" : "rounded-sm border border-line-2")}
                   style={{
                     flexGrow: s.nt,
                     flexBasis: 0,
@@ -111,7 +111,7 @@ export function DnaSplicing() {
               </motion.span>
             )}
           </AnimatePresence>
-          <span className="w-5 shrink-0 text-right text-[12px] font-semibold text-ink-3">3′</span>
+          <span className="w-4 shrink-0 text-right text-[12px] font-semibold text-ink-3">3′</span>
         </div>
         <div className="mt-3 flex flex-wrap justify-between gap-2 text-[12.5px] text-ink-3">
           <span>
@@ -153,8 +153,8 @@ export function DnaSplicing() {
           <span className="mt-1.5 block text-ink">
             {t(
               tx(
-                `Coding sequence: ${nt} nucleotides = ${nt / 3} codons → ${nt / 3 - 1} amino acids plus the stop codon.${skip3 ? " Exon 3 has 150 nucleotides, a multiple of 3: the reading frame stays intact, the protein is just 50 amino acids shorter." : ""}`,
-                `Codierende Sequenz: ${nt} Nukleotide = ${nt / 3} Codons → ${nt / 3 - 1} Aminosäuren plus das Stoppcodon.${skip3 ? " Exon 3 hat 150 Nukleotide, ein Vielfaches von 3: Das Leseraster bleibt erhalten, das Protein ist nur 50 Aminosäuren kürzer." : ""}`,
+                `Simplified, the exons here are all coding: ${nt} nucleotides = ${nt / 3} codons → ${nt / 3 - 1} amino acids plus the stop codon.${skip3 ? " Exon 3 has 150 nucleotides, a multiple of 3: the reading frame stays intact, the protein is just 50 amino acids shorter." : ""}`,
+                `Vereinfacht sind die Exons hier ganz codierend: ${nt} Nukleotide = ${nt / 3} Codons → ${nt / 3 - 1} Aminosäuren plus das Stoppcodon.${skip3 ? " Exon 3 hat 150 Nukleotide, ein Vielfaches von 3: Das Leseraster bleibt erhalten, das Protein ist nur 50 Aminosäuren kürzer." : ""}`,
               ),
             )}
           </span>

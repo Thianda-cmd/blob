@@ -35,7 +35,7 @@ function Tile({ base, dim, pop, mark }: { base: string; dim?: boolean; pop?: boo
   );
 }
 
-const End = ({ s }: { s: string }) => <span className="grid h-[22px] w-4 place-items-center text-[11px] font-semibold text-ink-3 sm:h-[30px] sm:w-5 sm:text-[12.5px]">{s}</span>;
+const End = ({ s }: { s: string }) => <span className="grid h-[22px] w-3 place-items-center text-[10.5px] font-semibold text-ink-3 sm:h-[30px] sm:w-5 sm:text-[12.5px]">{s}</span>;
 
 /** Transcription base by base: RNA polymerase reads the template strand 3′→5′ and builds the mRNA 5′→3′. */
 export function DnaTranscription() {
@@ -92,9 +92,9 @@ export function DnaTranscription() {
               <End s="3′" />
               <End s="5′" />
             </div>
-            <div className="flex gap-2 sm:gap-3">
+            <div className="flex gap-1.5 sm:gap-3">
               {triplets(CODING).map((codon, ci) => (
-                <div key={ci} className="flex gap-[2px] sm:gap-[3px]">
+                <div key={ci} className="flex gap-px sm:gap-[3px]">
                   {[...codon].map((b, k) => {
                     const i = ci * 3 + k;
                     const active = i === pos && !done;
