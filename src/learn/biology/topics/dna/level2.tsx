@@ -250,7 +250,8 @@ export function translateTask(rng: Rng | null, fixed?: { lead: string; body: str
   const ch = choiceOf(r, opts);
   return {
     instruction: tx("Translate the mRNA", "Übersetze die mRNA"),
-    text: tx(`Which peptide does the ribosome make from this mRNA?\n\n**$${strand(mrna, "5")}$**`, `Welches Peptid bildet das Ribosom aus dieser mRNA?\n\n**$${strand(mrna, "5")}$**`),
+    text: tx("Which peptide does the ribosome make from this mRNA?", "Welches Peptid bildet das Ribosom aus dieser mRNA?"),
+    math: strand(mrna, "5"),
     visual: sunVisual,
     answer: ch.answer,
     hint: tx("Find AUG first. Then read in steps of three until a stop codon.", "Such zuerst AUG. Dann lies in Dreierschritten bis zu einem Stoppcodon."),
@@ -272,7 +273,8 @@ function countAaTask(rng: Rng): Exercise {
   m.add(Math.floor(x.mrna.length / 3), tx("All triplets counted", "Alle Tripletts gezählt"), tx("Not every triplet counts: only from the start codon AUG up to (not including) the stop codon.", "Nicht jedes Triplett zählt: nur vom Startcodon AUG bis vor das Stoppcodon."));
   return {
     instruction: tx("Count the amino acids", "Zähle die Aminosäuren"),
-    text: tx(`How many amino acids does the peptide made from this mRNA have?\n\n**$${strand(x.mrna, "5")}$**`, `Wie viele Aminosäuren hat das Peptid, das aus dieser mRNA entsteht?\n\n**$${strand(x.mrna, "5")}$**`),
+    text: tx("How many amino acids does the peptide made from this mRNA have?", "Wie viele Aminosäuren hat das Peptid, das aus dieser mRNA entsteht?"),
+    math: strand(x.mrna, "5"),
     answer: { kind: "number", value },
     hint: tx("From AUG to the stop codon. The stop codon itself has no amino acid.", "Von AUG bis zum Stoppcodon. Das Stoppcodon selbst hat keine Aminosäure."),
     solution: [

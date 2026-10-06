@@ -154,7 +154,7 @@ export function GeneticsXLinked() {
                           </span>
                         </div>
                         <span className="text-[11.5px] text-ink-2">
-                          {state === "ill" ? t(disease.affected) : state === "carrier" ? t(tx("carrier", "Konduktorin")) : t(disease.healthy)}
+                          {state === "ill" ? t(tx("affected", "betroffen")) : state === "carrier" ? t(tx("carrier", "Konduktorin")) : t(tx("healthy", "gesund"))}
                         </span>
                       </motion.div>
                     </AnimatePresence>

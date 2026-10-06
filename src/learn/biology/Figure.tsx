@@ -43,6 +43,8 @@ export function Figure({
   title,
   width,
   height,
+  left = 0,
+  top = 0,
   parts,
   mode = "names",
   show,
@@ -58,6 +60,9 @@ export function Figure({
   title: Text;
   width: number;
   height: number;
+  /** Top-left corner of the visible area (viewBox units), to show a crop of a bigger drawing larger. */
+  left?: number;
+  top?: number;
   parts: FigurePart[];
   mode?: FigureMode;
   /** Only these parts get a marker (default: all). Numbers follow the order of `parts`. */
@@ -101,7 +106,7 @@ export function Figure({
     <figure className={cn("w-full", className)}>
       <div className={cn("grid gap-4", withLegend && legend === "auto" && "md:grid-cols-[minmax(0,1fr)_minmax(180px,240px)] md:items-center")}>
         <div className="relative min-w-0">
-          <svg id={uid} style={{ maxWidth: 640 }} viewBox={`0 0 ${width} ${height}`} className="mx-auto block h-auto w-full" role="img" aria-label={tt(title)}>
+          <svg id={uid} style={{ maxWidth: 640 }} viewBox={`${left} ${top} ${width} ${height}`} className="mx-auto block h-auto w-full" role="img" aria-label={tt(title)}>
             {css && <style>{css}</style>}
             {children}
             {markers &&
