@@ -114,7 +114,7 @@ export function TopicView({
               </h2>
               <span className="text-[13px] text-ink-3">{t.topic.levelsText}</span>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="tablist" aria-labelledby="topic-levels">
+            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3" role="tablist" aria-labelledby="topic-levels">
               {LEVELS.map((l) => (
                 <LevelTab
                   key={l}
@@ -264,23 +264,26 @@ function LevelTab({
       aria-selected={selected}
       onClick={onSelect}
       className={cn(
-        "relative flex min-w-0 flex-col items-start rounded-2xl border px-3 py-2.5 text-left transition-[border-color,background,box-shadow] sm:px-4 sm:py-3",
+        // Phones: one row per level (name and grade on the left, state on the right); wider: three cards side by side.
+        "relative flex min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-[border-color,background,box-shadow] sm:flex-col sm:items-start sm:gap-0 sm:px-4 sm:py-3",
         selected ? "border-blob/50 bg-blob-soft/45 shadow-card" : "border-line bg-raised hover:border-line-2",
       )}
     >
-      <span className={cn("flex items-center gap-1.5 text-[13.5px] font-semibold sm:text-[15px]", selected ? "text-blob-ink" : "text-ink")}>
-        <LevelBars level={level} />
-        <span className="truncate">{name}</span>
+      <span className="flex min-w-0 flex-1 flex-col sm:w-full sm:flex-none">
+        <span className={cn("flex min-w-0 items-center gap-1.5 text-[14px] font-semibold sm:text-[15px]", selected ? "text-blob-ink" : "text-ink")}>
+          <LevelBars level={level} className="shrink-0" />
+          <span className="truncate">{name}</span>
+        </span>
+        <span className="mt-0.5 truncate text-[12px] text-ink-3 sm:text-[12.5px]">{depth}</span>
       </span>
-      <span className="mt-0.5 truncate text-[11.5px] text-ink-3 sm:text-[12.5px]">{depth}</span>
-      <span className="mt-1.5 flex items-center gap-1 text-[11.5px] font-medium sm:text-[12px]">
+      <span className="flex min-w-0 shrink-0 items-center gap-1 text-[12px] font-medium sm:mt-1.5 sm:w-full sm:shrink">
         {!written ? (
-          <span className="flex items-center gap-1 text-ink-3">
-            <Hourglass className="size-3" /> <span className="truncate">{t.topic.comingSoon}</span>
+          <span className="flex min-w-0 items-center gap-1 text-ink-3">
+            <Hourglass className="size-3 shrink-0" /> <span className="truncate">{t.topic.comingSoon}</span>
           </span>
         ) : state.lesson_done ? (
-          <span className="flex items-center gap-1 text-ok">
-            <Check className="size-3.5" strokeWidth={3} /> <span className="truncate">{t.topic.lessonDone}</span>
+          <span className="flex min-w-0 items-center gap-1 text-ok">
+            <Check className="size-3.5 shrink-0" strokeWidth={3} /> <span className="truncate">{t.topic.lessonDone}</span>
           </span>
         ) : (
           <span className={cn("truncate", state.mastery > 0 ? "text-blob-ink" : "text-ink-3")}>{masteryLabel(state.mastery, locale)}</span>
