@@ -25,7 +25,7 @@ import {
   type SeedPart,
   type Vegetative,
 } from "./data";
-import { cap, capT, choice, de, en, join, multi, q, some, visual, type MultiOpt, type MultiSlip, type Opt } from "./kit";
+import { cap, capT, choice, de, en, join, multi, q, some, visual, type MultiOpt, type MultiSlip, type Opt, fitEx, fitLevel } from "./kit";
 
 // Level 2 (Fortgeschritten, Klasse 7–9): insect and wind flowers, self- and cross-pollination,
 // the pollen tube, fruit types, seed structure and germination, vegetative reproduction.
@@ -635,6 +635,10 @@ export function vegStatementsTask(rng: Rng): Exercise {
 // Generator
 
 export function generate2(rng: Rng): Exercise {
+  return fitEx(pick2(rng));
+}
+
+function pick2(rng: Rng): Exercise {
   switch (rng.int(0, 13)) {
     case 0:
       return featuresTask(rng);
@@ -749,7 +753,7 @@ const checkTube = tubeOrderTask(createRng(4), 1, 5);
 const checkGerm = germExperimentTask(createRng(9), 1);
 const checkPotato = potatoTask(createRng(2));
 
-export const level2: LevelLesson = {
+export const level2: LevelLesson = fitLevel({
   lesson: [
     {
       type: "explain",
@@ -855,4 +859,4 @@ export const level2: LevelLesson = {
       tone: "warning",
     },
   ],
-};
+});

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { resolveText, tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Mistake } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 
 // Small helpers for the flowers-seeds task generators (all three levels).
 
@@ -80,3 +80,44 @@ export function numberMistakes(right: number, list: { value: number; title: Text
 
 /** Pick `n` different items. */
 export const some = <T>(rng: Rng, list: readonly T[], n: number): T[] => rng.shuffle(list).slice(0, n);
+
+// ---------------------------------------------------------------------------
+// Long quoted words in display frames can't wrap (a quoted text is one token), so they get
+// split into one token per word. Highlights on such a token follow all of its words.
+
+const LONG = 20;
+
+function splitMath(src: string, map: Map<string, string[]>): string {
+  return src.replace(/"([^"]*)"(?:#([A-Za-z0-9_-]+))?/g, (m: string, body: string, key?: string) => {
+    if (body.length <= LONG || !body.includes(" ")) return m;
+    const words = body.split(/\s+/).filter(Boolean);
+    const keys = words.map((_, i) => (key ? (i ? `${key}-w${i}` : key) : ""));
+    if (key) map.set(key, [...new Set([...(map.get(key) ?? []), ...keys])]);
+    return words.map((w, i) => `"${w}"${keys[i] ? `#${keys[i]}` : ""}`).join(" \\; ");
+  });
+}
+
+const splitText = (t: Text, map: Map<string, string[]>): Text => (typeof t === "string" ? splitMath(t, map) : tx(splitMath(t.en, map), splitMath(t.de, map)));
+
+export function fitText(t: Text): Text {
+  return splitText(t, new Map());
+}
+
+export function fitFrames(frames: Frame[]): Frame[] {
+  return frames.map((f) => {
+    const map = new Map<string, string[]>();
+    const math = splitText(f.math, map);
+    const highlight = f.highlight?.flatMap((k) => map.get(k) ?? [k]);
+    return { ...f, math, ...(highlight ? { highlight } : {}) };
+  });
+}
+
+export const fitEx = (ex: Exercise): Exercise => ({ ...ex, solution: fitFrames(ex.solution) });
+
+/** Applies the word wrapping to a whole level: lesson frames, checks and cheat sheet examples. */
+export function fitLevel(level: LevelLesson): LevelLesson {
+  return {
+    lesson: level.lesson.map((s) => (s.type === "explain" && s.frames ? { ...s, frames: fitFrames(s.frames) } : s.type === "check" ? { ...s, exercise: fitEx(s.exercise) } : s)),
+    summary: level.summary.map((b) => (b.examples ? { ...b, examples: b.examples.map(fitText) } : b)),
+  };
+}

@@ -8,7 +8,7 @@ import { FlowerPollination } from "@/learn/biology/visuals/FlowerPollination";
 import { FlowerSection, FlowerSectionExplore } from "@/learn/biology/visuals/FlowerSection";
 import { FlowerToFruit } from "@/learn/biology/visuals/FlowerToFruit";
 import { ASK_PARTS, CHAIN1, DISPERSAL, JOB_PARTS, MODES, PARTS, plantById, type DispersalPlant, type Mode, type PartId } from "./data";
-import { cap, capT, choice, de, en, join, multi, q, some, visual, type MultiOpt, type MultiSlip, type Opt } from "./kit";
+import { cap, capT, choice, de, en, join, multi, q, some, visual, type MultiOpt, type MultiSlip, type Opt, fitEx, fitLevel } from "./kit";
 
 // Level 1 (Einsteiger, Klasse 5–6): the parts of the cherry blossom, pollination vs
 // fertilisation, from flower to fruit, and how fruits and seeds are spread.
@@ -700,6 +700,10 @@ export function statementsTask(rng: Rng): Exercise {
 // Generator
 
 export function generate1(rng: Rng): Exercise {
+  return fitEx(pick1(rng));
+}
+
+function pick1(rng: Rng): Exercise {
   switch (rng.int(0, 10)) {
     case 0:
       return nameTask(rng);
@@ -805,7 +809,7 @@ const checkEvent = eventTask(createRng(5), 0);
 const checkBecomes = becomesTask(createRng(7), 2);
 const checkChain = chainTask(createRng(3), 1, 5);
 
-export const level1: LevelLesson = {
+export const level1: LevelLesson = fitLevel({
   lesson: [
     {
       type: "explain",
@@ -922,5 +926,5 @@ export const level1: LevelLesson = {
       tone: "warning",
     },
   ],
-};
+});
 

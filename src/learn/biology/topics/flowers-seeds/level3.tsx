@@ -10,7 +10,7 @@ import { FlowerIncompat } from "@/learn/biology/visuals/FlowerIncompat";
 import { FlowerLifeCycle } from "@/learn/biology/visuals/FlowerLifeCycle";
 import { FlowerPollenGrain } from "@/learn/biology/visuals/FlowerPollenGrain";
 import { CHAINS3, PLOIDY_NAME, SPECIES, STRUCTURES, type Ploidy, type Structure } from "./data";
-import { cap, capT, choice, de, en, join, multi, numberMistakes, q, some, visual, type MultiOpt, type MultiSlip, type Opt } from "./kit";
+import { cap, capT, choice, de, en, join, multi, numberMistakes, q, some, visual, type MultiOpt, type MultiSlip, type Opt, fitEx, fitLevel } from "./kit";
 
 // Level 3 (Experte, Oberstufe): the embryo sac and the pollen grain as gametophytes, double
 // fertilisation with n/2n/3n, alternation of generations, self-incompatibility with S-alleles,
@@ -727,6 +727,10 @@ export function ethyleneTask(rng: Rng): Exercise {
 // Generator
 
 export function generate3(rng: Rng): Exercise {
+  return fitEx(pick3(rng));
+}
+
+function pick3(rng: Rng): Exercise {
   switch (rng.int(0, 14)) {
     case 0:
       return sacPartTask(rng);
@@ -832,7 +836,7 @@ const checkChromo = chromosomeTask(createRng(5), 0, "endo");
 const checkSi = siPercentTask(createRng(23), { sporo: false, share: 1 });
 const checkAbc = abcTask(createRng(31), { kind: 0, mutant: "b" });
 
-export const level3: LevelLesson = {
+export const level3: LevelLesson = fitLevel({
   lesson: [
     {
       type: "explain",
@@ -956,4 +960,4 @@ export const level3: LevelLesson = {
       tone: "warning",
     },
   ],
-};
+});
