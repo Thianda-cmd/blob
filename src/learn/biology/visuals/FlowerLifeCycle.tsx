@@ -172,18 +172,25 @@ export function FlowerLifeCycle({ start = "seed" }: { start?: Group }) {
                 <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700} fill="var(--ink)" style={{ fontFamily: "var(--font-sans)", pointerEvents: "none" }}>
                   {n.ploidy}
                 </text>
-                <text
-                  x={x}
-                  y={y + (n.angle === -90 ? -r - 10 : r + 15)}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={13.5}
-                  fontWeight={on ? 700 : 600}
-                  fill="var(--ink)"
-                  style={{ fontFamily: "var(--font-sans)", pointerEvents: "none" }}
-                >
-                  {t(n.name)}
-                </text>
+                {(() => {
+                  const top = n.angle === -90;
+                  const c = Math.cos((n.angle * Math.PI) / 180);
+                  const [lx, ly] = top ? [x, y - r - 11] : pos(n.angle, RING + r + 9);
+                  return (
+                    <text
+                      x={lx}
+                      y={ly + (!top && Math.sin((n.angle * Math.PI) / 180) > 0.5 ? 6 : 0)}
+                      textAnchor={top ? "middle" : c > 0.3 ? "start" : c < -0.3 ? "end" : "middle"}
+                      dominantBaseline="central"
+                      fontSize={13.5}
+                      fontWeight={on ? 700 : 600}
+                      fill="var(--ink)"
+                      style={{ fontFamily: "var(--font-sans)", pointerEvents: "none" }}
+                    >
+                      {t(n.name)}
+                    </text>
+                  );
+                })()}
               </g>
             );
           })}
