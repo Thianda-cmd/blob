@@ -215,7 +215,7 @@ export function EcoToleranceLab() {
             className={cn("relative h-9 rounded-lg border px-3 text-[14px] font-medium transition-colors", s.id === sid ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover hover:text-ink")}
           >
             {s.id === sid && <motion.span layoutId={`${scope}-sp`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 34 }} />}
-            <span className="relative">{t(s.name)}</span>
+            <span className="relative inline-block first-letter:uppercase">{t(s.name)}</span>
           </button>
         ))}
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-[13.5px] text-ink-2">

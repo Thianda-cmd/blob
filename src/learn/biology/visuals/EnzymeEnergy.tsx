@@ -47,12 +47,12 @@ function topOf(r: number, p: number, peak: number) {
   return best;
 }
 
-function Arrow({ x, from, to, id, label, dashedFrom }: { x: number; from: number; to: number; id: string; label?: string; dashedFrom?: number }) {
+function Arrow({ x, from, to, id, label, dashedFrom, right }: { x: number; from: number; to: number; id: string; label?: string; dashedFrom?: number; right?: boolean }) {
   return (
     <g>
       {dashedFrom !== undefined && <line x1={dashedFrom} x2={x + 6} y1={to} y2={to} stroke="var(--ink-3)" strokeWidth={1.2} strokeDasharray="3 4" />}
       <line x1={x} x2={x} y1={from} y2={to + (to < from ? 3 : -3)} stroke="var(--blob)" strokeWidth={2} markerEnd={`url(#${id})`} markerStart={`url(#${id})`} />
-      {label && <ArrowLabel x={x} y={(from + to) / 2} text={label} />}
+      {label && <ArrowLabel x={right ? x + 30 : x} y={(from + to) / 2} text={label} />}
     </g>
   );
 }
@@ -138,8 +138,8 @@ export function EnzymeEnergyDiagram({ kind = "exo", labels }: { kind?: "exo" | "
       <path d={pathOf(L.r, L.p, L.high)} fill="none" stroke="var(--ink-3)" strokeWidth={2.2} strokeDasharray="6 5" />
       <path d={pathOf(L.r, L.p, L.low)} fill="none" stroke="var(--ink)" strokeWidth={3} strokeLinecap="round" />
       <Levels r={L.r} p={L.p} />
-      <Arrow id={id} x={xs(0.27)} from={ys(L.r)} to={ys(hi.e)} label={labels[0]} dashedFrom={xs(hi.t)} />
-      <Arrow id={id} x={xs(0.38)} from={ys(L.r)} to={ys(lo.e)} label={labels[1]} dashedFrom={xs(lo.t)} />
+      <Arrow id={id} x={xs(0.2)} from={ys(L.r)} to={ys(hi.e)} label={labels[0]} dashedFrom={xs(hi.t)} />
+      <Arrow id={id} x={xs(0.29)} from={ys(L.r)} to={ys(lo.e)} label={labels[1]} dashedFrom={xs(lo.t)} right />
       <Arrow id={id} x={xs(0.95)} from={ys(L.r)} to={ys(L.p)} label={labels[2]} />
       <Legend />
     </Frame>

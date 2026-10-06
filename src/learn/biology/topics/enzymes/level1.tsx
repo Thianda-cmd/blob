@@ -106,7 +106,7 @@ const FACTS: Fact[] = [
       { text: tx("Nothing at all.", "Gar nichts."), title: tx("Heat matters", "Hitze macht etwas"), say: tx("Look at the boiled saliva in the experiment: it no longer splits starch. Boiling destroys enzymes.", "Schau dir den abgekochten Speichel im Versuch an: Er spaltet keine Stärke mehr. Kochen zerstört Enzyme.") },
     ],
     hint: tx("What happens to egg white when you boil an egg?", "Was passiert mit dem Eiklar, wenn du ein Ei kochst?"),
-    frame: { math: tx('100 \\deg"C" \\Rightarrow "enzyme destroyed"', '100 \\deg"C" \\Rightarrow "Enzym zerstört"'), note: tx("Like egg white in a boiled egg, the protein changes for good. The enzyme can't work any more.", "Wie das Eiklar beim gekochten Ei verändert sich das Protein dauerhaft. Das Enzym kann nicht mehr arbeiten.") },
+    frame: { math: tx('100 "°C" \\Rightarrow "enzyme destroyed"', '100 "°C" \\Rightarrow "Enzym zerstört"'), note: tx("Like egg white in a boiled egg, the protein changes for good. The enzyme can't work any more.", "Wie das Eiklar beim gekochten Ei verändert sich das Protein dauerhaft. Das Enzym kann nicht mehr arbeiten.") },
   },
   {
     q: tx("An enzyme molecule has already split 1000 substrate particles. What is true?", "Ein Enzymmolekül hat schon 1000 Substratteilchen gespalten. Was stimmt?"),
@@ -921,7 +921,7 @@ export const level1: LevelLesson = {
           note: tx("Amylases split starch. Lactase is used in food: it splits milk sugar and makes lactose-free milk.", "Amylasen spalten Stärke. Auch in Lebensmitteln stecken Enzyme: Laktase spaltet Milchzucker, so entsteht laktosefreie Milch."),
         },
         {
-          math: tx('95 \\deg"C" \\Rightarrow "enzymes destroyed"', '95 \\deg"C" \\Rightarrow "Enzyme zerstört"'),
+          math: tx('95 "°C" \\Rightarrow "enzymes destroyed"', '95 "°C" \\Rightarrow "Enzyme zerstört"'),
           note: tx("Most washing powder enzymes work best between 30 and 60 °C. A 95 °C hot wash destroys them, because they are proteins.", "Die meisten Waschmittel-Enzyme arbeiten am besten bei 30 bis 60 °C. Bei Kochwäsche mit 95 °C werden sie zerstört, denn sie sind Proteine."),
         },
       ],

@@ -59,7 +59,7 @@ const FACTS: Fact[] = [
       { text: tx("It is used up more slowly.", "Es wird langsamer verbraucht."), title: USED_UP, say: tx("Enzymes are never used up, whatever the temperature.", "Enzyme werden nie verbraucht, egal bei welcher Temperatur.") },
     ],
     hint: tx("Why do we keep food in the fridge?", "Warum bewahren wir Lebensmittel im Kühlschrank auf?"),
-    frame: { math: tx('0 \\deg"C" \\Rightarrow "slow, but intact"', '0 \\deg"C" \\Rightarrow "langsam, aber intakt"'), note: tx("Cold slows the particles down: few collisions, low activity. Warmed up again, the enzyme works normally (reversible).", "Kälte bremst die Teilchen: wenige Zusammenstöße, geringe Aktivität. Wieder erwärmt arbeitet das Enzym normal (reversibel).") },
+    frame: { math: tx('0 "°C" \\Rightarrow "slow, but intact"', '0 "°C" \\Rightarrow "langsam, aber intakt"'), note: tx("Cold slows the particles down: few collisions, low activity. Warmed up again, the enzyme works normally (reversible).", "Kälte bremst die Teilchen: wenige Zusammenstöße, geringe Aktivität. Wieder erwärmt arbeitet das Enzym normal (reversibel).") },
   },
   {
     q: tx("What does an enzyme do in the energy diagram of a reaction?", "Was bewirkt ein Enzym im Energiediagramm einer Reaktion?"),
@@ -135,7 +135,7 @@ const FACTS: Fact[] = [
       { text: tx("Enzymes only work below 0 °C.", "Enzyme arbeiten nur unter 0 °C."), title: tx("Cold slows down", "Kälte bremst"), say: tx("Below 0 °C enzymes hardly work at all: the particles are too slow.", "Unter 0 °C arbeiten Enzyme kaum: Die Teilchen sind zu langsam.") },
     ],
     hint: tx("Enzymes are proteins.", "Enzyme sind Proteine."),
-    frame: { math: tx('95 \\deg"C" \\Rightarrow "denaturation"', '95 \\deg"C" \\Rightarrow "Denaturierung"'), note: tx("The enzymes in washing powder are proteins too. At 95 °C they are denatured.", "Auch Waschmittel-Enzyme sind Proteine. Bei 95 °C werden sie denaturiert.") },
+    frame: { math: tx('95 "°C" \\Rightarrow "denaturation"', '95 "°C" \\Rightarrow "Denaturierung"'), note: tx("The enzymes in washing powder are proteins too. At 95 °C they are denatured.", "Auch Waschmittel-Enzyme sind Proteine. Bei 95 °C werden sie denaturiert.") },
   },
 ];
 
@@ -177,8 +177,8 @@ function tempGraphTask(rng: Rng): Exercise {
       answer: right,
       hint: tx("Find the highest point of the curve and go straight down to the x-axis.", "Such den höchsten Punkt der Kurve und geh senkrecht nach unten zur x-Achse."),
       solution: [
-        { math: tx(`"peak" \\Rightarrow ${opt} \\deg"C"`, `"Gipfel" \\Rightarrow ${opt} \\deg"C"`), note: tx(`The curve is highest at about **${opt} °C**: that's the temperature optimum.`, `Die Kurve ist bei etwa **${opt} °C** am höchsten: Das ist das Temperaturoptimum.`) },
-        { math: tx(`< ${opt} \\deg"C": "RGT rule" \\quad > ${opt} \\deg"C": "denaturation"`, `< ${opt} \\deg"C": "RGT-Regel" \\quad > ${opt} \\deg"C": "Denaturierung"`), note: tx("Below the optimum the rate rises with temperature (RGT rule). Above it the enzyme is denatured and the activity drops steeply.", "Unter dem Optimum steigt die Geschwindigkeit mit der Temperatur (RGT-Regel). Darüber wird das Enzym denaturiert, die Aktivität fällt steil ab.") },
+        { math: tx(`"peak" \\Rightarrow ${opt} "°C"`, `"Gipfel" \\Rightarrow ${opt} "°C"`), note: tx(`The curve is highest at about **${opt} °C**: that's the temperature optimum.`, `Die Kurve ist bei etwa **${opt} °C** am höchsten: Das ist das Temperaturoptimum.`) },
+        { math: tx(`< ${opt} "°C": "RGT rule" \\quad > ${opt} "°C": "denaturation"`, `< ${opt} "°C": "RGT-Regel" \\quad > ${opt} "°C": "Denaturierung"`), note: tx("Below the optimum the rate rises with temperature (RGT rule). Above it the enzyme is denatured and the activity drops steeply.", "Unter dem Optimum steigt die Geschwindigkeit mit der Temperatur (RGT-Regel). Darüber wird das Enzym denaturiert, die Aktivität fällt steil ab.") },
       ],
       mistakes: m.list,
     };
@@ -203,7 +203,7 @@ function tempGraphTask(rng: Rng): Exercise {
       visual: graph,
       answer: c.answer,
       hint: tx("An enzyme works best at the temperature at which its organism lives.", "Ein Enzym arbeitet am besten bei der Temperatur, bei der sein Lebewesen lebt."),
-      solution: [{ math: tx(`"optimum" \\approx ${opt} \\deg"C"`, `"Optimum" \\approx ${opt} \\deg"C"`), note: tx(`The optimum is about ${opt} °C. That fits ${resolveText(ORIGIN[right], "en")}: enzymes are adapted to the temperature their organism lives at.`, `Das Optimum liegt bei etwa ${opt} °C. Das passt zu ${resolveText(ORIGIN[right], "de")}: Enzyme sind an die Temperatur angepasst, bei der ihr Lebewesen lebt.`) }],
+      solution: [{ math: tx(`"optimum" \\approx ${opt} "°C"`, `"Optimum" \\approx ${opt} "°C"`), note: tx(`The optimum is about ${opt} °C. That fits ${resolveText(ORIGIN[right], "en")}: enzymes are adapted to the temperature their organism lives at.`, `Das Optimum liegt bei etwa ${opt} °C. Das passt zu ${resolveText(ORIGIN[right], "de")}: Enzyme sind an die Temperatur angepasst, bei der ihr Lebewesen lebt.`) }],
       mistakes: c.mistakes,
     };
   }
@@ -236,8 +236,8 @@ function tempGraphTask(rng: Rng): Exercise {
     hint: hot ? tx("What happens to a protein far above the optimum?", "Was passiert mit einem Protein weit über dem Optimum?") : tx("Does cold change the shape of the enzyme?", "Verändert Kälte die Form des Enzyms?"),
     solution: [
       hot
-        ? { math: tx(`${t2} \\deg"C" \\Rightarrow "denatured" \\Rightarrow "irreversible"`, `${t2} \\deg"C" \\Rightarrow "denaturiert" \\Rightarrow "irreversibel"`), note: tx("At this temperature the enzyme is denatured. Denaturation is irreversible: cooling down doesn't bring the active site back.", "Bei dieser Temperatur wird das Enzym denaturiert. Die Denaturierung ist irreversibel: Abkühlen bringt das aktive Zentrum nicht zurück.") }
-        : { math: tx(`${t2} \\deg"C" \\Rightarrow "slow" \\Rightarrow "reversible"`, `${t2} \\deg"C" \\Rightarrow "langsam" \\Rightarrow "reversibel"`), note: tx("In the cold the particles are just slow. The enzyme keeps its shape, so back at the optimum it works normally again.", "In der Kälte sind die Teilchen nur langsam. Das Enzym behält seine Form, also arbeitet es am Optimum wieder normal.") },
+        ? { math: tx(`${t2} "°C" \\Rightarrow "denatured" \\Rightarrow "irreversible"`, `${t2} "°C" \\Rightarrow "denaturiert" \\Rightarrow "irreversibel"`), note: tx("At this temperature the enzyme is denatured. Denaturation is irreversible: cooling down doesn't bring the active site back.", "Bei dieser Temperatur wird das Enzym denaturiert. Die Denaturierung ist irreversibel: Abkühlen bringt das aktive Zentrum nicht zurück.") }
+        : { math: tx(`${t2} "°C" \\Rightarrow "slow" \\Rightarrow "reversible"`, `${t2} "°C" \\Rightarrow "langsam" \\Rightarrow "reversibel"`), note: tx("In the cold the particles are just slow. The enzyme keeps its shape, so back at the optimum it works normally again.", "In der Kälte sind die Teilchen nur langsam. Das Enzym behält seine Form, also arbeitet es am Optimum wieder normal.") },
     ],
     mistakes: c.mistakes,
   };
@@ -342,7 +342,7 @@ function rgtTask(rng: Rng): Exercise {
       visual: visual(EnzymeTempGraph, { curves: [{ opt: 37 }], xMax: 80 }),
       answer: c.answer,
       hint: tx("Look at the graph: what happens above 40 °C?", "Schau ins Diagramm: Was passiert über 40 °C?"),
-      solution: [{ math: tx(`${t2} \\deg"C" > "optimum" \\Rightarrow "denaturation"`, `${t2} \\deg"C" > "Optimum" \\Rightarrow "Denaturierung"`), note: tx(`The RGT rule only works below the optimum. At ${t2} °C the enzyme is largely denatured: the rate drops instead of rising.`, `Die RGT-Regel gilt nur unterhalb des Optimums. Bei ${t2} °C ist das Enzym weitgehend denaturiert: Die Geschwindigkeit sinkt, statt zu steigen.`) }],
+      solution: [{ math: tx(`${t2} "°C" > "optimum" \\Rightarrow "denaturation"`, `${t2} "°C" > "Optimum" \\Rightarrow "Denaturierung"`), note: tx(`The RGT rule only works below the optimum. At ${t2} °C the enzyme is largely denatured: the rate drops instead of rising.`, `Die RGT-Regel gilt nur unterhalb des Optimums. Bei ${t2} °C ist das Enzym weitgehend denaturiert: Die Geschwindigkeit sinkt, statt zu steigen.`) }],
       mistakes: c.mistakes,
     };
   }
@@ -377,7 +377,7 @@ function rgtTask(rng: Rng): Exercise {
     answer: right,
     hint: down ? tx("Colder means slower: divide by the factor for each 10 °C step.", "Kälter heißt langsamer: Teile für jeden 10-°C-Schritt durch den Faktor.") : tx("Count the 10 °C steps, then multiply by the factor once per step.", "Zähl die 10-°C-Schritte und nimm für jeden Schritt einmal den Faktor."),
     solution: [
-      { math: tx(`${t1} \\deg"C" \\to ${t2} \\deg"C": \\; ${k} "step${k > 1 ? "s" : ""}"`, `${t1} \\deg"C" \\to ${t2} \\deg"C": \\; ${k} "Schritt${k > 1 ? "e" : ""}"`), note: tx(`From ${t1} °C to ${t2} °C there ${k > 1 ? "are" : "is"} ${k} step${k > 1 ? "s" : ""} of 10 °C. Both temperatures are below the optimum, so the rule applies.`, `Von ${t1} °C bis ${t2} °C ${k > 1 ? "sind es" : "ist es"} ${k} Schritt${k > 1 ? "e" : ""} von 10 °C. Beide Temperaturen liegen unter dem Optimum, die Regel gilt also.`) },
+      { math: tx(`${t1} "°C" \\to ${t2} "°C": \\; ${k} "step${k > 1 ? "s" : ""}"`, `${t1} "°C" \\to ${t2} "°C": \\; ${k} "Schritt${k > 1 ? "e" : ""}"`), note: tx(`From ${t1} °C to ${t2} °C there ${k > 1 ? "are" : "is"} ${k} step${k > 1 ? "s" : ""} of 10 °C. Both temperatures are below the optimum, so the rule applies.`, `Von ${t1} °C bis ${t2} °C ${k > 1 ? "sind es" : "ist es"} ${k} Schritt${k > 1 ? "e" : ""} von 10 °C. Beide Temperaturen liegen unter dem Optimum, die Regel gilt also.`) },
       { math: down ? `${v1} : ${f}${k > 1 ? ` : ${f}` : ""} = ${v2}` : `${v1} \\cdot ${f}${k > 1 ? ` \\cdot ${f}` : ""} = ${v2}`, note: tx(`So **${v2} µmol per minute**.`, `Also **${v2} µmol pro Minute**.`) },
     ],
     mistakes: m.list,
@@ -611,13 +611,13 @@ function experimentTask(rng: Rng): Exercise {
   const solution: Frame[] = [
     {
       math: tx(
-        `"${at(0)}:" 0 \\deg"C" \\to "blue-black (slow)" \\\\ "${at(37)}:" 37 \\deg"C" \\to "yellow-brown" \\\\ "${at(80)}:" 80 \\deg"C" \\to "blue-black (denatured)"`,
-        `"${at(0)}:" 0 \\deg"C" \\to "blau-schwarz (langsam)" \\\\ "${at(37)}:" 37 \\deg"C" \\to "gelb-braun" \\\\ "${at(80)}:" 80 \\deg"C" \\to "blau-schwarz (denaturiert)"`,
+        `"${at(0)}:" 0 "°C" \\to "blue-black (slow)" \\\\ "${at(37)}:" 37 "°C" \\to "yellow-brown" \\\\ "${at(80)}:" 80 "°C" \\to "blue-black (denatured)"`,
+        `"${at(0)}:" 0 "°C" \\to "blau-schwarz (langsam)" \\\\ "${at(37)}:" 37 "°C" \\to "gelb-braun" \\\\ "${at(80)}:" 80 "°C" \\to "blau-schwarz (denaturiert)"`,
       ),
       note: tx("At 37 °C the amylase has split all the starch. At 0 °C it works far too slowly, at 80 °C it is denatured.", "Bei 37 °C hat die Amylase die ganze Stärke gespalten. Bei 0 °C arbeitet sie viel zu langsam, bei 80 °C ist sie denaturiert."),
     },
     {
-      math: tx(`"warmed to" 37 \\deg"C": \\; "${at(0)}" \\to "yellow-brown" \\quad "${at(80)}" \\to "blue-black"`, `"auf" 37 \\deg"C" "gebracht:" \\; "${at(0)}" \\to "gelb-braun" \\quad "${at(80)}" \\to "blau-schwarz"`),
+      math: tx(`"warmed to" 37 "°C": \\; "${at(0)}" \\to "yellow-brown" \\quad "${at(80)}" \\to "blue-black"`, `"auf" 37 "°C" "gebracht:" \\; "${at(0)}" \\to "gelb-braun" \\quad "${at(80)}" \\to "blau-schwarz"`),
       note: tx("Cold is reversible: warmed up, the amylase from the cold tube gets to work. Denaturation is irreversible: the heated amylase stays inactive.", "Kälte ist reversibel: Erwärmt legt die Amylase aus dem kalten Glas los. Denaturierung ist irreversibel: Die erhitzte Amylase bleibt inaktiv."),
     },
   ];
@@ -798,7 +798,7 @@ const rgtCheck: Exercise = (() => {
     answer: right,
     hint: tx("How many steps of 10 °C are there from 15 °C to 35 °C?", "Wie viele 10-°C-Schritte sind es von 15 °C bis 35 °C?"),
     solution: [
-      { math: tx('15 \\deg"C" \\to 25 \\deg"C" \\to 35 \\deg"C"', '15 \\deg"C" \\to 25 \\deg"C" \\to 35 \\deg"C"'), note: tx("Two steps of 10 °C, both below the optimum.", "Zwei Schritte von 10 °C, beide unter dem Optimum.") },
+      { math: tx('15 "°C" \\to 25 "°C" \\to 35 "°C"', '15 "°C" \\to 25 "°C" \\to 35 "°C"'), note: tx("Two steps of 10 °C, both below the optimum.", "Zwei Schritte von 10 °C, beide unter dem Optimum.") },
       { math: "6 \\cdot 2 \\cdot 2 = 24", note: tx("Double, then double again: **24 µmol per minute**.", "Verdoppeln und noch mal verdoppeln: **24 µmol pro Minute**.") },
     ],
     mistakes: m.list,
@@ -919,10 +919,10 @@ export const level2: LevelLesson = {
       blob: tx("Every enzyme has its feel-good zone.", "Jedes Enzym hat seinen Wohlfühlbereich."),
       body: tx("Enzyme activity depends on temperature and pH. Each enzyme has an **optimum** at which it works fastest.", "Die Enzymaktivität hängt von Temperatur und pH-Wert ab. Jedes Enzym hat ein **Optimum**, bei dem es am schnellsten arbeitet."),
       frames: [
-        { math: tx('"+10" \\deg"C" \\Rightarrow v \\cdot 2 "to" 3', '"+10" \\deg"C" \\Rightarrow v \\cdot 2 "bis" 3'), note: tx("**RGT rule** (reaction rate and temperature): 10 °C warmer makes a reaction 2 to 3 times as fast. The particles move faster and collide more often.", "**RGT-Regel** (Reaktionsgeschwindigkeit-Temperatur-Regel): 10 °C wärmer macht eine Reaktion 2- bis 3-mal so schnell. Die Teilchen bewegen sich schneller und stoßen häufiger zusammen.") },
-        { math: tx('37 \\deg"C": "optimum"', '37 \\deg"C": "Optimum"'), note: tx("Most human enzymes work best at about 37 °C: their **temperature optimum**.", "Die meisten Enzyme des Menschen arbeiten bei etwa 37 °C am besten: ihr **Temperaturoptimum**.") },
-        { math: tx('"above" 45 \\deg"C": "denaturation (irreversible)"', '"über" 45 \\deg"C": "Denaturierung (irreversibel)"'), note: tx("Above that, heat destroys the protein's spatial structure. The active site is deformed and the substrate no longer fits. This **denaturation** is irreversible.", "Darüber zerstört die Hitze die räumliche Struktur des Proteins. Das aktive Zentrum verformt sich, das Substrat passt nicht mehr. Diese **Denaturierung** ist irreversibel.") },
-        { math: tx('0 \\deg"C": "slow, but intact (reversible)"', '0 \\deg"C": "langsam, aber intakt (reversibel)"'), note: tx("In the cold the particles move slowly and rarely meet. The enzyme is **not** denatured: warmed up, it works again.", "Bei Kälte bewegen sich die Teilchen langsam und treffen sich selten. Das Enzym wird aber **nicht** denaturiert: Erwärmt arbeitet es wieder.") },
+        { math: tx('"+10" "°C" \\Rightarrow v \\cdot 2 "to" 3', '"+10" "°C" \\Rightarrow v \\cdot 2 "bis" 3'), note: tx("**RGT rule** (reaction rate and temperature): 10 °C warmer makes a reaction 2 to 3 times as fast. The particles move faster and collide more often.", "**RGT-Regel** (Reaktionsgeschwindigkeit-Temperatur-Regel): 10 °C wärmer macht eine Reaktion 2- bis 3-mal so schnell. Die Teilchen bewegen sich schneller und stoßen häufiger zusammen.") },
+        { math: tx('37 "°C": "optimum"', '37 "°C": "Optimum"'), note: tx("Most human enzymes work best at about 37 °C: their **temperature optimum**.", "Die meisten Enzyme des Menschen arbeiten bei etwa 37 °C am besten: ihr **Temperaturoptimum**.") },
+        { math: tx('"above" 45 "°C": "denaturation (irreversible)"', '"über" 45 "°C": "Denaturierung (irreversibel)"'), note: tx("Above that, heat destroys the protein's spatial structure. The active site is deformed and the substrate no longer fits. This **denaturation** is irreversible.", "Darüber zerstört die Hitze die räumliche Struktur des Proteins. Das aktive Zentrum verformt sich, das Substrat passt nicht mehr. Diese **Denaturierung** ist irreversibel.") },
+        { math: tx('0 "°C": "slow, but intact (reversible)"', '0 "°C": "langsam, aber intakt (reversibel)"'), note: tx("In the cold the particles move slowly and rarely meet. The enzyme is **not** denatured: warmed up, it works again.", "Bei Kälte bewegen sich die Teilchen langsam und treffen sich selten. Das Enzym wird aber **nicht** denaturiert: Erwärmt arbeitet es wieder.") },
         {
           math: tx('"pepsin" \\; 2 \\quad "amylase" \\; 7 \\quad "trypsin" \\; 8', '"Pepsin" \\; 2 \\quad "Amylase" \\; 7 \\quad "Trypsin" \\; 8'),
           note: tx("**pH optimum**: pepsin in the acidic stomach about pH 2, salivary amylase about pH 7, trypsin in the small intestine about pH 8. Away from it, the charges in the active site change; strong acids and bases denature.", "**pH-Optimum**: Pepsin im sauren Magen etwa pH 2, Speichel-Amylase etwa pH 7, Trypsin im Dünndarm etwa pH 8. Abseits davon ändern sich die Ladungen im aktiven Zentrum, starke Säuren und Basen denaturieren."),
@@ -981,7 +981,7 @@ export const level2: LevelLesson = {
         "**RGT rule**: +10 °C → 2 to 3 times as fast (only below the optimum). Optimum of human enzymes about 37 °C. Above about 45 °C **denaturation** (irreversible). Cold only slows down (reversible).",
         "**RGT-Regel**: +10 °C → 2- bis 3-mal so schnell (nur unterhalb des Optimums). Optimum menschlicher Enzyme etwa 37 °C. Ab etwa 45 °C **Denaturierung** (irreversibel). Kälte bremst nur (reversibel).",
       ),
-      examples: [tx('"+10" \\deg"C" \\Rightarrow v \\cdot 2 "to" 3', '"+10" \\deg"C" \\Rightarrow v \\cdot 2 "bis" 3')],
+      examples: [tx('"+10" "°C" \\Rightarrow v \\cdot 2 "to" 3', '"+10" "°C" \\Rightarrow v \\cdot 2 "bis" 3')],
       tone: "rule",
     },
     {

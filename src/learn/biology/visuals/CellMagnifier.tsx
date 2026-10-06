@@ -142,7 +142,7 @@ export function CellMagnifier() {
             {i * 10}
           </text>
         ))}
-        <text x={X0 + 545} y={147} textAnchor="start" fontSize={11} fill="var(--ink)" opacity={0.7} style={{ fontFamily: "var(--font-sans)" }}>
+        <text x={X0 + 548} y={126} textAnchor="start" fontSize={11} fill="var(--ink)" opacity={0.7} style={{ fontFamily: "var(--font-sans)" }}>
           mm
         </text>
       </svg>
