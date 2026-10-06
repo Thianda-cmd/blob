@@ -56,7 +56,7 @@ function armPoints(x: number, y: number, angle: number, start: number, length: n
   for (let i = 0; i <= steps; i++) {
     const s = (length * i) / steps;
     const env = Math.min(1, s / 5);
-    const off = amp * env * Math.sin((2 * Math.PI * s) / 7 + seed);
+    const off = amp * env * (0.75 * Math.sin((2 * Math.PI * s) / 8 + seed) + 0.35 * Math.sin((2 * Math.PI * s) / 3.1 + 2.3 * seed));
     pts.push([x + ux * (start + s) + vx * off, y + uy * (start + s) + vy * off]);
   }
   return pts;
@@ -68,9 +68,9 @@ export function Chromatid({ x, y, pa, qa, len, cf, cond, fill, other, swap = 0, 
   if (opacity <= 0.01) return null;
   const c = Math.min(1, Math.max(0, cond));
   // Decondensed chromatin is longer, thinner and wiggles.
-  const stretch = 1 + 0.32 * (1 - c);
-  const amp = 4.2 * (1 - c) * (1 - c);
-  const w = (2.2 + 3.9 * c) * scale;
+  const stretch = 1 + 0.42 * (1 - c);
+  const amp = 3.4 * (1 - c) * (1 - c);
+  const w = (1.9 + 4.2 * c) * scale;
   const gap = (0.6 + 1.6 * c) * scale;
   const pLen = Math.max(1.5, len * cf * stretch - gap);
   const qLen = Math.max(1.5, len * (1 - cf) * stretch - gap);
@@ -83,12 +83,13 @@ export function Chromatid({ x, y, pa, qa, len, cf, cond, fill, other, swap = 0, 
   const tip = swap > 0.01 && other ? pathOf(q.slice(Math.min(k, q.length - 2))) : null;
   const band = (b: number) => {
     const onQ = b > 0;
-    const pts = onQ ? q : p;
-    const i = Math.min(pts.length - 1, Math.max(0, Math.round(Math.abs(b) * (pts.length - 1))));
-    const a = rad(onQ ? qa : pa) + Math.PI / 2;
-    const h = w * 0.5;
-    const [bx, by] = pts[i];
-    return `M${r1(bx - Math.cos(a) * h)} ${r1(by - Math.sin(a) * h)}L${r1(bx + Math.cos(a) * h)} ${r1(by + Math.sin(a) * h)}`;
+    const ang = rad(onQ ? qa : pa);
+    const d = gap + Math.abs(b) * (onQ ? qLen : pLen);
+    const bx = x + Math.cos(ang) * d;
+    const by = y + Math.sin(ang) * d;
+    const nx = -Math.sin(ang) * w * 0.5;
+    const ny = Math.cos(ang) * w * 0.5;
+    return `M${r1(bx - nx)} ${r1(by - ny)}L${r1(bx + nx)} ${r1(by + ny)}`;
   };
   return (
     <g opacity={opacity}>

@@ -298,7 +298,7 @@ export const ANIMALS: Animal[] = [
   },
   {
     id: "kiwi",
-    name: tx("kiwi", "Kiwi"),
+    name: tx("brown kiwi", "Streifenkiwi"),
     art: "der",
     cls: "bird",
     note: tx("cannot fly, its feathers look like hair", "kann nicht fliegen, seine Federn sehen aus wie Haare"),
@@ -396,7 +396,7 @@ export const ANIMALS: Animal[] = [
   },
   {
     id: "axolotl",
-    name: tx("axolotl", "Axolotl"),
+    name: tx("Mexican axolotl", "Mexikanischer Axolotl"),
     art: "der",
     cls: "amph",
     note: tx("lives in water all its life", "lebt sein ganzes Leben im Wasser"),

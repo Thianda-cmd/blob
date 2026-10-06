@@ -85,8 +85,14 @@ export function multi(rng: Rng, right: MultiOpt[], wrong: MultiOpt[]) {
   return { answer, mistakes: m.list.slice(0, 4) };
 }
 
-/** A quoted word for display-language frames, optionally keyed: `"Wasser"#w`. */
-export const q = (t: Text, k?: string): Text => tx(`"${en(t)}"${k ? `#${k}` : ""}`, `"${de(t)}"${k ? `#${k}` : ""}`);
+/**
+ * A quoted word for display-language frames, optionally keyed: `"Wasser"#w`. Text that reads the
+ * same in both languages (symbols, abbreviations like DCMU) becomes `\text{…}`.
+ */
+export const q = (t: Text, k?: string): Text => {
+  const key = k ? `#${k}` : "";
+  return en(t) === de(t) ? `\\text{${en(t)}}${key}` : tx(`"${en(t)}"${key}`, `"${de(t)}"${key}`);
+};
 /** Join display-language pieces (each may be bilingual). */
 export const join = (...parts: Text[]): Text => tx(parts.map(en).join(" "), parts.map(de).join(" "));
 

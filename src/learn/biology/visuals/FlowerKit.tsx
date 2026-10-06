@@ -1,6 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { tx, type Text } from "@/i18n/text";
+import { useText } from "@/i18n/useText";
+import { cn } from "@/lib/utils";
 
 // Shared drawing pieces for the topic "flowers-seeds": the cherry blossom in longitudinal
 // section (used by the labelled figure, the pollination widget and the flower-to-fruit
@@ -269,5 +273,99 @@ export function Bee({ pollen = 0 }: { pollen?: number }) {
         </g>
       )}
     </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step controls for the process widgets: back, one dot per step, next / play from the start.
+
+export function StepControls({ step, onStep, titles, delay = 1700 }: { step: number; onStep: (n: number) => void; titles: Text[]; delay?: number }) {
+  const t = useText();
+  const [playing, setPlaying] = useState(false);
+  const last = titles.length - 1;
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setTimeout(() => {
+      if (step >= last) setPlaying(false);
+      else onStep(step + 1);
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [playing, step, last, delay, onStep]);
+
+  const go = (n: number) => {
+    setPlaying(false);
+    onStep(n);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => go(Math.max(0, step - 1))}
+        disabled={step === 0}
+        aria-label={t(tx("Previous step", "Vorheriger Schritt"))}
+        className="grid size-10 place-items-center rounded-xl border border-line text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-40"
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+      <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
+        {titles.map((title, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => go(i)}
+            aria-label={`${i + 1}. ${t(title)}`}
+            aria-current={i === step ? "step" : undefined}
+            className={cn("h-2 rounded-full transition-all", i === step ? "w-7 bg-blob" : i < step ? "w-2 bg-blob/50" : "w-2 bg-line-2")}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (step >= last) {
+            onStep(0);
+            setPlaying(true);
+          } else go(step + 1);
+        }}
+        aria-label={step >= last ? t(tx("Play from the start", "Von vorn abspielen")) : t(tx("Next step", "Nächster Schritt"))}
+        className="grid size-10 place-items-center rounded-xl bg-blob text-white shadow-card hover:brightness-110"
+      >
+        {step >= last ? <Play className="size-4" /> : <ChevronRight className="size-4" />}
+      </button>
+    </div>
+  );
+}
+
+/** Caption card for a process step: "3. Title" and a note with **bold** words. */
+export function StepCaption({ n, title, note }: { n: number; title: Text; note: Text }) {
+  const t = useText();
+  return (
+    <div className="rounded-xl border border-line bg-surface px-3.5 py-2.5" aria-live="polite">
+      <div className="text-[14px] font-semibold text-ink">
+        {n}. {t(title)}
+      </div>
+      <p className="mt-0.5 min-h-[2.6em] text-[14px] leading-snug text-ink-2">
+        <Bold text={t(note)} />
+      </p>
+    </div>
+  );
+}
+
+/** Plain text with **bold** parts. */
+export function Bold({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+        p.startsWith("**") && p.endsWith("**") ? (
+          <strong key={i} className="font-semibold text-ink">
+            {p.slice(2, -2)}
+          </strong>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
   );
 }

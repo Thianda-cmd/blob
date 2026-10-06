@@ -22,7 +22,7 @@ export const PLANT_PARTS_EM: FigurePart[] = [
   ...PLANT_PARTS_LM,
   { id: "mitochondrion", label: tx("mitochondrion", "Mitochondrium"), at: [166, 104], tag: [206, 30], info: tx("Cellular respiration: releases energy from glucose. Plant cells have them too!", "Zellatmung: setzt Energie aus Traubenzucker frei. Auch Pflanzenzellen haben sie!") },
   { id: "er", label: tx("rough ER", "raues ER"), at: [220, 172], info: tx("Membrane channels with ribosomes: proteins are made and transported here.", "Membrankanäle mit Ribosomen: Hier werden Proteine hergestellt und transportiert.") },
-  { id: "golgi", label: tx("Golgi apparatus", "Golgi-Apparat"), at: [150, 285], tag: [150, 346], info: tx("Stack of flat sacs: modifies, sorts and packs proteins into vesicles.", "Stapel flacher Säckchen: verändert, sortiert und verpackt Proteine in Vesikel.") },
+  { id: "golgi", label: tx("Golgi apparatus", "Golgi-Apparat"), at: [150, 262], tag: [150, 346], info: tx("Stack of flat sacs: modifies, sorts and packs proteins into vesicles.", "Stapel flacher Säckchen: verändert, sortiert und verpackt Proteine in Vesikel.") },
   { id: "ribosome", label: tx("ribosomes", "Ribosomen"), at: [98, 137], tag: [24, 200], info: tx("Tiny protein factories: they join amino acids into proteins.", "Winzige Eiweißfabriken: Sie verknüpfen Aminosäuren zu Proteinen.") },
 ];
 
@@ -109,7 +109,7 @@ export function CellPlantCell({ mode = "names", show, ask, highlight, legend, de
             <RoughER d={ER_PATHS} dots={ER_DOTS} />
           </g>
           <g data-part="golgi">
-            <Golgi x={150} y={268} rot={180} s={0.9} />
+            <Golgi x={150} y={262} rot={0} s={0.9} />
           </g>
           <g data-part="mitochondrion">
             <Mitochondrion x={150} y={104} rot={-6} l={19} w={9} />

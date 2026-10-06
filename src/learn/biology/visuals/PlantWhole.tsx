@@ -59,7 +59,6 @@ export const PLANT_PARTS: FigurePart[] = [
   },
 ];
 
-const OUT = "var(--bio-outline)";
 const LEAF = "var(--bio-leaf)";
 const LEAF_D = "var(--bio-leaf-deep)";
 const ROOT = "var(--bio-bone)";
@@ -166,7 +165,7 @@ function HairInset({ clip }: { clip: string }) {
   const crumbs: [number, number, number][] = [
     [356, 290, 9], [384, 280, 7], [420, 286, 10], [446, 304, 7], [366, 372, 8], [398, 382, 10], [432, 370, 8], [350, 330, 5], [446, 352, 6],
   ];
-  const hairs = [352, 364, 376, 388, 400, 412];
+  const hairs = [348, 357, 366, 375, 384, 393, 402, 411];
   return (
     <g>
       <defs>
@@ -200,23 +199,23 @@ function HairInset({ clip }: { clip: string }) {
         <g fill={ROOT} stroke={ROOT_D} strokeWidth={1.2} clipPath={`url(#${clip})`}>
           {hairs.map((x, i) => {
             const up = i % 2 === 0;
-            const len = 26 + (i % 3) * 5;
-            const bend = (i % 3) - 1;
+            const len = 24 + ((i * 7) % 4) * 4;
+            const bend = ((i * 5) % 3) - 1;
             const y0 = up ? 316 : 344;
             const s = up ? -1 : 1;
             return (
               <path
                 key={x}
-                d={`M${x - 2.4} ${y0 + s} Q${x - 2.4 + bend * 6} ${y0 + s * len * 0.55} ${x + bend * 3 - 2.4} ${y0 + s * len} A2.4 2.4 0 0 ${up ? 1 : 0} ${x + bend * 3 + 2.4} ${y0 + s * len} Q${x + 2.4 + bend * 6} ${y0 + s * len * 0.55} ${x + 2.4} ${y0 + s}`}
+                d={`M${x - 2} ${y0 + s} Q${x - 2 + bend * 6} ${y0 + s * len * 0.55} ${x + bend * 3 - 2} ${y0 + s * len} A2 2 0 0 ${up ? 1 : 0} ${x + bend * 3 + 2} ${y0 + s * len} Q${x + 2 + bend * 6} ${y0 + s * len * 0.55} ${x + 2} ${y0 + s}`}
               />
             );
           })}
         </g>
       </g>
-      {/* water moves into the hairs */}
-      <g fill="var(--bio-water-deep)">
-        {[[358, 284], [394, 372], [416, 290]].map(([x, y], i) => (
-          <path key={i} d={`M${x} ${y} l5 ${y < cy ? 6 : -6} l-10 0 Z`} transform={`rotate(${y < cy ? 0 : 0} ${x} ${y})`} opacity={0.9} />
+      {/* water films around the crumbs reach the hairs */}
+      <g fill="var(--bio-water-deep)" clipPath={`url(#${clip})`}>
+        {[[352, 296], [372, 368], [404, 290], [420, 372], [388, 300]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={2.2} />
         ))}
       </g>
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--ink-2)" strokeWidth={2} />
@@ -260,10 +259,10 @@ export function PlantBody({ clip, inset = true }: { clip: string; inset?: boolea
         <PlantLeafShape x={239} y={126} angle={-32} len={70} width={14} />
       </g>
 
-      {/* bud on a side shoot */}
-      <g data-part="bud">
-        <path d="M206 93 C193 92 187 80 193 70 C197 76 201 74 203 71 C206 78 212 84 206 93 Z" fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1.4} transform="rotate(-38 204 88)" />
-        <path d="M209 95 C196 96 190 86 192 78 C198 84 204 86 209 95 Z M209 95 C210 84 206 76 199 72 C200 82 204 88 209 95 Z" fill={LEAF} stroke={LEAF_D} strokeWidth={1.4} strokeLinejoin="round" transform="rotate(-38 204 88)" />
+      {/* bud on a side shoot: green sepals, the pink petals just peeking out */}
+      <g data-part="bud" transform="translate(206 92) rotate(-50) scale(1.3)">
+        <path d="M0 -3 C-7 -8 -7 -19 0 -27 C7 -19 7 -8 0 -3 Z" fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1.4} />
+        <path d="M0 1 C-9 -3 -9 -13 -3 -20 L0 -11 L3 -20 C9 -13 9 -3 0 1 Z" fill={LEAF} stroke={LEAF_D} strokeWidth={1.4} strokeLinejoin="round" />
       </g>
 
       {/* flower */}
@@ -281,7 +280,6 @@ export function PlantBody({ clip, inset = true }: { clip: string; inset?: boolea
       </g>
 
       {inset && <HairInset clip={clip} />}
-      <path d="M0 0" stroke={OUT} />
     </g>
   );
 }

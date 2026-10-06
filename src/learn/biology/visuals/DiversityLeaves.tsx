@@ -10,7 +10,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 import { Figure, type DrawingProps, type FigurePart } from "@/learn/biology/Figure";
-import { leaf, pathOf, place, polarLeaf, sideVeins, type Leaf, type Pt } from "./DiversityShapes";
+import { leaf, pathOf, polarLeaf, sideVeins, veinsTo, type Leaf } from "./DiversityShapes";
 
 export type TreeId = "oak" | "beech" | "maple" | "lime" | "birch" | "chestnut" | "ash";
 
@@ -23,17 +23,21 @@ const OAK = leaf({
     [7, 5],
     [13, 2],
     [13, -8],
-    [21, -30],
-    [36, -62],
-    [50, -100],
-    [58, -130],
-    [55, -158],
-    [40, -180],
+    [24, -30],
+    [42, -62],
+    [56, -100],
+    [63, -132],
+    [58, -160],
+    [42, -181],
     [18, -194],
     [0, -199],
   ],
-  lobes: { n: 4.5, depth: 27, from: 0.13, to: 0.93, phase: 0.05 },
+  lobes: { n: 4.4, depth: 30, from: 0.16, to: 0.93, phase: 0.1, byWidth: true },
+  lobesLeft: { n: 4.4, depth: 30, from: 0.16, to: 0.93, phase: 0.28, byWidth: true },
 });
+
+/** Arc fractions of the oak's lobe tips on a side with this lobe phase. */
+const OAK_LOBES = (phase: number) => [0, 1, 2, 3].map((k) => 0.16 + ((k + 0.5 - phase) / 4.4) * 0.77).filter((f) => f < 0.86);
 
 const BEECH = leaf({
   right: [
@@ -127,27 +131,28 @@ const ASH_LEAFLET = leaf({
 // Spitzahorn: five pointed lobes with a few long teeth, round bays, heart-shaped base.
 const MAPLE_PTS = polarLeaf(
   [
-    { at: 0, len: 104, width: 34, sharp: 0.75 },
-    { at: 58, len: 98, width: 34, sharp: 0.75 },
-    { at: -58, len: 98, width: 34, sharp: 0.75 },
-    { at: 118, len: 66, width: 28, sharp: 0.8 },
-    { at: -118, len: 66, width: 28, sharp: 0.8 },
-    // teeth
-    { at: 0, len: 118, width: 7, sharp: 1.5 },
-    { at: 17, len: 86, width: 8, sharp: 1.6 },
-    { at: -17, len: 86, width: 8, sharp: 1.6 },
-    { at: 58, len: 112, width: 7, sharp: 1.5 },
-    { at: -58, len: 112, width: 7, sharp: 1.5 },
-    { at: 42, len: 82, width: 8, sharp: 1.6 },
-    { at: -42, len: 82, width: 8, sharp: 1.6 },
-    { at: 75, len: 82, width: 8, sharp: 1.6 },
-    { at: -75, len: 82, width: 8, sharp: 1.6 },
-    { at: 118, len: 76, width: 7, sharp: 1.5 },
-    { at: -118, len: 76, width: 7, sharp: 1.5 },
-    { at: 104, len: 58, width: 7, sharp: 1.6 },
-    { at: -104, len: 58, width: 7, sharp: 1.6 },
+    // lobe bodies: broad fingers that widen outwards
+    { at: 0, len: 90, width: 27, sharp: 0.35 },
+    { at: 62, len: 86, width: 27, sharp: 0.35 },
+    { at: -62, len: 86, width: 27, sharp: 0.35 },
+    { at: 126, len: 60, width: 25, sharp: 0.4 },
+    { at: -126, len: 60, width: 25, sharp: 0.4 },
+    // long pointed teeth: one at each lobe tip, a pair on each lobe side
+    { at: 0, len: 124, width: 9, sharp: 1.25 },
+    { at: 17, len: 98, width: 8, sharp: 1.3 },
+    { at: -17, len: 98, width: 8, sharp: 1.3 },
+    { at: 62, len: 120, width: 9, sharp: 1.25 },
+    { at: -62, len: 120, width: 9, sharp: 1.25 },
+    { at: 45, len: 94, width: 8, sharp: 1.3 },
+    { at: -45, len: 94, width: 8, sharp: 1.3 },
+    { at: 79, len: 94, width: 8, sharp: 1.3 },
+    { at: -79, len: 94, width: 8, sharp: 1.3 },
+    { at: 126, len: 82, width: 9, sharp: 1.25 },
+    { at: -126, len: 82, width: 9, sharp: 1.25 },
+    { at: 110, len: 64, width: 7, sharp: 1.3 },
+    { at: -110, len: 64, width: 7, sharp: 1.3 },
   ],
-  { base: 40, notch: 0.8, notchWidth: 26 },
+  { base: 34, notch: 0.75, notchWidth: 20 },
 );
 
 type Piece = { d: string; tf: string };
@@ -171,7 +176,7 @@ function geometry(id: TreeId): Geo {
   switch (id) {
     case "oak": {
       const tf = "translate(100 222)";
-      return { w: 200, h: 260, blades: [{ d: OAK.outline, tf }], veins: [{ d: `M0 0L0 -192${veinsOf(OAK, [0.17, 0.33, 0.5, 0.67, 0.82], 0.72, 0.09)}`, tf }], stalk: "M100 222L100 238" };
+      return { w: 200, h: 260, blades: [{ d: OAK.outline, tf }], veins: [{ d: `M0 0L0 -192${veinsTo(OAK, OAK_LOBES(0.1), OAK_LOBES(0.28), 0.82)}`, tf }], stalk: "M100 222L100 238" };
     }
     case "beech": {
       const tf = "translate(100 226)";
@@ -191,7 +196,7 @@ function geometry(id: TreeId): Geo {
         w: 260,
         h: 260,
         blades: [{ d: pathOf(MAPLE_PTS), tf }],
-        veins: [{ d: [ray(112, 0), ray(104, 58), ray(104, -58), ray(70, 118), ray(70, -118)].join(""), tf }],
+        veins: [{ d: [ray(112, 0), ray(108, 62), ray(108, -62), ray(72, 126), ray(72, -126)].join(""), tf }],
         stalk: "M130 150Q133 200 128 252",
       };
     }
@@ -509,7 +514,7 @@ export function DiversityLeafGallery() {
               <dd className="text-ink">{t(f.shape)}</dd>
               <dt className="font-semibold text-ink-3">{t(tx("Edge", "Rand"))}</dt>
               <dd className="text-ink">{t(f.margin)}</dd>
-              <dt className="font-semibold text-ink-3">{t(tx("Type", "Art"))}</dt>
+              <dt className="font-semibold text-ink-3">{t(tx("Build", "Aufbau"))}</dt>
               <dd className="text-ink">{t(f.kind)}</dd>
               <dt className="font-semibold text-ink-3">{t(tx("Fruit", "Frucht"))}</dt>
               <dd className="text-ink">{t(f.fruit)}</dd>

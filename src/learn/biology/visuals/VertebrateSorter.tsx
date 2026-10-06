@@ -150,7 +150,7 @@ export function VertebrateSorter() {
           ) : wrongSay ? (
             <motion.div key={`no-${picked}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-xl border border-danger/30 bg-danger/6 px-4 py-3 text-[15px] text-ink">
               <span className="font-semibold">
-                {t(tx(`Not ${resolveText(CLASSES[picked!].name, "en").toLowerCase()}. `, `Keine ${resolveText(CLASSES[picked!].name, "de")}. `))}
+                {t(tx(`Not ${resolveText(CLASSES[picked!].one, "en")}. `, `${resolveText(CLASSES[picked!].one, "de").replace(/^ein/, "Kein")}. `))}
               </span>
               {t(wrongSay)}
             </motion.div>

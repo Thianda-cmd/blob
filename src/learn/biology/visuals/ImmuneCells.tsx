@@ -81,6 +81,56 @@ export function abCup(side: -1 | 1, s: number, arm = AB.arm) {
   return { at: [f(d[0] * L), f(d[1] * L)] as [number, number], rot: side === -1 ? 140 : -140, dir: d };
 }
 
+/** One antibody bridging two pathogens in a clump: from pathogen `a` to `b` at angle `beta`, antibody below (1) or above (−1) the line. */
+export type ClumpLink = { a: number; b: number; beta: number; side: 1 | -1 };
+
+/**
+ * Lays out an agglutination clump: pathogen centres (radius `rp`, antigens of size `s`), the pose of
+ * each bridging antibody, and on every pathogen the angles of its antigens (bound ones first, free
+ * ones filled in between). Centred on `center`.
+ */
+export function clump(links: ClumpLink[], rp: number, s: number, center: [number, number]) {
+  const c = abCup(-1, s);
+  const c1: [number, number] = [c.at[0] + c.dir[0] * rp, c.at[1] + c.dir[1] * rp];
+  const D = Math.abs(2 * c1[0]);
+  const lift = Math.abs(c1[1]);
+  const P: [number, number][] = [[0, 0]];
+  for (const l of links) {
+    const r = rad(l.beta);
+    P[l.b] = [P[l.a][0] + D * Math.cos(r), P[l.a][1] + D * Math.sin(r)];
+  }
+  const abs = links.map((l) => {
+    const r = rad(l.beta);
+    const mid: [number, number] = [(P[l.a][0] + P[l.b][0]) / 2, (P[l.a][1] + P[l.b][1]) / 2];
+    return { H: [mid[0] - l.side * lift * Math.sin(r), mid[1] + l.side * lift * Math.cos(r)] as [number, number], rot: l.beta + (l.side === 1 ? 0 : 180) };
+  });
+  const bound: number[][] = P.map(() => []);
+  abs.forEach((ab, i) => {
+    for (const side of [-1, 1] as const) {
+      const o = turn(abCup(side, s).at, ab.rot);
+      const at: [number, number] = [ab.H[0] + o[0], ab.H[1] + o[1]];
+      const l = links[i];
+      const v = Math.hypot(P[l.a][0] - at[0], P[l.a][1] - at[1]) < Math.hypot(P[l.b][0] - at[0], P[l.b][1] - at[1]) ? l.a : l.b;
+      bound[v].push((Math.atan2(at[1] - P[v][1], at[0] - P[v][0]) * 180) / Math.PI);
+    }
+  });
+  const gap = (a: number, b: number) => Math.abs(((((a - b) % 360) + 540) % 360) - 180);
+  const angles = bound.map((list) => {
+    const out = [...list];
+    const base = list[0] ?? 0;
+    for (let k = 1; k < 8; k++) if (out.every((b) => gap(base + k * 45, b) > 38)) out.push(base + k * 45);
+    return out.map((a) => Math.round(a * 10) / 10);
+  });
+  const xs = P.map((p) => p[0]);
+  const ys = P.map((p) => p[1]);
+  const dx = center[0] - (Math.min(...xs) + Math.max(...xs)) / 2;
+  const dy = center[1] - (Math.min(...ys) + Math.max(...ys)) / 2;
+  return {
+    pathogens: P.map(([x, y], i) => ({ x: f(x + dx), y: f(y + dy), angles: angles[i] })),
+    antibodies: abs.map((a) => ({ x: f(a.H[0] + dx), y: f(a.H[1] + dy), rot: Math.round(a.rot) })),
+  };
+}
+
 /** A Y-shaped antibody: hinge at (0, 0), stem down, the two identical binding sites at the arm tips. */
 export function Antibody({
   shape,
@@ -140,14 +190,15 @@ export function VirusParticle({ r = 16, shape = "tri", s, angles, faded }: { r?:
 }
 
 /** A rod-shaped bacterium seen from above (length 2·w, height 2·h). */
-export function BacteriumRod({ w = 22, h = 10, flagellum = true, shape, angles }: { w?: number; h?: number; flagellum?: boolean; shape?: Epitope; angles?: number[] }) {
+export function BacteriumRod({ w = 22, h = 10, flagellum = true, shape, spots = [-11, 0, 11] }: { w?: number; h?: number; flagellum?: boolean; shape?: Epitope; spots?: number[] }) {
   return (
     <g>
       {flagellum && <path d={`M ${w - 1} 0 c 8 -7 12 7 20 0 s 12 -7 18 0`} fill="none" stroke={PAINT.bact.stroke} strokeWidth={1.4} strokeLinecap="round" />}
       {shape &&
-        (angles ?? [-90, 90]).map((t, i) => (
-          <path key={i} d={bumpPath(shape, 3.6)} transform={`rotate(${t + 90}) translate(0 ${-h})`} fill={PAINT.bact.stroke} />
-        ))}
+        spots.flatMap((x) => [
+          <path key={`t${x}`} d={bumpPath(shape, 3.6)} transform={`translate(${x} ${-h + 0.5})`} fill={PAINT.bact.stroke} />,
+          <path key={`b${x}`} d={bumpPath(shape, 3.6)} transform={`translate(${x} ${h - 0.5}) rotate(180)`} fill={PAINT.bact.stroke} />,
+        ])}
       <rect x={-w} y={-h} width={2 * w} height={2 * h} rx={h} fill={PAINT.bact.fill} stroke={PAINT.bact.stroke} strokeWidth={1.8} />
       <path d={`M ${-w * 0.45} ${-h * 0.15} q ${w * 0.25} ${-h * 0.55} ${w * 0.45} 0 t ${w * 0.45} 0`} fill="none" stroke="var(--bio-nucleus-deep)" strokeWidth={1.3} strokeLinecap="round" />
     </g>
@@ -157,17 +208,26 @@ export function BacteriumRod({ w = 22, h = 10, flagellum = true, shape, angles }
 // ---------------------------------------------------------------------------
 // Cells
 
+/** Radius of a blob outline at angle t (radians). */
+export function blobRadius(r: number, wobble: number[], t: number) {
+  let k = 1;
+  wobble.forEach((w, j) => (k += w * Math.sin((j + 2) * t + j * 1.7)));
+  return r * k;
+}
+
 /** A smooth, slightly irregular closed outline around (0, 0). */
 export function blobPath(r: number, wobble: number[], n = 48): string {
   const pts: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     const t = (i / n) * Math.PI * 2;
-    let k = 1;
-    wobble.forEach((w, j) => (k += w * Math.sin((j + 2) * t + j * 1.7)));
-    pts.push([f(r * k * Math.cos(t)), f(r * k * Math.sin(t))]);
+    const k = blobRadius(r, wobble, t);
+    pts.push([f(k * Math.cos(t)), f(k * Math.sin(t))]);
   }
   return `M ${pts.map((p) => p.join(" ")).join(" L ")} Z`;
 }
+
+export const MACRO_WOBBLE = [0.06, 0.05, 0.04];
+export const BODY_WOBBLE = [0.03, 0.025, 0.02];
 
 type CellProps = { r?: number; glow?: boolean; children?: ReactNode };
 
@@ -180,7 +240,7 @@ export function Macrophage({ r = 34, glow, children }: CellProps) {
   const k = r / 34;
   return (
     <g style={glow ? { filter: GLOW } : undefined}>
-      <path d={blobPath(r, [0.06, 0.05, 0.04])} fill={PAINT.macro.fill} stroke={PAINT.macro.stroke} strokeWidth={2} strokeLinejoin="round" />
+      <path d={blobPath(r, MACRO_WOBBLE)} fill={PAINT.macro.fill} stroke={PAINT.macro.stroke} strokeWidth={2} strokeLinejoin="round" />
       <path
         d={`M ${f(-14 * k)} ${f(-6 * k)} c ${f(4 * k)} ${f(-12 * k)} ${f(22 * k)} ${f(-12 * k)} ${f(24 * k)} ${f(2 * k)} c ${f(1 * k)} ${f(9 * k)} ${f(-8 * k)} ${f(13 * k)} ${f(-12 * k)} ${f(8 * k)} c ${f(-3 * k)} ${f(-3 * k)} ${f(-7 * k)} ${f(-2 * k)} ${f(-9 * k)} ${f(2 * k)} c ${f(-4 * k)} ${f(3 * k)} ${f(-6 * k)} ${f(-6 * k)} ${f(-3 * k)} ${f(-12 * k)} Z`}
         fill="var(--bio-nucleus)"
@@ -241,26 +301,26 @@ export function BReceptors({ r, shape, angles, s = 3.2 }: { r: number; shape: Ep
 
 const AROUND = [-90, -30, 30, 90, 150, 210];
 
-export function THelper({ r = 20, shape = "tri", glow, angles = AROUND }: CellProps & { shape?: Epitope; angles?: number[] }) {
+export function THelper({ r = 20, shape = "tri", glow, angles = AROUND, s }: CellProps & { shape?: Epitope; angles?: number[]; s?: number }) {
   return (
     <Lymphocyte r={r} paint={PAINT.th} glow={glow}>
-      <TReceptors r={r} shape={shape} angles={angles} color={PAINT.th.stroke} />
+      <TReceptors r={r} shape={shape} angles={angles} color={PAINT.th.stroke} s={s} />
     </Lymphocyte>
   );
 }
 
-export function TKiller({ r = 20, shape = "tri", glow, angles = AROUND }: CellProps & { shape?: Epitope; angles?: number[] }) {
+export function TKiller({ r = 20, shape = "tri", glow, angles = AROUND, s }: CellProps & { shape?: Epitope; angles?: number[]; s?: number }) {
   return (
     <Lymphocyte r={r} paint={PAINT.tk} glow={glow}>
-      <TReceptors r={r} shape={shape} angles={angles} color={PAINT.tk.stroke} />
+      <TReceptors r={r} shape={shape} angles={angles} color={PAINT.tk.stroke} s={s} />
     </Lymphocyte>
   );
 }
 
-export function BCell({ r = 20, shape = "tri", glow, angles = AROUND, receptors = true }: CellProps & { shape?: Epitope; angles?: number[]; receptors?: boolean }) {
+export function BCell({ r = 20, shape = "tri", glow, angles = AROUND, receptors = true, s }: CellProps & { shape?: Epitope; angles?: number[]; receptors?: boolean; s?: number }) {
   return (
     <Lymphocyte r={r} paint={PAINT.b} glow={glow}>
-      {receptors && <BReceptors r={r} shape={shape} angles={angles} />}
+      {receptors && <BReceptors r={r} shape={shape} angles={angles} s={s} />}
     </Lymphocyte>
   );
 }
@@ -297,7 +357,7 @@ export function BodyCell({ r = 30, infected, dying, glow, children }: CellProps 
   const k = r / 30;
   return (
     <g style={glow ? { filter: GLOW } : undefined} opacity={dying ? 0.55 : 1}>
-      <path d={blobPath(r, [0.03, 0.025, 0.02])} fill={PAINT.body.fill} stroke={PAINT.body.stroke} strokeWidth={2} strokeDasharray={dying ? "5 4" : undefined} />
+      <path d={blobPath(r, BODY_WOBBLE)} fill={PAINT.body.fill} stroke={PAINT.body.stroke} strokeWidth={2} strokeDasharray={dying ? "5 4" : undefined} />
       <Nucleus r={f(10 * k)} dx={f(-6 * k)} dy={f(-4 * k)} />
       {infected &&
         [

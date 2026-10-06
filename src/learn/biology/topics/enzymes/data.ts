@@ -58,14 +58,19 @@ export const both = (build: (f: (v: number, digits?: number) => string, de: bool
 // ---------------------------------------------------------------------------
 // Enzyme facts
 
-export type PhEnzyme = { id: string; name: Text; opt: number; width: number; place: Text };
+/** German grammar for an enzyme name: "zum Pepsin" / "zur Speichel-Amylase", "Es"/"Sie", "Sein"/"Ihr". */
+type DeForms = { nom: string; zu: string; pron: string; poss: string; rel: string };
+const NEUTER = (n: string): DeForms => ({ nom: n, zu: `zum ${n}`, pron: "Es", poss: "Sein", rel: "das" });
+const FEM = (nom: string, dat: string): DeForms => ({ nom: `Die ${nom}`, zu: `zur ${dat}`, pron: "Sie", poss: "Ihr", rel: "die" });
+
+export type PhEnzyme = { id: string; name: Text; opt: number; width: number; place: Text; de: DeForms };
 
 export const PH_ENZYMES: PhEnzyme[] = [
-  { id: "pepsin", name: tx("pepsin", "Pepsin"), opt: 2, width: 0.85, place: tx("in the stomach", "im Magen") },
-  { id: "acid", name: tx("acid phosphatase", "saure Phosphatase"), opt: 5, width: 0.95, place: tx("in the lysosomes", "in den Lysosomen") },
-  { id: "amylase", name: tx("salivary amylase", "Speichel-Amylase"), opt: 7, width: 1.05, place: tx("in the mouth", "in der Mundhöhle") },
-  { id: "trypsin", name: tx("trypsin", "Trypsin"), opt: 8, width: 1.05, place: tx("in the small intestine", "im Dünndarm") },
-  { id: "alkaline", name: tx("alkaline phosphatase", "alkalische Phosphatase"), opt: 10, width: 1.0, place: tx("in bone and intestine", "in Knochen und Darm") },
+  { id: "pepsin", name: tx("pepsin", "Pepsin"), opt: 2, width: 0.85, place: tx("in the stomach", "im Magen"), de: NEUTER("Pepsin") },
+  { id: "acid", name: tx("acid phosphatase", "saure Phosphatase"), opt: 5, width: 0.95, place: tx("in the lysosomes", "in den Lysosomen"), de: FEM("saure Phosphatase", "sauren Phosphatase") },
+  { id: "amylase", name: tx("salivary amylase", "Speichel-Amylase"), opt: 7, width: 1.05, place: tx("in the mouth", "in der Mundhöhle"), de: FEM("Speichel-Amylase", "Speichel-Amylase") },
+  { id: "trypsin", name: tx("trypsin", "Trypsin"), opt: 8, width: 1.05, place: tx("in the small intestine", "im Dünndarm"), de: NEUTER("Trypsin") },
+  { id: "alkaline", name: tx("alkaline phosphatase", "alkalische Phosphatase"), opt: 10, width: 1.0, place: tx("in bone and intestine", "in Knochen und Darm"), de: FEM("alkalische Phosphatase", "alkalischen Phosphatase") },
 ];
 export const phEnzyme = (id: string) => PH_ENZYMES.find((e) => e.id === id)!;
 

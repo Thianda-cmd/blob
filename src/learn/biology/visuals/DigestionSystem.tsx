@@ -98,7 +98,7 @@ const SMALL =
   "M260 362 C262 380 266 396 266 414 Q246 410 226 414 T186 414 A9 9 0 0 0 186 432 Q206 436 226 432 T266 432 Q276 430 286 432 A9 9 0 0 1 286 450 " +
   "Q266 454 246 450 T206 450 Q196 448 186 450 A9 9 0 0 0 186 468 Q206 472 226 468 T266 468 Q276 466 286 468 A9 9 0 0 1 286 486 Q256 490 226 486 T190 486 C176 486 168 484 158 482";
 const DUODENUM = "M236 326 C214 326 198 334 198 352 C198 372 216 380 236 376 C248 374 256 368 260 360";
-const OESOPHAGUS = "M220 134 C220 180 214 218 232 244 C238 252 246 258 254 262";
+const OESOPHAGUS = "M223 116 C219 150 216 200 226 232 C232 248 244 256 254 262";
 
 /** Way points of a bite, station by station (mouth, oesophagus, stomach, small intestine, large intestine, out). */
 export const BITE_PATH: [number, number][][] = [
@@ -262,12 +262,12 @@ export function DigestiveOrgans({ extra }: { extra?: ReactNode }) {
       {/* head: oral cavity with tongue and teeth, salivary glands */}
       <g data-part="mouth">
         <path
-          d="M268 101 C252 95 234 95 224 102 C216 109 214 122 215 136 L225 136 C225 126 228 119 236 117 C248 115 260 112 270 106 Z"
-          fill="color-mix(in oklab, var(--bio-petal-deep) 35%, var(--bio-flesh))"
+          d="M269 101 C256 96 236 96 226 103 C221 107 219 112 219 120 L227 120 C230 114 244 112 270 106 Z"
+          fill="color-mix(in oklab, var(--bio-petal-deep) 45%, var(--bio-flesh))"
           stroke={OUT}
-          strokeWidth={1.3}
+          strokeWidth={1.2}
         />
-        <path d="M263 107 C253 100 237 100 229 108 C226 114 230 119 238 118 C248 117 258 113 263 107 Z" fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1} />
+        <path d="M265 107 C255 102 239 102 231 109 C230 114 234 117 241 116 C251 115 259 112 265 107 Z" fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1} />
       </g>
       <g data-part="teeth" fill="var(--bio-bone)" stroke={OUT} strokeWidth={0.9}>
         <rect x={261} y={97.5} width={6} height={5} rx={1.2} />

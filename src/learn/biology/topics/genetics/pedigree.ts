@@ -27,6 +27,8 @@ export type Person = {
   unknown?: boolean;
   /** Known heterozygous carrier: drawn half filled. */
   carrier?: boolean;
+  /** A child that isn't born yet (sex unknown): drawn as a diamond with "?". */
+  unborn?: boolean;
 };
 
 /** A couple: [left partner, right partner]. */

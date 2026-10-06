@@ -80,7 +80,7 @@ export function PhotoStarchLeaf({ stencil = "strip", variegated = false, stage =
   );
 }
 
-function LeafArt({ stencil, variegated, stage, stain = 1 }: { stencil: Stencil; variegated: boolean; stage: LeafStage; stain?: number }) {
+function LeafArt({ stencil, variegated, stage }: { stencil: Stencil; variegated: boolean; stage: LeafStage }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const green = stage === "green" || stage === "foil";
   const base = green ? (variegated ? "var(--bio-cell)" : "var(--bio-leaf)") : stage === "pale" ? "var(--bio-bone)" : IODINE_BROWN;
@@ -101,7 +101,7 @@ function LeafArt({ stencil, variegated, stage, stain = 1 }: { stencil: Stencil; 
       <path d={LEAF} fill={base} stroke={green ? "var(--bio-leaf-deep)" : vein} strokeWidth={2} strokeLinejoin="round" />
       {green && variegated && <path d={INNER} fill="var(--bio-leaf)" />}
       {stage === "iodine" && (
-        <motion.g initial={false} animate={{ opacity: stain }} transition={{ duration: 1.4 }} mask={`url(#${uid}-starch)`}>
+        <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.4, delay: 0.3 }} mask={`url(#${uid}-starch)`}>
           <path d={LEAF} fill={STARCH_BLUE} />
         </motion.g>
       )}
@@ -120,7 +120,7 @@ function LeafArt({ stencil, variegated, stage, stain = 1 }: { stencil: Stencil; 
       </g>
       {stage === "foil" && (
         <g>
-          <Foil stencil={stencil} fill="var(--raised)" stroke="var(--ink-3)" />
+          <Foil stencil={stencil} fill="color-mix(in oklab, var(--ink-3) 45%, var(--raised))" stroke="var(--ink-2)" />
           {stencil !== "star" &&
             [0, 1, 2].map((i) => (
               <line
@@ -129,8 +129,9 @@ function LeafArt({ stencil, variegated, stage, stain = 1 }: { stencil: Stencil; 
                 y1={stencil === "strip" ? 44 : 100 + i * 4}
                 x2={stencil === "strip" ? 186 + i * 16 : 226 + i * 16}
                 y2={stencil === "strip" ? 216 : 150 + i * 4}
-                stroke="var(--line-2)"
-                strokeWidth={2}
+                stroke="var(--raised)"
+                strokeWidth={2.5}
+                opacity={0.7}
                 strokeLinecap="round"
               />
             ))}
@@ -143,13 +144,14 @@ function LeafArt({ stencil, variegated, stage, stain = 1 }: { stencil: Stencil; 
 // ---------------------------------------------------------------------------
 // The lesson widget
 
-type Step = { title: Text; text: Text; stage: LeafStage; prop?: "moon" | "sun" | "water" | "alcohol" | "iodine" };
+type Step = { title: Text; text: Text; stage: LeafStage; prop?: "plant" | "moon" | "foil" | "sun" | "water" | "alcohol" | "iodine" };
 
 const STEPS: Step[] = [
   {
     title: tx("The plant", "Die Pflanze"),
     text: tx("Choose a stencil and a leaf. Then start the experiment.", "Wähle eine Abdeckung und ein Blatt. Dann starte den Versuch."),
     stage: "green",
+    prop: "plant",
   },
   {
     title: tx("1. Two days in the dark", "1. Zwei Tage ins Dunkle"),
@@ -164,6 +166,7 @@ const STEPS: Step[] = [
     title: tx("2. Cover part of a leaf", "2. Einen Blattteil abdecken"),
     text: tx("Aluminium foil on both sides keeps the light away from this part. The rest of the leaf stays uncovered.", "Alufolie auf beiden Seiten hält das Licht von diesem Teil fern. Der Rest des Blattes bleibt frei."),
     stage: "foil",
+    prop: "foil",
   },
   {
     title: tx("3. Into the light", "3. Ins Licht"),
@@ -208,9 +211,11 @@ function result(stencil: Stencil, variegated: boolean): Text {
     stencil === "star"
       ? ["Only the star, where light came through the stencil, turns blue-black.", "Nur der Stern, durch den Licht fiel, wird blau-schwarz."]
       : ["The lit green part turns blue-black. The covered part stays yellow-brown: no light, no photosynthesis, no starch.", "Der belichtete grüne Teil wird blau-schwarz. Der abgedeckte Teil bleibt gelb-braun: kein Licht, keine Fotosynthese, keine Stärke."];
-  const margin = variegated
-    ? [" The white edge stays yellow-brown too, although it was in the light: it has no chlorophyll.", " Auch der weiße Rand bleibt gelb-braun, obwohl er im Licht war: Ihm fehlt das Chlorophyll."]
-    : ["", ""];
+  const margin = !variegated
+    ? ["", ""]
+    : stencil === "star"
+      ? [" The white edge was under the foil and has no chlorophyll anyway: yellow-brown.", " Der weiße Rand lag unter der Folie und hat ohnehin kein Chlorophyll: gelb-braun."]
+      : [" The white edge stays yellow-brown too, although it was in the light: it has no chlorophyll.", " Auch der weiße Rand bleibt gelb-braun, obwohl er im Licht war: Ihm fehlt das Chlorophyll."];
   return tx(covered[0] + margin[0], covered[1] + margin[1]);
 }
 
@@ -317,6 +322,8 @@ export function PhotoStarchTest() {
 function Prop({ kind }: { kind: Step["prop"] }) {
   const t = useText();
   const label: Record<NonNullable<Step["prop"]>, Text> = {
+    plant: tx("a potted plant", "eine Topfpflanze"),
+    foil: tx("aluminium foil", "Alufolie"),
     moon: tx("dark cupboard, 2 days", "dunkler Schrank, 2 Tage"),
     sun: tx("sunlight, a few hours", "Sonnenlicht, einige Stunden"),
     water: tx("boiling water", "kochendes Wasser"),
@@ -329,6 +336,22 @@ function Prop({ kind }: { kind: Step["prop"] }) {
         {kind && (
           <motion.div key={kind} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex flex-col items-center gap-1.5">
             <svg viewBox="0 0 100 100" className="size-[92px]" aria-hidden>
+              {kind === "plant" && (
+                <g>
+                  <path d="M50 64 C 49 48 51 36 50 22" fill="none" stroke="var(--bio-leaf-deep)" strokeWidth={3} strokeLinecap="round" />
+                  <path d="M50 44 C 40 30 26 30 18 36 C 26 48 40 50 50 44 Z" fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.6} />
+                  <path d="M50 34 C 60 20 74 20 82 26 C 74 38 60 40 50 34 Z" fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.6} />
+                  <path d="M50 24 C 44 14 38 12 34 14 C 38 22 44 26 50 24 Z" fill="var(--bio-leaf)" stroke="var(--bio-leaf-deep)" strokeWidth={1.4} />
+                  <path d="M28 62 L 72 62 L 66 92 L 34 92 Z" fill="var(--bio-wood)" stroke="var(--bio-outline)" strokeWidth={2} strokeLinejoin="round" />
+                  <rect x={24} y={58} width={52} height={8} rx={3} fill="var(--bio-wood)" stroke="var(--bio-outline)" strokeWidth={2} />
+                </g>
+              )}
+              {kind === "foil" && (
+                <g>
+                  <path d="M16 30 L 70 22 L 84 70 L 28 80 Z" fill="color-mix(in oklab, var(--ink-3) 45%, var(--raised))" stroke="var(--ink-2)" strokeWidth={2} strokeLinejoin="round" />
+                  <path d="M30 34 L 40 74 M 46 30 L 56 72 M 60 28 L 70 68" stroke="var(--raised)" strokeWidth={3} opacity={0.7} strokeLinecap="round" />
+                </g>
+              )}
               {kind === "moon" && (
                 <g>
                   <rect x={8} y={8} width={84} height={84} rx={14} fill="var(--bio-nucleus)" stroke="var(--bio-outline)" strokeWidth={2} />

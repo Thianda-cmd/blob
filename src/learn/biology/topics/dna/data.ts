@@ -192,9 +192,9 @@ export function pairs(top: string, bottom: string, opts: { ends?: [string, strin
   });
   if (opts.ends) {
     const [lt, lb, rt, rb] = opts.ends;
-    return `\\frac{\\text{${lt}}#${k}lt }{\\text{${lb}}#${k}lb }#${k}L ${cols.join(" ")} \\frac{\\text{${rt}}#${k}rt }{\\text{${rb}}#${k}rb }#${k}R`;
+    return `\\group{\\frac{\\text{${lt}}#${k}lt }{\\text{${lb}}#${k}lb }#${k}L ${cols.join(" ")} \\frac{\\text{${rt}}#${k}rt }{\\text{${rb}}#${k}rb }#${k}R}`;
   }
-  return cols.join(" ");
+  return `\\group{${cols.join(" ")}}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -89,6 +89,8 @@ export type Lobes = {
   to: number;
   /** Shift of the lobes on this side (oak lobes alternate a little). */
   phase?: number;
+  /** Shallower bays where the leaf is narrow. */
+  byWidth?: boolean;
 };
 
 /** A saw tooth whose sharp point faces the tip. */
@@ -97,6 +99,7 @@ const saw = (u: number) => (u < 0.78 ? Math.pow(u / 0.78, 1.35) : (1 - u) / 0.22
 /** Offsets a margin outwards (teeth) or inwards (lobes). */
 function shapeMargin(poly: Pt[], side: 1 | -1, teeth?: Teeth, lobes?: Lobes): Pt[] {
   const s = arcs(poly);
+  const widest = Math.max(...poly.map((p) => Math.abs(p[0])));
   const total = s[s.length - 1];
   const nn = normals(poly, side);
   return poly.map((p, i) => {
@@ -109,7 +112,8 @@ function shapeMargin(poly: Pt[], side: 1 | -1, teeth?: Teeth, lobes?: Lobes): Pt
       const lobe = Math.pow(Math.sin(Math.PI * v), 0.5);
       // Fade the bays in and out at the ends.
       const edge = Math.min(1, (f - lobes.from) / 0.04, (lobes.to - f) / 0.06);
-      off -= lobes.depth * (1 - lobe) * edge;
+      const k = lobes.byWidth ? Math.min(1, (1.25 * Math.abs(p[0])) / widest) : 1;
+      off -= lobes.depth * k * (1 - lobe) * edge;
     }
     if (teeth) {
       const from = teeth.from ?? 0.08;
@@ -245,4 +249,19 @@ export function petalPath(cx: number, cy: number, len: number, width: number, de
   const rx = tipX - px * w * 0.55;
   const ry = tipY - py * w * 0.55;
   return `M${r1(cx)} ${r1(cy)}C${r1(c1x)} ${r1(c1y)} ${r1(lx + px * w * 0.5)} ${r1(ly + py * w * 0.5)} ${r1(lx)} ${r1(ly)}Q${r1(tipX)} ${r1(tipY)} ${r1(nx)} ${r1(ny)}Q${r1(tipX)} ${r1(tipY)} ${r1(rx)} ${r1(ry)}C${r1(rx - px * w * 0.5)} ${r1(ry - py * w * 0.5)} ${r1(c2x)} ${r1(c2y)} ${r1(cx)} ${r1(cy)}Z`;
+}
+
+/** Veins from the midrib to given points of the margin (arc fractions 0 = base … 1 = tip), e.g. into lobe tips. */
+export function veinsTo(l: Leaf, right: number[], left: number[], reach = 0.85): string {
+  const out: string[] = [];
+  const one = (side: Pt[], f: number) => {
+    const m = side[Math.round(f * (side.length - 1))];
+    const ex = m[0] * reach;
+    const ey = m[1] * (0.9 + 0.1 * reach);
+    const y0 = ey + Math.abs(ex) * 0.55;
+    out.push(`M0 ${r1(Math.min(0, y0))}Q${r1(ex * 0.4)} ${r1(ey + Math.abs(ex) * 0.12)} ${r1(ex)} ${r1(ey)}`);
+  };
+  right.forEach((f) => one(l.rightSmooth, f));
+  left.forEach((f) => one(l.leftSmooth, f));
+  return out.join("");
 }

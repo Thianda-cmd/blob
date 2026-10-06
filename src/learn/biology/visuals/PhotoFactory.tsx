@@ -41,7 +41,7 @@ const INPUTS: { id: Input; label: Text; icon: ReactNode; missing: Text }[] = [
   },
   {
     id: "chloro",
-    label: tx("Chlorophyll", "Chlorophyll"),
+    label: tx("Chlorophyll", "Blattgrün"),
     icon: <Leaf className="size-4" />,
     missing: tx(
       "A white leaf has no chlorophyll. Nothing catches the light, so nothing is made, even in bright sun.",
@@ -112,7 +112,7 @@ export function PhotoFactory() {
   // While the factory runs, sugar keeps coming and is stored as starch (a growing chain).
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setStarch((s) => (s >= 9 ? 3 : s + 1)), 1600);
+    const id = setInterval(() => setStarch((s) => (s >= 7 ? 2 : s + 1)), 1600);
     return () => clearInterval(id);
   }, [running]);
 
@@ -202,8 +202,8 @@ export function PhotoFactory() {
         ))}
 
         {/* starch store inside the leaf */}
-        <g transform="translate(372 108) rotate(-22)">
-          <PhotoStarchChain n={starch} s={0.95} />
+        <g transform="translate(372 112) rotate(-24)">
+          <PhotoStarchChain n={starch} s={1.3} />
         </g>
 
         {/* flows */}
@@ -212,21 +212,21 @@ export function PhotoFactory() {
             <motion.g key="flows" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {[0, 1, 2, 3].map((i) => (
                 <Flow key={`w${i}`} points={WATER_PATH} delay={i * 0.9} duration={3.6} reduce={reduce}>
-                  <PhotoDrop s={0.9} />
+                  <PhotoDrop s={1.6} />
                 </Flow>
               ))}
               {[0, 1, 2].map((i) => (
                 <Flow key={`c${i}`} points={CO2_PATH} delay={0.4 + i * 1.2} duration={3.6} reduce={reduce}>
-                  <PhotoCO2 s={0.9} />
+                  <PhotoCO2 s={1.5} />
                 </Flow>
               ))}
               {[0, 1, 2].map((i) => (
                 <Flow key={`o${i}`} points={O2_PATH} delay={1 + i * 1.2} duration={3.6} reduce={reduce}>
-                  <PhotoO2 s={0.9} />
+                  <PhotoO2 s={1.5} />
                 </Flow>
               ))}
               <Flow points={SUGAR_PATH} delay={0.2} duration={1.6} reduce={reduce}>
-                <PhotoGlucose s={1} />
+                <PhotoGlucose s={1.5} />
               </Flow>
             </motion.g>
           )}

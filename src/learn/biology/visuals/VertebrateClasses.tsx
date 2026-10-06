@@ -26,6 +26,8 @@ const MEMBERS: Record<ClassId, string[]> = {
   bird: ["blackbird", "eagle", "penguin", "ostrich"],
   mammal: ["hedgehog", "whale", "bat", "platypus"],
 };
+/** Members that surprise students (shown in purple). */
+const SURPRISE = new Set(["seahorse", "eel", "axolotl", "salamander", "crocodile", "slowworm", "penguin", "ostrich", "whale", "bat", "platypus"]);
 
 export function VertebrateClassCards() {
   const t = useText();
@@ -84,7 +86,7 @@ export function VertebrateClassCards() {
             <span className="mr-1 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">{t(tx("Examples", "Beispiele"))}</span>
             {MEMBERS[sel].map((id) => {
               const a = ANIMALS.find((x) => x.id === id)!;
-              const tricky = !!a.traps;
+              const tricky = SURPRISE.has(id);
               return (
                 <span key={id} className={cn("rounded-full px-2.5 py-0.5 text-[13px]", tricky ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}>
                   {t(a.name)}

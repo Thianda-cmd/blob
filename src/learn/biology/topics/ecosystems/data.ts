@@ -17,7 +17,7 @@ export type Org = {
   note?: Text;
 };
 
-export const ORGS = {
+const ORG_LIST = {
   // producers
   grass: { name: tx("grass", "Gras"), role: "producer" },
   herbs: { name: tx("herbs", "Kräuter"), role: "producer" },
@@ -90,7 +90,8 @@ export const ORGS = {
   beetle: { name: tx("burying beetle", "Totengräber"), role: "decomposer", note: tx("The burying beetle buries dead mice and birds and feeds its larvae on them: it helps break down carrion.", "Der Totengräber vergräbt tote Mäuse und Vögel und füttert seine Larven damit: Er hilft, Aas abzubauen.") },
 } satisfies Record<string, Org>;
 
-export type OrgId = keyof typeof ORGS;
+export type OrgId = keyof typeof ORG_LIST;
+export const ORGS: Record<OrgId, Org> = ORG_LIST;
 export const org = (id: OrgId): Org => ORGS[id];
 export const nameOf = (id: OrgId) => ORGS[id].name;
 
@@ -386,24 +387,125 @@ export const LAYERS: { id: LayerId; name: Text; height: Text; plants: Text; anim
   },
 ];
 
-/** Plants and animals and the layer they typically live in (for tasks). */
-export const LAYER_MEMBERS: { name: Text; layer: LayerId; plant: boolean }[] = [
-  { name: tx("beech", "Buche"), layer: "tree", plant: true },
-  { name: tx("oak", "Eiche"), layer: "tree", plant: true },
-  { name: tx("spruce", "Fichte"), layer: "tree", plant: true },
-  { name: tx("great spotted woodpecker", "Buntspecht"), layer: "tree", plant: false },
-  { name: tx("hazel", "Hasel"), layer: "shrub", plant: true },
-  { name: tx("elder", "Holunder"), layer: "shrub", plant: true },
-  { name: tx("hawthorn", "Weißdorn"), layer: "shrub", plant: true },
-  { name: tx("dormouse", "Haselmaus"), layer: "shrub", plant: false },
-  { name: tx("wood anemone", "Buschwindröschen"), layer: "herb", plant: true },
-  { name: tx("woodruff", "Waldmeister"), layer: "herb", plant: true },
-  { name: tx("wild garlic", "Bärlauch"), layer: "herb", plant: true },
-  { name: tx("fern", "Farn"), layer: "herb", plant: true },
-  { name: tx("lily of the valley", "Maiglöckchen"), layer: "herb", plant: true },
-  { name: tx("moss cushions", "Moospolster"), layer: "moss", plant: true },
-  { name: tx("lichens", "Flechten"), layer: "moss", plant: false },
-  { name: tx("ground beetle", "Laufkäfer"), layer: "moss", plant: false },
-  { name: tx("earthworm", "Regenwurm"), layer: "root", plant: false },
-  { name: tx("mole", "Maulwurf"), layer: "root", plant: false },
+/** Plants and animals and the layer they typically live in (for tasks). `nom`: with article. */
+export const LAYER_MEMBERS: { name: Text; nom: Text; layer: LayerId; plant: boolean; plural?: boolean }[] = [
+  { name: tx("beech", "Buche"), nom: tx("the beech", "die Buche"), layer: "tree", plant: true },
+  { name: tx("oak", "Eiche"), nom: tx("the oak", "die Eiche"), layer: "tree", plant: true },
+  { name: tx("spruce", "Fichte"), nom: tx("the spruce", "die Fichte"), layer: "tree", plant: true },
+  { name: tx("great spotted woodpecker", "Buntspecht"), nom: tx("the great spotted woodpecker", "der Buntspecht"), layer: "tree", plant: false },
+  { name: tx("hazel", "Hasel"), nom: tx("the hazel", "die Hasel"), layer: "shrub", plant: true },
+  { name: tx("elder", "Holunder"), nom: tx("the elder", "der Holunder"), layer: "shrub", plant: true },
+  { name: tx("hawthorn", "Weißdorn"), nom: tx("the hawthorn", "der Weißdorn"), layer: "shrub", plant: true },
+  { name: tx("dormouse", "Haselmaus"), nom: tx("the dormouse", "die Haselmaus"), layer: "shrub", plant: false },
+  { name: tx("wood anemone", "Buschwindröschen"), nom: tx("the wood anemone", "das Buschwindröschen"), layer: "herb", plant: true },
+  { name: tx("woodruff", "Waldmeister"), nom: tx("woodruff", "der Waldmeister"), layer: "herb", plant: true },
+  { name: tx("wild garlic", "Bärlauch"), nom: tx("wild garlic", "der Bärlauch"), layer: "herb", plant: true },
+  { name: tx("fern", "Farn"), nom: tx("the fern", "der Farn"), layer: "herb", plant: true },
+  { name: tx("lily of the valley", "Maiglöckchen"), nom: tx("the lily of the valley", "das Maiglöckchen"), layer: "herb", plant: true },
+  { name: tx("moss cushions", "Moospolster"), nom: tx("moss cushions", "Moospolster"), layer: "moss", plant: true, plural: true },
+  { name: tx("lichens", "Flechten"), nom: tx("lichens", "Flechten"), layer: "moss", plant: false, plural: true },
+  { name: tx("ground beetle", "Laufkäfer"), nom: tx("the ground beetle", "der Laufkäfer"), layer: "moss", plant: false },
+  { name: tx("earthworm", "Regenwurm"), nom: tx("the earthworm", "der Regenwurm"), layer: "root", plant: false },
+  { name: tx("mole", "Maulwurf"), nom: tx("the mole", "der Maulwurf"), layer: "root", plant: false },
 ];
+
+// ---------------------------------------------------------------------------
+// Grammar for sentences about organisms: German article (nominative singular), plural (or the
+// mass noun), English plural. `plural`: the name itself is a plural ("Algen").
+
+type Gram = { art: "der" | "die" | "das"; pl: string; plEn: string; mass?: true; plural?: true };
+const G = (art: Gram["art"], pl: string, plEn: string, extra: Partial<Gram> = {}): Gram => ({ art, pl, plEn, ...extra });
+
+export const GRAM: Record<OrgId, Gram> = {
+  grass: G("das", "Gras", "grass", { mass: true }),
+  herbs: G("die", "Kräuter", "herbs", { plural: true }),
+  clover: G("der", "Klee", "clover", { mass: true }),
+  dandelion: G("der", "Löwenzahn", "dandelion", { mass: true }),
+  oak: G("die", "Eichen", "oaks"),
+  beech: G("die", "Buchen", "beeches"),
+  spruce: G("die", "Fichten", "spruces"),
+  bramble: G("die", "Brombeeren", "brambles"),
+  algae: G("die", "Algen", "algae", { plural: true }),
+  waterplants: G("die", "Wasserpflanzen", "water plants", { plural: true }),
+  moss: G("das", "Moose", "mosses"),
+  fern: G("der", "Farne", "ferns"),
+  anemone: G("das", "Buschwindröschen", "wood anemones"),
+  waterlily: G("die", "Seerosen", "water lilies"),
+  roe: G("das", "Rehe", "roe deer"),
+  hare: G("der", "Feldhasen", "hares"),
+  vole: G("die", "Feldmäuse", "voles"),
+  bankvole: G("die", "Rötelmäuse", "bank voles"),
+  grasshopper: G("die", "Heuschrecken", "grasshoppers"),
+  caterpillar: G("die", "Raupen", "caterpillars"),
+  aphid: G("die", "Blattläuse", "aphids"),
+  daphnia: G("der", "Wasserflöhe", "water fleas"),
+  snail: G("die", "Schlammschnecken", "pond snails"),
+  reddeer: G("der", "Rothirsche", "red deer"),
+  mosquito: G("die", "Mückenlarven", "mosquito larvae"),
+  squirrel: G("das", "Eichhörnchen", "squirrels"),
+  fox: G("der", "Füchse", "foxes"),
+  buzzard: G("der", "Mäusebussarde", "buzzards"),
+  kestrel: G("der", "Turmfalken", "kestrels"),
+  sparrowhawk: G("der", "Sperber", "sparrowhawks"),
+  goshawk: G("der", "Habichte", "goshawks"),
+  owl: G("der", "Waldkäuze", "tawny owls"),
+  marten: G("der", "Baummarder", "pine martens"),
+  lynx: G("der", "Luchse", "lynx"),
+  wolf: G("der", "Wölfe", "wolves"),
+  greattit: G("die", "Kohlmeisen", "great tits"),
+  frog: G("der", "Grasfrösche", "frogs"),
+  stork: G("der", "Weißstörche", "storks"),
+  heron: G("der", "Graureiher", "herons"),
+  pike: G("der", "Hechte", "pike"),
+  perch: G("der", "Barsche", "perch"),
+  roach: G("das", "Rotaugen", "roach"),
+  stickleback: G("der", "Stichlinge", "sticklebacks"),
+  kingfisher: G("der", "Eisvögel", "kingfishers"),
+  osprey: G("der", "Fischadler", "ospreys"),
+  cormorant: G("der", "Kormorane", "cormorants"),
+  dragonfly: G("die", "Libellenlarven", "dragonfly larvae"),
+  ladybird: G("der", "Marienkäfer", "ladybirds"),
+  spider: G("die", "Kreuzspinnen", "garden spiders"),
+  shrike: G("der", "Neuntöter", "shrikes"),
+  lark: G("die", "Feldlerchen", "skylarks"),
+  boar: G("das", "Wildschweine", "wild boar"),
+  badger: G("der", "Dachse", "badgers"),
+  human: G("der", "Menschen", "humans"),
+  crow: G("die", "Rabenkrähen", "crows"),
+  jay: G("der", "Eichelhäher", "jays"),
+  blackbird: G("die", "Amseln", "blackbirds"),
+  earthworm: G("der", "Regenwürmer", "earthworms"),
+  woodlouse: G("die", "Asseln", "woodlice"),
+  springtail: G("der", "Springschwänze", "springtails"),
+  millipede: G("der", "Tausendfüßer", "millipedes"),
+  mould: G("der", "Schimmelpilze", "moulds"),
+  mushroom: G("der", "Wiesenchampignons", "field mushrooms"),
+  bacteria: G("die", "Bodenbakterien", "soil bacteria", { plural: true }),
+  beetle: G("der", "Totengräber", "burying beetles"),
+};
+
+const up = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "the fox" / "der Fuchs" (nominative). */
+export const the = (id: OrgId): Text => {
+  const g = GRAM[id];
+  const n = ORGS[id].name as { en: string; de: string };
+  return tx(`the ${n.en}`, `${g.plural ? "die" : g.art} ${n.de}`);
+};
+/** "The fox" / "Der Fuchs". */
+export const The = (id: OrgId): Text => {
+  const t = the(id) as { en: string; de: string };
+  return tx(up(t.en), up(t.de));
+};
+/** Plural or mass noun: "foxes" / "Füchse", "grass" / "Gras". */
+export const plOf = (id: OrgId): Text => tx(GRAM[id].plEn, GRAM[id].pl);
+/** German dative plural ("von Füchsen", "an Gras"). */
+export const datPl = (id: OrgId): Text => {
+  const g = GRAM[id];
+  return tx(g.plEn, g.mass || /[ns]$/.test(g.pl) ? g.pl : `${g.pl}n`);
+};
+/** Is the name itself a plural (verb in plural)? */
+export const isPl = (id: OrgId) => !!GRAM[id].plural;
+/** Verb agreeing with the name: vb(id, "eats", "eat", "frisst", "fressen"). */
+export const vb = (id: OrgId, sgEn: string, plEn: string, sgDe: string, plDe: string): Text => (isPl(id) ? tx(plEn, plDe) : tx(sgEn, sgDe));
+/** "the number of hares" / "die Zahl der Feldhasen", "the amount of grass" / "die Menge an Gras". */
+export const amountOf = (id: OrgId): Text => (GRAM[id].mass ? tx(`the amount of ${GRAM[id].plEn}`, `die Menge an ${GRAM[id].pl}`) : tx(`the number of ${GRAM[id].plEn}`, `die Zahl der ${GRAM[id].pl}`));
