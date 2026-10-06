@@ -391,7 +391,7 @@ function seqTask(rng: Rng): Exercise {
     text: s.intro,
     items,
     hint: tx("Cause before effect: what has to happen so that the next step can start?", "Ursache vor Wirkung: Was muss passieren, damit der nächste Schritt beginnen kann?"),
-    solution: items.map((it, k) => ({ math: `${k + 1}`, note: it })).concat([{ math: tx('"feedback"', '"Rückkopplung"'), note: s.note }]),
+    solution: [...items.map((it, k): Frame => ({ math: `${k + 1}`, note: it })), { math: tx('"feedback"', '"Rückkopplung"'), note: s.note }],
     wrong: s.wrong.filter((w) => keep.includes(w.a) && keep.includes(w.b)).map((w) => ({ items: [s.steps[w.a], s.steps[w.b]], title: w.title, say: w.say })),
   });
 }

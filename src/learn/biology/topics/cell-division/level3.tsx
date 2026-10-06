@@ -4,7 +4,7 @@
 // recombination, nondisjunction and karyograms, and the control of the cell cycle.
 
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
-import { decText } from "@/learn/chemistry/format";
+import { dec } from "@/learn/chemistry/format";
 import { DivisionAssortment } from "@/learn/biology/visuals/DivisionAssortment";
 import { DivisionCheckpoints } from "@/learn/biology/visuals/DivisionCheckpoints";
 import { DivisionKaryogram, KARYOTYPES, type Karyotype } from "@/learn/biology/visuals/DivisionKaryogram";
@@ -74,18 +74,18 @@ function cExercise(pg: number, stage: CStage): Exercise {
     instruction: tx("Work out the DNA content", "Berechne den DNA-Gehalt"),
     text: txMap((t, l) =>
       t(
-        `A body cell in the G1 phase contains ${decText(pg).en} pg of DNA. How much DNA does ${resolveText(C_NAME[stage], l)} contain?`,
-        `Eine Körperzelle in der G1-Phase enthält ${decText(pg).de} pg DNA. Wie viel DNA enthält ${resolveText(C_NAME[stage], l)}?`,
+        `A body cell in the G1 phase contains ${dec(pg, "en")} pg of DNA. How much DNA does ${resolveText(C_NAME[stage], l)} contain?`,
+        `Eine Körperzelle in der G1-Phase enthält ${dec(pg, "de")} pg DNA. Wie viel DNA enthält ${resolveText(C_NAME[stage], l)}?`,
       ),
     ),
     answer: ans,
     hint: tx("G1 is 2c. Follow the c value: S phase doubles, every separation of homologues or chromatids halves.", "G1 entspricht 2c. Verfolge den c-Wert: Die S-Phase verdoppelt, jede Trennung von Homologen oder Chromatiden halbiert."),
     solution: [
-      { math: tx(`"G1 phase:" \\; 2c = ${decText(pg).en} "pg"`, `"G1-Phase:" \\; 2c = ${decText(pg).de} "pg"`), note: tx(`2c = ${decText(pg).en} pg, so 1c = ${decText(pg / 2).en} pg.`, `2c = ${decText(pg).de} pg, also 1c = ${decText(pg / 2).de} pg.`) },
+      { math: tx(`"G1 phase:" \\; 2c = ${dec(pg, "en")} "pg"`, `"G1-Phase:" \\; 2c = ${dec(pg, "de")} "pg"`), note: tx(`2c = ${dec(pg, "en")} pg, so 1c = ${dec(pg / 2, "en")} pg.`, `2c = ${dec(pg, "de")} pg, also 1c = ${dec(pg / 2, "de")} pg.`) },
       { math: path, note },
       {
-        math: tx(`"so" \\; ${c}c = ${decText(value).en}#r "pg"`, `"also" \\; ${c}c = ${decText(value).de}#r "pg"`),
-        note: tx(`So the cell contains **${decText(value).en} pg** of DNA.`, `Die Zelle enthält also **${decText(value).de} pg** DNA.`),
+        math: tx(`"so" \\; ${c}c = ${dec(value, "en")}#r "pg"`, `"also" \\; ${c}c = ${dec(value, "de")}#r "pg"`),
+        note: tx(`So the cell contains **${dec(value, "en")} pg** of DNA.`, `Die Zelle enthält also **${dec(value, "de")} pg** DNA.`),
       },
     ],
     mistakes: m.list,
@@ -268,7 +268,7 @@ function probabilityExercise(n2: number): Exercise {
     hint: tx("For each pair the chance is 1/2. The pairs are independent.", "Für jedes Paar ist die Chance 1/2. Die Paare sind unabhängig voneinander."),
     solution: [
       { math: `(\\frac{1}{2})^{${n}} = \\frac{1}{${2 ** n}}`, note: tx(`${n} pairs, each with a chance of 1/2: multiply.`, `${n} Paare, jedes mit der Chance 1/2: multiplizieren.`) },
-      { math: tx(`\\frac{1}{${2 ** n}} = ${decText(value, 3).en} "%"`, `\\frac{1}{${2 ** n}} = ${decText(value, 3).de} "%"`), note: tx(`About **${decText(value, 3).en} %**.`, `Etwa **${decText(value, 3).de} %**.`) },
+      { math: tx(`\\frac{1}{${2 ** n}} = ${dec(value, "en", 3)} "%"`, `\\frac{1}{${2 ** n}} = ${dec(value, "de", 3)} "%"`), note: tx(`About **${dec(value, "en", 3)} %**.`, `Etwa **${dec(value, "de", 3)} %**.`) },
     ],
     mistakes: m.list,
   };

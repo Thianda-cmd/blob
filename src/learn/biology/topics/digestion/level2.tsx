@@ -299,7 +299,7 @@ function seqTask(rng: Rng): Exercise {
     text: s.intro,
     items,
     hint: tx("Follow the food from the mouth. Enzymes can only split what the step before has prepared.", "Folge der Nahrung vom Mund aus. Enzyme können nur spalten, was der Schritt davor vorbereitet hat."),
-    solution: items.map((it, k) => ({ math: `${k + 1}`, note: it })).concat([{ math: tx('"done"', '"fertig"'), note: s.note }]),
+    solution: [...items.map((it, k): Frame => ({ math: `${k + 1}`, note: it })), { math: tx('"done"', '"fertig"'), note: s.note }],
     wrong: s.wrong.filter((w) => keep.includes(w.a) && keep.includes(w.b)).map((w) => ({ items: [s.steps[w.a], s.steps[w.b]], title: w.title, say: w.say })),
   });
 }
