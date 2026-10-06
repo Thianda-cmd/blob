@@ -645,7 +645,8 @@ export function nppTask(rng: Rng, fixed?: { gpp: number; rPct: number }): Exerci
     hint: tx("NPP = GPP − respiration of the producers.", "NPP = BPP − Zellatmung der Produzenten."),
     solution: [
       { math: tx(`R = ${rPct} "%" \\cdot ${en(numMath(gpp))} = ${en(numMath(resp))} "kJ"`, `R = ${rPct} "%" \\cdot ${de(numMath(gpp))} = ${de(numMath(resp))} "kJ"`), note: tx("First the respiration of the plants.", "Zuerst die Atmung der Pflanzen.") },
-      { math: tx(`"NPP" = "GPP" - "R" = ${en(numMath(gpp))} - ${en(numMath(resp))} = ${en(numMath(npp))}#r "kJ"`, `"NPP" = "BPP" - "R" = ${de(numMath(gpp))} - ${de(numMath(resp))} = ${de(numMath(npp))}#r "kJ"`), note: tx(`Net primary production: **${en(numText(npp))} kJ** per m² and year. That's the food available to all consumers.`, `Nettoprimärproduktion: **${de(numText(npp))} kJ** pro m² und Jahr. Das steht allen Konsumenten als Nahrung zur Verfügung.`), highlight: ["r"] },
+      { math: tx('"NPP"#n = "GPP"#b - R#r', '"NPP"#n = "BPP"#b - R#r'), note: tx("Net = gross minus respiration.", "Netto = brutto minus Atmung.") },
+      { math: tx(`${en(numMath(gpp))} - ${en(numMath(resp))} = ${en(numMath(npp))}#res "kJ"`, `${de(numMath(gpp))} - ${de(numMath(resp))} = ${de(numMath(npp))}#res "kJ"`), note: tx(`Net primary production: **${en(numText(npp))} kJ** per m² and year. That's the food available to all consumers.`, `Nettoprimärproduktion: **${de(numText(npp))} kJ** pro m² und Jahr. Das steht allen Konsumenten als Nahrung zur Verfügung.`), highlight: ["res"] },
     ],
     mistakes: m.list,
   };

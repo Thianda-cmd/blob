@@ -132,7 +132,7 @@ function SpectrumAxes({ top, h }: { top: number; h: number }) {
       <rect x={X0} y={top + h + 2} width={X1 - X0} height={7} rx={2} fill="url(#photo-spectrum-band)" />
       <line x1={X0} x2={X1} y1={top + h} y2={top + h} stroke="var(--ink-2)" strokeWidth={1.2} />
       <line x1={X0} x2={X0} y1={top - 4} y2={top + h} stroke="var(--ink-2)" strokeWidth={1.2} />
-      <text x={X0 + 6} y={top + 4} fontSize={11} className="fill-ink-2">
+      <text x={X0 - 12} y={top + h / 2} fontSize={11} textAnchor="middle" transform={`rotate(-90 ${X0 - 12} ${top + h / 2})`} className="fill-ink-2">
         {t(tx("absorption / rate", "Absorption / Rate"))}
       </text>
       <text x={X1} y={top + h + 36} textAnchor="end" fontSize={11} className="fill-ink-2">
