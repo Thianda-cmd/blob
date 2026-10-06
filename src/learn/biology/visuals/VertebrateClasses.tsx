@@ -53,7 +53,7 @@ export function VertebrateClassCards() {
               <motion.div animate={{ scale: on ? 1.06 : 1, y: on ? -2 : 0 }} transition={{ type: "spring", stiffness: 380, damping: 22 }} className="w-full max-w-[110px]">
                 <ClassAnimal cls={c} title={false} />
               </motion.div>
-              <span className={cn("w-full break-words text-center text-[11px] font-semibold leading-tight sm:text-[13px]", on ? "text-ink" : "text-ink-2")}>{t(CLASSES[c].name)}</span>
+              <span className={cn("w-full hyphens-auto text-center text-[10.5px] font-semibold leading-tight sm:text-[13px]", on ? "text-ink" : "text-ink-2")}>{t(CLASSES[c].name)}</span>
             </button>
           );
         })}

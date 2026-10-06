@@ -123,7 +123,7 @@ export function VertebrateSorter() {
               <div className="w-full max-w-[90px]">
                 <ClassAnimal cls={c} title={false} />
               </div>
-              <span className="w-full break-words text-center text-[11px] font-semibold leading-tight text-ink sm:text-[13px]">{t(CLASSES[c].name)}</span>
+              <span className="w-full hyphens-auto text-center text-[10.5px] font-semibold leading-tight text-ink sm:text-[13px]">{t(CLASSES[c].name)}</span>
             </motion.button>
           );
         })}

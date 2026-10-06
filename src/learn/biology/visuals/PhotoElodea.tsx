@@ -72,12 +72,12 @@ export function PhotoElodea() {
           <ellipse cx={397} cy={121} rx={2.6} ry={1.4} fill="var(--bio-leaf-deep)" />
           {/* bubbles */}
           {reduce
-            ? Array.from({ length: Math.min(6, Math.ceil(rate / 10)) }, (_, i) => <circle key={i} cx={397 + (i % 2 ? 2 : -2)} cy={112 - i * 4} r={2.8} fill="var(--raised)" stroke="var(--bio-water-deep)" strokeWidth={1.1} />)
+            ? Array.from({ length: Math.min(6, Math.ceil(rate / 10)) }, (_, i) => <circle key={i} cx={397 + (i % 2 ? 2 : -2)} cy={112 - i * 4} r={3.6} fill="var(--raised)" stroke="var(--bio-water-deep)" strokeWidth={1.1} />)
             : Array.from({ length: slots }, (_, i) => (
                 <motion.circle
                   key={`${rate}-${i}`}
                   cx={397}
-                  r={2.8}
+                  r={3.6}
                   fill="var(--raised)"
                   stroke="var(--bio-water-deep)"
                   strokeWidth={1.1}
@@ -155,7 +155,7 @@ export function PhotoElodea() {
             ))}
           </tbody>
         </table>
-        <svg viewBox="0 0 260 150" className="block h-auto w-full" role="img" aria-label={t(tx("Measured bubbles against distance", "Gemessene Bläschen gegen den Abstand"))}>
+        <svg viewBox="0 0 260 156" className="mx-auto block h-auto w-full max-w-[340px]" role="img" aria-label={t(tx("Measured bubbles against distance", "Gemessene Bläschen gegen den Abstand"))}>
           {[0, 20, 40, 60].map((v) => (
             <g key={v}>
               <line x1={34} x2={250} y1={124 - v * 1.8} y2={124 - v * 1.8} stroke="var(--line)" strokeWidth={0.8} />
@@ -165,11 +165,11 @@ export function PhotoElodea() {
             </g>
           ))}
           {[10, 20, 30, 40, 50].map((v) => (
-            <text key={v} x={34 + (v - 10) * 5.2} y={140} textAnchor="middle" fontSize={10} className="fill-ink-3 tabular-nums">
+            <text key={v} x={34 + (v - 10) * 5.2} y={138} textAnchor="middle" fontSize={10} className="fill-ink-3 tabular-nums">
               {v}
             </text>
           ))}
-          <text x={250} y={150} textAnchor="end" fontSize={10} className="fill-ink-2">
+          <text x={250} y={154} textAnchor="end" fontSize={10} className="fill-ink-2">
             {t(tx("distance in cm", "Abstand in cm"))}
           </text>
           {rows.map((r) => (

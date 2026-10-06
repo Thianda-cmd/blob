@@ -69,15 +69,15 @@ const BASE_PARTS: FigurePart[] = [
   { id: "sperm", label: tx("sperm cell", "Spermazelle"), at: [180, 200], tag: [82, 210] },
   { id: "ovary", label: tx("ovary", "Fruchtknoten"), at: [240, 300], tag: [306, 268] },
   { id: "ovule", label: tx("ovule", "Samenanlage"), at: [206, 352], tag: [306, 384] },
-  { id: "micropyle", label: tx("micropyle", "Mikropyle"), at: [180, 293], tag: [82, 280] },
-  { id: "egg", label: tx("egg cell", "Eizelle"), at: [180, 312], tag: [82, 326] },
-  { id: "zygote", label: tx("zygote", "Zygote"), at: [180, 312], tag: [82, 326] },
+  { id: "micropyle", label: tx("micropyle", "Mikropyle"), at: [180, 293], tag: [82, 266] },
+  { id: "egg", label: tx("egg cell", "Eizelle"), at: [180, 312], tag: [82, 338] },
+  { id: "zygote", label: tx("zygote", "Zygote"), at: [180, 312], tag: [82, 338] },
   { id: "embryo", label: tx("embryo", "Keimling (Embryo)"), at: [180, 334], tag: [82, 360] },
 ];
 
 function partsFor(step: number): FigurePart[] {
   const tip = TUBE[tipIndex(GROWN[step])];
-  return BASE_PARTS.map((p) => (p.id === "sperm" ? { ...p, at: [tip[0], tip[1] - 4] as [number, number], tag: [82, Math.max(150, tip[1] - 6)] as [number, number] } : p));
+  return BASE_PARTS.map((p) => (p.id === "sperm" ? { ...p, at: [tip[0], tip[1] - 4] as [number, number], tag: [82, tip[1] > 250 ? 302 : Math.max(150, tip[1] - 6)] as [number, number] } : p));
 }
 
 export function FlowerPollenTube({ start = 0 }: { start?: number }) {
