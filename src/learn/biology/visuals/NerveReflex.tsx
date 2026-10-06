@@ -227,7 +227,7 @@ export function NerveReflexLab() {
 
   return (
     <div className="space-y-4">
-      <NerveReflexArc mode="names" legend="below" state={reflexAt(time)} onTap={tap} highlight={stage === 3 ? ["synapse"] : stage === 1 ? ["receptor"] : stage === 5 ? ["effector"] : []} />
+      <NerveReflexArc mode="names" state={reflexAt(time)} onTap={tap} highlight={stage === 3 ? ["synapse"] : stage === 1 ? ["receptor"] : stage === 5 ? ["effector"] : []} />
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton onClick={tap}>
           <Hammer className="size-4" /> {t(time > 0 && time < 1 ? tx("Tap again", "Noch mal klopfen") : tx("Tap the knee", "Aufs Knie klopfen"))}

@@ -340,7 +340,7 @@ export function NerveEyeFocus() {
   const near = 1 - dist;
   const lens = adapt === "on" ? near : 0;
   // Where the rays would meet: on the yellow spot if the lens adapts, behind the retina if it can't.
-  const focusX = adapt === "on" ? FOVEA_X : FOVEA_X + 95 * near * near;
+  const focusX = adapt === "on" ? FOVEA_X : FOVEA_X + 170 * near * near;
   const objX = 62 - 560 * dist * dist;
   const showObject = objX > 16;
   const sharp = focusX - FOVEA_X < 6;
