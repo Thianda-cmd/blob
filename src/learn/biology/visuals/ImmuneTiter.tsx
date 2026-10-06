@@ -101,7 +101,7 @@ function Axes({ b, yLabel, xLabel, ticks }: { b: Box; yLabel: Text; xLabel: Text
   );
 }
 
-function EventMark({ b, day, label, color = "var(--ink-2)", icon }: { b: Box; day: number; label: Text; color?: string; icon?: "virus" | "syringe" | "serum" }) {
+function EventMark({ b, day, label, color = "var(--ink-2)", icon, left }: { b: Box; day: number; label: Text; color?: string; icon?: "virus" | "syringe" | "serum"; left?: boolean }) {
   const t = useText();
   const x = X(b, day);
   return (
@@ -110,7 +110,7 @@ function EventMark({ b, day, label, color = "var(--ink-2)", icon }: { b: Box; da
       {icon === "virus" && <circle cx={x} cy={b.y0 + 4} r={5} fill="var(--bio-petal)" stroke="var(--bio-petal-deep)" strokeWidth={1.4} />}
       {icon === "syringe" && <rect x={x - 5} y={b.y0} width={10} height={8} rx={2} fill="var(--blob)" />}
       {icon === "serum" && <rect x={x - 5} y={b.y0} width={10} height={8} rx={4} fill="var(--bio-water-deep)" />}
-      <text x={x + 6} y={b.y0 + 22} fontSize={12} fill={color}>
+      <text x={left ? x - 6 : x + 6} y={b.y0 + 22} fontSize={12} fill={color} textAnchor={left ? "end" : "start"}>
         {t(label)}
       </text>
     </g>
@@ -131,7 +131,7 @@ const PATHOGEN: Record<Scenario, Fn> = {
 };
 const ANTIBODY: Record<Scenario, Fn> = {
   none: wave({ at: INFECTION, lag: 4, up: 9, peak: 0.42, floor: 0.3, down: 10 }),
-  vaccine: sum(wave({ at: 0, lag: 4, up: 10, peak: 0.34, floor: 0.25, down: 9 }), wave({ at: INFECTION, lag: 1, up: 5, peak: 0.92, floor: 0.6, down: 12 })),
+  vaccine: sum(wave({ at: 0, lag: 4, up: 10, peak: 0.26, floor: 0.3, down: 9 }), wave({ at: INFECTION, lag: 1, up: 5, peak: 0.9, floor: 0.6, down: 12 })),
   serum: sum(serum(37, 0.78, 12), wave({ at: INFECTION, lag: 5, up: 9, peak: 0.1, floor: 0.3, down: 8 })),
 };
 
@@ -305,12 +305,12 @@ function TiterLinear({ level }: { level: 1 | 2 }) {
           <Axes b={b} yLabel={tx("Amount in the blood", "Menge im Blut")} xLabel={tx("time in days", "Zeit in Tagen")} ticks={[0, 10, 20, 30, 40, 50, 60, 70]} />
           {/* illness line and span */}
           <line x1={b.x0} x2={b.x1} y1={Y(b, SICK)} y2={Y(b, SICK)} stroke="var(--bio-blood)" strokeWidth={1} strokeDasharray="2 4" opacity={0.7} />
-          <text x={b.x1} y={Y(b, SICK) - 5} textAnchor="end" fontSize={11.5} fill="var(--bio-blood)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={b.x0 + 8} y={Y(b, SICK) - 5} textAnchor="start" fontSize={11.5} fill="var(--bio-blood)" style={{ fontFamily: "var(--font-sans)" }}>
             {t(tx("pathogens above this line: ill", "Erreger über dieser Linie: krank"))}
           </text>
           {sc === "vaccine" && <EventMark b={b} day={0} label={tx("vaccination", "Impfung")} color="var(--blob)" icon="syringe" />}
-          {sc === "serum" && <EventMark b={b} day={37} label={tx("serum", "Serum")} color="var(--bio-water-deep)" icon="serum" />}
-          <EventMark b={b} day={INFECTION} label={sc === "serum" ? "" : tx("infection", "Ansteckung")} color="var(--bio-petal-deep)" icon="virus" />
+          {sc === "serum" && <EventMark b={b} day={37} label={tx("serum", "Serum")} color="var(--bio-water-deep)" icon="serum" left />}
+          <EventMark b={b} day={INFECTION} label={sc === "serum" ? "" : tx("infection", "Ansteckung")} color="var(--bio-petal-deep)" icon="virus" left />
           <g clipPath={`url(#${id}-clip)`}>
             {sick && <rect x={X(b, sick[0])} width={X(b, sick[1]) - X(b, sick[0])} y={b.y1 - 12} height={10} rx={5} fill="var(--bio-blood)" opacity={0.75} />}
             <motion.path key={`p-${sc}`} d={pathOf(b, PATHOGEN[sc], INFECTION - 0.5)} fill="none" stroke="var(--bio-petal-deep)" strokeWidth={2.4} strokeDasharray="6 5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
@@ -319,10 +319,10 @@ function TiterLinear({ level }: { level: 1 | 2 }) {
               <g fontSize={12} fontWeight={600} fill="var(--bio-water-deep)" style={{ fontFamily: "var(--font-sans)" }}>
                 {sc === "vaccine" ? (
                   <>
-                    <text x={X(b, 14)} y={Y(b, 0.34) - 8} textAnchor="middle">
+                    <text x={X(b, 14)} y={Y(b, 0.26) - 8} textAnchor="middle">
                       {t(tx("primary", "primär"))}
                     </text>
-                    <text x={X(b, 46)} y={Y(b, 0.92) - 8} textAnchor="middle">
+                    <text x={X(b, 57)} y={Y(b, 0.82) - 6} textAnchor="start">
                       {t(tx("secondary response", "Sekundärreaktion"))}
                     </text>
                   </>

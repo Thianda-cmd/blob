@@ -25,22 +25,26 @@ function seeded(seed: number) {
   };
 }
 
-/** 24 places for bacteria inside the dish, not too close to each other. */
+/** 24 places for bacteria inside the dish: a jittered hexagonal grid, shuffled (always enough room). */
 const SPOTS: { x: number; y: number; rot: number }[] = (() => {
   const rnd = seeded(11);
-  const out: { x: number; y: number; rot: number }[] = [];
-  for (let tries = 0; out.length < 24 && tries < 5000; tries++) {
-    const a = rnd() * Math.PI * 2;
-    const r = Math.sqrt(rnd()) * 80;
-    const x = Math.round(C + r * Math.cos(a));
-    const y = Math.round(C + r * Math.sin(a));
-    if (out.every((p) => Math.hypot(p.x - x, p.y - y) > 32)) out.push({ x, y, rot: Math.round(rnd() * 180) });
+  const pts: { x: number; y: number; rot: number }[] = [];
+  for (let row = -3; row <= 3; row++) {
+    for (let col = -4; col <= 4; col++) {
+      const x = C + col * 30 + (row % 2 ? 15 : 0);
+      const y = C + row * 26;
+      if (Math.hypot(x - C, y - C) <= 90) pts.push({ x: Math.round(x + (rnd() - 0.5) * 6), y: Math.round(y + (rnd() - 0.5) * 6), rot: Math.round(rnd() * 180) });
+    }
   }
-  return out;
+  for (let i = pts.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pts[i], pts[j]] = [pts[j], pts[i]];
+  }
+  return pts.slice(0, 24);
 })();
 
-const START_SPOTS = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18];
-const RESISTANT_SPOT = 6;
+const START_SPOTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const RESISTANT_SPOT = 3;
 
 type Bug = { id: number; spot: number; from: number; res: boolean };
 type Phase = "start" | "grown" | "treated" | "regrown" | "useless";
@@ -147,8 +151,8 @@ export function ImmuneAntibiotics() {
                   transition={{ type: "spring", stiffness: 120, damping: 16 }}
                 >
                   <g style={shownRes && b.res ? { filter: "drop-shadow(0 0 3px var(--blob))" } : undefined}>
-                    <BacteriumRod w={14} h={7.5} flagellum={false} />
-                    {shownRes && b.res && <rect x={-14} y={-7.5} width={28} height={15} rx={7.5} fill="none" stroke="var(--blob)" strokeWidth={2} />}
+                    <BacteriumRod w={13} h={7} flagellum={false} />
+                    {shownRes && b.res && <rect x={-13} y={-7} width={26} height={14} rx={7} fill="none" stroke="var(--blob)" strokeWidth={2} />}
                   </g>
                 </motion.g>
               );
