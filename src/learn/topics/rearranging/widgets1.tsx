@@ -181,13 +181,21 @@ export function RectangleLab() {
               <div className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{m === "A" ? t(tx("Area: the inside", "Flächeninhalt: innen")) : t(tx("Perimeter: the way around", "Umfang: außen herum"))}</div>
               {m === "A" ? (
                 <div className="space-y-1">
-                  <MathView src="A = a \cdot b" size="sm" animate={false} />
-                  <MathView src={`A#A =#e ${a}#a "cm"#ua \\cdot#d ${b}#b "cm"#ub =#e2 ${A}#r "cm²"#ur`} size="sm" scope={`${scope}-A`} />
+                  <div>
+                    <MathView src="A = a \cdot b" size="sm" animate={false} />
+                  </div>
+                  <div>
+                    <MathView src={`A#A =#e ${a}#a "cm"#ua \\cdot#d ${b}#b "cm"#ub =#e2 ${A}#r "cm²"#ur`} size="sm" scope={`${scope}-A`} />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <MathView src="u = 2 \cdot a + 2 \cdot b" size="sm" animate={false} />
-                  <MathView src={`u#u =#e 2#t1 \\cdot#d1 ${a}#a "cm"#ua +#p 2#t2 \\cdot#d2 ${b}#b "cm"#ub =#e2 ${u}#r "cm"#ur`} size="sm" scope={`${scope}-u`} />
+                  <div>
+                    <MathView src="u = 2 \cdot a + 2 \cdot b" size="sm" animate={false} />
+                  </div>
+                  <div>
+                    <MathView src={`u#u =#e 2#t1 \\cdot#d1 ${a}#a "cm"#ua +#p 2#t2 \\cdot#d2 ${b}#b "cm"#ub =#e2 ${u}#r "cm"#ur`} size="sm" scope={`${scope}-u`} />
+                  </div>
                 </div>
               )}
             </button>

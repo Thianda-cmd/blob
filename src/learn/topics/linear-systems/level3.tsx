@@ -14,7 +14,6 @@ import {
   gaussFrames,
   gaussPlan,
   isZeroRow,
-  opSrc,
   products,
   rowSrc,
   solveFrames,
@@ -28,6 +27,7 @@ import {
   type Row,
   type V3,
 } from "./gauss";
+import { SystemCard } from "./board";
 import { GaussLab, ParabolaLab } from "./lab3";
 import { joinText, xyWhen, type Choice } from "./level2";
 
@@ -43,11 +43,19 @@ const scale = (r: Row, k: number): Row => ({ x: k * r.x, y: k * r.y, z: k * r.z,
 const IDS = ["1", "2", "3"];
 const LABELS = ["I", "II", "III"];
 
-/** The system as plain display maths (for the task card). */
+/** The system as plain display maths. */
 const sysOf = (rows: Row[], labels = LABELS, names: Names = XYZ) => plain(stack(rows.map((r, i) => rowSrc(r, IDS[i], labels[i], names))));
+
+/**
+ * The system for the task card. Three rows are too wide for the fixed task maths size
+ * at phone width, so they go into a card that scales with its width (see board.tsx).
+ */
+const sysCard = (rows: Row[]): Pick<Exercise, "visual"> => ({ visual: { component: SystemCard as never, props: { src: sysOf(rows) } } });
 
 /** A row with every term shown, a 0 faded ("0x"), for a written calculation. */
 function fullRowSrc(r: Row, id: string, label: string, names: Names = XYZ): string {
+  // Non-breaking spaces: a label like "(−2 · I)" must not wrap onto two lines.
+  const lab = label.replace(/ /g, "\u00a0");
   const parts: string[] = [];
   V3S.forEach((v, i) => {
     const k = r[v];
@@ -55,13 +63,13 @@ function fullRowSrc(r: Row, id: string, label: string, names: Names = XYZ): stri
     if (k === 0) parts.push(`${first ? "" : "+ "}\\fade{0 ${names[i]}}`);
     else parts.push(term(k, names[i], `${id}${v}`, first));
   });
-  return `\\group{\\text{${label}}#L${id} \\; ${parts.join(" ")} =#e${id} ${val(r.c, `${id}c`)}}#R${id}`;
+  return `\\group{\\text{${lab}}#L${id} \\; ${parts.join(" ")} =#e${id} ${val(r.c, `${id}c`)}}#R${id}`;
 }
 
 const wrap = (n: number) => (n < 0 ? `(${n})` : `${n}`);
 
-/** Typed numbers a student could really get (fractions with small denominators). */
-const nice = (v: number) => Number.isFinite(v) && Math.abs(v) < 200 && Math.abs(v * 12 - Math.round(v * 12)) < 1e-9;
+/** Numbers a student would really type: whole numbers or halves. */
+const nice = (v: number) => Number.isFinite(v) && Math.abs(v) < 200 && Math.abs(v * 2 - Math.round(v * 2)) < 1e-9;
 const niceAll = (v: number[] | null): v is number[] => !!v && v.every(nice);
 
 /** "2x^2-3x+1", "-t+3": a polynomial for the answer checker. */
@@ -211,7 +219,7 @@ function backExercise(rows: Row[]): Exercise {
   return {
     instruction: tx("Solve by back substitution", "Löse durch Rückwärtseinsetzen"),
     text: joinText(tx("The system is already in step form.", "Das LGS hat schon Stufenform."), GIVE_XY),
-    math: sysOf(rows),
+    ...sysCard(rows),
     answer: PAIR(sol),
     hint: tx(
       "Start at the bottom: the last row gives $z$. Put $z$ into the middle row to get $y$, then both into (I) to get $x$.",
@@ -231,7 +239,7 @@ function gaussExercise(rows: Row[]): Exercise {
   return {
     instruction: tx("Solve with the Gauss algorithm", "Löse mit dem Gauß-Verfahren"),
     text: tx("Bring the system into step form, then solve it. Give $x$ and $y$ (you'll need $z$ on the way).", "Bring das LGS auf Stufenform und löse es. Gib $x$ und $y$ an (dafür brauchst du unterwegs auch $z$)."),
-    math: sysOf(rows),
+    ...sysCard(rows),
     answer: PAIR(s.values),
     hint: tx(
       "Use (I) to eliminate $x$ from (II) and (III). Then use the new second row to eliminate $y$ from the third. Then solve from the bottom up.",
@@ -259,7 +267,6 @@ function stepExercise(rows: Row[], order: number[]): Exercise | null {
   ])} = ${val(r.c, "c")}`);
   const all = [right, noRhs, flip, onlyX].map(eq);
   if (new Set(all).size < 4) return null;
-  const op = opSrc(p, "II", q, "I");
   const opT = opText(p, "II", q, "I");
   const answer: Choice = { kind: "choice", options: order.map((i) => `$${all[i]}$`), correct: order.indexOf(0) };
   const signMsg: Msg =
@@ -314,7 +321,7 @@ function stepExercise(rows: Row[], order: number[]): Exercise | null {
   return {
     instruction: tx("One Gauss step", "Ein Gauß-Schritt"),
     text: tx(`Calculate **(IIa) = ${opT}**. Which equation do you get?`, `Berechne **(IIa) = ${opT}**. Welche Gleichung erhältst du?`),
-    math: sysOf(rows),
+    ...sysCard(rows),
     answer,
     hint: tx(
       `Write $${wrap(q)} \\cdot$ (I) term by term under ${p === 1 ? "(II)" : `$${p} \\cdot$ (II)`} and add column by column, the right side too.`,
@@ -384,7 +391,7 @@ function specialExercise(rows: Row[]): Exercise | null {
   return {
     instruction: tx("How many solutions?", "Wie viele Lösungen?"),
     text: tx("Use the Gauss algorithm. How many solutions does the system have?", "Nutze das Gauß-Verfahren. Wie viele Lösungen hat das LGS?"),
-    math: sysOf(rows),
+    ...sysCard(rows),
     answer,
     hint: tx(
       "Bring it to step form. If the last row loses all three unknowns, read what's left: a true or a false statement?",
@@ -497,7 +504,7 @@ function paramExercise(rows: Row[], ask: "x" | "y"): Exercise | null {
       `This system has infinitely many solutions. Use the Gauss algorithm, set $z = t$ and give $${ask}$ in terms of $t$.`,
       `Dieses LGS hat unendlich viele Lösungen. Nutze das Gauß-Verfahren, setze $z = t$ und gib $${ask}$ in Abhängigkeit von $t$ an.`,
     ),
-    math: sysOf(rows),
+    ...sysCard(rows),
     answer,
     hint: tx(
       `After Gauss the last row is $0 = 0$. Put $z = t$ into the middle row and solve for $y$${ask === "x" ? ", then put $y$ and $t$ into (I)" : ""}.`,
@@ -884,16 +891,19 @@ const probeRow = (r: Row, id: string, label: string) =>
 
 const introFrames: Frame[] = (() => {
   const back = backFrames(STEP0, LABELS)!;
+  // S0 gets its own token keys: the step-form system is a different one, so its rows
+  // appear fresh instead of gliding out of S0.
+  const A0 = ["a1", "a2", "a3"];
   return [
     {
-      math: stack(S0.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
+      math: stack(S0.map((r, i) => rowSrc(r, A0[i], LABELS[i]))),
       note: tx(
         "Three unknowns need three equations. A solution is a **triple** of numbers $(x | y | z)$ that makes **all three** equations true.",
         "Drei Unbekannte brauchen drei Gleichungen. Eine Lösung ist ein **Zahlentripel** $(x | y | z)$, das **alle drei** Gleichungen erfüllt.",
       ),
     },
     {
-      math: stack(S0.map((r, i) => probeRow(r, IDS[i], LABELS[i]))),
+      math: stack(S0.map((r, i) => probeRow(r, A0[i], LABELS[i]))),
       note: tx(
         "Try $(1 | 2 | 3)$: put it into every equation. All three are true, so $L = \\{ (1 | 2 | 3) \\}$. But how do you find it without guessing?",
         "Probier $(1 | 2 | 3)$: Setz es in jede Gleichung ein. Alle drei stimmen, also ist $L = \\{ (1 | 2 | 3) \\}$. Aber wie findest du das ohne Raten?",
@@ -902,16 +912,16 @@ const introFrames: Frame[] = (() => {
     {
       math: stack(STEP0.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
       note: tx(
-        "It's easy when the system has **step form** (Stufenform): the last row only has $z$, the middle one only $y$ and $z$.",
-        "Leicht wird es, wenn das LGS **Stufenform** hat: Die letzte Zeile enthält nur $z$, die mittlere nur $y$ und $z$.",
+        "Here is a **different** system with the same solution. It's easy because it has **step form** (Stufenform): the last row only has $z$, the middle one only $y$ and $z$.",
+        "Hier ein **anderes** LGS mit derselben Lösung. Es ist leicht, weil es **Stufenform** hat: Die letzte Zeile enthält nur $z$, die mittlere nur $y$ und $z$.",
       ),
     },
     ...back.frames,
     {
       math: tripleSrc(SOL0),
       note: tx(
-        "Solving from the bottom up is called **back substitution** (Rückwärtseinsetzen). $L = \\{ (1 | 2 | 3) \\}$, the same solution as above.",
-        "Von unten nach oben auflösen heißt **Rückwärtseinsetzen**. $L = \\{ (1 | 2 | 3) \\}$, dieselbe Lösung wie oben.",
+        "Solving from the bottom up is called **back substitution** (Rückwärtseinsetzen). $L = \\{ (1 | 2 | 3) \\}$, the same as for the first system. Next: how to bring the first system into step form.",
+        "Von unten nach oben auflösen heißt **Rückwärtseinsetzen**. $L = \\{ (1 | 2 | 3) \\}$, wie beim ersten LGS. Gleich siehst du, wie du das erste LGS auf Stufenform bringst.",
       ),
     },
   ];
@@ -926,8 +936,8 @@ const gauss1Frames: Frame[] = (() => {
     {
       math: stack(S0.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
       note: tx(
-        "No step form yet. The **Gauss algorithm** gets there with moves that don't change the solutions: multiply an equation by a number, and add a multiple of one equation to another.",
-        "Noch keine Stufenform. Das **Gauß-Verfahren** bringt das LGS dorthin, mit Umformungen, die die Lösungen nicht ändern: eine Gleichung mit einer Zahl multiplizieren und ein Vielfaches einer Gleichung zu einer anderen addieren.",
+        "No step form yet. The **Gauss algorithm** gets there with moves that don't change the solutions: multiply an equation by a number $≠ 0$, and add a multiple of one equation to another.",
+        "Noch keine Stufenform. Das **Gauß-Verfahren** bringt das LGS dorthin, mit Umformungen, die die Lösungen nicht ändern: eine Gleichung mit einer Zahl $≠ 0$ multiplizieren und ein Vielfaches einer Gleichung zu einer anderen addieren.",
       ),
     },
     {

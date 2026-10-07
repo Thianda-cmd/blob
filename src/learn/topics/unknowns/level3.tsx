@@ -5,7 +5,7 @@ import { tx } from "@/i18n/text";
 import type { Frame, LevelLesson } from "@/learn/types";
 import { FrameDrawing, FrameLab } from "./FrameLab";
 import { PumpLab } from "./PumpLab";
-import { consecStory, frameStory, gardenStory, landingStory, quadExercise, quadFrames, rectPAStory, throwBoth, workQuad, workTogether } from "./stories3";
+import { consecStory, frameStory, innerStory, landingStory, quadExercise, quadFrames, rectPAStory, throwBoth, workQuad, workTogether } from "./stories3";
 import { ThrowCurve } from "./ThrowCurve";
 
 export { generate3 } from "./stories3";
@@ -58,19 +58,19 @@ export const level3: LevelLesson = {
     {
       title: tx("Which solution makes sense?", "Welche Lösung ist sinnvoll?"),
       body: tx(
-        "Check **every** solution in the story. Lengths, times and natural numbers are never negative. Sometimes both make sense: on the way up and down, or the same rectangle twice.",
-        "Prüf **jede** Lösung an der Geschichte. Längen, Zeiten und natürliche Zahlen sind nie negativ. Manchmal sind beide sinnvoll: auf dem Weg nach oben und nach unten, oder zweimal dasselbe Rechteck.",
+        "Check **every** solution in the story. Lengths, times and natural numbers are never negative, and a positive solution can still be too big: what's left inside must stay positive. Sometimes both make sense: on the way up and down, or the same rectangle twice.",
+        "Prüf **jede** Lösung an der Geschichte. Längen, Zeiten und natürliche Zahlen sind nie negativ, und auch eine positive Lösung kann zu groß sein: Was innen übrig bleibt, muss positiv bleiben. Manchmal sind beide sinnvoll: auf dem Weg nach oben und nach unten, oder zweimal dasselbe Rechteck.",
       ),
-      examples: ["\\green{x_1 = 3} \\quad \\strike{x_2 = -27}"],
+      examples: ["\\green{x_1 = 3} \\quad \\strike{x_2 = -27}", "\\strike{x_1 = 16} \\quad \\green{x_2 = 2}"],
       tone: "warning",
     },
     {
       title: tx("Frames, paths, rectangles", "Rahmen, Wege, Rechtecke"),
       body: tx(
-        "A strip all around adds $x$ on **both** sides: each length grows by $2x$. With perimeter and area, half the perimeter is one length plus one width.",
-        "Ein Streifen ringsherum kommt auf **beiden** Seiten dazu: Jede Länge wächst um $2x$. Bei Umfang und Fläche ist der halbe Umfang eine Länge plus eine Breite.",
+        "A strip all around adds $x$ on **both** sides: each length grows by $2x$. A strip inside takes $2x$ away. With perimeter and area, half the perimeter is one length plus one width.",
+        "Ein Streifen ringsherum kommt auf **beiden** Seiten dazu: Jede Länge wächst um $2x$. Ein Streifen innen nimmt $2x$ weg. Bei Umfang und Fläche ist der halbe Umfang eine Länge plus eine Breite.",
       ),
-      examples: ["(a + 2x)(b + 2x)", "x(14 - x) = 48"],
+      examples: ["(a + 2x)(b + 2x)", "(a - 2x)(b - 2x)", "x(14 - x) = 48"],
       tone: "tip",
     },
     {
@@ -94,7 +94,7 @@ export const level3: LevelLesson = {
     {
       title: tx("Fractional equations", "Bruchgleichungen"),
       body: tx(
-        "Is the time alone unknown, $x$ ends up in a denominator. State the domain first, then multiply **every** term by the common denominator.",
+        "If the time alone is unknown, $x$ ends up in a denominator. State the domain first, then multiply **every** term by the common denominator.",
         "Ist die Zeit allein unbekannt, steht $x$ im Nenner. Gib zuerst die Definitionsmenge an und multipliziere dann **jeden** Term mit dem Hauptnenner.",
       ),
       examples: ["\\frac{1}{x} + \\frac{1}{x + 6} = \\frac{1}{4}", "4(x + 6) + 4x = x(x + 6)"],
@@ -140,8 +140,8 @@ export const level3: LevelLesson = {
     },
     {
       type: "check",
-      blob: tx("A garden this time. Remember: lengths are never negative!", "Diesmal ein Garten. Denk dran: Längen sind nie negativ!"),
-      exercise: quadExercise(gardenStory(8, 4, "width", "garden")),
+      blob: tx("A path inside a garden this time. Check **both** solutions in the story!", "Diesmal ein Weg innen im Garten. Prüf **beide** Lösungen an der Geschichte!"),
+      exercise: quadExercise(innerStory("garden", 20, 16, 2)),
     },
     {
       type: "explain",

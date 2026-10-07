@@ -290,6 +290,9 @@ function quadrantTask(rng: Rng): Exercise {
 // Tables of values
 
 /** The keyed computation of y = m·x + b at x, frame by frame. */
+/** Two sentences in both languages; an empty first one is left out. */
+const joinTx = (a: Text, b: Text): Text => tx([resolveText(a, "en"), resolveText(b, "en")].filter(Boolean).join(" "), [resolveText(a, "de"), resolveText(b, "de")].filter(Boolean).join(" "));
+
 function valueFrames(m: number, b: number, x: number, done: (y: number) => Text): Frame[] {
   const M = q(m);
   const B = q(b);
@@ -303,7 +306,10 @@ function valueFrames(m: number, b: number, x: number, done: (y: number) => Text)
     { math: lineSrc(M, B), highlight: ["vm"], note: tx(`Put $x = ${x}$ into the rule.`, `Setze $x = ${x}$ in die Vorschrift ein.`) },
     {
       math: `y#Y =#EQ ${mPart}${xs}${bPart}`,
-      note: x < 0 ? tx("A negative number goes in brackets. Multiply first, then add.", "Eine negative Zahl kommt in Klammern. Erst multiplizieren, dann addieren.") : tx("Multiply first, then add.", "Erst multiplizieren, dann addieren."),
+      note: joinTx(
+        x < 0 ? tx("A negative number goes in brackets.", "Eine negative Zahl kommt in Klammern.") : "",
+        b === 0 ? tx("Now multiply.", "Jetzt multiplizieren.") : b > 0 ? tx("Multiply first, then add.", "Erst multiplizieren, dann addieren.") : tx("Multiply first, then subtract.", "Erst multiplizieren, dann subtrahieren."),
+      ),
     },
   ];
   if (b !== 0 && !(m === 1 && x >= 0)) frames.push({ math: `y#Y =#EQ ${prodSrc}${bPart}`, note: `$${m === 1 ? "" : m === -1 ? "-" : `${m} \\cdot `}${x < 0 ? `(${x})` : x} = ${prod}$.` });
@@ -355,7 +361,7 @@ function tableExercise(m: number, b: number, xs: number[], gap: number): Exercis
     text: tx(`The table belongs to the rule $${rule}$. Which number belongs in the gap?`, `Die Tabelle gehört zur Vorschrift $${rule}$. Welche Zahl gehört in die Lücke?`),
     visual: view(ValueTable, { xs, ys: xs.map((v, i) => (i === gap ? null : m * v + b)), mark: gap }),
     answer: { kind: "number", value: y, label: "y =" },
-    hint: tx(`Put $x = ${x}$ into $${rule}$. Multiply before you add.`, `Setze $x = ${x}$ in $${rule}$ ein. Punkt vor Strich: erst multiplizieren.`),
+    hint: b === 0 ? tx(`Put $x = ${x}$ into $${rule}$ and multiply.`, `Setze $x = ${x}$ in $${rule}$ ein und multipliziere.`) : tx(`Put $x = ${x}$ into $${rule}$. Multiply before you add.`, `Setze $x = ${x}$ in $${rule}$ ein. Punkt vor Strich: erst multiplizieren.`),
     solution: valueFrames(m, b, x, (v) => tx(`So $y = ${v}$. The point $${pt(x, v)}$ belongs to the table.`, `Also ist $y = ${v}$. Der Punkt $${pt(x, v)}$ gehört zur Tabelle.`)),
     mistakes: valueMistakes(m, b, x),
   };
@@ -448,7 +454,12 @@ function proportionalTask(rng: Rng): Exercise {
         tx("Two slips: only the first pair, and upside down. Divide $y$ by $x$ for **every** pair and compare.", "Zwei Ausrutscher: nur das erste Paar und dazu auf dem Kopf. Teile bei **jedem** Paar $y$ durch $x$ und vergleiche."),
       );
     }
-    const quotient = (i: number, n: (v: number) => string) => `\\frac{${n(ys[i])}}{${n(xs[i])}} = ${ratio(frac(Math.round(ys[i] * 2), xs[i] * 2), n)}`;
+    const quotient = (i: number, n: (v: number, d?: number) => string) => {
+      const left = `\\frac{${n(ys[i])}}{${n(xs[i])}}`;
+      const right = ratio(frac(Math.round(ys[i] * 2), xs[i] * 2), n);
+      // Already in lowest terms (19/6 = 19/6 says nothing): give the rounded decimal instead.
+      return right === left ? `${left} \\approx ${n(ys[i] / xs[i], 2)}` : `${left} = ${right}`;
+    };
     const solution: Frame[] = [
       {
         math: say(({ n }) => quotient(0, n)),
@@ -466,7 +477,7 @@ function proportionalTask(rng: Rng): Exercise {
         math: kind === "inverse" ? say(({ n }) => xs.map((x, i) => `${x} \\cdot ${n(ys[i])}`).join(" = ") + ` = ${n(xs[0] * ys[0])}`) : say(({ n }) => `x = 0 \\Rightarrow y = ${n(ys[0] - (ys[1] - ys[0]) / (xs[1] - xs[0]) * xs[0])} \\ne 0`),
         note:
           kind === "inverse"
-            ? tx("Here $x \\cdot y$ is always the same: when $x$ doubles, $y$ halves. That's **inversely** proportional, the opposite.", "Hier ist $x \\cdot y$ immer gleich: Verdoppelt sich $x$, halbiert sich $y$. Das ist **antiproportional**, also das Gegenteil.")
+            ? tx("Here $x \\cdot y$ is always the same: when $x$ doubles, $y$ halves. That's **inversely** proportional: $x \\cdot y$ stays the same, not $y : x$.", "Hier ist $x \\cdot y$ immer gleich: Verdoppelt sich $x$, halbiert sich $y$. Das ist **antiproportional** (umgekehrt proportional): $x \\cdot y$ bleibt gleich, nicht $y : x$.")
             : tx("The $y$-values grow in equal steps, but at $x = 0$ the value isn't $0$: the line misses the origin. Proportional needs equal **quotients**.", "Die $y$-Werte wachsen in gleichen Schritten, aber bei $x = 0$ ist der Wert nicht $0$: Die Gerade verfehlt den Ursprung. Proportional braucht gleiche **Quotienten**."),
       });
     }
@@ -536,7 +547,11 @@ function factorExercise(x: number, y: number, withGraph: boolean): Exercise {
       { math: `m#M =#E ${fracSrc(y, x)}`, note: tx(`Put in $P$: $x = ${x}$ and $y = ${y}$.`, `Setze $P$ ein: $x = ${x}$ und $y = ${y}$.`) },
       {
         math: say(({ n }) => `m#M =#E ${m.d === 1 ? `${m.n < 0 ? "-#st " : ""}${Math.abs(m.n)}#mt` : decimal ? `${simple} = ${n(M)}` : simple}`),
-        note: say(({ t, n }) => t(`So $m = ${decimal ? n(M) : simple}$ and the line is $y = ${decimal ? n(M) : simple}x$.`, `Also ist $m = ${decimal ? n(M) : simple}$, und die Gerade heißt $y = ${decimal ? n(M) : simple}x$.`)),
+        note: say(({ t, n }) => {
+          const mS = decimal ? n(M) : simple;
+          const rule = M === 1 ? "x" : M === -1 ? "-x" : `${mS}x`;
+          return t(`So $m = ${mS}$ and the line is $y = ${rule}$.`, `Also ist $m = ${mS}$, und die Gerade heißt $y = ${rule}$.`);
+        }),
       },
     ],
     mistakes: mk.list,
@@ -667,10 +682,10 @@ function threeMistakes(s: Story, m: number, x1: number, x2: number, askY: boolea
     const mk = mistakeList({ kind: "number", value: y2, unit: s.yUnit });
     mk.add(
       { kind: "number", value: y1 + (x2 - x1), unit: s.yUnit },
-      tx("Added instead of multiplied", "Addiert statt multipliziert"),
+      x2 > x1 ? tx("Added instead of multiplied", "Addiert statt multipliziert") : tx("Subtracted instead of multiplied", "Subtrahiert statt multipliziert"),
       tx(
-        `Ah, you added the difference of $${x2 - x1 > 0 ? x2 - x1 : x1 - x2}$. Proportional works with **times**: twice as much $x$, twice as much $y$.`,
-        `Ah, du hast den Unterschied von $${x2 - x1 > 0 ? x2 - x1 : x1 - x2}$ addiert. Proportional geht mit **mal**: doppelt so viel $x$, doppelt so viel $y$.`,
+        `Ah, you ${x2 > x1 ? "added" : "subtracted"} the difference of $${Math.abs(x2 - x1)}$. Proportional works with **times**: twice as much $x$, twice as much $y$.`,
+        `Ah, du hast den Unterschied von $${Math.abs(x2 - x1)}$ ${x2 > x1 ? "dazugezählt" : "abgezogen"}. Proportional geht mit **mal**: doppelt so viel $x$, doppelt so viel $y$.`,
       ),
     );
     mk.add(
@@ -682,7 +697,7 @@ function threeMistakes(s: Story, m: number, x1: number, x2: number, askY: boolea
       mk.add(
         { kind: "number", value: y1 * x2, unit: s.yUnit },
         tx("Step to 1 missing", "Schritt auf 1 fehlt"),
-        tx(`Careful: $${amount(s, y1, "en")}$ belongs to $${x1}$, not to $1$. First divide by $${x1}$, then multiply.`, `Vorsicht: $${amount(s, y1, "de")}$ gehört zu $${x1}$, nicht zu $1$. Teile zuerst durch $${x1}$, dann multiplizieren.`),
+        tx(`Careful: $${amount(s, y1, "en")}$ belongs to $${x1}$, not to $1$. First divide by $${x1}$, then multiply.`, `Vorsicht: $${amount(s, y1, "de")}$ gehört zu $${x1}$, nicht zu $1$. Teile zuerst durch $${x1}$, dann multipliziere.`),
       );
     }
     return mk.list;
@@ -721,7 +736,9 @@ function threeTask(rng: Rng): Exercise {
       instruction: I_THREE,
       text: txMapJoin(given, ask),
       answer: { kind: "number", value: askY ? y2 : x2, unit: askY ? s.yUnit : s.xUnit },
-      hint: tx("Proportional: first work out the value for $1$ unit, then multiply (rule of three).", "Proportional: Rechne zuerst auf $1$ Einheit herunter, dann multiplizieren (Dreisatz)."),
+      hint: askY
+        ? tx("Proportional: first work out the value for $1$ unit, then multiply (rule of three).", "Proportional: Rechne zuerst auf $1$ Einheit herunter, dann multipliziere (Dreisatz).")
+        : tx("Proportional: first work out the value for $1$ unit, then divide by it (rule of three).", "Proportional: Rechne zuerst auf $1$ Einheit herunter, dann teile dadurch (Dreisatz)."),
       solution: threeFrames(s, m, x1, x2, askY),
       mistakes: threeMistakes(s, m, x1, x2, askY),
     };
@@ -866,7 +883,7 @@ const tableLessonFrames: Frame[] = [
 
 const propFrames: Frame[] = [
   {
-    math: '1#x1 "kg"#u1 \\to#a1 3#y1 "€"#e1 \\quad 2#x2 "kg"#u2 \\to#a2 6#y2 "€"#e2 \\quad 3#x3 "kg"#u3 \\to#a3 9#y3 "€"#e3',
+    math: '1#x1 "kg"#u1 \\to#a1 3#y1 "€"#e1 \\\\ 2#x2 "kg"#u2 \\to#a2 6#y2 "€"#e2 \\\\ 3#x3 "kg"#u3 \\to#a3 9#y3 "€"#e3',
     note: tx("Twice the weight, twice the price. Three times the weight, three times the price.", "Doppeltes Gewicht, doppelter Preis. Dreifaches Gewicht, dreifacher Preis."),
   },
   {
@@ -883,7 +900,28 @@ const propFrames: Frame[] = [
   },
   {
     math: "x#X =#E1 1#one \\Rightarrow#imp y#Y =#EQ m#m",
-    note: tx("Handy: at $x = 1$ the line is exactly at height $m$. The bigger $m$, the steeper the line.", "Praktisch: Bei $x = 1$ ist die Gerade genau auf Höhe $m$. Je größer $m$, desto steiler die Gerade."),
+    note: tx(
+      "Handy: at $x = 1$ the line is exactly at height $m$. The bigger $|m|$ (the size of $m$ without its sign), the steeper the line.",
+      "Praktisch: Bei $x = 1$ ist die Gerade genau auf Höhe $m$. Je größer $|m|$ (der Betrag von $m$, also ohne Vorzeichen), desto steiler die Gerade.",
+    ),
+  },
+  {
+    math: '4#xa "kg"#ua \\to#aa 12#ya "€"#ea \\\\ 1#xb "kg"#ub \\to#ab 3#yb "€"#eb',
+    note: tx(
+      "Missing values? Use the **rule of three**. $4$ kg cost $12$ €. Divide both by $4$: $1$ kg costs $3$ €.",
+      "Fehlende Werte? Dafür gibt es den **Dreisatz**. $4$ kg kosten $12$ €. Teile beide durch $4$: $1$ kg kostet $3$ €.",
+    ),
+  },
+  {
+    math: '4#xa "kg"#ua \\to#aa 12#ya "€"#ea \\\\ 1#xb "kg"#ub \\to#ab 3#yb "€"#eb \\\\ 7#xc "kg"#uc \\to#ac 21#yc "€"#ec',
+    note: tx("Then multiply both by $7$: $7$ kg cost $21$ €.", "Dann multipliziere beide mit $7$: $7$ kg kosten $21$ €."),
+  },
+  {
+    math: '1#xb "kg"#ub \\to#ab 3#yb "€"#eb \\\\ 5#xd "kg"#ud \\to#ad 15#yd "€"#ed',
+    note: tx(
+      "Backwards works too: how much do you get for $15$ €? Divide by the price of $1$ kg: $15 : 3 = 5$, so $5$ kg.",
+      "Rückwärts geht es auch: Wie viel bekommst du für $15$ €? Teile durch den Preis für $1$ kg: $15 : 3 = 5$, also $5$ kg.",
+    ),
   },
 ];
 
@@ -911,7 +949,7 @@ export const level1: LevelLesson = {
     {
       title: tx("Table of values", "Wertetabelle"),
       body: tx("Put each $x$ into the rule and work out $y$ (multiply before you add). Each pair is a point of the graph.", "Setze jedes $x$ in die Vorschrift ein und berechne $y$ (Punkt vor Strich). Jedes Wertepaar ist ein Punkt des Graphen."),
-      examples: ["y = 2x - 1", "x = -1: \; y = 2 \\cdot (-1) - 1 = -3"],
+      examples: ["y = 2x - 1", "x = -1\\text{:} \\; y = 2 \\cdot (-1) - 1 = -3"],
       tone: "rule",
     },
     {
@@ -1010,8 +1048,8 @@ export const level1: LevelLesson = {
       title: tx("Proportional functions", "Proportionale Funktionen"),
       blob: tx("Twice as much, twice the price. That's proportional!", "Doppelt so viel, doppelter Preis. Das ist proportional!"),
       body: tx(
-        "$1$ kg of apples costs $3$ €. Twice the weight costs twice as much: that's a **proportional** relationship.",
-        "$1$ kg Äpfel kostet $3$ €. Das doppelte Gewicht kostet doppelt so viel: Das ist eine **proportionale Zuordnung**.",
+        "$1$ kg of apples costs $3$ €. Twice the weight costs twice as much: that's a **proportional** relationship. With the **rule of three** you find missing values.",
+        "$1$ kg Äpfel kostet $3$ €. Das doppelte Gewicht kostet doppelt so viel: Das ist eine **proportionale Zuordnung**. Mit dem **Dreisatz** findest du fehlende Werte.",
       ),
       frames: propFrames,
     },

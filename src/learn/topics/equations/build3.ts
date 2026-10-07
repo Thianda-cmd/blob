@@ -64,9 +64,9 @@ export function absSimpleFrames(t: AbsSimple, v = "x"): Frame[] {
       a < 0
         ? tx(
             `$|${center}| = |${v} - (${a})|$ is the distance between $${v}$ and $${a}$ on the number line.`,
-            `$|${center}| = |${v} - (${a})|$ ist der Abstand zwischen $${v}$ und $${a}$ am Zahlenstrahl.`,
+            `$|${center}| = |${v} - (${a})|$ ist der Abstand zwischen $${v}$ und $${a}$ an der Zahlengeraden.`,
           )
-        : tx(`$|${center}|$ is the distance between $${v}$ and $${a}$ on the number line.`, `$|${center}|$ ist der Abstand zwischen $${v}$ und $${a}$ am Zahlenstrahl.`),
+        : tx(`$|${center}|$ is the distance between $${v}$ and $${a}$ on the number line.`, `$|${center}|$ ist der Abstand zwischen $${v}$ und $${a}$ an der Zahlengeraden.`),
   };
   if (r < 0)
     return [
@@ -378,11 +378,11 @@ export function absIneqFrames(t: AbsIneq, v = "x"): Frame[] {
     note: inner
       ? tx(
           `On the number line: the stretch from $${lo}$ to $${hi}$, ends ${close ? "included" : "left out"}.`,
-          `Am Zahlenstrahl: die Strecke von $${lo}$ bis $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
+          `An der Zahlengeraden: die Strecke von $${lo}$ bis $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
         )
       : tx(
           `On the number line: everything outside $${lo}$ and $${hi}$, ends ${close ? "included" : "left out"}.`,
-          `Am Zahlenstrahl: alles außerhalb von $${lo}$ und $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
+          `An der Zahlengeraden: alles außerhalb von $${lo}$ und $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
         ),
   });
   return frames;
@@ -419,7 +419,7 @@ function rootCheck({ u, a, b }: RootQuad, x: number, v: string): Frame {
   const ok = Math.abs(left - right) < 1e-9;
   const inside = `${u === 1 ? x : `${u} \\cdot ${par(x)}`}${a === 0 ? "" : ` ${a > 0 ? "+" : "-"} ${Math.abs(a)}`}`;
   const rhs = b === 0 ? String(x) : `${x} ${b > 0 ? "-" : "+"} ${Math.abs(b)}`;
-  const line = `\\sqrt{${inside}} = ${left} \\quad ${rhs} = ${right}`;
+  const line = b === 0 ? `\\sqrt{${inside}} = ${left} ${ok ? "=" : "\\ne"} ${x}` : `\\sqrt{${inside}} = ${left} \\quad ${rhs} = ${right}`;
   return {
     math: ok ? `\\green{${line}}` : `\\red{${line}}`,
     note: ok

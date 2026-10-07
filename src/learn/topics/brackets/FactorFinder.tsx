@@ -76,17 +76,17 @@ export function FactorFinder() {
     setPow([0, 0]);
   }
 
-  // One term of the bracket: fine, or red when the factor doesn't fit.
+  // One term of the bracket: fine, or a red fraction "term over factor" when the factor doesn't fit
+  // (no negative exponents or fractional coefficients: those come later at school).
   const termSrc = (m: Mono, i: number) => {
     const qi = q[i];
     const ok = Number.isInteger(qi.c) && qi.e.every((e) => e >= 0);
     const first = i === 0;
     if (ok) return isOne(qi) ? `${qi.c < 0 ? (first ? "-" : "- ") : first ? "" : "+ "}1` : monoSrc(qi, ex.vars, { first });
     const sign = qi.c < 0 ? (first ? "-" : "- ") : first ? "" : "+ ";
-    const c = Math.abs(qi.c);
-    const cs = Number.isInteger(c) ? (c === 1 && qi.e.some((e) => e !== 0) ? "" : String(c)) : `\\frac{${Math.abs(m.c)}}{${Math.abs(F.c)}}`;
-    const letters = ex.vars.map((v, j) => (qi.e[j] === 0 ? "" : qi.e[j] === 1 ? v : `${v}^{${qi.e[j]}}`)).join("");
-    return `${sign}\\red{${cs}${letters}}`;
+    const top = monoSrc({ ...m, c: Math.abs(m.c) }, ex.vars, { first: true });
+    const bottom = monoSrc({ ...F, c: Math.abs(F.c) }, ex.vars, { first: true });
+    return `${sign}\\red{\\frac{${top}}{${bottom}}}`;
   };
 
   const fSrc = trivial && !neg ? "1 \\cdot" : F.c === -1 && F.e.every((e) => e === 0) ? "-" : monoSrc(F, ex.vars, { first: true });
@@ -119,7 +119,7 @@ export function FactorFinder() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2">
-        <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-ink-2">
+        <p className="w-full min-w-0 text-[13.5px] leading-relaxed text-ink-2 sm:w-auto sm:flex-1">
           <Inline text={tx("Build the factor in front of the bracket: a number, a sign and the letters. The bracket shows what's left of every term.", "Bau den Faktor vor der Klammer: eine Zahl, ein Vorzeichen und die Buchstaben. Die Klammer zeigt, was von jedem Term übrig bleibt.")} />
         </p>
         <button onClick={next} className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
@@ -131,7 +131,9 @@ export function FactorFinder() {
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           <MathView src={polySrc(ex.terms, ex.vars)} size="lg" animate={false} />
           <span className="font-math text-[22px] text-ink-3">=</span>
-          <MathView src={formula} size="lg" scope={`${scope}-${n}`} />
+          <motion.span key={formula} initial={{ opacity: 0.35, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 420, damping: 30 }} className="inline-flex">
+            <MathView src={formula} size="lg" animate={false} />
+          </motion.span>
         </div>
       </div>
 

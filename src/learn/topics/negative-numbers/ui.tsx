@@ -256,9 +256,9 @@ export function DragPoint({
       onPointerUp={() => setDrag(false)}
       onPointerCancel={() => setDrag(false)}
     >
-      <circle cy={y} r={22} fill={color} opacity={drag ? 0.16 : 0.07} />
+      <circle cy={y} r={28} fill={color} opacity={drag ? 0.16 : 0.07} />
       {focus && <circle cy={y} r={14} fill="none" stroke={color} strokeWidth={2} opacity={0.6} />}
-      <circle cy={y} r={drag ? 10 : 8.5} fill={color} stroke="var(--raised)" strokeWidth={2.5} />
+      <circle cy={y} r={drag ? 11 : 9.5} fill={color} stroke="var(--raised)" strokeWidth={2.5} />
       <text y={above ? y - 20 : y + 46} textAnchor="middle" fill={color} className="font-math text-[17px] italic max-sm:text-[21px]" fontWeight={600}>
         {label}
       </text>

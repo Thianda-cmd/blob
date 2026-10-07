@@ -75,7 +75,7 @@ const EXAMPLES: Example[] = [
         grouped: "(x^2 + 3x) + (2x + 6)",
         factored: "x\\hl{(x + 3)} + 2\\hl{(x + 3)}",
         result: "(x + 3)(x + 2)",
-        note: tx("$x$ from the first pair, $2$ from the second. A product of two brackets: that's how you factorise many quadratic terms.", "$x$ aus dem ersten Paar, $2$ aus dem zweiten. Ein Produkt aus zwei Klammern: So zerlegst du viele quadratische Terme."),
+        note: tx("$x$ from the first pair, $2$ from the second. A product of two brackets: factoring out works when there's an $x^2$ too.", "$x$ aus dem ersten Paar, $2$ aus dem zweiten. Ein Produkt aus zwei Klammern: Ausklammern funktioniert auch, wenn ein $x^2$ dabei ist."),
       },
       2: {
         grouped: "(x^2 + 2x) + (3x + 6)",
@@ -104,7 +104,7 @@ export function GroupingPuzzle() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2">
-        <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-ink-2">
+        <p className="w-full min-w-0 text-[13.5px] leading-relaxed text-ink-2 sm:w-auto sm:flex-1">
           <Inline
             text={tx(
               "Four terms, but no factor is in all of them. Pick a partner for the first term. The other two form the second pair. Does the same bracket appear in both pairs?",

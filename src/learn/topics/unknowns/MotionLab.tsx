@@ -156,7 +156,7 @@ function Lab({ mode }: { mode: Mode }) {
             restart();
             setV1(v);
           }} />
-        <Stepper label={meet ? tx("B from town B", "B ab Ort B") : tx("B (moped, 1 h later)", "B (Mofa, 1 h später)")} value={v2} min={meet ? 40 : 15} max={meet ? 120 : 60} step={meet ? 10 : 5} unit=" km/h" onChange={(v) => {
+        <Stepper label={meet ? tx("B from town B", "B ab Ort B") : tx("B (moped, 1 h later)", "B (Moped, 1 h später)")} value={v2} min={meet ? 40 : 15} max={meet ? 120 : 45} step={meet ? 10 : 5} unit=" km/h" onChange={(v) => {
             restart();
             setV2(v);
           }} />
@@ -190,7 +190,7 @@ function Lab({ mode }: { mode: Mode }) {
           {sTicks.map((s) => (
             <g key={`s${s}`}>
               <line x1={M.l} x2={W - M.r} y1={py(s)} y2={py(s)} stroke="var(--line)" strokeWidth={0.8} />
-              <text x={M.l - 6} y={py(s) + 3.8} textAnchor="end" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+              <text x={M.l - 6} y={py(s) + 4.5} textAnchor="end" fontSize={13} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                 {s}
               </text>
             </g>
@@ -198,15 +198,15 @@ function Lab({ mode }: { mode: Mode }) {
           {hTicks.map((h) => (
             <g key={`h${h}`}>
               <line x1={px(h)} x2={px(h)} y1={M.t} y2={HH - M.b} stroke="var(--line)" strokeWidth={0.8} />
-              <text x={px(h)} y={HH - M.b + 14} textAnchor="middle" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+              <text x={px(h)} y={HH - M.b + 16} textAnchor="middle" fontSize={13} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                 {h}
               </text>
             </g>
           ))}
-          <text x={W - M.r} y={HH - 6} textAnchor="end" fontSize={11} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={W - M.r} y={HH - 3} textAnchor="end" fontSize={13} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             t in h
           </text>
-          <text x={8} y={14} fontSize={11} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={6} y={15} fontSize={13} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             s in km
           </text>
           <path d={lineA} fill="none" stroke="var(--blob)" strokeWidth={2.6} strokeLinecap="round" />
@@ -222,7 +222,7 @@ function Lab({ mode }: { mode: Mode }) {
                   x={px(tStar) + (px(tStar) > W * 0.65 ? -12 : 12)}
                   y={py(sStar) + (meet ? -10 : 18)}
                   textAnchor={px(tStar) > W * 0.65 ? "end" : "start"}
-                  fontSize={11.5}
+                  fontSize={13.5}
                   fontWeight={700}
                   fill="var(--ink)"
                   stroke="var(--surface)"

@@ -37,10 +37,11 @@ type Derivation = {
   legend?: Text;
 };
 
-/** A letter as a keyed token; R_1 keeps its subscript: R#k_{1#ks}. */
+/** A letter as a keyed token; R_1 keeps its subscript: {R#k}_{1#ks}. */
 const K = (x: string, key: string) => {
   const m = /^([A-Za-z])_(\w)$/.exec(x);
-  return m ? `${m[1]}#${key}_{${m[2]}#${key}s}` : `${x}#${key}`;
+  // Braces around the base: a key directly before "_" would swallow the underscore.
+  return m ? `{${m[1]}#${key}}_{${m[2]}#${key}s}` : `${x}#${key}`;
 };
 
 const SIGN = tx("Sign didn't change", "Vorzeichen nicht gewechselt");
@@ -518,7 +519,8 @@ function exprMistakes(d: Derivation): Mistake[] {
   return d.slips.filter((s) => s.plain).map((s) => ({ when: { kind: "expr", value: s.plain!, positive: true }, title: s.title, say: s.say, ...(s.close ? { close: true } : {}) }));
 }
 
-const markTarget = (formula: string, target: string) => formula.replace(new RegExp(`(^|[^A-Za-z\\\\])${target}(?![A-Za-z_])`, "g"), `$1\\blob{${target}}`);
+const escapeRe = (x: string) => x.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+const markTarget = (formula: string, target: string) => formula.replace(new RegExp(`(^|[^A-Za-z\\\\])${escapeRe(target)}(?![A-Za-z_])`, "g"), `$1\\blob{${target}}`);
 
 /** Solve for the letter (expression answer). */
 function solveTask(d: Derivation, instruction: Text): Exercise {
@@ -636,9 +638,10 @@ function numberTask(c: NumberCase): Exercise {
       const intro = resolveText(c.intro ?? d.legend, l);
       const list = c.given ? c.given(l) : given.map((x) => qty(x, vals[x], units[x], l)).join(", ");
       const round = c.round ? t(" Round to two decimal places.", " Runde auf zwei Nachkommastellen.") : "";
-      return `${intro} $${d.formula}$. ${t("Given:", "Gegeben:")} ${list}. ${t(`Calculate $${T}$.`, `Berechne $${T}$.`)}${round}`;
+      return `${intro} ${t("Given:", "Gegeben:")} ${list}. ${t(`Calculate $${T}$.`, `Berechne $${T}$.`)}${round}`;
     }),
     answer: right,
+    visual: { component: FormulaBoard, props: { src: markTarget(d.formula, T) } },
     hint: txMap((t, l) => t(`Solve for $${T}$ first, then put in the numbers. ${resolveText(d.hint, l)}`, `Stell zuerst nach $${T}$ um, dann setzt du die Zahlen ein. ${resolveText(d.hint, l)}`)),
     solution: smoothFracExits(frames),
     mistakes,
@@ -733,7 +736,7 @@ const ALPHA = 0.004;
 
 function resistanceDerivation(target: "R_0" | "\\Delta T"): Derivation {
   const legend = tx("A wire has the resistance $R_0$ at the start. Warmed up by $\\Delta T$, it has the resistance $R$ ($\\alpha$: temperature coefficient).", "Ein Draht hat anfangs den Widerstand $R_0$. Um $\\Delta T$ erwärmt, hat er den Widerstand $R$ ($\\alpha$: Temperaturkoeffizient).");
-  const start = "R#R =#eq R#z0_{0#z0s} (1#one +#p \\alpha#al \\Delta#dl T#dt)#br";
+  const start = "R#R =#eq {R#z0}_{0#z0s} (1#one +#p \\alpha#al \\Delta#dl T#dt)#br";
   if (target === "R_0")
     return {
       formula: "R = R_0 (1 + \\alpha \\Delta T)",
@@ -743,7 +746,7 @@ function resistanceDerivation(target: "R_0" | "\\Delta T"): Derivation {
       legend,
       frames: [
         { math: start, note: tx("$R_0$ is multiplied by the whole bracket.", "$R_0$ wird mit der ganzen Klammer multipliziert.") },
-        { math: "R#z0_{0#z0s} =#eq \\frac{R#R}{1#one +#p \\alpha#al \\Delta#dl T#dt}#fr", note: tx("Divide by the bracket and swap the sides.", "Teile durch die Klammer und tausche die Seiten.") },
+        { math: "{R#z0}_{0#z0s} =#eq \\frac{R#R}{1#one +#p \\alpha#al \\Delta#dl T#dt}#fr", note: tx("Divide by the bracket and swap the sides.", "Teile durch die Klammer und tausche die Seiten.") },
       ],
       slips: [
         { value: (v) => v.R / (ALPHA * v.dT), title: ONE_MISSING, say: tx("Hmm, the $1$ in the bracket got lost. Divide by the whole bracket $(1 + \\alpha \\Delta T)$.", "Hmm, die $1$ in der Klammer ist verloren gegangen. Teile durch die ganze Klammer $(1 + \\alpha \\Delta T)$.") },
@@ -759,9 +762,9 @@ function resistanceDerivation(target: "R_0" | "\\Delta T"): Derivation {
     legend,
     frames: [
       { math: start, note: tx("$\\Delta T$ is deep inside: in the bracket, times $\\alpha$.", "$\\Delta T$ steckt tief drin: in der Klammer, mal $\\alpha$.") },
-      { math: "\\frac{R#R}{R#z0_{0#z0s}}#fr =#eq 1#one +#p \\alpha#al \\Delta#dl T#dt", note: tx("Divide by $R_0$: the bracket opens up.", "Teile durch $R_0$: Die Klammer fällt weg.") },
-      { math: "\\frac{R#R}{R#z0_{0#z0s}}#fr -#m 1#one =#eq \\alpha#al \\Delta#dl T#dt", note: tx("Subtract $1$.", "Subtrahiere $1$.") },
-      { math: "\\Delta#dl T#dt =#eq \\frac{R#R -#m R#z1_{0#z1s}}{\\alpha#al R#z0_{0#z0s}}#fr2", note: tx("Divide by $\\alpha$ and write it as one fraction: $\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$.", "Teile durch $\\alpha$ und schreib es als einen Bruch: $\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$.") },
+      { math: "\\frac{R#R}{{R#z0}_{0#z0s}}#fr =#eq 1#one +#p \\alpha#al \\Delta#dl T#dt", note: tx("Divide by $R_0$: the bracket opens up.", "Teile durch $R_0$: Die Klammer fällt weg.") },
+      { math: "\\frac{R#R}{{R#z0}_{0#z0s}}#fr -#m 1#one =#eq \\alpha#al \\Delta#dl T#dt", note: tx("Subtract $1$.", "Subtrahiere $1$.") },
+      { math: "\\Delta#dl T#dt =#eq \\frac{R#R -#m {R#z1}_{0#z1s}}{\\alpha#al {R#z0}_{0#z0s}}#fr2", note: tx("Divide by $\\alpha$ and write it as one fraction: $\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$.", "Teile durch $\\alpha$ und schreib es als einen Bruch: $\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$.") },
     ],
     slips: [
       { value: (v) => (v.R - v.R0) / ALPHA, title: tx("Not divided by R₀", "Nicht durch R₀ geteilt"), say: tx("Hmm, the $R_0$ under the fraction bar got lost: $\\Delta T = \\frac{R - R_0}{\\alpha R_0}$.", "Hmm, das $R_0$ unter dem Bruchstrich ist verloren gegangen: $\\Delta T = \\frac{R - R_0}{\\alpha R_0}$.") },
@@ -974,12 +977,12 @@ const generalTwice: Frame[] = [
 ];
 
 const resistanceFrames: Frame[] = [
-  { math: "R#R =#eq R#z0_{0#z0s} +#p R#z1_{0#z1s} \\alpha#al \\Delta#dl T#dt", note: tx("A wire warms up by $\\Delta T$: its resistance grows from $R_0$ to $R$. We want $R_0$, and it appears twice.", "Ein Draht erwärmt sich um $\\Delta T$: Sein Widerstand wächst von $R_0$ auf $R$. Wir suchen $R_0$, und das kommt zweimal vor."), highlight: ["z0", "z0s", "z1", "z1s"] },
-  { math: "R#R =#eq R#z0_{0#z0s} (1#one +#p \\alpha#al \\Delta#dl T#dt)#br", note: tx("Factor out $R_0$. From the first summand a $1$ stays behind: $R_0 = R_0 \\cdot 1$.", "Klammere $R_0$ aus. Vom ersten Summanden bleibt eine $1$ übrig: $R_0 = R_0 \\cdot 1$."), highlight: ["one"] },
-  { math: "R#z0_{0#z0s} =#eq \\frac{R#R}{1#one +#p \\alpha#al \\Delta#dl T#dt}#fr", note: tx("Divide by the bracket and swap the sides. That's $R_0$.", "Teile durch die Klammer und tausche die Seiten. Das ist $R_0$.") },
-  { math: "\\frac{R#R}{R#z0_{0#z0s}}#fr =#eq 1#one +#p \\alpha#al \\Delta#dl T#dt", note: tx("And $\\Delta T$? Back to $R = R_0(1 + \\alpha \\Delta T)$, but this time divide by $R_0$.", "Und $\\Delta T$? Zurück zu $R = R_0(1 + \\alpha \\Delta T)$, aber diesmal teilst du durch $R_0$.") },
-  { math: "\\frac{R#R}{R#z0_{0#z0s}}#fr -#m 1#one =#eq \\alpha#al \\Delta#dl T#dt", note: tx("Subtract $1$.", "Subtrahiere $1$.") },
-  { math: "\\Delta#dl T#dt =#eq \\frac{R#R -#m R#z2_{0#z2s}}{\\alpha#al R#z0_{0#z0s}}#fr2", note: tx("Divide by $\\alpha$ and write one fraction ($\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$). $\\Delta T$ is **one** symbol: the change in temperature.", "Teile durch $\\alpha$ und schreib einen Bruch ($\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$). $\\Delta T$ ist **ein** Zeichen: die Temperaturänderung.") },
+  { math: "R#R =#eq {R#z0}_{0#z0s} +#p {R#z1}_{0#z1s} \\alpha#al \\Delta#dl T#dt", note: tx("A wire warms up by $\\Delta T$: its resistance grows from $R_0$ to $R$. We want $R_0$, and it appears twice.", "Ein Draht erwärmt sich um $\\Delta T$: Sein Widerstand wächst von $R_0$ auf $R$. Wir suchen $R_0$, und das kommt zweimal vor."), highlight: ["z0", "z0s", "z1", "z1s"] },
+  { math: "R#R =#eq {R#z0}_{0#z0s} (1#one +#p \\alpha#al \\Delta#dl T#dt)#br", note: tx("Factor out $R_0$. From the first summand a $1$ stays behind: $R_0 = R_0 \\cdot 1$.", "Klammere $R_0$ aus. Vom ersten Summanden bleibt eine $1$ übrig: $R_0 = R_0 \\cdot 1$."), highlight: ["one"] },
+  { math: "{R#z0}_{0#z0s} =#eq \\frac{R#R}{1#one +#p \\alpha#al \\Delta#dl T#dt}#fr", note: tx("Divide by the bracket and swap the sides. That's $R_0$.", "Teile durch die Klammer und tausche die Seiten. Das ist $R_0$.") },
+  { math: "\\frac{R#R}{{R#z0}_{0#z0s}}#fr =#eq 1#one +#p \\alpha#al \\Delta#dl T#dt", note: tx("And $\\Delta T$? Back to $R = R_0(1 + \\alpha \\Delta T)$, but this time divide by $R_0$.", "Und $\\Delta T$? Zurück zu $R = R_0(1 + \\alpha \\Delta T)$, aber diesmal teilst du durch $R_0$.") },
+  { math: "\\frac{R#R}{{R#z0}_{0#z0s}}#fr -#m 1#one =#eq \\alpha#al \\Delta#dl T#dt", note: tx("Subtract $1$.", "Subtrahiere $1$.") },
+  { math: "\\Delta#dl T#dt =#eq \\frac{R#R -#m {R#z2}_{0#z2s}}{\\alpha#al {R#z0}_{0#z0s}}#fr2", note: tx("Divide by $\\alpha$ and write one fraction ($\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$). $\\Delta T$ is **one** symbol: the change in temperature.", "Teile durch $\\alpha$ und schreib einen Bruch ($\\frac{R}{R_0} - 1 = \\frac{R - R_0}{R_0}$). $\\Delta T$ ist **ein** Zeichen: die Temperaturänderung.") },
 ];
 
 const lensFrames: Frame[] = [

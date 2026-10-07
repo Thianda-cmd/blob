@@ -10,6 +10,7 @@ import { useLocale } from "@/i18n/client";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
+import { Inline } from "@/learn/components/Rich";
 import { cos, sin } from "@/lib/stableMath";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +18,11 @@ import { cn } from "@/lib/utils";
 // Colours of balls and spinner fields (tokens only)
 
 export type Ball = "red" | "green" | "purple";
-export const BALL: Record<Ball, { fill: string; name: Text; adj: Text; noun: Text; letter: Text }> = {
-  red: { fill: "var(--danger)", name: tx("red", "rot"), adj: tx("red", "rote"), noun: tx("red", "Rot"), letter: "r" },
-  green: { fill: "var(--ok)", name: tx("green", "grün"), adj: tx("green", "grüne"), noun: tx("green", "Grün"), letter: "g" },
-  purple: { fill: "var(--blob)", name: tx("purple", "lila"), adj: tx("purple", "lila"), noun: tx("purple", "Lila"), letter: tx("p", "l") },
+/** name: „rot“; adj: „eine rote Kugel“; adjPl: „die roten Kugeln“; noun: „auf Rot“. */
+export const BALL: Record<Ball, { fill: string; name: Text; adj: Text; adjPl: Text; noun: Text; letter: Text }> = {
+  red: { fill: "var(--danger)", name: tx("red", "rot"), adj: tx("red", "rote"), adjPl: tx("red", "roten"), noun: tx("red", "Rot"), letter: "r" },
+  green: { fill: "var(--ok)", name: tx("green", "grün"), adj: tx("green", "grüne"), adjPl: tx("green", "grünen"), noun: tx("green", "Grün"), letter: "g" },
+  purple: { fill: "var(--blob)", name: tx("purple", "lila"), adj: tx("purple", "lila"), adjPl: tx("purple", "lila"), noun: tx("purple", "Lila"), letter: tx("p", "l") },
 };
 export type Field = Ball | "none";
 const FIELD_FILL: Record<Field, string> = { ...Object.fromEntries(Object.entries(BALL).map(([k, v]) => [k, v.fill])), none: "var(--surface)" } as Record<Field, string>;
@@ -209,7 +211,7 @@ export const SPINNER_VIEW = "0 0 260 244";
 export function ProbabilitySpinner({ sectors, angles = false }: { sectors: Sector[]; angles?: boolean }) {
   const t = useText();
   return (
-    <svg viewBox={SPINNER_VIEW} className="mx-auto block h-auto w-full max-w-[240px]" role="img" aria-label={t(tx("Spinner", "Glücksrad"))}>
+    <svg viewBox={SPINNER_VIEW} className="mx-auto block h-auto w-full max-w-[280px]" role="img" aria-label={t(tx("Spinner", "Glücksrad"))}>
       <SpinnerWheel sectors={sectors} angles={angles} />
       <SpinnerPointer />
     </svg>
@@ -337,7 +339,7 @@ export function ProbabilityTree({
   const num = useNum();
   const depth = (b: TreeBranch[]): number => 1 + Math.max(0, ...b.map((x) => (x.kids ? depth(x.kids) : 0)));
   const D = depth(branches);
-  const rowH = D >= 3 ? 34 : 50;
+  const rowH = D >= 3 ? 36 : 62;
   const colW = D >= 3 ? 112 : 150;
   const pad = 20;
   const { nodes, leaves } = layoutTree(branches, rowH, colW, pad);
@@ -395,17 +397,17 @@ export function ProbabilityTree({
           <g>
             {onLeaf && <rect x={leafX - 8} y={n.y - rowH / 2 + 3} width={width - leafX + 4} height={rowH - 6} rx={9} fill={on ? "var(--blob)" : "var(--surface)"} opacity={on ? 0.14 : 1} stroke={on ? "var(--blob)" : "var(--line)"} strokeWidth={1.2} />}
             {word.map((w, k) => (
-              <Letter key={k} x={leafX + 6 + k * 13} y={n.y + 5} label={w} size={15} fill={on ? "var(--blob-ink)" : "var(--ink)"} />
+              <Letter key={k} x={leafX + 6 + k * 14} y={n.y + 5} label={w} size={15} fill={on ? "var(--blob-ink)" : "var(--ink)"} />
             ))}
             {end !== undefined && end !== null && (
               <g>
-                <text x={leafX + 12 + word.length * 13} y={n.y + 5} fontSize={15} fill="var(--ink-3)" className="font-math">
+                <text x={leafX + 12 + word.length * 14} y={n.y + 5} fontSize={15} fill="var(--ink-3)" className="font-math">
                   =
                 </text>
                 {typeof end === "string" && /^\d+\/\d+$/.test(end) ? (
-                  <BranchLabel x={leafX + 40 + word.length * 13} y={n.y - 2} p={end} size={D >= 3 ? 12.5 : 14} />
+                  <BranchLabel x={leafX + 40 + word.length * 14} y={n.y - 2} p={end} size={D >= 3 ? 12.5 : 14} />
                 ) : (
-                  <text x={leafX + 28 + word.length * 13} y={n.y + 5} fontSize={15} fill="var(--ink)" className="font-math">
+                  <text x={leafX + 28 + word.length * 14} y={n.y + 5} fontSize={15} fill="var(--ink)" className="font-math">
                     {typeof end === "number" ? num(end) : end}
                   </text>
                 )}
@@ -600,12 +602,12 @@ export function ProbabilityPaths({ n, k, p }: { n: number; k: number; p: number 
           <MathView src={`\\cdot ${num(p)}^{${k}} \\cdot ${num(q)}^{${n - k}} = ${count} \\cdot ${num(p ** k * q ** (n - k), 5)} = ${num(result, 4)}`} size="md" animate={false} />
         </div>
         <div>
-          {t(
-            tx(
-              `${count} paths have exactly ${k} hits. Each has the probability ${num(p)}^${k} · ${num(q)}^${n - k}.`,
-              `${count} Pfade haben genau ${k} Treffer. Jeder hat die Wahrscheinlichkeit ${num(p)}^${k} · ${num(q)}^${n - k}.`,
-            ),
-          )}
+          <Inline
+            text={tx(
+              `$${count}$ paths have exactly $${k}$ hits. Each of them has the probability $${num(p)}^{${k}} \\cdot ${num(q)}^{${n - k}}$.`,
+              `$${count}$ Pfade haben genau $${k}$ Treffer. Jeder davon hat die Wahrscheinlichkeit $${num(p)}^{${k}} \\cdot ${num(q)}^{${n - k}}$.`,
+            )}
+          />
         </div>
       </div>
     </div>

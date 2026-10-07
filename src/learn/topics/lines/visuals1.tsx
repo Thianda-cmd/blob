@@ -36,7 +36,7 @@ export const quadrantOf = ([x, y]: Pt): 0 | 1 | 2 | 3 | 4 => (x === 0 || y === 0
 /** Big faint Roman numerals in the quadrants (SVG, inside a <Plane>). */
 export function QuadrantNumerals({ active, r = 5 }: { active?: number; r?: number }) {
   const geo = usePlaneGeo();
-  const at = (q: 1 | 2 | 3 | 4): Pt => [(q === 1 || q === 4 ? 1 : -1) * r * 0.62, (q === 1 || q === 2 ? 1 : -1) * r * 0.62];
+  const at = (q: 1 | 2 | 3 | 4): Pt => [(q === 1 || q === 4 ? 1 : -1) * r * 0.8, (q === 1 || q === 2 ? 1 : -1) * r * 0.8];
   return (
     <g fontFamily="var(--font-sans)" fontWeight={700} textAnchor="middle">
       {([1, 2, 3, 4] as const).map((q) => {

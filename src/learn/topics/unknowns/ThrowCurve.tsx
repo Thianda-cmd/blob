@@ -10,7 +10,7 @@ import { num } from "./kit";
 
 const W = 380;
 const H = 230;
-const M = { l: 40, r: 16, t: 16, b: 34 };
+const M = { l: 40, r: 16, t: 26, b: 34 };
 
 export function ThrowCurve({ v = 20, h0 = 0, height = 15 }: { v?: number; h0?: number; height?: number }) {
   const t = useText();
@@ -60,7 +60,7 @@ export function ThrowCurve({ v = 20, h0 = 0, height = 15 }: { v?: number; h0?: n
       <text x={W - M.r} y={H - 5} textAnchor="end" fontSize={11} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
         t in s
       </text>
-      <text x={6} y={M.t - 4} fontSize={11} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+      <text x={6} y={14} fontSize={11} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
         h in m
       </text>
       <line x1={M.l} x2={W - M.r} y1={py(height)} y2={py(height)} stroke="var(--blob)" strokeDasharray="5 4" strokeWidth={1.5} />

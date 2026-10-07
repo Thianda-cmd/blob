@@ -18,8 +18,11 @@ export function side(ts: Term[], n: (v: number) => string = String): string {
     .join(" ");
 }
 
-/** Both equations, labelled (I) and (II); each stays on one line, (II) moves below (I) when space is short. */
-export const sys = (a: string, b: string) => `\\group{"(I)"#L1 \\, ${a}}#G1 \\quad \\group{"(II)"#L2 \\, ${b}}#G2`;
+/**
+ * Both equations, labelled (I) and (II); each stays on one line, (II) moves below (I) when space is
+ * short. The gap belongs to (I), so it doesn't wrap onto the second line in front of (II).
+ */
+export const sys = (a: string, b: string) => `\\group{"(I)"#L1 \\, ${a} \\quad}#G1 \\group{"(II)"#L2 \\, ${b}}#G2`;
 
 /** A balance step after an equation: "| − 100". */
 export const bar = (op: string) => ` \\quad \\blob{|#bar ${op}}`;

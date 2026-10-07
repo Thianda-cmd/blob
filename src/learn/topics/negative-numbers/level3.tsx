@@ -18,7 +18,7 @@ const strip = (s: string) => s.replace(/#[A-Za-z0-9_-]+/g, "").replace(/(^|\(|\|
 
 /** Lösungsmenge: "L = {−4; 4}" in German, "L = {−4, 4}" in English. */
 const setOf = (vals: number[]): Text => {
-  const sorted = [...vals].sort((a, b) => a - b);
+  const sorted = [...vals].sort((a, b) => a - b).map((v) => (v < 0 ? `\\group{${v}}` : String(v)));
   return vals.length ? tx(`L = \\{${sorted.join(", ")}\\}`, `L = \\{${sorted.join("; ")}\\}`) : "L = \\{ \\}";
 };
 
@@ -746,7 +746,7 @@ export const level3: LevelLesson = {
         { math: "|#l -#s 5#a |#r", note: tx('Read: "the absolute value of $-5$". How far is $-5$ from $0$?', "Lies: „Betrag von $-5$“. Wie weit ist $-5$ von der $0$ entfernt?") },
         { math: "|#l -#s 5#a |#r =#e 5#b", note: tx("5 steps. So $|-5| = 5$.", "5 Schritte. Also ist $|-5| = 5$.") },
         { math: "|#l 5#a |#r =#e 5#b \\quad |#l2 0#z |#r2 =#e2 0#z2", note: tx("$5$ is also 5 away: $|5| = 5$. And $|0| = 0$. Opposite numbers have the same absolute value.", "Auch $5$ ist 5 entfernt: $|5| = 5$. Und $|0| = 0$. Gegenzahlen haben denselben Betrag.") },
-        { math: `${ab("3#p -#m (-#s 4#a)#k", "D")}`, note: tx("The distance between $3$ and $-4$: subtract and take the absolute value.", "Der Abstand von $3$ und $-4$: subtrahieren und den Betrag nehmen.") },
+        { math: `${ab("3#p -#m (-#s 4#a)#k", "D")}`, note: tx("The distance between $3$ and $-4$: subtract and take the absolute value.", "Der Abstand zwischen $3$ und $-4$: subtrahieren und den Betrag nehmen.") },
         { math: `${ab("3#p -#m (-#s 4#a)#k", "D")} =#e ${ab("7#r", "E")} =#e2 7#d`, note: tx("$3 - (-4) = 7$, so the distance is $7$.", "$3 - (-4) = 7$, der Abstand ist also $7$.") },
         { math: `${ab("-#s 4#a -#m 3#p", "D")} =#e ${ab("-#rs 7#r", "E")} =#e2 7#d`, note: tx("The other way round gives $-7$, but the absolute value is $7$ again. Order doesn't matter.", "Andersherum ergibt sich $-7$, der Betrag ist aber wieder $7$. Die Reihenfolge ist egal.") },
       ],
@@ -844,14 +844,14 @@ export const level3: LevelLesson = {
     },
     {
       title: tx("Distance between two numbers", "Abstand zweier Zahlen"),
-      body: tx("$|a - b|$ is the distance between $a$ and $b$. The order doesn't matter.", "$|a - b|$ ist der Abstand von $a$ und $b$. Die Reihenfolge ist egal."),
+      body: tx("$|a - b|$ is the distance between $a$ and $b$. The order doesn't matter.", "$|a - b|$ ist der Abstand zwischen $a$ und $b$. Die Reihenfolge ist egal."),
       examples: ["|3 - (-4)| = |7| = 7", "|-4 - 3| = |-7| = 7"],
       tone: "rule",
     },
     {
       title: tx("Equations with distances", "Gleichungen mit Abständen"),
       body: tx("$|x| = a$ and $x^2 = a^2$ (with $a > 0$) have two solutions: $a$ and $-a$. A negative distance or square: no solution.", "$|x| = a$ und $x^2 = a^2$ (mit $a > 0$) haben zwei Lösungen: $a$ und $-a$. Negativer Abstand oder negatives Quadrat: keine Lösung."),
-      examples: [tx("|x| = 4 \\Rightarrow L = \\{-4, 4\\}", "|x| = 4 \\Rightarrow L = \\{-4; 4\\}"), tx("x^2 = 16 \\Rightarrow L = \\{-4, 4\\}", "x^2 = 16 \\Rightarrow L = \\{-4; 4\\}"), "|x| = -2 \\Rightarrow L = \\{ \\}"],
+      examples: [tx("|x| = 4 \\Rightarrow L = \\{\\group{-4}, 4\\}", "|x| = 4 \\Rightarrow L = \\{\\group{-4}; 4\\}"), tx("x^2 = 16 \\Rightarrow L = \\{\\group{-4}, 4\\}", "x^2 = 16 \\Rightarrow L = \\{\\group{-4}; 4\\}"), "|x| = -2 \\Rightarrow L = \\{ \\}"],
       tone: "tip",
     },
     {

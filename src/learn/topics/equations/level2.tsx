@@ -50,7 +50,7 @@ function setFrame(v: string, rel: IneqRel, b: number): Frame {
     math: setBuilder(v, rel, b),
     note: txMap(
       (t, l) =>
-        `${t("As a solution set. On the number line:", "Als Lösungsmenge. Am Zahlenstrahl:")} ${closed ? t("a filled dot", "ein ausgefüllter Punkt") : t("an open circle", "ein offener Kreis")} ${t(`at $${b}$, shaded to the`, `bei $${b}$, markiert nach`)} ${rel === ">" || rel === "≥" ? t("right", "rechts") : t("left", "links")}. ${t("As an interval:", "Als Intervall:")} ${typeof interval === "string" ? interval : interval[l]}`,
+        `${t("As a solution set. On the number line:", "Als Lösungsmenge. An der Zahlengeraden:")} ${closed ? t("a filled dot", "ein ausgefüllter Punkt") : t("an open circle", "ein offener Kreis")} ${t(`at $${b}$, shaded to the`, `bei $${b}$, markiert nach`)} ${rel === ">" || rel === "≥" ? t("right", "rechts") : t("left", "links")}. ${t("As an interval:", "Als Intervall:")} ${typeof interval === "string" ? interval : interval[l]}`,
     ),
   };
 }
@@ -305,7 +305,7 @@ function lineExercise(at: number, right: boolean, closed: boolean): Exercise {
     },
   ];
   return {
-    instruction: tx("Which solution set does the number line show?", "Welche Lösungsmenge zeigt der Zahlenstrahl?"),
+    instruction: tx("Which solution set does the number line show?", "Welche Lösungsmenge zeigt die Zahlengerade?"),
     visual: { component: NumberLine as ComponentType<Record<string, unknown>>, props: { from: -6, to: 6, rays: [{ at, dir: right ? "right" : "left", closed }] } },
     answer: { kind: "choice", options, correct },
     hint: tx("Filled dot: the boundary belongs to it. Shading to the right: bigger numbers.", "Ausgefüllter Punkt: Die Grenze gehört dazu. Markierung nach rechts: größere Zahlen."),
@@ -633,7 +633,7 @@ export const level2: LevelLesson = {
       title: tx("Solution sets of inequalities", "Lösungsmengen von Ungleichungen"),
       body: tx(
         "Write the answer as a set. On the number line: an open circle for $<$ and $>$, a filled dot for $\\le$ and $\\ge$. As an interval: $x \\le 6$ is (−∞, 6].",
-        "Schreib die Lösung als Menge. Am Zahlenstrahl: ein offener Kreis bei $<$ und $>$, ein ausgefüllter Punkt bei $\\le$ und $\\ge$. Als Intervall: $x \\le 6$ ist ]−∞; 6].",
+        "Schreib die Lösung als Menge. An der Zahlengeraden: ein offener Kreis bei $<$ und $>$, ein ausgefüllter Punkt bei $\\le$ und $\\ge$. Als Intervall: $x \\le 6$ ist ]−∞; 6].",
       ),
       examples: ["L = \\{ x \\,|\\, x \\le 6 \\}"],
       tone: "tip",
@@ -722,7 +722,7 @@ export const level2: LevelLesson = {
     {
       type: "widget",
       title: tx("Build the solution set", "Bau die Lösungsmenge"),
-      blob: tx("Solve, then show it on the number line!", "Erst lösen, dann am Zahlenstrahl zeigen!"),
+      blob: tx("Solve, then show it on the number line!", "Erst lösen, dann an der Zahlengeraden zeigen!"),
       body: tx(
         "Solve the inequality, then set the boundary, the direction and the dot. The notation below follows along: as an inequality, as a set and as an interval.",
         "Löse die Ungleichung und stell dann Grenze, Richtung und Punkt ein. Die Schreibweisen darunter laufen mit: als Ungleichung, als Menge und als Intervall.",

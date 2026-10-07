@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
-import { Graph } from "@/learn/visuals/Graph";
+import { Graph, type GraphSegment } from "@/learn/visuals/Graph";
 import { cn } from "@/lib/utils";
 import { clean, dec, enDecimals, minusR, ptSrc, quadSrc } from "./shared";
 import { Chip, SPRING, useNum, ValueSlider } from "./ui";
@@ -27,6 +27,38 @@ export function vertexSrc(a: number, d: number, e: number): string {
   const sq = d === 0 ? "x^2" : `(${minusR(d)})^2`;
   return `${lead}${sq}${e === 0 ? "" : ` ${e < 0 ? "-" : "+"} ${dec(Math.abs(e))}`}`;
 }
+
+/**
+ * The normal parabola y = x² as short dash pieces (segments). Graph draws functions with a draw-in
+ * animation (pathLength), which overrides their dash pattern, so a dashed function would come out solid.
+ * Dashes of 0.3 and gaps of 0.2 units of arc length, cut off a little above the visible range.
+ */
+const NORMAL_DASHES: GraphSegment[] = (() => {
+  const out: GraphSegment[] = [];
+  const DASH = 0.3;
+  const GAP = 0.2;
+  const X = 2.85; // x² = 8.1, just above the top edge y = 7
+  const N = 2400;
+  let run = 0;
+  let on = true;
+  let start: [number, number] = [-X, X * X];
+  let prev: [number, number] = start;
+  for (let i = 1; i <= N; i++) {
+    const x = -X + (2 * X * i) / N;
+    const p: [number, number] = [x, x * x];
+    const dx = p[0] - prev[0];
+    const dy = p[1] - prev[1];
+    run += Math.sqrt(dx * dx + dy * dy);
+    prev = p;
+    if (run >= (on ? DASH : GAP) || i === N) {
+      if (on) out.push({ from: start, to: p, color: "ink", key: `n${out.length}` });
+      on = !on;
+      run = 0;
+      start = p;
+    }
+  }
+  return out;
+})();
 
 export function VertexLab() {
   const t = useText();
@@ -86,9 +118,9 @@ export function VertexLab() {
           height={380}
           className="aspect-square h-auto!"
           functions={[
-            { f: (x) => x * x, key: "normal", color: "ink", dashed: true },
             { f: (x) => a * (x - d) * (x - d) + e, key: "f", color: "blob" },
           ]}
+          segments={NORMAL_DASHES}
           points={[
             ...zeros.map((z, i) => ({ key: `z${i}`, x: z, y: 0, color: "ok" as const, hollow: true })),
             {

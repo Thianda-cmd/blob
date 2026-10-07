@@ -80,7 +80,7 @@ const CASES: Case[] = [
 const VW = 360;
 const VH = 230;
 const ML = 40;
-const MR = 14;
+const MR = 22;
 const MT = 14;
 const MB = 30;
 
@@ -218,17 +218,17 @@ export function TariffLab() {
           {ticksY.map((v) => (
             <g key={`y${v}`}>
               <line x1={ML} x2={VW - MR} y1={sy(v)} y2={sy(v)} stroke="var(--line)" strokeWidth={v === 0 ? 1.4 : 0.8} />
-              <text x={ML - 6} y={sy(v) + 4} textAnchor="end" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+              <text x={ML - 6} y={sy(v) + 4} textAnchor="end" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                 {nf(v, l, 0)} €
               </text>
             </g>
           ))}
           {ticksX.map((v) => (
-            <text key={`x${v}`} x={sx(v)} y={VH - MB + 15} textAnchor="middle" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+            <text key={`x${v}`} x={sx(v)} y={VH - MB + 15} textAnchor="middle" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
               {nf(v, l)}
             </text>
           ))}
-          <text x={VW - MR} y={VH - 3} textAnchor="end" fontSize={10.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={VW - MR} y={VH - 3} textAnchor="end" fontSize={11.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             {t(c0.axis)}
           </text>
           <line x1={ML} x2={ML} y1={MT} y2={VH - MB} stroke="var(--line)" strokeWidth={1.4} />
@@ -250,11 +250,25 @@ export function TariffLab() {
             />
           ))}
 
-          {crossIn && cross !== null && (
-            <motion.g initial={false} animate={{ x: sx(cross), y: sy(cost(a, cross)) }} transition={soft}>
-              <circle r={6} fill="var(--ok)" stroke="var(--raised)" strokeWidth={2} />
-            </motion.g>
-          )}
+          {(
+            [
+              [a, "var(--ink-2)", "A"],
+              [b, "var(--blob)", "B"],
+            ] as const
+          ).map(([tar, color, name]) => (
+            <motion.text
+              key={`${c0.id}-l${name}`}
+              initial={false}
+              animate={{ x: sx(c0.max) + 4, y: sy(cost(tar, c0.max)) + 4 }}
+              transition={soft}
+              fontSize={11}
+              fontWeight={700}
+              fill={color}
+              style={{ fontFamily: "var(--font-sans)" }}
+            >
+              {name}
+            </motion.text>
+          ))}
 
           <motion.line initial={false} animate={{ x1: sx(x), x2: sx(x) }} transition={soft} y1={MT} y2={VH - MB} stroke="var(--ink-3)" strokeDasharray="4 4" />
           {(
@@ -265,6 +279,11 @@ export function TariffLab() {
           ).map(([k, color, key]) => (
             <motion.circle key={key} initial={false} animate={{ cx: sx(x), cy: sy(k) }} transition={soft} r={5} fill={color} stroke="var(--raised)" strokeWidth={1.5} />
           ))}
+          {crossIn && cross !== null && (
+            <motion.g initial={false} animate={{ x: sx(cross), y: sy(cost(a, cross)) }} transition={soft} pointerEvents="none">
+              <circle r={6.5} fill="var(--ok)" stroke="var(--raised)" strokeWidth={2} />
+            </motion.g>
+          )}
         </svg>
       </div>
 

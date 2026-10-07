@@ -122,7 +122,7 @@ function ratPowEx(r: number, p: number, qd: number, style: "frac" | "root" | "de
       math: `${base}#b^{${qk(e, "x")}}`,
       note: neg
         ? L.t(`The minus means **one divided by**. Then: denominator $${qd}$ = root, numerator $${ap}$ = power.`, `Das Minus bedeutet **eins geteilt durch**. Dann gilt: Nenner $${qd}$ = Wurzel, Zähler $${ap}$ = Potenz.`)
-        : L.t(`Denominator $${qd}$: take the root. Numerator $${ap}$: the power.`, `Nenner $${qd}$: Zieh die Wurzel. Zähler $${ap}$: die Potenz.`),
+        : L.t(`The denominator $${qd}$ tells you the root, the numerator $${ap}$ the power.`, `Der Nenner $${qd}$ gibt die Wurzel an, der Zähler $${ap}$ die Potenz.`),
     });
     const wrap = (inner: string) => (neg ? `\\frac{1#o}{${inner}}#F` : inner);
     const rootPow = ap === 1 ? rtk(qd, `${base}#b`) : `(${rtk(qd, `${base}#b`)})#br^{${ap}#p}`;
@@ -184,7 +184,7 @@ function ratPowEx(r: number, p: number, qd: number, style: "frac" | "root" | "de
             `Ich glaub, ich weiß, was du gemacht hast: Du hast $${base}$ mal $${qs(e)}$ gerechnet. Ein Bruch im Exponenten bedeutet aber **Wurzel und Potenz**, nicht mal.`,
           ),
         );
-      if (ap > 1) add(asNum(r), T_ONLY_ROOT, tx(`The root is right: $${rootOf} = ${r}$! Now the numerator $${ap}$: raise it to that power.`, `Die Wurzel stimmt: $${rootOf} = ${r}$! Jetzt noch der Zähler $${ap}$: Nimm sie hoch $${ap}$.`), true);
+      if (ap > 1) add(asNum(r), T_ONLY_ROOT, tx(`The root is right: $${rootOf} = ${r}$! Now the numerator $${ap}$: raise the result to that power.`, `Die Wurzel stimmt: $${rootOf} = ${r}$! Jetzt noch der Zähler $${ap}$: Nimm das Ergebnis hoch $${ap}$.`), true);
       if (ap > 1 && base ** ap < 1e7) add(asNum(base ** ap), T_ONLY_POWER, tx(`You raised $${base}$ to the power $${ap}$, good. But the denominator $${qd}$ still asks for a root.`, `Du hast $${base}$ hoch $${ap}$ genommen, gut. Aber der Nenner $${qd}$ verlangt noch eine Wurzel.`), true);
       if (qd !== 2 && Number.isInteger(Math.sqrt(base)))
         add(
@@ -492,7 +492,7 @@ function logValueEx(kind: LogKind, b: number, k: number, j = 1): Exercise {
       instruction: LOG_VALUE,
       text: RESULT_FRACTION_TEXT,
       math: `${LOG(String(base))}${arg}`,
-      answer: { kind: "number", value: qv(res), label: tx("result =", "Ergebnis =") },
+      answer: { kind: "number", value: qv(res) },
       hint: tx(`Write both numbers as powers of $${b}$.`, `Schreib beide Zahlen als Potenzen von $${b}$.`),
       solution: [
         { math: `${LOG(String(base))}${arg}#v`, note: tx(`The question: $${base}$ to the power of what gives $${arg}$?`, `Die Frage: $${base}$ hoch wie viel ergibt $${arg}$?`) },
@@ -571,7 +571,7 @@ function logValueEx(kind: LogKind, b: number, k: number, j = 1): Exercise {
     instruction: LOG_VALUE,
     ...(res.d > 1 ? { text: RESULT_FRACTION_TEXT } : {}),
     math: mathEn === mathDe ? mathEn : { en: mathEn, de: mathDe },
-    answer: { kind: "number", value: qv(res), label: tx("result =", "Ergebnis =") },
+    answer: { kind: "number", value: qv(res) },
     hint: tx(`$${sym}$ to the power of what gives the number? Write it as a power of $${sym}$.`, `$${sym}$ hoch wie viel ergibt die Zahl? Schreib sie als Potenz von $${sym}$.`),
     solution: frames,
     mistakes: collect(asNum(qv(res)), (add) => {
@@ -677,7 +677,7 @@ function logRuleEx(kind: RuleKind, b: number, u: number, v: number): Exercise {
   return {
     instruction: LOG_RULES,
     math,
-    answer: { kind: "number", value: res, label: tx("result =", "Ergebnis =") },
+    answer: { kind: "number", value: res },
     hint:
       kind === "change"
         ? tx("$\\log_b x = \\frac{\\lg x}{\\lg b}$, read backwards.", "$\\log_b x = \\frac{\\lg x}{\\lg b}$, rückwärts gelesen.")
@@ -1415,7 +1415,7 @@ export function generate3(rng: Rng): Exercise {
 // Lesson
 
 const rootFrames: Frame[] = [
-  { math: "2#b^{3#e} =#eq 8#v", note: tx("Cubing: $2^3 = 8$.", "Hoch 3: $2^3 = 8$.") },
+  { math: "2#b^{3#e} =#eq 8#v", note: tx("The third power: $2^3 = 8$.", "Die dritte Potenz: $2^3 = 8$.") },
   {
     math: "\\sqrt[3#e]{8#v}#R =#eq 2#b",
     note: tx("The **cube root** goes back: $\\sqrt[3]{8} = 2$, because $2^3 = 8$.", "Die **dritte Wurzel** geht zurück: $\\sqrt[3]{8} = 2$, denn $2^3 = 8$."),
@@ -1445,7 +1445,7 @@ const rootFrames: Frame[] = [
   },
   {
     math: "16#b^{-#s \\frac{3}{4}#f} =#eq \\frac{1}{16^{\\frac{3}{4}}}#G =#eq2 \\frac{1}{8}#H",
-    note: tx("A negative exponent still means **one divided by**: $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$.", "Ein negativer Exponent bedeutet weiterhin **eins geteilt durch**: $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$."),
+    note: tx("A negative exponent still means **one divided by**. And $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$, so $16^{-\\frac{3}{4}} = \\frac{1}{8}$.", "Ein negativer Exponent bedeutet weiterhin **eins geteilt durch**. Und $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$, also ist $16^{-\\frac{3}{4}} = \\frac{1}{8}$."),
   },
 ];
 

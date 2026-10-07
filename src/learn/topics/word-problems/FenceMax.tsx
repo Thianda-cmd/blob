@@ -126,7 +126,7 @@ export function FenceMax() {
               <g>
                 <rect x={10} y={top - 16} width={DW - 20} height={14} fill={`url(#${id}-hatch)`} opacity={0.55} />
                 <line x1={10} x2={DW - 10} y1={top - 2} y2={top - 2} stroke="var(--ink-2)" strokeWidth={2.5} />
-                <text x={DW - 12} y={top - 20} textAnchor="end" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                <text x={DW - 12} y={top - 20} textAnchor="end" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                   {t(tx("house wall", "Hauswand"))}
                 </text>
               </g>
@@ -171,20 +171,20 @@ export function FenceMax() {
             {[0, 0.5, 1].map((k) => (
               <g key={k}>
                 <line x1={gl} x2={GW - gr} y1={gy(Abest * k)} y2={gy(Abest * k)} stroke="var(--line)" strokeWidth={k === 0 ? 1.4 : 0.8} />
-                <text x={gl - 5} y={gy(Abest * k) + 4} textAnchor="end" fontSize={10} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                <text x={gl - 5} y={gy(Abest * k) + 4} textAnchor="end" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                   {nf(Abest * k, l, 0)}
                 </text>
               </g>
             ))}
             {[0, xBest, xMax].map((v) => (
-              <text key={v} x={gx(v)} y={GH - gb + 14} textAnchor="middle" fontSize={10} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+              <text key={v} x={gx(v)} y={GH - gb + 14} textAnchor="middle" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                 {nf(v, l)}
               </text>
             ))}
-            <text x={GW - gr} y={GH - 2} textAnchor="end" fontSize={10.5} fill="var(--ink-2)" className="font-math">
+            <text x={GW - gr} y={GH - 2} textAnchor="end" fontSize={11.5} fill="var(--ink-2)" className="font-math">
               x
             </text>
-            <text x={gl + 4} y={gt - 2} fontSize={10.5} fill="var(--ink-2)" className="font-math">
+            <text x={gl + 4} y={gt - 2} fontSize={11.5} fill="var(--ink-2)" className="font-math">
               A(x)
             </text>
             <motion.path key={`${mode}${L}`} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7 }} d={curve} fill="none" stroke="var(--blob)" strokeWidth={2.4} />

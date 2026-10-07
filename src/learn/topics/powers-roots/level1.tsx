@@ -20,7 +20,7 @@ const tenDigits = (lead: number, n: number, k?: string) => grouped(String(lead) 
 /** Plain-text number for notes: 4 000 000 with thin spaces in maths. */
 const bigPlain = (v: number) => grouped(String(v));
 
-const T_PLUS_FIRST = tx("Point before line", "Punkt vor Strich");
+const T_PLUS_FIRST = tx("× and ÷ before + and −", "Punkt vor Strich");
 const T_POWER_FIRST = tx("Powers come first", "Potenz zuerst");
 const T_MINUS_IN = tx("Minus taken into the power", "Minus mitpotenziert");
 const T_SQUARE_CHECK = tx("Check by squaring", "Mach die Quadratprobe");
@@ -29,7 +29,7 @@ const T_DIGITS = tx("Counted all digits", "Alle Ziffern gezählt");
 
 const POWER_FIRST = (c: number) =>
   tx(
-    `Nearly! The power comes first: work out $${c}^2$ before you multiply. Powers before point before line.`,
+    `Nearly! The power comes first: work out $${c}^2$ before you multiply. Powers, then × and ÷, then + and −.`,
     `Fast! Die Potenz kommt zuerst: Rechne $${c}^2$ aus, bevor du multiplizierst. Potenz vor Punkt vor Strich.`,
   );
 
@@ -508,18 +508,18 @@ function orderTask(rng: Rng): Exercise | null {
       instruction: ORDER,
       math: `${a} + ${b} \\cdot ${c}^2`,
       answer: { kind: "number", value: v },
-      hint: tx("Powers first, then point before line.", "Erst die Potenz, dann Punkt vor Strich."),
+      hint: tx("Powers first, then multiply, then add.", "Erst die Potenz, dann Punkt vor Strich."),
       solution: [
         { math: `${a}#a +#p ${b}#b \\cdot#d ${c}#c^{2#e}`, note: tx("Powers first, then multiplication, then addition.", "Zuerst die Potenz, dann Punktrechnung, dann Strichrechnung.") },
         { math: `${a}#a +#p ${b}#b \\cdot#d ${c * c}#c`, note: tx(`$${c}^2 = ${c} \\cdot ${c} = ${c * c}$.`, `$${c}^2 = ${c} \\cdot ${c} = ${c * c}$.`), highlight: ["c"] },
-        { math: `${a}#a +#p ${b * c * c}#b`, note: tx(`Point before line: $${b} \\cdot ${c * c} = ${b * c * c}$.`, `Punkt vor Strich: $${b} \\cdot ${c * c} = ${b * c * c}$.`) },
+        { math: `${a}#a +#p ${b * c * c}#b`, note: tx(`Multiply before you add: $${b} \\cdot ${c * c} = ${b * c * c}$.`, `Punkt vor Strich: $${b} \\cdot ${c * c} = ${b * c * c}$.`) },
         { math: `${v}#a`, note: tx(`Finally $${a} + ${b * c * c} = ${v}$.`, `Zum Schluss $${a} + ${b * c * c} = ${v}$.`) },
       ],
       mistakes: collect(asNum(v), (add) => {
         add(
           asNum((a + b) * c * c),
           T_PLUS_FIRST,
-          tx(`Ah, I see what happened! You added $${a} + ${b}$ first. But multiplication comes before addition: point before line.`, `Ah, ich seh, was passiert ist! Du hast zuerst $${a} + ${b}$ gerechnet. Aber Punkt geht vor Strich.`),
+          tx(`Ah, I see what happened! You added $${a} + ${b}$ first. But multiplication comes before addition.`, `Ah, ich seh, was passiert ist! Du hast zuerst $${a} + ${b}$ gerechnet. Aber Punkt geht vor Strich.`),
         );
         add(
           asNum(a + (b * c) ** 2),
@@ -1037,11 +1037,11 @@ const rootFramesLesson: Frame[] = framesIn((L) => [
 const orderFramesLesson: Frame[] = [
   {
     math: "2#a +#p 3#b \\cdot#d 4#c^{2#e}",
-    note: tx("Which first? **Brackets, then powers, then point before line.**", "Was zuerst? **Klammern, dann Potenzen, dann Punkt vor Strich.**"),
+    note: tx("Which first? **Brackets, then powers, then × and ÷, then + and −.**", "Was zuerst? **Klammern, dann Potenzen, dann Punkt vor Strich.**"),
   },
   { math: "2#a +#p 3#b \\cdot#d 16#c", note: tx("The power first: $4^2 = 16$.", "Zuerst die Potenz: $4^2 = 16$."), highlight: ["c"] },
-  { math: "2#a +#p 48#b", note: tx("Then point: $3 \\cdot 16 = 48$.", "Dann Punkt: $3 \\cdot 16 = 48$.") },
-  { math: "50#a", note: tx("Finally line: $2 + 48 = 50$.", "Zum Schluss Strich: $2 + 48 = 50$.") },
+  { math: "2#a +#p 48#b", note: tx("Then multiply: $3 \\cdot 16 = 48$.", "Dann Punkt: $3 \\cdot 16 = 48$.") },
+  { math: "50#a", note: tx("Finally add: $2 + 48 = 50$.", "Zum Schluss Strich: $2 + 48 = 50$.") },
   {
     math: "(2#a +#p 3#b)#br^{2#e} =#eq 5#f^{2#e2} =#eq2 25#r",
     note: tx("Brackets change the order: bracket first, then square. ($2^2 + 3^2$ would only be $13$.)", "Klammern ändern die Reihenfolge: erst die Klammer, dann quadrieren. ($2^2 + 3^2$ wäre nur $13$.)"),
@@ -1093,7 +1093,7 @@ export const level1: LevelLesson = {
     },
     {
       title: tx("Order of operations", "Reihenfolge"),
-      body: tx("Brackets first, then powers, then point before line.", "Klammern zuerst, dann Potenzen, dann Punkt vor Strich."),
+      body: tx("Brackets first, then powers, then × and ÷, then + and −.", "Klammern zuerst, dann Potenzen, dann Punkt vor Strich."),
       examples: ["2 + 3 \\cdot 4^2 = 2 + 3 \\cdot 16 = 50", "(2 + 3)^2 = 25"],
       tone: "tip",
     },
@@ -1213,11 +1213,11 @@ export const level1: LevelLesson = {
         instruction: ORDER,
         math: "-3^2 + 2 \\cdot 5",
         answer: { kind: "number", value: 1 },
-        hint: tx("Power first: the exponent belongs only to the $3$. Then point before line.", "Zuerst die Potenz: Der Exponent gehört nur zur $3$. Dann Punkt vor Strich."),
+        hint: tx("Power first: the exponent belongs only to the $3$. Then multiply before you add.", "Zuerst die Potenz: Der Exponent gehört nur zur $3$. Dann Punkt vor Strich."),
         solution: [
           { math: "-#m 3#a^{2#e} +#p 2#b \\cdot#d 5#c", note: tx("Power first. The exponent belongs only to the $3$.", "Zuerst die Potenz. Der Exponent gehört nur zur $3$."), highlight: ["a", "e"] },
           { math: "-#m 9#a +#p 2#b \\cdot#d 5#c", note: tx("$3^2 = 9$, the minus stays in front.", "$3^2 = 9$, das Minus bleibt davor.") },
-          { math: "-#m 9#a +#p 10#b", note: tx("Then point before line: $2 \\cdot 5 = 10$.", "Dann Punkt vor Strich: $2 \\cdot 5 = 10$.") },
+          { math: "-#m 9#a +#p 10#b", note: tx("Then multiply before you add: $2 \\cdot 5 = 10$.", "Dann Punkt vor Strich: $2 \\cdot 5 = 10$.") },
           { math: "1#a", note: tx("$-9 + 10 = 1$.", "$-9 + 10 = 1$.") },
         ],
         mistakes: [
@@ -1226,7 +1226,7 @@ export const level1: LevelLesson = {
           {
             when: { kind: "number", value: -35 },
             title: T_PLUS_FIRST,
-            say: tx("Ah, I see what happened! You calculated from left to right. But point before line: $2 \\cdot 5$ comes first.", "Ah, ich seh, was passiert ist! Du hast von links nach rechts gerechnet. Aber Punkt vor Strich: $2 \\cdot 5$ kommt zuerst."),
+            say: tx("Ah, I see what happened! You calculated from left to right. But multiplication comes before addition: $2 \\cdot 5$ first.", "Ah, ich seh, was passiert ist! Du hast von links nach rechts gerechnet. Aber Punkt vor Strich: $2 \\cdot 5$ kommt zuerst."),
           },
         ],
       },

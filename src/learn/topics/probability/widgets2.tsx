@@ -204,7 +204,7 @@ export function ProbabilityAtLeastOnce() {
               <motion.rect
                 initial={false}
                 animate={{ y: y(v), height: y(0) - y(v) }}
-                transition={{ type: "spring", stiffness: 240, damping: 28 }}
+                transition={{ type: "tween", ease: "easeOut", duration: 0.35 }}
                 x={x0 + (k - 1) * bw + bw * 0.15}
                 width={bw * 0.7}
                 rx={2}
@@ -228,7 +228,7 @@ export function ProbabilityAtLeastOnce() {
           strokeDasharray="6 4"
         />
         {over && (
-          <text x={Math.min(x0 + (over - 0.5) * bw + 6, W - 150)} y={y(1.12)} fontSize={12} fill="var(--danger)" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+          <text x={Math.min(x0 + (over - 0.5) * bw + 10, W - 160)} y={y(1.15) + 17} fontSize={12} fill="var(--danger)" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
             {t(tx("n · p > 1: impossible!", "n · p > 1: unmöglich!"))}
           </text>
         )}
@@ -247,7 +247,7 @@ export function ProbabilityAtLeastOnce() {
         </div>
         <div className="rounded-xl border border-line bg-surface px-4 py-3">
           <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-danger">{t(tx("Wrong: adding", "Falsch: addieren"))}</div>
-          <MathView src={`${n} \\cdot ${fracSrc(c, d)} ${naive(n) > 1 ? ">" : "\\approx"} ${naive(n) > 1 ? "1" : num(naive(n), 3)}`} size="md" animate={false} className="text-ink-2" />
+          <MathView src={`${n} \\cdot ${fracSrc(c, d)} ${naive(n) > 1 ? ">" : Number.isInteger(Math.round(naive(n) * 1e6) / 1e3) ? "=" : "\\approx"} ${naive(n) > 1 ? "1" : num(naive(n), 3)}`} size="md" animate={false} className="text-ink-2" />
           <div className="mt-1 text-[13px] text-ink-2">
             {naive(n) > 1
               ? t(tx("More than 1? No probability can be that big.", "Mehr als 1? So groß kann keine Wahrscheinlichkeit sein."))

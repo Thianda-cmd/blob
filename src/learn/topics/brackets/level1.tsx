@@ -110,7 +110,7 @@ function combineNote(items: Item[], and = " and "): string {
   for (const [v, list] of kinds) {
     if (list.length < 2) continue;
     const sum = list.reduce((s, x) => s + x.c, 0);
-    parts.push(`$${showTerms(list)} = ${showTerms([{ c: sum, v }], { keepZero: true })}$`);
+    parts.push(`$${showTerms(list)} = ${sum === 0 ? "0" : showTerms([{ c: sum, v }])}$`);
   }
   return parts.join(and);
 }

@@ -243,7 +243,7 @@ function RollTab() {
   const U = 26;
   const r = (d * U) / 2;
   const x0 = 26;
-  const ground = 30 + 4 * U;
+  const ground = 14 + 4 * U;
   const len = Math.PI * d * U;
   const W = x0 + Math.PI * 4 * U + 60;
   const H = ground + 46;
@@ -269,7 +269,7 @@ function RollTab() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-blob px-3 py-1.5 text-[13px] font-medium text-white hover:bg-blob/90"
         >
           {rolled ? <RotateCcw className="size-3.5" /> : <Play className="size-3.5" />}
-          {rolled ? t(tx("Back", "Zurück")) : t(tx("Roll once", "Einmal abrollen"))}
+          {rolled ? t(tx("Roll back", "Zurückrollen")) : t(tx("Roll once", "Einmal abrollen"))}
         </button>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto w-full max-w-[520px]" role="img" aria-label={t(tx("A wheel rolls once along a line", "Ein Rad rollt einmal ab"))}>
@@ -347,10 +347,10 @@ function SectorTab() {
       <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,170px)_minmax(0,1fr)]">
         <svg viewBox={`0 0 ${2 * R + 20} ${2 * R + 20}`} className="mx-auto w-full max-w-[170px]" role="img" aria-label={t(tx(`Circle cut into ${n} pieces`, `Kreis in ${n} Stücke geschnitten`))}>
           {Array.from({ length: n }, (_, k) => (
-            <path key={`${n}-${k}`} d={sectorPath(R + 10, R + 10, R, -Math.PI / 2 + k * th, -Math.PI / 2 + (k + 1) * th)} fill={tint(k)} stroke="var(--ink)" strokeWidth={1} strokeLinejoin="round" />
+            <path key={`${n}-${k}`} d={sectorPath(R + 10, R + 10, R, -Math.PI / 2 + k * th, -Math.PI / 2 + (k + 1) * th)} fill={tint(k)} stroke="var(--ink)" strokeWidth={n >= 16 ? 0.6 : 1} strokeLinejoin="round" />
           ))}
-          <line x1={R + 10} y1={R + 10} x2={2 * R + 10} y2={R + 10} stroke="var(--blob)" strokeWidth={2} />
-          <text x={R + 10 + R / 2} y={R + 4} textAnchor="middle" fontSize={14} className="fill-blob font-math italic">
+          <line x1={R + 10} y1={R + 10} x2={2 * R + 10} y2={R + 10} stroke="var(--blob)" strokeWidth={2.5} />
+          <text x={R + 10 + R / 2} y={R + 4} textAnchor="middle" fontSize={15} className="fill-blob font-math italic" stroke="var(--raised)" strokeWidth={4} paintOrder="stroke">
             r
           </text>
         </svg>
@@ -362,7 +362,7 @@ function SectorTab() {
                 const ax = bx + (up ? ((k - 1) / 2) * c + c / 2 : (k / 2) * c);
                 const ay = up ? by - R : by;
                 const mid = up ? Math.PI / 2 : -Math.PI / 2;
-                return <path key={k} d={sectorPath(ax, ay, R, mid - th / 2, mid + th / 2)} fill={tint(k)} stroke="var(--ink)" strokeWidth={1} strokeLinejoin="round" />;
+                return <path key={k} d={sectorPath(ax, ay, R, mid - th / 2, mid + th / 2)} fill={tint(k)} stroke="var(--ink)" strokeWidth={n >= 16 ? 0.6 : 1} strokeLinejoin="round" />;
               })}
             </motion.g>
           </AnimatePresence>

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Eye, RotateCcw, Shuffle, Undo2 } from "lucide-react";
-import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { useId, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
@@ -32,6 +32,7 @@ import {
   type Item,
   type Rel,
 } from "./model";
+import { StepsBoard } from "./ui";
 
 // rearranging/level2.tsx uses these two helpers from here.
 export { emWidth, smoothFracExits } from "./model";
@@ -469,9 +470,15 @@ function findMistake(rng: Rng): Exercise | null {
       });
     }
   }
+  const rows = [
+    { left: lin(a, b), right: lin(c, d), op: `-${c === 1 ? "" : c}x` },
+    { left: lin(k2, b), right: String(d), op: `${b > 0 ? "-" : "+"}${Math.abs(b)}` },
+    { left: xTerm(k2), right: String(r3), op: `:${k2}` },
+    { left: "x", right: String(x4) },
+  ];
   return {
     instruction: tx("Find the first line with a mistake", "In welcher Zeile steckt der erste Fehler?"),
-    math: board(lines, () => null),
+    visual: { component: StepsBoard as ComponentType<Record<string, unknown>>, props: { rows } },
     answer: { kind: "choice", options, correct },
     hint: tx("Check each line against the one above it: is the step after the bar done correctly on both sides?", "Vergleich jede Zeile mit der darüber: Ist der Schritt hinter dem Strich auf beiden Seiten richtig ausgeführt?"),
     solution,

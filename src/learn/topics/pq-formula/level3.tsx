@@ -1,6 +1,6 @@
 "use client";
 
-import { tx, type Text } from "@/i18n/text";
+import { resolveText, tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, LessonStep, LevelLesson, Mistake, SummaryBlock } from "@/learn/types";
 import { cat, clean, dec, localize, minusR, NO_SOLUTION, num, par, ptSrc, quadSrc, rootsOf, setKeyed, solutionMistakes, solutionsAnswer } from "./shared";
@@ -23,6 +23,8 @@ const leadKeyed = (a: number) => (a === 1 ? "" : a === -1 ? "-#sa " : a < 0 ? `-
 const lead = (a: number) => (a === 1 ? "" : a === -1 ? "-" : dec(a));
 /** "-#qs 4#h2": a signed number after something, with fixed keys so it can morph. */
 const signedKeyed = (v: number, sk: string, nk: string) => `${v < 0 ? "-" : "+"}#${sk} ${dec(Math.abs(v))}#${nk}`;
+/** "lhs = 0" that breaks before the "=" on a phone, never between "=" and "0". */
+const eq0 = (lhs: string) => `\\group{${lhs}} \\group{= 0}`;
 const isNice = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9;
 const T_SIGN_D = tx("Sign of d", "Vorzeichen von d");
 
@@ -204,7 +206,7 @@ function vertexTask(a: number, b: number, c: number): Exercise {
   const h = b / (2 * a);
   return {
     instruction: VERTEX,
-    math: `f(x) = ${quadSrc(a, b, c)}`,
+    math: `f(x) = \\group{${quadSrc(a, b, c)}}`,
     answer: { kind: "pair", names: ["x_S", "y_S"], values: [clean(-h), clean(c - a * h * h)] },
     hint:
       a === 1
@@ -336,7 +338,7 @@ function abcTask(a: number, b: number, c: number): Exercise {
   const values = D < 0 ? [] : D === 0 ? [clean(-b / (2 * a))] : [clean((-b + Math.sqrt(D)) / (2 * a)), clean((-b - Math.sqrt(D)) / (2 * a))];
   return {
     instruction: ABC,
-    math: `${quadSrc(a, b, c)} = 0`,
+    math: eq0(quadSrc(a, b, c)),
     answer: solutionsAnswer(values),
     hint: tx(
       "$x_{1,2} = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$. Read off $a$, $b$, $c$ with their signs.",
@@ -425,8 +427,8 @@ function factorisedTask(rng: Rng): Exercise | null {
   const options = all.map((o) => `$f(x) = ${o.text}$`);
   const mistakes: Mistake[] = all.flatMap((o, i) => (o.why ? [{ when: { kind: "choice" as const, options, correct: i }, title: tx("Multiply it out to check", "Zur Probe ausmultiplizieren"), say: o.why }] : []));
   return {
-    instruction: tx("Which is the factorised form?", "Welche ist die faktorisierte Form?"),
-    math: `f(x) = ${quadSrc(a, a * -(r1 + r2), a * r1 * r2)}`,
+    instruction: tx("Which is the factorised form?", "Welche faktorisierte Form ist richtig?"),
+    math: `f(x) = \\group{${quadSrc(a, a * -(r1 + r2), a * r1 * r2)}}`,
     answer: { kind: "choice", options, correct: all.indexOf(right) },
     hint: tx("Find the zeros (Vieta or a formula). Then $f(x) = a(x - x_1)(x - x_2)$.", "Bestimme die Nullstellen (Vieta oder eine Formel). Dann gilt $f(x) = a(x - x_1)(x - x_2)$."),
     solution: factorisedFrames(a, r1, r2),
@@ -452,7 +454,7 @@ function vietaTask(rng: Rng): Exercise | null {
   let math: string;
   let frames: Frame[];
   if (askP) {
-    math = `x^2 + px ${sgn(q)} ${dec(Math.abs(q))} = 0`;
+    math = eq0(`x^2 + px ${sgn(q)} ${dec(Math.abs(q))}`);
     add(
       [x2, x1 + x2],
       tx("Sign of p", "Vorzeichen von p"),
@@ -465,7 +467,7 @@ function vietaTask(rng: Rng): Exercise | null {
     );
     frames = [
       {
-        math: `x^2 + px ${sgn(q)} ${dec(Math.abs(q))} = 0 \\quad x_1 = ${dec(x1)}`,
+        math: `${math} \\quad x_1 = ${dec(x1)}`,
         note: tx("Vieta: $x_1 \\cdot x_2 = q$ and $x_1 + x_2 = -p$. Start with the product, because $q$ is known.", "Vieta: $x_1 \\cdot x_2 = q$ und $x_1 + x_2 = -p$. Fang mit dem Produkt an, denn $q$ ist bekannt."),
       },
       { math: `${dec(x1)}#a \\cdot#d x#x _{2#i} =#eq ${num(q, "q")}`, note: tx(`Product: $${dec(x1)} \\cdot x_2 = ${dec(q)}$.`, `Produkt: $${dec(x1)} \\cdot x_2 = ${dec(q)}$.`) },
@@ -477,7 +479,7 @@ function vietaTask(rng: Rng): Exercise | null {
       { math: `p#p =#eq ${num(p, "pv")}`, note: tx(`So $p = ${dec(p)}$. Check: $${quadSrc(1, p, q)} = ${factoredSrc(1, x1, x2)}$.`, `Also $p = ${dec(p)}$. Probe: $${quadSrc(1, p, q)} = ${factoredSrc(1, x1, x2)}$.`) },
     ];
   } else {
-    math = `x^2 ${sgn(p)} ${Math.abs(p) === 1 ? "" : dec(Math.abs(p))}x + q = 0`;
+    math = eq0(`x^2 ${sgn(p)} ${Math.abs(p) === 1 ? "" : dec(Math.abs(p))}x + q`);
     add(
       [p - x1, x1 * (p - x1)],
       tx("Sign of p", "Vorzeichen von p"),
@@ -513,7 +515,7 @@ function vietaTask(rng: Rng): Exercise | null {
 // Biquadratic equations: x⁴ + Bx² + C = 0 with z = x²
 
 function biquadSrc(B: number, C: number) {
-  return `x^4 ${B ? `${sgn(B)} ${Math.abs(B) === 1 ? "" : dec(Math.abs(B))}x^2 ` : ""}${C ? `${sgn(C)} ${dec(Math.abs(C))} ` : ""}= 0`;
+  return eq0(`x^4 ${B ? `${sgn(B)} ${Math.abs(B) === 1 ? "" : dec(Math.abs(B))}x^2` : ""}${C ? ` ${sgn(C)} ${dec(Math.abs(C))}` : ""}`);
 }
 
 /** The real x for each z (sorted), and the z values. */
@@ -612,7 +614,7 @@ function biquadTask(B: number, C: number): Exercise {
   );
   add(
     xs.filter((x) => x > 0),
-    tx("The negative roots are missing", "Die negativen Wurzeln fehlen"),
+    tx("The negative solutions are missing", "Die negativen Lösungen fehlen"),
     tx("Nearly! $x^2 = z$ has **two** solutions for $z > 0$: plus and minus the root.", "Fast! $x^2 = z$ hat für $z > 0$ **zwei** Lösungen: plus und minus die Wurzel."),
     { part: true, close: true },
   );
@@ -643,8 +645,10 @@ function biquadMultiTask(rng: Rng): Exercise | null {
   const B = -(z1 + z2);
   const C = z1 * z2;
   const { xs } = biquadSolve(B, C);
-  const pool = [...new Set([...xs, z1, z2, -z1].map(clean))].sort((u, v) => u - v);
-  if (pool.length < 6) return null;
+  // Distractors from real mistakes: z itself ("stopped at z") and ±z ("x² = z ⇒ x = ±z", root forgotten).
+  // Shuffled, so the right answers aren't always the middle of a sorted row.
+  const pool = rng.shuffle([...new Set([...xs, z1, z2, -z1, -z2].map(clean))]);
+  if (pool.length < (r2 === 0 ? 5 : 6)) return null;
   const options = pool.map((v) => `$${dec(v)}$`);
   const idx = (vals: number[]) => vals.map((v) => pool.indexOf(v)).filter((i) => i >= 0).sort((u, v) => u - v);
   const correct = idx(xs);
@@ -655,6 +659,19 @@ function biquadMultiTask(rng: Rng): Exercise | null {
     mistakes.push({ when: { kind: "multi", options, correct: c }, title, say });
   };
   add([z1, z2].filter((z, i, all) => all.indexOf(z) === i), tx("Stopped at z", "Bei z stehen geblieben"), tx("Those are the values of $z = x^2$. Go back to $x$: take the roots.", "Das sind die Werte von $z = x^2$. Geh zurück zu $x$: Zieh die Wurzeln."));
+  add(
+    xs.filter((x) => x >= 0),
+    tx("The negative solutions are missing", "Die negativen Lösungen fehlen"),
+    tx("Nearly! $x^2 = z$ has **two** solutions for $z > 0$: plus and minus the root.", "Fast! $x^2 = z$ hat für $z > 0$ **zwei** Lösungen: plus und minus die Wurzel."),
+  );
+  add(
+    [...new Set([z1, -z1, z2, -z2].map(clean))],
+    tx("Root forgotten", "Wurzel vergessen"),
+    tx(
+      `Plus and minus is right! But $x^2 = ${dec(z1)}$ doesn't give $x = \\pm ${dec(z1)}$: take the root, $x = \\pm ${dec(r1)}$.`,
+      `Plus und Minus stimmt! Aber $x^2 = ${dec(z1)}$ ergibt nicht $x = \\pm ${dec(z1)}$: Zieh die Wurzel, $x = \\pm ${dec(r1)}$.`,
+    ),
+  );
   return {
     instruction: tx("Substitute z = x² and select all solutions", "Substituiere z = x² und wähle alle Lösungen aus"),
     math: biquadSrc(B, C),
@@ -691,12 +708,12 @@ function paramPTask(k: number): Exercise {
   ];
   const { list, add } = solutionMistakes([2 * k, -2 * k], "t");
   add([2 * k], tx("The negative t is missing", "Das negative t fehlt"), tx("Nearly! $\\frac{t}{2}$ can be plus **or** minus the root. There's a second value.", "Fast! $\\frac{t}{2}$ kann plus **oder** minus die Wurzel sein. Es gibt einen zweiten Wert."), { part: true, close: true });
-  add([k, -k], tx("t instead of t/2", "t statt t/2"), tx("Close! $D = (\\frac{t}{2})^2 - q$: you get $\\frac{t}{2}$ first, then multiply by $2$.", "Knapp! $D = (\\frac{t}{2})^2 - q$: Du erhältst zuerst $\\frac{t}{2}$, dann noch mal $2$ rechnen."));
+  add([k, -k], tx("t instead of t/2", "t statt t/2"), tx("Close! $D = (\\frac{t}{2})^2 - q$: you get $\\frac{t}{2}$ first, then you still have to multiply by $2$.", "Knapp! $D = (\\frac{t}{2})^2 - q$: Du erhältst zuerst $\\frac{t}{2}$ und musst dann noch mit $2$ multiplizieren."));
   add([4 * c, -4 * c], tx("Root forgotten", "Wurzel vergessen"), tx(`From $(\\frac{t}{2})^2 = ${c}$ you take the **root**: $\\frac{t}{2} = \\pm ${k}$.`, `Aus $(\\frac{t}{2})^2 = ${c}$ ziehst du die **Wurzel**: $\\frac{t}{2} = \\pm ${k}$.`));
   return {
     instruction: PARAM,
     text: tx("For which $t$ does the equation have **exactly one** solution?", "Für welche $t$ hat die Gleichung **genau eine** Lösung?"),
-    math: `x^2 + tx + ${c} = 0`,
+    math: eq0(`x^2 + tx + ${c}`),
     answer: solutionsAnswer([2 * k, -2 * k], "t"),
     hint: tx("Exactly one solution means $D = 0$. Write $D$ with $t$ and solve.", "Genau eine Lösung heißt $D = 0$. Schreib $D$ mit $t$ auf und löse."),
     solution: frames,
@@ -708,7 +725,7 @@ function paramPTask(k: number): Exercise {
 function paramQTask(b: number, want: 0 | 1 | 2): Exercise {
   const h = clean(b / 2);
   const hq = clean(h * h);
-  const eq = `x^2 ${sgn(b)} ${Math.abs(b) === 1 ? "" : dec(Math.abs(b))}x + t = 0`;
+  const eq = eq0(`x^2 ${sgn(b)} ${Math.abs(b) === 1 ? "" : dec(Math.abs(b))}x + t`);
   const rel = want === 1 ? "=" : want === 2 ? ">" : "<";
   const text: Text =
     want === 1
@@ -815,7 +832,7 @@ function zerosTask(rng: Rng): Exercise | null {
   }
   return {
     instruction: tx("How many zeros does the parabola have?", "Wie viele Nullstellen hat die Parabel?"),
-    math: `f(x) = ${vertexSrc(a, d, e)}`,
+    math: `f(x) = \\group{${vertexSrc(a, d, e)}}`,
     answer: { kind: "choice", options, correct: at(right) },
     hint: tx("Where is the vertex $S(d \\, | \\, e)$, and which way does the parabola open?", "Wo liegt der Scheitelpunkt $S(d \\, | \\, e)$, und wohin ist die Parabel geöffnet?"),
     solution: [
@@ -825,7 +842,7 @@ function zerosTask(rng: Rng): Exercise | null {
         note: cat(tx("The vertex lies ", "Der Scheitelpunkt liegt "), where, tx(", and the parabola opens ", ", und die Parabel ist nach "), up ? tx("upward.", "oben geöffnet.") : tx("downward.", "unten geöffnet.")),
       },
       {
-        math: ZERO_OPTS[right],
+        math: tx(`"${resolveText(ZERO_OPTS[right], "en")}"`, `"${resolveText(ZERO_OPTS[right], "de")}"`),
         note:
           right === 1
             ? tx("It touches the $x$-axis at the vertex: exactly one zero.", "Sie berührt die $x$-Achse im Scheitelpunkt: genau eine Nullstelle.")
@@ -882,6 +899,8 @@ function abcShape(rng: Rng): Exercise | null {
     // D = 0: s(kx − m)²
     const k = rng.pick([2, 3]);
     const m = rng.nonZero(-5, 5);
+    // The solution is m/k: with k = 3 only m = ±3 gives a number that ends (no 1,333…).
+    if (k === 3 && m % 3 !== 0) return null;
     return abcTask(k * k, -2 * k * m, m * m);
   }
   const a = rng.pick([2, 3, -2, 4]);
@@ -976,20 +995,47 @@ const vietaLessonFrames: Frame[] = [
   ),
 ];
 
+/** f(x) = x² − 6x + 5 = (x − 3)² − 4: vertex, then the zeros straight from the vertex form. */
+const vertexLessonFrames: Frame[] = [
+  ...vertexFrames(1, -6, 5),
+  {
+    math: "(x#x -#sb 3#h1)#B ^{2#e} -#qs 4#h2 =#feq 0#zr",
+    note: tx(
+      "Now the zeros: set $f(x) = 0$. With the vertex form you don't need a formula for that.",
+      "Jetzt die Nullstellen: Setz $f(x) = 0$. Mit der Scheitelpunktform brauchst du dafür keine Formel.",
+    ),
+  },
+  { math: "(x#x -#sb 3#h1)#B ^{2#e} =#feq 4#h2", note: tx("Add $4$ on both sides.", "Addiere auf beiden Seiten $4$.") },
+  {
+    math: "x#x -#sb 3#h1 =#feq \\pm#pm 2#r",
+    note: tx("Take the root, with plus **and** minus: the bracket is $2$ or $-2$.", "Zieh die Wurzel, mit Plus **und** Minus: Die Klammer ist $2$ oder $-2$."),
+  },
+  {
+    math: "x#x _{1#i1} =#feq 5#v1 \\quad x#x2 _{2#i2} =#eq2 1#v2",
+    note: tx(
+      "Add $3$: the zeros are $x_1 = 3 + 2 = 5$ and $x_2 = 3 - 2 = 1$. That fits: $S$ lies **below** the $x$-axis and the parabola opens **upward**, so it crosses twice.",
+      "Addiere $3$: Die Nullstellen sind $x_1 = 3 + 2 = 5$ und $x_2 = 3 - 2 = 1$. Das passt: $S$ liegt **unter** der $x$-Achse und die Parabel ist nach **oben** geöffnet, also schneidet sie zweimal.",
+    ),
+  },
+];
+
 const summary: SummaryBlock[] = [
   {
     title: tx("Completing the square", "Quadratische Ergänzung"),
-    body: tx("Halve the $x$-coefficient, add and subtract its square, use a binomial formula.", "Die Zahl vor $x$ halbieren, ihr Quadrat addieren und wieder abziehen, binomische Formel anwenden."),
+    body: tx(
+      "Halve the $x$-coefficient, add and subtract its square, use a binomial formula. With $a \\ne 1$, factor out $a$ first.",
+      "Die Zahl vor $x$ halbieren, ihr Quadrat addieren und wieder abziehen, binomische Formel anwenden. Bei $a \\ne 1$ zuerst $a$ ausklammern.",
+    ),
     examples: ["x^2 - 6x + 5 = x^2 - 6x + 3^2 - 3^2 + 5", `= (x - 3)^2 - 4 \\Rightarrow S${ptSrc(3, -4)}`],
     tone: "rule",
   },
   {
     title: tx("Vertex form", "Scheitelpunktform"),
     body: tx(
-      "$f(x) = a(x - d)^2 + e$ has the vertex $S(d \\, | \\, e)$. $a > 0$ opens upward, $|a| > 1$ is narrower. With $a \\ne 1$, factor out $a$ first.",
-      "$f(x) = a(x - d)^2 + e$ hat den Scheitelpunkt $S(d \\, | \\, e)$. $a > 0$: nach oben geöffnet, $|a| > 1$: schmaler. Bei $a \\ne 1$ zuerst $a$ ausklammern.",
+      "$f(x) = a(x - d)^2 + e$ has the vertex $S(d \\, | \\, e)$. $a > 0$ opens upward, $|a| > 1$ is narrower. Zeros: set $f(x) = 0$ and take the root. $a \\cdot e < 0$ gives two zeros, $e = 0$ one, otherwise none.",
+      "$f(x) = a(x - d)^2 + e$ hat den Scheitelpunkt $S(d \\, | \\, e)$. $a > 0$: nach oben geöffnet, $|a| > 1$: schmaler. Nullstellen: $f(x) = 0$ setzen und die Wurzel ziehen. $a \\cdot e < 0$ ergibt zwei Nullstellen, $e = 0$ eine, sonst keine.",
     ),
-    examples: ["2x^2 - 12x + 10 = 2(x - 3)^2 - 8", `(x + 2)^2 + 1 \\Rightarrow S${ptSrc(-2, 1)}`],
+    examples: ["2x^2 - 12x + 10 = 2(x - 3)^2 - 8", "(x - 3)^2 - 4 = 0 \\Rightarrow x - 3 = \\pm 2", "x_1 = 5 \\quad x_2 = 1"],
     tone: "rule",
   },
   {
@@ -1027,18 +1073,18 @@ const lesson: LessonStep[] = [
     title: tx("Completing the square", "Quadratische Ergänzung"),
     blob: tx("Every parabola has a secret address: its vertex. Let's find it!", "Jede Parabel hat eine geheime Adresse: ihren Scheitelpunkt. Den finden wir jetzt!"),
     body: tx(
-      "Any $f(x) = x^2 + bx + c$ can be rewritten in **vertex form** $f(x) = (x - d)^2 + e$. Then you read off the vertex $S(d \\, | \\, e)$ straight away.",
-      "Jedes $f(x) = x^2 + bx + c$ lässt sich in die **Scheitelpunktform** $f(x) = (x - d)^2 + e$ umschreiben. Dann liest du den Scheitelpunkt $S(d \\, | \\, e)$ direkt ab.",
+      "Any $f(x) = x^2 + bx + c$ can be rewritten in **vertex form** $f(x) = (x - d)^2 + e$. Then you read off the vertex $S(d \\, | \\, e)$ straight away, and you get the zeros by taking a root.",
+      "Jedes $f(x) = x^2 + bx + c$ lässt sich in die **Scheitelpunktform** $f(x) = (x - d)^2 + e$ umschreiben. Dann liest du den Scheitelpunkt $S(d \\, | \\, e)$ direkt ab, und die Nullstellen bekommst du durch Wurzelziehen.",
     ),
-    frames: vertexFrames(1, -6, 5),
+    frames: vertexLessonFrames,
   },
   {
     type: "widget",
     title: tx("Stretch and shift the parabola", "Parabeln strecken und verschieben"),
     blob: tx("Three sliders, three jobs. Try a negative a!", "Drei Regler, drei Aufgaben. Probier mal ein negatives a!"),
     body: tx(
-      "In $f(x) = a(x - d)^2 + e$ every letter has one job. Move the sliders or drag the vertex $S$ and compare with the normal parabola $y = x^2$.",
-      "In $f(x) = a(x - d)^2 + e$ hat jeder Buchstabe eine Aufgabe. Beweg die Regler oder zieh den Scheitelpunkt $S$ und vergleich mit der Normalparabel $y = x^2$.",
+      "In $f(x) = a(x - d)^2 + e$ every letter has one job. Move the sliders or drag the vertex $S$ and compare with the normal parabola $y = x^2$. Watch the zeros too: if $a$ and $e$ have opposite signs there are two, with $e = 0$ one, otherwise none.",
+      "In $f(x) = a(x - d)^2 + e$ hat jeder Buchstabe eine Aufgabe. Beweg die Regler oder zieh den Scheitelpunkt $S$ und vergleich mit der Normalparabel $y = x^2$. Achte auch auf die Nullstellen: Haben $a$ und $e$ verschiedene Vorzeichen, gibt es zwei, bei $e = 0$ eine, sonst keine.",
     ),
     widget: VertexLab,
   },

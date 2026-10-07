@@ -234,8 +234,9 @@ export function NegSignCounter() {
               exit={{ opacity: 0, scale: 0.7 }}
               className="flex items-center gap-1 rounded-lg border border-line bg-raised px-2 py-1 font-math text-[18px]"
             >
-              <span className="text-blob-ink">−</span>
-              <span className="text-blob-ink">−</span>
+              <span>{`(−${amounts[p]})`}</span>
+              <span className="text-ink-3">·</span>
+              <span>{`(−${amounts[q]})`}</span>
               <span className="text-ink-3">→</span>
               <span className="font-semibold text-ok">+</span>
             </motion.span>
@@ -249,7 +250,7 @@ export function NegSignCounter() {
               exit={{ opacity: 0, scale: 0.7 }}
               className="flex items-center gap-1 rounded-lg border border-danger px-2 py-1 font-math text-[18px]"
             >
-              <span className="font-semibold text-danger">−</span>
+              <span className="font-semibold text-danger">{`(−${amounts[left]})`}</span>
               <span className="text-[12px] text-ink-2">{t(tx("left over", "bleibt übrig"))}</span>
             </motion.span>
           )}

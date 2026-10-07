@@ -7,7 +7,9 @@ import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { figure, type FigureSpec } from "./figures";
-import { exact, matchTask, mistakeList, r6, rounded, say, weighted } from "./kit";
+import { exact, matchTask, mistakeList, rounded, say, weighted } from "./kit";
+
+const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : a);
 import { AreaVolumeBaseHeight, AreaVolumeCircleLab } from "./widgets2";
 
 const PI = Math.PI;
@@ -335,12 +337,12 @@ function sectorTask(rng: Rng): Exercise {
       {
         math: say((f) => `${sym} \\approx#e ${f.d(value, 2)}#r ${q(area ? `${unit}²` : unit)}#u`),
         note: say((f) => {
-          const share = f.n(Math.round(frac * 1e4) / 1e4);
-          const part = PARTS[Math.round(1 / frac)];
-          const whole = Number.isInteger(r6(1 / frac)) && part;
+          const g = gcdInt(al, 360);
+          const part = al === 180 ? PARTS[2] : 360 / g === 360 / al && Number.isInteger(360 / al) ? PARTS[360 / al] : undefined;
+          const share = `\\frac{${al}}{360} = \\frac{${al / g}}{${360 / g}}`;
           return f.t(
-            `$\\frac{${al}}{360} ${whole ? "=" : "\\approx"} ${share}$${whole ? `: the sector is ${part[0]} of the circle` : ""}. Use the π key and round.`,
-            `$\\frac{${al}}{360} ${whole ? "=" : "\\approx"} ${share}$${whole ? `: Der Ausschnitt ist ${part[1]} des Kreises` : ""}. π-Taste und runden.`,
+            `$${share}$${part ? `: the sector is ${part[0]} of the circle` : " of the circle"}. Use the π key and round.`,
+            `$${share}$${part ? `: Der Ausschnitt ist ${part[1]} des Kreises` : " des Kreises"}. π-Taste und runden.`,
           );
         }),
       },
@@ -743,6 +745,7 @@ export const level2: LevelLesson = {
       exercise: {
         instruction: CIRC_A,
         text: join(tx('A round table top has a diameter of $1.2 "m"$.', 'Eine runde Tischplatte hat einen Durchmesser von $1,2 "m"$.'), ROUND2),
+        visual: figure(circleFig(0.6, true, "m")),
         answer: tableCheck.right,
         hint: tx("Halve the diameter first.", "Halbiere zuerst den Durchmesser."),
         solution: tableCheck.frames,

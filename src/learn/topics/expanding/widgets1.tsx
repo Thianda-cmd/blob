@@ -404,7 +404,7 @@ export function ExpandingTiles() {
               <div className="space-y-3">
                 {rows.map((row) => (
                   <div key={row.kind} className="flex min-h-[58px] items-center gap-3">
-                    <span className="w-16 shrink-0 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{row.kind === "x" ? t(tx("x-terms", "x-Terme")) : t(tx("Numbers", "Zahlen"))}</span>
+                    <span className="w-16 shrink-0 text-[12.5px] font-medium text-ink-3">{row.kind === "x" ? t(tx("x-terms", "x-Terme")) : t(tx("Numbers", "Zahlen"))}</span>
                     <div className="flex min-w-0 flex-1 flex-wrap items-end gap-[3px]">
                       <AnimatePresence initial={false} mode="popLayout">
                         {row.keep.map((tile) => (

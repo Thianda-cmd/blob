@@ -56,7 +56,7 @@ export type Fmt = {
   ut: (unit: Unit, key: string) => string;
   /** The unit after a number in a sentence: ` kg`. */
   uw: (unit: Unit) => string;
-  /** A number in a story sentence; German groups big numbers: "25 000". */
+  /** A number in a story sentence; German prose groups big numbers with a dot (I18N.md): "25.000". */
   big: (s: string) => string;
 };
 
@@ -70,12 +70,14 @@ export function fmt(t: Fmt["t"], l: Locale): Fmt {
     a: (v, unit) => comma(unit === "€" ? cash(v) : num(v)),
     ut: (unit, key) => (unit ? ` "${unitName(unit, l)}"#${key}` : ""),
     uw: (unit) => (unit ? `${l === "de" ? "\u00a0" : " "}${unitName(unit, l)}` : ""),
-    big: (s) => (l === "de" && /^\d{5,}/.test(s) ? comma(s).replace(/^\d+/, (d) => d.replace(/\B(?=(\d{3})+$)/g, " ")) : comma(s)),
+    big: (s) => (l === "de" && /^\d{5,}/.test(s) ? comma(s).replace(/^\d+/, (d) => d.replace(/\B(?=(\d{3})+$)/g, ".")) : comma(s)),
   };
 }
 
 /** Money in a sentence: "297.50 €" / "297,50 €" (German keeps the unit on the same line). */
 export const euro = (f: Fmt, v: number) => `${f.big(cash(v))}${f.l === "de" ? "\u00a0" : " "}€`;
+/** Money with both cents shown, as on an invoice: "250.00" / "250,00". */
+export const cents2 = (f: Fmt, v: number) => (f.l === "de" ? r2(v).toFixed(2).replace(".", ",") : r2(v).toFixed(2));
 /** A rate in a sentence: "2.5 %" / "2,5 %". */
 export const perc = (f: Fmt, p: number) => `${f.n(p)}${f.l === "de" ? "\u00a0" : " "}%`;
 
@@ -241,8 +243,8 @@ export const FACTOR_OFF = tx("Growth factor off", "Wachstumsfaktor falsch");
 export const factorOff = (p: number, up: boolean) =>
   say(({ t, n }) =>
     t(
-      `So close! For ${up ? "a rise" : "a drop"} of $${p} %$ the growth factor is $${n(1 + (up ? p : -p) / 100)}$, not $${n(1 + (up ? p : -p) / 10)}$: percent means **hundredths**.`,
-      `Ganz knapp! Bei ${up ? "einer Zunahme" : "einer Abnahme"} um $${p} %$ ist der Wachstumsfaktor $${n(1 + (up ? p : -p) / 100)}$, nicht $${n(1 + (up ? p : -p) / 10)}$: Prozent heißt **Hundertstel**.`,
+      `So close! For ${up ? "a rise" : "a drop"} of $${n(p)} %$ the growth factor is $${n(1 + (up ? p : -p) / 100)}$, not $${n(1 + (up ? p : -p) / 10)}$: percent means **hundredths**.`,
+      `Ganz knapp! Bei ${up ? "einer Zunahme" : "einer Abnahme"} um $${n(p)} %$ ist der Wachstumsfaktor $${n(1 + (up ? p : -p) / 100)}$, nicht $${n(1 + (up ? p : -p) / 10)}$: Prozent heißt **Hundertstel**.`,
     ),
   );
 

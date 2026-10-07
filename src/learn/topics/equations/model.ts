@@ -130,6 +130,8 @@ export function emWidth(src: Text): number {
       case "var":
       case "sym":
         return 0.58;
+      case "fn":
+        return 0.5 * node.v.length + 0.14;
       case "text":
         return 0.42 * node.v.length + 0.5;
       case "space":

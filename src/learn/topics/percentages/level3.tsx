@@ -323,8 +323,8 @@ function factorExercise(story: FactorStory, p: number): Exercise {
         say((f) =>
           story.up
             ? f.t(
-                `Hmm, $${f.n(p)} %$ is only what comes on top. The factor has to keep the old amount too: $1 + \\ldots$`,
-                `Hm, $${f.n(p)} %$ sind nur das, was dazukommt. Der Faktor muss die alte Menge mit enthalten: $1 + \\ldots$`,
+                `Hmm, $${f.n(p)} %$ is only what comes on top. The factor has to keep the old amount too: $1 + …$`,
+                `Hm, $${f.n(p)} %$ sind nur das, was dazukommt. Der Faktor muss die alte Menge mit enthalten: $1 + …$`,
               )
             : f.t(
                 `Ooh, classic trap! $${f.n(p)} %$ is the part that **disappears**. The growth factor is the part that **stays**.`,
@@ -910,8 +910,8 @@ function halfLifeTask(rng: Rng): Exercise | null {
           T * 2 ** k,
           tx(`${2 ** k} half-lives?`, `${2 ** k} Halbwertszeiten?`),
           tx(
-            `Hmm, $\\frac{1}{${2 ** k}}$ doesn't mean ${2 ** k} half-lives. Each half-life halves again: $\\frac{1}{2}, \\frac{1}{4}, \\frac{1}{8}, \\ldots$ Count the halvings.`,
-            `Hm, $\\frac{1}{${2 ** k}}$ heißt nicht ${2 ** k} Halbwertszeiten. Jede Halbwertszeit halbiert erneut: $\\frac{1}{2}, \\frac{1}{4}, \\frac{1}{8}, \\ldots$ Zähl die Halbierungen.`,
+            `Hmm, $\\frac{1}{${2 ** k}}$ doesn't mean ${2 ** k} half-lives. Each half-life halves again: $\\frac{1}{2}, \\frac{1}{4}, \\frac{1}{8}, …$ Count the halvings.`,
+            `Hm, $\\frac{1}{${2 ** k}}$ heißt nicht ${2 ** k} Halbwertszeiten. Jede Halbwertszeit halbiert erneut: $\\frac{1}{2}, \\frac{1}{4}, \\frac{1}{8}, …$ Zähl die Halbierungen.`,
           ),
         ],
         [
@@ -1383,7 +1383,7 @@ function niceStep(v: number) {
 /** SVG coordinates rounded, so the server and the browser write the same markup. */
 const fix = (v: number) => Math.round(v * 10) / 10;
 
-const SVG_TEXT = { fill: "var(--ink-3)", fontFamily: "var(--font-sans)", fontSize: 10 } as const;
+const SVG_TEXT = { fill: "var(--ink-3)", fontFamily: "var(--font-sans)", fontSize: 11 } as const;
 
 function GrowthLab() {
   const scope = useId();
@@ -1423,12 +1423,12 @@ function GrowthLab() {
       ? t("q = 1: nothing changes.", "q = 1: Es ändert sich nichts.")
       : p > 0
         ? t(
-            `q = ${n(q)}: every year ${n(p)} % more than the year before. Doubling time about ${n(r1(T))} years.`,
-            `q = ${n(q)}: jedes Jahr ${n(p)} % mehr als im Jahr davor. Verdopplungszeit etwa ${n(r1(T))} Jahre.`,
+            `q = ${n(q)}: every year ${n(p)} % more than the year before. Doubling time about ${n(r1(T))} ${r1(T) === 1 ? "year" : "years"}.`,
+            `q = ${n(q)}: jedes Jahr ${n(p)} % mehr als im Jahr davor. Verdopplungszeit etwa ${n(r1(T))} ${r1(T) === 1 ? "Jahr" : "Jahre"}.`,
           )
         : t(
-            `q = ${n(q)}: every year ${n(-p)} % less than the year before. Half-life about ${n(r1(T))} years.`,
-            `q = ${n(q)}: jedes Jahr ${n(-p)} % weniger als im Jahr davor. Halbwertszeit etwa ${n(r1(T))} Jahre.`,
+            `q = ${n(q)}: every year ${n(-p)} % less than the year before. Half-life about ${n(r1(T))} ${r1(T) === 1 ? "year" : "years"}.`,
+            `q = ${n(q)}: jedes Jahr ${n(-p)} % weniger als im Jahr davor. Halbwertszeit etwa ${n(r1(T))} ${r1(T) === 1 ? "Jahr" : "Jahre"}.`,
           );
 
   return (
@@ -1469,6 +1469,7 @@ function GrowthLab() {
         </div>
       </div>
 
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <div className="rounded-xl border border-line bg-surface p-3 sm:p-4">
         <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={readout}>
           {ticks.map((v) => (
@@ -1502,13 +1503,18 @@ function GrowthLab() {
                   strokeDasharray="3 3"
                 />
                 <motion.line initial={false} animate={{ x1: X(T), x2: X(T), y1: Y(target), y2: Y(0) }} transition={spring} stroke="var(--ink-2)" strokeWidth={1} strokeDasharray="3 3" />
-                <motion.text initial={false} animate={{ x: X(T) + (X(T) > W - 90 ? -5 : 5), y: Y(target) - 6 }} transition={spring} textAnchor={X(T) > W - 90 ? "end" : "start"} {...SVG_TEXT} fill="var(--ink)">
-                  {p > 0 ? t(`doubled after ${n(r1(T))}`, `verdoppelt nach ${n(r1(T))}`) : t(`halved after ${n(r1(T))}`, `halbiert nach ${n(r1(T))}`)}
-                </motion.text>
               </motion.g>
             )}
           </AnimatePresence>
 
+          {showT && (
+            <g>
+              <line x1={L + 8} x2={L + 26} y1={TOP + 8} y2={TOP + 8} stroke="var(--ink-2)" strokeWidth={1} strokeDasharray="3 3" />
+              <text x={L + 31} y={TOP + 11.5} {...SVG_TEXT} fill="var(--ink)">
+                {p > 0 ? t(`doubled after ${n(r1(T))} ${r1(T) === 1 ? "year" : "years"}`, `verdoppelt nach ${n(r1(T))} ${r1(T) === 1 ? "Jahr" : "Jahren"}`) : t(`halved after ${n(r1(T))} ${r1(T) === 1 ? "year" : "years"}`, `halbiert nach ${n(r1(T))} ${r1(T) === 1 ? "Jahr" : "Jahren"}`)}
+              </text>
+            </g>
+          )}
           {compare && <motion.path initial={false} animate={{ d: path(lin) }} transition={spring} fill="none" stroke="var(--ink-2)" strokeWidth={1.8} strokeDasharray="5 4" />}
           <motion.path initial={false} animate={{ d: path(val) }} transition={spring} fill="none" stroke="var(--blob)" strokeWidth={2.6} strokeLinecap="round" />
           {Array.from({ length: LAB_YEARS + 1 }, (_, x) => (
@@ -1556,11 +1562,19 @@ function GrowthLab() {
         <p className="text-[13.5px] leading-relaxed text-ink-2">
           <strong className="font-semibold text-ink">{readout}</strong>
           {compare &&
-            t(
-              ` Dashed: linear growth with the same first step, always ${n(Math.abs(p))} more or less. The exponential curve always multiplies by q.`,
-              ` Gestrichelt: lineares Wachstum mit demselben ersten Schritt, immer ${n(Math.abs(p))} mehr oder weniger. Die Exponentialkurve multipliziert immer mit q.`,
-            )}
+            (p > 0
+              ? t(
+                  ` Dashed: linear growth with the same first step, exactly ${n(p)} more every year. The exponential curve always multiplies by q.`,
+                  ` Gestrichelt: lineares Wachstum mit demselben ersten Schritt, jedes Jahr genau ${n(p)} mehr. Die Exponentialkurve multipliziert immer mit q.`,
+                )
+              : p < 0
+                ? t(
+                    ` Dashed: linear decay with the same first step, exactly ${n(-p)} less every year, down to 0. The exponential curve always multiplies by q.`,
+                    ` Gestrichelt: lineare Abnahme mit demselben ersten Schritt, jedes Jahr genau ${n(-p)} weniger, bis 0. Die Exponentialkurve multipliziert immer mit q.`,
+                  )
+                : t(" Dashed: the linear model. With q = 1 both stay at 100.", " Gestrichelt: das lineare Modell. Mit q = 1 bleiben beide bei 100."))}
         </p>
+      </div>
       </div>
       <p className="text-[13px] text-ink-3">
         {t("Move the slider or pick a value. The start value is 100.", "Beweg den Schieberegler oder wähl einen Wert. Der Startwert ist 100.")}
@@ -1745,7 +1759,7 @@ function TwoTables({ start, d, q, steps = 4 }: { start: number; d: number; q: nu
     <div key={key} className="rounded-xl border border-line bg-surface p-3 sm:p-4">
       <div className="text-[14px] font-semibold text-ink">{title}</div>
       <div className="mb-2 text-[12.5px] text-ink-3">{sub}</div>
-      <div className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-2 font-math text-[16px] tabular-nums">
+      <div className="grid grid-cols-[22px_minmax(0,1fr)_52px] items-center gap-x-2 font-math text-[16px] tabular-nums">
         <span className="pb-1 italic text-ink-3">x</span>
         <span className="pb-1 italic text-ink-3">y</span>
         <span />
@@ -1758,7 +1772,7 @@ function TwoTables({ start, d, q, steps = 4 }: { start: number; d: number; q: nu
             <span className="relative h-full border-t border-line">
               {i < ys.length - 1 && (
                 <motion.span
-                  className="absolute left-0 top-full -translate-y-1/2 whitespace-nowrap rounded-md bg-blob-soft px-1.5 py-0.5 text-[12.5px] font-semibold text-blob-ink"
+                  className="absolute left-0 top-full z-10 -translate-y-1/2 whitespace-nowrap rounded-md bg-blob-soft px-1.5 py-0.5 text-[12.5px] font-semibold text-blob-ink"
                   initial={{ opacity: 0, scale: 0.7 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: delay + 0.5 + i * 0.12, type: "spring", stiffness: 400, damping: 24 }}
@@ -1792,12 +1806,12 @@ const compoundLessonFrames: Frame[] = [
     ),
   },
   {
-    math: say((f) => `K_1#Kn =#e 5000#v "€"#u \\cdot#t1 ${f.n(1.03)}#q1 =#e2 ${f.c(5000 * 1.03)}#r "€"#u2`),
+    math: say((f) => `K_1#Kn =#e 5000#v \\cdot#t1 ${f.n(1.03)}#q1 =#e2 ${f.c(5000 * 1.03)}#r "€"#u2`),
     note: say((f) => f.t(`After 1 year: $5000 \\cdot 1.03 = ${f.c(5150)}$ €.`, `Nach 1 Jahr: $5000 \\cdot 1,03 = ${f.c(5150)}$\u00a0€.`)),
     highlight: ["r"],
   },
   {
-    math: say((f) => `K_2#Kn =#e 5000#v "€"#u \\cdot#t1 ${f.n(1.03)}#q1 \\cdot#t2 ${f.n(1.03)}#q2 =#e2 ${f.c(5000 * 1.03 ** 2)}#r "€"#u2`),
+    math: say((f) => `K_2#Kn =#e 5000#v \\cdot#t1 ${f.n(1.03)}#q1 \\cdot#t2 ${f.n(1.03)}#q2 =#e2 ${f.c(5000 * 1.03 ** 2)}#r "€"#u2`),
     note: say((f) =>
       f.t(
         `After 2 years: $${f.c(5000 * 1.03 ** 2)}$ €. The $150$ € interest from year 1 earn interest too: that's **compound interest** (Zinseszins).`,
@@ -1807,7 +1821,7 @@ const compoundLessonFrames: Frame[] = [
     highlight: ["r"],
   },
   {
-    math: say((f) => `K_3#Kn =#e 5000#v "€"#u \\cdot#t1 ${f.n(1.03)}#q1 \\cdot#t2 ${f.n(1.03)}#q2 \\cdot#t3 ${f.n(1.03)}#q3 \\approx#e2 ${f.c(5000 * 1.03 ** 3)}#r "€"#u2`),
+    math: say((f) => `K_3#Kn =#e 5000#v \\cdot#t1 ${f.n(1.03)}#q1 \\cdot#t2 ${f.n(1.03)}#q2 \\cdot#t3 ${f.n(1.03)}#q3 \\approx#e2 ${f.c(5000 * 1.03 ** 3)}#r "€"#u2`),
     note: tx("After 3 years: the factor $1.03$ three times.", "Nach 3 Jahren: dreimal der Faktor $1,03$."),
     highlight: ["q1", "q2", "q3"],
   },
@@ -1819,7 +1833,7 @@ const compoundLessonFrames: Frame[] = [
     ),
   },
   {
-    math: say((f) => `K_{10}#Kn =#e 5000#v "€"#u \\cdot#t1 ${f.n(1.03)}#q1^{10}#x \\approx#e2 ${f.c(5000 * 1.03 ** 10)}#r "€"#u2`),
+    math: say((f) => `K_{10}#Kn =#e 5000#v \\cdot#t1 ${f.n(1.03)}#q1^{10}#x \\approx#e2 ${f.c(5000 * 1.03 ** 10)}#r "€"#u2`),
     note: say((f) =>
       f.t(
         `After 10 years (calculator): $${f.c(5000 * 1.03 ** 10)}$ €. With the same $150$ € every year, it would only be $6500$ €.`,
@@ -1829,7 +1843,7 @@ const compoundLessonFrames: Frame[] = [
     highlight: ["r"],
   },
   {
-    math: say((f) => `K_0#Kn =#e 10000#v "€"#u :#t1 ${f.n(1.03)}#q1^5#x \\approx#e2 ${f.c(10000 / 1.03 ** 5)}#r "€"#u2`),
+    math: say((f) => `K_0#Kn =#e 10000#v :#t1 ${f.n(1.03)}#q1^5#x \\approx#e2 ${f.c(10000 / 1.03 ** 5)}#r "€"#u2`),
     note: say((f) =>
       f.t(
         `Backwards: to have $10000$ € after 5 years, invest $10000 : 1.03^5 \\approx ${f.c(10000 / 1.03 ** 5)}$ € today.`,
@@ -1971,7 +1985,7 @@ const linExpFrames: Frame[] = [
     ),
   },
   {
-    math: say((f) => `g(10)#f \\approx#e ${f.big(String(Math.round(200 * 1.5 ** 10)))}#v \\quad >#gt \\quad f(10)#f2 =#e2 1200#w`),
+    math: `g(10)#f \\approx#e ${Math.round(200 * 1.5 ** 10)}#v \\quad >#gt \\quad f(10)#f2 =#e2 1200#w`,
     note: tx(
       "Both start the same, but in the long run exponential growth wins by far.",
       "Beide starten gleich, aber auf lange Sicht gewinnt das exponentielle Wachstum mit riesigem Abstand.",
@@ -2038,7 +2052,11 @@ export const level3: LevelLesson = {
     {
       title: tx("Doubling time and half-life", "Verdopplungszeit und Halbwertszeit"),
       body: tx("Solve $q^T = 2$ (or $q^T = 0.5$) with a logarithm, or try whole steps.", "Löse $q^T = 2$ (oder $q^T = 0,5$) mit einem Logarithmus oder probier ganze Schritte aus."),
-      examples: ["T = \\frac{\\log(2)}{\\log(q)}", "N(t) = N_0 \\cdot (\\frac{1}{2})^{\\frac{t}{T}}"],
+      examples: [
+        tx('"doubling:" \\; T = \\frac{\\log(2)}{\\log(q)}', '"Verdopplung:" \\; T = \\frac{\\log(2)}{\\log(q)}'),
+        tx('"half-life:" \\; T = \\frac{\\log(0.5)}{\\log(q)}', '"Halbierung:" \\; T = \\frac{\\log(0,5)}{\\log(q)}'),
+        "N(t) = N_0 \\cdot (\\frac{1}{2})^{\\frac{t}{T}}",
+      ],
       tone: "rule",
     },
     {

@@ -27,6 +27,8 @@ export type QS = {
   expandNote?: Text;
   sense: [boolean, boolean];
   senseNote: Text;
+  /** For "Which solutions make sense?": how to see that a positive solution fails. */
+  senseCheck?: Text;
   value: number;
   unit?: Text;
   label?: Text;
@@ -100,7 +102,7 @@ export function frameStory(ctx: FrameCtx, a: number, b: number, x: number): QS {
   const outside = `(${a}#a +#p1 2#k1 x#x1)#B1 (${b}#b +#p2 2#k2 x#x2)#B2`;
   const setup: Frame[] = [
     {
-      math: tx(`"outside:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\times#t (${b}#b +#p2 2#k2 x#x2)#B2`, `"außen:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\times#t (${b}#b +#p2 2#k2 x#x2)#B2`),
+      math: tx(`"outside:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b +#p2 2#k2 x#x2)#B2`, `"außen:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b +#p2 2#k2 x#x2)#B2`),
       note: sayN(({ N }) => [
         `Let $x$ be the width of the ${N(what)} in ${unit}. It adds $x$ on **both** sides, so the outside is $${a} + 2x$ by $${b} + 2x$.`,
         `Sei $x$ die Breite ${ctx === "pool" ? "des Wegs" : ctx === "lawn" ? "des Beets" : "des Rahmens"} in ${unit}. ${ctx === "pool" ? "Er" : ctx === "lawn" ? "Es" : "Er"} kommt auf **beiden** Seiten dazu, außen misst alles also $${a} + 2x$ mal $${b} + 2x$.`,
@@ -174,6 +176,87 @@ function frameTask(rng: Rng): QS {
     if (friendly(q)) return q;
   }
   return frameStory("picture", 30, 18, 3);
+}
+
+// ---------------------------------------------------------------------------
+// A strip inside: (a − 2x)(b − 2x). Both solutions are positive, but the larger one is too wide.
+
+export type InnerCtx = "garden" | "margin";
+
+export function innerStory(ctx: InnerCtx, a: number, b: number, x: number): QS {
+  const R = (a - 2 * x) * (b - 2 * x);
+  const big = (a + b) / 2 - x;
+  const garden = ctx === "garden";
+  const unit = garden ? "m" : "cm";
+  const what = garden ? tx("path", "Weg") : tx("margin", "Rand");
+  const Der = garden ? "Der Weg" : "Der Rand";
+  const inner = garden ? tx("the lawn", "der Rasen") : tx("the printed area", "die bedruckte Fläche");
+  return {
+    text: garden
+      ? tx(
+          `A rectangular garden is ${a} m long and ${b} m wide. Inside the garden, a path of the same width runs all along its edge. The lawn left in the middle covers ${R} m². How wide is the path?`,
+          `Ein rechteckiger Garten ist ${a} m lang und ${b} m breit. Innen am Rand entlang führt ringsherum ein gleich breiter Weg. Der Rasen, der in der Mitte übrig bleibt, ist ${R} m² groß. Wie breit ist der Weg?`,
+        )
+      : tx(
+          `A poster is ${a} cm wide and ${b} cm high. A margin of the same width is left blank all around. The printed area in the middle covers ${R} cm². How wide is the margin?`,
+          `Ein Plakat ist ${a} cm breit und ${b} cm hoch. Ringsherum bleibt ein gleich breiter Rand frei. Die bedruckte Fläche in der Mitte ist ${R} cm² groß. Wie breit ist der Rand?`,
+        ),
+    hint: tx(`Let $x$ be the width. Inside, ${E(inner)} measures $${a} - 2x$ by $${b} - 2x$.`, `Sei $x$ die Breite. Innen misst ${D(inner)} $${a} - 2x$ mal $${b} - 2x$.`),
+    setup: [
+      {
+        math: tx(`"inside:"#lo \\, (${a}#a -#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b -#p2 2#k2 x#x2)#B2`, `"innen:"#lo \\, (${a}#a -#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b -#p2 2#k2 x#x2)#B2`),
+        note: tx(
+          `Let $x$ be the width of the ${E(what)} in ${unit}. It takes $x$ away on **both** sides, so inside only $${a} - 2x$ by $${b} - 2x$ is left.`,
+          `Sei $x$ die Breite ${garden ? "des Wegs" : "des Rands"} in ${unit}. Er nimmt auf **beiden** Seiten $x$ weg, innen bleiben also nur $${a} - 2x$ mal $${b} - 2x$.`,
+        ),
+      },
+    ],
+    eq: `(${a}#a -#p1 2#k1 x#x1)#B1 (${b}#b -#p2 2#k2 x#x2)#B2 =#eq ${R}#r`,
+    eqNote: tx(`Inside, ${E(inner)} covers ${R} ${unit}².`, `Innen ist ${D(inner)} ${R} ${unit}² groß.`),
+    A: 4,
+    B: -2 * (a + b),
+    C: a * b,
+    R,
+    expandNote: tx(`Multiply out: $${a * b} - ${2 * a}x - ${2 * b}x + 4x^2$, then combine.`, `Multipliziere aus: $${a * b} - ${2 * a}x - ${2 * b}x + 4x^2$, dann zusammenfassen.`),
+    sense: [false, true],
+    senseNote: tx(
+      `Both are positive, but $x_1 = ${big}$ is too wide: inside, $${b} - 2 \\cdot ${big} = ${b - 2 * big}$ ${unit} would be left. A length can't be negative. Only $x_2 = ${x}$ fits.`,
+      `Beide sind positiv, aber $x_1 = ${big}$ ist zu breit: Innen blieben $${b} - 2 \\cdot ${big} = ${b - 2 * big}$ ${unit} übrig. Eine Länge kann nicht negativ sein. Nur $x_2 = ${x}$ passt.`,
+    ),
+    senseCheck: tx(`How much would be left inside, $${b} - 2x$?`, `Wie viel bliebe innen übrig, $${b} - 2x$?`),
+    value: x,
+    unit,
+    answer: tx(
+      `**Answer:** The ${E(what)} is ${x} ${unit} wide. Check: $${a - 2 * x} \\cdot ${b - 2 * x} = ${R}$.`,
+      `**Antwort:** ${Der} ist ${x} ${unit} breit. Probe: $${a - 2 * x} \\cdot ${b - 2 * x} = ${R}$.`,
+    ),
+    wrongs: [
+      wrong(big, tx("Too wide to fit", "Zu breit"), tx(`Hmm, $${big}$ solves the equation, but it's too wide: inside, $${b} - 2 \\cdot ${big}$ is less than nothing. Check which solution makes sense!`, `Hm, $${big}$ löst zwar die Gleichung, ist aber zu breit: Innen wäre $${b} - 2 \\cdot ${big}$ weniger als nichts. Prüf, welche Lösung sinnvoll ist!`)),
+      wrong(2 * x, tx("Only on one side", "Nur auf einer Seite"), tx(`I think you used $(${a} - x)(${b} - x)$. But the ${E(what)} is on **both** sides, so each length shrinks by $2x$.`, `Ich glaub, du hast $(${a} - x)(${b} - x)$ gerechnet. ${Der} liegt aber auf **beiden** Seiten, jede Länge schrumpft also um $2x$.`)),
+      wrong(b - 2 * x, tx("Inner length", "Länge innen"), tx(`Nearly! ${b - 2 * x} ${unit} is what's left **inside**. The question asks how wide the strip itself is: $x$.`, `Fast! ${b - 2 * x} ${unit} ist das, was **innen** übrig bleibt. Gefragt ist, wie breit der Streifen selbst ist: $x$.`)),
+    ],
+    traps: [
+      { eq: `(${a} - x)(${b} - x) = ${R}`, title: tx("Only on one side", "Nur auf einer Seite"), say: tx(`Nearly! The ${E(what)} is on **both** sides, so each length shrinks by $2x$.`, `Fast! ${Der} liegt auf **beiden** Seiten, jede Länge schrumpft also um $2x$.`) },
+      { eq: `(${a} + 2x)(${b} + 2x) = ${R}`, title: tx("Outside, not inside", "Außen statt innen"), say: tx(`Careful: the ${E(what)} is **inside**, so what's left in the middle gets smaller: $${a} - 2x$.`, `Vorsicht: ${Der} liegt **innen**, was in der Mitte übrig bleibt, wird also kleiner: $${a} - 2x$.`) },
+      { eq: `${a * b} - 4x = ${R}`, title: tx("Not an area", "Keine Fläche"), say: tx("Hmm, $4x$ looks like four strips of length 1. But the strips are as long as the sides: an area is length **times** width.", "Hm, $4x$ sieht aus wie vier Streifen der Länge 1. Die Streifen sind aber so lang wie die Seiten: Eine Fläche ist Länge **mal** Breite.") },
+    ],
+    eqPlain: `(${a} - 2x)(${b} - 2x) = ${R}`,
+  };
+}
+
+function innerTask(rng: Rng): QS {
+  const ctx = rng.pick<InnerCtx>(["garden", "margin"]);
+  for (let i = 0; i < 60; i++) {
+    const cm = ctx === "margin";
+    const a = cm ? rng.int(10, 30) * 2 : rng.int(10, 30);
+    const b = cm ? rng.int(8, 20) * 2 : rng.int(8, 24);
+    const x = cm ? rng.int(1, 5) : rng.int(1, 3);
+    // p/2 = −(a + b)/4 a whole number, and something sensible left inside.
+    if (a <= b || (a + b) % 4 !== 0 || b - 2 * x < 4) continue;
+    const q = innerStory(ctx, a, b, x);
+    if (friendly(q)) return q;
+  }
+  return innerStory("garden", 20, 16, 2);
 }
 
 /** The root in the pq formula is at most 25 (a square number students know). */
@@ -318,6 +401,13 @@ function rectPA(rng: Rng): QS {
 
 export type ConsecKind = "next" | "even" | "odd";
 
+/** Even or odd numbers in a row are 2 apart, not 1. */
+const stepTitle = (kind: ConsecKind) => (kind === "even" ? tx("Even numbers go up by 2", "Gerade Zahlen: Schritt 2") : tx("Odd numbers go up by 2", "Ungerade Zahlen: Schritt 2"));
+const stepSay = (kind: ConsecKind, en: string, de: string) =>
+  kind === "even"
+    ? tx(`${en}I think you used $x + 1$. But the next **even** number is $x + 2$: $x + 1$ would be odd.`, `${de}Ich glaub, du hast $x + 1$ genommen. Die nächste **gerade** Zahl ist aber $x + 2$: $x + 1$ wäre ungerade.`)
+    : tx(`${en}I think you used $x + 1$. But the next **odd** number is $x + 2$: $x + 1$ would be even.`, `${de}Ich glaub, du hast $x + 1$ genommen. Die nächste **ungerade** Zahl ist aber $x + 2$: $x + 1$ wäre gerade.`);
+
 export function consecStory(kind: ConsecKind, x: number, ask: "small" | "large", integers = false): QS {
   const step = kind === "next" ? 1 : 2;
   const y = x + step;
@@ -360,10 +450,14 @@ export function consecStory(kind: ConsecKind, x: number, ask: "small" | "large",
     wrongs: [
       wrong(ask === "small" ? other : other + step, tx("Not a natural number", "Keine natürliche Zahl"), tx(`That's from the second solution, $x_2 = ${other}$. But natural numbers can't be negative.`, `Das kommt aus der zweiten Lösung, $x_2 = ${other}$. Natürliche Zahlen sind aber nie negativ.`), true),
       wrong(ask === "small" ? y : x, tx("The other number", "Die andere Zahl"), tx(`Nearly! That's the ${ask === "small" ? "larger" : "smaller"} number. The question asks for the ${ask === "small" ? "smaller" : "larger"} one.`, `Fast! Das ist die ${ask === "small" ? "größere" : "kleinere"} Zahl. Gefragt ist die ${ask === "small" ? "kleinere" : "größere"}.`)),
-      wrong(P / 2, tx("Halved the product", "Produkt halbiert"), tx("Hmm, halving works for sums, not for products. Set up $x(x + 1) = …$ and solve.", "Hm, halbieren klappt bei Summen, nicht bei Produkten. Stell $x(x + 1) = …$ auf und löse.")),
+      wrong(P / 2, tx("Halved the product", "Produkt halbiert"), tx(`Hmm, halving works for sums, not for products. Set up $x(x + ${step}) = ${P}$ and solve.`, `Hm, halbieren klappt bei Summen, nicht bei Produkten. Stell $x(x + ${step}) = ${P}$ auf und löse.`)),
+      // Even or odd numbers taken one apart: x(x + 1) = P gives no whole number.
+      step === 2 && wrong((-1 + Math.sqrt(1 + 4 * P)) / 2 + (ask === "small" ? 0 : 1), stepTitle(kind), stepSay(kind, "Not a whole number? ", "Keine ganze Zahl? ")),
     ],
     traps: [
-      { eq: `x \\cdot ${step + 1}x = ${P}`, title: tx(`Not x and ${step + 1}x`, `Nicht x und ${step + 1}x`), say: tx(`The next number is $x + ${step}$, not $${step + 1}x$: it is only ${step} more.`, `Die nächste Zahl ist $x + ${step}$, nicht $${step + 1}x$: Sie ist nur ${step} größer.`) },
+      step === 2
+        ? { eq: `x(x + 1) = ${P}`, title: stepTitle(kind), say: stepSay(kind, "Nearly! ", "Fast! ") }
+        : { eq: `x \\cdot 2x = ${P}`, title: tx("Not x and 2x", "Nicht x und 2x"), say: tx("The next number is $x + 1$, not $2x$: it is only 1 more.", "Die nächste Zahl ist $x + 1$, nicht $2x$: Sie ist nur 1 größer.") },
       { eq: `x + (x + ${step}) = ${P}`, title: tx("Sum, not product", "Summe statt Produkt"), say: tx("Careful: the story talks about the **product**, so multiply.", "Vorsicht: In der Aufgabe geht es um das **Produkt**, also multiplizieren.") },
       { eq: `x^2 + ${step} = ${P}`, title: tx("Bracket forgotten", "Klammer vergessen"), say: tx(`Nearly! $x(x + ${step})$ means both parts are multiplied by $x$: $x^2 + ${step === 1 ? "" : step}x$.`, `Fast! $x(x + ${step})$ heißt: Beide Teile werden mit $x$ multipliziert, $x^2 + ${step === 1 ? "" : step}x$.`) },
     ],
@@ -466,7 +560,7 @@ export function landingStory(T: number, r: number, place: 0 | 1 | 2): QS {
     wrongs: [
       wrong(-r, tx("Before the throw", "Vor dem Wurf"), tx(`$t = ${-r}$ is a solution of the equation, but it lies **before** the throw. Time after the throw can't be negative.`, `$t = ${-r}$ löst zwar die Gleichung, liegt aber **vor** dem Wurf. Die Zeit nach dem Wurf kann nicht negativ sein.`), true),
       wrong(r, tx("Sign dropped", "Vorzeichen weggelassen"), tx(`Hmm, ${r} is the second solution without its minus. That solution makes no sense: drop it and keep the other one.`, `Hm, ${r} ist die zweite Lösung ohne ihr Minus. Diese Lösung ist nicht sinnvoll: Lass sie weg und nimm die andere.`)),
-      v > 0 && wrong(v / 10, tx("That's the top", "Das ist der höchste Punkt"), tx(`At $t = ${v / 10}$ the ball is at its **highest** point. It still has to fall down after that.`, `Bei $t = ${v / 10}$ ist der Ball am **höchsten** Punkt. Danach fällt er erst noch herunter.`)),
+      v > 0 && wrong(v / 10, tx("That's the top", "Das ist der höchste Punkt"), sayN(({ n }) => [`At $t = ${n(v / 10)}$ the ball is at its **highest** point. It still has to fall down after that.`, `Bei $t = ${n(v / 10)}$ ist der Ball am **höchsten** Punkt. Danach fällt er erst noch herunter.`])),
     ],
   };
 }
@@ -474,47 +568,52 @@ export function landingStory(T: number, r: number, place: 0 | 1 | 2): QS {
 function landing(rng: Rng): QS {
   const T = rng.int(2, 5);
   const r = rng.int(1, T - 1);
-  return landingStory(T, r, rng.pick([0, 1, 2] as const));
+  // A balcony is at most about 20 m high; higher starts are a tower or a cliff.
+  return landingStory(T, r, 5 * T * r <= 20 ? rng.pick([0, 1] as const) : rng.pick([0, 2] as const));
 }
+
+/** The thrown object: a ball or a stone is thrown, a model rocket is launched. */
+const THROWN = [
+  { en: "A ball", de: "Ein Ball", enVerb: "thrown", deVerb: "geworfen", pron: "er", poss: "Seine" },
+  { en: "A stone", de: "Ein Stein", enVerb: "thrown", deVerb: "geworfen", pron: "er", poss: "Seine" },
+  { en: "A model rocket", de: "Eine Modellrakete", enVerb: "launched", deVerb: "geschossen", pron: "sie", poss: "Ihre" },
+];
 
 /** "When is the ball exactly H m high?" Both times make sense: on the way up and down. */
 export function throwBoth(t1: number, t2: number, objectIndex = 0): Exercise {
   const v = 5 * (t1 + t2);
   const H = 5 * t1 * t2;
-  const obj = [
-    ["A ball", "Ein Ball", "it"],
-    ["A stone", "Ein Stein", "it"],
-    ["A model rocket", "Eine Modellrakete", "it"],
-  ][objectIndex];
+  const obj = THROWN[objectIndex];
   const answer: AnswerSpec = { kind: "solutions", variable: "t", values: [t1, t2] };
   const norm = normalFrames(-5, v, 0, H, "t");
   const pq = pqFrames(norm.p, norm.q, "t");
   const frames: Frame[] = [
-    { math: mathN((n) => `${v}#cb t#vb -#sa 5#ca t#va^{2#ea} =#eq ${n(H)}#r`), note: tx(`Set the height equal to ${H}: $h(t) = ${H}$.`, `Setz die Höhe gleich ${H}: $h(t) = ${H}$.`) },
+    { math: mathN((n) => `${n(v)}#cb t#vb -#sa 5#ca t#va^{2#ea} =#eq ${n(H)}#r`), note: sayN(({ n }) => [`Set the height equal to ${n(H)}: $h(t) = ${n(H)}$.`, `Setz die Höhe gleich ${n(H)}: $h(t) = ${n(H)}$.`]) },
     ...norm.frames.slice(0),
     ...pq.frames,
     senseFrame(pq.roots, [true, true], sayN(({ n }) => [
-      `Both make sense! At $t = ${n(t1)}$ s the ${obj[0].toLowerCase().replace("a ", "")} is on its way **up**, at $t = ${n(t2)}$ s on its way **down**. **Answer:** after ${n(t1)} s and after ${n(t2)} s.`,
-      `Beide sind sinnvoll! Bei $t = ${n(t1)}$ s ist ${obj[1].toLowerCase().startsWith("eine") ? "sie" : "er"} auf dem Weg **nach oben**, bei $t = ${n(t2)}$ s auf dem Weg **nach unten**. **Antwort:** nach ${n(t1)} s und nach ${n(t2)} s.`,
+      `Both make sense! At $t = ${n(t1)}$ s the ${obj.en.toLowerCase().replace("a ", "")} is on its way **up**, at $t = ${n(t2)}$ s on its way **down**. **Answer:** after ${n(t1)} s and after ${n(t2)} s.`,
+      `Beide sind sinnvoll! Bei $t = ${n(t1)}$ s ist ${obj.pron} auf dem Weg **nach oben**, bei $t = ${n(t2)}$ s auf dem Weg **nach unten**. **Antwort:** nach ${n(t1)} s und nach ${n(t2)} s.`,
     ]), "t"),
   ];
   // The first normal-form step repeats the equation: merge it.
   const merged = [frames[0], ...frames.slice(2)];
   merged[0] = { ...merged[0], math: frames[1].math, note: joinT(frames[0].note ?? "", frames[1].note ?? "") };
+  const P = obj.pron;
   return {
     instruction: tx("Find both times", "Bestimme beide Zeitpunkte"),
     text: sayN(({ n }) => [
-      `${obj[0]} is thrown straight up. Its height (in m) after $t$ seconds is $h(t) = ${v}t - 5t^2$. At which times is it exactly ${n(H)} m high?`,
-      `${obj[1]} wird senkrecht nach oben geworfen. ${obj[1].startsWith("Eine") ? "Ihre" : "Seine"} Höhe (in m) nach $t$ Sekunden ist $h(t) = ${v}t - 5t^2$. Zu welchen Zeitpunkten ist ${obj[1].startsWith("Eine") ? "sie" : "er"} genau ${n(H)} m hoch?`,
+      `${obj.en} is ${obj.enVerb} straight up. Its height (in m) after $t$ seconds is $h(t) = ${n(v)}t - 5t^2$. At which times is it exactly ${n(H)} m high?`,
+      `${obj.de} wird senkrecht nach oben ${obj.deVerb}. ${obj.poss} Höhe (in m) nach $t$ Sekunden ist $h(t) = ${n(v)}t - 5t^2$. Zu welchen Zeitpunkten ist ${P} genau ${n(H)} m hoch?`,
     ]),
     answer,
-    hint: tx(`Solve $${v}t - 5t^2 = ${H}$. Up **and** down!`, `Löse $${v}t - 5t^2 = ${H}$. Hoch **und** runter!`),
+    hint: sayN(({ n }) => [`Solve $${n(v)}t - 5t^2 = ${n(H)}$. Up **and** down!`, `Löse $${n(v)}t - 5t^2 = ${n(H)}$. Hoch **und** runter!`]),
     solution: merged,
     mistakes: wrongSolutions(answer, [
-      { v: [t1], title: tx("Only on the way up", "Nur auf dem Weg nach oben"), say: tx(`Right, it's ${H} m high on the way up! But it comes down again and passes ${H} m a **second** time.`, `Stimmt, auf dem Weg nach oben ist es ${H} m hoch! Aber es kommt wieder herunter und ist ein **zweites** Mal ${H} m hoch.`) },
-      { v: [t2], title: tx("Only on the way down", "Nur auf dem Weg nach unten"), say: tx(`Right, on the way down! But before that, on the way **up**, it was already ${H} m high once.`, `Stimmt, auf dem Weg nach unten! Aber vorher, auf dem Weg **nach oben**, war es schon einmal ${H} m hoch.`) },
-      { v: [0, t1 + t2], title: tx("That's take-off and landing", "Das sind Start und Landung"), say: tx(`Those are the times when the height is **0**: the throw and the landing. You need $h(t) = ${H}$.`, `Das sind die Zeitpunkte mit Höhe **0**: Abwurf und Landung. Gesucht ist $h(t) = ${H}$.`) },
-      { v: [-t1, -t2], title: tx("Signs flipped", "Vorzeichen vertauscht"), say: tx("Both times are negative? Check the sign of $-\\frac{p}{2}$ in the pq formula.", "Beide Zeiten negativ? Prüf das Vorzeichen von $-\\frac{p}{2}$ in der pq-Formel.") },
+      { v: [t1], title: tx("Only on the way up", "Nur auf dem Weg nach oben"), say: sayN(({ n }) => [`Right, it's ${n(H)} m high on the way up! But it comes down again and passes ${n(H)} m a **second** time.`, `Stimmt, auf dem Weg nach oben ist ${P} ${n(H)} m hoch! Aber ${P} kommt wieder herunter und ist ein **zweites** Mal ${n(H)} m hoch.`]) },
+      { v: [t2], title: tx("Only on the way down", "Nur auf dem Weg nach unten"), say: sayN(({ n }) => [`Right, on the way down! But before that, on the way **up**, it was already ${n(H)} m high once.`, `Stimmt, auf dem Weg nach unten! Aber vorher, auf dem Weg **nach oben**, war ${P} schon einmal ${n(H)} m hoch.`]) },
+      { v: [0, t1 + t2], title: tx("That's take-off and landing", "Das sind Start und Landung"), say: sayN(({ n }) => [`Those are the times when the height is **0**: the start and the landing. You need $h(t) = ${n(H)}$.`, `Das sind die Zeitpunkte mit Höhe **0**: Start und Landung. Gesucht ist $h(t) = ${n(H)}$.`]) },
+      { v: [-t1, -t2], title: tx("Signs flipped", "Vorzeichen vertauscht"), say: tx(`Both times are negative? Check the sign of $-\\frac{p}{2}$ in the pq formula.`, `Beide Zeiten negativ? Prüf das Vorzeichen von $-\\frac{p}{2}$ in der pq-Formel.`) },
     ]),
   };
 }
@@ -611,8 +710,8 @@ export function workTogether(ctx: WorkCtx, a: number, b: number): Exercise {
       math: `t#T =#eq ${T}#res`,
       highlight: ["T", "eq", "res"],
       note: tx(
-        `Together they do $\\frac{1}{${T}}$ of the job per ${unitWord(w.unit, "en", false)}, so they need ${T} ${U("en")}. **Answer:** Together they need ${T} ${U("en")}. That's less than the faster one alone, as it should be!`,
-        `Zusammen schaffen sie $\\frac{1}{${T}}$ pro ${unitWord(w.unit, "de", false)}, brauchen also ${T} ${U("de")}. **Antwort:** Zusammen brauchen sie ${T} ${U("de")}. Das ist weniger als der Schnellere allein, so muss es sein!`,
+        `Together they do $\\frac{1}{${T}}$ of the job per ${unitWord(w.unit, "en", false)}, so they need ${T} ${U("en")}. **Answer:** Together they need ${T} ${U("en")}. That's less than either of them needs alone, as it should be!`,
+        `Zusammen schaffen sie $\\frac{1}{${T}}$ pro ${unitWord(w.unit, "de", false)}, brauchen also ${T} ${U("de")}. **Antwort:** Zusammen brauchen sie ${T} ${U("de")}. Das ist weniger, als jeder allein braucht. So muss es sein!`,
       ),
     },
   ];
@@ -626,10 +725,10 @@ export function workTogether(ctx: WorkCtx, a: number, b: number): Exercise {
     hint: tx(`Per ${unitWord(w.unit, "en", false)}: $\\frac{1}{${a}}$ and $\\frac{1}{${b}}$ of the job. Together: $\\frac{1}{${a}} + \\frac{1}{${b}} = \\frac{1}{t}$.`, `Pro ${unitWord(w.unit, "de", false)}: $\\frac{1}{${a}}$ und $\\frac{1}{${b}}$ der Arbeit. Zusammen: $\\frac{1}{${a}} + \\frac{1}{${b}} = \\frac{1}{t}$.`),
     solution: frames,
     mistakes: wrongNumbers(answer, [
-      wrong((a + b) / 2, tx("The average", "Der Durchschnitt"), tx(`Hmm, that's the average of ${a} and ${b}. But together they must be **faster** than even the faster one alone!`, `Hm, das ist der Durchschnitt von ${a} und ${b}. Zusammen müssen sie aber **schneller** sein als selbst der Schnellere allein!`)),
+      wrong((a + b) / 2, tx("The average", "Der Durchschnitt"), tx(`Hmm, that's the average of ${a} and ${b}. But together it must be **quicker** than either of them alone!`, `Hm, das ist der Durchschnitt von ${a} und ${b}. Zusammen geht es aber **schneller**, als jeder allein braucht!`)),
       wrong(a + b, tx("Times added", "Zeiten addiert"), tx(`Whoa, together they'd take **longer** than each alone? Add the parts of the job they do per ${unitWord(w.unit, "en", false)}, not the times.`, `Huch, zusammen bräuchten sie **länger** als jeder allein? Addiere die Anteile pro ${unitWord(w.unit, "de", false)}, nicht die Zeiten.`)),
       wrong(Math.abs(a - b), tx("Times subtracted", "Zeiten subtrahiert"), tx(`Subtracting the times doesn't work. Think per ${unitWord(w.unit, "en", false)}: $\\frac{1}{${a}} + \\frac{1}{${b}}$ of the job.`, `Die Zeiten zu subtrahieren klappt nicht. Denk pro ${unitWord(w.unit, "de", false)}: $\\frac{1}{${a}} + \\frac{1}{${b}}$ der Arbeit.`)),
-      wrong(Math.min(a, b) / 2, tx("Both as fast as the faster one?", "Beide so schnell wie der Schnellere?"), tx(`Halving the faster time would be right if **both** were that fast. But one of them is slower.`, `Die schnellere Zeit zu halbieren wäre richtig, wenn **beide** so schnell wären. Einer ist aber langsamer.`)),
+      wrong(Math.min(a, b) / 2, tx("Both equally fast?", "Beide gleich schnell?"), tx(`Halving the faster time would be right if **both** were that fast. But one of them is slower.`, `Die schnellere Zeit zu halbieren wäre richtig, wenn **beide** so schnell wären. Einer ist aber langsamer.`)),
     ]),
   };
 }
@@ -723,7 +822,10 @@ export function workQuad(ctx: WorkCtx, x: number, d: number, ask: "fast" | "slow
       ask === "fast"
         ? wrong(slow, tx("The other one", "Der andere Teil"), tx(`Nearly! ${slow} is the **slower** time. The question asks for the faster one.`, `Fast! ${slow} ist die **langsamere** Zeit. Gefragt ist die schnellere.`))
         : wrong(x, tx("The other one", "Der andere Teil"), tx(`Great, $x = ${x}$ is right! But $x$ is the faster time. Add the ${d}.`, `Super, $x = ${x}$ stimmt! Aber $x$ ist die schnellere Zeit. Rechne die ${d} noch dazu.`)),
-      wrong(ask === "fast" ? (2 * T - d) / 2 : (2 * T - d) / 2 + d, tx("Times added", "Zeiten addiert"), tx(`I think you used $x + (x + ${d}) = ${2 * T}$ or similar. Add the parts of the job per ${unitWord(w.unit, "en", false)}, not the times.`, `Ich glaub, du hast mit den Zeiten statt mit den Anteilen gerechnet. Addiere, was jeder pro ${unitWord(w.unit, "de", false)} schafft.`)),
+      // (x + (x + d)) / 2 = T: the time together taken as the average of the two times.
+      wrong((2 * T - d) / 2 + (ask === "fast" ? 0 : d), tx("Averaged the times", "Mit dem Durchschnitt gerechnet"), tx(`I think you used $\\frac{x + (x + ${d})}{2} = ${T}$. But the time together isn't the average: together they're **faster** than each of them alone. Add the parts of the job per ${unitWord(w.unit, "en", false)}.`, `Ich glaub, du hast $\\frac{x + (x + ${d})}{2} = ${T}$ gerechnet. Die gemeinsame Zeit ist aber nicht der Durchschnitt: Zusammen sind sie **schneller** als jeder allein. Addiere die Anteile pro ${unitWord(w.unit, "de", false)}.`)),
+      // x + (x + d) = T: the times added (only possible when T > d).
+      T > d && wrong((T - d) / 2 + (ask === "fast" ? 0 : d), tx("Times added", "Zeiten addiert"), tx(`I think you used $x + (x + ${d}) = ${T}$. But adding the times would make them **slower** together. Add the parts of the job per ${unitWord(w.unit, "en", false)}, not the times.`, `Ich glaub, du hast $x + (x + ${d}) = ${T}$ gerechnet. Mit addierten Zeiten wären sie zusammen **langsamer**. Addiere die Anteile pro ${unitWord(w.unit, "de", false)}, nicht die Zeiten.`)),
     ],
     traps: [
       { eq: `x + (x + ${d}) = ${T}`, title: tx("Times added", "Zeiten addiert"), say: tx("Together they're faster, not slower: add the **parts of the job** per unit of time, not the times.", "Zusammen sind sie schneller, nicht langsamer: Addiere die **Anteile** pro Zeiteinheit, nicht die Zeiten.") },
@@ -737,18 +839,23 @@ export function workQuad(ctx: WorkCtx, x: number, d: number, ask: "fast" | "slow
 const WORK_PAIRS: [number, number][] = [[3, 6], [4, 12], [5, 20], [6, 12], [6, 30], [8, 24], [9, 18], [10, 15], [10, 40], [12, 24], [12, 36], [14, 35], [15, 30], [18, 36], [20, 30], [21, 28], [24, 40]];
 const WORK_QUAD: [number, number][] = [[3, 3], [4, 8], [5, 15], [6, 6], [8, 16], [9, 9], [10, 5], [12, 12], [12, 24], [14, 21], [15, 15], [20, 10], [21, 7]];
 
+/** Times that fit the job: a bathtub takes minutes (10 or more), a pool or a fence at most a day. */
+const fits = (ctx: WorkCtx, times: number[]) => (WORK[ctx].unit === "min" ? Math.min(...times) >= 10 : Math.max(...times) <= 24);
+const workPair = (ctx: WorkCtx, rng: Rng) => rng.pick(WORK_PAIRS.filter(([a, b]) => fits(ctx, [a, b])));
+const workQuadPair = (ctx: WorkCtx, rng: Rng) => rng.pick(WORK_QUAD.filter(([x, d]) => fits(ctx, [x, x + d])));
+
 function work(rng: Rng): Exercise {
   const ctx = rng.pick([0, 1, 2, 3] as const);
   const r = rng.next();
   if (r < 0.4) {
-    const [a, b] = rng.pick(WORK_PAIRS);
+    const [a, b] = workPair(ctx, rng);
     return rng.chance(0.5) ? workTogether(ctx, a, b) : workTogether(ctx, b, a);
   }
   if (r < 0.65) {
-    const [a, b] = rng.pick(WORK_PAIRS);
+    const [a, b] = workPair(ctx, rng);
     return rng.chance(0.5) ? workAlone(ctx, a, b) : workAlone(ctx, b, a);
   }
-  const [x, d] = rng.pick(WORK_QUAD);
+  const [x, d] = workQuadPair(ctx, rng);
   return { ...quadExercise(workQuad(ctx, x, d, rng.chance(0.5) ? "fast" : "slow")), instruction: WORK_INSTR };
 }
 
@@ -759,11 +866,10 @@ export function senseTask(s: QS, rng: Rng): Exercise {
   const v = s.v ?? "x";
   const { frames, roots } = quadFrames(s);
   const fmt = (r: number) => ({ en: String(r), de: String(r).replace(".", ",") });
-  const r1 = fmt(roots[0]);
-  const r2 = fmt(roots[1]);
+  const r = [fmt(roots[0]), fmt(roots[1])];
   const opts = [
-    tx(`only $${v}_1 = ${r1.en}$`, `nur $${v}_1 = ${r1.de}$`),
-    tx(`only $${v}_2 = ${r2.en}$`, `nur $${v}_2 = ${r2.de}$`),
+    tx(`only $${v}_1 = ${r[0].en}$`, `nur $${v}_1 = ${r[0].de}$`),
+    tx(`only $${v}_2 = ${r[1].en}$`, `nur $${v}_2 = ${r[1].de}$`),
     tx("both", "beide"),
     tx("neither", "keine von beiden"),
   ];
@@ -771,17 +877,26 @@ export function senseTask(s: QS, rng: Rng): Exercise {
   const order = rng.shuffle([0, 1, 2, 3]);
   const options = order.map((i) => opts[i]);
   const at = (i: number) => order.indexOf(i);
+  /** The solutions an option keeps: only x₁, only x₂, both, neither. */
+  const kept = [[0], [1], [0, 1], []];
+  const name = (k: number, l: "en" | "de") => `$${v}_${k + 1} = ${r[k][l]}$`;
+  const say = (i: number): Text => {
+    if (i === 3) return tx("Hmm, at least one solution fits here. Put each one back into the story.", "Hm, mindestens eine Lösung passt hier. Setz jede in die Geschichte ein.");
+    const bad = kept[i].find((k) => !s.sense[k]);
+    if (bad !== undefined) {
+      // Kept a solution that fails: negative, or positive but too big for the story.
+      if (roots[bad] < 0)
+        return i === 2
+          ? tx(`Careful: ${name(bad, "en")} solves the equation, but does it fit the **story**? Lengths, times and natural numbers are never negative.`, `Vorsicht: ${name(bad, "de")} löst die Gleichung, aber passt es zur **Geschichte**? Längen, Zeiten und natürliche Zahlen sind nie negativ.`)
+          : tx(`Hmm, ${name(bad, "en")} is negative. Can that be the answer to this story?`, `Hm, ${name(bad, "de")} ist negativ. Kann das die Antwort auf diese Aufgabe sein?`);
+      const check = s.senseCheck ?? tx("Put it back into the story and check every length.", "Setz sie in die Geschichte ein und prüf jede Länge.");
+      return joinT(tx(`Careful: ${name(bad, "en")} is positive, but does it fit the **story**?`, `Vorsicht: ${name(bad, "de")} ist zwar positiv, aber passt diese Lösung zur **Geschichte**?`), check);
+    }
+    // Left out a solution that makes sense too.
+    const missed = [0, 1].find((k) => s.sense[k] && !kept[i].includes(k)) ?? 0;
+    return tx(`Nearly! Look again at ${name(missed, "en")}: here it makes sense too. Put it into the story!`, `Fast! Schau dir ${name(missed, "de")} noch mal an: Hier ist sie auch sinnvoll. Setz sie in die Geschichte ein!`);
+  };
   const mistakes: Mistake[] = [];
-  const say = (i: number) =>
-    right === 2 && i === 1
-      ? tx(`Nearly! $${v}_1 = ${r1.en}$ makes sense too. Put it into the story!`, `Fast! $${v}_1 = ${r1.de}$ ist auch sinnvoll. Setz es in die Geschichte ein!`)
-      : i === 1
-      ? tx(`Hmm, $${v}_2 = ${r2.en}$ is negative. Can that be the answer to this story?`, `Hm, $${v}_2 = ${r2.de}$ ist negativ. Kann das die Antwort auf diese Aufgabe sein?`)
-      : i === 2
-        ? tx(`Careful: $${v}_2 = ${r2.en}$ solves the equation, but does it fit the **story**? Lengths, times and natural numbers are never negative.`, `Vorsicht: $${v}_2 = ${r2.de}$ löst die Gleichung, aber passt es zur **Geschichte**? Längen, Zeiten und natürliche Zahlen sind nie negativ.`)
-        : i === 3
-          ? tx("Hmm, at least one solution always fits here. Put each one back into the story.", "Hm, mindestens eine Lösung passt hier immer. Setz jede in die Geschichte ein.")
-          : tx(`Nearly! Look again at $${v}_2 = ${r2.en}$: here it makes sense too. Put it into the story!`, `Fast! Schau dir $${v}_2 = ${r2.de}$ noch mal an: Hier ist sie auch sinnvoll. Setz sie in die Geschichte ein!`);
   for (const i of [0, 1, 2, 3]) {
     if (i === right) continue;
     mistakes.push({ when: { kind: "choice", options, correct: at(i) }, title: tx("Check the story", "Prüf die Geschichte"), say: say(i) });
@@ -790,10 +905,10 @@ export function senseTask(s: QS, rng: Rng): Exercise {
     instruction: tx("Which solutions make sense?", "Welche Lösungen sind sinnvoll?"),
     text: paras(
       s.text,
-      tx(`The equation for this story has the solutions $${v}_1 = ${r1.en}$ and $${v}_2 = ${r2.en}$. Which of them make sense as an answer?`, `Die Gleichung zu dieser Aufgabe hat die Lösungen $${v}_1 = ${r1.de}$ und $${v}_2 = ${r2.de}$. Welche davon sind als Antwort sinnvoll?`),
+      tx(`The equation for this story has the solutions ${name(0, "en")} and ${name(1, "en")}. Which of them make sense as an answer?`, `Die Gleichung zu dieser Aufgabe hat die Lösungen ${name(0, "de")} und ${name(1, "de")}. Welche davon sind als Antwort sinnvoll?`),
     ),
     answer: { kind: "choice", options, correct: at(right) },
-    hint: tx("Put each solution back into the story. Can a length, a time or a natural number be negative?", "Setz jede Lösung in die Geschichte ein. Kann eine Länge, eine Zeit oder eine natürliche Zahl negativ sein?"),
+    hint: tx("Put each solution back into the story. Can a length, a time or a natural number be negative? Does every length that depends on it stay positive?", "Setz jede Lösung in die Geschichte ein. Kann eine Länge, eine Zeit oder eine natürliche Zahl negativ sein? Bleibt jede Länge, die davon abhängt, positiv?"),
     solution: frames,
     mistakes,
   };
@@ -816,7 +931,7 @@ export function equationTask(s: QS, rng: Rng): Exercise {
 
 // ---------------------------------------------------------------------------
 
-const QUAD_STORIES = [frameTask, frameTask, garden, rectPA, (r: Rng) => consec(r), pyth, landing, riddle];
+const QUAD_STORIES = [frameTask, frameTask, innerTask, garden, rectPA, (r: Rng) => consec(r), pyth, landing, riddle];
 
 /** Level 3 practice: quadratic stories, both times of a throw, which solution makes sense, which equation fits, work-rate. */
 export function generate3(rng: Rng): Exercise {
@@ -824,11 +939,14 @@ export function generate3(rng: Rng): Exercise {
   if (r < 0.36) return quadExercise(rng.pick(QUAD_STORIES)(rng));
   if (r < 0.46) return throwBothTask(rng);
   if (r < 0.58) {
-    const pick = rng.pick([frameTask, garden, rectPA, (q: Rng) => consec(q, true), (q: Rng) => consec(q), landing, pyth]);
+    const pick = rng.pick([frameTask, innerTask, innerTask, garden, rectPA, (q: Rng) => consec(q, true), (q: Rng) => consec(q), landing, pyth]);
     return senseTask(pick(rng), rng);
   }
   if (r < 0.72) {
-    const pick = rng.pick([frameTask, garden, rectPA, (q: Rng) => consec(q), pyth, (q: Rng) => workQuad(q.pick([0, 1, 2, 3] as const), ...q.pick(WORK_QUAD), "fast")]);
+    const pick = rng.pick([frameTask, innerTask, garden, rectPA, (q: Rng) => consec(q), pyth, (q: Rng) => {
+        const ctx = q.pick([0, 1, 2, 3] as const);
+        return workQuad(ctx, ...workQuadPair(ctx, q), "fast");
+      }]);
     return equationTask(pick(rng), rng);
   }
   return work(rng);

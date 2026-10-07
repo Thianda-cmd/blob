@@ -267,7 +267,7 @@ function coneSurfaceTask(rng: Rng): Exercise {
   if (!givenS) m.add(onlyM ? PI * r * h : PI * r * r + PI * r * h, tx("Height instead of slant height", "Höhe statt Mantellinie"), tx("The curved surface needs the slant height $s$ (along the side), not the height $h$. Find $s$ with Pythagoras first.", "Der Mantel braucht die Mantellinie $s$ (an der Seite entlang), nicht die Höhe $h$. Berechne $s$ zuerst mit Pythagoras."));
   if (!onlyM) m.add(M, tx("Base missing", "Grundfläche fehlt"), tx("That's only the curved surface. The surface area includes the circle at the bottom: $O = \\pi r^2 + \\pi r s$.", "Das ist nur der Mantel. Zur Oberfläche gehört noch der Kreis unten: $O = \\pi r^2 + \\pi r s$."));
   else m.add(O, tx("Base included", "Grundfläche dazugerechnet"), tx("The curved surface is only the side, without the circle at the bottom: $M = \\pi r s$.", "Der Mantel ist nur die Seitenfläche, ohne den Kreis unten: $M = \\pi r s$."));
-  m.add(onlyM ? 2 * PI * r * s : PI * r * r + 2 * PI * r * s, tx("Mixed up with the cylinder", "Mit dem Zylinder verwechselt"), tx("$2 \\pi r h$ belongs to the cylinder. The unrolled cone is only a sector: $M = \\pi r s$.", "$2 \\pi r h$ gehört zum Zylinder. Der abgewickelte Kegel ist nur ein Kreisausschnitt: $M = \\pi r s$."));
+  m.add(onlyM ? 2 * PI * r * s : PI * r * r + 2 * PI * r * s, tx("Like a cylinder's surface", "Wie ein Zylindermantel"), tx("$2 \\pi r \\cdot s$ would be a whole rectangle, like the curved surface of a cylinder. The unrolled cone is only a sector: $M = \\pi r s$.", "$2 \\pi r \\cdot s$ wäre ein ganzes Rechteck wie beim Zylindermantel. Der abgewickelte Kegelmantel ist nur ein Kreisausschnitt: $M = \\pi r s$."));
   const text = givenS
     ? tx(`A cone has the radius $r = ${r} ${q(unit)}$ and the slant height $s = ${s} ${q(unit)}$.`, `Ein Kegel hat den Radius $r = ${r} ${q(unit)}$ und die Mantellinie $s = ${s} ${q(unit)}$.`)
     : tx(`A cone has the radius $r = ${r} ${q(unit)}$ and the height $h = ${h} ${q(unit)}$.`, `Ein Kegel hat den Radius $r = ${r} ${q(unit)}$ und die Höhe $h = ${h} ${q(unit)}$.`);
@@ -598,8 +598,8 @@ function scalingTask(rng: Rng): Exercise {
       hint: area ? tx("Areas grow with $k^2$.", "Flächen wachsen mit $k^2$.") : tx("Volumes grow with $k^3$.", "Volumen wachsen mit $k^3$."),
       solution: [
         { math: `k#k =#e ${k}#kv`, note: tx(`Scale $1 : ${k}$: every length of the original is ${k} times as long.`, `Maßstab $1 : ${k}$: Jede Länge des Originals ist ${k}-mal so lang.`) },
-        { math: say((f) => `${area ? "O'" : "V'"}#O =#e ${k}#kv^{${area ? 2 : 3}#p} \\cdot#m ${base}#b =#e2 ${f.n(k ** (area ? 2 : 3))}#f \\cdot#m2 ${base}#b2`), note: area ? tx("Surface: times $k^2$.", "Oberfläche: mal $k^2$.") : tx("Volume: times $k^3$.", "Volumen: mal $k^3$.") },
-        { math: say((f) => `${area ? "O'" : "V'"}#O =#e ${f.n(value)}#r ${q(unit)}#u`), note: tx("Done!", "Fertig!") },
+        { math: say((f) => `${area ? "O_2" : "V_2"}#O =#e ${k}#kv^{${area ? 2 : 3}#p} \\cdot#m ${base}#b =#e2 ${f.n(k ** (area ? 2 : 3))}#f \\cdot#m2 ${base}#b2`), note: area ? tx("Surface: times $k^2$.", "Oberfläche: mal $k^2$.") : tx("Volume: times $k^3$.", "Volumen: mal $k^3$.") },
+        { math: say((f) => `${area ? "O_2" : "V_2"}#O =#e ${f.n(value)}#r ${q(unit)}#u`), note: tx("Done!", "Fertig!") },
       ],
       mistakes: m.list,
     };
@@ -844,13 +844,13 @@ export const level3: LevelLesson = {
       title: tx("Similar solids: lengths, areas, volumes", "Ähnliche Körper: Längen, Flächen, Volumen"),
       blob: tx("This is why elephants have thick legs and ants can carry so much.", "Darum haben Elefanten dicke Beine und Ameisen können so viel tragen."),
       body: tx(
-        "If every length of a solid is multiplied by $k$ (a model and the original, for example), all areas grow by $k^2$ and the volume grows by $k^3$. With the same material, the mass grows like the volume.",
-        "Wird jede Länge eines Körpers mit $k$ multipliziert (zum Beispiel Modell und Original), wachsen alle Flächen mit $k^2$ und das Volumen mit $k^3$. Bei gleichem Material wächst die Masse wie das Volumen.",
+        "If every length of a solid is multiplied by $k$ (a model and the original, for example), all areas grow by $k^2$ and the volume grows by $k^3$. With the same material, the mass grows like the volume. Index 1 marks the small solid, index 2 the big one.",
+        "Wird jede Länge eines Körpers mit $k$ multipliziert (zum Beispiel Modell und Original), wachsen alle Flächen mit $k^2$ und das Volumen mit $k^3$. Bei gleichem Material wächst die Masse wie das Volumen. Index 1 steht für den kleinen Körper, Index 2 für den großen.",
       ),
       frames: [
-        { math: "a'#a =#e k#k \\cdot#m a#a2", note: tx("Every length times $k$.", "Jede Länge mal $k$.") },
-        { math: "A'#A =#e k#k^{2#p2} \\cdot#m A#a2", note: tx("Areas stretch in two directions: times $k^2$.", "Flächen werden in zwei Richtungen gestreckt: mal $k^2$.") },
-        { math: "V'#V =#e k#k^{3#p3} \\cdot#m V#a2", note: tx("Volumes stretch in three directions: times $k^3$.", "Volumen werden in drei Richtungen gestreckt: mal $k^3$.") },
+        { math: "a_2#a =#e k#k \\cdot#m a_1#a2", note: tx("Every length times $k$.", "Jede Länge mal $k$.") },
+        { math: "A_2#A =#e k#k^{2#p2} \\cdot#m A_1#a2", note: tx("Areas stretch in two directions: times $k^2$.", "Flächen werden in zwei Richtungen gestreckt: mal $k^2$.") },
+        { math: "V_2#V =#e k#k^{3#p3} \\cdot#m V_1#a2", note: tx("Volumes stretch in three directions: times $k^3$.", "Volumen werden in drei Richtungen gestreckt: mal $k^3$.") },
         { math: "k#k =#e 10#kv \\Rightarrow#i k^2#A =#e2 100#A2 , \\; k^3#V =#e3 1000#V2", note: tx("A model car at the scale 1 : 10: the real car needs 100 times as much paint and has 1000 times the volume.", "Ein Modellauto im Maßstab 1 : 10: Das echte Auto braucht 100-mal so viel Lack und hat das 1000-fache Volumen.") },
         { math: "k^3#V =#e 8#F \\Rightarrow#i k#k =#e2 \\sqrt[3]{8}#rt =#e3 2#kv", note: tx("Backwards: 8 times the volume means only twice the lengths.", "Rückwärts: Das 8-fache Volumen heißt nur doppelte Längen.") },
       ],
@@ -905,13 +905,13 @@ export const level3: LevelLesson = {
     {
       title: tx("Scaling with the factor k", "Strecken mit dem Faktor k"),
       body: tx("Lengths times $k$, areas times $k^2$, volumes (and masses) times $k^3$.", "Längen mal $k$, Flächen mal $k^2$, Volumen (und Massen) mal $k^3$."),
-      examples: ["A' = k^2 \\cdot A", "V' = k^3 \\cdot V"],
+      examples: ["A_2 = k^2 \\cdot A_1", "V_2 = k^3 \\cdot V_1"],
       tone: "rule",
     },
     {
       title: tx("Classic mistakes", "Typische Fehler"),
       body: tx("Don't forget the $\\frac{1}{3}$. $h$ and $h_s$ (or $s$) are different lines. Halve the diameter. Twice as long means 8 times the volume.", "Vergiss das $\\frac{1}{3}$ nicht. $h$ und $h_s$ (oder $s$) sind verschiedene Linien. Halbiere den Durchmesser. Doppelt so lang heißt 8-faches Volumen."),
-      examples: ["h \\ne h_s", "k = 2 \\Rightarrow V' = 8 \\cdot V"],
+      examples: ["h \\ne h_s", "k = 2 \\Rightarrow V_2 = 8 \\cdot V_1"],
       tone: "warning",
     },
   ],

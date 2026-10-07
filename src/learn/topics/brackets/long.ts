@@ -269,8 +269,11 @@ export function valueAt(items: LN[], env: Record<string, number>): number {
   return round(items.reduce((s, it) => s + (it.kind === "t" ? it.c * (it.v ? env[it.v] : 1) : it.f * valueAt(it.items, env)), 0));
 }
 
-/** The term with numbers in place of the letters: 4 · 2 − 2(3 · 2 − 5). */
-export function insertedSrc(items: LN[], env: Record<string, number>, l: Locale): string {
+/**
+ * The term with numbers in place of the letters: 4 · 2 − 2(3 · 2 − 5). A negative number that opens a
+ * bracket needs no brackets of its own: 2(−3 + 4), not 2((−3) + 4). `inBracket` is set for the contents of a bracket.
+ */
+export function insertedSrc(items: LN[], env: Record<string, number>, l: Locale, inBracket = false): string {
   return items
     .map((it, i) => {
       const first = i === 0;
@@ -279,13 +282,14 @@ export function insertedSrc(items: LN[], env: Record<string, number>, l: Locale)
         const abs = Math.abs(it.c);
         if (!it.v) return `${sign}${num(abs, l)}`;
         const x = env[it.v];
-        const val = x < 0 ? `(${num(x, l)})` : num(x, l);
+        const bare = inBracket && first && it.c === 1;
+        const val = x < 0 && !bare ? `(${num(x, l)})` : num(x, l);
         return `${sign}${abs === 1 ? val : `${num(abs, l)} \\cdot ${val}`}`;
       }
       const sign = it.f < 0 ? (first ? "-" : "- ") : first ? "" : "+ ";
       const abs = Math.abs(it.f);
       const close = it.open === "(" ? ")" : "]";
-      return `${sign}${abs === 1 ? "" : num(abs, l)}${it.open}${insertedSrc(it.items, env, l)}${close}`;
+      return `${sign}${abs === 1 ? "" : num(abs, l)}${it.open}${insertedSrc(it.items, env, l, true)}${close}`;
     })
     .join(" ");
 }

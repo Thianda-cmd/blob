@@ -13,6 +13,8 @@ import { check } from "@/learn/engine/answers";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Level, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/i18n/client";
+import { englishDecimals } from "./kit";
 import { notNeeded, propOrInverse, whichCalc } from "./shapes1";
 
 // ---------------------------------------------------------------------------
@@ -2421,9 +2423,9 @@ export function generate1(rng: Rng): Exercise {
     const pool = r <= 32 ? TIERS[1] : r <= 60 ? TIERS[2] : r <= 75 ? TIERS[3] : PLAN;
     const ex = rng.pick(pool)(rng);
     const v = ex.answer.kind === "number" ? ex.answer.value : 1;
-    if (Number.isFinite(v) && v > 0 && v < 100000) return ex;
+    if (Number.isFinite(v) && v > 0 && v < 100000) return englishDecimals(ex);
   }
-  return buyMany(rng);
+  return englishDecimals(buyMany(rng));
 }
 
 // ---------------------------------------------------------------------------
@@ -2788,7 +2790,11 @@ function RatioTable() {
   const pos = c.targets.indexOf(t);
   const v1 = inv ? c.va * c.a : c.va / c.a;
   const vt = inv ? v1 / t : v1 * t;
-  const fmt = (v: number) => (c.money ? eur(v * 100) : de(v));
+  const locale = useLocale();
+  const fmt = (v: number) => {
+    const s = c.money ? eur(v * 100) : de(v);
+    return locale === "en" ? s.replace(",", ".") : s;
+  };
   const unitL = (n: number) => say(n === 1 ? c.one : c.many);
   const at = (d: number) => (moved ? 0 : d);
   const marker = `${scope}-arrow`;
@@ -3069,7 +3075,7 @@ const speedFrames: Frame[] = [
 ];
 
 /** Level 1 (Klasse 5–7): the plan for any word problem, the rule of three (proportional and inverse), speed and units. */
-export const level1: LevelLesson = {
+export const level1: LevelLesson = englishDecimals<LevelLesson>({
   summary: [
     {
       title: tx("Six steps, every time", "Sechs Schritte, jedes Mal"),
@@ -3326,4 +3332,4 @@ export const level1: LevelLesson = {
       },
     },
   ],
-};
+});

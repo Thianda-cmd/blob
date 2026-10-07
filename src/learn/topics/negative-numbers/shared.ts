@@ -26,6 +26,11 @@ export function kn(v: number, key: string, l: Locale = "en"): string {
   return v < 0 ? `-#${key}s ${abs}#${key}` : `${abs}#${key}`;
 }
 
+/** Like `kn`, but kept together, so the minus stays a sign in a row of numbers ("3 \\quad -5"). */
+export function gn(v: number, key: string, l: Locale = "en"): string {
+  return v < 0 ? `\\group{${kn(v, key, l)}}` : kn(v, key, l);
+}
+
 /** Like `kn`, but a negative number gets brackets keyed `<key>b`. */
 export function kp(v: number, key: string, l: Locale = "en"): string {
   return v < 0 ? `(${kn(v, key, l)})#${key}b` : kn(v, key, l);

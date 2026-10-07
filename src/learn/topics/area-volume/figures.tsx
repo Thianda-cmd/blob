@@ -519,7 +519,7 @@ function build(s: FigureSpec): Prim[] {
         const left = Math.min(proj([0, 0, 0])[0], proj([0, b, 0])[0]) - 0.12 * a;
         out.push(dimLine([left, M[1]], [left, apex[1]], s.lh, LEFT));
       }
-      if (s.lhs) out.push({ t: "label", text: s.lhs, at: mid(apex, F), dir: s.tri ? LEFT : RIGHT, tone: "blob", dist: 3 });
+      if (s.lhs) out.push({ t: "label", text: s.lhs, at: mid(apex, F), dir: LEFT, tone: "blob", dist: 3 });
       if (s.ls) out.push({ t: "label", text: s.ls, at: mid(apex, proj([a, 0, 0])), dir: RIGHT });
       return out;
     }
@@ -668,7 +668,7 @@ function layout(prims: Prim[], maxW: number, maxH: number, resolve: (t: Text) =>
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const s = Math.min(maxW / Math.max(1e-6, maxX - minX), maxH / Math.max(1e-6, maxY - minY), 60);
+  const s = Math.min(maxW / Math.max(1e-6, maxX - minX), maxH / Math.max(1e-6, maxY - minY));
   let bx0 = 0;
   let by0 = 0;
   let bx1 = (maxX - minX) * s;

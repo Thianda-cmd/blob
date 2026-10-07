@@ -201,7 +201,9 @@ export function fracFrames(s: FracSpec, v: string, opts: { check?: boolean; maxE
     {
       math: src + opSrc({ kind: "mul", k }, 0, v),
       highlight: ["qO0", "qkO0"],
-      note: tx(`Multiply **every** term by $${k}$, the ones without a fraction too.`, `Multipliziere **jeden** Term mit $${k}$, auch die ohne Bruch.`),
+      note: all.some((p) => p.den === 1)
+        ? tx(`Multiply **every** term by $${k}$, the ones without a fraction too.`, `Multipliziere **jeden** Term mit $${k}$, auch die ohne Bruch.`)
+        : tx(`Multiply **every** term by $${k}$.`, `Multipliziere **jeden** Term mit $${k}$.`),
     },
   ];
   const products = all.map((p) => `$${k} \\cdot ${pieceSrc({ ...p, sign: 1 }, v, true, false)} = ${sideSrc(clearPiece({ ...p, sign: 1 }, k), v, false)}$`);

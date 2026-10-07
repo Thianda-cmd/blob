@@ -73,7 +73,7 @@ export function InsertCheck() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2">
-        <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-ink-2">
+        <p className="w-full min-w-0 text-[13.5px] leading-relaxed text-ink-2 sm:w-auto sm:flex-1">
           <Inline
             text={tx(
               "Three classmates simplified the same term. Insert a number for $x$ into the term and into each result. Whose result always gives the same value?",
@@ -97,7 +97,8 @@ export function InsertCheck() {
           <Minus className="size-4" />
         </button>
         <motion.span key={x} initial={{ y: -6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="w-20 text-center font-math text-[22px] tabular-nums">
-          x = {num(x, locale)}
+          {/* A real minus sign, like in the rendered formulas next to it. */}
+          x = {num(x, locale).replace("-", "−")}
         </motion.span>
         <button onClick={() => setX((v) => Math.min(MAX, v + 1))} className="grid size-9 place-items-center rounded-lg border border-line text-ink-2 hover:bg-hover hover:text-ink" aria-label={t(tx("Bigger x", "x größer"))}>
           <Plus className="size-4" />

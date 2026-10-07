@@ -176,17 +176,18 @@ export function FractionsDivisionMachine() {
         )
       : t(`${rest} ${lines[lines.length - 1].r}: add a zero and divide by ${d} again.`, `${rest} ${lines[lines.length - 1].r}: Null anhängen und wieder durch ${d} teilen.`);
 
+  const fs = factors.length > 1 ? ` = ${factors.join(" · ")}` : "";
   const why =
     reduced.d === 1
       ? ""
       : bad.length
         ? t(
-            `Simplified denominator ${reduced.d} = ${factors.join(" · ")}. The factor ${bad[0]} makes it repeat.`,
-            `Gekürzter Nenner ${reduced.d} = ${factors.join(" · ")}. Der Faktor ${bad[0]} sorgt für die Periode.`,
+            `Simplified denominator ${reduced.d}${fs}. The prime factor ${bad[0]} makes it repeat.`,
+            `Gekürzter Nenner ${reduced.d}${fs}. Der Primfaktor ${bad[0]} sorgt für die Periode.`,
           )
         : t(
-            `Simplified denominator ${reduced.d} = ${factors.join(" · ")}: only 2s and 5s, so it terminates.`,
-            `Gekürzter Nenner ${reduced.d} = ${factors.join(" · ")}: nur Zweien und Fünfen, also bricht sie ab.`,
+            `Simplified denominator ${reduced.d}${fs}: only 2s and 5s, so it terminates.`,
+            `Gekürzter Nenner ${reduced.d}${fs}: nur Zweien und Fünfen, also bricht sie ab.`,
           );
 
   const digits = L.digits.slice(0, shown);
@@ -324,7 +325,7 @@ function Ticks({ from, to, d, y }: { from: number; to: number; d: number; y: num
           <g key={`${d}:${k}`}>
             <line x1={x} x2={x} y1={y - (whole ? 11 : 6)} y2={y + (whole ? 11 : 6)} stroke={whole ? "var(--ink-2)" : "var(--ink-3)"} strokeWidth={whole ? 2 : 1.2} />
             {whole && (
-              <text x={x} y={y + 30} textAnchor="middle" fontSize={18} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
+              <text x={x} y={y + 34} textAnchor="middle" fontSize={23} fill="var(--ink)" style={{ fontFamily: "var(--font-math)" }}>
                 {k / d < 0 ? `−${Math.abs(k / d)}` : k / d}
               </text>
             )}
@@ -341,7 +342,7 @@ export function FractionsLinePicture({ from, to, d, n }: { from: number; to: num
   const x = lineX(n / d, from, to);
   return (
     <div className="px-1 py-3">
-      <svg viewBox={`0 0 ${LW} 96`} className="block w-full" role="img" aria-label={t("Number line with a marked point", "Zahlenstrahl mit markiertem Punkt")}>
+      <svg viewBox={`0 0 ${LW} 100`} className="block w-full" role="img" aria-label={t("Number line with a marked point", "Zahlenstrahl mit markiertem Punkt")}>
         <Ticks from={from} to={to} d={d} y={52} />
         <motion.g initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 22, delay: 0.2 }}>
           <circle cx={x} cy={52} r={8} fill="var(--blob)" stroke="var(--raised)" strokeWidth={2.5} />
@@ -419,7 +420,7 @@ export function FractionsNumberLine() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-        <Stepper label={t("Ticks: steps of 1/…", "Einteilung: Schritte von 1/…")} value={d} min={1} max={12} onChange={changeD} />
+        <Stepper label={t("Steps per whole", "Abschnitte pro Ganzes")} value={d} min={1} max={12} onChange={changeD} />
         <button
           type="button"
           onClick={nextGoal}
@@ -468,8 +469,8 @@ export function FractionsNumberLine() {
           </div>
         </motion.div>
         <svg
-          viewBox={`0 0 ${LW} 90`}
-          className="block w-full cursor-pointer touch-none select-none"
+          viewBox={`0 0 ${LW} 96`}
+          className="block w-full cursor-pointer touch-none select-none rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-blob/40"
           role="slider"
           tabIndex={0}
           aria-label={t("Point on the number line", "Punkt auf dem Zahlenstrahl")}

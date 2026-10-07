@@ -93,7 +93,9 @@ export function mistakeList(right: AnswerSpec, digits?: number) {
     if (!Number.isFinite(value) || right.kind !== "number") return;
     const unit = typeof right.unit === "string" ? right.unit : undefined;
     const label = typeof right.label === "string" ? right.label : undefined;
-    const d = ownDigits ?? digits;
+    // A wrong value with many decimals (a third, a wrong root) is matched to 2 decimals.
+    const nice = Math.abs(value * 1e4 - Math.round(value * 1e4)) < 1e-6;
+    const d = ownDigits ?? digits ?? (nice ? undefined : 2);
     const when: AnswerSpec = d === undefined ? exact(value, unit, label) : rounded(value, d, unit, label);
     const v = asAnswer(when);
     if (!v || check(right, v).correct) return;

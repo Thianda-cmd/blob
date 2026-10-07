@@ -6,7 +6,7 @@
 
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
+import type { Exercise, Frame, LevelLesson } from "@/learn/types";
 import { choice, clean, D, E, fixedChoice, mb, mistakesFor, NAMES, nf, numAns, txs, visual, weighted, type Opt, type Say } from "./kit";
 import { FenceMax } from "./FenceMax";
 import { FermiLab } from "./FermiLab";
@@ -278,7 +278,7 @@ const linModel: Tpl = (rng) => {
       solution: [
         { math: `f(t)#f =#eq ${S}#s -#m ${r}#r t#t`, note: tx(`Linear model: start ${S}, minus ${r} per ${c.per}.`, `Lineares Modell: Start ${S}, minus ${r} pro ${c.per}.`) },
         { math: `f(${t})#f =#eq ${S}#s -#m ${r}#r \\cdot#d ${t}#t`, note: tx(`Insert t = ${t}.`, `t = ${t} einsetzen.`) },
-        { math: mb((s) => `f(${t})#f =#eq ${v}#z "${c.unit}"#u`), highlight: ["z", "u"], note: txs((s) => `**Answer:** after ${t} ${s.t(c.time)}, ${v} ${s.t(c.unitWord)} are left.`, (s) => `**Antwort:** Nach ${t} ${s.t(c.time)} sind noch ${v} ${s.t(c.unitWord)} übrig.`) },
+        { math: `f(${t})#f =#eq ${v}#z "${c.unit}"#u`, highlight: ["z", "u"], note: txs((s) => `**Answer:** after ${t} ${s.t(c.time)}, ${v} ${s.t(c.unitWord)} are left.`, (s) => `**Antwort:** Nach ${t} ${s.t(c.time)} sind noch ${v} ${s.t(c.unitWord)} übrig.`) },
       ],
     };
   }
@@ -588,7 +588,7 @@ const revenue: Tpl = (rng) => {
 
 const FERMI_INSTR = tx("Estimate with a plan", "Schätze mit einem Plan");
 
-type FermiCase = { question: (rng: Rng) => { text: Text; steps: { math: string; note: Text }[]; value: number; unit: Text; forgot: { v: number; say: Text }[] } };
+type FermiCase = { question: (rng: Rng) => { text: Text; steps: { math: (s: Say) => string; note: Text }[]; value: number; unit: Text; forgot: { v: number; say: Text }[] } };
 
 const FERMI: FermiCase[] = [
   {
@@ -603,8 +603,8 @@ const FERMI: FermiCase[] = [
           `Wie viele Liter Wasser trinken die ${S} Schülerinnen und Schüler einer Schule während der Schulzeit in einem Schuljahr? Nimm einen halben Liter pro Person und Schultag und 190 Schultage an.`,
         ),
         steps: [
-          { math: `${S} \\cdot 0,5 = ${S / 2}`, note: tx(`Per school day: ${S / 2} litres.`, `Pro Schultag: ${S / 2} Liter.`) },
-          { math: `${S / 2} \\cdot 190 = ${v}`, note: tx(`In 190 school days: ${v} litres.`, `In 190 Schultagen: ${v} Liter.`) },
+          { math: (s) => `${S} \\cdot ${s.m(0.5)} = ${S / 2}`, note: tx(`Per school day: ${S / 2} litres.`, `Pro Schultag: ${S / 2} Liter.`) },
+          { math: (s) => `${S / 2} \\cdot 190 = ${s.m(v)}`, note: txs((s) => `In 190 school days: ${s.n(v)} litres.`, (s) => `In 190 Schultagen: ${s.n(v)} Liter.`) },
         ],
         value: v,
         unit: tx("litres", "Liter"),
@@ -621,7 +621,7 @@ const FERMI: FermiCase[] = [
           `How many pizzas are eaten in a city with ${nf(P, "en", 0)} inhabitants in one year? Assume every inhabitant eats one pizza a month.`,
           `Wie viele Pizzen werden in einer Stadt mit ${nf(P, "de", 0)} Einwohnern in einem Jahr gegessen? Nimm an, jeder isst eine Pizza im Monat.`,
         ),
-        steps: [{ math: `${P} \\cdot 12 = ${v}`, note: tx(`12 months: ${nf(v, "en", 0)} pizzas.`, `12 Monate: ${nf(v, "de", 0)} Pizzen.`) }],
+        steps: [{ math: (s) => `${s.m(P)} \\cdot 12 = ${s.m(v)}`, note: tx(`12 months: ${nf(v, "en", 0)} pizzas.`, `12 Monate: ${nf(v, "de", 0)} Pizzen.`) }],
         value: v,
         unit: tx("pizzas", "Pizzen"),
         forgot: [{ v: P, say: tx("That's one month. A year has 12.", "Das ist ein Monat. Ein Jahr hat 12.") }],
@@ -635,8 +635,8 @@ const FERMI: FermiCase[] = [
       return {
         text: tx(`How often does a heart beat in one day? Assume ${b} beats per minute.`, `Wie oft schlägt ein Herz an einem Tag? Nimm ${b} Schläge pro Minute an.`),
         steps: [
-          { math: `${b} \\cdot 60 = ${b * 60}`, note: tx(`Per hour: ${b * 60}.`, `Pro Stunde: ${b * 60}.`) },
-          { math: `${b * 60} \\cdot 24 = ${v}`, note: tx(`Per day: ${nf(v, "en", 0)}.`, `Pro Tag: ${nf(v, "de", 0)}.`) },
+          { math: () => `${b} \\cdot 60 = ${b * 60}`, note: tx(`Per hour: ${b * 60}.`, `Pro Stunde: ${b * 60}.`) },
+          { math: (s) => `${b * 60} \\cdot 24 = ${s.m(v)}`, note: tx(`Per day: ${nf(v, "en", 0)}.`, `Pro Tag: ${nf(v, "de", 0)}.`) },
         ],
         value: v,
         unit: tx("beats", "Schläge"),
@@ -654,8 +654,8 @@ const FERMI: FermiCase[] = [
           `Wie viele Kilometer fährt ein Schulbus in einem Schuljahr? Nimm morgens und nachmittags je eine Runde von ${T} km an, an 190 Schultagen.`,
         ),
         steps: [
-          { math: `2 \\cdot ${T} = ${2 * T}`, note: tx(`Per day: ${2 * T} km.`, `Pro Tag: ${2 * T} km.`) },
-          { math: `${2 * T} \\cdot 190 = ${v}`, note: tx(`Per school year: ${nf(v, "en", 0)} km.`, `Pro Schuljahr: ${nf(v, "de", 0)} km.`) },
+          { math: () => `2 \\cdot ${T} = ${2 * T}`, note: tx(`Per day: ${2 * T} km.`, `Pro Tag: ${2 * T} km.`) },
+          { math: (s) => `${2 * T} \\cdot 190 = ${s.m(v)}`, note: tx(`Per school year: ${nf(v, "en", 0)} km.`, `Pro Schuljahr: ${nf(v, "de", 0)} km.`) },
         ],
         value: v,
         unit: "km",
@@ -674,8 +674,8 @@ const FERMI: FermiCase[] = [
           `Wie viele Blatt Papier verbraucht eine Schule mit ${S} Schülerinnen und Schülern in einem Schuljahr? Nimm ${p} Blatt pro Person und Schultag und 190 Schultage an.`,
         ),
         steps: [
-          { math: `${S} \\cdot ${p} = ${S * p}`, note: tx(`Per day: ${S * p} sheets.`, `Pro Tag: ${S * p} Blatt.`) },
-          { math: `${S * p} \\cdot 190 = ${v}`, note: tx(`Per school year: ${nf(v, "en", 0)} sheets.`, `Pro Schuljahr: ${nf(v, "de", 0)} Blatt.`) },
+          { math: () => `${S} \\cdot ${p} = ${S * p}`, note: tx(`Per day: ${S * p} sheets.`, `Pro Tag: ${S * p} Blatt.`) },
+          { math: (s) => `${S * p} \\cdot 190 = ${s.m(v)}`, note: tx(`Per school year: ${nf(v, "en", 0)} sheets.`, `Pro Schuljahr: ${nf(v, "de", 0)} Blatt.`) },
         ],
         value: v,
         unit: tx("sheets", "Blatt"),
@@ -705,7 +705,8 @@ const fermi: Tpl = (rng) => {
   const picked: { v: number; title?: Text; say?: Text }[] = [{ v: right }];
   for (const c of cands) {
     if (picked.length >= 4) break;
-    if (c.v < 1 || picked.some((p) => Math.abs(p.v - c.v) < 1e-9)) continue;
+    // Options at least a factor 3 apart, so they really are different orders of magnitude.
+    if (c.v < 1 || picked.some((p) => Math.max(p.v, c.v) / Math.min(p.v, c.v) < 3)) continue;
     picked.push(c);
   }
   picked.sort((a, b) => a.v - b.v);
@@ -718,7 +719,7 @@ const fermi: Tpl = (rng) => {
     mistakes,
     hint: tx("Break it into steps you can calculate, one after the other. Then round.", "Zerleg es in Schritte, die du nacheinander ausrechnen kannst. Dann runden."),
     solution: [
-      ...q.steps.map((st) => ({ math: mb((s) => (s.de ? st.math : st.math.replace(/(\d),(\d)/g, "$1.$2"))), note: st.note })),
+      ...q.steps.map((st) => ({ math: mb(st.math), note: st.note })),
       { math: mb((s) => `\\approx ${s.m(right, "r", 0)}`), highlight: ["r"], note: txs((s) => `Rounded: **about ${s.n(right, 0)} ${s.t(q.unit)}**. That's the order of magnitude that counts.`, (s) => `Gerundet: **etwa ${s.n(right, 0)} ${s.t(q.unit)}**. Auf diese Größenordnung kommt es an.`) },
     ],
   };
@@ -858,8 +859,8 @@ const domainChoice: Tpl = (rng) => {
     const opts: Opt[] = [
       { text: `$0 \\le t \\le ${T}$` },
       { text: `$t \\ge 0$`, title: tx("No end", "Kein Ende"), say: tx(`After ${T} ${E(c.time)} the model gives negative values. That can't happen: the model stops there.`, `Nach ${T} ${D(c.time)} liefert das Modell negative Werte. Das geht nicht: Dort endet das Modell.`) },
-      { text: `$0 \\le t \\le ${S}$`, title: tx("Start value as time", "Anfangswert als Zeit"), say: tx(`${S} is the start value in ${E(c.unitWord)}, not a time. When is f(t) = 0?`, `${S} ist der Anfangswert in ${D(c.unitWord)}, keine Zeit. Wann ist f(t) = 0?`) },
-      { text: `$0 \\le t \\le ${r}$`, title: tx("Rate as time", "Rate als Zeit"), say: tx(`${r} is the amount per ${c.per}. Solve f(t) = 0 to find the end.`, `${r} ist die Menge pro ${c.per}. Löse f(t) = 0, dann hast du das Ende.`) },
+      { text: `$0 \\le t \\le ${S}$`, title: tx("Start value as time", "Anfangswert als Zeit"), say: tx(`${S} is the start value (${S} ${E(c.unitWord)}), not a time. When is f(t) = 0?`, `${S} ist der Anfangswert (${S} ${D(c.unitWord)}), keine Zeit. Wann ist f(t) = 0?`) },
+      { text: `$0 \\le t \\le ${r}$`, title: tx("Rate as time", "Rate als Zeit"), say: tx(`${r} is the decrease per ${E(c.perWord)}. Solve f(t) = 0 to find the end.`, `${r} ist die Abnahme pro ${D(c.perWord)}. Löse f(t) = 0, dann hast du das Ende.`) },
     ];
     const { answer, mistakes } = choice(rng, opts);
     return {
@@ -1054,7 +1055,7 @@ export const level3: LevelLesson = {
         "Set up the target function, insert the condition so only one variable is left. If the parabola opens downwards, the maximum is the vertex: halfway between the zeros (or read it from the vertex form).",
         "Zielfunktion aufstellen und die Nebenbedingung einsetzen, bis nur eine Variable übrig ist. Ist die Parabel nach unten geöffnet, liegt das Maximum im Scheitelpunkt: in der Mitte zwischen den Nullstellen (oder aus der Scheitelpunktform ablesen).",
       ),
-      examples: ["A(x) = x(40 - 2x)", "x_S = \\frac{0 + 20}{2} = 10", '"A"(10) = 200'],
+      examples: ["A(x) = x(40 - 2x)", "x_S = \\frac{0 + 20}{2} = 10", "A(10) = 200"],
       tone: "rule",
     },
     {

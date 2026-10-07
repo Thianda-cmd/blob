@@ -153,6 +153,9 @@ export function resultPoly(a: Factor, b: Factor): Poly {
 
 export const VARS = ["x", "x", "x", "a", "y", "b"];
 
+/** Letters for tasks with a binomial formula: not a or b, which name the parts of the formulas in the notes. */
+const LETTERS = ["x", "x", "y", "z"];
+
 export const EXPAND = tx("Expand", "Multipliziere aus");
 export const EXPAND_SIMPLIFY = tx("Expand and simplify", "Multipliziere aus und fasse zusammen");
 
@@ -259,7 +262,7 @@ export function make(a: Factor, b: Factor, v: string, hint: Text, square = false
 
 /** The practice of the one-lesson topic, in three difficulty tiers (now mixed into level 2). */
 function tier(level: 1 | 2 | 3, rng: Rng): Exercise {
-  const v = rng.pick(VARS);
+  const v = rng.pick(level === 1 ? VARS : LETTERS);
   if (level === 1) {
     const k = rng.nonZero(-9, 9, [1, -1]);
     const b: Factor = rng.chance(0.75) ? [m(rng.int(1, 6), 1), m(rng.nonZero(-9, 9))] : [m(rng.nonZero(-9, 9)), m(rng.nonZero(-6, 6), 1)];
@@ -338,9 +341,6 @@ const FILL_GAP = tx("Fill in the gap", "Ergänze die Lücke");
 const FIND_MISTAKE = tx("Find the mistake", "Finde den Fehler");
 const CLEVER = tx("Calculate cleverly with a binomial formula", "Rechne geschickt mit einer binomischen Formel");
 const SIMPLIFY = tx("Simplify the term", "Vereinfache den Term");
-
-/** Letters for the new tasks: not a or b, which name the parts of the binomial formulas in the notes. */
-const LETTERS = ["x", "x", "y", "z"];
 
 const NAMES = ["Mia", "Tom", "Lena", "Jonas", "Emma", "Paul", "Elif", "Noah", "Anna", "Ben"];
 
@@ -446,7 +446,9 @@ function findMistake2(rng: Rng): Exercise {
     wrong = kind === "noMiddle" ? [q > 0 ? q * q : -q * q, 0, 1] : [-q * q, 2 * q, 1];
     why =
       kind === "noMiddle"
-        ? tx(`${name} squared each term on its own. But a bracket squared means the bracket **times itself**, and then the middle term $2ab$ appears.`, `${name} hat jeden Term einzeln quadriert. Aber Klammer hoch 2 heißt Klammer **mal sich selbst**, und dann entsteht der Mittelterm $2ab$.`)
+        ? q > 0
+          ? tx(`${name} squared each term on its own. But a bracket squared means the bracket **times itself**, and then the middle term $2ab$ appears.`, `${name} hat jeden Term einzeln quadriert. Aber Klammer hoch 2 heißt Klammer **mal sich selbst**, und dann entsteht der Mittelterm $2ab$.`)
+          : tx(`${name} squared each term and kept the minus. But $(-${-q})^2 = +${q * q}$, and the middle term $-${-2 * q}${v}$ is missing: a bracket squared means the bracket **times itself**.`, `${name} hat jeden Term quadriert und das Minus behalten. Aber $(-${-q})^2 = +${q * q}$, und der Mittelterm $-${-2 * q}${v}$ fehlt: Klammer hoch 2 heißt Klammer **mal sich selbst**.`)
         : tx(`${name} has the middle term right, but the last one wrong: $(-${-q})^2 = +${q * q}$. Minus times minus is plus!`, `${name} hat den Mittelterm richtig, aber den letzten falsch: $(-${-q})^2 = +${q * q}$. Minus mal Minus ist Plus!`);
   } else if (kind === "twoProducts") {
     const r = rng.nonZero(-7, 7);
@@ -475,9 +477,11 @@ function findMistake2(rng: Rng): Exercise {
   const task = productSrc(a, b, v, false, square);
   const wrongSrc = showPoly(wrong, v);
   const copiedValue = plainPoly(wrong, v);
+  // German genitive: "Mias Ergebnis", but "Jonas’ Ergebnis".
+  const genDe = /[sxzß]$/.test(name) ? `${name}’` : `${name}s`;
   const copied: Mistake = {
     when: { kind: "expr", value: copiedValue },
-    title: tx(`That's ${name}'s result`, `Das ist ${name}s Ergebnis`),
+    title: tx(`That's ${name}'s result`, `Das ist ${genDe} Ergebnis`),
     say: tx(`That's exactly what ${name} wrote, so the mistake is still in there. Expand it step by step yourself.`, `Das ist genau das, was ${name} geschrieben hat, also steckt der Fehler noch drin. Multipliziere selbst Schritt für Schritt aus.`),
   };
   const rest = expandMistakes(a, b, v, right, square).filter((x) => x.when.kind === "expr" && !equivalentText(x.when.value, copiedValue));
@@ -865,7 +869,7 @@ export const level2: LevelLesson = {
     },
     {
       title: tx("Binomial formulas", "Binomische Formeln"),
-      body: tx("Shortcuts worth knowing by heart (die binomischen Formeln).", "Abkürzungen, die du auswendig können solltest: die 1., 2. und 3. binomische Formel."),
+      body: tx("Shortcuts worth knowing by heart: the 1st, 2nd and 3rd binomial formula.", "Abkürzungen, die du auswendig können solltest: die 1., 2. und 3. binomische Formel."),
       examples: ["(a + b)^2 = a^2 + 2ab + b^2", "(a - b)^2 = a^2 - 2ab + b^2", "(a + b)(a - b) = a^2 - b^2"],
       tone: "tip",
     },
@@ -875,12 +879,18 @@ export const level2: LevelLesson = {
       examples: ["(a + b)^2 \\ne a^2 + b^2"],
       tone: "warning",
     },
+    {
+      title: tx("Calculate cleverly", "Geschickt rechnen"),
+      body: tx("Write a number as a round number plus or minus a little. Then a binomial formula does the work.", "Schreib eine Zahl als runde Zahl plus oder minus ein bisschen. Dann erledigt eine binomische Formel die Arbeit."),
+      examples: ["31^2 = (30 + 1)^2 = 900 + 60 + 1 = 961", "39 \\cdot 41 = (40 - 1)(40 + 1) = 40^2 - 1 = 1599"],
+      tone: "tip",
+    },
   ],
   lesson: [
     {
       type: "explain",
       title: tx("A factor in front of a bracket", "Ein Faktor vor der Klammer"),
-      blob: tx("Ausmultiplizieren means: the number in front visits everyone inside!", "Ausmultiplizieren heißt: Die Zahl davor besucht jeden in der Klammer!"),
+      blob: tx("Expanding means: the number in front visits everyone inside!", "Ausmultiplizieren heißt: Die Zahl davor besucht jeden in der Klammer!"),
       body: tx(
         "When a number stands right in front of a bracket, it means **times**. To get rid of the bracket, multiply it by every term inside.",
         "Steht eine Zahl direkt vor einer Klammer, bedeutet das **mal**. Um die Klammer loszuwerden, multiplizierst du die Zahl mit jedem Term in der Klammer.",

@@ -31,10 +31,10 @@ export function NegCompare() {
       : txMap(
           (tr) =>
             `${tr(`${L} lies further **left** than ${H}, so ${L} is the smaller number.`, `${L} liegt weiter **links** als ${H}, also ist ${L} die kleinere Zahl.`)}${
-              lo.v < 0 ? ` ${tr(`At ${L} °C it is colder than at ${H} °C.`, `Bei ${L} °C ist es kälter als bei ${H} °C.`)}` : ""
+              lo.v < 0 ? ` ${tr(`At ${L}\u00a0°C it is colder than at ${H}\u00a0°C.`, `Bei ${L}\u00a0°C ist es kälter als bei ${H}\u00a0°C.`)}` : ""
             }`,
         );
-  const arc = (v: number) => `M${ax.x(v)} ${y - 4} Q${ax.x(0)} ${y - 58} ${ax.x(-v)} ${y - 4}`;
+  const arc = (v: number) => `M${ax.x(v)} ${y - 4} Q${ax.x(0)} ${y - 14 - 5 * Math.abs(v)} ${ax.x(-v)} ${y - 4}`;
   const oppText = txMap((tr) =>
     [a, b]
       .filter((v, i, list) => v !== 0 && list.indexOf(v) === i)
@@ -104,7 +104,7 @@ export function NegWalker() {
   const [sign, setSign] = useState<Sign>("-");
   const [k, setK] = useState(4);
   const [walked, setWalked] = useState(false);
-  const ax = makeAxis(-12, 12);
+  const ax = makeAxis(-12, 12, 26);
   const y = 112;
   const look = op === "+" ? 1 : -1;
   const forward = sign === "+";
@@ -114,14 +114,14 @@ export function NegWalker() {
   const n = sign === "-" ? -k : k;
 
   const xs = walked ? Array.from({ length: k + 1 }, (_, i) => ax.x(start + dir * i)) : ax.x(start);
-  const ys = walked ? Array.from({ length: 2 * k + 1 }, (_, i) => (i % 2 ? -13 : 0)) : 0;
+  const ys = walked ? Array.from({ length: 2 * k + 1 }, (_, i) => (i % 2 ? -10 : 0)) : 0;
   const change = (f: () => void) => {
     f();
     setWalked(false);
   };
 
   const task = `${kn(start, "s")} ${op}#o ${kp(n, "n")}`;
-  const src = walked ? `${task} =#e1 ${kn(start, "s2")} ${merged}#m ${k}#k =#e2 ${kn(result, "r")}` : `${task} =#e1 ?#q`;
+  const src = walked ? `\\group{${task}} \\group{=#e1 ${kn(start, "s2")} ${merged}#m ${k}#k} \\group{=#e2 ${kn(result, "r")}}` : `\\group{${task}} \\group{=#e1 ?#q}`;
   const lookLine =
     op === "+"
       ? tx("Operation sign **plus**: Blob looks to the **right**.", "Rechenzeichen **plus**: Blob schaut nach **rechts**.")
@@ -176,7 +176,7 @@ export function NegWalker() {
           {walked && (
             <motion.g key={`trail${start}${result}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }}>
               <motion.path
-                d={`M${ax.x(start)} 56 Q${(ax.x(start) + ax.x(result)) / 2} 26 ${ax.x(result)} 56`}
+                d={`M${ax.x(start)} 46 Q${(ax.x(start) + ax.x(result)) / 2} 18 ${ax.x(result)} 46`}
                 fill="none"
                 stroke="var(--blob)"
                 strokeWidth={2.4}
@@ -187,7 +187,7 @@ export function NegWalker() {
               />
               <motion.text
                 x={(ax.x(start) + ax.x(result)) / 2}
-                y={22}
+                y={14}
                 textAnchor="middle"
                 fill="var(--blob)"
                 fontWeight={700}
@@ -216,7 +216,7 @@ export function NegWalker() {
           transition={walked ? { duration: 0.36 * k, ease: "easeInOut" } : { type: "spring", stiffness: 260, damping: 26 }}
         >
           <g transform={`translate(0 ${y - 3})`}>
-            <MiniBlob look={look > 0 ? "right" : "left"} />
+            <MiniBlob look={look > 0 ? "right" : "left"} scale={1.9} />
           </g>
         </motion.g>
       </svg>

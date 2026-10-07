@@ -71,8 +71,8 @@ export function BothSidesLab() {
       <p className="text-[14px] text-ink-2">
         {t(
           tx(
-            "Each side of the equation is a line. Where they cross, both sides have the same value. Change the left side with the sliders.",
-            "Jede Seite der Gleichung ist eine Gerade. Wo sie sich schneiden, haben beide Seiten denselben Wert. Verändere die linke Seite mit den Schiebereglern.",
+            "Change the left side with the sliders and pick a right side. Where the two lines cross, both sides have the same value.",
+            "Verändere die linke Seite mit den Schiebereglern und wähle eine rechte Seite. Wo sich die beiden Geraden schneiden, haben beide Seiten denselben Wert.",
           ),
         )}
       </p>

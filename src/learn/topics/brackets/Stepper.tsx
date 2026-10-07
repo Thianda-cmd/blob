@@ -65,7 +65,7 @@ export function BracketStepper() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-ink-2">
+        <p className="w-full min-w-0 text-[13.5px] leading-relaxed text-ink-2 sm:w-auto sm:flex-1">
           {t(tx("Tap a bracket to multiply it out. Inner brackets first, then combine like terms.", "Tippe auf eine Klammer, um sie aufzulösen. Innere Klammern zuerst, dann gleichartige Terme zusammenfassen."))}
         </p>
         <button onClick={() => setS(start(s.n))} className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">

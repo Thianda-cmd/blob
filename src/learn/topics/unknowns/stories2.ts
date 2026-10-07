@@ -24,6 +24,9 @@ export type CV = {
   /** Short plural names of the two kinds ("adult tickets"). */
   xs: Text;
   ys: Text;
+  /** The same in the singular, for "per adult ticket" / "pro Erwachsenenkarte". */
+  xOne: Text;
+  yOne: Text;
   /** Note for (I) and (II). */
   countNote: Text;
   valueNote: Text;
@@ -68,6 +71,8 @@ export function ticketsCV([pe, pd]: [string, string], a: number, b: number, x: n
     vars: tx("Use $x$ for the number of adult tickets and $y$ for the number of child tickets.", "Nimm $x$ für die Anzahl der Erwachsenenkarten und $y$ für die Anzahl der Kinderkarten."),
     xs: tx("adult tickets", "Erwachsenenkarten"),
     ys: tx("child tickets", "Kinderkarten"),
+    xOne: tx("adult ticket", "Erwachsenenkarte"),
+    yOne: tx("child ticket", "Kinderkarte"),
     countNote: tx(`(I) counts the tickets: ${N} in total.`, `(I) zählt die Karten: insgesamt ${N}.`),
     valueNote: tx(`(II) adds up the money: ${a} € per adult ticket, ${b} € per child ticket.`, `(II) zählt das Geld: ${a} € pro Erwachsenenkarte, ${b} € pro Kinderkarte.`),
     answer: tx(`${x} adult tickets and ${y} child tickets were sold.`, `Es wurden ${x} Erwachsenen- und ${y} Kinderkarten verkauft.`),
@@ -81,6 +86,9 @@ export const MONEY: { a: number; b: number; en: [string, string]; de: [string, s
   { a: 10, b: 20, en: ["10-euro notes", "20-euro notes"], de: ["10-Euro-Scheine", "20-Euro-Scheine"], where: ["In a wallet there are only", "In einem Portemonnaie sind nur"], max: 15 },
   { a: 20, b: 50, en: ["20-euro notes", "50-euro notes"], de: ["20-Euro-Scheine", "50-Euro-Scheine"], where: ["In an envelope there are only", "In einem Umschlag sind nur"], max: 12 },
 ];
+
+/** "5-Euro-Scheine" → "5-Euro-Schein", "2-Euro-Münzen" → "2-Euro-Münze". */
+const one = (de: string) => de.replace(/Scheine$/, "Schein").replace(/Münzen$/, "Münze");
 
 function money(rng: Rng): CV {
   const m = rng.pick(MONEY);
@@ -101,19 +109,21 @@ export function moneyCV(m: (typeof MONEY)[number], x: number, y: number): CV {
     vars: tx(`Use $x$ for the number of ${m.en[0]} and $y$ for the number of ${m.en[1]}.`, `Nimm $x$ für die Anzahl der ${m.de[0]} und $y$ für die Anzahl der ${m.de[1]}.`),
     xs: tx(m.en[0], m.de[0]),
     ys: tx(m.en[1], m.de[1]),
+    xOne: tx(m.en[0].replace(/s$/, ""), one(m.de[0])),
+    yOne: tx(m.en[1].replace(/s$/, ""), one(m.de[1])),
     countNote: tx(`(I) counts the ${coins ? "coins" : "notes"}: ${N} in total.`, `(I) zählt die ${coins ? "Münzen" : "Scheine"}: insgesamt ${N}.`),
-    valueNote: tx(`(II) adds up their value: each one of the first kind is worth ${m.a} €, each one of the second ${m.b} €.`, `(II) zählt den Wert: Jede der ersten Sorte ist ${m.a} € wert, jede der zweiten ${m.b} €.`),
+    valueNote: tx(`(II) adds up their value: each one of the first kind is worth ${m.a} €, each one of the second ${m.b} €.`, `(II) zählt den Wert: Jedes Stück der ersten Sorte ist ${m.a} € wert, jedes der zweiten ${m.b} €.`),
     answer: tx(`There are ${x} ${m.en[0]} and ${y} ${m.en[1]}.`, `Es sind ${x} ${m.de[0]} und ${y} ${m.de[1]}.`),
   };
 }
 
-export const COUNTED: { a: number; b: number; en: [string, string, string, string, string]; de: [string, string, string, string, string] }[] = [
-  // [place sentence, x-kind, y-kind, counted thing (I), counted thing (II)]
-  { a: 2, b: 4, en: ["On a farm there are chickens and rabbits.", "chickens", "rabbits", "heads", "legs"], de: ["Auf einem Bauernhof gibt es Hühner und Kaninchen.", "Hühner", "Kaninchen", "Köpfe", "Beine"] },
-  { a: 2, b: 4, en: ["In a meadow there are geese and sheep.", "geese", "sheep", "heads", "legs"], de: ["Auf einer Wiese stehen Gänse und Schafe.", "Gänse", "Schafe", "Köpfe", "Beine"] },
-  { a: 2, b: 3, en: ["In the kindergarten yard there are bicycles and tricycles.", "bicycles", "tricycles", "vehicles", "wheels"], de: ["Auf dem Kita-Hof stehen Fahrräder und Dreiräder.", "Fahrräder", "Dreiräder", "Fahrzeuge", "Räder"] },
-  { a: 2, b: 4, en: ["A youth hostel has double rooms and four-bed rooms.", "double rooms", "four-bed rooms", "rooms", "beds"], de: ["Eine Jugendherberge hat Zweibett- und Vierbettzimmer.", "Zweibettzimmer", "Vierbettzimmer", "Zimmer", "Betten"] },
-  { a: 4, b: 6, en: ["In a café there are tables for 4 and tables for 6.", "tables for 4", "tables for 6", "tables", "seats"], de: ["In einem Café gibt es Vierertische und Sechsertische.", "Vierertische", "Sechsertische", "Tische", "Plätze"] },
+export const COUNTED: { a: number; b: number; en: [string, string, string, string, string]; de: [string, string, string, string, string]; one: { en: [string, string]; de: [string, string] } }[] = [
+  // [place sentence, x-kind, y-kind, counted thing (I), counted thing (II)]; one: x-kind and y-kind in the singular
+  { a: 2, b: 4, en: ["On a farm there are chickens and rabbits.", "chickens", "rabbits", "heads", "legs"], de: ["Auf einem Bauernhof gibt es Hühner und Kaninchen.", "Hühner", "Kaninchen", "Köpfe", "Beine"], one: { en: ["chicken", "rabbit"], de: ["Huhn", "Kaninchen"] } },
+  { a: 2, b: 4, en: ["In a meadow there are geese and sheep.", "geese", "sheep", "heads", "legs"], de: ["Auf einer Wiese stehen Gänse und Schafe.", "Gänse", "Schafe", "Köpfe", "Beine"], one: { en: ["goose", "sheep"], de: ["Gans", "Schaf"] } },
+  { a: 2, b: 3, en: ["In the kindergarten yard there are bicycles and tricycles.", "bicycles", "tricycles", "vehicles", "wheels"], de: ["Auf dem Kita-Hof stehen Fahrräder und Dreiräder.", "Fahrräder", "Dreiräder", "Fahrzeuge", "Räder"], one: { en: ["bicycle", "tricycle"], de: ["Fahrrad", "Dreirad"] } },
+  { a: 2, b: 4, en: ["A youth hostel has double rooms and four-bed rooms.", "double rooms", "four-bed rooms", "rooms", "beds"], de: ["Eine Jugendherberge hat Zweibett- und Vierbettzimmer.", "Zweibettzimmer", "Vierbettzimmer", "Zimmer", "Betten"], one: { en: ["double room", "four-bed room"], de: ["Zweibettzimmer", "Vierbettzimmer"] } },
+  { a: 4, b: 6, en: ["In a café there are tables for 4 and tables for 6.", "tables for 4", "tables for 6", "tables", "seats"], de: ["In einem Café gibt es Vierertische und Sechsertische.", "Vierertische", "Sechsertische", "Tische", "Plätze"], one: { en: ["table for 4", "table for 6"], de: ["Vierertisch", "Sechsertisch"] } },
 ];
 
 function counted(rng: Rng): CV {
@@ -134,16 +144,19 @@ export function countedCV(c: (typeof COUNTED)[number], x: number, y: number): CV
     vars: tx(`Use $x$ for the number of ${c.en[1]} and $y$ for the number of ${c.en[2]}.`, `Nimm $x$ für die Anzahl der ${c.de[1]} und $y$ für die Anzahl der ${c.de[2]}.`),
     xs: tx(c.en[1], c.de[1]),
     ys: tx(c.en[2], c.de[2]),
+    xOne: tx(c.one.en[0], c.one.de[0]),
+    yOne: tx(c.one.en[1], c.one.de[1]),
     countNote: tx(`(I) counts the ${c.en[3]}: ${N}.`, `(I) zählt die ${c.de[3]}: ${N}.`),
-    valueNote: tx(`(II) counts the ${c.en[4]}: ${c.a} for each of the ${c.en[1]}, ${c.b} for each of the ${c.en[2]}.`, `(II) zählt die ${c.de[4]}: ${c.a} für jedes der ${c.de[1]}, ${c.b} für jedes der ${c.de[2]}.`),
+    valueNote: tx(`(II) counts the ${c.en[4]}: ${c.a} per ${c.one.en[0]}, ${c.b} per ${c.one.en[1]}.`, `(II) zählt die ${c.de[4]}: ${c.a} pro ${c.one.de[0]}, ${c.b} pro ${c.one.de[1]}.`),
     answer: tx(`There are ${x} ${c.en[1]} and ${y} ${c.en[2]}.`, `Es sind ${x} ${c.de[1]} und ${y} ${c.de[2]}.`),
   };
 }
 
 const MIX: { en: [string, string, string]; de: [string, string, string]; lo: number; hi: number }[] = [
-  { en: ["A tea shop mixes black tea", "green tea", "tea"], de: ["Ein Teeladen mischt Schwarztee", "grünen Tee", "Tee"], lo: 6, hi: 24 },
-  { en: ["A shop mixes peanuts", "cashews", "nuts"], de: ["Ein Laden mischt Erdnüsse", "Cashewkerne", "Nüsse"], lo: 4, hi: 20 },
-  { en: ["A café mixes a cheap coffee", "a fine coffee", "coffee"], de: ["Ein Café mischt einen günstigen Kaffee", "einen edlen Kaffee", "Kaffee"], lo: 8, hi: 30 },
+  // de[1] stands after "mit": dative.
+  { en: ["A tea shop mixes black tea", "green tea", "tea"], de: ["Ein Teeladen mischt Schwarztee", "grünem Tee", "Tee"], lo: 6, hi: 24 },
+  { en: ["A shop mixes peanuts", "cashews", "nuts"], de: ["Ein Laden mischt Erdnüsse", "Cashewkernen", "Nüsse"], lo: 4, hi: 20 },
+  { en: ["A café mixes a cheap coffee", "a fine coffee", "coffee"], de: ["Ein Café mischt einen günstigen Kaffee", "einem edlen Kaffee", "Kaffee"], lo: 8, hi: 30 },
 ];
 
 function mixture(rng: Rng): CV {
@@ -160,11 +173,13 @@ function mixture(rng: Rng): CV {
       a, b, N, V, x, y,
       text: tx(
         `${m.en[0]} at ${a} € per kg with ${m.en[1]} at ${b} € per kg. It wants ${N} kg of mixture that costs ${p} € per kg. How many kg of each does it need?`,
-        `${m.de[0]} für ${a} € pro kg mit ${m.de[1]} für ${b} € pro kg. Es sollen ${N} kg Mischung entstehen, die ${p} € pro kg kostet. Wie viel kg braucht man von jeder Sorte?`,
+        `${m.de[0]} für ${a} € pro kg mit ${m.de[1]} für ${b} € pro kg. Es sollen ${N} kg Mischung entstehen, die ${p} € pro kg kostet. Wie viele kg braucht man von jeder Sorte?`,
       ),
-      vars: tx("Use $x$ for the kg of the first kind and $y$ for the kg of the second kind.", "Nimm $x$ für die kg der ersten Sorte und $y$ für die kg der zweiten Sorte."),
+      vars: tx("Use $x$ for the amount of the first kind in kg and $y$ for the amount of the second kind in kg.", "Nimm $x$ für die Menge der ersten Sorte in kg und $y$ für die der zweiten Sorte in kg."),
       xs: tx("kg of the first kind", "kg der ersten Sorte"),
       ys: tx("kg of the second kind", "kg der zweiten Sorte"),
+      xOne: tx("kg of the first kind", "kg der ersten Sorte"),
+      yOne: tx("kg of the second kind", "kg der zweiten Sorte"),
       countNote: tx(`(I) is the amount: ${N} kg of mixture.`, `(I) ist die Menge: ${N} kg Mischung.`),
       valueNote: tx(`(II) is the money: the mixture is worth $${N} \\cdot ${p} = ${V}$ €, just like its two parts together.`, `(II) ist das Geld: Die Mischung ist $${N} \\cdot ${p} = ${V}$ € wert, genauso viel wie ihre beiden Teile zusammen.`),
       answer: tx(`You need ${x} kg of the first kind and ${y} kg of the second kind.`, `Man braucht ${x} kg der ersten und ${y} kg der zweiten Sorte.`),
@@ -229,7 +244,8 @@ export function cvSolve(cv: CV, first: Text): Frame[] {
       math: expanded,
       note: tx(`Expand: $${cu}(${N} - ${w}) = ${cu * N} - ${cu}${w}$.`, `Multipliziere aus: $${cu}(${N} - ${w}) = ${cu * N} - ${cu}${w}$.`),
     });
-  else frames.push({ math: expanded, note: tx("A plus in front of the bracket: just drop it.", "Vor der Klammer steht ein Plus: Sie fällt einfach weg.") });
+  else if (w === "y") frames.push({ math: expanded, note: tx("Nothing multiplies the bracket: just drop it.", "Vor der Klammer steht kein Faktor: Die Klammer fällt einfach weg.") });
+  else frames.push({ math: expanded, note: tx("A plus in front of the bracket: just drop it.", "Vor der Klammer steht ein Plus: Die Klammer fällt einfach weg.") });
   frames.push({
     math: `${kSrc(K)} +#p2 ${cu * N}#cn =#e2 ${V}#n2${bar(`- ${cu * N}`)}`,
     note: tx(`Combine the $${w}$-terms: $${cw}${w} - ${cu === 1 ? "" : cu}${w} = ${K === 1 ? "" : K}${w}$. Then subtract ${cu * N}.`, `Fasse die $${w}$-Terme zusammen: $${cw}${w} - ${cu === 1 ? "" : cu}${w} = ${K === 1 ? "" : K}${w}$. Dann subtrahiere ${cu * N}.`),
@@ -258,7 +274,7 @@ function cvMistakes(cv: CV, answer: AnswerSpec): Mistake[] {
       title: tx("Swapped", "Vertauscht"),
       say: tx(
         `Ha, the right numbers, just the wrong way round! $x$ is the number of ${E(cv.xs)}, $y$ the number of ${E(cv.ys)}.`,
-        `Ha, die richtigen Zahlen, nur andersherum! $x$ ist die Anzahl der ${D(cv.xs)}, $y$ die Anzahl der ${D(cv.ys)}.`,
+        `Ha, die richtigen Zahlen, nur andersherum! $x$ zählt die ${D(cv.xs)}, $y$ die ${D(cv.ys)}.`,
       ),
     },
   ];
@@ -290,7 +306,7 @@ function cvMistakes(cv: CV, answer: AnswerSpec): Mistake[] {
       title: tx("Value, not number", "Wert statt Anzahl"),
       say: tx(
         `$x = ${x}$ is right! But $${V} - ${a} \\cdot ${x} = ${V - a * x}$ is what the ${E(cv.ys)} add up to in (II), not how many there are. Divide by ${b}, or use (I).`,
-        `$x = ${x}$ stimmt! Aber $${V} - ${a} \\cdot ${x} = ${V - a * x}$ ist das, was die ${D(cv.ys)} in (II) beitragen, nicht ihre Anzahl. Teil durch ${b} oder nimm (I).`,
+        `$x = ${x}$ stimmt! Aber $${V} - ${a} \\cdot ${x} = ${V - a * x}$ ist das, was die ${D(cv.ys)} in (II) beitragen, nicht, wie viele es sind. Teil durch ${b} oder nimm (I).`,
       ),
     });
   if (a !== 1)
@@ -299,7 +315,7 @@ function cvMistakes(cv: CV, answer: AnswerSpec): Mistake[] {
       title: tx("Value, not number", "Wert statt Anzahl"),
       say: tx(
         `$y = ${y}$ is right! But $${V} - ${b} \\cdot ${y} = ${V - b * y}$ is what the ${E(cv.xs)} add up to in (II), not how many there are. Divide by ${a}, or use (I).`,
-        `$y = ${y}$ stimmt! Aber $${V} - ${b} \\cdot ${y} = ${V - b * y}$ ist das, was die ${D(cv.xs)} in (II) beitragen, nicht ihre Anzahl. Teil durch ${a} oder nimm (I).`,
+        `$y = ${y}$ stimmt! Aber $${V} - ${b} \\cdot ${y} = ${V - b * y}$ ist das, was die ${D(cv.xs)} in (II) beitragen, nicht, wie viele es sind. Teil durch ${a} oder nimm (I).`,
       ),
     });
   if (N % 2 === 0)
@@ -345,19 +361,19 @@ export function cvChoice(cv: CV, rng: Rng): Exercise {
       title: tx("Numbers on the wrong variable", "Zahlen bei der falschen Variablen"),
       say: sayN(({ N: T }) => [
         `Nearly! $x$ counts the ${T(xs)}, and each of them counts ${a} in (II). So the ${a} belongs in front of $x$.`,
-        `Fast! $x$ zählt die ${T(xs)}, und jedes davon zählt in (II) ${a}. Die ${a} gehört also vor das $x$.`,
+        `Fast! $x$ zählt die ${T(xs)}, und pro ${T(cv.xOne)} zählt (II) ${a}. Die ${a} gehört also vor das $x$.`,
       ]),
     },
     b !== 1
       ? {
           o: sysPlain(`x + y = ${N}`, `${term(a, 1)} = ${V}`),
           title: tx("A number missing in (II)", "Eine Zahl fehlt in (II)"),
-          say: sayN(({ N: T }) => [`Hmm, in (II) each of the ${T(ys)} counts only 1. But each one counts ${b}.`, `Hm, in (II) zählt jedes der ${T(ys)} nur 1. Es zählt aber jeweils ${b}.`]),
+          say: sayN(({ N: T }) => [`Hmm, in (II) each of the ${T(ys)} counts only 1. But each one counts ${b}.`, `Hm, so zählt (II) nur 1 pro ${T(cv.yOne)}. Es sind aber ${b} pro ${T(cv.yOne)}.`]),
         }
       : {
           o: sysPlain(`x + y = ${N}`, `${term(1, b)} = ${V}`),
           title: tx("A number missing in (II)", "Eine Zahl fehlt in (II)"),
-          say: sayN(({ N: T }) => [`Hmm, in (II) each of the ${T(xs)} counts only 1. But each one counts ${a}.`, `Hm, in (II) zählt jedes der ${T(xs)} nur 1. Es zählt aber jeweils ${a}.`]),
+          say: sayN(({ N: T }) => [`Hmm, in (II) each of the ${T(xs)} counts only 1. But each one counts ${a}.`, `Hm, so zählt (II) nur 1 pro ${T(cv.xOne)}. Es sind aber ${a} pro ${T(cv.xOne)}.`]),
         },
     {
       o: sysPlain(`x + y = ${N}`, `${a + b}(x + y) = ${V}`),
@@ -417,7 +433,7 @@ function sumDiff(rng: Rng): Exercise {
     hint: tx("(I) $x + y = …$, (II) $x - y = …$. Add the two equations.", "(I) $x + y = …$, (II) $x - y = …$. Addiere die beiden Gleichungen."),
     solution: [{ math: `x#x1 ,#cm \\quad y#y1`, note: tx("Let $x$ be the larger and $y$ the smaller number.", "Sei $x$ die größere und $y$ die kleinere Zahl.") }, ...frames],
     mistakes: wrongPairs(answer, [
-      { v: [S / 2, S / 2], title: tx("Half and half?", "Halbe-halbe?"), say: tx(`Hmm, ${S / 2} and ${S / 2} add up to ${S}, but their difference is 0, not ${Dd}.`, `Hm, ${S / 2} und ${S / 2} ergeben zusammen ${S}, ihre Differenz ist aber 0, nicht ${Dd}.`) },
+      { v: [S / 2, S / 2], title: tx("Half and half?", "Halbe-halbe?"), say: sayN(({ n }) => [`Hmm, ${n(S / 2)} and ${n(S / 2)} add up to ${S}, but their difference is 0, not ${Dd}.`, `Hm, ${n(S / 2)} und ${n(S / 2)} ergeben zusammen ${S}, ihre Differenz ist aber 0, nicht ${Dd}.`]) },
       { v: [S + Dd, S - Dd], title: tx("Forgot to halve", "Halbieren vergessen"), say: tx(`So close! Adding the equations gives $2x = ${S + Dd}$, not $x$. Divide by 2.`, `Ganz knapp! Die Addition ergibt $2x = ${S + Dd}$, noch nicht $x$. Teil durch 2.`) },
       { v: [x, S + x], title: tx("Sign slip in (I)", "Vorzeichenfehler in (I)"), say: tx(`$x = ${x}$ is right! Then $${x} + y = ${S}$, so subtract ${x}: $y = ${S} - ${x}$.`, `$x = ${x}$ stimmt! Dann ist $${x} + y = ${S}$, also subtrahierst du ${x}: $y = ${S} - ${x}$.`) },
     ]),
@@ -682,7 +698,7 @@ export type Chase = {
 export const CATCH: Chase[] = [
   {
     first: (v) => [`Lina sets off from home by bike at ${v} km/h.`, `Lina fährt mit ${v} km/h mit dem Rad von zu Hause los.`],
-    second: (v) => [`her brother follows her on his moped at ${v} km/h.`, `fährt ihr Bruder ihr mit ${v} km/h auf dem Mofa hinterher.`],
+    second: (v) => [`her brother follows her on his moped at ${v} km/h.`, `fährt ihr Bruder ihr mit ${v} km/h auf dem Moped hinterher.`],
     ask: {
       dist: ["How far from home does her brother catch up with her?", "Wie weit von zu Hause entfernt holt ihr Bruder sie ein?"],
       time: ["How many hours after Lina's start does her brother catch up with her?", "Wie viele Stunden nach Linas Start holt ihr Bruder sie ein?"],

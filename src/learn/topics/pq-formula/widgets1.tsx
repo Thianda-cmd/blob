@@ -221,8 +221,8 @@ export function RootLab() {
         <p className="text-[13px] leading-relaxed text-ink-3">
           {t(
             tx(
-              "c > 0: the line crosses the parabola twice, at −√c and √c. c = 0: it only touches the vertex. c < 0: it passes underneath.",
-              "c > 0: Die Gerade schneidet die Parabel zweimal, bei −√c und √c. c = 0: Sie berührt nur den Scheitel. c < 0: Sie läuft unten durch.",
+              "c > 0: the line crosses the parabola twice, at −√c and √c. c = 0: it only touches the vertex. c < 0: it runs completely below the parabola.",
+              "c > 0: Die Gerade schneidet die Parabel zweimal, bei −√c und √c. c = 0: Sie berührt nur den Scheitel. c < 0: Sie verläuft ganz unterhalb der Parabel.",
             ),
           )}
         </p>
@@ -388,7 +388,11 @@ export function ZeroProductLab() {
           <div className="min-h-[52px] rounded-xl bg-paper/60 px-3 py-2.5 text-[13.5px] leading-snug text-ink-2">
             {done ? (
               <span className="font-medium text-ok">
-                {t(tx("Found both! The product is 0 only at these two places:", "Beide gefunden! Das Produkt ist nur an diesen beiden Stellen 0:"))}{" "}
+                {t(
+                  zeros.length === 1
+                    ? tx("Found it! Both brackets are 0 at the same place, so there's only one solution:", "Gefunden! Beide Klammern sind an derselben Stelle 0, also gibt es nur eine Lösung:")
+                    : tx("Found both! The product is 0 only at these two places:", "Beide gefunden! Das Produkt ist nur an diesen beiden Stellen 0:"),
+                )}{" "}
                 <MathView src={polish(zeros.length === 1 ? `L = \\{ ${dec(zeros[0])} \\}` : `L = \\{ ${dec(zeros[0])}; ${dec(zeros[1])} \\}`)} size="inline" animate={false} />
               </span>
             ) : (

@@ -81,7 +81,9 @@ export function FormulaBoard(props: Record<string, unknown>) {
   return (
     <div className="relative -m-3 grid min-h-[150px] place-items-center overflow-hidden rounded-2xl px-6 py-9">
       <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" />
-      <MathView src={props.src as Text} size="xl" animate={false} className="relative" />
+      {/* One size smaller on phones, so long formulas stay on one line. */}
+      <MathView src={props.src as Text} size="lg" animate={false} className="relative sm:hidden" />
+      <MathView src={props.src as Text} size="xl" animate={false} className="relative hidden sm:inline-flex" />
     </div>
   );
 }

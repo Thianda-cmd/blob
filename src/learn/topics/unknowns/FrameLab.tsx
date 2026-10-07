@@ -185,7 +185,7 @@ const GW = 380;
 const GH = 220;
 const GM = { l: 44, r: 12, t: 12, b: 30 };
 const X0 = -32;
-const X1 = 8;
+const X1 = 10;
 const Y0 = -200;
 const Y1 = 1400;
 
@@ -204,7 +204,7 @@ function AreaParabola({ x }: { x: number }) {
   const xTicks = [-30, -20, -10, 0];
   const yTicks = [0, 400, 800, 1200];
   return (
-    <svg viewBox={`0 0 ${GW} ${GH}`} className="block h-auto w-full rounded-xl border border-line bg-surface" role="img" aria-label={t(tx("Graph of the area (30 + 2x)(18 + 2x)", "Graph der Fläche (30 + 2x)(18 + 2x)"))}>
+    <svg viewBox={`0 0 ${GW} ${GH}`} className="mx-auto block h-auto w-full max-w-[600px] rounded-xl border border-line bg-surface" role="img" aria-label={t(tx("Graph of the area (30 + 2x)(18 + 2x)", "Graph der Fläche (30 + 2x)(18 + 2x)"))}>
       <rect x={px(0)} y={GM.t} width={px(X1) - px(0)} height={GH - GM.t - GM.b} fill="color-mix(in oklab, var(--ok) 10%, transparent)" />
       {yTicks.map((v) => (
         <g key={`y${v}`}>
@@ -225,7 +225,7 @@ function AreaParabola({ x }: { x: number }) {
       <text x={GW - GM.r} y={GH - 4} textAnchor="end" fontSize={11} fill="var(--ink-2)" fontStyle="italic" className="font-math">
         x
       </text>
-      <text x={px(0) + 6} y={GM.t + 10} fontSize={10.5} fill="var(--ok)" fontWeight={600} style={{ fontFamily: "var(--font-sans)" }}>
+      <text x={(px(0) + px(X1)) / 2} y={py(-110)} textAnchor="middle" fontSize={10} fill="var(--ok)" fontWeight={600} style={{ fontFamily: "var(--font-sans)" }}>
         {t(tx("real frames", "echte Rahmen"))}
       </text>
       <line x1={GM.l} x2={GW - GM.r} y1={py(TARGET)} y2={py(TARGET)} stroke="var(--blob)" strokeDasharray="5 4" strokeWidth={1.4} />
@@ -242,7 +242,7 @@ function AreaParabola({ x }: { x: number }) {
         x = 3
       </text>
       <motion.circle initial={false} animate={{ cx: px(x), cy: py(area(x)) }} transition={soft} r={5.5} fill="var(--blob)" stroke="var(--raised)" strokeWidth={2} />
-      <text x={GW - GM.r - 2} y={GM.t + 10} textAnchor="end" fontSize={10.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+      <text x={px(-10)} y={GM.t + 10} textAnchor="middle" fontSize={10.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
         {`(${num(x, locale)} | ${num(area(x), locale)})`}
       </text>
     </svg>

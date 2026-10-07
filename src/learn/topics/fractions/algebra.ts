@@ -54,7 +54,14 @@ export const par = (a: number) => (a === 0 ? "x" : `(${lin(a)})`);
 export const numL = (v: number, l: Locale) => decStr(v, l);
 
 /** A set of numbers: \{ -3; 3 \} in German, \{ -3, 3 \} in English. Empty: \{ \}. */
-export const setSrc = (vals: number[], l: Locale) => (vals.length ? `\\{ ${[...vals].sort((a, b) => a - b).map((v) => numL(v, l)).join(l === "de" ? "; " : ", ")} \\}` : "\\{ \\}");
+export const setSrc = (vals: number[], l: Locale) =>
+  vals.length
+    ? `\\{ ${[...vals]
+        .sort((a, b) => a - b)
+        // \group keeps a leading minus a sign right after the brace.
+        .map((v) => (v < 0 ? `\\group{${numL(v, l)}}` : numL(v, l)))
+        .join(l === "de" ? "; " : ", ")} \\}`
+    : "\\{ \\; \\}";
 
 /** The domain: D = ℚ ∖ \{ … \} (or D = ℚ). */
 export const domainSrc = (gaps: number[]): Text => txMap((_, l) => (gaps.length ? `D = ℚ ∖ ${setSrc(gaps, l)}` : "D = ℚ"));

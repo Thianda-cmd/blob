@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useId, useSyncExternalStore, type ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
+import { MathView } from "@/learn/components/MathView";
 import { cn } from "@/lib/utils";
 
 // Small UI pieces shared by the level 2 and level 3 widgets.
@@ -135,7 +136,30 @@ export function Segmented<T extends string | number>({
   );
 }
 
+/**
+ * A worked solution as in an exercise book: numbered lines, the "=" signs one under
+ * the other, and the step after the bar. Used as the picture of "find the mistake" tasks.
+ */
+export function StepsBoard({ rows }: { rows: { left: string; right: string; op?: string }[] }) {
+  const size = useNarrow() ? "sm" : "md";
+  return (
+    <div className="overflow-x-auto py-2">
+      <div className="mx-auto grid w-max grid-cols-[auto_auto_auto_auto_auto] items-center gap-x-2 gap-y-2.5 sm:gap-x-3">
+        {rows.map((r, i) => (
+          <div key={i} className="contents">
+            <span className="pr-1 text-[13px] font-semibold tabular-nums text-ink-3">({i + 1})</span>
+            <MathView src={r.left} size={size} animate={false} className="justify-self-end" />
+            <MathView src="=" size={size} animate={false} />
+            <MathView src={r.right} size={size} animate={false} className="justify-self-start" />
+            {r.op ? <MathView src={`| \\, ${r.op}`} size={size} animate={false} className="pl-2 text-blob-ink sm:pl-4" /> : <span />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** A small caption above a control. */
 export function Caption({ children }: { children: ReactNode }) {
-  return <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{children}</span>;
+  return <span className="block text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{children}</span>;
 }

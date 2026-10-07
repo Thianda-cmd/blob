@@ -20,7 +20,7 @@ import { BALL, DieFace, SpinnerPointer, SpinnerWheel, useNum, type Ball } from "
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }) {
   const scope = useId();
   return (
-    <div className="flex rounded-lg border border-line p-0.5" role="radiogroup">
+    <div className="inline-flex w-fit max-w-full flex-wrap rounded-lg border border-line p-0.5" role="radiogroup">
       {options.map((o) => (
         <button
           key={o.id}
@@ -237,7 +237,7 @@ export function ProbabilityDiceLab() {
                   <motion.rect
                     initial={false}
                     animate={{ y: barY(hv), height: Math.max(0, top + plotH - barY(hv)) }}
-                    transition={{ type: "spring", stiffness: 220, damping: 26 }}
+                    transition={{ type: "tween", ease: "easeOut", duration: 0.35 }}
                     x={x}
                     width={bw}
                     rx={4}

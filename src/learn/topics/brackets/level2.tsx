@@ -309,7 +309,8 @@ type MSlip = "onlyFirst" | "signSlip" | "pbl" | "combine" | "none";
 
 const MSLIP_OPTION: Record<MSlip, Text> = {
   onlyFirst: tx("Step 1: the factor was not multiplied by every term.", "Schritt 1: Der Faktor wurde nicht mit jedem Term multipliziert."),
-  signSlip: tx("Step 1: a sign is wrong after multiplying.", "Schritt 1: Nach dem Multiplizieren stimmt ein Vorzeichen nicht."),
+  // "the absolute value is right" keeps this apart from onlyFirst, where the unmultiplied term can have the wrong sign too.
+  signSlip: tx("Step 1: a product has the wrong sign (its absolute value is right).", "Schritt 1: Ein Produkt hat das falsche Vorzeichen (der Betrag stimmt)."),
   pbl: tx("Step 1: point before line was ignored.", "Schritt 1: Punkt vor Strich wurde nicht beachtet."),
   combine: tx("Step 2: the like terms were combined wrongly.", "Schritt 2: Die gleichartigen Terme wurden falsch zusammengefasst."),
   none: tx("There is no mistake.", "Es gibt keinen Fehler."),

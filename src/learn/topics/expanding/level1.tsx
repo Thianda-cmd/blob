@@ -139,7 +139,11 @@ function expandPartsFrames(parts: Part[]): Frame[] {
           : tx("First get rid of the bracket, then combine.", "Erst die Klammer auflösen, dann zusammenfassen."),
     },
     { math: partsSrc(parts), arrows, note: tx("Each factor multiplies **every** term in its bracket.", "Jeder Faktor wird mit **jedem** Term in seiner Klammer multipliziert.") },
-    { math: tsrc(expanded), note: txMap((t) => `${products.join(", ")}. ${t("The brackets are gone.", "Die Klammern sind weg.")}`), highlight: rest[0].highlight },
+    {
+      math: tsrc(expanded),
+      note: txMap((t) => `${products.join(", ")}. ${brackets.length > 1 ? t("The brackets are gone.", "Die Klammern sind weg.") : t("The bracket is gone.", "Die Klammer ist weg.")}`),
+      highlight: rest[0].highlight,
+    },
     ...rest.slice(1),
   ];
 }
@@ -181,7 +185,7 @@ function collectMistakes(list: T[], add: ReturnType<typeof mistakeList>["add"]) 
       plain([{ c: total, v: vars[0] }]),
       tx("Unlike terms combined", "Ungleichartige Terme zusammengefasst"),
       tx(
-        `$${vars[0]}$-terms and plain numbers are different kinds, like apples and pears. You can only combine terms of the **same** kind.`,
+        `$${vars[0]}$-terms and plain numbers are different kinds, like apples and oranges. You can only combine terms of the **same** kind.`,
         `$${vars[0]}$-Terme und Zahlen ohne Variable sind verschiedene Sorten, wie Äpfel und Birnen. Zusammenfassen darfst du nur Terme der **gleichen** Sorte.`,
       ),
     );
@@ -499,7 +503,8 @@ function genClever(rng: Rng): Exercise {
     const n = rng.pick([3, 4, 5, 6, 7, 8, 9, 12, 25]);
     const sg = rng.chance(0.65) ? 1 : -1;
     if (sg > 0) {
-      const R = rng.pick([10, 20, 100, 100]);
+      // With R = 10 (8 · 9 + 8 · 1) direct calculation is just as quick, so the round number is 20 or 100.
+      const R = rng.pick([20, 100, 100]);
       const a = R === 100 ? rng.int(51, 97) : rng.int(R / 2 + 1, R - 1);
       return cleverBackTask(n, a, R - a, 1);
     }
@@ -575,7 +580,7 @@ const variableFrames: Frame[] = [
   { math: "3#k (x#x +#p 4#n)#b", note: tx("But the distributive law still works: the $3$ multiplies **each** term, the $x$ and the $4$.", "Aber das Distributivgesetz gilt trotzdem: Die $3$ wird mit **jedem** Term multipliziert, mit $x$ und mit $4$."), arrows: [["k", "x"], ["k", "n"]] },
   { math: "3#k \\cdot#d1 x#x +#p 3#k2 \\cdot#d2 4#n", note: tx("Two products, just like with $7 \\cdot 103$.", "Zwei Produkte, genau wie bei $7 \\cdot 103$.") },
   { math: "3#k x#x +#p 12#n", note: tx("$3 \\cdot x = 3x$ and $3 \\cdot 4 = 12$. The bracket is gone: $3(x + 4) = 3x + 12$.", "$3 \\cdot x = 3x$ und $3 \\cdot 4 = 12$. Die Klammer ist weg: $3(x + 4) = 3x + 12$.") },
-  { math: "3 \\cdot (2 + 4) = 18 = 3 \\cdot 2 + 12", note: tx("Quick test with $x = 2$: both sides give $18$. It works for every number!", "Schnelltest mit $x = 2$: Beide Seiten ergeben $18$. Das klappt mit jeder Zahl!") },
+  { math: "3 \\cdot (2 + 4) = 18 = 3 \\cdot 2 + 12", note: tx("Check with $x = 2$: both sides give $18$. It works for every number!", "Probe mit $x = 2$: Beide Seiten ergeben $18$. Das klappt mit jeder Zahl!") },
 ];
 
 const likeList: T[] = [term(3, "x", "a"), term(2, "", "b"), term(5, "x", "c"), term(-7, "", "d")];
@@ -652,6 +657,7 @@ export const level1: LevelLesson = {
     },
     {
       type: "widget",
+      id: "split-the-rectangle",
       title: tx("Split the rectangle", "Teil das Rechteck"),
       blob: tx("Drag the purple line and watch the two parts!", "Zieh an der lila Linie und schau dir die beiden Teile an!"),
       body: tx(
@@ -667,8 +673,9 @@ export const level1: LevelLesson = {
     },
     {
       type: "explain",
+      id: "rectangle-3-times-x-plus-4",
       title: tx("A variable in the bracket", "Eine Variable in der Klammer"),
-      blob: tx("Same trick, now with x. Ausmultiplizieren!", "Derselbe Trick, jetzt mit x. Ausmultiplizieren!"),
+      blob: tx("Same trick, now with x. Let's expand!", "Derselbe Trick, jetzt mit x. Ausmultiplizieren!"),
       body: tx(
         "$3(x + 4)$ means $3 \\cdot (x + 4)$. Think of a rectangle with height $3$ and width $x + 4$: its area is $3 \\cdot x$ plus $3 \\cdot 4$. Getting rid of the bracket like this is called **expanding**.",
         "$3(x + 4)$ heißt $3 \\cdot (x + 4)$. Stell dir ein Rechteck mit der Höhe $3$ und der Breite $x + 4$ vor: Seine Fläche ist $3 \\cdot x$ plus $3 \\cdot 4$. Die Klammer so aufzulösen heißt **Ausmultiplizieren**.",
@@ -684,7 +691,7 @@ export const level1: LevelLesson = {
     {
       type: "explain",
       title: tx("Like terms", "Gleichartige Terme"),
-      blob: tx("Apples with apples, pears with pears!", "Äpfel zu Äpfeln, Birnen zu Birnen!"),
+      blob: tx("Apples with apples, oranges with oranges!", "Äpfel zu Äpfeln, Birnen zu Birnen!"),
       body: tx(
         "Terms with the same variable part are **like terms**: $3x$ and $5x$, or $2$ and $-7$. You can combine them into one. $3x$ and $2$ are different kinds, so they stay apart.",
         "Terme mit demselben Variablenteil sind **gleichartig**: $3x$ und $5x$ oder $2$ und $-7$. Du kannst sie zu einem Term zusammenfassen. $3x$ und $2$ sind verschiedene Sorten, die bleiben getrennt.",
@@ -693,6 +700,7 @@ export const level1: LevelLesson = {
     },
     {
       type: "widget",
+      id: "algebra-tiles",
       title: tx("Algebra tiles", "Algebra-Kacheln"),
       blob: tx("Build a term with tiles and let them sort themselves.", "Bau einen Term aus Kacheln und lass sie sich sortieren."),
       body: tx(

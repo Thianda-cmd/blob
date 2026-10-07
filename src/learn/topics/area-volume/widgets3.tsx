@@ -181,7 +181,7 @@ export function AreaVolumePourLab() {
         </defs>
         {/* thirds on the container */}
         {[1, 2].map((k) => {
-          const p = kind === "pyr" ? R([A, 0, (k * H) / 3]) : ([rcx + rr, by - ((k * H) / 3) * S] as P);
+          const p = kind === "pyr" ? R([A, A, (k * H) / 3]) : ([rcx + rr, by - ((k * H) / 3) * S] as P);
           return (
             <g key={k}>
               <line x1={p[0] + 4} x2={p[0] + 12} y1={p[1]} y2={p[1]} stroke="var(--ink-3)" strokeWidth={1.2} />
@@ -342,11 +342,11 @@ export function AreaVolumeScaleLab() {
                 <div className="flex items-baseline justify-between gap-2 text-[13.5px]">
                   <span className="text-ink-2">{t(row.label)}</span>
                   <span className="font-semibold tabular-nums text-ink">
-                    · k{sup(row.pow)} = · {v}
+                    {t(tx("times", "mal"))} {v} <span className="font-math font-normal italic text-ink-3">(k{sup(row.pow)})</span>
                   </span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-hover">
-                  <motion.div className="h-full rounded-full bg-blob" initial={false} animate={{ width: `${Math.max(2, (v / MAXK ** row.pow) * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 26 }} />
+                  <motion.div className="h-full rounded-full bg-blob" initial={false} animate={{ width: `${Math.max(1.5, (v / MAXK ** 3) * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 26 }} />
                 </div>
               </div>
             );
@@ -356,7 +356,7 @@ export function AreaVolumeScaleLab() {
 
       <div className="space-y-2 rounded-xl border border-line bg-surface px-4 py-3">
         <div className="overflow-x-auto">
-          <MathView src={`a'#a =#e ${k}#k1 \\cdot#m1 a#a2 \\quad A'#A =#e2 ${k}#k2^{2#s2} \\cdot#m2 A#A2 =#e3 ${k * k}#v2 A#A3 \\quad V'#V =#e4 ${k}#k3^{3#s3} \\cdot#m3 V#V2 =#e5 ${k ** 3}#v3 V#V3`} size="md" scope={`${scope}-s`} />
+          <MathView src={`a_2#a =#e ${k}#k1 \\cdot#m1 a_1#a2 \\quad A_2#A =#e2 ${k}#k2^{2#s2} \\cdot#m2 A_1#A2 =#e3 ${k * k}#v2 A_1#A3 \\quad V_2#V =#e4 ${k}#k3^{3#s3} \\cdot#m3 V_1#V2 =#e5 ${k ** 3}#v3 V_1#V3`} size="md" scope={`${scope}-s`} />
         </div>
         <p className="text-[13.5px] leading-relaxed text-ink-2">
           {t(

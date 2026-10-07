@@ -42,7 +42,7 @@ const PLACES: { at: P; name: Text; dx?: number; dy?: number; anchor?: "start" | 
 
 /** Real length in cm → readable: metres below 1 km, else kilometres. */
 function realText(cm: number, l: Locale): { value: string; unit: string; n: number; digits: number } {
-  if (cm >= 100000) return { value: nf(cm / 100000, l, 2), unit: "km", n: cm / 100000, digits: 2 };
+  if (cm >= 100000) return { value: nf(cm / 100000, l, 3), unit: "km", n: cm / 100000, digits: 3 };
   return { value: nf(cm / 100, l, 1), unit: "m", n: cm / 100, digits: 1 };
 }
 
@@ -97,7 +97,15 @@ export function MapScale() {
     move(i, [Math.min(MW - 0.5, Math.max(0.5, p[0] + step[0])), Math.min(MH - 0.5, Math.max(0.5, p[1] + step[1]))]);
   }
 
-  const mid: P = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  // The distance label sits beside the line (on the upper side), not on top of the places.
+  const len = Math.max(exact, 1e-9);
+  let nx = -(b[1] - a[1]) / len;
+  let ny = (b[0] - a[0]) / len;
+  if (ny > 0 || (ny === 0 && nx > 0)) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const mid: P = [(a[0] + b[0]) / 2 + nx * 0.42, (a[1] + b[1]) / 2 + ny * 0.42];
   const bar = BAR[scale];
   const calc = `${mn(mapCm, l, "d", 1)} "cm"#u1 \\cdot#op ${mn(scale, l, "n")} =#e1 ${mn(realCm, l, "r")} "cm"#u2 =#e2 ${mn(real.n, l, "k", real.digits)} "${real.unit}"#u3`;
 
@@ -124,7 +132,7 @@ export function MapScale() {
       <div className="mx-auto max-w-[620px]">
         <svg
           ref={svgRef}
-          viewBox={`-8 -8 ${MW * U + 16} ${MH * U + 16}`}
+          viewBox={`-8 -8 ${MW * U + 16} ${MH * U + 50}`}
           className="w-full touch-none select-none"
           role="img"
           aria-label={t(tx("Town map with two pins", "Stadtplan mit zwei Nadeln"))}
@@ -200,9 +208,8 @@ export function MapScale() {
           ))}
 
           {/* scale bar */}
-          <g transform={`translate(${0.35 * U} ${MH * U - 0.42 * U})`}>
-            <rect x={-5} y={-17} width={bar.cm * U + 10} height={25} rx={5} fill="var(--raised)" opacity={0.9} />
-            <motion.g initial={false} animate={{ opacity: 1 }} key={scale}>
+          <g transform={`translate(0 ${MH * U + 30})`}>
+            <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} key={scale}>
               {Array.from({ length: bar.cm }, (_, i) => (
                 <rect key={i} x={i * U} y={-3} width={U} height={5} fill={i % 2 ? "var(--raised)" : "var(--ink)"} stroke="var(--ink)" strokeWidth={0.8} />
               ))}
@@ -226,8 +233,8 @@ export function MapScale() {
             strokeLinecap="round"
           />
           <motion.g initial={false} animate={{ x: mid[0] * U, y: mid[1] * U }} transition={spring}>
-            <rect x={-27} y={-22} width={54} height={18} rx={9} fill="var(--blob)" />
-            <text y={-9} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="white" style={{ fontFamily: "var(--font-sans)" }}>
+            <rect x={-27} y={-9} width={54} height={18} rx={9} fill="var(--blob)" />
+            <text y={4} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="white" style={{ fontFamily: "var(--font-sans)" }}>
               {nf(mapCm, l, 1)} cm
             </text>
           </motion.g>

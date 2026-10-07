@@ -1250,7 +1250,7 @@ export const level3: LevelLesson = {
     {
       type: "explain",
       title: tx("Fractional equations", "Bruchgleichungen"),
-      blob: tx("Four steps. And step four can save your life.", "Vier Schritte. Und Schritt vier rettet dir den Tag."),
+      blob: tx("Four steps. And step four saves the day.", "Vier Schritte. Und Schritt vier rettet dir den Tag."),
       body: tx(
         "1. Domain. 2. Multiply both sides by the common denominator. 3. Solve. 4. Compare every solution with the domain: excluded values are **false solutions** (Scheinlösungen).",
         "1. Definitionsmenge. 2. Beide Seiten mit dem Hauptnenner multiplizieren. 3. Lösen. 4. Jede Lösung mit der Definitionsmenge abgleichen: Ausgeschlossene Werte sind **Scheinlösungen**.",

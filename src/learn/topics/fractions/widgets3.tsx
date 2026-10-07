@@ -61,6 +61,7 @@ export function FractionsDomainExplorer() {
   const t = usePick();
   const de = useLocale() === "de";
   const l = de ? "de" : "en";
+  const scope = useId();
   const [ti, setTi] = useState("a");
   const [x, setX] = useState(0.5);
   const [found, setFound] = useState<Record<string, number[]>>({});
@@ -86,7 +87,7 @@ export function FractionsDomainExplorer() {
     ? `\\frac{${pn}}{${pd}} = \\frac{${fmt(n)}}{\\red{0}}`
     : `\\frac{${pn}}{${pd}} = \\frac{${fmt(n)}}{${fmt(d)}} ${exact ? "=" : "\\approx"} ${exact ? fmt(v) : decStr(Math.round(v * 100) / 100, l)}`;
 
-  const gapsSrc = (g: number[]) => `\\{ ${[...g].sort((a, b) => a - b).map((y) => fmt(y)).join(de ? "; " : ", ")} \\}`;
+  const gapsSrc = (g: number[]) => `\\{ ${[...g].sort((a, b) => a - b).map((y) => (y < 0 ? `\\group{${fmt(y)}}` : fmt(y))).join(de ? "; " : ", ")} \\}`;
   const domain = term.never ? "D = ℚ" : `D = ℚ ∖ ${gapsSrc(term.gaps)}`;
 
   const inRange = !gap && Math.abs(v) <= 4.5;
@@ -94,7 +95,7 @@ export function FractionsDomainExplorer() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
-          scope="fr-domain"
+          scope={scope}
           options={TERMS.map((tm, i) => [tm.id, `${t("Term", "Term")} ${i + 1}`] as [string, string])}
           value={ti}
           onChange={(id) => {

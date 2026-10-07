@@ -115,7 +115,10 @@ function bracketExercise(terms: Mono[], vars: string[], F: Mono): Exercise {
   }
   const oneAt = q.findIndex(isOne);
   if (oneAt >= 0 && q.length > 1) {
-    m.add(polyPlain(q.filter((_, i) => i !== oneAt), vars), tx("The 1 is missing", "Die 1 fehlt"), tx(`When a term is the factor itself, a $1$ stays in the bracket: $${monoSrc(terms[oneAt], vars, { first: true })} = ${Fs === "-" ? "-1" : Fs} \\cdot ${q[oneAt].c}$.`, `Ist ein Term der Faktor selbst, bleibt eine $1$ in der Klammer: $${monoSrc(terms[oneAt], vars, { first: true })} = ${Fs === "-" ? "-1" : Fs} \\cdot ${q[oneAt].c}$.`));
+    // A negative number after a times sign gets brackets: −3x · (−1), never −3x · −1.
+    const qc = q[oneAt].c < 0 ? `(${q[oneAt].c})` : String(q[oneAt].c);
+    const prod = `${monoSrc(terms[oneAt], vars, { first: true })} = ${Fs === "-" ? "-1" : Fs} \\cdot ${qc}`;
+    m.add(polyPlain(q.filter((_, i) => i !== oneAt), vars), tx("The 1 is missing", "Die 1 fehlt"), tx(`When a term is the factor itself, a $1$ stays in the bracket: $${prod}$.`, `Ist ein Term der Faktor selbst, bleibt eine $1$ in der Klammer: $${prod}$.`));
   }
   return {
     instruction: FILL,
@@ -216,8 +219,9 @@ function commonBracketTask(rng: Rng): Exercise {
     const value = `${p}${r < 0 ? "-" : "+"}${Math.abs(r)}`;
     const m = exprMistakes(value);
     m.add(`${p}${r < 0 ? "+" : "-"}${Math.abs(r)}`, tx("Sign of the second factor", "Vorzeichen des zweiten Faktors"), tx(`The sign in front of the second bracket belongs to its factor: $${r < 0 ? "-" : "+"}${Math.abs(r)}$ goes into the new bracket.`, `Das Zeichen vor der zweiten Klammer gehört zu ihrem Faktor: $${r < 0 ? "-" : "+"}${Math.abs(r)}$ kommt in die neue Klammer.`));
-    m.add(`${r * pc}${u}`, tx("Added, not multiplied", "Addieren, nicht multiplizieren"), tx(`Treat the bracket like one letter $z$: $${p}z ${r < 0 ? "-" : "+"} ${Math.abs(r)}z = (${p} ${r < 0 ? "-" : "+"} ${Math.abs(r)})z$. The factors are combined with their signs, not multiplied.`, `Behandle die Klammer wie einen Buchstaben $z$: $${p}z ${r < 0 ? "-" : "+"} ${Math.abs(r)}z = (${p} ${r < 0 ? "-" : "+"} ${Math.abs(r)})z$. Die Faktoren werden mit ihren Vorzeichen zusammengefasst, nicht multipliziert.`));
+    // Before the multiply mistake: for r = 1 both give p, and the forgotten 1 is the likelier slip.
     if (Math.abs(r) === 1) m.add(p, tx("The 1 is missing", "Die 1 fehlt"), tx(`$${r < 0 ? "-" : "+"}(${B})$ means $${r < 0 ? "-1" : "+1"} \\cdot (${B})$. That $1$ goes into the new bracket.`, `$${r < 0 ? "-" : "+"}(${B})$ heißt $${r < 0 ? "-1" : "+1"} \\cdot (${B})$. Diese $1$ kommt mit in die neue Klammer.`));
+    m.add(`${r * pc}${u}`, tx("Added, not multiplied", "Addieren, nicht multiplizieren"), tx(`Treat the bracket like one letter $z$: $${p}z ${r < 0 ? "-" : "+"} ${Math.abs(r) === 1 ? "" : Math.abs(r)}z = (${p} ${r < 0 ? "-" : "+"} ${Math.abs(r)})z$. The factors are combined with their signs, not multiplied.`, `Behandle die Klammer wie einen Buchstaben $z$: $${p}z ${r < 0 ? "-" : "+"} ${Math.abs(r) === 1 ? "" : Math.abs(r)}z = (${p} ${r < 0 ? "-" : "+"} ${Math.abs(r)})z$. Die Faktoren werden mit ihren Vorzeichen zusammengefasst, nicht multipliziert.`));
     return {
       instruction: tx("Factor out the common bracket", "Klammere die gemeinsame Klammer aus"),
       math: fill(lhs, B),
@@ -237,11 +241,11 @@ function commonBracketTask(rng: Rng): Exercise {
       ["m", "n"],
     ]);
     const u = w === "x" ? "a" : "x";
+    // p always has a letter: with a plain number, (m − n)(6 − 7) would still need working out.
     const pc = rng.int(1, 5);
-    const pn = rng.int(2, 9);
-    const p = rng.chance(0.6) ? `${pc === 1 ? "" : pc}${u}` : `${pn}`;
+    const p = `${pc === 1 ? "" : pc}${u}`;
     const r = rng.int(2, 9);
-    if (gcd(/\d/.test(p) ? Number(p.replace(/\D/g, "")) : 1, r) !== 1) return commonBracketTask(rng);
+    if (gcd(pc, r) !== 1) return commonBracketTask(rng);
     const B = `${w} - ${z}`;
     const lhs = `${p}(${w} - ${z}) + ${r}(${z} - ${w})`;
     const value = `${p}-${r}`;
@@ -323,7 +327,14 @@ function solveTask(rng: Rng): Exercise {
   const solution: Frame[] = [];
   if (moved) solution.push({ math: eq, note: tx("Bring everything to one side first, so that $0$ is on the other side. Don't divide by $x$!", "Bring zuerst alles auf eine Seite, sodass auf der anderen $0$ steht. Teile nicht durch $x$!") });
   solution.push(
-    { math: std, note: moved ? tx(`Subtract $${bx(-b, true)}$ on both sides.`, `Subtrahiere auf beiden Seiten $${bx(-b, true)}$.`) : tx("Don't divide by $x$, you'd lose a solution. Factor out instead.", "Teile nicht durch $x$, sonst verlierst du eine Lösung. Klammere lieber aus.") },
+    {
+      math: std,
+      note: moved
+        ? -b > 0
+          ? tx(`Subtract $${bx(-b, true)}$ on both sides.`, `Subtrahiere auf beiden Seiten $${bx(-b, true)}$.`)
+          : tx(`Add $${bx(b, true)}$ on both sides.`, `Addiere auf beiden Seiten $${bx(b, true)}$.`)
+        : tx("Don't divide by $x$, you'd lose a solution. Factor out instead.", "Teile nicht durch $x$, sonst verlierst du eine Lösung. Klammere lieber aus."),
+    },
     { math: `${F}(${inner}) = 0`, note: tx(`Factor out $${F}$. Now there is a product on the left.`, `Klammere $${F}$ aus. Links steht jetzt ein Produkt.`) },
     {
       math: tx(`${F} = 0 \\quad "or" \\quad ${inner} = 0`, `${F} = 0 \\quad "oder" \\quad ${inner} = 0`),
@@ -343,7 +354,8 @@ function solveTask(rng: Rng): Exercise {
 
 /** (6x + 9) : 3, (x² − 5x) : x, (4x + 8) : (x + 2): factor first, then cancel factors. */
 function fractionTask(rng: Rng): Exercise {
-  const kind = rng.int(0, 2);
+  // Mostly kinds 1 and 2: there a letter (or a whole bracket) has to be factored out, not just a number.
+  const kind = rng.pick([0, 1, 1, 2, 2]);
   const instruction = tx("Factor out, then simplify the fraction", "Klammere aus und kürze dann den Bruch");
   const hint = tx("Factor the numerator first. You may only cancel **factors**, never single summands.", "Klammere zuerst im Zähler aus. Kürzen darfst du nur **Faktoren**, nie einzelne Summanden.");
   if (kind === 0) {
@@ -402,7 +414,7 @@ function fractionTask(rng: Rng): Exercise {
   const v = rng.pick(["x", "a"]);
   const den = polySrc([mono(1, 1), mono(b, 0)], [v]);
   const num = polySrc([mono(k, 1), mono(k * b, 0)], [v]);
-  const summandwise = 1 + k;
+  // Cancelling summand by summand (kx : x and kb : b) gives k + k.
   const mistakes: Mistake[] = [
     {
       when: { kind: "number", value: 2 * k },
@@ -410,9 +422,6 @@ function fractionTask(rng: Rng): Exercise {
       say: tx(`You cancelled summand by summand. That's not allowed: only **factors** cancel. Factor out $${k}$ in the numerator first.`, `Du hast Summand für Summand gekürzt. Das ist nicht erlaubt: Kürzen darfst du nur **Faktoren**. Klammere zuerst im Zähler $${k}$ aus.`),
     },
   ];
-  if (summandwise !== 2 * k && summandwise !== k) {
-    mistakes.push({ when: { kind: "number", value: summandwise }, title: tx("Summands cancelled", "Summanden gekürzt"), say: tx("Only **factors** cancel, never single summands. Factor the numerator first.", "Kürzen darfst du nur **Faktoren**, nie einzelne Summanden. Klammere zuerst im Zähler aus.") });
-  }
   return {
     instruction,
     text: tx(`Assume $${v} \\ne ${-b}$.`, `Es gilt $${v} \\ne ${-b}$.`),

@@ -8,7 +8,6 @@ import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/
 import { bi, dec, decStr, dotsSrc, fracDots, periodOf, primeFactors, r6, terminates } from "./decimals";
 import {
   addSub,
-  appendNote,
   board,
   bracketTask,
   CALCULATE,
@@ -20,7 +19,6 @@ import {
   frf,
   kf,
   lcdNote,
-  mImproper,
   mSrc,
   mTx,
   mul,
@@ -123,7 +121,7 @@ function toDecimalExercise(n: number, d: number): Exercise {
   const glue = (a: string) => Number(a);
   const concat = n < d ? glue(`0.${n}${d}`) : null;
   const comma = glue(`${n}.${d}`);
-  const NOT_COMMA = tx("Fraction bar read as a comma", "Bruchstrich als Komma gelesen");
+  const NOT_COMMA = tx("Fraction bar read as a decimal point", "Bruchstrich als Komma gelesen");
   const notCommaSay = tx(
     `Ah, I see what happened! You wrote numerator and denominator next to each other as a decimal. But the fraction bar isn't a decimal point: $\\frac{${n}}{${d}}$ means $${n} : ${d}$.`,
     `Ah, ich seh, was passiert ist! Du hast Zähler und Nenner einfach als Dezimalzahl hintereinandergeschrieben. Der Bruchstrich ist aber kein Komma: $\\frac{${n}}{${d}}$ heißt $${n} : ${d}$.`,
@@ -292,7 +290,7 @@ function fromDecimalExercise(v: number, percent: boolean): Exercise {
         bi(`${showDe}#q %#pc =#e \\frac{${showDe}#an}{100#ad}#af`),
         tx(`$${decStr(shown, "en")}\\,\\% = \\frac{${decStr(shown, "en")}}{100}$. A decimal in the numerator? Expand by $10$.`, `$${showDe}\\,\\% = \\frac{${showDe}}{100}$. Eine Kommazahl im Zähler? Erweitere mit $10$.`),
       );
-      put(b, bi(`${showDe}#q %#pc =#e \\frac{${m}#an}{${p}#ad}#af`), tx(`$\\frac{${m}}{${p}}$: no comma left.`, `$\\frac{${m}}{${p}}$: Jetzt ohne Komma.`));
+      put(b, bi(`${showDe}#q %#pc =#e \\frac{${m}#an}{${p}#ad}#af`), tx(`$\\frac{${m}}{${p}}$: no decimal point left.`, `$\\frac{${m}}{${p}}$: Jetzt ohne Komma.`));
     }
     b.pre = bi(`${showDe}#q %#pc =#e `).de;
   } else {
@@ -345,7 +343,7 @@ function fromDecimalExercise(v: number, percent: boolean): Exercise {
         v: fv(Number(digits[1]), Number(digits[2])),
         title: tx("Comma read as a fraction bar", "Komma als Bruchstrich gelesen"),
         say: tx(
-          `Ooh, tempting! But the digits after the comma aren't numerator and denominator. $${decStr(v, "en")}$ means $${m}$ ${PLACE[p][0]}.`,
+          `Ooh, tempting! But the digits after the decimal point aren't numerator and denominator. $${decStr(v, "en")}$ means $${m}$ ${PLACE[p][0]}.`,
           `Ooh, verlockend! Die Ziffern nach dem Komma sind aber nicht Zähler und Nenner. $${decStr(v, "de")}$ heißt $${m}$ ${PLACE[p][1]}.`,
         ),
       },
@@ -414,11 +412,11 @@ function periodicFrames(P: Periodic): { frames: Frame[]; value: Frac; raw: Frac 
     note:
       m === 0
         ? tx(
-            `Multiply by $${big}$: the comma moves ${k} place${k > 1 ? "s" : ""} to the right. Behind the comma it looks exactly the same.`,
+            `Multiply by $${big}$: the decimal point moves ${k} place${k > 1 ? "s" : ""} to the right. After the point it looks exactly the same.`,
             `Mal $${big}$: Das Komma rutscht um ${k === 1 ? "eine Stelle" : `${k} Stellen`} nach rechts. Hinter dem Komma sieht alles genauso aus.`,
           )
         : tx(
-            `Move the comma behind the period ($\\cdot ${big}$) and in front of the period ($\\cdot ${small}$). Behind the comma, both lines look the same.`,
+            `Move the decimal point behind the period ($\\cdot ${big}$) and in front of the period ($\\cdot ${small}$). After the point, both lines look the same.`,
             `Verschieb das Komma einmal hinter die Periode ($\\cdot ${big}$) und einmal vor die Periode ($\\cdot ${small}$). Hinter dem Komma sehen beide Zeilen gleich aus.`,
           ),
     highlight: ["bv", "av"],
@@ -466,11 +464,11 @@ function periodicExercise(P: Periodic): Exercise {
     hint:
       m === 0
         ? tx(
-            `Call it $x$ and multiply by $${10 ** k}$: the comma moves past one period. Then subtract $x$.`,
+            `Call it $x$ and multiply by $${10 ** k}$: the decimal point moves past one period. Then subtract $x$.`,
             `Nenn die Zahl $x$ und nimm sie mal $${10 ** k}$: Das Komma rutscht über eine Periode. Dann zieh $x$ ab.`,
           )
         : tx(
-            `Call it $x$. Move the comma behind the period ($\\cdot ${10 ** (m + k)}$) and in front of it ($\\cdot ${10 ** m}$), then subtract.`,
+            `Call it $x$. Move the decimal point behind the period ($\\cdot ${10 ** (m + k)}$) and in front of it ($\\cdot ${10 ** m}$), then subtract.`,
             `Nenn die Zahl $x$. Verschieb das Komma hinter die Periode ($\\cdot ${10 ** (m + k)}$) und davor ($\\cdot ${10 ** m}$) und zieh dann ab.`,
           ),
     solution: frames,
@@ -487,7 +485,7 @@ function periodicExercise(P: Periodic): Exercise {
         v: frac(Number(`${P.int}${digits}`), 10 ** (m + k) - 1),
         title: tx("Treated the whole thing as the period", "Alles als Periode genommen"),
         say: tx(
-          `Careful: only $${P.period}$ repeats, the $${P.pre}$ in front doesn't. Your fraction would be $0.${digits}${digits} …$. Also move the comma to just in front of the period, then subtract.`,
+          `Careful: only $${P.period}$ repeats, the $${P.pre}$ in front doesn't. Your fraction would be $0.${digits}${digits} …$. Also move the decimal point to just in front of the period, then subtract.`,
           `Vorsicht: Nur die $${P.period}$ wiederholt sich, die $${P.pre}$ davor nicht. Dein Bruch wäre $0,${digits}${digits} …$. Verschieb das Komma auch direkt vor die Periode und zieh dann ab.`,
         ),
       },
@@ -546,8 +544,8 @@ function toPeriodicTask(rng: Rng): Exercise | null {
   if (n < 10)
     wrong.push({
       text: asOpt(dec(Number(`0.${n}${d}`))),
-      title: tx("Fraction bar read as a comma", "Bruchstrich als Komma gelesen"),
-      say: tx(`The fraction bar isn't a comma: $\\frac{${n}}{${d}}$ means $${n} : ${d}$.`, `Der Bruchstrich ist kein Komma: $\\frac{${n}}{${d}}$ heißt $${n} : ${d}$.`),
+      title: tx("Fraction bar read as a decimal point", "Bruchstrich als Komma gelesen"),
+      say: tx(`The fraction bar isn't a decimal point: $\\frac{${n}}{${d}}$ means $${n} : ${d}$.`, `Der Bruchstrich ist kein Komma: $\\frac{${n}}{${d}}$ heißt $${n} : ${d}$.`),
     });
   wrong.push({
     text: asOpt(dec(Number(`${p.int}.${p.pre}${p.period}`))),
@@ -798,7 +796,8 @@ function compareTask(rng: Rng): Exercise | null {
   const aSrc = (l: "en" | "de") => resolveText(A.src, l);
   const bSrc = (l: "en" | "de") => resolveText(B.src, l);
   const relSym = ["<", "=", ">"][right];
-  const pair = (a: string, b: string, r = "\\quad") => `${keyTokens(a, "a")} ${r === "\\quad" ? r : `${r}#r`} ${keyTokens(b, "b")}`;
+  // \group keeps a leading minus a sign (not a "minus" operation) after the gap.
+  const pair = (a: string, b: string, r = "\\quad") => `\\group{${keyTokens(a, "a")}} ${r === "\\quad" ? r : `${r}#r`} \\group{${keyTokens(b, "b")}}`;
   frames.push({ math: txMap((_, l) => pair(aSrc(l), bSrc(l))), note: tx("Which number is bigger?", "Welche Zahl ist größer?") });
   if (A.f && B.f && E(A.src).includes("frac") && E(B.src).includes("frac")) {
     const fa = A.f;
@@ -839,7 +838,7 @@ function compareTask(rng: Rng): Exercise | null {
   return {
     instruction: tx("Compare", "Vergleiche"),
     text: tx("Which sign is right: $<$, $=$ or $>$?", "Welches Zeichen stimmt: $<$, $=$ oder $>$?"),
-    math: txMap((_, l) => `${aSrc(l)} \\quad \\box{?} \\quad ${bSrc(l)}`),
+    math: txMap((_, l) => `${aSrc(l)} \\quad \\box{?} \\quad \\group{${bSrc(l)}}`),
     answer: { kind: "choice", options, correct: right },
     hint: tx("Same denominator, or both as decimals. And for negative numbers: further left is smaller.", "Gleicher Nenner oder beide als Dezimalzahl. Und bei negativen Zahlen: weiter links ist kleiner."),
     solution: frames,
@@ -864,7 +863,7 @@ function keyTokens(body: string, key: string): string {
 function orderExercise(items: Item[], traps: { a: Item; b: Item; title: Text; say: Text }[]): Exercise {
   const sorted = [...items].sort((x, y) => x.v - y.v);
   const opt = (it: Item) => txMap((_, l) => `$${resolveText(it.src, l)}$`);
-  const keyed = (it: Item, l: "en" | "de", what: "src" | "dec") => keyTokens(what === "src" ? resolveText(it.src, l) : decOf(it, l), it.key);
+  const keyed = (it: Item, l: "en" | "de", what: "src" | "dec") => `\\group{${keyTokens(what === "src" ? resolveText(it.src, l) : decOf(it, l), it.key)}}`;
   const frames: Frame[] = [
     {
       math: txMap((_, l) => items.map((it) => keyed(it, l, "src")).join(" \\quad ")),
@@ -887,7 +886,7 @@ function orderExercise(items: Item[], traps: { a: Item; b: Item; title: Text; sa
     instruction: tx("Order the numbers", "Ordne die Zahlen"),
     text: tx("Put the numbers in order, **smallest first**.", "Bring die Zahlen in die richtige Reihenfolge, **die kleinste zuerst**."),
     answer: { kind: "order", items: sorted.map(opt), label: tx("Smallest at the top", "Die kleinste nach oben") },
-    hint: tx("Write them all as decimals. Negative numbers come first, and $-0{,}8$ is smaller than $-0{,}7$.", "Schreib alle als Dezimalzahlen. Negative Zahlen kommen zuerst, und $-0,8$ ist kleiner als $-0,7$."),
+    hint: tx("Write them all as decimals. Negative numbers come first, and $-0.8$ is smaller than $-0.7$.", "Schreib alle als Dezimalzahlen. Negative Zahlen kommen zuerst, und $-0,8$ ist kleiner als $-0,7$."),
     solution: frames,
     mistakes: traps.map((t) => ({ when: { kind: "order" as const, items: [opt(t.a), opt(t.b)] }, title: t.title, say: t.say })),
   };
@@ -1424,7 +1423,7 @@ const repeatFrames: Frame[] = [
   { math: bi("x#x =#e 0,777#v …#dots"), note: tx("And back to a fraction? Call the number $x$.", "Und zurück zum Bruch? Nenn die Zahl $x$.") },
   {
     math: bi("10#k x#x2 =#e2 7,777#v2 …#dots2 \\\\ x#x =#e 0,777#v …#dots"),
-    note: tx("Times $10$: the comma moves one place. Behind the comma nothing changes.", "Mal $10$: Das Komma rutscht eine Stelle. Hinter dem Komma ändert sich nichts."),
+    note: tx("Times $10$: the decimal point moves one place. After the point nothing changes.", "Mal $10$: Das Komma rutscht eine Stelle. Hinter dem Komma ändert sich nichts."),
     highlight: ["v2", "v"],
   },
   {
@@ -1468,40 +1467,84 @@ const compareFrames: Frame[] = [
 ];
 
 // Order of operations: −3/4 + 1 1/2 : (2/3 − 1/6)
-const opsBoard = board();
-{
-  const X = kf(3, 4, "x");
-  const M: MixedN = { w: 1, n: 1, d: 2, id: "m" };
-  const A = kf(2, 3, "a");
-  const B = kf(1, 6, "b");
-  const lead = `-#${X.kf}s ${src(X)} +#o1 `;
-  put(
-    opsBoard,
-    `${lead}${mSrc(M)} :#o2 (${src(A)} -#o3 ${src(B)})#br`,
-    tx("The same order as with whole numbers: **brackets first**, then $\\cdot$ and $:$, then $+$ and $-$.", "Dieselbe Reihenfolge wie bei ganzen Zahlen: **Klammer zuerst**, dann Punkt-, dann Strichrechnung."),
-    { highlight: ["br(", "br)"] },
-  );
-  opsBoard.pre = `${lead}${mSrc(M)} :#o2 (`;
-  opsBoard.post = ")#br";
-  const S = addSub(opsBoard, A, B, -1, "o3");
-  opsBoard.pre = "";
-  opsBoard.post = "";
-  put(opsBoard, `${lead}${mSrc(M)} :#o2 ${src(S)}`, tx("The bracket is done. Now the division, before the plus.", "Die Klammer ist fertig. Jetzt die Division, vor dem Plus."), { highlight: ["o2"] });
-  put(opsBoard, `${lead}${mWork(M)} :#o2 ${src(S)}`, tx("Turn the mixed number into an improper fraction first.", "Wandle vorher die gemischte Zahl in einen unechten Bruch um."), { highlight: ["mw", "mk"] });
-  const MI = mImproper(M);
-  put(opsBoard, `${lead}${src(MI)} :#o2 ${src(S)}`, tx("$1 \\cdot 2 + 1 = 3$, so $1\\frac{1}{2} = \\frac{3}{2}$.", "$1 \\cdot 2 + 1 = 3$, also ist $1\\frac{1}{2} = \\frac{3}{2}$."));
-  opsBoard.pre = lead;
-  const Q = div(opsBoard, MI, S, "o2");
-  opsBoard.pre = "";
-  signedAddSub(opsBoard, X, -1, Q, 1, "o1");
-  appendNote(opsBoard.frames, tx("As a mixed number: $2\\frac{1}{4}$.", "Als gemischte Zahl: $2\\frac{1}{4}$."));
-}
+const opsLead = "-#xs \\frac{3#xn}{4#xd}#xf +#o1 ";
+const opsFrames: Frame[] = [
+  {
+    math: `${opsLead}1#mw \\frac{1#mn}{2#md}#mf :#o2 (\\frac{2#an}{3#ad}#af -#o3 \\frac{1#bn}{6#bd}#bf)#br`,
+    note: tx("The same order as with whole numbers: **brackets first**, then $\\cdot$ and $:$, then $+$ and $-$.", "Dieselbe Reihenfolge wie bei ganzen Zahlen: **Klammer zuerst**, dann Punkt-, dann Strichrechnung."),
+    highlight: ["br(", "br)"],
+  },
+  {
+    math: `${opsLead}1#mw \\frac{1#mn}{2#md}#mf :#o2 (\\frac{4#an}{6#ad}#af -#o3 \\frac{1#bn}{6#bd}#bf)#br`,
+    note: tx("Inside the bracket: common denominator $6$, so $\\frac{2}{3} = \\frac{4}{6}$.", "In der Klammer: Hauptnenner $6$, also $\\frac{2}{3} = \\frac{4}{6}$."),
+    highlight: ["an", "ad"],
+  },
+  {
+    math: `${opsLead}1#mw \\frac{1#mn}{2#md}#mf :#o2 (\\frac{3#an}{6#ad}#af)#br`,
+    note: tx("$\\frac{4}{6} - \\frac{1}{6} = \\frac{3}{6}$.", "$\\frac{4}{6} - \\frac{1}{6} = \\frac{3}{6}$."),
+  },
+  {
+    math: `${opsLead}1#mw \\frac{1#mn}{2#md}#mf :#o2 \\frac{1#an}{2#ad}#af`,
+    note: tx("Simplified: $\\frac{3}{6} = \\frac{1}{2}$. The bracket is done.", "Gekürzt: $\\frac{3}{6} = \\frac{1}{2}$. Die Klammer ist fertig."),
+  },
+  {
+    math: `${opsLead}\\frac{3#mn}{2#md}#mf :#o2 \\frac{1#an}{2#ad}#af`,
+    note: tx("Now the division, before the plus. First the mixed number: $1\\frac{1}{2} = \\frac{3}{2}$.", "Jetzt die Division, vor dem Plus. Vorher die gemischte Zahl: $1\\frac{1}{2} = \\frac{3}{2}$."),
+    highlight: ["mn", "md"],
+  },
+  {
+    math: `${opsLead}\\frac{3#mn}{2#md}#mf \\cdot#o2 \\frac{2#ad}{1#an}#af`,
+    note: tx("Divide by $\\frac{1}{2}$ means multiply by its reciprocal $\\frac{2}{1}$.", "Durch $\\frac{1}{2}$ teilen heißt mit dem Kehrwert $\\frac{2}{1}$ multiplizieren."),
+    highlight: ["o2", "ad", "an"],
+  },
+  { math: `${opsLead}3#mn`, note: tx("$\\frac{3}{2} \\cdot \\frac{2}{1} = \\frac{6}{2} = 3$.", "$\\frac{3}{2} \\cdot \\frac{2}{1} = \\frac{6}{2} = 3$.") },
+  { math: `${opsLead}\\frac{12#mn}{4#md}#mf`, note: tx("Last the plus. Write $3$ as quarters: $3 = \\frac{12}{4}$.", "Zum Schluss das Plus. Schreib $3$ als Viertel: $3 = \\frac{12}{4}$.") },
+  {
+    math: "\\frac{-#xs 3#xn +#o1 12#mn}{4#xd}#xf",
+    note: tx("Same denominator: combine the numerators. The minus belongs to the $3$ only.", "Gleicher Nenner: Zähler zusammenfassen. Das Minus gehört nur zur $3$."),
+  },
+  {
+    math: "\\frac{9#xn}{4#xd}#xf =#e 2#w \\frac{1#wn}{4#wd}#wf",
+    note: tx("$-3 + 12 = 9$. The result: $\\frac{9}{4} = 2\\frac{1}{4}$.", "$-3 + 12 = 9$. Das Ergebnis: $\\frac{9}{4} = 2\\frac{1}{4}$."),
+  },
+];
 
 // Double fraction: (1 − 1/4) / (1/2 + 1/8)
-const doubleBoard = (() => {
-  const ex = complexDoubleExercise({ f: frac(1), whole: true }, { f: frac(1, 4), whole: false }, -1, { f: frac(1, 2), whole: false }, { f: frac(1, 8), whole: false }, 1);
-  return ex ? ex.solution : [];
-})();
+const doubleFrames: Frame[] = [
+  {
+    math: "\\frac{1#an -#t1 \\frac{1#bn}{4#bd}#bf}{\\frac{1#cn}{2#cd}#cf +#u1 \\frac{1#en}{8#ed}#ef}#big",
+    note: tx("A **double fraction**: the long main bar means numerator **divided by** denominator.", "Ein **Doppelbruch**: Der lange Hauptbruchstrich bedeutet Zähler **geteilt durch** Nenner."),
+    highlight: ["big-bar"],
+  },
+  {
+    math: "(1#an -#t1 \\frac{1#bn}{4#bd}#bf)#tb :#big-bar (\\frac{1#cn}{2#cd}#cf +#u1 \\frac{1#en}{8#ed}#ef)#ub",
+    note: tx("Write it as a division. Top and bottom get brackets: they are worked out first.", "Schreib ihn als Division. Zähler und Nenner bekommen Klammern: Die rechnest du zuerst aus."),
+    highlight: ["big-bar"],
+  },
+  {
+    math: "(\\frac{4#an}{4#ad}#af -#t1 \\frac{1#bn}{4#bd}#bf)#tb :#big-bar (\\frac{4#cn}{8#cd}#cf +#u1 \\frac{1#en}{8#ed}#ef)#ub",
+    note: tx("Same denominators in each bracket: $1 = \\frac{4}{4}$ and $\\frac{1}{2} = \\frac{4}{8}$.", "In jeder Klammer gleiche Nenner: $1 = \\frac{4}{4}$ und $\\frac{1}{2} = \\frac{4}{8}$."),
+    highlight: ["an", "ad", "cn", "cd"],
+  },
+  {
+    math: "\\frac{3#an}{4#ad}#af :#big-bar \\frac{5#cn}{8#cd}#cf",
+    note: tx("Top: $\\frac{3}{4}$. Bottom: $\\frac{5}{8}$. The brackets can go.", "Oben: $\\frac{3}{4}$. Unten: $\\frac{5}{8}$. Die Klammern können weg."),
+  },
+  {
+    math: "\\frac{3#an}{4#ad}#af \\cdot#big-bar \\frac{8#cd}{5#cn}#cf",
+    note: tx("Divide means multiply by the reciprocal.", "Dividieren heißt mit dem Kehrwert multiplizieren."),
+    highlight: ["big-bar", "cd", "cn"],
+  },
+  {
+    math: "\\frac{3#an \\cdot#big-bar 2#cd}{1#ad \\cdot#m 5#cn}#af",
+    note: tx("Simplify crosswise: $8$ and $4$ both by $4$. Then top times top, bottom times bottom.", "Über Kreuz kürzen: $8$ und $4$ durch $4$. Dann Zähler mal Zähler, Nenner mal Nenner."),
+    highlight: ["cd", "ad"],
+  },
+  {
+    math: "\\frac{6#an}{5#ad}#af =#e 1#w \\frac{1#wn}{5#wd}#wf",
+    note: tx("The result: $\\frac{6}{5} = 1\\frac{1}{5}$.", "Das Ergebnis: $\\frac{6}{5} = 1\\frac{1}{5}$."),
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Checks
@@ -1575,7 +1618,7 @@ export const level2: LevelLesson = {
     {
       title: tx("Classic mistakes", "Typische Fehler"),
       body: tx(
-        "More digits don't make a decimal bigger. With negative numbers, the one further from $0$ is smaller. And the fraction bar is not a comma.",
+        "More digits don't make a decimal bigger. With negative numbers, the one further from $0$ is smaller. And the fraction bar is not a decimal point.",
         "Mehr Ziffern machen eine Dezimalzahl nicht größer. Bei negativen Zahlen ist die weiter von $0$ entfernte kleiner. Und der Bruchstrich ist kein Komma.",
       ),
       examples: [bi("\\frac{3}{4} \\ne 3,4"), bi("-0,8 < -0,7")],
@@ -1657,17 +1700,17 @@ export const level2: LevelLesson = {
         "Brackets first, then multiply and divide, then add and subtract. Turn mixed numbers into improper fractions, and mind the signs of negative fractions.",
         "Klammer vor Punkt vor Strich. Gemischte Zahlen werden zu unechten Brüchen, und bei negativen Brüchen achtest du auf die Vorzeichen.",
       ),
-      frames: opsBoard.frames,
+      frames: opsFrames,
     },
     {
       type: "explain",
       title: tx("Double fractions", "Doppelbrüche"),
-      blob: tx("A fraction made of fractions. Looks scary, isn't!", "Ein Bruch aus Brüchen. Sieht wild aus, ist es aber nicht!"),
+      blob: tx("A fraction made of fractions. Looks scary, but isn't!", "Ein Bruch aus Brüchen. Sieht wild aus, ist es aber nicht!"),
       body: tx(
         "In a **double fraction** the long main bar means: top divided by bottom. Work out the top and the bottom first, as if they were in brackets.",
         "Beim **Doppelbruch** bedeutet der lange Hauptbruchstrich: oben geteilt durch unten. Rechne Zähler und Nenner zuerst aus, als stünden sie in Klammern.",
       ),
-      frames: doubleBoard,
+      frames: doubleFrames,
     },
     {
       type: "check",

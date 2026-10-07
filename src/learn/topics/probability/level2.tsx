@@ -178,10 +178,14 @@ function urnTask(rng: Rng, replace: boolean): Exercise {
       ? tx("Draw the tree: both stages look the same. Multiply along each path, add the paths you need.", "Zeichne den Baum: Beide Stufen sehen gleich aus. Multipliziere entlang der Pfade und addiere die Pfade, die du brauchst.")
       : tx("Draw the tree: on the second stage there is one ball fewer, of the colour you drew first.", "Zeichne den Baum: Auf der zweiten Stufe fehlt eine Kugel, und zwar von der Farbe, die du zuerst gezogen hast."),
     solution: [
-      {
-        math: tx(`${en(pre)} = ${paths.map((p) => `P(${p.map((c) => en(L(c))).join("")})`).join(" + ")}`, `${de(pre)} = ${paths.map((p) => `P(${p.map((c) => de(L(c))).join("")})`).join(" + ")}`),
-        note: paths.length === 1 ? tx("One path belongs to this event.", "Zu diesem Ereignis gehört ein Pfad.") : tx(`${paths.length} paths belong to this event.`, `Zu diesem Ereignis gehören ${paths.length} Pfade.`),
-      },
+      ...(e.id === "12"
+        ? []
+        : [
+            {
+              math: tx(`${en(pre)} = ${paths.map((p) => `P(${p.map((c) => en(L(c))).join("")})`).join(" + ")}`, `${de(pre)} = ${paths.map((p) => `P(${p.map((c) => de(L(c))).join("")})`).join(" + ")}`),
+              note: paths.length === 1 ? tx("One path belongs to this event.", "Zu diesem Ereignis gehört ein Pfad.") : tx(`${paths.length} paths belong to this event.`, `Zu diesem Ereignis gehören ${paths.length} Pfade.`),
+            },
+          ]),
       {
         math: `P = ${prodSrc}`,
         note: replace
@@ -435,7 +439,7 @@ function decTreeTask(rng: Rng): Exercise {
     solution: [
       { math: say((f) => `P = ${sumSrc(f)}`), note: leaves.length === 1 ? tx("One path: multiply along it.", "Ein Pfad: entlang multiplizieren.") : tx(`${leaves.length} paths: multiply along each one.`, `${leaves.length} Pfade: entlang jedes Pfades multiplizieren.`) },
       ...(leaves.length > 1 ? [{ math: say((f) => `P = ${valSrc(f)}`), note: tx("Add the paths.", "Pfade addieren.") }] : []),
-      { math: say((f) => `P = ${f.n(right)}`), note: say((f) => f.t(`That's $${f.pc(right)} \\, %$.`, `Das sind $${f.pc(right)} \\, %$.`)) },
+      { math: say((f) => `P = ${f.n(right)}`), note: say((f) => f.t(`That's $\\group{${f.pc(right)} \\, %}$.`, `Das sind $\\group{${f.pc(right)} \\, %}$.`)) },
     ],
     mistakes: numMistakes(right, 1e-6, cands),
   };
@@ -537,7 +541,7 @@ function branchesTask(rng: Rng): Exercise {
     mistakes: choiceMistakes(s.options, s.correct, [
       { i: s.at(1), title: tx("That's with replacement", "Das wäre mit Zurücklegen"), say: tx("These are the probabilities of the first draw. Without replacement, the urn has changed.", "Das sind die Wahrscheinlichkeiten vom ersten Zug. Ohne Zurücklegen hat sich die Urne verändert.") },
       { i: s.at(2), title: tx("Total not reduced", "Gesamtzahl nicht verringert"), say: tx(`One ball fewer in the urn: only $${n - 1}$ are left. Check: your branches don't add up to $1$.`, `Eine Kugel weniger in der Urne: Es sind nur noch $${n - 1}$. Probe: Deine Äste ergeben nicht $1$.`) },
-      { i: s.at(3), title: tx("Colour not reduced", "Farbe nicht verringert"), say: tx(`The missing ball was ${en(col)}: there's one ${en(col)} ball fewer too. Check: your branches don't add up to $1$.`, `Die fehlende Kugel war ${de(col)}: Davon gibt es jetzt auch eine weniger. Probe: Deine Äste ergeben nicht $1$.`) },
+      { i: s.at(3), title: tx("Colour not reduced", "Farbe nicht verringert"), say: tx(`The missing ball was ${en(colName)}: there's one ${en(col)} ball fewer too. Check: your branches don't add up to $1$.`, `Die fehlende Kugel war ${de(colName)}: Davon gibt es jetzt auch eine weniger. Probe: Deine Äste ergeben nicht $1$.`) },
     ]),
   };
 }
@@ -585,7 +589,7 @@ const multistage: Frame[] = [
 const rule1: Frame[] = [
   { math: "P(rr) =#eq \\frac{3}{5}#f1 \\cdot#t \\frac{3}{5}#f2", note: tx("First ball red: $\\frac{3}{5}$. It goes back, so the second ball is red with $\\frac{3}{5}$ again.", "Erste Kugel rot: $\\frac{3}{5}$. Sie kommt zurück, also ist auch die zweite mit $\\frac{3}{5}$ rot.") },
   { math: "P(rr) =#eq \\frac{3}{5}#f1 \\cdot#t \\frac{3}{5}#f2 =#e2 \\frac{9}{25}#r", note: tx("Numerator times numerator, denominator times denominator.", "Zähler mal Zähler, Nenner mal Nenner.") },
-  { math: say((f) => `P(rr) =#eq \\frac{9}{25}#r =#e2 ${f.n(0.36)}#d =#e3 36 \\, %`), note: tx("So you draw red twice in a bit more than a third of all cases.", "In gut einem Drittel aller Fälle ziehst du also zweimal Rot.") },
+  { math: say((f) => `P(rr) =#eq \\frac{9}{25}#r =#e2 ${f.n(0.36)}#d =#e3 \\group{36 \\, %}`), note: tx("So you draw red twice in a bit more than a third of all cases.", "In gut einem Drittel aller Fälle ziehst du also zweimal Rot.") },
 ];
 
 const rule2: Frame[] = [
@@ -593,7 +597,7 @@ const rule2: Frame[] = [
   { math: "P(E) =#eq P(rg)#a +#p P(gr)#b", note: tx("Path rule 2: add the probabilities of the paths.", "2. Pfadregel: Die Wahrscheinlichkeiten der Pfade werden addiert.") },
   { math: "P(E) =#eq \\frac{3}{5} \\cdot \\frac{2}{5} +#p \\frac{2}{5} \\cdot \\frac{3}{5}", note: tx("Each path on its own, with path rule 1.", "Jeden Pfad einzeln, mit der 1. Pfadregel.") },
   { math: "P(E) =#eq \\frac{6}{25}#a +#p \\frac{6}{25}#b", note: tx("Both paths have the same probability here.", "Beide Pfade haben hier dieselbe Wahrscheinlichkeit.") },
-  { math: say((f) => `P(E) =#eq \\frac{12}{25}#a =#e2 ${f.n(0.48)} =#e3 48 \\, %`), note: tx("Add them up. Done!", "Addieren. Fertig!") },
+  { math: say((f) => `P(E) =#eq \\frac{12}{25}#a =#e2 ${f.n(0.48)} =#e3 \\group{48 \\, %}`), note: tx("Add them up. Done!", "Addieren. Fertig!") },
 ];
 
 const noReplace: Frame[] = [
@@ -607,8 +611,8 @@ const atLeast: Frame[] = [
   { math: tx(`P("at least one 6") =#eq 1#o -#m \\frac{5}{6} \\cdot \\frac{5}{6} \\cdot \\frac{5}{6}`, `P("mindestens eine 6") =#eq 1#o -#m \\frac{5}{6} \\cdot \\frac{5}{6} \\cdot \\frac{5}{6}`), note: tx("No six three times in a row: path rule 1.", "Dreimal hintereinander keine Sechs: 1. Pfadregel.") },
   { math: tx(`P("at least one 6") =#eq 1#o -#m \\frac{125}{216}#f`, `P("mindestens eine 6") =#eq 1#o -#m \\frac{125}{216}#f`), note: tx("$5 \\cdot 5 \\cdot 5 = 125$ and $6 \\cdot 6 \\cdot 6 = 216$.", "$5 \\cdot 5 \\cdot 5 = 125$ und $6 \\cdot 6 \\cdot 6 = 216$.") },
   {
-    math: say((f) => f.t(`P("at least one 6") =#eq \\frac{91}{216}#f \\approx ${f.n(0.421)} = ${f.n(42.1)} \\, %`, `P("mindestens eine 6") =#eq \\frac{91}{216}#f \\approx ${f.n(0.421)} = ${f.n(42.1)} \\, %`)),
-    note: say((f) => f.t(`Not $\\frac{3}{6} = 50 \\, %$! Adding $\\frac{1}{6}$ three times counts the paths with several sixes more than once.`, `Nicht $\\frac{3}{6} = 50 \\, %$! Wer dreimal $\\frac{1}{6}$ addiert, zählt die Pfade mit mehreren Sechsen mehrfach.`)),
+    math: say((f) => f.t(`P("at least one 6") =#eq \\frac{91}{216}#f \\approx \\group{${f.n(42.1)} \\, %}`, `P("mindestens eine 6") =#eq \\frac{91}{216}#f \\approx \\group{${f.n(42.1)} \\, %}`)),
+    note: say((f) => f.t(`Not $\\frac{3}{6} = \\group{50 \\, %}$! Adding $\\frac{1}{6}$ three times counts the paths with several sixes more than once.`, `Nicht $\\frac{3}{6} = \\group{50 \\, %}$! Wer dreimal $\\frac{1}{6}$ addiert, zählt die Pfade mit mehreren Sechsen mehrfach.`)),
   },
 ];
 
@@ -659,7 +663,7 @@ const raffleCheck: Exercise = {
   solution: [
     { math: "P(E) =#eq \\frac{3}{10}#a \\cdot#t \\frac{2}{9}#b", note: tx("First a winner: $\\frac{3}{10}$. Then $9$ tickets are left, $2$ of them winners.", "Erst ein Gewinn: $\\frac{3}{10}$. Dann sind noch $9$ Lose übrig, davon $2$ Gewinne.") },
     { math: "P(E) =#eq \\frac{3}{10}#a \\cdot#t \\frac{2}{9}#b =#e2 \\frac{6}{90}#r", note: tx("Path rule 1.", "1. Pfadregel.") },
-    { math: "P(E) =#eq \\frac{6}{90}#r =#e2 \\frac{1}{15}#s", note: tx("Simplify by $6$. That's only about $6.7 \\, %$.", "Mit $6$ kürzen. Das sind nur etwa $6,7 \\, %$.") },
+    { math: "P(E) =#eq \\frac{6}{90}#r =#e2 \\frac{1}{15}#s", note: tx("Simplify by $6$. That's only about $\\group{6.7 \\, %}$.", "Mit $6$ kürzen. Das sind nur etwa $\\group{6,7 \\, %}$.") },
   ],
   mistakes: fracMistakes(q(1, 15), [
     { v: q(9, 100), title: tx("Calculated with replacement", "Mit Zurücklegen gerechnet"), say: tx("The first ticket stays out! For the second draw only $9$ tickets are left, and only $2$ winners.", "Das erste Los bleibt draußen! Beim zweiten Zug sind nur noch $9$ Lose da, davon $2$ Gewinne.") },

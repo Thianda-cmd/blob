@@ -58,7 +58,8 @@ function nice(f: Frac, l: Locale): string {
 
 const SLOPES: Frac[] = [q(-3), q(-2), q(-3, 2), q(-1), q(-2, 3), q(-1, 2), q(-1, 3), q(0), q(1, 3), q(1, 2), q(2, 3), q(1), q(3, 2), q(2), q(3)];
 const S0 = 7;
-const BS = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+/** y-intercepts −6 … 6, so the starting line h: y = −x + 5 sits on the slider. */
+const BS = Array.from({ length: 13 }, (_, i) => i - 6);
 const idxOf = (m: Frac) => SLOPES.findIndex((s) => s.n === m.n && s.d === m.d);
 
 function LineSliders({ name, mi, b, onM, onB, tone }: { name: string; mi: number; b: number; onM: (i: number) => void; onB: (b: number) => void; tone: "blob" | "ink" }) {
@@ -66,7 +67,7 @@ function LineSliders({ name, mi, b, onM, onB, tone }: { name: string; mi: number
   const l = useLocale();
   const m = SLOPES[mi];
   return (
-    <div className="space-y-2 rounded-xl border border-line px-3 py-2.5">
+    <div className="space-y-2 rounded-xl border border-line px-4 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <span className="whitespace-nowrap">
           <Caption>{t(tx(`Line ${name}`, `Gerade ${name}`))}</Caption>
@@ -75,8 +76,11 @@ function LineSliders({ name, mi, b, onM, onB, tone }: { name: string; mi: number
           <MathView src={`m = ${nice(m, l)} \\quad b = ${b}`} size="sm" animate={false} />
         </span>
       </div>
-      <StepSlider value={mi} count={SLOPES.length} onChange={onM} zero={S0} tone={tone} label={tx(`Slope of ${name}`, `Steigung von ${name}`)} valueText={`m = ${qv(m).toFixed(2)}`} />
-      <StepSlider value={b + 4} count={BS.length} onChange={(i) => onB(BS[i])} zero={4} tone={tone} label={tx(`y-intercept of ${name}`, `y-Achsenabschnitt von ${name}`)} valueText={`b = ${b}`} />
+      {/* Inset, so a thumb at either end stays inside the card. */}
+      <div className="px-2">
+        <StepSlider value={mi} count={SLOPES.length} onChange={onM} zero={S0} tone={tone} label={tx(`Slope of ${name}`, `Steigung von ${name}`)} valueText={`m = ${m.d === 1 || [2, 4, 5, 10].includes(m.d) ? numIn(qv(m), l) : `${m.n}/${m.d}`}`} />
+        <StepSlider value={b + 6} count={BS.length} onChange={(i) => onB(BS[i])} zero={6} tone={tone} label={tx(`y-intercept of ${name}`, `y-Achsenabschnitt von ${name}`)} valueText={`b = ${b}`} />
+      </div>
     </div>
   );
 }
@@ -199,6 +203,8 @@ export function IntersectionLab() {
 // Angle lab: tan α = m. One line, or two lines and the angle between them.
 
 const ANGLE_M = [-3, -2, -1, -0.5, 0, 0.5, 1, 1.5, 2, 3];
+/** A label without the chip, for small letters right on the drawing. */
+const BARE = "bg-transparent! shadow-none! backdrop-blur-none! px-0! py-0!";
 
 /** An arc of radius r from angle a to b (radians), as world points. */
 function arc(a: number, b: number, r: number): Pt[] {
@@ -217,7 +223,11 @@ function acuteSpan(a: number, b: number): [number, number] {
   return [a, a + d];
 }
 
-const deg = (v: number, l: Locale) => `${Math.abs(v - Math.round(v)) < 1e-9 ? numIn(Math.round(v), l) : numIn(v, l, 1)} \\deg`;
+const isWhole = (v: number) => Math.abs(v - Math.round(v)) < 1e-9;
+const rel = (v: number) => (isWhole(v) ? "=" : "\\approx");
+const deg = (v: number, l: Locale) => `${isWhole(v) ? numIn(Math.round(v), l) : numIn(v, l, 1)} \\deg`;
+/** Slope angles with two decimals: the one-decimal result below always comes from the exact angles. */
+const deg2 = (v: number, l: Locale) => `${isWhole(v) ? numIn(Math.round(v), l) : numIn(v, l, 2)} \\deg`;
 
 export function AngleLab() {
   const t = useText();
@@ -241,7 +251,7 @@ export function AngleLab() {
   let lines: string[];
   let note: Text;
   if (!two) {
-    lines = [`\\tan \\alpha = m = ${mS}`, `\\alpha = \\tan^{-1}(${mS}) \\approx ${deg(aG, l)}`];
+    lines = [`\\tan \\alpha = m = ${mS}`, `\\alpha = \\tan^{-1}(${mS}) ${rel(aG)} ${deg(aG, l)}`];
     note =
       mg > 0
         ? tx(
@@ -255,14 +265,14 @@ export function AngleLab() {
             )
           : tx("$m = 0$: the line is horizontal, $\\alpha = 0 \\deg$.", "$m = 0$: Die Gerade verläuft waagerecht, $\\alpha = 0 \\deg$.");
   } else {
-    lines = [`\\alpha_g \\approx ${deg(aG, l)} \\quad \\alpha_h \\approx ${deg(aH, l)}`];
+    lines = [`\\alpha_g ${rel(aG)} ${deg2(aG, l)} \\quad \\alpha_h ${rel(aH)} ${deg2(aH, l)}`];
     if (parallel) {
       lines.push("\\varphi = 0 \\deg");
       note = tx("Same slope: the lines are parallel and never meet.", "Gleiche Steigung: Die Geraden sind parallel und schneiden sich nie.");
     } else {
-      lines.push(`|${deg(aG, l)} - ${aH < 0 ? `(${deg(aH, l)})` : deg(aH, l)}| = ${deg(diff, l)}`);
-      if (diff > 90) lines.push(`\\varphi = 180 \\deg - ${deg(diff, l)} = ${deg(delta, l)}`);
-      else lines.push(`\\varphi \\approx ${deg(delta, l)}`);
+      lines.push(`|${deg2(aG, l)} - ${aH < 0 ? `(${deg2(aH, l)})` : deg2(aH, l)}| ${rel(diff)} ${deg(diff, l)}`);
+      if (diff > 90) lines.push(`\\varphi ${rel(diff)} 180 \\deg - ${deg(diff, l)} = ${deg(delta, l)}`);
+      else lines.push(`\\varphi ${rel(delta)} ${deg(delta, l)}`);
       note = perp
         ? tx(`$m_g \\cdot m_h = -1$: the lines are **perpendicular**, $\\varphi = 90 \\deg$.`, `$m_g \\cdot m_h = -1$: Die Geraden sind **orthogonal**, $\\varphi = 90 \\deg$.`)
         : diff > 90
@@ -273,32 +283,34 @@ export function AngleLab() {
 
   const span = (): Pt[] => {
     const [a, b] = acuteSpan(ag.get(), ah.get());
-    return arc(a, b, 1.25);
+    return arc(a, b, 0.95);
   };
 
   return (
     <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="mx-auto w-full max-w-[420px] rounded-xl border border-line bg-surface p-2">
         <Plane
+          xRange={[-3, 3]}
+          yRange={[-3, 3]}
           label={tx("Lines through the origin with their slope angles", "Ursprungsgeraden mit ihren Steigungswinkeln")}
           overlay={
             <>
-              <PlaneTag at={() => [2.2 * cos(ag.get() / 2), 2.2 * sin(ag.get() / 2)]}>
+              <PlaneTag at={() => [(two ? 0.98 : 0.92) * cos(ag.get() / 2), (two ? 0.98 : 0.92) * sin(ag.get() / 2)]} className={BARE}>
                 <MathView src={two ? "\\alpha_g" : "\\alpha"} size="sm" animate={false} className="text-blob-ink" />
               </PlaneTag>
               {!two && mg !== 0 && (
                 <>
-                  <PlaneTag at={() => [0.5, 0]} dy={mg > 0 ? 12 : -12}>
+                  <PlaneTag at={() => [0.5, 0]} dy={mg > 0 ? 11 : -11} className={BARE}>
                     <MathView src="1" size="sm" animate={false} className="text-ink" />
                   </PlaneTag>
-                  <PlaneTag at={() => [1, Math.tan(ag.get()) / 2]} anchor="left" dx={6}>
+                  <PlaneTag at={() => [1, Math.tan(ag.get()) / 2]} anchor="left" dx={5} className={BARE}>
                     <MathView src="m" size="sm" animate={false} className="text-blob-ink" />
                   </PlaneTag>
                 </>
               )}
               {two && (
                 <>
-                  <PlaneTag at={() => [3.2 * cos(ah.get() / 2), 3.2 * sin(ah.get() / 2)]}>
+                  <PlaneTag at={() => [1.75 * cos(ah.get() / 2), 1.75 * sin(ah.get() / 2)]} className={BARE}>
                     <MathView src={"\\alpha_h"} size="sm" animate={false} className="text-ink" />
                   </PlaneTag>
                   {!parallel && (
@@ -306,8 +318,9 @@ export function AngleLab() {
                       at={() => {
                         const [a, b] = acuteSpan(ag.get(), ah.get());
                         const mid = (a + b) / 2;
-                        return [-1.9 * cos(mid), -1.9 * sin(mid)];
+                        return [-1.3 * cos(mid), -1.3 * sin(mid)];
                       }}
+                      className={BARE}
                     >
                       <MathView src={"\\varphi"} size="sm" animate={false} className="text-ok" />
                     </PlaneTag>
@@ -318,8 +331,8 @@ export function AngleLab() {
           }
         >
           {!two && <PlanePath shape={() => [[0, 0], [1, 0], [1, Math.tan(ag.get())]]} closed fill="color-mix(in oklab, var(--blob) 15%, transparent)" stroke={TONE.blob} width={0.45} dashed />}
-          <PlanePath shape={() => arc(0, ag.get(), 1.6)} stroke={TONE.blob} width={0.7} />
-          {two && <PlanePath shape={() => arc(0, ah.get(), 2.6)} stroke={TONE.ink} width={0.6} />}
+          <PlanePath shape={() => arc(0, ag.get(), two ? 0.7 : 0.6)} stroke={TONE.blob} width={0.7} />
+          {two && <PlanePath shape={() => arc(0, ah.get(), 1.4)} stroke={TONE.ink} width={0.6} />}
           {two && !parallel && (
             <>
               <PlanePath shape={span} stroke={TONE.ok} width={0.8} />
@@ -353,7 +366,7 @@ export function AngleLab() {
             <Caption>{t(two ? tx("Slope of g", "Steigung von g") : tx("Slope m", "Steigung m"))}</Caption>
             <MathView src={`m${two ? "_g" : ""} = ${mS}`} size="sm" animate={false} className="text-blob-ink" />
           </div>
-          <StepSlider value={gi} count={ANGLE_M.length} onChange={setGi} zero={4} label={two ? tx("Slope of g", "Steigung von g") : tx("Slope m", "Steigung m")} valueText={`m = ${mg}`} />
+          <StepSlider value={gi} count={ANGLE_M.length} onChange={setGi} zero={4} label={two ? tx("Slope of g", "Steigung von g") : tx("Slope m", "Steigung m")} valueText={`m = ${mS}`} />
         </div>
         {two && (
           <div className="space-y-1">
@@ -361,7 +374,7 @@ export function AngleLab() {
               <Caption>{t(tx("Slope of h", "Steigung von h"))}</Caption>
               <MathView src={`m_h = ${numIn(mh, l)}`} size="sm" animate={false} className="text-ink" />
             </div>
-            <StepSlider value={hi} count={ANGLE_M.length} onChange={setHi} zero={4} tone="ink" label={tx("Slope of h", "Steigung von h")} valueText={`m = ${mh}`} />
+            <StepSlider value={hi} count={ANGLE_M.length} onChange={setHi} zero={4} tone="ink" label={tx("Slope of h", "Steigung von h")} valueText={`m = ${numIn(mh, l)}`} />
           </div>
         )}
         <AnimatePresence mode="wait" initial={false}>
@@ -461,7 +474,7 @@ export function DistanceLab() {
           }}
           overlay={
             <>
-              <PlaneTag at={() => [px.get(), py.get()]} anchor="left" dx={12} dy={-14}>
+              <PlaneTag at={() => [px.get(), py.get()]} anchor={P[0] >= 2 ? "right" : "left"} dx={P[0] >= 2 ? -12 : 12} dy={-14}>
                 <MathView src={pt(P[0], P[1], "P")} size="sm" animate={false} className="text-ink" />
               </PlaneTag>
               {step >= 2 && !onLine && (

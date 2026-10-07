@@ -20,7 +20,7 @@ const MAX = 20;
 const W = 360;
 const H = 220;
 const L = 30;
-const R = 8;
+const R = 64;
 const T = 14;
 const B = 28;
 const PH = H - T - B;
@@ -129,6 +129,7 @@ export function MeanLevel() {
   }
 
   const shown = level ? values.map(() => mean.value) : values;
+  const pill = t(tx(`mean ${mean.text}`, `Ø ${mean.text}`));
   const formula = `\\frac{${values.map((v, i) => `${v}#v${i}`).join(" + ")}}{${n}#n} =#e1 \\frac{${sum}#s}{${n}#n2} ${mean.exact ? "=" : "\\approx"}#e2 ${mn(mean.value, l, "r", 2)}`;
 
   return (
@@ -253,9 +254,9 @@ export function MeanLevel() {
             pointerEvents="none"
           />
           <motion.g initial={false} animate={{ y: yOf(mean.value) }} transition={soft} pointerEvents="none">
-            <rect x={W - R - 70} y={-19} width={70} height={16} rx={8} fill="var(--ink)" />
-            <text x={W - R - 35} y={-7.5} textAnchor="middle" fontSize={10.5} fontWeight={600} fill="var(--raised)" style={{ fontFamily: "var(--font-sans)" }}>
-              {t(tx(`mean ${mean.text}`, `Ø ${mean.text}`))}
+            <rect x={W - R + 4} y={-9} width={Math.min(R - 4, 14 + 6 * pill.length)} height={18} rx={9} fill="var(--ink)" />
+            <text x={W - R + 4 + Math.min(R - 4, 14 + 6 * pill.length) / 2} y={3.5} textAnchor="middle" fontSize={10.5} fontWeight={600} fill="var(--raised)" style={{ fontFamily: "var(--font-sans)" }}>
+              {pill}
             </text>
           </motion.g>
         </svg>

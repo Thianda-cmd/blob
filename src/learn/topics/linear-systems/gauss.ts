@@ -178,30 +178,47 @@ export function backFrames(final: Row[], labels: string[], names: Names = XYZ): 
     note: tx(`Start at the bottom: (${labels[2]}) only has $${nz}$ left.`, `Fang unten an: In (${labels[2]}) steht nur noch $${nz}$.`),
   });
   frames.push({ math: `${nz}#v3z =#e3 ${val(Z, "3c")}`, note: tx(`So $${nz} = ${Z}$.`, `Also ist $${nz} = ${Z}$.`) });
-  // y from the middle row
+  // y from the middle row (it may have no z at all, e.g. b alone in a parabola task)
   const Dy = B.z * Z;
   frames.push({
-    math: `${term(B.y, ny, "2y", true)} ${products([[B.z, Z, "2z"]], false)} =#e2 ${val(B.c, "2c")}`,
-    note: tx(`Put $${nz} = ${Z}$ into (${labels[1]}).`, `Setze $${nz} = ${Z}$ in (${labels[1]}) ein.`),
+    math: [term(B.y, ny, "2y", true), products([[B.z, Z, "2z"]], false), `=#e2 ${val(B.c, "2c")}`].filter(Boolean).join(" "),
+    note: B.z === 0 ? tx(`(${labels[1]}) only contains $${ny}$.`, `(${labels[1]}) enthält nur noch $${ny}$.`) : putNote([[nz, Z]], labels[1]),
   });
   frames.push({
     math: `${ny}#v2y =#e2 ${val(Y, "2c")}`,
     note: tx(`$${chainSrc(B.y, ny, Dy, B.c)}$`, `$${chainSrc(B.y, ny, Dy, B.c)}$`),
   });
-  // x from the first row
+  // x from the first row: only the unknowns that really occur in it are put in
   const Dx = A.y * Y + A.z * Z;
+  const known: [string, number][] = [];
+  if (A.y !== 0) known.push([ny, Y]);
+  if (A.z !== 0) known.push([nz, Z]);
   frames.push({
-    math: `${term(A.x, nx, "1x", true)} ${products(
-      [
-        [A.y, Y, "1y"],
-        [A.z, Z, "1z"],
-      ],
-      false,
-    )} =#e1 ${val(A.c, "1c")}`,
-    note: tx(`Put $${ny} = ${Y}$ and $${nz} = ${Z}$ into (I).`, `Setze $${ny} = ${Y}$ und $${nz} = ${Z}$ in (I) ein.`),
+    math: [
+      term(A.x, nx, "1x", true),
+      products(
+        [
+          [A.y, Y, "1y"],
+          [A.z, Z, "1z"],
+        ],
+        false,
+      ),
+      `=#e1 ${val(A.c, "1c")}`,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    note: known.length ? putNote(known, labels[0]) : tx(`(${labels[0]}) only contains $${nx}$.`, `(${labels[0]}) enthält nur noch $${nx}$.`),
   });
   frames.push({ math: `${nx}#v1x =#e1 ${val(X, "1c")}`, note: tx(`$${chainSrc(A.x, nx, Dx, A.c)}$`, `$${chainSrc(A.x, nx, Dx, A.c)}$`) });
   return { frames: merged(frames), values: v };
+}
+
+/** "Put y = 2 and z = 3 into (I)." for the values that are really substituted. */
+function putNote(known: [string, number][], label: string): Text {
+  const list = known.map(([n, v]) => `$${n} = ${v}$`);
+  const en = list.join(" and ");
+  const de = list.join(" und ");
+  return tx(`Put ${en} into (${label}).`, `Setze ${de} in (${label}) ein.`);
 }
 
 /** Products c · value for the non-zero coefficients, as a sum: "2 \cdot 1 - 2 + 3". */

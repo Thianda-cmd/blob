@@ -23,7 +23,7 @@ export function NegThermometer({
   caption?: Text;
 }) {
   const tt = useText();
-  const top = 26;
+  const top = 44;
   const height = 220;
   const k = height / (max - min);
   const y = (v: number) => top + (max - v) * k;
@@ -36,7 +36,7 @@ export function NegThermometer({
   const arrowX = cx + 74;
   return (
     <figure className="mx-auto flex max-w-[420px] flex-col items-center gap-2">
-      <svg viewBox="0 0 280 300" className="w-full max-w-[300px]" role="img" aria-label={`${signed(value)} °C`}>
+      <svg viewBox="0 0 280 318" className="w-full max-w-[300px]" role="img" aria-label={`${signed(value)} °C`}>
         {/* tube and bulb */}
         <rect x={cx - 11} y={top - 14} width={22} height={height + 30} rx={11} fill="var(--surface)" stroke="var(--line-2)" strokeWidth={2} />
         <circle cx={cx} cy={bulbY} r={19} fill="var(--danger)" stroke="var(--line-2)" strokeWidth={2} />
@@ -56,7 +56,7 @@ export function NegThermometer({
             </g>
           );
         })}
-        <text x={cx - 20} y={top - 20} textAnchor="end" fill="var(--ink-3)" className="font-math text-[13px]">
+        <text x={cx - 20} y={top - 22} textAnchor="end" fill="var(--ink-3)" className="font-math text-[13px]">
           °C
         </text>
         {/* zero line across */}

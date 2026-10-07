@@ -327,6 +327,8 @@ function subMistakes(s: Solved, e: Std, extra: [AnswerSpec, Msg][] = []): Mistak
   const qm = e[sv] * s.m;
   if (qo !== 0 && qm !== 0 && qo + qm !== qm) {
     const lost = (e.c - e[sv] * s.n) / qm;
+    // Only numbers a student would really write down (whole numbers or halves).
+    if (Number.isInteger(lost * 2) && Number.isInteger((s.m * lost + s.n) * 2)) {
     const via = sv === "y" ? xyWhen(lost, s.m * lost + s.n) : xyWhen(s.m * lost + s.n, lost);
     mk.add(
       via,
@@ -336,6 +338,7 @@ function subMistakes(s: Solved, e: Std, extra: [AnswerSpec, Msg][] = []): Mistak
         `Ich glaub, beim Zusammenfassen ist ein Term verloren gegangen: $${termOf(qo, ov)}$ und $${termOf(qm, ov)}$ ergeben zusammen $${termOf(qo + qm, ov)}$. Vergiss das $${termOf(qo, ov)}$ nicht, das schon da war!`,
       ),
     );
+    }
   }
   return mk.list.slice(0, 5);
 }
@@ -386,17 +389,19 @@ const REVERSED = (d: number): Msg => [
 const REVERSED_TIMES = (k: number): Msg => [
   tx("The wrong way round", "Falsch herum"),
   tx(
-    `Read the sentence again: **which** is bigger? $y$ is the bigger one, so it's ${k} times the **smaller** one: $y = ${k}x$.`,
-    `Lies den Satz noch mal: **Was** ist größer? $y$ ist der größere Wert, also ist $y$ das ${k}-Fache des **kleineren**: $y = ${k}x$.`,
+    `Read the sentence again: **which** is bigger? $y$ is the bigger one, so it's ${k === 2 ? "twice" : `${k} times`} the **smaller** one: $y = ${k}x$.`,
+    `Lies den Satz noch mal: **Was** ist größer? $y$ ist der größere Wert, also ist $y$ das ${k === 2 ? "Doppelte" : `${k}-Fache`} des **kleineren**: $y = ${k}x$.`,
   ),
 ];
 const TIMES: Msg = [
   tx("More is not times", "Mehr heißt nicht mal"),
   tx("\"More than\" means **plus**, not times. \"Twice as many\" would be times.", "„Mehr als“ heißt **plus**, nicht mal. „Doppelt so viele“ wäre mal."),
 ];
+const timesEn = (k: number) => (k === 2 ? "twice" : `${k} times`);
+const timesDe = (k: number) => (k === 2 ? "doppelt" : `${k}-mal`);
 const PLUS = (k: number): Msg => [
   tx("Times is not more", "Mal heißt nicht mehr"),
-  tx(`"${k} times as many" means **multiply**: $y = ${k}x$, not $y = x + ${k}$.`, `„${k}-mal so viele“ heißt **multiplizieren**: $y = ${k}x$, nicht $y = x + ${k}$.`),
+  tx(`"${timesEn(k)} as many" means **multiply**: $y = ${k}x$, not $y = x + ${k}$.`, `„${timesDe(k)} so viele“ heißt **multiplizieren**: $y = ${k}x$, nicht $y = x + ${k}$.`),
 ];
 const TOGETHER: Msg = [
   tx("Together means plus", "Zusammen heißt plus"),
@@ -454,12 +459,12 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
     return {
       text: farm
         ? tx(
-            `On a farm there are ${k} times as many chickens as cows, ${S} animals in total. How many cows ($x$) and chickens ($y$) are there?`,
-            `Auf einem Bauernhof gibt es ${k}-mal so viele Hühner wie Kühe, insgesamt ${S} Tiere. Wie viele Kühe ($x$) und Hühner ($y$) sind es?`,
+            `On a farm there are ${timesEn(k)} as many chickens as cows, ${S} animals in total. How many cows ($x$) and chickens ($y$) are there?`,
+            `Auf einem Bauernhof gibt es ${timesDe(k)} so viele Hühner wie Kühe, insgesamt ${S} Tiere. Wie viele Kühe ($x$) und Hühner ($y$) sind es?`,
           )
         : tx(
-            `One number is ${k} times as big as another. Together they make ${S}. Find the smaller number $x$ and the bigger number $y$.`,
-            `Eine Zahl ist ${k}-mal so groß wie eine andere. Zusammen ergeben sie ${S}. Bestimme die kleinere Zahl $x$ und die größere Zahl $y$.`,
+            `One number is ${timesEn(k)} as big as another. Together they make ${S}. Find the smaller number $x$ and the bigger number $y$.`,
+            `Eine Zahl ist ${timesDe(k)} so groß wie eine andere. Zusammen ergeben sie ${S}. Bestimme die kleinere Zahl $x$ und die größere Zahl $y$.`,
           ),
       defs: farm
         ? tx(`x#X ": cows"#DX \\quad y#Y ": chickens"#DY`, `x#X ": Kühe"#DX \\quad y#Y ": Hühner"#DY`)
@@ -468,8 +473,8 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
       e: { x: 1, y: 1, c: S },
       sol: [x, y],
       setup: farm
-        ? tx(`"${k} times as many chickens": $y = ${k}x$. "${S} animals in total": $x + y = ${S}$.`, `„${k}-mal so viele Hühner“: $y = ${k}x$. „Insgesamt ${S} Tiere“: $x + y = ${S}$.`)
-        : tx(`"${k} times as big": $y = ${k}x$. "Together ${S}": $x + y = ${S}$.`, `„${k}-mal so groß“: $y = ${k}x$. „Zusammen ${S}“: $x + y = ${S}$.`),
+        ? tx(`"${timesEn(k)} as many chickens": $y = ${k}x$. "${S} animals in total": $x + y = ${S}$.`, `„${timesDe(k)} so viele Hühner“: $y = ${k}x$. „Insgesamt ${S} Tiere“: $x + y = ${S}$.`)
+        : tx(`"${timesEn(k)} as big": $y = ${k}x$. "Together ${S}": $x + y = ${S}$.`, `„${timesDe(k)} so groß“: $y = ${k}x$. „Zusammen ${S}“: $x + y = ${S}$.`),
       answer: farm
         ? tx(`There are ${x} cows and ${y} chickens.`, `Es sind ${x} Kühe und ${y} Hühner.`)
         : tx(`The numbers are ${x} and ${y}.`, `Die Zahlen sind ${x} und ${y}.`),

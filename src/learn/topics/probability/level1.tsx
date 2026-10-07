@@ -177,7 +177,7 @@ function dieTask(rng: Rng): Exercise {
   const all = n === 6 ? "1, 2, 3, 4, 5, 6" : `1, 2, …, ${n}`;
   const mistakes: Mistake[] = fracMistakes(right, [
     ...(ev.trap ? [{ v: frac(ev.trap.fav.length, n), title: ev.trap.title, say: ev.trap.say }] : []),
-    { v: k < n ? { n: k, d: n - k } : null, ...FAV_UNFAV(k, n - k) },
+    { v: k < n - k ? { n: k, d: n - k } : null, ...FAV_UNFAV(k, n - k) },
     {
       v: k > 1 ? { n: 1, d: n } : null,
       title: tx("Only one outcome counted", "Nur ein Ergebnis gezählt"),
@@ -246,7 +246,7 @@ function urnTask(rng: Rng): Exercise {
     extra.push({
       v: { n: counts[i], d: total },
       title: tx("Only one colour", "Nur eine Farbe"),
-      say: tx(`You only counted the ${en(BALL[c].adj)} balls. “Or” means both colours are favourable.`, `Du hast nur die ${de(BALL[c].adj)} Kugeln gezählt. „Oder“ heißt: Beide Farben sind günstig.`),
+      say: tx(`You only counted the ${en(BALL[c].adj)} balls. “Or” means both colours are favourable.`, `Du hast nur die ${de(BALL[c].adjPl)} Kugeln gezählt. „Oder“ heißt: Beide Farben sind günstig.`),
     });
   }
   const right = frac(fav, total);
@@ -265,7 +265,7 @@ function urnTask(rng: Rng): Exercise {
       { math: tx(`"favourable:" \\; ${fav}`, `"günstig:" \\; ${fav}`), note: tx(`$${fav}$ of them fit: ${qEn}.`, `$${fav}$ davon passen: ${qDe}.`) },
       { math: tx(`P("${en(label)}") = ${frChain(fav, total)}`, `P("${de(label)}") = ${frChain(fav, total)}`), note: tx("Favourable divided by possible.", "Günstige durch mögliche.") },
     ],
-    mistakes: fracMistakes(right, [...extra, { v: fav < total ? { n: fav, d: total - fav } : null, ...FAV_UNFAV(fav, total - fav) }]),
+    mistakes: fracMistakes(right, [...extra, { v: fav < total - fav ? { n: fav, d: total - fav } : null, ...FAV_UNFAV(fav, total - fav) }]),
   };
 }
 
@@ -324,7 +324,7 @@ function cardTask(rng: Rng): Exercise {
         title: tx("52 cards?", "52 Karten?"),
         say: tx("You used $52$ cards, like a poker deck. A Skat deck only has $32$: there are no 2s to 6s.", "Du hast mit $52$ Karten gerechnet wie bei einem Pokerblatt. Ein Skatblatt hat nur $32$: Es gibt keine 2 bis 6."),
       },
-      { v: { n: ev.fav, d: 32 - ev.fav }, ...FAV_UNFAV(ev.fav, 32 - ev.fav) },
+      { v: ev.fav < 32 - ev.fav ? { n: ev.fav, d: 32 - ev.fav } : null, ...FAV_UNFAV(ev.fav, 32 - ev.fav) },
     ]),
   };
 }
@@ -375,7 +375,7 @@ function spinnerTask(rng: Rng): Exercise {
       equal
         ? { v: fields, title: tx("Just counted", "Nur gezählt"), say: tx(`$${fields}$ is the number of fields. Percent means “out of $100$”: first write it as a fraction of all fields.`, `$${fields}$ ist die Anzahl der Felder. Prozent heißt „von $100$“: Schreib erst den Bruch „Felder durch alle Felder“.`) }
         : { v: (fields / sectors.length) * 100, title: tx("Fields counted", "Felder gezählt"), say: tx("The fields are **not** the same size! Count the angle, not the fields: angle : $360°$.", "Die Felder sind **nicht** gleich groß! Hier zählt der Winkel, nicht die Anzahl der Felder: Winkel durch $360°$.") },
-      equal ? { v: share < total ? (share / (total - share)) * 100 : null, ...FAV_UNFAV(share, total - share) } : { v: share, title: tx("Angle, not percent", "Winkel statt Prozent"), say: tx(`$${share}°$ is the angle. A full turn is $360°$, so divide by $360$ first.`, `$${share}°$ ist der Winkel. Eine volle Umdrehung hat $360°$: Teile erst durch $360$.`) },
+      equal ? { v: share < total - share ? (share / (total - share)) * 100 : null, ...FAV_UNFAV(share, total - share) } : { v: share, title: tx("Angle, not percent", "Winkel statt Prozent"), say: tx(`$${share}°$ is the angle. A full turn is $360°$, so divide by $360$ first.`, `$${share}°$ ist der Winkel. Eine volle Umdrehung hat $360°$: Teile erst durch $360$.`) },
       { v: 100 / present.length, ...SPIN_COLOURS(present.length) },
       { v: 100 - right, title: tx("The other colours", "Die anderen Farben"), say: tx(`That's the probability of **not** ${en(name)}. Look again at which colour is asked.`, `Das ist die Wahrscheinlichkeit für **nicht** ${de(name)}. Schau noch mal, welche Farbe gefragt ist.`) },
     ],
@@ -400,7 +400,7 @@ function spinnerTask(rng: Rng): Exercise {
           : tx(`The ${en(name)} part covers $${share}°$ of the full $360°$.`, `Der ${de(BALL[target].adj)} Anteil hat zusammen $${share}°$ von $360°$.`),
       },
       { math: say((f) => `P = ${frS(frac(share, total))} = ${f.n(p, 4)}`), note: tx("Simplify and write it as a decimal.", "Kürzen und als Dezimalzahl schreiben.") },
-      { math: say((f) => `${f.n(p, 4)} = ${f.n(right, 1)} \\, %`), note: tx("Times $100$ gives the percentage.", "Mal $100$ ergibt den Prozentsatz.") },
+      { math: say((f) => `${f.n(p, 4)} = \\group{${f.n(right, 1)} \\, %}`), note: tx("Times $100$ gives the percentage.", "Mal $100$ ergibt den Prozentsatz.") },
     ],
     mistakes,
   };
@@ -480,7 +480,7 @@ function relTask(rng: Rng): Exercise {
     solution: [
       { math: `h#h =#eq ${fr(k, n)}#f`, note: tx(`“${en(thing)}” happened $${k}$ times in $${n}$ trials.`, `„${de(thing)}“ kam $${k}$-mal in $${n}$ Versuchen vor.`) },
       { math: say((f) => `h#h =#eq ${fr(k, n)}#f =#e2 ${f.n(h, 4)}#d`), note: tx("Divide.", "Teilen.") },
-      ...(asPercent ? [{ math: say((f) => `h#h =#eq ${f.n(h, 4)}#d =#e3 ${f.n(right, 1)} \\, %`), note: tx("Times $100$ gives the percentage.", "Mal $100$ ergibt den Prozentsatz.") }] : []),
+      ...(asPercent ? [{ math: say((f) => `h#h =#eq ${f.n(h, 4)}#d =#e3 \\group{${f.n(right, 1)} \\, %}`), note: tx("Times $100$ gives the percentage.", "Mal $100$ ergibt den Prozentsatz.") }] : []),
     ],
     mistakes,
   };
@@ -509,7 +509,7 @@ function estimateTask(rng: Rng): Exercise {
       answer: numAnswer(right),
       hint: tx("First the probability (Laplace), then: probability · number of rolls.", "Erst die Wahrscheinlichkeit (Laplace), dann: Wahrscheinlichkeit · Anzahl der Würfe."),
       solution: [
-        { math: `P(E) = ${frChain(ev.fav, 6)}`, note: tx(`$${ev.fav}$ of $6$ numbers are favourable for ${ev.en}.`, `$${ev.fav}$ von $6$ Augenzahlen sind günstig für ${ev.de}.`) },
+        { math: `P(E) = ${frChain(ev.fav, 6)}`, note: tx(`$${ev.fav}$ of $6$ numbers ${ev.fav === 1 ? "is" : "are"} favourable for ${ev.en}.`, `$${ev.fav}$ von $6$ Augenzahlen ${ev.fav === 1 ? "ist" : "sind"} günstig für ${ev.de}.`) },
         { math: `${frS(frac(ev.fav, 6))} \\cdot ${N} = ${right}`, note: tx(`In the long run, about this share of the $${N}$ rolls: roughly $${right}$ times.`, `Auf lange Sicht kommt ungefähr dieser Anteil der $${N}$ Würfe: etwa $${right}$-mal.`) },
       ],
       mistakes: numMistakes(right, 1e-6, [
@@ -683,8 +683,8 @@ const frequencies: Frame[] = [
   { math: "h#h =#eq \\frac{9#k}{50#n}#f", note: tx("The **relative frequency** is the share: absolute frequency divided by the number of rolls.", "Die **relative Häufigkeit** ist der Anteil: absolute Häufigkeit geteilt durch die Anzahl der Würfe.") },
   { math: "h#h =#eq \\frac{9#k}{50#n}#f =#e2 \\frac{18#k2}{100#n2}#g", note: tx("Expand by $2$ to get hundredths.", "Erweitere mit $2$ auf Hundertstel.") },
   {
-    math: say((f) => `h#h =#eq \\frac{18#k2}{100#n2}#g =#e3 ${f.n(0.18)}#d =#e4 18#p \\, %#ps`),
-    note: say((f) => f.t(`So $h = ${f.n(0.18)} = 18 \\, %$. A relative frequency is always between $0$ and $1$.`, `Also $h = ${f.n(0.18)} = 18 \\, %$. Eine relative Häufigkeit liegt immer zwischen $0$ und $1$.`)),
+    math: say((f) => `h#h =#eq \\frac{18#k2}{100#n2}#g =#e3 ${f.n(0.18)}#d =#e4 \\group{18#p \\, %#ps}`),
+    note: say((f) => f.t(`So $h = ${f.n(0.18)} = \\group{18 \\, %}$. A relative frequency is always between $0$ and $1$.`, `Also $h = ${f.n(0.18)} = \\group{18 \\, %}$. Eine relative Häufigkeit liegt immer zwischen $0$ und $1$.`)),
   },
 ];
 
@@ -702,7 +702,7 @@ const laplace: Frame[] = [
     note: tx("Simplify: $\\frac{3}{6} = \\frac{1}{2}$.", "Kürzen: $\\frac{3}{6} = \\frac{1}{2}$."),
   },
   {
-    math: say((f) => `P#P ("${f.t("even", "gerade")}"#E)#pa =#eq \\frac{1#g2}{2#m2}#fr2 =#e3 ${f.n(0.5)}#d =#e4 50 \\, %#ps`),
+    math: say((f) => `P#P ("${f.t("even", "gerade")}"#E)#pa =#eq \\frac{1#g2}{2#m2}#fr2 =#e3 ${f.n(0.5)}#d =#e4 \\group{50 \\, %#ps}`),
     note: tx("You can write a probability as a fraction, a decimal or a percentage. All three are right.", "Eine Wahrscheinlichkeit kannst du als Bruch, als Dezimalzahl oder in Prozent angeben. Alle drei sind richtig."),
   },
 ];
@@ -718,7 +718,7 @@ const zeroOne: Frame[] = [
   },
   {
     math: "0#z \\le#l1 P#P (E#ev)#pa \\le#l2 1#r",
-    note: say((f) => f.t(`Every probability lies between $0$ (impossible) and $1$ (certain), so between $0 \\, %$ and $100 \\, %$.`, `Jede Wahrscheinlichkeit liegt zwischen $0$ (unmöglich) und $1$ (sicher), also zwischen $0 \\, %$ und $100 \\, %$.`)),
+    note: say((f) => f.t(`Every probability lies between $0$ (impossible) and $1$ (certain), so between $\\group{0 \\, %}$ and $\\group{100 \\, %}$.`, `Jede Wahrscheinlichkeit liegt zwischen $0$ (unmöglich) und $1$ (sicher), also zwischen $\\group{0 \\, %}$ und $\\group{100 \\, %}$.`)),
   },
 ];
 
@@ -734,7 +734,7 @@ const urnCheck: Exercise = {
   solution: [
     { math: tx(`"all balls:" \\; 3 + 5 + 2 = 10`, `"alle Kugeln:" \\; 3 + 5 + 2 = 10`), note: tx("Every **ball** is equally likely, so there are $10$ possible outcomes.", "Jede **Kugel** ist gleich wahrscheinlich, also gibt es $10$ mögliche Ergebnisse.") },
     { math: tx(`P("red") = \\frac{3}{10}`, `P("rot") = \\frac{3}{10}`), note: tx("$3$ of them are red: favourable : possible.", "$3$ davon sind rot: günstige durch mögliche.") },
-    { math: say((f) => f.t(`P("red") = \\frac{3}{10} = ${f.n(0.3)} = 30 \\, %`, `P("rot") = \\frac{3}{10} = ${f.n(0.3)} = 30 \\, %`)), note: tx("As a decimal and as a percentage.", "Als Dezimalzahl und in Prozent.") },
+    { math: say((f) => f.t(`P("red") = \\frac{3}{10} = ${f.n(0.3)} = \\group{30 \\, %}`, `P("rot") = \\frac{3}{10} = ${f.n(0.3)} = \\group{30 \\, %}`)), note: tx("As a decimal and as a percentage.", "Als Dezimalzahl und in Prozent.") },
   ],
   mistakes: fracMistakes(frac(3, 10), [
     { v: { n: 1, d: 3 }, ...COLOURS_COUNTED(3) },
@@ -753,7 +753,7 @@ const pinCheck: Exercise = {
   solution: [
     { math: "h#h =#eq \\frac{26#k}{40#n}#f", note: tx("Point up $26$ times in $40$ throws.", "$26$-mal Kopflage bei $40$ Würfen.") },
     { math: "h#h =#eq \\frac{13#k}{20#n}#f =#e2 \\frac{65#k2}{100#n2}#g", note: tx("Simplify by $2$, then expand by $5$ to get hundredths.", "Mit $2$ kürzen, dann mit $5$ auf Hundertstel erweitern.") },
-    { math: say((f) => `h#h =#eq \\frac{65#k2}{100#n2}#g =#e3 ${f.n(0.65)}#d`), note: say((f) => f.t(`$h = ${f.n(0.65)}$, that's $65 \\, %$ of the throws.`, `$h = ${f.n(0.65)}$, das sind $65 \\, %$ der Würfe.`)) },
+    { math: say((f) => `h#h =#eq \\frac{65#k2}{100#n2}#g =#e3 ${f.n(0.65)}#d`), note: say((f) => f.t(`$h = ${f.n(0.65)}$, that's $\\group{65 \\, %}$ of the throws.`, `$h = ${f.n(0.65)}$, das sind $\\group{65 \\, %}$ der Würfe.`)) },
   ],
   mistakes: numMistakes(0.65, 0.0006, [
     { v: 0.35, title: tx("The other outcome", "Das andere Ergebnis"), say: tx("You worked out “on its side”: $14$ of $40$. The question asks about point up.", "Du hast die Seitenlage berechnet: $14$ von $40$. Gefragt ist die Kopflage.") },
@@ -803,7 +803,7 @@ const spinnerCheck: Exercise = {
   solution: [
     { math: tx(`P#P ("purple"#c)#pa =#eq \\frac{2#a}{5#b}#f`, `P#P ("lila"#c)#pa =#eq \\frac{2#a}{5#b}#f`), note: tx("$2$ of the $5$ equal fields are purple.", "$2$ der $5$ gleich großen Felder sind lila.") },
     { math: tx(`P#P ("purple"#c)#pa =#eq \\frac{2#a}{5#b}#f =#e2 \\frac{40#a2}{100#b2}#g`, `P#P ("lila"#c)#pa =#eq \\frac{2#a}{5#b}#f =#e2 \\frac{40#a2}{100#b2}#g`), note: tx("Expand by $20$.", "Mit $20$ erweitern.") },
-    { math: tx(`P#P ("purple"#c)#pa =#eq 40#a2 \\, %#ps`, `P#P ("lila"#c)#pa =#eq 40#a2 \\, %#ps`), note: tx("$40$ hundredths are $40 \\, %$.", "$40$ Hundertstel sind $40 \\, %$.") },
+    { math: tx(`P#P ("purple"#c)#pa =#eq \\group{40#a2 \\, %#ps}`, `P#P ("lila"#c)#pa =#eq \\group{40#a2 \\, %#ps}`), note: tx("$40$ hundredths are $\\group{40 \\, %}$.", "$40$ Hundertstel sind $\\group{40 \\, %}$.") },
   ],
   mistakes: numMistakes(
     40,
@@ -912,7 +912,7 @@ export const level1: LevelLesson = {
         "Absolute frequency $H$ divided by the number of trials $n$. After many trials it settles near the probability (law of large numbers).",
         "Absolute Häufigkeit $H$ geteilt durch die Anzahl der Versuche $n$. Nach vielen Versuchen pendelt sie sich bei der Wahrscheinlichkeit ein (Gesetz der großen Zahlen).",
       ),
-      examples: ["h = \\frac{H}{n}", say((f) => `h = \\frac{9}{50} = ${f.n(0.18)} = 18 \\, %`)],
+      examples: ["h = \\frac{H}{n}", say((f) => `h = \\frac{9}{50} = ${f.n(0.18)} = \\group{18 \\, %}`)],
       tone: "rule",
     },
     {
@@ -924,7 +924,7 @@ export const level1: LevelLesson = {
     {
       title: tx("Three ways to write it", "Drei Schreibweisen"),
       body: tx("Fraction, decimal or percentage. Impossible: $P = 0$. Certain: $P = 1$.", "Bruch, Dezimalzahl oder Prozent. Unmöglich: $P = 0$. Sicher: $P = 1$."),
-      examples: [say((f) => `\\frac{1}{4} = ${f.n(0.25)} = 25 \\, %`), "0 \\le P(E) \\le 1"],
+      examples: [say((f) => `\\frac{1}{4} = ${f.n(0.25)} = \\group{25 \\, %}`), "0 \\le P(E) \\le 1"],
       tone: "tip",
     },
     {

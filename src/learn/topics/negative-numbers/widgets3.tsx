@@ -25,9 +25,9 @@ export function NegDistance() {
   const d = Math.abs(a - b);
   const src =
     mode === "zero"
-      ? `|#l1 ${a}#a |#r1 =#e1 ${Math.abs(a)}#da \\quad |#l2 ${b}#b |#r2 =#e2 ${Math.abs(b)}#db`
-      : `|#l1 ${par(a)}#a -#m ${par(b)}#b |#r1 =#e1 |#l2 ${a - b}#q |#r2 =#e2 ${d}#d`;
-  const other = `|#l1 ${par(b)}#b -#m ${par(a)}#a |#r1 =#e1 |#l2 ${b - a}#q |#r2 =#e2 ${d}#d`;
+      ? `\\group{|#l1 a#va |#r1 =#e1 |#l3 ${a}#a |#r3 =#e3 ${Math.abs(a)}#da} \\quad \\group{|#l2 b#vb |#r2 =#e2 |#l4 ${b}#b |#r4 =#e4 ${Math.abs(b)}#db}`
+      : `\\group{|#l1 ${par(a)}#a -#m ${par(b)}#b |#r1} \\group{=#e1 |#l2 ${a - b}#q |#r2} \\group{=#e2 ${d}#d}`;
+  const other = `\\group{|#l1 ${par(b)}#b -#m ${par(a)}#a |#r1} \\group{=#e1 |#l2 ${b - a}#q |#r2} \\group{=#e2 ${d}#d}`;
   const sentence =
     mode === "zero"
       ? tx(
@@ -141,22 +141,28 @@ export function NegPowerLab() {
 
       <LayoutGroup id={scope}>
         <div className="flex flex-wrap items-center gap-1.5" aria-hidden>
+          {!brackets && (
+            <motion.span layout key="minus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mr-1 font-math text-[22px] font-semibold text-danger">
+              −
+            </motion.span>
+          )}
           {factors.map((i) => {
             const pairNo = Math.floor(i / 2);
             const alone = odd && i === n - 1;
+            const closesPair = brackets && i % 2 === 1;
             return (
-              <motion.span
-                layout
-                key={i}
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className={cn(
-                  "flex h-10 min-w-12 items-center justify-center rounded-lg border px-2 font-math text-[18px]",
-                  !brackets ? "border-line bg-raised text-ink" : alone ? "border-danger text-danger" : pairNo % 2 ? "border-blob bg-blob-soft text-ink" : "border-ok text-ink",
-                  i % 2 === 1 && i !== n - 1 ? "mr-2" : "",
-                )}
-              >
-                {brackets ? `(${signed(base)})` : a}
+              <motion.span layout key={i} className={cn("flex items-center gap-1.5", closesPair && i !== n - 1 && "mr-2")}>
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={cn(
+                    "flex h-10 min-w-12 items-center justify-center rounded-lg border px-2 font-math text-[18px]",
+                    !brackets ? "border-line bg-raised text-ink" : alone ? "border-danger text-danger" : pairNo % 2 ? "border-blob bg-blob-soft text-ink" : "border-ok text-ink",
+                  )}
+                >
+                  {brackets ? `(${signed(base)})` : a}
+                </motion.span>
+                {closesPair && <span className="font-math text-[15px] font-semibold text-ok">→ +</span>}
               </motion.span>
             );
           })}
@@ -255,11 +261,12 @@ export function NegCleverSum() {
     if (round) setRoundMoves((m) => m + 1);
     setLast({ a: a.v, b: b.v, sum, swapped: Math.abs(i - j) > 1 });
   };
-  const sumSrc = cards.map((c, i) => (i === 0 ? String(c.v) : c.v < 0 ? `- ${-c.v}` : `+ ${c.v}`)).join(" ");
+  const sumOf = (list: Card[]) => list.map((c, i) => (i === 0 ? String(c.v) : c.v < 0 ? `- ${-c.v}` : `+ ${c.v}`)).join(" ");
+  const sumSrc = done ? `${sumOf(makePuzzle(seed))} = ${total}` : `${sumOf(cards)} = ?`;
   const stepText = last
     ? txMap((tr) =>
         [
-          `$${last.a} + ${par(last.b)} = ${last.sum}$`,
+          `$${last.a} + ${par(last.b)} = ${last.sum}$:`,
           last.sum % 10 === 0 ? tr("a round number!", "eine glatte Zahl!") : tr("not round, but that's allowed.", "nicht glatt, aber erlaubt."),
           last.swapped ? tr("You swapped and grouped: commutative and associative law.", "Du hast vertauscht und zusammengefasst: Kommutativ- und Assoziativgesetz.") : "",
         ]
@@ -272,7 +279,7 @@ export function NegCleverSum() {
     <div className="space-y-4">
       <Hint>{t(tx("Each number keeps its sign. You may add any two of them, in any order.", "Jede Zahl behält ihr Vorzeichen. Du darfst zwei beliebige Zahlen addieren, in jeder Reihenfolge."))}</Hint>
       <div className="grid min-h-[84px] place-items-center rounded-xl border border-line bg-surface px-4 py-3">
-        <MathView src={`${sumSrc}${done ? "" : " = ?"}`} size="lg" />
+        <MathView src={sumSrc} size="lg" />
       </div>
       <LayoutGroup id={scope}>
         <div className="flex min-h-[64px] flex-wrap items-center justify-center gap-2.5">

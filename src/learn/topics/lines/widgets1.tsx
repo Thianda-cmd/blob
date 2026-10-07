@@ -225,9 +225,11 @@ const RULES: Rule[] = [
   { m: 1, b: 2 },
   { m: 2, b: -1 },
   { m: -1, b: 1 },
-  { m: -2, b: 3 },
+  { m: -2, b: 1 },
 ];
 const TABLE_XS = [-2, -1, 0, 1, 2];
+/** The plane shows −6 … 6, so every value of every rule (−5 … 5) is a point well inside the picture. */
+const TABLE_R = 6;
 
 /** "y = 2 · (−1) − 1 = −3" for one column. */
 function calcSrc({ m, b }: Rule, x: number): string {
@@ -282,7 +284,7 @@ export function TableBuilder() {
 
       <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="mx-auto w-full max-w-[400px] rounded-xl border border-line bg-surface p-2">
-          <Plane label={tx("The pairs of the table as points", "Die Wertepaare der Tabelle als Punkte")}>
+          <Plane xRange={[-TABLE_R, TABLE_R]} yRange={[-TABLE_R, TABLE_R]} label={tx("The pairs of the table as points", "Die Wertepaare der Tabelle als Punkte")}>
             {done && <PlaneLine key={`line-${ri}`} through={() => [[0, rule.b], [1, rule.m]]} width={0.9} opacity={0.7} />}
             {TABLE_XS.map((x, i) => (filled[i] ? <PlaneDot key={`${ri}-${x}`} at={() => [x, rule.m * x + rule.b]} tone={last === i ? "blob" : "ink"} r={1.35} pulse={`${ri}-${x}`} /> : null))}
           </Plane>

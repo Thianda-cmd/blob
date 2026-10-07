@@ -5,7 +5,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame } from "@/learn/types";
-import { both, choice, D, E, eu, fixedChoice, mn, NAMES, visual, type Opt } from "./kit";
+import { both, choice, D, E, fixedChoice, mn, NAMES, visual, type Opt } from "./kit";
 import { ValueTable } from "./ValueTable";
 
 // ---------------------------------------------------------------------------
@@ -524,7 +524,7 @@ export function notNeeded(rng: Rng): Exercise {
       {
         math: listMath(true),
         highlight: [`p${extra}`],
-        note: tx(`**${E(extraText)}** has nothing to do with the question. Cross it out!`, `**${D(extraText)}** hat mit der Frage nichts zu tun. Streich es durch!`),
+        note: tx(`The number **${E(extraText)}** has nothing to do with the question. Cross it out!`, `Die Angabe **${D(extraText)}** hat mit der Frage nichts zu tun. Streich sie durch!`),
       },
       { math: s.calc, note: both((l) => `${l === "de" ? "Mit dem Rest rechnest du:" : "The rest gives the calculation:"} ${l === "de" ? D(s.answer) : E(s.answer)}`) },
     ],

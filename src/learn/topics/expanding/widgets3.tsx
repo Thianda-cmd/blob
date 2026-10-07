@@ -18,6 +18,14 @@ export function choose(n: number, k: number): number {
   return Math.round(r);
 }
 
+const SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+/** 12 → "¹²" for plain text. */
+const sup = (n: number) => String(n).replace(/\d/g, (d) => SUP[Number(d)]);
+/** The term aⁿ⁻ᵏbᵏ as plain text: "a²b²", "a⁴", "b", "1". */
+const termText = (n: number, k: number) => `${n - k === 0 ? "" : n - k === 1 ? "a" : `a${sup(n - k)}`}${k === 0 ? "" : k === 1 ? "b" : `b${sup(k)}`}` || "1";
+/** The same term in the display language. */
+const termSrc = (n: number, k: number) => `${n - k === 0 ? "" : n - k === 1 ? "a" : `a^{${n - k}}`}${k === 0 ? "" : k === 1 ? "b" : `b^{${k}}`}`;
+
 // ---------------------------------------------------------------------------
 // The binomial coefficient as German schools write it: n above k in round brackets.
 
@@ -33,12 +41,13 @@ function Fence({ side }: { side: "l" | "r" }) {
 
 /** (n über k), stacked, in the maths font. */
 export function Binom({ n, k, className }: { n: ReactNode; k: ReactNode; className?: string }) {
+  const letter = (x: ReactNode) => typeof x === "string" && /^[a-z]$/.test(x);
   return (
     <span className={cn("blob-math inline-flex items-stretch align-middle", className)} role="math">
       <Fence side="l" />
       <span className="inline-flex flex-col items-center justify-center px-[0.1em] text-[0.82em] leading-[1.15]">
-        <span>{n}</span>
-        <span>{k}</span>
+        <span className={letter(n) ? "italic" : ""}>{n}</span>
+        <span className={letter(k) ? "italic" : ""}>{k}</span>
       </span>
       <Fence side="r" />
     </span>
@@ -69,7 +78,7 @@ const X = 120;
 const UU = 18;
 const MAXK = 6;
 const MAXC = 36;
-const PER_ROW = 13;
+const PER_ROW = 11;
 
 function InlineStep({ value, onChange, min, max, step = 1, label }: { value: number; onChange: (n: number) => void; min: number; max: number; step?: number; label: string }) {
   const t = useText();
@@ -100,9 +109,10 @@ export function ExpandingSquarePuzzle() {
   const extra = Math.max(0, c - full);
   const side = X + k * UU;
   const pad = 30;
-  const trayY = pad + X + MAXK * UU + 18;
+  // Left-over tiles queue up under the square; the drawing is high enough for the most that can occur.
+  const trayY = pad + X + k * UU + 16;
   const W = pad + X + MAXK * UU + 12;
-  const H = trayY + 3 * (UU + 3) + 6;
+  const H = pad + X + 136;
   const cells = Array.from({ length: full }, (_, i) => ({ r: Math.floor(i / k), q: i % k }));
   const tiles = Array.from({ length: c }, (_, i) =>
     i < full
@@ -273,10 +283,10 @@ export function ExpandingSquarePuzzle() {
 
 const CA = 3;
 const CB = 1.35;
-const CS = 34;
-const GAP = 1.15;
-const DEPTH_X = 0.42;
-const DEPTH_Z = 0.3;
+const CS = 27;
+const GAP = 2.2;
+const DEPTH_X = 0.55;
+const DEPTH_Z = 0.4;
 type CubeKind = 0 | 1 | 2 | 3;
 const KIND_LABEL = ["a³", "a²b", "ab²", "b³"];
 const KIND_FILL = [
@@ -336,8 +346,10 @@ export function ExpandingCube() {
     if (reduce) setE(to);
     else run.current = animate(e, to, { type: "spring", stiffness: 120, damping: 20, onUpdate: setE });
   };
-  const terms = ["a^3", "3a^2b", "3ab^2", "b^3"];
-  const formula = `(a + b)^3 = ${terms.map((x, i) => (focus === i ? `\\hl{${x}}` : x)).join(" + ")}`;
+  // Keyed terms, so a highlight doesn't change the layout.
+  const terms = ["a#t0a ^{3#t0e}", "3#t1c a#t1a ^{2#t1e} b#t1b", "3#t2c a#t2a b#t2b ^{2#t2e}", "b#t3b ^{3#t3e}"];
+  const termKeys = [["t0a", "t0e"], ["t1c", "t1a", "t1e", "t1b"], ["t2c", "t2a", "t2b", "t2e"], ["t3b", "t3e"]];
+  const formula = `(a + b)^3 = ${terms.join(" + ")}`;
   const counts = [1, 3, 3, 1];
 
   return (
@@ -346,7 +358,8 @@ export function ExpandingCube() {
         <svg viewBox="0 0 300 280" className="mx-auto w-full max-w-[320px]" role="img" aria-label={t(tx("A cube with edge a + b, cut into 8 blocks", "Ein Würfel mit der Kante a + b, zerlegt in 8 Quader"))}>
           {blocks.map((b) => {
             const dim = focus !== null && focus !== b.kind;
-            const hidden = b.id === "010" ? Math.min(1, e * 3) : 1;
+            // The back slab's label sits behind the top slab until the blocks are far apart: fade it in late.
+            const hidden = b.id === "010" ? Math.max(0, Math.min(1, (e - 0.75) * 5)) : 1;
             return (
               <motion.g key={b.id} animate={{ opacity: dim ? 0.14 : 1 }} transition={{ duration: 0.25 }}>
                 {b.faces.map((f, n) => (
@@ -360,7 +373,7 @@ export function ExpandingCube() {
           })}
         </svg>
         <div className="min-w-0 space-y-4">
-          <MathView src={formula} size="md" scope={`${scope}-f`} />
+          <MathView src={formula} size="md" scope={`${scope}-f`} highlight={focus === null ? [] : termKeys[focus]} />
           <div className="flex flex-wrap gap-1.5">
             {KIND_LABEL.map((label, i) => (
               <button
@@ -534,7 +547,7 @@ export function ExpandingPascal() {
         <div className="overflow-x-auto">
           <MathView src={expansionSrc(n, k)} size="md" scope={`${scope}-x`} />
         </div>
-        <p className="text-[13px] text-ink-3">{t(tx(`Row ${n} gives the coefficients of (a + b)^${n}. The highlighted term belongs to the selected number.`, `Zeile ${n} liefert die Koeffizienten von (a + b)^${n}. Der markierte Term gehört zur gewählten Zahl.`))}</p>
+        <p className="text-[13px] text-ink-3">{t(tx(`Row ${n} gives the coefficients of (a + b)${sup(n)}. The highlighted term belongs to the selected number.`, `Zeile ${n} liefert die Koeffizienten von (a + b)${sup(n)}. Der markierte Term gehört zur gewählten Zahl.`))}</p>
       </div>
     </div>
   );
@@ -552,7 +565,7 @@ export function ExpandingBinomCard() {
   const [k, setK] = useState(2);
   const kk = Math.min(k, n);
   const value = choose(n, kk);
-  const termPow = `a^{${n - kk}} b^{${kk}}`;
+  const termPow = termSrc(n, kk);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-1 gap-y-2 text-[21px] text-ink">
@@ -562,7 +575,7 @@ export function ExpandingBinomCard() {
         <Binom n="n" k="1" />
         <MathView src="a^{n-1} b +" size="md" animate={false} />
         <Binom n="n" k="2" />
-        <MathView src="a^{n-2} b^2 + \\, ... \\, +" size="md" animate={false} />
+        <MathView src="a^{n-2} b^2 + … +" size="md" animate={false} />
         <Binom n="n" k="n" />
         <MathView src="b^n" size="md" animate={false} />
       </div>
@@ -580,12 +593,12 @@ export function ExpandingBinomCard() {
         <p className="text-[13.5px] leading-relaxed text-ink-2">
           {t(
             tx(
-              `n! (“n factorial”) is 1 · 2 · … · n, and 0! = 1. So ${n} choose ${kk} is ${value}: the number in row ${n}, place ${kk} of Pascal's triangle. In (a + b)^${n} it stands in front of the term with a^${n - kk} b^${kk}.`,
-              `n! („n Fakultät“) ist 1 · 2 · … · n, und 0! = 1. Also ist ${n} über ${kk} gleich ${value}: die Zahl in Zeile ${n}, Stelle ${kk} des Pascalschen Dreiecks. In (a + b)^${n} steht sie vor dem Term mit a^${n - kk} b^${kk}.`,
+              `n! (“n factorial”) is 1 · 2 · … · n, and 0! = 1. So ${n} choose ${kk} is ${value}: the number in row ${n}, place ${kk} of Pascal's triangle. In (a + b)${sup(n)} it stands in front of ${termText(n, kk)}.`,
+              `n! („n Fakultät“) ist 1 · 2 · … · n, und 0! = 1. Also ist ${n} über ${kk} gleich ${value}: die Zahl in Zeile ${n}, Stelle ${kk} des Pascalschen Dreiecks. In (a + b)${sup(n)} steht sie vor ${termText(n, kk)}.`,
             ),
           )}
         </p>
-        <MathView src={`${value === 1 ? "" : value}${termPow}`} size="md" animate={false} />
+        <MathView src={`${value === 1 && termPow ? "" : value}${termPow}`} size="md" animate={false} />
       </div>
     </div>
   );

@@ -14,7 +14,7 @@ import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Level, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { emWidth, smoothFracExits } from "../equations/level1";
-import { choice, clean, dec, enDecimalFrames, enDecimals, numberMistakes } from "./kit";
+import { choice, clean, dec, enDecimalFrames, enDecimals, FormulaBoard, numberMistakes } from "./kit";
 
 // ---------------------------------------------------------------------------
 // Formulas as small trees. To solve for a letter we undo the operations around
@@ -622,14 +622,7 @@ function formulaSrc(f: Formula, mark?: string) {
 }
 
 /** The formula, big, with the letter to solve for in purple. Shown as the task's picture. */
-function FormulaCard(props: Record<string, unknown>) {
-  return (
-    <div className="relative -m-3 grid min-h-[150px] place-items-center overflow-hidden rounded-2xl px-6 py-9">
-      <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" />
-      <MathView src={props.src as Text} size="xl" animate={false} className="relative" />
-    </div>
-  );
-}
+const FormulaCard = FormulaBoard;
 
 // ---------------------------------------------------------------------------
 // Typical mistakes. Blob rearranges the formula the way a student with one

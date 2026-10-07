@@ -15,7 +15,7 @@ const signNum = (v: number, k: string) => (v < 0 ? `-#${k}s ${dec(-v)}#${k}` : `
 const niceRoot = (R: number) => R >= 0 && Math.abs(Math.sqrt(R) * 100 - Math.round(Math.sqrt(R) * 100)) < 1e-9;
 const OR: Text = tx('"or"#or', '"oder"#or');
 const T_MOVED = tx("Sign kept when moving", "Vorzeichen nicht gedreht");
-const T_NEG = tx("The negative root is missing", "Die negative Wurzel fehlt");
+const T_NEG = tx("The negative solution is missing", "Die negative Lösung fehlt");
 
 // ---------------------------------------------------------------------------
 // Worked solutions
@@ -30,8 +30,8 @@ function rootFrames(R: number): Frame[] {
         {
           math: `x#x _{1,2#i} =#eq \\pm#pm \\sqrt{${dec(R)}#m}#rt \\approx#ap \\pm#pm2 ${dec(r2)}#r`,
           note: tx(
-            `Take the root, with plus **and** minus. $${dec(R)}$ isn't a square number, so the roots are about $\\pm ${dec(r2)}$.`,
-            `Zieh die Wurzel, mit Plus **und** Minus. $${dec(R)}$ ist keine Quadratzahl, also sind die Wurzeln etwa $\\pm ${dec(r2)}$.`,
+            `Take the root, with plus **and** minus. $${dec(R)}$ isn't a square number, so the solutions are about $\\pm ${dec(r2)}$.`,
+            `Zieh die Wurzel, mit Plus **und** Minus. $${dec(R)}$ ist keine Quadratzahl, also sind die Lösungen etwa $\\pm ${dec(r2)}$.`,
           ),
         },
         {
@@ -277,7 +277,7 @@ function pureMistakes(a: number, k: number, m: number): Mistake[] {
       [r],
       T_NEG,
       tx(
-        `Ooh, the classic trap! $${dec(clean(r))}$ is right, but $(-${dec(clean(r))})^2 = ${dec(R)}$ too. Squaring has **two** answers.`,
+        `Ooh, the classic trap! $${dec(clean(r))}$ is right, but $(-${dec(clean(r))})^2 = ${dec(R)}$ too. Taking the root gives **two** solutions.`,
         `Ooh, die klassische Falle! $${dec(clean(r))}$ stimmt, aber auch $(-${dec(clean(r))})^2 = ${dec(R)}$. Beim Wurzelziehen gibt es **zwei** Lösungen.`,
       ),
       { part: true, close: true },
@@ -663,10 +663,10 @@ function countShape(rng: Rng): Exercise | null {
   const at = (i: number) => order.indexOf(i);
   const say: Record<number, Text> = {};
   if (R > 0) {
-    say[1] = tx("Don't forget the negative root: a positive number has **two** square roots, like $3$ and $-3$ for $9$.", "Vergiss die negative Wurzel nicht: Eine positive Zahl hat **zwei** Wurzeln, z. B. $3$ und $-3$ bei $9$.");
+    say[1] = tx("Don't forget the negative solution: $x^2 = 9$ has the **two** solutions $3$ and $-3$.", "Vergiss die negative Lösung nicht: $x^2 = 9$ hat die **zwei** Lösungen $3$ und $-3$.");
     say[2] = moved
       ? tx("Ah, I see! When the number moves to the other side, its sign flips. Then the square equals a **positive** number.", "Ah, ich seh's! Wenn die Zahl auf die andere Seite wandert, dreht sich ihr Vorzeichen. Dann ist das Quadrat gleich einer **positiven** Zahl.")
-      : tx("The right side is positive, so there are roots: a plus one and a minus one.", "Die rechte Seite ist positiv, also gibt es Wurzeln: eine positive und eine negative.");
+      : tx("The right side is positive, so there are two solutions: a positive one and a negative one.", "Die rechte Seite ist positiv, also gibt es zwei Lösungen: eine positive und eine negative.");
   } else if (R === 0) {
     say[0] = tx("Plus $0$ and minus $0$ are the **same** number. So there's only one solution.", "Plus $0$ und minus $0$ sind **dieselbe** Zahl. Es gibt also nur eine Lösung.");
     say[2] = tx("There is one: the square is $0$ exactly when the base is $0$.", "Es gibt eine: Das Quadrat ist genau dann $0$, wenn die Basis $0$ ist.");
@@ -721,7 +721,7 @@ function mistakeShape(rng: Rng): Exercise | null {
     right = { text: tx("Dividing by $x$ loses the solution $x = 0$.", "Beim Teilen durch $x$ geht die Lösung $x = 0$ verloren.") };
     others = [
       { text: tx(`The solution $x = ${dec(-b)}$ is missing.`, `Die Lösung $x = ${dec(-b)}$ fehlt.`), why: tx(`Try it: $(${dec(-b)})^2 = ${b * b}$, but $${dec(b)} \\cdot (${dec(-b)}) = ${dec(-b * b)}$. That doesn't fit.`, `Probier's: $(${dec(-b)})^2 = ${b * b}$, aber $${dec(b)} \\cdot (${dec(-b)}) = ${dec(-b * b)}$. Das passt nicht.`) },
-      { text: tx(`You have to take the root: $x = \\pm\\sqrt{${dec(b)}}$.`, `Man muss die Wurzel ziehen: $x = \\pm\\sqrt{${dec(b)}}$.`) },
+      { text: tx(`You have to take the root: $x = \\pm\\sqrt{${dec(Math.abs(b))}}$.`, `Man muss die Wurzel ziehen: $x = \\pm\\sqrt{${dec(Math.abs(b))}}$.`) },
     ];
     okWhy = tx("Put $x = 0$ in: $0^2 = 0$ and $" + dec(b) + " \\cdot 0 = 0$. That's a solution too!", "Setz $x = 0$ ein: $0^2 = 0$ und $" + dec(b) + " \\cdot 0 = 0$. Das ist auch eine Lösung!");
     solution = factorFrames(1, -b, true);
@@ -813,7 +813,7 @@ function mistakeShape(rng: Rng): Exercise | null {
     math: work,
     answer: { kind: "choice", options, correct: all.indexOf(right) },
     hint: tx("Put the solutions back into the equation. Does every step hold?", "Setz die Lösungen in die Gleichung ein. Stimmt jeder Schritt?"),
-    solution: [{ math: work, note: cat(tx(`${name}'s work. `, `${name}s Rechnung. `), right.text) }, ...solution],
+    solution: [{ math: work, note: cat(tx(`${name}'s work. `, /[sxzß]$/.test(name) ? `${name}' Rechnung. ` : `${name}s Rechnung. `), right.text) }, ...solution],
     mistakes,
   };
 }
@@ -1012,7 +1012,10 @@ const factorLessonFrames: Frame[] = [
 const summary: SummaryBlock[] = [
   {
     title: tx("x² = c: take the root", "x² = c: Wurzel ziehen"),
-    body: tx("A positive number has **two** square roots. Zero has one, a negative number none.", "Eine positive Zahl hat **zwei** Wurzeln. Null hat eine, eine negative Zahl keine."),
+    body: tx(
+      "For $c > 0$, $x^2 = c$ has **two** solutions: $x = \\sqrt{c}$ and $x = -\\sqrt{c}$. For $c = 0$ one ($x = 0$), for $c < 0$ none.",
+      "Für $c > 0$ hat $x^2 = c$ **zwei** Lösungen: $x = \\sqrt{c}$ und $x = -\\sqrt{c}$. Für $c = 0$ eine ($x = 0$), für $c < 0$ keine.",
+    ),
     examples: ["x^2 = 25 \\Rightarrow x = \\pm 5", "x^2 = 0 \\Rightarrow x = 0", tx('x^2 = -4 \\Rightarrow "no solution"', 'x^2 = -4 \\Rightarrow "keine Lösung"')],
     tone: "rule",
   },
@@ -1043,8 +1046,8 @@ const summary: SummaryBlock[] = [
   {
     title: tx("Classic mistakes", "Typische Fehler"),
     body: tx(
-      "Forgetting the negative root, and dividing by $x$ (that loses $x = 0$).",
-      "Die negative Wurzel vergessen und durch $x$ teilen (dabei geht $x = 0$ verloren).",
+      "Forgetting the negative solution, and dividing by $x$ (that loses $x = 0$).",
+      "Die negative Lösung vergessen und durch $x$ teilen (dabei geht $x = 0$ verloren).",
     ),
     examples: [tx('x^2 = 16 \\Rightarrow x = 4 "and" x = -4', 'x^2 = 16 \\Rightarrow x = 4 "und" x = -4'), "x^2 = 3x \\quad \\strike{| : x}"],
     tone: "warning",
@@ -1075,7 +1078,7 @@ const lesson: LessonStep[] = [
   {
     type: "explain",
     title: tx("First get x² alone", "Erst x² allein, dann die Wurzel"),
-    blob: tx("Tidy up first, then take the root. Like clearing your desk before homework.", "Erst aufräumen, dann Wurzel ziehen. Wie den Schreibtisch, bevor du Hausaufgaben machst."),
+    blob: tx("Tidy up first, then take the root. Like your desk before homework.", "Erst aufräumen, dann Wurzel ziehen. Wie beim Schreibtisch vor den Hausaufgaben."),
     body: tx(
       "If there's more than $x^2$ on one side, rearrange first: move the number, then divide by the factor in front of $x^2$.",
       "Steht mehr als $x^2$ auf einer Seite, stellst du zuerst um: Zahl auf die andere Seite bringen, dann durch den Faktor vor $x^2$ teilen.",
@@ -1084,7 +1087,7 @@ const lesson: LessonStep[] = [
   },
   {
     type: "check",
-    blob: tx("Your turn! Two solutions, remember?", "Du bist dran! Zwei Lösungen, schon vergessen?"),
+    blob: tx("Your turn! Remember the two solutions.", "Du bist dran! Denk an die zwei Lösungen."),
     exercise: pureTask(3, -48, 0, tx("Add $48$, then divide by $3$. Then take the root.", "Addiere $48$, teile dann durch $3$. Dann zieh die Wurzel.")),
   },
   {
@@ -1117,8 +1120,8 @@ const lesson: LessonStep[] = [
     title: tx("The zero product detector", "Der Nullprodukt-Detektor"),
     blob: tx("Slide x and hunt for the zeros. Can you find both?", "Schieb x und such die Nullstellen. Findest du beide?"),
     body: tx(
-      "Pick the numbers in the brackets with $-$ and $+$, then slide $x$. The product is $0$ exactly where one of the brackets is $0$.",
-      "Stell die Zahlen in den Klammern mit $-$ und $+$ ein und schieb dann $x$. Das Produkt ist genau dort $0$, wo eine der Klammern $0$ ist.",
+      "Pick the numbers in the brackets with $-$ and $+$, then slide $x$. The product becomes zero exactly when one of the brackets becomes zero.",
+      "Stell die Zahlen in den Klammern mit $-$ und $+$ ein und schieb dann $x$. Das Produkt wird genau dann null, wenn eine der Klammern null wird.",
     ),
     widget: ZeroProductLab,
   },

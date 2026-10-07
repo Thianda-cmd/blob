@@ -158,7 +158,7 @@ function areaTask(rng: Rng): Exercise {
   }
   if (kind === "story") {
     const a = rng.int(3, 9);
-    const b = rng.int(2, a);
+    const b = rng.int(2, a - 1);
     const s = rng.pick([
       tx(`A room is ${a} m long and ${b} m wide. How many square metres of carpet are needed to cover the floor?`, `Ein Zimmer ist ${a} m lang und ${b} m breit. Wie viel Quadratmeter Teppich braucht man für den Boden?`),
       tx(`A vegetable patch is ${a} m long and ${b} m wide. How big is its area?`, `Ein Gemüsebeet ist ${a} m lang und ${b} m breit. Wie groß ist seine Fläche?`),

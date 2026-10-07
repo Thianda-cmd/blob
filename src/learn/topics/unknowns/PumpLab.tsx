@@ -109,10 +109,10 @@ export function PumpLab() {
           {/* pipes */}
           <rect x={30} y={8} width={14} height={22} rx={3} fill={onA ? "var(--blob)" : "var(--line)"} />
           <rect x={POOL_W - 4} y={8} width={14} height={22} rx={3} fill={onB ? "var(--ok)" : "var(--line)"} />
-          <text x={37} y={46} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={24} y={24} textAnchor="end" fontSize={12} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             A
           </text>
-          <text x={POOL_W + 3} y={46} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={POOL_W + 16} y={24} textAnchor="start" fontSize={12} fontWeight={700} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             B
           </text>
           {playing && onA && <motion.rect x={34} y={30} width={6} height={POOL_H + 10 - hA - hB} fill="var(--blob)" opacity={0.6} animate={{ opacity: [0.35, 0.7, 0.35] }} transition={{ duration: 0.6, repeat: Infinity }} />}

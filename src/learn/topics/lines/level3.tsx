@@ -4,6 +4,7 @@ import { resolveText, tx, type Text } from "@/i18n/text";
 import { add, div, mul, neg, sub, type Frac } from "@/learn/engine/frac";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
+import type { GraphSegment } from "@/learn/visuals/Graph";
 import { atanDeg, DEG, rounded, say } from "./kit";
 import { divideText, graphVisual, joinT, lineFn, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, val, valWrap, type Msg } from "./level2";
 import { AngleLab, DistanceLab, IntersectionLab } from "./widgets3";
@@ -14,7 +15,6 @@ import { AngleLab, DistanceLab, IntersectionLab } from "./widgets3";
 
 const ONE = q(1);
 const isOne = (f: Frac) => f.n === 1 && f.d === 1;
-const isUnit = (f: Frac) => f.d === 1 && Math.abs(f.n) === 1;
 const absF = (f: Frac) => (f.n < 0 ? neg(f) : f);
 /** "3x", "-x", "\frac{1}{2}x" for notes. */
 const mx = (m: Frac) => plain(term(m, "x", "m", true));
@@ -27,6 +27,10 @@ const ptF = (x: Frac, y: Frac, name: string, n: (v: number, d?: number) => strin
 /** One decimal place, but 45 stays 45. */
 const one = (v: number, n: (v: number, d?: number) => string) => (Math.abs(v - Math.round(v)) < 1e-9 ? n(Math.round(v)) : n(v, 1));
 const deg = (v: number, n: (v: number, d?: number) => string) => `${one(v, n)} \\deg`;
+/** "=" for a whole number of degrees, else "≈". */
+const rel = (v: number) => (Math.abs(v - Math.round(v)) < 1e-9 ? "=" : "\\approx");
+/** Two decimal places, but 45 stays 45. */
+const two = (v: number, n: (v: number, d?: number) => string) => (Math.abs(v - Math.round(v)) < 1e-9 ? n(Math.round(v)) : n(v, 2));
 /** "g:" in front of an equation (a label, not a division sign). */
 const lab = (name: string) => `${name}\\text{:} \\;`;
 const RAD_MODE: Msg = [
@@ -41,7 +45,7 @@ const RAD_MODE: Msg = [
 // Intersection point
 
 /** Equalise m_g·x + b_g = m_h·x + b_h step by step, then put x into g. */
-function intersectFrames(mg: Frac, bg: Frac, mh: Frac, bh: Frac, lead?: Text): Frame[] {
+function intersectFrames(mg: Frac, bg: Frac, mh: Frac, bh: Frac, lead?: Text, name = "S"): Frame[] {
   const dm = sub(mg, mh);
   const db = sub(bh, bg);
   const X = div(db, dm);
@@ -82,11 +86,11 @@ function intersectFrames(mg: Frac, bg: Frac, mh: Frac, bh: Frac, lead?: Text): F
     pending = "";
   }
   const frames: Frame[] = eqs.map((e) => ({ math: `${e.src}${e.op}`, note: e.note }));
-  frames.push({ math: `x#va =#EQ ${val(X, "d")}`, note: joinT(pending, say(({ t, n }) => t(`That's the $x$-coordinate of $S$: $x = ${fx(X, n)}$.`, `Das ist die $x$-Koordinate von $S$: $x = ${fx(X, n)}$.`))) });
+  frames.push({ math: `x#va =#EQ ${val(X, "d")}`, note: joinT(pending, say(({ t, n }) => t(`That's the $x$-coordinate of $${name}$: $x = ${fx(X, n)}$.`, `Das ist die $x$-Koordinate von $${name}$: $x = ${fx(X, n)}$.`))) });
   if (mg.n !== 0) {
     const times = isOne(mg) ? "" : mg.n === -1 && mg.d === 1 ? "-#sm " : `${val(mg, "m")} \\cdot#dot `;
     frames.push({
-      math: `y#Y =#EQ ${times}${isUnit(mg) ? val(X, "vx") : valWrap(X, "vx")} ${term(bg, "", "b", false)}`.trim(),
+      math: `y#Y =#EQ ${times}${isOne(mg) ? val(X, "vx") : valWrap(X, "vx")} ${term(bg, "", "b", false)}`.trim(),
       note: tx(`Put $x = ${num(X)}$ into $g$ to get $y$.`, `Setze $x = ${num(X)}$ in $g$ ein, um $y$ zu bekommen.`),
     });
   }
@@ -352,17 +356,14 @@ function angleFrames(m: number, acute: boolean): Frame[] {
       note: tx("Undo the tangent with $\\tan^{-1}$ on the calculator (often SHIFT + tan), in **DEG** mode.", "Die Umkehrung ist $\\tan^{-1}$ auf dem Taschenrechner (meist SHIFT + tan), im **DEG**-Modus."),
     },
     {
-      math: say(({ n }) => `\\alpha#al ${Math.abs(a - Math.round(a)) < 1e-9 ? "=" : "\\approx"}#E ${one(a, n)}#res \\deg#dg`),
+      math: say(({ n }) => `\\alpha#al ${rel(a)}#E ${one(a, n)}#res \\deg#dg`),
       note:
         m > 0
-          ? say(({ t, n }) => {
-              const rel = Math.abs(a - Math.round(a)) < 1e-9 ? "=" : "\\approx";
-              return t(`So the line rises at $\\alpha ${rel} ${deg(a, n)}$.`, `Die Gerade steigt also unter $\\alpha ${rel} ${deg(a, n)}$.`);
-            })
+          ? say(({ t, n }) => t(`So the line rises at $\\alpha ${rel(a)} ${deg(a, n)}$.`, `Die Gerade steigt also unter $\\alpha ${rel(a)} ${deg(a, n)}$.`))
           : say(({ t, n }) => t(`A negative angle: the line **falls**. It crosses the $x$-axis at $${deg(-a, n)}$.`, `Ein negativer Winkel: Die Gerade **fällt**. Sie schneidet die $x$-Achse unter $${deg(-a, n)}$.`)),
     },
   ];
-  if (acute && m < 0) frames.push({ math: say(({ n }) => `\\alpha#al ${Math.abs(a - Math.round(a)) < 1e-9 ? "=" : "\\approx"}#E ${one(-a, n)}#res \\deg#dg`), note: say(({ t, n }) => t(`The angle with the $x$-axis is $${deg(-a, n)}$.`, `Der Winkel mit der $x$-Achse beträgt $${deg(-a, n)}$.`)) });
+  if (acute && m < 0) frames.push({ math: say(({ n }) => `\\alpha#al ${rel(a)}#E ${one(-a, n)}#res \\deg#dg`), note: say(({ t, n }) => t(`The angle with the $x$-axis is $${deg(-a, n)}$.`, `Der Winkel mit der $x$-Achse beträgt $${deg(-a, n)}$.`)) });
   return frames;
 }
 
@@ -388,7 +389,7 @@ function angleMistakes(m: number, acute: boolean): Mistake[] {
     mk.add(
       rounded(180 + a, 1, { unit: "°" }),
       tx("The obtuse angle", "Der stumpfe Winkel"),
-      tx("That's the angle measured from the positive $x$-axis all the way round. The angle with the $x$-axis is the **acute** one.", "Das ist der Winkel, gemessen von der positiven $x$-Achse ganz herum. Der Winkel mit der $x$-Achse ist der **spitze**."),
+      tx("That's the angle measured counterclockwise from the positive $x$-axis. The angle with the $x$-axis is the **acute** one.", "Das ist der Winkel, gegen den Uhrzeigersinn von der positiven $x$-Achse aus gemessen. Der Winkel mit der $x$-Achse ist der **spitze**."),
     );
   }
   return mk.list;
@@ -447,8 +448,16 @@ function slopeFromAngleTask(rng: Rng): Exercise {
   const m = Math.tan(a / DEG);
   const b = rng.int(-4, 4);
   const answer = rounded(m, 2, { label: "m =" });
+  const bS = b === 0 ? "" : ` ${b < 0 ? "-" : "+"} ${Math.abs(b)}`;
   const mk = mistakeList(answer);
-  mk.add(rounded(Math.tan(a), 2), ...RAD_MODE);
+  mk.add(
+    rounded(Math.tan(a), 2),
+    tx("Calculator in RAD mode", "Taschenrechner im RAD-Modus"),
+    tx(
+      `Ooh, your calculator is in RAD mode and read $${a}$ as radians. Switch it to **DEG** and work out $\\tan(${a} \\deg)$ again.`,
+      `Ooh, dein Taschenrechner steht auf RAD und hat $${a}$ als Bogenmaß gelesen. Stell ihn auf **DEG** um und rechne $\\tan(${a} \\deg)$ noch mal.`,
+    ),
+  );
   mk.add(
     rounded(Math.atan(a) * DEG, 2),
     tx("tan⁻¹ instead of tan", "tan⁻¹ statt tan"),
@@ -477,7 +486,7 @@ function slopeFromAngleTask(rng: Rng): Exercise {
     solution: [
       { math: `m#m =#E \\tan#t \\alpha#al`, note: tx("The slope is the tangent of the slope angle. Where the line crosses the $y$-axis doesn't matter.", "Die Steigung ist der Tangens des Steigungswinkels. Wo die Gerade die $y$-Achse schneidet, spielt keine Rolle.") },
       { math: `m#m =#E \\tan#t (${a}#a \\deg#dg)#br`, note: tx(`Put in $\\alpha = ${a} \\deg$ (calculator in DEG mode).`, `Setze $\\alpha = ${a} \\deg$ ein (Taschenrechner im DEG-Modus).`) },
-      { math: say(({ n }) => `m#m \\approx#E ${n(m, 2)}#v`), note: say(({ t, n }) => t(`So $m \\approx ${n(m, 2)}$ and the line is $y \\approx ${n(m, 2)}x ${b < 0 ? "-" : "+"} ${Math.abs(b)}$.`, `Also ist $m \\approx ${n(m, 2)}$, und die Gerade heißt $y \\approx ${n(m, 2)}x ${b < 0 ? "-" : "+"} ${Math.abs(b)}$.`)) },
+      { math: say(({ n }) => `m#m \\approx#E ${n(m, 2)}#v`), note: say(({ t, n }) => t(`So $m \\approx ${n(m, 2)}$ and the line is $y \\approx ${n(m, 2)}x${bS}$.`, `Also ist $m \\approx ${n(m, 2)}$, und die Gerade heißt $y \\approx ${n(m, 2)}x${bS}$.`)) },
     ],
     mistakes: mk.list,
   };
@@ -486,33 +495,46 @@ function slopeFromAngleTask(rng: Rng): Exercise {
 // ---------------------------------------------------------------------------
 // Angle between two lines
 
+/** The angle of intersection: the acute one of the two angles between the lines. */
+const acuteOf = (v: number) => (v > 90 ? 180 - v : v);
+
+/**
+ * Both slope angles (shown with two decimals), their difference and the acute angle. Every
+ * rounded value comes from the exact angles: rounding α_g and α_h first can change the last digit.
+ */
 function lineAngleFrames(m1: number, m2: number): Frame[] {
   const a1 = atanDeg(m1);
   const a2 = atanDeg(m2);
   const d = Math.abs(a1 - a2);
-  const r = (v: number) => Math.round(v * 10) / 10;
+  const ang = (v: number, n: (v: number, d?: number) => string, k: string) => `${two(v, n)}#v${k} \\deg#d${k}`;
   const frames: Frame[] = [
     {
-      math: say(({ n }) => `\\alpha_g#ag =#E1 \\tan^{-1}(${n(m1)}) \\approx#A1 ${one(a1, n)}#v1 \\deg#d1`),
-      note: tx("First the slope angle of each line: $\\alpha = \\tan^{-1}(m)$.", "Zuerst der Steigungswinkel jeder Geraden: $\\alpha = \\tan^{-1}(m)$."),
+      math: say(({ n }) => `\\alpha_g#ag =#E1 \\tan^{-1}(${n(m1)}) ${rel(a1)}#A1 ${ang(a1, n, "1")}`),
+      note: tx(
+        "First the slope angle of each line: $\\alpha = \\tan^{-1}(m)$. Keep the exact value in the calculator, we only write it down rounded.",
+        "Zuerst der Steigungswinkel jeder Geraden: $\\alpha = \\tan^{-1}(m)$. Den genauen Wert behältst du im Taschenrechner, aufgeschrieben wird er gerundet.",
+      ),
     },
     {
-      math: say(({ n }) => `\\alpha_g#ag \\approx#A1 ${one(a1, n)}#v1 \\deg#d1 \\quad \\alpha_h#ah \\approx#A2 ${one(a2, n)}#v2 \\deg#d2`),
-      note: say(({ t, n }) => t(`And for $h$: $\\tan^{-1}(${n(m2)}) \\approx ${deg(a2, n)}$.`, `Und für $h$: $\\tan^{-1}(${n(m2)}) \\approx ${deg(a2, n)}$.`)),
+      math: say(({ n }) => `\\alpha_g#ag ${rel(a1)}#A1 ${ang(a1, n, "1")} \\quad \\alpha_h#ah ${rel(a2)}#A2 ${ang(a2, n, "2")}`),
+      note: say(({ t, n }) => t(`And for $h$: $\\tan^{-1}(${n(m2)}) ${rel(a2)} ${two(a2, n)} \\deg$.`, `Und für $h$: $\\tan^{-1}(${n(m2)}) ${rel(a2)} ${two(a2, n)} \\deg$.`)),
     },
     {
-      math: say(({ n }) => `|${one(a1, n)}#v1 \\deg#d1 - ${a2 < 0 ? `(${one(a2, n)}#v2 \\deg#d2)` : `${one(a2, n)}#v2 \\deg#d2`}| =#E ${n(r(a1) - r(a2) < 0 ? -(r(a1) - r(a2)) : r(a1) - r(a2), 1)}#dv \\deg#dd`),
-      note: tx("The angle between the lines is the difference of the slope angles.", "Der Winkel zwischen den Geraden ist die Differenz der Steigungswinkel."),
+      math: say(({ n }) => `|${ang(a1, n, "1")} - ${a2 < 0 ? `(${ang(a2, n, "2")})` : ang(a2, n, "2")}| ${rel(d)}#E ${one(d, n)}#dv \\deg#dd`),
+      note: tx(
+        "The angle between the lines is the difference of the slope angles. Subtract the exact values and round only the result.",
+        "Der Winkel zwischen den Geraden ist die Differenz der Steigungswinkel. Rechne mit den genauen Werten und runde erst das Ergebnis.",
+      ),
     },
   ];
   if (d > 90) {
     frames.push({
-      math: say(({ n }) => `\\varphi#dl =#E 180 \\deg - ${n(Math.abs(r(a1) - r(a2)), 1)}#dv \\deg#dd =#E2 ${n(180 - Math.abs(r(a1) - r(a2)), 1)}#res \\deg`),
+      math: say(({ n }) => `\\varphi#dl ${rel(d)}#E 180 \\deg - ${one(d, n)}#dv \\deg#dd =#E2 ${one(180 - d, n)}#res \\deg`),
       note: tx("That's more than $90 \\deg$. The angle of intersection is the **acute** one: $180 \\deg$ minus it.", "Das ist mehr als $90 \\deg$. Der Schnittwinkel ist der **spitze** Winkel: $180 \\deg$ minus die Differenz."),
     });
   } else {
     frames.push({
-      math: say(({ n }) => `\\varphi#dl \\approx#E ${n(Math.abs(r(a1) - r(a2)), 1)}#dv \\deg#dd`),
+      math: say(({ n }) => `\\varphi#dl ${rel(d)}#E ${one(d, n)}#dv \\deg#dd`),
       note: tx("It's at most $90 \\deg$, so this is the angle of intersection $\\varphi$.", "Sie ist höchstens $90 \\deg$, also ist das der Schnittwinkel $\\varphi$."),
     });
   }
@@ -522,21 +544,28 @@ function lineAngleFrames(m1: number, m2: number): Frame[] {
 function lineAngleExercise(m1: number, b1: number, m2: number, b2: number): Exercise {
   const a1 = atanDeg(m1);
   const a2 = atanDeg(m2);
-  const r = (v: number) => Math.round(v * 10) / 10;
-  const diff = Math.abs(r(a1) - r(a2));
-  const delta = diff > 90 ? 180 - diff : diff;
+  const diff = Math.abs(a1 - a2);
+  const delta = acuteOf(diff);
   const answer = rounded(delta, 1, { unit: "°" });
-  answer.tolerance = 0.11 / Math.max(1, delta);
   const mk = mistakeList(answer);
-  if (diff > 90) mk.add({ ...rounded(diff, 1, { unit: "°" }), tolerance: 0.11 / diff }, tx("Not the acute angle", "Nicht der spitze Winkel"), tx(`That's the obtuse angle, more than $90 \\deg$. The angle of intersection is the acute one: $180 \\deg$ minus your result.`, `Das ist der stumpfe Winkel, über $90 \\deg$. Der Schnittwinkel ist der spitze: $180 \\deg$ minus dein Ergebnis.`));
-  const plus = Math.abs(r(a1) + r(a2));
-  const plusA = plus > 90 ? 180 - plus : plus;
+  if (diff > 90) mk.add(rounded(diff, 1, { unit: "°" }), tx("Not the acute angle", "Nicht der spitze Winkel"), tx(`That's the obtuse angle, more than $90 \\deg$. The angle of intersection is the acute one: $180 \\deg$ minus your result.`, `Das ist der stumpfe Winkel, über $90 \\deg$. Der Schnittwinkel ist der spitze: $180 \\deg$ minus dein Ergebnis.`));
+  const plusA = acuteOf(Math.abs(a1 + a2));
   if (Math.abs(plusA - delta) > 0.5)
-    mk.add({ ...rounded(plusA, 1, { unit: "°" }), tolerance: 0.11 / Math.max(1, plusA) }, tx("Angles added", "Winkel addiert"), tx("Careful with the signs: the angle between the lines is the **difference** $|\\alpha_g - \\alpha_h|$, and a negative angle stays negative in it.", "Vorsicht mit den Vorzeichen: Der Winkel zwischen den Geraden ist die **Differenz** $|\\alpha_g - \\alpha_h|$, und ein negativer Winkel bleibt darin negativ."));
+    mk.add(rounded(plusA, 1, { unit: "°" }), tx("Angles added", "Winkel addiert"), tx("Careful with the signs: the angle between the lines is the **difference** $|\\alpha_g - \\alpha_h|$, and a negative angle stays negative in it.", "Vorsicht mit den Vorzeichen: Der Winkel zwischen den Geraden ist die **Differenz** $|\\alpha_g - \\alpha_h|$, und ein negativer Winkel bleibt darin negativ."));
   const short = atanDeg(Math.abs(m1 - m2));
   if (Math.abs(short - delta) > 0.5)
-    mk.add({ ...rounded(short, 1, { unit: "°" }), tolerance: 0.11 / Math.max(1, short) }, tx("Slopes subtracted", "Steigungen subtrahiert"), tx("Ah, you took $\\tan^{-1}$ of the difference of the slopes. That doesn't work: find **each** slope angle first, then subtract the angles.", "Ah, du hast $\\tan^{-1}$ von der Differenz der Steigungen genommen. Das klappt nicht: Bestimm erst **jeden** Steigungswinkel, dann ziehst du die Winkel voneinander ab."));
-  mk.add(rounded(Math.abs(Math.atan(m1) - Math.atan(m2)) > Math.PI / 2 ? Math.PI - Math.abs(Math.atan(m1) - Math.atan(m2)) : Math.abs(Math.atan(m1) - Math.atan(m2)), 2), ...RAD_MODE);
+    mk.add(rounded(short, 1, { unit: "°" }), tx("Slopes subtracted", "Steigungen subtrahiert"), tx("Ah, you took $\\tan^{-1}$ of the difference of the slopes. That doesn't work: find **each** slope angle first, then subtract the angles.", "Ah, du hast $\\tan^{-1}$ von der Differenz der Steigungen genommen. Das klappt nicht: Bestimm erst **jeden** Steigungswinkel, dann ziehst du die Winkel voneinander ab."));
+  // Both slope angles rounded to one decimal place before subtracting (skipped when that gives the same result).
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  mk.add(
+    rounded(acuteOf(Math.abs(r1(a1) - r1(a2))), 1, { unit: "°" }),
+    tx("Rounded too early", "Zu früh gerundet"),
+    tx(
+      "So close! You rounded the slope angles before subtracting, and that changes the last digit. Keep the exact values in the calculator and round only the result.",
+      "Ganz knapp! Du hast die Steigungswinkel vor dem Subtrahieren gerundet, und das verändert die letzte Stelle. Rechne mit den genauen Werten im Taschenrechner weiter und runde erst das Ergebnis.",
+    ),
+  );
+  mk.add(rounded(acuteOf(Math.abs(Math.atan(m1) - Math.atan(m2)) * DEG) / DEG, 2), ...RAD_MODE);
   const line = (m: number, b: number) => say(({ n }) => (m === 0 ? `y = ${b}` : `y = ${m === 1 ? "" : m === -1 ? "-" : n(m)}x${b ? (b > 0 ? ` + ${b}` : ` - ${-b}`) : ""}`));
   return {
     instruction: tx("Angle between two lines", "Schnittwinkel zweier Geraden"),
@@ -544,8 +573,8 @@ function lineAngleExercise(m1: number, b1: number, m2: number, b2: number): Exer
     math: txJoin([`${lab("g")} `, line(m1, b1), ` \\quad ${lab("h")} `, line(m2, b2)]),
     answer,
     hint: tx(
-      "Find both slope angles with $\\tan^{-1}$, then $\\varphi = |\\alpha_g - \\alpha_h|$. If that's more than $90 \\deg$, take $180 \\deg$ minus it.",
-      "Bestimm beide Steigungswinkel mit $\\tan^{-1}$, dann $\\varphi = |\\alpha_g - \\alpha_h|$. Ist das mehr als $90 \\deg$, nimm $180 \\deg$ minus die Differenz.",
+      "Find both slope angles with $\\tan^{-1}$, then $\\varphi = |\\alpha_g - \\alpha_h|$. If that's more than $90 \\deg$, take $180 \\deg$ minus it. Round only at the end.",
+      "Bestimm beide Steigungswinkel mit $\\tan^{-1}$, dann $\\varphi = |\\alpha_g - \\alpha_h|$. Ist das mehr als $90 \\deg$, nimm $180 \\deg$ minus die Differenz. Runde erst am Ende.",
     ),
     solution: lineAngleFrames(m1, m2),
     mistakes: mk.list,
@@ -689,7 +718,7 @@ function midpointTask(rng: Rng): Exercise {
       instruction: I_MID,
       text: tx(`Find the midpoint $M$ of the segment from $${pt(A[0], A[1], "A")}$ to $${pt(B[0], B[1], "B")}$.`, `Bestimme den Mittelpunkt $M$ der Strecke von $${pt(A[0], A[1], "A")}$ nach $${pt(B[0], B[1], "B")}$.`),
       answer: pairOf(M[0], M[1]),
-      hint: tx("The midpoint is the average: add the $x$-coordinates and halve, the same for $y$. A decimal like 2,5 is fine.", "Der Mittelpunkt ist der Mittelwert: $x$-Koordinaten addieren und halbieren, genauso bei $y$. Eine Kommazahl wie 2,5 ist okay."),
+      hint: tx("The midpoint is the average: add the $x$-coordinates and halve, the same for $y$. A decimal like 2.5 is fine.", "Der Mittelpunkt ist der Mittelwert: $x$-Koordinaten addieren und halbieren, genauso bei $y$. Eine Kommazahl wie 2,5 ist okay."),
       solution: [
         { math: "M#M (\\frac{x_1 + x_2}{2}#fx \\, |#bar \\, \\frac{y_1 + y_2}{2}#fy)#br", note: tx("Midpoint: the average of the $x$-coordinates and of the $y$-coordinates.", "Mittelpunkt: der Mittelwert der $x$-Koordinaten und der $y$-Koordinaten.") },
         { math: `M#M (\\frac{${A[0]} + ${B[0] < 0 ? `(${B[0]})` : B[0]}}{2}#fx \\, |#bar \\, \\frac{${A[1]} + ${B[1] < 0 ? `(${B[1]})` : B[1]}}{2}#fy)#br`, note: tx("Put in the coordinates of $A$ and $B$.", "Setze die Koordinaten von $A$ und $B$ ein.") },
@@ -724,7 +753,7 @@ type Setup = { mg: Frac; bg: Frac; P: [number, number]; F: [number, number]; mh:
 function footFrames({ mg, bg, P, mh, bh }: Setup, withDistance: boolean): Frame[] {
   const prod = mul(mh, q(P[0]));
   const [Fx, Fy] = footOf(mg, bg, mh, bh);
-  const meet = intersectFrames(mg, bg, mh, bh, tx("Step 2, the foot $F$: where $h$ meets $g$. Set equal.", "Schritt 2, der Lotfußpunkt $F$: Dort trifft $h$ auf $g$. Gleichsetzen."));
+  const meet = intersectFrames(mg, bg, mh, bh, tx("Step 2, the foot $F$: where $h$ meets $g$. Set equal.", "Schritt 2, der Lotfußpunkt $F$: Dort trifft $h$ auf $g$. Gleichsetzen."), "F");
   meet[meet.length - 1] = {
     math: say(({ n }) => `F#S ${ptF(Fx, Fy, "", n)}`),
     note: say(({ t, n }) => t(`So the foot of the perpendicular is $F${ptF(Fx, Fy, "", n)}$.`, `Der Lotfußpunkt ist also $F${ptF(Fx, Fy, "", n)}$.`)),
@@ -738,10 +767,15 @@ function footFrames({ mg, bg, P, mh, bh }: Setup, withDistance: boolean): Frame[
       math: `${val(P[1], "L")} =#EQ ${val(mh, "m")} \\cdot#dot ${valWrap(P[0], "vm")} +#sb b#vb`,
       note: tx(`Put $${pt(P[0], P[1], "P")}$ into $y = ${mx(mh)} + b$.`, `Setze $${pt(P[0], P[1], "P")}$ in $y = ${mx(mh)} + b$ ein.`),
     },
-    {
-      math: `${val(P[1], "L")} =#EQ ${val(prod, "m")} +#sb b#vb${opRemove(prod)}`,
-      note: tx("Solve for $b$.", "Löse nach $b$ auf."),
-    },
+    prod.n === 0
+      ? {
+          math: `${val(P[1], "L")} =#EQ b#vb`,
+          note: tx(`$P$ lies on the $y$-axis, so the product is $0$ and $b = ${P[1]}$.`, `$P$ liegt auf der $y$-Achse, das Produkt ist also $0$ und $b = ${P[1]}$.`),
+        }
+      : {
+          math: `${val(P[1], "L")} =#EQ ${val(prod, "m")} +#sb b#vb${opRemove(prod)}`,
+          note: tx("Solve for $b$.", "Löse nach $b$ auf."),
+        },
     { math: lineSrc(mh, bh), note: tx(`So $h$: $${eqLine(mh, bh)}$.`, `Also $h$: $${eqLine(mh, bh)}$.`) },
     ...meet,
   ];
@@ -814,7 +848,7 @@ function footMistakes(s: Setup): Mistake[] {
   mk.add(
     pairOf(P[0], qv(add(mul(mg, q(P[0])), bg))),
     tx("Straight up or down, not perpendicular", "Parallel zur y-Achse statt im Lot"),
-    tx("Ah, you went straight up or down from $P$ to $g$. But the foot $F$ is where the **perpendicular** meets $g$, at a right angle to $g$.", "Ah, du bist von $P$ parallel zur $y$-Achse bis $g$ gegangen. Der Lotfußpunkt $F$ liegt aber dort, wo die **Lotgerade** $g$ im rechten Winkel trifft."),
+    tx("Ah, you went straight up or down from $P$ to $g$. But the foot $F$ is where the **perpendicular** meets $g$, at a right angle to $g$.", "Ah, du bist von $P$ parallel zur $y$-Achse bis $g$ gegangen. Der Lotfußpunkt $F$ liegt aber dort, wo die **Lotgerade** im rechten Winkel auf $g$ trifft."),
   );
   return mk.list;
 }
@@ -934,6 +968,20 @@ const midLessonFrames: Frame[] = [
 
 const EXAMPLE_FOOT = setupFrom(q(1, 2), q(1), [6, -1]);
 
+/** A right-angle mark at F between the directions u and v (perpendicular), with legs of length s. */
+function rightAngle(F: [number, number], u: [number, number], v: [number, number], s: number): GraphSegment[] {
+  const unit = ([x, y]: [number, number]): [number, number] => [x / Math.hypot(x, y), y / Math.hypot(x, y)];
+  const [ux, uy] = unit(u);
+  const [vx, vy] = unit(v);
+  const A: [number, number] = [F[0] + s * ux, F[1] + s * uy];
+  const C: [number, number] = [F[0] + s * vx, F[1] + s * vy];
+  const B: [number, number] = [A[0] + s * vx, A[1] + s * vy];
+  return [
+    { from: A, to: B, color: "ink", key: "ra1" },
+    { from: B, to: C, color: "ink", key: "ra2" },
+  ];
+}
+
 export const level3: LevelLesson = {
   summary: [
     {
@@ -942,7 +990,7 @@ export const level3: LevelLesson = {
         "Set the right-hand sides equal, solve for $x$, put $x$ into one equation for $y$. Same slope: parallel (no point) or identical (every point).",
         "Rechte Seiten gleichsetzen, nach $x$ auflösen, $x$ in eine Gleichung einsetzen für $y$. Gleiche Steigung: parallel (kein Punkt) oder identisch (alle Punkte).",
       ),
-      examples: ["2x - 1 = -x + 5", "x = 2, \; y = 3 \; \\Rightarrow \; S(2 \\, | \\, 3)"],
+      examples: ["2x - 1 = -x + 5", "x = 2, \\; y = 3 \\; \\Rightarrow \\; S(2 \\, | \\, 3)"],
       tone: "rule",
     },
     {
@@ -957,8 +1005,8 @@ export const level3: LevelLesson = {
     {
       title: tx("Angle between two lines", "Schnittwinkel zweier Geraden"),
       body: tx(
-        "$\\varphi = |\\alpha_g - \\alpha_h|$. If that's more than $90 \\deg$, take $180 \\deg - \\varphi$. Perpendicular lines: $m_g \\cdot m_h = -1$ and $\\varphi = 90 \\deg$.",
-        "$\\varphi = |\\alpha_g - \\alpha_h|$. Ist das mehr als $90 \\deg$, nimm $180 \\deg - \\varphi$. Orthogonale Geraden: $m_g \\cdot m_h = -1$ und $\\varphi = 90 \\deg$.",
+        "$\\varphi = |\\alpha_g - \\alpha_h|$. If that's more than $90 \\deg$, take $180 \\deg - \\varphi$. Round only at the end. Perpendicular lines: $m_g \\cdot m_h = -1$ and $\\varphi = 90 \\deg$.",
+        "$\\varphi = |\\alpha_g - \\alpha_h|$. Ist das mehr als $90 \\deg$, nimm $180 \\deg - \\varphi$. Runde erst am Ende. Orthogonale Geraden: $m_g \\cdot m_h = -1$ und $\\varphi = 90 \\deg$.",
       ),
       tone: "rule",
     },
@@ -1085,11 +1133,14 @@ export const level3: LevelLesson = {
       visual: graphVisual({
         xRange: [-2, 8],
         yRange: [-3, 7],
-        functions: [
-          { f: lineFn(q(1, 2), q(1)), key: "g", color: "blob", label: "g" },
-          { f: lineFn(q(-2), q(11)), key: "h", color: "ink", dashed: true, label: "h" },
+        functions: [{ f: lineFn(q(1, 2), q(1)), key: "g", color: "blob", label: "g" }],
+        // h (y = −2x + 11) as dashed pieces around the solid distance PF, so d stays visible, plus the right angle at F.
+        segments: [
+          { from: [1, 9], to: [4, 3], color: "ink", dashed: true, key: "h1", label: "h" },
+          { from: [6, -1], to: [8, -5], color: "ink", dashed: true, key: "h2" },
+          ...rightAngle([4, 3], [2, 1], [1, -2], 0.55),
+          { from: [6, -1], to: [4, 3], color: "ok", key: "pf", label: "d" },
         ],
-        segments: [{ from: [6, -1], to: [4, 3], color: "ok", key: "pf", label: "d" }],
         points: [
           { x: 6, y: -1, key: "P", label: "P", color: "ink" },
           { x: 4, y: 3, key: "F", label: "F", color: "blob" },

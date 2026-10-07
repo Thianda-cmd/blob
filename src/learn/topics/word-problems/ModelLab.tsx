@@ -253,22 +253,22 @@ export function ModelLab() {
             {yTicks.map((y, i) => (
               <g key={i}>
                 <line x1={ML} x2={VW - MR} y1={sy(y)} y2={sy(y)} stroke="var(--line)" strokeWidth={Math.abs(y) < 1e-9 ? 1.4 : 0.8} />
-                <text x={ML - 5} y={sy(y) + 4} textAnchor="end" fontSize={10} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                <text x={ML - 5} y={sy(y) + 4} textAnchor="end" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                   {nf(y, l, 1)}
                 </text>
               </g>
             ))}
             {d.xs.map((x, i) =>
               i % (d.xs.length > 6 ? 2 : 1) === 0 ? (
-                <text key={x} x={sx(x)} y={VH - MB + 14} textAnchor="middle" fontSize={10} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                <text key={x} x={sx(x)} y={VH - MB + 14} textAnchor="middle" fontSize={11.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
                   {nf(x, l)}
                 </text>
               ) : null,
             )}
-            <text x={VW - MR} y={VH - 2} textAnchor="end" fontSize={10.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+            <text x={VW - MR} y={VH - 2} textAnchor="end" fontSize={11.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
               {`${d.v} in ${d.xUnit}`}
             </text>
-            <text x={ML} y={MT - 2} fontSize={10.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+            <text x={ML} y={MT - 2} fontSize={11.5} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
               {t(d.yName)}
             </text>
             <g clipPath={`url(#${id}-clip)`}>

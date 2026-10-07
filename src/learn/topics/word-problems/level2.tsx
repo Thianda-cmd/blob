@@ -6,7 +6,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
-import { choice, clean, D, E, fixedChoice, lcm, mb, mistakesFor, NAMES, numAns, txs, weighted, type Say } from "./kit";
+import { clean, D, E, fixedChoice, lcm, mb, mistakesFor, NAMES, numAns, txs, weighted, type Say } from "./kit";
 import { MapScale } from "./MapScale";
 import { MeanLevel } from "./MeanLevel";
 import { TariffLab } from "./TariffLab";
@@ -471,7 +471,7 @@ const planToReal: Tpl = (rng) => {
         ),
     answer,
     mistakes: mk.list,
-    hint: txs((s) => `1 cm stands for ${n} cm. Multiply, then convert: 100 cm = 1 m.`, () => `1 cm steht für ${n} cm. Multipliziere und rechne dann um: 100 cm = 1 m.`),
+    hint: tx(`1 cm stands for ${n} cm. Multiply, then convert: 100 cm = 1 m.`, `1 cm steht für ${n} cm. Multipliziere und rechne dann um: 100 cm = 1 m.`),
     solution: [
       { math: mb((s) => `${s.m(p, "a")} "cm"#ua \\cdot#op ${n}#n`), note: txs((s) => `Scale ${scaleProse(n)}: reality is ${n} times as big. ${s.n(p)} cm times ${n}.`, (s) => `Maßstab ${scaleProse(n)}: In Wirklichkeit ist alles ${n}-mal so groß. ${s.n(p)} cm mal ${n}.`) },
       { math: mb((s) => `${s.m(cm, "a")} "cm"#ua`), note: txs((s) => `${s.n(p)} · ${n} = ${s.n(cm)} cm.`, (s) => `${s.n(p)} · ${n} = ${s.n(cm)} cm.`) },

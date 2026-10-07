@@ -132,8 +132,8 @@ function Finder({ story }: { story: Story }) {
       : lines
         ? {
             text: tx(
-              "Every point on the purple line fits clue (I), every point on the dark line fits clue (II). Which point fits **both**?",
-              "Jeder Punkt auf der lila Geraden erfüllt Hinweis (I), jeder Punkt auf der dunklen Geraden Hinweis (II). Welcher Punkt erfüllt **beide**?",
+              "Every point on the purple line (I) fits clue (I), every point on the other line (II) fits clue (II). Which point fits **both**?",
+              "Jeder Punkt auf der lila Geraden (I) erfüllt Hinweis (I), jeder Punkt auf der anderen Geraden (II) Hinweis (II). Welcher Punkt erfüllt **beide**?",
             ),
             mood: "thinking",
           }
@@ -245,7 +245,7 @@ function Finder({ story }: { story: Story }) {
                   />
                 )}
                 {l1[0] && (
-                  <text x={sx(l1[0][0]) + 6} y={sy(l1[0][1]) + 12} fontSize={11} fontWeight={700} fill="var(--blob)" style={{ fontFamily: "var(--font-sans)" }}>
+                  <text x={sx(l1[0][0]) + 16} y={sy(l1[0][1]) + 12} fontSize={11} fontWeight={700} fill="var(--blob)" style={{ fontFamily: "var(--font-sans)" }}>
                     (I)
                   </text>
                 )}

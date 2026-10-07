@@ -10,6 +10,7 @@ import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import {
   amount,
+  cents2,
   changeSlips,
   EMPTY,
   euro,
@@ -196,7 +197,7 @@ function rateFrames(K: number, Z: number, s: Span): Frame[] {
     ...toYearFrames(Z, s),
     {
       math: say(({ c }) => `p#p %#pc =#e \\frac{${c(Zy)}#b}{${c(K)}#K}#f`),
-      note: tx("The rate is the yearly interest divided by the capital.", "Der Zinssatz ist der Jahreszins geteilt durch das Kapital."),
+      note: tx("The rate is the yearly interest divided by the capital.", "Der Zinssatz ist: Jahreszinsen geteilt durch Kapital."),
       highlight: ["b", "K"],
     },
     {
@@ -1048,7 +1049,7 @@ function invoiceExercise(N: number, s: number, who: (typeof CRAFTS)[number]): Ex
     instruction: tx("Invoice with VAT and Skonto", "Rechnung mit Mehrwertsteuer und Skonto"),
     text: say((f) =>
       f.t(
-        `The invoice of ${who.en} is ${euro(f, N)} net. On top come ${perc(f, 19)} VAT. If they pay within 10 days, the Weber family may take off ${perc(f, s)} cash discount (Skonto). How much do they pay if they pay straight away?`,
+        `The invoice of ${who.en} is ${euro(f, N)} net, plus ${perc(f, 19)} VAT. If they pay within 10 days, the Weber family may take off ${perc(f, s)} cash discount (Skonto). How much do they pay if they pay straight away?`,
         `Die Rechnung ${who.de} beträgt netto ${euro(f, N)}. Dazu kommen ${perc(f, 19)} Mehrwertsteuer. Bei Zahlung innerhalb von 10 Tagen darf Familie Weber ${perc(f, s)} Skonto abziehen. Wie viel zahlt sie, wenn sie sofort zahlt?`,
       ),
     ),
@@ -1711,14 +1712,14 @@ function InvoiceBuilder() {
         ))}
       </div>
 
-      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <ul className="space-y-2">
           {lines.map((l, i) => (
             <motion.li
               key={l.kind}
               layout
               transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              className="flex items-center gap-2 rounded-xl border border-line bg-surface px-2.5 py-2"
+              className="flex items-center gap-1.5 rounded-xl border border-line bg-surface px-2 py-2 sm:gap-2 sm:px-2.5"
             >
               <button
                 type="button"
@@ -1730,18 +1731,18 @@ function InvoiceBuilder() {
               >
                 <Check className="size-3.5" />
               </button>
-              <span className={cn("min-w-0 flex-1 truncate text-[13.5px] font-medium", !l.on && "text-ink-3")}>{names[l.kind]}</span>
+              <span className={cn("min-w-0 flex-1 text-[13.5px] font-medium leading-tight", !l.on && "text-ink-3")}>{names[l.kind]}</span>
               <div className="flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
                   onClick={() => stepP(l, -1)}
                   disabled={!l.on || LINE_STEPS[l.kind].indexOf(l.p) === 0}
-                  className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35"
+                  className="grid size-6 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35 sm:size-7"
                   aria-label={t(`Less ${names[l.kind]}`, `Weniger ${names[l.kind]}`)}
                 >
                   <Minus className="size-3.5" />
                 </button>
-                <span className={cn("w-[52px] text-center font-math text-[15px] tabular-nums", !l.on && "text-ink-3")}>
+                <span className={cn("w-[46px] text-center font-math text-[15px] tabular-nums sm:w-[52px]", !l.on && "text-ink-3")}>
                   {l.kind === "vat" ? "+" : "−"}
                   {l.p} %
                 </span>
@@ -1749,18 +1750,18 @@ function InvoiceBuilder() {
                   type="button"
                   onClick={() => stepP(l, 1)}
                   disabled={!l.on || LINE_STEPS[l.kind].indexOf(l.p) === LINE_STEPS[l.kind].length - 1}
-                  className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35"
+                  className="grid size-6 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-35 sm:size-7"
                   aria-label={t(`More ${names[l.kind]}`, `Mehr ${names[l.kind]}`)}
                 >
                   <Plus className="size-3.5" />
                 </button>
               </div>
-              <div className="flex shrink-0 items-center border-l border-line pl-1">
+              <div className="flex shrink-0 items-center border-l border-line pl-0.5 sm:pl-1">
                 <button
                   type="button"
                   onClick={() => moveLine(i, -1)}
                   disabled={i === 0}
-                  className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30"
+                  className="grid size-6 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-7"
                   aria-label={t(`Move ${names[l.kind]} up`, `${names[l.kind]} nach oben`)}
                 >
                   <ArrowUp className="size-3.5" />
@@ -1769,7 +1770,7 @@ function InvoiceBuilder() {
                   type="button"
                   onClick={() => moveLine(i, 1)}
                   disabled={i === lines.length - 1}
-                  className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30"
+                  className="grid size-6 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-7"
                   aria-label={t(`Move ${names[l.kind]} down`, `${names[l.kind]} nach unten`)}
                 >
                   <ArrowDown className="size-3.5" />
@@ -1783,7 +1784,7 @@ function InvoiceBuilder() {
           <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t("Invoice", "Rechnung")}</div>
           <div className="flex justify-between gap-3">
             <span>{t("List price", "Listenpreis")}</span>
-            <span className="font-math tabular-nums">{c(base)} €</span>
+            <span className="font-math tabular-nums">{cents2(f, base)} €</span>
           </div>
           <AnimatePresence initial={false}>
             {rows
@@ -1803,18 +1804,18 @@ function InvoiceBuilder() {
                       {r.line.kind === "vat" ? "+" : "−"} {r.line.p} % {names[r.line.kind]}
                     </span>
                     <span className="font-math tabular-nums">
-                      {r.line.kind === "vat" ? "+" : "−"} {c(Math.abs(r.after - r.before))} €
+                      {r.line.kind === "vat" ? "+" : "−"} {cents2(f, Math.abs(r.after - r.before))} €
                     </span>
                   </div>
                   <div className="flex justify-end border-t border-line pt-0.5">
-                    <span className="font-math tabular-nums">{c(r.after)} €</span>
+                    <span className="font-math tabular-nums">{cents2(f, r.after)} €</span>
                   </div>
                 </motion.div>
               ))}
           </AnimatePresence>
           <div className="mt-2 flex justify-between gap-3 border-t-2 border-ink pt-1.5 font-semibold">
             <span>{t("To pay", "Zu zahlen")}</span>
-            <span className="font-math tabular-nums">{c(final)} €</span>
+            <span className="font-math tabular-nums">{cents2(f, final)} €</span>
           </div>
         </div>
       </div>
@@ -1840,7 +1841,8 @@ function InvoiceBuilder() {
 // Picture: net price, VAT and gross price as one bar
 
 function VatBar({ net, rate }: { net: number; rate: number }) {
-  const { t, c, n } = useFmt();
+  const f = useFmt();
+  const { t, n } = f;
   const vat = (net * rate) / 100;
   const gross = net + vat;
   const q = 1 + rate / 100;
@@ -1875,19 +1877,19 @@ function VatBar({ net, rate }: { net: number; rate: number }) {
         <div className="flex items-center gap-2.5">
           <span className="size-3 shrink-0 rounded-sm bg-blob" />
           <span className="flex-1">{t("Net price", "Nettopreis")}</span>
-          <span className="font-math tabular-nums">{c(net)} €</span>
+          <span className="font-math tabular-nums">{cents2(f, net)} €</span>
         </div>
         <div className="flex items-center gap-2.5">
           <span className="size-3 shrink-0 rounded-sm" style={{ background: light }} />
           <span className="flex-1">
             {t("VAT", "Mehrwertsteuer")} ({rate} %)
           </span>
-          <span className="font-math tabular-nums">+ {c(vat)} €</span>
+          <span className="font-math tabular-nums">+ {cents2(f, vat)} €</span>
         </div>
         <div className="flex items-center gap-2.5 border-t border-line pt-1.5 font-semibold">
           <span className="size-3 shrink-0" />
           <span className="flex-1">{t("Gross price", "Bruttopreis")}</span>
-          <span className="font-math tabular-nums">{c(gross)} €</span>
+          <span className="font-math tabular-nums">{cents2(f, gross)} €</span>
         </div>
       </div>
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">

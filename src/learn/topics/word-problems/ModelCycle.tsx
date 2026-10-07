@@ -11,19 +11,14 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { cn } from "@/lib/utils";
 
-type Station = { x: number; y: number; title: Text; example: Text; math?: Text };
+type Station = { title: Text; example?: Text; math?: Text };
 type Step = { name: Text; what: Text; from: number; to: number };
 
-const BW = 140;
-const BH = 84;
-const W = 420;
-const H = 290;
-
 const STATIONS: Station[] = [
-  { x: 8, y: 22, title: tx("Real situation", "Reale Situation"), example: tx("Battery at 100 %, minus 8 % an hour: when is it empty?", "Akku bei 100 %, minus 8 % pro Stunde: Wann ist er leer?") },
-  { x: W - BW - 8, y: 22, title: tx("Maths model", "Mathematisches Modell"), example: "", math: "A(t) = 100 - 8t" },
-  { x: W - BW - 8, y: H - BH - 8, title: tx("Maths result", "Mathematisches Ergebnis"), example: "", math: tx("t = 12.5", "t = 12,5") },
-  { x: 8, y: H - BH - 8, title: tx("Real result", "Reales Ergebnis"), example: tx("Empty after about 12 h 30 min.", "Nach etwa 12 h 30 min leer.") },
+  { title: tx("Real situation", "Reale Situation"), example: tx("Battery at 100 %, minus 8 % an hour: when is it empty?", "Akku bei 100 %, minus 8 % pro Stunde: Wann ist er leer?") },
+  { title: tx("Maths model", "Mathematisches Modell"), math: "A(t) = 100 - 8t" },
+  { title: tx("Maths result", "Mathematisches Ergebnis"), math: tx("t = 12.5", "t = 12,5") },
+  { title: tx("Real result", "Reales Ergebnis"), example: tx("Empty after about 12 h 30 min.", "Nach etwa 12 h 30 min leer.") },
 ];
 
 const STEPS: Step[] = [
@@ -54,93 +49,67 @@ const STEPS: Step[] = [
   },
 ];
 
-/** Arrow path between two stations along the outside of the cycle. */
-function arrow(i: number) {
-  const a = STATIONS[STEPS[i].from];
-  const b = STATIONS[STEPS[i].to];
-  if (i === 0) return { d: `M ${a.x + BW + 4} ${a.y + BH / 2} L ${b.x - 8} ${b.y + BH / 2}`, lx: W / 2, ly: a.y + BH / 2 - 9 };
-  if (i === 1) return { d: `M ${a.x + BW / 2} ${a.y + BH + 4} L ${b.x + BW / 2} ${b.y - 8}`, lx: a.x + BW / 2 + 8, ly: H / 2 + 4 };
-  if (i === 2) return { d: `M ${a.x - 4} ${a.y + BH / 2} L ${b.x + BW + 8} ${b.y + BH / 2}`, lx: W / 2, ly: a.y + BH / 2 + 17 };
-  return { d: `M ${a.x + BW / 2} ${a.y - 4} L ${b.x + BW / 2} ${b.y + BH + 8}`, lx: a.x + BW / 2 - 8, ly: H / 2 + 4 };
+/** A straight arrow; `dir` says where it points. */
+function Arrow({ dir, on }: { dir: "right" | "down" | "left" | "up"; on: boolean }) {
+  const horizontal = dir === "right" || dir === "left";
+  const d = horizontal ? (dir === "right" ? "M2 6 H 94 M86 1 L94 6 L86 11" : "M98 6 H 6 M14 1 L6 6 L14 11") : dir === "down" ? "M6 2 V 34 M1 26 L6 34 L11 26" : "M6 38 V 6 M1 14 L6 6 L11 14";
+  return (
+    <svg viewBox={horizontal ? "0 0 100 12" : "0 0 12 40"} preserveAspectRatio="none" className={horizontal ? "h-3 w-full" : "h-9 w-3"} aria-hidden>
+      <motion.path d={d} fill="none" stroke="var(--blob)" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" initial={false} animate={{ strokeWidth: on ? 2.6 : 1.6, opacity: on ? 1 : 0.5 }} />
+    </svg>
+  );
 }
 
 export function ModelCycle() {
   const t = useText();
   const [step, setStep] = useState(0);
+  const active = (i: number) => STEPS[step].from === i || STEPS[step].to === i;
+
+  const card = (i: number) => {
+    const s = STATIONS[i];
+    return (
+      <motion.div
+        initial={false}
+        animate={{ scale: active(i) ? 1 : 0.98 }}
+        className={cn("flex min-h-[86px] min-w-0 flex-col rounded-xl border px-3 py-2 transition-colors", active(i) ? "border-blob bg-raised shadow-card" : "border-line-2 bg-surface")}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{t(s.title)}</span>
+        <span className="mt-1 flex flex-1 items-center text-[13px] leading-snug text-ink">{s.math ? <MathView src={s.math} size="sm" animate={false} /> : t(s.example)}</span>
+      </motion.div>
+    );
+  };
+  const link = (i: number, dir: "right" | "down" | "left" | "up") => (
+    <button
+      onClick={() => setStep(i)}
+      className={cn("flex min-w-0 items-center gap-1 rounded-md px-1 text-[11.5px] font-semibold leading-tight transition-colors", dir === "right" || dir === "left" ? "flex-col justify-center" : "justify-center", i === step ? "text-blob-ink" : "text-ink-3 hover:text-ink")}
+      aria-label={`${i + 1}. ${t(STEPS[i].name)}`}
+    >
+      {dir === "up" && <Arrow dir="up" on={i === step} />}
+      <span className="text-center">
+        {i + 1}.<span className="hidden sm:inline"> {t(STEPS[i].name)}</span>
+      </span>
+      {dir !== "up" && <Arrow dir={dir} on={i === step} />}
+    </button>
+  );
+
   return (
     <div className="space-y-3">
-      <div className="mx-auto max-w-[560px]">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full select-none" role="img" aria-label={t(tx("The modelling cycle", "Der Modellierungskreislauf"))}>
-          <defs>
-            <marker id="wp-cycle-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M0 0 L10 5 L0 10 z" fill="var(--blob)" />
-            </marker>
-          </defs>
-          <line x1={W / 2} x2={W / 2} y1={4} y2={H - 4} stroke="var(--line-2)" strokeDasharray="4 5" />
-          <text x={W / 2 - 8} y={14} textAnchor="end" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)", letterSpacing: "0.08em" }}>
-            {t(tx("REALITY", "REALITÄT"))}
-          </text>
-          <text x={W / 2 + 8} y={14} fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)", letterSpacing: "0.08em" }}>
-            {t(tx("MATHS", "MATHEMATIK"))}
-          </text>
-
-          {STEPS.map((s, i) => {
-            const a = arrow(i);
-            const on = i === step;
-            return (
-              <g key={i} onClick={() => setStep(i)} style={{ cursor: "pointer" }}>
-                <path d={a.d} stroke="transparent" strokeWidth={22} />
-                <motion.path
-                  d={a.d}
-                  fill="none"
-                  stroke="var(--blob)"
-                  strokeLinecap="round"
-                  markerEnd="url(#wp-cycle-arrow)"
-                  initial={false}
-                  animate={{ strokeWidth: on ? 3.2 : 1.8, opacity: on ? 1 : 0.55 }}
-                />
-                <text
-                  x={a.lx}
-                  y={a.ly}
-                  textAnchor={i === 1 ? "start" : i === 3 ? "end" : "middle"}
-                  fontSize={11.5}
-                  fontWeight={on ? 700 : 500}
-                  fill={on ? "var(--blob-ink)" : "var(--ink-2)"}
-                  style={{ fontFamily: "var(--font-sans)" }}
-                >
-                  {`${i + 1}. ${t(s.name)}`}
-                </text>
-              </g>
-            );
-          })}
-
-          {STATIONS.map((s, i) => {
-            const on = STEPS[step].from === i || STEPS[step].to === i;
-            return (
-              <g key={i}>
-                <motion.rect
-                  x={s.x}
-                  y={s.y}
-                  width={BW}
-                  height={BH}
-                  rx={12}
-                  initial={false}
-                  animate={{ strokeWidth: on ? 2 : 1 }}
-                  fill={on ? "var(--raised)" : "var(--surface)"}
-                  stroke={on ? "var(--blob)" : "var(--line-2)"}
-                />
-                <text x={s.x + 10} y={s.y + 18} fontSize={11} fontWeight={600} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
-                  {t(s.title)}
-                </text>
-                <foreignObject x={s.x + 6} y={s.y + 24} width={BW - 12} height={BH - 28}>
-                  <div className="flex h-full items-center px-1 text-[12px] leading-snug text-ink">
-                    {s.math ? <MathView src={s.math} size="sm" animate={false} /> : t(s.example)}
-                  </div>
-                </foreignObject>
-              </g>
-            );
-          })}
-        </svg>
+      <div className="mx-auto max-w-[620px]">
+        <div className="mb-1.5 grid grid-cols-2 text-center text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-3">
+          <span>{t(tx("Reality", "Realität"))}</span>
+          <span>{t(tx("Maths", "Mathematik"))}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(36px,0.42fr)_minmax(0,1fr)] items-center gap-y-1">
+          {card(0)}
+          {link(0, "right")}
+          {card(1)}
+          <div className="flex justify-center">{link(3, "up")}</div>
+          <div className="mx-auto h-full w-px border-l border-dashed border-line-2" />
+          <div className="flex justify-center">{link(1, "down")}</div>
+          {card(3)}
+          {link(2, "left")}
+          {card(2)}
+        </div>
       </div>
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t(tx("Steps of the cycle", "Schritte des Kreislaufs"))}>
         {STEPS.map((s, i) => (

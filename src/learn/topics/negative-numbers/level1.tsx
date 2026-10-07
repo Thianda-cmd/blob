@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
-import { choiceOf, distinct, dmath, kn, kp, num, numberAnswer, numberMistakes, say, weighted, type Slip } from "./shared";
+import { choiceOf, distinct, dmath, gn, kn, kp, num, numberAnswer, numberMistakes, say, weighted, type Slip } from "./shared";
 import { NegLineFigure, NegThermometer } from "./visuals";
 import { NegCompare, NegWalker } from "./widgets1";
 
@@ -281,9 +281,9 @@ function orderTask(rng: Rng, desc: boolean): Exercise {
       ? tx("Positive numbers first. Among the negative numbers, the one closest to zero is the largest.", "Zuerst die positiven Zahlen. Bei den negativen ist die Zahl am nächsten an der Null die größte.")
       : tx("Negative numbers first. Among them, the one with the biggest digits lies furthest left.", "Zuerst die negativen Zahlen. Die mit den größten Ziffern liegt am weitesten links."),
     solution: [
-      { math: pool.map((v) => kn(v, keyOf(v))).join(" \\quad "), note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
+      { math: pool.map((v) => gn(v, keyOf(v))).join(" \\quad "), note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
       {
-        math: sorted.map((v, i) => `${i ? `${rel}#r${i} ` : ""}${kn(v, keyOf(v))}`).join(" "),
+        math: sorted.map((v, i) => `${i ? `${rel}#r${i} ` : ""}${gn(v, keyOf(v))}`).join(" "),
         note: desc
           ? tx("From right to left: the positive numbers, then the negative ones (closest to zero first).", "Von rechts nach links: erst die positiven Zahlen, dann die negativen (die nächste an der Null zuerst).")
           : tx("From left to right: the negative numbers (biggest digits first), then the rest.", "Von links nach rechts: erst die negativen Zahlen (die mit den größten Ziffern zuerst), dann der Rest."),
@@ -499,7 +499,7 @@ function tempChangeTask(rng: Rng): Exercise {
         {
           v: -d,
           title: tx("A difference is positive", "Ein Unterschied ist positiv"),
-          say: tx(`The question asks "by how many degrees": that's a positive amount. Warmer or colder is already in the question.`, `Gefragt ist „um wie viel Grad“: Das ist ein positiver Betrag. Ob wärmer oder kälter, steht schon in der Frage.`),
+          say: tx(`The question asks "by how many degrees": that's a positive amount. Warmer or colder is already in the question.`, `Gefragt ist „um wie viel Grad“: Die Antwort ist also eine positive Zahl. Ob wärmer oder kälter, steht schon in der Frage.`),
           close: true,
         },
       ],
@@ -706,7 +706,7 @@ function oppositeTask(rng: Rng): Exercise {
     answer: { kind: "pair", names: [tx('"opposite number"', '"Gegenzahl"'), tx('"distance"', '"Abstand"')], values: [-v, 2 * Math.abs(v)] },
     hint: tx("The opposite number is on the other side of $0$, just as far away.", "Die Gegenzahl liegt auf der anderen Seite der $0$, genauso weit weg."),
     solution: [
-      { math: `${kn(v, "a")} \\quad 0#z \\quad ${kn(-v, "b")}`, note: tx(`The opposite number of $${v}$ is $${-v}$.`, `Die Gegenzahl von $${v}$ ist $${-v}$.`) },
+      { math: `${gn(v, "a")} \\quad 0#z \\quad ${gn(-v, "b")}`, note: tx(`The opposite number of $${v}$ is $${-v}$.`, `Die Gegenzahl von $${v}$ ist $${-v}$.`) },
       { math: `${Math.abs(v)}#c +#p ${Math.abs(v)}#d =#e ${2 * Math.abs(v)}#r`, note: tx(`${Math.abs(v)} steps to zero and ${Math.abs(v)} steps beyond: ${2 * Math.abs(v)}.`, `${Math.abs(v)} Schritte bis zur Null und ${Math.abs(v)} Schritte darüber hinaus: ${2 * Math.abs(v)}.`) },
     ],
     mistakes: [
@@ -740,8 +740,8 @@ const orderCheck: Exercise = {
   answer: { kind: "order", items: ORDER_ITEMS, label: tx("Smallest at the top", "Kleinste Zahl oben") },
   hint: tx("Negative numbers first. Among them, the one with the biggest digits lies furthest left.", "Zuerst die negativen Zahlen. Die mit den größten Ziffern liegt am weitesten links."),
   solution: [
-    { math: "-#as 4#a \\quad 6#b \\quad -#cs 9#c \\quad 2#d \\quad -#es 1#e", note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
-    { math: "-#cs 9#c <#r1 -#as 4#a <#r2 -#es 1#e <#r3 2#d <#r4 6#b", note: tx("$-9$ lies furthest left, then $-4$ and $-1$. Then come the positive numbers.", "$-9$ liegt am weitesten links, dann $-4$ und $-1$. Danach kommen die positiven Zahlen.") },
+    { math: "\\group{-#as 4#a} \\quad 6#b \\quad \\group{-#cs 9#c} \\quad 2#d \\quad \\group{-#es 1#e}", note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
+    { math: "\\group{-#cs 9#c} <#r1 \\group{-#as 4#a} <#r2 \\group{-#es 1#e} <#r3 2#d <#r4 6#b", note: tx("$-9$ lies furthest left, then $-4$ and $-1$. Then come the positive numbers.", "$-9$ liegt am weitesten links, dann $-4$ und $-1$. Danach kommen die positiven Zahlen.") },
   ],
   mistakes: [
     { when: { kind: "order", items: [...ORDER_ITEMS].reverse() }, title: tx("Wrong direction", "Falsche Richtung"), say: tx("You sorted from largest to smallest. Here the **smallest** number goes at the top.", "Du hast von groß nach klein sortiert. Hier gehört die **kleinste** Zahl nach oben.") },
@@ -797,7 +797,7 @@ const changeCheck: Exercise = {
     11,
     [
       { v: 3, title: tx("Counted only to one side", "Nur auf einer Seite gezählt"), say: tx("You worked out $7 - 4$. But $-4$ is **below** zero: count 4 up to zero, then 7 more.", "Du hast $7 - 4$ gerechnet. Aber $-4$ liegt **unter** null: Zähl 4 bis zur Null und dann noch 7.") },
-      { v: -11, title: tx("A difference is positive", "Ein Unterschied ist positiv"), say: tx(`The question asks "by how many degrees": that's a positive amount.`, `Gefragt ist „um wie viel Grad“: Das ist ein positiver Betrag.`), close: true },
+      { v: -11, title: tx("A difference is positive", "Ein Unterschied ist positiv"), say: tx(`The question asks "by how many degrees": that's a positive amount.`, `Gefragt ist „um wie viel Grad“: Die Antwort ist also eine positive Zahl.`), close: true },
       { v: -3, title: tx("Counted only to one side", "Nur auf einer Seite gezählt"), say: tx("Count the steps from $-4$ to $7$ on the number line: across zero.", "Zähl die Schritte von $-4$ bis $7$ auf der Zahlengeraden: über die Null hinweg.") },
     ],
     DEG,
@@ -819,11 +819,11 @@ export const level1: LevelLesson = {
         { math: `5#n "°C"#u`, note: tx("Five degrees **above** zero: a positive number. You could write $+5$, but the plus is usually left out.", "Fünf Grad **über** null: eine positive Zahl. Du könntest $+5$ schreiben, aber das Plus lässt man meistens weg.") },
         { math: `-#m 5#n "°C"#u`, highlight: ["m"], note: tx('Five degrees **below** zero: a minus goes in front. Read it as "minus five degrees".', "Fünf Grad **unter** null: Davor kommt ein Minus. Lies: „minus fünf Grad“.") },
         {
-          math: `… \\; -#m3 3#n3 \\; -#m2 2#n2 \\; -#m1 1#n1 \\; 0#z \\; 1#p1 \\; 2#p2 \\; 3#p3 \\; …#e`,
+          math: `… \\quad \\group{-#m3 3#n3} \\quad \\group{-#m2 2#n2} \\quad \\group{-#m1 1#n1} \\quad 0#z \\quad 1#p1 \\quad 2#p2 \\quad 3#p3 \\quad …#e`,
           note: tx("Put all the numbers in a row: that's the **number line**. Negative numbers sit to the **left** of zero, positive numbers to the right.", "Leg alle Zahlen in eine Reihe: Das ist die **Zahlengerade**. Negative Zahlen stehen **links** von der Null, positive rechts."),
         },
         {
-          math: `… \\; -#m3 3#n3 \\; -#m2 2#n2 \\; -#m1 1#n1 \\; 0#z \\; 1#p1 \\; 2#p2 \\; 3#p3 \\; …#e`,
+          math: `… \\quad \\group{-#m3 3#n3} \\quad \\group{-#m2 2#n2} \\quad \\group{-#m1 1#n1} \\quad 0#z \\quad 1#p1 \\quad 2#p2 \\quad 3#p3 \\quad …#e`,
           highlight: ["m3", "n3", "p3"],
           arrows: [["n3", "p3"]],
           note: tx("$-3$ and $3$ are the same distance from zero, on opposite sides. They are **opposite numbers**.", "$-3$ und $3$ sind gleich weit von der Null entfernt, auf verschiedenen Seiten. Sie sind **Gegenzahlen**."),
@@ -843,17 +843,17 @@ export const level1: LevelLesson = {
     {
       type: "explain",
       title: tx("Ordering numbers", "Zahlen ordnen"),
-      blob: tx("Think of the thermometer: −7 °C is colder than −2 °C.", "Denk ans Thermometer: Bei −7 °C ist es kälter als bei −2 °C."),
+      blob: tx("Think of the thermometer: −7\u00a0°C is colder than −2\u00a0°C.", "Denk ans Thermometer: Bei −7\u00a0°C ist es kälter als bei −2\u00a0°C."),
       body: tx(
         "For negative numbers: the bigger the digits after the minus, the **smaller** the number. A debt of 50 € is worse than a debt of 10 €.",
         "Bei negativen Zahlen gilt: Je größer die Ziffern hinter dem Minus, desto **kleiner** die Zahl. 50 € Schulden sind schlimmer als 10 € Schulden.",
       ),
       frames: [
-        { math: "-#as 7#a \\quad ?#q \\quad -#bs 2#b", note: tx("Which one is smaller, $-7$ or $-2$?", "Welche Zahl ist kleiner, $-7$ oder $-2$?") },
-        { math: "-#as 7#a <#q2 -#bs 2#b", highlight: ["q2"], note: tx('$-7$ lies further left, so $-7 < -2$. Read: "minus 7 is less than minus 2".', "$-7$ liegt weiter links, also gilt $-7 < -2$. Lies: „minus 7 ist kleiner als minus 2“.") },
-        { math: "3#c \\quad -#ds 5#d \\quad 0#e \\quad -#fs 1#f \\quad -#gs 8#g \\quad 2#h", note: tx("Now a whole row. Let's sort it from smallest to largest.", "Jetzt eine ganze Reihe. Wir sortieren sie von der kleinsten zur größten Zahl.") },
+        { math: "\\group{-#as 7#a} \\quad ?#q \\quad \\group{-#bs 2#b}", note: tx("Which one is smaller, $-7$ or $-2$?", "Welche Zahl ist kleiner, $-7$ oder $-2$?") },
+        { math: "\\group{-#as 7#a} <#q2 \\group{-#bs 2#b}", highlight: ["q2"], note: tx('$-7$ lies further left, so $-7 < -2$. Read: "minus 7 is less than minus 2".', "$-7$ liegt weiter links, also gilt $-7 < -2$. Lies: „minus 7 ist kleiner als minus 2“.") },
+        { math: "3#c \\quad \\group{-#ds 5#d} \\quad 0#e \\quad \\group{-#fs 1#f} \\quad \\group{-#gs 8#g} \\quad 2#h", note: tx("Now a whole row. Let's sort it from smallest to largest.", "Jetzt eine ganze Reihe. Wir sortieren sie von der kleinsten zur größten Zahl.") },
         {
-          math: "-#gs 8#g <#l1 -#ds 5#d <#l2 -#fs 1#f <#l3 0#e <#l4 2#h <#l5 3#c",
+          math: "\\group{-#gs 8#g} <#l1 \\group{-#ds 5#d} <#l2 \\group{-#fs 1#f} <#l3 0#e <#l4 2#h <#l5 3#c",
           note: tx("First the negative numbers (furthest left first), then $0$, then the positive numbers.", "Zuerst die negativen Zahlen (die am weitesten links zuerst), dann die $0$, dann die positiven Zahlen."),
         },
       ],
@@ -902,7 +902,7 @@ export const level1: LevelLesson = {
         { math: "5#a -#o (-#s 3#b)#k", highlight: ["o", "s"], note: tx("Minus a negative number: Blob looks left and walks backwards, so to the right!", "Minus eine negative Zahl: Blob schaut nach links und läuft rückwärts, also nach rechts!") },
         { math: "5#a +#s 3#b =#e 8#r", highlight: ["s"], note: tx("Two minus signs become a plus: $5 - (-3) = 5 + 3 = 8$.", "Aus zwei Minuszeichen wird ein Plus: $5 - (-3) = 5 + 3 = 8$.") },
         {
-          math: "+(+3) = +3 \\quad +(-3) = -3 \\\\ -(+3) = -3 \\quad -(-3) = +3",
+          math: "\\group{+(-3) = -3} \\quad \\group{-(-3) = +3}",
           note: tx("In short: **equal signs** next to each other give plus, **different signs** give minus.", "Kurz gesagt: **Gleiche Zeichen** nebeneinander ergeben plus, **verschiedene Zeichen** ergeben minus."),
         },
       ],
@@ -911,7 +911,7 @@ export const level1: LevelLesson = {
     {
       type: "explain",
       title: tx("How big is the change?", "Wie groß ist die Änderung?"),
-      blob: tx("From −3 °C to 5 °C: how many degrees warmer is that?", "Von −3 °C auf 5 °C: Wie viel Grad wärmer ist das?"),
+      blob: tx("From −3\u00a0°C to 5\u00a0°C: how many degrees warmer is that?", "Von −3\u00a0°C auf 5\u00a0°C: Wie viel Grad wärmer ist das?"),
       body: tx(
         "To find a change, count the steps between the two numbers, or calculate **new value minus old value**. If the result is positive, it went up. If it's negative, it went down.",
         "Für eine Änderung zählst du die Schritte zwischen den beiden Zahlen oder rechnest **neuer Wert minus alter Wert**. Ist das Ergebnis positiv, ging es nach oben. Ist es negativ, ging es nach unten.",

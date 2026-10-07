@@ -80,7 +80,7 @@ export function DistanceLine({
       viewBox={`0 0 ${g.w} 128`}
       className={cn("block w-full select-none", onProbe && "touch-none", onProbe && (dragging ? "cursor-grabbing" : "cursor-pointer"))}
       role={onProbe ? "slider" : "img"}
-      aria-label={onProbe ? t(tx("Test value x", "Testwert x")) : t(tx("Distance on the number line", "Abstand am Zahlenstrahl"))}
+      aria-label={onProbe ? t(tx("Test value x", "Testwert x")) : t(tx("Distance on the number line", "Abstand an der Zahlengeraden"))}
       aria-valuemin={onProbe ? from : undefined}
       aria-valuemax={onProbe ? to : undefined}
       aria-valuenow={onProbe && probe != null ? probe : undefined}
@@ -171,7 +171,7 @@ export function DistanceLine({
       {/* the centre */}
       <motion.g initial={false} animate={{ x: nx(center) }} transition={spring}>
         <path d={`M -6 ${Y + 34} L 6 ${Y + 34} L 0 ${Y + 27} Z`} fill="var(--ink-2)" />
-        <text y={Y + 50} fontSize={g.font - 1} textAnchor="middle" fill="var(--ink-2)" className="font-math">
+        <text y={Y + 50} fontSize={g.font - 2} textAnchor="middle" fill="var(--ink-2)" fontFamily="var(--font-sans)">
           {t(tx("centre", "Mitte"))}
         </text>
       </motion.g>
@@ -202,16 +202,24 @@ export function DistanceLine({
   );
 }
 
-/** A static picture for explain steps (props come from the lesson). */
-export function DistancePicture(props: { center: number; radius: number; rel: DistRel; from?: number; to?: number }) {
+const REL_TEX: Record<"=" | "<" | ">", string> = { "=": "=", "<": "<", ">": ">" };
+
+/** A static picture for explain steps (props come from the lesson): the statement, its solution set and the number line. */
+export function DistancePicture(props: { center: number; radius: number; rel: "=" | "<" | ">"; from?: number; to?: number }) {
+  const { center: a, radius: r, rel } = props;
+  const set: Text = rel === "=" ? setOf([a - r, a + r]) : absIneqSet(a - r, a + r, rel);
   return (
-    <div className="rounded-xl border border-line bg-surface px-2 pt-2">
-      <DistanceLine {...props} />
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+        <MathView src={`|${lin(1, -a)}| ${REL_TEX[rel]} ${r}`} size="lg" animate={false} />
+        <MathView src={set} size="md" animate={false} className="text-ink-2" />
+      </div>
+      <div className="rounded-xl border border-line bg-surface px-2 pt-2">
+        <DistanceLine {...props} />
+      </div>
     </div>
   );
 }
-
-const REL_TEX: Record<"=" | "<" | ">", string> = { "=": "=", "<": "<", ">": ">" };
 
 export function DistanceLab() {
   const t = useText();
@@ -270,7 +278,7 @@ export function DistanceLab() {
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-1.5">
-          <Slider name={t(tx("centre", "Mitte"))} value={a} min={-4} max={4} shown={fmtNum(a, locale)} onChange={setA} label={t(tx("Centre a", "Mitte a"))} />
+          <Slider name="a" value={a} min={-4} max={4} shown={fmtNum(a, locale)} onChange={setA} label={t(tx("Centre a", "Mitte a"))} />
           <Slider name="r" value={r} min={0} max={5} shown={fmtNum(r, locale)} onChange={setR} label={t(tx("Distance r", "Abstand r"))} />
         </div>
         <div className="space-y-1.5">
@@ -382,7 +390,14 @@ export function RootLab() {
               ))}
             </AnimatePresence>
             <div className="pt-1">
-              <MathView src={setOf(good)} size="md" animate={false} />
+              {good.every((x) => Number.isInteger(x)) ? (
+                <MathView src={setOf(good)} size="md" animate={false} />
+              ) : (
+                <span className="flex items-center gap-2 text-[13.5px] text-ink-2">
+                  {t(tx("Real solution:", "Echte Lösung:"))}
+                  <MathView src={good.map((x) => `x \\approx ${texNum(x, locale)}`).join(" \\quad ")} size="md" animate={false} className="text-ink" />
+                </span>
+              )}
             </div>
           </div>
         </div>

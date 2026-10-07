@@ -192,3 +192,23 @@ export const NAMES = [
 ];
 
 export const ANSWER = tx("**Answer:**", "**Antwort:**");
+
+const COMMA = /(\d),(\d)/g;
+
+/**
+ * English uses a decimal point: "7,50 €" becomes "7.50 €" in the English half of every text
+ * (and a plain string with a decimal comma becomes bilingual). German stays as it is. Walks
+ * lessons and exercises; components and functions are left alone.
+ */
+export function englishDecimals<T>(x: T): T {
+  if (typeof x === "string") return (/\d,\d/.test(x) ? { en: x.replace(COMMA, "$1.$2"), de: x } : x) as T;
+  if (Array.isArray(x)) return x.map((v) => englishDecimals(v)) as T;
+  if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>;
+    if (typeof o.en === "string" && typeof o.de === "string" && Object.keys(o).length === 2) return { en: o.en.replace(COMMA, "$1.$2"), de: o.de } as T;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) out[k] = k === "component" || k === "widget" || typeof v === "function" ? v : englishDecimals(v);
+    return out as T;
+  }
+  return x;
+}

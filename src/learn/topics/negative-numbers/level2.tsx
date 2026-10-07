@@ -330,13 +330,13 @@ function decimalTask(rng: Rng): Exercise {
     }
     const slipped = steps(root, 0);
     if (kind === 3 && slipped.length) slips.push({ v: evaluate(slipped[slipped.length - 1].n), title: SIGN_TITLE, say: tx("Check the sign of the product first: minus times plus is **minus**.", "Prüf zuerst das Vorzeichen des Produkts: Minus mal plus ergibt **minus**.") });
-    slips.push({ v: -right, title: SIGN_TITLE, say: tx("Nearly! Decide the sign first, then calculate with the amounts.", "Fast! Bestimm zuerst das Vorzeichen, dann rechne mit den Beträgen."), close: true });
+    slips.push({ v: -right, title: SIGN_TITLE, say: tx("Nearly! Decide the sign first, then calculate without the signs.", "Fast! Bestimm zuerst das Vorzeichen, dann rechne ohne Vorzeichen."), close: true });
     return {
       instruction: tx("Calculate with decimals", "Rechne mit Dezimalzahlen"),
       math: dmath((l) => render(root, l, false)),
       answer: numberAnswer(right),
       hint: tx("The sign rules are the same as for whole numbers. Decide the sign first.", "Die Vorzeichenregeln sind dieselben wie bei ganzen Zahlen. Bestimm zuerst das Vorzeichen."),
-      solution: solveFrames(root, tx("First the sign, then the calculation with the amounts.", "Zuerst das Vorzeichen, dann die Rechnung mit den Beträgen.")),
+      solution: solveFrames(root, tx("First the sign, then calculate without the signs.", "Zuerst das Vorzeichen, dann rechnest du ohne Vorzeichen.")),
       mistakes: numberMistakes(right, slips),
     };
   }
@@ -673,7 +673,7 @@ export const level2: LevelLesson = {
       blob: tx("Two rules are all you need, for multiplying and for dividing.", "Zwei Regeln reichen, fürs Multiplizieren und fürs Dividieren."),
       body: tx("First decide the sign, then calculate with the numbers without their signs.", "Bestimm zuerst das Vorzeichen, dann rechne mit den Zahlen ohne Vorzeichen."),
       frames: [
-        { math: "3 \\cdot 4 = 12#r1 \\\\ 3 \\cdot (-4) = -#s2 12#r2 \\\\ (-3) \\cdot 4 = -#s3 12#r3 \\\\ (-3) \\cdot (-4) = 12#r4", highlight: ["r1", "s2", "r2", "s3", "r3", "r4"], note: tx("All four cases at a glance.", "Alle vier Fälle auf einen Blick.") },
+        { math: "3 \\cdot 4 = \\green{12#r1} \\\\ 3 \\cdot (-4) = \\red{-#s2 12#r2} \\\\ (-3) \\cdot 4 = \\red{-#s3 12#r3} \\\\ (-3) \\cdot (-4) = \\green{12#r4}", note: tx("All four cases at a glance.", "Alle vier Fälle auf einen Blick.") },
         { math: "(+) \\cdot (+) = (+) \\quad (-) \\cdot (-) = (+)", note: tx("**Same signs**: the result is **positive**.", "**Gleiche Vorzeichen**: Das Ergebnis ist **positiv**.") },
         { math: "(+) \\cdot (-) = (-) \\quad (-) \\cdot (+) = (-)", note: tx("**Different signs**: the result is **negative**.", "**Verschiedene Vorzeichen**: Das Ergebnis ist **negativ**.") },
         { math: "(-#s 12#a)#k :#d 3#b =#e ?#q", note: tx("Dividing is multiplying backwards. Which number times $3$ gives $-12$?", "Dividieren ist Multiplizieren rückwärts. Welche Zahl mal $3$ ergibt $-12$?") },
@@ -747,7 +747,7 @@ export const level2: LevelLesson = {
         "Für negative Zahlen ändern sich die Regeln nicht: zuerst **Klammern**, dann **Potenzen**, dann **Punktrechnung** ($\\cdot$ und $:$) und erst danach **Strichrechnung** ($+$ und $-$).",
       ),
       frames: [
-        ...solveFrames(opsExample, tx("Point before line: multiply first.", "Punkt vor Strich: Zuerst wird multipliziert."), tx("From left to right you would get $1 \\cdot (-2) = -2$: wrong!", "Von links nach rechts käme $1 \\cdot (-2) = -2$ heraus: falsch!")),
+        ...solveFrames(opsExample, tx("Which operation comes first?", "Welche Rechnung kommt zuerst?"), tx("From left to right you would get $1 \\cdot (-2) = -2$: wrong!", "Von links nach rechts käme $1 \\cdot (-2) = -2$ heraus: falsch!")),
         { math: "(-3 + 4)#br \\cdot (-2) = 1 \\cdot (-2) = -2", note: tx("With brackets it's different: the bracket comes first.", "Mit Klammern ist es anders: Die Klammer kommt zuerst.") },
         { math: "2 - (-3)^2 = 2 - 9 = -7", note: tx("Powers before point and line: $(-3)^2 = (-3) \\cdot (-3) = 9$.", "Potenzen vor Punkt und Strich: $(-3)^2 = (-3) \\cdot (-3) = 9$.") },
       ],
@@ -773,8 +773,8 @@ export const level2: LevelLesson = {
       title: tx("Fractions and decimals", "Brüche und Dezimalzahlen"),
       blob: tx("Good news: the rules stay exactly the same for fractions and decimals.", "Gute Nachricht: Für Brüche und Dezimalzahlen bleiben die Regeln genau gleich."),
       body: tx(
-        "Positive and negative fractions and decimals together form the **rational numbers**. You calculate with them just like with whole numbers: first the sign, then the amount.",
-        "Positive und negative Brüche und Dezimalzahlen bilden zusammen die **rationalen Zahlen**. Du rechnest mit ihnen genau wie mit ganzen Zahlen: zuerst das Vorzeichen, dann der Betrag.",
+        "Positive and negative fractions and decimals together form the **rational numbers**. You calculate with them just like with whole numbers: first the sign, then the numbers without their signs.",
+        "Positive und negative Brüche und Dezimalzahlen bilden zusammen die **rationalen Zahlen**. Du rechnest mit ihnen genau wie mit ganzen Zahlen: zuerst das Vorzeichen, dann die Zahlen ohne Vorzeichen.",
       ),
       frames: [
         { math: "-#m \\frac{3}{4} = \\frac{-3}{4} = \\frac{3}{-4}", note: tx("A negative fraction: the minus can stand in front, in the numerator or in the denominator. Usually it goes in front.", "Ein negativer Bruch: Das Minus kann davor, im Zähler oder im Nenner stehen. Meistens schreibt man es davor.") },
@@ -828,7 +828,7 @@ export const level2: LevelLesson = {
     },
     {
       title: tx("Fractions and decimals", "Brüche und Dezimalzahlen"),
-      body: tx("Decide the sign first, then calculate with the amounts.", "Bestimm zuerst das Vorzeichen, dann rechne mit den Beträgen."),
+      body: tx("Decide the sign first, then calculate without the signs.", "Bestimm zuerst das Vorzeichen, dann rechne ohne Vorzeichen."),
       examples: [dmath((l) => `(-${num(0.5, l)}) \\cdot (-${num(0.4, l)}) = ${num(0.2, l)}`), "-\\frac{1}{2} + \\frac{3}{4} = \\frac{1}{4}"],
       tone: "tip",
     },

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { tx, txMap, type Text } from "@/i18n/text";
+import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import {
@@ -57,7 +57,7 @@ function absSimpleExercise(a: number, r: number): Exercise {
     hint:
       r < 0
         ? tx("Can a distance be negative?", "Kann ein Abstand negativ sein?")
-        : tx(`Which numbers are $${r}$ away from $${a}$ on the number line?`, `Welche Zahlen liegen am Zahlenstrahl $${r}$ von $${a}$ entfernt?`),
+        : tx(`Which numbers are $${r}$ away from $${a}$ on the number line?`, `Welche Zahlen liegen an der Zahlengeraden $${r}$ von $${a}$ entfernt?`),
     solution: absSimpleFrames({ a, r }),
     mistakes: absSimpleMistakes({ a, r }),
   };
@@ -300,7 +300,9 @@ function probeTask(rng: Rng): Exercise | null {
   const say = (x: number) => {
     const { left, right } = check(x);
     return left === right
-      ? tx(`$x = ${x}$ works: $\\sqrt{${x + a}} = ${left}$ and $${x} ${b >= 0 ? "-" : "+"} ${Math.abs(b)} = ${right}$.`, `$x = ${x}$ passt: $\\sqrt{${x + a}} = ${left}$ und $${x} ${b >= 0 ? "-" : "+"} ${Math.abs(b)} = ${right}$.`)
+      ? b === 0
+        ? tx(`$x = ${x}$ works: $\\sqrt{${x + a}} = ${left}$, and the right side is $${right}$ too.`, `$x = ${x}$ passt: $\\sqrt{${x + a}} = ${left}$, und die rechte Seite ist auch $${right}$.`)
+        : tx(`$x = ${x}$ works: $\\sqrt{${x + a}} = ${left}$ and $${x} ${b > 0 ? "-" : "+"} ${Math.abs(b)} = ${right}$.`, `$x = ${x}$ passt: $\\sqrt{${x + a}} = ${left}$ und $${x} ${b > 0 ? "-" : "+"} ${Math.abs(b)} = ${right}$.`)
       : tx(
           `Check $x = ${x}$: the root gives $${left}$, the right side $${right}$. A root is never negative, so that's a false solution.`,
           `Probe für $x = ${x}$: Die Wurzel ergibt $${left}$, die rechte Seite $${right}$. Eine Wurzel ist nie negativ, also ist das eine Scheinlösung.`,
@@ -423,6 +425,21 @@ const casesIntro = absCasesFrames(
 
 const ineqIntro: Frame[] = [
   ...absIneqFrames({ a: 2, r: 3, rel: "<" }),
+  {
+    math: tx('"Case 1:" \\; x \\ge 2 \\quad \\quad x - 2 < 3 \\;\\Rightarrow\\; x < 5', '"1. Fall:" \\; x \\ge 2 \\quad \\quad x - 2 < 3 \\;\\Rightarrow\\; x < 5'),
+    note: tx(
+      "The same with case analysis. Case 1: the inside is $\\ge 0$, so the bars just go. Together with the condition: $2 \\le x < 5$.",
+      "Dasselbe mit Fallunterscheidung. 1. Fall: Das Innere ist $\\ge 0$, die Striche fallen weg. Zusammen mit der Bedingung: $2 \\le x < 5$.",
+    ),
+  },
+  {
+    math: tx('"Case 2:" \\; x < 2 \\quad \\quad -(x - 2) < 3 \\;\\Rightarrow\\; x > -1', '"2. Fall:" \\; x < 2 \\quad \\quad -(x - 2) < 3 \\;\\Rightarrow\\; x > -1'),
+    note: tx(
+      "Case 2: the inside is negative, so a minus goes in front: $-x + 2 < 3$ gives $x > -1$. Together with $x < 2$: $-1 < x < 2$.",
+      "2. Fall: Das Innere ist negativ, also kommt ein Minus davor: $-x + 2 < 3$ ergibt $x > -1$. Zusammen mit $x < 2$: $-1 < x < 2$.",
+    ),
+  },
+  { math: "-1 < x < 5", note: tx("Both cases together, $2 \\le x < 5$ and $-1 < x < 2$: the same stretch from $-1$ to $5$.", "Beide Fälle zusammen, $2 \\le x < 5$ und $-1 < x < 2$: dieselbe Strecke von $-1$ bis $5$.") },
   ...absIneqFrames({ a: 2, r: 3, rel: ">" }).map((f, i) =>
     i === 0 ? { ...f, note: tx("And the opposite: more than $3$ away from $2$.", "Und das Gegenteil: mehr als $3$ von $2$ entfernt.") } : f,
   ),
@@ -439,10 +456,10 @@ const noSolutionFrames: Frame[] = [
   { math: "|x + 1| < 0", note: tx("A distance smaller than $0$? Never: $L = \\{ \\}$.", "Ein Abstand kleiner als $0$? Niemals: $L = \\{ \\}$.") },
   { math: "|x - 5| \\ge 0", note: tx("A distance is always at least $0$, so this holds for every number: $L =$ ℝ.", "Ein Abstand ist immer mindestens $0$, das gilt also für jede Zahl: $L =$ ℝ.") },
   {
-    math: txMap((t) => `\\sqrt{x} = x - 6 \\quad \\Rightarrow \\quad ${t('"check!"', '"Probe!"')}`),
+    math: "\\sqrt{x} = x - 6 \\;\\Rightarrow\\; x_1 = 9 \\quad x_2 = 4",
     note: tx(
-      "With an $x$ on the other side you can't tell at a glance. Then: square, solve, and always check.",
-      "Steht auf der anderen Seite ein $x$, siehst du es nicht auf einen Blick. Dann gilt: quadrieren, lösen und immer die Probe machen.",
+      "With an $x$ on the other side you can't tell at a glance. Squaring gives $9$ and $4$, but only $9$ passes the check: $\\sqrt{4} = 2$, while $4 - 6 = -2$.",
+      "Steht auf der anderen Seite ein $x$, siehst du es nicht auf einen Blick. Quadrieren liefert $9$ und $4$, aber nur $9$ besteht die Probe: $\\sqrt{4} = 2$, aber $4 - 6 = -2$.",
     ),
   },
 ];
@@ -505,18 +522,18 @@ export const level3: LevelLesson = {
       blob: tx("Bars around a number? Think distance, not sign!", "Striche um eine Zahl? Denk an Abstand, nicht an Vorzeichen!"),
       body: tx(
         "$|x - 3| = 5$ asks: which numbers are $5$ away from $3$ on the number line? There are two, one on each side.",
-        "$|x - 3| = 5$ fragt: Welche Zahlen liegen am Zahlenstrahl $5$ von $3$ entfernt? Es gibt zwei, auf jeder Seite eine.",
+        "$|x - 3| = 5$ fragt: Welche Zahlen liegen an der Zahlengeraden $5$ von $3$ entfernt? Es gibt zwei, auf jeder Seite eine.",
       ),
       visual: { component: DistancePicture as ComponentType<Record<string, unknown>>, props: { center: 3, radius: 5, rel: "=", from: -4, to: 10 } },
       frames: distanceIntro,
     },
     {
       type: "widget",
-      title: tx("Distance on the number line", "Abstand am Zahlenstrahl"),
+      title: tx("Distance on the number line", "Abstand an der Zahlengeraden"),
       blob: tx("Drag x around. When is the distance just right?", "Zieh x hin und her. Wann passt der Abstand genau?"),
       body: tx(
-        "$|x - a|$ measures how far $x$ is from the centre $a$. Change the centre and the distance, switch between $=$, $<$ and $>$, and watch the solution set.",
-        "$|x - a|$ misst, wie weit $x$ von der Mitte $a$ entfernt ist. Verändere Mitte und Abstand, wechsle zwischen $=$, $<$ und $>$ und beobachte die Lösungsmenge.",
+        "$|x - a|$ measures how far $x$ is from the centre $a$. Change the centre and the distance, switch between equal, less and greater, and watch the solution set.",
+        "$|x - a|$ misst, wie weit $x$ von der Mitte $a$ entfernt ist. Verändere Mitte und Abstand, wechsle zwischen gleich, kleiner und größer und beobachte die Lösungsmenge.",
       ),
       widget: DistanceLab,
     },

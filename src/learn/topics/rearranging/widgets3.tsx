@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { Minus, Plus } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useLocale } from "@/i18n/client";
 import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
@@ -16,12 +16,11 @@ import { dec } from "./kit";
 // object) along the axis; the rays and the image follow, and the lens equation
 // 1/f = 1/g + 1/b, solved for b, is worked out with the numbers.
 
-const VW = 660;
-const VH = 280;
-const AX = 150; // optical axis
-const LX = 330; // lens
-const S = 12; // px per cm
-const G = 3.5; // object height in cm
+/** The bench: viewBox size, optical axis, lens position, px per cm, lens half-height. Narrower on phones. */
+type Bench = { VW: number; VH: number; AX: number; LX: number; S: number; RY: number };
+const WIDE: Bench = { VW: 660, VH: 280, AX: 150, LX: 330, S: 12, RY: 118 };
+const NARROW: Bench = { VW: 420, VH: 250, AX: 136, LX: 210, S: 7.6, RY: 104 };
+const G = 2.5; // object height in cm
 const FOCALS = [4, 5, 6, 8];
 
 /** Where a line through two points meets the vertical x = X. */
@@ -32,9 +31,21 @@ export function LensLab() {
   const l = useLocale();
   const scope = useId();
   const svgRef = useRef<SVGSVGElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const [f, setF] = useState(6);
   const [g, setG] = useState(15);
   const [dragging, setDragging] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const { VW, VH, AX, LX, S, RY } = narrow ? NARROW : WIDE;
+
+  // A phone gets a compact bench, so the labels stay readable.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => setNarrow(entries[0].contentRect.width < 520));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const setObject = (v: number) => setG(Math.min(26, Math.max(1, Math.round(v * 2) / 2)));
   const moveTo = (e: React.PointerEvent) => {
@@ -68,7 +79,7 @@ export function LensLab() {
   const r2 = { x1: ox, y1: oy, x3: VW, y3: atX(ox, oy, LX, AX, VW) };
   // Ray 3: through the focal point in front (or coming from its direction), then parallel.
   const y3lens = g > f ? atX(ox, oy, fxl, AX, LX) : atX(fxl, AX, ox, oy, LX);
-  const showR3 = Math.abs(g - f) > 0.4 && Math.abs(y3lens - AX) < 125;
+  const showR3 = Math.abs(g - f) > 0.4 && Math.abs(y3lens - AX) < RY + 7;
 
   const num = (v: number, d = 1) => dec(Math.round(v * 10 ** d) / 10 ** d, l, d);
   const bText = real ? num(b) : virtual ? num(b) : "";
@@ -87,20 +98,22 @@ export function LensLab() {
         : tx("$f < g < 2f$: a **real** image, upside down and **enlarged** (like a projector).", "$f < g < 2f$: ein **reelles** Bild, umgedreht und **vergrößert** (wie bei einem Beamer).");
 
   return (
-    <div className="space-y-4">
+    <div ref={boxRef} className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-[13px] text-ink-2">{t(tx("Focal length", "Brennweite"))}</span>
-        <div className="flex gap-1">
+        <span className="text-[13px] text-ink-2">
+          <Inline text={tx("Focal length $f$", "Brennweite $f$")} />
+        </span>
+        <div className="flex flex-wrap gap-1">
           {FOCALS.map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setF(v)}
-              className={cn("relative h-9 rounded-lg border px-3 font-math text-[15px] transition-colors", f === v ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover")}
+              className={cn("relative h-9 whitespace-nowrap rounded-lg border px-3 font-math text-[15px] transition-colors", f === v ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover")}
               aria-pressed={f === v}
             >
               {f === v && <motion.span layoutId={`${scope}-f`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 34 }} />}
-              <span className="relative">f = {v} cm</span>
+              <span className="relative">{v} cm</span>
             </button>
           ))}
         </div>
@@ -135,18 +148,18 @@ export function LensLab() {
         <line x1={0} y1={AX} x2={VW} y2={AX} stroke="var(--ink-3)" strokeWidth={1} />
 
         {/* lens */}
-        <ellipse cx={LX} cy={AX} rx={7} ry={118} fill="var(--blob)" fillOpacity={0.12} stroke="var(--blob)" strokeWidth={1.5} />
+        <ellipse cx={LX} cy={AX} rx={7} ry={RY} fill="var(--blob)" fillOpacity={0.12} stroke="var(--blob)" strokeWidth={1.5} />
         {/* focal points */}
         {[fxl, fx].map((x, i) => (
           <g key={i}>
             <motion.circle initial={false} animate={{ cx: x }} cy={AX} r={3.5} fill="var(--ink)" />
-            <motion.text initial={false} animate={{ x }} y={AX + 20} textAnchor="middle" fontSize={13} fill="var(--ink-2)" className="font-math" fontStyle="italic">
+            <motion.text initial={false} animate={{ x }} y={AX + 22} textAnchor="middle" fontSize={16} fill="var(--ink-2)" className="font-math" fontStyle="italic">
               F
             </motion.text>
           </g>
         ))}
         {[2 * f * S, -2 * f * S].map((d, i) => (
-          <motion.text key={i} initial={false} animate={{ x: LX - d }} y={AX + 20} textAnchor="middle" fontSize={11} fill="var(--ink-3)" className="font-math">
+          <motion.text key={i} initial={false} animate={{ x: LX - d }} y={AX + 22} textAnchor="middle" fontSize={13} fill="var(--ink-3)" className="font-math">
             2F
           </motion.text>
         ))}
@@ -180,18 +193,18 @@ export function LensLab() {
           <rect x={-5} y={oy} width={10} height={G * S} rx={2} fill="var(--ink-2)" />
           <path d={`M0,${oy - 15} C6,${oy - 7} 5,${oy - 1} 0,${oy} C-5,${oy - 1} -6,${oy - 7} 0,${oy - 15} Z`} fill="var(--blob)" />
           <circle cx={0} cy={AX} r={14} fill="var(--blob)" opacity={dragging ? 0.25 : 0.12} />
-          <text x={0} y={AX + 36} textAnchor="middle" fontSize={12} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={0} y={AX + 46} textAnchor="middle" fontSize={14} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
             {t(tx("drag", "ziehen"))}
           </text>
         </motion.g>
-        <text x={12} y={22} fontSize={13} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+        <text x={12} y={24} fontSize={15} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
           {t(tx("object", "Gegenstand"))}
         </text>
-        <text x={VW - 12} y={22} textAnchor="end" fontSize={13} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
+        <text x={VW - 12} y={24} textAnchor="end" fontSize={15} fill="var(--ink-2)" style={{ fontFamily: "var(--font-sans)" }}>
           {real ? t(tx("real image", "reelles Bild")) : virtual ? t(tx("virtual image", "virtuelles Bild")) : t(tx("no image", "kein Bild"))}
         </text>
         {real && ix > VW - 4 && (
-          <text x={VW - 12} y={VH - 12} textAnchor="end" fontSize={12} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+          <text x={VW - 12} y={VH - 12} textAnchor="end" fontSize={14} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
             {t(tx("image off the bench →", "Bild außerhalb →"))}
           </text>
         )}
@@ -251,12 +264,12 @@ export function PendulumLab() {
     <div className="grid items-start gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
       <div className="relative mx-auto h-[250px] w-[200px] overflow-hidden rounded-xl border border-line bg-surface">
         {/* ceiling */}
-        <div className="absolute inset-x-6 top-3 h-1.5 rounded-full bg-ink-3" />
+        <div className="absolute inset-x-10 top-3 h-1.5 rounded-full bg-ink-3" />
         {/* metre ruler */}
-        <div className="absolute right-2 top-[18px] flex flex-col items-end text-[10px] text-ink-3" aria-hidden>
+        <div className="absolute left-2 top-[18px] text-[10px] text-ink-3" aria-hidden>
           {[0, 1, 2].map((m) => (
-            <span key={m} className="absolute right-0 flex items-center gap-1" style={{ top: m * PX_PER_M - 6 }}>
-              {m} m <span className="inline-block h-px w-2 bg-ink-3" />
+            <span key={m} className="absolute left-0 flex items-center gap-1 whitespace-nowrap" style={{ top: m * PX_PER_M - 7 }}>
+              <span className="inline-block h-px w-2 bg-ink-3" /> {m} m
             </span>
           ))}
         </div>
@@ -289,8 +302,12 @@ export function PendulumLab() {
           ))}
         </div>
         <div className="space-y-2 rounded-xl bg-blob-soft/50 px-4 py-3">
-          <MathView src="T = 2 \pi \sqrt{\frac{l}{g}} \quad \Rightarrow \quad l = \frac{g \cdot T^2}{4 \pi^2}" size="sm" animate={false} />
-          <MathView src={`l = \\frac{${n(GRAV)} \\cdot ${n(T, 1)}^2}{4 \\pi^2} \\approx ${n(len)} "m"`} size="sm" animate={false} />
+          <div>
+            <MathView src="T = 2 \pi \sqrt{\frac{l}{g}} \quad \Rightarrow \quad l = \frac{g \cdot T^2}{4 \pi^2}" size="sm" animate={false} />
+          </div>
+          <div>
+            <MathView src={`l = \\frac{${n(GRAV)} \\cdot ${n(T, 1)}^2}{4 \\pi^2} \\approx ${n(len)} "m"`} size="sm" animate={false} />
+          </div>
           <p className="text-[13px] text-ink-2">
             <Inline
               text={tx(
