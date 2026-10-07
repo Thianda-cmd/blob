@@ -8,40 +8,13 @@ import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
-import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { asFrac, asNum, bilingual, cat, collect, dec, gcdInt, grouped, inner, kp, largestSquareRoot, num, pairOf, par, pp, sep, type AddMistake } from "./kit";
 
 // ---------------------------------------------------------------------------
-// Small helpers for writing powers with stable animation keys. Decimals use a
-// comma, as in German schools.
-
-/** "3,6", "-0,5", "12". */
-function dec(v: number): string {
-  return String(Math.round(v * 1e9) / 1e9).replace(".", ",");
-}
-
-/** A number on its own, keyed: "5#k" or "-#ks 2#k". */
-function num(n: number, k: string): string {
-  return n < 0 ? `-#${k}s ${dec(-n)}#${k}` : `${dec(n)}#${k}`;
-}
-
-/** A number inside a sum or product, keyed; negative ones get brackets. */
-function inner(n: number, k: string): string {
-  return n < 0 ? `(-#${k}s ${dec(-n)}#${k})#${k}b` : `${dec(n)}#${k}`;
-}
-
-/** Plain number for notes, in brackets when negative: "(-2)". */
-const par = (n: number) => (n < 0 ? `(${dec(n)})` : dec(n));
-
-/** Plain power: "x", "x^{5}", "x^{-2}". */
-const pp = (base: string | number, e: number) => (e === 1 ? `${base}` : `${base}^{${e}}`);
-
-/** Keyed power with base key `b` and exponent key `ek`. A lone base hides its 1 unless `showOne`. */
-function kp(base: string | number, b: string, e: number, ek: string, showOne = false): string {
-  return e === 1 && !showOne ? `${base}#${b}` : `${base}#${b}^{${num(e, ek)}}`;
-}
+// Small helpers for writing powers with stable animation keys (shared ones live in kit.ts).
 
 /** Keyed exponent sum like "4 + 5 + (-2)" (op keys `${opKey}1`, `${opKey}2`…). */
 function keyedSum(list: { v: number; k: string }[], op: string, opKey: string): string {
@@ -53,26 +26,8 @@ const plainSum = (vals: number[]) => vals.map((v, i) => (i === 0 ? dec(v) : `+ $
 /** Coefficient in front of a variable: "" for 1, "-" for -1, else the number. */
 const coef = (c: number) => (c === 1 ? "" : c === -1 ? "-" : dec(c));
 
-/** Digits grouped in threes with thin spaces: "36\,000\,000". The first group gets key `k`. */
-function grouped(digits: string, k?: string): string {
-  if (digits.length < 5) return k ? `${digits}#${k}` : digits;
-  const groups: string[] = [];
-  for (let end = digits.length; end > 0; end -= 3) groups.unshift(digits.slice(Math.max(0, end - 3), end));
-  return groups.map((g, i) => (i === 0 && k ? `${g}#${k}` : g)).join(" \\,");
-}
-
-function largestSquareRoot(n: number): number {
-  for (let k = Math.floor(Math.sqrt(n)); k >= 1; k--) if (n % (k * k) === 0) return k;
-  return 1;
-}
-
-const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : Math.abs(a));
-
 // ---------------------------------------------------------------------------
 // Bilingual helpers
-
-/** Joins bilingual pieces, language by language. */
-const cat = (...parts: (Text | undefined)[]): Text => txMap((_, locale) => parts.map((part) => resolveText(part, locale)).join(""));
 
 /** " So $c = 8$ and $n = 3$." */
 const soBoth = (n1: string, v1: number | string, n2: string, v2: number | string) =>
@@ -88,7 +43,7 @@ const loneDe = (v: string) => (/^\d/.test(v) ? `Eine einzelne $${v}$` : `Ein ein
 // Worked solutions (also used by the lesson checks)
 
 /** (−2)^5 = −32 etc.: written out, then multiplied step by step. */
-function evalPowerFrames(b: number, n: number): Frame[] {
+export function evalPowerFrames(b: number, n: number): Frame[] {
   const value = b ** n;
   const bp = par(b);
   const factor = (i: number) => (b < 0 ? `(-#f${i}s ${-b}#f${i})#f${i}b` : `${b}#f${i}`);
@@ -139,7 +94,7 @@ function evalPowerFrames(b: number, n: number): Frame[] {
 }
 
 /** −3² = −9: the exponent only belongs to the 3. */
-function minusTrapFrames(b: number, n: number): Frame[] {
+export function minusTrapFrames(b: number, n: number): Frame[] {
   const factors = Array.from({ length: n }, (_, i) => (i === 0 ? `${b}#f0` : `\\cdot#d${i} ${b}#f${i}`)).join(" ");
   const product = Array.from({ length: n }, () => b).join(" \\cdot ");
   return [
@@ -321,7 +276,7 @@ function bracketPowerFrames(v: string, k: number, e1: number, j: number, extra: 
 
 const places = (k: number) => tx(k === 1 ? "place" : "places", k === 1 ? "Stelle" : "Stellen");
 
-/** 36 000 000 = 3,6 · 10^7 and 0,00036 = 3,6 · 10^{-4}. */
+/** 36 000 000 = 3,6 · 10^7 and 0,00036 = 3,6 · 10^{-4} (call inside `bilingual` for the English decimal point). */
 function sciFrames(digits: string, e: number): Frame[] {
   const mant = Number(digits) / 10 ** (digits.length - 1);
   if (e > 0) {
@@ -332,7 +287,7 @@ function sciFrames(digits: string, e: number): Frame[] {
         math: grouped(raw, "m"),
         note: cat(
           tx(
-            `Move the comma to the left until exactly one digit is in front of it: $${dec(mant)}$. That's $${e}$ `,
+            `Move the decimal point to the left until exactly one digit is in front of it: $${dec(mant)}$. That's $${e}$ `,
             `Verschiebe das Komma nach links, bis genau eine Ziffer davor steht: $${dec(mant)}$. Das sind $${e}$ `,
           ),
           places(e),
@@ -352,14 +307,14 @@ function sciFrames(digits: string, e: number): Frame[] {
       },
     ];
   }
-  const raw = `0,${"0".repeat(-e - 1)}${digits}`;
-  const small = `0,${"0".repeat(-e - 1)}1`;
+  const raw = `0${sep()}${"0".repeat(-e - 1)}${digits}`;
+  const small = `0${sep()}${"0".repeat(-e - 1)}1`;
   return [
     {
       math: `${raw}#m`,
       note: cat(
         tx(
-          `Move the comma to the **right** until one digit (not $0$) is in front of it: $${dec(mant)}$. That's $${-e}$ `,
+          `Move the decimal point to the **right** until one digit (not $0$) is in front of it: $${dec(mant)}$. That's $${-e}$ `,
           `Verschiebe das Komma nach **rechts**, bis eine Ziffer (nicht $0$) davor steht: $${dec(mant)}$. Das sind $${-e}$ `,
         ),
         places(-e),
@@ -455,46 +410,8 @@ function sciCalcFrames(a1: number, e1: number, a2: number, e2: number, div: bool
 // exactly what a student with that misconception gets. A mistake is only kept
 // when it differs from the right answer and from the ones before it.
 
-const sameValue = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
-
-function sameAnswer(a: AnswerSpec, b: AnswerSpec): boolean {
-  if (a.kind === "number" && b.kind === "number") return sameValue(a.value, b.value, 1e-6);
-  if (a.kind === "fraction" && b.kind === "fraction") return sameValue(a.n / a.d, b.n / b.d, 1e-9);
-  if (a.kind === "pair" && b.kind === "pair") return a.values.every((v, i) => sameValue(v, b.values[i], 1e-4));
-  return false;
-}
-
-/** A value a student could actually type: finite, not absurdly big or tiny. */
-const typeable = (v: number) => Number.isFinite(v) && Math.abs(v) < 1e7 && (v === 0 || Math.abs(v) >= 1e-6);
-
-function usable(s: AnswerSpec): boolean {
-  if (s.kind === "number") return typeable(s.value);
-  if (s.kind === "fraction") return Number.isInteger(s.n) && Number.isInteger(s.d) && s.d !== 0 && Math.abs(s.n) < 1e7 && Math.abs(s.d) < 1e7;
-  if (s.kind === "pair") return s.values.every(typeable);
-  return false;
-}
-
-/** `close`: a near miss (a sign, a count, not finished yet): Blob looks thoughtful instead of worried. */
-type AddMistake = (when: AnswerSpec, title: Text, say: Text, close?: boolean) => void;
-
-/** The typical mistakes for one answer, in the order given (first match wins). */
-function collect(right: AnswerSpec, fill: (add: AddMistake) => void): Mistake[] {
-  const list: Mistake[] = [];
-  fill((when, title, say, close) => {
-    if (list.length >= 5 || !usable(when) || sameAnswer(when, right) || list.some((m) => sameAnswer(m.when, when))) return;
-    list.push(close ? { when, title, say, close } : { when, title, say });
-  });
-  return list;
-}
-
-const asNum = (value: number): AnswerSpec => ({ kind: "number", value });
-const asFrac = (n: number, d: number): AnswerSpec => ({ kind: "fraction", n, d });
-const pairOf =
-  (names: [string, string]) =>
-  (a: number, b: number): AnswerSpec => ({ kind: "pair", names, values: [a, b] });
-
 // Titles and lines shared by several shapes.
-const T_BASE_TIMES = tx("Base times exponent", "Basis mal Exponent");
+export const T_BASE_TIMES = tx("Base times exponent", "Basis mal Exponent");
 const T_EXP_MUL = tx("Exponents multiplied", "Exponenten multipliziert");
 const T_EXP_ADD = tx("Added instead of subtracted", "Addiert statt subtrahiert");
 const T_EXP_DIV = tx("Exponents divided", "Exponenten dividiert");
@@ -505,7 +422,7 @@ const T_MINUS_MINUS = tx("Minus a negative", "Minus minus");
 const T_COUNT_MINUS = tx("Count the minus signs", "Zähl die Minuszeichen");
 const T_NOT_NEG = tx("Not a negative number", "Keine negative Zahl");
 const T_NEG_IGNORED = tx("Negative exponent ignored", "Negativen Exponenten übersehen");
-const T_HALF = tx("A root isn't half", "Wurzel ist nicht die Hälfte");
+export const T_HALF = tx("A root isn't half", "Wurzel ist nicht die Hälfte");
 const T_ROOT_LEFT = tx("Root not taken yet", "Wurzel noch nicht gezogen");
 const T_PLACES = tx("Count places, not zeros", "Stellen zählen, nicht Nullen");
 const T_ZEROS = tx("Counted the zeros", "Nullen gezählt");
@@ -545,7 +462,7 @@ const order = (frac: boolean) =>
       );
 
 /** "You calculated 2 · 5. But 2^5 means 5 factors 2." */
-const baseTimes = (B: string, n: number) =>
+export const baseTimes = (B: string, n: number) =>
   tx(
     `I think I know what you did: you calculated $${B} \\cdot ${n}$. But $${pp(B, n)}$ means $${n}$ factors $${B}$, multiplied together.`,
     `Ich glaub, ich weiß, was du gemacht hast: Du hast $${B} \\cdot ${n}$ gerechnet. Aber $${pp(B, n)}$ bedeutet $${n}$ Faktoren $${B}$, miteinander multipliziert.`,
@@ -588,14 +505,14 @@ const powAdd = (v: string, e1: number, k: number) =>
     `Ah, ich seh, was passiert ist! Bei $(${pp(v, e1)})^{${k}}$ hast du die Exponenten addiert. Eine Potenz einer Potenz heißt aber: $${pp(v, e1)}$ wird $${k}$-mal mit sich selbst multipliziert, also werden die Exponenten **multipliziert**.`,
   );
 
-const half = (x: string) =>
+export const half = (x: string) =>
   tx(
     `Ah, I see what happened: you halved $${x}$. But the root asks which number **times itself** gives $${x}$.`,
     `Ah, ich seh, was passiert ist: Du hast $${x}$ halbiert. Aber die Wurzel fragt, welche Zahl **mal sich selbst** $${x}$ ergibt.`,
   );
 
 /** b^n, (−b)^n and −b^n worked out. */
-function powerValueMistakes(b: number, n: number, minusTrap: boolean): Mistake[] {
+export function powerValueMistakes(b: number, n: number, minusTrap: boolean): Mistake[] {
   if (minusTrap) {
     return collect(asNum(-(b ** n)), (add) => {
       add(
@@ -789,7 +706,7 @@ function tenPowerMistakes(e: number): Mistake[] {
         asNum(Number(`1e-${e + 1}`)),
         T_PLACES,
         tx(
-          `Nearly! Count the places, not the zeros: the $1$ itself is one of the $${e}$ places after the comma.`,
+          `Nearly! Count the places, not the zeros: the $1$ itself is one of the $${e}$ places after the decimal point.`,
           `Fast! Zähl die Stellen, nicht die Nullen: Die $1$ selbst ist eine der $${e}$ Stellen nach dem Komma.`,
         ),
         true,
@@ -862,7 +779,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
         at(mant, -e),
         tx("Sign of the exponent", "Vorzeichen vom Exponenten"),
         tx(
-          "Nearly! The number is smaller than $1$ and the comma moved to the **right**, so the exponent is negative.",
+          "Nearly! The number is smaller than $1$ and the decimal point moved to the **right**, so the exponent is negative.",
           "Fast! Die Zahl ist kleiner als $1$, und das Komma ist nach **rechts** gerutscht, also ist der Exponent negativ.",
         ),
         true,
@@ -871,7 +788,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
         at(mant, e + 1),
         T_ZEROS,
         tx(
-          `Ah, I see what happened! You counted the zeros after the comma. But the comma also has to jump over the $${digits[0]}$, so count the places it moves.`,
+          `Ah, I see what happened! You counted the zeros after the decimal point. But the decimal point also has to jump over the $${digits[0]}$, so count the places it moves.`,
           `Ah, ich seh, was passiert ist! Du hast die Nullen nach dem Komma gezählt. Aber das Komma muss auch noch über die $${digits[0]}$ springen. Zähl die Stellen, um die es rutscht.`,
         ),
         true,
@@ -882,7 +799,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
           at(mant, e - 1),
           T_ZEROS,
           tx(
-            `Ah, I see what happened! You counted the zeros. But the comma also jumps over the $${digits[1]}$, so count the places it moves.`,
+            `Ah, I see what happened! You counted the zeros. But the decimal point also jumps over the $${digits[1]}$, so count the places it moves.`,
             `Ah, ich seh, was passiert ist! Du hast die Nullen gezählt. Aber das Komma springt auch über die $${digits[1]}$. Zähl die Stellen, um die es rutscht.`,
           ),
           true,
@@ -891,7 +808,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
         at(mant, -e),
         T_DIRECTION,
         tx(
-          "Nearly! The number is big and the comma moved to the **left**, so the exponent is positive.",
+          "Nearly! The number is big and the decimal point moved to the **left**, so the exponent is positive.",
           "Fast! Die Zahl ist groß, und das Komma ist nach **links** gerutscht, also ist der Exponent positiv.",
         ),
         true,
@@ -902,7 +819,7 @@ function sciMistakes(digits: string, e: number): Mistake[] {
         at(Number(digits), e - 1),
         tx("a is too big", "a ist zu groß"),
         tx(
-          `The value is right, nice! But $a$ has to be between $1$ and $10$, and $${digits}$ is too big. Move the comma one more place.`,
+          `The value is right, nice! But $a$ has to be between $1$ and $10$, and $${digits}$ is too big. Move the decimal point one more place.`,
           `Der Wert stimmt, stark! Aber $a$ muss zwischen $1$ und $10$ liegen, und $${digits}$ ist zu groß. Verschieb das Komma noch um eine Stelle.`,
         ),
         true,
@@ -918,7 +835,7 @@ function sciBackMistakes(digits: string, mant: number, e: number): Mistake[] {
       asNum(Number(`${mant}e${k}`)),
       T_DIRECTION,
       tx(
-        "Oops, the comma went the wrong way! A negative exponent makes the number **smaller**, so the comma moves to the left.",
+        "Oops, the decimal point went the wrong way! A negative exponent makes the number **smaller**, so the decimal point moves to the left.",
         "Hoppla, das Komma ist in die falsche Richtung gerutscht! Ein negativer Exponent macht die Zahl **kleiner**, also rutscht das Komma nach links.",
       ),
     );
@@ -927,11 +844,11 @@ function sciBackMistakes(digits: string, mant: number, e: number): Mistake[] {
       T_PLACES,
       k === 1
         ? tx(
-            `Nearly! The comma moves $1$ place, but that doesn't add a zero: the $${digits[0]}$ itself takes that place.`,
+            `Nearly! The decimal point moves $1$ place, but that doesn't add a zero: the $${digits[0]}$ itself takes that place.`,
             `Fast! Das Komma rutscht um $1$ Stelle, dabei kommt aber keine Null dazu: Die $${digits[0]}$ selbst belegt diese Stelle.`,
           )
         : tx(
-            `Nearly! The comma moves $${k}$ places, but that's not $${k}$ zeros: the $${digits[0]}$ itself takes one of the places.`,
+            `Nearly! The decimal point moves $${k}$ places, but that's not $${k}$ zeros: the $${digits[0]}$ itself takes one of the places.`,
             `Fast! Das Komma rutscht um $${k}$ Stellen, das sind aber nicht $${k}$ Nullen: Die $${digits[0]}$ selbst belegt eine der Stellen.`,
           ),
       true,
@@ -1232,7 +1149,7 @@ function sciCalcMistakes(a1: number, e1: number, a2: number, e2: number, div: bo
         at(P, E),
         up ? tx("a must be below 10", "a muss kleiner als 10 sein") : tx("a must be at least 1", "a muss mindestens 1 sein"),
         tx(
-          `The calculation is right! But $a = ${dec(P)}$ isn't between $1$ and $10$. Move the comma and adjust $n$ so the value stays the same.`,
+          `The calculation is right! But $a = ${dec(P)}$ isn't between $1$ and $10$. Move the decimal point and adjust $n$ so the value stays the same.`,
           `Die Rechnung stimmt! Aber $a = ${dec(P)}$ liegt nicht zwischen $1$ und $10$. Verschieb das Komma und pass $n$ so an, dass der Wert gleich bleibt.`,
         ),
         true,
@@ -1317,7 +1234,10 @@ const LETTER_PAIRS: [string, string][] = [
 ];
 const SQUAREFREE = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15];
 
-type Shape = (rng: Rng, level: Level) => Exercise | null;
+/** The old difficulty tiers (1 basics, 2 standard, 3 challenge) still tune some shapes. */
+type Tier = 1 | 2 | 3;
+
+type Shape = (rng: Rng, level: Tier) => Exercise | null;
 
 const CALCULATE = tx("Calculate", "Berechne");
 const SIMPLIFY = tx("Simplify", "Vereinfache");
@@ -1502,24 +1422,24 @@ const negativeExponent: Shape = (rng) => {
     const e = rng.int(1, 4);
     const value = Number(`1e-${e}`);
     const big = grouped("1" + "0".repeat(e));
-    return {
+    return bilingual(() => ({
       instruction: AS_DECIMAL,
       math: `10^{-${e}}`,
       answer: { kind: "number", value },
       mistakes: tenPowerMistakes(e),
-      hint: tx(`$10^{-${e}} = \\frac{1}{10^{${e}}}$. How many places after the comma?`, `$10^{-${e}} = \\frac{1}{10^{${e}}}$. Wie viele Stellen nach dem Komma?`),
+      hint: tx(`$10^{-${e}} = \\frac{1}{10^{${e}}}$. How many places after the decimal point?`, `$10^{-${e}} = \\frac{1}{10^{${e}}}$. Wie viele Stellen nach dem Komma?`),
       solution: [
         { math: `10#b^{-#s ${e}#e}`, note: tx("A negative exponent means: one divided by the power.", "Ein negativer Exponent bedeutet: eins geteilt durch die Potenz.") },
         { math: `\\frac{1#one}{${kp(10, "b", e, "e")}}#F`, note: `$10^{-${e}} = \\frac{1}{${pp(10, e)}}$.` },
         {
           math: `\\frac{1#one}{${big}#b}#F =#eq ${dec(value)}#r`,
           note: tx(
-            `Divide by $${big}$: the $1$ moves $${e}$ ${e === 1 ? "place" : "places"} behind the comma. So $10^{-${e}} = ${dec(value)}$.`,
+            `Divide by $${big}$: the $1$ moves $${e}$ ${e === 1 ? "place" : "places"} behind the decimal point. So $10^{-${e}} = ${dec(value)}$.`,
             `Teile durch $${big}$: Die $1$ steht dann an der $${e}$. Stelle nach dem Komma. Also ist $10^{-${e}} = ${dec(value)}$.`,
           ),
         },
       ],
-    };
+    }));
   }
   if (kind === 2) {
     const b = rng.int(2, 5);
@@ -1583,13 +1503,13 @@ const sciNotation: Shape = (rng) => {
   if (kind === "back") {
     const e = -rng.int(1, 5);
     const value = Number(`${mant}e${e}`);
-    return {
+    return bilingual(() => ({
       instruction: AS_DECIMAL,
       math: `${dec(mant)} \\cdot 10^{${e}}`,
       answer: { kind: "number", value },
       mistakes: sciBackMistakes(digits, mant, e),
       hint: cat(
-        tx(`The exponent $${e}$ means: move the comma $${-e}$ `, `Der Exponent $${e}$ bedeutet: Verschiebe das Komma um $${-e}$ `),
+        tx(`The exponent $${e}$ means: move the decimal point $${-e}$ `, `Der Exponent $${e}$ bedeutet: Verschiebe das Komma um $${-e}$ `),
         places(-e),
         tx(" to the left.", " nach links."),
       ),
@@ -1597,7 +1517,7 @@ const sciNotation: Shape = (rng) => {
         {
           math: `${dec(mant)}#m \\cdot#d 10#t^{-#es ${-e}#e}`,
           note: cat(
-            tx(`$10^{${e}}$ makes the number smaller: move the comma $${-e}$ `, `$10^{${e}}$ macht die Zahl kleiner: Verschiebe das Komma um $${-e}$ `),
+            tx(`$10^{${e}}$ makes the number smaller: move the decimal point $${-e}$ `, `$10^{${e}}$ macht die Zahl kleiner: Verschiebe das Komma um $${-e}$ `),
             places(-e),
             tx(" to the **left**.", " nach **links**."),
           ),
@@ -1610,22 +1530,22 @@ const sciNotation: Shape = (rng) => {
           ),
         },
       ],
-    };
+    }));
   }
   const e = kind === "big" ? rng.int(4, 9) : -rng.int(2, 6);
-  const raw = kind === "big" ? digits + "0".repeat(e - digits.length + 1) : `0,${"0".repeat(-e - 1)}${digits}`;
-  return {
+  const raw = () => (kind === "big" ? digits + "0".repeat(e - digits.length + 1) : `0${sep()}${"0".repeat(-e - 1)}${digits}`);
+  return bilingual(() => ({
     instruction: tx("Write in scientific notation", "Schreib in wissenschaftlicher Schreibweise"),
     text: tx("Write it as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Schreib die Zahl als $a \\cdot 10^n$ mit $1 \\le a < 10$."),
-    math: `${kind === "big" ? grouped(raw) : raw} = \\blob{a} \\cdot 10^{\\blob{n}}`,
+    math: `${kind === "big" ? grouped(raw()) : raw()} = \\blob{a} \\cdot 10^{\\blob{n}}`,
     answer: { kind: "pair", names: ["a", "n"], values: [mant, e] },
     mistakes: sciMistakes(digits, e),
     hint:
       kind === "big"
-        ? tx("Count how many places the comma moves to the left. That's $n$.", "Zähl, um wie viele Stellen das Komma nach links rutscht. Das ist $n$.")
-        : tx("The comma moves to the right, so $n$ is negative.", "Das Komma rutscht nach rechts, also ist $n$ negativ."),
+        ? tx("Count how many places the decimal point moves to the left. That's $n$.", "Zähl, um wie viele Stellen das Komma nach links rutscht. Das ist $n$.")
+        : tx("The decimal point moves to the right, so $n$ is negative.", "Das Komma rutscht nach rechts, also ist $n$ negativ."),
     solution: sciFrames(digits, e),
-  };
+  }));
 };
 
 const simpleRoot: Shape = (rng) => {
@@ -1649,7 +1569,7 @@ const simpleRoot: Shape = (rng) => {
   if (kind === 1) {
     const k = rng.nonZero(2, 15, [10]);
     const N = k * k;
-    return {
+    return bilingual(() => ({
       instruction: CALCULATE,
       math: `\\sqrt{${dec(N / 100)}}`,
       answer: { kind: "number", value: k / 10 },
@@ -1670,7 +1590,7 @@ const simpleRoot: Shape = (rng) => {
           ),
         },
       ],
-    };
+    }));
   }
   if (kind === 2) {
     const b = rng.int(2, 12);
@@ -2113,7 +2033,7 @@ const sciCalc: Shape = (rng) => {
   const n = P >= 10 ? E + 1 : P < 1 ? E - 1 : E;
   if (n === 0 || Math.abs(n) > 15 || Math.abs(E) > 15) return null;
   const t = (a: number, e: number) => `(${a} \\cdot 10^{${e}})`;
-  return {
+  return bilingual(() => ({
     instruction: CALCULATE,
     text: tx("Give the result as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Gib das Ergebnis als $a \\cdot 10^n$ mit $1 \\le a < 10$ an."),
     math: `${t(a1, e1)} ${div ? ":" : "\\cdot"} ${t(a2, e2)} = \\blob{a} \\cdot 10^{\\blob{n}}`,
@@ -2124,7 +2044,7 @@ const sciCalc: Shape = (rng) => {
       `${div ? "Teile" : "Multipliziere"} die Zahlen und die Zehnerpotenzen getrennt. Prüf, ob $a$ zwischen $1$ und $10$ liegt.`,
     ),
     solution: sciCalcFrames(a1, e1, a2, e2, div),
-  };
+  }));
 };
 
 const negativeFraction: Shape = (rng) => {
@@ -2177,42 +2097,39 @@ const negativeFraction: Shape = (rng) => {
   };
 };
 
-const SHAPES: Record<Level, [Shape, number][]> = {
-  1: [
-    [evalPower, 3],
-    [productExponent, 3],
-    [quotientExponent, 2],
-    [evalWithRules, 2],
-  ],
-  2: [
-    [powerOfPower, 2],
-    [negativeExponent, 2],
-    [quotientExponent, 1],
-    [productExponent, 1],
-    [sciNotation, 2],
-    [simpleRoot, 2],
-    [coefficientProduct, 2],
-    [evalPower, 1],
-  ],
-  3: [
-    [mixedTwoVars, 2],
-    [mixedCoefficient, 2],
-    [partialRoot, 3],
-    [sciCalc, 2],
-    [negativeFraction, 1],
-  ],
-};
+/**
+ * Level 2 practice: the three old tiers as one mix, mostly the standard and challenge shapes
+ * (power rules, negative exponents, scientific notation, simplifying roots), with a few easy
+ * warm-ups. Each entry: shape, the tier it is tuned for, weight.
+ */
+const MIX: [Shape, Tier, number][] = [
+  [productExponent, 1, 0.7],
+  [quotientExponent, 1, 0.5],
+  [evalWithRules, 1, 1],
+  [powerOfPower, 2, 2],
+  [negativeExponent, 2, 2],
+  [quotientExponent, 2, 1],
+  [productExponent, 2, 1],
+  [sciNotation, 2, 2],
+  [simpleRoot, 2, 1.5],
+  [coefficientProduct, 2, 2],
+  [evalPower, 2, 0.6],
+  [mixedTwoVars, 3, 1.5],
+  [mixedCoefficient, 3, 1.5],
+  [partialRoot, 3, 2.5],
+  [sciCalc, 3, 1.5],
+  [negativeFraction, 3, 1],
+];
 
-function generate(level: Level, rng: Rng): Exercise {
-  const shapes = SHAPES[level];
-  const total = shapes.reduce((s, [, w]) => s + w, 0);
+export function generate2(rng: Rng): Exercise {
+  const total = MIX.reduce((s, [, , w]) => s + w, 0);
   for (let tries = 0; tries < 60; tries++) {
     let pick = rng.next() * total;
-    const shape = shapes.find(([, w]) => (pick -= w) < 0)?.[0] ?? shapes[0][0];
-    const ex = shape(rng, level);
+    const [shape, tier] = MIX.find(([, , w]) => (pick -= w) < 0) ?? MIX[0];
+    const ex = shape(rng, tier);
     if (ex) return ex;
   }
-  return productExponent(rng, 1) ?? findN("x^2 \\cdot x^3 = x^{\\blob{n}}", 5, SAME_BASE_ADD, productFrames("x", [2, 3]));
+  return productExponent(rng, 2) ?? findN("x^2 \\cdot x^3 = x^{\\blob{n}}", 5, SAME_BASE_ADD, productFrames("x", [2, 3]));
 }
 
 // ---------------------------------------------------------------------------
@@ -2788,31 +2705,31 @@ const bracketFramesLesson: Frame[] = [
 const tenFramesLesson: Frame[] = [
   { math: "10#t^{3#e} =#eq 1#v1 \\,000#v2", note: tx("$10^3$ is a $1$ with three zeros.", "$10^3$ ist eine $1$ mit drei Nullen.") },
   {
-    math: "10#t^{-#es 3#e} =#eq \\frac{1#o}{1\\,000}#F =#eq2 0,001#v2",
+    math: tx("10#t^{-#es 3#e} =#eq \\frac{1#o}{1\\,000}#F =#eq2 0.001#v2", "10#t^{-#es 3#e} =#eq \\frac{1#o}{1\\,000}#F =#eq2 0,001#v2"),
     note: tx(
-      "A negative exponent gives a small number: $10^{-3} = 0,001$, three places after the comma.",
+      "A negative exponent gives a small number: $10^{-3} = 0.001$, three places after the decimal point.",
       "Ein negativer Exponent ergibt eine kleine Zahl: $10^{-3} = 0,001$, drei Stellen nach dem Komma.",
     ),
   },
   { math: "4#m \\,500\\,000", note: tx("Big numbers are easier to read with powers of ten.", "Große Zahlen lassen sich mit Zehnerpotenzen leichter lesen.") },
   {
-    math: "4,5#m \\cdot#d 1#t \\,000\\,000",
+    math: tx("4.5#m \\cdot#d 1#t \\,000\\,000", "4,5#m \\cdot#d 1#t \\,000\\,000"),
     note: tx(
-      "Move the comma $6$ places to the left: $4,5$. To keep the value, multiply by $1\\,000\\,000$.",
+      "Move the decimal point $6$ places to the left: $4.5$. To keep the value, multiply by $1\\,000\\,000$.",
       "Verschiebe das Komma um $6$ Stellen nach links: $4,5$. Damit der Wert gleich bleibt, multiplizierst du mit $1\\,000\\,000$.",
     ),
   },
   {
-    math: "4,5#m \\cdot#d 10#t^{6#e}",
+    math: tx("4.5#m \\cdot#d 10#t^{6#e}", "4,5#m \\cdot#d 10#t^{6#e}"),
     note: tx(
       "$1\\,000\\,000 = 10^6$. This is **scientific notation**: a number from $1$ to below $10$, times a power of ten.",
       "$1\\,000\\,000 = 10^6$. Das ist die **wissenschaftliche Schreibweise**: eine Zahl von $1$ bis unter $10$, mal eine Zehnerpotenz.",
     ),
   },
   {
-    math: "0,00072#s =#eq 7,2#m \\cdot#d 10#t^{-#es 4#e}",
+    math: tx("0.00072#s =#eq 7.2#m \\cdot#d 10#t^{-#es 4#e}", "0,00072#s =#eq 7,2#m \\cdot#d 10#t^{-#es 4#e}"),
     note: tx(
-      "Small numbers work the same way. The comma moves $4$ places to the **right**, so the exponent is $-4$.",
+      "Small numbers work the same way. The decimal point moves $4$ places to the **right**, so the exponent is $-4$.",
       "Kleine Zahlen funktionieren genauso. Das Komma rutscht $4$ Stellen nach **rechts**, also ist der Exponent $-4$.",
     ),
   },
@@ -2865,8 +2782,8 @@ const rootFramesLesson: Frame[] = [
   },
 ];
 
-const powersRoots: Topic = {
-  ...topicMeta("powers-roots"),
+/** Level 2 (Klasse 8–9): power rules, negative exponents, scientific notation and simplifying square roots. */
+export const level2: LevelLesson = {
   summary: [
     {
       title: tx("Same base", "Gleiche Basis"),
@@ -2901,10 +2818,10 @@ const powersRoots: Topic = {
     {
       title: tx("Scientific notation", "Wissenschaftliche Schreibweise"),
       body: tx(
-        "A number from 1 to below 10, times a power of ten. Count how far the comma moves.",
+        "A number from 1 to below 10, times a power of ten. Count how far the decimal point moves.",
         "Eine Zahl von 1 bis unter 10, mal eine Zehnerpotenz. Zähl, um wie viele Stellen das Komma rutscht.",
       ),
-      examples: ["4\\,500\\,000 = 4,5 \\cdot 10^6", "0,00072 = 7,2 \\cdot 10^{-4}"],
+      examples: [tx("4\\,500\\,000 = 4.5 \\cdot 10^6", "4\\,500\\,000 = 4,5 \\cdot 10^6"), tx("0.00072 = 7.2 \\cdot 10^{-4}", "0,00072 = 7,2 \\cdot 10^{-4}")],
       tone: "tip",
     },
     {
@@ -3016,18 +2933,18 @@ const powersRoots: Topic = {
     },
     {
       type: "check",
-      blob: tx("Count the places the comma moves.", "Zähl, um wie viele Stellen das Komma rutscht."),
+      blob: tx("Count the places the decimal point moves.", "Zähl, um wie viele Stellen das Komma rutscht."),
       exercise: {
         instruction: tx("Write in scientific notation", "Schreib in wissenschaftlicher Schreibweise"),
         text: tx("Write it as $a \\cdot 10^n$ with $1 \\le a < 10$.", "Schreib die Zahl als $a \\cdot 10^n$ mit $1 \\le a < 10$."),
-        math: "0,00036 = \\blob{a} \\cdot 10^{\\blob{n}}",
+        math: tx("0.00036 = \\blob{a} \\cdot 10^{\\blob{n}}", "0,00036 = \\blob{a} \\cdot 10^{\\blob{n}}"),
         answer: { kind: "pair", names: ["a", "n"], values: [3.6, -4] },
         mistakes: sciMistakes("36", -4),
         hint: tx(
-          "Move the comma to the right until one digit (not $0$) is in front of it. Right means negative.",
+          "Move the decimal point to the right until one digit (not $0$) is in front of it. Right means negative.",
           "Verschiebe das Komma nach rechts, bis eine Ziffer (nicht $0$) davor steht. Rechts heißt negativ.",
         ),
-        solution: sciFrames("36", -4),
+        solution: bilingual(() => sciFrames("36", -4)),
       },
     },
     {
@@ -3063,7 +2980,4 @@ const powersRoots: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default powersRoots;

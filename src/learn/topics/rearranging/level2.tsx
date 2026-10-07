@@ -8,13 +8,13 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { SolutionPlayer } from "@/learn/components/SolutionPlayer";
-import { topicMeta } from "@/learn/catalog";
 import { parseDisplay, type DNode } from "@/learn/engine/display";
 import { equivalentText } from "@/learn/engine/expr";
 import type { Rng } from "@/learn/engine/rng";
-import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { emWidth, smoothFracExits } from "../equations/level1";
+import { choice, clean, dec, enDecimalFrames, enDecimals, numberMistakes } from "./kit";
 
 // ---------------------------------------------------------------------------
 // Formulas as small trees. To solve for a letter we undo the operations around
@@ -626,7 +626,7 @@ function FormulaCard(props: Record<string, unknown>) {
   return (
     <div className="relative -m-3 grid min-h-[150px] place-items-center overflow-hidden rounded-2xl px-6 py-9">
       <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" />
-      <MathView src={String(props.src)} size="xl" animate={false} className="relative" />
+      <MathView src={props.src as Text} size="xl" animate={false} className="relative" />
     </div>
   );
 }
@@ -727,20 +727,28 @@ const signedItem = (it: SumItem) => `${it.neg ? "-" : "+"} ${show(it.n)}`;
 const bare = (it: SumItem) => `${it.neg ? "-" : ""}${show(it.n)}`;
 const paren = (x: N) => (needsBrackets(x) ? `(${show(x)})` : show(x));
 
+/** A typical wrong formula: what a student with one misconception gets. `typing`: right idea, brackets missing when typed. */
+type Slip = { node: N; title: Text; say: Text; close: boolean; typing: boolean };
+
 function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
+  return formulaSlips(L0, R0, target, right).map((s) => ({ when: { kind: "expr", value: plain(s.node), positive: true }, title: s.title, say: s.say, close: s.close }));
+}
+
+function formulaSlips(L0: N, R0: N, target: string, right: N): Slip[] {
   const base = solveTo(L0, R0, target);
   const steps = base.steps;
   if (!steps.length) return [];
   const rightSrc = plain(right);
-  const out: Mistake[] = [];
+  const out: Slip[] = [];
+  const BRACKETS = tx("Brackets missing", "Klammern fehlen");
   /** `close`: a near miss (right idea, one small slip), so Blob looks thoughtful and doesn't reveal the solution yet. */
   const push = (answer: N | null, title: Text, say: Text, close = false) => {
     if (!answer || out.length >= 5 || has(answer, target)) return;
     const value = plain(answer);
     // Must be defined for the positive test values, and different from the answer and from the other slips.
     if (!equivalentText(value, value, { positive: true }) || equivalentText(value, rightSrc, { positive: true })) return;
-    if (out.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, value, { positive: true }))) return;
-    out.push({ when: { kind: "expr", value, positive: true }, title, say, close });
+    if (out.some((m) => equivalentText(plain(m.node), value, { positive: true }))) return;
+    out.push({ node: answer, title, say, close, typing: title === BRACKETS });
   };
   const find = (pred: (tr: Trace) => boolean, last = false) => (last ? steps.findLastIndex(pred) : steps.findIndex(pred));
   /** The answer with step `i` done the way `twist` says. */
@@ -750,7 +758,6 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
     return run.twisted ? run.answer : null;
   };
   const first = steps[0].s.short;
-  const BRACKETS = tx("Brackets missing", "Klammern fehlen");
 
   // Undone in the wrong order: the summand inside the bracket came off first.
   const leftSide = has(L0, target);
@@ -1025,9 +1032,21 @@ function formulaMistakes(L0: N, R0: N, target: string, right: N): Mistake[] {
   return out;
 }
 
+/** English shows decimal points: the Fahrenheit formula's 1,8 becomes 1.8 there. */
+function localise(ex: Exercise): Exercise {
+  return {
+    ...ex,
+    text: ex.text === undefined ? undefined : enDecimals(ex.text),
+    hint: ex.hint === undefined ? undefined : enDecimals(ex.hint),
+    solution: enDecimalFrames(ex.solution),
+    mistakes: ex.mistakes?.map((m) => ({ ...m, say: enDecimals(m.say) })),
+    visual: ex.visual && { ...ex.visual, props: { ...ex.visual.props, src: enDecimals(ex.visual.props.src as Text) } },
+  };
+}
+
 function task(f: Formula, target: string): Exercise {
   const sol = rearrange(f.L, f.R, target);
-  return {
+  return localise({
     instruction: tx("Rearrange the formula", "Stelle die Formel um"),
     text: txMap((t, locale) => {
       const legend = resolveText(f.legend, locale);
@@ -1039,14 +1058,14 @@ function task(f: Formula, target: string): Exercise {
     solution: sol.frames,
     visual: { component: FormulaCard, props: { src: formulaSrc(f, target) } },
     mistakes: formulaMistakes(f.L, f.R, target, sol.answer),
-  };
+  });
 }
 
 const POOLS: Record<Level, [string, string][]> = { 1: [], 2: [], 3: [] };
 for (const f of FORMULAS) for (const [letter, level] of Object.entries(f.targets)) POOLS[level].push([f.key, letter]);
 
 /** Letters and numbers, as in "Stelle nach x um": y = 3x + 5, y = 4(x - 2), y = 12/x + 1 … */
-function algebra(level: Level, rng: Rng): Exercise {
+function algebraFormula(level: Level, rng: Rng): [Formula, string] {
   const [y, x] = rng.pick([["y", "x"], ["y", "x"], ["y", "x"], ["s", "t"], ["q", "p"]] as const);
   const a = rng.int(2, 9);
   const b = rng.int(1, 15);
@@ -1069,14 +1088,248 @@ function algebra(level: Level, rng: Rng): Exercise {
       () => sq(sum(X(), num(b))),
     ],
   };
-  const f = formula("algebra", "", sym(y), rng.pick(shapes[level])(), "", { [x]: level });
+  return [formula("algebra", "", sym(y), rng.pick(shapes[level])(), "", { [x]: level }), x];
+}
+
+function algebra(level: Level, rng: Rng): Exercise {
+  const [f, x] = algebraFormula(level, rng);
   return { ...task(f, x), text: tx(`Solve $${formulaSrc(f)}$ for $${x}$.`, `Stelle $${formulaSrc(f)}$ nach $${x}$ um.`) };
 }
 
-function generate(level: Level, rng: Rng): Exercise {
+/** The practice of the one-lesson topic: three tiers from one-step formulas to roots and brackets. */
+function tier(level: Level, rng: Rng): Exercise {
   if (rng.chance(0.4)) return algebra(level, rng);
   const [key, letter] = rng.pick(POOLS[level]);
   return task(byKey(key), letter);
+}
+
+/** A formula and a letter for the new task shapes: mostly two or more steps, sometimes plain algebra. */
+function pickFormula(rng: Rng): [Formula, string] {
+  if (rng.chance(0.25)) return algebraFormula(rng.chance(0.5) ? 2 : 3, rng);
+  const [key, letter] = rng.pick([...POOLS[2], ...POOLS[3]]);
+  return [byKey(key), letter];
+}
+
+/** "Solve for $t$." or, for plain algebra, "Solve $y = 3x + 5$ for $x$." */
+const askText = (f: Formula, target: string, en: string, de: string): Text =>
+  txMap((t, locale) => {
+    const legend = resolveText(f.legend, locale);
+    return legend ? `${legend} ${t(en, de)}` : t(`$${formulaSrc(f)}$. ${en}`, `$${formulaSrc(f)}$. ${de}`);
+  });
+
+// ---------------------------------------------------------------------------
+// Which rearrangement is correct? The wrong options are the typical slips.
+
+function choiceTask(rng: Rng): Exercise | null {
+  const [f, target] = pickFormula(rng);
+  const sol = rearrange(f.L, f.R, target);
+  const slips = formulaSlips(f.L, f.R, target, sol.answer).filter((s) => !s.typing);
+  if (slips.length < 2) return null;
+  const line = (n: N) => enDecimals(`$${target} = ${src(n, false)}$`);
+  const c = choice(rng, [{ text: line(sol.answer) }, ...rng.shuffle(slips).slice(0, 3).map((s) => ({ text: line(s.node), title: s.title, say: s.say }))]);
+  return localise({
+    instruction: tx("Which rearrangement is right?", "Welche Umstellung stimmt?"),
+    text: askText(f, target, `Which formula for $${target}$ is right?`, `Welche Formel für $${target}$ stimmt?`),
+    answer: c.answer,
+    hint: sol.hint,
+    solution: sol.frames,
+    visual: { component: FormulaCard, props: { src: formulaSrc(f, target) } },
+    mistakes: c.mistakes,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Rearrange and calculate: values that fit together, and the units of every letter.
+
+type Values = Record<string, number>;
+const YEARS = tx("years", "Jahre");
+
+const NUMERIC: Record<string, { units: Record<string, Text>; pick: (r: Rng) => Values }> = {
+  rect: { units: { A: "cm²", a: "cm", b: "cm" }, pick: (r) => ({ a: r.int(3, 15), b: r.int(2, 12) }) },
+  perimeter: { units: { u: "cm", a: "cm", b: "cm" }, pick: (r) => ({ a: r.int(3, 20), b: r.int(2, 15) }) },
+  speed: { units: { v: "km/h", s: "km", t: "h" }, pick: (r) => ({ s: r.pick([1.5, 2, 2.5, 3, 4, 5]) * r.pick([20, 30, 40, 50, 60, 70, 80, 90, 100, 120]), t: r.pick([1.5, 2, 2.5, 3, 4, 5]) }) },
+  force: { units: { F: "N", m: "kg", a: "m/s²" }, pick: (r) => ({ m: r.int(2, 40), a: r.int(2, 9) }) },
+  power: { units: { P: "W", U: "V", I: "A" }, pick: (r) => ({ U: r.pick([6, 9, 12, 24, 230]), I: r.pick([0.5, 1, 2, 3, 4, 5, 6, 8, 10]) }) },
+  triangle: { units: { A: "cm²", g: "cm", h: "cm" }, pick: (r) => ({ g: 2 * r.int(2, 9), h: r.int(2, 14) }) },
+  interest: { units: { Z: "€", K: "€", p: "%", t: YEARS }, pick: (r) => ({ K: r.pick([200, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 2500, 4000, 5000]), p: r.pick([1, 2, 3, 4, 5, 1.5, 2.5]), t: r.int(2, 6) }) },
+  trapezoid: { units: { A: "cm²", a: "cm", c: "cm", h: "cm" }, pick: (r) => ({ a: r.int(6, 14), c: r.int(2, 5), h: 2 * r.int(2, 6) }) },
+  work: { units: { W: "J", F: "N", s: "m" }, pick: (r) => ({ F: r.pick([10, 20, 25, 40, 50, 80, 100, 150]), s: r.int(2, 12) }) },
+  ohm: { units: { U: "V", R: "Ω", I: "A" }, pick: (r) => ({ R: r.pick([2, 4, 5, 10, 20, 50, 100]), I: r.pick([0.5, 1, 2, 3, 4, 5]) }) },
+  powerTime: { units: { P: "W", W: "J", t: "s" }, pick: (r) => ({ W: r.pick([20, 40, 50, 60, 100, 500, 1000]) * r.int(2, 10), t: r.int(2, 10) }) },
+  cuboid: { units: { V: "cm³", a: "cm", b: "cm", c: "cm" }, pick: (r) => ({ a: r.int(2, 9), b: r.int(2, 9), c: r.int(2, 9) }) },
+  kinetic: { units: { E: "J", m: "kg", v: "m/s" }, pick: (r) => ({ m: r.pick([2, 4, 6, 8, 10, 20, 50, 60, 80]), v: r.int(2, 10) }) },
+  pyramid: { units: { V: "cm³", G: "cm²", h: "cm" }, pick: (r) => ({ G: 3 * r.int(3, 20), h: r.int(2, 12) }) },
+  percent: { units: { W: "€", G: "€", p: "%" }, pick: (r) => ({ G: r.pick([40, 50, 60, 80, 120, 150, 200, 250, 300, 400, 500, 600, 800]), p: r.pick([5, 10, 15, 20, 25, 30, 40, 50, 75]) }) },
+  fahrenheit: { units: { F: "°F", C: "°C" }, pick: (r) => ({ C: 5 * r.int(0, 8) }) },
+  pythagoras: {
+    units: { a: "cm", b: "cm", c: "cm" },
+    pick: (r) => {
+      const [a, b, c] = r.pick([[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17], [9, 12, 15], [12, 16, 20], [7, 24, 25], [15, 20, 25]]);
+      return r.chance(0.5) ? { a, b, c } : { a: b, b: a, c };
+    },
+  },
+  fall: { units: { s: "m", a: "m/s²", t: "s" }, pick: (r) => ({ a: r.pick([2, 4, 6, 8, 10]), t: r.int(2, 6) }) },
+  centripetal: { units: { F: "N", m: "kg", v: "m/s", r: "m" }, pick: (r) => ({ m: r.int(1, 8), v: r.pick([2, 4, 6, 8, 10]), r: r.pick([2, 4]) }) },
+  prism: { units: { V: "cm³", a: "cm", h: "cm" }, pick: (r) => ({ a: r.int(2, 8), h: r.int(2, 12) }) },
+};
+
+/** Every letter of a formula with a value: the picked inputs plus the subject worked out. */
+function valuesFor(f: Formula, r: Rng): Values | null {
+  const vals = NUMERIC[f.key].pick(r);
+  if (f.L.t === "sym") vals[f.L.s] = clean(evaluate(f.R, vals));
+  const ok = Math.abs(evaluate(f.L, vals) - evaluate(f.R, vals)) < 1e-6 && Object.values(vals).every((v) => Number.isFinite(v) && v >= 0 && Math.abs(v * 100 - Math.round(v * 100)) < 1e-6);
+  return ok ? vals : null;
+}
+
+/** A number with its unit in the display language: 20 "cm²", 37,50 "€". */
+function amountSrc(v: number, unit: Text | undefined, l: "en" | "de") {
+  const u = resolveText(unit, l);
+  const n = u === "€" && !Number.isInteger(v) ? v.toFixed(2).replace(".", l === "de" ? "," : ".") : dec(v, l);
+  return u ? `${n} "${u}"` : n;
+}
+
+/** The formula with numbers put in, keeping the keys, so letters turn into numbers on the board. */
+function withValues(node: N, vals: Values, l: "en" | "de"): N {
+  switch (node.t) {
+    case "sym":
+      return node.s === "π" || vals[node.s] === undefined ? node : { t: "num", v: dec(vals[node.s], l), id: node.id };
+    case "num":
+      return { ...node, v: l === "en" ? node.v.replace(",", ".") : node.v };
+    case "sum":
+      return { ...node, items: node.items.map((it) => ({ ...it, n: withValues(it.n, vals, l) })) };
+    case "prod":
+      return { ...node, tight: false, items: node.items.map((f) => withValues(f, vals, l)) };
+    case "frac":
+      return { ...node, num: withValues(node.num, vals, l), den: withValues(node.den, vals, l) };
+    case "pow":
+      return { ...node, base: withValues(node.base, vals, l) };
+    case "sqrt":
+      return { ...node, body: withValues(node.body, vals, l) };
+  }
+}
+
+function numberTask(rng: Rng): Exercise | null {
+  const key = rng.pick(Object.keys(NUMERIC));
+  const f = byKey(key);
+  const target = rng.pick(Object.keys(f.targets));
+  const vals = valuesFor(f, rng);
+  if (!vals) return null;
+  const { units } = NUMERIC[key];
+  const answer = vals[target];
+  const sol = rearrange(f.L, f.R, target);
+  const given = Object.keys(vals)
+    .filter((k) => k !== target)
+    .sort((x, y) => Number(f.L.t === "sym" && y === f.L.s) - Number(f.L.t === "sym" && x === f.L.s));
+  const givenText = (l: "en" | "de") => given.map((k) => `$${k} = ${amountSrc(vals[k], units[k], l)}$`).join(", ");
+  // Letters on the board turn into numbers: same keys as the solved formula.
+  const subject = sol.L.t === "sym" ? sol.L : null;
+  if (!subject) return null;
+  const head = `\\blob{${target}#${subject.id}} =#eq`;
+  const unitOf = (l: "en" | "de") => resolveText(units[target], l);
+  const right: Extract<AnswerSpec, { kind: "number" }> = { kind: "number", value: answer, unit: units[target], label: `${target} =` };
+  const frames: Frame[] = [
+    ...sol.frames,
+    {
+      math: txMap((_, l) => `${head} ${src(withValues(sol.R, vals, l), true)}`),
+      note: tx("Now put in the values you know.", "Jetzt setzt du die bekannten Werte ein."),
+    },
+    {
+      math: txMap((_, l) => `${head} ${amountSrc(answer, units[target], l).replace(/^(\S+)/, "$1#res").replace(/"$/, '"#unit')}`),
+      note: txMap((t, l) => t(`Work it out: $${target} = ${amountSrc(answer, units[target], l)}$.`, `Ausrechnen: $${target} = ${amountSrc(answer, units[target], l)}$.`)),
+    },
+  ];
+  const slips = formulaSlips(f.L, f.R, target, sol.answer).filter((s) => !s.typing);
+  const mistakes = numberMistakes(
+    right,
+    slips.map((s) => {
+      const v = evaluate(s.node, vals);
+      const whole = Math.abs(v - Math.round(v)) < 1e-9;
+      return { value: v, title: s.title, say: s.say, close: s.close, tolerance: whole ? undefined : 0.01 };
+    }),
+  );
+  return localise({
+    instruction: tx("Rearrange and calculate", "Stelle um und berechne"),
+    text: txMap((t, l) => {
+      const legend = resolveText(f.legend, l);
+      const unit = unitOf(l);
+      const inUnit = typeof units[target] === "string" && unit !== "%" ? ` in ${unit}` : "";
+      return `${legend} ${t("Given:", "Gegeben:")} ${givenText(l)}. ${t(`Calculate $${target}$`, `Berechne $${target}$`)}${inUnit}.`;
+    }),
+    answer: right,
+    hint: txMap((t, l) => t(`First solve the formula for $${target}$, then put in the numbers. ${resolveText(sol.hint, l)}`, `Stell die Formel zuerst nach $${target}$ um, dann setzt du die Zahlen ein. ${resolveText(sol.hint, l)}`)),
+    solution: smoothFracExits(frames),
+    visual: { component: FormulaCard, props: { src: formulaSrc(f, target) } },
+    mistakes,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Put the lines of a rearrangement in order.
+
+/** The equation after every undo step (and the swap at the end), as display sources. */
+function linesOf(L0: N, R0: N, target: string): { lines: string[]; shorts: Text[] } {
+  let L = L0;
+  let R = R0;
+  const line = (l: N, r: N) => `${src(l, false)} = ${src(r, false)}`;
+  const lines = [line(L, R)];
+  const shorts: Text[] = [];
+  for (let guard = 0; guard < 10; guard++) {
+    const left = has(L, target);
+    const T = left ? L : R;
+    if (T.t === "sym") break;
+    const s = plan(T, left ? R : L, target, guard + 1);
+    shorts.push(s.short);
+    if (left) [L, R] = [s.t, s.o];
+    else [L, R] = [s.o, s.t];
+    lines.push(line(L, R));
+  }
+  if (!has(L, target)) lines.push(line(R, L));
+  return { lines, shorts };
+}
+
+function orderTask(rng: Rng): Exercise | null {
+  const [f, target] = pickFormula(rng);
+  const { lines, shorts } = linesOf(f.L, f.R, target);
+  if (lines.length < 3 || lines.length > 5 || new Set(lines).size !== lines.length) return null;
+  const items = lines.map((l) => enDecimals(`$${l}$`));
+  const sol = rearrange(f.L, f.R, target);
+  const mistakes: Exercise["mistakes"] = [];
+  if (shorts.length >= 2) {
+    mistakes.push({
+      when: { kind: "order", items: [items[2], items[1]] },
+      title: tx("Wrong order", "Falsche Reihenfolge"),
+      say: txMap((t, l) =>
+        t(
+          `Ah, I see what happened! You took the second step first. Undo the last operation first: ${resolveText(shorts[0], l)}. Only then ${resolveText(shorts[1], l)}.`,
+          `Ah, ich seh, was passiert ist! Du hast den zweiten Schritt zuerst gemacht. Mach zuerst die letzte Rechnung rückgängig: ${resolveText(shorts[0], l)}. Erst danach ${resolveText(shorts[1], l)}.`,
+        ),
+      ),
+    });
+  }
+  return localise({
+    instruction: tx("Put the lines in order", "Bring die Zeilen in die richtige Reihenfolge"),
+    text: askText(f, target, `Solve for $${target}$: which line comes after which?`, `Stelle nach $${target}$ um: Welche Zeile kommt nach welcher?`),
+    answer: { kind: "order", items, label: tx("From the formula to the result", "Von der Formel zum Ergebnis") },
+    hint: tx("The formula itself comes first. Then undo one operation per line, the last one first.", "Die Formel selbst kommt zuerst. Dann machst du pro Zeile eine Rechnung rückgängig, die letzte zuerst."),
+    solution: sol.frames,
+    visual: { component: FormulaCard, props: { src: formulaSrc(f, target) } },
+    mistakes,
+  });
+}
+
+/**
+ * Level 2 practice: the old tiers (mostly the standard and the harder one) mixed with three newer
+ * shapes: pick the right rearrangement, rearrange and calculate, put the lines in order.
+ */
+export function generate2(rng: Rng): Exercise {
+  const r = rng.next();
+  for (let i = 0; i < 8; i++) {
+    const ex = r < 0.2 ? choiceTask(rng) : r < 0.4 ? numberTask(rng) : r < 0.55 ? orderTask(rng) : null;
+    if (ex) return ex;
+    if (r >= 0.55) break;
+  }
+  const t = rng.next();
+  return tier(t < 0.1 ? 1 : t < 0.6 ? 2 : 3, rng);
 }
 
 // ---------------------------------------------------------------------------
@@ -1298,8 +1551,8 @@ const rootFrames = rearrange(fall.L, fall.R, "t", {
   intro: tx("Distance $s = \\frac{1}{2} a t^2$. We want the time $t$, and it's squared.", "Strecke $s = \\frac{1}{2} a t^2$. Wir suchen die Zeit $t$, und die ist quadriert."),
 }).frames;
 
-const rearranging: Topic = {
-  ...topicMeta("rearranging"),
+/** Level 2 (the lesson written before levels): any letter on its own, step by step, with inverse operations. */
+export const level2: LevelLesson = {
   summary: [
     {
       title: tx("Same rules as equations", "Gleiche Regeln wie bei Gleichungen"),
@@ -1426,7 +1679,4 @@ const rearranging: Topic = {
       exercise: task(byKey("interest"), "p"),
     },
   ],
-  generate,
 };
-
-export default rearranging;

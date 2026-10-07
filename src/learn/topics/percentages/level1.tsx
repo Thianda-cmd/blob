@@ -2,83 +2,43 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Minus, Plus, X } from "lucide-react";
-import { useId, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { useLocale } from "@/i18n/client";
-import type { Locale } from "@/i18n/config";
-import { tx, txMap, type Text } from "@/i18n/text";
+import { useId, useRef, useState, type ComponentType } from "react";
+import { tx, type Text } from "@/i18n/text";
 import { MathView } from "@/learn/components/MathView";
-import { topicMeta } from "@/learn/catalog";
 import { gcd, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import {
+  amount,
+  amt,
+  CALCULATE,
+  cash,
+  changeFrames,
+  changeSlips,
+  EMPTY,
+  factorOf,
+  findTask,
+  mistakesFor,
+  Pill,
+  r2,
+  r6,
+  rateAnswer,
+  reverseFrames,
+  reverseSlips,
+  say,
+  useFmt,
+  WORD_PROBLEM,
+  type Change,
+  type Fmt,
+  type Gen,
+  type Slip,
+  type Unit,
+} from "./shared";
 
-// ---------------------------------------------------------------------------
-// Numbers
-
-const r2 = (v: number) => Math.round(v * 100) / 100;
-const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
-/** "0.15", "297.5", "1500" */
-const num = (v: number) => String(r6(v));
-/** Money: "60" or "297.50". */
-const cash = (v: number) => (Number.isInteger(r2(v)) ? String(r2(v)) : r2(v).toFixed(2));
-
-/** Units of the quantities in the tasks. Word units get a German name. */
-type Unit = "" | "€" | "kg" | "m" | "L" | "g" | "km" | "students" | "members" | "pages" | "inhabitants";
-const UNIT_DE: Partial<Record<Unit, string>> = { students: "Schüler", members: "Mitglieder", pages: "Seiten", inhabitants: "Einwohner" };
-const unitName = (unit: Unit, l: Locale) => (l === "de" ? (UNIT_DE[unit] ?? unit) : unit);
-const unitText = (unit: Unit): Text => {
-  const de = UNIT_DE[unit];
-  return de ? tx(unit, de) : unit;
-};
-
-/** Number formatting and wording for one language: decimal comma and German unit names in German. */
-type Fmt = {
-  /** Picks the English or the German wording. */
-  t: (en: string, de: string) => string;
-  l: Locale;
-  /** A number: "0.15" / "0,15". */
-  n: (v: number) => string;
-  /** Money: "297.50" / "297,50". */
-  c: (v: number) => string;
-  /** An amount in a unit (money with cents). */
-  a: (v: number, unit: Unit) => string;
-  /** A quoted unit token for the display language: ` "kg"#u`. */
-  ut: (unit: Unit, key: string) => string;
-  /** The unit after a number in a sentence: ` kg`. */
-  uw: (unit: Unit) => string;
-  /** A number in a story sentence; German groups big numbers: "25 000". */
-  big: (s: string) => string;
-};
-
-function fmt(t: Fmt["t"], l: Locale): Fmt {
-  const comma = (s: string) => (l === "de" ? s.replace(".", ",") : s);
-  return {
-    t,
-    l,
-    n: (v) => comma(num(v)),
-    c: (v) => comma(cash(v)),
-    a: (v, unit) => comma(unit === "€" ? cash(v) : num(v)),
-    ut: (unit, key) => (unit ? ` "${unitName(unit, l)}"#${key}` : ""),
-    uw: (unit) => (unit ? `${l === "de" ? "\u00a0" : " "}${unitName(unit, l)}` : ""),
-    big: (s) => (l === "de" && /^\d{5,}/.test(s) ? comma(s).replace(/^\d+/, (d) => d.replace(/\B(?=(\d{3})+$)/g, " ")) : comma(s)),
-  };
-}
-
-/** Builds a text in both languages from one template function. */
-const say = (build: (f: Fmt) => string): Text => txMap((t, l) => build(fmt(t, l)));
-
-/** Money answers accept one cent either way; everything else must be exact. */
-function amount(v: number, unit: Unit, label?: string): AnswerSpec {
-  const value = unit === "€" ? r2(v) : r6(v);
-  return {
-    kind: "number",
-    value,
-    unit: unitText(unit),
-    ...(label ? { label } : {}),
-    ...(unit === "€" ? { tolerance: 0.0101 / Math.max(1, Math.abs(value)) } : {}),
-  };
-}
-const rateAnswer = (p: number, label?: string): AnswerSpec => ({ kind: "number", value: r6(p), unit: "%", ...(label ? { label } : {}) });
+/**
+ * Level 1 (Klasse 6–7): percentage, base value and percent rate, growth factors for increases and
+ * discounts, going back to the original value, and percent versus percentage points.
+ */
 
 // ---------------------------------------------------------------------------
 // Worked solutions
@@ -178,261 +138,19 @@ function findGFrames(p: number, W: number, unit: Unit): Frame[] {
   ];
 }
 
-/** A change by p %: growth factor q, new value G · q. */
-function changeFrames(G: number, p: number, up: boolean, unit: Unit): Frame[] {
-  const q = 1 + (up ? p : -p) / 100;
-  const N = G * q;
-  const left = up ? 100 + p : 100 - p;
-  return [
-    {
-      math: `100#a %#ap ${up ? "+" : "-"}#pm ${p}#b %#bp =#e ${left}#c %#cp`,
-      note: up
-        ? tx(
-            `The old value is $100 %$. After the rise, the new value is $${left} %$ of it.`,
-            `Der alte Wert ist $100 %$. Nach der Erhöhung ist der neue Wert $${left} %$ davon.`,
-          )
-        : tx(`The old value is $100 %$. After $${p} %$ off, $${left} %$ is left.`, `Der alte Wert ist $100 %$. Nach $${p} %$ Abzug bleiben $${left} %$ übrig.`),
-    },
-    {
-      math: say(({ n }) => `q#q =#e ${left}#c %#cp =#e2 ${n(q)}#f`),
-      note: say(({ t, n }) => t(`As a decimal, that's the growth factor $q = ${n(q)}$ (Wachstumsfaktor).`, `Als Dezimalzahl ist das der Wachstumsfaktor $q = ${n(q)}$.`)),
-      highlight: ["f"],
-    },
-    {
-      math: say(({ a, n, ut }) => `${a(G, unit)}#G${ut(unit, "u")} \\cdot#t ${n(q)}#f =#e3 ${a(N, unit)}#r${ut(unit, "u2")}`),
-      note: say(({ t, a, n, uw }) =>
-        t(
-          `New value = old value $\\cdot\\, q$: $${a(G, unit)} \\cdot ${n(q)} = ${a(N, unit)}$${uw(unit)}.`,
-          `Neuer Wert = alter Wert $\\cdot\\, q$: $${a(G, unit)} \\cdot ${n(q)} = ${a(N, unit)}$${uw(unit)}.`,
-        ),
-      ),
-      highlight: ["r"],
-    },
-  ];
-}
-
-/** Back to the original value: divide by the growth factor. */
-function reverseFrames(N: number, p: number, up: boolean, unit: Unit): Frame[] {
-  const q = 1 + (up ? p : -p) / 100;
-  const G = N / q;
-  return [
-    {
-      math: say(({ a, n, ut }) => `G#G \\cdot#t ${n(q)}#f =#e ${a(N, unit)}#W${ut(unit, "u")}`),
-      note: say(({ t, a, n, uw }) =>
-        up
-          ? t(
-              `A rise of $${p} %$ means: old value $G$ times $${n(q)}$ gives the new value $${a(N, unit)}$${uw(unit)}.`,
-              `Eine Erhöhung um $${p} %$ heißt: Der alte Wert $G$ mal $${n(q)}$ ergibt den neuen Wert $${a(N, unit)}$${uw(unit)}.`,
-            )
-          : t(
-              `$${p} %$ off means: old value $G$ times $${n(q)}$ gives the new value $${a(N, unit)}$${uw(unit)}.`,
-              `$${p} %$ weniger heißt: Der alte Wert $G$ mal $${n(q)}$ ergibt den neuen Wert $${a(N, unit)}$${uw(unit)}.`,
-            ),
-      ),
-      highlight: ["f"],
-    },
-    {
-      math: say(({ a, n, ut }) => `G#G =#e ${a(N, unit)}#W${ut(unit, "u")} :#t2 ${n(q)}#f`),
-      note: tx("Undo the multiplication: divide by the growth factor.", "Mach die Multiplikation rückgängig: Teile durch den Wachstumsfaktor."),
-      highlight: ["t2", "f"],
-    },
-    {
-      math: say(({ a, ut }) => `G#G =#e ${a(G, unit)}#W${ut(unit, "u")}`),
-      note: say(({ t, a, n }) =>
-        t(
-          `$${a(N, unit)} : ${n(q)} = ${a(G, unit)}$. Check: $${a(G, unit)} \\cdot ${n(q)} = ${a(N, unit)}$.`,
-          `$${a(N, unit)} : ${n(q)} = ${a(G, unit)}$. Probe: $${a(G, unit)} \\cdot ${n(q)} = ${a(N, unit)}$.`,
-        ),
-      ),
-      highlight: ["W"],
-    },
-  ];
-}
-
-type Change = { up: boolean; p: number };
-const factorOf = (c: Change) => 1 + (c.up ? c.p : -c.p) / 100;
-const changeNote = (c: Change, { t, n }: Fmt) =>
-  c.up
-    ? t(`a rise of $${c.p} %$ means $\\cdot\\, ${n(factorOf(c))}$`, `eine Zunahme um $${c.p} %$ heißt $\\cdot\\, ${n(factorOf(c))}$`)
-    : t(`a drop of $${c.p} %$ means $\\cdot\\, ${n(factorOf(c))}$`, `eine Abnahme um $${c.p} %$ heißt $\\cdot\\, ${n(factorOf(c))}$`);
-const changeList = (changes: Change[], f: Fmt) => changes.map((c) => changeNote(c, f)).join(f.t(", and ", " und "));
-
-/** Two changes in a row, step by step. */
-function chainFrames(G: number, changes: Change[], unit: Unit): Frame[] {
-  const fac = changes.map(factorOf);
-  const tail = (from: number, n: Fmt["n"]) =>
-    fac
-      .slice(from)
-      .map((q, i) => ` \\cdot#t${from + i} ${n(q)}#q${from + i}`)
-      .join("");
-  const frames: Frame[] = [
-    {
-      math: say(({ a, n, ut }) => `${a(G, unit)}#v${ut(unit, "u")}${tail(0, n)}`),
-      note: say((f) => f.t(`Each change is one growth factor: ${changeList(changes, f)}.`, `Jede Änderung ist ein Wachstumsfaktor: ${changeList(changes, f)}.`)),
-    },
-  ];
-  let v = G;
-  fac.forEach((q, i) => {
-    const before = v;
-    v *= q;
-    const now = v;
-    frames.push({
-      math: say(({ a, n, ut }) => `${a(now, unit)}#v${ut(unit, "u")}${tail(i + 1, n)}`),
-      note: say(
-        ({ t, a, n, uw }) => `${i === 0 ? t("First change", "Erste Änderung") : t("Next change", "Nächste Änderung")}: $${a(before, unit)} \\cdot ${n(q)} = ${a(now, unit)}$${uw(unit)}.`,
-      ),
-    });
-  });
-  return frames;
-}
-
-/** Total change of several changes: multiply the factors. */
-function totalFrames(changes: Change[]): Frame[] {
-  const fac = changes.map(factorOf);
-  const Q = fac.reduce((a, b) => a * b, 1);
-  const prod = (n: Fmt["n"]) => fac.map((q, i) => `${i ? ` \\cdot#t${i} ` : ""}${n(q)}#q${i}`).join("");
-  const pct = r6(Math.abs(Q - 1) * 100);
-  return [
-    {
-      math: say(({ n }) => prod(n)),
-      note: say((f) => f.t(`Turn each change into a growth factor: ${changeList(changes, f)}.`, `Mach aus jeder Änderung einen Wachstumsfaktor: ${changeList(changes, f)}.`)),
-    },
-    {
-      math: say(({ n }) => `${prod(n)} =#e ${n(Q)}#Q`),
-      note: say(({ t, n }) => t(`Multiply the factors: $q = ${n(Q)}$.`, `Multipliziere die Faktoren: $q = ${n(Q)}$.`)),
-      highlight: ["Q"],
-    },
-    {
-      math: say(({ n }) => `${n(Q)}#Q =#e2 ${n(Q * 100)}#P %#pc`),
-      note: say(({ t, n }) => t(`The final value is $${n(Q * 100)} %$ of the original.`, `Der Endwert ist $${n(Q * 100)} %$ des Anfangswerts.`)),
-      highlight: ["P"],
-    },
-    {
-      math: say(({ n }) =>
-        Q > 1 ? `${n(Q * 100)}#P %#pc -#m 100#H %#hp =#e3 ${n(pct)}#A %#ap` : `100#H %#hp -#m ${n(Q * 100)}#P %#pc =#e3 ${n(pct)}#A %#ap`,
-      ),
-      note: say(({ t, n }) =>
-        Q > 1
-          ? t(`Compared with the $100 %$ at the start, that's $${n(pct)} %$ more.`, `Verglichen mit den $100 %$ am Anfang sind das $${n(pct)} %$ mehr.`)
-          : t(`Compared with the $100 %$ at the start, that's $${n(pct)} %$ less.`, `Verglichen mit den $100 %$ am Anfang sind das $${n(pct)} %$ weniger.`),
-      ),
-      highlight: ["A"],
-    },
-  ];
-}
-
-/** Compound growth or decay over n years. */
-function compoundFrames(K: number, p: number, up: boolean, n: number, unit: Unit, whole = false): Frame[] {
-  const q = 1 + (up ? p : -p) / 100;
-  const exact = K * q ** n;
-  const shown = whole ? String(Math.round(exact)) : unit === "€" ? cash(exact) : num(exact);
-  const isExact = Math.abs(Number(shown) - exact) < 1e-9;
-  const show = (f: Fmt) => (f.l === "de" ? shown.replace(".", ",") : shown);
-  // Money keeps its unit on the board; counts (inhabitants) only get it in the result.
-  const money = unit === "€";
-  const L = money ? "K" : "N";
-  const factors = (f: Fmt) => Array.from({ length: n }, (_, i) => ` \\cdot#t${i} ${f.n(q)}#q${i}`).join("");
-  return [
-    {
-      math: say((f) => `${L}_${n} =#e ${K}#k${money ? f.ut(unit, "u") : ""}${factors(f)}`),
-      note: say(({ t, n: N }) =>
-        t(
-          `Each year the value is multiplied by $q = ${N(q)}$. After ${n} years, that's ${n} times.`,
-          `Jedes Jahr wird der Wert mit $q = ${N(q)}$ multipliziert. Nach ${n} Jahren also ${n}-mal.`,
-        ),
-      ),
-    },
-    {
-      math: say((f) => `${L}_${n} =#e ${K}#k${money ? f.ut(unit, "u") : ""} \\cdot#t0 ${f.n(q)}#q0^{${n}#n}`),
-      note: say(({ t, n: N }) => t(`Write it as a power: $${L}_${n} = ${K} \\cdot ${N(q)}^${n}$.`, `Schreib das als Potenz: $${L}_${n} = ${K} \\cdot ${N(q)}^${n}$.`)),
-      highlight: ["n"],
-    },
-    {
-      math: say((f) => `${L}_${n} ${isExact ? "=" : "\\approx"}#e ${show(f)}#k${f.ut(unit, "u")}`),
-      note: say((f) =>
-        f.t(
-          `With a calculator: $${K} \\cdot ${f.n(q)}^${n} ${isExact ? "=" : "\\approx"} ${show(f)}$${f.uw(unit)}.${isExact ? "" : whole ? " Rounded to a whole number." : " Rounded to the cent."}`,
-          `Mit dem Taschenrechner: $${K} \\cdot ${f.n(q)}^${n} ${isExact ? "=" : "\\approx"} ${show(f)}$${f.uw(unit)}.${isExact ? "" : whole ? " Auf eine ganze Zahl gerundet." : " Auf Cent gerundet."}`,
-        ),
-      ),
-    },
-  ];
-}
-
 // ---------------------------------------------------------------------------
-// Exercise generator
-
-type Gen = (rng: Rng) => Exercise | null;
-
-function pickWeighted(rng: Rng, list: [number, Gen][]): Gen {
-  const total = list.reduce((s, [w]) => s + w, 0);
-  let r = rng.next() * total;
-  for (const [w, g] of list) {
-    r -= w;
-    if (r < 0) return g;
-  }
-  return list[list.length - 1][1];
-}
+// Practice
 
 /** Smallest base value step that makes p % of it a whole number. */
 const stepFor = (p: number) => 100 / gcd(p, 100);
 
 const UNITS: Unit[] = ["€", "kg", "m", "L", "g", "km"];
 
-const CALCULATE = tx("Calculate", "Berechne");
-const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
 const AS_PERCENT = tx("Write as a percentage", "Schreib in Prozent");
 const OF = (en: string) => tx(en, en.replace('"of"', '"von"'));
 
-// ---------------------------------------------------------------------------
-// Typical mistakes. Each one is simulated from the task's numbers, so the wrong
-// value is exactly what a student with that misconception gets.
-
-/** A misconception: the (unrounded) value it leads to, a title and what Blob says. */
-type Slip = [value: number, title: Text, say: Text] | null | false;
-type NumberSpec = Extract<AnswerSpec, { kind: "number" }>;
-
-/** How far a typed number may be from `v`: cents for money, whole numbers when the answer is rounded, else rounding of long decimals. */
-function slack(v: number, answer: NumberSpec): number {
-  if (answer.unit === "€") return 0.0101;
-  if ((answer.tolerance ?? 0) * Math.max(1, Math.abs(answer.value)) >= 1) return 1.01;
-  return Math.abs(r2(v) - v) < 1e-9 ? 0 : Math.min(0.051, Math.abs(v) * 0.005);
-}
-
-/** The slips as Mistakes for a number answer: only those clearly apart from the right value and from each other. */
-function mistakesFor(answer: AnswerSpec, slips: Slip[]): Mistake[] {
-  if (answer.kind !== "number") return [];
-  const taken: [number, number][] = [[answer.value, slack(answer.value, answer)]];
-  const out: Mistake[] = [];
-  for (const s of slips) {
-    if (!s) continue;
-    const [raw, title, say] = s;
-    if (!Number.isFinite(raw) || raw < 0) continue;
-    const value = answer.unit === "€" ? r2(raw) : slack(raw, answer) >= 1 ? Math.round(raw) : r6(raw);
-    const tol = slack(value, answer);
-    if (taken.some(([v, t]) => Math.abs(v - value) <= t + tol + 1e-9)) continue;
-    taken.push([value, tol]);
-    const when: NumberSpec = { kind: "number", value, ...(answer.unit ? { unit: answer.unit } : {}), ...(tol ? { tolerance: tol / Math.max(1, Math.abs(value)) } : {}) };
-    out.push({ when, title, say });
-  }
-  return out;
-}
-
-/** An amount in a sentence: "$45$ €", "$300$ g", "$24$ Schüler". */
-const amt = (f: Fmt, v: number, unit: Unit) => `$${f.a(v, unit)}$${f.uw(unit)}`;
-
 const OTHER_PART = tx("The other part", "Der andere Teil");
 const WRONG_WAY = tx("Point moved the wrong way", "Komma in die falsche Richtung");
-const FACTOR_OFF = tx("Growth factor off", "Wachstumsfaktor falsch");
-/** "1.5 instead of 1.05": a rate below 10 % written with one zero too few. */
-const factorOff = (p: number, up: boolean) =>
-  say(({ t, n }) =>
-    t(
-      `So close! For ${up ? "a rise" : "a drop"} of $${p} %$ the growth factor is $${n(1 + (up ? p : -p) / 100)}$, not $${n(1 + (up ? p : -p) / 10)}$: percent means **hundredths**.`,
-      `Ganz knapp! Bei ${up ? "einer Zunahme" : "einer Abnahme"} um $${p} %$ ist der Wachstumsfaktor $${n(1 + (up ? p : -p) / 100)}$, nicht $${n(1 + (up ? p : -p) / 10)}$: Prozent heißt **Hundertstel**.`,
-    ),
-  );
-
 /** p % of G. */
 function wSlips(p: number, G: number, unit: Unit, story = false): Slip[] {
   const W = (G * p) / 100;
@@ -539,117 +257,7 @@ function gSlips(W: number, p: number, unit: Unit): Slip[] {
   ];
 }
 
-/** A rise or drop by p %: new value G · (1 ± p/100). */
-function changeSlips(G: number, p: number, up: boolean, unit: Unit, vat = false): Slip[] {
-  const money = unit === "€";
-  return [
-    [
-      (G * p) / 100,
-      vat ? tx("Only the VAT", "Nur die Mehrwertsteuer") : up ? tx("Only the increase", "Nur die Zunahme") : tx("Only the discount", "Nur der Rabatt"),
-      vat
-        ? tx(
-            "Nearly! That's just the **VAT** itself. The question asks for the price including it, so it still has to go on top.",
-            "Fast! Das ist nur die **Mehrwertsteuer** selbst. Gefragt ist der Preis mit Steuer, sie muss also noch drauf.",
-          )
-        : up
-          ? tx(
-              "Nearly! That's just the **increase**. The question asks for the new value, so it still has to go on top of the old one.",
-              "Fast! Das ist nur die **Zunahme**. Gefragt ist der neue Wert, sie muss also noch auf den alten drauf.",
-            )
-          : tx(
-              "Nearly! That's just the **discount**. The question asks for the new price, so it still has to come off the old one.",
-              "Fast! Das ist nur der **Rabatt**. Gefragt ist der neue Preis, er muss also noch vom alten weg.",
-            ),
-    ],
-    [
-      up ? G + p : G - p,
-      tx("Percent taken as a number", "Prozent als feste Zahl genommen"),
-      say(({ t }) =>
-        up
-          ? t(
-              `Ah, I see what happened! You added $${p}$${money ? " €" : ""} straight on. But $${p} %$ means $${p}$ hundredths **of** the old value.`,
-              `Ah, ich seh, was passiert ist! Du hast einfach $${p}$${money ? "\u00a0€" : ""} draufgerechnet. Aber $${p} %$ heißt $${p}$ Hundertstel **vom** alten Wert.`,
-            )
-          : t(
-              `Ah, I see what happened! You took $${p}$${money ? " €" : ""} straight off. But $${p} %$ means $${p}$ hundredths **of** the price.`,
-              `Ah, ich seh, was passiert ist! Du hast einfach $${p}$${money ? "\u00a0€" : ""} abgezogen. Aber $${p} %$ heißt $${p}$ Hundertstel **vom** Preis.`,
-            ),
-      ),
-    ],
-    p < 10 && [G * (1 + (up ? p : -p) / 10), FACTOR_OFF, factorOff(p, up)],
-  ];
-}
-
-/** Back to the old value G = N / q. */
-function reverseSlips(N: number, p: number, up: boolean, vat = false): Slip[] {
-  const q = 1 + (up ? p : -p) / 100;
-  const qWrong = 1 + (up ? -p : p) / 100;
-  return [
-    [
-      N * qWrong,
-      tx("Percent of the new price", "Prozent vom neuen Preis"),
-      vat
-        ? tx(
-            `Ooh, classic trap! You took $${p} %$ of the price **with** VAT off. But the VAT is $${p} %$ of the price **without** VAT, so divide by the growth factor instead.`,
-            `Die klassische Falle! Du hast $${p} %$ vom Preis **mit** Steuer abgezogen. Die Mehrwertsteuer beträgt aber $${p} %$ vom Preis **ohne** Steuer, also teile durch den Wachstumsfaktor.`,
-          )
-        : up
-        ? tx(
-            `Ooh, classic trap! You took $${p} %$ of the **new** price off. But the rise was $${p} %$ of the **old** price, so divide by the growth factor instead.`,
-            `Die klassische Falle! Du hast $${p} %$ vom **neuen** Preis abgezogen. Die Erhöhung betrug aber $${p} %$ vom **alten** Preis, also teile durch den Wachstumsfaktor.`,
-          )
-        : tx(
-            `Ooh, classic trap! You added $${p} %$ of the **new** price. But the discount was $${p} %$ of the **old** price, so divide by the growth factor instead.`,
-            `Die klassische Falle! Du hast $${p} %$ vom **neuen** Preis draufgerechnet. Der Rabatt betrug aber $${p} %$ vom **alten** Preis, also teile durch den Wachstumsfaktor.`,
-          ),
-    ],
-    [
-      N * q,
-      tx("Changed it once more", "Noch mal verändert"),
-      say(({ t, c, n }) =>
-        vat
-          ? t(
-              `Hmm, you added the VAT once more. But $${c(N)}$ € already includes it: undo it by dividing by $${n(q)}$.`,
-              `Hm, du hast die Mehrwertsteuer noch mal draufgerechnet. Aber in $${c(N)}$\u00a0€ ist sie schon drin: Mach sie rückgängig, indem du durch $${n(q)}$ teilst.`,
-            )
-          : up
-          ? t(
-              `Hmm, you raised the price by another $${p} %$. But $${c(N)}$ € is already the price **after** the rise: undo it by dividing by $${n(q)}$.`,
-              `Hm, du hast den Preis noch mal um $${p} %$ erhöht. Aber $${c(N)}$\u00a0€ ist schon der Preis **nach** der Erhöhung: Mach sie rückgängig, indem du durch $${n(q)}$ teilst.`,
-            )
-          : t(
-              `Hmm, you took another $${p} %$ off. But $${c(N)}$ € is already the price **after** the discount: undo it by dividing by $${n(q)}$.`,
-              `Hm, du hast noch mal $${p} %$ abgezogen. Aber $${c(N)}$\u00a0€ ist schon der Preis **nach** dem Rabatt: Mach ihn rückgängig, indem du durch $${n(q)}$ teilst.`,
-            ),
-      ),
-    ],
-    [
-      N / qWrong,
-      tx("Wrong growth factor", "Falscher Wachstumsfaktor"),
-      up
-        ? tx(
-            `Dividing is the right idea! But after a **rise** of $${p} %$ the growth factor is bigger than $1$.`,
-            `Teilen ist die richtige Idee! Aber nach einer **Erhöhung** um $${p} %$ ist der Wachstumsfaktor größer als $1$.`,
-          )
-        : tx(
-            `Dividing is the right idea! But after a **discount** of $${p} %$ the growth factor is smaller than $1$.`,
-            `Teilen ist die richtige Idee! Aber nach einem **Rabatt** von $${p} %$ ist der Wachstumsfaktor kleiner als $1$.`,
-          ),
-    ],
-    !up && [
-      (N * 100) / p,
-      tx(`New price taken as ${p} %`, `Neuer Preis als ${p}\u00a0% genommen`),
-      say(({ t, c }) =>
-        t(
-          `I think you treated $${c(N)}$ € as $${p} %$ of the old price. But after $${p} %$ off, the new price is $${100 - p} %$ of the old one.`,
-          `Ich glaub, du hast $${c(N)}$\u00a0€ als $${p} %$ vom alten Preis genommen. Nach $${p} %$ Rabatt ist der neue Preis aber $${100 - p} %$ vom alten.`,
-        ),
-      ),
-    ],
-  ];
-}
-
-// Level 1 ---------------------------------------------------------------------
+// Tasks: the percentage ------------------------------------------------------
 
 function wTask(rng: Rng): Exercise | null {
   const p = rng.pick([1, 2, 5, 10, 10, 15, 20, 25, 25, 30, 40, 50, 50, 60, 75, 80]);
@@ -935,7 +543,7 @@ function gridTask(rng: Rng): Exercise | null {
   };
 }
 
-// Level 2 ---------------------------------------------------------------------
+// Tasks: rate, base value, increases and discounts ---------------------------
 
 const P_STORIES: { text: (W: number, G: number) => Text; maxG: number }[] = [
   {
@@ -1148,7 +756,7 @@ function changeTask(rng: Rng): Exercise | null {
   };
 }
 
-// Level 3 ---------------------------------------------------------------------
+// Tasks: back to the original value, percentage points ------------------------
 
 const REVERSE_STORIES: { up: boolean; vat?: boolean; base: (rng: Rng) => number; text: (N: string, p: number, f: Fmt) => string }[] = [
   {
@@ -1216,259 +824,6 @@ function reverseTask(rng: Rng): Exercise | null {
     ),
     solution: reverseFrames(N, p, story.up, "€"),
     mistakes: mistakesFor(amount(G, "€"), reverseSlips(N, p, story.up, story.vat)),
-  };
-}
-
-const CHAIN_STORIES: { text: (G: string, a: Change, b: Change) => Text; signs: [boolean, boolean] }[] = [
-  {
-    signs: [true, false],
-    text: (G, a, b) =>
-      tx(
-        `A bike costs ${G} €. First the price goes up by ${a.p} %, later it is reduced by ${b.p} %. What does the bike cost now?`,
-        `Ein Fahrrad kostet ${G}\u00a0€. Zuerst steigt der Preis um ${a.p}\u00a0%, später wird er um ${b.p}\u00a0% gesenkt. Wie viel kostet das Fahrrad jetzt?`,
-      ),
-  },
-  {
-    signs: [true, false],
-    text: (G, a, b) =>
-      tx(
-        `A share is worth ${G} €. On Monday its value rises by ${a.p} %, on Tuesday it falls by ${b.p} %. What is it worth now?`,
-        `Eine Aktie ist ${G}\u00a0€ wert. Am Montag steigt ihr Wert um ${a.p}\u00a0%, am Dienstag fällt er um ${b.p}\u00a0%. Wie viel ist sie jetzt wert?`,
-      ),
-  },
-  {
-    signs: [false, true],
-    text: (G, a, b) =>
-      tx(
-        `In a sale, a TV is reduced from ${G} € by ${a.p} %. After the sale, the reduced price goes up by ${b.p} %. What does the TV cost after the sale?`,
-        `Im Angebot wird ein Fernseher von ${G}\u00a0€ um ${a.p}\u00a0% reduziert. Nach der Aktion steigt der reduzierte Preis um ${b.p}\u00a0%. Wie viel kostet der Fernseher nach der Aktion?`,
-      ),
-  },
-  {
-    signs: [true, true],
-    text: (G, a, b) =>
-      tx(
-        `A shop raises a price of ${G} € by ${a.p} %. A month later it raises the new price by another ${b.p} %. What is the final price?`,
-        `Ein Laden erhöht einen Preis von ${G}\u00a0€ um ${a.p}\u00a0%. Einen Monat später erhöht er den neuen Preis noch einmal um ${b.p}\u00a0%. Wie hoch ist der Endpreis?`,
-      ),
-  },
-];
-
-function chainTask(rng: Rng): Exercise | null {
-  const story = rng.pick(CHAIN_STORIES);
-  const pa = rng.pick([10, 20, 25, 50, 5]);
-  const pb = rng.chance(0.4) ? pa : rng.pick([10, 20, 25, 50, 5]);
-  const a: Change = { up: story.signs[0], p: pa };
-  const b: Change = { up: story.signs[1], p: pb };
-  const G = rng.pick([100, 200, 400, 500, 800, 1000, 50, 300, 250]);
-  const N = G * factorOf(a) * factorOf(b);
-  if (Math.abs(r2(N) - N) > 1e-9) return null;
-  const same = a.p === b.p && a.up !== b.up;
-  return {
-    instruction: WORD_PROBLEM,
-    text: story.text(String(G), a, b),
-    answer: amount(N, "€"),
-    hint: same
-      ? tx(
-          "Careful: the second change works on the **new** price. Multiply by both growth factors.",
-          "Vorsicht: Die zweite Änderung bezieht sich auf den **neuen** Preis. Multipliziere mit beiden Wachstumsfaktoren.",
-        )
-      : tx("One growth factor per change. Multiply the price by both.", "Ein Wachstumsfaktor pro Änderung. Multipliziere den Preis mit beiden."),
-    solution: chainFrames(G, [a, b], "€"),
-    mistakes: mistakesFor(amount(N, "€"), chainSlips(G, a, b)),
-  };
-}
-
-/** Two changes in a row. */
-function chainSlips(G: number, a: Change, b: Change): Slip[] {
-  const signed = (c: Change) => `${c.up ? "+" : "-"}${c.p} %`;
-  const cancel = a.p === b.p && a.up !== b.up;
-  const small = [a, b].find((c) => c.p < 10);
-  const tenths = (c: Change) => (c.p < 10 ? 1 + (c.up ? c.p : -c.p) / 10 : factorOf(c));
-  return [
-    [
-      G * (1 + ((a.up ? a.p : -a.p) + (b.up ? b.p : -b.p)) / 100),
-      cancel ? tx("Back to the start?", "Wieder am Anfang?") : tx("Percentages added", "Prozente addiert"),
-      cancel
-        ? tx(
-            `Ooh, tempting! But $${signed(a)}$ and $${signed(b)}$ don't cancel out: the second change works on the **new** price, not on the original one.`,
-            `Ooh, verlockend! Aber $${signed(a)}$ und $${signed(b)}$ heben sich nicht auf: Die zweite Änderung bezieht sich auf den **neuen** Preis, nicht auf den ursprünglichen.`,
-          )
-        : tx(
-            "Ooh, tempting! You just added up the percentages. But the second change works on the **new** price, not on the original one.",
-            "Ooh, verlockend! Du hast die Prozentsätze einfach zusammengerechnet. Die zweite Änderung bezieht sich aber auf den **neuen** Preis, nicht auf den ursprünglichen.",
-          ),
-    ],
-    small ? [G * tenths(a) * tenths(b), FACTOR_OFF, factorOff(small.p, small.up)] : null,
-  ];
-}
-
-function totalChangeTask(rng: Rng): Exercise | null {
-  const kind = rng.int(0, 2);
-  const p1 = rng.pick([10, 20, 25, 30, 50]);
-  const p2 = rng.pick([10, 20, 25, 30, 50]);
-  let changes: Change[];
-  let text: Text;
-  if (kind === 0) {
-    changes = [
-      { up: true, p: p1 },
-      { up: false, p: p1 },
-    ];
-    text = tx(
-      `A price goes up by ${p1} % and later goes down by ${p1} %. By how many percent is the final price lower than the original price?`,
-      `Ein Preis steigt um ${p1}\u00a0% und sinkt später wieder um ${p1}\u00a0%. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
-    );
-  } else if (kind === 1) {
-    changes = [
-      { up: true, p: p1 },
-      { up: true, p: p2 },
-    ];
-    text = tx(
-      `A price rises by ${p1} %, and later by another ${p2} %. By how many percent has it risen in total?`,
-      `Ein Preis steigt um ${p1}\u00a0% und später noch einmal um ${p2}\u00a0%. Um wie viel Prozent ist er insgesamt gestiegen?`,
-    );
-  } else {
-    changes = [
-      { up: false, p: p1 },
-      { up: false, p: p2 },
-    ];
-    text = tx(
-      `In a sale, a price is reduced by ${p1} %. On the last day, the sale price is cut by another ${p2} %. By how many percent is the final price lower than the original price?`,
-      `Im Schlussverkauf wird ein Preis um ${p1}\u00a0% reduziert. Am letzten Tag wird der reduzierte Preis noch einmal um ${p2}\u00a0% gesenkt. Um wie viel Prozent ist der Endpreis niedriger als der ursprüngliche Preis?`,
-    );
-  }
-  const Q = changes.map(factorOf).reduce((x, y) => x * y, 1);
-  const pct = r6(Math.abs(Q - 1) * 100);
-  if (pct === 0 || pct >= 100) return null;
-  return {
-    instruction: WORD_PROBLEM,
-    text,
-    answer: rateAnswer(pct),
-    hint: tx(
-      "Don't just add the percentages. Multiply the growth factors, then compare with $1$.",
-      "Nicht einfach die Prozentsätze addieren! Multipliziere die Wachstumsfaktoren und vergleiche dann mit $1$.",
-    ),
-    solution: totalFrames(changes),
-    mistakes: mistakesFor(rateAnswer(pct), [
-      kind === 0
-        ? [
-            0,
-            tx("Back to the start?", "Wieder am Anfang?"),
-            tx(
-              `Ooh, the classic trap! It feels like $+${p1} %$ and $-${p1} %$ cancel out. But the drop is $${p1} %$ of the **new**, higher price.`,
-              `Die klassische Falle! Es fühlt sich an, als würden sich $+${p1} %$ und $-${p1} %$ aufheben. Aber die Senkung beträgt $${p1} %$ vom **neuen**, höheren Preis.`,
-            ),
-          ]
-        : [
-            p1 + p2,
-            tx("Percentages added", "Prozente addiert"),
-            kind === 1
-              ? tx(
-                  `Ooh, tempting! But you can't just add the percentages: the second rise is $${p2} %$ of the **new**, higher price. Multiply the growth factors instead.`,
-                  `Ooh, verlockend! Aber Prozentsätze darfst du nicht einfach addieren: Die zweite Erhöhung beträgt $${p2} %$ vom **neuen**, höheren Preis. Multipliziere stattdessen die Wachstumsfaktoren.`,
-                )
-              : tx(
-                  `Ooh, tempting! But you can't just add the percentages: the second cut is $${p2} %$ of the **reduced** price. Multiply the growth factors instead.`,
-                  `Ooh, verlockend! Aber Prozentsätze darfst du nicht einfach addieren: Die zweite Senkung beträgt $${p2} %$ vom **reduzierten** Preis. Multipliziere stattdessen die Wachstumsfaktoren.`,
-                ),
-          ],
-      [
-        Q * 100,
-        tx("Final value, not the change", "Endwert statt Änderung"),
-        say(({ t, n }) =>
-          t(
-            `Nearly! $${n(Q * 100)} %$ is the final price compared with the original. But the question asks how much it **changed**.`,
-            `Fast! $${n(Q * 100)} %$ ist der Endpreis im Vergleich zum Anfang. Gefragt ist aber, um wie viel er sich **verändert** hat.`,
-          ),
-        ),
-      ],
-    ]),
-  };
-}
-
-const COMPOUND_STORIES: { up: boolean; whole?: boolean; unit: Unit; text: (K: string, p: number, n: number, f: Fmt) => string }[] = [
-  {
-    up: true,
-    unit: "€",
-    text: (K, p, n, { t }) =>
-      t(
-        `Mia puts ${K} € into a savings account with ${p} % interest per year. The interest stays in the account and earns interest too (Zinseszins). How much money is in the account after ${n} years? Round to the cent.`,
-        `Mia legt ${K}\u00a0€ auf ein Sparkonto mit ${p}\u00a0% Zinsen pro Jahr. Die Zinsen bleiben auf dem Konto und werden mitverzinst (Zinseszins). Wie viel Geld ist nach ${n} Jahren auf dem Konto? Runde auf Cent.`,
-      ),
-  },
-  {
-    up: false,
-    unit: "€",
-    text: (K, p, n, { t }) =>
-      t(
-        `A new car costs ${K} €. It loses ${p} % of its value every year. What is it worth after ${n} years? Round to the cent.`,
-        `Ein Neuwagen kostet ${K}\u00a0€. Er verliert jedes Jahr ${p}\u00a0% seines Werts. Wie viel ist er nach ${n} Jahren noch wert? Runde auf Cent.`,
-      ),
-  },
-  {
-    up: true,
-    whole: true,
-    unit: "inhabitants",
-    text: (K, p, n, { t }) =>
-      t(
-        `A town has ${K} inhabitants. The population grows by ${p} % each year. How many inhabitants will it have after ${n} years? Round to a whole number.`,
-        `Eine Stadt hat ${K} Einwohner. Die Einwohnerzahl wächst jedes Jahr um ${p}\u00a0%. Wie viele Einwohner hat sie nach ${n} Jahren? Runde auf eine ganze Zahl.`,
-      ),
-  },
-];
-
-function compoundTask(rng: Rng): Exercise | null {
-  const story = rng.pick(COMPOUND_STORIES);
-  const p = story.up ? rng.pick([2, 3, 4, 5]) : rng.pick([10, 15, 20, 25]);
-  const n = rng.int(2, 3);
-  const K = story.whole ? rng.int(5, 40) * 1000 : story.up ? rng.pick([500, 1000, 2000, 2500, 5000]) : rng.pick([10000, 12000, 15000, 20000, 25000, 30000]);
-  const q = 1 + (story.up ? p : -p) / 100;
-  const exact = K * q ** n;
-  const value = story.whole ? Math.round(exact) : r2(exact);
-  const answer: AnswerSpec = story.whole ? { kind: "number", value, unit: unitText(story.unit), tolerance: 1.01 / Math.max(1, value) } : amount(value, "€");
-  const linear = !story.up
-    ? tx(
-        `Ah, I see what happened! You took $${p} %$ of the **original** price off every year. But each year it loses $${p} %$ of its **current** value.`,
-        `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ vom **ursprünglichen** Preis abgezogen. Aber jedes Jahr verliert er $${p} %$ von seinem **aktuellen** Wert.`,
-      )
-    : story.whole
-      ? tx(
-          `Ah, I see what happened! You added $${p} %$ of the **original** population every year. But each year it grows by $${p} %$ of the **current** population.`,
-          `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ der **ursprünglichen** Einwohnerzahl dazugezählt. Aber jedes Jahr wächst sie um $${p} %$ der **aktuellen** Einwohnerzahl.`,
-        )
-      : tx(
-          `Ah, I see what happened! You added $${p} %$ of the **starting** amount every year. But the interest earns interest too: each year it's $${p} %$ of the **new** balance.`,
-          `Ah, ich seh, was passiert ist! Du hast jedes Jahr $${p} %$ vom **Startbetrag** draufgerechnet. Aber die Zinsen werden mitverzinst: Jedes Jahr kommen $${p} %$ vom **neuen** Kontostand dazu.`,
-        );
-  return {
-    instruction: WORD_PROBLEM,
-    text: say((f) => story.text(f.big(String(K)), p, n, f)),
-    answer,
-    hint: say(({ t, n: N }) =>
-      t(
-        `Growth factor $q = ${N(1 + (story.up ? p : -p) / 100)}$, once per year: multiply by $q^${n}$.`,
-        `Wachstumsfaktor $q = ${N(1 + (story.up ? p : -p) / 100)}$, einmal pro Jahr: Multipliziere mit $q^${n}$.`,
-      ),
-    ),
-    solution: compoundFrames(K, p, story.up, n, story.unit, story.whole),
-    mistakes: mistakesFor(answer, [
-      [
-        K * (1 + ((story.up ? p : -p) * n) / 100),
-        story.up && !story.whole ? tx("Interest on interest forgotten", "Zinseszins vergessen") : tx("Same amount every year", "Jedes Jahr gleich viel"),
-        linear,
-      ],
-      [
-        K * q * n,
-        tx(`Times ${n} instead of to the power ${n}`, `Mal ${n} statt hoch ${n}`),
-        say(({ t, n: N }) =>
-          t(
-            `Close idea! But multiplying by $${n}$ isn't the same as multiplying by $${N(q)}$ ${n} times. Use the power $${N(q)}^${n}$.`,
-            `Gute Idee, aber mal $${n}$ ist nicht dasselbe wie ${n}-mal mit $${N(q)}$ malnehmen. Nimm die Potenz $${N(q)}^${n}$.`,
-          ),
-        ),
-      ],
-      story.up && p < 10 && [K * (1 + p / 10) ** n, FACTOR_OFF, factorOff(p, true)],
-    ]),
   };
 }
 
@@ -1617,51 +972,127 @@ function pointsTask(rng: Rng): Exercise | null {
   };
 }
 
-const LEVELS: Record<Level, [number, Gen][]> = {
-  1: [
-    [3, wTask],
-    [3, wStoryTask],
-    [2, convertTask],
-    [2, gridTask],
-  ],
-  2: [
-    [3, pTask],
-    [3, gTask],
-    [4, changeTask],
-  ],
-  3: [
-    [3, reverseTask],
-    [2, chainTask],
-    [2, totalChangeTask],
-    [2, compoundTask],
-    [1.5, pointsTask],
-  ],
-};
+// Tasks: equal shares ----------------------------------------------------------
 
-function generate(level: Level, rng: Rng): Exercise {
-  for (let tries = 0; tries < 80; tries++) {
-    const ex = pickWeighted(rng, LEVELS[level])(rng);
-    if (ex) return ex;
+/** A share as a fraction and as a decimal, with the percentage a student gets by misreading each one. */
+const SHARES: { p: number; n: number; d: number; fracTrap?: number; decTrap?: number }[] = [
+  { p: 50, n: 1, d: 2, fracTrap: 12, decTrap: 5 },
+  { p: 25, n: 1, d: 4, fracTrap: 14, decTrap: 2.5 },
+  { p: 20, n: 1, d: 5, fracTrap: 15, decTrap: 2 },
+  { p: 75, n: 3, d: 4, fracTrap: 34, decTrap: 7.5 },
+  { p: 10, n: 1, d: 10, decTrap: 1 },
+  { p: 5, n: 1, d: 20, decTrap: 50 },
+  { p: 40, n: 2, d: 5, fracTrap: 25, decTrap: 4 },
+  { p: 30, n: 3, d: 10, decTrap: 3 },
+  { p: 60, n: 3, d: 5, fracTrap: 35, decTrap: 6 },
+  { p: 80, n: 4, d: 5, fracTrap: 45, decTrap: 8 },
+  { p: 1, n: 1, d: 100, decTrap: 10 },
+  { p: 2, n: 1, d: 50, decTrap: 20 },
+  { p: 12.5, n: 1, d: 8, fracTrap: 18, decTrap: 1.25 },
+  { p: 150, n: 3, d: 2, fracTrap: 32, decTrap: 15 },
+];
+
+function shareMatchTask(rng: Rng): Exercise | null {
+  const chosen = rng.shuffle(SHARES).slice(0, 4);
+  const items = chosen.map((s) => ({ ...s, asFrac: rng.chance(0.5) }));
+  const left = (s: (typeof items)[number]): Text => (s.asFrac ? `$\\frac{${s.n}}{${s.d}}$` : say(({ n }) => `$${n(s.p / 100)}$`));
+  const pct = (v: number): Text => say(({ n }) => `$${n(v)} %$`);
+  const taken = new Set(chosen.map((s) => s.p));
+  const traps: { left: Text; right: Text; say: Text; title: Text }[] = [];
+  for (const s of rng.shuffle(items)) {
+    if (traps.length >= 2) break;
+    const trap = s.asFrac ? s.fracTrap : s.decTrap;
+    if (trap === undefined || taken.has(trap)) continue;
+    taken.add(trap);
+    traps.push({
+      left: left(s),
+      right: pct(trap),
+      title: s.asFrac ? tx("Digits copied", "Ziffern abgeschrieben") : trap < s.p ? tx("One place too few", "Eine Stelle zu wenig") : tx("Zeros mixed up", "Nullen verwechselt"),
+      say: s.asFrac
+        ? tx(
+            `I think you wrote the digits $${s.n}$ and $${s.d}$ next to each other. But $\\frac{${s.n}}{${s.d}}$ means $${s.n} : ${s.d}$: turn it into hundredths first.`,
+            `Ich glaub, du hast die Ziffern $${s.n}$ und $${s.d}$ einfach nebeneinandergeschrieben. Aber $\\frac{${s.n}}{${s.d}}$ heißt $${s.n} : ${s.d}$: Mach erst Hundertstel daraus.`,
+          )
+        : trap < s.p
+          ? tx(
+              "Nearly! Percent counts **hundredths**: from a decimal to percent the point moves **two** places to the right, not one.",
+              "Fast! Prozent zählt **Hundertstel**: Von der Dezimalzahl zu Prozent rückt das Komma **zwei** Stellen nach rechts, nicht eine.",
+            )
+          : say(({ t, n }) =>
+              t(
+                `Careful with the zeros! $${n(s.p / 100)}$ has only $${n(s.p)}$ hundredths. The point moves exactly **two** places.`,
+                `Vorsicht mit den Nullen! $${n(s.p / 100)}$ sind nur $${n(s.p)}$ Hundertstel. Das Komma rückt genau **zwei** Stellen.`,
+              ),
+            ),
+    });
   }
+  const frames: Frame[] = items.map((s) => {
+    const k = 100 / s.d;
+    if (!s.asFrac)
+      return {
+        math: say(({ n }) => `${n(s.p / 100)}#v =#e \\frac{${n(s.p)}#z}{100#h}#f =#e2 ${n(s.p)}#p %#pc`),
+        note: say(({ t, n }) =>
+          t(`$${n(s.p / 100)}$ is $${n(s.p)}$ hundredths: the point moves two places to the right.`, `$${n(s.p / 100)}$ sind $${n(s.p)}$ Hundertstel: Das Komma rückt zwei Stellen nach rechts.`),
+        ),
+      };
+    if (Number.isInteger(k))
+      return {
+        math: `\\frac{${s.n}#v}{${s.d}#w}#f0 =#e \\frac{${s.p}#z}{100#h}#f =#e2 ${s.p}#p %#pc`,
+        note: tx(`Expand $\\frac{${s.n}}{${s.d}}$ by $${k}$ to get hundredths.`, `Erweitere $\\frac{${s.n}}{${s.d}}$ mit $${k}$, dann hast du Hundertstel.`),
+      };
+    return {
+      math: say(({ n }) => `\\frac{${s.n}#v}{${s.d}#w}#f0 =#e ${s.n}#a :#c ${s.d}#b =#e1 ${n(s.p / 100)}#z =#e2 ${n(s.p)}#p %#pc`),
+      note: say(({ t, n }) =>
+        t(`$${s.d}$ doesn't fit into $100$, so divide: $${s.n} : ${s.d} = ${n(s.p / 100)}$.`, `$${s.d}$ passt nicht in $100$, also teilst du: $${s.n} : ${s.d} = ${n(s.p / 100)}$.`),
+      ),
+    };
+  });
   return {
+    instruction: tx("Match equal shares", "Ordne gleiche Anteile zu"),
+    answer: {
+      kind: "match",
+      pairs: items.map((s) => [left(s), pct(s.p)]),
+      distractors: traps.map((x) => x.right),
+      label: tx("Find the percentage for each share.", "Finde zu jedem Anteil den passenden Prozentsatz."),
+    },
+    hint: tx(
+      "Turn everything into hundredths: expand a fraction (or divide), and move a decimal point two places to the right.",
+      "Mach aus allem Hundertstel: Brüche erweitern (oder teilen), bei Dezimalzahlen rückt das Komma zwei Stellen nach rechts.",
+    ),
+    solution: frames,
+    mistakes: traps.map((x) => ({ when: { kind: "match", pairs: [[x.left, x.right]] }, title: x.title, say: x.say })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Level 1 practice: mostly the percentage, the rate and the base value; some growth factors, going
+// back and percentage points, as far as the lesson teaches them.
+
+const TASKS: [number, Gen][] = [
+  [3, wTask],
+  [3, wStoryTask],
+  [2, convertTask],
+  [2, gridTask],
+  [1.3, shareMatchTask],
+  [2.5, pTask],
+  [2.5, gTask],
+  [2.5, changeTask],
+  [1.2, reverseTask],
+  [0.8, pointsTask],
+];
+
+export function generate1(rng: Rng): Exercise {
+  return findTask(rng, TASKS, () => ({
     instruction: CALCULATE,
     math: OF(`10 % "of" 300 "€"`),
     answer: amount(30, "€"),
     hint: tx("$10 %$ is a tenth.", "$10 %$ ist ein Zehntel."),
     solution: findWFrames(10, 300, "€"),
-  };
+  }));
 }
 
 // ---------------------------------------------------------------------------
 // Pictures
-
-const EMPTY = "color-mix(in oklab, var(--ink) 8%, transparent)";
-
-/** Number formatting and wording for the widgets in the current language. */
-function useFmt(): Fmt {
-  const l = useLocale();
-  return fmt((en, de) => (l === "de" ? de : en), l);
-}
 
 /** A grid of squares with the first k shaded (row by row). */
 function PercentGrid({ rows, cols, k }: { rows: number; cols: number; k: number }) {
@@ -1700,21 +1131,6 @@ const BASES: { G: number; unit: Unit }[] = [
   { G: 1500, unit: "m" },
   { G: 50, unit: "L" },
 ];
-
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "h-8 rounded-lg border px-2.5 text-[13px] font-medium transition-colors",
-        active ? "border-blob bg-blob-soft text-blob-ink" : "border-line text-ink-2 hover:bg-hover hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Scale labels: centred on their tick, but kept inside the bar at both ends. */
 const edge = (t: number) => (t === 0 ? "" : t === 100 ? "-translate-x-full" : "-translate-x-1/2");
@@ -2060,6 +1476,12 @@ function GrowthChain() {
           {trap}
         </motion.p>
       </AnimatePresence>
+      <p className="text-[13px] text-ink-3">
+        {t(
+          "Pick + or − for each change and set its percentage. Up to three changes in a row.",
+          "Wähle für jede Änderung + oder − und stell den Prozentsatz ein. Bis zu drei Änderungen nacheinander.",
+        )}
+      </p>
     </div>
   );
 }
@@ -2228,8 +1650,7 @@ const pointsFrames: Frame[] = [
 const PER_HUNDRED = tx("Percent means per hundred", "Prozent heißt „von Hundert“");
 const POINTS_TITLE = tx("Percent or percentage points?", "Prozent oder Prozentpunkte?");
 
-const percentages: Topic = {
-  ...topicMeta("percentages"),
+export const level1: LevelLesson = {
   summary: [
     {
       title: PER_HUNDRED,
@@ -2416,7 +1837,4 @@ const percentages: Topic = {
       frames: pointsFrames,
     },
   ],
-  generate,
 };
-
-export default percentages;

@@ -2,18 +2,18 @@
 
 import { topicMeta } from "@/learn/catalog";
 import type { Topic } from "@/learn/types";
-import base from "./level2";
-import { level1 } from "./level1";
-import { level3 } from "./level3";
+import { generate1, level1 } from "./level1";
+import { generate2, level2 } from "./level2";
+import { generate3, level3 } from "./level3";
 
 /**
- * Systems of equations. Level 2 is the lesson written before levels; until the other levels have their own
- * tasks, its practice (three difficulty tiers) serves every level.
+ * Systems of equations at three levels: two conditions at once (pairs, tables, graphs, simple
+ * substitution), the three methods for 2×2 systems, and the Gauss algorithm for 3×3 systems.
  */
 const topic: Topic = {
   ...topicMeta("linear-systems"),
-  lessons: { 1: level1, 2: { lesson: base.lesson, summary: base.summary }, 3: level3 },
-  generate: base.generate,
+  lessons: { 1: level1, 2: level2, 3: level3 },
+  generate: (level, rng) => (level === 1 ? generate1(rng) : level === 2 ? generate2(rng) : generate3(rng)),
 };
 
 export default topic;

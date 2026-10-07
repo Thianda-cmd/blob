@@ -6,10 +6,9 @@ import { useEffect, useId, useState, type ComponentType, type ReactNode } from "
 import { useLocale } from "@/i18n/client";
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { MathView } from "@/learn/components/MathView";
-import { topicMeta } from "@/learn/catalog";
 import { add, div as divF, frac, mul as mulF, sub, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { cos, sin } from "@/lib/stableMath";
 
@@ -18,22 +17,22 @@ import { cos, sin } from "@/lib/stableMath";
 // denominator, bar), so numbers glide when fractions are expanded, combined,
 // flipped or multiplied.
 
-type KF = { n: number; d: number; kn: string; kd: string; kf: string; asFrac?: boolean };
+export type KF = { n: number; d: number; kn: string; kd: string; kf: string; asFrac?: boolean };
 
-const kf = (n: number, d: number, id: string): KF => ({ n, d, kn: `${id}n`, kd: `${id}d`, kf: `${id}f` });
-const isWhole = (f: KF) => f.d === 1 && !f.asFrac;
+export const kf = (n: number, d: number, id: string): KF => ({ n, d, kn: `${id}n`, kd: `${id}d`, kf: `${id}f` });
+export const isWhole = (f: KF) => f.d === 1 && !f.asFrac;
 
 /** Keyed display source: "\frac{3#an}{4#ad}#af", or "2#an" for a whole number. */
-function src(f: KF): string {
+export function src(f: KF): string {
   return isWhole(f) ? `${f.n}#${f.kn}` : `\\frac{${f.n}#${f.kn}}{${f.d}#${f.kd}}#${f.kf}`;
 }
 
 /** Plain display for notes and tasks: "\frac{3}{4}" or "2". */
-const fr = (n: number, d: number) => (d === 1 ? String(n) : `\\frac{${n}}{${d}}`);
-const frf = (f: { n: number; d: number }) => fr(f.n, f.d);
+export const fr = (n: number, d: number) => (d === 1 ? String(n) : `\\frac{${n}}{${d}}`);
+export const frf = (f: { n: number; d: number }) => fr(f.n, f.d);
 
 /** "2\frac{3}{4}" for an improper fraction. */
-function mixedTx(n: number, d: number) {
+export function mixedTx(n: number, d: number) {
   const w = Math.floor(n / d);
   const r = n - w * d;
   if (w === 0) return fr(n, d);
@@ -41,16 +40,16 @@ function mixedTx(n: number, d: number) {
 }
 
 /** A worked solution being written. `pre` and `post` frame the part we're working on. */
-type Board = { frames: Frame[]; pre: string; post: string };
-const board = (): Board => ({ frames: [], pre: "", post: "" });
+export type Board = { frames: Frame[]; pre: string; post: string };
+export const board = (): Board => ({ frames: [], pre: "", post: "" });
 
-function put(b: Board, body: Text, note: Text, extra: Omit<Frame, "math" | "note"> = {}) {
+export function put(b: Board, body: Text, note: Text, extra: Omit<Frame, "math" | "note"> = {}) {
   const math = typeof body === "string" ? `${b.pre}${body}${b.post}` : txMap((t) => `${b.pre}${t(body.en, body.de)}${b.post}`);
   b.frames.push({ math, note, ...extra });
 }
 
 /** Divide top and bottom by their greatest common factor. */
-function simplify(b: Board, f: KF): KF {
+export function simplify(b: Board, f: KF): KF {
   const g = gcd(f.n, f.d);
   if (g === 1 || f.d === 1) return f;
   put(
@@ -71,7 +70,7 @@ function simplify(b: Board, f: KF): KF {
 }
 
 /** How to find the lowest common denominator (Hauptnenner). */
-function lcdNote(a: number, b: number): Text {
+export function lcdNote(a: number, b: number): Text {
   const big = Math.max(a, b);
   const small = Math.min(a, b);
   const l = lcm(a, b);
@@ -89,7 +88,7 @@ function lcdNote(a: number, b: number): Text {
 }
 
 /** Adds or subtracts two fractions: common denominator, combine numerators, simplify. Keeps A's keys. */
-function addSub(b: Board, A: KF, B: KF, sign: 1 | -1, opKey: string): KF {
+export function addSub(b: Board, A: KF, B: KF, sign: 1 | -1, opKey: string): KF {
   const op = sign > 0 ? "+" : "-";
   const both = (x: KF, y: KF) => `${src(x)} ${op}#${opKey} ${src(y)}`;
   if (A.d !== B.d) {
@@ -128,10 +127,10 @@ function addSub(b: Board, A: KF, B: KF, sign: 1 | -1, opKey: string): KF {
 }
 
 /** Plain text of a board fraction for notes. */
-const src0 = (f: KF) => (isWhole(f) ? String(f.n) : `\\frac{${f.n}}{${f.d}}`);
+export const src0 = (f: KF) => (isWhole(f) ? String(f.n) : `\\frac{${f.n}}{${f.d}}`);
 
 /** Multiplies: whole numbers over 1, simplify crosswise, top times top and bottom times bottom. */
-function mul(b: Board, A: KF, B: KF, opKey: string): KF {
+export function mul(b: Board, A: KF, B: KF, opKey: string): KF {
   const both = (x: KF, y: KF) => `${src(x)} \\cdot#${opKey} ${src(y)}`;
   if (isWhole(A) || isWhole(B)) {
     const w = isWhole(A) ? A : B;
@@ -195,14 +194,14 @@ function mul(b: Board, A: KF, B: KF, opKey: string): KF {
   return simplify(b, r);
 }
 
-const TOP_TIMES_TOP = tx("Top times top, bottom times bottom.", "Zähler mal Zähler, Nenner mal Nenner.");
-const RECIPROCAL_LEAD = tx(
+export const TOP_TIMES_TOP = tx("Top times top, bottom times bottom.", "Zähler mal Zähler, Nenner mal Nenner.");
+export const RECIPROCAL_LEAD = tx(
   "To divide, multiply by the **reciprocal** (Kehrwert): flip the second fraction upside down.",
   "Dividieren heißt: mit dem **Kehrwert** multiplizieren. Dreh dafür den zweiten Bruch um.",
 );
 
 /** Divides: multiply by the reciprocal (Kehrwert) of the second number. */
-function div(b: Board, A: KF, B: KF, opKey: string, lead?: Text): KF {
+export function div(b: Board, A: KF, B: KF, opKey: string, lead?: Text): KF {
   put(b, `${src(A)} :#${opKey} ${src(B)}`, lead ?? RECIPROCAL_LEAD, {
     highlight: [opKey],
   });
@@ -225,7 +224,7 @@ function div(b: Board, A: KF, B: KF, opKey: string, lead?: Text): KF {
 }
 
 /** A quantity's unit, with the German word for word units. */
-type Unit = Text;
+export type Unit = Text;
 
 /** "3/4 of 28 kg": divide by the denominator, multiply by the numerator. */
 function ofSteps(b: Board, n: number, d: number, q: number, unit: Unit) {
@@ -249,34 +248,34 @@ function ofSteps(b: Board, n: number, d: number, q: number, unit: Unit) {
 }
 
 /** Adds a sentence to the note of the last frame. */
-function appendNote(frames: Frame[], text: Text) {
+export function appendNote(frames: Frame[], text: Text) {
   const last = frames[frames.length - 1];
   const prev = last.note;
   frames[frames.length - 1] = { ...last, note: prev ? txMap((_, l) => `${resolveText(prev, l)} ${resolveText(text, l)}`) : text };
 }
 
 /** Closes a worked solution: lowest terms, and the mixed-number form of an improper result. */
-function finish(frames: Frame[], r: Frac) {
+export function finish(frames: Frame[], r: Frac) {
   const last = resolveText(frames[frames.length - 1].note, "en");
   if (r.d > 1 && !/simplified/i.test(last)) appendNote(frames, tx("Already in lowest terms.", "Schon vollständig gekürzt."));
   if (r.d > 1 && r.n > r.d) appendNote(frames, tx(`As a mixed number: $${mixedTx(r.n, r.d)}$.`, `Als gemischte Zahl: $${mixedTx(r.n, r.d)}$.`));
 }
 
 // Mixed numbers (w = 0 means a plain fraction).
-type MixedN = { w: number; n: number; d: number; id: string };
-const mSrc = (m: MixedN) => `${m.w ? `${m.w}#${m.id}w ` : ""}\\frac{${m.n}#${m.id}n}{${m.d}#${m.id}d}#${m.id}f`;
-const mWork = (m: MixedN) =>
+export type MixedN = { w: number; n: number; d: number; id: string };
+export const mSrc = (m: MixedN) => `${m.w ? `${m.w}#${m.id}w ` : ""}\\frac{${m.n}#${m.id}n}{${m.d}#${m.id}d}#${m.id}f`;
+export const mWork = (m: MixedN) =>
   m.w ? `\\frac{${m.w}#${m.id}w \\cdot#${m.id}x ${m.d}#${m.id}k +#${m.id}p ${m.n}#${m.id}n}{${m.d}#${m.id}d}#${m.id}f` : mSrc(m);
-const mImproper = (m: MixedN): KF => ({ n: m.w * m.d + m.n, d: m.d, kn: `${m.id}n`, kd: `${m.id}d`, kf: `${m.id}f` });
-const mTx = (m: MixedN) => `${m.w ? m.w : ""}\\frac{${m.n}}{${m.d}}`;
+export const mImproper = (m: MixedN): KF => ({ n: m.w * m.d + m.n, d: m.d, kn: `${m.id}n`, kd: `${m.id}d`, kf: `${m.id}f` });
+export const mTx = (m: MixedN) => `${m.w ? m.w : ""}\\frac{${m.n}}{${m.d}}`;
 
 // ---------------------------------------------------------------------------
 // Exercise generator
 
-type Gen = (rng: Rng) => Exercise | null;
-type Visual = NonNullable<Exercise["visual"]>;
+export type Gen = (rng: Rng) => Exercise | null;
+export type Visual = NonNullable<Exercise["visual"]>;
 
-function pickWeighted(rng: Rng, list: [number, Gen][]): Gen {
+export function pickWeighted(rng: Rng, list: [number, Gen][]): Gen {
   const total = list.reduce((s, [w]) => s + w, 0);
   let r = rng.next() * total;
   for (const [w, g] of list) {
@@ -287,20 +286,20 @@ function pickWeighted(rng: Rng, list: [number, Gen][]): Gen {
 }
 
 /** A numerator in [lo, hi] with no common factor with d. */
-function coprime(rng: Rng, d: number, lo: number, hi: number): number | null {
+export function coprime(rng: Rng, d: number, lo: number, hi: number): number | null {
   const options: number[] = [];
   for (let n = lo; n <= hi; n++) if (gcd(n, d) === 1) options.push(n);
   return options.length ? rng.pick(options) : null;
 }
 
 /** A fraction in lowest terms (proper, or improper if asked). */
-function randFrac(rng: Rng, dens: number[], improper = false): Frac | null {
+export function randFrac(rng: Rng, dens: number[], improper = false): Frac | null {
   const d = rng.pick(dens);
   const n = improper ? coprime(rng, d, d + 1, 2 * d - 1) : coprime(rng, d, 1, d - 1);
   return n === null ? null : { n, d };
 }
 
-function fracAnswer(r: Frac): AnswerSpec {
+export function fracAnswer(r: Frac): AnswerSpec {
   return r.d === 1 ? { kind: "number", value: r.n } : { kind: "fraction", n: r.n, d: r.d, mustReduce: true };
 }
 
@@ -309,17 +308,17 @@ function fracAnswer(r: Frac): AnswerSpec {
 // value is exactly what a student with that misconception gets.
 
 /** A misconception: the value it leads to (null when it leads nowhere sensible) and what Blob says. */
-type Slip = { v: Frac | null; title: Text; say: Text } | null | false;
+export type Slip = { v: Frac | null; title: Text; say: Text } | null | false;
 
 /** A positive fraction, or null (e.g. a zero or negative denominator). */
-const fq = (n: number, d: number): Frac | null => (n > 0 && d > 0 && Number.isInteger(n) && Number.isInteger(d) ? frac(n, d) : null);
-const pos = (f: Frac | null): Frac | null => (f && f.n > 0 ? f : null);
+export const fq = (n: number, d: number): Frac | null => (n > 0 && d > 0 && Number.isInteger(n) && Number.isInteger(d) ? frac(n, d) : null);
+export const pos = (f: Frac | null): Frac | null => (f && f.n > 0 ? f : null);
 
 /**
  * The slips as Mistakes for an answer made by fracAnswer(right) (or a whole-number answer
  * with `unit`). Only kept when the value differs from the right one and from earlier slips.
  */
-function slipsFor(right: Frac, slips: Slip[], unit?: Text): Mistake[] {
+export function slipsFor(right: Frac, slips: Slip[], unit?: Text): Mistake[] {
   const out: Mistake[] = [];
   const seen = [right.n / right.d];
   for (const s of slips) {
@@ -335,14 +334,14 @@ function slipsFor(right: Frac, slips: Slip[], unit?: Text): Mistake[] {
   return out;
 }
 
-const NO_FLIP = tx("Forgot to flip", "Kehrwert vergessen");
-const NO_FLIP_SAY = tx(
+export const NO_FLIP = tx("Forgot to flip", "Kehrwert vergessen");
+export const NO_FLIP_SAY = tx(
   "Ah, you multiplied straight away! When dividing, flip the **second** fraction first (the reciprocal), then multiply.",
   "Ah, du hast direkt multipliziert! Beim Dividieren drehst du zuerst den **zweiten** Bruch um (Kehrwert) und multiplizierst dann.",
 );
 
 /** Top plus top over bottom plus bottom (or minus): the number one fraction mistake. */
-function numDenSlip(P: Frac, Q: Frac, sign: 1 | -1, where?: [string, string]): Slip {
+export function numDenSlip(P: Frac, Q: Frac, sign: 1 | -1, where?: [string, string]): Slip {
   const plus = sign > 0;
   const [en, de] = where ?? ["", ""];
   const who = en ? `${en}, you` : "You";
@@ -362,7 +361,7 @@ function numDenSlip(P: Frac, Q: Frac, sign: 1 | -1, where?: [string, string]): S
 }
 
 /** Adding or subtracting fractions with different denominators. */
-function addSubSlips(P: Frac, Q: Frac, sign: 1 | -1): Slip[] {
+export function addSubSlips(P: Frac, Q: Frac, sign: 1 | -1): Slip[] {
   const L = lcm(P.d, Q.d);
   const notExpanded = (den: number): Slip => ({
     v: fq(P.n + sign * Q.n, den),
@@ -388,7 +387,7 @@ function addSubSlips(P: Frac, Q: Frac, sign: 1 | -1): Slip[] {
 }
 
 /** Simplifying n/d, whose greatest common factor is k. */
-function simplifySlips(n: number, d: number, k: number): Slip[] {
+export function simplifySlips(n: number, d: number, k: number): Slip[] {
   // Crossing out a digit that appears on top and bottom (12/24 → 1/4).
   const a = String(n);
   const b = String(d);
@@ -471,7 +470,7 @@ function ofSlips(n: number, d: number, q: number, story: boolean): Slip[] {
 }
 
 /** Multiplying two fractions (or a whole number and a fraction). */
-function mulSlips(A: Frac, B: Frac): Slip[] {
+export function mulSlips(A: Frac, B: Frac): Slip[] {
   const whole = A.d === 1 ? A : B.d === 1 ? B : null;
   const flip: Slip = {
     v: fq(A.n * B.d, A.d * B.n),
@@ -525,7 +524,7 @@ function mulSlips(A: Frac, B: Frac): Slip[] {
 }
 
 /** Dividing A by B (B may be a whole number). */
-function divSlips(A: Frac, B: Frac): Slip[] {
+export function divSlips(A: Frac, B: Frac): Slip[] {
   const k = B.d === 1 ? B.n : 0;
   return [
     {
@@ -560,7 +559,7 @@ const picture = (n: number, d: number, shape: "bar" | "circle"): Visual => ({
   props: { n, d, shape },
 });
 
-// Level 1 ---------------------------------------------------------------------
+// Basics: simplify, expand, same denominators, "of", pictures (old tier 1) ------
 
 function simplifyTask(rng: Rng): Exercise | null {
   const d0 = rng.int(2, 10);
@@ -729,9 +728,9 @@ function sameDenTask(rng: Rng): Exercise | null {
   };
 }
 
-const CALC_SIMPLIFY = tx("Calculate and simplify", "Berechne und kürze");
-const CALCULATE = tx("Calculate", "Berechne");
-const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
+export const CALC_SIMPLIFY = tx("Calculate and simplify", "Berechne und kürze");
+export const CALCULATE = tx("Calculate", "Berechne");
+export const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
 const STUDENTS = tx("students", "Schüler");
 
 const OF_STORIES: { unit: Unit; scale: number; max: number; text: (f: string, q: number) => Text }[] = [
@@ -860,9 +859,9 @@ function pictureTask(rng: Rng): Exercise | null {
   };
 }
 
-// Level 2 ---------------------------------------------------------------------
+// The four operations (old tier 2) ---------------------------------------------
 
-const DENS = [2, 3, 4, 5, 6, 8, 9, 10, 12];
+export const DENS = [2, 3, 4, 5, 6, 8, 9, 10, 12];
 
 function addTask(rng: Rng): Exercise | null {
   const A = randFrac(rng, DENS);
@@ -1044,9 +1043,10 @@ function storyAddTask(rng: Rng): Exercise | null {
   };
 }
 
-// Level 3 ---------------------------------------------------------------------
+// Mixed numbers, Punkt vor Strich, brackets, double fractions, stories (old tier 3).
+// orderTask, bracketTask and doubleTask are practised at level 2. -----------------
 
-function mixedTask(rng: Rng): Exercise | null {
+export function mixedTask(rng: Rng): Exercise | null {
   const op = rng.pick(["+", "-", "*", ":"] as const);
   const muldiv = op === "*" || op === ":";
   const make = (id: string, maxW: number, plainOk: boolean): MixedN | null => {
@@ -1099,7 +1099,7 @@ function mixedTask(rng: Rng): Exercise | null {
 }
 
 /** Mixed numbers: converting them wrongly, or working with wholes and fractions separately. */
-function mixedSlips(M1: MixedN, M2: MixedN, op: "+" | "-" | "*" | ":"): Slip[] {
+export function mixedSlips(M1: MixedN, M2: MixedN, op: "+" | "-" | "*" | ":"): Slip[] {
   const calc = (x: Frac, y: Frac) => (op === "+" ? add(x, y) : op === "-" ? sub(x, y) : op === "*" ? mulF(x, y) : divF(x, y));
   const value = (m: MixedN) => frac(m.w * m.d + m.n, m.d);
   const part = (m: MixedN) => frac(m.n, m.d);
@@ -1163,7 +1163,7 @@ function mixedSlips(M1: MixedN, M2: MixedN, op: "+" | "-" | "*" | ":"): Slip[] {
   return out;
 }
 
-function orderTask(rng: Rng): Exercise | null {
+export function orderTask(rng: Rng): Exercise | null {
   const X = randFrac(rng, [2, 3, 4, 5, 6, 8, 10, 12]);
   const Y = randFrac(rng, [2, 3, 4, 5, 6, 8, 9], rng.chance(0.2));
   const Z = randFrac(rng, [2, 3, 4, 5, 6, 8, 9]);
@@ -1213,9 +1213,9 @@ function orderTask(rng: Rng): Exercise | null {
   };
 }
 
-const BRACKET_GONE = tx("The bracket is a single fraction now, so the brackets can go.", "In der Klammer steht jetzt nur noch ein Bruch, die Klammern können weg.");
+export const BRACKET_GONE = tx("The bracket is a single fraction now, so the brackets can go.", "In der Klammer steht jetzt nur noch ein Bruch, die Klammern können weg.");
 
-function bracketTask(rng: Rng): Exercise | null {
+export function bracketTask(rng: Rng): Exercise | null {
   const X = randFrac(rng, [2, 3, 4, 5, 6, 8, 10]);
   const Y = randFrac(rng, [2, 3, 4, 5, 6, 8, 10]);
   const Z = randFrac(rng, [2, 3, 4, 5, 6, 7, 8, 9], rng.chance(0.25));
@@ -1268,7 +1268,7 @@ function bracketTask(rng: Rng): Exercise | null {
 }
 
 /** (P ± Q) · Z or (P ± Q) : Z. */
-function bracketSlips(P: Frac, Q: Frac, Z: Frac, sign: 1 | -1, times: boolean): Slip[] {
+export function bracketSlips(P: Frac, Q: Frac, Z: Frac, sign: 1 | -1, times: boolean): Slip[] {
   const inner = (x: Frac, y: Frac) => (sign > 0 ? add(x, y) : sub(x, y));
   const outer = times ? mulF : divF;
   const S = inner(P, Q);
@@ -1287,7 +1287,7 @@ function bracketSlips(P: Frac, Q: Frac, Z: Frac, sign: 1 | -1, times: boolean): 
   ];
 }
 
-function doubleTask(rng: Rng): Exercise | null {
+export function doubleTask(rng: Rng): Exercise | null {
   const A = randFrac(rng, [2, 3, 4, 5, 6, 8, 9, 10], rng.chance(0.2));
   let B = randFrac(rng, [2, 3, 4, 5, 6, 8, 9, 10], rng.chance(0.2));
   if (rng.chance(0.25)) B = { n: rng.int(2, 6), d: 1 };
@@ -1495,33 +1495,29 @@ function moneyLeftTask(rng: Rng): Exercise | null {
   };
 }
 
-const LEVELS: Record<Level, [number, Gen][]> = {
-  1: [
-    [3, simplifyTask],
-    [2, gapTask],
-    [3, sameDenTask],
-    [3, ofTask],
-    [2, pictureTask],
-  ],
-  2: [
-    [4, addTask],
-    [3, mulTask],
-    [3, divTask],
-    [2, storyAddTask],
-  ],
-  3: [
-    [4, mixedTask],
-    [2, orderTask],
-    [2, bracketTask],
-    [1.5, doubleTask],
-    [1, leftoverTask],
-    [1, moneyLeftTask],
-  ],
-};
+/**
+ * Level 1 practice: the old three tiers as one mix. Mostly the basics (simplify, expand,
+ * same denominators, "of", pictures) and the four operations; a few mixed numbers and word
+ * problems on top. Punkt vor Strich, brackets and double fractions are level 2.
+ */
+const LEVEL1: [number, Gen][] = [
+  [3, simplifyTask],
+  [2, gapTask],
+  [2.5, sameDenTask],
+  [2.5, ofTask],
+  [2, pictureTask],
+  [3, addTask],
+  [2, mulTask],
+  [2, divTask],
+  [1.5, storyAddTask],
+  [1.5, mixedTask],
+  [1, leftoverTask],
+  [1, moneyLeftTask],
+];
 
-function generate(level: Level, rng: Rng): Exercise {
+export function generate1(rng: Rng): Exercise {
   for (let tries = 0; tries < 60; tries++) {
-    const ex = pickWeighted(rng, LEVELS[level])(rng);
+    const ex = pickWeighted(rng, LEVEL1)(rng);
     if (ex) return ex;
   }
   for (;;) {
@@ -1538,12 +1534,12 @@ function generate(level: Level, rng: Rng): Exercise {
 type Cut = { key: string; at: number };
 
 /** Picks the English or German UI string for the current language. */
-function usePick() {
+export function usePick() {
   const de = useLocale() === "de";
   return (en: string, deText: string) => (de ? deText : en);
 }
 
-function cutsFor(parts: number): Cut[] {
+export function cutsFor(parts: number): Cut[] {
   const out: Cut[] = [];
   for (let i = 1; i < parts; i++) {
     const g = gcd(i, parts);
@@ -1552,12 +1548,12 @@ function cutsFor(parts: number): Cut[] {
   return out;
 }
 
-type Seg = { key: string; from: number; to: number; tone?: "main" | "second" | "gone"; enter?: [number, number]; delay?: number };
-const SEG_FILL = { main: "var(--blob)", second: "var(--blob-light)", gone: "color-mix(in oklab, var(--danger) 16%, transparent)" };
-const EMPTY = "color-mix(in oklab, var(--ink) 7%, transparent)";
+export type Seg = { key: string; from: number; to: number; tone?: "main" | "second" | "gone"; enter?: [number, number]; delay?: number };
+export const SEG_FILL = { main: "var(--blob)", second: "var(--blob-light)", gone: "color-mix(in oklab, var(--danger) 16%, transparent)" };
+export const EMPTY = "color-mix(in oklab, var(--ink) 7%, transparent)";
 const BW = 400;
 
-function FracBar({
+export function FracBar({
   parts,
   segs,
   height = 54,
@@ -1620,7 +1616,7 @@ function FracBar({
   );
 }
 
-function sectorPath(c: number, r: number, t: number): string {
+export function sectorPath(c: number, r: number, t: number): string {
   if (t <= 0.0005) return "M 0 0";
   if (t >= 0.9995) return `M ${c} ${c - r} A ${r} ${r} 0 1 1 ${c} ${c + r} A ${r} ${r} 0 1 1 ${c} ${c - r} Z`;
   const a = 2 * Math.PI * t - Math.PI / 2;
@@ -1629,7 +1625,7 @@ function sectorPath(c: number, r: number, t: number): string {
   return `M ${c} ${c} L ${c} ${c - r} A ${r} ${r} 0 ${t > 0.5 ? 1 : 0} 1 ${x} ${y} Z`;
 }
 
-function FracPie({ parts, value, bg = "var(--raised)", appear = false, className }: { parts: number; value: number; bg?: string; appear?: boolean; className?: string }) {
+export function FracPie({ parts, value, bg = "var(--raised)", appear = false, className }: { parts: number; value: number; bg?: string; appear?: boolean; className?: string }) {
   const t = usePick();
   const C = 100;
   const R = 92;
@@ -1684,7 +1680,7 @@ function FractionPicture({ n, d, shape }: { n: number; d: number; shape: "bar" |
 // ---------------------------------------------------------------------------
 // Small controls
 
-function Segmented<T extends string>({ options, value, onChange, scope }: { options: [T, string][]; value: T; onChange: (v: T) => void; scope: string }) {
+export function Segmented<T extends string>({ options, value, onChange, scope }: { options: [T, string][]; value: T; onChange: (v: T) => void; scope: string }) {
   return (
     <div className="flex rounded-lg border border-line p-0.5">
       {options.map(([v, label]) => (
@@ -1702,7 +1698,7 @@ function Segmented<T extends string>({ options, value, onChange, scope }: { opti
   );
 }
 
-function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+export function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
   const t = usePick();
   return (
     <div className="flex items-center gap-1.5">
@@ -1732,7 +1728,7 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
   );
 }
 
-function Chip({ children, onClick, disabled, title }: { children: ReactNode; onClick: () => void; disabled?: boolean; title?: string }) {
+export function Chip({ children, onClick, disabled, title }: { children: ReactNode; onClick: () => void; disabled?: boolean; title?: string }) {
   return (
     <motion.button
       type="button"
@@ -1888,7 +1884,7 @@ const PAIRS: [number, number, number, number][] = [
   [4, 9, 1, 3],
 ];
 
-const PIECES: Record<number, [string, string]> = {
+export const PIECES: Record<number, [string, string]> = {
   2: ["halves", "Halbe"],
   3: ["thirds", "Drittel"],
   4: ["quarters", "Viertel"],
@@ -1901,7 +1897,7 @@ const PIECES: Record<number, [string, string]> = {
   20: ["twentieths", "Zwanzigstel"],
   24: ["twenty-fourths", "Vierundzwanzigstel"],
 };
-const pieces = (d: number, de: boolean) => PIECES[d]?.[de ? 1 : 0] ?? (de ? `${d}-tel` : `parts of ${d}`);
+export const pieces = (d: number, de: boolean) => PIECES[d]?.[de ? 1 : 0] ?? (de ? `${d}-tel` : `parts of ${d}`);
 
 function CommonDenominator() {
   const de = useLocale() === "de";
@@ -2061,7 +2057,7 @@ function CommonDenominator() {
   );
 }
 
-function BarRow({ label, scope, children }: { label: string; scope: string; children: ReactNode }) {
+export function BarRow({ label, scope, children }: { label: string; scope: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-4">
       <div className="grid w-14 shrink-0 place-items-center">
@@ -2208,8 +2204,7 @@ ofSteps(checkOf, 3, 7, 28, STUDENTS);
 
 // ---------------------------------------------------------------------------
 
-const fractions: Topic = {
-  ...topicMeta("fractions"),
+export const level1: LevelLesson = {
   summary: [
     {
       title: tx("Expand and simplify", "Erweitern und kürzen"),
@@ -2406,7 +2401,4 @@ const fractions: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default fractions;

@@ -3,18 +3,19 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Eraser, Minus, Plus, RotateCcw, Shuffle, Wand2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-import { Blob, type BlobMood } from "@/components/blob/Blob";
-import { resolveText, tx, txMap, type Text } from "@/i18n/text";
+import type { BlobMood } from "@/components/blob/Blob";
+import { resolveText, tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { SolutionPlayer } from "@/learn/components/SolutionPlayer";
-import { topicMeta } from "@/learn/catalog";
-import { check } from "@/learn/engine/answers";
 import { evaluate, parse } from "@/learn/engine/expr";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { both, D, de, deList, E, joinT, NAMES, names, say, wrong, wrongNumbers, type Wrong } from "./kit";
+import { termTask } from "./terms";
+import { BlobSays, spring } from "./ui";
 
 // ---------------------------------------------------------------------------
 // Linear equations as lists of terms with stable token keys, so every balance
@@ -31,11 +32,6 @@ const isBr = (p: Part): p is Br => "items" in p;
 const X = (id: string, c = 1, d?: number): Tm => ({ id, c, x: true, d });
 const K = (id: string, c: number): Tm => ({ id, c });
 const B = (id: string, f: number, items: Tm[]): Br => ({ id, f, items });
-
-/** German number style: decimal comma. */
-function de(v: number): string {
-  return String(Math.round(v * 1000) / 1000).replace(".", ",");
-}
 
 function tmSrc(t: Tm, first: boolean, keys = true): string {
   const k = (name: string) => (keys ? `#${name}` : "");
@@ -136,38 +132,7 @@ function combineNote(s: Tm[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Bilingual text helpers
-
-/** Join note parts with spaces, in both languages; empty parts are dropped. */
-function joinT(...parts: Text[]): Text {
-  if (parts.every((p): p is string => typeof p === "string")) return parts.filter(Boolean).join(" ");
-  return txMap((_, l) => parts.map((p) => resolveText(p, l)).filter(Boolean).join(" "));
-}
-
-const E = (t: Text) => resolveText(t, "en");
-const D = (t: Text) => resolveText(t, "de");
-
-/** German genitive of a name: "Lenas", "Jonas’", "Moritz’". */
-const deGen = (name: string) => (/[sßxz]$/.test(name) ? `${name}’` : `${name}s`);
-
-/**
- * A sentence with names (or other bilingual parts) in both languages. The builder gets
- * N (a part in the current language) and G (its German genitive) and returns [English, German]:
- * say((N, G) => [`Let $x$ be ${N(a)}'s age.`, `Sei $x$ ${G(a)} Alter.`]).
- */
-function say(build: (N: (p: Text) => string, G: (p: Text) => string) => [string, string]): Text {
-  return txMap((_, l) => {
-    const N = (p: Text) => resolveText(p, l);
-    const [en, deText] = build(N, (p) => deGen(N(p)));
-    return l === "en" ? en : deText;
-  });
-}
-
-/** The same display-language source in both languages, only the names differ. */
-function both(build: (N: (p: Text) => string) => string): Text {
-  const t = txMap((_, l) => build((p) => resolveText(p, l)));
-  return typeof t !== "string" && t.en === t.de ? t.en : t;
-}
+// Answer sentences
 
 /** "Let $x$ be …" / "Sei $x$ …" */
 const letX = (meaning: Text): Text => say((N) => [`Let $x$ be ${N(meaning)}.`, `Sei $x$ ${N(meaning)}.`]);
@@ -177,9 +142,6 @@ const answerCheck = (sentence: Text, check: string): Text => say((N) => [`**Answ
 
 /** "**Answer:** The number is 7. Check: $…$." */
 const numberAnswer = (x: number, check: string) => answerCheck(tx(`The number is ${x}.`, `Die Zahl ist ${x}.`), check);
-
-/** "18, 19 und 20" */
-const deList = (items: (string | number)[]) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} und ${items[items.length - 1]}`);
 
 // ---------------------------------------------------------------------------
 // Solving
@@ -300,32 +262,6 @@ export function solveFrames(start: Eq, startNote: Text, before: Frame[] = []): {
 // added to one person only, consecutive numbers as x, 2x, 3x…), a balance step done
 // wrongly, or x given although another quantity was asked.
 
-type Wrong = { v: number; title: Text; say: Text; signed?: boolean } | false;
-
-const wrong = (v: number, title: Text, say: Text, signed = false): Wrong => ({ v, title, say, signed });
-
-/**
- * Simulated wrong results → Exercise.mistakes. Only values the checker rejects (and,
- * unless `signed`, positive ones), no duplicates: the first explanation wins. Results
- * like 10,333… get typed rounded, so those accept a small window around them.
- */
-function wrongNumbers(answer: AnswerSpec, list: Wrong[]): Mistake[] {
-  if (answer.kind !== "number") return [];
-  const out: Mistake[] = [];
-  for (const w of list) {
-    if (!w || !Number.isFinite(w.v) || (!w.signed && w.v <= 0)) continue;
-    const value = Math.round(w.v * 1000) / 1000;
-    const exact = Math.abs(w.v * 100 - Math.round(w.v * 100)) < 1e-6;
-    const window = exact ? 0 : Math.min(0.051, 0.05 * Math.abs(value) + 0.0005);
-    if (Math.abs(value - answer.value) <= Math.max(1e-6, 3 * window)) continue;
-    if (check(answer, { kind: "text", text: String(value) }).correct) continue;
-    if (out.some((m) => m.when.kind === "number" && Math.abs(m.when.value - value) < 1e-6)) continue;
-    const when: AnswerSpec = { kind: "number", value, unit: answer.unit, ...(window ? { tolerance: window / Math.max(1, Math.abs(value)) } : {}) };
-    out.push({ when, title: w.title, say: w.say });
-  }
-  return out;
-}
-
 /** A wrong option of "Which equation fits?", with what Blob says when it's picked. */
 type WrongEq = { eq: Eq; title: Text; say: Text };
 const opt = (eq: Eq, title: Text, say: Text): WrongEq => ({ eq, title, say });
@@ -440,18 +376,6 @@ function choiceOf(s: Story, wrongs: WrongEq[], rng: Rng): Exercise {
     ),
     solution: frames,
   };
-}
-
-// The German stories use their own (equally typical) names, picked with the same random draw.
-const NAMES_EN = ["Mia", "Leon", "Emma", "Noah", "Lina", "Elias", "Hannah", "Paul", "Sophie", "Ben", "Finn", "Lea", "Jonas", "Amira", "Can", "Zeynep", "Luca", "Ida", "Mats", "Aylin", "Nele", "Yusuf", "Clara", "Theo", "Omar", "Jana"];
-const NAMES_DE = ["Marie", "Lukas", "Emilia", "Felix", "Luisa", "Jakob", "Johanna", "Moritz", "Charlotte", "Henri", "Anton", "Frieda", "Niklas", "Elif", "Emre", "Leyla", "Luis", "Greta", "Ole", "Selin", "Merle", "Mehmet", "Lotta", "Karl", "Samir", "Pia"];
-const SHORT_EN = ["Ida", "Ben", "Can", "Mia", "Tim", "Lea", "Ali", "Finn", "Nele", "Emma", "Paul", "Noah", "Lina", "Jana", "Omar", "Max", "Ella", "Jan"];
-const SHORT_DE = ["Pia", "Tom", "Ole", "Lia", "Kai", "Mara", "Elif", "Lars", "Ina", "Lotte", "Nils", "Jule", "Rosa", "Till", "Eda", "Leni", "Anna", "Malte"];
-const NAMES: Text[] = NAMES_EN.map((n, i) => tx(n, NAMES_DE[i]));
-const SHORT: Text[] = SHORT_EN.map((n, i) => tx(n, SHORT_DE[i]));
-
-function names(rng: Rng, n: number, list = SHORT): Text[] {
-  return rng.shuffle(list).slice(0, n);
 }
 
 const PART: Record<"en" | "de", Record<number, [string, string]>> = {
@@ -2181,8 +2105,12 @@ function bothSides(rng: Rng): Exercise {
   });
 }
 
-const LEVELS: Record<Level, ((rng: Rng) => Exercise)[]> = {
-  1: [
+/**
+ * The practice of the lesson written before levels, in its three difficulty tiers: one step;
+ * two steps, consecutive numbers and perimeters; ages, shares and brackets.
+ */
+const TIERS: ((rng: Rng) => Exercise)[][] = [
+  [
     (r) => riddleAdd(r),
     (r) => riddleSub(r),
     (r) => riddleMul(r),
@@ -2192,7 +2120,7 @@ const LEVELS: Record<Level, ((rng: Rng) => Exercise)[]> = {
     contextMul,
     (r) => r.pick([riddleAdd, riddleSub, riddleMul, riddleDiv])(r, true),
   ],
-  2: [
+  [
     (r) => riddle2(r),
     riddleFrac2,
     (r) => consecutive(r),
@@ -2203,7 +2131,7 @@ const LEVELS: Record<Level, ((rng: Rng) => Exercise)[]> = {
     rectangleTimes,
     (r) => r.pick([riddle2, consecutive, sumAges])(r, true),
   ],
-  3: [
+  [
     (r) => ageFuture(r),
     ageDiff,
     share,
@@ -2213,11 +2141,16 @@ const LEVELS: Record<Level, ((rng: Rng) => Exercise)[]> = {
     (r) => r.pick([ageFuture, tickets, riddleBrackets])(r, true),
     share,
   ],
-};
+];
 
-function generate(level: Level, rng: Rng): Exercise {
+/**
+ * Level 1 practice: mostly one- and two-step stories, some ages, shares and brackets (the lesson
+ * teaches them too), and "Write as a term" for the translating part.
+ */
+export function generate1(rng: Rng): Exercise {
   for (let tries = 0; tries < 20; tries++) {
-    const ex = rng.pick(LEVELS[level])(rng);
+    const r = rng.next();
+    const ex = r < 0.16 ? termTask(rng) : rng.pick(TIERS[r < 0.46 ? 0 : r < 0.8 ? 1 : 2])(rng);
     if (ex.answer.kind === "choice" && ex.answer.options.length < 3) continue;
     if (ex.answer.kind === "number" && !(Number.isInteger(ex.answer.value) && ex.answer.value > 0)) continue;
     return ex;
@@ -2333,8 +2266,6 @@ const PHRASES: Phrase[] = [
     ),
   },
 ];
-
-const spring = { type: "spring" as const, stiffness: 420, damping: 32 };
 
 function Badge({ n, on }: { n: number; on?: boolean }) {
   return (
@@ -2593,30 +2524,6 @@ function judge(c: BuildCase, line: BuildChip[]): Verdict {
   return { ok: false, msg: c.hint };
 }
 
-function BlobSays({ text, mood }: { text: Text; mood: BlobMood }) {
-  const line = useText()(text);
-  return (
-    <div className="flex items-end gap-2.5">
-      <div className="shrink-0">
-        <Blob size={52} mood={mood} track={false} accessory="glasses" interactive={false} />
-      </div>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={line}
-          initial={{ opacity: 0, y: 6, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
-          transition={spring}
-          style={{ transformOrigin: "bottom left" }}
-          className="mb-2 rounded-2xl rounded-bl-md border border-line bg-raised px-3.5 py-2 text-[14px] leading-snug text-ink shadow-card"
-        >
-          <Inline text={line} />
-        </motion.div>
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function EquationBuilder() {
   const [n, setN] = useState(0);
   return <BuildRound key={n} c={BUILD[n % BUILD.length]} index={n % BUILD.length} onNext={() => setN((v) => v + 1)} />;
@@ -2842,8 +2749,8 @@ const ageFrames = (() => {
   return frames;
 })();
 
-const unknowns: Topic = {
-  ...topicMeta("unknowns"),
+/** Level 1: one unknown. Name it, translate the story into an equation, solve it, answer and check. */
+export const level1: LevelLesson = {
   summary: [
     {
       title: tx("Name the unknown", "Die Unbekannte benennen"),
@@ -3036,7 +2943,4 @@ const unknowns: Topic = {
       exercise: story(ageFutureStory("Tim", DAD, 4, 3, 5)),
     },
   ],
-  generate,
 };
-
-export default unknowns;

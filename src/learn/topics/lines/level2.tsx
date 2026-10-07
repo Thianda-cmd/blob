@@ -7,11 +7,10 @@ import { useLocale } from "@/i18n/client";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
-import { topicMeta } from "@/learn/catalog";
 import { check, type AnswerValue } from "@/learn/engine/answers";
 import { add, div, eq, frac, mul, neg, show, sub, type Frac } from "@/learn/engine/frac";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { Graph, type GraphProps } from "@/learn/visuals/Graph";
 import { alongLine, crossing, Plane, PlaneDot, PlaneHandle, PlaneLine, PlanePath, PlaneTag, planeGeo, StepSlider, TONE, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
@@ -141,7 +140,7 @@ export const joinT = (...parts: Text[]): Text => txMap((_, l) => parts.map((p) =
 // Worked-solution builders
 
 /** Solve L = m·x + b for x. */
-function solveFrames(L: Frac, m: Frac, b: Frac, first: Text, last: (x: Frac) => Text): Frame[] {
+export function solveFrames(L: Frac, m: Frac, b: Frac, first: Text, last: (x: Frac) => Text): Frame[] {
   const R = sub(L, b);
   const X = div(R, m);
   const one = m.n === 1 && m.d === 1;
@@ -169,7 +168,7 @@ function solveFrames(L: Frac, m: Frac, b: Frac, first: Text, last: (x: Frac) => 
 }
 
 /** Find b from the slope and one point P on the line. */
-function findBFrames(m: Frac, P: Pt, name: string, first: Text): Frame[] {
+export function findBFrames(m: Frac, P: Pt, name: string, first: Text): Frame[] {
   const [px, py] = P;
   const prod = mul(m, q(px));
   const b = sub(q(py), prod);
@@ -195,7 +194,7 @@ function findBFrames(m: Frac, P: Pt, name: string, first: Text): Frame[] {
 }
 
 /** m = (y₂ − y₁) : (x₂ − x₁); the numbers drop into the formula, then simplify. */
-function slopeFrames(A: Pt, B: Pt, first: Text): { frames: Frame[]; m: Frac } {
+export function slopeFrames(A: Pt, B: Pt, first: Text): { frames: Frame[]; m: Frac } {
   const dy = B[1] - A[1];
   const dx = B[0] - A[0];
   const m = q(dy, dx);
@@ -1288,27 +1287,29 @@ function throughPointTask(rng: Rng, perp: boolean): Exercise {
   }
 }
 
-function generate(level: Level, rng: Rng): Exercise {
-  if (level === 1) {
-    const r = rng.next();
-    if (r < 0.35) return readEquation(rng);
-    if (r < 0.6) return graphTask(rng, false);
-    if (r < 0.85) return valueAt(rng);
-    return whichGraph(rng);
-  }
-  if (level === 2) {
-    const r = rng.next();
-    if (r < 0.25) return slopeTask(rng);
-    if (r < 0.5) return slopePointTask(rng);
-    if (r < 0.62) return pointTest(rng);
-    if (r < 0.75) return missingX(rng);
-    return zeroTask(rng, false);
-  }
+/**
+ * Level 2 practice: the three difficulty tiers of the old one-lesson topic, mixed. Mostly the
+ * standard tasks (slope, line through a point, point test, zero) and the harder ones (line
+ * through two points, parallel and perpendicular, the equation of a graph), a few warm-ups.
+ */
+export function generate2(rng: Rng): Exercise {
   const r = rng.next();
-  if (r < 0.3) return twoPointsTask(rng);
-  if (r < 0.45) return throughPointTask(rng, false);
-  if (r < 0.65) return throughPointTask(rng, true);
-  if (r < 0.8) return zeroTask(rng, true);
+  // Warm-ups: read m and b, work out a point
+  if (r < 0.04) return readEquation(rng);
+  if (r < 0.08) return graphTask(rng, false);
+  if (r < 0.12) return whichGraph(rng);
+  if (r < 0.15) return valueAt(rng);
+  // Standard
+  if (r < 0.27) return slopeTask(rng);
+  if (r < 0.39) return slopePointTask(rng);
+  if (r < 0.47) return pointTest(rng);
+  if (r < 0.55) return missingX(rng);
+  if (r < 0.64) return zeroTask(rng, false);
+  // Harder
+  if (r < 0.76) return twoPointsTask(rng);
+  if (r < 0.82) return throughPointTask(rng, false);
+  if (r < 0.89) return throughPointTask(rng, true);
+  if (r < 0.94) return zeroTask(rng, true);
   return graphTask(rng, true);
 }
 
@@ -1316,13 +1317,13 @@ function generate(level: Level, rng: Rng): Exercise {
 // Widgets
 
 const M_STEPS: Frac[] = [q(-3), q(-2), q(-3, 2), q(-1), q(-2, 3), q(-1, 2), q(-1, 3), q(0), q(1, 3), q(1, 2), q(2, 3), q(1), q(3, 2), q(2), q(3)];
-const TRI_FILL = "color-mix(in oklab, var(--blob) 15%, transparent)";
+export const TRI_FILL = "color-mix(in oklab, var(--blob) 15%, transparent)";
 
-function Caption({ children }: { children: ReactNode }) {
+export function Caption({ children }: { children: ReactNode }) {
   return <span className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{children}</span>;
 }
 
-function Tag({ src, tone = "blob" }: { src: string; tone?: "blob" | "ink" }) {
+export function Tag({ src, tone = "blob" }: { src: string; tone?: "blob" | "ink" }) {
   return (
     <span className={tone === "blob" ? "text-blob-ink" : "text-ink"}>
       <MathView src={src} size="inline" animate={false} />
@@ -1824,8 +1825,8 @@ const lessonTest: Frame[] = [
   ),
 ];
 
-const lines: Topic = {
-  ...topicMeta("lines"),
+/** Level 2 (Klasse 8): slope, y-intercept and the line through two points. */
+export const level2: LevelLesson = {
   summary: [
     {
       title: tx("The line equation", "Die Geradengleichung"),
@@ -2042,7 +2043,4 @@ const lines: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default lines;

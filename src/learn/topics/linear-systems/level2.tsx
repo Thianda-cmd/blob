@@ -7,10 +7,9 @@ import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
-import { topicMeta } from "@/learn/catalog";
 import { add, div, mul, sub, type Frac } from "@/learn/engine/frac";
 import { gcd, lcm, type Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { alongLine, crossing, Plane, PlaneDot, PlaneLine, PlanePath, PlaneTag, planeGeo, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
 import { graphVisual, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap, type Msg } from "../lines/level2";
@@ -22,18 +21,18 @@ import { cos, sin } from "@/lib/stableMath";
 // "2c", "e2". So when II is multiplied, numbers change in place, and when the
 // equations are added, every term glides into the sum.
 
-type V = "x" | "y";
+export type V = "x" | "y";
 /** Standard form: x·x + y·y = c. */
-type Std = { x: number; y: number; c: number };
+export type Std = { x: number; y: number; c: number };
 /** Solved form: v = m·(other) + n. */
-type Solved = { v: V; m: number; n: number };
+export type Solved = { v: V; m: number; n: number };
 
-const other = (v: V): V => (v === "x" ? "y" : "x");
+export const other = (v: V): V => (v === "x" ? "y" : "x");
 
 /** Display source of a frame (the keys are the same in both languages). */
-const srcOf = (t: Text) => (typeof t === "string" ? t : t.en);
+export const srcOf = (t: Text) => (typeof t === "string" ? t : t.en);
 /** Sentences joined with a space; empty parts are skipped. */
-const joinText = (...parts: (Text | undefined)[]): Text =>
+export const joinText = (...parts: (Text | undefined)[]): Text =>
   txMap((_, locale) =>
     parts
       .map((p) => resolveText(p, locale))
@@ -43,16 +42,16 @@ const joinText = (...parts: (Text | undefined)[]): Text =>
 const VARS: V[] = ["x", "y"];
 
 /** Write "y − 2x" rather than "−2x + y", so an equation doesn't start with a minus. */
-const yFirst = (e: Std) => e.x < 0 && e.y > 0;
+export const yFirst = (e: Std) => e.x < 0 && e.y > 0;
 
-function stdSrc(e: Std, id: string): string {
+export function stdSrc(e: Std, id: string): string {
   const xs: [number, string, string] = [e.x, "x", `${id}x`];
   const ys: [number, string, string] = [e.y, "y", `${id}y`];
   return `${side(yFirst(e) ? [ys, xs] : [xs, ys])} =#e${id} ${val(e.c, `${id}c`)}`;
 }
 
 /** Both coefficients negative? Flip the whole equation, it reads nicer. */
-const tidy = (e: Std): Std => (e.x < 0 && e.y < 0 ? { x: -e.x, y: -e.y, c: -e.c } : e);
+export const tidy = (e: Std): Std => (e.x < 0 && e.y < 0 ? { x: -e.x, y: -e.y, c: -e.c } : e);
 
 function rhsSrc(e: Solved, id: string): string {
   return side([
@@ -61,7 +60,7 @@ function rhsSrc(e: Solved, id: string): string {
   ]);
 }
 
-function solvedSrc(e: Solved, id: string): string {
+export function solvedSrc(e: Solved, id: string): string {
   return `${e.v}#w${id} =#e${id} ${rhsSrc(e, id)}`;
 }
 
@@ -69,15 +68,15 @@ function solvedSrc(e: Solved, id: string): string {
  * Both equations, labelled (I) and (II). Each one is a style group so it never
  * breaks in the middle: when space is short, (II) moves below (I) as a whole.
  */
-function sysSrc(a: string, b: string, la = "(I)", lb = "(II)", tone: [string, string] = ["blob", "blob"]): string {
+export function sysSrc(a: string, b: string, la = "(I)", lb = "(II)", tone: [string, string] = ["blob", "blob"]): string {
   return `\\${tone[0]}{"${la}"#L1 ${a}}#G1 \\quad \\${tone[1]}{"${lb}"#L2 ${b}}#G2`;
 }
 
 /** The solution set L = {(x | y)}. */
-const resultSrc = (x: number, y: number) => `L#Lr =#Er "{"#Lo (${val(x, "rx")} \\, |#rb${y < 0 ? "" : " \\,"} ${val(y, "ry")})#rp "}"#Lc`;
+export const resultSrc = (x: number, y: number) => `L#Lr =#Er "{"#Lo (${val(x, "rx")} \\, |#rb${y < 0 ? "" : " \\,"} ${val(y, "ry")})#rp "}"#Lc`;
 
 /** c·value as a term of a sum, e.g. "− 3 · (−2)". The coefficient keeps the term's keys. */
-function prodTerm(c: number, value: number, id: string, first: boolean): string {
+export function prodTerm(c: number, value: number, id: string, first: boolean): string {
   const sign = c < 0 ? `-#s${id} ` : first ? "" : `+#s${id} `;
   const a = Math.abs(c);
   // Negative numbers go in brackets when they're put in for a variable.
@@ -86,7 +85,7 @@ function prodTerm(c: number, value: number, id: string, first: boolean): string 
 }
 
 const scale = (e: Std, k: number): Std => ({ x: e.x * k, y: e.y * k, c: e.c * k });
-const holds = (e: Std, x: number, y: number) => e.x * x + e.y * y === e.c;
+export const holds = (e: Std, x: number, y: number) => e.x * x + e.y * y === e.c;
 
 function checkNote(e: Std, x: number, y: number, name: string): Text {
   const calc = `$${plain(`${prodTerm(e.x, x, "a", true)} ${prodTerm(e.y, y, "b", false)}`)} = ${e.c}$`;
@@ -147,7 +146,7 @@ const NONE_NOTE = tx("**No solution**: the lines are parallel and never meet.", 
 const MANY_NOTE = tx("**Infinitely many** solutions: both equations describe the same line.", "**Unendlich viele** Lösungen: Beide Gleichungen beschreiben dieselbe Gerade.");
 
 /** Einsetzungsverfahren: I is solved for a variable, put it into II. */
-function substitution(s: Solved, e: Std, sol: [number, number] | null): Frame[] {
+export function substitution(s: Solved, e: Std, sol: [number, number] | null): Frame[] {
   const sv = s.v;
   const ov = other(sv);
   const qs = e[sv];
@@ -378,14 +377,14 @@ function elimination(e1: Std, e2: Std, sol: [number, number] | null, lead?: Text
 // made at the step where students make it, and the rest is worked out the way they would.
 
 type Collector = ReturnType<typeof mistakeList>;
-type Choice = Extract<AnswerSpec, { kind: "choice" }>;
+export type Choice = Extract<AnswerSpec, { kind: "choice" }>;
 
 const XY: [string, string] = ["x", "y"];
-const xyWhen = (x: number, y: number): AnswerSpec => ({ kind: "pair", names: XY, values: [x, y] });
+export const xyWhen = (x: number, y: number): AnswerSpec => ({ kind: "pair", names: XY, values: [x, y] });
 /** The pair (x | y) when the variable v has the value a and the other one has b. */
 const xyOf = (v: V, a: number, b: number): AnswerSpec => (v === "x" ? xyWhen(a, b) : xyWhen(b, a));
 /** "3x", "-y" for messages. */
-const termOf = (c: number, v: string) => plain(term(c, v, "t", true));
+export const termOf = (c: number, v: string) => plain(term(c, v, "t", true));
 const wrapNum = (n: number) => (n < 0 ? `(${n})` : `${n}`);
 
 const SIGN_FLIP: Text = tx("Sign flip missing", "Vorzeichenwechsel vergessen");
@@ -425,7 +424,7 @@ function addBackSign(mk: Collector, v: V, m: number, n: number, known: number, n
 }
 
 /** Einsetzungsverfahren: (I) v = m·o + n put into (II). */
-function substitutionMistakes(s: Solved, e: Std): Mistake[] {
+export function substitutionMistakes(s: Solved, e: Std): Mistake[] {
   const sv = s.v;
   const ov = other(sv);
   const qs = e[sv];
@@ -599,7 +598,7 @@ function eliminationMistakes(e1: Std, e2: Std, first: [AnswerSpec, Msg][] = []):
 }
 
 /** Reading the solution off a graph: a point on just one of the lines instead of the crossing. */
-function graphSystemMistakes(x: number, y: number, lines: [number, number][]): Mistake[] {
+export function graphSystemMistakes(x: number, y: number, lines: [number, number][]): Mistake[] {
   const mk = mistakeList(xyWhen(x, y));
   const names = ["I", "II"];
   lines.forEach(([, n], i) =>
@@ -629,7 +628,7 @@ function graphSystemMistakes(x: number, y: number, lines: [number, number][]): M
 }
 
 /** Does (p0 | p1) solve (I), (II)? Options: both, only (I), only (II), neither. */
-function checkPairMistakes(e1: Std, e2: Std, p: Pt, answer: Choice): Mistake[] {
+export function checkPairMistakes(e1: Std, e2: Std, p: Pt, answer: Choice): Mistake[] {
   const eqs = [e1, e2];
   const names = ["(I)", "(II)"];
   const ok = eqs.map((e) => holds(e, p[0], p[1]));
@@ -742,8 +741,8 @@ function specialMistakes(answer: Choice, notOne: Msg, one: Msg): Mistake[] {
 // ---------------------------------------------------------------------------
 // Exercise generator: always designed backwards from a whole-number solution.
 
-const sysMath = (a: string, b: string) => plain(sysSrc(a, b));
-const pairAnswer = (x: number, y: number) => ({ kind: "pair" as const, names: ["x", "y"] as [string, string], values: [x, y] as [number, number] });
+export const sysMath = (a: string, b: string) => plain(sysSrc(a, b));
+export const pairAnswer = (x: number, y: number) => ({ kind: "pair" as const, names: ["x", "y"] as [string, string], values: [x, y] as [number, number] });
 
 function pickSol(rng: Rng): [number, number] {
   for (;;) {
@@ -760,7 +759,7 @@ function stdThrough(rng: Rng, x: number, y: number, max = 5): Std {
   return tidy({ x: a, y: b, c: a * x + b * y });
 }
 
-const det = (e1: Std, e2: Std) => e1.x * e2.y - e1.y * e2.x;
+export const det = (e1: Std, e2: Std) => e1.x * e2.y - e1.y * e2.x;
 const HINT_SUB = (v: V) =>
   tx(
     `Equation (I) says what $${v}$ is. Put that expression, in brackets, in place of $${v}$ in (II). Then solve for the other variable.`,
@@ -779,7 +778,7 @@ const SOLVE_SUB = tx("Solve by substitution", "Löse mit dem Einsetzungsverfahre
 const SOLVE_EQ = tx("Solve by equalization", "Löse mit dem Gleichsetzungsverfahren");
 const SOLVE_ELIM = tx("Solve by elimination", "Löse mit dem Additionsverfahren");
 
-/** L1: one equation is already solved for a variable. */
+/** Basics: one equation is already solved for a variable. */
 function substitutionTask(rng: Rng): Exercise {
   for (;;) {
     const [x, y] = pickSol(rng);
@@ -807,7 +806,7 @@ function substitutionTask(rng: Rng): Exercise {
   }
 }
 
-/** L1: does a given pair solve the system? */
+/** Basics: does a given pair solve the system? */
 function checkPairTask(rng: Rng): Exercise {
   for (;;) {
     const [x, y] = pickSol(rng);
@@ -867,7 +866,7 @@ function checkPairTask(rng: Rng): Exercise {
   }
 }
 
-/** L1: read the solution off a graph. */
+/** Basics: read the solution off a graph. */
 function graphTask(rng: Rng): Exercise {
   for (;;) {
     const x = rng.int(-4, 4);
@@ -915,7 +914,7 @@ function graphTask(rng: Rng): Exercise {
   }
 }
 
-/** L2: both solved for the same variable. */
+/** Standard: both solved for the same variable. */
 function equalizationTask(rng: Rng): Exercise {
   for (;;) {
     const [x, y] = pickSol(rng);
@@ -941,7 +940,7 @@ function equalizationTask(rng: Rng): Exercise {
   }
 }
 
-/** L2: elimination where the coefficients already match. */
+/** Standard: elimination where the coefficients already match. */
 function matchingTask(rng: Rng): Exercise {
   for (;;) {
     const [x, y] = pickSol(rng);
@@ -980,7 +979,7 @@ function matchingTask(rng: Rng): Exercise {
   }
 }
 
-/** L3: elimination that needs one or both equations multiplied first. */
+/** Harder: elimination that needs one or both equations multiplied first. */
 function multiplyTask(rng: Rng): Exercise {
   const both = rng.chance(0.4);
   for (;;) {
@@ -1003,7 +1002,7 @@ function multiplyTask(rng: Rng): Exercise {
   }
 }
 
-/** L3: a short word problem. */
+/** Harder: a short word problem. */
 function wordTask(rng: Rng): Exercise {
   const kind = rng.pick(["tickets", "animals", "numbers", "cafe"] as const);
   for (;;) {
@@ -1104,7 +1103,7 @@ const COUNT_OPTIONS = [
 const HOW_MANY = tx("How many solutions?", "Wie viele Lösungen?");
 const HOW_MANY_TEXT = tx("How many solutions does the system have?", "Wie viele Lösungen hat das Gleichungssystem?");
 
-/** L3: one, none or infinitely many solutions? */
+/** Harder: one, none or infinitely many solutions? */
 function specialTask(rng: Rng): Exercise {
   const outcome = rng.pick(["none", "none", "many", "many", "one"] as const);
   const variant = rng.pick(outcome === "many" ? (["mixed", "std"] as const) : (["mixed", "std", "solved"] as const));
@@ -1193,17 +1192,19 @@ function specialTask(rng: Rng): Exercise {
   }
 }
 
-function generate(level: Level, rng: Rng): Exercise {
-  if (level === 1) {
-    const r = rng.next();
-    if (r < 0.65) return substitutionTask(rng);
-    if (r < 0.85) return checkPairTask(rng);
-    return graphTask(rng);
-  }
-  if (level === 2) return rng.chance(0.45) ? equalizationTask(rng) : matchingTask(rng);
+/**
+ * Level 2 practice: the methods (substitution, equalization, elimination, multiplying first), word
+ * problems and special cases, with a few warm-ups from the basics (checking a pair, reading a graph).
+ */
+export function generate2(rng: Rng): Exercise {
   const r = rng.next();
-  if (r < 0.45) return multiplyTask(rng);
-  if (r < 0.72) return wordTask(rng);
+  if (r < 0.06) return checkPairTask(rng);
+  if (r < 0.12) return graphTask(rng);
+  if (r < 0.28) return substitutionTask(rng);
+  if (r < 0.44) return equalizationTask(rng);
+  if (r < 0.6) return matchingTask(rng);
+  if (r < 0.78) return multiplyTask(rng);
+  if (r < 0.89) return wordTask(rng);
   return specialTask(rng);
 }
 
@@ -1437,8 +1438,8 @@ specialFrames[parallelEnd + 1] = {
   note: tx("Second system. Equation (I) is solved for $y$, so substitute.", "Zweites LGS: Gleichung (I) ist nach $y$ aufgelöst, also setzt du ein."),
 };
 
-const linearSystems: Topic = {
-  ...topicMeta("linear-systems"),
+/** Level 2: the three methods (Gleichsetzungs-, Einsetzungs- and Additionsverfahren) and the special cases. */
+export const level2: LevelLesson = {
   summary: [
     {
       title: tx("What a solution is", "Was eine Lösung ist"),
@@ -1621,7 +1622,4 @@ const linearSystems: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default linearSystems;

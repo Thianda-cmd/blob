@@ -6,11 +6,10 @@ import { useId, useState } from "react";
 import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
-import { topicMeta } from "@/learn/catalog";
 import type { Rng } from "@/learn/engine/rng";
 import { showTerms, type Term } from "@/learn/engine/terms";
 import { equivalentText } from "@/learn/engine/expr";
-import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 
 // ---------------------------------------------------------------------------
 // A small model of sums with brackets, rendered with stable token keys so each
@@ -268,7 +267,7 @@ function exercise(items: Item[], hint: Text): Exercise {
   };
 }
 
-function level1(rng: Rng): Exercise {
+function tier1(rng: Rng): Exercise {
   const v = rng.pick(LETTERS);
   const sign: 1 | -1 = rng.chance(0.7) ? -1 : 1;
   const a = rng.int(2, 9);
@@ -286,7 +285,7 @@ function level1(rng: Rng): Exercise {
   return exercise(items, hint);
 }
 
-function level2(rng: Rng): Exercise {
+function tier2(rng: Rng): Exercise {
   const v = rng.pick(LETTERS);
   const shape = rng.int(0, 2);
   let items: Item[];
@@ -300,7 +299,7 @@ function level2(rng: Rng): Exercise {
   return exercise(items, tx("Take one bracket at a time and look at the sign right in front of it.", "Nimm dir eine Klammer nach der anderen vor und schau auf das Zeichen direkt davor."));
 }
 
-function level3(rng: Rng): Exercise {
+function tier3(rng: Rng): Exercise {
   if (rng.chance(0.6)) {
     // nested: k ± [a·v − (b ± c·v)]
     const v = rng.pick(LETTERS);
@@ -330,14 +329,242 @@ function level3(rng: Rng): Exercise {
   return exercise(items, tx(`Only like terms go together: ${p}-terms with ${p}-terms, ${q}-terms with ${q}-terms.`, `Nur gleichartige Terme gehören zusammen: ${p}-Terme zu ${p}-Termen, ${q}-Terme zu ${q}-Termen.`));
 }
 
-function generate(level: Level, rng: Rng): Exercise {
+// ---------------------------------------------------------------------------
+// More task shapes for level 1: pick the right result, find the mistake, find the bracket.
+
+const NAMES = ["Tom", "Lea", "Mia", "Ben", "Emma", "Paul", "Finn", "Lena", "Noah", "Anna", "Jonas", "Elif"];
+
+/** Compact text for the answer checker ("4x+5"). */
+const compact = (items: Item[]) => plain(items).replace(/\s+/g, "") || "0";
+
+/** A lead term (a·v or a number) and one bracket with two terms: 7x − (3x − 5), 12 + (5 − x). */
+function oneBracket(rng: Rng, sign: 1 | -1): Item[] {
+  const v = rng.pick(LETTERS);
+  const lead = rng.chance(0.65) ? term("a", rng.int(2, 9), v) : term("a", rng.int(5, 20));
+  const b = rng.int(1, 9);
+  const inner = rng.chance(0.7) ? [term("b", b, v), term("c", coef(rng))] : [term("c", rng.int(1, 12)), term("b", rng.sign() * b, v)];
+  return [lead, group("g", sign, inner)];
+}
+
+const kept = (r: Item[]) => r.length >= 2 && terms(r).some((x) => x.v);
+
+/** Like terms combined with one sign slip: the first coefficient (or the number) with the wrong sign. */
+function slipped(result: Item[], which: "var" | "num"): Item[] {
+  const at = result.findIndex((x) => x.kind === "t" && (which === "var" ? !!x.v : !x.v));
+  return result.map((x, i) => (i === at && x.kind === "t" ? { ...x, c: -x.c } : x));
+}
+
+const SIGN_SLIP = {
+  title: tx("Sign slip when combining", "Vorzeichenfehler beim Zusammenfassen"),
+  say: tx(
+    "Close! The brackets are gone the right way, but one sign went wrong when you combined the like terms. Each term takes **its own** sign along.",
+    "Fast! Die Klammern sind richtig weg, aber beim Zusammenfassen ist ein Vorzeichen verrutscht. Jeder Term nimmt **sein eigenes** Vorzeichen mit.",
+  ),
+};
+
+function whichResultTask(rng: Rng): Exercise {
+  for (;;) {
+    const two = rng.chance(0.35);
+    const items: Item[] = two
+      ? [term("k", rng.int(4, 20)), group("g", -1, [term("a", rng.int(1, 9), "x"), term("b", coef(rng))]), group("h", rng.chance(0.5) ? 1 : -1, [term("c", rng.int(1, 9), "x"), term("d", coef(rng))])]
+      : oneBracket(rng, -1);
+    const right = solve(items).result;
+    if (!kept(right)) continue;
+    const firstOnly = wrongItems(items, "firstOnly");
+    const noFlip = wrongItems(items, "noFlip");
+    const cands: { items: Item[]; title?: Text; say?: Text }[] = [
+      { items: right },
+      { items: firstOnly, title: tx("Only the first sign flipped", "Nur das erste Vorzeichen gedreht"), say: tx("That's what you get if only the first sign flips. But a minus in front of a bracket flips **every** sign inside.", "Das kommt raus, wenn sich nur das erste Vorzeichen umdreht. Ein Minus vor der Klammer dreht aber **jedes** Vorzeichen darin um.") },
+      { items: noFlip, title: tx("The minus got ignored", "Minus übersehen"), say: tx("That result ignores the minus in front of the bracket. With a minus, every sign inside has to flip.", "Bei diesem Ergebnis wurde das Minus vor der Klammer übersehen. Bei einem Minus dreht sich jedes Vorzeichen in der Klammer um.") },
+      { items: slipped(right, "var"), ...SIGN_SLIP },
+      { items: slipped(right, "num"), ...SIGN_SLIP },
+    ];
+    const opts: typeof cands = [];
+    for (const c of cands) if (c.items.length && !opts.some((o) => equivalentText(compact(o.items), compact(c.items)))) opts.push(c);
+    if (opts.length < 4) continue;
+    const order = rng.shuffle([0, 1, 2, 3]);
+    const options = order.map((i) => `$${plain(opts[i].items)}$`);
+    const mistakes: Mistake[] = [];
+    order.forEach((i, at) => {
+      const o = opts[i];
+      if (i !== 0 && o.say) mistakes.push({ when: { kind: "choice", options, correct: at }, title: o.title, say: o.say });
+    });
+    return {
+      instruction: tx("Which result is correct?", "Welches Ergebnis ist richtig?"),
+      math: plain(items),
+      answer: { kind: "choice", options, correct: order.indexOf(0) },
+      hint: tx("Remove the brackets yourself first. A minus in front flips **every** sign inside.", "Löse die Klammern zuerst selbst auf. Ein Minus davor dreht **jedes** Vorzeichen darin um."),
+      solution: solve(items).frames,
+      mistakes,
+    };
+  }
+}
+
+/** The result a student gets with a misconception, as items. */
+function wrongItems(start: Item[], mode: "firstOnly" | "noFlip"): Item[] {
+  let cur = start;
+  for (let g = nextGroup(cur); g; g = nextGroup(cur)) cur = flattenWrong(cur, g.id, mode);
+  return combineLike(cur);
+}
+
+type Slip = "last" | "plusFlip" | "combine" | "none";
+
+const SLIP_OPTION: Record<Slip, Text> = {
+  last: tx("Step 1: not every sign in the bracket was flipped.", "Schritt 1: Nicht jedes Vorzeichen in der Klammer wurde umgedreht."),
+  plusFlip: tx("Step 1: signs were flipped that should stay.", "Schritt 1: Es wurden Vorzeichen umgedreht, die bleiben müssten."),
+  combine: tx("Step 2: the like terms were combined wrongly.", "Schritt 2: Die gleichartigen Terme wurden falsch zusammengefasst."),
+  none: tx("There is no mistake.", "Es gibt keinen Fehler."),
+};
+
+function findMistakeTask(rng: Rng): Exercise {
+  for (;;) {
+    const slip = rng.pick<Slip>(["last", "last", "plusFlip", "combine", "none"]);
+    const sign: 1 | -1 = slip === "plusFlip" ? 1 : slip === "last" ? -1 : rng.chance(0.75) ? -1 : 1;
+    const items = oneBracket(rng, sign);
+    const g = items[1] as Extract<Item, { kind: "g" }>;
+    const flat = flatten(items, "g");
+    const right = combineLike(flat);
+    if (!kept(right)) continue;
+    let work = flat;
+    if (slip === "last") work = flattenWrong(items, "g", "firstOnly");
+    if (slip === "plusFlip") work = flatten([items[0], { ...g, sign: -1 }], "g");
+    let result = combineLike(work);
+    if (slip === "combine") result = slipped(right, rng.chance(0.5) ? "var" : "num");
+    if (slip !== "none" && equivalentText(compact(result), compact(right))) continue;
+    if (!kept(result)) continue;
+
+    const name = rng.pick(NAMES);
+    const step1 = `${plain(items)} = `;
+    const marked =
+      slip === "last" || slip === "plusFlip"
+        ? `${step1}\\red{${plain(work)}} = ${plain(result)}`
+        : slip === "combine"
+          ? `${step1}${plain(work)} = \\red{${plain(result)}}`
+          : `${step1}${plain(work)} = ${plain(result)}`;
+    const keys = rng.shuffle<Slip>(["last", "plusFlip", "combine", "none"]);
+    const options = keys.map((k) => SLIP_OPTION[k]);
+    const last = g.items[g.items.length - 1];
+    const lastText = last.kind === "t" ? plain([{ ...last, c: Math.abs(last.c) }]) : "";
+    const sayFor = (picked: Slip): Text => {
+      if (slip === "last")
+        return picked === "plusFlip"
+          ? tx("With a minus in front, flipping is right. The problem is a sign that did **not** flip.", "Bei einem Minus davor ist Umdrehen richtig. Das Problem ist ein Vorzeichen, das sich **nicht** umgedreht hat.")
+          : tx(`Look at the term $${lastText}$ in step 1: with a minus in front of the bracket, its sign has to flip too.`, `Schau dir in Schritt 1 den Term $${lastText}$ an: Bei einem Minus vor der Klammer muss auch sein Vorzeichen umgedreht werden.`);
+      if (slip === "plusFlip")
+        return picked === "last"
+          ? tx("Look at the sign in front of the bracket: it's a **plus**. Then no sign should flip at all.", "Schau auf das Zeichen vor der Klammer: Es ist ein **Plus**. Dann darf sich gar kein Vorzeichen umdrehen.")
+          : tx("There's a **plus** in front of the bracket, so every sign stays. Compare the signs in step 1 with the bracket.", "Vor der Klammer steht ein **Plus**, also bleiben alle Vorzeichen. Vergleich die Vorzeichen in Schritt 1 mit der Klammer.");
+      if (slip === "combine")
+        return picked === "none"
+          ? tx(`Step 1 is fine, but work out step 2 again: what is $${plain(work)}$?`, `Schritt 1 stimmt, aber rechne Schritt 2 noch mal nach: Was ergibt $${plain(work)}$?`)
+          : tx("Step 1 is correct here. Check the adding up in step 2.", "Schritt 1 stimmt hier. Prüf das Zusammenrechnen in Schritt 2.");
+      return tx(
+        `Every step checks out: ${sign < 0 ? "a minus in front flips every sign, and that happened" : "a plus in front changes nothing, and nothing changed"}. Then the like terms were added correctly.`,
+        `Jeder Schritt stimmt: ${sign < 0 ? "Ein Minus davor dreht jedes Vorzeichen um, und genau das ist passiert" : "Ein Plus davor ändert nichts, und es hat sich nichts geändert"}. Danach wurde richtig zusammengefasst.`,
+      );
+    };
+    const mistakes: Mistake[] = [];
+    keys.forEach((k, at) => {
+      if (k === slip) return;
+      mistakes.push({ when: { kind: "choice", options, correct: at }, title: k === "none" ? tx("There is a mistake", "Da steckt ein Fehler") : tx("Look at the other step", "Schau dir den anderen Schritt an"), say: sayFor(k) });
+    });
+    const why: Text =
+      slip === "last"
+        ? tx(`In step 1 only the first sign flipped. With a minus in front, **every** sign in the bracket flips, also the one of $${lastText}$.`, `In Schritt 1 hat sich nur das erste Vorzeichen umgedreht. Bei einem Minus davor dreht sich **jedes** Vorzeichen in der Klammer um, auch das von $${lastText}$.`)
+        : slip === "plusFlip"
+          ? tx("In step 1 the signs were flipped, but there's a **plus** in front of the bracket. Then all signs stay.", "In Schritt 1 wurden die Vorzeichen umgedreht, aber vor der Klammer steht ein **Plus**. Dann bleiben alle Vorzeichen.")
+          : slip === "combine"
+            ? tx(`Step 1 is right. In step 2 a sign slipped: ${combineNote(work)}.`, `Schritt 1 stimmt. In Schritt 2 ist ein Vorzeichen verrutscht: ${combineNote(work, " und ")}.`)
+            : tx("Every step is right.", "Jeder Schritt stimmt.");
+    return {
+      instruction: tx("Find the mistake", "Finde den Fehler"),
+      text: tx(`${name} simplified the term like this. Is there a mistake? If so, where?`, `${name} hat den Term so vereinfacht. Steckt ein Fehler drin? Wenn ja, wo?`),
+      math: `${step1}${plain(work)} = ${plain(result)}`,
+      answer: { kind: "choice", options, correct: keys.indexOf(slip) },
+      hint: tx("Check each step on its own. Which sign stands in front of the bracket?", "Prüf jeden Schritt einzeln. Welches Zeichen steht vor der Klammer?"),
+      solution: [
+        { math: marked, note: why },
+        ...(slip === "none" ? [] : [{ math: `${step1}${plain(flat)} = ${plain(right)}`, note: tx(`Correct: $${plain(items)} = ${plain(right)}$.`, `Richtig ist: $${plain(items)} = ${plain(right)}$.`) }]),
+      ],
+      mistakes,
+    };
+  }
+}
+
+function fillBracketTask(rng: Rng): Exercise {
+  for (;;) {
+    const sign: 1 | -1 = rng.chance(0.75) ? -1 : 1;
+    const v = rng.pick(LETTERS);
+    const lead = rng.chance(0.6) ? term("a", rng.int(2, 9), v) : term("a", rng.int(5, 20));
+    const inner = rng.chance(0.7) ? [term("b", rng.nonZero(-9, 9), v), term("c", coef(rng))] : [term("b", rng.nonZero(-9, 9), v), term("c", coef(rng)), term("d", coef(rng), v === "y" ? "x" : "y")];
+    const items: Item[] = [lead, group("g", sign, inner)];
+    const flat = flatten(items, "g");
+    const value = compact(inner);
+    const gap = `${plain([lead])} ${sign < 0 ? "-" : "+"} (\\,\\box{\\,?\\,}\\,)`;
+    const mistakes: Mistake[] = [];
+    const add = (wrong: Item[], title: Text, say: Text) => {
+      const w = compact(wrong);
+      if (equivalentText(w, value) || mistakes.some((m) => m.when.kind === "expr" && equivalentText(m.when.value, w))) return;
+      mistakes.push({ when: { kind: "expr", value: w }, title, say });
+    };
+    const flipped = inner.map((x) => flip(x, -1));
+    if (sign < 0) {
+      add(
+        flipped,
+        tx("That's after the bracket", "Das steht nach der Klammer"),
+        tx("You copied the terms as they stand **after** the bracket was removed. Inside the bracket the signs were the other way round: the minus flipped them.", "Du hast die Terme so abgeschrieben, wie sie **nach** dem Auflösen dastehen. In der Klammer waren die Vorzeichen andersherum: Das Minus hat sie umgedreht."),
+      );
+      add(
+        [inner[0], ...flipped.slice(1)],
+        tx("Only the first sign flipped back", "Nur das erste Vorzeichen zurückgedreht"),
+        tx("Nearly! The minus flipped **every** sign, so flip every one back, not just the first.", "Fast! Das Minus hat **jedes** Vorzeichen umgedreht, also dreh auch jedes zurück, nicht nur das erste."),
+      );
+    } else {
+      add(flipped, tx("Nothing flips after a plus", "Bei Plus dreht sich nichts"), tx("There's a **plus** in front of the bracket. Nothing flipped, so copy the signs exactly as they are.", "Vor der Klammer steht ein **Plus**. Da hat sich nichts umgedreht, also übernimm die Vorzeichen genau so."));
+    }
+    const back = inner.map((x) => `$${plain([x])}$`).join(", ");
+    const leadText = plain([lead]);
+    const rest = plain(flat).slice(leadText.length).trim();
+    return {
+      instruction: tx("What was in the bracket?", "Was stand in der Klammer?"),
+      math: `${gap} = ${plain(flat)}`,
+      answer: { kind: "expr", value },
+      hint:
+        sign < 0
+          ? tx("Think backwards: the minus in front flipped every sign. Flip them back.", "Denk rückwärts: Das Minus davor hat jedes Vorzeichen umgedreht. Dreh sie zurück.")
+          : tx("Think backwards: a plus in front changes nothing.", "Denk rückwärts: Ein Plus davor ändert nichts."),
+      solution: [
+        { math: `${gap} = ${leadText} \\hl{${rest}}`, note: sign < 0 ? tx("Read the right side backwards. The minus in front of the bracket flipped every sign.", "Lies die rechte Seite rückwärts. Das Minus vor der Klammer hat jedes Vorzeichen umgedreht.") : tx("Read the right side backwards. A plus in front of the bracket changed nothing.", "Lies die rechte Seite rückwärts. Ein Plus vor der Klammer hat nichts verändert.") },
+        {
+          math: `${leadText} ${sign < 0 ? "-" : "+"} (\\green{${plain(inner)}}) = ${plain(flat)}`,
+          note: sign < 0 ? tx(`Flip every sign back. In the bracket: ${back}.`, `Dreh jedes Vorzeichen zurück. In der Klammer: ${back}.`) : tx(`Copy the terms with their signs: ${back}.`, `Übernimm die Terme mit ihren Vorzeichen: ${back}.`),
+        },
+      ],
+      mistakes,
+    };
+  }
+}
+
+/** One of the old difficulty tiers, retried until the result is neither trivial nor too long. */
+function simplifyTask(rng: Rng, tier: () => Exercise): Exercise {
   for (let tries = 0; tries < 20; tries++) {
-    const ex = level === 1 ? level1(rng) : level === 2 ? level2(rng) : level3(rng);
+    const ex = tier();
     // Avoid trivial results (everything cancels) and very long answers.
     const value = ex.answer.kind === "expr" ? ex.answer.value : "";
     if (/[a-z]/.test(value) && value.length <= 14) return ex;
   }
-  return level1(rng);
+  return tier1(rng);
+}
+
+/** Level 1 practice: mostly one bracket, some with two brackets or nesting, plus three other task shapes. */
+export function generate1(rng: Rng): Exercise {
+  const r = rng.next();
+  if (r < 0.28) return simplifyTask(rng, () => tier1(rng));
+  if (r < 0.44) return simplifyTask(rng, () => tier2(rng));
+  if (r < 0.58) return simplifyTask(rng, () => tier3(rng));
+  if (r < 0.72) return whichResultTask(rng);
+  if (r < 0.86) return findMistakeTask(rng);
+  return fillBracketTask(rng);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,8 +681,7 @@ const nestedFrames: Frame[] = [
   { math: "18#k -#s x#c", note: tx("Finally $20 - 2 = 18$. Result: $18 - x$.", "Zum Schluss $20 - 2 = 18$. Ergebnis: $18 - x$.") },
 ];
 
-const brackets: Topic = {
-  ...topicMeta("brackets"),
+export const level1: LevelLesson = {
   summary: [
     {
       title: tx("Plus in front", "Plus vor der Klammer"),
@@ -517,9 +743,12 @@ const brackets: Topic = {
     },
     {
       type: "widget",
-      title: tx("Try it yourself", "Probier's selbst"),
+      title: tx("Plus or minus in front of the bracket", "Plus oder Minus vor der Klammer"),
       blob: tx("Flip the sign in front and watch what happens inside.", "Wechsle das Zeichen vor der Klammer und schau, was darin passiert."),
-      body: tx("Switch between $+$ and $-$. The highlighted signs are the ones that change.", "Schalte zwischen $+$ und $-$ um. Die markierten Vorzeichen sind die, die sich ändern."),
+      body: tx(
+        "Switch the sign in front of the bracket between $+$ and $-$ and watch the term without brackets. The highlighted signs are the ones that change.",
+        "Schalte das Zeichen vor der Klammer zwischen $+$ und $-$ um und beobachte den Term ohne Klammern. Die markierten Vorzeichen sind die, die sich ändern.",
+      ),
       widget: SignFlipper,
     },
     {
@@ -590,7 +819,4 @@ const brackets: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default brackets;

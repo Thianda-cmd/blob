@@ -9,11 +9,11 @@ import { resolveText, tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
-import { topicMeta } from "@/learn/catalog";
 import { check } from "@/learn/engine/answers";
 import type { Rng } from "@/learn/engine/rng";
-import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
+import type { AnswerSpec, Exercise, Frame, Level, LevelLesson, Mistake } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { notNeeded, propOrInverse, whichCalc } from "./shapes1";
 
 // ---------------------------------------------------------------------------
 // Numbers and names. Stories use the German decimal comma ("2,5 km", "7,50 €").
@@ -2404,15 +2404,22 @@ const mixedArea: Tpl = (rng) => {
   };
 };
 
-const LEVELS: Record<Level, Tpl[]> = {
+/** The three difficulty tiers of the lesson written before levels: one step; rule of three, speed, units; inverse, two steps. */
+const TIERS: Record<Level, Tpl[]> = {
   1: [buyMany, share, change, duration, convert, area, perimeter, distance, saving],
   2: [dreisatz, recipe, speedV, speedT, unitsCount, centsToEuro, trainingHours, dreisatz],
   3: [inverse, twoStepShopping, fenceCost, tileCost, speedMinutes, runMinutes, budget, speedInverse, mixedArea, inverse],
 };
 
-function generate(level: Level, rng: Rng): Exercise {
+/** Steps 2 and 3 of the plan on their own: which calculation, proportional or inverse, the number that isn't needed. */
+const PLAN: Tpl[] = [whichCalc, propOrInverse, notNeeded];
+
+/** Level 1 practice: mostly the one-step and rule-of-three tiers, some two-step tasks, and the planning shapes. */
+export function generate1(rng: Rng): Exercise {
   for (let tries = 0; tries < 20; tries++) {
-    const ex = rng.pick(LEVELS[level])(rng);
+    const r = rng.int(1, 100);
+    const pool = r <= 32 ? TIERS[1] : r <= 60 ? TIERS[2] : r <= 75 ? TIERS[3] : PLAN;
+    const ex = rng.pick(pool)(rng);
     const v = ex.answer.kind === "number" ? ex.answer.value : 1;
     if (Number.isFinite(v) && v > 0 && v < 100000) return ex;
   }
@@ -3061,8 +3068,8 @@ const speedFrames: Frame[] = [
   },
 ];
 
-const wordProblems: Topic = {
-  ...topicMeta("word-problems"),
+/** Level 1 (Klasse 5–7): the plan for any word problem, the rule of three (proportional and inverse), speed and units. */
+export const level1: LevelLesson = {
   summary: [
     {
       title: tx("Six steps, every time", "Sechs Schritte, jedes Mal"),
@@ -3319,7 +3326,4 @@ const wordProblems: Topic = {
       },
     },
   ],
-  generate,
 };
-
-export default wordProblems;
