@@ -28,9 +28,20 @@ const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
 const xpFor = (level: Level) => 6 + level * 4;
 
 /** Generate an exercise, avoiding repeats within the round. */
+/** A task for this seed; a seed that makes the generator fail moves on to the next one (same on server and browser). */
+function attempt(topic: Topic, level: Level, seed: number): Exercise {
+  for (let n = 0; ; n++) {
+    try {
+      return topic.generate(level, createRng(seed + n * 7_368_787));
+    } catch (e) {
+      if (n >= 20) throw e;
+    }
+  }
+}
+
 function make(topic: Topic, level: Level, seed: number, avoid: string[]): Exercise {
-  let ex = topic.generate(level, createRng(seed));
-  for (let n = 1; n < 10 && avoid.includes(sig(ex)); n++) ex = topic.generate(level, createRng(seed + n * 104729));
+  let ex = attempt(topic, level, seed);
+  for (let n = 1; n < 10 && avoid.includes(sig(ex)); n++) ex = attempt(topic, level, seed + n * 104729);
   return ex;
 }
 /** Identity of a task: math and text may be bilingual objects, so they are serialised as JSON. */

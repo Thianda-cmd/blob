@@ -1,21 +1,256 @@
 {
- "negative-numbers": [],
+ "negative-numbers": [
+  {
+   "level": 1,
+   "id": "numbers-below-zero",
+   "kind": "picture",
+   "title": {
+    "en": "Numbers below zero",
+    "de": "Zahlen unter null"
+   },
+   "text": {
+    "en": "In winter the thermometer often shows temperatures below zero. We write them with a minus sign: -5 °C means five degrees below zero. Numbers with a minus sign are negative numbers. Numbers greater …",
+    "de": "Im Winter zeigt das Thermometer oft Temperaturen unter null. Wir schreiben sie mit einem Minuszeichen: -5 °C heißt fünf Grad unter null. Zahlen mit Minuszeichen sind negative Zahlen. Zahlen größer …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "compare-on-the-number-line",
+   "kind": "widget",
+   "title": {
+    "en": "Compare on the number line",
+    "de": "Vergleichen auf der Zahlengeraden"
+   },
+   "text": {
+    "en": "On the number line, numbers get bigger to the right. So the number further left is always the smaller one: -8 < -2, even though 8 looks bigger than 2.",
+    "de": "Auf der Zahlengeraden werden die Zahlen nach rechts größer. Die Zahl weiter links ist also immer die kleinere: -8 < -2, auch wenn 8 größer aussieht als 2."
+   }
+  },
+  {
+   "level": 1,
+   "id": "warmer-and-colder",
+   "kind": "picture",
+   "title": {
+    "en": "Warmer and colder",
+    "de": "Wärmer und kälter"
+   },
+   "text": {
+    "en": "If it gets warmer, you go right on the number line: you add. If it gets colder, you go left: you subtract. This works across zero too.",
+    "de": "Wird es wärmer, gehst du auf der Zahlengeraden nach rechts: Du addierst. Wird es kälter, gehst du nach links: Du subtrahierst. Das klappt auch über die Null hinweg."
+   }
+  },
+  {
+   "level": 1,
+   "id": "blob-walks-the-number-line",
+   "kind": "widget",
+   "title": {
+    "en": "Blob walks the number line",
+    "de": "Blob läuft auf der Zahlengeraden"
+   },
+   "text": {
+    "en": "The operation sign (+ or -) decides which way Blob looks: plus means right, minus means left. The sign of the number decides how Blob walks: positive means forwards, negative means backwards. Try …",
+    "de": "Das Rechenzeichen (+ oder -) bestimmt, wohin Blob schaut: Plus heißt nach rechts, Minus heißt nach links. Das Vorzeichen der Zahl bestimmt, wie Blob läuft: positiv heißt vorwärts, negativ heißt …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "how-big-is-the-change",
+   "kind": "picture",
+   "title": {
+    "en": "How big is the change?",
+    "de": "Wie groß ist die Änderung?"
+   },
+   "text": {
+    "en": "To find a change, count the steps between the two numbers, or calculate new value minus old value. If the result is positive, it went up. If it's negative, it went down.",
+    "de": "Für eine Änderung zählst du die Schritte zwischen den beiden Zahlen oder rechnest neuer Wert minus alter Wert. Ist das Ergebnis positiv, ging es nach oben. Ist es negativ, ging es nach unten."
+   }
+  },
+  {
+   "level": 2,
+   "id": "follow-the-pattern",
+   "kind": "widget",
+   "title": {
+    "en": "Follow the pattern",
+    "de": "Folge dem Muster"
+   },
+   "text": {
+    "en": "Each row the first factor gets 1 smaller, and the result goes up by the same amount. If the pattern keeps going below zero, (-1) \\cdot (-4) must be +4. That's why minus times minus is plus.",
+    "de": "In jeder Zeile wird der erste Faktor um 1 kleiner, und das Ergebnis steigt immer um denselben Wert. Geht das Muster unter null weiter, muss (-1) \\cdot (-4) gleich +4 sein. Deshalb gilt: Minus mal …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "count-the-minus-signs",
+   "kind": "widget",
+   "title": {
+    "en": "Count the minus signs",
+    "de": "Zähl die Minuszeichen"
+   },
+   "text": {
+    "en": "Each pair of minus signs turns into a plus. If one minus is left over, the product is negative.",
+    "de": "Jedes Paar Minuszeichen wird zu einem Plus. Bleibt ein Minus übrig, ist das Produkt negativ."
+   }
+  },
+  {
+   "level": 3,
+   "id": "absolute-value-the-distance-from-0",
+   "kind": "picture",
+   "title": {
+    "en": "Absolute value: the distance from 0",
+    "de": "Der Betrag: Abstand zur Null"
+   },
+   "text": {
+    "en": "The absolute value |a| is the distance of a from 0 on the number line. A distance is never negative, so |a| \\ge 0. The distance between two numbers a and b is |a - b|.",
+    "de": "Der Betrag |a| ist der Abstand der Zahl a von der 0 auf der Zahlengeraden. Ein Abstand ist nie negativ, also gilt |a| \\ge 0. Der Abstand zweier Zahlen a und b ist |a - b|."
+   }
+  },
+  {
+   "level": 3,
+   "id": "measure-distances-on-the-number-line",
+   "kind": "widget",
+   "title": {
+    "en": "Measure distances on the number line",
+    "de": "Abstände auf der Zahlengeraden messen"
+   },
+   "text": {
+    "en": "Switch between the distances from 0 and the distance between a and b. Notice: |a - b| and |b - a| are always equal.",
+    "de": "Wechsle zwischen den Abständen zur 0 und dem Abstand zwischen a und b. Fällt dir etwas auf? |a - b| und |b - a| sind immer gleich."
+   }
+  },
+  {
+   "level": 3,
+   "id": "power-lab-negative-bases",
+   "kind": "widget",
+   "title": {
+    "en": "Power lab: negative bases",
+    "de": "Potenz-Labor: negative Basis"
+   },
+   "text": {
+    "en": "Choose a base and an exponent. Then switch the brackets off and see what changes.",
+    "de": "Wähl eine Basis und einen Exponenten. Schalte dann die Klammer aus und schau, was sich ändert."
+   }
+  },
+  {
+   "level": 3,
+   "id": "clever-adding",
+   "kind": "widget",
+   "title": {
+    "en": "Clever adding",
+    "de": "Geschickt addieren"
+   },
+   "text": {
+    "en": "Tap two numbers to add them. Because you may swap and group (commutative and associative law), any two numbers can be partners. Look for pairs that give round numbers.",
+    "de": "Tipp zwei Zahlen an, um sie zu addieren. Weil du vertauschen und zusammenfassen darfst (Kommutativ- und Assoziativgesetz), können zwei beliebige Zahlen Partner sein. Such Paare, die glatte Zahlen …"
+   }
+  }
+ ],
  "brackets": [
   {
    "level": 1,
-   "id": "try-it-yourself",
+   "id": "plus-or-minus-in-front-of-the-bracket",
    "kind": "widget",
    "title": {
-    "en": "Try it yourself",
-    "de": "Probier's selbst"
+    "en": "Plus or minus in front of the bracket",
+    "de": "Plus oder Minus vor der Klammer"
    },
    "text": {
-    "en": "Switch between + and -. The highlighted signs are the ones that change.",
-    "de": "Schalte zwischen + und - um. Die markierten Vorzeichen sind die, die sich ändern."
+    "en": "Switch the sign in front of the bracket between + and - and watch the term without brackets. The highlighted signs are the ones that change.",
+    "de": "Schalte das Zeichen vor der Klammer zwischen + und - um und beobachte den Term ohne Klammern. Die markierten Vorzeichen sind die, die sich ändern."
+   }
+  },
+  {
+   "level": 2,
+   "id": "multiply-out-a-long-term-step-by-step",
+   "kind": "widget",
+   "title": {
+    "en": "Multiply out a long term step by step",
+    "de": "Lange Terme Schritt für Schritt auflösen"
+   },
+   "text": {
+    "en": "Pick a bracket and watch its factor multiply every term inside. Inner brackets come first. At the end, combine like terms: the check with a number shows that nothing changed.",
+    "de": "Wähl eine Klammer und schau zu, wie ihr Faktor jeden Term darin multipliziert. Innere Klammern kommen zuerst. Zum Schluss fasst du gleichartige Terme zusammen: Die Probe mit einer Zahl zeigt, dass …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-check-by-inserting-a-number",
+   "kind": "widget",
+   "title": {
+    "en": "The check by inserting a number",
+    "de": "Die Einsetzprobe"
+   },
+   "text": {
+    "en": "Insert the same number into the start term and into the result. A different value proves a mistake. The same value is a good sign, but test numbers like 0 and 1 can let mistakes slip through.",
+    "de": "Setz dieselbe Zahl in den Anfangsterm und in das Ergebnis ein. Ein anderer Wert beweist einen Fehler. Derselbe Wert ist ein gutes Zeichen, aber Testzahlen wie 0 und 1 lassen Fehler leicht …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "build-the-greatest-common-factor",
+   "kind": "widget",
+   "title": {
+    "en": "Build the greatest common factor",
+    "de": "Baue den größten gemeinsamen Faktor"
+   },
+   "text": {
+    "en": "Choose the number, the sign and the power of each letter for the factor in front. If the factor doesn't fit into a term, that term turns red. The goal: a bracket with no common factor left.",
+    "de": "Wähl für den Faktor davor die Zahl, das Vorzeichen und den Exponenten jedes Buchstabens. Passt der Faktor in einen Term nicht hinein, wird dieser Term rot. Das Ziel: eine Klammer ohne gemeinsamen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "factoring-by-grouping-pair-up-the-terms",
+   "kind": "widget",
+   "title": {
+    "en": "Factoring by grouping: pair up the terms",
+    "de": "Ausklammern durch Gruppieren: Paare bilden"
+   },
+   "text": {
+    "en": "Choose a partner for the first term. Each pair gets its own factor out. If the same bracket appears in both pairs, you can factor it out and the term becomes a product.",
+    "de": "Wähl einen Partner für den ersten Term. Aus jedem Paar wird ein Faktor ausgeklammert. Taucht in beiden Paaren dieselbe Klammer auf, klammerst du sie aus, und der Term wird zum Produkt."
    }
   }
  ],
  "expanding": [
+  {
+   "level": 1,
+   "id": "split-the-rectangle",
+   "kind": "widget",
+   "title": {
+    "en": "Split the rectangle",
+    "de": "Teil das Rechteck"
+   },
+   "text": {
+    "en": "A rectangle of unit squares shows a product: height times width. Split it into two parts: the two smaller products always add up to the whole. That's why the distributive law works.",
+    "de": "Ein Rechteck aus Kästchen zeigt ein Produkt: Höhe mal Breite. Teilst du es in zwei Teile, ergeben die beiden kleineren Produkte zusammen immer das Ganze. Darum funktioniert das Distributivgesetz."
+   }
+  },
+  {
+   "level": 1,
+   "id": "rectangle-3-times-x-plus-4",
+   "kind": "picture",
+   "title": {
+    "en": "A variable in the bracket",
+    "de": "Eine Variable in der Klammer"
+   },
+   "text": {
+    "en": "3(x + 4) means 3 \\cdot (x + 4). Think of a rectangle with height 3 and width x + 4: its area is 3 \\cdot x plus 3 \\cdot 4. Getting rid of the bracket like this is called expanding.",
+    "de": "3(x + 4) heißt 3 \\cdot (x + 4). Stell dir ein Rechteck mit der Höhe 3 und der Breite x + 4 vor: Seine Fläche ist 3 \\cdot x plus 3 \\cdot 4. Die Klammer so aufzulösen heißt Ausmultiplizieren."
+   }
+  },
+  {
+   "level": 1,
+   "id": "algebra-tiles",
+   "kind": "widget",
+   "title": {
+    "en": "Algebra tiles",
+    "de": "Algebra-Kacheln"
+   },
+   "text": {
+    "en": "A long tile stands for x, a small tile for 1, red tiles are negative. Collecting like terms means: put the same kind together, and let a plus and a minus tile cancel out.",
+    "de": "Eine lange Kachel steht für x, eine kleine für 1, rote Kacheln sind negativ. Gleichartige Terme zusammenfassen heißt: Gleiche Sorten zusammenlegen, und eine Plus- und eine Minus-Kachel heben sich auf."
+   }
+  },
   {
    "level": 2,
    "id": "why-it-works",
@@ -28,9 +263,87 @@
     "en": "A rectangle with sides a and x + b has the area a(x + b). Split it in two and you get ax + ab.",
     "de": "Ein Rechteck mit den Seiten a und x + b hat den Flächeninhalt a(x + b). Zerlegst du es in zwei Teile, bekommst du ax + ab."
    }
+  },
+  {
+   "level": 3,
+   "id": "square-puzzle",
+   "kind": "widget",
+   "title": {
+    "en": "The square puzzle",
+    "de": "Das Quadrat-Puzzle"
+   },
+   "text": {
+    "en": "x^2 + px + q as tiles: one x^2 square, p strips and q small squares. Only if q is exactly (\\frac{p}{2})^2 do they form a square: then x^2 + px + q = (x + \\frac{p}{2})^2.",
+    "de": "x^2 + px + q als Kacheln: ein x^2-Quadrat, p Streifen und q kleine Quadrate. Nur wenn q genau (\\frac{p}{2})^2 ist, bilden sie ein Quadrat: Dann ist x^2 + px + q = (x + \\frac{p}{2})^2."
+   }
+  },
+  {
+   "level": 3,
+   "id": "cube-of-a-sum",
+   "kind": "picture",
+   "title": {
+    "en": "(a + b)³: the cube",
+    "de": "(a + b)³: der Würfel"
+   },
+   "text": {
+    "en": "A cube with edge a + b has the volume (a + b)^3. Cut it at a in all three directions: you get 8 blocks. Pull them apart and count.",
+    "de": "Ein Würfel mit der Kante a + b hat das Volumen (a + b)^3. Schneid ihn in alle drei Richtungen bei a durch: Es entstehen 8 Quader. Zieh sie auseinander und zähl nach."
+   }
+  },
+  {
+   "level": 3,
+   "id": "pascals-triangle",
+   "kind": "widget",
+   "title": {
+    "en": "Pascal's triangle",
+    "de": "Das Pascalsche Dreieck"
+   },
+   "text": {
+    "en": "Every number is the sum of the two numbers above it. Row n gives the coefficients of (a + b)^n: row 2 is 1, 2, 1, row 3 is 1, 3, 3, 1. Add rows and tap any number.",
+    "de": "Jede Zahl ist die Summe der beiden Zahlen darüber. Zeile n liefert die Koeffizienten von (a + b)^n: Zeile 2 ist 1, 2, 1, Zeile 3 ist 1, 3, 3, 1. Füg Zeilen hinzu und tipp auf eine Zahl."
+   }
+  },
+  {
+   "level": 3,
+   "id": "binomial-coefficients",
+   "kind": "picture",
+   "title": {
+    "en": "The binomial theorem",
+    "de": "Der binomische Lehrsatz"
+   },
+   "text": {
+    "en": "The numbers in row n are the binomial coefficients “n choose k”, written as n above k in round brackets. You calculate them with factorials: “n choose k” = \\frac{n!}{k! \\cdot (n - k)!} with n! = 1 …",
+    "de": "Die Zahlen in Zeile n sind die Binomialkoeffizienten „n über k“, geschrieben als n und k übereinander in runden Klammern. Du berechnest sie mit Fakultäten: „n über k“ = \\frac{n!}{k! \\cdot (n - …"
+   }
   }
  ],
  "rearranging": [
+  {
+   "level": 1,
+   "id": "the-rectangle-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The rectangle lab",
+    "de": "Das Rechteck-Labor"
+   },
+   "text": {
+    "en": "Drag the purple corner to change the sides a and b. The area counts the squares inside, the perimeter is the way around the edge.",
+    "de": "Zieh an der lila Ecke, um die Seiten a und b zu ändern. Der Flächeninhalt zählt die Kästchen innen, der Umfang ist der Weg einmal außen herum."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-undo-machine",
+   "kind": "widget",
+   "title": {
+    "en": "The undo machine",
+    "de": "Die Umkehr-Maschine"
+   },
+   "text": {
+    "en": "Pick the operation that gets the purple letter on its own. Whatever you pick happens on both sides of the equals sign.",
+    "de": "Mit welcher Rechnung steht der lila Buchstabe allein? Was du wählst, passiert auf beiden Seiten des Gleichheitszeichens."
+   }
+  },
   {
    "level": 2,
    "id": "pick-a-letter",
@@ -42,6 +355,32 @@
    "text": {
     "en": "Tap a formula, then the letter you want on its own. Each step shows what is undone. The numbers at the bottom check that the new formula gives the same result.",
     "de": "Tippe auf eine Formel und dann auf den Buchstaben, der allein stehen soll. Jeder Schritt zeigt, was rückgängig gemacht wird. Die Zahlen unten prüfen, ob die neue Formel dasselbe Ergebnis liefert."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-lens-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The lens lab",
+    "de": "Das Linsen-Labor"
+   },
+   "text": {
+    "en": "A converging lens makes an image of a candle. Drag the candle along the axis: the rays and the image follow, and b = \\frac{fg}{g - f} is worked out live. Try g = f and g < f.",
+    "de": "Eine Sammellinse erzeugt ein Bild einer Kerze. Zieh die Kerze entlang der Achse: Strahlen und Bild folgen, und b = \\frac{fg}{g - f} wird live ausgerechnet. Probier g = f und g < f."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-pendulum-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The pendulum lab",
+    "de": "Das Pendel-Labor"
+   },
+   "text": {
+    "en": "Choose the period T. The rearranged formula l = \\frac{gT^2}{4\\pi^2} gives the length, and the pendulum swings in real time. A seconds pendulum (T = 2 s) is almost exactly 1 m long.",
+    "de": "Wähle die Periodendauer T. Die umgestellte Formel l = \\frac{gT^2}{4\\pi^2} liefert die Länge, und das Pendel schwingt in Echtzeit. Ein Sekundenpendel (T = 2 s) ist fast genau 1 m lang."
    }
   }
  ],
@@ -71,9 +410,100 @@
     "en": "Press Next step. Both bars are cut into the same number of parts, and then the parts can simply be counted.",
     "de": "Drück auf Nächster Schritt. Beide Streifen werden in gleich viele Teile zerlegt, dann kannst du die Teile einfach zählen."
    }
+  },
+  {
+   "level": 2,
+   "id": "the-division-machine",
+   "kind": "widget",
+   "title": {
+    "en": "The division machine",
+    "de": "Die Divisionsmaschine"
+   },
+   "text": {
+    "en": "The machine divides numerator by denominator by hand, one digit at a time. When the remainder is 0, the decimal ends. When a remainder comes back, the digits repeat forever.",
+    "de": "Die Maschine teilt Zähler durch Nenner schriftlich, Ziffer für Ziffer. Ist der Rest 0, bricht die Dezimalzahl ab. Kommt ein Rest wieder, wiederholen sich die Ziffern endlos."
+   }
+  },
+  {
+   "level": 2,
+   "id": "repeating-decimals",
+   "kind": "picture",
+   "title": {
+    "en": "Repeating decimals",
+    "de": "Periodische Dezimalzahlen"
+   },
+   "text": {
+    "en": "A repeating decimal has a part that repeats forever, the period. With a little trick you can turn it back into a fraction, even when the period starts later.",
+    "de": "Eine periodische Dezimalzahl hat einen Teil, der sich endlos wiederholt: die Periode. Mit einem kleinen Trick wird daraus wieder ein Bruch, auch wenn die Periode erst später beginnt."
+   }
+  },
+  {
+   "level": 2,
+   "id": "one-point-three-names",
+   "kind": "widget",
+   "title": {
+    "en": "One point, three names",
+    "de": "Ein Punkt, drei Namen"
+   },
+   "text": {
+    "en": "Drag the point along the number line, also into the negative numbers. You see its value as a fraction, a decimal and a percentage. Change the ticks to reach other fractions.",
+    "de": "Zieh den Punkt über den Zahlenstrahl, auch zu den negativen Zahlen. Du siehst seinen Wert als Bruch, als Dezimalzahl und in Prozent. Mit der Einteilung erreichst du andere Brüche."
+   }
+  },
+  {
+   "level": 3,
+   "id": "where-the-denominator-becomes-zero",
+   "kind": "widget",
+   "title": {
+    "en": "Where the denominator becomes zero",
+    "de": "Wo der Nenner null wird"
+   },
+   "text": {
+    "en": "Move x and watch the value of the term. Where the denominator becomes 0, the term has no value and the graph breaks apart. Find all the gaps.",
+    "de": "Verschieb x und beobachte den Wert des Terms. Wo der Nenner 0 wird, hat der Term keinen Wert und der Graph reißt auseinander. Finde alle Lücken."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-cancelling-workshop",
+   "kind": "widget",
+   "title": {
+    "en": "The cancelling workshop",
+    "de": "Die Kürzwerkstatt"
+   },
+   "text": {
+    "en": "Tap a piece on top and one at the bottom to cancel them. With summands that's not allowed. Factorise the term, then cancel the matching factors.",
+    "de": "Tipp oben und unten je ein Teil an, um beide zu kürzen. Bei Summanden geht das nicht. Faktorisiere den Term und kürze dann die passenden Faktoren."
+   }
   }
  ],
  "powers-roots": [
+  {
+   "level": 1,
+   "id": "build-square-and-cube-numbers",
+   "kind": "widget",
+   "title": {
+    "en": "Build square and cube numbers",
+    "de": "Quadrat- und Kubikzahlen bauen"
+   },
+   "text": {
+    "en": "A square with side n is made of n \\cdot n = n^2 small squares, a cube with edge n of n^3 small cubes. That's where the names square number and cube number come from.",
+    "de": "Ein Quadrat mit Seitenlänge n besteht aus n \\cdot n = n^2 kleinen Quadraten, ein Würfel mit Kantenlänge n aus n^3 kleinen Würfeln. Daher kommen die Namen Quadratzahl und Kubikzahl."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-power-of-ten-machine",
+   "kind": "widget",
+   "title": {
+    "en": "The power-of-ten machine",
+    "de": "Die Zehnerpotenz-Maschine"
+   },
+   "text": {
+    "en": "Choose a digit a and an exponent n. The machine writes a \\cdot 10^n as a number and names it. Then build the number in the task below.",
+    "de": "Wähl eine Ziffer a und einen Exponenten n. Die Maschine schreibt a \\cdot 10^n als Zahl und nennt ihren Namen. Dann bau die Zahl aus der Aufgabe darunter."
+   }
+  },
   {
    "level": 2,
    "id": "the-power-lab",
@@ -98,6 +528,32 @@
    "text": {
     "en": "Pick a square factor. The picture shows the number as equal squares. The side of one square comes out of the root.",
     "de": "Wähl eine Quadratzahl als Faktor. Das Bild zeigt die Zahl als gleich große Quadrate. Die Seitenlänge eines Quadrats kommt vor die Wurzel."
+   }
+  },
+  {
+   "level": 3,
+   "id": "between-the-powers",
+   "kind": "widget",
+   "title": {
+    "en": "Between the powers",
+    "de": "Zwischen den Potenzen"
+   },
+   "text": {
+    "en": "The dots are the powers with whole exponents. Pick a base and a denominator, then slide the exponent: fractions fill the gaps on the curve y = b^x, and the formula shows root first, then power.",
+    "de": "Die Punkte sind die Potenzen mit ganzzahligem Exponenten. Wähl eine Basis und einen Nenner und verschieb dann den Exponenten: Brüche füllen die Lücken auf der Kurve y = b^x, und die Formel zeigt …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "hunt-the-exponent",
+   "kind": "widget",
+   "title": {
+    "en": "Hunt the exponent",
+    "de": "Jagd auf den Exponenten"
+   },
+   "text": {
+    "en": "Choose a base b and a target y. Slide x until b^x hits the target: the x you find is \\log_b y. The calculator gets it with \\frac{\\lg y}{\\lg b}.",
+    "de": "Wähl eine Basis b und ein Ziel y. Schieb x, bis b^x das Ziel trifft: Das gefundene x ist \\log_b y. Der Taschenrechner bekommt es mit \\frac{\\lg y}{\\lg b}."
    }
   }
  ],
@@ -127,6 +583,84 @@
     "en": "Every change is one growth factor. Several changes in a row: multiply the factors. Change the steps, or try the examples.",
     "de": "Jede Änderung ist ein Wachstumsfaktor. Mehrere Änderungen nacheinander: Faktoren multiplizieren. Ändere die Schritte oder probier die Beispiele aus."
    }
+  },
+  {
+   "level": 2,
+   "id": "drag-through-the-year",
+   "kind": "widget",
+   "title": {
+    "en": "Drag through the year",
+    "de": "Zieh durchs Jahr"
+   },
+   "text": {
+    "en": "The bar is one banking year. Choose the capital and the rate, then drag: the interest is always the same part of the yearly interest as the time is of the year.",
+    "de": "Der Balken ist ein Bankjahr. Wähle Kapital und Zinssatz und zieh dann: Die Zinsen sind immer derselbe Teil der Jahreszinsen wie die Zeit vom Jahr."
+   }
+  },
+  {
+   "level": 2,
+   "id": "vat-net-and-gross",
+   "kind": "picture",
+   "title": {
+    "en": "VAT: net and gross",
+    "de": "Mehrwertsteuer: netto und brutto"
+   },
+   "text": {
+    "en": "The net price (netto) is without VAT, the gross price (brutto) includes it. The VAT is always a percentage of the net price.",
+    "de": "Der Nettopreis ist ohne Mehrwertsteuer, der Bruttopreis mit. Die Mehrwertsteuer ist immer ein Prozentsatz vom Nettopreis."
+   }
+  },
+  {
+   "level": 2,
+   "id": "build-an-invoice",
+   "kind": "widget",
+   "title": {
+    "en": "Build an invoice",
+    "de": "Bau eine Rechnung"
+   },
+   "text": {
+    "en": "Each line of the invoice is one factor. Switch lines on and off, change them, and move them up or down: watch the amounts in between and the price at the end.",
+    "de": "Jede Zeile der Rechnung ist ein Faktor. Schalte Zeilen an und aus, ändere sie und verschieb sie: Achte auf die Beträge dazwischen und auf den Endpreis."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-growth-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The growth lab",
+    "de": "Das Wachstumslabor"
+   },
+   "text": {
+    "en": "The same percentage every year makes a curve that bends: exponential growth or decay. Compare it with linear growth, and watch the doubling time or half-life.",
+    "de": "Jedes Jahr derselbe Prozentsatz ergibt eine Kurve, die sich krümmt: exponentielles Wachstum oder exponentielle Abnahme. Vergleich sie mit linearem Wachstum und achte auf Verdopplungszeit und …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "decay-with-dice",
+   "kind": "widget",
+   "title": {
+    "en": "Decay with dice",
+    "de": "Zerfall mit Würfeln"
+   },
+   "text": {
+    "en": "A classic experiment for radioactive decay: every die is an atom, and each throw about \\frac{1}{6} of the dice left decay. Throw and compare your bars with the formula.",
+    "de": "Ein klassisches Experiment zum radioaktiven Zerfall: Jeder Würfel ist ein Atom, und bei jedem Wurf zerfällt etwa \\frac{1}{6} der übrigen Würfel. Würfle und vergleich deine Balken mit der Formel."
+   }
+  },
+  {
+   "level": 3,
+   "id": "linear-or-exponential",
+   "kind": "picture",
+   "title": {
+    "en": "Linear or exponential?",
+    "de": "Linear oder exponentiell?"
+   },
+   "text": {
+    "en": "In a table of values, compare neighbouring values: subtract them, and divide them. Whatever stays constant tells you the type of growth.",
+    "de": "Vergleich in einer Wertetabelle benachbarte Werte: Zieh sie voneinander ab und teile sie durcheinander. Was konstant bleibt, verrät die Art des Wachstums."
+   }
   }
  ],
  "equations": [
@@ -155,9 +689,126 @@
     "en": "Move x and watch whether the inequality is true. The dots remember what you tried. Then compare 2x + 1 < 7 with -2x < 6: where are the solutions?",
     "de": "Verschieb x und schau, ob die Ungleichung wahr ist. Die Punkte merken sich, was du ausprobiert hast. Vergleich dann 2x + 1 < 7 mit -2x < 6: Wo liegen die Lösungen?"
    }
+  },
+  {
+   "level": 2,
+   "id": "both-sides-as-lines",
+   "kind": "widget",
+   "title": {
+    "en": "Both sides as lines",
+    "de": "Beide Seiten als Geraden"
+   },
+   "text": {
+    "en": "Each side of an equation is a line. The solution is where they cross. Parallel lines never cross: no solution. The same line twice: every number is a solution.",
+    "de": "Jede Seite einer Gleichung ist eine Gerade. Die Lösung liegt dort, wo sie sich schneiden. Parallele Geraden schneiden sich nie: keine Lösung. Zweimal dieselbe Gerade: Jede Zahl ist eine Lösung."
+   }
+  },
+  {
+   "level": 2,
+   "id": "build-the-solution-set",
+   "kind": "widget",
+   "title": {
+    "en": "Build the solution set",
+    "de": "Bau die Lösungsmenge"
+   },
+   "text": {
+    "en": "Solve the inequality, then set the boundary, the direction and the dot. The notation below follows along: as an inequality, as a set and as an interval.",
+    "de": "Löse die Ungleichung und stell dann Grenze, Richtung und Punkt ein. Die Schreibweisen darunter laufen mit: als Ungleichung, als Menge und als Intervall."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-absolute-value-is-a-distance",
+   "kind": "picture",
+   "title": {
+    "en": "The absolute value is a distance",
+    "de": "Der Betrag ist ein Abstand"
+   },
+   "text": {
+    "en": "|x - 3| = 5 asks: which numbers are 5 away from 3 on the number line? There are two, one on each side.",
+    "de": "|x - 3| = 5 fragt: Welche Zahlen liegen an der Zahlengeraden 5 von 3 entfernt? Es gibt zwei, auf jeder Seite eine."
+   }
+  },
+  {
+   "level": 3,
+   "id": "distance-on-the-number-line",
+   "kind": "widget",
+   "title": {
+    "en": "Distance on the number line",
+    "de": "Abstand an der Zahlengeraden"
+   },
+   "text": {
+    "en": "|x - a| measures how far x is from the centre a. Change the centre and the distance, switch between equal, less and greater, and watch the solution set.",
+    "de": "|x - a| misst, wie weit x von der Mitte a entfernt ist. Verändere Mitte und Abstand, wechsle zwischen gleich, kleiner und größer und beobachte die Lösungsmenge."
+   }
+  },
+  {
+   "level": 3,
+   "id": "absolute-value-inequalities",
+   "kind": "picture",
+   "title": {
+    "en": "Absolute value inequalities",
+    "de": "Betragsungleichungen"
+   },
+   "text": {
+    "en": "|x - 2| < 3: all numbers less than 3 away from 2, a stretch between two boundaries. |x - 2| > 3: everything outside that stretch.",
+    "de": "|x - 2| < 3: alle Zahlen, die weniger als 3 von 2 entfernt sind, eine Strecke zwischen zwei Grenzen. |x - 2| > 3: alles außerhalb dieser Strecke."
+   }
+  },
+  {
+   "level": 3,
+   "id": "where-false-solutions-come-from",
+   "kind": "widget",
+   "title": {
+    "en": "Where false solutions come from",
+    "de": "Woher Scheinlösungen kommen"
+   },
+   "text": {
+    "en": "After squaring, \\sqrt{x + a} = x - b and \\sqrt{x + a} = -(x - b) look the same. The real solution is where the curve meets the line; a false one is where it meets the mirrored line.",
+    "de": "Nach dem Quadrieren sehen \\sqrt{x + a} = x - b und \\sqrt{x + a} = -(x - b) gleich aus. Die echte Lösung liegt dort, wo die Kurve die Gerade trifft, eine Scheinlösung dort, wo sie die gespiegelte …"
+   }
   }
  ],
  "linear-systems": [
+  {
+   "level": 1,
+   "id": "the-pair-tester",
+   "kind": "widget",
+   "title": {
+    "en": "The pair tester",
+    "de": "Der Zahlenpaar-Tester"
+   },
+   "text": {
+    "en": "Every point P(x | y) on the grid is a pair of numbers. Drag it and watch both equations. Pairs that fit leave a mark, and soon you'll see that they lie on a line.",
+    "de": "Jeder Punkt P(x | y) im Gitter ist ein Zahlenpaar. Zieh ihn herum und beobachte beide Gleichungen. Passende Paare hinterlassen eine Markierung, und bald siehst du: Sie liegen auf einer Geraden."
+   }
+  },
+  {
+   "level": 1,
+   "id": "solving-with-a-table-of-values",
+   "kind": "widget",
+   "title": {
+    "en": "Solving with a table of values",
+    "de": "Mit einer Wertetabelle lösen"
+   },
+   "text": {
+    "en": "When both equations say what y is, make a table: for each x, work out y in both. Where the values are equal, both conditions hold at once.",
+    "de": "Sagen beide Gleichungen, was y ist, legst du eine Tabelle an: Für jedes x rechnest du y in beiden aus. Wo die Werte gleich sind, gelten beide Bedingungen gleichzeitig."
+   }
+  },
+  {
+   "level": 1,
+   "id": "reading-the-crossing-point",
+   "kind": "picture",
+   "title": {
+    "en": "Reading the crossing point",
+    "de": "Den Schnittpunkt ablesen"
+   },
+   "text": {
+    "en": "Draw both equations as lines. A point on both lines fits both equations, so the intersection point is the solution.",
+    "de": "Zeichne beide Gleichungen als Geraden. Ein Punkt auf beiden Geraden passt zu beiden Gleichungen, also ist der Schnittpunkt die Lösung."
+   }
+  },
   {
    "level": 2,
    "id": "each-equation-is-a-line",
@@ -170,9 +821,61 @@
     "en": "Solve each equation for y and you get a line. A point on both lines solves both equations: the intersection is the solution. Try the special cases too.",
     "de": "Löst du jede Gleichung nach y auf, bekommst du eine Gerade. Ein Punkt auf beiden Geraden löst beide Gleichungen: Der Schnittpunkt ist die Lösung. Probier auch die Sonderfälle aus."
    }
+  },
+  {
+   "level": 3,
+   "id": "the-gauss-workshop",
+   "kind": "widget",
+   "title": {
+    "en": "The elimination workshop",
+    "de": "Die Gauß-Werkstatt"
+   },
+   "text": {
+    "en": "Pick a row, combine it with another one and choose the factors. When the three cells below the diagonal are zero, the system is in echelon form. Try all four systems: two of them hold a surprise.",
+    "de": "Wähl eine Zeile, kombinier sie mit einer anderen und stell die Faktoren ein. Sind die drei Felder unter der Diagonale null, hat das LGS Stufenform. Probier alle vier LGS aus: Zwei davon haben eine …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "a-parabola-through-three-points",
+   "kind": "widget",
+   "title": {
+    "en": "A parabola through three points",
+    "de": "Eine Parabel durch drei Punkte"
+   },
+   "text": {
+    "en": "Three points with different x-values always fix exactly one parabola (or a line). Drag them and watch the system and f(x) change.",
+    "de": "Drei Punkte mit verschiedenen x-Werten legen immer genau eine Parabel fest (oder eine Gerade). Zieh sie und beobachte, wie sich das LGS und f(x) ändern."
+   }
   }
  ],
  "pq-formula": [
+  {
+   "level": 1,
+   "id": "square-roots-on-the-parabola",
+   "kind": "widget",
+   "title": {
+    "en": "Square roots on the parabola",
+    "de": "Wurzelziehen an der Parabel"
+   },
+   "text": {
+    "en": "The solutions of x^2 = c are where the parabola y = x^2 meets the line y = c. Move the line and watch how many crossing points there are.",
+    "de": "Die Lösungen von x^2 = c liegen dort, wo die Parabel y = x^2 die Gerade y = c trifft. Verschieb die Gerade und schau, wie viele Schnittpunkte es gibt."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-zero-product-detector",
+   "kind": "widget",
+   "title": {
+    "en": "The zero product detector",
+    "de": "Der Nullprodukt-Detektor"
+   },
+   "text": {
+    "en": "Pick the numbers in the brackets with - and +, then slide x. The product becomes zero exactly when one of the brackets becomes zero.",
+    "de": "Stell die Zahlen in den Klammern mit - und + ein und schieb dann x. Das Produkt wird genau dann null, wenn eine der Klammern null wird."
+   }
+  },
   {
    "level": 2,
    "id": "see-it-on-the-parabola",
@@ -185,9 +888,113 @@
     "en": "The solutions are where the parabola y = x^2 + px + q meets the x-axis. Use the sliders or drag the vertex S. The vertex lies exactly D below the axis.",
     "de": "Die Lösungen sind die Nullstellen der Parabel y = x^2 + px + q, also die Stellen, an denen sie die x-Achse trifft. Nutze die Regler oder zieh den Scheitelpunkt S. Er liegt genau D unter der Achse."
    }
+  },
+  {
+   "level": 3,
+   "id": "stretch-and-shift-the-parabola",
+   "kind": "widget",
+   "title": {
+    "en": "Stretch and shift the parabola",
+    "de": "Parabeln strecken und verschieben"
+   },
+   "text": {
+    "en": "In f(x) = a(x - d)^2 + e every letter has one job. Move the sliders or drag the vertex S and compare with the normal parabola y = x^2. Watch the zeros too: if a and e have opposite signs there are …",
+    "de": "In f(x) = a(x - d)^2 + e hat jeder Buchstabe eine Aufgabe. Beweg die Regler oder zieh den Scheitelpunkt S und vergleich mit der Normalparabel y = x^2. Achte auch auf die Nullstellen: Haben a und e …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "hunt-for-the-parameter-t",
+   "kind": "widget",
+   "title": {
+    "en": "Hunt for the parameter t",
+    "de": "Jagd auf den Parameter t"
+   },
+   "text": {
+    "en": "A letter like t in the equation is a parameter: each value gives a different equation. Slide t, watch the discriminant, and find every t with exactly one solution.",
+    "de": "Ein Buchstabe wie t in der Gleichung ist ein Parameter: Jeder Wert ergibt eine andere Gleichung. Schieb t, beobachte die Diskriminante und finde jedes t mit genau einer Lösung."
+   }
   }
  ],
  "lines": [
+  {
+   "level": 1,
+   "id": "the-coordinate-system",
+   "kind": "picture",
+   "title": {
+    "en": "The coordinate system",
+    "de": "Das Koordinatensystem"
+   },
+   "text": {
+    "en": "Two number lines cross at a right angle: the horizontal x-axis and the vertical y-axis. They meet at the origin.",
+    "de": "Zwei Zahlengeraden kreuzen sich im rechten Winkel: die waagerechte x-Achse und die senkrechte y-Achse. Sie treffen sich im Ursprung."
+   }
+  },
+  {
+   "level": 1,
+   "id": "point-hunt",
+   "kind": "widget",
+   "title": {
+    "en": "Point hunt",
+    "de": "Punktejagd"
+   },
+   "text": {
+    "en": "Drag P across the grid and watch its coordinates change. In Targets, put P exactly on the point that's asked for.",
+    "de": "Zieh P über das Gitter und beobachte, wie sich seine Koordinaten ändern. Bei Zielpunkte setzt du P genau auf den gesuchten Punkt."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-four-quadrants",
+   "kind": "picture",
+   "title": {
+    "en": "The four quadrants",
+    "de": "Die vier Quadranten"
+   },
+   "text": {
+    "en": "The axes cut the plane into four parts, the quadrants. They're numbered I to IV counterclockwise, starting top right.",
+    "de": "Die Achsen teilen die Ebene in vier Felder, die Quadranten. Sie werden gegen den Uhrzeigersinn von I bis IV nummeriert, oben rechts geht es los."
+   }
+  },
+  {
+   "level": 1,
+   "id": "tables-of-values",
+   "kind": "picture",
+   "title": {
+    "en": "Tables of values",
+    "de": "Wertetabellen"
+   },
+   "text": {
+    "en": "A rule like y = 2x - 1 gives a y for every x. Put each x in, work out y, and write both into a table of values. Each pair is a point.",
+    "de": "Eine Vorschrift wie y = 2x - 1 liefert zu jedem x ein y. Setz jedes x ein, rechne y aus und trag beides in eine Wertetabelle ein. Jedes Wertepaar ist ein Punkt."
+   }
+  },
+  {
+   "level": 1,
+   "id": "from-the-table-to-the-graph",
+   "kind": "widget",
+   "title": {
+    "en": "From the table to the graph",
+    "de": "Von der Tabelle zum Graphen"
+   },
+   "text": {
+    "en": "Pick a rule and fill in the table one value at a time. Every pair (x | y) becomes a point. What do the points do once all five are there?",
+    "de": "Wähl eine Vorschrift und füll die Tabelle Wert für Wert aus. Jedes Wertepaar (x | y) wird zu einem Punkt. Was machen die Punkte, wenn alle fünf da sind?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "lines-through-the-origin",
+   "kind": "widget",
+   "title": {
+    "en": "Lines through the origin",
+    "de": "Ursprungsgeraden"
+   },
+   "text": {
+    "en": "Choose the factor m and drag P along the line y = m \\cdot x. The table collects your points: y : x always gives m.",
+    "de": "Wähl den Faktor m und zieh P an der Geraden y = m \\cdot x entlang. Die Tabelle sammelt deine Punkte: y : x ergibt immer m."
+   }
+  },
   {
    "level": 2,
    "id": "what-m-and-b-do",
@@ -226,10 +1033,558 @@
     "en": "Parallel lines have the same slope. Perpendicular lines meet at a right angle; their slopes multiply to -1, so m_h = -\\frac{1}{m_g}.",
     "de": "Parallele Geraden haben die gleiche Steigung. Orthogonale (senkrechte) Geraden schneiden sich im rechten Winkel. Das Produkt ihrer Steigungen ist -1, also m_h = -\\frac{1}{m_g}."
    }
+  },
+  {
+   "level": 3,
+   "id": "where-two-lines-meet",
+   "kind": "picture",
+   "title": {
+    "en": "Where two lines meet",
+    "de": "Der Schnittpunkt zweier Geraden"
+   },
+   "text": {
+    "en": "At the intersection point S both equations give the same y for the same x. So you set the right-hand sides equal, solve for x and then find y. Here: g: y = 2x - 1 and h: y = -x + 5.",
+    "de": "Im Schnittpunkt S liefern beide Gleichungen beim selben x dasselbe y. Also setzt du die rechten Seiten gleich (Gleichsetzen), löst nach x auf und bestimmst dann y. Hier: g: y = 2x - 1 und h: y = …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "intersection-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Intersection lab",
+    "de": "Schnittpunkt-Labor"
+   },
+   "text": {
+    "en": "Change the slope and the y-intercept of g and h. The intersection point S and the equating follow live. Give both lines the same slope and see what happens.",
+    "de": "Ändere Steigung und y-Achsenabschnitt von g und h. Der Schnittpunkt S und das Gleichsetzen laufen live mit. Gib beiden Geraden dieselbe Steigung und schau, was passiert."
+   }
+  },
+  {
+   "level": 3,
+   "id": "angle-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Angle lab",
+    "de": "Winkel-Labor"
+   },
+   "text": {
+    "en": "Change the slope and watch \\alpha = \\tan^{-1}(m). Switch to Two lines to see the angle of intersection \\varphi between g and h.",
+    "de": "Ändere die Steigung und beobachte \\alpha = \\tan^{-1}(m). Unter Zwei Geraden siehst du den Schnittwinkel \\varphi zwischen g und h."
+   }
+  },
+  {
+   "level": 3,
+   "id": "distance-and-midpoint",
+   "kind": "picture",
+   "title": {
+    "en": "Distance and midpoint",
+    "de": "Abstand und Mittelpunkt"
+   },
+   "text": {
+    "en": "The segment AB is the hypotenuse of a slope triangle with the legs \\Delta x and \\Delta y. The midpoint M is the average of the two points.",
+    "de": "Die Strecke AB ist die Hypotenuse eines Steigungsdreiecks mit den Katheten \\Delta x und \\Delta y. Der Mittelpunkt M ist der Mittelwert der beiden Punkte."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-shortest-way-to-a-line",
+   "kind": "picture",
+   "title": {
+    "en": "The shortest way to a line",
+    "de": "Der kürzeste Weg zur Geraden"
+   },
+   "text": {
+    "en": "The distance from P to the line g is measured at a right angle. Three steps: 1. the perpendicular h through P, 2. its foot F on g, 3. d = |PF|. Example: g: y = \\frac{1}{2}x + 1 and P(6 | -1).",
+    "de": "Der Abstand von P zur Geraden g wird im rechten Winkel gemessen. Drei Schritte: 1. die Lotgerade h durch P, 2. ihr Lotfußpunkt F auf g, 3. d = |PF|. Beispiel: g: y = \\frac{1}{2}x + 1 und P(6 | -1)."
+   }
+  },
+  {
+   "level": 3,
+   "id": "distance-from-a-point-to-a-line",
+   "kind": "widget",
+   "title": {
+    "en": "Distance from a point to a line",
+    "de": "Abstand Punkt–Gerade"
+   },
+   "text": {
+    "en": "Drag P and pick a line g. Go through the method step by step: the perpendicular h, the foot F, the distance d.",
+    "de": "Zieh P und wähl eine Gerade g. Geh das Verfahren Schritt für Schritt durch: Lotgerade h, Lotfußpunkt F, Abstand d."
+   }
   }
  ],
- "area-volume": [],
- "probability": [],
+ "area-volume": [
+  {
+   "level": 1,
+   "id": "perimeter-and-area",
+   "kind": "picture",
+   "title": {
+    "en": "Perimeter and area",
+    "de": "Umfang und Flächeninhalt"
+   },
+   "text": {
+    "en": "The perimeter u is the length of the edge: once all the way round. The area A tells you how many unit squares fit inside. Here every square is 1 \"cm²\": a square with 1 \"cm\" sides.",
+    "de": "Der Umfang u ist die Länge des Randes: einmal ganz herum. Der Flächeninhalt A sagt, wie viele Einheitsquadrate hineinpassen. Hier ist jedes Kästchen 1 \"cm²\" groß: ein Quadrat mit 1 \"cm\" Seitenlänge."
+   }
+  },
+  {
+   "level": 1,
+   "id": "rectangle-builder",
+   "kind": "widget",
+   "title": {
+    "en": "Rectangle builder",
+    "de": "Rechteck-Baukasten"
+   },
+   "text": {
+    "en": "Drag the corner of the rectangle on squared paper and watch area and perimeter change. Then solve the five building challenges.",
+    "de": "Zieh die Ecke des Rechtecks auf dem Kästchenpapier und beobachte, wie sich Fläche und Umfang ändern. Dann löse die fünf Bauaufträge."
+   }
+  },
+  {
+   "level": 1,
+   "id": "area-units-the-factor-is-100",
+   "kind": "picture",
+   "title": {
+    "en": "Area units: the factor is 100",
+    "de": "Flächeneinheiten: Umrechnungszahl 100"
+   },
+   "text": {
+    "en": "A square with 1 \"cm\" sides is split into millimetre squares: 10 rows of 10. So the next smaller area unit is always 100 times as many, not 10.",
+    "de": "Ein Quadrat mit 1 \"cm\" Seitenlänge wird in Millimeter-Quadrate zerlegt: 10 Reihen mit je 10. Die nächstkleinere Flächeneinheit passt also immer 100-mal hinein, nicht 10-mal."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-unit-table",
+   "kind": "widget",
+   "title": {
+    "en": "The unit table",
+    "de": "Die Einheitentafel"
+   },
+   "text": {
+    "en": "In the place-value table every unit gets two places for areas and three for volumes. The digits stay where they are, only the comma moves. Tap a unit to convert.",
+    "de": "In der Stellenwerttafel bekommt jede Einheit zwei Stellen bei Flächen und drei bei Volumen. Die Ziffern bleiben stehen, nur das Komma wandert. Tippe eine Einheit an, um umzurechnen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "shapes-made-of-rectangles",
+   "kind": "picture",
+   "title": {
+    "en": "Shapes made of rectangles",
+    "de": "Zusammengesetzte Flächen"
+   },
+   "text": {
+    "en": "Split the shape into rectangles and add their areas. Or complete it to a big rectangle and subtract the missing piece. Missing sides you get by subtracting.",
+    "de": "Zerleg die Figur in Rechtecke und addiere ihre Flächen. Oder ergänze sie zu einem großen Rechteck und zieh das fehlende Stück ab. Fehlende Seiten bekommst du durch Subtrahieren."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-cuboid-volume-and-surface-area",
+   "kind": "picture",
+   "title": {
+    "en": "The cuboid: volume and surface area",
+    "de": "Der Quader: Volumen und Oberfläche"
+   },
+   "text": {
+    "en": "The volume V says how many unit cubes fit inside. A unit cube with 1 \"cm\" edges has the volume 1 \"cm³\". The surface area O is all six faces together.",
+    "de": "Das Volumen V sagt, wie viele Einheitswürfel hineinpassen. Ein Einheitswürfel mit 1 \"cm\" Kantenlänge hat das Volumen 1 \"cm³\". Die Oberfläche O sind alle sechs Flächen zusammen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "cuboid-from-cubes-and-its-net",
+   "kind": "widget",
+   "title": {
+    "en": "Cuboid from cubes, and its net",
+    "de": "Quader aus Würfeln und sein Netz"
+   },
+   "text": {
+    "en": "Set length, width and height. On the left you count the volume in unit cubes, on the right you see the net: six rectangles, always two the same. Tap a pair of faces to find it on the cuboid.",
+    "de": "Stell Länge, Breite und Höhe ein. Links zählst du das Volumen in Einheitswürfeln, rechts siehst du das Netz: sechs Rechtecke, immer zwei gleiche. Tippe ein Flächenpaar an, um es am Quader zu finden."
+   }
+  },
+  {
+   "level": 2,
+   "id": "parallelogram-cut-and-shift",
+   "kind": "picture",
+   "title": {
+    "en": "Parallelogram: cut and shift",
+    "de": "Parallelogramm: abschneiden und verschieben"
+   },
+   "text": {
+    "en": "Cut off the triangle on the left and move it to the right: you get a rectangle with length g and width h. The height h is the distance between the parallel sides, at right angles to the base g.",
+    "de": "Schneide das Dreieck links ab und setz es rechts an: Es entsteht ein Rechteck mit der Länge g und der Breite h. Die Höhe h ist der Abstand der parallelen Seiten, senkrecht zur Grundseite g."
+   }
+  },
+  {
+   "level": 2,
+   "id": "base-and-height",
+   "kind": "widget",
+   "title": {
+    "en": "Base and height",
+    "de": "Grundseite und Höhe"
+   },
+   "text": {
+    "en": "Drag the top corner of a triangle or a parallelogram. As long as base and height stay the same, the area doesn't change. For the triangle you can also pick another side as the base.",
+    "de": "Zieh die obere Ecke eines Dreiecks oder Parallelogramms. Solange Grundseite und Höhe gleich bleiben, ändert sich der Flächeninhalt nicht. Beim Dreieck kannst du auch eine andere Seite als …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "triangle-half-a-parallelogram",
+   "kind": "picture",
+   "title": {
+    "en": "Triangle: half a parallelogram",
+    "de": "Dreieck: ein halbes Parallelogramm"
+   },
+   "text": {
+    "en": "Two copies of a triangle make a parallelogram, so A = \\frac{g \\cdot h}{2}. Any side can be the base g, as long as you take the height that belongs to it.",
+    "de": "Zwei gleiche Dreiecke ergeben ein Parallelogramm, also gilt A = \\frac{g \\cdot h}{2}. Jede Seite kann die Grundseite g sein, wenn du die passende Höhe dazu nimmst."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-trapezium",
+   "kind": "picture",
+   "title": {
+    "en": "The trapezium",
+    "de": "Das Trapez"
+   },
+   "text": {
+    "en": "A trapezium has two parallel sides a and c. Turn a copy upside down and put it next to it: you get a parallelogram with base a + c. The trapezium is half of it.",
+    "de": "Ein Trapez hat zwei parallele Seiten a und c. Dreh eine Kopie um und leg sie daneben: Es entsteht ein Parallelogramm mit der Grundseite a + c. Das Trapez ist die Hälfte davon."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-circle-and-pi",
+   "kind": "picture",
+   "title": {
+    "en": "The circle and π",
+    "de": "Der Kreis und π"
+   },
+   "text": {
+    "en": "Every circle has a radius r (centre to edge) and a diameter d = 2r (straight across). The circumference is always a bit more than 3 diameters: exactly \\pi \\approx 3.14 times.",
+    "de": "Jeder Kreis hat einen Radius r (Mittelpunkt bis Rand) und einen Durchmesser d = 2r (einmal quer durch). Der Umfang ist immer etwas mehr als 3 Durchmesser: genau \\pi \\approx 3,14-mal."
+   }
+  },
+  {
+   "level": 2,
+   "id": "discovering-pi",
+   "kind": "widget",
+   "title": {
+    "en": "Discovering π",
+    "de": "π entdecken"
+   },
+   "text": {
+    "en": "First roll a wheel once along the ground: the track is π times the diameter. Then cut a circle into pieces and lay them side by side: a nearly-rectangle with sides \\pi r and r appears.",
+    "de": "Roll zuerst ein Rad einmal über den Boden: Die Strecke ist π-mal der Durchmesser. Dann schneide einen Kreis in Stücke und leg sie nebeneinander: Es entsteht fast ein Rechteck mit den Seiten \\pi r …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "parts-of-circles-and-composite-shapes",
+   "kind": "picture",
+   "title": {
+    "en": "Parts of circles and composite shapes",
+    "de": "Kreisteile und zusammengesetzte Flächen"
+   },
+   "text": {
+    "en": "A window: a rectangle with a semicircle on top. A semicircle is half a circle, a quarter circle a quarter. In general a sector with angle \\alpha is the share \\frac{\\alpha}{360°} of the circle. If …",
+    "de": "Ein Fenster: ein Rechteck mit einem Halbkreis oben. Ein Halbkreis ist ein halber Kreis, ein Viertelkreis ein Viertel. Allgemein ist ein Kreisausschnitt mit dem Mittelpunktswinkel \\alpha der Anteil …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "prism-and-cylinder",
+   "kind": "picture",
+   "title": {
+    "en": "Prism and cylinder",
+    "de": "Prisma und Zylinder"
+   },
+   "text": {
+    "en": "A prism has two equal, parallel bases. Its height h is their distance, even if the prism lies on its side. A cylinder is the same with a circle as the base. The curved surface (Mantel) unrolls …",
+    "de": "Ein Prisma hat zwei gleiche, parallele Grundflächen. Seine Höhe h ist ihr Abstand, auch wenn das Prisma liegt. Ein Zylinder ist dasselbe mit einem Kreis als Grundfläche. Der Mantel lässt sich zu …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "pyramid-and-cone-a-third",
+   "kind": "picture",
+   "title": {
+    "en": "Pyramid and cone: a third",
+    "de": "Pyramide und Kegel: ein Drittel"
+   },
+   "text": {
+    "en": "A pyramid holds exactly a third of a prism with the same base G and the same height h. The height h goes from the apex straight down to the base.",
+    "de": "Eine Pyramide fasst genau ein Drittel eines Prismas mit gleicher Grundfläche G und gleicher Höhe h. Die Höhe h geht von der Spitze senkrecht nach unten auf die Grundfläche."
+   }
+  },
+  {
+   "level": 3,
+   "id": "why-a-third",
+   "kind": "widget",
+   "title": {
+    "en": "Why a third?",
+    "de": "Warum ein Drittel?"
+   },
+   "text": {
+    "en": "Fill the pyramid with water and pour it into the prism with the same base and the same height. How many fillings until the prism is full? Then try cone and cylinder.",
+    "de": "Füll die Pyramide mit Wasser und schütte sie in das Prisma mit gleicher Grundfläche und gleicher Höhe. Wie viele Füllungen, bis das Prisma voll ist? Dann probier Kegel und Zylinder."
+   }
+  },
+  {
+   "level": 3,
+   "id": "heights-with-pythagoras",
+   "kind": "picture",
+   "title": {
+    "en": "Heights with Pythagoras",
+    "de": "Höhen mit dem Satz des Pythagoras"
+   },
+   "text": {
+    "en": "Quick reminder: in a right triangle a^2 + b^2 = c^2, where c is the hypotenuse, the longest side opposite the right angle. In the pyramid: the height h, half the base edge \\frac{a}{2} and the …",
+    "de": "Kurz zur Erinnerung: Im rechtwinkligen Dreieck gilt a^2 + b^2 = c^2. Dabei ist c die Hypotenuse, die längste Seite gegenüber dem rechten Winkel. In der Pyramide: die Höhe h, die halbe Grundkante …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "surface-area-of-pyramid-and-cone",
+   "kind": "picture",
+   "title": {
+    "en": "Surface area of pyramid and cone",
+    "de": "Oberfläche von Pyramide und Kegel"
+   },
+   "text": {
+    "en": "Surface area = base + lateral surface (O = G + M). A square pyramid has four triangles as side faces. A cone's curved surface unrolls into a sector with radius s: its arc is the circumference 2 …",
+    "de": "Oberfläche = Grundfläche + Mantel (O = G + M). Eine quadratische Pyramide hat vier Dreiecke als Seitenflächen. Der Mantel eines Kegels ist abgewickelt ein Kreisausschnitt mit dem Radius s: Sein …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-sphere",
+   "kind": "picture",
+   "title": {
+    "en": "The sphere",
+    "de": "Die Kugel"
+   },
+   "text": {
+    "en": "A sphere has the volume V = \\frac{4}{3} \\pi r^3 and the surface area O = 4 \\pi r^2: exactly four circles with the same radius. Archimedes found: a sphere holds \\frac{2}{3} of the cylinder that …",
+    "de": "Eine Kugel hat das Volumen V = \\frac{4}{3} \\pi r^3 und die Oberfläche O = 4 \\pi r^2: genau vier Kreise mit dem gleichen Radius. Archimedes fand heraus: Eine Kugel fasst \\frac{2}{3} des Zylinders, …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "scaling-k-k2-k3",
+   "kind": "widget",
+   "title": {
+    "en": "Scaling: k, k², k³",
+    "de": "Vergrößern: k, k², k³"
+   },
+   "text": {
+    "en": "Scale the cube by the factor k. Count: how many small squares make up one face, how many small cubes fit inside? The bars show how fast lengths, areas and volumes grow.",
+    "de": "Vergrößere den Würfel mit dem Faktor k. Zähl nach: Aus wie vielen kleinen Quadraten besteht eine Seitenfläche, wie viele kleine Würfel passen hinein? Die Balken zeigen, wie schnell Längen, Flächen …"
+   }
+  }
+ ],
+ "probability": [
+  {
+   "level": 1,
+   "id": "roll-a-thousand-times",
+   "kind": "widget",
+   "title": {
+    "en": "Roll a thousand times",
+    "de": "Würfle tausendmal"
+   },
+   "text": {
+    "en": "The more often you roll, the more closely each number's relative frequency settles near \\frac{1}{6} \\approx 0.167: the law of large numbers. For a drawing pin, no counting rule tells you the …",
+    "de": "Je öfter du würfelst, desto genauer pendelt sich die relative Häufigkeit jeder Augenzahl bei \\frac{1}{6} \\approx 0,167 ein: das Gesetz der großen Zahlen. Für eine Reißzwecke gibt es keine …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "from-impossible-to-certain",
+   "kind": "picture",
+   "title": {
+    "en": "From impossible to certain",
+    "de": "Von unmöglich bis sicher"
+   },
+   "text": {
+    "en": "An event that can never happen is impossible: P = 0. One that always happens is certain: P = 1. The scale shows some events of rolling a normal die.",
+    "de": "Ein Ereignis, das nie eintreten kann, ist unmöglich: P = 0. Eines, das immer eintritt, ist sicher: P = 1. Die Skala zeigt einige Ereignisse beim Würfeln mit einem normalen Würfel."
+   }
+  },
+  {
+   "level": 1,
+   "id": "build-your-own-spinner",
+   "kind": "widget",
+   "title": {
+    "en": "Build your own spinner",
+    "de": "Bau dein eigenes Glücksrad"
+   },
+   "text": {
+    "en": "Tap a field to change its colour and choose how many fields the wheel has. Next to it you see each colour's probability as a fraction, a decimal and a percentage. Spin it many times and compare.",
+    "de": "Tippe auf ein Feld, um seine Farbe zu wechseln, und wähle, wie viele Felder das Rad hat. Daneben siehst du die Wahrscheinlichkeit jeder Farbe als Bruch, Dezimalzahl und in Prozent. Dreh oft und …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "multi-stage-experiments",
+   "kind": "picture",
+   "title": {
+    "en": "Multi-stage experiments",
+    "de": "Mehrstufige Zufallsexperimente"
+   },
+   "text": {
+    "en": "If you toss a coin twice, that's a two-stage chance experiment. A tree diagram shows every possibility: each stage branches, and every path from left to right is one outcome.",
+    "de": "Wirfst du eine Münze zweimal, ist das ein zweistufiges Zufallsexperiment. Ein Baumdiagramm zeigt alle Möglichkeiten: Jede Stufe verzweigt sich, und jeder Pfad von links nach rechts ist ein Ergebnis."
+   }
+  },
+  {
+   "level": 2,
+   "id": "path-rule-1-multiply-along-the-path",
+   "kind": "picture",
+   "title": {
+    "en": "Path rule 1: multiply along the path",
+    "de": "1. Pfadregel: entlang des Pfades multiplizieren"
+   },
+   "text": {
+    "en": "The probability of a path is the product of the probabilities along it (path rule 1, product rule). Example: an urn holds 3 red and 2 green balls, and you draw twice with replacement.",
+    "de": "Die Wahrscheinlichkeit eines Pfades ist das Produkt der Wahrscheinlichkeiten entlang des Pfades (1. Pfadregel, Produktregel). Beispiel: In einer Urne liegen 3 rote und 2 grüne Kugeln, und du …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "build-a-tree-diagram",
+   "kind": "widget",
+   "title": {
+    "en": "Build a tree diagram",
+    "de": "Bau ein Baumdiagramm"
+   },
+   "text": {
+    "en": "Choose how many red and green balls are in the urn, and whether the first ball goes back. The tree shows both draws with all branch probabilities. Pick paths: Blob multiplies along each path and …",
+    "de": "Stell ein, wie viele rote und grüne Kugeln in der Urne liegen und ob die erste Kugel zurückkommt. Der Baum zeigt beide Züge mit allen Wahrscheinlichkeiten. Wähle Pfade aus: Blob multipliziert …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "path-rule-2-add-the-paths",
+   "kind": "picture",
+   "title": {
+    "en": "Path rule 2: add the paths",
+    "de": "2. Pfadregel: Pfade addieren"
+   },
+   "text": {
+    "en": "If several paths belong to an event, you add their probabilities (path rule 2, sum rule). “Two different colours” means red then green or green then red.",
+    "de": "Gehören zu einem Ereignis mehrere Pfade, addierst du ihre Wahrscheinlichkeiten (2. Pfadregel, Summenregel). „Zwei verschiedene Farben“ heißt: erst rot, dann grün, oder erst grün, dann rot."
+   }
+  },
+  {
+   "level": 2,
+   "id": "without-replacement",
+   "kind": "picture",
+   "title": {
+    "en": "Without replacement",
+    "de": "Ohne Zurücklegen"
+   },
+   "text": {
+    "en": "If you don't put the ball back, the second draw is different: there is one ball fewer, and it's one of the colour you drew. The path rules work just the same.",
+    "de": "Legst du die Kugel nicht zurück, sieht der zweite Zug anders aus: Es ist eine Kugel weniger drin, und zwar eine von der Farbe, die du gezogen hast. Die Pfadregeln gelten genauso."
+   }
+  },
+  {
+   "level": 2,
+   "id": "how-many-tries-until-it-s-likely",
+   "kind": "widget",
+   "title": {
+    "en": "How many tries until it's likely?",
+    "de": "Wie oft muss ich es versuchen?"
+   },
+   "text": {
+    "en": "Pick an experiment and drag the slider for the number of tries n. The purple bars show P(\\text{at least once}) = 1 - (1 - p)^n. The red dashed line is the tempting wrong rule n \\cdot p: it shoots …",
+    "de": "Wähle ein Experiment und zieh am Regler für die Anzahl der Versuche n. Die lila Säulen zeigen P(\\text{mindestens einmal}) = 1 - (1 - p)^n. Die rote gestrichelte Linie ist die verlockende falsche …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "two-way-tables-and-conditional-probability",
+   "kind": "picture",
+   "title": {
+    "en": "Two-way tables and conditional probability",
+    "de": "Vierfeldertafel und bedingte Wahrscheinlichkeit"
+   },
+   "text": {
+    "en": "A survey of 200 students asks about two features at once: A and B. The two-way table (Vierfeldertafel) has an inner field for each combination and the totals at the edge. \\overline{A} (with a bar) …",
+    "de": "Eine Umfrage unter 200 Jugendlichen fragt zwei Merkmale gleichzeitig ab: A und B. Die Vierfeldertafel hat für jede Kombination ein inneres Feld und am Rand die Summen. \\overline{A} (mit Strich) …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "turning-the-tree-around-the-medical-test",
+   "kind": "picture",
+   "title": {
+    "en": "Turning the tree around: the medical test",
+    "de": "Den Baum umkehren: der medizinische Test"
+   },
+   "text": {
+    "en": "\\group{2 \\, %} of people have an illness (K). The test is positive (T) for \\group{90 \\, %} of the ill and, by mistake, for \\group{5 \\, %} of the healthy. The first tree starts with “ill or …",
+    "de": "\\group{2 \\, %} der Menschen haben eine Krankheit (K). Der Test ist bei \\group{90 \\, %} der Kranken positiv (T), bei Gesunden fälschlich in \\group{5 \\, %} der Fälle. Der erste Baum beginnt mit …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-test-fact-checked-with-10-000-people",
+   "kind": "widget",
+   "title": {
+    "en": "The test, fact-checked with 10 000 people",
+    "de": "Der Test im Faktencheck: 10 000 Menschen"
+   },
+   "text": {
+    "en": "Set how common the illness is and how good the test is. Blob shows 10\\,000 people as dots (one dot for every 10), with the two-way table next to it. How many of the positive tests are really ill? …",
+    "de": "Stell ein, wie häufig die Krankheit ist und wie gut der Test ist. Blob zeigt 10\\,000 Menschen als Punkte (ein Punkt für je 10), daneben die Vierfeldertafel. Wie viele der positiv Getesteten sind …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "expected-value-and-fair-games",
+   "kind": "picture",
+   "title": {
+    "en": "Expected value and fair games",
+    "de": "Erwartungswert und faires Spiel"
+   },
+   "text": {
+    "en": "One spin costs a stake of €2. The random variable X is the payout. The expected value E(X) is what you get per game on average in the long run: each value is weighted with its probability.",
+    "de": "Eine Drehung kostet 2 € Einsatz. Die Zufallsgröße X ist die Auszahlung. Der Erwartungswert E(X) ist das, was du auf lange Sicht im Mittel pro Spiel bekommst: Jeder Wert wird mit seiner …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "bernoulli-chains-and-the-binomial-distribution",
+   "kind": "picture",
+   "title": {
+    "en": "Bernoulli chains and the binomial distribution",
+    "de": "Bernoulli-Ketten und die Binomialverteilung"
+   },
+   "text": {
+    "en": "An experiment with just two outcomes, hit (1, probability p) or miss (0, probability 1 - p), is a Bernoulli experiment. Repeat it n times independently and you get a Bernoulli chain of length n. …",
+    "de": "Ein Experiment mit nur zwei Ausgängen, Treffer (1, Wahrscheinlichkeit p) oder Niete (0, Wahrscheinlichkeit 1 - p), heißt Bernoulli-Experiment. Wiederholst du es n-mal unabhängig, entsteht eine …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "explore-the-binomial-distribution",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the binomial distribution",
+    "de": "Die Binomialverteilung erkunden"
+   },
+   "text": {
+    "en": "Choose the number of trials n and the hit probability p. The histogram shows P(X = k) for every k. Tap a bar to see the Bernoulli formula with its numbers, or switch to “at most” and “at least”.",
+    "de": "Wähle die Anzahl der Versuche n und die Trefferwahrscheinlichkeit p. Das Histogramm zeigt P(X = k) für jedes k. Tippe auf eine Säule, um die Bernoulli-Formel mit Zahlen zu sehen, oder wechsle zu …"
+   }
+  }
+ ],
  "word-problems": [
   {
    "level": 1,
@@ -255,6 +1610,97 @@
    "text": {
     "en": "Switch between more → more and more → less, and change the amount you want. On the right side, is it the same operation or the opposite?",
     "de": "Wechsle zwischen mehr → mehr und mehr → weniger und ändere die gesuchte Menge. Rechnest du rechts gleich oder umgekehrt?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "measure-on-the-map",
+   "kind": "widget",
+   "title": {
+    "en": "Measure on the map",
+    "de": "Miss auf der Karte"
+   },
+   "text": {
+    "en": "A small town map with a scale bar. Measure between two places and see how the scale turns map centimetres into metres and kilometres.",
+    "de": "Ein kleiner Stadtplan mit Maßstabsleiste. Miss zwischen zwei Orten und sieh, wie der Maßstab aus Kartenzentimetern Meter und Kilometer macht."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-mean-as-levelling-out",
+   "kind": "widget",
+   "title": {
+    "en": "The mean as levelling out",
+    "de": "Der Mittelwert als Ausgleich"
+   },
+   "text": {
+    "en": "Five test scores as bars, the dashed line is their mean. Level them out to see the mean as a fair share, and add or remove values.",
+    "de": "Fünf Testergebnisse als Balken, die gestrichelte Linie ist ihr Mittelwert. Gleich sie aus, um den Mittelwert als gerechten Anteil zu sehen, und füge Werte hinzu oder nimm welche weg."
+   }
+  },
+  {
+   "level": 2,
+   "id": "tariff-calculator",
+   "kind": "widget",
+   "title": {
+    "en": "Tariff calculator",
+    "de": "Der Tarifrechner"
+   },
+   "text": {
+    "en": "Each tariff is a straight line: the basic fee is where it starts, the price per unit is how steep it is. Where the lines cross, both cost the same.",
+    "de": "Jeder Tarif ist eine Gerade: Die Grundgebühr ist ihr Startwert, der Preis pro Einheit ihre Steigung. Wo sich die Geraden schneiden, kosten beide gleich viel."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-modelling-cycle",
+   "kind": "picture",
+   "title": {
+    "en": "The modelling cycle",
+    "de": "Der Modellierungskreislauf"
+   },
+   "text": {
+    "en": "A phone battery is at 100 % and loses 8 % every hour. When is it empty? Modelling means: translate the situation into maths, solve, translate back and check whether it makes sense. Tap the steps …",
+    "de": "Ein Handyakku ist bei 100 % und verliert jede Stunde 8 %. Wann ist er leer? Modellieren heißt: Die Situation in Mathe übersetzen, lösen, zurückübersetzen und prüfen, ob es Sinn ergibt. Tipp im …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-model-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The model lab",
+    "de": "Das Modell-Labor"
+   },
+   "text": {
+    "en": "Five real data sets: bacteria, a candle, braking distance, a medicine and a throw. Choose a model and see whether it fits all points, then look at what it predicts far ahead.",
+    "de": "Fünf echte Messreihen: Bakterien, eine Kerze, der Bremsweg, ein Medikament und ein Wurf. Wähl ein Modell, prüf, ob es zu allen Punkten passt, und schau, was es weit in der Zukunft vorhersagt."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-biggest-enclosure",
+   "kind": "widget",
+   "title": {
+    "en": "The biggest enclosure",
+    "de": "Das größte Gehege"
+   },
+   "text": {
+    "en": "Against a wall or free-standing, 24, 32 or 40 m of fence: the rectangle changes shape and the area follows a parabola. Find its highest point.",
+    "de": "An der Hauswand oder frei stehend, 24, 32 oder 40 m Zaun: Das Rechteck ändert seine Form, und die Fläche folgt einer Parabel. Finde ihren höchsten Punkt."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-fermi-estimator",
+   "kind": "widget",
+   "title": {
+    "en": "The Fermi estimator",
+    "de": "Der Fermi-Schätzer"
+   },
+   "text": {
+    "en": "Three classic Fermi questions as chains of assumptions. Change each guess and watch the estimate and its order of magnitude.",
+    "de": "Drei klassische Fermi-Fragen als Ketten von Annahmen. Ändere jede Schätzung und beobachte das Ergebnis und seine Größenordnung."
    }
   }
  ],
@@ -283,6 +1729,84 @@
    "text": {
     "en": "Read the story and tap the chips in the right order to build the equation. Tap a chip in your equation to send it back.",
     "de": "Lies die Geschichte und tippe die Bausteine in der richtigen Reihenfolge an. Tippst du einen Baustein in deiner Gleichung an, wandert er zurück."
+   }
+  },
+  {
+   "level": 2,
+   "id": "find-the-pair-that-fits-both-clues",
+   "kind": "widget",
+   "title": {
+    "en": "Find the pair that fits both clues",
+    "de": "Finde das Paar, das beide Hinweise erfüllt"
+   },
+   "text": {
+    "en": "Each clue on its own has lots of solutions. Change x and y until both clues light up. Then show the lines: every point on a line fits one clue, and the solution of the system is where the lines cross.",
+    "de": "Jeder Hinweis allein hat viele Lösungen. Ändere x und y, bis beide Hinweise leuchten. Dann blende die Geraden ein: Jeder Punkt auf einer Geraden erfüllt einen Hinweis, und die Lösung des …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "meet-or-catch-up",
+   "kind": "widget",
+   "title": {
+    "en": "Meet or catch up",
+    "de": "Begegnen oder einholen"
+   },
+   "text": {
+    "en": "Two vehicles on one road, and their distance-time diagram. Choose the speeds and press play. Towards each other, the gap shrinks by both speeds together. When catching up, it only shrinks by the …",
+    "de": "Zwei Fahrzeuge auf einer Straße und ihr Weg-Zeit-Diagramm. Wähl die Geschwindigkeiten und drück auf Start. Aufeinander zu schrumpft der Abstand um beide Geschwindigkeiten zusammen, beim Einholen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "a-frame-around-a-picture",
+   "kind": "picture",
+   "title": {
+    "en": "A frame around a picture",
+    "de": "Ein Rahmen um ein Bild"
+   },
+   "text": {
+    "en": "A picture is 30 cm wide and 18 cm high. It gets a frame that is equally wide all around. Picture and frame together cover 864 cm². How wide is the frame? The frame adds its width on both sides, so …",
+    "de": "Ein Bild ist 30 cm breit und 18 cm hoch. Es bekommt einen Rahmen, der ringsherum gleich breit ist. Bild und Rahmen bedecken zusammen 864 cm². Wie breit ist der Rahmen? Der Rahmen kommt auf beiden …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "slide-the-frame",
+   "kind": "widget",
+   "title": {
+    "en": "Slide the frame",
+    "de": "Schieb den Rahmen"
+   },
+   "text": {
+    "en": "Change the width x of the frame and watch the area outside grow. Find the width for exactly 864 cm². Then show the graph of the area: the equation has a second solution, but it isn't a real frame.",
+    "de": "Ändere die Breite x des Rahmens und beobachte, wie die Fläche außen wächst. Finde die Breite für genau 864 cm². Dann blende den Graphen der Fläche ein: Die Gleichung hat noch eine zweite Lösung, …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "thrown-upwards-up-and-down",
+   "kind": "picture",
+   "title": {
+    "en": "Thrown upwards: up and down",
+    "de": "Senkrechter Wurf: hoch und runter"
+   },
+   "text": {
+    "en": "A ball is thrown straight up. Its height (in m) after t seconds is h(t) = 20t - 5t^2. When is it exactly 15 m high? When does it land? Set h(t) equal to the height you want and solve.",
+    "de": "Ein Ball wird senkrecht nach oben geworfen. Seine Höhe (in m) nach t Sekunden ist h(t) = 20t - 5t^2. Wann ist er genau 15 m hoch? Wann landet er? Setz h(t) gleich der gesuchten Höhe und löse die …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "two-pumps-one-pool",
+   "kind": "widget",
+   "title": {
+    "en": "Two pumps, one pool",
+    "de": "Zwei Pumpen, ein Becken"
+   },
+   "text": {
+    "en": "Set how long each pump would need alone, switch them on and off, and fill the pool. The colours show how much water came from which pump. Together they're always faster than the faster pump alone.",
+    "de": "Stell ein, wie lange jede Pumpe allein bräuchte, schalte sie ein und aus und füll das Becken. Die Farben zeigen, wie viel Wasser von welcher Pumpe kommt. Zusammen sind sie immer schneller als die …"
    }
   }
  ],

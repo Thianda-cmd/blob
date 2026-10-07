@@ -21,7 +21,6 @@ import {
   t3,
   tripleSrc,
   tripleText,
-  V3S,
   XYZ,
   type Names,
   type Row,
