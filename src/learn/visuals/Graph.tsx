@@ -208,11 +208,12 @@ export function Graph({
             />
           ))}
           {functions.map((fn, i) => (
+            // Dashed curves fade in instead of drawing in: motion's pathLength would replace the dash pattern.
             <motion.path
               key={fn.key ?? `fn${i}`}
-              initial={{ pathLength: 0 }}
-              animate={{ d: path(fn), pathLength: 1 }}
-              transition={{ d: { type: "spring", stiffness: 200, damping: 26 }, pathLength: { duration: 0.9, ease: "easeOut" } }}
+              initial={fn.dashed ? { opacity: 0 } : { pathLength: 0 }}
+              animate={fn.dashed ? { d: path(fn), opacity: 1 } : { d: path(fn), pathLength: 1 }}
+              transition={{ d: { type: "spring", stiffness: 200, damping: 26 }, pathLength: { duration: 0.9, ease: "easeOut" }, opacity: { duration: 0.5 } }}
               fill="none"
               stroke={COLOR[fn.color ?? "blob"]}
               strokeWidth={0.9}

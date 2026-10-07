@@ -41,17 +41,30 @@ export function Inline({ text }: { text: Text }) {
   );
 }
 
+const isMath = (part: string) => part.startsWith("$") && part.endsWith("$") && part.length > 2;
+
 function WithMath({ text }: { text: string }) {
   const parts = text.split(/(\$[^$]+\$)/g).filter(Boolean);
   return (
     <>
-      {parts.map((part, i) =>
-        part.startsWith("$") && part.endsWith("$") && part.length > 2 ? (
-          <MathView key={i} src={part.slice(1, -1)} size="inline" animate={false} className="mx-[0.1em] align-middle" />
-        ) : (
-          <Fragment key={i}>{part}</Fragment>
-        ),
-      )}
+      {parts.map((part, i) => {
+        if (isMath(part)) {
+          const math = <MathView src={part.slice(1, -1)} size="inline" animate={false} className="mx-[0.1em] align-middle" />;
+          // Punctuation right after the maths stays on its line ("… $x = 3$, so …").
+          const tail = !isMath(parts[i + 1] ?? "") ? (parts[i + 1]?.match(/^[,.;:!?)]+/)?.[0] ?? "") : "";
+          return tail ? (
+            <span key={i} className="whitespace-nowrap">
+              {math}
+              {tail}
+            </span>
+          ) : (
+            <Fragment key={i}>{math}</Fragment>
+          );
+        }
+        const prev = parts[i - 1];
+        const cut = prev && isMath(prev) ? (part.match(/^[,.;:!?)]+/)?.[0].length ?? 0) : 0;
+        return <Fragment key={i}>{cut ? part.slice(cut) : part}</Fragment>;
+      })}
     </>
   );
 }

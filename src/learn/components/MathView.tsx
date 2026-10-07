@@ -141,6 +141,8 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
         (!prev ||
           (prev.type === "op" && !["!", "%", "°"].includes(prev.v) && (node.v === "−" || RELATIONS.has(prev.v))) ||
           (prev.type === "space" && prev.v === "br") ||
+          // A sign right after a set brace: L = {−5; 5}
+          (prev.type === "sym" && prev.v === "{") ||
           (node.v === "−" && prev.type === "text" && LABEL.test(prev.v))));
       const cls = RELATIONS.has(node.v) ? "mv-rel" : BINARY.has(node.v) && !unary ? "mv-bin" : node.v === "," || node.v === ";" ? "mv-punct" : "mv-op";
       return <Leaf k={node.k} ctx={ctx} className={cls}>{node.v}</Leaf>;

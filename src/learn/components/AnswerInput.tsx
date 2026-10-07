@@ -278,7 +278,14 @@ export function AnswerInput({
   }, [currentKey]);
   const submitNow = () => onSubmit(current);
 
-  const setPart = (i: number, v: string) => setParts((p) => p.map((x, j) => (j === i ? v : x)));
+  // Any number of boxes (equations can have three or four solutions).
+  const setPart = (i: number, v: string) =>
+    setParts((p) => {
+      const next = [...p];
+      while (next.length <= i) next.push("");
+      next[i] = v;
+      return next;
+    });
   const t = useMessages(learnText).input;
   const tt = useText();
 
@@ -313,7 +320,8 @@ export function AnswerInput({
         </div>
       );
     case "solutions": {
-      const count = spec.allowNone ? 2 : Math.max(1, spec.values.length);
+      // With "no solution" allowed, at least two boxes, so the box count doesn't give the answer away.
+      const count = spec.allowNone ? Math.max(2, spec.values.length) : Math.max(1, spec.values.length);
       return (
         <div className="space-y-3">
           <div className={cn("flex flex-wrap items-center gap-4 transition-opacity", none && "pointer-events-none opacity-35")}>
