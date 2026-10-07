@@ -6,6 +6,7 @@ import { resolveText } from "@/i18n/text";
 import { SUBJECTS, subjectCatalog, type Subject } from "@/learn/catalog";
 import { TopicGlyph } from "@/learn/components/TopicGlyph";
 import { showTopicHref } from "@/learn/showcase";
+import { manifestItems } from "@/learn/showManifest";
 import { AREAS } from "@/learn/types";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +23,9 @@ export default async function ShowGallery() {
       <h1 className="max-w-[720px] font-display text-[34px] font-bold leading-tight tracking-[-0.02em] sm:text-[42px]">{t.galleryTitle}</h1>
       <p className="mt-3 max-w-[680px] text-[16px] leading-relaxed text-ink-2">{t.galleryIntro}</p>
       {subjects.map((s) => {
-        const topics = subjectCatalog(s.slug as Subject);
+        // Topics without pictures stay out (a topic the manifest doesn't know yet is shown).
+        const topics = subjectCatalog(s.slug as Subject).filter((topic) => manifestItems(topic.slug)?.length !== 0);
+        if (!topics.length) return null;
         return (
           <section key={s.slug} className="mt-12">
             <h2 className="mb-4 flex items-baseline gap-3 font-display text-[24px] font-bold tracking-[-0.015em]">
@@ -43,6 +46,7 @@ export default async function ShowGallery() {
                     <span className="block text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{resolveText(AREAS[topic.area].title, locale)}</span>
                     <span className="block truncate font-display text-[16.5px] font-semibold tracking-[-0.01em] group-hover:text-blob-ink">{resolveText(topic.title, locale)}</span>
                     <span className="line-clamp-2 text-[12.5px] leading-snug text-ink-3">{resolveText(topic.blurb, locale)}</span>
+                    {manifestItems(topic.slug) && <span className="mt-0.5 block text-[12px] font-medium text-blob-ink">{t.pictureCount(manifestItems(topic.slug)!.length)}</span>}
                   </span>
                 </Link>
               ))}

@@ -1,0 +1,3127 @@
+{
+ "negative-numbers": [],
+ "brackets": [
+  {
+   "level": 1,
+   "id": "try-it-yourself",
+   "kind": "widget",
+   "title": {
+    "en": "Try it yourself",
+    "de": "Probier's selbst"
+   },
+   "text": {
+    "en": "Switch between + and -. The highlighted signs are the ones that change.",
+    "de": "Schalte zwischen + und - um. Die markierten Vorzeichen sind die, die sich ändern."
+   }
+  }
+ ],
+ "expanding": [
+  {
+   "level": 2,
+   "id": "why-it-works",
+   "kind": "widget",
+   "title": {
+    "en": "Why it works",
+    "de": "Warum das funktioniert"
+   },
+   "text": {
+    "en": "A rectangle with sides a and x + b has the area a(x + b). Split it in two and you get ax + ab.",
+    "de": "Ein Rechteck mit den Seiten a und x + b hat den Flächeninhalt a(x + b). Zerlegst du es in zwei Teile, bekommst du ax + ab."
+   }
+  }
+ ],
+ "rearranging": [
+  {
+   "level": 2,
+   "id": "pick-a-letter",
+   "kind": "widget",
+   "title": {
+    "en": "Pick a letter",
+    "de": "Wähle einen Buchstaben"
+   },
+   "text": {
+    "en": "Tap a formula, then the letter you want on its own. Each step shows what is undone. The numbers at the bottom check that the new formula gives the same result.",
+    "de": "Tippe auf eine Formel und dann auf den Buchstaben, der allein stehen soll. Jeder Schritt zeigt, was rückgängig gemacht wird. Die Zahlen unten prüfen, ob die neue Formel dasselbe Ergebnis liefert."
+   }
+  }
+ ],
+ "fractions": [
+  {
+   "level": 1,
+   "id": "same-amount-new-name",
+   "kind": "widget",
+   "title": {
+    "en": "Same amount, new name",
+    "de": "Gleicher Wert, neuer Name"
+   },
+   "text": {
+    "en": "Build a fraction with the steppers. Then expand or simplify it and watch the cuts appear and disappear.",
+    "de": "Stell mit Plus und Minus einen Bruch ein. Dann erweitere oder kürze ihn und schau zu, wie Schnitte dazukommen und verschwinden."
+   }
+  },
+  {
+   "level": 1,
+   "id": "find-the-common-denominator",
+   "kind": "widget",
+   "title": {
+    "en": "Find the common denominator",
+    "de": "Den Hauptnenner finden"
+   },
+   "text": {
+    "en": "Press Next step. Both bars are cut into the same number of parts, and then the parts can simply be counted.",
+    "de": "Drück auf Nächster Schritt. Beide Streifen werden in gleich viele Teile zerlegt, dann kannst du die Teile einfach zählen."
+   }
+  }
+ ],
+ "powers-roots": [
+  {
+   "level": 2,
+   "id": "the-power-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The power lab",
+    "de": "Das Potenzlabor"
+   },
+   "text": {
+    "en": "Pick a rule, change m and n and press Combine. Try : with a bigger n than m. What happens?",
+    "de": "Wähl eine Regel, ändere m und n und drück auf Zusammenfassen. Probier : mit einem größeren n als m. Was passiert?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-root-splitter",
+   "kind": "widget",
+   "title": {
+    "en": "The root splitter",
+    "de": "Der Wurzelzerleger"
+   },
+   "text": {
+    "en": "Pick a square factor. The picture shows the number as equal squares. The side of one square comes out of the root.",
+    "de": "Wähl eine Quadratzahl als Faktor. Das Bild zeigt die Zahl als gleich große Quadrate. Die Seitenlänge eines Quadrats kommt vor die Wurzel."
+   }
+  }
+ ],
+ "percentages": [
+  {
+   "level": 1,
+   "id": "drag-the-rate",
+   "kind": "widget",
+   "title": {
+    "en": "Drag the rate",
+    "de": "Zieh am Prozentsatz"
+   },
+   "text": {
+    "en": "The hundred square is the base value G, cut into 100 equal pieces. Choose G, drag the rate and watch the percentage W.",
+    "de": "Das Hunderterfeld ist der Grundwert G, aufgeteilt in 100 gleich große Kästchen. Wähle G, zieh am Prozentsatz und beobachte den Prozentwert W."
+   }
+  },
+  {
+   "level": 1,
+   "id": "one-change-after-another",
+   "kind": "widget",
+   "title": {
+    "en": "One change after another",
+    "de": "Eine Änderung nach der anderen"
+   },
+   "text": {
+    "en": "Every change is one growth factor. Several changes in a row: multiply the factors. Change the steps, or try the examples.",
+    "de": "Jede Änderung ist ein Wachstumsfaktor. Mehrere Änderungen nacheinander: Faktoren multiplizieren. Ändere die Schritte oder probier die Beispiele aus."
+   }
+  }
+ ],
+ "equations": [
+  {
+   "level": 1,
+   "id": "keep-it-balanced",
+   "kind": "widget",
+   "title": {
+    "en": "Keep it balanced",
+    "de": "Halte die Waage im Gleichgewicht"
+   },
+   "text": {
+    "en": "Each purple box weighs x, each small block weighs 1. Take away the same on both sides and the balance stays level. Then switch to One side only and see what happens.",
+    "de": "Jede lila Kiste wiegt x, jeder kleine Block wiegt 1. Nimm auf beiden Seiten dasselbe weg, dann bleibt die Waage im Gleichgewicht. Wechsle danach zu Nur eine Seite und schau, was passiert."
+   }
+  },
+  {
+   "level": 1,
+   "id": "test-numbers-on-the-number-line",
+   "kind": "widget",
+   "title": {
+    "en": "Test numbers on the number line",
+    "de": "Zahlen am Zahlenstrahl testen"
+   },
+   "text": {
+    "en": "Move x and watch whether the inequality is true. The dots remember what you tried. Then compare 2x + 1 < 7 with -2x < 6: where are the solutions?",
+    "de": "Verschieb x und schau, ob die Ungleichung wahr ist. Die Punkte merken sich, was du ausprobiert hast. Vergleich dann 2x + 1 < 7 mit -2x < 6: Wo liegen die Lösungen?"
+   }
+  }
+ ],
+ "linear-systems": [
+  {
+   "level": 2,
+   "id": "each-equation-is-a-line",
+   "kind": "widget",
+   "title": {
+    "en": "Each equation is a line",
+    "de": "Jede Gleichung ist eine Gerade"
+   },
+   "text": {
+    "en": "Solve each equation for y and you get a line. A point on both lines solves both equations: the intersection is the solution. Try the special cases too.",
+    "de": "Löst du jede Gleichung nach y auf, bekommst du eine Gerade. Ein Punkt auf beiden Geraden löst beide Gleichungen: Der Schnittpunkt ist die Lösung. Probier auch die Sonderfälle aus."
+   }
+  }
+ ],
+ "pq-formula": [
+  {
+   "level": 2,
+   "id": "see-it-on-the-parabola",
+   "kind": "widget",
+   "title": {
+    "en": "See it on the parabola",
+    "de": "Ein Blick auf die Parabel"
+   },
+   "text": {
+    "en": "The solutions are where the parabola y = x^2 + px + q meets the x-axis. Use the sliders or drag the vertex S. The vertex lies exactly D below the axis.",
+    "de": "Die Lösungen sind die Nullstellen der Parabel y = x^2 + px + q, also die Stellen, an denen sie die x-Achse trifft. Nutze die Regler oder zieh den Scheitelpunkt S. Er liegt genau D unter der Achse."
+   }
+  }
+ ],
+ "lines": [
+  {
+   "level": 2,
+   "id": "what-m-and-b-do",
+   "kind": "widget",
+   "title": {
+    "en": "What m and b do",
+    "de": "Was m und b bewirken"
+   },
+   "text": {
+    "en": "Change m and b and watch the line. The little triangle shows the slope: go right, then up or down, and you're back on the line.",
+    "de": "Ändere m und b und beobachte die Gerade. Das kleine Dreieck zeigt die Steigung: nach rechts, dann nach oben oder unten, und du bist wieder auf der Geraden."
+   }
+  },
+  {
+   "level": 2,
+   "id": "drag-the-points",
+   "kind": "widget",
+   "title": {
+    "en": "Drag the points",
+    "de": "Zieh die Punkte"
+   },
+   "text": {
+    "en": "Two points fix a line. Drag A and B: the slope triangle shows \\Delta x and \\Delta y, and the equation updates as you go.",
+    "de": "Zwei Punkte legen eine Gerade fest. Zieh A und B: Das Steigungsdreieck zeigt \\Delta x und \\Delta y, und die Gleichung passt sich sofort an."
+   }
+  },
+  {
+   "level": 2,
+   "id": "parallel-and-perpendicular",
+   "kind": "widget",
+   "title": {
+    "en": "Parallel and perpendicular",
+    "de": "Parallel und orthogonal"
+   },
+   "text": {
+    "en": "Parallel lines have the same slope. Perpendicular lines meet at a right angle; their slopes multiply to -1, so m_h = -\\frac{1}{m_g}.",
+    "de": "Parallele Geraden haben die gleiche Steigung. Orthogonale (senkrechte) Geraden schneiden sich im rechten Winkel. Das Produkt ihrer Steigungen ist -1, also m_h = -\\frac{1}{m_g}."
+   }
+  }
+ ],
+ "area-volume": [],
+ "probability": [],
+ "word-problems": [
+  {
+   "level": 1,
+   "id": "what-s-given-what-s-wanted",
+   "kind": "widget",
+   "title": {
+    "en": "What's given, what's wanted?",
+    "de": "Was ist gegeben, was ist gesucht?"
+   },
+   "text": {
+    "en": "Tap the numbers you need and the question. Some numbers are only there to confuse you: tap them and they get crossed out.",
+    "de": "Tippe auf die Zahlen, die du brauchst, und auf die Frage. Manche Zahlen sollen dich nur verwirren: Tippst du sie an, werden sie durchgestrichen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "same-or-opposite",
+   "kind": "widget",
+   "title": {
+    "en": "Same or opposite?",
+    "de": "Gleich oder umgekehrt?"
+   },
+   "text": {
+    "en": "Switch between more → more and more → less, and change the amount you want. On the right side, is it the same operation or the opposite?",
+    "de": "Wechsle zwischen mehr → mehr und mehr → weniger und ändere die gesuchte Menge. Rechnest du rechts gleich oder umgekehrt?"
+   }
+  }
+ ],
+ "unknowns": [
+  {
+   "level": 1,
+   "id": "from-words-to-maths",
+   "kind": "widget",
+   "title": {
+    "en": "From words to maths",
+    "de": "Von Worten zu Mathe"
+   },
+   "text": {
+    "en": "Each piece of the sentence becomes a piece of maths. Sometimes the order changes, sometimes you need brackets. Try them all, and test each term with a number.",
+    "de": "Jedes Stück des Satzes wird zu einem Stück Mathe. Manchmal ändert sich die Reihenfolge, manchmal brauchst du Klammern. Probier alle aus und teste jeden Term mit einer Zahl."
+   }
+  },
+  {
+   "level": 1,
+   "id": "build-the-equation",
+   "kind": "widget",
+   "title": {
+    "en": "Build the equation",
+    "de": "Bau die Gleichung"
+   },
+   "text": {
+    "en": "Read the story and tap the chips in the right order to build the equation. Tap a chip in your equation to send it back.",
+    "de": "Lies die Geschichte und tippe die Bausteine in der richtigen Reihenfolge an. Tippst du einen Baustein in deiner Gleichung an, wandert er zurück."
+   }
+  }
+ ],
+ "particles": [
+  {
+   "level": 1,
+   "id": "everything-is-made-of-particles",
+   "kind": "widget",
+   "title": {
+    "en": "Everything is made of particles",
+    "de": "Alles besteht aus Teilchen"
+   },
+   "text": {
+    "en": "Chemists explain substances with the particle model: every substance is made of tiny particles. The particles of one pure substance are all the same. Between them there is empty space. They are …",
+    "de": "Chemiker erklären Stoffe mit dem Teilchenmodell: Jeder Stoff besteht aus winzigen Teilchen. Die Teilchen eines Reinstoffs sind alle gleich. Zwischen ihnen ist leerer Raum. Sie bewegen sich ständig …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "heat-the-box",
+   "kind": "widget",
+   "title": {
+    "en": "Heat the box",
+    "de": "Heiz die Box auf"
+   },
+   "text": {
+    "en": "Move the slider. Watch how the particles move faster and faster, and what happens at the melting temperature (m.p.) and the boiling temperature (b.p.). Then try dry ice: it skips the liquid state.",
+    "de": "Bewege den Regler. Schau, wie die Teilchen immer schneller werden und was bei der Schmelztemperatur (Smt.) und der Siedetemperatur (Sdt.) passiert. Probier danach Trockeneis: Es überspringt den …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-heating-curve",
+   "kind": "widget",
+   "title": {
+    "en": "The heating curve",
+    "de": "Die Erhitzungskurve"
+   },
+   "text": {
+    "en": "We heat ice evenly from −20 °C. While it melts and while it boils, the temperature stops rising: the curve has two flat parts (plateaus). The energy goes into pulling the particles apart instead.",
+    "de": "Wir erhitzen Eis gleichmäßig von −20 °C an. Während es schmilzt und während es siedet, steigt die Temperatur nicht weiter: Die Kurve hat zwei waagerechte Stücke (Plateaus). Die Energie geht …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "particles-on-the-move",
+   "kind": "widget",
+   "title": {
+    "en": "Particles on the move",
+    "de": "Teilchen in Bewegung"
+   },
+   "text": {
+    "en": "Diffusion: substances mix by themselves because their particles move on their own, faster when it's warm. Compressing: gases can be squeezed because there is so much empty space between their …",
+    "de": "Diffusion: Stoffe mischen sich von selbst, weil sich ihre Teilchen von allein bewegen, wenn es warm ist, schneller. Zusammendrücken: Gase lassen sich zusammendrücken, weil zwischen ihren Teilchen …"
+   }
+  }
+ ],
+ "mixtures": [
+  {
+   "level": 1,
+   "id": "kinds-of-mixtures",
+   "kind": "widget",
+   "title": {
+    "en": "Kinds of mixtures",
+    "de": "Arten von Gemischen"
+   },
+   "text": {
+    "en": "Mixtures get their names from what is spread in what: solid, liquid or gas. Homogeneous mixtures look the same everywhere, even under a microscope. In heterogeneous mixtures you can tell the parts …",
+    "de": "Gemische bekommen ihren Namen danach, was worin verteilt ist: fest, flüssig oder gasförmig. Homogene Gemische sehen überall gleich aus, selbst unter dem Mikroskop. Bei heterogenen Gemischen kann …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-separation-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The separation lab",
+    "de": "Das Trennlabor"
+   },
+   "text": {
+    "en": "Choose steps one after another and watch the beaker. The order matters! When it works, try another mixture.",
+    "de": "Wähle die Schritte nacheinander und beobachte das Becherglas. Die Reihenfolge zählt! Wenn es klappt, probier ein anderes Gemisch."
+   }
+  },
+  {
+   "level": 1,
+   "id": "chromatography",
+   "kind": "widget",
+   "title": {
+    "en": "Chromatography",
+    "de": "Chromatografie"
+   },
+   "text": {
+    "en": "A dot of ink sits on paper, the paper stands in water. The water creeps up and carries the dyes along. Each dye sticks differently strongly to the paper, so they separate.",
+    "de": "Ein Tintenpunkt sitzt auf Papier, das Papier steht im Wasser. Das Wasser steigt auf und nimmt die Farbstoffe mit. Jeder Farbstoff haftet unterschiedlich stark am Papier, deshalb trennen sie sich."
+   }
+  }
+ ],
+ "atoms": [
+  {
+   "level": 1,
+   "id": "build-your-own-atom",
+   "kind": "widget",
+   "title": {
+    "en": "Build your own atom",
+    "de": "Bau dein eigenes Atom"
+   },
+   "text": {
+    "en": "Add and remove protons, neutrons and electrons. Watch the element, the mass number and the charge change. Which change makes a new element, which an isotope, which an ion?",
+    "de": "Nimm Protonen, Neutronen und Elektronen dazu oder weg. Schau, wie sich Element, Massenzahl und Ladung ändern. Welche Änderung macht ein neues Element, welche ein Isotop, welche ein Ion?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "fill-the-shells",
+   "kind": "widget",
+   "title": {
+    "en": "Fill the shells",
+    "de": "Schalen auffüllen"
+   },
+   "text": {
+    "en": "Each step adds one electron (and one proton, so it's the next element). Watch which shell the new electron lands on.",
+    "de": "Jeder Schritt bringt ein Elektron mehr (und ein Proton, also das nächste Element). Schau, auf welcher Schale das neue Elektron landet."
+   }
+  }
+ ],
+ "periodic-table": [
+  {
+   "level": 1,
+   "id": "explore-the-table",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the table",
+    "de": "Erkunde das Periodensystem"
+   },
+   "text": {
+    "en": "Pick elements and compare: same row, same number of shells. Same column, same number of outer electrons.",
+    "de": "Wähle Elemente und vergleiche: gleiche Zeile, gleich viele Schalen. Gleiche Spalte, gleich viele Außenelektronen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "metals-nonmetals-and-families",
+   "kind": "widget",
+   "title": {
+    "en": "Metals, nonmetals and families",
+    "de": "Metalle, Nichtmetalle und Familien"
+   },
+   "text": {
+    "en": "Switch between the tabs. Where are the metals? What do the members of a family have in common?",
+    "de": "Schalte zwischen den Reitern um. Wo stehen die Metalle? Was haben die Mitglieder einer Familie gemeinsam?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "noble-gas-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Noble gas lab",
+    "de": "Edelgas-Labor"
+   },
+   "text": {
+    "en": "Pick an atom. Give away or take up electrons and watch the shells. Which way is shorter?",
+    "de": "Wähle ein Atom. Gib Elektronen ab oder nimm welche auf und beobachte die Schalen. Welcher Weg ist kürzer?"
+   }
+  }
+ ],
+ "ionic-bonds": [
+  {
+   "level": 2,
+   "id": "watch-the-electrons-jump",
+   "kind": "widget",
+   "title": {
+    "en": "Watch the electrons jump",
+    "de": "Schau den Elektronen beim Springen zu"
+   },
+   "text": {
+    "en": "This is an electron transfer: the metal atom gives, the nonmetal atom takes. The numbers under each atom are its shells.",
+    "de": "Das ist ein Elektronenübergang: Das Metallatom gibt ab, das Nichtmetallatom nimmt auf. Die Zahlen unter jedem Atom sind seine Schalen."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-ionic-lattice",
+   "kind": "widget",
+   "title": {
+    "en": "The ionic lattice",
+    "de": "Das Ionengitter"
+   },
+   "text": {
+    "en": "Positive and negative ions attract each other in all directions: that's the ionic bond. Countless ions line up in a regular ionic lattice, a salt crystal. Try the hammer and the flame.",
+    "de": "Positive und negative Ionen ziehen sich in alle Richtungen an: Das ist die Ionenbindung. Unzählige Ionen ordnen sich zu einem regelmäßigen Ionengitter, einem Salzkristall. Probier den Hammer und …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "build-a-salt",
+   "kind": "widget",
+   "title": {
+    "en": "Build a salt",
+    "de": "Bau ein Salz"
+   },
+   "text": {
+    "en": "Choose a cation and an anion. Each block is one charge. When plus and minus are equal, the salt is neutral.",
+    "de": "Wähl ein Kation und ein Anion. Jeder Block ist eine Ladung. Wenn Plus und Minus gleich sind, ist das Salz neutral."
+   }
+  }
+ ],
+ "covalent-bonds": [
+  {
+   "level": 2,
+   "id": "sharing-instead-of-giving",
+   "kind": "widget",
+   "title": {
+    "en": "Sharing instead of giving",
+    "de": "Teilen statt abgeben"
+   },
+   "text": {
+    "en": "Between nonmetal atoms no electrons change sides. Instead each atom puts a single electron into a shared electron pair. This covalent bond holds the atoms together in a molecule. Press the button!",
+    "de": "Zwischen Nichtmetallatomen wechseln keine Elektronen die Seite. Stattdessen steuert jedes Atom ein einzelnes Elektron zu einem gemeinsamen Elektronenpaar bei. Diese Elektronenpaarbindung …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "explore-lewis-formulas",
+   "kind": "widget",
+   "title": {
+    "en": "Explore Lewis formulas",
+    "de": "Lewis-Formeln erkunden"
+   },
+   "text": {
+    "en": "Pick a molecule. With Check the octet, each ring shows all the electrons around one atom: the shared pairs count in both rings.",
+    "de": "Wähl ein Molekül. Mit Oktett prüfen zeigt jeder Ring alle Elektronen um ein Atom: Die gemeinsamen Paare zählen in beiden Ringen mit."
+   }
+  },
+  {
+   "level": 2,
+   "id": "from-nonpolar-to-ionic",
+   "kind": "widget",
+   "title": {
+    "en": "From nonpolar to ionic",
+    "de": "Von unpolar bis ionisch"
+   },
+   "text": {
+    "en": "The difference ΔEN decides the kind of bond. Rule of thumb: below 0.4 nonpolar, 0.4 to 1.7 polar, above 1.7 ionic. The borders are fuzzy, not sharp.",
+    "de": "Die Differenz ΔEN entscheidet über die Bindungsart. Faustregel: unter 0,4 unpolar, 0,4 bis 1,7 polar, über 1,7 ionisch. Die Grenzen sind fließend."
+   }
+  },
+  {
+   "level": 2,
+   "id": "dipole-molecules",
+   "kind": "widget",
+   "title": {
+    "en": "Dipole molecules",
+    "de": "Dipolmoleküle"
+   },
+   "text": {
+    "en": "A molecule is a dipole if it has polar bonds and its centres of positive and negative charge don't coincide. In symmetric molecules the partial charges cancel out.",
+    "de": "Ein Molekül ist ein Dipol, wenn es polare Bindungen hat und die Schwerpunkte der positiven und negativen Ladung nicht zusammenfallen. In symmetrischen Molekülen heben sich die Teilladungen auf."
+   }
+  }
+ ],
+ "reactions": [
+  {
+   "level": 1,
+   "id": "physical-or-chemical",
+   "kind": "widget",
+   "title": {
+    "en": "Physical or chemical?",
+    "de": "Physikalisch oder chemisch?"
+   },
+   "text": {
+    "en": "Sort each process. Careful: bubbles, light or heat can fool you. Only a new substance proves a reaction.",
+    "de": "Sortiere jeden Vorgang. Vorsicht: Blasen, Licht oder Wärme können täuschen. Nur ein neuer Stoff beweist eine Reaktion."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-energy-hill-and-the-catalyst",
+   "kind": "widget",
+   "title": {
+    "en": "The energy hill and the catalyst",
+    "de": "Der Energieberg und der Katalysator"
+   },
+   "text": {
+    "en": "Even exothermic reactions need a start push, like the spark on a gas stove: the activation energy E_A. A catalyst lowers the hill. It speeds the reaction up and isn't used up.",
+    "de": "Auch exotherme Reaktionen brauchen einen Startschubs, wie den Funken am Gasherd: die Aktivierungsenergie E_A. Ein Katalysator senkt den Berg. Er beschleunigt die Reaktion und wird dabei nicht …"
+   }
+  }
+ ],
+ "balancing": [
+  {
+   "level": 2,
+   "id": "balance-it-yourself",
+   "kind": "widget",
+   "title": {
+    "en": "Balance it yourself",
+    "de": "Gleich selbst aus"
+   },
+   "text": {
+    "en": "Every atom lands on the scale. It only levels out when every kind of atom is the same on both sides, and then the mass is equal too: the law of conservation of mass.",
+    "de": "Jedes Atom landet auf der Waage. Sie ist erst im Gleichgewicht, wenn jede Atomsorte auf beiden Seiten gleich oft da ist, und dann ist auch die Masse gleich: das Gesetz von der Erhaltung der Masse."
+   }
+  }
+ ],
+ "acids-bases": [
+  {
+   "level": 2,
+   "id": "watch-the-proton-hop",
+   "kind": "widget",
+   "title": {
+    "en": "Watch the proton hop",
+    "de": "Schau dem Proton beim Springen zu"
+   },
+   "text": {
+    "en": "The proton leaves its electron behind. That's why the donor ends up one charge more negative and the acceptor one charge more positive.",
+    "de": "Das Proton lässt sein Elektron zurück. Deshalb wird der Donator um eine Ladung negativer und der Akzeptor um eine Ladung positiver."
+   }
+  },
+  {
+   "level": 2,
+   "id": "colour-it-in-indicators",
+   "kind": "widget",
+   "title": {
+    "en": "Colour it in: indicators",
+    "de": "Farbe bekennen: Indikatoren"
+   },
+   "text": {
+    "en": "Indicators are dyes that change colour with the pH. Universal indicator shows the whole range, the others mainly tell acidic from alkaline.",
+    "de": "Indikatoren sind Farbstoffe, die ihre Farbe mit dem pH-Wert ändern. Universalindikator zeigt den ganzen Bereich, die anderen unterscheiden vor allem sauer und alkalisch."
+   }
+  },
+  {
+   "level": 2,
+   "id": "neutralise-it-drop-by-drop",
+   "kind": "widget",
+   "title": {
+    "en": "Neutralise it, drop by drop",
+    "de": "Neutralisiere Tropfen für Tropfen"
+   },
+   "text": {
+    "en": "Add sodium hydroxide solution to hydrochloric acid. Bromothymol blue shows you when it's exactly neutral.",
+    "de": "Gib Natronlauge zu Salzsäure. Bromthymolblau zeigt dir, wann die Lösung genau neutral ist."
+   }
+  }
+ ],
+ "redox": [
+  {
+   "level": 2,
+   "id": "send-the-electrons-across",
+   "kind": "widget",
+   "title": {
+    "en": "Send the electrons across",
+    "de": "Schick die Elektronen rüber"
+   },
+   "text": {
+    "en": "The pills show each particle's oxidation number, written in Roman numerals as in your textbook. Giving away electrons makes it rise, taking them up makes it fall.",
+    "de": "Die Kärtchen zeigen die Oxidationszahl jedes Teilchens, mit römischen Zahlen wie im Schulbuch. Elektronen abgeben lässt sie steigen, aufnehmen lässt sie sinken."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-redox-series",
+   "kind": "widget",
+   "title": {
+    "en": "The redox series",
+    "de": "Die Redoxreihe"
+   },
+   "text": {
+    "en": "Metals differ in how easily they give away electrons. Ordered from less noble (gives electrons easily) to noble, they form the redox series. A metal only reacts with the ions of a nobler metal.",
+    "de": "Metalle geben ihre Elektronen unterschiedlich leicht ab. Geordnet von unedel (gibt leicht Elektronen ab) bis edel ergeben sie die Redoxreihe. Ein Metall reagiert nur mit den Ionen eines edleren …"
+   }
+  }
+ ],
+ "moles": [
+  {
+   "level": 2,
+   "id": "the-mole-counter",
+   "kind": "widget",
+   "title": {
+    "en": "The mole counter",
+    "de": "Der Molzähler"
+   },
+   "text": {
+    "en": "Slide the mass. The counter works out n = \\frac{m}{M} and the number of particles live. Switch substances: the same mass gives a different number of particles, because the particles weigh differently.",
+    "de": "Verschieb die Masse. Der Zähler rechnet n = \\frac{m}{M} und die Teilchenzahl live aus. Wechsle den Stoff: Dieselbe Masse ergibt eine andere Teilchenzahl, weil die Teilchen verschieden schwer sind."
+   }
+  }
+ ],
+ "alkanes": [
+  {
+   "level": 2,
+   "id": "build-an-alkane",
+   "kind": "widget",
+   "title": {
+    "en": "Build an alkane",
+    "de": "Bau dir ein Alkan"
+   },
+   "text": {
+    "en": "You see the structural formula with every bond, below it the condensed structural formula (the chain with its CH₃ and CH₂ groups), and next to it the molecular formula (which atoms, how many).",
+    "de": "Du siehst die Strukturformel mit jeder Bindung, darunter die Halbstrukturformel (die Kette mit ihren CH₃- und CH₂-Gruppen) und daneben die Summenformel (welche Atome, wie viele)."
+   }
+  },
+  {
+   "level": 2,
+   "id": "boiling-points-and-van-der-waals-forces",
+   "kind": "widget",
+   "title": {
+    "en": "Boiling points and van der Waals forces",
+    "de": "Siedetemperaturen und Van-der-Waals-Kräfte"
+   },
+   "text": {
+    "en": "Between alkane molecules only weak van der Waals forces act. The longer the chain, the larger the contact surface and the stronger the attraction: the boiling point rises. Alkanes are non-polar. …",
+    "de": "Zwischen Alkanmolekülen wirken nur schwache Van-der-Waals-Kräfte. Je länger die Kette, desto größer die Berührungsfläche und desto stärker die Anziehung: Die Siedetemperatur steigt. Alkane sind …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "branch-it-yourself",
+   "kind": "widget",
+   "title": {
+    "en": "Branch it yourself",
+    "de": "Verzweige selbst"
+   },
+   "text": {
+    "en": "Tap a carbon atom of the chain to attach a methyl group. The purple bonds show the main chain, the small numbers its numbering. Try a methyl group at the very end of the chain too!",
+    "de": "Tipp auf ein C-Atom der Kette, um eine Methylgruppe anzuhängen. Die lila Bindungen zeigen die Hauptkette, die kleinen Zahlen ihre Nummerierung. Probier auch eine Methylgruppe ganz am Kettenende!"
+   }
+  }
+ ],
+ "cell": [
+  {
+   "level": 1,
+   "id": "the-light-microscope",
+   "kind": "widget",
+   "title": {
+    "en": "The light microscope",
+    "de": "Das Lichtmikroskop"
+   },
+   "text": {
+    "en": "Light shines from below through the thin specimen. The objective magnifies it, and the eyepiece magnifies the image again. You focus with the coarse and the fine focus knob.",
+    "de": "Licht scheint von unten durch das dünne Präparat. Das Objektiv vergrößert es, das Okular vergrößert das Bild noch einmal. Scharf stellst du mit Grobtrieb und Feintrieb."
+   }
+  },
+  {
+   "level": 1,
+   "id": "focus",
+   "kind": "widget",
+   "title": {
+    "en": "Focus!",
+    "de": "Scharf stellen!"
+   },
+   "text": {
+    "en": "Start with the 4× objective and the coarse focus. Once the image is sharp, swing in a bigger objective and only use the fine focus. The diaphragm sets brightness and contrast. Try all four specimens!",
+    "de": "Beginne mit dem 4er-Objektiv und dem Grobtrieb. Ist das Bild scharf, schwenkst du ein größeres Objektiv ein und stellst nur noch mit dem Feintrieb nach. Die Blende regelt Helligkeit und Kontrast. …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "spot-the-difference",
+   "kind": "widget",
+   "title": {
+    "en": "Spot the difference",
+    "de": "Finde die Unterschiede"
+   },
+   "text": {
+    "en": "Tap a row of the table: the part lights up in the drawing.",
+    "de": "Tipp auf eine Zeile der Tabelle: Der Bestandteil leuchtet in der Zeichnung auf."
+   }
+  },
+  {
+   "level": 1,
+   "id": "single-celled-organisms-everything-in-one-cell",
+   "kind": "widget",
+   "title": {
+    "en": "Single-celled organisms: everything in one cell",
+    "de": "Einzeller: alles in einer Zelle"
+   },
+   "text": {
+    "en": "Many living things consist of just one cell: single-celled organisms like the slipper animalcule from a pond. This one cell has to do everything: move, eat, digest, get rid of waste and reproduce. …",
+    "de": "Viele Lebewesen bestehen aus nur einer Zelle: Einzeller wie das Pantoffeltierchen aus dem Teich. Diese eine Zelle muss alles können: sich bewegen, fressen, verdauen, ausscheiden und sich …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "explore-the-organelles",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the organelles",
+    "de": "Erkunde die Organellen"
+   },
+   "text": {
+    "en": "Mitochondria release energy (cellular respiration), ribosomes build proteins, the ER and the Golgi apparatus produce, pack and ship them, lysosomes digest. The nucleus is wrapped in a double …",
+    "de": "Mitochondrien setzen Energie frei (Zellatmung), Ribosomen bauen Proteine, ER und Golgi-Apparat stellen sie her, verpacken und verschicken sie, Lysosomen verdauen. Der Zellkern ist von einer …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-bacterial-cell",
+   "kind": "widget",
+   "title": {
+    "en": "The bacterial cell",
+    "de": "Die Bakterienzelle"
+   },
+   "text": {
+    "en": "A bacterium has no nucleus. Its DNA is a single ring, the bacterial chromosome, lying free in the cytoplasm (nucleoid). Many bacteria also carry small extra rings, plasmids. Tap the numbers!",
+    "de": "Ein Bakterium hat keinen Zellkern. Seine DNA ist ein einzelner Ring, das Bakterienchromosom, das frei im Zellplasma liegt (Nucleoid). Viele Bakterien haben zusätzlich kleine Ringe, die Plasmide. …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-magnification-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The magnification lab",
+    "de": "Das Vergrößerungslabor"
+   },
+   "text": {
+    "en": "Choose an eyepiece and an objective. The ruler shows how big the object looks at that magnification. Can you make a bacterium as big as a cheek cell at 40×?",
+    "de": "Wähle Okular und Objektiv. Das Lineal zeigt, wie groß das Objekt bei dieser Vergrößerung erscheint. Schaffst du es, ein Bakterium so groß erscheinen zu lassen wie eine Mundschleimhautzelle bei …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "resolution-why-the-light-microscope-has-a-limit",
+   "kind": "widget",
+   "title": {
+    "en": "Resolution: why the light microscope has a limit",
+    "de": "Auflösung: Warum das Lichtmikroskop eine Grenze hat"
+   },
+   "text": {
+    "en": "Resolution is the smallest distance at which two points can still be seen as separate. The light microscope manages about 0.2 µm, because light waves are too long for finer details. The electron …",
+    "de": "Das Auflösungsvermögen ist der kleinste Abstand, bei dem zwei Punkte noch getrennt erkennbar sind. Das Lichtmikroskop schafft etwa 0,2 µm, weil Lichtwellen für feinere Details zu lang sind. Das …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "inside-the-membrane",
+   "kind": "widget",
+   "title": {
+    "en": "Inside the membrane",
+    "de": "Ein Blick in die Membran"
+   },
+   "text": {
+    "en": "Channel proteins form pores, carriers bind their substance and change shape, glycoproteins carry sugar chains on the outside (glycocalyx), and cholesterol keeps the fluidity right.",
+    "de": "Kanalproteine bilden Poren, Carrier binden ihren Stoff und ändern ihre Form, Glykoproteine tragen außen Zuckerketten (Glykokalyx), und Cholesterin hält die Fluidität im richtigen Bereich."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-osmosis-lab-plasmolysis",
+   "kind": "widget",
+   "title": {
+    "en": "The osmosis lab: plasmolysis",
+    "de": "Das Osmose-Labor: Plasmolyse"
+   },
+   "text": {
+    "en": "Put a red onion cell into salt solution: water leaves the vacuole and the protoplast pulls away from the wall (plasmolysis). Back in water it recovers (deplasmolysis). Then try a red blood cell: …",
+    "de": "Leg eine Zelle der roten Zwiebel in Salzlösung: Wasser strömt aus der Vakuole, der Protoplast löst sich von der Wand (Plasmolyse). Zurück im Wasser erholt sie sich (Deplasmolyse). Dann probier ein …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-sodium-potassium-pump",
+   "kind": "widget",
+   "title": {
+    "en": "The sodium-potassium pump",
+    "de": "Die Natrium-Kalium-Pumpe"
+   },
+   "text": {
+    "en": "Per ATP it pumps 3 Na⁺ out and 2 K⁺ in, both against their gradients. It keeps Na⁺ high outside and K⁺ high inside, which nerve cells, for example, depend on.",
+    "de": "Pro ATP pumpt sie 3 Na⁺ hinaus und 2 K⁺ hinein, beide gegen ihr Gefälle. So bleibt außen viel Na⁺ und innen viel K⁺, worauf zum Beispiel Nervenzellen angewiesen sind."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-endosymbiotic-theory",
+   "kind": "widget",
+   "title": {
+    "en": "The endosymbiotic theory",
+    "de": "Die Endosymbiontentheorie"
+   },
+   "text": {
+    "en": "According to the endosymbiotic theory (Lynn Margulis, 1967), mitochondria and chloroplasts come from bacteria that were taken up by a host cell and stayed. Step through the story.",
+    "de": "Nach der Endosymbiontentheorie (Lynn Margulis, 1967) stammen Mitochondrien und Chloroplasten von Bakterien ab, die eine Wirtszelle aufgenommen hat und die geblieben sind. Geh die Geschichte …"
+   }
+  }
+ ],
+ "cell-division": [
+  {
+   "level": 1,
+   "id": "watch-a-cell-divide",
+   "kind": "widget",
+   "title": {
+    "en": "Watch a cell divide",
+    "de": "Schau einer Zelle beim Teilen zu"
+   },
+   "text": {
+    "en": "This model cell has 4 chromosomes: two pairs, one chromosome of each pair from the mother (red) and one from the father (blue). Drag the bar or press play. Count the chromosomes before and after …",
+    "de": "Diese Modellzelle hat 4 Chromosomen: zwei Paare, von jedem Paar eins von der Mutter (rot) und eins vom Vater (blau). Zieh am Zeitstrahl oder drück auf Abspielen. Zähl die Chromosomen vor und nach …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "fertilisation-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Fertilisation lab",
+    "de": "Befruchtungslabor"
+   },
+   "text": {
+    "en": "Choose a living thing and fertilise. Then find out what would happen if sex cells were not halved.",
+    "de": "Wähle ein Lebewesen und befruchte. Probier dann aus, was passieren würde, wenn Keimzellen nicht halbiert wären."
+   }
+  },
+  {
+   "level": 2,
+   "id": "how-a-chromosome-is-built",
+   "kind": "widget",
+   "title": {
+    "en": "How a chromosome is built",
+    "de": "Wie ein Chromosom gebaut ist"
+   },
+   "text": {
+    "en": "After the S phase each one-chromatid chromosome has become a two-chromatid chromosome: two identical sister chromatids, held together at the centromere. Homologous chromosomes are the two …",
+    "de": "Nach der S-Phase ist aus jedem Ein-Chromatid-Chromosom ein Zwei-Chromatid-Chromosom geworden: zwei identische Schwesterchromatiden, die am Zentromer zusammenhängen. Homologe Chromosomen sind die …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "mitosis-to-play-with",
+   "kind": "widget",
+   "title": {
+    "en": "Mitosis to play with",
+    "de": "Mitose zum Durchspielen"
+   },
+   "text": {
+    "en": "Drag the time bar and watch the chromosomes. The counter shows how the chromatids and the DNA content (in c) change. Switch to “Human” too.",
+    "de": "Zieh am Zeitstrahl und beobachte die Chromosomen. Der Zähler zeigt, wie sich Chromatiden und DNA-Gehalt (in c) ändern. Schalte auch auf „Mensch“ um."
+   }
+  },
+  {
+   "level": 2,
+   "id": "meiosis-to-play-with",
+   "kind": "widget",
+   "title": {
+    "en": "Meiosis to play with",
+    "de": "Meiose zum Durchspielen"
+   },
+   "text": {
+    "en": "Watch the pairs of red and blue chromosomes. When is the chromosome number halved? And how do the four cells at the end differ?",
+    "de": "Beobachte die Paare aus roten und blauen Chromosomen. Wann wird die Chromosomenzahl halbiert? Und wie unterscheiden sich die vier Zellen am Ende?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "meiosis-step-by-step",
+   "kind": "widget",
+   "title": {
+    "en": "Meiosis step by step",
+    "de": "Meiose Schritt für Schritt"
+   },
+   "text": {
+    "en": "Red: chromosomes from the mother, blue: from the father. Watch the chiasmata in prophase I and how the colours are mixed in the four cells at the end. The counter shows n and c.",
+    "de": "Rot: Chromosomen der Mutter, blau: des Vaters. Achte auf die Chiasmata in der Prophase I und darauf, wie die Farben in den vier Zellen am Ende gemischt sind. Der Zähler zeigt n und c."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-distribution-lottery",
+   "kind": "widget",
+   "title": {
+    "en": "The distribution lottery",
+    "de": "Das Verteilungslotto"
+   },
+   "text": {
+    "en": "A model cell with 2n = 6 in metaphase I. Flip the pairs or let chance decide, and collect all combinations of sex cells. Then add crossing over.",
+    "de": "Eine Modellzelle mit 2n = 6 in der Metaphase I. Dreh die Paare um oder lass den Zufall entscheiden und sammle alle Kombinationen von Keimzellen. Nimm dann das Crossing-over dazu."
+   }
+  },
+  {
+   "level": 3,
+   "id": "nondisjunction-and-karyograms",
+   "kind": "widget",
+   "title": {
+    "en": "Nondisjunction and karyograms",
+    "de": "Fehlverteilung und Karyogramme"
+   },
+   "text": {
+    "en": "In the first tab, compare an error in meiosis I with one in meiosis II: count the chromosomes in the four sex cells. In the second tab you see karyograms: chromosomes sorted by size and centromere …",
+    "de": "Vergleich im ersten Reiter einen Fehler in der Meiose I mit einem in der Meiose II: Zähl die Chromosomen in den vier Keimzellen. Im zweiten Reiter siehst du Karyogramme: Chromosomen nach Größe und …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "control-of-the-cell-cycle-and-cancer",
+   "kind": "widget",
+   "title": {
+    "en": "Control of the cell cycle and cancer",
+    "de": "Kontrolle des Zellzyklus und Krebs"
+   },
+   "text": {
+    "en": "The cell cycle is checked at checkpoints: at the end of G1, at the end of G2 and in metaphase (spindle checkpoint). Proteins (cyclins and cyclin-dependent kinases) drive the cycle on. The protein …",
+    "de": "Der Zellzyklus wird an Kontrollpunkten überwacht: am Ende von G1, am Ende von G2 und in der Metaphase (Spindelkontrollpunkt). Proteine (Cycline und cyclinabhängige Kinasen) treiben den Zyklus …"
+   }
+  }
+ ],
+ "enzymes": [
+  {
+   "level": 1,
+   "id": "an-enzyme-at-work",
+   "kind": "widget",
+   "title": {
+    "en": "An enzyme at work",
+    "de": "Ein Enzym bei der Arbeit"
+   },
+   "text": {
+    "en": "Watch step by step how the enzyme splits its substrate. Keep an eye on the counter. Then try a different substance: does it fit too?",
+    "de": "Schau Schritt für Schritt zu, wie das Enzym sein Substrat spaltet. Behalte den Zähler im Blick. Probier dann einen anderen Stoff aus: Passt der auch?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-starch-experiment",
+   "kind": "widget",
+   "title": {
+    "en": "The starch experiment",
+    "de": "Der Stärke-Versuch"
+   },
+   "text": {
+    "en": "Iodine solution (iodine-potassium iodide) turns starch blue-black, so you can see whether starch is there. Three test tubes contain starch solution with a little iodine solution. Water, saliva or …",
+    "de": "Iod-Kaliumiodid-Lösung färbt Stärke blau-schwarz. So siehst du, ob Stärke da ist. In drei Reagenzgläsern ist Stärkelösung mit etwas Iodlösung. Dazu kommt Wasser, Speichel oder abgekochter …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-enzyme-substrate-complex",
+   "kind": "widget",
+   "title": {
+    "en": "The enzyme-substrate complex",
+    "de": "Der Enzym-Substrat-Komplex"
+   },
+   "text": {
+    "en": "Step through the reaction and watch which part of E + S \\to ES \\to E + P lights up. Then try the other molecule.",
+    "de": "Geh die Reaktion Schritt für Schritt durch und schau, welcher Teil von E + S \\to ES \\to E + P aufleuchtet. Probier dann das andere Molekül aus."
+   }
+  },
+  {
+   "level": 2,
+   "id": "activation-energy",
+   "kind": "widget",
+   "title": {
+    "en": "Activation energy",
+    "de": "Aktivierungsenergie"
+   },
+   "text": {
+    "en": "To get a reaction going, the particles need a starting energy: the activation energy E_A. Enzymes lower it. That's why reactions run quickly at body temperature. Switch between with and without …",
+    "de": "Damit eine Reaktion startet, brauchen die Teilchen eine Startenergie: die Aktivierungsenergie E_A. Enzyme senken sie. Darum laufen Reaktionen schon bei Körpertemperatur schnell ab. Schalte …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "temperature-and-ph",
+   "kind": "widget",
+   "title": {
+    "en": "Temperature and pH",
+    "de": "Temperatur und pH-Wert"
+   },
+   "text": {
+    "en": "Move the sliders and watch the activity curve. Heat the enzyme above 60 °C and then cool it down again. In the pH tab, compare pepsin, salivary amylase and trypsin.",
+    "de": "Beweg die Regler und beobachte die Aktivitätskurve. Erhitze das Enzym auf über 60 °C und kühl es dann wieder ab. Vergleich im pH-Tab Pepsin, Speichel-Amylase und Trypsin."
+   }
+  },
+  {
+   "level": 2,
+   "id": "more-substrate-more-speed",
+   "kind": "widget",
+   "title": {
+    "en": "More substrate, more speed?",
+    "de": "Mehr Substrat, mehr Tempo?"
+   },
+   "text": {
+    "en": "Add substrate bit by bit. At first the rate rises almost in proportion, then the curve flattens: saturation. Then try twice the enzyme.",
+    "de": "Gib nach und nach Substrat dazu. Zuerst steigt die Geschwindigkeit fast proportional, dann flacht die Kurve ab: Sättigung. Probier dann doppelt so viel Enzym."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-michaelis-menten-diagram",
+   "kind": "widget",
+   "title": {
+    "en": "The Michaelis-Menten diagram",
+    "de": "Das Michaelis-Menten-Diagramm"
+   },
+   "text": {
+    "en": "Move [S] and read off v. With the guide lines you find K_M at \\frac{1}{2} v_{max}. Then switch on an inhibitor: which value changes, v_{max} or K_M?",
+    "de": "Verschieb [S] und lies v ab. Mit den Hilfslinien findest du K_M bei \\frac{1}{2} v_{max}. Dann schalte einen Hemmstoff zu: Welcher Wert ändert sich, v_{max} oder K_M?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "induced-fit-and-inhibitors-in-the-model",
+   "kind": "widget",
+   "title": {
+    "en": "Induced fit and inhibitors in the model",
+    "de": "Induced Fit und Hemmstoffe im Modell"
+   },
+   "text": {
+    "en": "The lock and key model is a rigid picture. In 1958 Koshland extended it to the induced fit model: the substrate itself brings the active site into its fitting shape. Compare the two models, then …",
+    "de": "Das Schlüssel-Schloss-Modell ist ein starres Bild. Koshland erweiterte es 1958 zum Induced-Fit-Modell: Erst das Substrat bringt das aktive Zentrum in seine passende Form. Vergleich beide Modelle …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "end-product-inhibition",
+   "kind": "widget",
+   "title": {
+    "en": "End-product inhibition",
+    "de": "Endprodukthemmung"
+   },
+   "text": {
+    "en": "Many pathways are controlled at their first enzyme. It is an allosteric enzyme: besides the active site it has an allosteric site where an effector binds. In end-product inhibition (feedback …",
+    "de": "Viele Stoffwechselwege werden an ihrem ersten Enzym gesteuert. Es ist ein allosterisches Enzym: Neben dem aktiven Zentrum hat es ein allosterisches Zentrum, an dem ein Effektor bindet. Bei der …"
+   }
+  }
+ ],
+ "plant-structure": [
+  {
+   "level": 1,
+   "id": "explore-the-plant",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the plant",
+    "de": "Erkunde die Pflanze"
+   },
+   "text": {
+    "en": "Tap a number or a name to see what that part does. The magnifier shows the tip of a root.",
+    "de": "Tipp auf eine Nummer oder einen Namen, dann siehst du, was der Teil leistet. Die Lupe zeigt eine Wurzelspitze."
+   }
+  },
+  {
+   "level": 1,
+   "id": "your-germination-experiment",
+   "kind": "widget",
+   "title": {
+    "en": "Your germination experiment",
+    "de": "Dein Keimungsversuch"
+   },
+   "text": {
+    "en": "Bean seeds lie on cotton wool. Switch water, warmth, oxygen and light on or off and let a week pass. Always compare with the control dish, where everything is on.",
+    "de": "Bohnensamen liegen auf Watte. Schalte Wasser, Wärme, Sauerstoff und Licht an oder aus und lass eine Woche ablaufen. Vergleiche immer mit dem Kontrollansatz, bei dem alles an ist."
+   }
+  },
+  {
+   "level": 2,
+   "id": "explore-the-leaf-section",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the leaf section",
+    "de": "Erkunde den Blattquerschnitt"
+   },
+   "text": {
+    "en": "Tap a number or a name to see what each structure does. The switches show the gas exchange and the way of the water.",
+    "de": "Tipp auf eine Nummer oder einen Namen, dann siehst du, was jede Struktur leistet. Die Schalter zeigen den Gasaustausch und den Weg des Wassers."
+   }
+  },
+  {
+   "level": 2,
+   "id": "inside-a-vascular-bundle",
+   "kind": "widget",
+   "title": {
+    "en": "Inside a vascular bundle",
+    "de": "Ein Leitbündel von innen"
+   },
+   "text": {
+    "en": "Left: the bundle in cross-section. Right: cut lengthwise. Tap the numbers to explore.",
+    "de": "Links: das Leitbündel im Querschnitt. Rechts: der Länge nach aufgeschnitten. Tipp auf die Nummern."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-transpiration-stream",
+   "kind": "widget",
+   "title": {
+    "en": "The transpiration stream",
+    "de": "Der Transpirationsstrom"
+   },
+   "text": {
+    "en": "Change light, temperature, wind, humidity and soil water. Watch how fast the water flows and what the stomata do.",
+    "de": "Verändere Licht, Temperatur, Wind, Luftfeuchtigkeit und Bodenwasser. Beobachte, wie schnell das Wasser fließt und was die Spaltöffnungen tun."
+   }
+  },
+  {
+   "level": 3,
+   "id": "tissue-atlas",
+   "kind": "widget",
+   "title": {
+    "en": "Tissue atlas",
+    "de": "Gewebe-Atlas"
+   },
+   "text": {
+    "en": "Tap a picture or a name. Look at the cell walls: thin, thickened at the corners, or thick all round?",
+    "de": "Tipp auf ein Bild oder einen Namen. Achte auf die Zellwände: dünn, an den Ecken verdickt oder rundum dick?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "let-a-tree-grow",
+   "kind": "widget",
+   "title": {
+    "en": "Let a tree grow",
+    "de": "Lass einen Baum wachsen"
+   },
+   "text": {
+    "en": "Slide to add years. Tap a year to make it dry. Compare with a monocot: does maize get any rings?",
+    "de": "Schieb den Regler, um Jahre hinzuzufügen. Tipp auf ein Jahr, um es trocken zu machen. Vergleiche mit einer Einkeimblättrigen: Bekommt Mais Ringe?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "guard-cell-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Guard cell lab",
+    "de": "Schließzellen-Labor"
+   },
+   "text": {
+    "en": "Step through the opening in light and the closing in drought. Watch the K⁺ ions, the water and the turgor.",
+    "de": "Geh Schritt für Schritt durch das Öffnen bei Licht und das Schließen bei Trockenheit. Beobachte die K⁺-Ionen, das Wasser und den Turgor."
+   }
+  },
+  {
+   "level": 3,
+   "id": "adapted-to-dry-and-wet-places",
+   "kind": "widget",
+   "title": {
+    "en": "Adapted to dry and wet places",
+    "de": "Angepasst an trockene und nasse Standorte"
+   },
+   "text": {
+    "en": "Leaves are a compromise: open stomata let carbon dioxide in, but water out. Depending on the habitat, plants shift the balance. Switch between the habitats and tap the numbers.",
+    "de": "Blätter sind ein Kompromiss: Offene Spaltöffnungen lassen Kohlenstoffdioxid hinein, aber auch Wasser hinaus. Je nach Standort verschieben Pflanzen das Gleichgewicht. Wechsle zwischen den …"
+   }
+  }
+ ],
+ "photosynthesis": [
+  {
+   "level": 1,
+   "id": "the-leaf-factory",
+   "kind": "widget",
+   "title": {
+    "en": "The leaf factory",
+    "de": "Die Blattfabrik"
+   },
+   "text": {
+    "en": "The leaf is the plant's food factory. Water comes up from the roots, carbon dioxide comes from the air, and light delivers the energy. The green pigment chlorophyll in the chloroplasts catches the …",
+    "de": "Das Blatt ist die Nahrungsfabrik der Pflanze. Wasser kommt von den Wurzeln, Kohlenstoffdioxid aus der Luft, und das Licht liefert die Energie. Der grüne Farbstoff Chlorophyll in den Chloroplasten …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-starch-test",
+   "kind": "widget",
+   "title": {
+    "en": "The starch test",
+    "de": "Der Stärkenachweis"
+   },
+   "text": {
+    "en": "Is starch really only made in the light? We test it on a leaf that is partly covered with foil. Try a leaf with a white edge too.",
+    "de": "Entsteht Stärke wirklich nur im Licht? Wir testen es an einem Blatt, das teilweise mit Folie abgedeckt ist. Probier auch ein Blatt mit weißem Rand."
+   }
+  },
+  {
+   "level": 2,
+   "id": "where-in-the-leaf",
+   "kind": "widget",
+   "title": {
+    "en": "Where in the leaf?",
+    "de": "Wo im Blatt?"
+   },
+   "text": {
+    "en": "Photosynthesis takes place in the chloroplasts. Most of them sit in the palisade tissue, right under the clear upper epidermis where the light falls. CO₂ gets in through the stomata and spreads …",
+    "de": "Die Fotosynthese läuft in den Chloroplasten ab. Die meisten sitzen im Palisadengewebe, direkt unter der durchsichtigen oberen Epidermis, wo das Licht ankommt. CO₂ gelangt durch die Spaltöffnungen …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-elodea-experiment",
+   "kind": "widget",
+   "title": {
+    "en": "The Elodea experiment",
+    "de": "Der Wasserpest-Versuch"
+   },
+   "text": {
+    "en": "Elodea (Wasserpest) is a water plant. In the light it gives off oxygen bubbles from its cut stem. The number of bubbles per minute is a measure of the rate of photosynthesis. Record values at …",
+    "de": "Die Wasserpest ist eine Wasserpflanze. Im Licht gibt sie an der Schnittstelle des Stängels Sauerstoffbläschen ab. Die Bläschen pro Minute sind ein Maß für die Fotosyntheserate. Notiere Messwerte …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-limiting-factor-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The limiting factor lab",
+    "de": "Das Faktorenlabor"
+   },
+   "text": {
+    "en": "The curve shows the rate of photosynthesis against light intensity. Change CO₂ and temperature and watch the curve. Pin a curve to compare. The cards show what a little more of each factor would …",
+    "de": "Die Kurve zeigt die Fotosyntheserate in Abhängigkeit von der Lichtintensität. Verändere CO₂ und Temperatur und beobachte die Kurve. Merk dir eine Kurve zum Vergleich. Die Karten zeigen, was ein …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "day-and-night",
+   "kind": "widget",
+   "title": {
+    "en": "Day and night",
+    "de": "Tag und Nacht"
+   },
+   "text": {
+    "en": "During the day photosynthesis and respiration run side by side. The light intensity at which both are equally strong is called the compensation point: there the plant gives off as much oxygen as …",
+    "de": "Tagsüber laufen Fotosynthese und Zellatmung nebeneinander. Die Lichtintensität, bei der beide gleich stark sind, heißt Kompensationspunkt: Dort gibt die Pflanze so viel Sauerstoff ab, wie sie …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-chloroplast",
+   "kind": "widget",
+   "title": {
+    "en": "The chloroplast",
+    "de": "Der Chloroplast"
+   },
+   "text": {
+    "en": "A chloroplast is enclosed by two membranes. Inside, the thylakoids are stacked into grana and surrounded by the stroma. The light-dependent reactions take place in the thylakoid membrane, the …",
+    "de": "Ein Chloroplast ist von zwei Membranen umgeben. Innen sind die Thylakoide zu Grana gestapelt und vom Stroma umgeben. Die lichtabhängigen Reaktionen laufen in der Thylakoidmembran ab, der …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "which-light-is-used",
+   "kind": "widget",
+   "title": {
+    "en": "Which light is used?",
+    "de": "Welches Licht wird genutzt?"
+   },
+   "text": {
+    "en": "The absorption spectrum shows how much light of each wavelength a pigment absorbs (measured in solution). The action spectrum shows how fast photosynthesis runs at each wavelength. In 1882 …",
+    "de": "Das Absorptionsspektrum zeigt, wie viel Licht jeder Wellenlänge ein Pigment absorbiert (in Lösung gemessen). Das Wirkungsspektrum zeigt, wie schnell die Fotosynthese bei jeder Wellenlänge läuft. …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "on-the-thylakoid-membrane",
+   "kind": "widget",
+   "title": {
+    "en": "On the thylakoid membrane",
+    "de": "An der Thylakoidmembran"
+   },
+   "text": {
+    "en": "Non-cyclic electron transport from water to NADP⁺. The Z-scheme on the side shows the electron's energy: light lifts it twice. (In cyclic electron transport the electrons go from ferredoxin back …",
+    "de": "Nichtzyklischer Elektronentransport vom Wasser zum NADP⁺. Das Z-Schema daneben zeigt die Energie des Elektrons: Licht hebt es zweimal an. (Beim zyklischen Elektronentransport fließen die …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-calvin-cycle",
+   "kind": "widget",
+   "title": {
+    "en": "The Calvin cycle",
+    "de": "Der Calvin-Zyklus"
+   },
+   "text": {
+    "en": "The light-independent reactions in the stroma: fixation (Rubisco binds CO₂ to RuBP), reduction (3-PG becomes G3P with ATP and NADPH) and regeneration (RuBP is rebuilt with ATP). Black beads are …",
+    "de": "Die lichtunabhängigen Reaktionen im Stroma: Fixierung (Rubisco bindet CO₂ an RuBP), Reduktion (aus 3-PG wird mit ATP und NADPH das GAP) und Regeneration (mit ATP wird RuBP zurückgebildet). …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "c4-and-cam-plants",
+   "kind": "widget",
+   "title": {
+    "en": "C₄ and CAM plants",
+    "de": "C₄- und CAM-Pflanzen"
+   },
+   "text": {
+    "en": "In heat, plants close their stomata to save water. Then CO₂ runs short, and Rubisco also binds O₂ (photorespiration). C₄ and CAM plants first fix CO₂ with PEP carboxylase, which doesn't bind O₂, …",
+    "de": "Bei Hitze schließen Pflanzen ihre Spaltöffnungen, um Wasser zu sparen. Dann wird CO₂ knapp, und Rubisco bindet auch O₂ (Fotorespiration). C₄- und CAM-Pflanzen fixieren CO₂ zuerst mit der …"
+   }
+  }
+ ],
+ "flowers-seeds": [
+  {
+   "level": 1,
+   "id": "inside-the-cherry-blossom",
+   "kind": "widget",
+   "title": {
+    "en": "Inside the cherry blossom",
+    "de": "Blick in die Kirschblüte"
+   },
+   "text": {
+    "en": "Here the blossom is cut lengthwise through the middle (a longitudinal section). Tap a number or a name.",
+    "de": "Hier ist die Blüte genau in der Mitte längs durchgeschnitten (ein Längsschnitt). Tipp auf eine Nummer oder einen Namen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "from-bee-to-egg-cell",
+   "kind": "widget",
+   "title": {
+    "en": "From bee to egg cell",
+    "de": "Von der Biene zur Eizelle"
+   },
+   "text": {
+    "en": "Watch closely: first comes pollination (pollen on the stigma), then the pollen tube grows, and only then fertilisation (sperm cell and egg cell fuse).",
+    "de": "Schau genau hin: Erst kommt die Bestäubung (Pollen auf der Narbe), dann wächst der Pollenschlauch und erst dann folgt die Befruchtung (Spermazelle und Eizelle verschmelzen)."
+   }
+  },
+  {
+   "level": 1,
+   "id": "from-flower-to-fruit",
+   "kind": "widget",
+   "title": {
+    "en": "From flower to fruit",
+    "de": "Von der Blüte zur Frucht"
+   },
+   "text": {
+    "en": "Step through the weeks after fertilisation. Follow the colours: green (ovary) becomes the fruit, orange (ovule) becomes the seed.",
+    "de": "Geh die Wochen nach der Befruchtung Schritt für Schritt durch. Folge den Farben: Grün (Fruchtknoten) wird zur Frucht, Orange (Samenanlage) wird zum Samen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "how-seeds-travel",
+   "kind": "widget",
+   "title": {
+    "en": "How seeds travel",
+    "de": "Wie Samen reisen"
+   },
+   "text": {
+    "en": "So that new plants don't grow right under the mother plant, fruits and seeds travel: with the wind, with animals, with water, or the plant flings them out itself.",
+    "de": "Damit neue Pflanzen nicht direkt unter der Mutterpflanze wachsen, reisen Früchte und Samen: mit dem Wind, mit Tieren, mit dem Wasser oder die Pflanze schleudert sie selbst heraus."
+   }
+  },
+  {
+   "level": 2,
+   "id": "insect-flower-or-wind-flower",
+   "kind": "widget",
+   "title": {
+    "en": "Insect flower or wind flower",
+    "de": "Insektenblüte oder Windblüte"
+   },
+   "text": {
+    "en": "Toggle the flower type. Every feature of the flower changes with it: petals, pollen, stamens and stigma.",
+    "de": "Wechsle den Blütentyp. Mit ihm ändert sich jedes Merkmal: Kronblätter, Pollen, Staubblätter und Narbe."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-pollen-tube",
+   "kind": "widget",
+   "title": {
+    "en": "The pollen tube",
+    "de": "Der Pollenschlauch"
+   },
+   "text": {
+    "en": "After pollination the pollen grain germinates. Its pollen tube carries the sperm cell to the egg cell in the ovule. Step through with the arrows.",
+    "de": "Nach der Bestäubung keimt das Pollenkorn. Sein Pollenschlauch bringt die Spermazelle zur Eizelle in der Samenanlage. Geh mit den Pfeilen Schritt für Schritt durch."
+   }
+  },
+  {
+   "level": 2,
+   "id": "types-of-fruit",
+   "kind": "widget",
+   "title": {
+    "en": "Types of fruit",
+    "de": "Fruchttypen"
+   },
+   "text": {
+    "en": "Fruits are sorted by their fruit wall, which grew from the wall of the ovary. Tap through the fruits and their parts.",
+    "de": "Früchte werden nach ihrer Fruchtwand sortiert, die aus der Wand des Fruchtknotens entstanden ist. Tipp dich durch die Früchte und ihre Teile."
+   }
+  },
+  {
+   "level": 2,
+   "id": "seed-and-germination",
+   "kind": "widget",
+   "title": {
+    "en": "Seed and germination",
+    "de": "Samen und Keimung"
+   },
+   "text": {
+    "en": "A seed contains the embryo (a tiny plant with root, stem and shoot bud), a food store (cotyledons in the bean, nutritive tissue in maize) and the protective seed coat. Then watch a bean germinate.",
+    "de": "Ein Samen enthält den Keimling (eine winzige Pflanze mit Wurzel, Stängel und Sprossknospe), einen Nährstoffspeicher (Keimblätter bei der Bohne, Nährgewebe beim Mais) und die schützende …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "moss-fern-seed-plant",
+   "kind": "widget",
+   "title": {
+    "en": "Moss, fern, seed plant",
+    "de": "Moos, Farn, Samenpflanze"
+   },
+   "text": {
+    "en": "Switch between the plant groups and tap the stages. The size of each circle shows which generation dominates.",
+    "de": "Wechsle zwischen den Pflanzengruppen und tipp auf die Stadien. Die Größe der Kreise zeigt, welche Generation dominiert."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-gametophytes-of-the-flower",
+   "kind": "widget",
+   "title": {
+    "en": "The gametophytes of the flower",
+    "de": "Die Gametophyten der Blüte"
+   },
+   "text": {
+    "en": "Step through the development of the embryo sac (female) and the pollen grain (male). At the end you can tap every structure.",
+    "de": "Geh die Entwicklung des Embryosacks (weiblich) und des Pollenkorns (männlich) Schritt für Schritt durch. Am Ende kannst du jede Struktur antippen."
+   }
+  },
+  {
+   "level": 3,
+   "id": "double-fertilisation",
+   "kind": "widget",
+   "title": {
+    "en": "Double fertilisation",
+    "de": "Doppelte Befruchtung"
+   },
+   "text": {
+    "en": "Follow the pollen tube into the embryo sac. Watch the chromosome sets: n + n = 2n, but n + n + n = 3n.",
+    "de": "Folge dem Pollenschlauch in den Embryosack. Achte auf die Chromosomensätze: n + n = 2n, aber n + n + n = 3n."
+   }
+  },
+  {
+   "level": 3,
+   "id": "self-incompatibility",
+   "kind": "widget",
+   "title": {
+    "en": "Self-incompatibility",
+    "de": "Selbstinkompatibilität"
+   },
+   "text": {
+    "en": "Many plants prevent self-fertilisation genetically with S-alleles (multiple alleles of one S-locus). If pollen and style share an S-allele, fertilisation fails. The style here is S₁S₂. Choose the …",
+    "de": "Viele Pflanzen verhindern Selbstbefruchtung genetisch mit S-Allelen (multiple Allele eines S-Locus). Teilen Pollen und Griffel ein S-Allel, scheitert die Befruchtung. Der Griffel hier ist S₁S₂. …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-abc-model",
+   "kind": "widget",
+   "title": {
+    "en": "The ABC model",
+    "de": "Das ABC-Modell"
+   },
+   "text": {
+    "en": "Organ identity genes (homeotic genes, studied in thale cress) decide which organ forms in each whorl: A alone gives sepals, A + B petals, B + C stamens, C alone carpels. Switch off one function.",
+    "de": "Organidentitätsgene (homöotische Gene, untersucht an der Ackerschmalwand) bestimmen, welches Organ in jedem Wirtel entsteht: A allein ergibt Kelchblätter, A + B Kronblätter, B + C Staubblätter, C …"
+   }
+  }
+ ],
+ "plant-diversity": [
+  {
+   "level": 1,
+   "id": "leaves-and-fruits-of-our-trees",
+   "kind": "widget",
+   "title": {
+    "en": "Leaves and fruits of our trees",
+    "de": "Blätter und Früchte unserer Bäume"
+   },
+   "text": {
+    "en": "Every broadleaf tree has its own leaf shape and its own fruit. You can tell them apart even in winter, by the fruits on the ground.",
+    "de": "Jeder Laubbaum hat seine eigene Blattform und seine eigene Frucht. Sogar im Winter erkennst du ihn an den Früchten am Boden."
+   }
+  },
+  {
+   "level": 1,
+   "id": "five-conifers",
+   "kind": "widget",
+   "title": {
+    "en": "Five conifers",
+    "de": "Fünf Nadelbäume"
+   },
+   "text": {
+    "en": "Look at how the needles sit on the twig (singly, in pairs, in tufts), whether they are flat or pointed, and at the cones.",
+    "de": "Achte darauf, wie die Nadeln am Zweig sitzen (einzeln, zu zweit, in Büscheln), ob sie flach oder spitz sind, und auf die Zapfen."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-dichotomous-key",
+   "kind": "widget",
+   "title": {
+    "en": "The dichotomous key",
+    "de": "Der Bestimmungsschlüssel"
+   },
+   "text": {
+    "en": "A dichotomous key always offers two descriptions (a and b). Exactly one fits your plant. It sends you to the next step until you reach a name. If the name doesn't fit, go back and check.",
+    "de": "Ein Bestimmungsschlüssel bietet immer zwei Beschreibungen an (a und b). Genau eine passt zu deiner Pflanze. Sie schickt dich zum nächsten Schritt, bis du bei einem Namen ankommst. Passt der Name …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "early-bloomers-racing-the-leaves",
+   "kind": "widget",
+   "title": {
+    "en": "Early bloomers: racing the leaves",
+    "de": "Frühblüher: Wettlauf mit dem Laub"
+   },
+   "text": {
+    "en": "Early bloomers such as snowdrop, wood anemone, crocus, tulip and lesser celandine flower before the trees come into leaf. Only then does enough light reach the forest floor. They can start so …",
+    "de": "Frühblüher wie Schneeglöckchen, Buschwindröschen, Krokus, Tulpe und Scharbockskraut blühen, bevor die Bäume austreiben. Nur dann erreicht genug Licht den Waldboden. Sie können so früh starten, …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "storage-organs",
+   "kind": "widget",
+   "title": {
+    "en": "Storage organs",
+    "de": "Speicherorgane"
+   },
+   "text": {
+    "en": "Bulb (tulip, snowdrop): thick storage leaves on a very short stem. Corm (crocus): a solid, thickened stem. Rhizome (wood anemone): a stem lying sideways in the soil. Root tubers (lesser …",
+    "de": "Zwiebel (Tulpe, Schneeglöckchen): dicke Speicherblätter an einer gestauchten Sprossachse. Sprossknolle (Krokus): eine feste, verdickte Sprossachse. Erdspross (Buschwindröschen): ein Spross, der …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "six-families",
+   "kind": "widget",
+   "title": {
+    "en": "Six families",
+    "de": "Sechs Familien"
+   },
+   "text": {
+    "en": "Crucifers, mint family, pea family, rose family, daisy family and grasses: each has its own flower plan and its own fruit.",
+    "de": "Kreuzblütler, Lippenblütler, Schmetterlingsblütler, Rosengewächse, Korbblütler und Süßgräser: Jede Familie hat ihren eigenen Blütenbau und ihre eigene Frucht."
+   }
+  },
+  {
+   "level": 2,
+   "id": "build-the-formula",
+   "kind": "widget",
+   "title": {
+    "en": "Build the formula",
+    "de": "Bau die Formel"
+   },
+   "text": {
+    "en": "A floral diagram shows the flower from above, every circle of parts as a ring: green sepals outside, then the petals, the yellow anthers and the ovary in the middle. Count and build the formula.",
+    "de": "Ein Blütendiagramm zeigt die Blüte von oben, jeden Kreis von Blütenteilen als Ring: außen die grünen Kelchblätter, dann die Kronblätter, die gelben Staubbeutel und in der Mitte der Fruchtknoten. …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "finding-the-family-with-a-key",
+   "kind": "widget",
+   "title": {
+    "en": "Finding the family with a key",
+    "de": "Die Familie mit dem Schlüssel finden"
+   },
+   "text": {
+    "en": "Work through the key step by step. Watch out: a clover head or a dandelion looks like one flower, but is it?",
+    "de": "Arbeite den Schlüssel Schritt für Schritt durch. Vorsicht: Ein Kleeköpfchen oder ein Löwenzahn sieht aus wie eine Blüte, aber ist es eine?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-family-tree-of-land-plants",
+   "kind": "widget",
+   "title": {
+    "en": "The family tree of land plants",
+    "de": "Der Stammbaum der Landpflanzen"
+   },
+   "text": {
+    "en": "In a cladogram the groups sit at the tips. Each bar on the stem marks new features (apomorphies). All groups above a bar share it, because they descend from one common ancestor.",
+    "de": "In einem Kladogramm stehen die Gruppen an den Spitzen. Jeder Strich am Stamm markiert neue Merkmale (Apomorphien). Alle Gruppen oberhalb eines Strichs teilen sie, weil sie von einem gemeinsamen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "moss-and-fern-life-cycles",
+   "kind": "widget",
+   "title": {
+    "en": "Moss and fern life cycles",
+    "de": "Entwicklungszyklus von Moos und Farn"
+   },
+   "text": {
+    "en": "Purple: haploid phase (gametophyte). Orange: diploid phase (sporophyte). The bars mark meiosis and fertilisation. The dominant generation is drawn larger.",
+    "de": "Lila: haploide Phase (Gametophyt). Orange: diploide Phase (Sporophyt). Die Balken markieren Meiose und Befruchtung. Die vorherrschende Generation ist größer gezeichnet."
+   }
+  },
+  {
+   "level": 3,
+   "id": "seed-plants-naked-and-enclosed-seeds",
+   "kind": "widget",
+   "title": {
+    "en": "Seed plants: naked and enclosed seeds",
+    "de": "Samenpflanzen: nackte und bedeckte Samen"
+   },
+   "text": {
+    "en": "Gymnosperms (conifers, ginkgo) carry their ovules openly on scales; they form no fruits. Angiosperms enclose their ovules in an ovary that becomes the fruit. Angiosperms are divided into monocots …",
+    "de": "Nacktsamer (Nadelbäume, Ginkgo) tragen ihre Samenanlagen frei auf Schuppen; sie bilden keine Früchte. Bedecktsamer schließen ihre Samenanlagen in einen Fruchtknoten ein, aus dem die Frucht wird. …"
+   }
+  }
+ ],
+ "vertebrates": [
+  {
+   "level": 1,
+   "id": "the-five-classes",
+   "kind": "widget",
+   "title": {
+    "en": "The five classes",
+    "de": "Die fünf Klassen"
+   },
+   "text": {
+    "en": "Each class shares the same features: body covering, breathing, body temperature and how the young develop.",
+    "de": "Die Tiere einer Klasse haben gemeinsame Merkmale: Körperbedeckung, Atmung, Körpertemperatur und Fortpflanzung."
+   }
+  },
+  {
+   "level": 1,
+   "id": "warm-blooded-or-cold-blooded",
+   "kind": "widget",
+   "title": {
+    "en": "Warm-blooded or cold-blooded?",
+    "de": "Gleichwarm oder wechselwarm?"
+   },
+   "text": {
+    "en": "A warm-blooded animal (gleichwarm) keeps its body temperature constant: it burns food to make heat. In a cold-blooded animal (wechselwarm) the body temperature follows the surroundings.",
+    "de": "Ein gleichwarmes Tier hält seine Körpertemperatur konstant: Es verbrennt Nahrung, um Wärme zu erzeugen. Bei einem wechselwarmen Tier folgt die Körpertemperatur der Umgebung."
+   }
+  },
+  {
+   "level": 1,
+   "id": "which-class-am-i",
+   "kind": "widget",
+   "title": {
+    "en": "Which class am I?",
+    "de": "Welche Klasse bin ich?"
+   },
+   "text": {
+    "en": "Read each profile, then pick a class. Every clue is checked against your choice.",
+    "de": "Lies jeden Steckbrief und wähle dann eine Klasse. Jeder Hinweis wird mit deiner Wahl verglichen."
+   }
+  },
+  {
+   "level": 2,
+   "id": "inside-a-fish",
+   "kind": "widget",
+   "title": {
+    "en": "Inside a fish",
+    "de": "Ein Fisch von innen"
+   },
+   "text": {
+    "en": "The perch is a typical bony fish. Its gills take oxygen from the water: water and blood flow in opposite directions (countercurrent principle). The swim bladder lets it float, and the lateral line …",
+    "de": "Der Barsch ist ein typischer Knochenfisch. Seine Kiemen holen Sauerstoff aus dem Wasser: Wasser und Blut fließen dabei gegeneinander (Gegenstromprinzip). Die Schwimmblase lässt ihn schweben, und …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "built-to-fly",
+   "kind": "widget",
+   "title": {
+    "en": "Built to fly",
+    "de": "Gebaut zum Fliegen"
+   },
+   "text": {
+    "en": "Birds save weight everywhere: hollow bones, a beak of horn without teeth, fused bones. The flight muscles are attached to the keel of the breastbone. Air sacs supply the lungs with fresh air all …",
+    "de": "Vögel sparen überall Gewicht: Röhrenknochen, ein Hornschnabel ohne Zähne, verwachsene Knochen. Die Flugmuskeln setzen am Brustbeinkamm an. Luftsäcke versorgen die Lunge ständig mit Frischluft. …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "from-spawn-to-frog",
+   "kind": "widget",
+   "title": {
+    "en": "From spawn to frog",
+    "de": "Vom Laich zum Frosch"
+   },
+   "text": {
+    "en": "The transformation of the larva into the adult animal is called metamorphosis. The tadpole swaps gills for lungs, plant food for insects, and its tail for legs.",
+    "de": "Die Umwandlung der Larve zum erwachsenen Tier heißt Metamorphose. Die Kaulquappe tauscht Kiemen gegen Lungen, Pflanzenkost gegen Insekten und den Schwanz gegen Beine."
+   }
+  },
+  {
+   "level": 2,
+   "id": "one-plan-for-all-teeth-for-every-diet",
+   "kind": "widget",
+   "title": {
+    "en": "One plan for all, teeth for every diet",
+    "de": "Ein Bauplan für alle, Zähne für jede Kost"
+   },
+   "text": {
+    "en": "Every vertebrate skeleton has a skull, a backbone, a shoulder girdle and a pelvic girdle with front and hind limbs. Mammals' teeth show what they eat: plant-eaters grind, meat-eaters cut, …",
+    "de": "Jedes Wirbeltierskelett hat einen Schädel, eine Wirbelsäule, einen Schultergürtel und einen Beckengürtel mit Vorder- und Hintergliedmaßen. Am Gebiss der Säugetiere erkennt man ihre Nahrung: …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "getting-through-the-winter",
+   "kind": "widget",
+   "title": {
+    "en": "Getting through the winter",
+    "de": "Durch den Winter kommen"
+   },
+   "text": {
+    "en": "Warm-blooded animals need a lot of food in winter, cold-blooded ones get stiff. Four strategies: Hibernation (hedgehog, bat, marmot): body temperature lowered to a few degrees, lives off fat. …",
+    "de": "Gleichwarme Tiere brauchen im Winter viel Nahrung, wechselwarme werden starr. Vier Strategien: Winterschlaf (Igel, Fledermaus, Murmeltier): Körpertemperatur auf wenige Grad gesenkt, lebt vom Fett. …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "four-limbs-one-plan",
+   "kind": "widget",
+   "title": {
+    "en": "Four limbs, one plan",
+    "de": "Vier Gliedmaßen, ein Bauplan"
+   },
+   "text": {
+    "en": "The front limbs of human, whale, bat and mole look completely different and do different jobs. Inside, the same bones sit in the same order: they are homologous.",
+    "de": "Die Vordergliedmaßen von Mensch, Wal, Fledermaus und Maulwurf sehen völlig verschieden aus und haben verschiedene Aufgaben. Innen liegen dieselben Knochen in derselben Reihenfolge: Sie sind homolog."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-family-tree-of-the-vertebrates",
+   "kind": "widget",
+   "title": {
+    "en": "The family tree of the vertebrates",
+    "de": "Der Stammbaum der Wirbeltiere"
+   },
+   "text": {
+    "en": "Each branching point stands for a common ancestor in which a new feature appeared. Bridge animals (mosaic forms) such as Tiktaalik or Archaeopteryx combine features of two groups.",
+    "de": "Jeder Verzweigungspunkt steht für einen gemeinsamen Vorfahren, bei dem ein neues Merkmal entstand. Brückentiere (Mosaikformen) wie Tiktaalik oder Archaeopteryx vereinen Merkmale zweier Gruppen."
+   }
+  },
+  {
+   "level": 3,
+   "id": "hearts-in-evolution",
+   "kind": "widget",
+   "title": {
+    "en": "Hearts in evolution",
+    "de": "Die Evolution des Herzens"
+   },
+   "text": {
+    "en": "From fish to bird and mammal, the heart becomes more and more divided. The gain: oxygen-rich and oxygen-poor blood no longer mix, and the body gets blood at high pressure.",
+    "de": "Vom Fisch zu Vogel und Säuger wird das Herz immer stärker unterteilt. Der Gewinn: Sauerstoffreiches und sauerstoffarmes Blut mischen sich nicht mehr, und der Körper bekommt Blut mit hohem Druck."
+   }
+  },
+  {
+   "level": 3,
+   "id": "temperature-control",
+   "kind": "widget",
+   "title": {
+    "en": "Temperature control",
+    "de": "Temperaturregulation"
+   },
+   "text": {
+    "en": "Endothermic (warm-blooded) animals produce heat in their metabolism and keep their temperature constant; ectothermic (cold-blooded) ones get their heat from outside. Heat is produced in the volume …",
+    "de": "Endotherme (gleichwarme) Tiere erzeugen Wärme im Stoffwechsel und halten ihre Temperatur konstant, ektotherme (wechselwarme) beziehen ihre Wärme von außen. Wärme entsteht im Volumen und geht über …"
+   }
+  }
+ ],
+ "digestion": [
+  {
+   "level": 1,
+   "id": "a-balanced-diet-the-food-pyramid",
+   "kind": "widget",
+   "title": {
+    "en": "A balanced diet: the food pyramid",
+    "de": "Ausgewogen essen: die Ernährungspyramide"
+   },
+   "text": {
+    "en": "No single food is healthy or unhealthy on its own: the mix matters. The food pyramid shows what to eat plenty of (bottom, green), moderately (yellow) and only a little of (top, red). Each block is …",
+    "de": "Kein Lebensmittel ist allein gesund oder ungesund: Auf die Mischung kommt es an. Die Ernährungspyramide zeigt, wovon du reichlich (unten, grün), mäßig (gelb) und nur wenig (oben, rot) essen …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "your-teeth",
+   "kind": "widget",
+   "title": {
+    "en": "Your teeth",
+    "de": "Dein Gebiss"
+   },
+   "text": {
+    "en": "Digestion starts in the mouth: the teeth cut the food into small pieces. Children first have 20 milk teeth, adults have 32 permanent teeth. Tap the types of teeth. Tooth enamel is the hardest …",
+    "de": "Die Verdauung beginnt im Mund: Die Zähne zerkleinern die Nahrung. Kinder haben zuerst 20 Milchzähne, Erwachsene 32 bleibende Zähne. Tipp die Zahnarten an. Zahnschmelz ist der härteste Stoff im …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-journey-of-a-bite",
+   "kind": "widget",
+   "title": {
+    "en": "The journey of a bite",
+    "de": "Die Reise eines Bissens"
+   },
+   "text": {
+    "en": "Follow a bite through your body. At each station something different happens. Which organs light up?",
+    "de": "Folge einem Bissen durch deinen Körper. An jeder Station passiert etwas anderes. Welche Organe leuchten auf?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-enzyme-scissors",
+   "kind": "widget",
+   "title": {
+    "en": "The enzyme scissors",
+    "de": "Die Enzym-Schere"
+   },
+   "text": {
+    "en": "Cut starch, protein and fat into their building blocks. Which enzyme fits which substrate? And what does bile do?",
+    "de": "Zerlege Stärke, Eiweiß und Fett in ihre Bausteine. Welches Enzym passt zu welchem Substrat? Und was macht die Galle?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "who-cuts-where",
+   "kind": "widget",
+   "title": {
+    "en": "Who cuts where?",
+    "de": "Wer schneidet wo?"
+   },
+   "text": {
+    "en": "Follow the bite again, this time with the digestive juices. The bars show how far starch, protein and fat are digested. Notice: the hydrochloric acid of the stomach kills germs and activates …",
+    "de": "Folge dem Bissen noch einmal, diesmal mit den Verdauungssäften. Die Balken zeigen, wie weit Stärke, Eiweiß und Fett schon zerlegt sind. Achte darauf: Die Salzsäure des Magens tötet Keime und …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "a-villus-under-the-microscope",
+   "kind": "widget",
+   "title": {
+    "en": "A villus under the microscope",
+    "de": "Eine Darmzotte unter dem Mikroskop"
+   },
+   "text": {
+    "en": "Tap the markers or the names: what does each structure do?",
+    "de": "Tipp auf die Nummern oder die Namen: Was macht welche Struktur?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "food-tests-the-mini-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Food tests: the mini lab",
+    "de": "Nachweisreaktionen: das Minilabor"
+   },
+   "text": {
+    "en": "With food tests you find out which nutrients a food contains. Test every food and compare with the control (water). There is also Fehling's test for glucose: when heated, the blue Fehling's …",
+    "de": "Mit Nachweisreaktionen findest du heraus, welche Nährstoffe in einem Lebensmittel stecken. Teste alle Lebensmittel und vergleiche mit der Blindprobe Wasser. Für Glucose gibt es außerdem die …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "energy-from-food",
+   "kind": "widget",
+   "title": {
+    "en": "Energy from food",
+    "de": "Energie aus der Nahrung"
+   },
+   "text": {
+    "en": "Food energy is given in kilojoules (kJ). Per gram: fat about 39 kJ, carbohydrates and protein about 17 kJ each. Your energy need is the basal metabolic rate (energy at rest: breathing, heartbeat, …",
+    "de": "Die Energie der Nahrung wird in Kilojoule (kJ) angegeben. Pro Gramm: Fett etwa 39 kJ, Kohlenhydrate und Eiweiß je etwa 17 kJ. Dein Energiebedarf ist der Grundumsatz (Energie in Ruhe: Atmung, …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "through-the-gut-cell",
+   "kind": "widget",
+   "title": {
+    "en": "Through the gut cell",
+    "de": "Durch die Darmzelle"
+   },
+   "text": {
+    "en": "Choose glucose, amino acids or fats and step through their way from the gut into blood or lymph. Watch which transporter lights up.",
+    "de": "Wähle Glucose, Aminosäuren oder Fette und geh ihren Weg aus dem Darm ins Blut oder in die Lymphe Schritt für Schritt durch. Achte darauf, welcher Transporter aufleuchtet."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-blood-sugar-simulator",
+   "kind": "widget",
+   "title": {
+    "en": "The blood sugar simulator",
+    "de": "Der Blutzucker-Simulator"
+   },
+   "text": {
+    "en": "A model of the control loop over 4 hours. Compare a meal with sport, and a healthy person with diabetes type 1 (without and with insulin) and type 2. The green band is the normal range, the dashed …",
+    "de": "Ein Modell des Regelkreises über 4 Stunden. Vergleiche eine Mahlzeit mit Sport und eine gesunde Person mit Diabetes Typ 1 (ohne und mit Insulin) und Typ 2. Das grüne Band ist der Normalbereich, …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "energy-balance-and-bmi",
+   "kind": "widget",
+   "title": {
+    "en": "Energy balance and BMI",
+    "de": "Energiebilanz und BMI"
+   },
+   "text": {
+    "en": "The energy balance compares intake with need (total = basal metabolic rate × PAL value). A surplus is stored as fat. The body mass index BMI = body mass (kg) / height² (m²) estimates whether …",
+    "de": "Die Energiebilanz vergleicht Zufuhr und Bedarf (Gesamtumsatz = Grundumsatz × PAL-Wert). Ein Überschuss wird als Fett gespeichert. Der Body-Mass-Index BMI = Körpermasse (kg) / Körpergröße² (m²) …"
+   }
+  }
+ ],
+ "circulation": [
+  {
+   "level": 1,
+   "id": "feeling-the-pulse",
+   "kind": "widget",
+   "title": {
+    "en": "Feeling the pulse",
+    "de": "Den Puls fühlen"
+   },
+   "text": {
+    "en": "With every heartbeat blood is pushed into the arteries. You feel this pressure wave as your pulse, for example at your wrist or neck. The pulse tells you the heart rate: beats per minute. Try out …",
+    "de": "Bei jedem Herzschlag wird Blut in die Arterien gedrückt. Diese Druckwelle spürst du als Puls, zum Beispiel am Handgelenk oder am Hals. Der Puls verrät die Herzfrequenz: Schläge pro Minute. Probier …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "what-the-blood-carries",
+   "kind": "widget",
+   "title": {
+    "en": "What the blood carries",
+    "de": "Was das Blut transportiert"
+   },
+   "text": {
+    "en": "Blood is the body's transport system. It brings oxygen from the lungs and nutrients from the intestine to every cell. It takes away the carbon dioxide the cells give off and spreads heat. Tap a …",
+    "de": "Das Blut ist das Transportsystem des Körpers. Es bringt Sauerstoff aus der Lunge und Nährstoffe aus dem Darm zu jeder Zelle. Es nimmt das Kohlenstoffdioxid mit, das die Zellen abgeben, und …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-way-of-the-air",
+   "kind": "widget",
+   "title": {
+    "en": "The way of the air",
+    "de": "Der Weg der Luft"
+   },
+   "text": {
+    "en": "When you breathe in, air flows through the nose (where it is warmed, moistened and cleaned), the pharynx and the larynx into the windpipe. It splits into two bronchi, which branch finer and finer …",
+    "de": "Beim Einatmen strömt die Luft durch die Nase (dort wird sie angewärmt, angefeuchtet und gereinigt), den Rachen und den Kehlkopf in die Luftröhre. Sie teilt sich in zwei Bronchien, die sich in der …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "breathing-in-and-out",
+   "kind": "widget",
+   "title": {
+    "en": "Breathing in and out",
+    "de": "Einatmen und Ausatmen"
+   },
+   "text": {
+    "en": "The air you breathe out is different from the air you breathe in. Switch between the two and compare. Then do the limewater experiment.",
+    "de": "Die Luft, die du ausatmest, ist anders als die Luft, die du einatmest. Wechsle zwischen beiden und vergleiche. Dann mach den Kalkwasser-Versuch."
+   }
+  },
+  {
+   "level": 2,
+   "id": "inside-the-heart",
+   "kind": "widget",
+   "title": {
+    "en": "Inside the heart",
+    "de": "Ein Blick ins Herz"
+   },
+   "text": {
+    "en": "The septum divides the heart into a right and a left half. Each half has an atrium on top and a ventricle below. The right half pumps oxygen-poor blood (blue) to the lungs, the left half …",
+    "de": "Die Herzscheidewand teilt das Herz in eine rechte und eine linke Hälfte. Jede Hälfte hat oben einen Vorhof und darunter eine Kammer. Die rechte Hälfte pumpt sauerstoffarmes Blut (blau) zur Lunge, …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-heart-beats",
+   "kind": "widget",
+   "title": {
+    "en": "The heart beats",
+    "de": "Das Herz schlägt"
+   },
+   "text": {
+    "en": "Let the heart beat or jump through the three moments of a heartbeat. Watch the valves!",
+    "de": "Lass das Herz schlagen oder spring durch die drei Momente eines Herzschlags. Achte auf die Klappen!"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-double-circulation",
+   "kind": "widget",
+   "title": {
+    "en": "The double circulation",
+    "de": "Der doppelte Kreislauf"
+   },
+   "text": {
+    "en": "The blood flows through two circuits one after the other. In the pulmonary circulation the right ventricle pumps oxygen-poor blood to the lungs; oxygen-rich, it returns to the left atrium. In the …",
+    "de": "Das Blut durchfließt zwei Kreisläufe nacheinander. Im Lungenkreislauf pumpt die rechte Kammer sauerstoffarmes Blut zur Lunge, sauerstoffreich kommt es in den linken Vorhof zurück. Im …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "artery-vein-capillary",
+   "kind": "widget",
+   "title": {
+    "en": "Artery, vein, capillary",
+    "de": "Arterie, Vene, Kapillare"
+   },
+   "text": {
+    "en": "Arteries have a thick, elastic wall with lots of muscle: they withstand the high pressure with which the heart ejects the blood. Veins have a thinner wall and a wide lumen. The pressure in them is …",
+    "de": "Arterien haben eine dicke, elastische Wand mit viel Muskulatur: Sie halten den hohen Druck aus, mit dem das Herz das Blut auswirft. Venen haben eine dünnere Wand und ein weites Lumen. In ihnen ist …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "what-swims-in-the-blood",
+   "kind": "widget",
+   "title": {
+    "en": "What swims in the blood",
+    "de": "Was im Blut schwimmt"
+   },
+   "text": {
+    "en": "Spin blood in a centrifuge and it separates: about 55 % is plasma, a yellowish liquid. About 45 % are cells: red blood cells (erythrocytes) with the red pigment haemoglobin, which binds oxygen; …",
+    "de": "Zentrifugiert man Blut, trennt es sich: Etwa 55 % sind Blutplasma, eine gelbliche Flüssigkeit. Etwa 45 % sind Zellen: rote Blutkörperchen (Erythrozyten) mit dem roten Farbstoff Hämoglobin, der …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "gas-exchange-in-the-lungs",
+   "kind": "widget",
+   "title": {
+    "en": "Gas exchange in the lungs",
+    "de": "Gasaustausch in der Lunge"
+   },
+   "text": {
+    "en": "In the alveoli only a paper-thin wall separates the air from the blood in the capillaries. Oxygen diffuses from the air, where there is a lot of it, into the blood, where there is little. Carbon …",
+    "de": "In den Lungenbläschen trennt nur eine hauchdünne Wand die Luft vom Blut in den Kapillaren. Sauerstoff diffundiert aus der Luft, wo viel davon ist, ins Blut, wo wenig ist. Kohlenstoffdioxid …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "blood-groups",
+   "kind": "widget",
+   "title": {
+    "en": "Blood groups",
+    "de": "Blutgruppen"
+   },
+   "text": {
+    "en": "Red blood cells carry surface markers, the antigens A and B. The plasma contains antibodies against the antigens you don't have: group A has anti-B, group B has anti-A, group 0 has both, AB none. …",
+    "de": "Rote Blutkörperchen tragen auf ihrer Oberfläche Merkmale, die Antigene A und B. Im Plasma schwimmen Antikörper gegen die Antigene, die man nicht hat: Gruppe A hat Anti-B, Gruppe B hat Anti-A, …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-oxygen-dissociation-curve",
+   "kind": "widget",
+   "title": {
+    "en": "The oxygen dissociation curve",
+    "de": "Die Sauerstoffbindungskurve"
+   },
+   "text": {
+    "en": "The curve shows what percentage of haemoglobin is loaded with oxygen at a given O₂ partial pressure. Bohr effect: more CO₂ and a lower pH (as in a working muscle) shift the curve to the right. …",
+    "de": "Die Kurve zeigt, wie viel Prozent des Hämoglobins bei einem bestimmten O₂-Partialdruck mit Sauerstoff beladen sind. Bohr-Effekt: Mehr CO₂ und ein niedrigerer pH-Wert (wie im arbeitenden Muskel) …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "pressures-and-volume-during-one-heartbeat",
+   "kind": "widget",
+   "title": {
+    "en": "Pressures and volume during one heartbeat",
+    "de": "Drücke und Volumen bei einem Herzschlag"
+   },
+   "text": {
+    "en": "Scrub through one heartbeat (0.8 s at 75 beats per minute). Top: the ECG; middle: the pressures in the left ventricle, aorta and left atrium; bottom: the ventricle volume. Where pressure curves …",
+    "de": "Fahr mit dem Regler durch einen Herzschlag (0,8 s bei 75 Schlägen pro Minute). Oben das EKG, in der Mitte die Drücke in linker Kammer, Aorta und linkem Vorhof, unten das Kammervolumen. Wo sich …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-heart-s-own-pacemaker",
+   "kind": "widget",
+   "title": {
+    "en": "The heart's own pacemaker",
+    "de": "Der Schrittmacher des Herzens"
+   },
+   "text": {
+    "en": "The heart beats by itself (autorhythmicity): special heart muscle cells form and conduct excitation. The sinus node sets the pace. The excitation spreads over the atria to the AV node, which …",
+    "de": "Das Herz schlägt von selbst (Autorhythmie): Spezialisierte Herzmuskelzellen bilden und leiten Erregungen. Der Sinusknoten gibt den Takt vor. Die Erregung läuft über die Vorhöfe zum AV-Knoten, der …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "cardiac-output",
+   "kind": "widget",
+   "title": {
+    "en": "Cardiac output",
+    "de": "Das Herzminutenvolumen"
+   },
+   "text": {
+    "en": "The cardiac output (CO) is the volume of blood one ventricle ejects per minute: CO = stroke volume × heart rate. At rest that's about 70 ml × 70/min ≈ 4.9 l/min, roughly all your blood once a minute.",
+    "de": "Das Herzminutenvolumen (HMV) ist das Blutvolumen, das eine Kammer pro Minute auswirft: HMV = Schlagvolumen · Herzfrequenz. In Ruhe sind das etwa 70 ml · 70/min ≈ 4,9 l/min, also ungefähr dein …"
+   }
+  }
+ ],
+ "nervous-system": [
+  {
+   "level": 1,
+   "id": "catch-the-ruler",
+   "kind": "widget",
+   "title": {
+    "en": "Catch the ruler!",
+    "de": "Fang das Lineal!"
+   },
+   "text": {
+    "en": "Test your reaction time. At some point the ruler drops: grab it as fast as you can. The quicker you react, the shorter the distance it falls.",
+    "de": "Teste deine Reaktionszeit. Irgendwann fällt das Lineal los: Greif so schnell du kannst zu. Je schneller du reagierst, desto kürzer ist die Strecke, die es fällt."
+   }
+  },
+  {
+   "level": 1,
+   "id": "explore-the-eye",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the eye",
+    "de": "Das Auge erkunden"
+   },
+   "text": {
+    "en": "Tap the numbers to find out what each part of the eye does. Then slide the light up and down: what does the pupil do?",
+    "de": "Tippe auf die Nummern und finde heraus, was die Teile des Auges tun. Schieb dann das Licht hoch und runter: Was macht die Pupille?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "find-your-blind-spot",
+   "kind": "widget",
+   "title": {
+    "en": "Find your blind spot",
+    "de": "Finde deinen blinden Fleck"
+   },
+   "text": {
+    "en": "An experiment for you: cover one eye, look at the cross and slowly move closer to the screen.",
+    "de": "Ein Versuch für dich: Halte ein Auge zu, schau aufs Kreuz und geh langsam näher an den Bildschirm."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-brain-who-does-what",
+   "kind": "widget",
+   "title": {
+    "en": "The brain: who does what?",
+    "de": "Das Gehirn: Wer macht was?"
+   },
+   "text": {
+    "en": "Tap the parts of the brain or try the activities. Then switch to the cortical areas of the cerebrum.",
+    "de": "Tippe auf die Hirnteile oder probier die Tätigkeiten aus. Schalte dann auf die Rindenfelder des Großhirns um."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-reflex-arc",
+   "kind": "widget",
+   "title": {
+    "en": "The reflex arc",
+    "de": "Der Reflexbogen"
+   },
+   "text": {
+    "en": "In the knee-jerk reflex the doctor taps just below your kneecap and your leg kicks forward. Tap it yourself and follow the impulse. Its route is called the reflex arc.",
+    "de": "Beim Kniesehnenreflex klopft die Ärztin unter die Kniescheibe, und dein Bein schnellt vor. Klopf selbst und verfolge die Erregung. Ihr Weg heißt Reflexbogen."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-nerve-cell",
+   "kind": "widget",
+   "title": {
+    "en": "The nerve cell",
+    "de": "Die Nervenzelle"
+   },
+   "text": {
+    "en": "Nerve cells (neurons) pass signals on. Tap the parts, then send an impulse on its way.",
+    "de": "Nervenzellen (Neurone) leiten Erregungen weiter. Tippe auf die Teile und schick dann eine Erregung los."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-synapse-a-handover-with-a-messenger",
+   "kind": "widget",
+   "title": {
+    "en": "The synapse: a handover with a messenger",
+    "de": "Die Synapse: Übergabe mit Botenstoff"
+   },
+   "text": {
+    "en": "Between two nerve cells, or between a nerve and a muscle, there's a tiny gap: the synapse. The signal doesn't simply jump across. It is passed on electrically → chemically → electrically, with a …",
+    "de": "Zwischen zwei Nervenzellen, oder zwischen Nerv und Muskel, liegt ein winziger Spalt: die Synapse. Die Erregung springt nicht einfach hinüber. Sie wird elektrisch → chemisch → elektrisch …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "near-and-far",
+   "kind": "widget",
+   "title": {
+    "en": "Near and far",
+    "de": "Nah und fern"
+   },
+   "text": {
+    "en": "Move the flower closer and watch the ciliary muscle, the zonular fibres and the lens. Try the stiff lens too.",
+    "de": "Schieb die Blume näher heran und beobachte Ziliarmuskel, Linsenbänder und Linse. Probier auch die starre Linse aus."
+   }
+  },
+  {
+   "level": 3,
+   "id": "how-the-resting-potential-arises",
+   "kind": "widget",
+   "title": {
+    "en": "How the resting potential arises",
+    "de": "So entsteht das Ruhepotenzial"
+   },
+   "text": {
+    "en": "Go through the thought experiment step by step and watch the voltage.",
+    "de": "Geh das Gedankenexperiment Schritt für Schritt durch und beobachte die Spannung."
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-action-potential",
+   "kind": "widget",
+   "title": {
+    "en": "The action potential",
+    "de": "Das Aktionspotenzial"
+   },
+   "text": {
+    "en": "Stimulate the membrane and watch the curve and the ion channels at the same time. Try a weak stimulus too, and switch on the refractory period. The second tab shows what a stronger stimulus does.",
+    "de": "Reize die Membran und beobachte gleichzeitig die Kurve und die Ionenkanäle. Probier auch einen schwachen Reiz und schalte die Refraktärzeit ein. Im zweiten Reiter siehst du, was ein stärkerer Reiz …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "continuous-or-saltatory",
+   "kind": "widget",
+   "title": {
+    "en": "Continuous or saltatory?",
+    "de": "Kontinuierlich oder saltatorisch?"
+   },
+   "text": {
+    "en": "In unmyelinated axons the action potential has to form anew at every spot of the membrane: continuous conduction. Local currents depolarise the next stretch above threshold. In myelinated axons …",
+    "de": "Bei marklosen Axonen muss das Aktionspotenzial an jeder Stelle der Membran neu entstehen: kontinuierliche Erregungsleitung. Ausgleichsströme depolarisieren das nächste Stück überschwellig. Bei …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "synaptic-poisons",
+   "kind": "widget",
+   "title": {
+    "en": "Synaptic poisons",
+    "de": "Synapsengifte"
+   },
+   "text": {
+    "en": "Step through the transmission. Then pick a poison and find out where it acts and what happens to the next cell.",
+    "de": "Geh die Übertragung Schritt für Schritt durch. Wähle dann ein Gift und finde heraus, wo es angreift und was mit der nachfolgenden Zelle passiert."
+   }
+  }
+ ],
+ "immune-system": [
+  {
+   "level": 1,
+   "id": "bacteria-and-viruses-compared",
+   "kind": "widget",
+   "title": {
+    "en": "Bacteria and viruses compared",
+    "de": "Bakterien und Viren im Vergleich"
+   },
+   "text": {
+    "en": "Bacteria and viruses are often mixed up, but they are completely different. Tap the features and compare.",
+    "de": "Bakterien und Viren werden oft verwechselt, dabei sind sie grundverschieden. Tipp auf die Merkmale und vergleiche."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-body-s-barriers",
+   "kind": "widget",
+   "title": {
+    "en": "The body's barriers",
+    "de": "Die Schutzbarrieren des Körpers"
+   },
+   "text": {
+    "en": "Before a pathogen can do any harm, it has to get past the outer barriers. Tap the numbers.",
+    "de": "Bevor ein Erreger Schaden anrichten kann, muss er an den äußeren Barrieren vorbei. Tipp auf die Nummern."
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-antibiotic-experiment",
+   "kind": "widget",
+   "title": {
+    "en": "The antibiotic experiment",
+    "de": "Das Antibiotika-Experiment"
+   },
+   "text": {
+    "en": "Antibiotics (like penicillin, found by Alexander Fleming in a mould in 1928) kill bacteria or stop them from growing. Try them on bacteria and on viruses, and wait in between.",
+    "de": "Antibiotika (wie das Penicillin, das Alexander Fleming 1928 in einem Schimmelpilz entdeckte) töten Bakterien ab oder hemmen ihr Wachstum. Probier sie an Bakterien und an Viren aus, und warte …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-idea-of-vaccination",
+   "kind": "widget",
+   "title": {
+    "en": "The idea of vaccination",
+    "de": "Die Idee des Impfens"
+   },
+   "text": {
+    "en": "Once you have had measles, you usually never get them again: the body remembers the pathogen. A vaccination uses exactly that. Press play, then vaccinate and play again.",
+    "de": "Wer einmal Masern hatte, bekommt sie meist nie wieder: Der Körper merkt sich den Erreger. Eine Impfung nutzt genau das. Drück auf Abspielen, dann impfe und spiel es noch mal ab."
+   }
+  },
+  {
+   "level": 2,
+   "id": "bacterium-and-virus-up-close",
+   "kind": "widget",
+   "title": {
+    "en": "Bacterium and virus up close",
+    "de": "Bakterium und Virus ganz nah"
+   },
+   "text": {
+    "en": "Bacteria are prokaryotes: living cells without a nucleus. Viruses are just genetic material (DNA or RNA) in a protein coat (capsid), often with an extra envelope. Tap through both drawings, then …",
+    "de": "Bakterien sind Prokaryoten: lebende Zellen ohne Zellkern. Viren bestehen nur aus Erbinformation (DNA oder RNA) in einer Proteinhülle (Kapsid), oft mit einer zusätzlichen Hülle. Tipp dich durch …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "how-a-virus-multiplies",
+   "kind": "widget",
+   "title": {
+    "en": "How a virus multiplies",
+    "de": "Wie sich ein Virus vermehrt"
+   },
+   "text": {
+    "en": "Step through the replication cycle. The host cell does all the work.",
+    "de": "Geh den Vermehrungszyklus Schritt für Schritt durch. Die ganze Arbeit macht die Wirtszelle."
+   }
+  },
+  {
+   "level": 2,
+   "id": "non-specific-defence-phagocytes",
+   "kind": "widget",
+   "title": {
+    "en": "Non-specific defence: phagocytes",
+    "de": "Unspezifische Abwehr: Fresszellen"
+   },
+   "text": {
+    "en": "If pathogens get past the barriers, macrophages (big phagocytes) are there at once. This defence is innate and non-specific: it acts against everything foreign, quickly, but without memory.",
+    "de": "Kommen Erreger an den Barrieren vorbei, sind sofort Makrophagen (große Fresszellen) zur Stelle. Diese Abwehr ist angeboren und unspezifisch: Sie wirkt schnell gegen alles Fremde, aber ohne Gedächtnis."
+   }
+  },
+  {
+   "level": 2,
+   "id": "lock-and-key",
+   "kind": "widget",
+   "title": {
+    "en": "Lock and key",
+    "de": "Schlüssel und Schloss"
+   },
+   "text": {
+    "en": "Send one antibody after another against the viruses. Watch what happens when one fits.",
+    "de": "Schick einen Antikörper nach dem anderen gegen die Viren. Schau, was passiert, wenn einer passt."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-course-of-an-immune-response",
+   "kind": "widget",
+   "title": {
+    "en": "The course of an immune response",
+    "de": "Ablauf einer Immunreaktion"
+   },
+   "text": {
+    "en": "Step through a complete immune response: the macrophage, the T helper cell, the B cell with its plasma cells, the antibodies, and the T killer cell for infected cells.",
+    "de": "Geh eine komplette Immunreaktion durch: die Makrophage, die T-Helferzelle, die B-Zelle mit ihren Plasmazellen, die Antikörper und die T-Killerzelle für befallene Zellen."
+   }
+  },
+  {
+   "level": 2,
+   "id": "first-and-second-infection-active-and-passive",
+   "kind": "widget",
+   "title": {
+    "en": "First and second infection, active and passive",
+    "de": "Erst- und Zweitinfektion, aktiv und passiv"
+   },
+   "text": {
+    "en": "The first contact causes a slow primary response. Thanks to memory cells, the second contact causes a fast, strong secondary response. Active immunisation (vaccine) uses that; passive immunisation …",
+    "de": "Der Erstkontakt löst eine langsame Primärreaktion aus. Dank der Gedächtniszellen folgt beim Zweitkontakt eine schnelle, starke Sekundärreaktion. Die aktive Immunisierung (Impfstoff) nutzt das; die …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "antigen-presentation-mhc-i-and-mhc-ii",
+   "kind": "widget",
+   "title": {
+    "en": "Antigen presentation: MHC I and MHC II",
+    "de": "Antigenpräsentation: MHC-I und MHC-II"
+   },
+   "text": {
+    "en": "MHC I: all nucleated body cells show peptides of their own proteins; T killer cells (co-receptor CD8) check them. MHC II: antigen-presenting cells show what they took up; T helper cells (CD4) …",
+    "de": "MHC-I: Alle kernhaltigen Körperzellen zeigen Peptide ihrer eigenen Proteine; T-Killerzellen (Corezeptor CD8) kontrollieren sie. MHC-II: Antigenpräsentierende Zellen zeigen, was sie aufgenommen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "clonal-selection-and-expansion",
+   "kind": "widget",
+   "title": {
+    "en": "Clonal selection and expansion",
+    "de": "Klonale Selektion und Expansion"
+   },
+   "text": {
+    "en": "Random recombination of gene segments produces millions of B and T cell clones, each with one receptor; clones that react against self are removed while they mature. An antigen selects the …",
+    "de": "Durch zufällige Neukombination von Gen-Abschnitten entstehen Millionen B- und T-Zell-Klone mit je einem Rezeptor; Klone, die gegen Eigenes reagieren, werden bei der Reifung beseitigt. Ein Antigen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-structure-of-an-antibody",
+   "kind": "widget",
+   "title": {
+    "en": "The structure of an antibody",
+    "de": "Der Bau eines Antikörpers"
+   },
+   "text": {
+    "en": "Antibodies (immunoglobulins) consist of two heavy and two light chains held together by disulphide bridges. The variable regions form the antigen-binding sites; the constant region decides the …",
+    "de": "Antikörper (Immunglobuline) bestehen aus zwei schweren und zwei leichten Ketten, die Disulfidbrücken zusammenhalten. Die variablen Regionen bilden die Antigenbindungsstellen; die konstante Region …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "primary-and-secondary-response",
+   "kind": "widget",
+   "title": {
+    "en": "Primary and secondary response",
+    "de": "Primär- und Sekundärantwort"
+   },
+   "text": {
+    "en": "The antibody titre shows how much antibody is in the serum. Play the curves, then switch the second contact to a new antigen.",
+    "de": "Der Antikörpertiter zeigt, wie viel Antikörper im Serum ist. Spiel die Kurven ab und stell dann den Zweitkontakt auf ein neues Antigen um."
+   }
+  },
+  {
+   "level": 3,
+   "id": "hiv-and-aids",
+   "kind": "widget",
+   "title": {
+    "en": "HIV and AIDS",
+    "de": "HIV und AIDS"
+   },
+   "text": {
+    "en": "HIV is a retrovirus: RNA, reverse transcriptase, integrase. It infects T helper cells (CD4). After an acute phase it stays hidden for years as a provirus while the number of T helper cells falls. …",
+    "de": "HIV ist ein Retrovirus: RNA, reverse Transkriptase, Integrase. Es befällt T-Helferzellen (CD4). Nach einer akuten Phase versteckt es sich jahrelang als Provirus, während die Zahl der …"
+   }
+  }
+ ],
+ "genetics": [
+  {
+   "level": 1,
+   "id": "a-pair-of-chromosomes",
+   "kind": "widget",
+   "title": {
+    "en": "A pair of chromosomes",
+    "de": "Ein Chromosomenpaar"
+   },
+   "text": {
+    "en": "Tap the numbers or the names. Where is the gene? Which letters are alleles? Where are both alleles the same?",
+    "de": "Tipp auf die Nummern oder die Namen. Wo liegt das Gen? Welche Buchstaben sind Allele? Wo sind beide Allele gleich?"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-allele-lab",
+   "kind": "widget",
+   "title": {
+    "en": "The allele lab",
+    "de": "Das Allel-Labor"
+   },
+   "text": {
+    "en": "For each gene pick one allele from the mother and one from the father. Watch the pea plant, its genotype and its phenotype.",
+    "de": "Wähle für jedes Gen ein Allel von der Mutter und eins vom Vater. Beobachte die Erbsenpflanze, ihren Genotyp und ihren Phänotyp."
+   }
+  },
+  {
+   "level": 1,
+   "id": "cross-pure-breeding-plants",
+   "kind": "widget",
+   "title": {
+    "en": "Cross pure-breeding plants",
+    "de": "Reinerbige Pflanzen kreuzen"
+   },
+   "text": {
+    "en": "Pick the two parents of the P generation. Watch the gametes and the F1. Is the F1 uniform every time?",
+    "de": "Wähle die beiden Eltern der P-Generation. Beobachte die Keimzellen und die F1. Ist die F1 jedes Mal einheitlich?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-punnett-square-builder",
+   "kind": "widget",
+   "title": {
+    "en": "The Punnett square builder",
+    "de": "Der Kreuzungsschema-Baukasten"
+   },
+   "text": {
+    "en": "Pick the genotypes of both parents. Which cross gives 3 : 1? Which gives 1 : 1? Then try the four o'clock flower and the blood groups.",
+    "de": "Wähle die Genotypen beider Eltern. Welche Kreuzung ergibt 3 : 1? Welche 1 : 1? Probier dann die Wunderblume und die Blutgruppen."
+   }
+  },
+  {
+   "level": 2,
+   "id": "two-traits-at-once",
+   "kind": "widget",
+   "title": {
+    "en": "Two traits at once",
+    "de": "Zwei Merkmale gleichzeitig"
+   },
+   "text": {
+    "en": "Mendel also followed two traits together: seed colour (G yellow, g green) and seed shape (R round, r wrinkled). P: GGRR \\times ggrr, F1: all GgRr. Each F1 plant forms four kinds of gametes. 3rd …",
+    "de": "Mendel verfolgte auch zwei Merkmale gleichzeitig: Samenfarbe (G gelb, g grün) und Samenform (R rund, r runzlig). P: GGRR \\times ggrr, F1: alle GgRr. Jede F1-Pflanze bildet vier Sorten Keimzellen. …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "reading-pedigrees",
+   "kind": "widget",
+   "title": {
+    "en": "Reading pedigrees",
+    "de": "Stammbäume lesen"
+   },
+   "text": {
+    "en": "A pedigree shows a family over several generations: square = man, circle = woman, filled = affected. A line joins a couple, their children hang below. Two clues decide: two healthy parents with an …",
+    "de": "Ein Stammbaum zeigt eine Familie über mehrere Generationen: Quadrat = Mann, Kreis = Frau, gefüllt = krank. Eine Linie verbindet ein Paar, die Kinder hängen darunter. Zwei Hinweise entscheiden: …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "x-linked-crosses",
+   "kind": "widget",
+   "title": {
+    "en": "X-linked crosses",
+    "de": "X-chromosomale Kreuzungen"
+   },
+   "text": {
+    "en": "Red-green colour blindness and haemophilia A are inherited X-linked recessively. Choose the mother and the father and compare daughters and sons.",
+    "de": "Rot-Grün-Sehschwäche und Bluterkrankheit (Hämophilie A) werden X-chromosomal-rezessiv vererbt. Wähle Mutter und Vater und vergleiche Töchter und Söhne."
+   }
+  },
+  {
+   "level": 3,
+   "id": "pedigree-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Pedigree lab",
+    "de": "Stammbaum-Labor"
+   },
+   "text": {
+    "en": "Tap a mode of inheritance: the tree shows the family that rules it out, or the genotypes that fit. Half-filled symbols are certain carriers. Then load a new family.",
+    "de": "Tipp auf einen Erbgang: Der Stammbaum zeigt die Familie, die ihn ausschließt, oder die Genotypen, die passen. Halb gefüllte Symbole sind sichere Überträger(innen). Dann lade eine neue Familie."
+   }
+  },
+  {
+   "level": 3,
+   "id": "crossing-over-and-gene-maps",
+   "kind": "widget",
+   "title": {
+    "en": "Crossing-over and gene maps",
+    "de": "Crossing-over und Genkarten"
+   },
+   "text": {
+    "en": "Tab 1: simulate meioses and watch the recombination frequency follow the distance. Tab 2: find the gene order from recombination frequencies, with real Drosophila data.",
+    "de": "Reiter 1: Simuliere Meiosen und beobachte, wie die Rekombinationshäufigkeit dem Abstand folgt. Reiter 2: Finde die Genreihenfolge aus Rekombinationshäufigkeiten, mit echten Drosophila-Daten."
+   }
+  }
+ ],
+ "dna": [
+  {
+   "level": 1,
+   "id": "a-twisted-rope-ladder",
+   "kind": "widget",
+   "title": {
+    "en": "A twisted rope ladder",
+    "de": "Eine verdrehte Strickleiter"
+   },
+   "text": {
+    "en": "DNA is a double helix: two strands wound around each other like a twisted rope ladder. The rails are made of sugar and phosphate in turns, the rungs are pairs of two bases. Untwist the helix into …",
+    "de": "Die DNA ist eine Doppelhelix: zwei Stränge, die wie eine verdrehte Strickleiter umeinander gewunden sind. Die Holme bestehen abwechselnd aus Zucker und Phosphat, die Sprossen sind Paare aus zwei …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "build-the-other-strand",
+   "kind": "widget",
+   "title": {
+    "en": "Build the other strand",
+    "de": "Bau den Gegenstrang"
+   },
+   "text": {
+    "en": "Tap the base that fits below the marked one. A wrong partner wobbles back.",
+    "de": "Tipp unten die Base an, die zur markierten passt. Ein falscher Partner wackelt zurück."
+   }
+  },
+  {
+   "level": 2,
+   "id": "nucleotides-the-building-blocks",
+   "kind": "widget",
+   "title": {
+    "en": "Nucleotides: the building blocks",
+    "de": "Nukleotide: die Bausteine"
+   },
+   "text": {
+    "en": "DNA is a chain of nucleotides. Each one has three parts: a phosphate group, the sugar deoxyribose and one of the four bases. Sugar and phosphate form the backbone, the bases point inwards.",
+    "de": "Die DNA ist eine Kette aus Nukleotiden. Jedes besteht aus drei Teilen: einem Phosphatrest, dem Zucker Desoxyribose und einer der vier Basen. Zucker und Phosphat bilden das Rückgrat, die Basen …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "replication-copying-dna",
+   "kind": "widget",
+   "title": {
+    "en": "Replication: copying DNA",
+    "de": "Replikation: DNA wird kopiert"
+   },
+   "text": {
+    "en": "The enzyme helicase unwinds the double helix and separates the two strands. DNA polymerase then adds complementary nucleotides to each old strand. Each new molecule has one old and one new strand: …",
+    "de": "Das Enzym Helikase entwindet die Doppelhelix und trennt die beiden Stränge. Die DNA-Polymerase ergänzt dann an jedem alten Strang komplementäre Nukleotide. Jedes neue Molekül hat einen alten und …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "watch-the-rna-polymerase",
+   "kind": "widget",
+   "title": {
+    "en": "Watch the RNA polymerase",
+    "de": "Schau der RNA-Polymerase zu"
+   },
+   "text": {
+    "en": "The polymerase moves along the template strand and adds one RNA nucleotide at a time.",
+    "de": "Die Polymerase wandert am codogenen Strang entlang und hängt ein RNA-Nukleotid nach dem anderen an."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-genetic-code",
+   "kind": "widget",
+   "title": {
+    "en": "The genetic code",
+    "de": "Der genetische Code"
+   },
+   "text": {
+    "en": "Three bases of the mRNA, a codon (triplet), stand for one amino acid. Read the code sun from the inside out: 1st base in the middle, 2nd in the middle ring, 3rd outside. AUG is the start codon …",
+    "de": "Drei Basen der mRNA, ein Codon (Triplett), stehen für eine Aminosäure. Lies die Codesonne von innen nach außen: 1. Base in der Mitte, 2. im mittleren Ring, 3. außen. AUG ist das Startcodon …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "translation-at-the-ribosome",
+   "kind": "widget",
+   "title": {
+    "en": "Translation at the ribosome",
+    "de": "Translation am Ribosom"
+   },
+   "text": {
+    "en": "At the ribosome the mRNA is translated into a chain of amino acids. tRNAs bring the amino acids. Each tRNA has an anticodon that pairs with exactly one codon. Neighbouring amino acids are linked …",
+    "de": "Am Ribosom wird die mRNA in eine Kette aus Aminosäuren übersetzt. tRNAs bringen die Aminosäuren. Jede tRNA hat ein Anticodon, das genau zu einem Codon passt. Benachbarte Aminosäuren werden durch …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "mutation-lab",
+   "kind": "widget",
+   "title": {
+    "en": "Mutation lab",
+    "de": "Mutationslabor"
+   },
+   "text": {
+    "en": "Here is the start of the gene for the β chain of haemoglobin. Exchange, insert or delete bases in the DNA and watch the mRNA and the protein. Try deleting three bases in a row!",
+    "de": "Hier siehst du den Anfang des Gens für die β-Kette des Hämoglobins. Tausch Basen in der DNA aus, füge welche ein oder lösch sie, und beobachte mRNA und Protein. Probier mal, drei Basen …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-replication-fork",
+   "kind": "widget",
+   "title": {
+    "en": "The replication fork",
+    "de": "Die Replikationsgabel"
+   },
+   "text": {
+    "en": "Go through the work at the fork: helicase, primase, DNA polymerase III, DNA polymerase I and ligase. Watch which way each new strand grows.",
+    "de": "Geh die Arbeit an der Gabel durch: Helikase, Primase, DNA-Polymerase III, DNA-Polymerase I und Ligase. Achte darauf, in welche Richtung jeder neue Strang wächst."
+   }
+  },
+  {
+   "level": 3,
+   "id": "process-a-pre-mrna",
+   "kind": "widget",
+   "title": {
+    "en": "Process a pre-mRNA",
+    "de": "Prozessiere eine prä-mRNA"
+   },
+   "text": {
+    "en": "Go through the processing step by step. Then leave out exon 3 and compare the two proteins.",
+    "de": "Geh die Prozessierung Schritt für Schritt durch. Lass dann Exon 3 weg und vergleich die beiden Proteine."
+   }
+  },
+  {
+   "level": 3,
+   "id": "translation-a-p-and-e-site",
+   "kind": "widget",
+   "title": {
+    "en": "Translation: A, P and E site",
+    "de": "Translation: A-, P- und E-Stelle"
+   },
+   "text": {
+    "en": "Initiation: the small subunit binds the mRNA and finds AUG; the initiator tRNA (Met) sits in the P site, then the large subunit joins. Elongation repeats three steps: a tRNA binds in the A site …",
+    "de": "Initiation: Die kleine Untereinheit bindet die mRNA und sucht AUG; die Start-tRNA (Met) sitzt an der P-Stelle, dann kommt die große Untereinheit dazu. Die Elongation wiederholt drei Schritte: Eine …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "gene-regulation-the-operon-model",
+   "kind": "widget",
+   "title": {
+    "en": "Gene regulation: the operon model",
+    "de": "Genregulation: das Operon-Modell"
+   },
+   "text": {
+    "en": "Jacob and Monod (1961) explained gene regulation in bacteria with the operon: promoter, operator and structural genes in a row. A repressor from the regulator gene can block the operator. lac …",
+    "de": "Jacob und Monod (1961) erklärten die Genregulation bei Bakterien mit dem Operon: Promotor, Operator und Strukturgene hintereinander. Ein Repressor vom Regulatorgen kann den Operator blockieren. …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "pcr-the-copying-machine",
+   "kind": "widget",
+   "title": {
+    "en": "PCR: the copying machine",
+    "de": "PCR: die Kopiermaschine"
+   },
+   "text": {
+    "en": "The polymerase chain reaction copies a DNA section in a test tube: denaturation (~95 °C), primer annealing (~55 °C), elongation (~72 °C) with the heat-stable Taq polymerase. Each cycle doubles the …",
+    "de": "Die Polymerase-Kettenreaktion vervielfältigt einen DNA-Abschnitt im Reagenzglas: Denaturierung (~95 °C), Primeranlagerung (~55 °C), Elongation (~72 °C) mit der hitzestabilen Taq-Polymerase. Jeder …"
+   }
+  }
+ ],
+ "evolution": [
+  {
+   "level": 1,
+   "id": "dig-through-the-rock-layers",
+   "kind": "widget",
+   "title": {
+    "en": "Dig through the rock layers",
+    "de": "Grab dich durch die Gesteinsschichten"
+   },
+   "text": {
+    "en": "Rock forms in layers: sand and mud settle on top of each other for millions of years and harden. Dig down layer by layer and look at the fossils and their ages.",
+    "de": "Gestein entsteht in Schichten: Sand und Schlamm lagern sich Millionen Jahre lang übereinander ab und werden fest. Grab dich Schicht für Schicht nach unten und schau dir die Fossilien und ihr Alter an."
+   }
+  },
+  {
+   "level": 1,
+   "id": "archaeopteryx-the-primeval-bird",
+   "kind": "widget",
+   "title": {
+    "en": "Archaeopteryx, the primeval bird",
+    "de": "Der Urvogel Archaeopteryx"
+   },
+   "text": {
+    "en": "Archaeopteryx lived about 150 million years ago; its fossils were found in Bavaria. It has bird features and reptile features. Such a living thing is called a transitional form. It shows that …",
+    "de": "Archaeopteryx lebte vor etwa 150 Millionen Jahren; seine Fossilien wurden in Bayern gefunden. Er hat Vogelmerkmale und Reptilienmerkmale. So ein Lebewesen nennt man Übergangsform (Brückentier). Es …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "the-peppered-moth-selection-live",
+   "kind": "widget",
+   "title": {
+    "en": "The peppered moth: selection live",
+    "de": "Der Birkenspanner: Selektion live"
+   },
+   "text": {
+    "en": "In England around 1850, almost all peppered moths were light: on birch bark with lichens they are hard to see. Then factories covered the trunks with soot. Switch the bark and let the birds hunt …",
+    "de": "In England waren um 1850 fast alle Birkenspanner hell: Auf Birkenrinde mit Flechten sind sie kaum zu sehen. Dann bedeckten Fabriken die Stämme mit Ruß. Schalte die Rinde um und lass die Vögel ein …"
+   }
+  },
+  {
+   "level": 1,
+   "id": "reading-a-family-tree",
+   "kind": "widget",
+   "title": {
+    "en": "Reading a family tree",
+    "de": "Stammbäume lesen"
+   },
+   "text": {
+    "en": "A family tree shows how living things are related. Today's species sit at the tips. Where two lines meet lies their last common ancestor. The more recent this ancestor, the closer the …",
+    "de": "Ein Stammbaum zeigt, wie Lebewesen miteinander verwandt sind. Die heutigen Arten stehen an den Spitzen. Wo sich zwei Linien treffen, liegt ihr letzter gemeinsamer Vorfahre. Je jünger dieser …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "lamarck-and-darwin-the-giraffe-s-neck",
+   "kind": "widget",
+   "title": {
+    "en": "Lamarck and Darwin: the giraffe's neck",
+    "de": "Lamarck und Darwin: der Hals der Giraffe"
+   },
+   "text": {
+    "en": "Jean-Baptiste de Lamarck (1809) and Charles Darwin (1859) both thought that species change over time. But they explained it very differently. Go through the four steps and compare.",
+    "de": "Jean-Baptiste de Lamarck (1809) und Charles Darwin (1859) waren beide überzeugt, dass sich Arten im Lauf der Zeit verändern. Sie erklärten es aber ganz unterschiedlich. Geh die vier Schritte durch …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "new-species-on-islands",
+   "kind": "widget",
+   "title": {
+    "en": "New species on islands",
+    "de": "Neue Arten auf Inseln"
+   },
+   "text": {
+    "en": "On the Galápagos Islands Darwin found finches that differ mainly in their beaks. Today we know: they descend from one species that came from the mainland. Step through how new species arise.",
+    "de": "Auf den Galápagosinseln fand Darwin Finken, die sich vor allem in ihren Schnäbeln unterscheiden. Heute weiß man: Sie stammen von einer Art ab, die vom Festland kam. Geh Schritt für Schritt durch, …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "homologous-forelimbs",
+   "kind": "widget",
+   "title": {
+    "en": "Homologous forelimbs",
+    "de": "Homologe Vordergliedmaßen"
+   },
+   "text": {
+    "en": "Grasping, flying, swimming, running: the forelimbs of these mammals do very different jobs. Yet they are built from the same bones, in the same order. That only makes sense if they all go back to …",
+    "de": "Greifen, Fliegen, Schwimmen, Laufen: Die Vordergliedmaßen dieser Säugetiere haben ganz verschiedene Aufgaben. Trotzdem bestehen sie aus denselben Knochen in derselben Anordnung. Das ergibt nur …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-hardy-weinberg-calculator",
+   "kind": "widget",
+   "title": {
+    "en": "The Hardy-Weinberg calculator",
+    "de": "Der Hardy-Weinberg-Rechner"
+   },
+   "text": {
+    "en": "Usually you only see phenotypes. Homozygous recessive individuals (aa) can be recognised, so their share q² is known. From it: q = √q², p = 1 − q, and the carriers 2pq. Try the presets and the slider.",
+    "de": "Meist sieht man nur die Phänotypen. Homozygot rezessive Individuen (aa) erkennt man, ihr Anteil q² ist also bekannt. Daraus folgt q = √q², p = 1 − q und der Anteil der Überträger 2pq. Probier die …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "genetic-drift-and-selection",
+   "kind": "widget",
+   "title": {
+    "en": "Genetic drift and selection",
+    "de": "Gendrift und Selektion"
+   },
+   "text": {
+    "en": "Six populations each start with p(A) = 0.5. In every generation the alleles of the next generation are drawn at random from the gene pool. Compare small and large populations, with and without …",
+    "de": "Sechs Populationen starten jeweils mit p(A) = 0,5. In jeder Generation werden die Allele der nächsten Generation zufällig aus dem Genpool gezogen. Vergleiche kleine und große Populationen, mit und …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "selection-forms-in-motion",
+   "kind": "widget",
+   "title": {
+    "en": "Selection forms in motion",
+    "de": "Selektionsformen in Bewegung"
+   },
+   "text": {
+    "en": "The red zones show where selection works against the individuals. Choose a form and let the generations pass.",
+    "de": "Die roten Bereiche zeigen, wo die Selektion gegen die Individuen wirkt. Wähle eine Form und lass die Generationen ablaufen."
+   }
+  },
+  {
+   "level": 3,
+   "id": "explore-the-cladogram",
+   "kind": "widget",
+   "title": {
+    "en": "Explore the cladogram",
+    "de": "Das Kladogramm erkunden"
+   },
+   "text": {
+    "en": "Each numbered bar marks where a character arose. Everything to the right of it has the character. Switch to the groups to test familiar groups like reptiles or fish.",
+    "de": "Jeder nummerierte Balken zeigt, wo ein Merkmal entstanden ist. Alles rechts davon hat das Merkmal. Wechsle zu den Gruppen und prüfe bekannte Gruppen wie Reptilien oder Fische."
+   }
+  }
+ ],
+ "ecosystems": [
+  {
+   "level": 1,
+   "id": "the-layers-of-the-forest",
+   "kind": "widget",
+   "title": {
+    "en": "The layers of the forest",
+    "de": "Die Stockwerke des Waldes"
+   },
+   "text": {
+    "en": "A forest is built in layers, like a house with storeys. Each layer gets a different amount of light, so different plants and animals live there. Tap the numbers!",
+    "de": "Ein Wald ist in Schichten aufgebaut, wie ein Haus mit Stockwerken. Jedes Stockwerk bekommt unterschiedlich viel Licht, deshalb leben dort verschiedene Pflanzen und Tiere. Tippe auf die Nummern!"
+   }
+  },
+  {
+   "level": 1,
+   "id": "decomposers-close-the-cycle",
+   "kind": "widget",
+   "title": {
+    "en": "Decomposers close the cycle",
+    "de": "Destruenten schließen den Kreislauf"
+   },
+   "text": {
+    "en": "Without decomposers the forest would drown in dead leaves. They turn dead remains back into minerals that plants can use again: the substances go round in a cycle.",
+    "de": "Ohne Destruenten würde der Wald im Laub ersticken. Sie machen aus toten Resten wieder Mineralstoffe, die Pflanzen erneut nutzen: Die Stoffe gehen im Kreislauf."
+   }
+  },
+  {
+   "level": 1,
+   "id": "build-a-food-web",
+   "kind": "widget",
+   "title": {
+    "en": "Build a food web",
+    "de": "Bau ein Nahrungsnetz"
+   },
+   "text": {
+    "en": "Most animals eat more than one kind of food and are eaten by more than one enemy. Many linked food chains form a food web. Draw the arrows, then let a species disappear.",
+    "de": "Die meisten Tiere fressen mehr als eine Sorte Nahrung und haben mehrere Fressfeinde. Viele verknüpfte Nahrungsketten bilden ein Nahrungsnetz. Zieh die Pfeile, dann lass eine Art verschwinden."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-tolerance-curve",
+   "kind": "widget",
+   "title": {
+    "en": "The tolerance curve",
+    "de": "Die Toleranzkurve"
+   },
+   "text": {
+    "en": "For every factor a species has a range of tolerance between a minimum and a maximum. It does best at the optimum. Close to the limits lies the pessimum: it survives, but hardly grows and doesn't …",
+    "de": "Für jeden Faktor hat eine Art einen Toleranzbereich zwischen Minimum und Maximum. Am besten geht es ihr im Optimum. Nahe den Grenzen liegt das Pessimum: Sie überlebt, wächst aber kaum und pflanzt …"
+   }
+  },
+  {
+   "level": 2,
+   "id": "fill-the-energy-pyramid",
+   "kind": "widget",
+   "title": {
+    "en": "Fill the energy pyramid",
+    "de": "Füll die Energiepyramide"
+   },
+   "text": {
+    "en": "Stack the trophic levels on top of each other and you get a pyramid: energy and biomass decrease strongly towards the top. Fill it in with the 10 % rule.",
+    "de": "Stapelt man die Trophieebenen (Ernährungsstufen) übereinander, entsteht eine Pyramide: Energie und Biomasse nehmen nach oben stark ab. Füll sie mit der 10-%-Regel aus."
+   }
+  },
+  {
+   "level": 2,
+   "id": "the-carbon-cycle",
+   "kind": "widget",
+   "title": {
+    "en": "The carbon cycle",
+    "de": "Der Kohlenstoffkreislauf"
+   },
+   "text": {
+    "en": "Carbon is in the CO₂ of the air and in all organic substances. Tap the processes: which ones take CO₂ out of the air, which release it? And what does the greenhouse effect have to do with it?",
+    "de": "Kohlenstoff steckt im CO₂ der Luft und in allen organischen Stoffen. Tippe die Vorgänge an: Welche entziehen der Luft CO₂, welche setzen es frei? Und was hat der Treibhauseffekt damit zu tun?"
+   }
+  },
+  {
+   "level": 2,
+   "id": "predator-and-prey-lynx-and-hare",
+   "kind": "widget",
+   "title": {
+    "en": "Predator and prey: lynx and hare",
+    "de": "Räuber und Beute: Luchs und Schneehase"
+   },
+   "text": {
+    "en": "For almost a century, a fur trading company in Canada counted the skins of lynx and snowshoe hares. The numbers rise and fall in a rhythm of about 10 years, and the lynx always follows the hare.",
+    "de": "Fast ein Jahrhundert lang zählte eine Pelzhandelsgesellschaft in Kanada die Felle von Luchsen und Schneeschuhhasen. Die Zahlen steigen und fallen im Rhythmus von etwa 10 Jahren, und der Luchs …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "exponential-and-logistic-growth",
+   "kind": "widget",
+   "title": {
+    "en": "Exponential and logistic growth",
+    "de": "Exponentielles und logistisches Wachstum"
+   },
+   "text": {
+    "en": "Both curves start the same way. The logistic one is braked by limited resources and levels off at the capacity K. Show the growth per time unit: where is it largest?",
+    "de": "Beide Kurven beginnen gleich. Die logistische wird durch begrenzte Ressourcen gebremst und flacht bei der Kapazität K ab. Lass dir den Zuwachs pro Zeiteinheit zeigen: Wo ist er am größten?"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-lotka-volterra-rules",
+   "kind": "widget",
+   "title": {
+    "en": "The Lotka-Volterra rules",
+    "de": "Die Lotka-Volterra-Regeln"
+   },
+   "text": {
+    "en": "Lotka and Volterra described predator and prey with equations. Three rules follow: 1. both populations oscillate periodically, the predator maxima follow the prey maxima with a delay. 2. The mean …",
+    "de": "Lotka und Volterra beschrieben Räuber und Beute mit Gleichungen. Daraus folgen drei Regeln: 1. Beide Populationen schwanken periodisch, die Maxima der Räuber folgen phasenverzögert auf die der …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-nitrogen-cycle",
+   "kind": "widget",
+   "title": {
+    "en": "The nitrogen cycle",
+    "de": "Der Stickstoffkreislauf"
+   },
+   "text": {
+    "en": "Living things need nitrogen for proteins and DNA. Plants can only take it up as nitrate or ammonium. Bacteria drive the cycle: tap the processes and note which need oxygen.",
+    "de": "Lebewesen brauchen Stickstoff für Proteine und DNA. Pflanzen können ihn nur als Nitrat oder Ammonium aufnehmen. Bakterien treiben den Kreislauf an: Tippe die Vorgänge an und achte darauf, welche …"
+   }
+  },
+  {
+   "level": 3,
+   "id": "the-lake-through-the-year",
+   "kind": "widget",
+   "title": {
+    "en": "The lake through the year",
+    "de": "Der See im Jahresverlauf"
+   },
+   "text": {
+    "en": "Water is densest at 4 °C (density anomaly). That's why a deep lake is layered in summer and winter (stagnation) and mixed in spring and autumn (circulation). Go through the seasons and watch …",
+    "de": "Wasser hat bei 4 °C die größte Dichte (Dichteanomalie). Deshalb ist ein tiefer See im Sommer und Winter geschichtet (Stagnation) und im Frühjahr und Herbst durchmischt (Zirkulation). Geh durch die …"
+   }
+  }
+ ]
+}

@@ -117,6 +117,8 @@ export function LessonPlayer({
       return;
     }
     if (finished || step.type === "check" || e.defaultPrevented) return;
+    // A share panel is open (it lives in a portal, so focus may sit outside it): keys are its own.
+    if (document.querySelector("[data-share-panel]")) return;
     const el = document.activeElement as HTMLElement | null;
     // Widgets own their keys: sliders, inputs and anything inside a control.
     const busy = el?.closest("input, textarea, select, [contenteditable], [role=slider], [role=spinbutton], [data-own-keys]");

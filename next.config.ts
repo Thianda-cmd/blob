@@ -12,6 +12,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Only lesson pictures (/embed) are made to sit in other sites' frames. Everything else may be framed
+        // by Blob itself at most, so no other site can trick a signed-in student into clicks (clickjacking).
+        source: "/((?!embed/|oauth/).*)",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+        ],
+      },
+      {
         // The consent screen must never be shown inside someone else's frame (clickjacking).
         source: "/oauth/:path*",
         headers: [

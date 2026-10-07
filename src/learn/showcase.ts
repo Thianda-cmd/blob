@@ -9,7 +9,7 @@ import { LEVELS, type Level, type RichText, type Topic } from "./types";
  * showing it to a class.
  */
 export type ShowItem = {
-  /** Unique within its level: the English step title as a slug ("nucleotides-the-building-blocks"). */
+  /** Unique within its level: the step's `id`, or else its English title as a slug ("nucleotides-the-building-blocks"). */
   id: string;
   level: Level;
   /** Index of the step in its level's lesson. */
@@ -41,16 +41,18 @@ export function showItems(topic: Topic): ShowItem[] {
   const items: ShowItem[] = [];
   for (const level of LEVELS) {
     const lesson = topic.lessons[level]?.lesson ?? [];
-    const taken = new Map<string, number>();
+    const used = new Set<string>();
     lesson.forEach((step, i) => {
       if (step.type === "check") return;
       const visual = step.type === "widget" ? { component: step.widget as ComponentType<Record<string, unknown>>, props: {} } : step.visual;
       if (!visual) return;
-      const base = slugify(resolveText(step.title, "en"));
-      const n = (taken.get(base) ?? 0) + 1;
-      taken.set(base, n);
+      // Steps with the same title get -2, -3…: every id of a level is handed out once.
+      const base = slugify(step.id ?? resolveText(step.title, "en"));
+      let id = base;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
       items.push({
-        id: n === 1 ? base : `${base}-${n}`,
+        id,
         level,
         step: i,
         title: step.title,

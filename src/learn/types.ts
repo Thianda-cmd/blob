@@ -132,6 +132,8 @@ export type LessonStep =
       visual?: { component: ComponentType<Record<string, unknown>>; props: Record<string, unknown> };
       /** Blob's line when the step opens. */
       blob?: Text;
+      /** The picture's public id (/show/…/<id>); by default the slug of the English title. Set it to keep a link when renaming. */
+      id?: string;
     }
   | {
       type: "widget";
@@ -140,6 +142,8 @@ export type LessonStep =
       blob?: Text;
       /** An interactive explanation (graph you can drag, number line…). */
       widget: ComponentType;
+      /** The widget's public id (/show/…/<id>); by default the slug of the English title. Set it to keep a link when renaming. */
+      id?: string;
     }
   | {
       type: "check";

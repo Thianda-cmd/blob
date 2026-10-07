@@ -46,8 +46,14 @@ function TopicHeader({ topic, small }: { topic: Topic; small?: boolean }) {
   const subject = SUBJECTS.find((s) => s.slug === topic.subject);
   return (
     <div className="flex items-center gap-3">
-      <div className={cn("grid shrink-0 place-items-center rounded-xl border border-line bg-raised shadow-card", small ? "size-11" : "size-14")}>
-        <TopicGlyph topic={topic} size="sm" />
+      <div
+        className={cn(
+          "grid shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-raised px-1 shadow-card",
+          small ? "h-11" : "h-14",
+          topic.icon ? (small ? "w-11" : "w-14") : "w-[104px]",
+        )}
+      >
+        <TopicGlyph topic={topic} size="sm" className="max-w-full" />
       </div>
       <div className="min-w-0">
         <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
@@ -73,7 +79,7 @@ export function ShowTopicList({ slug }: { slug: string }) {
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 pb-20 pt-8 sm:px-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div className="relative grid h-[104px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised shadow-card sm:w-[168px]">
+        <div className="relative grid h-[120px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised shadow-card sm:w-[200px]">
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
           <TopicGlyph topic={topic} size="lg" className="relative" />
         </div>
@@ -121,12 +127,13 @@ export function ShowTopicList({ slug }: { slug: string }) {
         );
       })}
 
-      <LearnCard topic={topic} level={items[0]?.level ?? 1} />
+      <LearnCard topic={topic} />
     </div>
   );
 }
 
-function LearnCard({ topic, level }: { topic: Topic; level: Level }) {
+/** The way to the lessons: a picture's own level, or else the first lesson that's written. */
+function LearnCard({ topic, level }: { topic: Topic; level?: Level }) {
   const t = useMessages(showText);
   return (
     <section className="mt-12 flex flex-col gap-4 rounded-2xl border border-line bg-raised p-5 shadow-card sm:flex-row sm:items-center sm:p-6">
@@ -213,6 +220,8 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
             <button
               type="button"
               onClick={toggle}
+              aria-label={t.fullscreen}
+              title={t.fullscreen}
               className="flex h-8.5 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
             >
               <Maximize2 className="size-4" /> <span className="hidden sm:inline">{t.fullscreen}</span>
@@ -239,16 +248,16 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
         <VisualCard item={item} className={cn(full && "mx-auto my-auto w-full max-w-[1200px]")} />
       </div>
 
-      <nav className="mt-4 flex items-center justify-between gap-3 text-[13.5px]">
+      <nav aria-label={t.pictureNav} className="mt-4 flex items-center justify-between gap-3 text-[13.5px]">
         {prev ? (
-          <Link href={showHref(topic, prev.level, prev.id)} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <Link href={showHref(topic, prev.level, prev.id)} aria-label={`${t.previous}: ${tt(prev.title)}`} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-medium text-ink-2 hover:bg-hover hover:text-ink">
             <ArrowLeft className="size-4 shrink-0" /> <span className="truncate">{tt(prev.title)}</span>
           </Link>
         ) : (
           <span />
         )}
         {next && (
-          <Link href={showHref(topic, next.level, next.id)} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-right font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <Link href={showHref(topic, next.level, next.id)} aria-label={`${t.next}: ${tt(next.title)}`} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-right font-medium text-ink-2 hover:bg-hover hover:text-ink">
             <span className="truncate">{tt(next.title)}</span> <ArrowRight className="size-4 shrink-0" />
           </Link>
         )}
@@ -282,24 +291,36 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
   );
 }
 
-/** One picture alone, for an iframe on someone else's site. */
-export function EmbedVisual({ slug, level, id, theme }: { slug: string; level: Level; id: string; theme?: "light" | "dark" }) {
+/** One picture alone, for an iframe on someone else's site. Tells the page around it how tall it is. */
+export function EmbedVisual({ slug, level, id }: { slug: string; level: Level; id: string }) {
   const topic = useTopic(slug);
   const t = useMessages(showText);
   const tt = useText();
   const item = showItems(topic).find((i) => i.level === level && i.id === id);
+  const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (theme) document.documentElement.dataset.theme = theme;
-  }, [theme]);
+    const el = root.current;
+    if (!el || window.parent === window) return;
+    let last = 0;
+    const report = () => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      if (Math.abs(height - last) < 2) return;
+      last = height;
+      // Only the height leaves the frame; public/sdk/blob-embed.js on the page around it resizes the iframe.
+      window.parent.postMessage({ type: "blob-embed-size", height }, "*");
+    };
+    const observer = new ResizeObserver(report);
+    observer.observe(el);
+    report();
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col gap-3 p-3 sm:p-4">
+    <div ref={root} className="flex flex-col gap-3 p-3 sm:p-4">
       {item ? (
         <>
-          <div className="flex items-center gap-2">
-            <h1 className="min-w-0 flex-1 truncate font-display text-[17px] font-bold tracking-[-0.01em]">{tt(item.title)}</h1>
-          </div>
+          <h1 className="min-w-0 truncate font-display text-[17px] font-bold tracking-[-0.01em]">{tt(item.title)}</h1>
           <VisualCard item={item} />
         </>
       ) : (
@@ -309,7 +330,7 @@ export function EmbedVisual({ slug, level, id, theme }: { slug: string; level: L
         href={item ? showHref(topic, level, id) : showTopicHref(topic)}
         target="_blank"
         rel="noopener"
-        className="mt-auto flex items-center gap-1.5 self-end rounded-lg px-2 py-1 text-[12.5px] font-medium text-ink-3 hover:text-blob-ink"
+        className="flex items-center gap-1.5 self-end rounded-lg px-2 py-1 text-[12.5px] font-medium text-ink-3 hover:text-blob-ink"
       >
         <BlobMark size={16} /> {t.openOnBlob} <ExternalLink className="size-3" />
       </a>

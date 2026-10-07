@@ -19,6 +19,8 @@ export function Popover({
   className,
   open: controlledOpen,
   onOpenChange,
+  role = "menu",
+  label,
 }: {
   trigger: (props: { onClick: (e: React.MouseEvent) => void; "aria-expanded": boolean; ref: React.Ref<HTMLButtonElement> }) => ReactNode;
   children: ReactNode | ((close: () => void) => ReactNode);
@@ -27,6 +29,9 @@ export function Popover({
   className?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** "dialog" for panels with fields and buttons rather than menu items. */
+  role?: "menu" | "dialog";
+  label?: string;
 }) {
   const [uncontrolled, setUncontrolled] = useState(false);
   const open = controlledOpen ?? uncontrolled;
@@ -112,7 +117,8 @@ export function Popover({
                   "fixed z-[60] min-w-[200px] rounded-xl border border-line bg-raised p-1 text-[13px] shadow-pop",
                   className,
                 )}
-                role="menu"
+                role={role}
+                aria-label={label}
               >
                 {typeof children === "function" ? children(close) : children}
               </motion.div>

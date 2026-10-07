@@ -44,7 +44,7 @@ export const landingText = defineMessages({
     learn: {
       kicker: "New · Learn with Blob",
       title: "Maths, chemistry and biology that finally click.",
-      body: "Topics straight from your lessons, each in three levels from beginner to expert. Blob explains everything step by step, spots what went wrong in your answers, and you practise until it sticks.",
+      body: "Topics straight from your lessons, maths and biology in three levels from beginner to expert. Blob explains everything step by step, spots what went wrong in your answers, and you practise until it sticks.",
       demo: {
         label: "Live demo: removing brackets, step by step",
         solution: "Worked solution",
@@ -204,7 +204,7 @@ export const landingText = defineMessages({
     learn: {
       kicker: "Neu · Lernen mit Blob",
       title: "Mathe, Chemie und Bio, bei denen es endlich Klick macht.",
-      body: "Themen direkt aus dem Unterricht, jedes in drei Stufen vom Einsteiger bis zum Experten. Blob erklärt dir alles Schritt für Schritt, merkt, wo es in deiner Antwort hakt, und du übst, bis es sitzt.",
+      body: "Themen direkt aus dem Unterricht, Mathe und Bio in drei Stufen vom Einsteiger bis zum Experten. Blob erklärt dir alles Schritt für Schritt, merkt, wo es in deiner Antwort hakt, und du übst, bis es sitzt.",
       demo: {
         label: "Live-Demo: Klammern auflösen, Schritt für Schritt",
         solution: "Lösungsweg",

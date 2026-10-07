@@ -8,28 +8,49 @@ import { resolveText } from "@/i18n/text";
 import { findTopicMeta } from "@/learn/catalog";
 import { ShowVisual } from "@/learn/components/ShowViews";
 import { parseLevel } from "@/learn/levels";
+import { showHref } from "@/learn/showcase";
+import { manifestItem, manifestItems } from "@/learn/showManifest";
 import { ShowSkeleton } from "../../../../skeleton";
 
-export async function generateMetadata({ params }: PageProps<"/show/[subject]/[topic]/[level]/[id]">): Promise<Metadata> {
-  const { subject, topic, level: raw } = await params;
+type Params = { subject: string; topic: string; level: string; id: string };
+
+/** The picture's topic and level, or nothing when the address can't be one (only "1", "2", "3" count as levels). */
+function resolve({ subject, topic, level: raw, id }: Params) {
   const meta = findTopicMeta(topic);
   const level = parseLevel(raw);
-  if (meta?.subject !== subject || !level) return {};
+  if (meta?.subject !== subject || !level || raw !== String(level) || !/^[a-z0-9-]{1,80}$/.test(id)) return null;
+  return { meta, level };
+}
+
+export async function generateMetadata({ params }: PageProps<"/show/[subject]/[topic]/[level]/[id]">): Promise<Metadata> {
+  const p = await params;
+  const found = resolve(p);
+  if (!found) return {};
+  const { meta, level } = found;
   const [t, learn, locale] = await Promise.all([getMessages(showText), getMessages(learnText), getLocale()]);
-  // The picture's own title lives in the (client-side) lesson; the topic and level name it well enough.
-  const title = t.metaVisual(resolveText(meta.title, locale), learn.levels[level]);
-  const description = resolveText(meta.levels[level].blurb ?? meta.blurb, locale);
-  return { title, description, openGraph: { title, description, siteName: "Blob", type: "website" } };
+  const topic = resolveText(meta.title, locale);
+  const item = manifestItem(meta.slug, level, p.id);
+  const known = manifestItems(meta.slug);
+  const title = item ? t.metaPicture(item.title[locale], topic) : t.metaVisual(topic, learn.levels[level]);
+  const description = item?.text?.[locale] ?? resolveText(meta.levels[level].blurb ?? meta.blurb, locale);
+  const url = showHref(meta, level, p.id);
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, siteName: "Blob", type: "website" },
+    // A picture the lessons don't have (any more): the page explains that, but search engines shouldn't keep it.
+    ...(known && !item ? { robots: { index: false } } : {}),
+  };
 }
 
 export default async function ShowVisualPage({ params }: PageProps<"/show/[subject]/[topic]/[level]/[id]">) {
-  const { subject, topic, level: raw, id } = await params;
-  const meta = findTopicMeta(topic);
-  const level = parseLevel(raw);
-  if (meta?.subject !== subject || !level || !/^[a-z0-9-]{1,80}$/.test(id)) notFound();
+  const p = await params;
+  const found = resolve(p);
+  if (!found) notFound();
   return (
     <Suspense fallback={<ShowSkeleton />}>
-      <ShowVisual slug={topic} level={level} id={id} />
+      <ShowVisual slug={found.meta.slug} level={found.level} id={p.id} />
     </Suspense>
   );
 }
