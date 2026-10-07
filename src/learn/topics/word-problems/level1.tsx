@@ -117,7 +117,7 @@ function wrongNumbers(answer: AnswerSpec, list: Wrong[]): Mistake[] {
 /** The comma of a price got lost (1,50 € taken as 150 €). */
 const commaLost = (cents: number, en: string, de: string): Text =>
   tx(
-    `Hmm, that's a lot ${en}! I think the comma in ${eur(cents)} € got lost on the way. A rough check helps: about how much should it be?`,
+    `Hmm, that's a lot ${en}! I think the decimal point in ${eur(cents)} € got lost on the way. A rough check helps: about how much should it be?`,
     `Hm, das ist ganz schön viel ${de}! Ich glaub, das Komma in ${eur(cents)} € ist unterwegs verloren gegangen. Ein Überschlag hilft: Wie viel sollte es ungefähr sein?`,
   );
 
@@ -151,7 +151,7 @@ function shareWrongs(total: number, n: number, people: Text): Wrong[] {
         `Ich glaub, ich weiß, was du gemacht hast: Du hast ${n} von ${eur(total)} abgezogen. Aber die ${n} ${D(people)} **teilen** sich die Kosten, also wird geteilt.`,
       ),
     ),
-    total % 100 !== 0 && wrong(total / n, tx("Comma lost", "Komma verloren"), commaLost(total, "for each of them", "pro Person")),
+    total % 100 !== 0 && wrong(total / n, tx("Decimal point lost", "Komma verloren"), commaLost(total, "for each of them", "pro Person")),
   ];
 }
 
@@ -375,7 +375,7 @@ const buyMany: Tpl = (rng) => {
           `Fast! ${eur(p)} € kostet **${g.de.a.toLowerCase()} ${g.de.one}**. ${name} kauft aber ${n} davon.`,
         ),
       ),
-      p % 100 !== 0 && wrong(total, tx("Comma lost", "Komma verloren"), commaLost(p, `for ${n} ${g.many}`, `für ${n} ${g.de.many}`)),
+      p % 100 !== 0 && wrong(total, tx("Decimal point lost", "Komma verloren"), commaLost(p, `for ${n} ${g.many}`, `für ${n} ${g.de.many}`)),
     ]),
     hint: tx(
       "The same price several times: **multiply** the number of items by the price of one.",
@@ -737,9 +737,9 @@ const convert: Tpl = (rng) => {
         c.dir === "mul" &&
         wrong(
           Math.floor(v) * 60 + Math.round((v % 1) * 100),
-          tx("The comma isn't minutes", "Komma sind keine Minuten"),
+          tx("The decimal places aren't minutes", "Nachkommastellen sind keine Minuten"),
           tx(
-            `Ooh, the classic time trap! The digits after the comma in ${de(v)} h aren't minutes, they're a **part of an hour**. Multiply the whole ${de(v)} by 60.`,
+            `Ooh, the classic time trap! The digits after the decimal point in ${de(v)} h aren't minutes, they're a **part of an hour**. Multiply the whole ${de(v)} by 60.`,
             `Die klassische Zeitfalle! Die Ziffern nach dem Komma in ${de(v)} h sind keine Minuten, sondern ein **Teil einer Stunde**. Rechne ${de(v)} als Ganzes mal 60.`,
           ),
         ),
@@ -750,7 +750,7 @@ const convert: Tpl = (rng) => {
           hh + mm / 100,
           NOT_H_MIN,
           tx(
-            `Ooh, the classic time trap! ${hh},${String(mm).padStart(2, "0")} h is **not** ${hh ? `${hh} h ` : ""}${mm} min: the digits after the comma aren't minutes. Divide the ${v} min by 60.`,
+            `Ooh, the classic time trap! ${hh},${String(mm).padStart(2, "0")} h is **not** ${hh ? `${hh} h ` : ""}${mm} min: the digits after the decimal point aren't minutes. Divide the ${v} min by 60.`,
             `Die klassische Zeitfalle! ${hh},${String(mm).padStart(2, "0")} h sind **nicht** ${hh ? `${hh} h ` : ""}${mm} min: Die Ziffern nach dem Komma sind keine Minuten. Teil die ${v} min durch 60.`,
           ),
         ),
@@ -1648,7 +1648,7 @@ const trainingHours: Tpl = (rng) => {
           hh + mm / 100,
           NOT_H_MIN,
           tx(
-            `So close! ${hh} h ${mm} min is right, but that isn't ${hh},${mm} h: the digits after the comma aren't minutes. What part of an hour are ${mm} minutes?`,
+            `So close! ${hh} h ${mm} min is right, but that isn't ${hh},${mm} h: the digits after the decimal point aren't minutes. What part of an hour are ${mm} minutes?`,
             `Ganz knapp! ${hh} h ${mm} min stimmt, aber das sind nicht ${hh},${mm} h: Die Ziffern nach dem Komma sind keine Minuten. Welcher Teil einer Stunde sind ${mm} Minuten?`,
           ),
         ),

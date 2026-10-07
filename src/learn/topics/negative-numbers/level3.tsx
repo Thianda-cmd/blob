@@ -191,7 +191,7 @@ function solveTask(rng: Rng): Exercise {
       { math: `x_1#x =#e -#s ${a}#a \\quad x_2#x2 =#e2 ${a}#a2`, note: tx(`$${a}^2 = ${a * a}$ and $(-${a})^2 = ${a * a}$ too.`, `$${a}^2 = ${a * a}$ und auch $(-${a})^2 = ${a * a}$.`) },
     ];
     slips.push({ values: [a], title: ONE_MORE, say: tx(`$(-${a})^2 = ${a * a}$ as well: minus times minus is plus.`, `Auch $(-${a})^2 = ${a * a}$: Minus mal minus ergibt plus.`), close: true });
-    if ((a * a) % 2 === 0) slips.push({ values: [(a * a) / 2], title: tx("Squared is not doubled", "Quadrieren ist nicht verdoppeln"), say: tx("$x^2$ means $x \\cdot x$, not $2 \\cdot x$.", "$x^2$ heißt $x \\cdot x$, nicht $2 \\cdot x$.") });
+    if ((a * a) % 2 === 0 && (a * a) / 2 !== a) slips.push({ values: [(a * a) / 2], title: tx("Squared is not doubled", "Quadrieren ist nicht verdoppeln"), say: tx("$x^2$ means $x \\cdot x$, not $2 \\cdot x$.", "$x^2$ heißt $x \\cdot x$, nicht $2 \\cdot x$.") });
   } else if (kind === "absNeg") {
     task = `${ab("x")} = -${a}`;
     values = [];
@@ -245,8 +245,15 @@ function solveTask(rng: Rng): Exercise {
     const sq = rng.chance(0.5);
     task = sq ? "x^2 = 0" : `${ab("x")} = 0`;
     values = [0];
-    frames = [{ math: sq ? "x#x ^{2#p} =#e 0#a" : "|#l x#x |#r =#e 0#a", note: tx("Only one number is $0$ away from zero: zero itself.", "Nur eine Zahl ist $0$ von der Null entfernt: die Null selbst.") }];
-    slips.push({ values: [], title: tx("There is a solution", "Es gibt eine Lösung"), say: tx("Try $x = 0$: it works! It's the only solution, because $0$ has no opposite.", "Probier $x = 0$: Das passt! Es ist die einzige Lösung, denn $0$ hat keine Gegenzahl.") });
+    frames = [
+      {
+        math: sq ? "x#x ^{2#p} =#e 0#a" : "|#l x#x |#r =#e 0#a",
+        note: sq
+          ? tx("Only $0 \\cdot 0 = 0$: a square is $0$ only for $x = 0$.", "Nur $0 \\cdot 0 = 0$: Ein Quadrat ist nur für $x = 0$ gleich $0$.")
+          : tx("Only one number is $0$ away from zero: zero itself.", "Nur eine Zahl ist $0$ von der Null entfernt: die Null selbst."),
+      },
+    ];
+    slips.push({ values: [], title: tx("There is a solution", "Es gibt eine Lösung"), say: tx("Try $x = 0$: it works! It's the only solution, because $0$ is its own opposite: $-0 = 0$.", "Probier $x = 0$: Das passt! Es ist die einzige Lösung, denn die Null ist ihre eigene Gegenzahl: $-0 = 0$.") });
   }
   frames.push({ math: setOf(values), note: values.length === 2 ? tx("Two solutions.", "Zwei Lösungen.") : values.length === 1 ? tx("Exactly one solution.", "Genau eine Lösung.") : tx("No solution: the solution set is empty.", "Keine Lösung: Die Lösungsmenge ist leer.") });
   const mistakes: Mistake[] = slips
@@ -256,7 +263,7 @@ function solveTask(rng: Rng): Exercise {
     instruction: tx("Solve the equation", "Löse die Gleichung"),
     math: task,
     answer: { kind: "solutions", variable: "x", values, allowNone: true },
-    hint: kind.startsWith("sq") ? tx("Think: which numbers squared give the right side? Watch out for the negative one.", "Überleg: Welche Zahlen ergeben quadriert die rechte Seite? Denk an die negative.") : tx("Think of distances on the number line: a distance is never negative.", "Denk an Abstände auf der Zahlengeraden: Ein Abstand ist nie negativ."),
+    hint: kind.startsWith("sq") || task.startsWith("x^2") ? tx("Think: which numbers squared give the right side? Watch out for the negative one.", "Überleg: Welche Zahlen ergeben quadriert die rechte Seite? Denk an die negative.") : tx("Think of distances on the number line: a distance is never negative.", "Denk an Abstände auf der Zahlengeraden: Ein Abstand ist nie negativ."),
     solution: frames,
     mistakes,
   };

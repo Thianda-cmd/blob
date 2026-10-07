@@ -204,7 +204,7 @@ export function RectangleLab() {
           <div className="rounded-xl bg-surface px-4 py-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[13px] font-semibold text-ink">
-                <Inline text={tx("Challenge: every rectangle with $A = 24$ cm²", "Herausforderung: jedes Rechteck mit $A = 24$ cm²")} />
+                <Inline text={tx("Challenge: every rectangle with $A = 24$ cm² that fits on the paper", "Herausforderung: alle Rechtecke mit $A = 24$ cm², die aufs Papier passen")} />
               </span>
               <span className="shrink-0 text-[12px] tabular-nums text-ink-3">
                 {found.length} / {GOALS.length}

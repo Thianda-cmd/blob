@@ -865,6 +865,7 @@ const pointsNotPercent = (a: number, what: string) =>
 
 /** "1 Prozentpunkt", "5 Prozentpunkte". */
 const pointsDe = (v: number | string) => `${v} ${String(v) === "1" ? "Prozentpunkt" : "Prozentpunkte"}`;
+const pointsEn = (v: number | string) => `${v} ${String(v) === "1" ? "percentage point" : "percentage points"}`;
 
 function pointsTask(rng: Rng): Exercise | null {
   const [a, b] = rng.pick(POINT_PAIRS);
@@ -875,8 +876,8 @@ function pointsTask(rng: Rng): Exercise | null {
   const frames: Frame[] = [
     { math: `${a}#a %#ap \\to#to ${b}#b %#bp`, note: tx(`From $${a} %$ to $${b} %$.`, `Von $${a} %$ auf $${b} %$.`) },
     {
-      math: tx(`${b}#b %#bp -#m ${a}#a %#ap =#e ${diff}#c "percentage points"#pp`, `${b}#b %#bp -#m ${a}#a %#ap =#e ${diff}#c "${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}"#pp`),
-      note: tx(`The difference is $${diff}$ **percentage points** (Prozentpunkte).`, `Der Unterschied beträgt $${diff}$ **${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}**.`),
+      math: tx(`${b}#b %#bp -#m ${a}#a %#ap =#e ${diff}#c "${diff === 1 ? "percentage point" : "percentage points"}"#pp`, `${b}#b %#bp -#m ${a}#a %#ap =#e ${diff}#c "${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}"#pp`),
+      note: tx(`The difference is $${diff}$ **${diff === 1 ? "percentage point" : "percentage points"}** (${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}).`, `Der Unterschied beträgt $${diff}$ **${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}**.`),
     },
     {
       math: say(({ n }) => `\\frac{${diff}#c}{${a}#a}#f =#e ${n(diff / a)}#h =#e2 ${n(rel)}#r %#rp`),
@@ -893,12 +894,12 @@ function pointsTask(rng: Rng): Exercise | null {
   const en = (s: Text) => (typeof s === "string" ? s : s.en);
   if (rng.chance(0.45)) {
     const options: Text[] = [
-      tx(`It rose by ${diff} percentage points.`, `Das ist ein Anstieg um ${pointsDe(diff)}.`),
+      tx(`It rose by ${pointsEn(diff)}.`, `Das ist ein Anstieg um ${pointsDe(diff)}.`),
       tx(`It rose by ${diff} %.`, `Das ist ein Anstieg um ${diff}\u00a0%.`),
-      tx(`It rose by ${b} percentage points.`, `Das ist ein Anstieg um ${pointsDe(b)}.`),
+      tx(`It rose by ${pointsEn(b)}.`, `Das ist ein Anstieg um ${pointsDe(b)}.`),
       rel === b
-        ? tx(`It fell by ${diff} percentage points.`, `Das ist ein Rückgang um ${pointsDe(diff)}.`)
-        : say(({ t, n }) => t(`It rose by ${n(rel)} percentage points.`, `Das ist ein Anstieg um ${pointsDe(n(rel))}.`)),
+        ? tx(`It fell by ${pointsEn(diff)}.`, `Das ist ein Rückgang um ${pointsDe(diff)}.`)
+        : say(({ t, n }) => t(`It rose by ${pointsEn(n(rel))}.`, `Das ist ein Anstieg um ${pointsDe(n(rel))}.`)),
     ];
     const order = rng.shuffle([0, 1, 2, 3]);
     const shown = order.map((i) => options[i]);
@@ -965,7 +966,7 @@ function pointsTask(rng: Rng): Exercise | null {
       ],
     ]),
     hint: tx(
-      `It rose by $${diff}$ percentage points. But in percent, compare the rise with the old value $${a} %$.`,
+      `It rose by $${diff}$ ${diff === 1 ? "percentage point" : "percentage points"}. But in percent, compare the rise with the old value $${a} %$.`,
       `Der Anstieg beträgt $${diff}$ ${diff === 1 ? "Prozentpunkt" : "Prozentpunkte"}. In Prozent vergleichst du den Anstieg aber mit dem alten Wert $${a} %$.`,
     ),
     solution: frames,

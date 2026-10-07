@@ -9,7 +9,7 @@ import { frac, type Frac } from "@/learn/engine/frac";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson } from "@/learn/types";
 import { C, choiceMistakes, fr, frChain, fracAnswer, fracMistakes, numAnswer, numMistakes, round, say, shuffled, visual, type Fmt } from "./kit";
-import { ProbabilityFourField, ProbabilityPaths, ProbabilitySpinner, ProbabilityTree, type Cell, type Sector, type TreeBranch } from "./pictures";
+import { ProbabilityFourField, ProbabilityPaths, ProbabilitySpinner, ProbabilityTree, ProbabilityTreePair, type Cell, type Sector, type TreeBranch } from "./pictures";
 import { ProbabilityBayesLab, ProbabilityBinomialLab } from "./widgets3";
 
 const I = {
@@ -48,30 +48,44 @@ const NOT_CONDITIONAL: { title: Text; say: Text } = {
 // ---------------------------------------------------------------------------
 // Two-way tables with counts
 
-type Pair = { a: Text; aSub: Text; b: Text; bSub: Text; who: Text };
+/**
+ * `assoc`: the direction real data would show. "pos": B is more common among A than among not-A
+ * (people who live nearby cycle more often), "neg" the other way round. Without it, either way is fine.
+ */
+type Pair = { a: Text; aSub: Text; b: Text; bSub: Text; who: Text; assoc?: "pos" | "neg" };
 /** German dative plural after „unter“. */
 const WHO_DAT: Record<string, string> = { Jugendliche: "Jugendlichen", Kinder: "Kindern", Personen: "Personen", Erwachsene: "Erwachsenen" };
 const PAIRS: Pair[] = [
-  { a: tx("lives less than 3 km from school", "wohnt weniger als 3 km von der Schule entfernt"), aSub: tx("lives less than 3 km from school", "weniger als 3 km von der Schule entfernt wohnt"), b: tx("cycles to school", "fährt mit dem Rad zur Schule"), bSub: tx("cycles to school", "mit dem Rad zur Schule fährt"), who: tx("students", "Jugendliche") },
+  { a: tx("lives less than 3 km from school", "wohnt weniger als 3 km von der Schule entfernt"), aSub: tx("lives less than 3 km from school", "weniger als 3 km von der Schule entfernt wohnt"), b: tx("cycles to school", "fährt mit dem Rad zur Schule"), bSub: tx("cycles to school", "mit dem Rad zur Schule fährt"), who: tx("students", "Jugendliche"), assoc: "pos" },
   { a: tx("has a pet", "hat ein Haustier"), aSub: tx("has a pet", "ein Haustier hat"), b: tx("has siblings", "hat Geschwister"), bSub: tx("has siblings", "Geschwister hat"), who: tx("children", "Kinder") },
   { a: tx("is in a sports club", "ist in einem Sportverein"), aSub: tx("is in a sports club", "in einem Sportverein ist"), b: tx("plays an instrument", "spielt ein Instrument"), bSub: tx("plays an instrument", "ein Instrument spielt"), who: tx("students", "Jugendliche") },
-  { a: tx("was vaccinated against flu", "ist gegen Grippe geimpft"), aSub: tx("was vaccinated against flu", "gegen Grippe geimpft ist"), b: tx("caught the flu this winter", "hatte diesen Winter Grippe"), bSub: tx("caught the flu this winter", "diesen Winter Grippe hatte"), who: tx("people", "Personen") },
-  { a: tx("revised for the test", "hat für den Test gelernt"), aSub: tx("revised for the test", "für den Test gelernt hat"), b: tx("passed the test", "hat den Test bestanden"), bSub: tx("passed the test", "den Test bestanden hat"), who: tx("students", "Jugendliche") },
+  { a: tx("drinks coffee every day", "trinkt jeden Tag Kaffee"), aSub: tx("drinks coffee every day", "jeden Tag Kaffee trinkt"), b: tx("drinks tea every day", "trinkt jeden Tag Tee"), bSub: tx("drinks tea every day", "jeden Tag Tee trinkt"), who: tx("adults", "Erwachsene") },
+  { a: tx("revised for the test", "hat für den Test gelernt"), aSub: tx("revised for the test", "für den Test gelernt hat"), b: tx("passed the test", "hat den Test bestanden"), bSub: tx("passed the test", "den Test bestanden hat"), who: tx("students", "Jugendliche"), assoc: "pos" },
   { a: tx("wears glasses", "trägt eine Brille"), aSub: tx("wears glasses", "eine Brille trägt"), b: tx("reads at least one book a month", "liest mindestens ein Buch im Monat"), bSub: tx("reads at least one book a month", "mindestens ein Buch im Monat liest"), who: tx("adults", "Erwachsene") },
 ];
 
-function counts(rng: Rng) {
-  for (let i = 0; i < 100; i++) {
+/**
+ * Counts for a two-way table: a = A and B, b = A and not B, c = not A and B, d = neither.
+ * With `assoc`, the columns B and not B are swapped if needed so that P_A(B) is greater ("pos")
+ * or smaller ("neg") than P_(not A)(B), as real data would show.
+ */
+function counts(rng: Rng, assoc?: "pos" | "neg") {
+  for (let i = 0; i < 200; i++) {
     const N = rng.pick([100, 200, 250, 400, 500]);
     const st = N === 100 ? 1 : 5;
     const lo = N / 10;
-    const a = rng.int(lo / st, (N * 0.4) / st) * st;
-    const b = rng.int(lo / st, (N * 0.3) / st) * st;
-    const c = rng.int(lo / st, (N * 0.3) / st) * st;
-    const d = N - a - b - c;
-    if (d >= lo && a !== b && a !== c) return { N, a, b, c, d };
+    let a = rng.int(lo / st, (N * 0.4) / st) * st;
+    let b = rng.int(lo / st, (N * 0.3) / st) * st;
+    let c = rng.int(lo / st, (N * 0.3) / st) * st;
+    let d = N - a - b - c;
+    if (d < lo) continue;
+    // P_A(B) − P_(not A)(B) has the sign of a·d − b·c.
+    const dir = a * d - b * c;
+    if (assoc && dir === 0) continue;
+    if ((assoc === "pos" && dir < 0) || (assoc === "neg" && dir > 0)) [a, b, c, d] = [b, a, d, c];
+    if (a !== b && a !== c) return { N, a, b, c, d };
   }
-  return { N: 200, a: 60, b: 20, c: 30, d: 90 };
+  return assoc === "neg" ? { N: 200, a: 20, b: 60, c: 90, d: 30 } : { N: 200, a: 60, b: 20, c: 30, d: 90 };
 }
 
 const tableCells = (x: { N: number; a: number; b: number; c: number; d: number }): Cell[][] => [
@@ -82,7 +96,7 @@ const tableCells = (x: { N: number; a: number; b: number; c: number; d: number }
 
 function tableTask(rng: Rng): Exercise {
   const pair = rng.pick(PAIRS);
-  const x = counts(rng);
+  const x = counts(rng, pair.assoc);
   const ask = rng.pick(["AB", "B|A", "A|B", "B|A", "A|B"] as const);
   const rowA = x.a + x.b;
   const colB = x.a + x.c;
@@ -99,7 +113,7 @@ function tableTask(rng: Rng): Exercise {
       : ask === "B|A"
         ? `Eine Person, die ${de(pair.aSub)}, wird zufällig ausgewählt. Wie groß ist die Wahrscheinlichkeit, dass sie ${de(pair.bSub)}?`
         : `Eine Person, die ${de(pair.bSub)}, wird zufällig ausgewählt. Wie groß ist die Wahrscheinlichkeit, dass sie ${de(pair.aSub)}?`;
-  const sym = ask === "AB" ? "P(A ∩ B)" : ask === "B|A" ? "P_A(B)" : "P_B(A)";
+  const sym = ask === "AB" ? "P(A \\cap B)" : ask === "B|A" ? "P_A(B)" : "P_B(A)";
   const den = ask === "AB" ? x.N : ask === "B|A" ? rowA : colB;
   const cands: { v: Frac | null; title: Text; say: Text }[] =
     ask === "AB"
@@ -127,13 +141,13 @@ function tableTask(rng: Rng): Exercise {
       {
         math:
           ask === "AB"
-            ? tx(`P(A ∩ B) = \\frac{"in A and B"}{"all"}`, `P(A ∩ B) = \\frac{"in A und B"}{"alle"}`)
+            ? tx(`P(A \\cap B) = \\frac{"in A and B"}{"all"}`, `P(A \\cap B) = \\frac{"in A und B"}{"alle"}`)
             : ask === "B|A"
               ? tx(`P_A(B) = \\frac{"in A and B"}{"in A"}`, `P_A(B) = \\frac{"in A und B"}{"in A"}`)
               : tx(`P_B(A) = \\frac{"in A and B"}{"in B"}`, `P_B(A) = \\frac{"in A und B"}{"in B"}`),
         note:
           ask === "AB"
-            ? tx(`Both apply: the inner field $A ∩ B$ with $${x.a}$ people, out of all $${x.N}$.`, `Beides trifft zu: das innere Feld $A ∩ B$ mit $${x.a}$ Personen, von allen $${x.N}$.`)
+            ? tx(`Both apply: the inner field $A \\cap B$ with $${x.a}$ people, out of all $${x.N}$.`, `Beides trifft zu: das innere Feld $A \\cap B$ mit $${x.a}$ Personen, von allen $${x.N}$.`)
             : ask === "B|A"
               ? tx(`Condition $A$: only the row $A$ counts, that's $${rowA}$ people. $${x.a}$ of them are also in $B$.`, `Bedingung $A$: Nur die Zeile $A$ zählt, das sind $${rowA}$ Personen. $${x.a}$ davon sind auch in $B$.`)
               : tx(`Condition $B$: only the column $B$ counts, that's $${colB}$ people. $${x.a}$ of them are also in $A$.`, `Bedingung $B$: Nur die Spalte $B$ zählt, das sind $${colB}$ Personen. $${x.a}$ davon sind auch in $A$.`),
@@ -180,8 +194,8 @@ function fillTask(rng: Rng): Exercise {
   const cands: { v: number | null; title: Text; say: Text }[] = [];
   if (ask === "ab") {
     cands.push(
-      { v: 1 - pab, title: tx("Only one field subtracted", "Nur ein Feld abgezogen"), say: tx("$1 - P(A ∩ B)$ is “not both”. “Neither” is the bottom right inner field: fill the table step by step.", "$1 - P(A ∩ B)$ heißt „nicht beide“. „Keins von beiden“ ist das innere Feld unten rechts: Füll die Tafel Schritt für Schritt.") },
-      { v: 1 - pa - pb, title: tx("Subtracted A ∩ B twice", "A ∩ B doppelt abgezogen"), say: tx("$P(A)$ and $P(B)$ both contain $A ∩ B$, so you subtracted it twice. Add it back once.", "In $P(A)$ und in $P(B)$ steckt jeweils $A ∩ B$: Du hast es doppelt abgezogen. Einmal wieder dazuzählen.") },
+      { v: 1 - pab, title: tx("Only one field subtracted", "Nur ein Feld abgezogen"), say: tx("$1 - P(A \\cap B)$ is “not both”. “Neither” is the bottom right inner field: fill the table step by step.", "$1 - P(A \\cap B)$ heißt „nicht beide“. „Keins von beiden“ ist das innere Feld unten rechts: Füll die Tafel Schritt für Schritt.") },
+      { v: 1 - pa - pb, title: tx("Subtracted A ∩ B twice", "A ∩ B doppelt abgezogen"), say: tx("$P(A)$ and $P(B)$ both contain $A \\cap B$, so you subtracted it twice. Add it back once.", "In $P(A)$ und in $P(B)$ steckt jeweils $A \\cap B$: Du hast es doppelt abgezogen. Einmal wieder dazuzählen.") },
       { v: (1 - pa) * (1 - pb), title: tx("Assumed independence", "Unabhängigkeit angenommen"), say: tx("Multiplying the totals only works if $A$ and $B$ are independent. Here they aren't: use the sums in the table.", "Die Randsummen multiplizieren darfst du nur, wenn $A$ und $B$ unabhängig sind. Das sind sie hier nicht: Nutze die Summen in der Tafel.") },
     );
   } else {
@@ -195,13 +209,13 @@ function fillTask(rng: Rng): Exercise {
   const steps: Frame[] =
     ask === "ab"
       ? [
-          { math: say((f) => `P(A ∩ \\frac{}{B}) = ${f.n(pa)} - ${f.n(pab)} = ${f.n(v.Ab)}`), note: tx("Row $A$: its two fields add up to $P(A)$.", "Zeile $A$: Ihre beiden Felder ergeben zusammen $P(A)$.") },
-          { math: say((f) => `P(\\frac{}{B}) = 1 - ${f.n(pb)} = ${f.n(round(1 - pb, 2))}`), note: tx("The column totals add up to $1$.", "Die Spaltensummen ergeben zusammen $1$.") },
-          { math: say((f) => `P(\\frac{}{A} ∩ \\frac{}{B}) = ${f.n(round(1 - pb, 2))} - ${f.n(v.Ab)} = ${f.n(v.ab)}`), note: tx("Column “not $B$”: subtract the field above.", "Spalte „nicht $B$“: das Feld darüber abziehen.") },
+          { math: say((f) => `P(A \\cap \\overline{B}) = ${f.n(pa)} - ${f.n(pab)} = ${f.n(v.Ab)}`), note: tx("Row $A$: its two fields add up to $P(A)$.", "Zeile $A$: Ihre beiden Felder ergeben zusammen $P(A)$.") },
+          { math: say((f) => `P(\\overline{B}) = 1 - ${f.n(pb)} = ${f.n(round(1 - pb, 2))}`), note: tx("The column totals add up to $1$.", "Die Spaltensummen ergeben zusammen $1$.") },
+          { math: say((f) => `P(\\overline{A} \\cap \\overline{B}) = ${f.n(round(1 - pb, 2))} - ${f.n(v.Ab)} = ${f.n(v.ab)}`), note: tx("Column “not $B$”: subtract the field above.", "Spalte „nicht $B$“: das Feld darüber abziehen.") },
         ]
       : ask === "AB"
-        ? [{ math: say((f) => `P(A ∩ \\frac{}{B}) = P(A) - P(A ∩ B) = ${f.n(pa)} - ${f.n(pab)} = ${f.n(v.Ab)}`), note: tx("Row $A$: its two inner fields add up to the row total $P(A)$.", "Zeile $A$: Ihre beiden inneren Felder ergeben die Zeilensumme $P(A)$.") }]
-        : [{ math: say((f) => `P(\\frac{}{A} ∩ B) = P(B) - P(A ∩ B) = ${f.n(pb)} - ${f.n(pab)} = ${f.n(v.aB)}`), note: tx("Column $B$: its two inner fields add up to the column total $P(B)$.", "Spalte $B$: Ihre beiden inneren Felder ergeben die Spaltensumme $P(B)$.") }];
+        ? [{ math: say((f) => `P(A \\cap \\overline{B}) = P(A) - P(A \\cap B) = ${f.n(pa)} - ${f.n(pab)} = ${f.n(v.Ab)}`), note: tx("Row $A$: its two inner fields add up to the row total $P(A)$.", "Zeile $A$: Ihre beiden inneren Felder ergeben die Zeilensumme $P(A)$.") }]
+        : [{ math: say((f) => `P(\\overline{A} \\cap B) = P(B) - P(A \\cap B) = ${f.n(pb)} - ${f.n(pab)} = ${f.n(v.aB)}`), note: tx("Column $B$: its two inner fields add up to the column total $P(B)$.", "Spalte $B$: Ihre beiden inneren Felder ergeben die Spaltensumme $P(B)$.") }];
   return {
     instruction: I.fill,
     text: tx(`The two-way table shows probabilities. What is the probability that ${en(askText)}? Fill in the field marked “?”.`, `Die Vierfeldertafel zeigt Wahrscheinlichkeiten. Wie groß ist die Wahrscheinlichkeit, dass ${de(askText)}? Ergänze das Feld mit dem „?“.`),
@@ -239,13 +253,13 @@ function bayesTask(rng: Rng): Exercise {
   const value = ask === "ppv" ? tp / (tp + fp) : ask === "pt" ? (tp + fp) / N : tn / (tn + fn);
   const right = round(value * 100, 1);
   const questionEn = ask === "ppv" ? "Someone tests positive. What is the probability that they are really ill?" : ask === "pt" ? "What is the probability that a randomly chosen person tests positive?" : "Someone tests negative. What is the probability that they are really healthy?";
-  const questionDe = ask === "ppv" ? "Ein Test ist positiv. Wie groß ist die Wahrscheinlichkeit, dass die Person wirklich krank ist?" : ask === "pt" ? "Wie groß ist die Wahrscheinlichkeit, dass eine zufällig ausgewählte Person positiv getestet wird?" : "Ein Test ist negativ. Wie groß ist die Wahrscheinlichkeit, dass die Person wirklich gesund ist?";
-  const sym = ask === "ppv" ? "P_T(K)" : ask === "pt" ? "P(T)" : "P_{\\frac{}{T}}(\\frac{}{K})";
+  const questionDe = ask === "ppv" ? "Eine Person wird positiv getestet. Wie groß ist die Wahrscheinlichkeit, dass sie wirklich krank ist?" : ask === "pt" ? "Wie groß ist die Wahrscheinlichkeit, dass eine zufällig ausgewählte Person positiv getestet wird?" : "Eine Person wird negativ getestet. Wie groß ist die Wahrscheinlichkeit, dass sie wirklich gesund ist?";
+  const sym = ask === "ppv" ? "P_T(K)" : ask === "pt" ? "P(T)" : "P_{\\overline{T}}(\\overline{K})";
   const cands: { v: number | null; title: Text; say: Text }[] =
     ask === "ppv"
       ? [
           { v: sens, title: tx("Condition swapped", "Bedingung vertauscht"), say: tx(`$\\group{${sens} \\, %}$ is $P_K(T)$: how often the test is positive **if** someone is ill. You need it the other way round: ill **if** the test is positive.`, `$\\group{${sens} \\, %}$ ist $P_K(T)$: wie oft der Test positiv ist, **wenn** jemand krank ist. Gesucht ist es umgekehrt: krank, **wenn** der Test positiv ist.`) },
-          { v: (tp / N) * 100, title: tx("Path, not conditional", "Pfad statt bedingt"), say: tx("That's $P(K ∩ T)$, one path. Divide it by **all** positive tests, $P(T)$.", "Das ist $P(K ∩ T)$, ein Pfad. Teile ihn durch **alle** positiven Tests, also $P(T)$.") },
+          { v: (tp / N) * 100, title: tx("Path, not conditional", "Pfad statt bedingt"), say: tx("That's $P(K \\cap T)$, one path. Divide it by **all** positive tests, $P(T)$.", "Das ist $P(K \\cap T)$, ein Pfad. Teile ihn durch **alle** positiven Tests, also $P(T)$.") },
           { v: ((tp + fp) / N) * 100, title: tx("That's P(T)", "Das ist P(T)"), say: tx("That's the probability of a positive test. Now: which share of the positive tests are ill?", "Das ist die Wahrscheinlichkeit für einen positiven Test. Jetzt noch: Welcher Anteil der Positiven ist krank?") },
           { v: prev, title: tx("Test result ignored", "Testergebnis ignoriert"), say: tx("That's how common the illness is overall. The positive test changes the picture: divide among the positives only.", "So häufig ist die Krankheit insgesamt. Der positive Test ändert das Bild: Teile nur unter den Positiven auf.") },
         ]
@@ -264,13 +278,24 @@ function bayesTask(rng: Rng): Exercise {
     { node: "~K", p: round(1 - prev / 100, 2), kids: [{ node: "T", p: fpr / 100 }, { node: "~T", p: round(1 - fpr / 100, 2) }] },
   ];
   const fracLine = ask === "ppv" ? fr(tp, tp + fp) : ask === "pt" ? fr(tp + fp, N) : fr(tn, tn + fn);
+  // The turned-around tree (test first), with "?" on the branch that is asked for.
+  const mark = (k: typeof ask) => (ask === k ? "?" : "");
+  const inverted: TreeBranch[] = [
+    { node: "T", p: mark("pt"), kids: [{ node: "K", p: mark("ppv") }, { node: "~K", p: "" }] },
+    { node: "~T", p: "", kids: [{ node: "K", p: "" }, { node: "~K", p: mark("npv") }] },
+  ];
   return {
     instruction: I.bayes,
     text: tx(
-      `$\\group{${prev} \\, %}$ of the population have an illness ($K$). A test ($T$ = positive) is positive for $\\group{${sens} \\, %}$ of the ill and, by mistake, for $\\group{${fpr} \\, %}$ of the healthy. ${questionEn} Give it as a percentage to one decimal place.`,
-      `$\\group{${prev} \\, %}$ der Bevölkerung haben eine Krankheit ($K$). Ein Test ($T$ = positiv) fällt bei $\\group{${sens} \\, %}$ der Kranken positiv aus, bei Gesunden fälschlich in $\\group{${fpr} \\, %}$ der Fälle. ${questionDe} Gib sie in Prozent auf eine Nachkommastelle an.`,
+      `$\\group{${prev} \\, %}$ of the population have an illness ($K$). A test ($T$ = positive) is positive for $\\group{${sens} \\, %}$ of the ill and, by mistake, for $\\group{${fpr} \\, %}$ of the healthy. ${questionEn} In the turned-around tree, that's the branch marked “?”. Give it as a percentage to one decimal place.`,
+      `$\\group{${prev} \\, %}$ der Bevölkerung haben eine Krankheit ($K$). Ein Test ($T$ = positiv) fällt bei $\\group{${sens} \\, %}$ der Kranken positiv aus, bei Gesunden fälschlich in $\\group{${fpr} \\, %}$ der Fälle. ${questionDe} Im umgekehrten Baum ist das der Ast mit dem „?“. Gib sie in Prozent auf eine Nachkommastelle an.`,
     ),
-    visual: visual(ProbabilityTree, { branches }),
+    visual: visual(ProbabilityTreePair, {
+      trees: [
+        { title: tx("Tree: ill or healthy first", "Baum: erst krank oder gesund"), branches },
+        { title: tx("Turned around: the test first", "Umgekehrt: erst der Test"), branches: inverted },
+      ],
+    }),
     math: sym,
     answer: numAnswer(right, 0.06, PCT),
     hint: tx("Imagine $10\\,000$ people: how many are ill, how many of them test positive, how many healthy people test positive?", "Stell dir $10\\,000$ Menschen vor: Wie viele sind krank, wie viele davon positiv, wie viele Gesunde positiv?"),
@@ -290,10 +315,10 @@ function bayesTask(rng: Rng): Exercise {
         math: say((f) => `${sym} = ${fracLine} \\approx ${f.n(right / 100, 3)} = \\group{${f.n(right, 1)} \\, %}`),
         note:
           ask === "ppv"
-            ? tx("Ill and positive, divided by **all** positives. That's Bayes' theorem with natural frequencies.", "Krank und positiv, geteilt durch **alle** Positiven. Das ist der Satz von Bayes mit natürlichen Häufigkeiten.")
+            ? tx("Ill and positive, divided by **all** positives. That's Bayes' theorem with natural frequencies, and the branch from $T$ to $K$ in the turned-around tree.", "Krank und positiv, geteilt durch **alle** Positiven. Das ist der Satz von Bayes mit natürlichen Häufigkeiten und der Ast von $T$ nach $K$ im umgekehrten Baum.")
             : ask === "pt"
-              ? tx("Both positive paths together, out of everyone (path rule 2).", "Beide positiven Pfade zusammen, von allen (2. Pfadregel).")
-              : tx("Healthy and negative, divided by **all** negatives.", "Gesund und negativ, geteilt durch **alle** Negativen."),
+              ? tx("Both positive paths together, out of everyone (path rule 2). That's the first branch of the turned-around tree.", "Beide positiven Pfade zusammen, von allen (2. Pfadregel). Das ist der erste Ast im umgekehrten Baum.")
+              : tx("Healthy and negative, divided by **all** negatives. That's the branch from $\\overline{T}$ to $\\overline{K}$ in the turned-around tree.", "Gesund und negativ, geteilt durch **alle** Negativen. Das ist der Ast von $\\overline{T}$ nach $\\overline{K}$ im umgekehrten Baum."),
       },
     ],
     mistakes: numMistakes(right, 0.06, cands, PCT),
@@ -304,8 +329,8 @@ function bayesTask(rng: Rng): Exercise {
 // Independence
 
 const INDEP: Text[] = [
-  tx("independent, because $P(A ∩ B) = P(A) \\cdot P(B)$", "unabhängig, weil $P(A ∩ B) = P(A) \\cdot P(B)$"),
-  tx("dependent, because $P(A ∩ B) \\ne P(A) \\cdot P(B)$", "abhängig, weil $P(A ∩ B) \\ne P(A) \\cdot P(B)$"),
+  tx("independent, because $P(A \\cap B) = P(A) \\cdot P(B)$", "unabhängig, weil $P(A \\cap B) = P(A) \\cdot P(B)$"),
+  tx("dependent, because $P(A \\cap B) \\ne P(A) \\cdot P(B)$", "abhängig, weil $P(A \\cap B) \\ne P(A) \\cdot P(B)$"),
   tx("dependent, because $A$ and $B$ can happen at the same time", "abhängig, weil $A$ und $B$ gleichzeitig eintreten können"),
   tx("independent, because $P(A) + P(B) \\ne 1$", "unabhängig, weil $P(A) + P(B) \\ne 1$"),
 ];
@@ -318,10 +343,10 @@ function indepTask(rng: Rng): Exercise {
     return {
       instruction: I.indepCalc,
       math: say((f) => `P(A) = ${f.n(pa)} \\quad P(B) = ${f.n(pb)}`),
-      text: tx("$A$ and $B$ are independent. What is $P(A ∩ B)$?", "$A$ und $B$ sind unabhängig. Wie groß ist $P(A ∩ B)$?"),
+      text: tx("$A$ and $B$ are independent. What is $P(A \\cap B)$?", "$A$ und $B$ sind unabhängig. Wie groß ist $P(A \\cap B)$?"),
       answer: numAnswer(prod),
       hint: tx("For independent events you may multiply.", "Bei unabhängigen Ereignissen darfst du multiplizieren."),
-      solution: [{ math: say((f) => `P(A ∩ B) = P(A) \\cdot P(B) = ${f.n(pa)} \\cdot ${f.n(pb)} = ${f.n(prod)}`), note: tx("Independent: the probability of both is the product.", "Unabhängig: Die Wahrscheinlichkeit für beides ist das Produkt.") }],
+      solution: [{ math: say((f) => `P(A \\cap B) = P(A) \\cdot P(B) = ${f.n(pa)} \\cdot ${f.n(pb)} = ${f.n(prod)}`), note: tx("Independent: the probability of both is the product.", "Unabhängig: Die Wahrscheinlichkeit für beides ist das Produkt.") }],
       mistakes: numMistakes(prod, 1e-6, [
         { v: round(pa + pb, 2), title: tx("Added", "Addiert"), say: tx("“Both” means multiply, not add. $A$ and $B$ together are rarer than each alone.", "„Beides“ heißt multiplizieren, nicht addieren. $A$ und $B$ zusammen sind seltener als jedes allein.") },
         { v: round(pa + pb - prod, 2), title: tx("That's “A or B”", "Das ist „A oder B“"), say: tx("You worked out $P(A \\text{ or } B)$. For “and” the product is enough.", "Du hast $P(A \\text{ oder } B)$ berechnet. Für „und“ reicht das Produkt.") },
@@ -339,18 +364,18 @@ function indepTask(rng: Rng): Exercise {
   const s = shuffled(rng.shuffle, INDEP, independent ? 0 : 1);
   return {
     instruction: I.indep,
-    math: say((f) => `P(A) = ${f.n(pa)} \\quad P(B) = ${f.n(pb)} \\quad P(A ∩ B) = ${f.n(pab)}`),
+    math: say((f) => `P(A) = ${f.n(pa)} \\quad P(B) = ${f.n(pb)} \\quad P(A \\cap B) = ${f.n(pab)}`),
     answer: { kind: "choice", options: s.options, correct: s.correct },
-    hint: tx("Compare $P(A ∩ B)$ with the product $P(A) \\cdot P(B)$.", "Vergleiche $P(A ∩ B)$ mit dem Produkt $P(A) \\cdot P(B)$."),
+    hint: tx("Compare $P(A \\cap B)$ with the product $P(A) \\cdot P(B)$.", "Vergleiche $P(A \\cap B)$ mit dem Produkt $P(A) \\cdot P(B)$."),
     solution: [
       { math: say((f) => `P(A) \\cdot P(B) = ${f.n(pa)} \\cdot ${f.n(pb)} = ${f.n(prod)}`), note: tx("Work out the product.", "Das Produkt ausrechnen.") },
       {
-        math: say((f) => `P(A ∩ B) = ${f.n(pab)} ${independent ? "=" : "\\ne"} ${f.n(prod)}`),
+        math: say((f) => `P(A \\cap B) = ${f.n(pab)} ${independent ? "=" : "\\ne"} ${f.n(prod)}`),
         note: independent ? tx("Equal: $A$ and $B$ are **independent**.", "Gleich: $A$ und $B$ sind **unabhängig**.") : tx("Not equal: $A$ and $B$ are **dependent**.", "Nicht gleich: $A$ und $B$ sind **abhängig**."),
       },
     ],
     mistakes: choiceMistakes(s.options, s.correct, [
-      { i: s.at(independent ? 1 : 0), title: tx("Check the product", "Prüf das Produkt"), say: say((f) => f.t(`Work it out: $P(A) \\cdot P(B) = ${f.n(prod)}$. Compare it with $P(A ∩ B)$ again.`, `Rechne nach: $P(A) \\cdot P(B) = ${f.n(prod)}$. Vergleich das noch mal mit $P(A ∩ B)$.`)) },
+      { i: s.at(independent ? 1 : 0), title: tx("Check the product", "Prüf das Produkt"), say: say((f) => f.t(`Work it out: $P(A) \\cdot P(B) = ${f.n(prod)}$. Compare it with $P(A \\cap B)$ again.`, `Rechne nach: $P(A) \\cdot P(B) = ${f.n(prod)}$. Vergleich das noch mal mit $P(A \\cap B)$.`)) },
       { i: s.at(2), title: tx("Independent ≠ disjoint", "Unabhängig ≠ unvereinbar"), say: tx("Classic mix-up! Events that can't happen together are **disjoint**. Independent means: one doesn't change the probability of the other.", "Klassische Verwechslung! Ereignisse, die nicht zusammen eintreten können, heißen **unvereinbar**. Unabhängig heißt: Das eine ändert die Wahrscheinlichkeit des anderen nicht.") },
       { i: s.at(3), title: tx("Not a criterion", "Kein Kriterium"), say: tx("The sum $P(A) + P(B)$ says nothing about independence. The test is the product rule.", "Die Summe $P(A) + P(B)$ sagt nichts über Unabhängigkeit. Das Kriterium ist die Produktregel.") },
     ]),
@@ -404,8 +429,8 @@ function expectTask(rng: Rng): Exercise {
     const colours = rng.shuffle(["purple", "green", "red"] as const);
     const sectors: Sector[] = g.w.map((w, i) => ({ w, color: colours[i], label: tx(`€${g.pay[i]}`, `${g.pay[i]} €`) }));
     vis = visual(ProbabilitySpinner, { sectors });
-    introDe = `Eine Drehung kostet ${stake} € Einsatz. Das Glücksrad zahlt den Betrag aus, auf dem es stehen bleibt. Die Mittelpunktswinkel der Felder sind ${g.w.join("°, ")}°.`;
-    introEn = `One spin costs a stake of €${stake}. The spinner pays out the amount in the field where it stops. The angles of the fields are ${g.w.join("°, ")}°.`;
+    introDe = `Eine Drehung kostet ${stake} € Einsatz. Das Glücksrad zahlt den Betrag aus, auf dem es stehen bleibt. Die Mittelpunktswinkel der Felder: ${g.w.map((w, i) => `${g.pay[i]} €: ${w}°`).join(", ")}.`;
+    introEn = `One spin costs a stake of €${stake}. The spinner pays out the amount in the field where it stops. The angles of the fields: ${g.w.map((w, i) => `€${g.pay[i]}: ${w}°`).join(", ")}.`;
   }
   const ev = outcomes.reduce((s, o) => s + (o.p.n / o.p.d) * o.pay, 0);
   const right = round(askFair ? ev : ev - stake, 2);
@@ -476,7 +501,6 @@ const BCTX: BCtx[] = [
 
 const bin = (n: number, k: number, p: number) => C(n, k) * p ** k * (1 - p) ** (n - k);
 const binSrc = (f: Fmt, n: number, k: number, p: number) => `${C(n, k)} \\cdot ${f.n(p)}^{${k}} \\cdot ${f.n(round(1 - p, 2))}^{${n - k}}`;
-const choose = (f: Fmt, n: number, k: number) => f.t(`("${n} choose ${k}")`, `("${n} über ${k}")`);
 
 function binomTask(rng: Rng): Exercise {
   const c = rng.pick(BCTX);
@@ -497,7 +521,7 @@ function binomTask(rng: Rng): Exercise {
     hint: tx("Bernoulli formula: number of paths · $p^k$ · $(1 - p)^{n - k}$.", "Bernoulli-Formel: Anzahl der Pfade · $p^k$ · $(1 - p)^{n - k}$."),
     solution: [
       { math: say((f) => `n = ${n}, \\; p = ${f.n(p)}, \\; k = ${k}`), note: tx(`A Bernoulli chain of length $${n}$ with hit probability $p$.`, `Eine Bernoulli-Kette der Länge $${n}$ mit der Trefferwahrscheinlichkeit $p$.`) },
-      { math: say((f) => `P(X = ${k}) = ${choose(f, n, k)} \\cdot ${f.n(p)}^{${k}} \\cdot ${f.n(round(1 - p, 2))}^{${n - k}}`), note: say((f) => f.t(`There ${C(n, k) === 1 ? "is 1 path" : `are ${C(n, k)} paths`} with exactly $${k}$ ${k === 1 ? "hit" : "hits"} ($${n}$ choose $${k}$, nCr on the calculator).`, `Es gibt ${C(n, k) === 1 ? "einen Pfad" : `${C(n, k)} Pfade`} mit genau ${k === 1 ? "einem Treffer" : `$${k}$ Treffern`} („${n} über ${k}“, nCr auf dem Taschenrechner).`)) },
+      { math: say((f) => `P(X = ${k}) = \\binom{${n}}{${k}} \\cdot ${f.n(p)}^{${k}} \\cdot ${f.n(round(1 - p, 2))}^{${n - k}}`), note: say((f) => f.t(`There ${C(n, k) === 1 ? "is 1 path" : `are ${C(n, k)} paths`} with exactly $${k}$ ${k === 1 ? "hit" : "hits"}: $\\binom{${n}}{${k}} = ${C(n, k)}$ (read “${n} choose ${k}”, nCr on the calculator).`, `Es gibt ${C(n, k) === 1 ? "einen Pfad" : `${C(n, k)} Pfade`} mit genau ${k === 1 ? "einem Treffer" : `$${k}$ Treffern`}: $\\binom{${n}}{${k}} = ${C(n, k)}$ (gelesen „${n} über ${k}“, nCr auf dem Taschenrechner).`)) },
       { math: say((f) => `P(X = ${k}) = ${binSrc(f, n, k, p)} \\approx ${f.n(right, 4)}`), note: tx("Type it into the calculator and round.", "In den Taschenrechner eingeben und runden.") },
     ],
     mistakes: numMistakes(right, 0.00006, [
@@ -584,17 +608,17 @@ function pathsTask(rng: Rng): Exercise {
   return {
     instruction: I.paths,
     text: tx(
-      `A Bernoulli chain has length $${n}$. How many paths of the tree have exactly $${k}$ ${k === 1 ? "hit" : "hits"}? (That's the binomial coefficient $${n}$ choose $${k}$.)`,
-      `Eine Bernoulli-Kette hat die Länge $${n}$. Wie viele Pfade im Baum haben genau $${k}$ Treffer? (Das ist der Binomialkoeffizient „${n} über ${k}“.)`,
+      `A Bernoulli chain has length $${n}$. How many paths of the tree have exactly $${k}$ ${k === 1 ? "hit" : "hits"}? (That's the binomial coefficient $\\binom{${n}}{${k}}$.)`,
+      `Eine Bernoulli-Kette hat die Länge $${n}$. Wie viele Pfade im Baum haben genau $${k}$ Treffer? (Das ist der Binomialkoeffizient $\\binom{${n}}{${k}}$.)`,
     ),
     answer: numAnswer(right),
     hint: tx(`Choose the $${k}$ places of the hits among $${n}$ places. Calculator: nCr.`, `Wähle die $${k}$ Stellen der Treffer unter $${n}$ Stellen aus. Taschenrechner: nCr.`),
     solution: [
-      { math: tx(`("${n} choose ${k}") = \\frac{${n}!}{${k}! \\cdot ${n - k}!}`, `("${n} über ${k}") = \\frac{${n}!}{${k}! \\cdot ${n - k}!}`), note: tx("The binomial coefficient counts the ways to pick the places of the hits.", "Der Binomialkoeffizient zählt, wie viele Möglichkeiten es gibt, die Stellen der Treffer auszuwählen.") },
-      { math: tx(`("${n} choose ${k}") = \\frac{${fact(n)}}{${fact(k)} \\cdot ${fact(n - k)}} = ${right}`, `("${n} über ${k}") = \\frac{${fact(n)}}{${fact(k)} \\cdot ${fact(n - k)}} = ${right}`), note: tx(`So $${right}$ paths have exactly $${k}$ ${k === 1 ? "hit" : "hits"}.`, `Also haben $${right}$ Pfade genau $${k}$ Treffer.`) },
+      { math: `\\binom{${n}}{${k}} = \\frac{${n}!}{${k}! \\cdot ${n - k}!}`, note: tx(`The binomial coefficient (read “${n} choose ${k}”) counts the ways to pick the places of the hits.`, `Der Binomialkoeffizient (gelesen „${n} über ${k}“) zählt, wie viele Möglichkeiten es gibt, die Stellen der Treffer auszuwählen.`) },
+      { math: `\\binom{${n}}{${k}} = \\frac{${fact(n)}}{${fact(k)} \\cdot ${fact(n - k)}} = ${right}`, note: tx(`So $${right}$ paths have exactly $${k}$ ${k === 1 ? "hit" : "hits"}.`, `Also haben $${right}$ Pfade genau $${k}$ Treffer.`) },
     ],
     mistakes: numMistakes(right, 1e-6, [
-      { v: n * k, title: tx("Multiplied n and k", "n mal k gerechnet"), say: tx("$n \\cdot k$ isn't the number of paths. Count the ways to place the hits: that's $n$ choose $k$.", "$n \\cdot k$ ist nicht die Anzahl der Pfade. Zähl, wie viele Möglichkeiten es gibt, die Treffer zu verteilen: „n über k“.") },
+      { v: n * k, title: tx("Multiplied n and k", "n mal k gerechnet"), say: tx("$n \\cdot k$ isn't the number of paths. Count the ways to place the hits: that's $\\binom{n}{k}$.", "$n \\cdot k$ ist nicht die Anzahl der Pfade. Zähl, wie viele Möglichkeiten es gibt, die Treffer zu verteilen: $\\binom{n}{k}$.") },
       { v: 2 ** n, title: tx("All paths", "Alle Pfade"), say: tx(`$2^${n}$ is the number of **all** paths. You need only those with exactly $${k}$ ${k === 1 ? "hit" : "hits"}.`, `$2^${n}$ ist die Anzahl **aller** Pfade. Gesucht sind nur die mit genau ${k === 1 ? "einem Treffer" : `$${k}$ Treffern`}.`) },
       { v: fact(n) / fact(n - k) !== right ? fact(n) / fact(n - k) : null, title: tx("Order counted", "Reihenfolge mitgezählt"), say: tx(`You forgot to divide by $${k}!$: the hits are all the same, their order doesn't matter.`, `Du hast vergessen, durch $${k}!$ zu teilen: Die Treffer sind alle gleich, ihre Reihenfolge spielt keine Rolle.`) },
     ]),
@@ -634,28 +658,42 @@ const SCHOOL = { N: 200, a: 60, b: 20, c: 30, d: 90 };
 const schoolLegend = { a: tx("lives less than 3 km from school", "wohnt weniger als 3 km von der Schule entfernt"), b: tx("cycles to school", "fährt mit dem Rad zur Schule") };
 
 const tableFrames: Frame[] = [
-  { math: say((f) => `P(A ∩ B) =#eq \\frac{60}{200}#f =#e2 ${f.n(0.3)}#v`), note: tx("An inner field: both apply. $60$ out of all $200$. Read $A ∩ B$ as “$A$ and $B$”.", "Ein inneres Feld: Beides trifft zu. $60$ von allen $200$. $A ∩ B$ liest du „$A$ und $B$“.") },
+  { math: say((f) => `P(A \\cap B) =#eq \\frac{60}{200}#f =#e2 ${f.n(0.3)}#v`), note: tx("An inner field: both apply. $60$ out of all $200$. Read $A \\cap B$ as “$A$ and $B$”.", "Ein inneres Feld: Beides trifft zu. $60$ von allen $200$. $A \\cap B$ liest du „$A$ und $B$“.") },
   { math: say((f) => `P(A) =#eq \\frac{80}{200}#f =#e2 ${f.n(0.4)}#v`), note: tx("The totals are at the edge: $80$ live nearby.", "Am Rand stehen die Summen: $80$ wohnen in der Nähe.") },
   {
-    math: say((f) => `P(\\frac{}{A} ∩ \\frac{}{B}) =#eq \\frac{90}{200}#f =#e2 ${f.n(0.45)}#v`),
+    math: say((f) => `P(\\overline{A} \\cap \\overline{B}) =#eq \\frac{90}{200}#f =#e2 ${f.n(0.45)}#v`),
     note: tx("The bar means “not”: neither nearby nor by bike. That's the bottom right inner field.", "Der Strich heißt „nicht“: weder in der Nähe noch mit dem Rad. Das ist das innere Feld unten rechts."),
   },
   { math: say((f) => `P_A(B) =#eq \\frac{60}{80}#f =#e2 ${f.n(0.75)}#v`), note: tx("**Conditional probability**: we only look at the $80$ people in $A$. $60$ of them cycle. Say: “P of $B$ given $A$”.", "**Bedingte Wahrscheinlichkeit**: Wir schauen nur auf die $80$ Personen aus $A$. $60$ davon fahren Rad. Sprich: „P von $B$ unter der Bedingung $A$“.") },
-  { math: say((f) => `P_A(B) =#eq \\frac{P(A ∩ B)}{P(A)}#f =#e2 \\frac{${f.n(0.3)}}{${f.n(0.4)}} =#e3 ${f.n(0.75)}#v`), note: tx("The same with probabilities: “and” divided by the condition.", "Dasselbe mit Wahrscheinlichkeiten: „und“ geteilt durch die Bedingung.") },
+  { math: say((f) => `P_A(B) =#eq \\frac{P(A \\cap B)}{P(A)}#f =#e2 \\frac{${f.n(0.3)}}{${f.n(0.4)}} =#e3 ${f.n(0.75)}#v`), note: tx("The same with probabilities: “and” divided by the condition.", "Dasselbe mit Wahrscheinlichkeiten: „und“ geteilt durch die Bedingung.") },
 ];
 
 const bayesFrames: Frame[] = [
   { math: say((f) => `P(T) =#eq ${f.n(0.02)} \\cdot ${f.n(0.9)} +#p ${f.n(0.98)} \\cdot ${f.n(0.05)}`), note: tx("Two paths lead to a positive test: ill and positive, healthy and positive.", "Zwei Pfade führen zu einem positiven Test: krank und positiv, gesund und positiv.") },
   { math: say((f) => `P(T) =#eq ${f.n(0.018)}#a +#p ${f.n(0.049)}#b =#e2 ${f.n(0.067)}#c`), note: tx("Path rules: multiply along, then add.", "Pfadregeln: entlang multiplizieren, dann addieren.") },
-  { math: say((f) => `P_T(K) =#eq \\frac{P(K ∩ T)}{P(T)}#q =#e2 \\frac{${f.n(0.018)}}{${f.n(0.067)}}#r`), note: tx("Now the other way round: ill **given** a positive test. The path “ill and positive” divided by **all** positive tests. That's **Bayes' theorem**.", "Jetzt umgekehrt: krank **unter der Bedingung** positiver Test. Der Pfad „krank und positiv“ geteilt durch **alle** positiven Tests. Das ist der **Satz von Bayes**.") },
+  { math: say((f) => `P_T(K) =#eq \\frac{P(K \\cap T)}{P(T)}#q =#e2 \\frac{${f.n(0.018)}}{${f.n(0.067)}}#r`), note: tx("Now the other way round: ill **given** a positive test. The path “ill and positive” divided by **all** positive tests. That's **Bayes' theorem**.", "Jetzt umgekehrt: krank **unter der Bedingung** positiver Test. Der Pfad „krank und positiv“ geteilt durch **alle** positiven Tests. Das ist der **Satz von Bayes**.") },
   { math: say((f) => `P_T(K) \\approx#e2 ${f.n(0.269)} =#e3 \\group{${f.n(26.9)} \\, %}`), note: tx("Only about one in four people with a positive test is really ill! There are many more healthy people, and $\\group{5 \\, %}$ of many is a lot.", "Nur etwa jeder Vierte mit positivem Test ist wirklich krank! Es gibt viel mehr Gesunde, und $\\group{5 \\, %}$ von vielen sind viele.") },
+  {
+    math: say((f) => `P(\\overline{T}) =#eq 1 - ${f.n(0.067)} =#e2 ${f.n(0.933)}`),
+    note: tx(
+      "Now turn the whole tree around: the **turned-around tree** starts with the test. Its first stage is $P(T) = 0.067$ and $P(\\overline{T}) = 0.933$.",
+      "Jetzt kehren wir den ganzen Baum um: Der **umgekehrte Baum** beginnt mit dem Test. Seine erste Stufe ist $P(T) = 0,067$ und $P(\\overline{T}) = 0,933$.",
+    ),
+  },
+  {
+    math: say((f) => `P_{\\overline{T}}(K) =#eq \\frac{P(K \\cap \\overline{T})}{P(\\overline{T})}#q =#e2 \\frac{${f.n(0.002)}}{${f.n(0.933)}}#r \\approx#e3 ${f.n(0.002)}`),
+    note: tx(
+      "On the second stage, every branch is a conditional probability: the path end divided by the first branch. So $P_T(K) \\approx 0.269$ and $P_{\\overline{T}}(K) \\approx 0.002$. The path ends are the same four numbers as in the first tree: the inner fields of the two-way table.",
+      "Auf der zweiten Stufe steht an jedem Ast eine bedingte Wahrscheinlichkeit: Pfadende geteilt durch den ersten Ast. Also $P_T(K) \\approx 0,269$ und $P_{\\overline{T}}(K) \\approx 0,002$. Die Pfadenden sind dieselben vier Zahlen wie im ersten Baum: die inneren Felder der Vierfeldertafel.",
+    ),
+  },
 ];
 
 const indepFrames: Frame[] = [
-  { math: say((f) => `P(A) \\cdot P(B) =#eq ${f.n(0.4)} \\cdot ${f.n(0.45)} =#e2 ${f.n(0.18)}#v`), note: tx("If $A$ and $B$ were independent, $P(A ∩ B)$ would have to be exactly this product.", "Wären $A$ und $B$ unabhängig, müsste $P(A ∩ B)$ genau dieses Produkt sein.") },
-  { math: say((f) => `P(A ∩ B) =#eq ${f.n(0.3)} \\ne#e2 ${f.n(0.18)}#v`), note: tx("It isn't: $A$ and $B$ are **dependent**. People who live nearby cycle more often.", "Ist es aber nicht: $A$ und $B$ sind **abhängig**. Wer in der Nähe wohnt, fährt öfter mit dem Rad.") },
+  { math: say((f) => `P(A) \\cdot P(B) =#eq ${f.n(0.4)} \\cdot ${f.n(0.45)} =#e2 ${f.n(0.18)}#v`), note: tx("If $A$ and $B$ were independent, $P(A \\cap B)$ would have to be exactly this product.", "Wären $A$ und $B$ unabhängig, müsste $P(A \\cap B)$ genau dieses Produkt sein.") },
+  { math: say((f) => `P(A \\cap B) =#eq ${f.n(0.3)} \\ne#e2 ${f.n(0.18)}#v`), note: tx("It isn't: $A$ and $B$ are **dependent**. People who live nearby cycle more often.", "Ist es aber nicht: $A$ und $B$ sind **abhängig**. Wer in der Nähe wohnt, fährt öfter mit dem Rad.") },
   { math: say((f) => `P_A(B) = ${f.n(0.75)} \\ne P(B) = ${f.n(0.45)}`), note: tx("The same from another side: the condition $A$ changes the probability of $B$.", "Dasselbe von der anderen Seite: Die Bedingung $A$ ändert die Wahrscheinlichkeit von $B$.") },
-  { math: tx(`P("6" ∩ "heads") = \\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}`, `P("6" ∩ "Wappen") = \\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}`), note: tx("A die and a coin don't affect each other: independent. Then you may simply multiply.", "Würfel und Münze beeinflussen sich nicht: unabhängig. Dann darfst du einfach multiplizieren.") },
+  { math: tx(`P("6" \\cap "heads") = \\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}`, `P("6" \\cap "Wappen") = \\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}`), note: tx("A die and a coin don't affect each other: independent. Then you may simply multiply.", "Würfel und Münze beeinflussen sich nicht: unabhängig. Dann darfst du einfach multiplizieren.") },
 ];
 
 const expectFrames: Frame[] = [
@@ -670,10 +708,10 @@ const binomFrames: Frame[] = [
   { math: "110, \\; 101, \\; 011", note: tx("The two hits can sit in different places: $3$ paths, all with the same probability.", "Die zwei Treffer können an verschiedenen Stellen liegen: $3$ Pfade, alle mit derselben Wahrscheinlichkeit.") },
   { math: say((f) => `P(X = 2) =#eq 3 \\cdot ${f.n(0.2)}^2 \\cdot ${f.n(0.8)}^1 =#e2 ${f.n(0.096)}`), note: tx("Number of paths times the probability of one path.", "Anzahl der Pfade mal Wahrscheinlichkeit eines Pfades.") },
   {
-    math: tx(`P(X = k) =#eq \\hl{("n choose k")} \\cdot p^k \\cdot (1 - p)^{n - k}`, `P(X = k) =#eq \\hl{("n über k")} \\cdot p^k \\cdot (1 - p)^{n - k}`),
+    math: "P(X = k) =#eq \\hl{\\binom{n}{k}} \\cdot p^k \\cdot (1 - p)^{n - k}",
     note: tx(
-      "The number of paths with exactly $k$ hits is the **binomial coefficient** “n choose k” (nCr on the calculator; the picture shows how it's written). This is the **Bernoulli formula**: $X$ is **binomially distributed**.",
-      "Die Anzahl der Pfade mit genau $k$ Treffern ist der **Binomialkoeffizient** „n über k“ (Taschenrechner: nCr; das Bild zeigt die Schreibweise). Das ist die **Bernoulli-Formel**: $X$ ist **binomialverteilt**.",
+      "The number of paths with exactly $k$ hits is the **binomial coefficient** $\\binom{n}{k}$, read “n choose k” (nCr on the calculator). This is the **Bernoulli formula**: $X$ is **binomially distributed**.",
+      "Die Anzahl der Pfade mit genau $k$ Treffern ist der **Binomialkoeffizient** $\\binom{n}{k}$, gelesen „n über k“ (Taschenrechner: nCr). Das ist die **Bernoulli-Formel**: $X$ ist **binomialverteilt**.",
     ),
   },
   { math: say((f) => `E(X) =#eq n \\cdot p = 3 \\cdot ${f.n(0.2)} =#e2 ${f.n(0.6)}`), note: tx("The expected value of a binomial distribution: $\\mu = n \\cdot p$.", "Der Erwartungswert einer Binomialverteilung: $\\mu = n \\cdot p$.") },
@@ -768,16 +806,16 @@ const binomCheck: Exercise = {
     ),
   ),
   answer: numAnswer(0.2048, 0.00006),
-  hint: tx("$n = 5$, $p = 0.2$, $k = 2$. The number of paths is “5 choose 2”.", "$n = 5$, $p = 0,2$, $k = 2$. Die Anzahl der Pfade ist „5 über 2“."),
+  hint: tx("$n = 5$, $p = 0.2$, $k = 2$. The number of paths is $\\binom{5}{2}$.", "$n = 5$, $p = 0,2$, $k = 2$. Die Anzahl der Pfade ist $\\binom{5}{2}$."),
   solution: [
-    { math: say((f) => `P(X = 2) =#eq ${choose(f, 5, 2)} \\cdot ${f.n(0.2)}^2 \\cdot ${f.n(0.8)}^3`), note: tx("Two hits, three misses.", "Zwei Treffer, drei Nieten.") },
+    { math: say((f) => `P(X = 2) =#eq \\binom{5}{2} \\cdot ${f.n(0.2)}^2 \\cdot ${f.n(0.8)}^3`), note: tx("Two hits, three misses.", "Zwei Treffer, drei Nieten.") },
     { math: say((f) => `P(X = 2) =#eq 10 \\cdot ${f.n(0.04)} \\cdot ${f.n(0.512)}`), note: tx("There are $10$ paths with two hits among five spins.", "Es gibt $10$ Pfade mit zwei Treffern bei fünf Drehungen.") },
     { math: say((f) => `P(X = 2) =#eq ${f.n(0.2048)}`), note: tx("About $\\group{20 \\, %}$.", "Etwa $\\group{20 \\, %}$.") },
   ],
   mistakes: numMistakes(0.2048, 0.00006, [
     { v: 0.02048, title: tx("Only one path", "Nur ein Pfad"), say: tx("That's the probability of **one** path. There are $10$ paths with two hits: multiply by the binomial coefficient.", "Das ist die Wahrscheinlichkeit für **einen** Pfad. Es gibt $10$ Pfade mit zwei Treffern: Multipliziere mit dem Binomialkoeffizienten.") },
     { v: 0.0512, title: tx("Exponents swapped", "Exponenten vertauscht"), say: tx("$p = 0.2$ belongs to the $2$ hits, $0.8$ to the $3$ misses.", "$p = 0,2$ gehört zu den $2$ Treffern, $0,8$ zu den $3$ Nieten.") },
-    { v: 0.1024, title: tx("Wrong number of paths", "Falsche Anzahl der Pfade"), say: tx("You multiplied by $5$. The number of paths is “5 choose 2” $= 10$.", "Du hast mit $5$ multipliziert. Die Anzahl der Pfade ist „5 über 2“ $= 10$.") },
+    { v: 0.1024, title: tx("Wrong number of paths", "Falsche Anzahl der Pfade"), say: tx("You multiplied by $5$. The number of paths is $\\binom{5}{2} = 10$.", "Du hast mit $5$ multipliziert. Die Anzahl der Pfade ist $\\binom{5}{2} = 10$.") },
   ]),
 };
 
@@ -788,8 +826,8 @@ export const level3: LevelLesson = {
       title: tx("Two-way tables and conditional probability", "Vierfeldertafel und bedingte Wahrscheinlichkeit"),
       blob: tx("Two features at once? Put them in a table!", "Zwei Merkmale auf einmal? Ab in die Tafel!"),
       body: tx(
-        "A survey of $200$ students asks about two features at once: $A$ and $B$. The **two-way table** (Vierfeldertafel) has an inner field for each combination and the totals at the edge. $\\frac{}{A}$ (with a bar) means “not $A$”.",
-        "Eine Umfrage unter $200$ Jugendlichen fragt zwei Merkmale gleichzeitig ab: $A$ und $B$. Die **Vierfeldertafel** hat für jede Kombination ein inneres Feld und am Rand die Summen. $\\frac{}{A}$ (mit Strich) heißt „nicht $A$“.",
+        "A survey of $200$ students asks about two features at once: $A$ and $B$. The **two-way table** (Vierfeldertafel) has an inner field for each combination and the totals at the edge. $\\overline{A}$ (with a bar) means “not $A$”.",
+        "Eine Umfrage unter $200$ Jugendlichen fragt zwei Merkmale gleichzeitig ab: $A$ und $B$. Die **Vierfeldertafel** hat für jede Kombination ein inneres Feld und am Rand die Summen. $\\overline{A}$ (mit Strich) heißt „nicht $A$“.",
       ),
       visual: visual(ProbabilityFourField, { cells: tableCells(SCHOOL), legend: schoolLegend }),
       frames: tableFrames,
@@ -801,27 +839,42 @@ export const level3: LevelLesson = {
       blob: tx("A positive test means you're ill? Not so fast!", "Test positiv, also krank? Nicht so schnell!"),
       body: say((f) =>
         f.t(
-          `$\\group{2 \\, %}$ of people have an illness ($K$). The test is positive ($T$) for $\\group{90 \\, %}$ of the ill and, by mistake, for $\\group{5 \\, %}$ of the healthy. The tree starts with “ill or healthy”. But the question goes the other way: how likely are you ill **if** your test is positive?`,
-          `$\\group{2 \\, %}$ der Menschen haben eine Krankheit ($K$). Der Test ist bei $\\group{90 \\, %}$ der Kranken positiv ($T$), bei Gesunden fälschlich in $\\group{5 \\, %}$ der Fälle. Der Baum beginnt mit „krank oder gesund“. Die Frage geht aber umgekehrt: Wie wahrscheinlich bist du krank, **wenn** dein Test positiv ist?`,
+          `$\\group{2 \\, %}$ of people have an illness ($K$). The test is positive ($T$) for $\\group{90 \\, %}$ of the ill and, by mistake, for $\\group{5 \\, %}$ of the healthy. The first tree starts with “ill or healthy”. But the question goes the other way: how likely are you ill **if** your test is positive? For that, we turn the tree around: the second tree starts with the test.`,
+          `$\\group{2 \\, %}$ der Menschen haben eine Krankheit ($K$). Der Test ist bei $\\group{90 \\, %}$ der Kranken positiv ($T$), bei Gesunden fälschlich in $\\group{5 \\, %}$ der Fälle. Der erste Baum beginnt mit „krank oder gesund“. Die Frage geht aber umgekehrt: Wie wahrscheinlich bist du krank, **wenn** dein Test positiv ist? Dafür kehren wir den Baum um: Der zweite Baum beginnt mit dem Test.`,
         ),
       ),
-      visual: visual(ProbabilityTree, {
-        branches: [
-          { node: "K", p: 0.02, kids: [{ node: "T", p: 0.9 }, { node: "~T", p: 0.1 }] },
-          { node: "~K", p: 0.98, kids: [{ node: "T", p: 0.05 }, { node: "~T", p: 0.95 }] },
+      visual: visual(ProbabilityTreePair, {
+        trees: [
+          {
+            title: tx("Tree: ill or healthy first", "Baum: erst krank oder gesund"),
+            branches: [
+              { node: "K", p: 0.02, kids: [{ node: "T", p: 0.9 }, { node: "~T", p: 0.1 }] },
+              { node: "~K", p: 0.98, kids: [{ node: "T", p: 0.05 }, { node: "~T", p: 0.95 }] },
+            ],
+            hl: [0, 2],
+            ends: [0.018, 0.002, 0.049, 0.931],
+          },
+          {
+            // P(T) = 0.067; P_T(K) = 0.018 : 0.067 ≈ 0.269; P_(not T)(K) = 0.002 : 0.933 ≈ 0.002
+            title: tx("Turned around: the test first", "Umgekehrt: erst der Test"),
+            branches: [
+              { node: "T", p: 0.067, kids: [{ node: "K", p: 0.269 }, { node: "~K", p: 0.731 }] },
+              { node: "~T", p: 0.933, kids: [{ node: "K", p: 0.002 }, { node: "~K", p: 0.998 }] },
+            ],
+            hl: [0],
+            ends: [0.018, 0.049, 0.002, 0.931],
+          },
         ],
-        hl: [0, 2],
-        ends: [0.018, null, 0.049, null],
       }),
       frames: bayesFrames,
     },
     {
       type: "widget",
-      title: tx("The test, fact-checked with 1000 people", "Der Test im Faktencheck: 1000 Menschen"),
+      title: tx("The test, fact-checked with 10 000 people", "Der Test im Faktencheck: 10 000 Menschen"),
       blob: tx("Make the illness rare and watch the purple dots!", "Mach die Krankheit selten und schau auf die lila Punkte!"),
       body: tx(
-        "Set how common the illness is and how good the test is. Blob shows $1000$ people as dots, with the two-way table next to it. How many of the positive tests are really ill? Try a rare illness ($\\group{1 \\, %}$) with a good test ($\\group{95 \\, %}$).",
-        "Stell ein, wie häufig die Krankheit ist und wie gut der Test ist. Blob zeigt $1000$ Menschen als Punkte, daneben die Vierfeldertafel. Wie viele der positiv Getesteten sind wirklich krank? Probier eine seltene Krankheit ($\\group{1 \\, %}$) mit einem guten Test ($\\group{95 \\, %}$).",
+        "Set how common the illness is and how good the test is. Blob shows $10\\,000$ people as dots (one dot for every $10$), with the two-way table next to it. How many of the positive tests are really ill? Try a rare illness ($\\group{1 \\, %}$) with a good test ($\\group{95 \\, %}$).",
+        "Stell ein, wie häufig die Krankheit ist und wie gut der Test ist. Blob zeigt $10\\,000$ Menschen als Punkte (ein Punkt für je $10$), daneben die Vierfeldertafel. Wie viele der positiv Getesteten sind wirklich krank? Probier eine seltene Krankheit ($\\group{1 \\, %}$) mit einem guten Test ($\\group{95 \\, %}$).",
       ),
       widget: ProbabilityBayesLab,
     },
@@ -831,8 +884,8 @@ export const level3: LevelLesson = {
       title: tx("Independence", "Stochastische Unabhängigkeit"),
       blob: tx("Does one event care about the other?", "Kümmert sich ein Ereignis um das andere?"),
       body: tx(
-        "Two events are **independent** if one doesn't change the probability of the other: $P_A(B) = P(B)$. That's the same as $P(A ∩ B) = P(A) \\cdot P(B)$. Back to the survey: $P(A) = 0.4$, $P(B) = 0.45$.",
-        "Zwei Ereignisse heißen **stochastisch unabhängig**, wenn das eine die Wahrscheinlichkeit des anderen nicht ändert: $P_A(B) = P(B)$. Das ist gleichbedeutend mit $P(A ∩ B) = P(A) \\cdot P(B)$. Zurück zur Umfrage: $P(A) = 0,4$, $P(B) = 0,45$.",
+        "Two events are **independent** if one doesn't change the probability of the other: $P_A(B) = P(B)$. That's the same as $P(A \\cap B) = P(A) \\cdot P(B)$. Back to the survey: $P(A) = 0.4$, $P(B) = 0.45$.",
+        "Zwei Ereignisse heißen **stochastisch unabhängig**, wenn das eine die Wahrscheinlichkeit des anderen nicht ändert: $P_A(B) = P(B)$. Das ist gleichbedeutend mit $P(A \\cap B) = P(A) \\cdot P(B)$. Zurück zur Umfrage: $P(A) = 0,4$, $P(B) = 0,45$.",
       ),
       frames: indepFrames,
     },
@@ -883,19 +936,19 @@ export const level3: LevelLesson = {
     {
       title: tx("Conditional probability", "Bedingte Wahrscheinlichkeit"),
       body: tx("$P_A(B)$: probability of $B$ if $A$ has happened. In the two-way table: inner field divided by the total of the condition.", "$P_A(B)$: Wahrscheinlichkeit von $B$ unter der Bedingung $A$. In der Vierfeldertafel: inneres Feld geteilt durch die Summe der Bedingung."),
-      examples: ["P_A(B) = \\frac{P(A ∩ B)}{P(A)}", say((f) => `P_A(B) = \\frac{60}{80} = ${f.n(0.75)}`)],
+      examples: ["P_A(B) = \\frac{P(A \\cap B)}{P(A)}", say((f) => `P_A(B) = \\frac{60}{80} = ${f.n(0.75)}`)],
       tone: "rule",
     },
     {
       title: tx("Bayes: turning the tree around", "Bayes: den Baum umkehren"),
-      body: tx("The path you want divided by **all** paths that fit the condition. Natural frequencies (imagine 1000 people) make it easy.", "Der gesuchte Pfad geteilt durch **alle** Pfade, die zur Bedingung passen. Mit natürlichen Häufigkeiten (stell dir 1000 Menschen vor) geht's leicht."),
+      body: tx("The path you want divided by **all** paths that fit the condition. The turned-around tree starts with the condition; its path ends are the same as before. Natural frequencies (imagine 1000 people) make it easy.", "Der gesuchte Pfad geteilt durch **alle** Pfade, die zur Bedingung passen. Der umgekehrte Baum beginnt mit der Bedingung, seine Pfadenden bleiben dieselben. Mit natürlichen Häufigkeiten (stell dir 1000 Menschen vor) geht's leicht."),
       examples: ["P_T(K) = \\frac{P(K) \\cdot P_K(T)}{P(T)}"],
       tone: "rule",
     },
     {
       title: tx("Independence", "Unabhängigkeit"),
       body: tx("Independent: the condition changes nothing. Check with the product rule.", "Unabhängig: Die Bedingung ändert nichts. Prüfen mit der Produktregel."),
-      examples: ["P(A ∩ B) = P(A) \\cdot P(B)", "P_A(B) = P(B)"],
+      examples: ["P(A \\cap B) = P(A) \\cdot P(B)", "P_A(B) = P(B)"],
       tone: "rule",
     },
     {
@@ -906,9 +959,9 @@ export const level3: LevelLesson = {
     },
     {
       title: tx("Binomial distribution", "Binomialverteilung"),
-      body: tx("$n$ independent trials, hit probability $p$, $X$ counts the hits. The binomial coefficient “n choose k” (nCr) counts the paths.", "$n$ unabhängige Versuche, Trefferwahrscheinlichkeit $p$, $X$ zählt die Treffer. Der Binomialkoeffizient „n über k“ (nCr) zählt die Pfade."),
+      body: tx("$n$ independent trials, hit probability $p$, $X$ counts the hits. The binomial coefficient $\\binom{n}{k}$ (“n choose k”, nCr) counts the paths.", "$n$ unabhängige Versuche, Trefferwahrscheinlichkeit $p$, $X$ zählt die Treffer. Der Binomialkoeffizient $\\binom{n}{k}$ („n über k“, nCr) zählt die Pfade."),
       examples: [
-        tx(`P(X = k) = ("n choose k") \\cdot p^k \\cdot (1 - p)^{n - k}`, `P(X = k) = ("n über k") \\cdot p^k \\cdot (1 - p)^{n - k}`),
+        "P(X = k) = \\binom{n}{k} \\cdot p^k \\cdot (1 - p)^{n - k}",
         say((f) => `P(X = 2) = 10 \\cdot ${f.n(0.2)}^2 \\cdot ${f.n(0.8)}^3 = ${f.n(0.2048)}`),
         "E(X) = n \\cdot p",
       ],

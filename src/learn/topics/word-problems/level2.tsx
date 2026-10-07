@@ -1053,6 +1053,26 @@ const scaleFrames: Frame[] = [
   { math: mb((s) => `${s.m(7.4, "a")} "cm"#ua \\to#ar ${s.m(7.4, "f")} \\cdot#op 250#b "m"#ub`), note: tx("The path is 7.4 cm on the map. Every centimetre is 250 m: multiply.", "Der Weg ist auf der Karte 7,4 cm lang. Jeder Zentimeter sind 250 m: multiplizieren.") },
   { math: mb((s) => `${s.m(7.4, "a")} "cm"#ua \\to#ar 1850#b "m"#ub`), note: tx("$7.4 \\cdot 250 = 1850$.", "$7,4 \\cdot 250 = 1850$.") },
   { math: mb((s) => `${s.m(7.4, "a")} "cm"#ua \\to#ar ${s.m(1.85, "b")} "km"#ub`), highlight: ["b", "ub"], note: tx("1000 m = 1 km. **Answer:** In reality the path is 1.85 km long.", "1000 m = 1 km. **Antwort:** In Wirklichkeit ist der Weg 1,85 km lang.") },
+  {
+    math: mb((s) => `2#a "cm"#ua \\to#ar ${s.m(50000, "b")} "cm"#ub`),
+    note: tx(
+      "**Backwards:** on another map, 2 cm stand for 500 m. Which scale is that? First the same unit on both sides: 500 m = 50 000 cm.",
+      "**Rückwärts:** Auf einer anderen Karte stehen 2 cm für 500 m. Welcher Maßstab ist das? Zuerst auf beiden Seiten dieselbe Einheit: 500 m = 50.000 cm.",
+    ),
+  },
+  {
+    math: mb((s) => `1#a "cm"#ua \\to#ar ${s.m(25000, "b")} "cm"#ub`),
+    highlight: ["b"],
+    note: tx("Divide both sides by 2: 1 cm stands for 25 000 cm. The scale is **1 : 25 000**.", "Beide Seiten durch 2: 1 cm steht für 25.000 cm. Der Maßstab ist **1 : 25 000**."),
+  },
+  {
+    math: mb((s) => `4#a "cm"#ua \\to#ar 4 :#op 5 =#eq ${s.m(0.8, "b")} "cm"#ub`),
+    highlight: ["b", "ub"],
+    note: tx(
+      "**Enlargements** are written the other way round: **5 : 1** means the photo is 5 times as big as reality. A beetle that is 4 cm long on the photo is 4 : 5 = 0.8 cm = 8 mm long in reality.",
+      "**Vergrößerungen** schreibt man andersherum: **5 : 1** heißt, das Foto ist 5-mal so groß wie die Wirklichkeit. Ein Käfer, der auf dem Foto 4 cm lang ist, ist in Wirklichkeit 4 : 5 = 0,8 cm = 8 mm lang.",
+    ),
+  },
 ];
 
 const lapsFrames: Frame[] = [
@@ -1156,8 +1176,8 @@ export const level2: LevelLesson = {
       title: tx("Scale: 1 : 25 000", "Maßstab: 1 : 25 000"),
       blob: tx("Maps shrink the world. The scale tells you by how much!", "Karten machen die Welt klein. Der Maßstab sagt dir, wie sehr!"),
       body: tx(
-        "On a hiking map with the scale **1 : 25 000**, every length is 25 000 times smaller than in reality. The path from the hut to the lake is **7.4 cm** long on the map. How long is it really?",
-        "Auf einer Wanderkarte im Maßstab **1 : 25 000** ist jede Strecke 25.000-mal kleiner als in Wirklichkeit. Der Weg von der Hütte zum See ist auf der Karte **7,4 cm** lang. Wie lang ist er wirklich?",
+        "On a hiking map with the scale **1 : 25 000**, every length is 25 000 times smaller than in reality. The path from the hut to the lake is **7.4 cm** long on the map. How long is it really? Then: finding the scale itself and enlargements like 5 : 1.",
+        "Auf einer Wanderkarte im Maßstab **1 : 25 000** ist jede Strecke 25.000-mal kleiner als in Wirklichkeit. Der Weg von der Hütte zum See ist auf der Karte **7,4 cm** lang. Wie lang ist er wirklich? Danach: den Maßstab selbst bestimmen und Vergrößerungen wie 5 : 1.",
       ),
       frames: scaleFrames,
     },

@@ -26,6 +26,7 @@ const T_MINUS_IN = tx("Minus taken into the power", "Minus mitpotenziert");
 const T_SQUARE_CHECK = tx("Check by squaring", "Mach die Quadratprobe");
 const T_ZEROS = tx("Count the zeros", "Zähl die Nullen");
 const T_DIGITS = tx("Counted all digits", "Alle Ziffern gezählt");
+const T_BOTH_SIDES = tx("Work out both sides", "Rechne beide Seiten aus");
 
 const POWER_FIRST = (c: number) =>
   tx(
@@ -670,7 +671,9 @@ function orderTask(rng: Rng): Exercise | null {
 const REL = ["$<$", "$=$", "$>$"];
 
 function compareTask(rng: Rng): Exercise | null {
-  const kind = rng.pick(["swap", "swap", "minus", "double", "one"] as const);
+  const kind = rng.pick(["swap", "swap", "minus", "double", "one", "rebase", "rebase"] as const);
+  // The wrong option the typical mistake leads to (mostly "="); -1: the message fits every wrong option.
+  let tempting = 1;
   let left: string;
   let right: string;
   let lv: number;
@@ -696,7 +699,7 @@ function compareTask(rng: Rng): Exercise | null {
     lv = x ** y;
     rv = y ** x;
     hint = tx("Work out both powers, then compare.", "Rechne beide Potenzen aus und vergleiche dann.");
-    wrongTitle = tx("Work out both sides", "Rechne beide Seiten aus");
+    wrongTitle = T_BOTH_SIDES;
     wrongSay = tx(
       "Hmm, not quite. Swapping base and exponent usually changes the value, so work out both powers before you compare.",
       "Hm, nicht ganz. Wenn du Basis und Exponent vertauschst, ändert sich meistens der Wert. Rechne also beide Potenzen aus, bevor du vergleichst.",
@@ -722,6 +725,34 @@ function compareTask(rng: Rng): Exercise | null {
     hint = tx(`$${a}^{${e}}$ means $${e}$ factors $${a}$.`, `$${a}^{${e}}$ bedeutet $${e}$ Faktoren $${a}$.`);
     wrongTitle = T_BASE_TIMES;
     wrongSay = baseTimes(String(a), e);
+  } else if (kind === "rebase") {
+    // Different bases and exponents, often with the same value: 2^6 = 4^3 = 8^2.
+    const [x1, y1, x2, y2] = rng.pick<[number, number, number, number]>([
+      [2, 6, 4, 3],
+      [2, 6, 8, 2],
+      [4, 3, 8, 2],
+      [3, 4, 9, 2],
+      [2, 8, 4, 4],
+      [2, 8, 16, 2],
+      [2, 9, 8, 3],
+      [3, 3, 5, 2],
+      [2, 7, 5, 3],
+      [2, 10, 10, 3],
+      [6, 2, 2, 5],
+      [2, 6, 7, 2],
+    ]);
+    const swap = rng.chance(0.5);
+    left = swap ? `${x2}^{${y2}}` : `${x1}^{${y1}}`;
+    right = swap ? `${x1}^{${y1}}` : `${x2}^{${y2}}`;
+    lv = swap ? x2 ** y2 : x1 ** y1;
+    rv = swap ? x1 ** y1 : x2 ** y2;
+    tempting = -1;
+    hint = tx("Work out both powers, then compare the numbers.", "Rechne beide Potenzen aus und vergleiche dann die Zahlen.");
+    wrongTitle = T_BOTH_SIDES;
+    wrongSay = tx(
+      `Hmm, not quite. A bigger base or a bigger exponent alone doesn't decide it. Work out $${left}$ and $${right}$ and compare the numbers.`,
+      `Hm, nicht ganz. Eine größere Basis oder ein größerer Exponent allein entscheidet das nicht. Rechne $${left}$ und $${right}$ aus und vergleiche die Zahlen.`,
+    );
   } else {
     const m = 2 * rng.int(1, 5);
     const n = 2 * rng.int(1, 5) + 1;
@@ -730,6 +761,7 @@ function compareTask(rng: Rng): Exercise | null {
     right = swap ? `(-1)^{${m}}` : `(-1)^{${n}}`;
     lv = swap ? -1 : 1;
     rv = swap ? 1 : -1;
+    tempting = -1;
     hint = tx("Count the minus signs: even gives plus, odd gives minus.", "Zähl die Minuszeichen: gerade ergibt Plus, ungerade Minus.");
     wrongTitle = tx("Count the minus signs", "Zähl die Minuszeichen");
     wrongSay = tx(
@@ -740,9 +772,14 @@ function compareTask(rng: Rng): Exercise | null {
   const correct = lv < rv ? 0 : lv === rv ? 1 : 2;
   const rel = ["<", "=", ">"][correct];
   const options = REL;
+  // Any other wrong option: no typical mistake leads there, so Blob just asks to work out both sides.
+  const generic = tx(`Not quite. Work out $${left}$ and $${right}$ as numbers first, then compare.`, `Nicht ganz. Rechne $${left}$ und $${right}$ zuerst als Zahlen aus und vergleiche dann.`);
   const mistakes: Mistake[] = [0, 1, 2]
     .filter((i) => i !== correct)
-    .map((i) => ({ when: { kind: "choice", options, correct: i } as AnswerSpec, title: wrongTitle, say: wrongSay }));
+    .map((i) => {
+      const typical = tempting === -1 || i === tempting;
+      return { when: { kind: "choice", options, correct: i } as AnswerSpec, title: typical ? wrongTitle : T_BOTH_SIDES, say: typical ? wrongSay : generic };
+    });
   return {
     instruction: COMPARE,
     math: `${left} \\quad \\box{?} \\quad ${right}`,

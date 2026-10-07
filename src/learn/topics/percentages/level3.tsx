@@ -1389,6 +1389,10 @@ function GrowthLab() {
   const scope = useId();
   const f = useFmt();
   const { t, n } = f;
+  /** Axis labels: German groups 5+ digits with a narrow no-break space, like in maths books ("20 000"). */
+  const axisNum = (v: number) => (f.l === "de" && v >= 10000 ? String(v).replace(/\B(?=(\d{3})+$)/g, "\u202f") : String(v));
+  /** Table cells stay short: one decimal, whole numbers from 1000 on. */
+  const cell = (v: number) => n(v >= 1000 ? Math.round(v) : r1(v));
   const [p, setP] = useState(7);
   const [compare, setCompare] = useState(false);
 
@@ -1476,7 +1480,7 @@ function GrowthLab() {
             <g key={v}>
               <line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} stroke="var(--line)" strokeWidth={1} />
               <text x={L - 6} y={Y(v) + 3.5} textAnchor="end" {...SVG_TEXT}>
-                {f.big(String(v))}
+                {axisNum(v)}
               </text>
             </g>
           ))}
@@ -1528,7 +1532,13 @@ function GrowthLab() {
           <MathView src={`N(t)#N =#e 100#a \\cdot#m ${n(q)}#q^t#tt`} size="md" scope={`${scope}-f`} highlight={["q"]} />
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[300px] border-collapse text-center font-math text-[14px] tabular-nums">
+          <table className="w-full min-w-[300px] table-fixed border-collapse text-center font-math text-[14px] tabular-nums">
+            <colgroup>
+              <col className="w-11" />
+              {[0, 1, 2, 3, 4, 5].map((x) => (
+                <col key={x} />
+              ))}
+            </colgroup>
             <tbody>
               <tr className="text-ink-3">
                 <th className="py-1 pr-2 text-left font-normal italic">t</th>
@@ -1542,7 +1552,7 @@ function GrowthLab() {
                 <th className="py-1 pr-2 text-left font-normal text-blob-ink">{t("exp.", "exp.")}</th>
                 {[0, 1, 2, 3, 4, 5].map((x) => (
                   <td key={x} className="border-t border-line py-1">
-                    {n(r1(val(x)))}
+                    {cell(val(x))}
                   </td>
                 ))}
               </tr>
@@ -1551,7 +1561,7 @@ function GrowthLab() {
                   <th className="py-1 pr-2 text-left font-normal">{t("lin.", "lin.")}</th>
                   {[0, 1, 2, 3, 4, 5].map((x) => (
                     <td key={x} className="border-t border-line py-1">
-                      {n(r1(lin(x)))}
+                      {cell(lin(x))}
                     </td>
                   ))}
                 </tr>
@@ -1922,8 +1932,8 @@ const halfLifeFrames: Frame[] = [
   {
     math: tx("t#l =#e \\log_{1.05}#g (2)#r", "t#l =#e \\log_{1,05}#g (2)#r"),
     note: tx(
-      "Exactly: the **logarithm** $\\log_{1.05}(2)$ is the exponent that turns $1.05$ into $2$.",
-      "Genau: Der **Logarithmus** $\\log_{1,05}(2)$ ist der Exponent, der aus $1,05$ eine $2$ macht.",
+      "To get it exactly, use the **logarithm**: $\\log_{1.05}(2)$ is the exponent that turns $1.05$ into $2$.",
+      "Exakt geht es mit dem **Logarithmus**: $\\log_{1,05}(2)$ ist der Exponent, der aus $1,05$ eine $2$ macht.",
     ),
   },
   {

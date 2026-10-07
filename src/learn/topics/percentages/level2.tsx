@@ -367,6 +367,7 @@ function timeSlips(K: number, p: number, Z: number, s: Span): Slip[] {
       s.kind === "months"
         ? tx("Nearly! That's the time in **years**. The question asks for months: a year has $12$ of them.", "Fast! Das ist die Zeit in **Jahren**. Gefragt sind Monate: Ein Jahr hat $12$ davon.")
         : tx("Nearly! That's the time in **years**. The question asks for days: a banking year has $360$ of them.", "Fast! Das ist die Zeit in **Jahren**. Gefragt sind Tage: Ein Bankjahr hat $360$ davon."),
+      0.0051,
     ],
     [
       (Zy / Z) * total,
@@ -382,6 +383,7 @@ function timeSlips(K: number, p: number, Z: number, s: Span): Slip[] {
       (Z / Zy) * 365,
       tx("365 instead of 360 days", "365 statt 360 Tage"),
       tx("So close! Banks count a year as **360 days** (banking year).", "Ganz knapp! Banken rechnen das Jahr mit **360 Tagen** (Bankjahr)."),
+      0.51,
     ],
   ];
 }
@@ -1049,7 +1051,7 @@ function invoiceExercise(N: number, s: number, who: (typeof CRAFTS)[number]): Ex
     instruction: tx("Invoice with VAT and Skonto", "Rechnung mit Mehrwertsteuer und Skonto"),
     text: say((f) =>
       f.t(
-        `The invoice of ${who.en} is ${euro(f, N)} net, plus ${perc(f, 19)} VAT. If they pay within 10 days, the Weber family may take off ${perc(f, s)} cash discount (Skonto). How much do they pay if they pay straight away?`,
+        `The Weber family gets an invoice from ${who.en}: ${euro(f, N)} net, plus ${perc(f, 19)} VAT. If the family pays within 10 days, they may take off ${perc(f, s)} cash discount (Skonto). How much do they pay if they pay straight away?`,
         `Die Rechnung ${who.de} beträgt netto ${euro(f, N)}. Dazu kommen ${perc(f, 19)} Mehrwertsteuer. Bei Zahlung innerhalb von 10 Tagen darf Familie Weber ${perc(f, s)} Skonto abziehen. Wie viel zahlt sie, wenn sie sofort zahlt?`,
       ),
     ),
@@ -1908,8 +1910,8 @@ const interestIntroFrames: Frame[] = [
   {
     math: "Z#W =#e K#G \\cdot#m \\frac{p#p}{100#h}#f",
     note: tx(
-      "Interest is the same formula with new names: the **capital** $K$ (Kapital) is the base value, the **interest** $Z$ (Zinsen) is the percentage, and $p %$ is the **interest rate** (Zinssatz).",
-      "Zinsrechnung ist dieselbe Formel mit neuen Namen: Das **Kapital** $K$ ist der Grundwert, die **Zinsen** $Z$ sind der Prozentwert, und $p %$ heißt **Zinssatz**.",
+      "For interest, it's the same formula with new names: the **capital** $K$ (Kapital) is the base value, the **interest** $Z$ (Zinsen) is the percentage, and $p %$ is the **interest rate** (Zinssatz).",
+      "Bei der Zinsrechnung gilt dieselbe Formel, nur mit neuen Namen: Das **Kapital** $K$ ist der Grundwert, die **Zinsen** $Z$ sind der Prozentwert, und $p %$ heißt **Zinssatz**.",
     ),
     highlight: ["W", "G"],
   },

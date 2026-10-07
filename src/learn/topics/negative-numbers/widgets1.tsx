@@ -8,7 +8,7 @@ import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { cn } from "@/lib/utils";
-import { kn, kp } from "./shared";
+import { kn, kp, stepsOf } from "./shared";
 import { AxisLine, DragPoint, Hint, makeAxis, MiniBlob, Segmented, Stepper, signed } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -127,8 +127,8 @@ export function NegWalker() {
       ? tx("Operation sign **plus**: Blob looks to the **right**.", "Rechenzeichen **plus**: Blob schaut nach **rechts**.")
       : tx("Operation sign **minus**: Blob turns and looks to the **left**.", "Rechenzeichen **minus**: Blob dreht sich um und schaut nach **links**.");
   const walkLine = forward
-    ? tx(`The number is **positive**: Blob walks ${k} steps **forwards**.`, `Die Zahl ist **positiv**: Blob läuft ${k} Schritte **vorwärts**.`)
-    : tx(`The number is **negative**: Blob walks ${k} steps **backwards**.`, `Die Zahl ist **negativ**: Blob läuft ${k} Schritte **rückwärts**.`);
+    ? tx(`The number is **positive**: Blob walks ${stepsOf(k, "en")} **forwards**.`, `Die Zahl ist **positiv**: Blob läuft ${stepsOf(k, "de")} **vorwärts**.`)
+    : tx(`The number is **negative**: Blob walks ${stepsOf(k, "en")} **backwards**.`, `Die Zahl ist **negativ**: Blob läuft ${stepsOf(k, "de")} **rückwärts**.`);
   const pm = (s: Sign) => (s === "+" ? "+" : "−");
 
   return (
@@ -170,7 +170,8 @@ export function NegWalker() {
       </div>
 
       <svg viewBox={`0 0 ${ax.width} 160`} className="mx-auto w-full max-w-[700px] select-none overflow-visible" role="img" aria-label={t(tx(`Blob walks from ${signed(start)} to ${signed(result)}.`, `Blob läuft von ${signed(start)} nach ${signed(result)}.`))}>
-        <AxisLine ax={ax} y={y} />
+        {/* 25 numbers wide: on a phone the drawing shrinks to half, so the numbers are drawn bigger there. */}
+        <AxisLine ax={ax} y={y} phoneText="max-sm:text-[28px]" labelGap={32} />
         <circle cx={ax.x(start)} cy={y} r={6} fill="var(--raised)" stroke="var(--ink-2)" strokeWidth={2} />
         <AnimatePresence>
           {walked && (
@@ -191,7 +192,7 @@ export function NegWalker() {
                 textAnchor="middle"
                 fill="var(--blob)"
                 fontWeight={700}
-                className="font-math text-[16px] max-sm:text-[22px]"
+                className="font-math text-[16px] max-sm:text-[32px]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.36 * k }}

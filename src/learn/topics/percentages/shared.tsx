@@ -56,7 +56,7 @@ export type Fmt = {
   ut: (unit: Unit, key: string) => string;
   /** The unit after a number in a sentence: ` kg`. */
   uw: (unit: Unit) => string;
-  /** A number in a story sentence; German prose groups big numbers with a dot (I18N.md): "25.000". */
+  /** A number in a story sentence; German prose groups 5+ digits with a dot (I18N.md): "25.000". 4 digits stay "2500", as everywhere in the maths. */
   big: (s: string) => string;
 };
 
@@ -205,8 +205,8 @@ export const WORD_PROBLEM = tx("Word problem", "Textaufgabe");
 // Typical mistakes. Each one is simulated from the task's numbers, so the wrong
 // value is exactly what a student with that misconception gets.
 
-/** A misconception: the (unrounded) value it leads to, a title and what Blob says. */
-export type Slip = [value: number, title: Text, say: Text] | null | false;
+/** A misconception: the (unrounded) value it leads to, a title, what Blob says, and an absolute `tol` when students usually round that value. */
+export type Slip = [value: number, title: Text, say: Text, tol?: number] | null | false;
 type NumberSpec = Extract<AnswerSpec, { kind: "number" }>;
 
 /** How far a typed number may be from `v`: cents for money, whole numbers when the answer is rounded, else rounding of long decimals. */
@@ -223,10 +223,10 @@ export function mistakesFor(answer: AnswerSpec, slips: Slip[]): Mistake[] {
   const out: Mistake[] = [];
   for (const s of slips) {
     if (!s) continue;
-    const [raw, title, say] = s;
+    const [raw, title, say, own] = s;
     if (!Number.isFinite(raw) || raw < 0) continue;
     const value = answer.unit === "€" ? r2(raw) : slack(raw, answer) >= 1 ? Math.round(raw) : r6(raw);
-    const tol = slack(value, answer);
+    const tol = own ?? slack(value, answer);
     if (taken.some(([v, t]) => Math.abs(v - value) <= t + tol + 1e-9)) continue;
     taken.push([value, tol]);
     const when: NumberSpec = { kind: "number", value, ...(answer.unit ? { unit: answer.unit } : {}), ...(tol ? { tolerance: tol / Math.max(1, Math.abs(value)) } : {}) };

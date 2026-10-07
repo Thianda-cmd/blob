@@ -173,15 +173,15 @@ export function LogHunter() {
           {calc ? (
             <motion.div key="calc" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2">
               <MathView
-                src={`\\log_{${bS}} \\, ${target} =#e1 \\frac{\\lg ${target}}{\\lg ${bS}} \\approx#e2 \\frac{${fmt(lg(target), l, 4)}}{${fmt(lg(B.b), l, 4)}} \\approx#e3 ${fmt(exact, l)}`}
+                src={`\\log_{${bS}} \\, ${target} =#e1 \\frac{\\lg ${target}}{\\lg ${bS}} \\approx#e2 \\frac{${fmt(lg(target), l, 5)}}{${fmt(lg(B.b), l, 5)}} \\approx#e3 ${fmt(exact, l)}`}
                 size="md"
               />
               <p className="text-[13.5px] leading-relaxed text-ink-2">
                 <Inline
                   text={t(
                     tx(
-                      `A calculator only knows **lg** (base 10) and **ln** (base $e$). Divide: $\\frac{\\ln ${target}}{\\ln ${bS}} \\approx \\frac{${fmt(ln(target), "en", 4)}}{${fmt(ln(B.b), "en", 4)}}$ gives the same ${fmt(exact, "en")}.`,
-                      `Ein Taschenrechner kennt nur **lg** (Basis 10) und **ln** (Basis $e$). Teile: $\\frac{\\ln ${target}}{\\ln ${bS}} \\approx \\frac{${fmt(ln(target), "de", 4)}}{${fmt(ln(B.b), "de", 4)}}$ ergibt dasselbe: ${fmt(exact, "de")}.`,
+                      `A calculator only knows **lg** (base 10) and **ln** (base $e$). Divide: $\\frac{\\ln ${target}}{\\ln ${bS}} \\approx \\frac{${fmt(ln(target), "en", 5)}}{${fmt(ln(B.b), "en", 5)}}$ gives the same ${fmt(exact, "en")}.`,
+                      `Ein Taschenrechner kennt nur **lg** (Basis 10) und **ln** (Basis $e$). Teile: $\\frac{\\ln ${target}}{\\ln ${bS}} \\approx \\frac{${fmt(ln(target), "de", 5)}}{${fmt(ln(B.b), "de", 5)}}$ ergibt dasselbe: ${fmt(exact, "de")}.`,
                     ),
                   )}
                 />

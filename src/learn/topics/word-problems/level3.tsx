@@ -337,6 +337,14 @@ const expModel: Tpl = (rng) => {
     } else {
       if (a - (a / 2) * n >= 0) mk.add(a - (a / 2) * n, tx("Linear thinking", "Linear gedacht"), tx("You took away the same amount each time. But halving takes away less and less: halve in every step.", "Du hast jedes Mal gleich viel abgezogen. Beim Halbieren wird es aber immer weniger: In jedem Schritt halbieren."));
       mk.add(a / (2 * n), tx("Divided by the time", "Durch die Zeit geteilt"), tx(`Halving ${n} times means · 0.5 in every step: ${a} · 0.5^${n}.`, `${n}-mal halbieren heißt in jedem Schritt · 0,5: ${a} · 0,5 hoch ${n}.`));
+      mk.add(
+        a * 0.5 ** hours,
+        tx("Hours instead of halvings", "Stunden statt Halbierungen"),
+        tx(
+          `You halved ${hours} times, once per hour. But the amount only halves every 4 hours: ${hours} : 4 = ${n} halvings, so the exponent is ${n}.`,
+          `Du hast ${hours}-mal halbiert, einmal pro Stunde. Die Menge halbiert sich aber nur alle 4 Stunden: ${hours} : 4 = ${n} Halbierungen, der Exponent ist also ${n}.`,
+        ),
+      );
     }
     mk.add(a * c.q ** (n - 1), tx("One step missing", "Ein Schritt zu wenig"), txs((s) => `Nearly! Count the steps again: after ${s.t(after)} there are **${n}** steps, so the exponent is ${n}.`, (s) => `Fast! Zähl die Schritte noch mal: Nach ${s.t(after)} sind es **${n}** Schritte, der Exponent ist also ${n}.`), true);
     mk.add(a * c.q ** (n + 1), tx("One step too many", "Ein Schritt zu viel"), txs((s) => `Nearly! At the start (t = 0) the value is ${s.n(a)}. After ${s.t(after)} it's ${n} steps, not ${n + 1}.`, (s) => `Fast! Am Anfang (t = 0) ist der Wert ${s.n(a)}. Nach ${s.t(after)} sind es ${n} Schritte, nicht ${n + 1}.`), true);
@@ -355,7 +363,13 @@ const expModel: Tpl = (rng) => {
             (s) => `In jedem Schritt derselbe **Faktor** ${s.n(c.q)}: exponentiell. Anfangswert ${s.n(a)}, n = Anzahl der ${s.t(c.pers)}.`,
           ),
         },
-        { math: mb((s) => `f(${n})#f =#eq ${s.m(a, "a")} \\cdot#d ${s.m(c.q, "q")}^{${n}#n}`), note: txs((s) => `After ${s.t(after)}: n = ${n}.`, (s) => `Nach ${s.t(after)}: n = ${n}.`) },
+        {
+          math: mb((s) => `f(${n})#f =#eq ${s.m(a, "a")} \\cdot#d ${s.m(c.q, "q")}^{${n}#n}`),
+          note:
+            c.q === 0.5
+              ? tx(`After ${hours} hours: ${hours} h : 4 h = ${n} halvings, so n = ${n}.`, `Nach ${hours} Stunden: ${hours} h : 4 h = ${n} Halbierungen, also n = ${n}.`)
+              : txs((s) => `After ${s.t(after)}: n = ${n}.`, (s) => `Nach ${s.t(after)}: n = ${n}.`),
+        },
         { math: mb((s) => `f(${n})#f =#eq ${s.m(a, "a")} \\cdot#d ${s.m(c.q ** n, "q", 4)}`), note: txs((s) => `${s.n(c.q)}^${n} = ${s.n(c.q ** n, 4)}.`, (s) => `${s.n(c.q)} hoch ${n} = ${s.n(c.q ** n, 4)}.`) },
         { math: mb((s) => `f(${n})#f =#eq ${s.m(v, "v")} "${s.t(c.unit)}"#u`), highlight: ["v", "u"], note: txs((s) => `**Answer:** ${s.n(v)} ${s.t(c.unit)}.`, (s) => `**Antwort:** ${s.n(v)} ${s.t(c.unit)}.`) },
       ],
@@ -418,7 +432,7 @@ const fenceWall: Tpl = (rng) => {
   const what = rng.pick([
     { en: "a rectangular run for rabbits", de: "ein rechteckiges Freigehege für Kaninchen" },
     { en: "a rectangular vegetable patch", de: "ein rechteckiges Gemüsebeet" },
-    { en: "a rectangular chicken run", de: "einen rechteckigen Hühnerauslauf" },
+    { en: "a rectangular chicken run", de: "ein rechteckiger Hühnerauslauf" },
   ]);
   const askArea = rng.chance(0.7);
   const answer = numAns(askArea ? A : y, askArea ? "m²" : "m");
@@ -588,20 +602,37 @@ const revenue: Tpl = (rng) => {
 
 const FERMI_INSTR = tx("Estimate with a plan", "Schätze mit einem Plan");
 
-type FermiCase = { question: (rng: Rng) => { text: Text; steps: { math: (s: Say) => string; note: Text }[]; value: number; unit: Text; forgot: { v: number; say: Text }[] } };
+/**
+ * A Fermi question. With `open`, one assumption is left out of the text: the student makes it
+ * (the hint names a sensible range) and the solution says which value it uses. Every guess in
+ * that range lands nearest the same order of magnitude, since the options are a factor 10 apart.
+ */
+type FermiQ = {
+  text: Text;
+  steps: { math: (s: Say) => string; note: Text }[];
+  value: number;
+  unit: Text;
+  forgot: { v: number; say: Text }[];
+  /** Only with `open`: the hint with a sensible range, and the assumption the solution uses (in step `at`, default 0). */
+  guess?: { hint: Text; assume: Text; at?: number };
+};
+type FermiCase = { question: (rng: Rng, open: boolean) => FermiQ };
 
 const FERMI: FermiCase[] = [
   {
-    question: (rng) => {
+    question: (rng, open) => {
       const S = rng.pick([400, 500, 600, 800, 1000, 1200]);
-      const l = 0.5;
-      const days = 190;
-      const v = S * l * days;
+      const v = S * 0.5 * 190;
       return {
-        text: tx(
-          `How many litres of water do the ${S} students of a school drink during school hours in one school year? Assume half a litre per student and school day, and 190 school days.`,
-          `Wie viele Liter Wasser trinken die ${S} Schülerinnen und Schüler einer Schule während der Schulzeit in einem Schuljahr? Nimm einen halben Liter pro Person und Schultag und 190 Schultage an.`,
-        ),
+        text: open
+          ? tx(
+              `How many litres of water do the ${S} students of a school drink during school hours in one school year? Make your own assumption for one student, and take 190 school days.`,
+              `Wie viele Liter Wasser trinken die ${S} Schülerinnen und Schüler einer Schule während der Schulzeit in einem Schuljahr? Triff selbst eine Annahme für eine Person und nimm 190 Schultage an.`,
+            )
+          : tx(
+              `How many litres of water do the ${S} students of a school drink during school hours in one school year? Assume half a litre per student and school day, and 190 school days.`,
+              `Wie viele Liter Wasser trinken die ${S} Schülerinnen und Schüler einer Schule während der Schulzeit in einem Schuljahr? Nimm einen halben Liter pro Person und Schultag und 190 Schultage an.`,
+            ),
         steps: [
           { math: (s) => `${S} \\cdot ${s.m(0.5)} = ${S / 2}`, note: tx(`Per school day: ${S / 2} litres.`, `Pro Schultag: ${S / 2} Liter.`) },
           { math: (s) => `${S / 2} \\cdot 190 = ${s.m(v)}`, note: txs((s) => `In 190 school days: ${s.n(v)} litres.`, (s) => `In 190 Schultagen: ${s.n(v)} Liter.`) },
@@ -609,31 +640,52 @@ const FERMI: FermiCase[] = [
         value: v,
         unit: tx("litres", "Liter"),
         forgot: [{ v: S / 2, say: tx("That's just one school day. Multiply by the number of school days.", "Das ist nur ein Schultag. Multipliziere noch mit der Zahl der Schultage.") }],
+        guess: {
+          hint: tx(
+            "First guess how much one student drinks during a school day: anything from a quarter of a litre to one litre is sensible. Then students times litres times days.",
+            "Schätz zuerst, wie viel eine Person an einem Schultag trinkt: Alles von einem viertel bis zu einem Liter ist sinnvoll. Dann Schüler mal Liter mal Tage.",
+          ),
+          assume: tx("Assumption: half a litre per student and school day.", "Annahme: ein halber Liter pro Person und Schultag."),
+        },
       };
     },
   },
   {
-    question: (rng) => {
+    question: (rng, open) => {
       const P = rng.pick([100000, 200000, 300000, 500000]);
       const v = P * 12;
       return {
-        text: tx(
-          `How many pizzas are eaten in a city with ${nf(P, "en", 0)} inhabitants in one year? Assume every inhabitant eats one pizza a month.`,
-          `Wie viele Pizzen werden in einer Stadt mit ${nf(P, "de", 0)} Einwohnern in einem Jahr gegessen? Nimm an, jeder isst eine Pizza im Monat.`,
-        ),
+        text: open
+          ? tx(
+              `How many pizzas are eaten in a city with ${nf(P, "en", 0)} inhabitants in one year? Make your own assumption how often one person eats pizza.`,
+              `Wie viele Pizzen werden in einer Stadt mit ${nf(P, "de", 0)} Einwohnern in einem Jahr gegessen? Triff selbst eine Annahme, wie oft eine Person Pizza isst.`,
+            )
+          : tx(
+              `How many pizzas are eaten in a city with ${nf(P, "en", 0)} inhabitants in one year? Assume every inhabitant eats one pizza a month.`,
+              `Wie viele Pizzen werden in einer Stadt mit ${nf(P, "de", 0)} Einwohnern in einem Jahr gegessen? Nimm an, jeder isst eine Pizza im Monat.`,
+            ),
         steps: [{ math: (s) => `${s.m(P)} \\cdot 12 = ${s.m(v)}`, note: tx(`12 months: ${nf(v, "en", 0)} pizzas.`, `12 Monate: ${nf(v, "de", 0)} Pizzen.`) }],
         value: v,
         unit: tx("pizzas", "Pizzen"),
         forgot: [{ v: P, say: tx("That's one month. A year has 12.", "Das ist ein Monat. Ein Jahr hat 12.") }],
+        guess: {
+          hint: tx(
+            "Guess how many pizzas one person eats in a year: somewhere between 6 (every two months) and 24 (twice a month) is sensible. Then times the inhabitants.",
+            "Schätz, wie viele Pizzen eine Person im Jahr isst: Irgendwas zwischen 6 (alle zwei Monate) und 24 (zweimal im Monat) ist sinnvoll. Dann mal die Einwohner.",
+          ),
+          assume: tx("Assumption: one pizza per person a month, so 12 a year.", "Annahme: eine Pizza pro Person im Monat, also 12 im Jahr."),
+        },
       };
     },
   },
   {
-    question: (rng) => {
-      const b = rng.pick([60, 70, 80]);
+    question: (rng, open) => {
+      const b = open ? 70 : rng.pick([60, 70, 80]);
       const v = b * 60 * 24;
       return {
-        text: tx(`How often does a heart beat in one day? Assume ${b} beats per minute.`, `Wie oft schlägt ein Herz an einem Tag? Nimm ${b} Schläge pro Minute an.`),
+        text: open
+          ? tx("How often does a heart beat in one day? Feel your pulse or make your own assumption for one minute.", "Wie oft schlägt ein Herz an einem Tag? Fühl deinen Puls oder triff selbst eine Annahme für eine Minute.")
+          : tx(`How often does a heart beat in one day? Assume ${b} beats per minute.`, `Wie oft schlägt ein Herz an einem Tag? Nimm ${b} Schläge pro Minute an.`),
         steps: [
           { math: () => `${b} \\cdot 60 = ${b * 60}`, note: tx(`Per hour: ${b * 60}.`, `Pro Stunde: ${b * 60}.`) },
           { math: (s) => `${b * 60} \\cdot 24 = ${s.m(v)}`, note: tx(`Per day: ${nf(v, "en", 0)}.`, `Pro Tag: ${nf(v, "de", 0)}.`) },
@@ -641,18 +693,30 @@ const FERMI: FermiCase[] = [
         value: v,
         unit: tx("beats", "Schläge"),
         forgot: [{ v: b * 60, say: tx("That's one hour. A day has 24 of them.", "Das ist eine Stunde. Ein Tag hat 24 davon.") }],
+        guess: {
+          hint: tx(
+            "A resting heart beats about 60 to 80 times a minute. Then go from minute to hour to day.",
+            "Ein Herz in Ruhe schlägt etwa 60- bis 80-mal pro Minute. Dann geh von der Minute zur Stunde zum Tag.",
+          ),
+          assume: tx("Assumption: 70 beats per minute.", "Annahme: 70 Schläge pro Minute."),
+        },
       };
     },
   },
   {
-    question: (rng) => {
+    question: (rng, open) => {
       const T = rng.pick([20, 25, 30, 40]);
       const v = 2 * T * 190;
       return {
-        text: tx(
-          `How many kilometres does a school bus drive in a school year? Assume one round trip of ${T} km in the morning and one in the afternoon, on 190 school days.`,
-          `Wie viele Kilometer fährt ein Schulbus in einem Schuljahr? Nimm morgens und nachmittags je eine Runde von ${T} km an, an 190 Schultagen.`,
-        ),
+        text: open
+          ? tx(
+              `How many kilometres does a school bus drive in a school year? Assume one round trip of ${T} km in the morning and one in the afternoon on every school day. Estimate the number of school days yourself.`,
+              `Wie viele Kilometer fährt ein Schulbus in einem Schuljahr? Nimm an jedem Schultag morgens und nachmittags je eine Runde von ${T} km an. Wie viele Schultage es gibt, schätzt du selbst.`,
+            )
+          : tx(
+              `How many kilometres does a school bus drive in a school year? Assume one round trip of ${T} km in the morning and one in the afternoon, on 190 school days.`,
+              `Wie viele Kilometer fährt ein Schulbus in einem Schuljahr? Nimm morgens und nachmittags je eine Runde von ${T} km an, an 190 Schultagen.`,
+            ),
         steps: [
           { math: () => `2 \\cdot ${T} = ${2 * T}`, note: tx(`Per day: ${2 * T} km.`, `Pro Tag: ${2 * T} km.`) },
           { math: (s) => `${2 * T} \\cdot 190 = ${s.m(v)}`, note: tx(`Per school year: ${nf(v, "en", 0)} km.`, `Pro Schuljahr: ${nf(v, "de", 0)} km.`) },
@@ -660,19 +724,32 @@ const FERMI: FermiCase[] = [
         value: v,
         unit: "km",
         forgot: [{ v: T * 190, say: tx("That's only the morning trips. The bus also drives in the afternoon.", "Das sind nur die Fahrten am Morgen. Der Bus fährt auch nachmittags.") }],
+        guess: {
+          hint: tx(
+            "A year has 52 weeks, minus the holidays: something between 36 and 40 school weeks of 5 days is sensible. Then km per day times school days.",
+            "Ein Jahr hat 52 Wochen, minus die Ferien: Irgendwas zwischen 36 und 40 Schulwochen mit 5 Tagen ist sinnvoll. Dann km pro Tag mal Schultage.",
+          ),
+          assume: tx("Assumption: 38 school weeks of 5 days, so about 190 school days.", "Annahme: 38 Schulwochen mit 5 Tagen, also rund 190 Schultage."),
+          at: 1,
+        },
       };
     },
   },
   {
-    question: (rng) => {
+    question: (rng, open) => {
       const S = rng.pick([500, 600, 800, 1000]);
-      const p = rng.pick([5, 8, 10]);
+      const p = open ? 8 : rng.pick([5, 8, 10]);
       const v = S * p * 190;
       return {
-        text: tx(
-          `How many sheets of paper does a school with ${S} students use in a school year? Assume ${p} sheets per student and school day, and 190 school days.`,
-          `Wie viele Blatt Papier verbraucht eine Schule mit ${S} Schülerinnen und Schülern in einem Schuljahr? Nimm ${p} Blatt pro Person und Schultag und 190 Schultage an.`,
-        ),
+        text: open
+          ? tx(
+              `How many sheets of paper does a school with ${S} students use in a school year? Make your own assumption for one student and school day, and take 190 school days.`,
+              `Wie viele Blatt Papier verbraucht eine Schule mit ${S} Schülerinnen und Schülern in einem Schuljahr? Triff selbst eine Annahme für eine Person und einen Schultag und nimm 190 Schultage an.`,
+            )
+          : tx(
+              `How many sheets of paper does a school with ${S} students use in a school year? Assume ${p} sheets per student and school day, and 190 school days.`,
+              `Wie viele Blatt Papier verbraucht eine Schule mit ${S} Schülerinnen und Schülern in einem Schuljahr? Nimm ${p} Blatt pro Person und Schultag und 190 Schultage an.`,
+            ),
         steps: [
           { math: () => `${S} \\cdot ${p} = ${S * p}`, note: tx(`Per day: ${S * p} sheets.`, `Pro Tag: ${S * p} Blatt.`) },
           { math: (s) => `${S * p} \\cdot 190 = ${s.m(v)}`, note: tx(`Per school year: ${nf(v, "en", 0)} sheets.`, `Pro Schuljahr: ${nf(v, "de", 0)} Blatt.`) },
@@ -680,6 +757,13 @@ const FERMI: FermiCase[] = [
         value: v,
         unit: tx("sheets", "Blatt"),
         forgot: [{ v: S * p, say: tx("That's just one day. Multiply by the school days.", "Das ist nur ein Tag. Multipliziere noch mit den Schultagen.") }],
+        guess: {
+          hint: tx(
+            "Worksheets, copies, exercise books: maybe 5 to 10 sheets per student and day. Then times the students and the school days.",
+            "Arbeitsblätter, Kopien, Hefte: vielleicht 5 bis 10 Blatt pro Person und Tag. Dann mal die Schülerzahl und die Schultage.",
+          ),
+          assume: tx("Assumption: 8 sheets per student and school day.", "Annahme: 8 Blatt pro Person und Schultag."),
+        },
       };
     },
   },
@@ -692,7 +776,11 @@ function sig1(v: number) {
 }
 
 const fermi: Tpl = (rng) => {
-  const q = rng.pick(FERMI).question(rng);
+  const kind = rng.pick(FERMI);
+  // About half of the tasks leave one assumption to the student.
+  const open = rng.chance(0.5);
+  const q = kind.question(rng, open);
+  const guess = open ? q.guess : undefined;
   const right = sig1(q.value);
   const forgot = q.forgot[0];
   const cands: { v: number; title: Text; say: Text }[] = [
@@ -717,15 +805,29 @@ const fermi: Tpl = (rng) => {
     text: q.text,
     answer,
     mistakes,
-    hint: tx("Break it into steps you can calculate, one after the other. Then round.", "Zerleg es in Schritte, die du nacheinander ausrechnen kannst. Dann runden."),
+    hint: guess?.hint ?? tx("Break it into steps you can calculate, one after the other. Then round.", "Zerleg es in Schritte, die du nacheinander ausrechnen kannst. Dann runden."),
     solution: [
-      ...q.steps.map((st) => ({ math: mb(st.math), note: st.note })),
-      { math: mb((s) => `\\approx ${s.m(right, "r", 0)}`), highlight: ["r"], note: txs((s) => `Rounded: **about ${s.n(right, 0)} ${s.t(q.unit)}**. That's the order of magnitude that counts.`, (s) => `Gerundet: **etwa ${s.n(right, 0)} ${s.t(q.unit)}**. Auf diese Größenordnung kommt es an.`) },
+      ...q.steps.map((st, i) => {
+        const join = (s: Say) => `${s.t(guess!.assume)} ${s.t(st.note)}`;
+        return { math: mb(st.math), note: guess && i === (guess.at ?? 0) ? txs(join, join) : st.note };
+      }),
+      {
+        math: mb((s) => `\\approx ${s.m(right, "r", 0)}`),
+        highlight: ["r"],
+        note: txs(
+          (s) => `Rounded: **about ${s.n(right, 0)} ${s.t(q.unit)}**. That's the order of magnitude that counts.${guess ? " Any other sensible assumption lands at the same order of magnitude." : ""}`,
+          (s) => `Gerundet: **etwa ${s.n(right, 0)} ${s.t(q.unit)}**. Auf diese Größenordnung kommt es an.${guess ? " Mit einer anderen sinnvollen Annahme landest du bei derselben Größenordnung." : ""}`,
+        ),
+      },
     ],
   };
 };
 
-const FERMI_ORDERS: { q: Text; steps: Text[]; first: Text }[] = [
+/**
+ * Order tasks: each scenario is a strict chain, every step uses the result of the step before,
+ * so exactly one order is right. `early` is the typical mistake of doing the last step too soon.
+ */
+const FERMI_ORDERS: { q: Text; steps: Text[]; early: { title: Text; say: Text } }[] = [
   {
     q: tx("How many piano tuners work in a big city?", "Wie viele Klavierstimmer arbeiten in einer Großstadt?"),
     steps: [
@@ -733,39 +835,78 @@ const FERMI_ORDERS: { q: Text; steps: Text[]; first: Text }[] = [
       tx("Households = inhabitants : people per household", "Haushalte = Einwohner : Personen pro Haushalt"),
       tx("Pianos = households : 20 (every 20th has one)", "Klaviere = Haushalte : 20 (jeder 20. hat eins)"),
       tx("Tunings per year = pianos · 1", "Stimmungen pro Jahr = Klaviere · 1"),
-      tx("Divide by what one tuner manages in a year", "Durch das teilen, was ein Stimmer im Jahr schafft"),
+      tx("Tuners = tunings : what one tuner manages in a year", "Stimmer = Stimmungen : Leistung eines Stimmers im Jahr"),
     ],
-    first: tx("pianos", "Klaviere"),
+    early: {
+      title: tx("Divided too early", "Zu früh geteilt"),
+      say: tx("First work out how many tunings are needed in total, then divide by what one tuner manages.", "Rechne zuerst aus, wie viele Stimmungen insgesamt nötig sind, und teile dann durch die Leistung eines Stimmers."),
+    },
   },
   {
     q: tx("How many hairdressers work in a big city?", "Wie viele Friseure arbeiten in einer Großstadt?"),
     steps: [
       tx("Look up the number of inhabitants", "Einwohnerzahl nachschlagen"),
       tx("Haircuts per year = inhabitants · 6", "Haarschnitte pro Jahr = Einwohner · 6"),
-      tx("One hairdresser: 8 a day · 220 days", "Ein Friseur: 8 pro Tag · 220 Tage"),
-      tx("Divide the haircuts by what one hairdresser manages", "Die Haarschnitte durch die Leistung eines Friseurs teilen"),
+      tx("Hairdresser working days = haircuts : 8 (8 haircuts a day)", "Friseur-Arbeitstage = Haarschnitte : 8 (8 Schnitte pro Tag)"),
+      tx("Hairdressers = working days : 220 (220 working days a year)", "Friseure = Arbeitstage : 220 (220 Arbeitstage im Jahr)"),
     ],
-    first: tx("haircuts", "Haarschnitte"),
+    early: {
+      title: tx("Divided too early", "Zu früh geteilt"),
+      say: tx("The 220 divides the working days, so you need those first: haircuts : 8.", "Durch 220 teilst du die Arbeitstage, die brauchst du also zuerst: Haarschnitte : 8."),
+    },
   },
   {
     q: tx("How much water does a school drink in a school year?", "Wie viel Wasser trinkt eine Schule in einem Schuljahr?"),
     steps: [
       tx("Find the number of students", "Schülerzahl herausfinden"),
-      tx("Estimate the litres per student and day", "Liter pro Person und Tag schätzen"),
-      tx("Litres per day for the whole school", "Liter pro Tag für die ganze Schule"),
-      tx("Multiply by the school days in a year", "Mit den Schultagen im Jahr multiplizieren"),
+      tx("Litres per day = students · 0.5 (half a litre each)", "Liter pro Tag = Schüler · 0,5 (ein halber Liter pro Person)"),
+      tx("Litres per week = litres per day · 5", "Liter pro Woche = Liter pro Tag · 5"),
+      tx("Litres per year = litres per week · 38 (school weeks)", "Liter pro Jahr = Liter pro Woche · 38 (Schulwochen)"),
     ],
-    first: tx("litres", "Liter"),
+    early: {
+      title: tx("Year before week", "Jahr vor der Woche"),
+      say: tx("For the year you need the litres per week first. Go from the small unit to the big one.", "Für das Jahr brauchst du zuerst die Liter pro Woche. Geh von der kleinen Einheit zur großen."),
+    },
   },
   {
     q: tx("How many petrol stations are there in Germany?", "Wie viele Tankstellen gibt es in Deutschland?"),
     steps: [
       tx("Look up the number of cars (about 49 million)", "Zahl der Autos nachschlagen (etwa 49 Millionen)"),
       tx("Fill-ups per week = cars · 1", "Tankfüllungen pro Woche = Autos · 1"),
-      tx("One station: about 500 fill-ups a day, 3500 a week", "Eine Tankstelle: etwa 500 Füllungen pro Tag, 3500 pro Woche"),
-      tx("Divide the fill-ups by what one station manages", "Die Tankfüllungen durch die Leistung einer Tankstelle teilen"),
+      tx("Fill-ups per day = fill-ups per week : 7", "Tankfüllungen pro Tag = Tankfüllungen pro Woche : 7"),
+      tx("Stations = fill-ups per day : 500 (one station manages about 500 a day)", "Tankstellen = Tankfüllungen pro Tag : 500 (eine schafft etwa 500 am Tag)"),
     ],
-    first: tx("fill-ups", "Tankfüllungen"),
+    early: {
+      title: tx("Divided too early", "Zu früh geteilt"),
+      say: tx("A station's 500 are fill-ups per day. So first work out the fill-ups per day for the whole country.", "Die 500 einer Tankstelle sind Füllungen pro Tag. Rechne also zuerst die Füllungen pro Tag für ganz Deutschland aus."),
+    },
+  },
+  {
+    q: tx("How many teachers work at German schools?", "Wie viele Lehrkräfte arbeiten an deutschen Schulen?"),
+    steps: [
+      tx("Look up the number of students (about 11 million)", "Schülerzahl nachschlagen (etwa 11 Millionen)"),
+      tx("Classes = students : 25", "Klassen = Schüler : 25"),
+      tx("Lessons per week = classes · 30", "Unterrichtsstunden pro Woche = Klassen · 30"),
+      tx("Teachers = lessons per week : 25 (one teacher gives about 25)", "Lehrkräfte = Unterrichtsstunden pro Woche : 25 (eine gibt etwa 25)"),
+    ],
+    early: {
+      title: tx("Divided too early", "Zu früh geteilt"),
+      say: tx("First count all the lessons that have to be taught, then divide by what one teacher gives.", "Zähl zuerst alle Stunden, die unterrichtet werden müssen, und teile dann durch das, was eine Lehrkraft gibt."),
+    },
+  },
+  {
+    q: tx("How often does a heart beat in a whole life?", "Wie oft schlägt ein Herz in einem ganzen Leben?"),
+    steps: [
+      tx("Measure the beats per minute (about 70)", "Schläge pro Minute messen (etwa 70)"),
+      tx("Beats per hour = beats per minute · 60", "Schläge pro Stunde = Schläge pro Minute · 60"),
+      tx("Beats per day = beats per hour · 24", "Schläge pro Tag = Schläge pro Stunde · 24"),
+      tx("Beats per year = beats per day · 365", "Schläge pro Jahr = Schläge pro Tag · 365"),
+      tx("Beats in a life = beats per year · 80", "Schläge im Leben = Schläge pro Jahr · 80"),
+    ],
+    early: {
+      title: tx("A unit skipped", "Eine Einheit übersprungen"),
+      say: tx("The life needs the year, and the year needs the day. Go from the small unit to the big one.", "Das Leben braucht das Jahr, und das Jahr braucht den Tag. Geh von der kleinen Einheit zur großen."),
+    },
   },
 ];
 
@@ -774,19 +915,16 @@ const fermiOrder: Tpl = (rng) => {
   const n = c.steps.length;
   return {
     instruction: tx("Put the steps of the estimate in order", "Bring die Schritte der Schätzung in die richtige Reihenfolge"),
-    text: txs((s) => `**${s.t(c.q)}** A Fermi estimate goes step by step, each step uses the one before.`, (s) => `**${s.t(c.q)}** Eine Fermi-Schätzung geht Schritt für Schritt, jeder Schritt baut auf dem vorigen auf.`),
+    text: txs((s) => `**${s.t(c.q)}** A Fermi estimate goes step by step: each step uses the result of the one before.`, (s) => `**${s.t(c.q)}** Eine Fermi-Schätzung geht Schritt für Schritt: Jeder Schritt rechnet mit dem Ergebnis des vorigen weiter.`),
     answer: { kind: "order", items: c.steps },
-    mistakes: [
-      {
-        when: { kind: "order", items: [c.steps[n - 1], c.steps[n - 2]] },
-        title: tx("Divided too early", "Zu früh geteilt"),
-        say: tx("First work out the total demand, then divide it by what one person or station manages.", "Rechne zuerst den Gesamtbedarf aus und teile ihn dann durch die Leistung von einer Person oder Station."),
-      },
-    ],
-    hint: tx("Start with what you can look up, and end with the number that was asked for.", "Fang mit dem an, was du nachschlagen kannst, und hör mit der gesuchten Zahl auf."),
+    mistakes: [{ when: { kind: "order", items: [c.steps[n - 1], c.steps[n - 2]] }, title: c.early.title, say: c.early.say }],
+    hint: tx("Start with what you can look up or measure. Each next step needs the quantity the step before has just worked out.", "Fang mit dem an, was du nachschlagen oder messen kannst. Jeder nächste Schritt braucht die Größe, die der vorige gerade ausgerechnet hat."),
     solution: c.steps.map((st, i) => ({
       math: tx(`"Step"#w ${i + 1}#n`, `"Schritt"#w ${i + 1}#n`),
-      note: txs((s) => `${s.t(st)}.${i === n - 1 ? " Only now do you divide: the total comes first." : ""}`, (s) => `${s.t(st)}.${i === n - 1 ? " Erst jetzt wird geteilt: Der Gesamtbedarf kommt zuerst." : ""}`),
+      note: txs(
+        (s) => `${s.t(st)}.${i === 0 ? " This is where the chain starts." : i === n - 1 ? " This gives the number that was asked for." : ""}`,
+        (s) => `${s.t(st)}.${i === 0 ? " Hier beginnt die Kette." : i === n - 1 ? " Das ist die gesuchte Zahl." : ""}`,
+      ),
     })),
   };
 };
@@ -804,7 +942,7 @@ const ballLand: Tpl = (rng) => {
     const answer = numAns(T, "s");
     const mk = mistakesFor(answer);
     mk.add(v / 10, tx("The highest point, not the landing", "Der höchste Punkt statt der Landung"), tx("At that time the ball is at its highest. It lands when h(t) = 0 again.", "Da ist der Ball am höchsten. Er landet, wenn h(t) wieder 0 ist."));
-    mk.add(v, tx("Read off the 20t", "Den Faktor vor t abgelesen"), tx(`Set h(t) = 0 and factor out t: t(${v} − 5t) = 0.`, `Setz h(t) = 0 und klammere t aus: t(${v} − 5t) = 0.`));
+    mk.add(v, tx("Read off the factor in front of t", "Den Faktor vor t abgelesen"), tx(`Set h(t) = 0 and factor out t: t(${v} − 5t) = 0.`, `Setz h(t) = 0 und klammere t aus: t(${v} − 5t) = 0.`));
     return {
       instruction: CHECK_INSTR,
       text: tx(
@@ -830,7 +968,8 @@ const ballLand: Tpl = (rng) => {
   const answer = numAns(r2, "s");
   const mk = mistakesFor(answer);
   mk.add((r1 + r2) / 2, tx("The highest point, not the landing", "Der höchste Punkt statt der Landung"), tx("At that time the ball is at its highest. It lands when h(t) = 0.", "Da ist der Ball am höchsten. Er landet, wenn h(t) = 0 ist."));
-  mk.add(Math.abs(r1), tx("The negative solution", "Die negative Lösung"), tx(`t = ${r1} is a solution of the equation, but negative times are before the throw: the model doesn't apply there.`, `t = ${r1} löst zwar die Gleichung, aber negative Zeiten liegen vor dem Abwurf: Dort gilt das Modell nicht.`));
+  mk.add(r1, tx("The negative solution", "Die negative Lösung"), tx(`t = ${r1} is a solution of the equation, but negative times are before the throw: the model doesn't apply there.`, `t = ${r1} löst zwar die Gleichung, aber negative Zeiten liegen vor dem Abwurf: Dort gilt das Modell nicht.`));
+  mk.add(Math.abs(r1), tx("The negative solution", "Die negative Lösung"), tx(`That's the solution t = ${r1} without its minus sign. Negative times are before the throw: the model doesn't apply there. Take the other solution.`, `Das ist die Lösung t = ${r1} ohne ihr Minuszeichen. Negative Zeiten liegen vor dem Abwurf: Dort gilt das Modell nicht. Nimm die andere Lösung.`));
   return {
     instruction: CHECK_INSTR,
     text: tx(
@@ -842,7 +981,7 @@ const ballLand: Tpl = (rng) => {
     hint: tx("Set h(t) = 0, divide by −5 and use the pq formula. Then think: which solution makes sense?", "Setz h(t) = 0, teile durch −5 und nimm die pq-Formel. Dann überleg: Welche Lösung ist sinnvoll?"),
     solution: [
       { math: `-5t^2 + ${v}t + ${h0} =#eq 0`, note: tx("Hitting the ground: h(t) = 0.", "Aufschlag: h(t) = 0.") },
-      { math: `t^2 ${p < 0 ? "-" : "+"} ${Math.abs(p)}t ${q < 0 ? "-" : "+"} ${Math.abs(q)} =#eq 0`, note: tx("Divide by −5: normal form.", "Durch −5 teilen: Normalform.") },
+      { math: mb((s) => `${polySrc(s, [1, p, q], "t")} =#eq 0`), note: tx("Divide by −5: normal form.", "Durch −5 teilen: Normalform.") },
       { math: `t_1 =#e1 ${r1} \\quad t_2 =#e2 ${r2}#r`, note: tx("pq formula (or factorise): two solutions.", "pq-Formel (oder faktorisieren): zwei Lösungen.") },
       { math: `t =#e2 ${r2}#r "s"#u`, highlight: ["r", "u"], note: tx(`A negative time lies before the throw, so only t = ${r2} makes sense. **Answer:** after ${r2} s.`, `Eine negative Zeit liegt vor dem Abwurf, sinnvoll ist nur t = ${r2}. **Antwort:** nach ${r2} s.`) },
     ],
@@ -937,13 +1076,13 @@ export function generate3(rng: Rng): Exercise {
 
 const cycleFrames: Frame[] = [
   {
-    math: `A(t)#A =#eq 100#a -#m 8#b t#t`,
+    math: `A(t)#A =#eq \\group{100#a -#m 8#b t#t}`,
     note: tx(
       "**1. Mathematise:** the battery starts at 100 % and loses 8 percentage points every hour. The same amount each hour: a **linear** model. $A(t)$ is the charge after $t$ hours.",
       "**1. Mathematisieren:** Der Akku startet bei 100 % und verliert jede Stunde 8 Prozentpunkte. Jede Stunde gleich viel: ein **lineares** Modell. $A(t)$ ist der Ladestand nach $t$ Stunden.",
     ),
   },
-  { math: `100#a -#m 8#b t#t =#eq 0#z`, note: tx("**2. Solve:** empty means $A(t) = 0$.", "**2. Lösen:** Leer heißt $A(t) = 0$.") },
+  { math: `\\group{100#a -#m 8#b t#t} =#eq 0#z`, note: tx("**2. Solve:** empty means $A(t) = 0$.", "**2. Lösen:** Leer heißt $A(t) = 0$.") },
   { math: mb((s) => `t#t =#eq ${s.m(12.5, "z")}`), note: tx("$100 : 8 = 12.5$.", "$100 : 8 = 12,5$.") },
   {
     math: mb((s) => `t#t =#eq ${s.m(12.5, "z")} "h"#u =#e2 12 "h"#u2 \\; 30 "min"#u3`),
@@ -1018,7 +1157,7 @@ const tableCheck = modelChoiceExercise(
 
 const WATER_OPTS: Opt[] = [
   { text: tx("about 800 litres", "etwa 800 Liter"), title: tx("Only one or two days", "Nur ein, zwei Tage"), say: tx("That's what the whole school drinks in about two days. A school year has about 190 school days.", "So viel trinkt die ganze Schule in etwa zwei Tagen. Ein Schuljahr hat rund 190 Schultage.") },
-  { text: tx("about 8000 litres", "etwa 8000 Liter"), title: tx("Much too little", "Viel zu wenig"), say: tx("That would be only about 10 school days, or 50 ml per day and student. Check each step of your chain.", "Das wären nur etwa 10 Schultage oder 50 ml pro Tag und Person. Prüf jeden Schritt deiner Kette.") },
+  { text: tx("about 8000 litres", "etwa 8000 Liter"), title: tx("Much too little", "Viel zu wenig"), say: tx("That would be only about 20 school days, or 50 ml per day and student. Check each step of your chain.", "Das wären nur etwa 20 Schultage oder 50 ml pro Tag und Person. Prüf jeden Schritt deiner Kette.") },
   { text: tx("about 80 000 litres", "etwa 80.000 Liter") },
   { text: tx("about 800 000 litres", "etwa 800.000 Liter"), title: tx("Much too much", "Viel zu viel"), say: tx("Then every student would drink 5 litres during each school day. Check your assumptions.", "Dann müsste jede Person an jedem Schultag 5 Liter trinken. Prüf deine Annahmen.") },
 ];

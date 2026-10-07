@@ -421,7 +421,7 @@ function decTreeTask(rng: Rng): Exercise {
   if (ask === "both") cands.push({ v: pa + pb1, ...ADDED });
   if (ask === "exact") cands.push({ v: paths[1], ...ONE_PATH }, { v: paths[2], ...ONE_PATH });
   if (ask === "least") {
-    cands.push({ v: pa + pb1, title: tx("Added the branches", "Äste addiert"), say: tx("Adding $P(A)$ and $P(B)$ counts the path where both happen twice. Easier: $1 - P(\\text{neither})$.", "Wenn du $P(A)$ und $P(B)$ addierst, zählst du den Pfad, auf dem beides eintritt, doppelt. Einfacher: $1 - P(\\text{keins})$.") });
+    cands.push({ v: pa + pb1, title: tx("Added the branches", "Äste addiert"), say: tx("You added the two upper branches. But an event is made of whole paths: multiply along each path that fits, then add the paths. Easier: $1 - P(\\text{neither})$.", "Du hast die beiden oberen Äste addiert. Ein Ereignis besteht aber aus ganzen Pfaden: Multipliziere entlang jedes passenden Pfades, dann addiere die Pfade. Einfacher: $1 - P(\\text{keins})$.") });
     cands.push({ v: paths[1] + paths[2], title: tx("“Both” forgotten", "„Beide“ vergessen"), say: tx("At least one includes the path where **both** happen.", "Mindestens eins schließt den Pfad mit ein, auf dem **beides** eintritt.") });
   }
   if (ask === "none") cands.push({ v: 1 - paths[0], title: tx("Wrong complement", "Falsches Gegenereignis"), say: tx("$1 - P(A \\text{ and } B)$ is “not both”. “Neither” is only the bottom path.", "$1 - P(A \\text{ und } B)$ heißt „nicht beide“. „Keins von beiden“ ist nur der unterste Pfad.") });
@@ -755,8 +755,8 @@ export const level2: LevelLesson = {
       title: tx("The complement and “at least once”", "Gegenereignis und „mindestens einmal“"),
       blob: tx("At least once? Think about never!", "Mindestens einmal? Denk an nie!"),
       body: tx(
-        "The **complementary event** happens exactly when $E$ doesn't. Together they have the probability $1$, so $P(E) = 1 - P(\\text{not } E)$. For “at least once” the complement is “never”, and that's just one path.",
-        "Das **Gegenereignis** tritt genau dann ein, wenn $E$ nicht eintritt. Zusammen haben beide die Wahrscheinlichkeit $1$, also $P(E) = 1 - P(\\text{nicht } E)$. Bei „mindestens einmal“ ist das Gegenereignis „nie“, und das ist nur ein Pfad.",
+        "The **complementary event** $\\overline{E}$ (say “not E”) happens exactly when $E$ doesn't. Together they have the probability $1$, so $P(\\overline{E}) = 1 - P(E)$ and $P(E) = 1 - P(\\overline{E})$. For “at least once” the complement is “never”, and that's just one path.",
+        "Das **Gegenereignis** $\\overline{E}$ (sprich „E quer“) tritt genau dann ein, wenn $E$ nicht eintritt. Zusammen haben beide die Wahrscheinlichkeit $1$, also $P(\\overline{E}) = 1 - P(E)$ und $P(E) = 1 - P(\\overline{E})$. Bei „mindestens einmal“ ist das Gegenereignis „nie“, und das ist nur ein Pfad.",
       ),
       frames: atLeast,
     },
@@ -799,8 +799,8 @@ export const level2: LevelLesson = {
     },
     {
       title: tx("Complement and “at least once”", "Gegenereignis und „mindestens einmal“"),
-      body: tx("$P(E) = 1 - P(\\text{not } E)$. At least once $= 1 -$ never.", "$P(E) = 1 - P(\\text{nicht } E)$. Mindestens einmal $= 1 -$ nie."),
-      examples: [tx(`P("at least one 6 in 3 rolls") = 1 - (\\frac{5}{6})^3 = \\frac{91}{216}`, `P("mind. eine 6 bei 3 Würfen") = 1 - (\\frac{5}{6})^3 = \\frac{91}{216}`)],
+      body: tx("The complement $\\overline{E}$ happens exactly when $E$ doesn't. At least once $= 1 -$ never.", "Das Gegenereignis $\\overline{E}$ tritt genau dann ein, wenn $E$ nicht eintritt. Mindestens einmal $= 1 -$ nie."),
+      examples: ["P(\\overline{E}) = 1 - P(E)", tx(`P("at least one 6 in 3 rolls") = 1 - (\\frac{5}{6})^3 = \\frac{91}{216}`, `P("mind. eine 6 bei 3 Würfen") = 1 - (\\frac{5}{6})^3 = \\frac{91}{216}`)],
       tone: "rule",
     },
     {

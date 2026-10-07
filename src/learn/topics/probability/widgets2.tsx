@@ -165,15 +165,33 @@ export function ProbabilityAtLeastOnce() {
   const [c, d] = KINDS[kind].p;
   const q = (d - c) / d;
   const at = (k: number) => 1 - pow(q, k);
-  const half = Array.from({ length: NMAX }, (_, i) => i + 1).find((k) => at(k) >= 0.5) ?? NMAX;
+  // "More likely than not" needs more than 50 %: one coin toss gives exactly 50 %.
+  const half = Array.from({ length: NMAX }, (_, i) => i + 1).find((k) => at(k) > 0.5) ?? NMAX;
   const W = 560;
-  const H = 230;
-  const x0 = 40;
+  const H = 240;
+  const x0 = 56;
   const plotW = W - x0 - 12;
   const bw = plotW / NMAX;
-  const y = (v: number) => 18 + (1 - Math.min(v, 1.15) / 1.15) * (H - 52);
+  const TOP = 1.15;
+  const y = (v: number) => 18 + (1 - Math.min(v, TOP) / TOP) * (H - 56);
   const naive = (k: number) => (k * c) / d;
   const over = Array.from({ length: NMAX }, (_, i) => i + 1).find((k) => naive(k) > 1);
+  // The n · p line ends where it leaves the chart (at 115 %), with an arrow: it keeps on rising.
+  const kx = (k: number) => x0 + (k - 0.5) * bw;
+  const kTop = (TOP * d) / c;
+  const linePts = Array.from({ length: NMAX }, (_, i) => i + 1)
+    .filter((k) => naive(k) <= TOP)
+    .map((k) => [kx(k), y(naive(k))]);
+  if (kTop < NMAX) linePts.push([kx(kTop), y(TOP)]);
+  const [ex, ey] = linePts[linePts.length - 1];
+  const [px, py] = linePts[linePts.length - 2] ?? [ex - 10, ey + 10];
+  const len = Math.sqrt((ex - px) ** 2 + (ey - py) ** 2) || 1;
+  const [ux, uy] = [(ex - px) / len, (ey - py) / len];
+  const arrow = [
+    [ex + 3 * ux, ey + 3 * uy],
+    [ex - 7 * ux - 4.5 * uy, ey - 7 * uy + 4.5 * ux],
+    [ex - 7 * ux + 4.5 * uy, ey - 7 * uy - 4.5 * ux],
+  ];
   const pct = (v: number) => `${num(v * 100, 1)}${locale === "de" ? " %" : "%"}`;
   const ev = t(KINDS[kind].event);
 
@@ -191,8 +209,9 @@ export function ProbabilityAtLeastOnce() {
         {[0, 0.25, 0.5, 0.75, 1].map((v) => (
           <g key={v}>
             <line x1={x0} x2={W - 12} y1={y(v)} y2={y(v)} stroke={v === 1 ? "var(--ink-3)" : "var(--line)"} strokeWidth={v === 1 ? 1.4 : 1} />
-            <text x={x0 - 6} y={y(v) + 4} textAnchor="end" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
-              {Math.round(v * 100)}%
+            <text x={x0 - 6} y={y(v) + 4} textAnchor="end" fontSize={11} fill="var(--ink-3)" className="max-sm:text-[17px]" style={{ fontFamily: "var(--font-sans)" }}>
+              {Math.round(v * 100)}
+              {locale === "de" ? " %" : "%"}
             </text>
           </g>
         ))}
@@ -212,7 +231,7 @@ export function ProbabilityAtLeastOnce() {
                 opacity={on ? 1 : k < n ? 0.45 : 0.22}
               />
               {(k === 1 || k % 5 === 0) && (
-                <text x={x0 + (k - 0.5) * bw} y={H - 18} textAnchor="middle" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                <text x={x0 + (k - 0.5) * bw} y={H - 20} textAnchor="middle" fontSize={11} fill="var(--ink-3)" className="max-sm:text-[17px]" style={{ fontFamily: "var(--font-sans)" }}>
                   {k}
                 </text>
               )}
@@ -220,19 +239,14 @@ export function ProbabilityAtLeastOnce() {
           );
         })}
         {/* the tempting wrong rule n · p */}
-        <polyline
-          points={Array.from({ length: NMAX }, (_, i) => `${(x0 + (i + 0.5) * bw).toFixed(1)},${y(naive(i + 1)).toFixed(1)}`).join(" ")}
-          fill="none"
-          stroke="var(--danger)"
-          strokeWidth={2}
-          strokeDasharray="6 4"
-        />
+        <polyline points={linePts.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")} fill="none" stroke="var(--danger)" strokeWidth={2} strokeDasharray="6 4" />
+        {kTop < NMAX && <polygon points={arrow.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")} fill="var(--danger)" />}
         {over && (
-          <text x={Math.min(x0 + (over - 0.5) * bw + 10, W - 160)} y={y(1.15) + 17} fontSize={12} fill="var(--danger)" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+          <text x={Math.min(kx(over) + 14, W - 230)} y={y(TOP) + 18} fontSize={12} fill="var(--danger)" className="max-sm:text-[17px]" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
             {t(tx("n · p > 1: impossible!", "n · p > 1: unmöglich!"))}
           </text>
         )}
-        <text x={W - 12} y={H - 2} textAnchor="end" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+        <text x={W - 12} y={H - 2} textAnchor="end" fontSize={11} fill="var(--ink-3)" className="max-sm:text-[16px]" style={{ fontFamily: "var(--font-sans)" }}>
           {t(tx("number of tries n", "Anzahl der Versuche n"))}
         </text>
       </svg>
@@ -246,12 +260,16 @@ export function ProbabilityAtLeastOnce() {
           </div>
         </div>
         <div className="rounded-xl border border-line bg-surface px-4 py-3">
-          <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-danger">{t(tx("Wrong: adding", "Falsch: addieren"))}</div>
+          <div className={cn("mb-1 text-[12px] font-semibold uppercase tracking-[0.06em]", n === 1 ? "text-ink-3" : "text-danger")}>
+            {n === 1 ? t(tx("Adding: n · p", "Addieren: n · p")) : t(tx("Wrong: adding", "Falsch: addieren"))}
+          </div>
           <MathView src={`${n} \\cdot ${fracSrc(c, d)} ${naive(n) > 1 ? ">" : Number.isInteger(Math.round(naive(n) * 1e6) / 1e3) ? "=" : "\\approx"} ${naive(n) > 1 ? "1" : num(naive(n), 3)}`} size="md" animate={false} className="text-ink-2" />
           <div className="mt-1 text-[13px] text-ink-2">
-            {naive(n) > 1
-              ? t(tx("More than 1? No probability can be that big.", "Mehr als 1? So groß kann keine Wahrscheinlichkeit sein."))
-              : t(tx("Too big: paths with several hits get counted more than once.", "Zu groß: Pfade mit mehreren Treffern werden mehrfach gezählt."))}
+            {n === 1
+              ? t(tx("1 · p = p: with a single try that's still right. From two tries on, adding goes wrong.", "1 · p = p: Bei einem Versuch stimmt das noch. Ab zwei Versuchen geht Addieren schief."))
+              : naive(n) > 1
+                ? t(tx("More than 1? No probability can be that big.", "Mehr als 1? So groß kann keine Wahrscheinlichkeit sein."))
+                : t(tx("Too big: paths with several hits get counted more than once.", "Zu groß: Pfade mit mehreren Treffern werden mehrfach gezählt."))}
           </div>
         </div>
       </div>

@@ -493,7 +493,7 @@ function build(s: FigureSpec): Prim[] {
         if (s.lr) out.push({ t: "label", text: s.lr, at: [0, h + E * r], dir: UP, tone: "blob" });
       } else {
         out.push({ t: "poly", pts: [[0, h], [r, h]], stroke: "blob" }, { t: "dot", at: [0, h] });
-        if (s.lr) out.push({ t: "label", text: s.lr, at: [r / 2, h], dir: UP, tone: "blob", dist: 3 });
+        if (s.lr) out.push({ t: "label", text: s.lr, at: [r / 2, h + E * r], dir: UP, tone: "blob", dist: 3 });
       }
       if (s.lh) out.push({ t: "label", text: s.lh, at: [r, h / 2], dir: RIGHT });
       return out;
@@ -547,7 +547,7 @@ function build(s: FigureSpec): Prim[] {
       if (s.diameter) out.push({ t: "poly", pts: [[-r, 0], [r, 0]], stroke: "blob" });
       else out.push({ t: "poly", pts: [[0, 0], [r, 0]], stroke: "blob" });
       out.push({ t: "dot", at: [0, 0], tone: "blob" });
-      out.push({ t: "label", text: s.lr, at: s.diameter ? [0, 0] : [r / 2, 0], dir: UP, tone: "blob", dist: 4 });
+      out.push({ t: "label", text: s.lr, at: [s.diameter ? 0 : r / 2, E * r], dir: UP, tone: "blob", dist: 3 });
       return out;
     }
     case "cylcone": {
@@ -555,7 +555,8 @@ function build(s: FigureSpec): Prim[] {
       const out = cylinderShape(r, h1, "front");
       out.push(...coneShape(h1, r, h2, false));
       out.push({ t: "poly", pts: [[0, 0], [r, 0]], stroke: "blob" }, { t: "dot", at: [0, 0], tone: "blob" });
-      out.push({ t: "label", text: s.lr, at: [r / 2, 0], dir: UP, tone: "blob", dist: 3 });
+      // Below the solid: inside, the label would cross the dashed back rim or the rim on top.
+      out.push({ t: "label", text: s.lr, at: [r / 2, -E * r], dir: DOWN, tone: "blob", dist: 3 });
       out.push(dimLine([r + 0.25 * r, 0], [r + 0.25 * r, h1], s.lh1, RIGHT));
       out.push({ t: "poly", pts: [[0, h1], [0, h1 + h2]], stroke: "hiddenBlob" });
       out.push(dimLine([-r - 0.25 * r, h1], [-r - 0.25 * r, h1 + h2], s.lh2, LEFT));
@@ -566,7 +567,8 @@ function build(s: FigureSpec): Prim[] {
       const out = cylinderShape(r, h1, "front");
       out.push(...domeShape(h1, r));
       out.push({ t: "poly", pts: [[0, 0], [r, 0]], stroke: "blob" }, { t: "dot", at: [0, 0], tone: "blob" });
-      out.push({ t: "label", text: s.lr, at: [r / 2, 0], dir: UP, tone: "blob", dist: 3 });
+      // Below the solid: inside, the label would cross the dashed back rim or the rim on top.
+      out.push({ t: "label", text: s.lr, at: [r / 2, -E * r], dir: DOWN, tone: "blob", dist: 3 });
       out.push(dimLine([r + 0.25 * r, 0], [r + 0.25 * r, h1], s.lh1, RIGHT));
       return out;
     }
@@ -575,7 +577,7 @@ function build(s: FigureSpec): Prim[] {
       const out = coneShape(h, r, -h, false);
       out.push(...domeShape(h, r), ...baseEllipse(h, r));
       out.push({ t: "poly", pts: [[0, h], [r, h]], stroke: "blob" }, { t: "dot", at: [0, h], tone: "blob" });
-      out.push({ t: "label", text: s.lr, at: [r / 2, h], dir: UP, tone: "blob", dist: 3 });
+      out.push({ t: "label", text: s.lr, at: [r, h], dir: RIGHT, tone: "blob", dist: 4 });
       out.push(dimLine([-r - 0.25 * r, 0], [-r - 0.25 * r, h], s.lh, LEFT));
       return out;
     }

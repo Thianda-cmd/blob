@@ -17,11 +17,15 @@ const CALC = tx("Calculate", "Berechne");
 // Sign-rule feedback, shared by many task shapes.
 
 const SIGN_TITLE = tx("Check the sign", "Prüf das Vorzeichen");
-function signSay(negs: number): Text {
+function signSay(negs: number, divide = false): Text {
   if (negs === 2)
-    return tx("Minus times minus is **plus**! Two negative numbers give a positive result.", "Minus mal minus ergibt **plus**! Zwei negative Zahlen ergeben ein positives Ergebnis.");
+    return divide
+      ? tx("Minus divided by minus is **plus**! Two negative numbers give a positive result.", "Minus durch minus ergibt **plus**! Zwei negative Zahlen ergeben ein positives Ergebnis.")
+      : tx("Minus times minus is **plus**! Two negative numbers give a positive result.", "Minus mal minus ergibt **plus**! Zwei negative Zahlen ergeben ein positives Ergebnis.");
   if (negs === 1)
-    return tx("Plus times minus is **minus**: if exactly one number is negative, the result is negative.", "Plus mal minus ergibt **minus**: Ist genau eine Zahl negativ, ist das Ergebnis negativ.");
+    return divide
+      ? tx("Minus divided by plus, or plus divided by minus, is **minus**: if exactly one number is negative, the result is negative.", "Minus durch plus oder plus durch minus ergibt **minus**: Ist genau eine Zahl negativ, ist das Ergebnis negativ.")
+      : tx("Plus times minus is **minus**: if exactly one number is negative, the result is negative.", "Plus mal minus ergibt **minus**: Ist genau eine Zahl negativ, ist das Ergebnis negativ.");
   return tx(
     `Count the minus signs again: there are ${negs}. Every pair makes a plus. Is ${negs} even or odd?`,
     `Zähl die Minuszeichen noch mal: Es sind ${negs}. Jedes Paar ergibt ein Plus. Ist ${negs} gerade oder ungerade?`,
@@ -65,7 +69,7 @@ function twoFactorTask(rng: Rng): Exercise {
       },
     ],
     mistakes: numberMistakes(right, [
-      { v: -right, title: SIGN_TITLE, say: signSay(negs) },
+      { v: -right, title: SIGN_TITLE, say: signSay(negs, divide) },
       !divide && {
         v: first + second,
         title: tx("Added instead of multiplied", "Addiert statt multipliziert"),
@@ -311,7 +315,7 @@ function decimalTask(rng: Rng): Exercise {
     const right = evaluate(root);
     if (!hasNeg(root) || Math.abs(right) > 50 || r9(right * 100) % 1 !== 0 || right === 0) continue;
     const slips: Slip[] = [];
-    if (root.t === "op" && (root.op === "*" || root.op === ":")) slips.push({ v: -right, title: SIGN_TITLE, say: signSay((evaluate(root.l) < 0 ? 1 : 0) + (evaluate(root.r) < 0 ? 1 : 0)) });
+    if (root.t === "op" && (root.op === "*" || root.op === ":")) slips.push({ v: -right, title: SIGN_TITLE, say: signSay((evaluate(root.l) < 0 ? 1 : 0) + (evaluate(root.r) < 0 ? 1 : 0), root.op === ":") });
     if (root.t === "op" && (root.op === "+" || root.op === "-") && root.l.t === "n" && root.r.t === "n") {
       const a = root.l.v;
       const b = root.op === "+" ? root.r.v : -root.r.v;
@@ -382,7 +386,7 @@ function fractionTask(rng: Rng): Exercise {
       frames.push({ math: `${neg ? "-" : ""}\\frac{${Math.abs(a.n)} \\cdot ${Math.abs(bb.n)}}{${a.d} \\cdot ${bb.d}}`, note: neg ? tx("Different signs: the result is negative.", "Verschiedene Vorzeichen: Das Ergebnis ist negativ.") : tx("Same signs: the result is positive.", "Gleiche Vorzeichen: Das Ergebnis ist positiv.") });
       const reducible = gcdInt(top, bottom) !== 1;
       frames.push({ math: `${neg ? "-" : ""}\\frac{${top}}{${bottom}}${reducible ? ` = ${fsrc(r)}` : ""}`, note: reducible ? tx("Multiply, then reduce the fraction.", "Multiplizieren, dann den Bruch kürzen.") : tx("Multiply. The fraction can't be reduced.", "Multiplizieren. Kürzen geht hier nicht.") });
-      slips.push({ v: frac(-r.n, r.d), title: SIGN_TITLE, say: signSay((a.n < 0 ? 1 : 0) + (b.n < 0 ? 1 : 0)) });
+      slips.push({ v: frac(-r.n, r.d), title: SIGN_TITLE, say: signSay((a.n < 0 ? 1 : 0) + (b.n < 0 ? 1 : 0), kind === "div") });
       if (kind === "div") {
         const m = mul(a, b);
         slips.push({ v: m, title: tx("No reciprocal", "Kehrwert vergessen"), say: tx("To divide by a fraction, multiply by its **reciprocal**: flip the second fraction first.", "Durch einen Bruch teilst du, indem du mit dem **Kehrwert** malnimmst: Dreh zuerst den zweiten Bruch um.") });
@@ -403,7 +407,17 @@ function fractionTask(rng: Rng): Exercise {
       });
       const naive = frac(kind === "add" ? a.n + b.n : a.n - b.n, a.d + b.d);
       if (naive.n !== 0) slips.push({ v: naive, title: tx("Added the denominators", "Nenner addiert"), say: tx("Oh no, you added the denominators too! Bring both fractions to a common denominator first, then only the numerators are added.", "Oh nein, du hast auch die Nenner addiert! Bring beide Brüche zuerst auf den Hauptnenner, dann werden nur die Zähler verrechnet.") });
-      slips.push({ v: frac(-r.n, r.d), title: SIGN_TITLE, say: tx("Check the sign of the numerator: which part is bigger, the negative or the positive one?", "Prüf das Vorzeichen im Zähler: Welcher Teil ist größer, der negative oder der positive?") });
+      const eff = kind === "add" ? bn2 : -bn2;
+      slips.push({
+        v: frac(-r.n, r.d),
+        title: SIGN_TITLE,
+        say:
+          an2 < 0 && eff < 0
+            ? tx("Both parts are negative, so the result is negative too.", "Beide Teile sind negativ, also ist auch das Ergebnis negativ.")
+            : an2 > 0 && eff > 0
+              ? tx("Minus a negative number means plus: both parts are positive, so the result is positive too.", "Minus eine negative Zahl heißt plus: Beide Teile sind positiv, also ist auch das Ergebnis positiv.")
+              : tx("Check the sign of the numerator: which part is bigger, the negative or the positive one?", "Prüf das Vorzeichen im Zähler: Welcher Teil ist größer, der negative oder der positive?"),
+      });
     }
     const mistakes: Mistake[] = [];
     const seen = [r.n / r.d];
@@ -471,9 +485,10 @@ function storyTask(rng: Rng): Exercise {
     };
   }
   if (kind === "drop") {
-    const t0 = rng.int(-4, 12);
-    const k = rng.int(2, 5);
+    // A cold evening: 2 or 3 degrees per hour, and below zero at the end.
+    const k = rng.int(2, 3);
     const h = rng.int(2, 6);
+    const t0 = rng.int(-4, Math.min(12, k * h - 1));
     const r = t0 - k * h;
     return {
       instruction,
@@ -747,7 +762,7 @@ export const level2: LevelLesson = {
         "Für negative Zahlen ändern sich die Regeln nicht: zuerst **Klammern**, dann **Potenzen**, dann **Punktrechnung** ($\\cdot$ und $:$) und erst danach **Strichrechnung** ($+$ und $-$).",
       ),
       frames: [
-        ...solveFrames(opsExample, tx("Which operation comes first?", "Welche Rechnung kommt zuerst?"), tx("From left to right you would get $1 \\cdot (-2) = -2$: wrong!", "Von links nach rechts käme $1 \\cdot (-2) = -2$ heraus: falsch!")),
+        ...solveFrames(opsExample, tx("Which operation comes first?", "Welche Rechnung kommt zuerst?"), tx("If you had simply gone in order, ignoring point before line, you would get $1 \\cdot (-2) = -2$: wrong!", "Hättest du stur der Reihe nach gerechnet (ohne Punkt vor Strich), käme $1 \\cdot (-2) = -2$ heraus: falsch!")),
         { math: "(-3 + 4)#br \\cdot (-2) = 1 \\cdot (-2) = -2", note: tx("With brackets it's different: the bracket comes first.", "Mit Klammern ist es anders: Die Klammer kommt zuerst.") },
         { math: "2 - (-3)^2 = 2 - 9 = -7", note: tx("Powers before point and line: $(-3)^2 = (-3) \\cdot (-3) = 9$.", "Potenzen vor Punkt und Strich: $(-3)^2 = (-3) \\cdot (-3) = 9$.") },
       ],

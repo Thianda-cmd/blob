@@ -16,7 +16,7 @@ import { NumStepper, Segmented, spring } from "./ui";
 type Mode = "square" | "cube";
 
 const MAX: Record<Mode, number> = { square: 10, cube: 6 };
-const W = 260;
+const W = 276;
 const H = 250;
 const SQ = 22; // side of one small square
 const CU = 19; // edge of one small cube
@@ -26,7 +26,8 @@ const S30 = sin(Math.PI / 6);
 const smooth = { type: "spring" as const, stiffness: 240, damping: 28 };
 
 function SquarePicture({ n }: { n: number }) {
-  const ox = (W - 10 * SQ) / 2;
+  // shifted right so a two-digit side label fits on the left
+  const ox = (W - 10 * SQ) / 2 + 8;
   const bottom = H - 22;
   const cells = Array.from({ length: n * n }, (_, i) => ({ i: i % n, j: Math.floor(i / n) }));
   return (

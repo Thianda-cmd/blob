@@ -424,7 +424,7 @@ function compositeTask(rng: Rng): Exercise {
     const w = rng.int(2, 12);
     A = w * w - (PI * w * w) / 4;
     fig = { kind: "quarter", w, lw: L(w) };
-    hint = tx("The square minus a quarter circle with radius $a$.", "Das Quadrat minus einen Viertelkreis mit dem Radius $a$.");
+    hint = tx("The square minus a quarter circle. Its radius is the side of the square.", "Das Quadrat minus einen Viertelkreis. Sein Radius ist die Quadratseite.");
     frames = [
       { math: tx('A#A =#e A_{"square"}#a1 -#p A_{"quarter"}#a2', 'A#A =#e A_{"Quadrat"}#a1 -#p A_{"Viertelkreis"}#a2'), note: tx("The shaded part is what's left of the square after cutting out a quarter circle.", "Die gefärbte Fläche ist der Rest des Quadrats, wenn man einen Viertelkreis herausschneidet.") },
       { math: `A#A =#e ${w}#w^{2#s1} -#p \\frac{1}{4}#qf \\cdot#m2 \\pi#pi \\cdot#m ${w}#r^{2#sq}`, note: tx("The radius of the quarter circle is the side of the square.", "Der Radius des Viertelkreises ist die Quadratseite.") },
@@ -519,6 +519,42 @@ function prismTask(rng: Rng): Exercise {
   };
 }
 
+const PRISM_O = tx("Find the surface area of the prism", "Berechne die Oberfläche des Prismas");
+
+function prismSurfaceTask(rng: Rng): Exercise {
+  const unit = rng.pick(["cm", "m", "cm"]);
+  const u2 = `${unit}²`;
+  // A lying prism whose base is a right triangle with whole sides.
+  const [a, b, c] = rng.pick(TRIPLES.filter((t) => t[0] <= 12 && t[1] <= 12));
+  const L = rng.int(3, 12);
+  const G = (a * b) / 2;
+  const per = a + b + c;
+  const M = per * L;
+  const O = 2 * G + M;
+  const m = mistakeList(exact(O, u2, "O ="));
+  m.add(G + M, tx("One base missing", "Eine Grundfläche fehlt"), tx("A prism has **two** triangles, front and back: $O = 2 \\cdot G + M$.", "Ein Prisma hat **zwei** Dreiecke, vorne und hinten: $O = 2 \\cdot G + M$."));
+  m.add(M, tx("Only the rectangles", "Nur die Rechtecke"), tx("That's the lateral surface $M$. Add the two triangles too.", "Das ist der Mantel $M$. Dazu kommen noch die beiden Dreiecke."));
+  m.add(2 * a * b + M, tx("Triangle not halved", "Dreieck nicht halbiert"), tx("The base is a triangle: $G = \\frac{a \\cdot b}{2}$. Don't forget the halving.", "Die Grundfläche ist ein Dreieck: $G = \\frac{a \\cdot b}{2}$. Vergiss das Halbieren nicht."));
+  m.add(2 * G + (a + b) * L, tx("Slanted face missing", "Schräge Fläche vergessen"), tx(`The lateral surface has **three** rectangles, one for each side of the triangle. The slanted one (${c} ${unit}) counts too.`, `Der Mantel hat **drei** Rechtecke, eins für jede Dreiecksseite. Das schräge (${c} ${unit}) zählt auch.`));
+  m.add(G * L, tx("Volume instead of surface", "Volumen statt Oberfläche"), tx("$G \\cdot h_K$ is the volume. The surface is the two triangles plus the rectangles around them.", "$G \\cdot h_K$ ist das Volumen. Die Oberfläche sind die beiden Dreiecke plus die Rechtecke rundherum."));
+  return {
+    instruction: PRISM_O,
+    text: tx("The prism lies on one of its faces. Its base is a right triangle.", "Das Prisma liegt auf einer Seitenfläche. Seine Grundfläche ist ein rechtwinkliges Dreieck."),
+    visual: figure({ kind: "prism", g: a, ht: b, px: 0, L, lg: `${a} ${unit}`, lht: `${b} ${unit}`, lL: `h_K = ${L} ${unit}`, ls: `${c} ${unit}`, sideS: 1 }),
+    answer: exact(O, u2, "O ="),
+    hint: tx("Two triangles plus three rectangles: $O = 2 \\cdot G + M$ with $M = u \\cdot h_K$.", "Zwei Dreiecke plus drei Rechtecke: $O = 2 \\cdot G + M$ mit $M = u \\cdot h_K$."),
+    solution: [
+      { math: "O#O =#e 2#k \\cdot#m G#G +#p M#M", note: tx("Surface area: two bases (the triangles) plus the lateral surface $M$ (the rectangles).", "Oberfläche: zwei Grundflächen (die Dreiecke) plus der Mantel $M$ (die Rechtecke).") },
+      { math: `G#G =#e \\frac{${a}#a \\cdot#m2 ${b}#b}{2#two}#fr =#e2 ${G}#gv ${q(u2)}#u2`, note: tx("A right triangle: leg times leg, divided by 2.", "Ein rechtwinkliges Dreieck: Kathete mal Kathete durch 2.") },
+      { math: `u#u =#e ${a}#a +#p ${b}#b +#p2 ${c}#c =#e2 ${per}#uv ${q(unit)}#un`, note: tx("The perimeter of the triangle: all three sides.", "Der Umfang des Dreiecks: alle drei Seiten.") },
+      { math: `M#M =#e ${per}#uv \\cdot#m ${L}#h =#e2 ${M}#mv ${q(u2)}#u2`, note: tx("Unfolded, the three rectangles make one long rectangle: perimeter times $h_K$.", "Aufgeklappt ergeben die drei Rechtecke ein langes Rechteck: Umfang mal $h_K$.") },
+      { math: `O#O =#e 2#k \\cdot#m ${G}#gv +#p ${M}#mv`, note: tx("Put both into the formula.", "Beides in die Formel einsetzen.") },
+      { math: `O#O =#e ${O}#gv ${q(u2)}#u`, note: tx(`$2 \\cdot ${G} = ${2 * G}$, plus ${M}. Done!`, `$2 \\cdot ${G} = ${2 * G}$, plus ${M}. Fertig!`) },
+    ],
+    mistakes: m.list,
+  };
+}
+
 function cylinderTask(rng: Rng): Exercise {
   const r = rng.pick([2, 3, 4, 5, 6, 8, 10, 1.5, 2.5]);
   const h = rng.pick([3, 4, 5, 6, 8, 10, 12, 15, 20]);
@@ -589,7 +625,37 @@ const FORMULAS: Fm[] = [
   { id: "cylM", name: tx("Cylinder: curved surface", "Zylinder: Mantel"), f: "$M = 2 \\pi r h$" },
   { id: "prism", name: tx("Prism: volume", "Prisma: Volumen"), f: "$V = G \\cdot h$" },
 ];
-const DISTRACTORS: Text[] = ["$A = g \\cdot h \\cdot 2$", "$A = 2 \\pi r^2$", "$V = \\frac{1}{3} G \\cdot h$", "$u = \\pi r^2$"];
+/** A wrong formula, and Blob's note for each shape a student may wrongly match it with. */
+type Distractor = { f: Text; wrongFor: { id: string; title: Text; say: Text }[] };
+const DISTRACTORS: Distractor[] = [
+  {
+    f: "$A = g \\cdot h \\cdot 2$",
+    wrongFor: [
+      { id: "tri", title: tx("Doubled instead of halved", "Verdoppelt statt halbiert"), say: tx("A triangle is **half** a parallelogram: divide $g \\cdot h$ by 2, don't multiply.", "Ein Dreieck ist ein **halbes** Parallelogramm: $g \\cdot h$ durch 2 teilen, nicht mal 2 nehmen.") },
+      { id: "para", title: tx("A factor 2 too many", "Ein Faktor 2 zu viel"), say: tx("A parallelogram is simply base times height: $A = g \\cdot h$.", "Ein Parallelogramm ist einfach Grundseite mal Höhe: $A = g \\cdot h$.") },
+    ],
+  },
+  {
+    f: "$A = 2 \\pi r^2$",
+    wrongFor: [
+      { id: "circA", title: tx("Formulas mixed up", "Formeln vermischt"), say: tx("The area of a circle is $\\pi r^2$. The 2 belongs to the circumference $2 \\pi r$.", "Der Flächeninhalt des Kreises ist $\\pi r^2$. Die 2 gehört zum Umfang $2 \\pi r$.") },
+    ],
+  },
+  {
+    f: "$V = \\frac{1}{3} G \\cdot h$",
+    wrongFor: [
+      { id: "prism", title: tx("The third belongs to pyramids", "Das Drittel gehört zur Pyramide"), say: tx("$\\frac{1}{3}$ is for pointed solids (pyramid, cone). A prism is simply $G \\cdot h$.", "$\\frac{1}{3}$ gehört zu spitzen Körpern (Pyramide, Kegel). Ein Prisma ist einfach $G \\cdot h$.") },
+      { id: "cylV", title: tx("The third belongs to cones", "Das Drittel gehört zum Kegel"), say: tx("$\\frac{1}{3}$ is for pointed solids (pyramid, cone). A cylinder is base times height: $V = \\pi r^2 h$.", "$\\frac{1}{3}$ gehört zu spitzen Körpern (Pyramide, Kegel). Ein Zylinder ist Grundfläche mal Höhe: $V = \\pi r^2 h$.") },
+    ],
+  },
+  {
+    f: "$u = \\pi r^2$",
+    wrongFor: [
+      { id: "circU", title: tx("Circumference with r²", "Umfang mit r²"), say: tx("$r^2$ gives square units, so $\\pi r^2$ is an area. The circumference is a length: $u = 2 \\pi r$.", "$r^2$ ergibt Quadrateinheiten, $\\pi r^2$ ist also eine Fläche. Der Umfang ist eine Länge: $u = 2 \\pi r$.") },
+      { id: "circA", title: tx("Look at the letter", "Schau auf den Buchstaben"), say: tx("$u$ stands for the circumference. The area of a circle is $A = \\pi r^2$.", "$u$ steht für den Umfang. Den Flächeninhalt schreibst du $A = \\pi r^2$.") },
+    ],
+  },
+];
 
 function matchFormulaTask(rng: Rng): Exercise {
   const chosen = rng.shuffle(FORMULAS).slice(0, 4);
@@ -597,15 +663,18 @@ function matchFormulaTask(rng: Rng): Exercise {
   const extra = rng.pick(DISTRACTORS);
   const wrong: { pairs: [Text, Text][]; title: Text; say: Text }[] = [];
   if (has("tri") && has("para")) wrong.push({ pairs: [[has("tri")!.name, has("para")!.f]], title: tx("Triangle without the half", "Dreieck ohne Hälfte"), say: tx("A triangle is **half** a parallelogram: $\\frac{g \\cdot h}{2}$.", "Ein Dreieck ist ein **halbes** Parallelogramm: $\\frac{g \\cdot h}{2}$.") });
-  if (has("circA") && has("circU")) wrong.push({ pairs: [[has("circA")!.name, has("circU")!.f]], title: tx("Area and circumference swapped", "Fläche und Umfang vertauscht"), say: tx("$r^2$ belongs to the **area** (square units), $2 \\pi r$ to the circumference (a length).", "$r^2$ gehört zur **Fläche** (Quadrat-Einheiten), $2 \\pi r$ zum Umfang (eine Länge).") });
+  if (has("circA") && has("circU")) wrong.push({ pairs: [[has("circA")!.name, has("circU")!.f]], title: tx("Area and circumference swapped", "Fläche und Umfang vertauscht"), say: tx("$r^2$ belongs to the **area** (square units), $2 \\pi r$ to the circumference (a length).", "$r^2$ gehört zur **Fläche** (Quadrateinheiten), $2 \\pi r$ zum Umfang (eine Länge).") });
   if (has("cylV") && has("cylM")) wrong.push({ pairs: [[has("cylV")!.name, has("cylM")!.f]], title: tx("Volume and curved surface swapped", "Volumen und Mantel vertauscht"), say: tx("The volume is base times height: $\\pi r^2 \\cdot h$. $2 \\pi r h$ is the unrolled curved surface.", "Das Volumen ist Grundfläche mal Höhe: $\\pi r^2 \\cdot h$. $2 \\pi r h$ ist der abgerollte Mantel.") });
-  if (has("prism")) wrong.push({ pairs: [[has("prism")!.name, extra]], title: tx("The third belongs to pyramids", "Das Drittel gehört zur Pyramide"), say: tx("$\\frac{1}{3}$ is for pointed solids (pyramid, cone). A prism is simply $G \\cdot h$.", "$\\frac{1}{3}$ gehört zu spitzen Körpern (Pyramide, Kegel). Ein Prisma ist einfach $G \\cdot h$.") });
-  const m = matchTask(chosen.map((c) => [c.name, c.f] as [Text, Text]), [extra], wrong);
+  for (const w of extra.wrongFor) {
+    const c = has(w.id);
+    if (c) wrong.push({ pairs: [[c.name, extra.f]], title: w.title, say: w.say });
+  }
+  const m = matchTask(chosen.map((c) => [c.name, c.f] as [Text, Text]), [extra.f], wrong);
   return {
     instruction: tx("Match the formulas", "Ordne die Formeln zu"),
     text: tx("Which formula belongs to which shape? One formula is left over.", "Welche Formel gehört zu welcher Figur? Eine Formel bleibt übrig."),
     answer: m.answer,
-    hint: tx("Areas have a squared length, volumes three lengths multiplied, a circumference only one length.", "Flächen haben eine quadrierte Länge, Volumen drei Längen mal genommen, ein Umfang nur eine Länge."),
+    hint: tx("Areas have a squared length, volumes three lengths multiplied, a circumference only one length.", "Flächen haben eine quadrierte Länge, Volumen drei Längen malgenommen, ein Umfang nur eine Länge."),
     solution: chosen.map((c, i) => ({
       math: E(c.f).slice(1, -1),
       note: i === chosen.length - 1 ? tx(`${E(c.name)}. The formula left over doesn't belong to any of them.`, `${D(c.name)}. Die übrige Formel gehört zu keiner Figur.`) : tx(`${E(c.name)}.`, `${D(c.name)}.`),
@@ -627,6 +696,7 @@ export function generate2(rng: Rng): Exercise {
     [8, () => sectorTask(rng)],
     [10, () => compositeTask(rng)],
     [8, () => prismTask(rng)],
+    [6, () => prismSurfaceTask(rng)],
     [12, () => cylinderTask(rng)],
     [6, () => matchFormulaTask(rng)],
   ]);
@@ -714,6 +784,7 @@ export const level2: LevelLesson = {
     {
       type: "explain",
       title: tx("The circle and π", "Der Kreis und π"),
+      id: "the-circle-and-pi",
       blob: tx("π is the most famous number in maths: 3.14159…", "π ist die berühmteste Zahl der Mathematik: 3,14159…"),
       body: tx(
         "Every circle has a radius $r$ (centre to edge) and a diameter $d = 2r$ (straight across). The circumference is always a bit more than 3 diameters: exactly $\\pi \\approx 3.14$ times.",
@@ -732,6 +803,7 @@ export const level2: LevelLesson = {
     {
       type: "widget",
       title: tx("Discovering π", "π entdecken"),
+      id: "discovering-pi",
       blob: tx("The more pieces, the more it looks like a rectangle!", "Je mehr Stücke, desto mehr sieht es aus wie ein Rechteck!"),
       body: tx(
         "First roll a wheel once along the ground: the track is π times the diameter. Then cut a circle into pieces and lay them side by side: a nearly-rectangle with sides $\\pi r$ and $r$ appears.",

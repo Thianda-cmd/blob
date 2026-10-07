@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
-import { choiceOf, distinct, dmath, gn, kn, kp, num, numberAnswer, numberMistakes, say, weighted, type Slip } from "./shared";
+import { choiceOf, distinct, dmath, gn, kn, kp, num, numberAnswer, numberMistakes, say, stepsOf, weighted, type Slip } from "./shared";
 import { NegLineFigure, NegThermometer } from "./visuals";
 import { NegCompare, NegWalker } from "./widgets1";
 
@@ -34,8 +34,8 @@ function walkNote(x: number, op: Op, v: number): Text {
   const cross = x !== 0 && r !== 0 && Math.sign(x) !== Math.sign(r);
   const toZero = Math.abs(x);
   return tx(
-    `$${x} ${op} ${v} = ${r}$: from $${x}$ go ${v} steps to the **${op === "+" ? "right" : "left"}**${cross ? ` (${toZero} to zero, then ${v - toZero} more)` : ""}.`,
-    `$${x} ${op} ${v} = ${r}$: Von $${x}$ aus gehst du ${v} Schritte nach **${op === "+" ? "rechts" : "links"}**${cross ? ` (${toZero} bis zur Null, dann noch ${v - toZero})` : ""}.`,
+    `$${x} ${op} ${v} = ${r}$: from $${x}$ go ${stepsOf(v, "en")} to the **${op === "+" ? "right" : "left"}**${cross ? ` (${toZero} to zero, then ${v - toZero} more)` : ""}.`,
+    `$${x} ${op} ${v} = ${r}$: Von $${x}$ aus gehst du ${stepsOf(v, "de")} nach **${op === "+" ? "rechts" : "links"}**${cross ? ` (${toZero} bis zur Null, dann noch ${v - toZero})` : ""}.`,
   );
 }
 
@@ -108,8 +108,8 @@ function chainMistakes(c: Chain): Mistake[] {
         v: a - b,
         title: tx("Went the wrong way", "In die falsche Richtung"),
         say: tx(
-          `You added ${-a} and ${b} and kept the minus. But $+ ${b}$ means going ${b} steps to the **right** from $${a}$, towards zero.`,
-          `Du hast ${-a} und ${b} addiert und das Minus behalten. Aber $+ ${b}$ heißt: von $${a}$ aus ${b} Schritte nach **rechts**, Richtung Null.`,
+          `You added ${-a} and ${b} and kept the minus. But $+ ${b}$ means going ${stepsOf(b, "en")} to the **right** from $${a}$, towards zero.`,
+          `Du hast ${-a} und ${b} addiert und das Minus behalten. Aber $+ ${b}$ heißt: von $${a}$ aus ${stepsOf(b, "de")} nach **rechts**, Richtung Null.`,
         ),
       });
     if (a < 0 && op === "-")
@@ -117,8 +117,8 @@ function chainMistakes(c: Chain): Mistake[] {
         v: a + b,
         title: tx("Went the wrong way", "In die falsche Richtung"),
         say: tx(
-          `From $${a}$ you go ${b} steps further **left**. The result gets even smaller, so it moves away from zero.`,
-          `Von $${a}$ aus gehst du ${b} Schritte weiter nach **links**. Das Ergebnis wird noch kleiner und entfernt sich von der Null.`,
+          `From $${a}$ you go ${stepsOf(b, "en")} further **left**. The result gets even smaller, so it moves away from zero.`,
+          `Von $${a}$ aus gehst du ${stepsOf(b, "de")} weiter nach **links**. Das Ergebnis wird noch kleiner und entfernt sich von der Null.`,
         ),
       });
     if (a >= 0 && op === "-" && b > a)
@@ -126,11 +126,29 @@ function chainMistakes(c: Chain): Mistake[] {
         v: b - a,
         title: tx("Numbers swapped", "Zahlen vertauscht"),
         say: tx(
-          `You worked out $${b} - ${a}$. But $${a} - ${b}$ starts at ${a} and goes ${b} steps left, past zero.`,
-          `Du hast $${b} - ${a}$ gerechnet. Aber $${a} - ${b}$ startet bei ${a} und geht ${b} Schritte nach links, über die Null hinaus.`,
+          `You worked out $${b} - ${a}$. But $${a} - ${b}$ starts at ${a} and goes ${stepsOf(b, "en")} left, past zero.`,
+          `Du hast $${b} - ${a}$ gerechnet. Aber $${a} - ${b}$ startet bei ${a} und geht ${stepsOf(b, "de")} nach links, über die Null hinaus.`,
         ),
       });
   }
+  if (c.rest.length === 2 && c.rest.every((t) => t.v > 0) && c.rest[0].op === "-") {
+    const [{ v: b }, { op: op2, v: d }] = c.rest;
+    slips.push({
+      v: op2 === "-" ? c.first - (b - d) : c.first - (b + d),
+      title: tx("Not from left to right", "Nicht von links nach rechts"),
+      say: tx(
+        `You worked out $${b} ${op2} ${d}$ first. But the minus belongs only to the ${b}: start at $${c.first}$ and work from left to right.`,
+        `Du hast zuerst $${b} ${op2} ${d}$ gerechnet. Aber das Minus gehört nur zur ${b}: Starte bei $${c.first}$ und rechne von links nach rechts.`,
+      ),
+    });
+  }
+  if (c.rest.length === 2 && c.rest.every((t) => t.v > 0) && right !== 0)
+    slips.push({
+      v: -right,
+      title: tx("Above or below zero?", "Über oder unter null?"),
+      say: tx("Nearly! Check whether you end up left or right of zero.", "Fast! Prüf, ob du links oder rechts von der Null landest."),
+      close: true,
+    });
   if (c.first < 0)
     slips.push({
       v: right - 2 * c.first,
@@ -170,7 +188,13 @@ function calcTask(rng: Rng): Exercise {
     else {
       const ops: Op[] = [rng.pick(["+", "-"] as const), rng.pick(["+", "-"] as const)];
       c = { first: rng.sign() * n1(rng, 1, 12), rest: ops.map((op) => ({ op, v: rng.chance(0.55) ? -n1(rng, 1, 12) : n1(rng, 1, 12) })) };
-      hint = tx("First turn every pair of signs into one sign. Then work from left to right.", "Mach zuerst aus jedem Zeichenpaar ein Zeichen. Dann rechne von links nach rechts.");
+      const pairs = c.rest.some((t) => t.v < 0);
+      // Only positive numbers and no step below zero: not a task about negative numbers.
+      const firstStep = c.rest[0].op === "+" ? c.first + c.rest[0].v : c.first - c.rest[0].v;
+      if (!pairs && c.first > 0 && firstStep >= 0 && value(c) >= 0) continue;
+      hint = pairs
+        ? tx("First turn every pair of signs into one sign. Then work from left to right.", "Mach zuerst aus jedem Zeichenpaar ein Zeichen. Dann rechne von links nach rechts.")
+        : tx("Work from left to right: plus means go right, minus means go left on the number line.", "Rechne von links nach rechts: Plus heißt nach rechts gehen, minus heißt nach links gehen auf der Zahlengeraden.");
     }
     const v = value(c);
     if (Math.abs(v) > 30 || (v === 0 && rng.chance(0.7))) continue;
@@ -279,14 +303,14 @@ function orderTask(rng: Rng, desc: boolean): Exercise {
     answer: { kind: "order", items, label: desc ? tx("Largest at the top", "Größte Zahl oben") : tx("Smallest at the top", "Kleinste Zahl oben") },
     hint: desc
       ? tx("Positive numbers first. Among the negative numbers, the one closest to zero is the largest.", "Zuerst die positiven Zahlen. Bei den negativen ist die Zahl am nächsten an der Null die größte.")
-      : tx("Negative numbers first. Among them, the one with the biggest digits lies furthest left.", "Zuerst die negativen Zahlen. Die mit den größten Ziffern liegt am weitesten links."),
+      : tx("Negative numbers first. Among them, the one furthest from zero lies furthest left.", "Zuerst die negativen Zahlen: Die am weitesten von der Null entfernte liegt ganz links."),
     solution: [
       { math: pool.map((v) => gn(v, keyOf(v))).join(" \\quad "), note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
       {
         math: sorted.map((v, i) => `${i ? `${rel}#r${i} ` : ""}${gn(v, keyOf(v))}`).join(" "),
         note: desc
           ? tx("From right to left: the positive numbers, then the negative ones (closest to zero first).", "Von rechts nach links: erst die positiven Zahlen, dann die negativen (die nächste an der Null zuerst).")
-          : tx("From left to right: the negative numbers (biggest digits first), then the rest.", "Von links nach rechts: erst die negativen Zahlen (die mit den größten Ziffern zuerst), dann der Rest."),
+          : tx("From left to right: the negative numbers (the one furthest from zero first), then the rest.", "Von links nach rechts: erst die negativen Zahlen (die am weitesten von der Null entfernte zuerst), dann der Rest."),
       },
     ],
     mistakes,
@@ -312,8 +336,8 @@ function gapTask(rng: Rng): Exercise {
       src = `${kn(a, "a")} +#o \\box{?#q} =#e ${kn(c, "c")}`;
       solved = `${kn(a, "a")} +#o \\green{${kp(x, "x")}} =#e ${kn(c, "c")}`;
       note = tx(
-        `From $${a}$ to $${c}$ are ${Math.abs(x)} steps to the ${x > 0 ? "right" : "left"}, so the missing number is $${x}$.`,
-        `Von $${a}$ bis $${c}$ sind es ${Math.abs(x)} Schritte nach ${x > 0 ? "rechts" : "links"}, also fehlt $${x}$.`,
+        `From $${a}$ to $${c}$ are ${stepsOf(Math.abs(x), "en")} to the ${x > 0 ? "right" : "left"}, so the missing number is $${x}$.`,
+        `Von $${a}$ bis $${c}$ sind es ${stepsOf(Math.abs(x), "de")} nach ${x > 0 ? "rechts" : "links"}, also fehlt $${x}$.`,
       );
       wrong = {
         v: c + a,
@@ -437,15 +461,20 @@ function tempNewTask(rng: Rng): Exercise {
 
 /** How much did the temperature change? */
 function tempChangeTask(rng: Rng): Exercise {
-  let t0 = 0;
-  let t1 = 0;
+  // Two cities at the same moment: one below zero, one above. Over a day: sometimes both on one side.
+  const cities = rng.chance(0.35);
+  let t0 = -4;
+  let t1 = 7;
   for (let i = 0; i < 40; i++) {
-    t0 = rng.int(-15, 12);
-    t1 = rng.int(-15, 15);
-    if (t0 !== t1 && t0 !== 0 && t1 !== 0 && Math.abs(t1 - t0) >= 4 && Math.abs(t1 - t0) <= 25 && (Math.sign(t0) !== Math.sign(t1) || rng.chance(0.25))) break;
+    const a = rng.int(-15, 12);
+    const b = rng.int(-15, 15);
+    const across = Math.sign(a) !== Math.sign(b);
+    if (a !== b && a !== 0 && b !== 0 && Math.abs(b - a) >= 4 && Math.abs(b - a) <= 25 && (across || (!cities && rng.chance(0.25)))) {
+      [t0, t1] = [a, b];
+      break;
+    }
   }
   const d = Math.abs(t1 - t0);
-  const cities = rng.chance(0.35);
   const up = t1 > t0;
   let text: Text;
   let calc: string;
@@ -472,16 +501,21 @@ function tempChangeTask(rng: Rng): Exercise {
   const small = Math.min(t0, t1);
   const crosses = Math.sign(t0) !== Math.sign(t1);
   return {
-    instruction: tx("Find the change", "Bestimme die Änderung"),
+    instruction: cities ? tx("Find the difference", "Bestimme den Unterschied") : tx("Find the change", "Bestimme die Änderung"),
     text,
     answer: numberAnswer(d, DEG),
-    hint: tx("Count the steps between the two temperatures. Across zero, count in two parts.", "Zähl die Schritte zwischen den beiden Temperaturen. Über die Null hinweg zählst du in zwei Teilen."),
+    hint: crosses
+      ? tx("Count the steps between the two temperatures. Across zero, count in two parts.", "Zähl die Schritte zwischen den beiden Temperaturen. Über die Null hinweg zählst du in zwei Teilen.")
+      : tx("Count the steps between the two temperatures on the number line.", "Zähl die Schritte zwischen den beiden Temperaturen auf der Zahlengeraden."),
     solution: [
       { math: `${calc}`, note: tx("Higher temperature minus lower temperature.", "Höhere Temperatur minus niedrigere Temperatur.") },
       {
         math: `${calc} =#e ${d}#r`,
         note: crosses
-          ? tx(`From $${small}$ up to $0$ are ${-small} degrees, from $0$ to $${big}$ another ${big}: together ${d} degrees.`, `Von $${small}$ bis $0$ sind es ${-small} Grad, von $0$ bis $${big}$ noch einmal ${big}: zusammen ${d} Grad.`)
+          ? tx(
+              `From $${small}$ up to $0$ ${small === -1 ? "is 1 degree" : `are ${-small} degrees`}, from $0$ to $${big}$ another ${big}: together ${d} degrees.`,
+              `Von $${small}$ bis $0$ ${small === -1 ? "ist es 1 Grad" : `sind es ${-small} Grad`}, von $0$ bis $${big}$ noch einmal ${big}: zusammen ${d} Grad.`,
+            )
           : tx(`From $${small}$ to $${big}$ are ${d} steps on the number line.`, `Von $${small}$ bis $${big}$ sind es ${d} Schritte auf der Zahlengeraden.`),
       },
     ],
@@ -542,9 +576,9 @@ function storyTask(rng: Rng): Exercise {
     const d = rng.int(3, 25);
     const h = rng.int(4, 40);
     const what = rng.pick([
-      [tx("a seagull flies", "eine Möwe fliegt"), tx("the seagull", "der Möwe")],
-      [tx("a lighthouse lamp shines", "die Lampe eines Leuchtturms leuchtet"), tx("the lamp", "der Lampe")],
-      [tx("a helicopter hovers", "ein Hubschrauber schwebt"), tx("the helicopter", "dem Hubschrauber")],
+      [tx("a seagull flies", "fliegt eine Möwe"), tx("the seagull", "der Möwe")],
+      [tx("a drone hovers", "schwebt eine Drohne"), tx("the drone", "der Drohne")],
+      [tx("a helicopter hovers", "schwebt ein Hubschrauber"), tx("the helicopter", "dem Hubschrauber")],
     ]);
     const [w0, w1] = what as [{ en: string; de: string }, { en: string; de: string }];
     return {
@@ -738,7 +772,7 @@ const ORDER_ITEMS = ["$-9$", "$-4$", "$-1$", "$2$", "$6$"];
 const orderCheck: Exercise = {
   instruction: tx("Order from smallest to largest", "Ordne von der kleinsten zur größten Zahl"),
   answer: { kind: "order", items: ORDER_ITEMS, label: tx("Smallest at the top", "Kleinste Zahl oben") },
-  hint: tx("Negative numbers first. Among them, the one with the biggest digits lies furthest left.", "Zuerst die negativen Zahlen. Die mit den größten Ziffern liegt am weitesten links."),
+  hint: tx("Negative numbers first. Among them, the one furthest from zero lies furthest left.", "Zuerst die negativen Zahlen: Die am weitesten von der Null entfernte liegt ganz links."),
   solution: [
     { math: "\\group{-#as 4#a} \\quad 6#b \\quad \\group{-#cs 9#c} \\quad 2#d \\quad \\group{-#es 1#e}", note: tx("Picture the numbers on the number line.", "Stell dir die Zahlen auf der Zahlengeraden vor.") },
     { math: "\\group{-#cs 9#c} <#r1 \\group{-#as 4#a} <#r2 \\group{-#es 1#e} <#r3 2#d <#r4 6#b", note: tx("$-9$ lies furthest left, then $-4$ and $-1$. Then come the positive numbers.", "$-9$ liegt am weitesten links, dann $-4$ und $-1$. Danach kommen die positiven Zahlen.") },
@@ -845,8 +879,8 @@ export const level1: LevelLesson = {
       title: tx("Ordering numbers", "Zahlen ordnen"),
       blob: tx("Think of the thermometer: −7\u00a0°C is colder than −2\u00a0°C.", "Denk ans Thermometer: Bei −7\u00a0°C ist es kälter als bei −2\u00a0°C."),
       body: tx(
-        "For negative numbers: the bigger the digits after the minus, the **smaller** the number. A debt of 50 € is worse than a debt of 10 €.",
-        "Bei negativen Zahlen gilt: Je größer die Ziffern hinter dem Minus, desto **kleiner** die Zahl. 50 € Schulden sind schlimmer als 10 € Schulden.",
+        "For negative numbers: the further a number is from zero, the **smaller** it is. A debt of 50 € is worse than a debt of 10 €.",
+        "Bei negativen Zahlen gilt: Je weiter eine Zahl von der Null entfernt ist, desto **kleiner** ist sie. 50 € Schulden sind schlimmer als 10 € Schulden.",
       ),
       frames: [
         { math: "\\group{-#as 7#a} \\quad ?#q \\quad \\group{-#bs 2#b}", note: tx("Which one is smaller, $-7$ or $-2$?", "Welche Zahl ist kleiner, $-7$ oder $-2$?") },

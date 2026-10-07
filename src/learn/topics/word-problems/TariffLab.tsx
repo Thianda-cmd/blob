@@ -84,9 +84,11 @@ const MR = 22;
 const MT = 14;
 const MB = 30;
 
+/** Top of the cost axis: 4 gridline steps, each a whole, round number of euros. */
 function niceMax(v: number) {
-  const steps = [10, 20, 25, 40, 50, 60, 80, 100, 120, 150, 200];
-  return steps.find((s) => s >= v) ?? Math.ceil(v / 50) * 50;
+  const steps = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 75, 100];
+  const step = steps.find((s) => 4 * s >= v) ?? Math.ceil(v / 400) * 100;
+  return 4 * step;
 }
 
 const cost = (t: Tariff, x: number) => clean(t.base + t.rate * x, 4);

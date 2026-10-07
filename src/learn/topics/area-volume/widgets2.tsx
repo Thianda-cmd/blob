@@ -9,6 +9,7 @@ import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "
 import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
+import { Inline } from "@/learn/components/Rich";
 import { cos, sin } from "@/lib/stableMath";
 import { cn } from "@/lib/utils";
 import { Segmented, Stepper, TINT, useNum } from "./ui";
@@ -106,8 +107,8 @@ export function AreaVolumeBaseHeight() {
   const fmt = (v: number) => (Number.isInteger(r2(v)) ? num(r2(v)) : num(r2(v), 2));
   const areaText = tri ? (area2 % 2 === 0 ? num(area2 / 2) : num(area2 / 2, 1)) : num(area2);
   const formula = tri
-    ? `A#A =#e \\frac{g#g \\cdot#m h#h}{2#two}#fr ${exact ? "=" : "\\approx"}#e2 \\frac{${fmt(gl)}#gv \\cdot#m2 ${fmt(hl)}#hv}{2#two2}#fr2 =#e3 ${areaText}#r`
-    : `A#A =#e g#g \\cdot#m h#h =#e2 ${g}#gv \\cdot#m2 ${C[1]}#hv =#e3 ${areaText}#r`;
+    ? `A#A =#e \\frac{g#g \\cdot#m h#h}{2#two}#fr ${exact ? "=" : "\\approx"}#e2 \\frac{${fmt(gl)}#gv \\cdot#m2 ${fmt(hl)}#hv}{2#two2}#fr2 =#e3 ${areaText}#r "cm²"#u`
+    : `A#A =#e g#g \\cdot#m h#h =#e2 ${g}#gv \\cdot#m2 ${C[1]}#hv =#e3 ${areaText}#r "cm²"#u`;
   const labelAt = (p: V, d: V, text: string, cls = "fill-ink") => {
     const [x, y] = px(p);
     return (
@@ -209,11 +210,15 @@ export function AreaVolumeBaseHeight() {
           <MathView src={formula} size="md" scope={`${scope}-f`} />
         </div>
         <p className="text-[13.5px] leading-relaxed text-ink-2">
-          {tri
-            ? side === "c"
-              ? t(tx("Two copies of the triangle make a parallelogram (dashed). So the triangle is half of $g \\cdot h$. Drag sideways: the height stays, so the area stays.", "Zwei gleiche Dreiecke ergeben ein Parallelogramm (gestrichelt). Das Dreieck ist also die Hälfte von $g \\cdot h$. Zieh zur Seite: Die Höhe bleibt, also bleibt die Fläche."))
-              : t(tx("Another side as the base, another height, but the same area. The height always stands at a right angle on the base (or its extension).", "Andere Seite als Grundseite, andere Höhe, aber dieselbe Fläche. Die Höhe steht immer senkrecht auf der Grundseite (oder ihrer Verlängerung)."))
-            : t(tx("Drag sideways: the parallelogram leans, but base and height stay, so the area stays the same.", "Zieh zur Seite: Das Parallelogramm wird schiefer, aber Grundseite und Höhe bleiben, also bleibt die Fläche gleich."))}
+          <Inline
+            text={
+              tri
+                ? side === "c"
+                  ? tx("Two copies of the triangle make a parallelogram (dashed). So the triangle is half of $g \\cdot h$. Drag sideways: the height stays, so the area stays.", "Zwei gleiche Dreiecke ergeben ein Parallelogramm (gestrichelt). Das Dreieck ist also die Hälfte von $g \\cdot h$. Zieh zur Seite: Die Höhe bleibt, also bleibt die Fläche.")
+                  : tx("Another side as the base, another height, but the same area. The height always stands at a right angle on the base (or its extension).", "Andere Seite als Grundseite, andere Höhe, aber dieselbe Fläche. Die Höhe steht immer senkrecht auf der Grundseite (oder ihrer Verlängerung).")
+                : tx("Drag sideways: the parallelogram leans, but base and height stay, so the area stays the same.", "Zieh zur Seite: Das Parallelogramm wird schiefer, aber Grundseite und Höhe bleiben, also bleibt die Fläche gleich.")
+            }
+          />
         </p>
       </div>
     </div>
@@ -242,7 +247,8 @@ function RollTab() {
   const [rolled, setRolled] = useState(false);
   const U = 26;
   const r = (d * U) / 2;
-  const x0 = 26;
+  // The wheel starts one biggest radius (d = 4) from the left edge, so it is never cut off.
+  const x0 = 2 * U + 12;
   const ground = 14 + 4 * U;
   const len = Math.PI * d * U;
   const W = x0 + Math.PI * 4 * U + 60;
@@ -273,7 +279,7 @@ function RollTab() {
         </button>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mx-auto w-full max-w-[520px]" role="img" aria-label={t(tx("A wheel rolls once along a line", "Ein Rad rollt einmal ab"))}>
-        <line x1={x0 - 10} x2={W - 6} y1={ground} y2={ground} stroke="var(--ink-3)" strokeWidth={1.5} />
+        <line x1={6} x2={W - 6} y1={ground} y2={ground} stroke="var(--ink-3)" strokeWidth={1.5} />
         {[1, 2, 3].map((k) => (
           <g key={k}>
             <line x1={x0 + k * d * U} x2={x0 + k * d * U} y1={ground - 6} y2={ground + 6} stroke="var(--ink-2)" strokeWidth={1.5} />

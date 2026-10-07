@@ -2111,9 +2111,9 @@ const MIX: [Shape, Tier, number][] = [
   [quotientExponent, 2, 1],
   [productExponent, 2, 1],
   [sciNotation, 2, 2],
-  [simpleRoot, 2, 1.5],
+  [simpleRoot, 2, 1],
   [coefficientProduct, 2, 2],
-  [evalPower, 2, 0.6],
+  [evalPower, 2, 0.3],
   [mixedTwoVars, 3, 1.5],
   [mixedCoefficient, 3, 1.5],
   [partialRoot, 3, 2.5],
@@ -2586,30 +2586,15 @@ function RootSplitter() {
 // ---------------------------------------------------------------------------
 // Lesson
 
+// A short recap of level 1 (base, exponent, brackets) before the power rules.
 const introFrames: Frame[] = [
   {
-    math: "2#a \\cdot#d1 2#b \\cdot#d2 2#c \\cdot#d3 2#d \\cdot#d4 2#e",
-    note: tx("Five times the same factor $2$. Writing that out gets long.", "Fünfmal derselbe Faktor $2$. Das auszuschreiben wird ganz schön lang."),
-  },
-  {
-    math: "2#a^{5#n}",
+    math: "2#a^{5#n} =#eq 2#x1 \\cdot#m1 2#x2 \\cdot#m2 2#x3 \\cdot#m3 2#x4 \\cdot#m4 2#x5 =#eq2 32#r",
     note: tx(
-      'Short: $2^5$, read "2 to the power of 5". The **base** $2$ is the factor, the **exponent** $5$ counts the factors.',
-      "Kurz: $2^5$, gelesen „2 hoch 5“. Die **Basis** $2$ ist der Faktor, der **Exponent** (die Hochzahl) $5$ zählt die Faktoren.",
+      "The **base** $2$ is the factor, the **exponent** $5$ counts the factors. So $2^5 = 32$, and not $2 \\cdot 5 = 10$.",
+      "Die **Basis** $2$ ist der Faktor, der **Exponent** $5$ zählt die Faktoren. Also ist $2^5 = 32$, und nicht $2 \\cdot 5 = 10$.",
     ),
     highlight: ["a", "n"],
-  },
-  {
-    math: "2#a^{5#n} =#eq 32#r",
-    note: tx("Worked out: $2 \\cdot 2 \\cdot 2 \\cdot 2 \\cdot 2 = 32$.", "Ausgerechnet: $2 \\cdot 2 \\cdot 2 \\cdot 2 \\cdot 2 = 32$."),
-  },
-  {
-    math: "2#a^{3#n} =#eq 2#x1 \\cdot#m1 2#x2 \\cdot#m2 2#x3 =#eq2 8#r",
-    note: tx(
-      "Careful: $2^3$ means $2 \\cdot 2 \\cdot 2 = 8$. It's **not** $2 \\cdot 3 = 6$.",
-      "Vorsicht: $2^3$ bedeutet $2 \\cdot 2 \\cdot 2 = 8$. Es ist **nicht** $2 \\cdot 3 = 6$.",
-    ),
-    highlight: ["n"],
   },
   {
     // German: a semicolon separates the two equations (the comma is the decimal comma).
@@ -2837,11 +2822,11 @@ export const level2: LevelLesson = {
   lesson: [
     {
       type: "explain",
-      title: tx("Powers: a short way to multiply", "Potenzen: Multiplizieren in Kurzform"),
-      blob: tx("Ready? Powers are just lazy multiplication. I like lazy!", "Bereit? Potenzen sind einfach faules Multiplizieren. Faul find ich gut!"),
+      title: tx("Quick recap: powers", "Kurz wiederholt: Potenzen"),
+      blob: tx("A quick warm-up from level 1. Then we learn the rules!", "Kurz aufwärmen aus Stufe 1. Danach lernen wir die Regeln!"),
       body: tx(
-        "When the same factor appears again and again, we write it as a **power**.",
-        "Wenn derselbe Faktor immer wieder vorkommt, schreiben wir ihn als **Potenz**.",
+        "A **power** is a product of equal factors: $a^n$ means $n$ factors $a$. Brackets decide what belongs to the base.",
+        "Eine **Potenz** ist ein Produkt aus gleichen Faktoren: $a^n$ bedeutet $n$ Faktoren $a$. Klammern entscheiden, was zur Basis gehört.",
       ),
       frames: introFrames,
     },

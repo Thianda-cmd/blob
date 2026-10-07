@@ -208,6 +208,11 @@ export function LensLab() {
             {t(tx("image off the bench →", "Bild außerhalb →"))}
           </text>
         )}
+        {virtual && ix < 4 && (
+          <text x={12} y={VH - 12} fontSize={14} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+            {t(tx("← image off the bench", "← Bild außerhalb"))}
+          </text>
+        )}
       </svg>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

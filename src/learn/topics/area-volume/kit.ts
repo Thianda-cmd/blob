@@ -52,6 +52,19 @@ export function fmt(t: Fmt["t"], l: Locale): Fmt {
   };
 }
 
+/**
+ * An exact number for the display language: a decimal when it ends ("4,5"), otherwise a fraction
+ * ("\frac{20}{3}" instead of 6,666667), so a worked solution never writes a rounded value with "=".
+ */
+export function exactNum(f: Fmt, v: number): string {
+  const whole = (x: number) => Math.abs(x - Math.round(x)) < 1e-6;
+  if (whole(v * 1000)) return f.n(v);
+  for (let d = 2; d <= 1000; d++) {
+    if (whole(v * d)) return `${v < 0 ? "-" : ""}\\frac{${f.n(Math.abs(Math.round(v * d)))}}{${d}}`;
+  }
+  return f.n(v);
+}
+
 /** Builds a text in both languages from one template function. */
 export const say = (build: (f: Fmt) => string): Text => txMap((t, l) => build(fmt(t, l)));
 

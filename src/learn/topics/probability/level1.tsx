@@ -1,8 +1,8 @@
 "use client";
 
 // Probability, level 1 (Klasse 5–7): chance experiments and outcomes, absolute and relative
-// frequency, the law of large numbers (dice lab), Laplace probability with dice, urns, cards and
-// spinners as fraction, decimal and percentage, impossible and certain events.
+// frequency, the law of large numbers (dice lab), Laplace probability with dice, coins, urns, cards
+// and spinners as fraction, decimal and percentage, impossible and certain events.
 
 import { tx, type Text } from "@/i18n/text";
 import { frac, type Frac } from "@/learn/engine/frac";
@@ -16,6 +16,7 @@ const I = {
   die: tx("Find the probability", "Berechne die Wahrscheinlichkeit"),
   urn: tx("Draw a ball: find the probability", "Kugel ziehen: Berechne die Wahrscheinlichkeit"),
   cards: tx("Draw a card: find the probability", "Karte ziehen: Berechne die Wahrscheinlichkeit"),
+  coins: tx("Toss two coins: find the probability", "Zwei Münzen werfen: Berechne die Wahrscheinlichkeit"),
   spinner: tx("Give the probability as a percentage", "Gib die Wahrscheinlichkeit in Prozent an"),
   rel: tx("Find the relative frequency", "Bestimme die relative Häufigkeit"),
   estimate: tx("Estimate how often", "Schätze, wie oft"),
@@ -330,6 +331,62 @@ function cardTask(rng: Rng): Exercise {
 }
 
 // ---------------------------------------------------------------------------
+// Two coins at once: list the outcomes
+
+/** Outcomes: 0 = HH (WW), 1 = HT (WZ), 2 = TH (ZW), 3 = TT (ZZ). `heads`: the numbers of heads that fit (for the 0/1/2 trap). */
+const COIN_EVENTS: { en: string; de: string; fav: number[]; heads: number[] }[] = [
+  { en: "heads twice", de: "zweimal Wappen", fav: [0], heads: [2] },
+  { en: "heads exactly once", de: "genau einmal Wappen", fav: [1, 2], heads: [1] },
+  { en: "heads at least once", de: "mindestens einmal Wappen", fav: [0, 1, 2], heads: [1, 2] },
+  { en: "no heads at all", de: "keinmal Wappen", fav: [3], heads: [0] },
+  { en: "the same side on both coins", de: "auf beiden Münzen dieselbe Seite", fav: [0, 3], heads: [0, 2] },
+  { en: "two different sides", de: "zwei verschiedene Seiten", fav: [1, 2], heads: [1] },
+];
+const COIN_OUT = { en: ["HH", "HT", "TH", "TT"], de: ["WW", "WZ", "ZW", "ZZ"] };
+
+function coinTask(rng: Rng): Exercise {
+  const ev = rng.pick(COIN_EVENTS);
+  const k = ev.fav.length;
+  const right = frac(k, 4);
+  const set = (l: "en" | "de", idx: number[]) => `\\{ ${idx.map((i) => COIN_OUT[l][i]).join(", ")} \\}`;
+  return {
+    instruction: I.coins,
+    text: tx(
+      `You toss a 1-euro coin and a 2-euro coin at the same time. Each one shows heads (H) or tails (T). What is the probability of ${ev.en}?`,
+      `Du wirfst eine 1-Euro-Münze und eine 2-Euro-Münze gleichzeitig. Jede zeigt Wappen (W) oder Zahl (Z). Wie groß ist die Wahrscheinlichkeit für ${ev.de}?`,
+    ),
+    answer: fracAnswer(right),
+    hint: tx("Write down all outcomes: first the 1-euro coin, then the 2-euro coin. Are HT and TH the same?", "Schreib alle Ergebnisse auf: erst die 1-Euro-Münze, dann die 2-Euro-Münze. Sind WZ und ZW dasselbe?"),
+    solution: [
+      { math: tx(`S = ${set("en", [0, 1, 2, 3])}`, `S = ${set("de", [0, 1, 2, 3])}`), note: tx("Each coin is fair. Together they give $4$ equally likely outcomes. HT (heads on the 1-euro coin) and TH (heads on the 2-euro coin) are two different outcomes!", "Jede Münze ist fair. Zusammen gibt es $4$ gleich wahrscheinliche Ergebnisse. WZ (Wappen auf der 1-Euro-Münze) und ZW (Wappen auf der 2-Euro-Münze) sind zwei verschiedene Ergebnisse!") },
+      { math: tx(`E = ${set("en", ev.fav)}`, `E = ${set("de", ev.fav)}`), note: tx(`Favourable for ${ev.en}: $${k}$ ${k === 1 ? "outcome" : "outcomes"}.`, `Günstig für ${ev.de}: $${k}$ ${k === 1 ? "Ergebnis" : "Ergebnisse"}.`) },
+      { math: `P(E) = ${frChain(k, 4)}`, note: tx("Laplace rule: favourable outcomes divided by possible outcomes.", "Laplace-Regel: günstige Ergebnisse durch mögliche Ergebnisse.") },
+    ],
+    mistakes: fracMistakes(right, [
+      {
+        v: frac(ev.heads.length, 3),
+        title: tx("Only three outcomes", "Nur drei Ergebnisse"),
+        say: tx(
+          "You counted three outcomes: $0$, $1$ or $2$ heads. But they aren't equally likely: “heads once” can happen in two ways, HT and TH. List all four outcomes.",
+          "Du hast drei Ergebnisse gezählt: $0$-, $1$- oder $2$-mal Wappen. Die sind aber nicht gleich wahrscheinlich: „einmal Wappen“ geht auf zwei Arten, WZ und ZW. Schreib alle vier Ergebnisse auf.",
+        ),
+      },
+      {
+        v: ev.fav.includes(1) && ev.fav.includes(2) ? frac(k - 1, 4) : null,
+        title: tx("One outcome missing", "Ein Ergebnis fehlt"),
+        say: tx("HT and TH are two different outcomes: the 1-euro coin or the 2-euro coin shows heads. Count both.", "WZ und ZW sind zwei verschiedene Ergebnisse: Mal zeigt die 1-Euro-Münze Wappen, mal die 2-Euro-Münze. Zähl beide."),
+      },
+      {
+        v: k === 1 ? frac(1, 2) : null,
+        title: tx("Only one coin", "Nur eine Münze"),
+        say: tx("$\\frac{1}{2}$ is right for **one** coin. Here both coins have to fit: that's only one of the four outcomes.", "$\\frac{1}{2}$ stimmt für **eine** Münze. Hier müssen beide Münzen passen: Das ist nur eins der vier Ergebnisse."),
+      },
+      { v: k < 4 - k ? { n: k, d: 4 - k } : null, ...FAV_UNFAV(k, 4 - k) },
+    ]),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Spinner in percent
 
 const ANGLE_SETS: number[][] = [
@@ -513,9 +570,12 @@ function estimateTask(rng: Rng): Exercise {
         { math: `${frS(frac(ev.fav, 6))} \\cdot ${N} = ${right}`, note: tx(`In the long run, about this share of the $${N}$ rolls: roughly $${right}$ times.`, `Auf lange Sicht kommt ungefähr dieser Anteil der $${N}$ Würfe: etwa $${right}$-mal.`) },
       ],
       mistakes: numMistakes(right, 1e-6, [
-        { v: ev.fav > 1 ? N / 6 : null, title: tx("Only one number", "Nur eine Zahl"), say: tx(`$${N} : 6$ counts just one number. ${ev.en} has $${ev.fav}$ favourable numbers.`, `$${N} : 6$ zählt nur eine Augenzahl. Für ${ev.de} sind $${ev.fav}$ Augenzahlen günstig.`) },
+        // The complement comes first: for "no six", N : 6 is how often a six comes.
         { v: N - right, title: tx("The opposite", "Das Gegenteil"), say: tx("That's how often the event does **not** happen. Swap it round.", "So oft tritt das Ereignis **nicht** ein. Andersrum!") },
-        { v: N * ev.fav, title: tx("Forgot to divide by 6", "Durch 6 vergessen"), say: tx("More often than you roll? The probability is a fraction of the rolls: divide by $6$ too.", "Öfter, als du würfelst? Die Wahrscheinlichkeit ist ein Anteil der Würfe: Teile auch durch $6$.") },
+        { v: ev.fav > 1 ? N / 6 : null, title: tx("Only one number", "Nur eine Zahl"), say: tx(`$${N} : 6$ counts just one number. For ${ev.en}, $${ev.fav}$ numbers are favourable.`, `$${N} : 6$ zählt nur eine Augenzahl. Für ${ev.de} sind $${ev.fav}$ Augenzahlen günstig.`) },
+        ev.fav > 1
+          ? { v: N * ev.fav, title: tx("Forgot to divide by 6", "Durch 6 vergessen"), say: tx("More often than you roll? The probability is a fraction of the rolls: divide by $6$ too.", "Öfter, als du würfelst? Die Wahrscheinlichkeit ist ein Anteil der Würfe: Teile auch durch $6$.") }
+          : { v: N, title: tx("Forgot to divide by 6", "Durch 6 vergessen"), say: tx(`As often as you roll? Then every single roll would be ${ev.en}. The probability is a fraction of the rolls: divide by $6$.`, `So oft, wie du würfelst? Dann wäre jeder Wurf ${ev.de}. Die Wahrscheinlichkeit ist ein Anteil der Würfe: Teile durch $6$.`) },
       ]),
     };
   }
@@ -638,7 +698,7 @@ function orderTask(rng: Rng): Exercise {
 // ---------------------------------------------------------------------------
 
 export function generate1(rng: Rng): Exercise {
-  const shape = rng.pick(["die", "die", "urn", "urn", "cards", "spinner", "spinner", "rel", "rel", "estimate", "classify", "order"] as const);
+  const shape = rng.pick(["die", "die", "urn", "urn", "cards", "coins", "spinner", "spinner", "rel", "rel", "estimate", "classify", "order"] as const);
   switch (shape) {
     case "die":
       return dieTask(rng);
@@ -646,6 +706,8 @@ export function generate1(rng: Rng): Exercise {
       return urnTask(rng);
     case "cards":
       return cardTask(rng);
+    case "coins":
+      return coinTask(rng);
     case "spinner":
       return spinnerTask(rng);
     case "rel":
@@ -847,8 +909,8 @@ export const level1: LevelLesson = {
       blob: tx("Roll 10 times, then 100, then 1000. What happens to the bars?", "Würfle 10-mal, dann 100-mal, dann 1000-mal. Was passiert mit den Balken?"),
       body: say((f) =>
         f.t(
-          `The more often you roll, the closer each number's relative frequency settles near $\\frac{1}{6} \\approx ${f.n(0.167)}$: the **law of large numbers**. A drawing pin has no such rule. There, the relative frequency after many throws is your best estimate of the probability.`,
-          `Je öfter du würfelst, desto näher pendelt sich die relative Häufigkeit jeder Augenzahl bei $\\frac{1}{6} \\approx ${f.n(0.167)}$ ein: das **Gesetz der großen Zahlen**. Für eine Reißzwecke gibt es keine solche Regel. Dort ist die relative Häufigkeit nach vielen Würfen der beste Schätzwert für die Wahrscheinlichkeit.`,
+          `The more often you roll, the more closely each number's relative frequency settles near $\\frac{1}{6} \\approx ${f.n(0.167)}$: the **law of large numbers**. For a drawing pin, no counting rule tells you the probability in advance. But the law of large numbers holds there too: after many throws, the relative frequency is a good estimate of the probability.`,
+          `Je öfter du würfelst, desto genauer pendelt sich die relative Häufigkeit jeder Augenzahl bei $\\frac{1}{6} \\approx ${f.n(0.167)}$ ein: das **Gesetz der großen Zahlen**. Für eine Reißzwecke gibt es keine Abzählregel, die die Wahrscheinlichkeit vorher verrät. Das Gesetz der großen Zahlen gilt aber auch hier: Nach vielen Würfen ist die relative Häufigkeit ein guter Schätzwert für die Wahrscheinlichkeit.`,
         ),
       ),
       widget: ProbabilityDiceLab,

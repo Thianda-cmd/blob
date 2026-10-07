@@ -42,6 +42,12 @@ export const say = (build: (t: (en: string, de: string) => string, l: Locale) =>
 /** Maths that contains decimals: built once per language (decimal comma in German). */
 export const dmath = (build: (l: Locale) => string): Text => txMap((_, l) => build(l));
 
+/** "1 step" / "3 steps", "1 Schritt" / "3 Schritte". */
+export function stepsOf(v: number, l: Locale): string {
+  const one = Math.abs(v) === 1;
+  return l === "de" ? `${num(v, l)} ${one ? "Schritt" : "Schritte"}` : `${num(v, l)} ${one ? "step" : "steps"}`;
+}
+
 // ---------------------------------------------------------------------------
 // Task helpers
 

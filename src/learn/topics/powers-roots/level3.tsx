@@ -6,7 +6,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
-import { asFrac, asNum, choice, collect, framesIn, gcdInt, maths, pairOf, say, weighted, type Lang, type Opt } from "./kit";
+import { asFrac, asNum, choice, collect, framesIn, gcdInt, kp, maths, pairOf, pp, say, weighted, type Lang, type Opt } from "./kit";
 import { LogHunter } from "./LogHunter";
 import { RationalPowers } from "./RationalPowers";
 
@@ -42,6 +42,8 @@ const LOG = (b: string) => (b === "10" ? "\\lg " : b === "e" ? "\\ln " : `\\log_
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const stable = (v: number) => Number(v.toPrecision(12));
+/** A calculator value shown in a worked solution: 6 significant digits, so the shown quotient gives the rounded answer. */
+const sig6 = (v: number) => Number(v.toPrecision(6));
 const lg = (v: number) => stable(Math.log10(v));
 
 /** A rounded answer (2 decimal places) that accepts the correctly rounded value. */
@@ -85,10 +87,11 @@ const SWAPPED = tx(
   "Ah, I see what happened! You swapped numerator and denominator. In $a^{\\frac{m}{n}}$ the **denominator** $n$ is the root and the **numerator** $m$ is the power.",
   "Ah, ich seh, was passiert ist! Du hast Zähler und Nenner vertauscht. Bei $a^{\\frac{m}{n}}$ ist der **Nenner** $n$ die Wurzel und der **Zähler** $m$ die Potenz.",
 );
-const NOT_DIVISION = (b: string, V: string) =>
+/** log_b V asks "b to the power of what gives V?"; the student divided num by den (V by b unless given). */
+const NOT_DIVISION = (b: string, V: string, num = V, den = b) =>
   tx(
-    `I think I know what you did: you divided $${V}$ by $${b}$. But a logarithm asks for an **exponent**: $${b}$ to the power of what gives $${V}$?`,
-    `Ich glaub, ich weiß, was du gemacht hast: Du hast $${V}$ durch $${b}$ geteilt. Der Logarithmus fragt aber nach einem **Exponenten**: $${b}$ hoch wie viel ergibt $${V}$?`,
+    `I think I know what you did: you divided $${num}$ by $${den}$. But a logarithm asks for an **exponent**: $${b}$ to the power of what gives $${V}$?`,
+    `Ich glaub, ich weiß, was du gemacht hast: Du hast $${num}$ durch $${den}$ geteilt. Der Logarithmus fragt aber nach einem **Exponenten**: $${b}$ hoch wie viel ergibt $${V}$?`,
   );
 
 // ---------------------------------------------------------------------------
@@ -103,8 +106,15 @@ function ratPowEx(r: number, p: number, qd: number, style: "frac" | "root" | "de
   const val = r ** ap;
   const task = maths((L) => (style === "root" ? rt(qd, ap === 1 ? `${base}` : `${base}^{${ap}}`) : `${base}^{${style === "dec" ? L.n(p / qd) : qs(e)}}`));
   const rootOf = rt(qd, `${base}`);
+  const asked = (L: Lang) => L.t(`Which number, raised to the power $${qd}$, gives $${base}$?`, `Welche Zahl hoch $${qd}$ ergibt $${base}$?`);
   const frames = framesIn((L) => {
     const out: Frame[] = [];
+    if (style === "root" && ap === 1)
+      // a plain nth root: no detour through the fraction exponent
+      return [
+        { math: rtk(qd, `${base}#b`), note: asked(L) },
+        { math: `${r}#b`, note: L.t(`$${r}^{${qd}} = ${base}$, so $${rootOf} = ${r}$.`, `$${r}^{${qd}} = ${base}$, also ist $${rootOf} = ${r}$.`), highlight: ["b"] },
+      ];
     if (style === "dec")
       out.push({
         math: `${base}#b^{${L.n(p / qd)}#x}`,
@@ -173,10 +183,11 @@ function ratPowEx(r: number, p: number, qd: number, style: "frac" | "root" | "de
     instruction: CALC,
     math: task,
     answer: { kind: "number", value: val },
-    hint: style === "root" ? tx(`$\\sqrt[n]{a^m} = (\\sqrt[n]{a})^m$. Root first.`, `$\\sqrt[n]{a^m} = (\\sqrt[n]{a})^m$. Zuerst die Wurzel.`) : hint,
+    hint: style === "root" ? (ap === 1 ? say(asked) : tx(`$\\sqrt[n]{a^m} = (\\sqrt[n]{a})^m$. Root first.`, `$\\sqrt[n]{a^m} = (\\sqrt[n]{a})^m$. Zuerst die Wurzel.`)) : hint,
     solution: frames,
     mistakes: collect(asNum(val), (add) => {
-      add(
+      if (style !== "root")
+        add(
           asNum((base * ap) / qd),
           T_BASE_TIMES,
           tx(
@@ -184,13 +195,41 @@ function ratPowEx(r: number, p: number, qd: number, style: "frac" | "root" | "de
             `Ich glaub, ich weiß, was du gemacht hast: Du hast $${base}$ mal $${qs(e)}$ gerechnet. Ein Bruch im Exponenten bedeutet aber **Wurzel und Potenz**, nicht mal.`,
           ),
         );
-      if (ap > 1) add(asNum(r), T_ONLY_ROOT, tx(`The root is right: $${rootOf} = ${r}$! Now the numerator $${ap}$: raise the result to that power.`, `Die Wurzel stimmt: $${rootOf} = ${r}$! Jetzt noch der Zähler $${ap}$: Nimm das Ergebnis hoch $${ap}$.`), true);
-      if (ap > 1 && base ** ap < 1e7) add(asNum(base ** ap), T_ONLY_POWER, tx(`You raised $${base}$ to the power $${ap}$, good. But the denominator $${qd}$ still asks for a root.`, `Du hast $${base}$ hoch $${ap}$ genommen, gut. Aber der Nenner $${qd}$ verlangt noch eine Wurzel.`), true);
+      else if (ap === 1)
+        add(
+          asNum(base / qd),
+          tx("Root is not division", "Wurzel ist keine Division"),
+          tx(
+            `I think I know what you did: you calculated $${base} : ${qd}$. But the ${qd === 3 ? "cube" : `${qd}th`} root isn't a ${qd === 3 ? "third" : qd === 4 ? "quarter" : "fifth"}: you want the number that gives $${base}$ when raised to the power $${qd}$.`,
+            `Ich glaub, ich weiß, was du gemacht hast: Du hast $${base} : ${qd}$ gerechnet. Die ${qd}. Wurzel ist aber nicht ${qd === 3 ? "ein Drittel" : qd === 4 ? "ein Viertel" : "ein Fünftel"}: Gesucht ist die Zahl, die hoch $${qd}$ genommen $${base}$ ergibt.`,
+          ),
+        );
+      const isRoot = style === "root";
+      if (ap > 1)
+        add(
+          asNum(r),
+          T_ONLY_ROOT,
+          isRoot
+            ? tx(`The root is right: $${rootOf} = ${r}$! But under the root there's $${base}^{${ap}}$: raise the result to the power $${ap}$.`, `Die Wurzel stimmt: $${rootOf} = ${r}$! Unter der Wurzel steht aber $${base}^{${ap}}$: Nimm das Ergebnis noch hoch $${ap}$.`)
+            : tx(`The root is right: $${rootOf} = ${r}$! Now the numerator $${ap}$: raise the result to that power.`, `Die Wurzel stimmt: $${rootOf} = ${r}$! Jetzt noch der Zähler $${ap}$: Nimm das Ergebnis hoch $${ap}$.`),
+          true,
+        );
+      if (ap > 1 && base ** ap < 1e7)
+        add(
+          asNum(base ** ap),
+          T_ONLY_POWER,
+          isRoot
+            ? tx(`You worked out $${base}^{${ap}} = ${base ** ap}$, good. But the ${qd === 2 ? "square" : qd === 3 ? "cube" : `${qd}th`} root is still missing.`, `Du hast $${base}^{${ap}} = ${base ** ap}$ ausgerechnet, gut. Aber die ${qd === 2 ? "Quadratwurzel" : `${qd}. Wurzel`} fehlt noch.`)
+            : tx(`You raised $${base}$ to the power $${ap}$, good. But the denominator $${qd}$ still asks for a root.`, `Du hast $${base}$ hoch $${ap}$ genommen, gut. Aber der Nenner $${qd}$ verlangt noch eine Wurzel.`),
+          true,
+        );
       if (qd !== 2 && Number.isInteger(Math.sqrt(base)))
         add(
           asNum(Math.sqrt(base) ** ap),
           tx("Wrong root", "Falsche Wurzel"),
-          tx(`Nearly! You took the square root. The denominator $${qd}$ asks for the ${qd === 3 ? "cube" : `${qd}th`} root.`, `Fast! Du hast die Quadratwurzel gezogen. Der Nenner $${qd}$ verlangt die ${qd}. Wurzel.`),
+          style === "root"
+            ? tx(`Nearly! You took the square root. Here it's the ${qd === 3 ? "cube" : `${qd}th`} root: look at the small $${qd}$ on the root sign.`, `Fast! Du hast die Quadratwurzel gezogen. Hier ist es die ${qd}. Wurzel: Schau auf die kleine $${qd}$ am Wurzelzeichen.`)
+            : tx(`Nearly! You took the square root. The denominator $${qd}$ asks for the ${qd === 3 ? "cube" : `${qd}th`} root.`, `Fast! Du hast die Quadratwurzel gezogen. Der Nenner $${qd}$ verlangt die ${qd}. Wurzel.`),
         );
       const swapped = Math.pow(base, qd / ap);
       if (ap > 1 && Number.isInteger(Math.round(swapped * 1e6) / 1e6) && swapped < 1e7) add(asNum(Math.round(swapped)), T_SWAPPED, SWAPPED);
@@ -219,7 +258,11 @@ function asPowerEx(kind: PowerKind, a: number, b: number): Exercise {
     math = kind === "inv" ? `\\frac{1}{${rt(b, a === 1 ? x : `${x}^{${a}}`)}}` : rt(b, a === 1 ? x : `${x}^{${a}}`);
     frames = [
       { math: wrap(inner), note: toPow },
-      { math: wrap(`${x}#x^{\\frac{${a}}{${b}}#p}`), note: tx(`The power $${a}$ goes on top, the root $${b}$ below: $${x}^{\\frac{${a}}{${b}}}$.`, `Die Potenz $${a}$ kommt nach oben, die Wurzel $${b}$ nach unten: $${x}^{\\frac{${a}}{${b}}}$.`) },
+      {
+        // "1 : x^{a/b}" instead of a fraction: a raised fraction exponent below a fraction bar would touch the bar
+        math: kind === "inv" ? `1#o :#dv ${x}#x^{\\frac{${a}}{${b}}#p}` : `${x}#x^{\\frac{${a}}{${b}}#p}`,
+        note: tx(`The power $${a}$ goes on top, the root $${b}$ below: $${x}^{\\frac{${a}}{${b}}}$.`, `Die Potenz $${a}$ kommt nach oben, die Wurzel $${b}$ nach unten: $${x}^{\\frac{${a}}{${b}}}$.`),
+      },
     ];
     if (kind === "inv")
       frames.push({ math: `${x}#x^{-#ps \\frac{${a}}{${b}}#p}`, note: tx("One divided by a power: the exponent gets a minus.", "Eins geteilt durch eine Potenz: Der Exponent bekommt ein Minus.") });
@@ -259,9 +302,12 @@ function asPowerEx(kind: PowerKind, a: number, b: number): Exercise {
     // x^a · \sqrt[b]{x}  or  x^a / \sqrt[b]{x}
     const div = kind === "quot";
     res = div ? qAdd(q(a), q(-1, b)) : qAdd(q(a), q(1, b));
-    math = div ? `\\frac{${x}^{${a}}}{${rt(b, x)}}` : `${x}^{${a}} \\cdot ${rt(b, x)}`;
-    const first = div ? `\\frac{${x}#x1^{${a}#e1}}{${rtk(b, `${x}#x2`)}}#F` : `${x}#x1^{${a}#e1} \\cdot#d ${rtk(b, `${x}#x2`)}`;
-    const second = div ? `\\frac{${x}#x1^{${a}#e1}}{${x}#x2^{\\frac{1}{${b}}#e2}}#F` : `${x}#x1^{${a}#e1} \\cdot#d ${x}#x2^{\\frac{1}{${b}}#e2}`;
+    const xa = pp(x, a);
+    const xaK = kp(x, "x1", a, "e1");
+    math = div ? `\\frac{${xa}}{${rt(b, x)}}` : `${xa} \\cdot ${rt(b, x)}`;
+    const first = div ? `\\frac{${xaK}}{${rtk(b, `${x}#x2`)}}#F` : `${xaK} \\cdot#d ${rtk(b, `${x}#x2`)}`;
+    // the quotient as "x^a : x^{1/b}": a raised fraction exponent below a fraction bar would touch the bar
+    const second = div ? `${xaK} :#d ${x}#x2^{\\frac{1}{${b}}#e2}` : `${xaK} \\cdot#d ${x}#x2^{\\frac{1}{${b}}#e2}`;
     frames = [
       { math: first, note: toPow },
       { math: second, note: div ? tx("Same base, divided: subtract the exponents.", "Gleiche Basis, dividiert: Subtrahiere die Exponenten.") : tx("Same base, multiplied: add the exponents.", "Gleiche Basis, multipliziert: Addiere die Exponenten.") },
@@ -279,10 +325,11 @@ function asPowerEx(kind: PowerKind, a: number, b: number): Exercise {
     // nest: \sqrt[b]{x^a \sqrt{x}} = x^{(a + 1/2)/b}
     const innerE = qAdd(q(a), q(1, 2));
     res = qMul(innerE, q(1, b));
-    math = rt(b, `${x}^{${a}} \\sqrt{${x}}`);
+    const xaK = kp(x, "x1", a, "e1");
+    math = rt(b, `${pp(x, a)} \\sqrt{${x}}`);
     frames = [
-      { math: rtk(b, `${x}#x1^{${a}#e1} \\sqrt{${x}#x2}#R2`), note: tx("Work from the inside out. The inner root first.", "Arbeite von innen nach außen. Zuerst die innere Wurzel.") },
-      { math: rtk(b, `${x}#x1^{${a}#e1} \\cdot#d ${x}#x2^{\\frac{1}{2}#e2}`), note: tx("$\\sqrt{x} = x^{\\frac{1}{2}}$.", "$\\sqrt{x} = x^{\\frac{1}{2}}$.") },
+      { math: rtk(b, `${xaK} \\sqrt{${x}#x2}#R2`), note: tx("Work from the inside out. The inner root first.", "Arbeite von innen nach außen. Zuerst die innere Wurzel.") },
+      { math: rtk(b, `${xaK} \\cdot#d ${x}#x2^{\\frac{1}{2}#e2}`), note: tx("$\\sqrt{x} = x^{\\frac{1}{2}}$.", "$\\sqrt{x} = x^{\\frac{1}{2}}$.") },
       { math: rtk(b, `${x}#x1^{${qk(innerE, "e1")}}`), note: tx(`Inside, add the exponents: $${a} + \\frac{1}{2} = ${qs(innerE)}$.`, `Innen die Exponenten addieren: $${a} + \\frac{1}{2} = ${qs(innerE)}$.`) },
       { math: `(${x}#x1^{${qk(innerE, "e1")}})#br^{\\frac{1}{${b}}#e3}`, note: tx(`The outer root is the power $\\frac{1}{${b}}$ of **everything** inside.`, `Die äußere Wurzel ist die Potenz $\\frac{1}{${b}}$ von **allem**, was darin steht.`) },
       { math: `${x}#x1^{${qk(res, "e1")}}`, note: tx(`Power of a power: $${qs(innerE)} \\cdot \\frac{1}{${b}} = ${qs(res)}$.`, `Potenz einer Potenz: $${qs(innerE)} \\cdot \\frac{1}{${b}} = ${qs(res)}$.`) },
@@ -502,7 +549,7 @@ function logValueEx(kind: LogKind, b: number, k: number, j = 1): Exercise {
       ],
       mistakes: collect(asNum(qv(res)), (add) => {
         add(asNum(k / j), T_UPSIDE, tx(`Ah, I see what happened! You found $${arg}^{?} = ${base}$. But the question is the other way round: $${base}^{?} = ${arg}$.`, `Ah, ich seh, was passiert ist! Du hast $${arg}^{?} = ${base}$ gelöst. Die Frage ist aber andersherum: $${base}^{?} = ${arg}$.`));
-        if (base % arg === 0) add(asNum(base / arg), T_NOT_DIVISION, NOT_DIVISION(String(arg), String(base)));
+        if (base % arg === 0) add(asNum(base / arg), T_NOT_DIVISION, NOT_DIVISION(String(base), String(arg), String(base), String(arg)));
       }),
     };
   }
@@ -825,8 +872,8 @@ function expCalcEx(a: number, b: number, t: number, story?: Story): Exercise {
     out.push({
       math: `${v}#x \\approx#eq ${L.n(r2(xv))}#v`,
       note: L.t(
-        `Calculator: $\\frac{${L.n(Number(lg(t).toFixed(4)))}}{${L.n(Number(lg(b).toFixed(4)))}} \\approx ${L.n(r2(xv))}$.`,
-        `Taschenrechner: $\\frac{${L.n(Number(lg(t).toFixed(4)))}}{${L.n(Number(lg(b).toFixed(4)))}} \\approx ${L.n(r2(xv))}$.`,
+        `Calculator: $\\frac{${L.n(sig6(lg(t)))}}{${L.n(sig6(lg(b)))}} \\approx ${L.n(r2(xv))}$.`,
+        `Taschenrechner: $\\frac{${L.n(sig6(lg(t)))}}{${L.n(sig6(lg(b)))}} \\approx ${L.n(r2(xv))}$.`,
       ) + (story ? ` ${story.end(L, L.n(r2(xv)))}` : ""),
     });
     return out;
@@ -866,7 +913,11 @@ function expCalcEx(a: number, b: number, t: number, story?: Story): Exercise {
     ...(story ? { text: say(story.text) } : {}),
     math: maths((L) => `${a !== 1 ? `${L.n(a)} \\cdot ` : ""}${L.n(b)}^{${v}} = ${L.n(W)}`),
     answer: right,
-    hint: say((L) => L.t(`${a !== 1 ? `Divide by $${L.n(a)}$ first. ` : ""}Then take lg of both sides and use the power rule.`, `${a !== 1 ? `Teile zuerst durch $${L.n(a)}$. ` : ""}Dann wende lg auf beiden Seiten an und nutze die Potenzregel.`)),
+    hint: say((L) =>
+      a !== 1
+        ? L.t(`Divide by $${L.n(a)}$ first. Then take lg of both sides and use the power rule.`, `Teile zuerst durch $${L.n(a)}$. Dann wende lg auf beiden Seiten an und nutze die Potenzregel.`)
+        : L.t("Take lg of both sides and use the power rule.", "Wende lg auf beiden Seiten an und nutze die Potenzregel."),
+    ),
     solution: frames,
     mistakes,
   };
@@ -882,7 +933,7 @@ function changeBaseEx(b: number, V: number): Exercise {
     { math: `\\log_{${L.n(b)}#b} \\, ${V}#v`, note: L.t(`The calculator has no $\\log_{${L.n(b)}}$ key. Change the base to $10$.`, `Der Taschenrechner hat keine Taste für $\\log_{${L.n(b)}}$. Wechsle zur Basis $10$.`) },
     { math: `\\frac{\\lg ${V}#v}{\\lg ${L.n(b)}#b}#F`, note: L.t("Change of base: $\\log_b x = \\frac{\\lg x}{\\lg b}$.", "Basiswechsel: $\\log_b x = \\frac{\\lg x}{\\lg b}$.") },
     {
-      math: `\\frac{${L.n(Number(lg(V).toFixed(4)))}#v}{${L.n(Number(lg(b).toFixed(4)))}#b}#F \\approx#eq ${L.n(r2(xv))}#r`,
+      math: `\\frac{${L.n(sig6(lg(V)))}#v}{${L.n(sig6(lg(b)))}#b}#F \\approx#eq ${L.n(r2(xv))}#r`,
       note: L.t(`So $\\log_{${L.n(b)}} ${V} \\approx ${L.n(r2(xv))}$. Check: $${L.n(b)}^{${L.n(r2(xv))}} \\approx ${V}$.`, `Also ist $\\log_{${L.n(b)}} ${V} \\approx ${L.n(r2(xv))}$. Probe: $${L.n(b)}^{${L.n(r2(xv))}} \\approx ${V}$.`),
     },
   ]);
@@ -1041,6 +1092,8 @@ function ratTask(rng: Rng): Exercise | null {
   let p = rng.pick(ps);
   const style = rng.pick(["frac", "frac", "frac", "root", "dec"] as const);
   if (style === "dec" && ![2, 4, 5].includes(qd)) return null;
+  // a plain square root like \sqrt{49} is level 1 content
+  if (style === "root" && p === 1 && qd === 2) return null;
   if (style !== "root" && rng.chance(0.25)) {
     p = -p;
     if (r ** -p > 64) return null;
@@ -1279,6 +1332,7 @@ function exactTask(rng: Rng): Exercise | null {
   if (kind === "plain" || kind === "shift" || kind === "twox") {
     if (rng.chance(0.25)) k = -rng.int(1, Math.min(kMax, 3));
   }
+  if (kind === "plain" && k === 1) return null; // 3^x = 3 is too easy here
   if (kind === "shift") return expExactEx(kind, { b, k, c: rng.nonZero(-3, 3) });
   if (kind === "times") {
     const m = rng.int(2, 3);
@@ -1444,7 +1498,7 @@ const rootFrames: Frame[] = [
     note: tx("$a^{\\frac{m}{n}} = (\\sqrt[n]{a})^m$: the **denominator** is the root, the **numerator** the power. Root first keeps the numbers small.", "$a^{\\frac{m}{n}} = (\\sqrt[n]{a})^m$: Der **Nenner** ist die Wurzel, der **Zähler** die Potenz. Zuerst die Wurzel, dann bleiben die Zahlen klein."),
   },
   {
-    math: "16#b^{-#s \\frac{3}{4}#f} =#eq \\frac{1}{16^{\\frac{3}{4}}}#G =#eq2 \\frac{1}{8}#H",
+    math: "16#b^{-#s \\frac{3}{4}#f} =#eq \\frac{1}{(\\sqrt[4]{16})^{3}}#G =#eq2 \\frac{1}{8}#H",
     note: tx("A negative exponent still means **one divided by**. And $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$, so $16^{-\\frac{3}{4}} = \\frac{1}{8}$.", "Ein negativer Exponent bedeutet weiterhin **eins geteilt durch**. Und $16^{\\frac{3}{4}} = (\\sqrt[4]{16})^3 = 2^3 = 8$, also ist $16^{-\\frac{3}{4}} = \\frac{1}{8}$."),
   },
 ];
@@ -1456,6 +1510,20 @@ const lawFrames: Frame[] = framesIn((L) => [
     note: L.t(
       "Same root index: one root for both. $\\sqrt[n]{a} \\cdot \\sqrt[n]{b} = \\sqrt[n]{a \\cdot b}$, because $a^{\\frac{1}{n}} \\cdot b^{\\frac{1}{n}} = (ab)^{\\frac{1}{n}}$.",
       "Gleicher Wurzelexponent: eine Wurzel für beide. $\\sqrt[n]{a} \\cdot \\sqrt[n]{b} = \\sqrt[n]{a \\cdot b}$, denn $a^{\\frac{1}{n}} \\cdot b^{\\frac{1}{n}} = (ab)^{\\frac{1}{n}}$.",
+    ),
+  },
+  {
+    math: "\\frac{\\sqrt[3]{54#a}#R1}{\\sqrt[3]{2#b}#R2}#F =#eq \\sqrt[3]{\\frac{54}{2}}#R3 =#eq2 \\sqrt[3]{27} =#eq3 3#r",
+    note: L.t(
+      "Dividing works the same way: $\\frac{\\sqrt[n]{a}}{\\sqrt[n]{b}} = \\sqrt[n]{\\frac{a}{b}}$. Here $54 : 2 = 27$ and $3^3 = 27$.",
+      "Beim Dividieren genauso: $\\frac{\\sqrt[n]{a}}{\\sqrt[n]{b}} = \\sqrt[n]{\\frac{a}{b}}$. Hier ist $54 : 2 = 27$ und $3^3 = 27$.",
+    ),
+  },
+  {
+    math: "\\sqrt{\\sqrt{625#a}#R2}#R1 =#eq \\sqrt[4]{625}#R3 =#eq2 5#r",
+    note: L.t(
+      "A root of a root: **multiply** the root indices. $\\sqrt[m]{\\sqrt[n]{a}} = \\sqrt[m \\cdot n]{a}$, because $(a^{\\frac{1}{n}})^{\\frac{1}{m}} = a^{\\frac{1}{m \\cdot n}}$. And $5^4 = 625$.",
+      "Eine Wurzel aus einer Wurzel: Die Wurzelexponenten werden **multipliziert**. $\\sqrt[m]{\\sqrt[n]{a}} = \\sqrt[m \\cdot n]{a}$, denn $(a^{\\frac{1}{n}})^{\\frac{1}{m}} = a^{\\frac{1}{m \\cdot n}}$. Und $5^4 = 625$.",
     ),
   },
   {
@@ -1550,8 +1618,13 @@ export const level3: LevelLesson = {
     },
     {
       title: tx("Root laws and rational denominators", "Wurzelgesetze und rationale Nenner"),
-      body: tx("Same root index: one root. A root in the denominator: expand.", "Gleicher Wurzelexponent: eine Wurzel. Wurzel im Nenner: erweitern."),
-      examples: ["\\sqrt[n]{a} \\cdot \\sqrt[n]{b} = \\sqrt[n]{a \\cdot b}", "\\frac{1}{\\sqrt{2}} = \\frac{\\sqrt{2}}{2}", "\\frac{2}{\\sqrt{3} - 1} = \\frac{2(\\sqrt{3} + 1)}{3 - 1} = \\sqrt{3} + 1"],
+      body: tx("Same root index: one root. Root of a root: multiply the indices. A root in the denominator: expand.", "Gleicher Wurzelexponent: eine Wurzel. Wurzel aus einer Wurzel: Wurzelexponenten multiplizieren. Wurzel im Nenner: erweitern."),
+      examples: [
+        "\\sqrt[n]{a} \\cdot \\sqrt[n]{b} = \\sqrt[n]{a \\cdot b} \\quad \\frac{\\sqrt[n]{a}}{\\sqrt[n]{b}} = \\sqrt[n]{\\frac{a}{b}}",
+        "\\sqrt[m]{\\sqrt[n]{a}} = \\sqrt[m \\cdot n]{a} \\quad \\sqrt{\\sqrt{625}} = \\sqrt[4]{625} = 5",
+        "\\frac{1}{\\sqrt{2}} = \\frac{\\sqrt{2}}{2}",
+        "\\frac{2}{\\sqrt{3} - 1} = \\frac{2(\\sqrt{3} + 1)}{3 - 1} = \\sqrt{3} + 1",
+      ],
       tone: "rule",
     },
     {
@@ -1616,7 +1689,10 @@ export const level3: LevelLesson = {
       type: "explain",
       title: tx("Root laws and rational denominators", "Wurzelgesetze und rationale Nenner"),
       blob: tx("Roots like to share. And they hate sitting in the denominator!", "Wurzeln teilen gern. Und im Nenner sitzen mögen sie gar nicht!"),
-      body: tx("Roots with the same index can go under one root. A root in the denominator disappears if you expand the fraction cleverly.", "Wurzeln mit gleichem Wurzelexponenten kommen unter eine Wurzel. Eine Wurzel im Nenner verschwindet, wenn du den Bruch geschickt erweiterst."),
+      body: tx(
+        "Roots with the same index can go under one root, when multiplying and when dividing. A root of a root is one root with the indices multiplied. And a root in the denominator disappears if you expand the fraction cleverly.",
+        "Wurzeln mit gleichem Wurzelexponenten kommen unter eine Wurzel, beim Multiplizieren und beim Dividieren. Eine Wurzel aus einer Wurzel wird eine Wurzel mit multiplizierten Wurzelexponenten. Und eine Wurzel im Nenner verschwindet, wenn du den Bruch geschickt erweiterst.",
+      ),
       frames: lawFrames,
     },
     {

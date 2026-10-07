@@ -500,8 +500,9 @@ const SPOTS: ((rng: Rng) => Spot)[] = [
 export function notNeeded(rng: Rng): Exercise {
   const s = rng.pick(SPOTS)(rng);
   const extra = s.parts.findIndex((p) => !p.need);
-  const opts = s.parts.map((p) => (p.need ? { text: p.text, title: tx("You need that one", "Die brauchst du"), say: p.role } : { text: p.text }));
-  const { answer, mistakes } = fixedChoice(opts, extra);
+  // The numbers have no natural order: shuffle, so the right letter doesn't follow the story.
+  const opts: Opt[] = [{ text: s.parts[extra].text }, ...s.parts.filter((p) => p.need).map((p) => ({ text: p.text, title: tx("You need that one", "Die brauchst du"), say: p.role }))];
+  const { answer, mistakes } = choice(rng, opts);
   const listMath = (strike: boolean) =>
     both((l) =>
       s.parts

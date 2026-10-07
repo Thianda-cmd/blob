@@ -40,7 +40,8 @@ export function FenceMax() {
   const atMax = Math.abs(x - xBest) < 1e-9;
 
   // Drawing: y runs along the wall (horizontal), x away from it (vertical).
-  const s = 210 / L;
+  // Leaves room on the left for the label "x = 0,5 m" even when the rectangle is at its widest.
+  const s = 180 / L;
   const rw = y * s;
   const rh = x * s;
   const left = (DW - rw) / 2;
@@ -154,7 +155,7 @@ export function FenceMax() {
               strokeLinejoin="round"
             />
             <motion.text initial={false} animate={{ x: left - 6, y: top + rh / 2 + 4 }} transition={soft} textAnchor="end" fontSize={12} fill="var(--ink)" className="font-math">
-              {`x = ${nf(x, l)}`}
+              {`x = ${nf(x, l)} m`}
             </motion.text>
             <motion.text initial={false} animate={{ x: left + rw / 2, y: top + rh + 16 }} transition={soft} textAnchor="middle" fontSize={12} fill="var(--ink)" className="font-math">
               {`${nf(y, l)} m`}

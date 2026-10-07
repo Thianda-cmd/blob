@@ -102,7 +102,7 @@ export function RationalPowers() {
     ? tx(`Exponent $0$: no factor at all, so $${B.b}^0 = 1$.`, `Exponent $0$: gar kein Faktor, also ist $${B.b}^0 = 1$.`)
     : Number.isInteger(ex)
     ? tx(
-        `A whole exponent: $${ex}$ ${Math.abs(ex) === 1 ? "factor" : "factors"} $${B.b}$${ex < 0 ? " below the fraction bar" : ""}. Now pick a denominator and slide between the dots.`,
+        `A whole exponent: $${Math.abs(ex)}$ ${Math.abs(ex) === 1 ? "factor" : "factors"} $${B.b}$${ex < 0 ? " below the fraction bar" : ""}. Now pick a denominator and slide between the dots.`,
         `Ein ganzzahliger Exponent: $${Math.abs(ex)}$ ${Math.abs(ex) === 1 ? "Faktor" : "Faktoren"} $${B.b}$${ex < 0 ? " unter dem Bruchstrich" : ""}. Wähl jetzt einen Nenner und schieb zwischen die Punkte.`,
       )
     : exact

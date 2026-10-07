@@ -151,6 +151,7 @@ export function ProbabilityDiceLab() {
   const watchName = mode === "die" ? t(tx("six", "Sechs")) : t(tx("point up", "Kopflage"));
   const h = n ? run.counts[watch] / n : 0;
   const pct = (v: number) => `${num(v * 100, 1)}${locale === "de" ? " %" : "%"}`;
+  const tick = (v: number) => `${Math.round(v * 100)}${locale === "de" ? " %" : "%"}`;
 
   const caption =
     n === 0
@@ -159,12 +160,14 @@ export function ProbabilityDiceLab() {
         : tx("Throw the drawing pin. How likely is it to land point up? Nobody can count that in advance.", "Wirf die Reißzwecke. Wie wahrscheinlich ist die Kopflage? Das kann man vorher nicht abzählen.")
       : n < 60
         ? tx("Few throws: the relative frequencies still jump around a lot.", "Wenige Würfe: Die relativen Häufigkeiten springen noch stark hin und her.")
-        : mode === "die"
-          ? tx("Many rolls: every number settles near 1/6 ≈ 16.7 %. That's the law of large numbers.", "Viele Würfe: Jede Augenzahl pendelt sich bei etwa 1/6 ≈ 16,7 % ein. Das ist das Gesetz der großen Zahlen.")
-          : tx(
-              `Many throws: the relative frequency settles down. A good estimate is P(point up) ≈ ${pct(h)}.`,
-              `Viele Würfe: Die relative Häufigkeit pendelt sich ein. Ein guter Schätzwert ist P(Kopflage) ≈ ${pct(h)}.`,
-            );
+        : n < 500
+          ? tx("It's getting calmer, but it isn't settled yet. Keep going!", "Es wird ruhiger, aber noch nicht genau. Mach weiter!")
+          : mode === "die"
+            ? tx("Many rolls: every number settles near 1/6 ≈ 16.7 %. That's the law of large numbers.", "Viele Würfe: Jede Augenzahl pendelt sich bei etwa 1/6 ≈ 16,7 % ein. Das ist das Gesetz der großen Zahlen.")
+            : tx(
+                `Many throws: the relative frequency settles down. A good estimate is P(point up) ≈ ${pct(h)}.`,
+                `Viele Würfe: Die relative Häufigkeit pendelt sich ein. Ein guter Schätzwert ist P(Kopflage) ≈ ${pct(h)}.`,
+              );
 
   return (
     <div className="space-y-4">
@@ -222,8 +225,8 @@ export function ProbabilityDiceLab() {
             {(mode === "die" ? [0, 0.1, 0.2, 0.3, 0.4, 0.5] : [0, 0.25, 0.5, 0.75, 1]).map((v) => (
               <g key={v}>
                 <line x1={34} x2={W - right + 4} y1={barY(v)} y2={barY(v)} stroke="var(--line)" strokeWidth={1} />
-                <text x={28} y={barY(v) + 4} textAnchor="end" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
-                  {Math.round(v * 100)}%
+                <text x={31} y={barY(v) + 4} textAnchor="end" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                  {tick(v)}
                 </text>
               </g>
             ))}
@@ -287,8 +290,8 @@ export function ProbabilityDiceLab() {
               </g>
             ))}
             {[0, 0.25, 0.5, 0.75, 1].filter((v) => v <= lyMax).map((v) => (
-              <text key={v} x={28} y={ly(v) + 4} textAnchor="end" fontSize={11} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
-                {Math.round(v * 100)}%
+              <text key={v} x={31} y={ly(v) + 4} textAnchor="end" fontSize={10.5} fill="var(--ink-3)" style={{ fontFamily: "var(--font-sans)" }}>
+                {tick(v)}
               </text>
             ))}
             <line x1={34} x2={lx(10000)} y1={ly(0)} y2={ly(0)} stroke="var(--ink-3)" strokeWidth={1} />
@@ -478,7 +481,7 @@ export function ProbabilitySpinnerLab() {
           <p className="text-[13px] leading-relaxed text-ink-2">
             {t(
               tx(
-                "Tap a field to change its colour. All fields are the same size, so P = coloured fields : all fields. The thin mark on each bar shows the relative frequency of your spins.",
+                "Tap a field to change its colour. All fields are the same size, so P = fields of that colour : all fields. The thin mark on each bar shows the relative frequency of your spins.",
                 "Tippe auf ein Feld, um seine Farbe zu wechseln. Alle Felder sind gleich groß, also ist P = Felder dieser Farbe : alle Felder. Der Strich auf jedem Balken zeigt die relative Häufigkeit deiner Drehungen.",
               ),
             )}

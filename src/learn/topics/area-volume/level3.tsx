@@ -8,7 +8,7 @@ import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson } from "@/learn/types";
 import { figure, type FigureSpec } from "./figures";
-import { exact, matchTask, mistakeList, rounded, say, weighted } from "./kit";
+import { exact, exactNum, matchTask, mistakeList, rounded, say, weighted } from "./kit";
 import { AreaVolumePourLab, AreaVolumeScaleLab } from "./widgets3";
 
 const PI = Math.PI;
@@ -102,7 +102,7 @@ function pyrVFrames(a: number, b: number, h: number, unit: string): Frame[] {
     { math: "V#V =#e \\frac{1}{3}#f \\cdot#m G#G \\cdot#m2 h#h", note: tx("Pyramid: a third of base times height.", "Pyramide: ein Drittel von Grundfläche mal Höhe.") },
     { math: say((f) => `G#G =#e ${a === b ? `${a}#a^{2#sq}` : `${a}#a \\cdot#mg ${b}#b`} =#eg ${f.n(G)}#gv ${q(`${unit}²`)}#ug`), note: a === b ? tx("The base is a square.", "Die Grundfläche ist ein Quadrat.") : tx("The base is a rectangle.", "Die Grundfläche ist ein Rechteck.") },
     { math: say((f) => `V#V =#e \\frac{1}{3}#f \\cdot#m ${f.n(G)}#G \\cdot#m2 ${f.n(h)}#h`), note: tx("Put in $G$ and $h$.", "Setz $G$ und $h$ ein.") },
-    { math: say((f) => `V#V =#e ${f.n((G * h) / 3)}#G ${q(`${unit}³`)}#u`), note: say((f) => f.t(`$${f.n(G)} \\cdot ${f.n(h)} = ${f.n(G * h)}$, a third of it is $${f.n((G * h) / 3)}$.`, `$${f.n(G)} \\cdot ${f.n(h)} = ${f.n(G * h)}$, ein Drittel davon ist $${f.n((G * h) / 3)}$.`)) },
+    { math: say((f) => `V#V =#e ${exactNum(f, (G * h) / 3)}#G ${q(`${unit}³`)}#u`), note: say((f) => f.t(`$${f.n(G)} \\cdot ${f.n(h)} = ${f.n(G * h)}$, a third of it is $${exactNum(f, (G * h) / 3)}$.`, `$${f.n(G)} \\cdot ${f.n(h)} = ${f.n(G * h)}$, ein Drittel davon ist $${exactNum(f, (G * h) / 3)}$.`)) },
   ];
 }
 
@@ -236,7 +236,7 @@ function coneVolumeTask(rng: Rng): Exercise {
   if (kind === "rs") frames.push({ math: `h#h =#e \\sqrt{${s}^2 - ${r}^2}#rt =#e2 \\sqrt{${h * h}}#rt2 =#e3 ${h}#hv ${q(unit)}#u`, note: tx("The height isn't given: Pythagoras with the slant height $s$ as the hypotenuse.", "Die Höhe ist nicht gegeben: Pythagoras mit der Mantellinie $s$ als Hypotenuse.") });
   frames.push(
     { math: say((f) => `V#V =#e \\frac{1}{3}#f \\cdot#m \\pi#pi \\cdot#m3 ${f.n(r)}#r^{2#sq} \\cdot#m2 ${h}#h`), note: tx("Put in radius and height.", "Setz Radius und Höhe ein.") },
-    { math: say((f) => `V#V =#e ${f.n((r * r * h) / 3)}#r \\pi#pi`), note: say((f) => f.t(`$\\frac{1}{3} \\cdot ${f.n(r * r)} \\cdot ${h} = ${f.n((r * r * h) / 3)}$.`, `$\\frac{1}{3} \\cdot ${f.n(r * r)} \\cdot ${h} = ${f.n((r * r * h) / 3)}$.`)) },
+    { math: say((f) => `V#V =#e ${exactNum(f, (r * r * h) / 3)}#r \\pi#pi`), note: say((f) => f.t(`$\\frac{1}{3} \\cdot ${f.n(r * r)} \\cdot ${h} = ${exactNum(f, (r * r * h) / 3)}$.`, `$\\frac{1}{3} \\cdot ${f.n(r * r)} \\cdot ${h} = ${exactNum(f, (r * r * h) / 3)}$.`)) },
     { math: say((f) => `V#V \\approx#e ${f.d(V, 1)}#r ${q(`${unit}³`)}#u`), note: tx("π key, then round.", "π-Taste, dann runden.") },
   );
   return {
@@ -441,7 +441,7 @@ function sphereFrames(r: number, vol: boolean, unit: string, useD: boolean): Fra
   const value = vol ? (4 / 3) * PI * r ** 3 : 4 * PI * r * r;
   out.push(
     { math: say((f) => (vol ? `V#V =#e \\frac{4}{3}#f \\pi#pi \\cdot#m ${f.n(r)}#r^{3#e}` : `O#V =#e 4#f \\pi#pi \\cdot#m ${f.n(r)}#r^{2#e}`)), note: tx("Put in the radius.", "Setz den Radius ein.") },
-    { math: say((f) => `${vol ? "V#V" : "O#V"} =#e ${f.n(vol ? (4 / 3) * r ** 3 : 4 * r * r)}#r \\pi#pi`), note: say((f) => f.t(vol ? `$${f.n(r)}^3 = ${f.n(r ** 3)}$, times $\\frac{4}{3}$.` : `$${f.n(r)}^2 = ${f.n(r * r)}$, times 4.`, vol ? `$${f.n(r)}^3 = ${f.n(r ** 3)}$, mal $\\frac{4}{3}$.` : `$${f.n(r)}^2 = ${f.n(r * r)}$, mal 4.`)) },
+    { math: say((f) => `${vol ? "V#V" : "O#V"} =#e ${exactNum(f, vol ? (4 / 3) * r ** 3 : 4 * r * r)}#r \\pi#pi`), note: say((f) => f.t(vol ? `$${f.n(r)}^3 = ${f.n(r ** 3)}$, times $\\frac{4}{3}$.` : `$${f.n(r)}^2 = ${f.n(r * r)}$, times 4.`, vol ? `$${f.n(r)}^3 = ${f.n(r ** 3)}$, mal $\\frac{4}{3}$.` : `$${f.n(r)}^2 = ${f.n(r * r)}$, mal 4.`)) },
     { math: say((f) => `${vol ? "V#V" : "O#V"} \\approx#e ${f.d(value, 1)}#r ${q(vol ? `${unit}³` : `${unit}²`)}#u`), note: tx("π key, then round.", "π-Taste, dann runden.") },
   );
   return out;
@@ -496,7 +496,7 @@ function compositeSolidTask(rng: Rng): Exercise {
     frames = [
       { math: tx('V#V =#e V_{"cyl"}#a +#p V_{"cone"}#b', 'V#V =#e V_{"Zylinder"}#a +#p V_{"Kegel"}#b'), note: tx("Cylinder plus cone with the same radius.", "Zylinder plus Kegel mit gleichem Radius.") },
       { math: `V#V =#e \\pi#p1 \\cdot#m1 ${r}#r1^{2#s1} \\cdot#m2 ${h1}#h1 +#p \\frac{1}{3}#f \\pi#p2 \\cdot#m3 ${r}#r2^{2#s2} \\cdot#m4 ${h2}#h2`, note: tx("Only the cone gets the $\\frac{1}{3}$.", "Nur der Kegel bekommt das $\\frac{1}{3}$.") },
-      { math: say((f) => `V#V =#e ${r * r * h1}#r1 \\pi#p1 +#p ${f.n((r * r * h2) / 3)}#r2 \\pi#p2 =#e2 ${f.n(r * r * h1 + (r * r * h2) / 3)}#v \\pi#p3`), note: tx("Both parts are multiples of π.", "Beide Teile sind Vielfache von π.") },
+      { math: say((f) => `V#V =#e ${r * r * h1}#r1 \\pi#p1 +#p ${exactNum(f, (r * r * h2) / 3)}#r2 \\pi#p2 =#e2 ${exactNum(f, r * r * h1 + (r * r * h2) / 3)}#v \\pi#p3`), note: tx("Both parts are multiples of π.", "Beide Teile sind Vielfache von π.") },
       { math: say((f) => `V#V \\approx#e ${f.d(V, 1)}#v ${q(u3)}#u`), note: tx("π key, then round.", "π-Taste, dann runden.") },
     ];
     wrong.push([PI * r * r * (h1 + h2), tx("Cone without the third", "Kegel ohne Drittel"), tx("The roof is a **cone**: a third of the cylinder with the same base.", "Das Dach ist ein **Kegel**: ein Drittel des Zylinders mit gleicher Grundfläche.")]);
@@ -510,7 +510,7 @@ function compositeSolidTask(rng: Rng): Exercise {
     frames = [
       { math: tx('V#V =#e V_{"cyl"}#a +#p \\frac{1}{2}#hf V_{"sphere"}#b', 'V#V =#e V_{"Zylinder"}#a +#p \\frac{1}{2}#hf V_{"Kugel"}#b'), note: tx("Cylinder plus half a sphere with the same radius.", "Zylinder plus eine halbe Kugel mit gleichem Radius.") },
       { math: `V#V =#e \\pi#p1 \\cdot#m1 ${r}#r1^{2#s1} \\cdot#m2 ${h1}#h1 +#p \\frac{1}{2}#hf \\cdot#m5 \\frac{4}{3}#f \\pi#p2 \\cdot#m3 ${r}#r2^{3#s2}`, note: tx("Half of $\\frac{4}{3}$ is $\\frac{2}{3}$.", "Die Hälfte von $\\frac{4}{3}$ ist $\\frac{2}{3}$.") },
-      { math: say((f) => `V#V =#e ${r * r * h1}#r1 \\pi#p1 +#p ${f.n((2 / 3) * r ** 3)}#r2 \\pi#p2`), note: tx("Both parts as multiples of π.", "Beide Teile als Vielfache von π.") },
+      { math: say((f) => `V#V =#e ${r * r * h1}#r1 \\pi#p1 +#p ${exactNum(f, (2 / 3) * r ** 3)}#r2 \\pi#p2`), note: tx("Both parts as multiples of π.", "Beide Teile als Vielfache von π.") },
       { math: say((f) => `V#V \\approx#e ${f.d(V, 1)}#v ${q(u3)}#u`), note: tx("π key, then round.", "π-Taste, dann runden.") },
     ];
     wrong.push([PI * r * r * h1 + (4 / 3) * PI * r ** 3, tx("A whole sphere", "Eine ganze Kugel"), tx("Only **half** a sphere sits on top: $\\frac{1}{2} \\cdot \\frac{4}{3} \\pi r^3$.", "Oben sitzt nur eine **halbe** Kugel: $\\frac{1}{2} \\cdot \\frac{4}{3} \\pi r^3$.")]);
@@ -523,7 +523,7 @@ function compositeSolidTask(rng: Rng): Exercise {
     frames = [
       { math: tx('V#V =#e V_{"cone"}#a +#p \\frac{1}{2}#hf V_{"sphere"}#b', 'V#V =#e V_{"Kegel"}#a +#p \\frac{1}{2}#hf V_{"Kugel"}#b'), note: tx("Cone plus hemisphere with the same radius.", "Kegel plus Halbkugel mit gleichem Radius.") },
       { math: `V#V =#e \\frac{1}{3}#f1 \\pi#p1 \\cdot#m1 ${r}#r1^{2#s1} \\cdot#m2 ${h}#h1 +#p \\frac{2}{3}#f2 \\pi#p2 \\cdot#m3 ${r}#r2^{3#s2}`, note: tx("A third for the cone, half of $\\frac{4}{3}$ for the hemisphere.", "Ein Drittel beim Kegel, die Hälfte von $\\frac{4}{3}$ bei der Halbkugel.") },
-      { math: say((f) => `V#V =#e ${f.n((r * r * h) / 3)}#r1 \\pi#p1 +#p ${f.n((2 / 3) * r ** 3)}#r2 \\pi#p2`), note: tx("Both parts as multiples of π.", "Beide Teile als Vielfache von π.") },
+      { math: say((f) => `V#V =#e ${exactNum(f, (r * r * h) / 3)}#r1 \\pi#p1 +#p ${exactNum(f, (2 / 3) * r ** 3)}#r2 \\pi#p2`), note: tx("Both parts as multiples of π.", "Beide Teile als Vielfache von π.") },
       { math: say((f) => `V#V \\approx#e ${f.d(V, 1)}#v ${q(u3)}#u`), note: tx("π key, then round.", "π-Taste, dann runden.") },
     ];
     wrong.push([(PI * r * r * h) / 3 + (4 / 3) * PI * r ** 3, tx("A whole sphere", "Eine ganze Kugel"), tx("Only **half** a sphere of ice cream sits on top.", "Oben sitzt nur eine **halbe** Kugel Eis.")]);
@@ -638,7 +638,30 @@ const FORMULAS: Fm[] = [
   { id: "sphO", name: tx("Sphere: surface area", "Kugel: Oberfläche"), f: "$O = 4 \\pi r^2$" },
   { id: "cylV", name: tx("Cylinder: volume", "Zylinder: Volumen"), f: "$V = \\pi r^2 h$" },
 ];
-const DISTRACTORS: Text[] = ["$V = \\frac{4}{3} \\pi r^2$", "$M = 2 \\pi r s$", "$V = \\frac{1}{2} G h$"];
+/** A wrong formula, and Blob's note for each solid a student may wrongly match it with. */
+type Distractor = { f: Text; wrongFor: { id: string; title: Text; say: Text }[] };
+const DISTRACTORS: Distractor[] = [
+  {
+    f: "$V = \\frac{4}{3} \\pi r^2$",
+    wrongFor: [
+      { id: "sphV", title: tx("Check the power", "Prüf die Potenz"), say: tx("A volume needs three lengths: $r^3$.", "Ein Volumen braucht drei Längen: $r^3$.") },
+      { id: "sphO", title: tx("The 4/3 belongs to the volume", "Das 4/3 gehört zum Volumen"), say: tx("The surface of a sphere is four circles: $O = 4 \\pi r^2$. The $\\frac{4}{3}$ belongs to the volume.", "Die Kugeloberfläche ist so groß wie vier Kreise: $O = 4 \\pi r^2$. Das $\\frac{4}{3}$ gehört zum Volumen.") },
+    ],
+  },
+  {
+    f: "$M = 2 \\pi r s$",
+    wrongFor: [
+      { id: "coneM", title: tx("Like a cylinder's surface", "Wie ein Zylindermantel"), say: tx("$2 \\pi r \\cdot s$ would be a whole rectangle, like the curved surface of a cylinder. The unrolled cone is only a sector: $M = \\pi r s$.", "$2 \\pi r \\cdot s$ wäre ein ganzes Rechteck wie beim Zylindermantel. Der abgewickelte Kegelmantel ist nur ein Kreisausschnitt: $M = \\pi r s$.") },
+    ],
+  },
+  {
+    f: "$V = \\frac{1}{2} G h$",
+    wrongFor: [
+      { id: "pyr", title: tx("Half instead of a third", "Hälfte statt Drittel"), say: tx("A pyramid is **a third** of the prism, not half of it: $V = \\frac{1}{3} G h$.", "Eine Pyramide ist **ein Drittel** des Prismas, nicht die Hälfte: $V = \\frac{1}{3} G h$.") },
+      { id: "coneV", title: tx("Half instead of a third", "Hälfte statt Drittel"), say: tx("A cone holds **a third** of the cylinder, not half of it: $V = \\frac{1}{3} \\pi r^2 h$.", "Ein Kegel fasst **ein Drittel** des Zylinders, nicht die Hälfte: $V = \\frac{1}{3} \\pi r^2 h$.") },
+    ],
+  },
+];
 
 function matchSolidsTask(rng: Rng): Exercise {
   const chosen = rng.shuffle(FORMULAS).slice(0, 4);
@@ -647,8 +670,11 @@ function matchSolidsTask(rng: Rng): Exercise {
   const wrong: { pairs: [Text, Text][]; title: Text; say: Text }[] = [];
   if (has("coneV") && has("cylV")) wrong.push({ pairs: [[has("coneV")!.name, has("cylV")!.f]], title: tx("The third is missing", "Das Drittel fehlt"), say: tx("A cone holds only a third of the cylinder: $\\frac{1}{3} \\pi r^2 h$.", "Ein Kegel fasst nur ein Drittel des Zylinders: $\\frac{1}{3} \\pi r^2 h$.") });
   if (has("sphV") && has("sphO")) wrong.push({ pairs: [[has("sphV")!.name, has("sphO")!.f]], title: tx("Volume and surface swapped", "Volumen und Oberfläche vertauscht"), say: tx("A volume has $r^3$ (three lengths), a surface $r^2$.", "Ein Volumen hat $r^3$ (drei Längen), eine Oberfläche $r^2$.") });
-  if (has("sphV")) wrong.push({ pairs: [[has("sphV")!.name, extra]], title: tx("Check the power", "Prüf die Potenz"), say: tx("A volume needs three lengths: $r^3$.", "Ein Volumen braucht drei Längen: $r^3$.") });
-  const m = matchTask(chosen.map((c) => [c.name, c.f] as [Text, Text]), [extra], wrong);
+  for (const w of extra.wrongFor) {
+    const c = has(w.id);
+    if (c) wrong.push({ pairs: [[c.name, extra.f]], title: w.title, say: w.say });
+  }
+  const m = matchTask(chosen.map((c) => [c.name, c.f] as [Text, Text]), [extra.f], wrong);
   return {
     instruction: tx("Match the formulas", "Ordne die Formeln zu"),
     text: tx("Which formula belongs to which solid? One formula is left over.", "Welche Formel gehört zu welchem Körper? Eine Formel bleibt übrig."),

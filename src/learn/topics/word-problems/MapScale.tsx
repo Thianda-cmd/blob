@@ -285,7 +285,7 @@ export function MapScale() {
       <div className="overflow-x-auto rounded-xl border border-line px-4 py-3">
         <MathView src={calc} size="sm" scope={`${id}-calc`} />
         <p className="mt-1.5 text-[12.5px] text-ink-3">
-          {t(tx("100 cm = 1 m and 100 000 cm = 1 km: cross out zeros in groups.", "100 cm = 1 m und 100 000 cm = 1 km: Streich die Nullen gruppenweise weg."))}
+          {t(tx("100 cm = 1 m and 100 000 cm = 1 km: cross out zeros in groups.", "100 cm = 1 m und 100.000 cm = 1 km: Streich die Nullen gruppenweise weg."))}
         </p>
       </div>
     </div>

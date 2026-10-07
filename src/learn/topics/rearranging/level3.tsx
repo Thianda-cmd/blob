@@ -123,9 +123,10 @@ function twiceA3(k1: number, k2: number): Derivation {
       { math: `x#x1 =#eq \\frac{a#a +#m2 ${k2}#k2}{b#b -#m ${k1}#k1}#fr`, note: tx(`Tidy up: multiply numerator **and** denominator by $-1$. Condition: $b \\ne ${k1}$.`, `Aufräumen: Zähler **und** Nenner mit $-1$ multiplizieren. Bedingung: $b \\ne ${k1}$.`) },
     ],
     slips: [
-      { plain: `(a-${k2})/(b-${k1})`, title: SIGN, say: tx(`Nearly! $a$ went to the right but kept its plus. Bringing it over means **subtracting** it: $-${k2} - a$.`, `Fast! $a$ ist nach rechts gewandert, hat aber sein Plus behalten. Rüberbringen heißt **subtrahieren**: $-${k2} - a$.`) },
+      { plain: `(${k2}-a)/(b-${k1})`, title: SIGN, say: tx(`Nearly! $a$ went to the right but kept its plus. Bringing it over means **subtracting** it: $-${k2} - a$.`, `Fast! $a$ ist nach rechts gewandert, hat aber sein Plus behalten. Rüberbringen heißt **subtrahieren**: $-${k2} - a$.`) },
       { plain: `(a+${k2})/(${k1}-b)`, title: tx("Only the numerator times −1", "Nur den Zähler mal −1"), say: tx("When you multiply by $-1$ to tidy up, the numerator **and** the denominator change their signs.", "Wenn du zum Aufräumen mit $-1$ multiplizierst, ändern Zähler **und** Nenner ihre Vorzeichen.") },
       { plain: `-(a+${k2})/(${k1}+b)`, title: SIGN, say: tx("Ah, I see what happened! $bx$ went over to the left but kept its plus. Bringing it over means **subtracting** it.", "Ah, ich seh, was passiert ist! $bx$ ist nach links gewandert, hat aber sein Plus behalten. Rüberbringen heißt **subtrahieren**.") },
+      { plain: `(a-${k2})/(b-${k1})`, title: SIGN, say: tx(`Nearly! The $-${k2}$ went to the other side but kept its minus. Bringing it over means **adding** it: $a + ${k2}$.`, `Fast! Das $-${k2}$ hat die Seite gewechselt, aber sein Minus behalten. Rüberbringen heißt **addieren**: $a + ${k2}$.`) },
     ],
     cond: { den: `b - ${k1}`, letter: "b", value: `${k1}`, others: [{ text: "b = 0", kind: "zero" }, { text: `a = -${k2}`, kind: "num" }, { text: `b = -${k1}`, kind: "sign" }] },
     hint: tx("Collect the x-terms on the left, the rest on the right, then factor out $x$.", "Sammle die x-Terme links, den Rest rechts, dann klammere $x$ aus."),
@@ -201,7 +202,7 @@ function twiceA6(k: number): Derivation {
       { plain: `${k}*y/(a+y)`, title: SIGN, say: tx("Ah, I see what happened! $yx$ changed sides but kept its plus. Bringing it over means **subtracting** it: $ax - yx$.", "Ah, ich seh, was passiert ist! $yx$ hat die Seite gewechselt, aber sein Plus behalten. Rüberbringen heißt **subtrahieren**: $ax - yx$.") },
       { plain: `${k}*y/a`, title: TERM_LOST, say: tx("Hmm, you only divided by $a$. But $yx$ is an x-term too: collect both x-terms and factor out $x$.", "Hmm, du hast nur durch $a$ geteilt. Aber $yx$ ist auch ein x-Term: Sammle beide x-Terme und klammere $x$ aus.") },
     ],
-    cond: { den: "a - y", letter: "y", value: "a", others: [{ text: "y = 0", kind: "num" }, { text: "a = 0", kind: "zero" }, { text: "y = -a", kind: "sign" }] },
+    cond: { den: "a - y", letter: "y", value: "a", others: [{ text: "y = 0", kind: "num" }, { text: "a = 1", kind: "zero" }, { text: "y = -a", kind: "sign" }] },
     hint: tx("Multiply by the denominator, expand, collect the x-terms on one side, then factor out $x$.", "Multipliziere mit dem Nenner, multipliziere aus, sammle die x-Terme auf einer Seite und klammere $x$ aus."),
   };
 }
@@ -275,7 +276,7 @@ function twiceHarmonic(): Derivation {
       { plain: "h*b/(2*b+h)", title: SIGN, say: tx("Ah, I see what happened! $ha$ changed sides but kept its plus. Bringing it over means **subtracting** it: $2ab - ha$.", "Ah, ich seh, was passiert ist! $ha$ hat die Seite gewechselt, aber sein Plus behalten. Rüberbringen heißt **subtrahieren**: $2ab - ha$.") },
       { plain: "h*b/(2*b)", title: TERM_LOST, say: tx("Hmm, $ha$ got lost. It contains $a$ too: collect both a-terms and factor out $a$.", "Hmm, $ha$ ist verloren gegangen. Da steckt auch $a$ drin: Sammle beide a-Terme und klammere $a$ aus.") },
     ],
-    cond: { den: "2 b - h", letter: "h", value: "2 b", others: [{ text: "h = 0", kind: "num" }, { text: "b = 0", kind: "zero" }, { text: "h = -2 b", kind: "sign" }] },
+    cond: { den: "2 b - h", letter: "h", value: "2 b", others: [{ text: "h = 0", kind: "num" }, { text: "h = b", kind: "zero" }, { text: "h = -2 b", kind: "sign" }] },
     hint: tx("Multiply by the denominator, expand, collect the a-terms on one side and factor out $a$.", "Multipliziere mit dem Nenner, löse die Klammer auf, sammle die a-Terme auf einer Seite und klammere $a$ aus."),
   };
 }
@@ -428,7 +429,7 @@ function gravity(target: "r" | "M"): Derivation {
       slips: [
         { plain: "G*m*M/F", title: tx("Square root missing", "Wurzel vergessen"), say: tx("So close! That's $r^2$. You still need the **square root** to get $r$.", "Ganz knapp! Das ist $r^2$. Für $r$ fehlt noch die **Wurzel**."), close: true },
         { plain: "sqrt(F/(G*m*M))", title: UPSIDE, say: tx("Upside down! $r^2 = \\frac{GmM}{F}$: the force $F$ goes **under** the fraction bar.", "Andersrum! $r^2 = \\frac{GmM}{F}$: Die Kraft $F$ kommt **unter** den Bruchstrich.") },
-        { plain: "G*m*M/F^2", title: tx("Squared instead of root", "Quadriert statt Wurzel gezogen"), say: tx("To undo a square you take the **square root**, not another square.", "Ein Quadrat machst du mit der **Wurzel** rückgängig, nicht mit noch einem Quadrat.") },
+        { plain: "(G*m*M/F)^2", title: tx("Squared instead of root", "Quadriert statt Wurzel gezogen"), say: tx("To undo a square you take the **square root**, not another square.", "Ein Quadrat machst du mit der **Wurzel** rückgängig, nicht mit noch einem Quadrat.") },
       ],
       hint: tx("Get $r^2$ out of the denominator, isolate it, then take the square root.", "Hol $r^2$ aus dem Nenner, bring es allein auf eine Seite und zieh dann die Wurzel."),
     };
@@ -1000,9 +1001,9 @@ const rootFrames: Frame[] = [
 
 const conditionFrames: Frame[] = [
   { math: "x = \\frac{d - b}{a - c} \\quad a \\ne c", note: tx("Every division is a promise: the divisor is not $0$. Here $a - c \\ne 0$, so $a \\ne c$.", "Jede Division ist ein Versprechen: Der Teiler ist nicht $0$. Hier $a - c \\ne 0$, also $a \\ne c$.") },
-  { math: "b = \\frac{f g}{g - f} \\quad g \\ne f", note: tx("The lens: $g \\ne f$. Physically, a candle at the focal point sends out parallel rays: no image.", "Die Linse: $g \\ne f$. Physikalisch: Eine Kerze im Brennpunkt sendet parallele Strahlen aus, es gibt kein Bild.") },
-  { math: tx('x^2 = 9 \\Rightarrow x = 3 \\; "or" \\; x = -3', 'x^2 = 9 \\Rightarrow x = 3 \\; "oder" \\; x = -3'), note: tx("In pure maths, a square has **two** roots.", "In der reinen Mathematik hat ein Quadrat **zwei** Wurzeln.") },
-  { math: "r^2 = 9 \\Rightarrow r = 3", note: tx("But a radius, a length or a time is **positive**: only $r = 3$ makes sense. That's why formulas keep just the positive root.", "Aber ein Radius, eine Länge oder eine Zeit ist **positiv**: Nur $r = 3$ ergibt Sinn. Deshalb behalten Formeln nur die positive Wurzel.") },
+  { math: "b = \\frac{f g}{g - f} \\quad g \\ne f", note: tx("The lens: $g \\ne f$. Physically: with the candle at the focal point, the rays leave the lens parallel. There is no image.", "Die Linse: $g \\ne f$. Physikalisch: Steht die Kerze im Brennpunkt, verlaufen die Strahlen hinter der Linse parallel. Es gibt kein Bild.") },
+  { math: tx('x^2 = 9 \\Rightarrow x = 3 \\; "or" \\; x = -3', 'x^2 = 9 \\Rightarrow x = 3 \\; "oder" \\; x = -3'), note: tx("The equation $x^2 = 9$ has **two** solutions: $3$ and $-3$.", "Die Gleichung $x^2 = 9$ hat **zwei** Lösungen: $3$ und $-3$.") },
+  { math: "r^2 = 9 \\Rightarrow r = 3", note: tx("But a radius, a length or a time is **positive**: only $r = 3$ makes sense. That's why formulas keep just the positive solution.", "Aber ein Radius, eine Länge oder eine Zeit ist **positiv**: Nur $r = 3$ ergibt Sinn. Deshalb behalten Formeln nur die positive Lösung.") },
   { math: "v = \\sqrt{2 g h} \\quad h \\ge 0", note: tx("And under a square root nothing negative may stand: here $h \\ge 0$.", "Und unter einer Quadratwurzel darf nichts Negatives stehen: Hier ist $h \\ge 0$.") },
 ];
 

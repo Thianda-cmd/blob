@@ -130,6 +130,8 @@ export function AxisLine({
   labelEvery = 1,
   phoneEvery = 2,
   labels,
+  phoneText = "max-sm:text-[19px]",
+  labelGap = 26,
 }: {
   ax: Axis;
   y: number;
@@ -138,6 +140,10 @@ export function AxisLine({
   phoneEvery?: number;
   /** Only these values get a number (for "read the number line" tasks). */
   labels?: number[];
+  /** Font size of the numbers on phones (a wide axis is scaled down more, so it needs bigger numbers). */
+  phoneText?: string;
+  /** Distance of the numbers below the line. */
+  labelGap?: number;
 }) {
   const ticks: number[] = [];
   for (let v = ax.from; v <= ax.to + 1e-9; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
@@ -157,10 +163,10 @@ export function AxisLine({
             {shown && (
               <text
                 x={ax.x(v)}
-                y={y + 26}
+                y={y + labelGap}
                 textAnchor="middle"
                 fill={big ? "var(--ink)" : "var(--ink-2)"}
-                className={cn("font-math text-[14px] max-sm:text-[19px]", !onPhone && "max-sm:hidden")}
+                className={cn("font-math text-[14px]", phoneText, !onPhone && "max-sm:hidden")}
                 fontWeight={big ? 600 : 400}
               >
                 {signed(v)}

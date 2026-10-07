@@ -951,8 +951,8 @@ export const level1: LevelLesson = {
     },
     {
       title: tx("Rearrange with the opposite", "Umstellen mit der Umkehroperation"),
-      body: tx("Times is undone by divided by, plus by minus. Always on **both** sides.", "Mal machst du mit Geteilt rückgängig, Plus mit Minus. Immer auf **beiden** Seiten."),
-      examples: ["u = 4 \\cdot a \\quad | \\, : 4", "u : 4 = a", "a = u : 4"],
+      body: tx("Times and divided by undo each other, and so do plus and minus. Always on **both** sides.", "Mal und Geteilt machen sich gegenseitig rückgängig, Plus und Minus auch. Immer auf **beiden** Seiten."),
+      examples: ["u = 4 \\cdot a \\quad | \\, : 4", "a = u : 4", "v = s : t \\quad | \\, \\cdot t", "s = v \\cdot t"],
       tone: "rule",
     },
     {
@@ -971,7 +971,7 @@ export const level1: LevelLesson = {
         "A formula tells you how to work out a quantity. Its letters stand for quantities: $A$ for the area, $a$ and $b$ for the sides. To use it, you **put in** the values with their units.",
         "Eine Formel sagt dir, wie du eine Größe ausrechnest. Ihre Buchstaben stehen für Größen: $A$ für den Flächeninhalt, $a$ und $b$ für die Seiten. Um sie zu benutzen, **setzt** du die Werte mit ihren Einheiten **ein**.",
       ),
-      frames: calcFrames(RECT_A, complete(RECT_A, { a: 6, b: 4 }), "cm", tx("The area of a rectangle: side times side. Here $a = 6$ cm and $b = 4$ cm.", "Der Flächeninhalt eines Rechtecks: Seite mal Seite. Hier ist $a = 6$ cm und $b = 4$ cm.")),
+      frames: calcFrames(RECT_A, complete(RECT_A, { a: 6, b: 4 }), "cm", tx("The area of a rectangle: length times width, so $A = a \\cdot b$. Here $a = 6$ cm and $b = 4$ cm.", "Der Flächeninhalt eines Rechtecks: Länge mal Breite, also $A = a \\cdot b$. Hier ist $a = 6$ cm und $b = 4$ cm.")),
     },
     {
       type: "widget",
@@ -1029,7 +1029,7 @@ export const level1: LevelLesson = {
       blob: tx("Every operation has an opposite. Find it!", "Jede Rechenart hat eine Umkehrung. Finde sie!"),
       body: tx(
         "Pick the operation that gets the purple letter on its own. Whatever you pick happens on **both** sides of the equals sign.",
-        "Wähle die Rechnung, mit der der lila Buchstabe allein steht. Was du wählst, passiert auf **beiden** Seiten des Gleichheitszeichens.",
+        "Mit welcher Rechnung steht der lila Buchstabe allein? Was du wählst, passiert auf **beiden** Seiten des Gleichheitszeichens.",
       ),
       widget: UndoMachine,
     },

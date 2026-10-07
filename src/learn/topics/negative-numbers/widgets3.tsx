@@ -9,7 +9,7 @@ import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
 import { createRng } from "@/learn/engine/rng";
 import { cn } from "@/lib/utils";
-import { par } from "./shared";
+import { par, stepsOf } from "./shared";
 import { AxisLine, Brace, DragPoint, Hint, makeAxis, Segmented, signed, Stepper } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -31,15 +31,15 @@ export function NegDistance() {
   const sentence =
     mode === "zero"
       ? tx(
-          `$a = ${a}$ is ${Math.abs(a)} steps from $0$, and $b = ${b}$ is ${Math.abs(b)} steps from $0$. The absolute value is that distance, so it is never negative.`,
-          `$a = ${a}$ ist ${Math.abs(a)} Schritte von $0$ entfernt und $b = ${b}$ ist ${Math.abs(b)} Schritte von $0$ entfernt. Der Betrag ist genau dieser Abstand, deshalb ist er nie negativ.`,
+          `$a = ${a}$ is ${stepsOf(Math.abs(a), "en")} from $0$, and $b = ${b}$ is ${stepsOf(Math.abs(b), "en")} from $0$. The absolute value is that distance, so it is never negative.`,
+          `$a = ${a}$ ist ${stepsOf(Math.abs(a), "de")} von $0$ entfernt und $b = ${b}$ ist ${stepsOf(Math.abs(b), "de")} von $0$ entfernt. Der Betrag ist genau dieser Abstand, deshalb ist er nie negativ.`,
         )
       : d === 0
         ? tx("Both points are on the same number: the distance is $0$.", "Beide Punkte liegen auf derselben Zahl: Der Abstand ist $0$.")
         : txMap((tr) =>
             tr(
-              `There are ${d} steps between $a$ and $b$. Whichever way round you subtract, $${a - b}$ or $${b - a}$, the absolute value makes the distance positive.`,
-              `Zwischen $a$ und $b$ liegen ${d} Schritte. Egal, wie herum du subtrahierst, $${a - b}$ oder $${b - a}$: Der Betrag macht den Abstand positiv.`,
+              `There ${d === 1 ? "is" : "are"} ${stepsOf(d, "en")} between $a$ and $b$. Whichever way round you subtract, $${a - b}$ or $${b - a}$, the absolute value makes the distance positive.`,
+              `Zwischen $a$ und $b$ ${d === 1 ? "liegt" : "liegen"} ${stepsOf(d, "de")}. Egal, wie herum du subtrahierst, $${a - b}$ oder $${b - a}$: Der Betrag macht den Abstand positiv.`,
             ),
           );
 
@@ -104,9 +104,12 @@ export function NegPowerLab() {
   const a = Math.abs(base);
   const value = brackets ? base ** n : -(a ** n);
   const factors = Array.from({ length: n }, (_, i) => i);
-  const chain = brackets ? factors.map(() => `(${base})`).join(" \\cdot ") : `-(${factors.map(() => a).join(" \\cdot ")})`;
+  // Lines may only break before "=" or "·": a minus never dangles at the end of a line.
+  const chain = brackets
+    ? [`\\group{= (${base})}`, ...factors.slice(1).map(() => `\\group{\\cdot (${base})}`)].join(" ")
+    : `\\group{= -(${factors.map(() => a).join(" \\cdot ")})}`;
   const head = brackets ? `(${base})^{${n}}` : `-${a}^{${n}}`;
-  const src = `${head} = ${chain} = ${big(value)}`;
+  const src = `${head} ${chain} \\group{= ${big(value)}}`;
   const pairs = Math.floor(n / 2);
   const odd = n % 2 === 1;
   const verdict = brackets

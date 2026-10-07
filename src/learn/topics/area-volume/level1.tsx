@@ -112,7 +112,7 @@ function areaFrames(a: number, b: number, unit: string, square: boolean): Frame[
     return [
       { math: "A#A =#e a#a \\cdot#m a#b", note: tx("A square: length times width, and both are $a$. So $A = a \\cdot a = a^2$.", "Ein Quadrat: Länge mal Breite, und beide sind $a$. Also $A = a \\cdot a = a^2$.") },
       { math: `A#A =#e ${a}#a \\cdot#m ${a}#b`, note: tx(`Put in $a = ${a} ${q(unit)}$.`, `Setz $a = ${a} ${q(unit)}$ ein.`) },
-      { math: `A#A =#e ${a * a}#a ${q(`${unit}²`)}#un`, note: tx(`${a * a} squares of $1 ${q(`${unit}²`)}$. An area is measured in square units.`, `${a * a} Quadrate mit je $1 ${q(`${unit}²`)}$. Flächen misst man in Quadrat-Einheiten.`) },
+      { math: `A#A =#e ${a * a}#a ${q(`${unit}²`)}#un`, note: tx(`${a * a} squares of $1 ${q(`${unit}²`)}$. An area is measured in square units.`, `${a * a} Quadrate mit je $1 ${q(`${unit}²`)}$. Flächen misst man in Quadrateinheiten.`) },
     ];
   return [
     { math: "A#A =#e a#a \\cdot#m b#b", note: tx("Area of a rectangle: length times width.", "Flächeninhalt eines Rechtecks: Länge mal Breite.") },
@@ -215,7 +215,7 @@ function missingTask(rng: Rng): Exercise {
     const A = a * b;
     const m = mistakeList(exact(b, unit, "b ="));
     m.add(A - a, tx("Subtracted instead of divided", "Subtrahiert statt dividiert"), tx(`The area is $a$ **times** $b$. To undo a multiplication, divide: $b = A : a$.`, `Der Flächeninhalt ist $a$ **mal** $b$. Eine Multiplikation machst du mit Geteilt rückgängig: $b = A : a$.`));
-    m.add(A * a, tx("Multiplied instead of divided", "Multipliziert statt dividiert"), tx(`Your side is much too long. Ask: $" + a + " \\cdot \\, ? = " + A + "$. That's a division.`, 'Deine Seite ist viel zu lang. Frag dich: $" + a + " \\cdot \\, ? = " + A + "$. Das ist eine Division.'));
+    m.add(A * a, tx("Multiplied instead of divided", "Multipliziert statt dividiert"), tx(`Your side is much too long. Ask: $${a} \\cdot \\, ? = ${A}$. That's a division.`, `Deine Seite ist viel zu lang. Frag dich: $${a} \\cdot \\, ? = ${A}$. Das ist eine Division.`));
     m.add(A / 2, tx("Halved", "Halbiert"), tx(`Halving doesn't help here: divide the area by the known side $${a} ${q(unit)}$.`, `Halbieren hilft hier nicht: Teil den Flächeninhalt durch die bekannte Seite $${a} ${q(unit)}$.`));
     return {
       instruction: MISSING,
@@ -228,7 +228,7 @@ function missingTask(rng: Rng): Exercise {
       solution: [
         { math: "A#A =#e a#a \\cdot#m b#b", note: tx("Start with the formula for the area.", "Fang mit der Formel für den Flächeninhalt an.") },
         { math: `${A}#A =#e ${a}#a \\cdot#m b#b`, note: tx("Put in what you know.", "Setz ein, was du kennst.") },
-        { math: `b#b =#e ${A}#A :#m ${a}#a`, note: tx('Undo the multiplication: divide by $" + a + "$.', 'Mach die Multiplikation rückgängig: Teil durch $" + a + "$.') },
+        { math: `b#b =#e ${A}#A :#m ${a}#a`, note: tx(`Undo the multiplication: divide by $${a}$.`, `Mach die Multiplikation rückgängig: Teil durch $${a}$.`) },
         { math: `b#b =#e ${b}#r ${q(unit)}#u`, note: tx(`Check: $${a} \\cdot ${b} = ${A}$. Fits!`, `Probe: $${a} \\cdot ${b} = ${A}$. Passt!`) },
       ],
       mistakes: m.list,
@@ -266,7 +266,7 @@ function missingTask(rng: Rng): Exercise {
     const A = a * a;
     const m = mistakeList(exact(a, unit, "a ="));
     m.add(A / 2, tx("Halved", "Halbiert"), tx(`$a^2$ means $a \\cdot a$, not $2 \\cdot a$. Look for the number that gives ${A} when multiplied by itself.`, `$a^2$ heißt $a \\cdot a$, nicht $2 \\cdot a$. Such die Zahl, die mit sich selbst malgenommen ${A} ergibt.`));
-    m.add(A / 4, tx("Divided by 4", "Durch 4 geteilt"), tx('Dividing by 4 works for the **perimeter** of a square. Here you have the area: $a \\cdot a = " + A + "$.', 'Durch 4 teilen klappt beim **Umfang** eines Quadrats. Hier hast du den Flächeninhalt: $a \\cdot a = " + A + "$.'));
+    m.add(A / 4, tx("Divided by 4", "Durch 4 geteilt"), tx(`Dividing by 4 works for the **perimeter** of a square. Here you have the area: $a \\cdot a = ${A}$.`, `Durch 4 teilen klappt beim **Umfang** eines Quadrats. Hier hast du den Flächeninhalt: $a \\cdot a = ${A}$.`));
     return {
       instruction: MISSING,
       text: tx(`A square has the area $A = ${A} ${q(`${unit}²`)}$. How long is one side?`, `Ein Quadrat hat den Flächeninhalt $A = ${A} ${q(`${unit}²`)}$. Wie lang ist eine Seite?`),
@@ -535,7 +535,7 @@ function volumeFrames(a: number, b: number, c: number, unit: string, cube: boole
     { math: "V#V =#e a#a \\cdot#m1 b#b \\cdot#m2 c#c", note: tx("Volume of a cuboid: length times width times height.", "Volumen eines Quaders: Länge mal Breite mal Höhe.") },
     { math: `V#V =#e ${a}#a \\cdot#m1 ${b}#b \\cdot#m2 ${c}#c`, note: tx("Put in the three edges.", "Setz die drei Kanten ein.") },
     { math: `V#V =#e ${a * b}#a \\cdot#m2 ${c}#c`, note: tx(`One layer at the bottom: $${a} \\cdot ${b} = ${a * b}$ unit cubes.`, `Eine Schicht am Boden: $${a} \\cdot ${b} = ${a * b}$ Einheitswürfel.`) },
-    { math: `V#V =#e ${a * b * c}#a ${u}#u`, note: tx(`${c} layers: $${a * b} \\cdot ${c} = ${a * b * c}$. Volume has cubic units: ${unit}³.`, `${c} Schichten: $${a * b} \\cdot ${c} = ${a * b * c}$. Volumen hat Kubik-Einheiten: ${unit}³.`) },
+    { math: `V#V =#e ${a * b * c}#a ${u}#u`, note: tx(`${c} layers: $${a * b} \\cdot ${c} = ${a * b * c}$. Volume has cubic units: ${unit}³.`, `${c} Schichten: $${a * b} \\cdot ${c} = ${a * b * c}$. Volumen hat Kubikeinheiten: ${unit}³.`) },
   ];
 }
 
@@ -712,14 +712,14 @@ function unitTask(rng: Rng): Exercise {
       title = tx("That's a length", "Das ist eine Länge");
       sayText =
         r.kind === "area"
-          ? tx(`$"${w}"$ measures a **length**. An area needs square units like $"m²"$.`, `$"${w}"$ misst eine **Länge**. Für eine Fläche brauchst du Quadrat-Einheiten wie $"m²"$.`)
-          : tx(`$"${w}"$ measures a **length**. A volume needs cubic units or litres.`, `$"${w}"$ misst eine **Länge**. Für ein Volumen brauchst du Kubik-Einheiten oder Liter.`);
+          ? tx(`$"${w}"$ measures a **length**. An area needs square units like $"m²"$.`, `$"${w}"$ misst eine **Länge**. Für eine Fläche brauchst du Quadrateinheiten wie $"m²"$.`)
+          : tx(`$"${w}"$ measures a **length**. A volume needs cubic units or litres.`, `$"${w}"$ misst eine **Länge**. Für ein Volumen brauchst du Kubikeinheiten oder Liter.`);
     } else if (info.kind !== r.kind) {
       title = info.kind === "vol" ? tx("That's a volume", "Das ist ein Volumen") : tx("That's an area", "Das ist eine Fläche");
       sayText =
         info.kind === "vol"
-          ? tx("Cubed units (and litres) measure **volume**. An area has squared units.", "Kubik-Einheiten (und Liter) messen ein **Volumen**. Eine Fläche hat Einheiten mit hoch 2.")
-          : tx("Squared units measure an **area**. For how much fits inside, you need cubed units or litres.", "Einheiten mit hoch 2 messen eine **Fläche**. Für das, was hineinpasst, brauchst du Kubik-Einheiten oder Liter.");
+          ? tx("Cubed units (and litres) measure **volume**. An area has squared units.", "Kubikeinheiten (und Liter) messen ein **Volumen**. Eine Fläche hat Quadrateinheiten.")
+          : tx("Squared units measure an **area**. For how much fits inside, you need cubed units or litres.", "Quadrateinheiten messen eine **Fläche**. Für das, was hineinpasst, brauchst du Kubikeinheiten oder Liter.");
     } else {
       const small = info.size < r.size;
       title = small ? tx("Much too small", "Viel zu klein") : tx("Much too big", "Viel zu groß");
@@ -734,7 +734,7 @@ function unitTask(rng: Rng): Exercise {
     instruction: tx("Which unit fits?", "Welche Einheit passt?"),
     text: tx(E(th.text).replace("{v}", `${th.value} ___`), D(th.text).replace("{v}", `${th.value} ___`)),
     answer: c.answer,
-    hint: r.kind === "area" ? tx("An area needs a squared unit. Then think about the size.", "Eine Fläche braucht eine Einheit mit hoch 2. Dann überleg die Größe.") : tx("A volume needs a cubed unit or litres. Then think about the size.", "Ein Volumen braucht eine Kubik-Einheit oder Liter. Dann überleg die Größe."),
+    hint: r.kind === "area" ? tx("An area needs a squared unit. Then think about the size.", "Eine Fläche braucht eine Quadrateinheit. Dann überleg die Größe.") : tx("A volume needs a cubed unit or litres. Then think about the size.", "Ein Volumen braucht eine Kubikeinheit oder Liter. Dann überleg die Größe."),
     solution: [{ math: `${th.value} ${q(th.right)}`, note: th.why }],
     mistakes: c.mistakes,
   };
@@ -777,7 +777,7 @@ export const level1: LevelLesson = {
         { math: "u#u =#e 2#k1 \\cdot#m1 5#a1 +#p1 2#k2 \\cdot#m2 3#b1", note: tx("Opposite sides are equally long: $u = 2 \\cdot a + 2 \\cdot b$.", "Gegenüberliegende Seiten sind gleich lang: $u = 2 \\cdot a + 2 \\cdot b$.") },
         { math: 'u#u =#e 16#a1 "cm"#cm', note: tx("$10 + 6 = 16$. A perimeter is a length, so it's in cm.", "$10 + 6 = 16$. Der Umfang ist eine Länge, also in cm.") },
         { math: "A#A =#e 5#a1 \\cdot#m1 3#b1", note: tx("Area: 3 rows of 5 squares. So length times width: $A = a \\cdot b$.", "Flächeninhalt: 3 Reihen mit je 5 Kästchen. Also Länge mal Breite: $A = a \\cdot b$.") },
-        { math: 'A#A =#e 15#a1 "cm²"#cm', note: tx('15 squares of $1 "cm²"$. Areas are measured in square units: $"cm"$ times $"cm"$ gives $"cm²"$.', '15 Kästchen mit je $1 "cm²"$. Flächen misst man in Quadrat-Einheiten: $"cm"$ mal $"cm"$ ergibt $"cm²"$.') },
+        { math: 'A#A =#e 15#a1 "cm²"#cm', note: tx('15 squares of $1 "cm²"$. Areas are measured in square units: $"cm"$ times $"cm"$ gives $"cm²"$.', '15 Kästchen mit je $1 "cm²"$. Flächen misst man in Quadrateinheiten: $"cm"$ mal $"cm"$ ergibt $"cm²"$.') },
         { math: "A#A =#e a#a1 \\cdot#m1 a#b1 =#e2 a#a3^{2#sq}", note: tx("For a **square** all sides are equal: $A = a \\cdot a = a^2$ and $u = 4 \\cdot a$.", "Beim **Quadrat** sind alle Seiten gleich: $A = a \\cdot a = a^2$ und $u = 4 \\cdot a$.") },
       ],
     },
@@ -896,7 +896,7 @@ export const level1: LevelLesson = {
       frames: [
         { math: "V#V =#e 4#a \\cdot#m1 3#b", note: tx('One layer at the bottom: $4 \\cdot 3 = 12$ cubes of $1 "cm³"$.', 'Eine Schicht am Boden: $4 \\cdot 3 = 12$ Würfel mit je $1 "cm³"$.') },
         { math: "V#V =#e 4#a \\cdot#m1 3#b \\cdot#m2 2#c", note: tx("There are 2 layers, so times 2. In general: $V = a \\cdot b \\cdot c$.", "Es gibt 2 Schichten, also mal 2. Allgemein: $V = a \\cdot b \\cdot c$.") },
-        { math: 'V#V =#e 24#a "cm³"#u', note: tx('24 unit cubes. Volume has cubic units: $"cm³"$, $"dm³"$, $"m³"$.', '24 Einheitswürfel. Volumen hat Kubik-Einheiten: $"cm³"$, $"dm³"$, $"m³"$.') },
+        { math: 'V#V =#e 24#a "cm³"#u', note: tx('24 unit cubes. Volume has cubic units: $"cm³"$, $"dm³"$, $"m³"$.', '24 Einheitswürfel. Volumen hat Kubikeinheiten: $"cm³"$, $"dm³"$, $"m³"$.') },
         { math: '1#a "dm³"#u =#e 1000#b "cm³"#v =#e2 1#c "l"#w', note: tx('A cube with $1 "dm"$ edges holds $10 \\cdot 10 \\cdot 10 = 1000$ small cubes: for volumes the factor is **1000**. Exactly 1 litre fits inside.', 'In einen Würfel mit $1 "dm"$ Kantenlänge passen $10 \\cdot 10 \\cdot 10 = 1000$ kleine Würfel: Bei Volumen ist die Umrechnungszahl **1000**. Genau 1 Liter passt hinein.') },
         { math: "O#O =#e 2#k \\cdot#m (a#a1 \\cdot#m1 b#b1 +#p1 a#a2 \\cdot#m2 c#c1 +#p2 b#b2 \\cdot#m3 c#c2)#br", note: tx("Surface area: the six faces come in three pairs. Top and bottom, front and back, left and right.", "Oberfläche: Die sechs Flächen kommen in drei Paaren vor. Oben und unten, vorne und hinten, links und rechts.") },
         { math: 'O#O =#e 2#k \\cdot#m (12#a1 +#p1 8#a2 +#p2 6#b2)#br =#e2 52#r "cm²"#u', note: tx('$2 \\cdot 26 = 52 "cm²"$. The surface is an area, so its unit is $"cm²"$.', '$2 \\cdot 26 = 52 "cm²"$. Die Oberfläche ist eine Fläche, also in $"cm²"$.') },

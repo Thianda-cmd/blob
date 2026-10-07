@@ -441,6 +441,24 @@ export function ProbabilityTree({
   );
 }
 
+/**
+ * Two tree diagrams with a caption each, side by side on wide screens and stacked on narrow ones:
+ * a tree and the same tree turned around (Bayes).
+ */
+export function ProbabilityTreePair({ trees }: { trees: { title: Text; branches: TreeBranch[]; ends?: (string | number | null)[]; hl?: number[] }[] }) {
+  const t = useText();
+  return (
+    <div className="grid gap-x-6 gap-y-5 lg:grid-cols-2">
+      {trees.map((tr, i) => (
+        <figure key={i} className="min-w-0 space-y-1.5">
+          <figcaption className="text-center text-[12.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">{t(tr.title)}</figcaption>
+          <ProbabilityTree branches={tr.branches} ends={tr.ends} hl={tr.hl} />
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Two-way table (Vierfeldertafel)
 
@@ -525,32 +543,6 @@ export function ProbabilityFourField({
 }
 
 // ---------------------------------------------------------------------------
-// Binomial coefficient, written as German schools do: n over k in round brackets
-
-function Fence({ right }: { right?: boolean }) {
-  return (
-    <svg viewBox="0 0 10 40" preserveAspectRatio="none" className="w-[0.42em] self-stretch" aria-hidden>
-      <path d={right ? "M2 1 C9 10 9 30 2 39" : "M8 1 C1 10 1 30 8 39"} fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** (n über k) with the two numbers stacked, in round brackets. */
-export function Binom({ n, k, className }: { n: ReactNode; k: ReactNode; className?: string }) {
-  const t = useText();
-  return (
-    <span className={cn("inline-flex items-stretch align-middle font-math", className)} role="math" aria-label={`${n} ${t(tx("choose", "über"))} ${k}`}>
-      <Fence />
-      <span className="flex flex-col items-center justify-center px-[0.08em] text-[0.82em] leading-[1.1]">
-        <span>{n}</span>
-        <span>{k}</span>
-      </span>
-      <Fence right />
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Bernoulli paths: every path of length n, those with k hits highlighted
 
 /** All paths of a Bernoulli chain (1 = hit, 0 = miss), with the ones that have exactly k hits highlighted. */
@@ -597,9 +589,7 @@ export function ProbabilityPaths({ n, k, p }: { n: number; k: number; p: number 
           <span className="font-semibold text-blob-ink">1</span> = {t(tx("hit", "Treffer"))} ({num(p)}) · <span className="font-semibold">0</span> = {t(tx("miss", "Niete"))} ({num(q)})
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-2 text-[20px] text-ink">
-          <MathView src={`P(X = ${k}) =`} size="md" animate={false} />
-          <Binom n={n} k={k} className="text-[24px]" />
-          <MathView src={`\\cdot ${num(p)}^{${k}} \\cdot ${num(q)}^{${n - k}} = ${count} \\cdot ${num(p ** k * q ** (n - k), 5)} = ${num(result, 4)}`} size="md" animate={false} />
+          <MathView src={`P(X = ${k}) = \\binom{${n}}{${k}} \\cdot ${num(p)}^{${k}} \\cdot ${num(q)}^{${n - k}} = ${count} \\cdot ${num(p ** k * q ** (n - k), 5)} = ${num(result, 4)}`} size="md" animate={false} />
         </div>
         <div>
           <Inline

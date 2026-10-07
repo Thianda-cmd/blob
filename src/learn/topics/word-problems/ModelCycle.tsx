@@ -16,7 +16,7 @@ type Step = { name: Text; what: Text; from: number; to: number };
 
 const STATIONS: Station[] = [
   { title: tx("Real situation", "Reale Situation"), example: tx("Battery at 100 %, minus 8 % an hour: when is it empty?", "Akku bei 100 %, minus 8 % pro Stunde: Wann ist er leer?") },
-  { title: tx("Maths model", "Mathematisches Modell"), math: "A(t) = 100 - 8t" },
+  { title: tx("Maths model", "Mathematisches Modell"), math: "\\group{A(t) =} \\group{100 - 8t}" },
   { title: tx("Maths result", "Mathematisches Ergebnis"), math: tx("t = 12.5", "t = 12,5") },
   { title: tx("Real result", "Reales Ergebnis"), example: tx("Empty after about 12 h 30 min.", "Nach etwa 12 h 30 min leer.") },
 ];
