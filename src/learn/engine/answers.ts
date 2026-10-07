@@ -119,7 +119,7 @@ function checkCore(spec: AnswerSpec, answer: AnswerValue): Feedback {
     case "solutions": {
       if (answer.kind !== "list") return { correct: false };
       if (answer.none) return spec.values.length === 0 ? { correct: true } : { correct: false, message: tx("There is a solution here. Look again.", "Hier gibt es eine Lösung. Schau noch mal hin.") };
-      if (spec.values.length === 0) return { correct: false, message: tx("Check the discriminant first. Is there a solution at all?", "Prüf zuerst die Diskriminante. Gibt es überhaupt eine Lösung?") };
+      if (spec.values.length === 0) return { correct: false, message: tx("Check first whether there is a solution at all.", "Prüf zuerst, ob es überhaupt eine Lösung gibt.") };
       const given = answer.values.map((t) => t.trim()).filter(Boolean).map(parseNumber);
       if (given.some((g) => g === null)) return { correct: false, message: tx("Type numbers like 3, -2 or 1,5.", "Gib Zahlen wie 3, -2 oder 1,5 ein.") };
       const nums = given as number[];
@@ -279,7 +279,8 @@ export function answerDisplay(spec: AnswerSpec, locale: Locale): string {
       return `${n(spec.value, unit)}${unit ? ` "${unit}"` : ""}`;
     }
     case "fraction":
-      return `\\frac{${spec.n}}{${spec.d}}`;
+      // A negative fraction gets its minus in front: −5/6, not (−5)/6.
+      return spec.n * spec.d < 0 ? `-\\frac{${Math.abs(spec.n)}}{${Math.abs(spec.d)}}` : `\\frac{${Math.abs(spec.n)}}{${Math.abs(spec.d)}}`;
     case "expr": {
       const p = parse(spec.value);
       const prefix = t(spec.prefix);

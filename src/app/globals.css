@@ -837,6 +837,29 @@
   display: inline-flex;
   align-items: flex-start;
 }
+/* A fraction as an exponent (16^(3/4)) stays small and high, so it doesn't read as a mixed number. */
+.mv-sup .mv-frac {
+  font-size: 0.82em;
+  margin: 0 0.04em;
+}
+.mv-sup:has(> .mv-frac) {
+  margin-top: -0.55em;
+}
+/* Function names: upright, with a little room before their argument (sin x, log₂ 8). */
+.mv-fn {
+  font-style: normal;
+  margin-right: 0.14em;
+}
+.mv-fnwrap {
+  margin-right: 0.14em;
+}
+.mv-fnwrap .mv-fn {
+  margin-right: 0;
+}
+/* \binom: the two numbers stacked without a bar. */
+.mv-nobar {
+  background: transparent;
+}
 .mv-sup {
   display: inline-flex;
   align-items: center;
@@ -925,6 +948,12 @@
   top: 52%;
   border-top: max(1.5px, 0.07em) solid var(--danger);
   transform: rotate(-14deg);
+}
+/* A bar on top: repeating decimals (0,3̅), complements (Ā). */
+.mv-over {
+  border-top: max(1.5px, 0.06em) solid currentColor;
+  border-radius: 0;
+  padding-top: 0.04em;
 }
 .mv-box {
   outline: max(1.5px, 0.06em) solid var(--blob);

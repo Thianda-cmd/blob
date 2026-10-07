@@ -7,6 +7,9 @@
 //   * → ·    - → −   <= → ≤   >= → ≥   != → ≠   +- → ±   => → ⇒
 //   \pi \Delta \cdot \pm \le \ge \ne \approx \to \Rightarrow \infty \deg \rho …
 //   \, \; \quad (spaces)   \\ (line break)   \{ \} (set braces)
+//   \sin \cos \tan \log \lg \ln   upright functions (\log_2 8)
+//   \binom{n}{k}   \abs{x}   \overline{36} (\period, \bar)   binomial coefficient, |x|, a bar on top
+//   \Q \R \N \Z \in \notin \setminus \cap \cup \dots \delta \theta \prime \perp \parallel   symbols
 //   \hl{..} \blob{..} \red{..} \green{..} \fade{..} \strike{..} \box{..}   styles
 //   \group{..}                 keeps its contents on one line, no styling
 //   x#key                      give a token a fixed animation key
@@ -14,11 +17,11 @@
 // Every leaf gets a stable key ("x#0", "+#1", …) so the same token glides to its
 // new place when the next animation frame is shown.
 
-export type StyleName = "hl" | "blob" | "red" | "green" | "fade" | "strike" | "box" | "group";
+export type StyleName = "hl" | "blob" | "red" | "green" | "fade" | "strike" | "box" | "group" | "over";
 
 export type DNode =
-  | { k: string; type: "num" | "var" | "op" | "text" | "sym"; v: string }
-  | { k: string; type: "frac"; num: DNode[]; den: DNode[] }
+  | { k: string; type: "num" | "var" | "op" | "text" | "sym" | "fn"; v: string }
+  | { k: string; type: "frac"; num: DNode[]; den: DNode[]; nobar?: boolean }
   | { k: string; type: "pow"; base: DNode[]; exp: DNode[] }
   | { k: string; type: "sub"; base: DNode[]; sub: DNode[] }
   | { k: string; type: "sqrt"; body: DNode[]; index: DNode[] | null }
@@ -58,8 +61,32 @@ const SYMBOLS: Record<string, { type: "op" | "sym"; v: string }> = {
   omega: { type: "sym", v: "ω" },
   emptyset: { type: "sym", v: "∅" },
   mid: { type: "op", v: "|" },
+  Q: { type: "sym", v: "ℚ" },
+  R: { type: "sym", v: "ℝ" },
+  N: { type: "sym", v: "ℕ" },
+  Z: { type: "sym", v: "ℤ" },
+  notin: { type: "op", v: "∉" },
+  setminus: { type: "op", v: "∖" },
+  cap: { type: "op", v: "∩" },
+  cup: { type: "op", v: "∪" },
+  subset: { type: "op", v: "⊂" },
+  perp: { type: "op", v: "⊥" },
+  parallel: { type: "op", v: "∥" },
+  dots: { type: "sym", v: "…" },
+  ldots: { type: "sym", v: "…" },
+  cdots: { type: "sym", v: "⋯" },
+  delta: { type: "sym", v: "δ" },
+  theta: { type: "sym", v: "θ" },
+  phi: { type: "sym", v: "φ" },
+  epsilon: { type: "sym", v: "ε" },
+  prime: { type: "sym", v: "′" },
+  angle: { type: "sym", v: "∠" },
 };
-const STYLES: StyleName[] = ["hl", "blob", "red", "green", "fade", "strike", "box", "group"];
+/** Function names, set upright: \sin x, \log_2 8. */
+const FUNCTIONS = new Set(["sin", "cos", "tan", "log", "lg", "ln", "exp"]);
+/** Style commands with another name: \overline, \period and \bar draw a bar on top. */
+const STYLE_ALIASES: Record<string, StyleName> = { overline: "over", period: "over", bar: "over" };
+const STYLES: StyleName[] = ["hl", "blob", "red", "green", "fade", "strike", "box", "group", "over"];
 const OPS: Record<string, string> = { "+": "+", "-": "−", "*": "·", "/": "/", ":": ":", "=": "=", "<": "<", ">": ">", ",": ",", ";": ";", "|": "|", "!": "!", "%": "%", "·": "·", "−": "−", "±": "±", "≤": "≤", "≥": "≥", "≠": "≠", "≈": "≈", "⇒": "⇒", "→": "→", "°": "°" };
 
 type Raw = {
@@ -76,6 +103,7 @@ type Raw = {
   open?: string;
   close?: string;
   style?: StyleName;
+  nobar?: boolean;
 };
 
 /** A lone element with a number and a sign is an ion: "Mg2+" means Mg²⁺ (as chemists write it), not Mg₂⁺. */
@@ -216,12 +244,13 @@ export function parseDisplay(src: string): DNode[] {
     while (i < src.length && src[i] === " ") i++;
   };
 
-  function group(): Raw[] {
-    // Parses until a closing } or ) or ] belonging to the caller.
+  function group(inSet = false): Raw[] {
+    // Parses until a closing } or ) or ] belonging to the caller (inside \{ … \} also until \}).
     const out: Raw[] = [];
     for (;;) {
       skipWs();
       if (i >= src.length) return out;
+      if (inSet && src.startsWith("\\}", i)) return out;
       const c = src[i];
       if (c === "}" || c === ")" || c === "]") return out;
       if (c === "^" || c === "_") {
@@ -272,6 +301,12 @@ export function parseDisplay(src: string): DNode[] {
     if (/[0-9]/.test(c)) {
       let j = i;
       while (j < src.length && (/[0-9]/.test(src[j]) || (/[.,]/.test(src[j]) && /[0-9]/.test(src[j + 1] ?? "") && /[0-9]/.test(src[j - 1] ?? "")))) j++;
+      // 0,\overline{36}: the decimal comma belongs to the number, and number and period stay together.
+      if (/[.,]/.test(src[j] ?? "") && /^\\(overline|period|bar)\b/.test(src.slice(j + 1))) {
+        const v = src.slice(i, j + 1);
+        i = j + 1;
+        return [{ type: "style", style: "group", body: [{ type: "num", v }, ...atom()] }];
+      }
       const v = src.slice(i, j);
       i = j;
       return [{ type: "num", v }];
@@ -313,9 +348,17 @@ export function parseDisplay(src: string): DNode[] {
         i = j + 1;
         return [{ type: "space", v: "br" }];
       }
-      if (src[j] === "{" || src[j] === "}") {
+      if (src[j] === "{") {
+        // A set {−5; 5} stays on one line.
         i = j + 1;
-        return [{ type: "sym", v: src[j] }];
+        const body = group(true);
+        const closed = src.startsWith("\\}", i);
+        if (closed) i += 2;
+        return [{ type: "style", style: "group", body: [{ type: "sym", v: "{" }, ...body, ...(closed ? [{ type: "sym" as const, v: "}" }] : [])] }];
+      }
+      if (src[j] === "}") {
+        i = j + 1;
+        return [{ type: "sym", v: "}" }];
       }
       while (j < src.length && /[A-Za-z]/.test(src[j])) j++;
       const cmd = src.slice(i + 1, j);
@@ -344,10 +387,41 @@ export function parseDisplay(src: string): DNode[] {
         return [{ type: "text", v }];
       }
       if (cmd === "frac") {
-        const num = argument();
-        const den = argument();
+        // As in LaTeX, \frac12 is one half: without braces each argument is one digit.
+        const digit = (): Raw[] | null => {
+          skipWs();
+          if (!/[0-9]/.test(src[i] ?? "")) return null;
+          return [{ type: "num", v: src[i++] }];
+        };
+        const num = digit() ?? argument();
+        const den = digit() ?? argument();
         return [{ type: "frac", num, den }];
       }
+      if (cmd === "binom") {
+        const num = argument();
+        const den = argument();
+        return [{ type: "paren", open: "(", close: ")", body: [{ type: "frac", num, den, nobar: true }] }];
+      }
+      if (cmd === "abs") return [{ type: "paren", open: "|", close: "|", body: argument() }];
+      if (FUNCTIONS.has(cmd)) {
+        // The name with its index or power (log₂, sin²) and its argument stay together: sin 30°, log₂ 32.
+        let head: Raw = { type: "fn", v: cmd };
+        const script = (base: Raw): Raw => {
+          skipWs();
+          if (src[i] !== "^" && src[i] !== "_") return base;
+          const c = src[i++];
+          const arg = argument();
+          return c === "^" ? { type: "pow", base: [base], exp: arg } : { type: "sub", base: [base], sub: arg };
+        };
+        head = script(head);
+        skipWs();
+        const rest = src.slice(i);
+        const startsArgument = /^[0-9A-Za-z(]/.test(rest) || /^\\(alpha|beta|gamma|delta|theta|phi|varphi|omega|pi|frac|sqrt|abs)\b/.test(rest);
+        if (!startsArgument) return [head];
+        const [arg, ...more] = atom();
+        return [{ type: "style", style: "group", body: [head, ...(arg ? [script(arg)] : []), ...more] }];
+      }
+      if (STYLE_ALIASES[cmd]) return [{ type: "style", style: STYLE_ALIASES[cmd], body: argument() }];
       if (cmd === "sqrt") {
         skipWs();
         let index: Raw[] | null = null;
@@ -400,6 +474,7 @@ function assignKeys(nodes: Raw[]): DNode[] {
         case "op":
         case "text":
         case "sym":
+        case "fn":
           out.k = n.k ?? next(n.v ?? "");
           break;
         case "space":

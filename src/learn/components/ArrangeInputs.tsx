@@ -3,14 +3,23 @@
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, GripVertical, X } from "lucide-react";
 import { useState } from "react";
-import { useMessages } from "@/i18n/client";
+import { useLocale, useMessages } from "@/i18n/client";
+import { resolveText, type Text } from "@/i18n/text";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import { matchOptions, matchShown } from "@/learn/engine/arrange";
 import type { AnswerSpec } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import type { AnswerStatus } from "./AnswerInput";
+import { MathView } from "./MathView";
 import { Inline } from "./Rich";
+
+/** A card's text; a card that is only maths ("$-9$") shows it at reading size, not inline size. */
+function CardText({ text }: { text: Text }) {
+  const raw = resolveText(text, useLocale()).trim();
+  const only = /^\$[^$]+\$$/.test(raw);
+  return only ? <MathView src={raw.slice(1, -1)} size="md" animate={false} /> : <Inline text={text} />;
+}
 
 type OrderSpec = Extract<AnswerSpec, { kind: "order" }>;
 type MatchSpec = Extract<AnswerSpec, { kind: "match" }>;
@@ -107,7 +116,7 @@ function OrderRow({
         {pos + 1}
       </span>
       <span className="min-w-0 flex-1 py-1 leading-snug">
-        <Inline text={text} />
+        <CardText text={text} />
       </span>
       <span className="flex shrink-0 flex-col">
         <button
@@ -182,7 +191,7 @@ export function MatchField({
             >
               <div className="grid items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <span className="min-w-0 px-1.5 text-[15px] font-medium leading-snug">
-                  <Inline text={left} />
+                  <CardText text={left} />
                 </span>
                 <span className="flex min-w-0 items-center gap-1">
                   <button
@@ -196,7 +205,7 @@ export function MatchField({
                     )}
                   >
                     {state === "ok" && <Check className="size-4 shrink-0 text-ok" strokeWidth={3} />}
-                    <span className="min-w-0 flex-1 leading-snug">{chosen === null ? t.matchPick : <Inline text={options[chosen]} />}</span>
+                    <span className="min-w-0 flex-1 leading-snug">{chosen === null ? t.matchPick : <CardText text={options[chosen]} />}</span>
                     {!disabled && <ChevronDown className={cn("size-4 shrink-0 text-ink-3 transition-transform", isOpen && "rotate-180")} />}
                   </button>
                   {chosen !== null && !disabled && (
@@ -235,7 +244,7 @@ export function MatchField({
                               taken && "opacity-45",
                             )}
                           >
-                            <Inline text={options[o]} />
+                            <CardText text={options[o]} />
                           </motion.button>
                         );
                       })}

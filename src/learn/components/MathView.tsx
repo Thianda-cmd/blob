@@ -7,7 +7,8 @@ import { resolveText, type Text } from "@/i18n/text";
 import { parseDisplay, type DNode, type StyleName } from "@/learn/engine/display";
 import { cn } from "@/lib/utils";
 
-const SIZES = { inline: "1.05em", sm: "18px", md: "24px", lg: "34px", xl: "46px" } as const;
+// The big sizes shrink on phones, so a board line like "f(x) = x² − 6x + 5" still fits on one line.
+const SIZES = { inline: "1.05em", sm: "18px", md: "24px", lg: "clamp(26px, 7.5vw, 34px)", xl: "clamp(30px, 9vw, 46px)" } as const;
 export type MathSize = keyof typeof SIZES;
 
 const leafMotion = {
@@ -19,8 +20,8 @@ const leafMotion = {
 
 type Ctx = { scope: string; highlight: Set<string>; animate: boolean };
 
-const RELATIONS = new Set(["=", "<", ">", "≤", "≥", "≠", "≈", "⇒", "⇔", "→", "⇌", "∈"]);
-const BINARY = new Set(["+", "−", "·", "×", ":", "/", "±"]);
+const RELATIONS = new Set(["=", "<", ">", "≤", "≥", "≠", "≈", "⇒", "⇔", "→", "⇌", "∈", "∉", "⊂", "⊥", "∥"]);
+const BINARY = new Set(["+", "−", "·", "×", ":", "/", "±", "∩", "∪", "∖"]);
 
 /**
  * Renders the display language (see engine/display.ts). Change `src` and the
@@ -55,7 +56,7 @@ export function MathView({
     <LayoutGroup id={ctx.scope}>
       <span
         ref={ref}
-        className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center", className)}
+        className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center justify-center", className)}
         style={{ fontSize: SIZES[size] }}
         aria-label={spoken(source)}
         role="math"
@@ -78,11 +79,14 @@ const spoken = (source: string) =>
 /** Labels like "(I)" or "a:" behave like the start of an expression: a minus after them is a sign. */
 const LABEL = /^\(.*\)$|:$/;
 
-/** The token a sign looks back at: skips spaces, so "| \, -1" still reads as a negative number. */
+/**
+ * The token a sign looks back at: skips small spaces, so "| \, -1" still reads as a negative number.
+ * A line break or a \quad starts something new ("x = 3 \quad -5"), so a sign after them is a sign.
+ */
 function previous(nodes: DNode[], i: number): DNode | undefined {
   for (let j = i - 1; j >= 0; j--) {
     const n = nodes[j];
-    if (n.type !== "space" || n.v === "br") return n;
+    if (n.type !== "space" || n.v === "br" || n.v === "quad") return n;
   }
   return undefined;
 }
@@ -128,6 +132,8 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
       return <Leaf k={node.k} ctx={ctx} className="mv-var">{node.v}</Leaf>;
     case "sym":
       return <Leaf k={node.k} ctx={ctx} className="mv-num">{node.v}</Leaf>;
+    case "fn":
+      return <Leaf k={node.k} ctx={ctx} className="mv-fn">{node.v}</Leaf>;
     case "text":
       return <Leaf k={node.k} ctx={ctx} className="mv-text">{node.v}</Leaf>;
     case "space":
@@ -140,7 +146,7 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
         (signLike &&
         (!prev ||
           (prev.type === "op" && !["!", "%", "°"].includes(prev.v) && (node.v === "−" || RELATIONS.has(prev.v))) ||
-          (prev.type === "space" && prev.v === "br") ||
+          (prev.type === "space" && (prev.v === "br" || prev.v === "quad")) ||
           // A sign right after a set brace: L = {−5; 5}
           (prev.type === "sym" && prev.v === "{") ||
           (node.v === "−" && prev.type === "text" && LABEL.test(prev.v))));
@@ -159,7 +165,7 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
           <span className="mv-row">
             <Children nodes={node.num} ctx={ctx} />
           </span>
-          <Leaf k={`${node.k}-bar`} ctx={ctx} className="mv-bar">{""}</Leaf>
+          <Leaf k={`${node.k}-bar`} ctx={ctx} className={node.nobar ? "mv-bar mv-nobar" : "mv-bar"}>{""}</Leaf>
           <span className="mv-row">
             <Children nodes={node.den} ctx={ctx} />
           </span>
@@ -167,7 +173,7 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
       );
     case "pow":
       return (
-        <span className="mv-pow">
+        <span className={cn("mv-pow", node.base.length === 1 && node.base[0].type === "fn" && "mv-fnwrap")}>
           <span className="mv-row">
             <Children nodes={node.base} ctx={ctx} />
           </span>
@@ -178,7 +184,7 @@ function Node({ node, ctx, prev }: { node: DNode; ctx: Ctx; prev?: DNode }) {
       );
     case "sub":
       return (
-        <span className="mv-pow">
+        <span className={cn("mv-pow", node.base.length === 1 && node.base[0].type === "fn" && "mv-fnwrap")}>
           <span className="mv-row">
             <Children nodes={node.base} ctx={ctx} />
           </span>
@@ -236,7 +242,9 @@ function Fence({ kind }: { kind: string }) {
         ? "M2 0 C8 5 8 15 2 20"
         : kind === "["
           ? "M8 0 L3 0 L3 20 L8 20"
-          : "M2 0 L7 0 L7 20 L2 20";
+          : kind === "|"
+            ? "M5 0 L5 20"
+            : "M2 0 L7 0 L7 20 L2 20";
   return (
     <svg viewBox="0 0 10 20" preserveAspectRatio="none" aria-hidden>
       <path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
