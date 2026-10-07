@@ -1063,7 +1063,7 @@ function consecutiveWrongs(kind: ConsecKind, nums: number[], S: number, at: numb
         S / 2,
         tx("Just halved the sum", "Nur halbiert"),
         tx(
-          `Hmm, ${de(S / 2)} isn't a whole number! Halving only works if both numbers were the same. Let $x$ be the smaller one: the next one is $x + 1$.`,
+          `Hmm, ${String(S / 2)} isn't a whole number! Halving only works if both numbers were the same. Let $x$ be the smaller one: the next one is $x + 1$.`,
           `Hm, ${de(S / 2)} ist keine ganze Zahl! Halbieren klappt nur, wenn beide Zahlen gleich wären. Sei $x$ die kleinere: Die nächste ist $x + 1$.`,
         ),
       ),

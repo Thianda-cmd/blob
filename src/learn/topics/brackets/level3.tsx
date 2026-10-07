@@ -631,7 +631,7 @@ function groupingCheck(): Exercise {
   m.add("xy+3x+2y+6", tx("Only the bracket", "Nur die Klammer"), tx("Type only what goes into the second bracket. $(y + 3)$ is already there.", "Gib nur ein, was in die zweite Klammer kommt. $(y + 3)$ steht schon da."));
   return {
     instruction: tx("Factor by grouping", "Klammere durch Gruppieren aus"),
-    math: "\\group{xy} + \\group{3x} + \\group{2y} + 6 \\group{= (y + 3)(\\,\\box{\\,?\\,}\\,)}",
+    math: "\\group{xy} \\group{\\; + \\; 3x} \\group{\\; + \\; 2y} \\group{\\; + \\; 6} \\group{= (y + 3)(\\,\\box{\\,?\\,}\\,)}",
     answer: { kind: "expr", value },
     hint: tx("Pair $xy + 3x$ and $2y + 6$. What can you factor out of each pair?", "Bilde die Paare $xy + 3x$ und $2y + 6$. Was kannst du aus jedem Paar ausklammern?"),
     solution: [

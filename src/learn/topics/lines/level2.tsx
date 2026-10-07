@@ -1188,7 +1188,7 @@ function zeroTask(rng: Rng, hard: boolean): Exercise {
       math: plain(lineSrc(m, b)),
       answer: { kind: "number", value: qv(x0), label: "x =" },
       hint: tx(
-        "On the $x$-axis $y = 0$. Set $y = 0$ and solve for $x$. A decimal like 2,5 is fine.",
+        "On the $x$-axis $y = 0$. Set $y = 0$ and solve for $x$. A decimal like 2.5 is fine.",
         "Auf der $x$-Achse ist $y = 0$. Setze $y = 0$ und löse nach $x$ auf. Eine Kommazahl wie 2,5 ist okay.",
       ),
       solution: [
@@ -1989,7 +1989,7 @@ export const level2: LevelLesson = {
         text: Q_ZERO,
         math: "y = -2x + 5",
         answer: { kind: "number", value: 2.5, label: "x =" },
-        hint: tx("Solve $0 = -2x + 5$. A decimal like 2,5 is fine.", "Löse $0 = -2x + 5$. Eine Kommazahl wie 2,5 ist okay."),
+        hint: tx("Solve $0 = -2x + 5$. A decimal like 2.5 is fine.", "Löse $0 = -2x + 5$. Eine Kommazahl wie 2,5 ist okay."),
         solution: [
           { math: lineSrc(q(-2), q(5)), highlight: ["Y"], note: tx("At the zero, $y = 0$.", "An der Nullstelle ist $y = 0$.") },
           ...solveFrames(ZERO, q(-2), q(5), "", (X) =>

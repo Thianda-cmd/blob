@@ -1,6 +1,6 @@
 "use client";
 
-import { tx, type Text } from "@/i18n/text";
+import { resolveText, tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { mistakeList, plain, pt, side, term, val, type Msg } from "../lines/level2";
@@ -27,7 +27,7 @@ import {
   type Row,
   type V3,
 } from "./gauss";
-import { SystemCard } from "./board";
+import { groupEm, SystemCard } from "./board";
 import { GaussLab, ParabolaLab } from "./lab3";
 import { joinText, xyWhen, type Choice } from "./level2";
 
@@ -783,6 +783,13 @@ function pickTriple(rng: Rng, lo = -3, hi = 4): Triple {
   }
 }
 
+/**
+ * Every row of the worked solution fits the solution player at phone width (390 px, and 360 px
+ * with a little to spare): a labelled row like "(III) −3x − 2y + 7z = −12" is too wide, so such
+ * a task is drawn again.
+ */
+const narrow = (ex: Exercise) => ex.solution.every((f) => groupEm(resolveText(f.math, "en")) <= 11 && groupEm(resolveText(f.math, "de")) <= 11);
+
 /** Nice intermediate numbers in every Gauss step. */
 function tame(rows: Row[]): boolean {
   const plan = gaussPlan(rows);
@@ -816,7 +823,8 @@ function backTask(rng: Rng): Exercise {
     if (A.y === 0 && A.z === 0) continue;
     const v = backSolve([A, B, C]);
     if (!v || v.some((x, i) => x !== sol[i]) || Math.abs(A.c) > 30) continue;
-    return backExercise([A, B, C]);
+    const ex = backExercise([A, B, C]);
+    if (narrow(ex)) return ex;
   }
 }
 
@@ -824,12 +832,15 @@ function stepTask(rng: Rng): Exercise {
   for (;;) {
     const rows = randomSystem(rng, pickTriple(rng));
     const ex = stepExercise(rows, rng.shuffle([0, 1, 2, 3]));
-    if (ex) return ex;
+    if (ex && narrow(ex)) return ex;
   }
 }
 
 function gaussTask(rng: Rng): Exercise {
-  return gaussExercise(randomSystem(rng, pickTriple(rng)));
+  for (;;) {
+    const ex = gaussExercise(randomSystem(rng, pickTriple(rng)));
+    if (narrow(ex)) return ex;
+  }
 }
 
 /** Step form first, then mixed up by row operations: the Gauss algorithm undoes them. */
@@ -857,7 +868,7 @@ function specialTask(rng: Rng): Exercise {
     const rows = mixedUp(rng, I, II, III);
     if (anyProportional(rows) || rows.some((r) => isZeroRow(r) || Math.abs(r.c) > 40 || Math.abs(r.x) > 9 || Math.abs(r.y) > 9 || Math.abs(r.z) > 9)) continue;
     const ex = specialExercise(rows);
-    if (ex && (ex.answer as Choice).correct === kind) return ex;
+    if (ex && (ex.answer as Choice).correct === kind && narrow(ex)) return ex;
   }
 }
 
@@ -869,7 +880,7 @@ function paramTask(rng: Rng): Exercise {
     const rows = mixedUp(rng, I, II, ROW(0, 0, 0, 0));
     if (anyProportional(rows) || rows.some((r) => isZeroRow(r) || Math.abs(r.c) > 40 || Math.abs(r.x) > 9 || Math.abs(r.y) > 9 || Math.abs(r.z) > 9)) continue;
     const ex = paramExercise(rows, rng.chance(0.6) ? "x" : "y");
-    if (ex) return ex;
+    if (ex && narrow(ex)) return ex;
   }
 }
 
@@ -885,7 +896,7 @@ function parabolaTask(rng: Rng): Exercise {
     const P = xs.sort((p, q) => p - q).map((x): [number, number] => [x, a * x * x + b * x + c]);
     if (P.some((p) => Math.abs(p[1]) > 15)) continue;
     const ex = parabolaExercise(P, [a, b, c]);
-    if (ex) return ex;
+    if (ex && narrow(ex)) return ex;
   }
 }
 
@@ -907,7 +918,7 @@ function wordTask(rng: Rng): Exercise {
     const rows = counts.map((n) => through(n[0], n[1], n[2], prices));
     if (!tame(rows)) continue;
     const ex = wordExercise(shop, counts, prices, rng.int(0, 2));
-    if (ex) return ex;
+    if (ex && narrow(ex)) return ex;
   }
 }
 

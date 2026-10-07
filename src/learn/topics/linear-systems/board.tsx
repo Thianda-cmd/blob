@@ -70,6 +70,17 @@ export function rowsEm(src: string): number {
   return Math.max(...rows.map(width));
 }
 
+/**
+ * Width of the widest labelled row or other style group (\group{…}, \blob{…}) or bracket: these
+ * never wrap, while plain tokens around them can. A worked solution with a group wider than about 11 em gets
+ * clipped in the solution player at phone width.
+ */
+export function groupEm(src: string): number {
+  let best = 0;
+  for (const n of parseDisplay(src)) if (n.type === "style" || n.type === "paren") best = Math.max(best, width([n]));
+  return best;
+}
+
 /** The system of a task, as big as the card allows (at most like the usual task maths). */
 export function SystemCard({ src }: { src: Text }) {
   const locale = useLocale();

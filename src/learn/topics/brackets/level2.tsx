@@ -401,8 +401,8 @@ function factorTask(rng: Rng): Exercise {
     if (vc === 0) continue;
     const result: LT[] = [lt("r", vc, v), lt("s", f * c)];
     const lead = src([lt("a", a, v)], "en", false);
-    // The term in front, the box and the bracket stay together on a phone: "3x ☐(4x − 5)".
-    const task = `\\group{${src([lt("a", a, v)], "en", false, true)} \\box{\\,?\\,} (${src([lt("b", bb, v), lt("c", c)], "en", false, true)})} = ${src(result, "en", false, true)}`;
+    // The term in front, the box and the bracket stay together on a phone ("3x ☐(4x − 5)"), and so does the short right side.
+    const task = `\\group{${src([lt("a", a, v)], "en", false, true)} \\, \\box{\\,?\\,} (${src([lt("b", bb, v), lt("c", c)], "en", false)})} \\group{= ${src(result, "en", false)}}`;
     const mistakes: Mistake[] = [
       {
         when: { kind: "number", value: -f },
