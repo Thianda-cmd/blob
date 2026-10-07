@@ -13,7 +13,7 @@ import { gcd, lcm, type Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { alongLine, crossing, Plane, PlaneDot, PlaneLine, PlanePath, PlaneTag, planeGeo, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
-import { graphVisual, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap, type Msg } from "./lines";
+import { graphVisual, lineSrc, mistakeList, num, opDivide, opRemove, plain, pt, q, qv, side, term, termKeys, val, valWrap, type Msg } from "../lines/level2";
 import { cos, sin } from "@/lib/stableMath";
 
 // ---------------------------------------------------------------------------

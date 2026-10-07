@@ -14,7 +14,7 @@ import { equivalentText } from "@/learn/engine/expr";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, Level, Mistake, SingleLessonTopic as Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
-import { emWidth, smoothFracExits } from "./equations";
+import { emWidth, smoothFracExits } from "../equations/level1";
 
 // ---------------------------------------------------------------------------
 // Formulas as small trees. To solve for a letter we undo the operations around

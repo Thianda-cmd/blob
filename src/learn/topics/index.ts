@@ -8,6 +8,7 @@ type Loader = () => Promise<{ default: Topic | SingleLessonTopic }>;
 
 /** Maths topics, loaded when first needed (each topic is its own chunk). */
 const MATHS_LOADERS: Record<string, Loader> = {
+  "negative-numbers": () => import("./negative-numbers"),
   brackets: () => import("./brackets"),
   expanding: () => import("./expanding"),
   rearranging: () => import("./rearranging"),
@@ -18,6 +19,8 @@ const MATHS_LOADERS: Record<string, Loader> = {
   "linear-systems": () => import("./linear-systems"),
   "pq-formula": () => import("./pq-formula"),
   lines: () => import("./lines"),
+  "area-volume": () => import("./area-volume"),
+  probability: () => import("./probability"),
   "word-problems": () => import("./word-problems"),
   unknowns: () => import("./unknowns"),
 };

@@ -163,6 +163,8 @@ export type Area =
   | "numbers"
   | "functions"
   | "applied"
+  | "geometry"
+  | "stochastics"
   // Chemistry
   | "matter"
   | "atoms"
@@ -206,6 +208,8 @@ export const AREAS: Record<Area, { title: Text; blurb: Text }> = {
   numbers: { title: tx("Numbers", "Zahlen"), blurb: tx("Fractions, powers and percentages", "Brüche, Potenzen und Prozente") },
   equations: { title: tx("Equations", "Gleichungen"), blurb: tx("Solve for the unknown", "Finde die Unbekannte") },
   functions: { title: tx("Functions", "Funktionen"), blurb: tx("Lines and graphs", "Geraden und Graphen") },
+  geometry: { title: tx("Geometry", "Geometrie"), blurb: tx("Shapes, areas and bodies", "Figuren, Flächen und Körper") },
+  stochastics: { title: tx("Data and chance", "Daten und Zufall"), blurb: tx("How likely is it?", "Wie wahrscheinlich ist es?") },
   applied: { title: tx("Word problems", "Textaufgaben"), blurb: tx("Maths in real life", "Mathe im echten Leben") },
   matter: { title: tx("Substances and particles", "Stoffe und Teilchen"), blurb: tx("What everything is made of", "Woraus alles besteht") },
   atoms: { title: tx("Atoms", "Atome"), blurb: tx("Inside the atom and the periodic table", "Atombau und Periodensystem") },

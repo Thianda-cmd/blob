@@ -42,12 +42,11 @@ type Entry = Omit<TopicMeta, "subject">;
 type SingleEntry = Omit<Entry, "levels"> & { minutes: number; lessonLevel: Level };
 
 /** How deep each level goes in a subject, for topics whose levels aren't written yet. */
-const DEPTH: Record<"maths" | "chemistry", Record<Level, Text>> = {
-  maths: { 1: tx("Grades 5–7", "Klasse 5–7"), 2: tx("Grades 8–10", "Klasse 8–10"), 3: tx("Upper school", "Oberstufe") },
+const DEPTH: Record<"chemistry", Record<Level, Text>> = {
   chemistry: { 1: tx("Grades 7–8", "Klasse 7–8"), 2: tx("Grades 9–10", "Klasse 9–10"), 3: tx("Upper school", "Oberstufe") },
 };
 
-function single(subject: "maths" | "chemistry", { minutes, lessonLevel, ...entry }: SingleEntry): Entry {
+function single(subject: "chemistry", { minutes, lessonLevel, ...entry }: SingleEntry): Entry {
   const levels = { 1: { depth: DEPTH[subject][1] }, 2: { depth: DEPTH[subject][2] }, 3: { depth: DEPTH[subject][3] } } as Record<Level, LevelMeta>;
   levels[lessonLevel] = { ...levels[lessonLevel], blurb: entry.blurb, minutes };
   return { ...entry, levels };
@@ -56,21 +55,165 @@ function single(subject: "maths" | "chemistry", { minutes, lessonLevel, ...entry
 /** The level of the lesson a topic had before levels (its old progress row counts for it). */
 export const LEGACY_LESSON_LEVEL: Record<string, Level> = {};
 
-/** Maths topics in the order they're suggested. */
-const MATHS_ENTRIES: SingleEntry[] = [
-  { slug: "brackets", title: tx("Removing brackets", "Klammern auflösen"), de: "Klammern auflösen", area: "algebra", blurb: tx("Plus or minus in front? Learn when signs stay and when they flip.", "Plus oder Minus davor? Lerne, wann Vorzeichen bleiben und wann du sie umdrehst."), glyph: "-(a - b)", minutes: 7, lessonLevel: 1 },
-  { slug: "expanding", title: tx("Expanding brackets", "Ausmultiplizieren"), de: "Ausmultiplizieren", area: "algebra", blurb: tx("Multiply into brackets, two brackets at once and the binomial formulas.", "In Klammern hineinmultiplizieren, zwei Klammern auf einmal und die binomischen Formeln."), glyph: "a(b + c)", minutes: 9, lessonLevel: 2 },
-  { slug: "rearranging", title: tx("Rearranging formulas", "Formeln umstellen"), de: "Formeln umstellen", area: "algebra", blurb: tx("Get any letter on its own, step by step, with inverse operations.", "Bring jeden Buchstaben allein auf eine Seite, Schritt für Schritt mit Umkehroperationen."), glyph: "v = \\frac{s}{t}", minutes: 8, lessonLevel: 2 },
-  { slug: "fractions", title: tx("Fractions", "Bruchrechnung"), de: "Bruchrechnung", area: "numbers", blurb: tx("Simplify, add, subtract, multiply and divide fractions with confidence.", "Brüche sicher kürzen, addieren, subtrahieren, multiplizieren und dividieren."), glyph: "\\frac{3}{4}", minutes: 10, lessonLevel: 1 },
-  { slug: "powers-roots", title: tx("Powers and roots", "Potenzen und Wurzeln"), de: "Potenzen und Wurzeln", area: "numbers", blurb: tx("Power rules, negative exponents and simplifying square roots.", "Potenzgesetze, negative Exponenten und Wurzeln vereinfachen."), glyph: "a^n", minutes: 9, lessonLevel: 2 },
-  { slug: "percentages", title: tx("Percentages", "Prozentrechnung"), de: "Prozentrechnung", area: "numbers", blurb: tx("Percentage, base value and percent rate, plus increases and discounts.", "Grundwert, Prozentwert und Prozentsatz, dazu Erhöhungen und Rabatte."), glyph: "25 %", minutes: 8, lessonLevel: 1 },
-  { slug: "equations", title: tx("Equations and inequalities", "Gleichungen und Ungleichungen"), de: "Gleichungen und Ungleichungen", area: "equations", blurb: tx("Solve linear equations and inequalities, and know when the sign flips.", "Lineare Gleichungen und Ungleichungen lösen und wissen, wann sich das Zeichen umdreht."), glyph: "2x + 3 = 11", minutes: 10, lessonLevel: 1 },
-  { slug: "linear-systems", title: tx("Systems of equations", "Lineare Gleichungssysteme"), de: "Lineare Gleichungssysteme", area: "equations", blurb: tx("Two equations, two unknowns: substitution, elimination and graphs.", "Zwei Gleichungen, zwei Unbekannte: Einsetzen, Gleichsetzen, Addieren und Graphen."), glyph: "x + y = 5", minutes: 10, lessonLevel: 2 },
-  { slug: "pq-formula", title: tx("The pq formula", "pq-Formel"), de: "pq-Formel", area: "equations", blurb: tx("Solve any quadratic equation in normal form, and read the discriminant.", "Jede quadratische Gleichung in Normalform lösen und die Diskriminante deuten."), glyph: "x^2 + px + q", minutes: 9, lessonLevel: 2 },
-  { slug: "lines", title: tx("Straight lines", "Geraden"), de: "Geraden", area: "functions", blurb: tx("Slope, y-intercept and the line through two points, on a live graph.", "Steigung, y-Achsenabschnitt und die Gerade durch zwei Punkte, am lebendigen Graphen."), glyph: "y = mx + b", minutes: 10, lessonLevel: 2 },
-  { slug: "word-problems", title: tx("Word problems", "Textaufgaben"), de: "Textaufgaben", area: "applied", blurb: tx("Turn a story into maths: find what's asked, pick the operation, check.", "Aus einer Geschichte wird Mathe: Gesuchtes finden, Rechenweg wählen, prüfen."), glyph: '12 "km" : 3 "h"', minutes: 8, lessonLevel: 1 },
-  { slug: "unknowns", title: tx("Word problems with unknowns", "Textaufgaben mit Unbekannten"), de: "Textaufgaben mit Unbekannten", area: "applied", blurb: tx("Name the unknown x, write the equation, solve it, answer in words.", "Die Unbekannte x benennen, die Gleichung aufstellen, lösen und im Antwortsatz antworten."), glyph: "x + 2x = 30", minutes: 10, lessonLevel: 1 },
+const L = (en: string, de: string) => tx(en, de);
+/** "Klasse a–b" (or just "Klasse a"). */
+const G = (a: number, b?: number) => (b ? L(`Grades ${a}–${b}`, `Klasse ${a}–${b}`) : L(`Grade ${a}`, `Klasse ${a}`));
+const G56 = G(5, 6);
+const G79 = G(7, 9);
+const G78 = G(7, 8);
+const G910 = G(9, 10);
+const G810 = G(8, 10);
+const UP = L("Upper school", "Oberstufe");
+const UP10 = L("Grade 10 and upper school", "Klasse 10 und Oberstufe");
+const UPU = L("Upper school and university", "Oberstufe und Studium");
+
+/**
+ * Maths topics in the order they're suggested. Each level builds on the one before: beginner
+ * (first contact), intermediate (the standard of class tests) and expert (up to Oberstufe).
+ */
+const MATHS_ENTRIES: Entry[] = [
+  {
+    slug: "negative-numbers", title: L("Negative numbers", "Negative Zahlen"), de: "Ganze und rationale Zahlen", area: "numbers", glyph: "-3 + 5",
+    blurb: L("Below zero: the number line, adding and subtracting, and the sign rules.", "Unter null: die Zahlengerade, Addieren und Subtrahieren und die Vorzeichenregeln."),
+    levels: {
+      1: { depth: G56, minutes: 9, blurb: L("The number line, ordering and comparing, temperatures and bank balances, adding and subtracting negative numbers.", "Die Zahlengerade, Ordnen und Vergleichen, Temperaturen und Kontostände, negative Zahlen addieren und subtrahieren.") },
+      2: { depth: G(6, 7), minutes: 10, blurb: L("Multiplying and dividing with the sign rules, the order of operations, and negative fractions and decimals.", "Multiplizieren und Dividieren mit den Vorzeichenregeln, die Rechenreihenfolge und negative Brüche und Dezimalzahlen.") },
+      3: { depth: G78, minutes: 10, blurb: L("Absolute value as distance, powers with negative bases, and the laws of arithmetic for clever calculating.", "Der Betrag als Abstand, Potenzen mit negativer Basis und die Rechengesetze für geschicktes Rechnen.") },
+    },
+  },
+  {
+    slug: "brackets", title: L("Removing brackets", "Klammern auflösen"), de: "Klammern auflösen", area: "algebra", glyph: "-(a - b)",
+    blurb: L("Plus or minus in front? Learn when signs stay and when they flip.", "Plus oder Minus davor? Lerne, wann Vorzeichen bleiben und wann du sie umdrehst."),
+    levels: {
+      1: { depth: G(7), minutes: 7, blurb: L("Plus or minus in front of a bracket: when the signs stay and when they flip, also with brackets inside brackets.", "Plus oder Minus vor der Klammer: wann die Vorzeichen bleiben und wann sie sich umdrehen, auch bei Klammern in Klammern.") },
+      2: { depth: G78, minutes: 9, blurb: L("Long terms with several brackets and a factor in front, like 4x − 2(3x − 5): step by step to the simplest form.", "Lange Terme mit mehreren Klammern und einem Faktor davor wie 4x − 2(3x − 5): Schritt für Schritt zur einfachsten Form.") },
+      3: { depth: G(8, 9), minutes: 10, blurb: L("Factoring out: put common factors with variables and powers in front of a bracket, factor out −1, and use it to simplify.", "Ausklammern: gemeinsame Faktoren mit Variablen und Potenzen vor die Klammer ziehen, −1 ausklammern und damit vereinfachen.") },
+    },
+  },
+  {
+    slug: "expanding", title: L("Expanding brackets", "Ausmultiplizieren"), de: "Ausmultiplizieren", area: "algebra", glyph: "a(b + c)",
+    blurb: L("Multiply into brackets, two brackets at once and the binomial formulas.", "In Klammern hineinmultiplizieren, zwei Klammern auf einmal und die binomischen Formeln."),
+    levels: {
+      1: { depth: G(7), minutes: 8, blurb: L("The distributive law with numbers and one variable, the area model, and collecting like terms.", "Das Distributivgesetz mit Zahlen und einer Variablen, das Flächenmodell und gleichartige Terme zusammenfassen.") },
+      2: { depth: G(8), minutes: 9, blurb: L("Multiply into brackets, two brackets at once and the binomial formulas.", "In Klammern hineinmultiplizieren, zwei Klammern auf einmal und die binomischen Formeln.") },
+      3: { depth: G910, minutes: 11, blurb: L("The binomial formulas backwards to factorise, (a + b)³ and Pascal's triangle, and the binomial theorem.", "Die binomischen Formeln rückwärts zum Faktorisieren, (a + b)³ und das Pascalsche Dreieck und der binomische Lehrsatz.") },
+    },
+  },
+  {
+    slug: "rearranging", title: L("Rearranging formulas", "Formeln umstellen"), de: "Formeln umstellen", area: "algebra", glyph: "v = \\frac{s}{t}",
+    blurb: L("Get any letter on its own, step by step, with inverse operations.", "Bring jeden Buchstaben allein auf eine Seite, Schritt für Schritt mit Umkehroperationen."),
+    levels: {
+      1: { depth: G(6, 7), minutes: 7, blurb: L("Formulas you know (perimeter, area, speed): insert values, calculate, and rearrange in one step.", "Formeln, die du kennst (Umfang, Flächeninhalt, Geschwindigkeit): Werte einsetzen, ausrechnen und in einem Schritt umstellen.") },
+      2: { depth: G(8, 9), minutes: 8, blurb: L("Get any letter on its own, step by step, with inverse operations.", "Bring jeden Buchstaben allein auf eine Seite, Schritt für Schritt mit Umkehroperationen.") },
+      3: { depth: UP10, minutes: 11, blurb: L("Harder formulas: the letter appears twice, reciprocal formulas like 1/f = 1/g + 1/b, roots and powers.", "Schwierigere Formeln: der Buchstabe kommt zweimal vor, Kehrwertformeln wie 1/f = 1/g + 1/b, Wurzeln und Potenzen.") },
+    },
+  },
+  {
+    slug: "fractions", title: L("Fractions", "Bruchrechnung"), de: "Bruchrechnung", area: "numbers", glyph: "\\frac{3}{4}",
+    blurb: L("Simplify, add, subtract, multiply and divide fractions with confidence.", "Brüche sicher kürzen, addieren, subtrahieren, multiplizieren und dividieren."),
+    levels: {
+      1: { depth: G(6), minutes: 10, blurb: L("Simplify, add, subtract, multiply and divide fractions with confidence.", "Brüche sicher kürzen, addieren, subtrahieren, multiplizieren und dividieren.") },
+      2: { depth: G(6, 7), minutes: 10, blurb: L("Fractions, decimals and percentages both ways, repeating decimals, comparing and ordering, and the order of operations with fractions.", "Brüche, Dezimalzahlen und Prozente in beide Richtungen, periodische Dezimalzahlen, Vergleichen und Ordnen und die Rechenreihenfolge mit Brüchen.") },
+      3: { depth: G(8, 9), minutes: 12, blurb: L("Algebraic fractions: the domain, simplifying by factorising, common denominators, and fractional equations.", "Bruchterme: die Definitionsmenge, Kürzen durch Faktorisieren, der Hauptnenner und Bruchgleichungen.") },
+    },
+  },
+  {
+    slug: "powers-roots", title: L("Powers and roots", "Potenzen und Wurzeln"), de: "Potenzen und Wurzeln", area: "numbers", glyph: "a^n",
+    blurb: L("Power rules, negative exponents and simplifying square roots.", "Potenzgesetze, negative Exponenten und Wurzeln vereinfachen."),
+    levels: {
+      1: { depth: G(5, 7), minutes: 8, blurb: L("Squares, cubes and powers of ten, big numbers, square roots of square numbers, and why −3² is not (−3)².", "Quadrat-, Kubik- und Zehnerpotenzen, große Zahlen, Wurzeln aus Quadratzahlen und warum −3² nicht (−3)² ist.") },
+      2: { depth: G(8, 9), minutes: 9, blurb: L("Power rules, negative exponents, scientific notation and simplifying square roots.", "Potenzgesetze, negative Exponenten, wissenschaftliche Schreibweise und Wurzeln vereinfachen.") },
+      3: { depth: UP10, minutes: 12, blurb: L("Rational exponents and nth roots, rationalising denominators, logarithms and the log rules, exponential equations.", "Rationale Exponenten und n-te Wurzeln, Nenner rational machen, Logarithmen und Logarithmengesetze, Exponentialgleichungen.") },
+    },
+  },
+  {
+    slug: "percentages", title: L("Percentages", "Prozentrechnung"), de: "Prozentrechnung", area: "numbers", glyph: "25 %",
+    blurb: L("Percentage, base value and percent rate, plus increases and discounts.", "Grundwert, Prozentwert und Prozentsatz, dazu Erhöhungen und Rabatte."),
+    levels: {
+      1: { depth: G(6, 7), minutes: 8, blurb: L("Percentage, base value and percent rate, plus increases and discounts.", "Grundwert, Prozentwert und Prozentsatz, dazu Erhöhungen und Rabatte.") },
+      2: { depth: G78, minutes: 10, blurb: L("Interest for years, months and days, VAT, and several discounts and surcharges in a row.", "Zinsen für Jahre, Monate und Tage, Mehrwertsteuer und mehrere Rabatte und Aufschläge nacheinander.") },
+      3: { depth: UP10, minutes: 11, blurb: L("Compound interest, exponential growth and decay, half-life and doubling time: linear or exponential?", "Zinseszins, exponentielles Wachstum und exponentielle Abnahme, Halbwertszeit und Verdopplungszeit: linear oder exponentiell?") },
+    },
+  },
+  {
+    slug: "equations", title: L("Equations and inequalities", "Gleichungen und Ungleichungen"), de: "Gleichungen und Ungleichungen", area: "equations", glyph: "2x + 3 = 11",
+    blurb: L("Solve linear equations and inequalities, and know when the sign flips.", "Lineare Gleichungen und Ungleichungen lösen und wissen, wann sich das Zeichen umdreht."),
+    levels: {
+      1: { depth: G(7), minutes: 10, blurb: L("Solve linear equations and inequalities, and know when the sign flips.", "Lineare Gleichungen und Ungleichungen lösen und wissen, wann sich das Zeichen umdreht.") },
+      2: { depth: G(8), minutes: 10, blurb: L("Equations with fractions and decimals, no or infinitely many solutions, ratio equations, and solution sets of inequalities.", "Gleichungen mit Brüchen und Dezimalzahlen, keine oder unendlich viele Lösungen, Verhältnisgleichungen und Lösungsmengen von Ungleichungen.") },
+      3: { depth: G910, minutes: 12, blurb: L("Absolute value equations and inequalities with case analysis, root equations, and checking for false solutions.", "Betragsgleichungen und -ungleichungen mit Fallunterscheidung, Wurzelgleichungen und die Probe gegen Scheinlösungen.") },
+    },
+  },
+  {
+    slug: "linear-systems", title: L("Systems of equations", "Lineare Gleichungssysteme"), de: "Lineare Gleichungssysteme", area: "equations", glyph: "x + y = 5",
+    blurb: L("Two equations, two unknowns: substitution, elimination and graphs.", "Zwei Gleichungen, zwei Unbekannte: Einsetzen, Gleichsetzen, Addieren und Graphen."),
+    levels: {
+      1: { depth: G78, minutes: 8, blurb: L("Two conditions at once: test a pair of numbers, solve with a table or where two lines cross, and simple substitution.", "Zwei Bedingungen auf einmal: ein Zahlenpaar testen, mit einer Tabelle oder am Schnittpunkt zweier Geraden lösen und einfaches Einsetzen.") },
+      2: { depth: G(8, 9), minutes: 10, blurb: L("Two equations, two unknowns: substitution, elimination and graphs.", "Zwei Gleichungen, zwei Unbekannte: Einsetzen, Gleichsetzen, Addieren und Graphen.") },
+      3: { depth: UP, minutes: 12, blurb: L("Three equations, three unknowns: the Gauss algorithm, special cases, and the parabola through three points.", "Drei Gleichungen, drei Unbekannte: das Gauß-Verfahren, Sonderfälle und die Parabel durch drei Punkte.") },
+    },
+  },
+  {
+    slug: "pq-formula", title: L("Quadratic equations", "Quadratische Gleichungen"), de: "Quadratische Gleichungen", area: "equations", glyph: "x^2 + px + q",
+    blurb: L("Solve any quadratic equation, read the discriminant and see it on the parabola.", "Jede quadratische Gleichung lösen, die Diskriminante deuten und alles an der Parabel sehen."),
+    levels: {
+      1: { depth: G(8, 9), minutes: 8, blurb: L("Quadratic equations without a formula: take the root (x² = 25 has two solutions), factor out x and use the zero product rule.", "Quadratische Gleichungen ohne Formel: Wurzel ziehen (x² = 25 hat zwei Lösungen), x ausklammern und den Satz vom Nullprodukt nutzen.") },
+      2: { depth: G(9), minutes: 9, blurb: L("Solve any quadratic equation in normal form with the pq formula, and read the discriminant.", "Jede quadratische Gleichung in Normalform mit der pq-Formel lösen und die Diskriminante deuten.") },
+      3: { depth: UP10, minutes: 12, blurb: L("Parabolas in vertex form by completing the square, the abc formula, factorised form with Vieta, and biquadratic equations.", "Parabeln in Scheitelpunktform durch quadratische Ergänzung, die abc-Formel, die faktorisierte Form mit Vieta und biquadratische Gleichungen.") },
+    },
+  },
+  {
+    slug: "lines", title: L("Straight lines", "Geraden"), de: "Geraden", area: "functions", glyph: "y = mx + b",
+    blurb: L("Slope, y-intercept and the line through two points, on a live graph.", "Steigung, y-Achsenabschnitt und die Gerade durch zwei Punkte, am lebendigen Graphen."),
+    levels: {
+      1: { depth: G(6, 7), minutes: 8, blurb: L("The coordinate system, points in all four quadrants, tables of values, and proportional functions y = mx.", "Das Koordinatensystem, Punkte in allen vier Quadranten, Wertetabellen und proportionale Funktionen y = mx.") },
+      2: { depth: G(8), minutes: 10, blurb: L("Slope, y-intercept and the line through two points, on a live graph.", "Steigung, y-Achsenabschnitt und die Gerade durch zwei Punkte, am lebendigen Graphen.") },
+      3: { depth: UP10, minutes: 11, blurb: L("Where two lines meet, the slope angle (tan α = m), distances and midpoints, and the perpendicular through a point.", "Wo sich zwei Geraden schneiden, der Steigungswinkel (tan α = m), Abstände und Mittelpunkte und die Senkrechte durch einen Punkt.") },
+    },
+  },
+  {
+    slug: "area-volume", title: L("Area and volume", "Flächen und Körper"), de: "Flächeninhalt und Volumen", area: "geometry", glyph: "A = a \\cdot b",
+    blurb: L("Perimeter, area and volume: from rectangles and cuboids to circles, cylinders and spheres.", "Umfang, Flächeninhalt und Volumen: vom Rechteck und Quader bis zu Kreis, Zylinder und Kugel."),
+    levels: {
+      1: { depth: G56, minutes: 9, blurb: L("Perimeter and area of rectangles and squares, area units, and the volume and surface area of a cuboid.", "Umfang und Flächeninhalt von Rechteck und Quadrat, Flächeneinheiten sowie Volumen und Oberfläche des Quaders.") },
+      2: { depth: G78, minutes: 11, blurb: L("Triangle, parallelogram and trapezium, composite shapes, the circle and π, prisms and cylinders.", "Dreieck, Parallelogramm und Trapez, zusammengesetzte Flächen, der Kreis und π, Prisma und Zylinder.") },
+      3: { depth: G910, minutes: 12, blurb: L("Pyramid, cone and sphere, heights with Pythagoras, and how area and volume grow when you scale.", "Pyramide, Kegel und Kugel, Höhen mit dem Satz des Pythagoras und wie Fläche und Volumen beim Vergrößern wachsen.") },
+    },
+  },
+  {
+    slug: "probability", title: L("Probability", "Wahrscheinlichkeit"), de: "Wahrscheinlichkeitsrechnung", area: "stochastics", glyph: "P = \\frac{1}{6}",
+    blurb: L("Dice, coins and tree diagrams: how likely is it, and what can you expect?", "Würfel, Münzen und Baumdiagramme: Wie wahrscheinlich ist es und was kannst du erwarten?"),
+    levels: {
+      1: { depth: G(5, 7), minutes: 9, blurb: L("Chance experiments, relative frequency, and Laplace probability with dice, coins and spinners.", "Zufallsexperimente, relative Häufigkeit und Laplace-Wahrscheinlichkeit mit Würfeln, Münzen und Glücksrädern.") },
+      2: { depth: G810, minutes: 11, blurb: L("Multi-stage experiments, tree diagrams and the path rules, with and without replacement, and \"at least once\".", "Mehrstufige Zufallsexperimente, Baumdiagramme und die Pfadregeln, mit und ohne Zurücklegen und \"mindestens einmal\".") },
+      3: { depth: UP, minutes: 13, blurb: L("Two-way tables and conditional probability, expected value, Bernoulli chains and the binomial distribution.", "Vierfeldertafel und bedingte Wahrscheinlichkeit, Erwartungswert, Bernoulli-Ketten und die Binomialverteilung.") },
+    },
+  },
+  {
+    slug: "word-problems", title: L("Word problems", "Textaufgaben"), de: "Textaufgaben", area: "applied", glyph: '12 "km" : 3 "h"',
+    blurb: L("Turn a story into maths: find what's asked, pick the operation, check.", "Aus einer Geschichte wird Mathe: Gesuchtes finden, Rechenweg wählen, prüfen."),
+    levels: {
+      1: { depth: G(5, 7), minutes: 8, blurb: L("Turn a story into maths: find what's asked, pick the operation, check. Rule of three and speed.", "Aus einer Geschichte wird Mathe: Gesuchtes finden, Rechenweg wählen, prüfen. Dreisatz und Geschwindigkeit.") },
+      2: { depth: G78, minutes: 10, blurb: L("The rule of three in several steps, scale and maps, averages, and comparing tariffs.", "Der zusammengesetzte Dreisatz, Maßstab und Karten, Durchschnitte und Tarifvergleiche.") },
+      3: { depth: UP10, minutes: 12, blurb: L("Modelling: choose a linear, quadratic or exponential model, find the best value with a parabola, and Fermi estimates.", "Modellieren: ein lineares, quadratisches oder exponentielles Modell wählen, den besten Wert mit einer Parabel finden und Fermi-Aufgaben.") },
+    },
+  },
+  {
+    slug: "unknowns", title: L("Word problems with unknowns", "Textaufgaben mit Unbekannten"), de: "Textaufgaben mit Unbekannten", area: "applied", glyph: "x + 2x = 30",
+    blurb: L("Name the unknown x, write the equation, solve it, answer in words.", "Die Unbekannte x benennen, die Gleichung aufstellen, lösen und im Antwortsatz antworten."),
+    levels: {
+      1: { depth: G(7), minutes: 10, blurb: L("Name the unknown x, write the equation, solve it, answer in words.", "Die Unbekannte x benennen, die Gleichung aufstellen, lösen und im Antwortsatz antworten.") },
+      2: { depth: G(8, 9), minutes: 11, blurb: L("Two unknowns: turn a story into a system of equations (tickets, coins, mixtures), and motion problems.", "Zwei Unbekannte: aus einer Geschichte ein Gleichungssystem machen (Eintrittskarten, Münzen, Mischungen) und Bewegungsaufgaben.") },
+      3: { depth: G910, minutes: 12, blurb: L("Quadratic word problems (areas, numbers, falling objects) and work-rate problems: which solution makes sense?", "Quadratische Textaufgaben (Flächen, Zahlen, Fallbewegungen) und Arbeitsaufgaben: Welche Lösung ist sinnvoll?") },
+    },
+  },
 ];
+
+/** Where each maths lesson written before levels sits (its old progress row counts for that level). */
+const MATHS_LEGACY: Record<string, Level> = {
+  brackets: 1, expanding: 2, rearranging: 2, fractions: 1, "powers-roots": 2, percentages: 1,
+  equations: 1, "linear-systems": 2, "pq-formula": 2, lines: 2, "word-problems": 1, unknowns: 1,
+};
 
 /** Chemistry topics in the order they're suggested (roughly the German school order, grades 7 to 10). */
 const CHEMISTRY_ENTRIES: SingleEntry[] = [
@@ -88,14 +231,6 @@ const CHEMISTRY_ENTRIES: SingleEntry[] = [
   { slug: "alkanes", title: tx("Alkanes", "Alkane"), de: "Alkane", area: "organic", blurb: tx("Methane to decane: formulas, names and the homologous series.", "Von Methan bis Decan: Formeln, Namen und die homologe Reihe."), glyph: "\\ce{CH4}", minutes: 9, lessonLevel: 2 },
 ];
 
-const L = (en: string, de: string) => tx(en, de);
-const G56 = L("Grades 5–6", "Klasse 5–6");
-const G79 = L("Grades 7–9", "Klasse 7–9");
-const G78 = L("Grades 7–8", "Klasse 7–8");
-const G910 = L("Grades 9–10", "Klasse 9–10");
-const G810 = L("Grades 8–10", "Klasse 8–10");
-const UP = L("Upper school", "Oberstufe");
-const UPU = L("Upper school and university", "Oberstufe und Studium");
 
 /**
  * Biology topics in the order they're suggested. Every topic has three levels: beginner
@@ -249,9 +384,10 @@ const BIOLOGY_ENTRIES: Entry[] = [
   },
 ];
 
-for (const t of [...MATHS_ENTRIES, ...CHEMISTRY_ENTRIES]) LEGACY_LESSON_LEVEL[t.slug] = t.lessonLevel;
+for (const t of CHEMISTRY_ENTRIES) LEGACY_LESSON_LEVEL[t.slug] = t.lessonLevel;
+Object.assign(LEGACY_LESSON_LEVEL, MATHS_LEGACY);
 
-export const MATHS_CATALOG: TopicMeta[] = MATHS_ENTRIES.map((t) => ({ ...single("maths", t), subject: "maths" }));
+export const MATHS_CATALOG: TopicMeta[] = MATHS_ENTRIES.map((t) => ({ ...t, subject: "maths" }));
 export const CHEMISTRY_CATALOG: TopicMeta[] = CHEMISTRY_ENTRIES.map((t) => ({ ...single("chemistry", t), subject: "chemistry" }));
 export const BIOLOGY_CATALOG: TopicMeta[] = BIOLOGY_ENTRIES.map((t) => ({ ...t, subject: "biology" }));
 /** Every topic of every live subject. */
@@ -282,7 +418,7 @@ export type SubjectInfo = { slug: string; title: Text; live: boolean; areas?: Ar
 
 /** Subjects shown in the learning center. */
 export const SUBJECTS: SubjectInfo[] = [
-  { slug: "maths", title: tx("Maths", "Mathe"), live: true, areas: ["algebra", "numbers", "equations", "functions", "applied"] },
+  { slug: "maths", title: tx("Maths", "Mathe"), live: true, areas: ["numbers", "algebra", "equations", "functions", "geometry", "stochastics", "applied"] },
   { slug: "chemistry", title: tx("Chemistry", "Chemie"), live: true, areas: ["matter", "atoms", "bonding", "reactions", "chemcalc", "organic"] },
   { slug: "biology", title: tx("Biology", "Biologie"), live: true, areas: ["cells", "botany", "zoology", "human", "genetics", "evolution", "ecology"] },
   { slug: "physics", title: tx("Physics", "Physik"), live: false },
