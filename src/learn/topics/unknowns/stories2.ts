@@ -2,7 +2,7 @@ import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, Mistake } from "@/learn/types";
 import { D, E, joinT, paras, mathN, sayN, wrongNumbers, wrongPairs, wrong, type Wrong, type WrongPair } from "./kit";
-import { bar, plain, side, sys } from "./sys";
+import { bar, plain, side, sys, sysStack } from "./sys";
 
 // Level 2 stories with two unknowns: count and value (tickets, coins, animals, mixtures),
 // two numbers from their sum and difference, two-digit numbers, and motion problems.
@@ -459,8 +459,8 @@ export function digitStory(x: number, y: number) {
         `The digit sum of a two-digit number is ${s}. If you swap its two digits, the number gets ${d} smaller. What is the number?`,
         `Die Quersumme einer zweistelligen Zahl ist ${s}. Vertauscht man ihre beiden Ziffern, wird die Zahl um ${d} kleiner. Wie heißt die Zahl?`,
       );
-  // (II) 10y + x = 10x + y ± d  →  9y − 9x = ±d  →  y − x = ±k
-  const iiRaw = `10#ta y#yb +#pb x#xb =#e2 10#tc x#xc +#pc y#yc ${up ? "+" : "-"}#pd ${d}#nd`;
+  // (II) 10y + x = 10x + y ± d  →  9y − 9x = ±d  →  y − x = ±k. (I) and (II) stacked: (II) is long.
+  const I = `x#x1 +#p1 y#y1 =#e1 ${s}#n1`;
   const frames: Frame[] = [
     {
       math: tx(`"number:"#ln \\, 10#tn x#xn +#pn y#yn \\quad "swapped:"#ls \\, 10#ta y#yb +#pb x#xb`, `"Zahl:"#ln \\, 10#tn x#xn +#pn y#yn \\quad "vertauscht:"#ls \\, 10#ta y#yb +#pb x#xb`),
@@ -470,21 +470,23 @@ export function digitStory(x: number, y: number) {
       ),
     },
     {
-      math: sys(`x#x1 +#p1 y#y1 =#e1 ${s}#n1`, iiRaw),
+      math: sysStack(I, `10#ta y#yb +#pb x#xb`, `=#e2 10#tc x#xc +#pc y#yc ${up ? "+" : "-"}#pd ${d}#nd`),
       note: tx(
         `(I) is the digit sum. (II): the swapped number is ${d} ${up ? "bigger" : "smaller"} than the number.`,
         `(I) ist die Quersumme. (II): Die vertauschte Zahl ist um ${d} ${up ? "größer" : "kleiner"} als die Zahl.`,
       ),
     },
     {
-      math: sys(`x#x1 +#p1 y#y1 =#e1 ${s}#n1`, up ? `9#ta y#yb -#pc 9#tc x#xc =#e2 ${d}#nd${bar(": 9")}` : `9#tc x#xc -#pb 9#ta y#yb =#e2 ${d}#nd${bar(": 9")}`),
-      note: tx(
-        `Tidy up (II): all $x$ and $y$ to the left. $10y - y = 9y$ and $10x - x = 9x$.`,
-        `Räum (II) auf: alle $x$ und $y$ nach links. $10y - y = 9y$ und $10x - x = 9x$.`,
-      ),
+      math: sysStack(I, up ? `9#ta y#yb -#pc 9#tc x#xc =#e2 ${d}#nd` : `9#tc x#xc -#pb 9#ta y#yb =#e2 ${d}#nd`, bar(": 9").trim()),
+      note: up
+        ? tx(`Tidy up (II): all $x$ and $y$ to the left. $10y - y = 9y$ and $10x - x = 9x$.`, `Räum (II) auf: alle $x$ und $y$ nach links. $10y - y = 9y$ und $10x - x = 9x$.`)
+        : tx(
+            `Tidy up (II): all $x$ and $y$ to the right, the ${d} to the left. $10x - x = 9x$ and $10y - y = 9y$, so $${d} = 9x - 9y$. Written the other way round: $9x - 9y = ${d}$.`,
+            `Räum (II) auf: alle $x$ und $y$ nach rechts, die ${d} nach links. $10x - x = 9x$ und $10y - y = 9y$, also $${d} = 9x - 9y$. Andersherum geschrieben: $9x - 9y = ${d}$.`,
+          ),
     },
     {
-      math: sys(`x#x1 +#p1 y#y1 =#e1 ${s}#n1`, up ? `-#pc x#xc +#pb y#yb =#e2 ${k}#nd` : `x#xc -#pb y#yb =#e2 ${k}#nd`),
+      math: sysStack(I, up ? `-#pc x#xc +#pb y#yb =#e2 ${k}#nd` : `x#xc -#pb y#yb =#e2 ${k}#nd`),
       highlight: up ? ["pc", "xc", "x1"] : ["pb", "yb", "y1"],
       note: tx(
         `Divide by 9. Now ${up ? "$x$" : "$y$"} has opposite signs in (I) and (II): add the equations.`,

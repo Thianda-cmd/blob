@@ -14,6 +14,8 @@ const NEG_LENGTH = tx("Negative length", "Negative Länge");
 /** A quadratic word problem: set up, A·x² + B·x + C = R, pq formula, which solution makes sense. */
 export type QS = {
   text: Text;
+  /** What x stands for ("Let $x$ be the width of the frame in cm."), shown with "Which solutions make sense?" and "Which equation fits?". */
+  xIs: Text;
   hint: Text;
   setup: Frame[];
   /** The equation as set up from the story (display source). */
@@ -100,13 +102,14 @@ export function frameStory(ctx: FrameCtx, a: number, b: number, x: number): QS {
             );
   const what = ctx === "pool" ? tx("path", "Weg") : ctx === "lawn" ? tx("flower bed", "Beet") : tx("frame", "Rahmen");
   const outside = `(${a}#a +#p1 2#k1 x#x1)#B1 (${b}#b +#p2 2#k2 x#x2)#B2`;
+  const xIs = tx(`Let $x$ be the width of the ${E(what)} in ${unit}.`, `Sei $x$ die Breite ${ctx === "pool" ? "des Wegs" : ctx === "lawn" ? "des Beets" : "des Rahmens"} in ${unit}.`);
   const setup: Frame[] = [
     {
       math: tx(`"outside:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b +#p2 2#k2 x#x2)#B2`, `"außen:"#lo \\, (${a}#a +#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b +#p2 2#k2 x#x2)#B2`),
-      note: sayN(({ N }) => [
-        `Let $x$ be the width of the ${N(what)} in ${unit}. It adds $x$ on **both** sides, so the outside is $${a} + 2x$ by $${b} + 2x$.`,
-        `Sei $x$ die Breite ${ctx === "pool" ? "des Wegs" : ctx === "lawn" ? "des Beets" : "des Rahmens"} in ${unit}. ${ctx === "pool" ? "Er" : ctx === "lawn" ? "Es" : "Er"} kommt auf **beiden** Seiten dazu, außen misst alles also $${a} + 2x$ mal $${b} + 2x$.`,
-      ]),
+      note: joinT(
+        xIs,
+        tx(`It adds $x$ on **both** sides, so the outside is $${a} + 2x$ by $${b} + 2x$.`, `${ctx === "lawn" ? "Es" : "Er"} kommt auf **beiden** Seiten dazu, außen misst alles also $${a} + 2x$ mal $${b} + 2x$.`),
+      ),
     },
   ];
   const traps = [
@@ -128,6 +131,7 @@ export function frameStory(ctx: FrameCtx, a: number, b: number, x: number): QS {
   ];
   return {
     text,
+    xIs,
     hint: tx(`Let $x$ be the width. The outside measures $${a} + 2x$ by $${b} + 2x$.`, `Sei $x$ die Breite. Außen misst alles $${a} + 2x$ mal $${b} + 2x$.`),
     setup,
     eq: total ? `${outside} =#eq ${R}#r` : `${outside} -#m ${ab}#ab =#eq ${F}#r`,
@@ -191,6 +195,7 @@ export function innerStory(ctx: InnerCtx, a: number, b: number, x: number): QS {
   const what = garden ? tx("path", "Weg") : tx("margin", "Rand");
   const Der = garden ? "Der Weg" : "Der Rand";
   const inner = garden ? tx("the lawn", "der Rasen") : tx("the printed area", "die bedruckte Fläche");
+  const xIs = tx(`Let $x$ be the width of the ${E(what)} in ${unit}.`, `Sei $x$ die Breite ${garden ? "des Wegs" : "des Rands"} in ${unit}.`);
   return {
     text: garden
       ? tx(
@@ -201,13 +206,14 @@ export function innerStory(ctx: InnerCtx, a: number, b: number, x: number): QS {
           `A poster is ${a} cm wide and ${b} cm high. A margin of the same width is left blank all around. The printed area in the middle covers ${R} cm². How wide is the margin?`,
           `Ein Plakat ist ${a} cm breit und ${b} cm hoch. Ringsherum bleibt ein gleich breiter Rand frei. Die bedruckte Fläche in der Mitte ist ${R} cm² groß. Wie breit ist der Rand?`,
         ),
+    xIs,
     hint: tx(`Let $x$ be the width. Inside, ${E(inner)} measures $${a} - 2x$ by $${b} - 2x$.`, `Sei $x$ die Breite. Innen misst ${D(inner)} $${a} - 2x$ mal $${b} - 2x$.`),
     setup: [
       {
         math: tx(`"inside:"#lo \\, (${a}#a -#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b -#p2 2#k2 x#x2)#B2`, `"innen:"#lo \\, (${a}#a -#p1 2#k1 x#x1)#B1 \\cdot#t (${b}#b -#p2 2#k2 x#x2)#B2`),
-        note: tx(
-          `Let $x$ be the width of the ${E(what)} in ${unit}. It takes $x$ away on **both** sides, so inside only $${a} - 2x$ by $${b} - 2x$ is left.`,
-          `Sei $x$ die Breite ${garden ? "des Wegs" : "des Rands"} in ${unit}. Er nimmt auf **beiden** Seiten $x$ weg, innen bleiben also nur $${a} - 2x$ mal $${b} - 2x$.`,
+        note: joinT(
+          xIs,
+          tx(`It takes $x$ away on **both** sides, so inside only $${a} - 2x$ by $${b} - 2x$ is left.`, `Er nimmt auf **beiden** Seiten $x$ weg, innen bleiben also nur $${a} - 2x$ mal $${b} - 2x$.`),
         ),
       },
     ],
@@ -274,6 +280,7 @@ export function gardenStory(x: number, d: number, ask: "width" | "length", place
   const unit = place === "garden" ? "m" : "cm";
   const unit2 = place === "garden" ? "m²" : "cm²";
   const len = x + d;
+  const xIs = place === "garden" ? tx("Let $x$ be the width of the garden in m.", "Sei $x$ die Breite des Gartens in m.") : tx("Let $x$ be the width of the poster in cm.", "Sei $x$ die Breite des Plakats in cm.");
   return {
     text:
       place === "garden"
@@ -285,11 +292,12 @@ export function gardenStory(x: number, d: number, ask: "width" | "length", place
             `A poster is ${d} cm higher than it is wide and covers ${A} cm². How ${ask === "width" ? "wide" : "high"} is the poster?`,
             `Ein Plakat ist ${d} cm höher als breit und hat eine Fläche von ${A} cm². Wie ${ask === "width" ? "breit" : "hoch"} ist das Plakat?`,
           ),
+    xIs,
     hint: tx(`Let $x$ be the width. The other side is $x + ${d}$. Area = length times width.`, `Sei $x$ die Breite. Die andere Seite ist $x + ${d}$. Fläche = Länge mal Breite.`),
     setup: [
       {
         math: tx(`"width:"#lw \\, x#x1 \\quad "${place === "garden" ? "length" : "height"}:"#ll \\, x#x2 +#p ${d}#d`, `"Breite:"#lw \\, x#x1 \\quad "${place === "garden" ? "Länge" : "Höhe"}:"#ll \\, x#x2 +#p ${d}#d`),
-        note: tx(`Let $x$ be the width in ${unit}. The other side is ${d} ${unit} more: $x + ${d}$.`, `Sei $x$ die Breite in ${unit}. Die andere Seite ist ${d} ${unit} länger: $x + ${d}$.`),
+        note: joinT(xIs, tx(`The other side is ${d} ${unit} more: $x + ${d}$.`, `Die andere Seite ist ${d} ${unit} länger: $x + ${d}$.`)),
       },
     ],
     eq: `x#x1 (x#x2 +#p ${d}#d)#B =#eq ${A}#r`,
@@ -328,26 +336,29 @@ export function gardenStory(x: number, d: number, ask: "width" | "length", place
   };
 }
 
-function garden(rng: Rng): QS {
+function garden(rng: Rng, ask?: "width" | "length"): QS {
   const place = rng.pick(["garden", "poster"] as const);
   for (let i = 0; i < 30; i++) {
     const d = place === "garden" ? rng.pick([2, 4, 6, 8, 10]) : rng.pick([2, 4, 6, 8, 10, 12, 20]);
     const x = place === "garden" ? rng.int(4, 18) : rng.int(10, 30);
-    const q = gardenStory(x, d, rng.chance(0.6) ? "width" : "length", place);
+    const q = gardenStory(x, d, ask ?? (rng.chance(0.6) ? "width" : "length"), place);
     if (friendly(q)) return q;
   }
-  return gardenStory(8, 4, "width", "garden");
+  return gardenStory(8, 4, ask ?? "width", "garden");
 }
 
-export function rectPAStory(u: number, w: number, ask: "short" | "long"): QS {
+/** ask "both": "How long are its sides?" (both solutions answer it). */
+export function rectPAStory(u: number, w: number, ask: "short" | "long" | "both"): QS {
   const s = u + w;
   const P = 2 * s;
   const A = u * w;
+  const question =
+    ask === "both"
+      ? tx("How long are its sides?", "Wie lang sind seine Seiten?")
+      : tx(`How long is its ${ask === "short" ? "shorter" : "longer"} side?`, `Wie lang ist seine ${ask === "short" ? "kürzere" : "längere"} Seite?`);
   return {
-    text: tx(
-      `A rectangle has a perimeter of ${P} cm and an area of ${A} cm². How long is its ${ask === "short" ? "shorter" : "longer"} side?`,
-      `Ein Rechteck hat einen Umfang von ${P} cm und einen Flächeninhalt von ${A} cm². Wie lang ist seine ${ask === "short" ? "kürzere" : "längere"} Seite?`,
-    ),
+    text: joinT(tx(`A rectangle has a perimeter of ${P} cm and an area of ${A} cm².`, `Ein Rechteck hat einen Umfang von ${P} cm und einen Flächeninhalt von ${A} cm².`), question),
+    xIs: tx("Let $x$ be one side of the rectangle in cm.", "Sei $x$ eine Seite des Rechtecks in cm."),
     hint: tx(`Half the perimeter is one length plus one width: ${s} cm. So if one side is $x$, the other is $${s} - x$.`, `Der halbe Umfang ist eine Länge plus eine Breite: ${s} cm. Ist eine Seite $x$, dann ist die andere $${s} - x$.`),
     setup: [
       {
@@ -367,16 +378,23 @@ export function rectPAStory(u: number, w: number, ask: "short" | "long"): QS {
       `Both make sense, and they give **the same** rectangle: if one side is ${w}, the other is $${s} - ${w} = ${u}$, and the other way round.`,
       `Beide sind sinnvoll, und sie ergeben **dasselbe** Rechteck: Ist eine Seite ${w}, dann ist die andere $${s} - ${w} = ${u}$, und umgekehrt.`,
     ),
-    value: ask === "short" ? u : w,
+    value: ask === "long" ? w : u,
     unit: "cm",
-    answer: tx(
-      `**Answer:** The rectangle is ${u} cm by ${w} cm, so the ${ask === "short" ? "shorter" : "longer"} side is ${ask === "short" ? u : w} cm. Check: $2 \\cdot (${u} + ${w}) = ${P}$ and $${u} \\cdot ${w} = ${A}$.`,
-      `**Antwort:** Das Rechteck ist ${u} cm mal ${w} cm groß, die ${ask === "short" ? "kürzere" : "längere"} Seite ist also ${ask === "short" ? u : w} cm lang. Probe: $2 \\cdot (${u} + ${w}) = ${P}$ und $${u} \\cdot ${w} = ${A}$.`,
-    ),
+    answer:
+      ask === "both"
+        ? tx(
+            `**Answer:** The sides are ${u} cm and ${w} cm long. Check: $2 \\cdot (${u} + ${w}) = ${P}$ and $${u} \\cdot ${w} = ${A}$.`,
+            `**Antwort:** Die Seiten sind ${u} cm und ${w} cm lang. Probe: $2 \\cdot (${u} + ${w}) = ${P}$ und $${u} \\cdot ${w} = ${A}$.`,
+          )
+        : tx(
+            `**Answer:** The rectangle is ${u} cm by ${w} cm, so the ${ask === "short" ? "shorter" : "longer"} side is ${ask === "short" ? u : w} cm. Check: $2 \\cdot (${u} + ${w}) = ${P}$ and $${u} \\cdot ${w} = ${A}$.`,
+            `**Antwort:** Das Rechteck ist ${u} cm mal ${w} cm groß, die ${ask === "short" ? "kürzere" : "längere"} Seite ist also ${ask === "short" ? u : w} cm lang. Probe: $2 \\cdot (${u} + ${w}) = ${P}$ und $${u} \\cdot ${w} = ${A}$.`,
+          ),
     wrongs: [
-      wrong(ask === "short" ? w : u, tx("The other side", "Die andere Seite"), tx(`Nearly! That's the ${ask === "short" ? "longer" : "shorter"} side. Both solutions belong to the same rectangle: pick the one that's asked for.`, `Fast! Das ist die ${ask === "short" ? "längere" : "kürzere"} Seite. Beide Lösungen gehören zum selben Rechteck: Nimm die gesuchte.`)),
+      ask !== "both" &&
+        wrong(ask === "short" ? w : u, tx("The other side", "Die andere Seite"), tx(`Nearly! That's the ${ask === "short" ? "longer" : "shorter"} side. Both solutions belong to the same rectangle: pick the one that's asked for.`, `Fast! Das ist die ${ask === "short" ? "längere" : "kürzere"} Seite. Beide Lösungen gehören zum selben Rechteck: Nimm die gesuchte.`)),
       wrong(P / 4, tx("Taken as a square", "Als Quadrat gerechnet"), tx(`$${P} : 4$ would be right for a **square**. But then the area would be $${P / 4}^2 = ${(P / 4) ** 2}$, not ${A}.`, `$${P} : 4$ wäre richtig für ein **Quadrat**. Dann wäre der Flächeninhalt aber $${P / 4}^2 = ${(P / 4) ** 2}$, nicht ${A}.`)),
-      wrong(P - (ask === "short" ? w : u), tx("Whole perimeter used", "Ganzen Umfang benutzt"), tx(`Careful: one side plus the other is only **half** the perimeter: ${s}, not ${P}.`, `Vorsicht: Eine Seite plus die andere ist nur der **halbe** Umfang: ${s}, nicht ${P}.`)),
+      wrong(P - (ask === "long" ? u : w), tx("Whole perimeter used", "Ganzen Umfang benutzt"), tx(`Careful: one side plus the other is only **half** the perimeter: ${s}, not ${P}.`, `Vorsicht: Eine Seite plus die andere ist nur der **halbe** Umfang: ${s}, nicht ${P}.`)),
     ],
     traps: [
       { eq: `x(${P} - x) = ${A}`, title: tx("Whole perimeter used", "Ganzen Umfang benutzt"), say: tx(`Nearly! One side plus the other is only **half** the perimeter, ${s} cm. So the other side is $${s} - x$.`, `Fast! Eine Seite plus die andere ist nur der **halbe** Umfang, ${s} cm. Die andere Seite ist also $${s} - x$.`) },
@@ -387,13 +405,13 @@ export function rectPAStory(u: number, w: number, ask: "short" | "long"): QS {
   };
 }
 
-function rectPA(rng: Rng): QS {
+function rectPA(rng: Rng, ask?: "short" | "long" | "both"): QS {
   for (let i = 0; i < 30; i++) {
     const u = rng.int(3, 14);
     const w = rng.int(u + 1, 20);
-    if ((u + w) % 2 === 0 && friendly(rectPAStory(u, w, "short"))) return rectPAStory(u, w, rng.chance(0.5) ? "short" : "long");
+    if ((u + w) % 2 === 0 && friendly(rectPAStory(u, w, "short"))) return rectPAStory(u, w, ask ?? (rng.chance(0.5) ? "short" : "long"));
   }
-  return rectPAStory(6, 8, "long");
+  return rectPAStory(6, 8, ask ?? "long");
 }
 
 // ---------------------------------------------------------------------------
@@ -420,6 +438,7 @@ export function consecStory(kind: ConsecKind, x: number, ask: "small" | "large",
       `The product of two ${words[0]} ${set[0]} is ${P}. What is the ${ask === "small" ? "smaller" : "larger"} number?`,
       `Das Produkt zweier ${kind === "next" ? "aufeinanderfolgender" : kind === "even" ? "aufeinanderfolgender gerader" : "aufeinanderfolgender ungerader"} ${integers ? "ganzer" : "natürlicher"} Zahlen ist ${P}. Wie heißt die ${ask === "small" ? "kleinere" : "größere"} Zahl?`,
     ),
+    xIs: tx("Let $x$ be the smaller number.", "Sei $x$ die kleinere Zahl."),
     hint: tx(`Let $x$ be the smaller number. The next one is $x + ${step}$.`, `Sei $x$ die kleinere Zahl. Die nächste ist $x + ${step}$.`),
     setup: [
       {
@@ -465,17 +484,21 @@ export function consecStory(kind: ConsecKind, x: number, ask: "small" | "large",
   };
 }
 
-function consec(rng: Rng, integers = false): QS {
+function consec(rng: Rng, integers = false, ask?: "small" | "large"): QS {
   const kind = rng.pick<ConsecKind>(["next", "even", "odd"]);
   const x = kind === "next" ? rng.int(6, 24) : kind === "even" ? rng.int(3, 12) * 2 : rng.int(3, 12) * 2 + 1;
-  return consecStory(kind, x, rng.chance(0.6) ? "small" : "large", integers);
+  return consecStory(kind, x, ask ?? (rng.chance(0.6) ? "small" : "large"), integers);
 }
 
 // ---------------------------------------------------------------------------
 // Pythagoras: legs x and x + d, hypotenuse c
 
+/**
+ * Legs u < w with an even difference d = w − u: then p/2 = d/2 and the root (u + w)/2 are whole
+ * numbers (an odd d gives roots like √132,25). The root stays at most 25, like friendly().
+ */
 const TRIPLES: [number, number, number][] = [
-  [3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17], [9, 12, 15], [12, 16, 20], [20, 21, 29], [7, 24, 25], [10, 24, 26], [15, 20, 25],
+  [6, 8, 10], [12, 16, 20], [10, 24, 26], [18, 24, 30], [16, 30, 34],
 ];
 
 export function pythStory(u: number, w: number, c: number, ask: "short" | "long"): QS {
@@ -485,6 +508,7 @@ export function pythStory(u: number, w: number, c: number, ask: "short" | "long"
       `The diagonal of a rectangle is ${c} cm long. One side is ${d} cm longer than the other. How long is the ${ask === "short" ? "shorter" : "longer"} side?`,
       `Die Diagonale eines Rechtecks ist ${c} cm lang. Eine Seite ist ${d} cm länger als die andere. Wie lang ist die ${ask === "short" ? "kürzere" : "längere"} Seite?`,
     ),
+    xIs: tx("Let $x$ be the shorter side in cm.", "Sei $x$ die kürzere Seite in cm."),
     hint: tx("The diagonal splits the rectangle into two right-angled triangles: Pythagoras!", "Die Diagonale teilt das Rechteck in zwei rechtwinklige Dreiecke: Satz des Pythagoras!"),
     setup: [
       {
@@ -520,9 +544,9 @@ export function pythStory(u: number, w: number, c: number, ask: "short" | "long"
   };
 }
 
-function pyth(rng: Rng): QS {
+function pyth(rng: Rng, ask?: "short" | "long"): QS {
   const [u, w, c] = rng.pick(TRIPLES);
-  return pythStory(u, w, c, rng.chance(0.6) ? "short" : "long");
+  return pythStory(u, w, c, ask ?? (rng.chance(0.6) ? "short" : "long"));
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +567,7 @@ export function landingStory(T: number, r: number, place: 0 | 1 | 2): QS {
       `A ball is thrown upwards ${where[0]}. Its height above the ground (in m) after $t$ seconds is $h(t) = ${hSrc(h0, v)}$. After how many seconds does it hit the ground?`,
       `Ein Ball wird ${where[1]} nach oben geworfen. Seine Höhe über dem Boden (in m) nach $t$ Sekunden ist $h(t) = ${hSrc(h0, v)}$. Nach wie vielen Sekunden schlägt er auf dem Boden auf?`,
     ),
+    xIs: tx("$t$ is the time in seconds after the throw.", "$t$ ist die Zeit in Sekunden nach dem Wurf."),
     hint: tx("On the ground the height is 0: solve $h(t) = 0$.", "Am Boden ist die Höhe 0: Löse $h(t) = 0$."),
     setup: [{ math: `h#h (t#t1)#B =#eq 0#r`, note: tx("On the ground, the height is 0.", "Am Boden ist die Höhe 0.") }],
     eq: `${h0}#c +#sb ${v}#cb t#vb -#sa 5#ca t#va^{2#ea} =#eq 0#r`,
@@ -637,6 +662,7 @@ export function riddleStory(r: number, k: number, plus: boolean): QS {
     text: plus
       ? tx(`If you add ${k} times a natural number to its square, you get ${c}. What is the number?`, `Addiert man zum Quadrat einer natürlichen Zahl das ${k}-Fache der Zahl, erhält man ${c}. Wie heißt die Zahl?`)
       : tx(`If you subtract ${k} times a natural number from its square, you get ${c}. What is the number?`, `Subtrahiert man vom Quadrat einer natürlichen Zahl das ${k}-Fache der Zahl, erhält man ${c}. Wie heißt die Zahl?`),
+    xIs: tx("Let $x$ be the number.", "Sei $x$ die gesuchte Zahl."),
     hint: tx(`Let $x$ be the number: its square is $x^2$, ${k} times the number is $${k}x$.`, `Sei $x$ die Zahl: Ihr Quadrat ist $x^2$, das ${k}-Fache ist $${k}x$.`),
     setup: [{ math: "x#va", note: tx("Let $x$ be the number.", "Sei $x$ die gesuchte Zahl.") }],
     eq: `x#va^{2#ea} ${plus ? "+" : "-"}#sb ${k}#cb x#vb =#eq ${c}#r`,
@@ -791,6 +817,7 @@ export function workQuad(ctx: WorkCtx, x: number, d: number, ask: "fast" | "slow
       `Working together, ${mid(w.en[0])} and ${mid(w.en[1])} need ${T} ${U("en")} to ${w.job[0]}. Alone, ${mid(w.en[1])} would need ${d} ${U("en")} longer than ${mid(w.en[0])}. How long does ${mid(ask === "fast" ? w.en[0] : w.en[1])} need alone?`,
       `Zusammen brauchen ${mid(w.de[0])} und ${mid(w.de[1])} ${T} ${U("de")}, um ${w.job[1]}. Allein bräuchte ${mid(w.de[1])} ${d} ${U("de")} länger als ${mid(w.de[0])}. Wie lange braucht ${mid(ask === "fast" ? w.de[0] : w.de[1])} allein?`,
     ),
+    xIs: tx(`Let $x$ be the time ${mid(w.en[0])} needs alone, in ${U("en")}.`, `Sei $x$ die Zeit in ${U("de")}, die ${mid(w.de[0])} allein braucht.`),
     hint: tx(`Let $x$ be the faster time. Then $\\frac{1}{x} + \\frac{1}{x + ${d}} = \\frac{1}{${T}}$. Multiply by the common denominator.`, `Sei $x$ die schnellere Zeit. Dann ist $\\frac{1}{x} + \\frac{1}{x + ${d}} = \\frac{1}{${T}}$. Multipliziere mit dem Hauptnenner.`),
     setup: [
       {
@@ -820,8 +847,8 @@ export function workQuad(ctx: WorkCtx, x: number, d: number, ask: "fast" | "slow
     wrongs: [
       wrong(other, tx("Negative time", "Negative Zeit"), tx(`$${other}$ solves the equation, but a time can't be negative. Take the other solution.`, `$${other}$ löst zwar die Gleichung, aber eine Zeit kann nicht negativ sein. Nimm die andere Lösung.`), true),
       ask === "fast"
-        ? wrong(slow, tx("The other one", "Der andere Teil"), tx(`Nearly! ${slow} is the **slower** time. The question asks for the faster one.`, `Fast! ${slow} ist die **langsamere** Zeit. Gefragt ist die schnellere.`))
-        : wrong(x, tx("The other one", "Der andere Teil"), tx(`Great, $x = ${x}$ is right! But $x$ is the faster time. Add the ${d}.`, `Super, $x = ${x}$ stimmt! Aber $x$ ist die schnellere Zeit. Rechne die ${d} noch dazu.`)),
+        ? wrong(slow, tx("The other time", "Die andere Zeit"), tx(`Nearly! ${slow} is the **slower** time. The question asks for the faster one.`, `Fast! ${slow} ist die **langsamere** Zeit. Gefragt ist die schnellere.`))
+        : wrong(x, tx("The other time", "Die andere Zeit"), tx(`Great, $x = ${x}$ is right! But $x$ is the faster time. Add the ${d}.`, `Super, $x = ${x}$ stimmt! Aber $x$ ist die schnellere Zeit. Rechne die ${d} noch dazu.`)),
       // (x + (x + d)) / 2 = T: the time together taken as the average of the two times.
       wrong((2 * T - d) / 2 + (ask === "fast" ? 0 : d), tx("Averaged the times", "Mit dem Durchschnitt gerechnet"), tx(`I think you used $\\frac{x + (x + ${d})}{2} = ${T}$. But the time together isn't the average: together they're **faster** than each of them alone. Add the parts of the job per ${unitWord(w.unit, "en", false)}.`, `Ich glaub, du hast $\\frac{x + (x + ${d})}{2} = ${T}$ gerechnet. Die gemeinsame Zeit ist aber nicht der Durchschnitt: Zusammen sind sie **schneller** als jeder allein. Addiere die Anteile pro ${unitWord(w.unit, "de", false)}.`)),
       // x + (x + d) = T: the times added (only possible when T > d).
@@ -905,7 +932,13 @@ export function senseTask(s: QS, rng: Rng): Exercise {
     instruction: tx("Which solutions make sense?", "Welche Lösungen sind sinnvoll?"),
     text: paras(
       s.text,
-      tx(`The equation for this story has the solutions ${name(0, "en")} and ${name(1, "en")}. Which of them make sense as an answer?`, `Die Gleichung zu dieser Aufgabe hat die Lösungen ${name(0, "de")} und ${name(1, "de")}. Welche davon sind als Antwort sinnvoll?`),
+      joinT(
+        s.xIs,
+        tx(
+          `The equation for this story has the solutions ${name(0, "en")} and ${name(1, "en")}. Which solutions of the equation make sense in the story?`,
+          `Die Gleichung zu dieser Aufgabe hat die Lösungen ${name(0, "de")} und ${name(1, "de")}. Welche Lösungen der Gleichung sind im Sachzusammenhang sinnvoll?`,
+        ),
+      ),
     ),
     answer: { kind: "choice", options, correct: at(right) },
     hint: tx("Put each solution back into the story. Can a length, a time or a natural number be negative? Does every length that depends on it stay positive?", "Setz jede Lösung in die Geschichte ein. Kann eine Länge, eine Zeit oder eine natürliche Zahl negativ sein? Bleibt jede Länge, die davon abhängt, positiv?"),
@@ -921,7 +954,7 @@ export function equationTask(s: QS, rng: Rng): Exercise {
   const { frames } = quadFrames(s);
   return {
     instruction: tx("Which equation fits?", "Welche Gleichung passt?"),
-    text: s.text,
+    text: paras(s.text, s.xIs),
     answer: { kind: "choice", options, correct: options.indexOf(right) },
     hint: s.hint,
     solution: frames,
@@ -933,15 +966,32 @@ export function equationTask(s: QS, rng: Rng): Exercise {
 
 const QUAD_STORIES = [frameTask, frameTask, innerTask, garden, rectPA, (r: Rng) => consec(r), pyth, landing, riddle];
 
+/**
+ * The stories for "Which solutions make sense?". Each one asks for $x$ itself (the width, the
+ * smaller number, the shorter side, the time; for perimeter and area both sides), so "makes
+ * sense in the story" and "answers the question" are the same thing.
+ */
+export function senseStory(rng: Rng): QS {
+  const pick = rng.pick<(q: Rng) => QS>([
+    frameTask,
+    innerTask,
+    innerTask,
+    (q) => garden(q, "width"),
+    (q) => rectPA(q, "both"),
+    (q) => consec(q, true, "small"),
+    (q) => consec(q, false, "small"),
+    landing,
+    (q) => pyth(q, "short"),
+  ]);
+  return pick(rng);
+}
+
 /** Level 3 practice: quadratic stories, both times of a throw, which solution makes sense, which equation fits, work-rate. */
 export function generate3(rng: Rng): Exercise {
   const r = rng.next();
   if (r < 0.36) return quadExercise(rng.pick(QUAD_STORIES)(rng));
   if (r < 0.46) return throwBothTask(rng);
-  if (r < 0.58) {
-    const pick = rng.pick([frameTask, innerTask, innerTask, garden, rectPA, (q: Rng) => consec(q, true), (q: Rng) => consec(q), landing, pyth]);
-    return senseTask(pick(rng), rng);
-  }
+  if (r < 0.58) return senseTask(senseStory(rng), rng);
   if (r < 0.72) {
     const pick = rng.pick([frameTask, innerTask, garden, rectPA, (q: Rng) => consec(q), pyth, (q: Rng) => {
         const ctx = q.pick([0, 1, 2, 3] as const);

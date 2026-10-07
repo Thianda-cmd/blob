@@ -730,7 +730,8 @@ export const level3: LevelLesson = {
     {
       title: tx("Factor out first", "Erst ausklammern"),
       body: tx("If all terms share a factor, factor it out first. Then look for a binomial formula in the bracket.", "Haben alle Terme einen gemeinsamen Faktor, klammerst du ihn zuerst aus. Dann suchst du in der Klammer nach einer binomischen Formel."),
-      examples: ["3x^2 - 12x + 12 = 3(x^2 - 4x + 4) = 3(x - 2)^2", "2x^2 - 18 = 2(x^2 - 9) = 2(x + 3)(x - 3)"],
+      // Grouped so a narrow screen breaks before an "=", never inside a product.
+      examples: ["\\group{3x^2 - 12x + 12} \\group{= 3(x^2 - 4x + 4)} \\group{= 3(x - 2)^2}", "\\group{2x^2 - 18} \\group{= 2(x^2 - 9)} \\group{= 2(x + 3)(x - 3)}"],
       tone: "rule",
     },
     {
@@ -742,7 +743,7 @@ export const level3: LevelLesson = {
     {
       title: tx("Cubes", "Hoch 3"),
       body: tx("The numbers in front are $1, 3, 3, 1$. With a minus the signs alternate.", "Die Zahlen davor sind $1, 3, 3, 1$. Mit Minus wechseln die Vorzeichen."),
-      examples: ["(a + b)^3 = a^3 + 3a^2b + 3ab^2 + b^3", "(a - b)^3 = a^3 - 3a^2b + 3ab^2 - b^3"],
+      examples: ["\\group{(a + b)^3} \\group{= a^3 + 3a^2b + 3ab^2 + b^3}", "\\group{(a - b)^3} \\group{= a^3 - 3a^2b + 3ab^2 - b^3}"],
       tone: "rule",
     },
     {
@@ -751,7 +752,7 @@ export const level3: LevelLesson = {
         "Row n holds the coefficients of $(a + b)^n$, the binomial coefficients “n choose k” $= \\frac{n!}{k! \\cdot (n - k)!}$. Powers of $a$ go down, powers of $b$ go up.",
         "Zeile n enthält die Koeffizienten von $(a + b)^n$, die Binomialkoeffizienten „n über k“ $= \\frac{n!}{k! \\cdot (n - k)!}$. Die Exponenten von $a$ gehen runter, die von $b$ hoch.",
       ),
-      examples: ["(a + b)^4 = a^4 + 4a^3b + 6a^2b^2 + 4ab^3 + b^4", "(x + 2)^4 = x^4 + 8x^3 + 24x^2 + 32x + 16"],
+      examples: ["\\group{(a + b)^4} \\group{= a^4 + 4a^3b + 6a^2b^2 + 4ab^3 + b^4}", "\\group{(x + 2)^4} \\group{= x^4 + 8x^3 + 24x^2 + 32x + 16}"],
       tone: "rule",
     },
   ],

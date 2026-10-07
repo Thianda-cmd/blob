@@ -629,7 +629,7 @@ export const level2: LevelLesson = {
         "If $x$ cancels, look at what's left. A false statement: $L = \\{ \\}$. A true statement: every number works, $L = \\Q$.",
         "Fällt $x$ weg, schau, was übrig bleibt. Eine falsche Aussage: $L = \\{ \\}$. Eine wahre Aussage: Jede Zahl passt, $L = \\Q$.",
       ),
-      examples: ["2x + 6 = 2x + 5 \\Rightarrow 6 = 5 \\Rightarrow L = \\{ \\}", "4x - 3 = 4x - 3 \\Rightarrow -3 = -3 \\Rightarrow L = \\Q"],
+      examples: ["2x + 6 = 2x + 5 \\Rightarrow 6 = 5 \\Rightarrow \\group{L = \\{ \\}}", "4x - 3 = 4x - 3 \\Rightarrow -3 = -3 \\Rightarrow \\group{L = \\Q}"],
       tone: "rule",
     },
     {

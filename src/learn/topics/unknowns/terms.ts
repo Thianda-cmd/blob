@@ -301,6 +301,14 @@ function priceTerm(rng: Rng): TermCase {
   };
 }
 
+/** The phrase in bold. "Use $x$ for the unknown number" only when the phrase doesn't say what $x$ is itself. */
+function phraseText(phrase: Text): Text {
+  const en = typeof phrase === "string" ? phrase : phrase.en;
+  const de = typeof phrase === "string" ? phrase : phrase.de;
+  if (en.includes("$x$")) return tx(`**${en}**`, `**${de}**`);
+  return tx(`**${en}**\n\nUse $x$ for the unknown number.`, `**${de}**\n\nNimm $x$ für die unbekannte Zahl.`);
+}
+
 const CASES = [moreThan, lessThan, differenceOf, timesMinus, timesSum, halfOf, successor, priceTerm, lessThan, timesMinus];
 
 /** "Write as a term": a phrase in words, the term in x, worked out piece by piece. */
@@ -309,7 +317,7 @@ export function termTask(rng: Rng): Exercise {
   const mistakes: Mistake[] = c.wrongs.map((w) => ({ when: { kind: "expr", value: w.value }, title: w.title, say: w.say }));
   return {
     instruction: tx("Write as a term", "Schreib als Term"),
-    text: tx(`**${typeof c.phrase === "string" ? c.phrase : c.phrase.en}**\n\nUse $x$ for the unknown number.`, `**${typeof c.phrase === "string" ? c.phrase : c.phrase.de}**\n\nNimm $x$ für die unbekannte Zahl.`),
+    text: phraseText(c.phrase),
     answer: { kind: "expr", value: c.value, form: "any" },
     hint: c.hint,
     solution: c.steps,

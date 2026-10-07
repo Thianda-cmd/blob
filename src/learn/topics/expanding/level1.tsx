@@ -84,7 +84,7 @@ function collectFrames(list: T[], intro?: Text): Frame[] {
   if (sorted.some((t, i) => t !== list[i])) {
     frames.push({
       math: tsrc(sorted),
-      note: tx("Put like terms next to each other. Each term takes the sign in front of it along.", "Stell gleichartige Terme nebeneinander. Jeder Term nimmt das Vorzeichen vor ihm mit."),
+      note: tx("Put like terms next to each other. Each term takes the sign in front of it along.", "Stell gleichartige Terme nebeneinander. Jeder Term nimmt das Vorzeichen vor sich mit."),
       highlight: lit,
     });
   }
@@ -192,12 +192,14 @@ function collectMistakes(list: T[], add: ReturnType<typeof mistakeList>["add"]) 
   }
   const lone = list.find((t) => t.v && Math.abs(t.c) === 1);
   if (lone) {
+    // "-x" means "-1x", "x" means "1x".
+    const sg = lone.c < 0 ? "-" : "";
     add(
       plain(collect(list.filter((t) => t !== lone))),
       tx(`A lone ${lone.v} counts too`, `Ein einzelnes ${lone.v} zählt mit`),
       tx(
-        `I think the ${lone.c < 0 ? `$-${lone.v}$` : `$${lone.v}$`} slipped through. A lone $${lone.v}$ means $1${lone.v}$, so it changes the result.`,
-        `Ich glaub, ${lone.c < 0 ? `das $-${lone.v}$` : `das $${lone.v}$`} ist dir durchgerutscht. Ein einzelnes $${lone.v}$ heißt $1${lone.v}$, es verändert also das Ergebnis.`,
+        `I think the $${sg}${lone.v}$ slipped through. A lone $${sg}${lone.v}$ means $${sg}1${lone.v}$, so it changes the result.`,
+        `Ich glaub, das $${sg}${lone.v}$ ist dir durchgerutscht. Ein einzelnes $${sg}${lone.v}$ heißt $${sg}1${lone.v}$, es verändert also das Ergebnis.`,
       ),
     );
   }
@@ -209,7 +211,7 @@ function collectMistakes(list: T[], add: ReturnType<typeof mistakeList>["add"]) 
 const CLEVER = tx("Calculate cleverly", "Rechne geschickt");
 const COLLECT = tx("Collect like terms", "Fasse gleichartige Terme zusammen");
 const AREA = tx("Write the area as a term", "Gib den Flächeninhalt als Term an");
-const EQUAL = tx("Which term is equal?", "Welcher Term ist gleich?");
+const EQUAL = tx("Which term is equivalent?", "Welcher Term ist gleichwertig?");
 
 const pic = (props: Record<string, unknown>) => ({ component: ExpandingAreaPic as ComponentType<Record<string, unknown>>, props });
 
@@ -567,13 +569,19 @@ export function generate1(rng: Rng): Exercise {
 // ---------------------------------------------------------------------------
 // Lesson
 
-const clever7: Frame[] = cleverTask(7, 100, 3, 1).solution.map((f, i) =>
-  i === 0
-    ? { ...f, note: tx("$7 \\cdot 103$ in your head? Tricky. But $103 = 100 + 3$, and with $100$ everything is easy.", "$7 \\cdot 103$ im Kopf? Knifflig. Aber $103 = 100 + 3$, und mit $100$ ist alles leicht.") }
-    : i === 2
-      ? { ...f, note: tx("$7 \\cdot (100 + 3) = 7 \\cdot 100 + 7 \\cdot 3$. That's the **distributive law**: the factor in front multiplies each part.", "$7 \\cdot (100 + 3) = 7 \\cdot 100 + 7 \\cdot 3$. Das ist das **Distributivgesetz**: Der Faktor davor wird mit jedem Teil multipliziert.") }
-      : f,
-);
+const clever7: Frame[] = [
+  ...cleverTask(7, 100, 3, 1).solution.map((f, i) =>
+    i === 0
+      ? { ...f, note: tx("$7 \\cdot 103$ in your head? Tricky. But $103 = 100 + 3$, and with $100$ everything is easy.", "$7 \\cdot 103$ im Kopf? Knifflig. Aber $103 = 100 + 3$, und mit $100$ ist alles leicht.") }
+      : i === 2
+        ? { ...f, note: tx("$7 \\cdot (100 + 3) = 7 \\cdot 100 + 7 \\cdot 3$. That's the **distributive law**: the factor in front multiplies each part.", "$7 \\cdot (100 + 3) = 7 \\cdot 100 + 7 \\cdot 3$. Das ist das **Distributivgesetz**: Der Faktor davor wird mit jedem Teil multipliziert.") }
+        : f,
+  ),
+  // The same law backwards: a common factor goes in front of a bracket.
+  { math: "7#n \\cdot#d 13#a +#p 7#n2 \\cdot#d2 7#b", note: tx("It also works **backwards**: in $7 \\cdot 13 + 7 \\cdot 7$ both products contain the factor $7$.", "Das geht auch **rückwärts**: In $7 \\cdot 13 + 7 \\cdot 7$ enthalten beide Produkte den Faktor $7$."), highlight: ["n", "n2"] },
+  { math: "7#n \\cdot#d (13#a +#p 7#b)#br", note: tx("Write the $7$ only once, in front of a bracket: $7 \\cdot (13 + 7)$.", "Schreib die $7$ nur einmal, vor eine Klammer: $7 \\cdot (13 + 7)$.") },
+  { math: "7#n \\cdot#d 20#a = 140#r", note: tx("$13 + 7 = 20$, and $7 \\cdot 20 = 140$. Much quicker than $91 + 49$!", "$13 + 7 = 20$, und $7 \\cdot 20 = 140$. Viel schneller als $91 + 49$!") },
+];
 
 const variableFrames: Frame[] = [
   { math: "3#k (x#x +#p 4#n)#b", note: tx("Now there's a variable inside. We can't add $x + 4$, because we don't know $x$.", "Jetzt steht eine Variable in der Klammer. $x + 4$ können wir nicht ausrechnen, wir kennen $x$ ja nicht.") },
@@ -612,7 +620,7 @@ export const level1: LevelLesson = {
     },
     {
       title: tx("Calculating cleverly", "Geschickt rechnen"),
-      body: tx("Split an awkward number at a round one. It also works backwards: a common factor goes in front of a bracket.", "Zerleg eine unhandliche Zahl an einer runden Zahl. Es geht auch rückwärts: Ein gemeinsamer Faktor kommt vor eine Klammer."),
+      body: tx("Write an awkward number as a round number plus or minus a little bit. It also works backwards: a common factor goes in front of a bracket.", "Zerleg eine unhandliche Zahl in eine runde Zahl plus oder minus einen kleinen Rest. Es geht auch rückwärts: Ein gemeinsamer Faktor kommt vor eine Klammer."),
       examples: ["6 \\cdot 98 = 600 - 12 = 588", "7 \\cdot 13 + 7 \\cdot 7 = 7 \\cdot 20 = 140"],
       tone: "tip",
     },
@@ -627,7 +635,7 @@ export const level1: LevelLesson = {
     },
     {
       title: tx("The sign belongs to the term", "Das Vorzeichen gehört zum Term"),
-      body: tx("When you reorder a term, each part takes the sign in front of it along.", "Wenn du umsortierst, nimmt jeder Teil das Vorzeichen vor ihm mit."),
+      body: tx("When you reorder a term, each part takes the sign in front of it along.", "Wenn du umsortierst, nimmt jeder Teil das Vorzeichen vor sich mit."),
       examples: ["3x + 2 + 5x - 7 = 3x + 5x + 2 - 7 = 8x - 5"],
       tone: "tip",
     },
@@ -650,8 +658,8 @@ export const level1: LevelLesson = {
       title: tx("Clever calculating: 7 · 103", "Geschickt rechnen: 7 · 103"),
       blob: tx("Bet I can work out 7 · 103 in my head in three seconds. Watch!", "Wetten, ich rechne 7 · 103 in drei Sekunden im Kopf? Schau zu!"),
       body: tx(
-        "Instead of multiplying $103$ in one go, split it into $100 + 3$. Multiply **each** part and add the results.",
-        "Statt $103$ auf einmal zu multiplizieren, zerlegst du es in $100 + 3$. Multipliziere **jeden** Teil und addiere die Ergebnisse.",
+        "Instead of multiplying $103$ in one go, split it into $100 + 3$. Multiply **each** part and add the results. It also works backwards: $7 \\cdot 13 + 7 \\cdot 7 = 7 \\cdot (13 + 7)$.",
+        "Statt $103$ auf einmal zu multiplizieren, zerlegst du es in $100 + 3$. Multipliziere **jeden** Teil und addiere die Ergebnisse. Das geht auch rückwärts: $7 \\cdot 13 + 7 \\cdot 7 = 7 \\cdot (13 + 7)$.",
       ),
       frames: clever7,
     },

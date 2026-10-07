@@ -126,8 +126,8 @@ export const level2: LevelLesson = {
     {
       title: tx("Motion problems", "Bewegungsaufgaben"),
       body: tx(
-        "$s = v \\cdot t$ for each one. Towards each other, the gap shrinks by **both** speeds together. Catching up: whoever starts later is on the way for $t$ minus the delay. Where they meet, the lines in the diagram cross.",
-        "$s = v \\cdot t$ für jeden. Aufeinander zu schrumpft der Abstand um **beide** Geschwindigkeiten zusammen. Beim Einholen ist, wer später startet, $t$ minus die Verspätung unterwegs. Wo sie sich treffen, schneiden sich die Geraden im Diagramm.",
+        "$s = v \\cdot t$ for each one. Towards each other, the gap shrinks by **both** speeds together. Catching up: the chaser is only on the way for $t$ minus the delay. Where they meet, the lines in the diagram cross.",
+        "$s = v \\cdot t$ für jeden. Aufeinander zu schrumpft der Abstand um **beide** Geschwindigkeiten zusammen. Beim Einholen ist der Verfolger nur $t$ minus die Verspätung unterwegs. Wo sie sich treffen, schneiden sich die Geraden im Diagramm.",
       ),
       examples: ["80t = 280 - 60t", "30(t - 1) = 15t"],
       tone: "rule",

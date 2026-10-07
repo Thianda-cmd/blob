@@ -134,7 +134,7 @@ export function ExpandingSquarePuzzle() {
           disabled={perfect}
           className="ml-auto flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-40"
         >
-          <Sparkles className="size-3.5" /> {t(tx("Make it a square", "Zum Quadrat machen"))}
+          <Sparkles className="size-3.5" /> {t(tx("Complete the square", "Zum Quadrat ergänzen"))}
         </button>
       </div>
 
@@ -349,7 +349,8 @@ export function ExpandingCube() {
   // Keyed terms, so a highlight doesn't change the layout.
   const terms = ["a#t0a ^{3#t0e}", "3#t1c a#t1a ^{2#t1e} b#t1b", "3#t2c a#t2a b#t2b ^{2#t2e}", "b#t3b ^{3#t3e}"];
   const termKeys = [["t0a", "t0e"], ["t1c", "t1a", "t1e", "t1b"], ["t2c", "t2a", "t2b", "t2e"], ["t3b", "t3e"]];
-  const formula = `(a + b)^3 = ${terms.join(" + ")}`;
+  // Grouped, so a narrow screen breaks before the "=" and not in front of b³.
+  const formula = `\\group{(a + b)^3} \\group{= ${terms.join(" + ")}}`;
   const counts = [1, 3, 3, 1];
 
   return (
@@ -407,8 +408,8 @@ export function ExpandingCube() {
           <p className="text-[13.5px] leading-relaxed text-ink-2">
             {t(
               tx(
-                "Each edge is a + b long. Cut along a and b in all three directions and you get 8 blocks: one big cube a³, three slabs a²b, three rods ab² and one small cube b³. Tap a term to find its blocks.",
-                "Jede Kante ist a + b lang. Schneidest du in alle drei Richtungen bei a und b, entstehen 8 Quader: ein großer Würfel a³, drei Platten a²b, drei Stangen ab² und ein kleiner Würfel b³. Tipp auf einen Term, um seine Quader zu finden.",
+                "Each edge is a + b long. Cut at a in all three directions and you get 8 blocks: one big cube a³, three slabs a²b, three rods ab² and one small cube b³. Tap a term to find its blocks.",
+                "Jede Kante ist a + b lang. Schneidest du in alle drei Richtungen bei a durch, entstehen 8 Quader: ein großer Würfel a³, drei Platten a²b, drei Stangen ab² und ein kleiner Würfel b³. Tipp auf einen Term, um seine Quader zu finden.",
               ),
             )}
           </p>
@@ -586,9 +587,13 @@ export function ExpandingBinomCard() {
       </div>
 
       <div className="space-y-2 rounded-xl border border-line bg-surface p-4">
+        {/* The coefficient and its factorial fraction stay together; on a phone the long fraction gets its own line. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[22px] text-ink">
-          <Binom n={n} k={kk} />
-          <MathView src={`= \\frac{${n}!}{${kk}! \\cdot ${n - kk}!} = \\frac{${fact(n)}}{(${fact(kk)}) \\cdot (${fact(n - kk)})} = ${value}`} size="sm" animate={false} />
+          <span className="flex shrink-0 items-center gap-2">
+            <Binom n={n} k={kk} />
+            <MathView src={`= \\frac{${n}!}{${kk}! \\cdot ${n - kk}!}`} size="sm" animate={false} />
+          </span>
+          <MathView src={`\\group{= \\frac{${fact(n)}}{(${fact(kk)}) \\cdot (${fact(n - kk)})}} \\group{= ${value}}`} size="sm" animate={false} className="justify-start" />
         </div>
         <p className="text-[13.5px] leading-relaxed text-ink-2">
           {t(

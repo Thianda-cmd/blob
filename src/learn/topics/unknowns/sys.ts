@@ -24,6 +24,13 @@ export function side(ts: Term[], n: (v: number) => string = String): string {
  */
 export const sys = (a: string, b: string) => `\\group{"(I)"#L1 \\, ${a} \\quad}#G1 \\group{"(II)"#L2 \\, ${b}}#G2`;
 
+/**
+ * Both equations stacked, (I) above (II), for a long (II) like $10y + x = 10x + y + 27$. `rest`
+ * (the right side of (II), or a balance step) is a group of its own, so on a phone it moves to
+ * the next line instead of running off the board.
+ */
+export const sysStack = (a: string, b: string, rest = "") => `\\group{"(I)"#L1 \\, ${a}}#G1 \\\\ \\group{"(II)"#L2 \\, ${b}}#G2${rest ? ` \\group{${rest}}#G3` : ""}`;
+
 /** A balance step after an equation: "| − 100". */
 export const bar = (op: string) => ` \\quad \\blob{|#bar ${op}}`;
 

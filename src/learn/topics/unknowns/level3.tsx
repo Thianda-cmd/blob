@@ -16,7 +16,7 @@ export { generate3 } from "./stories3";
 const visual = (component: unknown, props: Record<string, unknown>) => ({ component: component as ComponentType<Record<string, unknown>>, props });
 
 const PICTURE = frameStory("picture", 30, 18, 3);
-const RECT = rectPAStory(6, 8, "long");
+const RECT = rectPAStory(6, 8, "both");
 const POOL = workQuad(0, 6, 6, "fast");
 
 const throwFrames: Frame[] = (() => {

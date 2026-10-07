@@ -72,8 +72,8 @@ export function PumpLab() {
     ctrl.current = animate(from, full, { duration: Math.max(1.2, (full - from) * 0.8), ease: "linear", onUpdate: setTime, onComplete: () => setPlaying(false) });
   };
 
-  // Together: 1/a + 1/b = (a + b)/(ab).
-  const equation = onA && onB ? `\\frac{1}{${a}} + \\frac{1}{${b}} = ${frac(a + b, a * b)} = \\frac{1}{t}` : onA ? `\\frac{1}{${a}} = \\frac{1}{t}` : onB ? `\\frac{1}{${b}} = \\frac{1}{t}` : "";
+  // Together: 1/a + 1/b = (a + b)/(ab). The sum and t only show once the pool is full: Blob asks for a guess first.
+  const equation = onA && onB ? `\\frac{1}{${a}} + \\frac{1}{${b}} = ${done ? `${frac(a + b, a * b)} = ` : ""}\\frac{1}{t}` : onA ? `\\frac{1}{${a}} = \\frac{1}{t}` : onB ? `\\frac{1}{${b}} = \\frac{1}{t}` : "";
   const avg = (a + b) / 2;
 
   const say: { text: Text; mood: "happy" | "thinking" | "excited" } = !onA && !onB
@@ -143,8 +143,8 @@ export function PumpLab() {
               <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t(tx("Together per hour", "Zusammen pro Stunde"))}</div>
               <MathView src={equation} size="md" animate={false} className="mt-1" />
               <div className="mt-1.5 text-[14px] text-ink-2">
-                {t(tx("Full after", "Voll nach"))} <span className="font-semibold tabular-nums text-ink">t = {f(full)} h</span>
-                {Number.isInteger(full) ? "" : ` (${hm(full)})`}
+                {t(tx("Full after", "Voll nach"))} <span className="font-semibold tabular-nums text-ink">t = {done ? `${f(full)} h` : "?"}</span>
+                {!done || Number.isInteger(full) ? "" : ` (${hm(full)})`}
               </div>
             </div>
           )}

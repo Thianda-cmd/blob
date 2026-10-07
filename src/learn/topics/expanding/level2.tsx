@@ -209,10 +209,15 @@ export function expandMistakes(a: Factor, b: Factor, v: string, right: string, s
       add(
         productsOf(a, b, (i, j) => (i === j ? 1 : 0)),
         tx("The middle term is missing", "Der Mittelterm fehlt"),
-        tx(
-          "The classic trap! $(a + b)^2$ is **not** $a^2 + b^2$: the middle term $2ab$ is missing. Write it as two brackets and you'll see it.",
-          "Die klassische Falle! $(a + b)^2$ ist **nicht** $a^2 + b^2$: Der Mittelterm $2ab$ fehlt. Schreib es als zwei Klammern, dann siehst du ihn.",
-        ),
+        a[1].c < 0
+          ? tx(
+              "The classic trap! $(a - b)^2$ is **not** $a^2 + b^2$: the middle term $-2ab$ is missing. Write it as two brackets and you'll see it.",
+              "Die klassische Falle! $(a - b)^2$ ist **nicht** $a^2 + b^2$: Der Mittelterm $-2ab$ fehlt. Schreib es als zwei Klammern, dann siehst du ihn.",
+            )
+          : tx(
+              "The classic trap! $(a + b)^2$ is **not** $a^2 + b^2$: the middle term $2ab$ is missing. Write it as two brackets and you'll see it.",
+              "Die klassische Falle! $(a + b)^2$ ist **nicht** $a^2 + b^2$: Der Mittelterm $2ab$ fehlt. Schreib es als zwei Klammern, dann siehst du ihn.",
+            ),
       );
       if (a[1].c < 0) {
         add(
