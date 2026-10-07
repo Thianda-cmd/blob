@@ -84,6 +84,8 @@ const SYMBOLS: Record<string, { type: "op" | "sym"; v: string }> = {
 };
 /** Function names, set upright: \sin x, \log_2 8. */
 const FUNCTIONS = new Set(["sin", "cos", "tan", "log", "lg", "ln", "exp"]);
+/** What a command reads as (for screen readers): "\lg" → "lg", "\cap" → "∩"; undefined for layout commands. */
+export const commandText = (cmd: string): string | undefined => SYMBOLS[cmd]?.v ?? (FUNCTIONS.has(cmd) ? cmd : undefined);
 /** Style commands with another name: \overline, \period and \bar draw a bar on top. */
 const STYLE_ALIASES: Record<string, StyleName> = { overline: "over", period: "over", bar: "over" };
 const STYLES: StyleName[] = ["hl", "blob", "red", "green", "fade", "strike", "box", "group", "over"];
@@ -244,6 +246,15 @@ export function parseDisplay(src: string): DNode[] {
     while (i < src.length && src[i] === " ") i++;
   };
 
+  /** A #key right here belongs to `node` (inside groups the parser builds itself, like sets and functions). */
+  const keyFor = (node?: Raw) => {
+    if (src[i] !== "#") return;
+    let j = i + 1;
+    while (j < src.length && /[A-Za-z0-9_-]/.test(src[j])) j++;
+    if (node) node.k = src.slice(i + 1, j);
+    i = j;
+  };
+
   function group(inSet = false): Raw[] {
     // Parses until a closing } or ) or ] belonging to the caller (inside \{ … \} also until \}).
     const out: Raw[] = [];
@@ -349,12 +360,18 @@ export function parseDisplay(src: string): DNode[] {
         return [{ type: "space", v: "br" }];
       }
       if (src[j] === "{") {
-        // A set {−5; 5} stays on one line.
+        // A set {−5; 5} stays on one line. Keys written on the braces (\\{#o … \\}#c) stay on them.
         i = j + 1;
+        const open: Raw = { type: "sym", v: "{" };
+        keyFor(open);
         const body = group(true);
-        const closed = src.startsWith("\\}", i);
-        if (closed) i += 2;
-        return [{ type: "style", style: "group", body: [{ type: "sym", v: "{" }, ...body, ...(closed ? [{ type: "sym" as const, v: "}" }] : [])] }];
+        let close: Raw | undefined;
+        if (src.startsWith("\\}", i)) {
+          i += 2;
+          close = { type: "sym", v: "}" };
+          keyFor(close);
+        }
+        return [{ type: "style", style: "group", body: [open, ...body, ...(close ? [close] : [])] }];
       }
       if (src[j] === "}") {
         i = j + 1;
@@ -405,20 +422,26 @@ export function parseDisplay(src: string): DNode[] {
       if (cmd === "abs") return [{ type: "paren", open: "|", close: "|", body: argument() }];
       if (FUNCTIONS.has(cmd)) {
         // The name with its index or power (log₂, sin²) and its argument stay together: sin 30°, log₂ 32.
-        let head: Raw = { type: "fn", v: cmd };
+        // Keys written in it (\\lg#f 2#v) stay on the name and the argument, not on the group around them.
+        const fn: Raw = { type: "fn", v: cmd };
+        keyFor(fn);
         const script = (base: Raw): Raw => {
           skipWs();
           if (src[i] !== "^" && src[i] !== "_") return base;
           const c = src[i++];
           const arg = argument();
-          return c === "^" ? { type: "pow", base: [base], exp: arg } : { type: "sub", base: [base], sub: arg };
+          const node: Raw = c === "^" ? { type: "pow", base: [base], exp: arg } : { type: "sub", base: [base], sub: arg };
+          keyFor(node);
+          return node;
         };
-        head = script(head);
+        const head = script(fn);
         skipWs();
         const rest = src.slice(i);
         const startsArgument = /^[0-9A-Za-z(]/.test(rest) || /^\\(alpha|beta|gamma|delta|theta|phi|varphi|omega|pi|frac|sqrt|abs)\b/.test(rest);
         if (!startsArgument) return [head];
-        const [arg, ...more] = atom();
+        const parts = atom();
+        keyFor(parts[parts.length - 1]);
+        const [arg, ...more] = parts;
         return [{ type: "style", style: "group", body: [head, ...(arg ? [script(arg)] : []), ...more] }];
       }
       if (STYLE_ALIASES[cmd]) return [{ type: "style", style: STYLE_ALIASES[cmd], body: argument() }];

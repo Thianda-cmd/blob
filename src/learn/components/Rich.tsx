@@ -50,8 +50,9 @@ function WithMath({ text }: { text: string }) {
       {parts.map((part, i) => {
         if (isMath(part)) {
           const math = <MathView src={part.slice(1, -1)} size="inline" animate={false} className="mx-[0.1em] align-middle" />;
-          // Punctuation right after the maths stays on its line ("… $x = 3$, so …").
-          const tail = !isMath(parts[i + 1] ?? "") ? (parts[i + 1]?.match(/^[,.;:!?)]+/)?.[0] ?? "") : "";
+          // Punctuation right after short maths stays on its line ("… $x = 3$, so …"). Long maths may wrap
+          // itself, and then must not drag the comma past the edge.
+          const tail = part.length <= 32 && !isMath(parts[i + 1] ?? "") ? (parts[i + 1]?.match(/^[,.;:!?)]+/)?.[0] ?? "") : "";
           return tail ? (
             <span key={i} className="whitespace-nowrap">
               {math}
@@ -62,7 +63,7 @@ function WithMath({ text }: { text: string }) {
           );
         }
         const prev = parts[i - 1];
-        const cut = prev && isMath(prev) ? (part.match(/^[,.;:!?)]+/)?.[0].length ?? 0) : 0;
+        const cut = prev && isMath(prev) && prev.length <= 32 ? (part.match(/^[,.;:!?)]+/)?.[0].length ?? 0) : 0;
         return <Fragment key={i}>{cut ? part.slice(cut) : part}</Fragment>;
       })}
     </>

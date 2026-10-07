@@ -4,7 +4,7 @@ import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Fragment, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale } from "@/i18n/client";
 import { resolveText, type Text } from "@/i18n/text";
-import { parseDisplay, type DNode, type StyleName } from "@/learn/engine/display";
+import { commandText, parseDisplay, type DNode, type StyleName } from "@/learn/engine/display";
 import { cn } from "@/lib/utils";
 
 // The big sizes shrink on phones, so a board line like "f(x) = x² − 6x + 5" still fits on one line.
@@ -56,7 +56,8 @@ export function MathView({
     <LayoutGroup id={ctx.scope}>
       <span
         ref={ref}
-        className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center justify-center", className)}
+        // Board sizes centre their lines (several lines, or one that wraps); maths in running text stays left.
+        className={cn("blob-math relative inline-flex max-w-full flex-wrap items-center", size !== "inline" && size !== "sm" && "justify-center", className)}
         style={{ fontSize: SIZES[size] }}
         aria-label={spoken(source)}
         role="math"
@@ -72,7 +73,8 @@ export function MathView({
 const spoken = (source: string) =>
   source
     .replace(/#[A-Za-z0-9_-]+/g, "")
-    .replace(/\\[a-z]+|[{}#"]/gi, " ")
+    .replace(/\\([A-Za-z]+)/g, (_, cmd: string) => ` ${commandText(cmd) ?? ""} `)
+    .replace(/[{}#"\\]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
