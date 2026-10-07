@@ -25,8 +25,8 @@ const group = (id: string, sign: 1 | -1, items: Item[], open: "(" | "[" = "("): 
 
 /**
  * Display-language source with keys: sign `s<id>`, coefficient `c<id>`, variable `v<id>`, bracket `b<id>`.
- * `glue` (only without keys, for task maths): a term like 3x, and a bracket with the sign in front of it,
- * each stay on one line, so a phone never shows "13 −" at the end of a line and the bracket on the next.
+ * `glue` (only without keys, for task maths): every term and every bracket stays on one line together
+ * with its sign, so a phone never shows "13 −" at the end of a line and the bracket on the next.
  */
 export function render(items: Item[], keys = true, glue = false): string {
   const k = (key: string) => (keys ? `#${key}` : "");
@@ -42,13 +42,14 @@ export function render(items: Item[], keys = true, glue = false): string {
         const coef = it.v && abs === 1 ? "" : `${abs}${k(`c${it.id}`)}`;
         const v = it.v ? `${it.v}${k(`v${it.id}`)}` : "";
         const body = [coef, v].filter(Boolean).join(keys ? " " : "");
-        if (tight && (first ? it.c < 0 || (coef && v) : coef && v)) return first ? glued(it.c < 0 ? "-" : "", body, true) : `${sign}\\group{${body}}`;
+        if (tight && (!first || it.c < 0 || (coef && v))) return glued(it.c < 0 ? "-" : first ? "" : "+", body, first);
         return `${sign}${body}`;
       }
       const sk = it.sk ?? `p${it.id}`;
       const sign = it.sign < 0 ? `-${k(sk)}${first && !keys ? "" : " "}` : first ? "" : `+${k(sk)} `;
       const close = it.open === "(" ? ")" : "]";
-      const bracket = `${it.open}${render(it.items, keys, glue)}${close}${k(`b${it.id}`)}`;
+      // A bracket never breaks inside, so its contents need no glue.
+      const bracket = `${it.open}${render(it.items, keys)}${close}${k(`b${it.id}`)}`;
       if (tight && (it.sign < 0 || !first)) return glued(it.sign < 0 ? "-" : "+", bracket, first);
       return `${sign}${bracket}`;
     })
@@ -57,7 +58,7 @@ export function render(items: Item[], keys = true, glue = false): string {
 
 /** Plain text without keys, for notes and answers. */
 const plain = (items: Item[]) => render(items, false);
-/** The same for task maths and options: terms and signed brackets stay on one line. */
+/** The same for task maths and options: each term and bracket stays on one line with its sign. */
 const shown = (items: Item[]) => render(items, false, true);
 
 function flip(it: Item, sign: 1 | -1): Item {

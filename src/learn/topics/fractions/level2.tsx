@@ -59,9 +59,11 @@ function mistakesFor(answer: AnswerSpec, slips: Slip[]): Mistake[] {
     let when: AnswerSpec;
     if (answer.kind === "fraction") when = { kind: "fraction", n: s.v.n, d: s.v.d };
     else if (answer.kind === "number") {
-      // A number answer is typed: only values with at most three decimals.
-      if (Math.abs(v * 1000 - Math.round(v * 1000)) > 1e-9) continue;
-      when = { kind: "number", value: r6(v), ...(answer.unit ? { unit: answer.unit } : {}) };
+      // A number answer is typed: values with at most three decimals. A calculation with a
+      // whole-number result keeps its fraction slips too: the box also reads "4/3".
+      const typable = Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-9;
+      if (!typable && (answer.unit || !Number.isInteger(answer.value))) continue;
+      when = { kind: "number", value: typable ? r6(v) : v, ...(answer.unit ? { unit: answer.unit } : {}) };
     } else continue;
     seen.push(v);
     out.push({ when, title: s.title, say: s.say, ...(s.close ? { close: true } : {}) });
@@ -1433,9 +1435,33 @@ const repeatFrames: Frame[] = [
   {
     math: "x#x2 =#e2 \\frac{7#v2}{9#k}#f",
     note: tx(
-      "So $0.777… = \\frac{7}{9}$. Rule: the period over as many nines as it has digits: $0.3636… = \\frac{36}{99} = \\frac{4}{11}$.",
-      "Also ist $0,777… = \\frac{7}{9}$. Merke: die Periode über so viele Neunen, wie sie Ziffern hat: $0,3636… = \\frac{36}{99} = \\frac{4}{11}$.",
+      "So $0.777… = \\frac{7}{9}$. Rule: if the period starts right after the decimal point, write the period over as many nines as it has digits: $0.3636… = \\frac{36}{99} = \\frac{4}{11}$.",
+      "Also ist $0,777… = \\frac{7}{9}$. Merke: Beginnt die Periode direkt nach dem Komma, kommt sie über so viele Neunen, wie sie Ziffern hat: $0,3636… = \\frac{36}{99} = \\frac{4}{11}$.",
     ),
+  },
+  {
+    math: bi("x#x =#e 0,1666#v …#dots"),
+    note: tx(
+      "Careful with $0.1666…$: here the $1$ comes first and only the $6$ repeats (**mixed repeating**). The rule with nines doesn't work here.",
+      "Vorsicht bei $0,1666…$: Hier kommt erst die $1$, und nur die $6$ wiederholt sich (**gemischt periodisch**). Die Regel mit den Neunen klappt hier nicht.",
+    ),
+  },
+  {
+    math: bi("100#k x#x2 =#e2 16,666#v2 …#dots2 \\\\ 10#k3 x#x =#e 1,666#v …#dots"),
+    note: tx(
+      "Move the decimal point once behind the period ($\\cdot 100$) and once in front of it ($\\cdot 10$). Now both tails after the point are the same.",
+      "Schieb das Komma einmal hinter die Periode ($\\cdot 100$) und einmal davor ($\\cdot 10$). Jetzt sind beide Schwänze hinter dem Komma gleich.",
+    ),
+    highlight: ["v2", "v"],
+  },
+  {
+    math: "90#k x#x2 =#e2 15#v2",
+    note: tx("Subtract: $100x - 10x = 90x$ and $16 - 1 = 15$. The tails cancel again.", "Abziehen: $100x - 10x = 90x$ und $16 - 1 = 15$. Die Schwänze heben sich wieder weg."),
+  },
+  {
+    math: "x#x2 =#e2 \\frac{15#v2}{90#k}#f =#e3 \\frac{1#n}{6#d}#f2",
+    note: tx("Divide by $90$ and simplify by $15$: $0.1666… = \\frac{15}{90} = \\frac{1}{6}$.", "Durch $90$ teilen und mit $15$ kürzen: $0,1666… = \\frac{15}{90} = \\frac{1}{6}$."),
+    highlight: ["n", "d"],
   },
 ];
 
@@ -1591,10 +1617,10 @@ export const level2: LevelLesson = {
     {
       title: tx("Repeating decimals", "Periodische Dezimalzahlen"),
       body: tx(
-        "A fully simplified fraction terminates only if its denominator has no prime factors except 2 and 5. Otherwise a period repeats forever. Back to a fraction: the period over as many nines as it has digits.",
-        "Ein vollständig gekürzter Bruch bricht nur ab, wenn sein Nenner nur die Primfaktoren 2 und 5 hat. Sonst wiederholt sich eine Periode endlos. Zurück zum Bruch: Periode über so viele Neunen, wie sie Ziffern hat.",
+        "A fully simplified fraction terminates only if its denominator has no prime factors except 2 and 5. Otherwise a period repeats forever. Back to a fraction: if the period starts right after the decimal point, write it over as many nines as it has digits. Otherwise move the decimal point once behind and once in front of the period and subtract. A whole number in front simply stays.",
+        "Ein vollständig gekürzter Bruch bricht nur ab, wenn sein Nenner nur die Primfaktoren 2 und 5 hat. Sonst wiederholt sich eine Periode endlos. Zurück zum Bruch: Beginnt die Periode direkt nach dem Komma, kommt sie über so viele Neunen, wie sie Ziffern hat. Sonst das Komma einmal hinter und einmal vor die Periode schieben und abziehen. Ganze vor dem Komma bleiben einfach stehen.",
       ),
-      examples: [bi("\\frac{1}{6} = 0,1666 …"), bi("0,3636 … = \\frac{36}{99} = \\frac{4}{11}")],
+      examples: [bi("0,3636 … = \\frac{36}{99} = \\frac{4}{11}"), bi("0,1666 … = \\frac{15}{90} = \\frac{1}{6}"), bi("1,333 … = 1 + \\frac{3}{9} = \\frac{4}{3}")],
       tone: "rule",
     },
     {
@@ -1656,8 +1682,8 @@ export const level2: LevelLesson = {
       title: tx("Repeating decimals", "Periodische Dezimalzahlen"),
       blob: tx("Endless digits, but a neat trick to tame them.", "Endlose Ziffern, aber ein schlauer Trick bändigt sie."),
       body: tx(
-        "A **repeating decimal** has a part that repeats forever, the **period**. With a little trick you can turn it back into a fraction.",
-        "Eine **periodische Dezimalzahl** hat einen Teil, der sich endlos wiederholt: die **Periode**. Mit einem kleinen Trick wird daraus wieder ein Bruch.",
+        "A **repeating decimal** has a part that repeats forever, the **period**. With a little trick you can turn it back into a fraction, even when the period starts later.",
+        "Eine **periodische Dezimalzahl** hat einen Teil, der sich endlos wiederholt: die **Periode**. Mit einem kleinen Trick wird daraus wieder ein Bruch, auch wenn die Periode erst später beginnt.",
       ),
       visual: visual(FractionsDecimalKinds, {}),
       frames: repeatFrames,

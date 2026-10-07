@@ -288,8 +288,9 @@ function commonBracketTask(rng: Rng): Exercise {
   const sorted = (a: string, b: string) => [a, b].sort().join("");
   const s = (c: number, first = false) => (c < 0 ? (first ? "-" : "- ") : first ? "" : "+ ");
   const coef = (c: number) => (Math.abs(c) === 1 ? "" : String(Math.abs(c)));
-  const unit = (c: string, v: string) => (c ? `\\group{${c}${v}}` : v);
-  const lhs = `\\group{${sorted(mm, w)}} ${s(q)}${unit(coef(q), mm)} ${s(n)}${unit(coef(n), w)} ${s(n * q)}${Math.abs(n * q)}`;
+  // Each term stays on one line with its sign.
+  const pm = (c: number) => (c < 0 ? "-" : "+");
+  const lhs = `\\group{${sorted(mm, w)}} ${glued(pm(q), `${coef(q)}${mm}`, false)} ${glued(pm(n), `${coef(n)}${w}`, false)} ${glued(pm(n * q), String(Math.abs(n * q)), false)}`;
   const B = `${w} ${s(q)}${Math.abs(q)}`;
   const value = `${mm}${n < 0 ? "-" : "+"}${Math.abs(n)}`;
   const m = exprMistakes(value);
@@ -319,11 +320,8 @@ function solveTask(rng: Rng): Exercise {
   const b = -a * r;
   const moved = rng.chance(0.3);
   const ax = a === 1 ? "x^2" : `\\group{${a}x^2}`;
-  const bx = (c: number, first = false) => {
-    const sign = c < 0 ? (first ? "-" : "- ") : first ? "" : "+ ";
-    const body = `${Math.abs(c) === 1 ? "" : Math.abs(c)}x`;
-    return first && c < 0 ? `\\group{-${body}}` : `${sign}${Math.abs(c) === 1 ? body : `\\group{${body}}`}`;
-  };
+  // Each term stays on one line with its sign.
+  const bx = (c: number, first = false) => glued(c < 0 ? "-" : first ? "" : "+", `${Math.abs(c) === 1 ? "" : Math.abs(c)}x`, first);
   const eq = moved ? `${ax} = ${bx(-b, true)}` : `${ax} ${bx(b)} = 0`;
   const std = `${ax} ${bx(b)} = 0`;
   const F = a === 1 ? "x" : `${a}x`;

@@ -800,10 +800,13 @@ function ofTask(rng: Rng): Exercise | null {
     instruction: asText ? WORD_PROBLEM : CALCULATE,
     ...(asText ? { text: story.text(`$${fr(n, d)}$`, q) } : { math: tx(`${fr(n, d)} "of" ${q}`, `${fr(n, d)} "von" ${q}`) }),
     answer: { kind: "number", value: (q / d) * n, ...(asText ? { unit: story.unit } : {}) },
-    hint: tx(
-      `First find $\\frac{1}{${d}}$ of $${q}$: divide by $${d}$. Then multiply by $${n}$.`,
-      `Berechne zuerst $\\frac{1}{${d}}$ von $${q}$: Teile durch $${d}$. Multipliziere dann mit $${n}$.`,
-    ),
+    hint:
+      n === 1
+        ? tx(`$\\frac{1}{${d}}$ of $${q}$: divide $${q}$ by $${d}$.`, `$\\frac{1}{${d}}$ von $${q}$: Teile $${q}$ durch $${d}$.`)
+        : tx(
+            `First find $\\frac{1}{${d}}$ of $${q}$: divide by $${d}$. Then multiply by $${n}$.`,
+            `Berechne zuerst $\\frac{1}{${d}}$ von $${q}$: Teile durch $${d}$. Multipliziere dann mit $${n}$.`,
+          ),
     solution: b.frames,
     mistakes: slipsFor({ n: (q / d) * n, d: 1 }, ofSlips(n, d, q, asText), asText ? story.unit : undefined),
   };

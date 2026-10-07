@@ -132,7 +132,7 @@ export function GaussLab() {
       ? {
           tone: "ok",
           text: tx(
-            `**Step form!** Now solve from the bottom up: $z = ${fmt(values[2])}$, then $y = ${fmt(values[1])}$, then $x = ${fmt(values[0])}$. So $L = \\{ ${tripleText(values.map(round) as [number, number, number])} \\}$.`,
+            `**Echelon form!** Now solve from the bottom up: $z = ${fmt(values[2])}$, then $y = ${fmt(values[1])}$, then $x = ${fmt(values[0])}$. So $L = \\{ ${tripleText(values.map(round) as [number, number, number])} \\}$.`,
             `**Stufenform!** Jetzt von unten nach oben einsetzen: $z = ${fmt(values[2])}$, dann $y = ${fmt(values[1])}$, dann $x = ${fmt(values[0])}$. Also ist $L = \\{ ${tripleText(values.map(round) as [number, number, number])} \\}$.`,
           ),
         }
@@ -155,7 +155,7 @@ export function GaussLab() {
           : {
               tone: "ink",
               text: tx(
-                "Step form, but a pivot is 0. Undo a step and try another combination.",
+                "Echelon form, but a pivot is 0. Undo a step and try another combination.",
                 "Stufenform, aber ein Diagonalfeld ist 0. Mach einen Schritt rückgängig und probier eine andere Kombination.",
               ),
             };
@@ -175,7 +175,7 @@ export function GaussLab() {
       <p className="text-[14px] leading-relaxed text-ink-2">
         <Inline
           text={tx(
-            "Bring the system into **step form** with the Gauss algorithm: change a row into $a \\cdot$ (that row) $+ \\, b \\cdot$ (another row). Every coefficient and the right side change together.",
+            "Bring the system into **echelon form** by Gaussian elimination: change a row into $a \\cdot$ (that row) $+ \\, b \\cdot$ (another row). Every coefficient and the right side change together.",
             "Bring das LGS mit dem Gauß-Verfahren auf **Stufenform**: Ersetze eine Zeile durch $a \\cdot$ (diese Zeile) $+ \\, b \\cdot$ (eine andere Zeile). Alle Koeffizienten und die rechte Seite ändern sich mit.",
           )}
         />
@@ -281,13 +281,16 @@ export function GaussLab() {
               <Stepper label="a" value={a} onChange={setA} min={1} max={9} />
               <Stepper label="b" value={b} onChange={setB} min={-9} max={9} skip={0} />
             </div>
-            <div className="rounded-lg bg-raised px-3 py-2">
-              <MathView src={`"${nextLabel(labels[target])}" = ${opSrc(a, labels[target], b, labels[source])}`} size="md" scope={`${scope}-op`} />
-              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink-3">
-                <span>{t(tx("gives", "ergibt"))}</span>
-                <MathView src={`${side([[preview.x, "x", "px"], [preview.y, "y", "py"], [preview.z, "z", "pz"]])} = ${preview.c}`} size="md" scope={`${scope}-pv`} className="text-ink" />
+            {/* In echelon form there is nothing left to do: no preview of a step nobody needs. */}
+            {!step && (
+              <div className="rounded-lg bg-raised px-3 py-2">
+                <MathView src={`"${nextLabel(labels[target])}" = ${opSrc(a, labels[target], b, labels[source])}`} size="md" scope={`${scope}-op`} />
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink-3">
+                  <span>{t(tx("gives", "ergibt"))}</span>
+                  <MathView src={`${side([[preview.x, "x", "px"], [preview.y, "y", "py"], [preview.z, "z", "pz"]])} = ${preview.c}`} size="md" scope={`${scope}-pv`} className="text-ink" />
+                </div>
               </div>
-            </div>
+            )}
             </div>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={apply} disabled={step} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blob px-3.5 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-40">

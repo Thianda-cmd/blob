@@ -341,7 +341,8 @@ export function FractionsCancelWorkshop() {
   const tap = (side: "num" | "den", p: Piece) => {
     if (!factored) {
       // Summands: tapping one on each side is the classic forbidden "cancelling".
-      if (!pick) {
+      // A second tap in the same row just moves the selection.
+      if (!pick || pick.startsWith(`${side}:`)) {
         setPick(`${side}:${p.id}`);
         setMsg({ tone: "info", text: t("Now tap a piece in the other row.", "Tipp jetzt ein Teil in der anderen Zeile an.") });
         return;
@@ -480,7 +481,7 @@ export function FractionsCancelWorkshop() {
             {msg?.text ??
               t(
                 "Tap a piece on top and one at the bottom to cancel them. Or press “Factorise” first: only factors may be cancelled.",
-                "Tipp oben und unten ein Teil an, um sie zu kürzen. Oder drück zuerst auf „Faktorisieren“: Kürzen darfst du nur Faktoren.",
+                "Tipp oben und unten je ein Teil an, um beide zu kürzen. Oder drück zuerst auf „Faktorisieren“: Kürzen darfst du nur Faktoren.",
               )}
           </motion.p>
         </AnimatePresence>

@@ -451,13 +451,24 @@ export function substitutionMistakes(s: Solved, e: Std): Mistake[] {
     );
   }
   if (D !== 0) {
+    // "Multiplying out" only where a factor really multiplies the bracket: x + (x + 5) = 17 just loses its brackets.
     mk.add(
       via((e.c + D) / K),
       SIGN_FLIP,
-      tx(
-        `Nearly! After multiplying out, the $${D}$ has to go to the other side, and on the way its sign flips.`,
-        `Fast! Nach dem Ausmultiplizieren muss die $${D}$ auf die andere Seite, und dabei dreht sich ihr Vorzeichen um.`,
-      ),
+      qs === 1
+        ? tx(
+            `Nearly! When you solve, the $${D}$ has to go to the other side, and on the way its sign flips.`,
+            `Fast! Beim Auflösen muss die $${D}$ auf die andere Seite, und dabei dreht sich ihr Vorzeichen um.`,
+          )
+        : qs === -1
+          ? tx(
+              `Nearly! After removing the brackets, the $${D}$ has to go to the other side, and on the way its sign flips.`,
+              `Fast! Nach dem Auflösen der Klammer muss die $${D}$ auf die andere Seite, und dabei dreht sich ihr Vorzeichen um.`,
+            )
+          : tx(
+              `Nearly! After multiplying out, the $${D}$ has to go to the other side, and on the way its sign flips.`,
+              `Fast! Nach dem Ausmultiplizieren muss die $${D}$ auf die andere Seite, und dabei dreht sich ihr Vorzeichen um.`,
+            ),
     );
   }
   if (K < 0) mk.add(via(-known), ...negDivide(ov, K));

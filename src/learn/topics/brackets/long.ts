@@ -31,8 +31,9 @@ export const glued = (sign: "" | "+" | "-", body: string, first: boolean) =>
 
 /**
  * Display source: sign `s<id>`, coefficient `c<id>`, variable `v<id>`; bracket sign `p<id>`, factor `f<id>`, brackets `b<id>`.
- * `glue` (only without keys, for task maths and options): a term like 3x, and a bracket with its sign and
- * factor, each stay on one line, so a phone breaks only between them. Answer texts are never glued.
+ * `glue` (only without keys, for task maths and options): every term and every bracket stays on one line
+ * together with its sign and factor ("− 8a", "− 2(3x − 5)"), so a phone breaks only in front of a sign,
+ * just as each term takes its sign along. Answer texts are never glued.
  */
 export function src(items: LN[], l: Locale = "en", keys = true, glue = false): string {
   const k = (key: string) => (keys ? `#${key}` : "");
@@ -48,7 +49,7 @@ export function src(items: LN[], l: Locale = "en", keys = true, glue = false): s
         const coef = it.v && abs === 1 ? "" : `${num(abs, l)}${k(`c${it.id}`)}`;
         const v = it.v ? `${it.v}${k(`v${it.id}`)}` : "";
         const body = [coef, v].filter(Boolean).join(keys ? " " : "");
-        if (tight && (first ? it.c < 0 || (coef && v) : coef && v)) return first ? glued(it.c < 0 ? "-" : "", body, true) : `${sign}\\group{${body}}`;
+        if (tight && (!first || it.c < 0 || (coef && v))) return glued(it.c < 0 ? "-" : first ? "" : "+", body, first);
         return `${sign}${body}`;
       }
       const sk = it.sk ?? `p${it.id}`;
@@ -56,7 +57,8 @@ export function src(items: LN[], l: Locale = "en", keys = true, glue = false): s
       const abs = Math.abs(it.f);
       const fac = abs === 1 ? "" : `${num(abs, l)}${k(`f${it.id}`)}${keys ? " " : ""}`;
       const close = it.open === "(" ? ")" : "]";
-      const bracket = `${fac}${it.open}${src(it.items, l, keys, glue)}${close}${k(`b${it.id}`)}`;
+      // A bracket never breaks inside, so its contents need no glue.
+      const bracket = `${fac}${it.open}${src(it.items, l, keys)}${close}${k(`b${it.id}`)}`;
       if (tight && (fac || it.f < 0 || !first)) return glued(it.f < 0 ? "-" : first ? "" : "+", bracket, first);
       return `${sign}${bracket}`;
     })

@@ -150,7 +150,7 @@ export function gaussFrames(rows: Row[], names: Names = XYZ, intro?: Text): { fr
       note: joinText(
         intro,
         tx(
-          `Goal: **step form**. Use (I) to eliminate $${names[0]}$ from the rows below it, then use the second row to eliminate $${names[1]}$ from the last one.`,
+          `Goal: **echelon form**. Use (I) to eliminate $${names[0]}$ from the rows below it, then use the second row to eliminate $${names[1]}$ from the last one.`,
           `Ziel: **Stufenform**. Eliminiere mit (I) das $${names[0]}$ aus den Zeilen darunter, dann mit der zweiten Zeile das $${names[1]}$ aus der letzten.`,
         ),
       ),
@@ -257,7 +257,7 @@ export function solveFrames(rows: Row[], intro?: Text): { frames: Frame[]; value
   const g = gaussFrames(rows, XYZ, intro);
   if (!g) return null;
   const last = g.frames[g.frames.length - 1];
-  g.frames[g.frames.length - 1] = { ...last, note: joinText(last.note, tx("Step form reached!", "Stufenform erreicht!")) };
+  g.frames[g.frames.length - 1] = { ...last, note: joinText(last.note, tx("Echelon form reached!", "Stufenform erreicht!")) };
   const b = backFrames(g.final, g.labels);
   if (!b) return null;
   const frames = [...g.frames, ...b.frames, { math: tripleSrc(b.values), note: joinText(tx(`So $L = \\{ ${tripleText(b.values)} \\}$.`, `Also ist $L = \\{ ${tripleText(b.values)} \\}$.`), check3Note(rows[1], b.values, "(II)")) }];

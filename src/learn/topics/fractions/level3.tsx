@@ -103,12 +103,14 @@ function domainExercise(s: DomainSpec): Exercise {
   };
 }
 
-const SIGN_SLIP = (gaps: number[], z: string): Slip => ({
+/** Every gap with the wrong sign. `z = 0` is the factor that has the solution `root`. */
+const SIGN_SLIP = (gaps: number[], z: string, root: number): Slip => ({
   values: gaps.map((g) => -g),
   title: tx("Sign flipped", "Vorzeichen vertauscht"),
-  say: tx(
-    `Careful with the sign: $${z} = 0$ is solved by the **opposite** number. Put your value in and check: the denominator must become $0$.`,
-    `Vorsicht beim Vorzeichen: $${z} = 0$ löst die **Gegenzahl**. Setz deinen Wert zur Probe ein: Der Nenner muss $0$ werden.`,
+  say: txMap((_, l) =>
+    l === "de"
+      ? `Vorsicht beim Vorzeichen: $${z} = 0$ gilt für $x = ${numL(root, l)}$, nicht für $x = ${numL(-root, l)}$. Setz zur Probe ein: Der Nenner muss $0$ werden.`
+      : `Careful with the sign: $${z} = 0$ holds for $x = ${numL(root, l)}$, not for $x = ${numL(-root, l)}$. Put the value in to check: the denominator must become $0$.`,
   ),
 });
 const NUMERATOR_SLIP = (c: number): Slip => ({
@@ -127,7 +129,7 @@ function domainTask(rng: Rng): Exercise | null {
   const k = rng.int(2, 9);
   if (kind === 1) {
     const z = lin(-a);
-    return domainExercise({ term: `\\frac{${k}}{${z}}`, zero: [z], gaps: [a], slips: [SIGN_SLIP([a], z)] });
+    return domainExercise({ term: `\\frac{${k}}{${z}}`, zero: [z], gaps: [a], slips: [SIGN_SLIP([a], z, a)] });
   }
   if (kind === 2) {
     const m = rng.int(1, 9) * rng.pick([1, -1]);
@@ -140,7 +142,7 @@ function domainTask(rng: Rng): Exercise | null {
       linear: { a: 2, m },
       gaps: [g],
       slips: [
-        SIGN_SLIP([g], z),
+        SIGN_SLIP([g], z, g),
         {
           values: [m],
           title: tx("Divided too early", "Nicht durch 2 geteilt"),
@@ -162,12 +164,12 @@ function domainTask(rng: Rng): Exercise | null {
           values: [a],
           title: tx("x = 0 forgotten", "x = 0 vergessen"),
           say: tx(
-            `Half of it! $x^2 ${a > 0 ? "-" : "+"} ${Math.abs(a)}x = x${par(-a)}$ is also $0$ for $x = 0$. Factor out $x$ instead of dividing by it.`,
-            `Die Hälfte! $x^2 ${a > 0 ? "-" : "+"} ${Math.abs(a)}x = x${par(-a)}$ wird auch für $x = 0$ null. Klammere $x$ aus, statt durch $x$ zu teilen.`,
+            `Half of it! $${z} = x${par(-a)}$ is also $0$ for $x = 0$. Factor out $x$ instead of dividing by it.`,
+            `Die Hälfte! $${z} = x${par(-a)}$ wird auch für $x = 0$ null. Klammere $x$ aus, statt durch $x$ zu teilen.`,
           ),
           close: true,
         },
-        SIGN_SLIP([0, a], lin(-a)),
+        SIGN_SLIP([0, a], lin(-a), a),
       ],
     });
   }
@@ -199,7 +201,7 @@ function domainTask(rng: Rng): Exercise | null {
       term: `\\frac{${k}}{${z}}`,
       zero: [z],
       gaps: [a, -b],
-      slips: [SIGN_SLIP([a, -b], par(-a))],
+      slips: [SIGN_SLIP([a, -b], lin(-a), a)],
     });
   }
   if (kind === 6) {
@@ -227,7 +229,7 @@ function domainTask(rng: Rng): Exercise | null {
     zero: [z],
     factored: `(x - ${b})^2`,
     gaps: [b],
-    slips: [SIGN_SLIP([b], `x - ${b}`), { values: [0], title: tx("That's where the numerator is 0", "Da wird der Zähler 0"), say: tx("For $x = 0$ only the **numerator** is $0$, and that's allowed. Use the second binomial formula on the denominator.", "Für $x = 0$ wird nur der **Zähler** $0$, und das ist erlaubt. Nimm für den Nenner die 2. binomische Formel.") }],
+    slips: [SIGN_SLIP([b], `x - ${b}`, b), { values: [0], title: tx("That's where the numerator is 0", "Da wird der Zähler 0"), say: tx("For $x = 0$ only the **numerator** is $0$, and that's allowed. Use the second binomial formula on the denominator.", "Für $x = 0$ wird nur der **Zähler** $0$, und das ist erlaubt. Nimm für den Nenner die 2. binomische Formel.") }],
   });
 }
 
@@ -504,14 +506,19 @@ const SUM_SLIP = (sum: Poly): Slip => ({
 function hnTask(rng: Rng): Exercise | null {
   const t = rng.int(1, 5);
   const c = rng.int(1, 6);
-  const ka = rng.int(1, 9);
-  const kb = rng.int(1, 9);
+  let ka = rng.int(1, 9);
+  let kb = rng.int(1, 9);
+  // A numerator that shares a factor with its denominator's number could be simplified first,
+  // and then the common denominator would be smaller. So: numerators coprime to that number.
+  const coprimeTo = (k: number, m: number) => (gcd(k, m) === 1 ? k : rng.pick([1, 2, 3, 4, 5, 6, 7, 8, 9].filter((j) => gcd(j, m) === 1)));
   let s: HN;
   if (t === 1) {
     const [p, q] = rng.shuffle([2, 3, 4, 6, 8, 9, 10, 12]).slice(0, 2);
     const L = lcm(p, q);
     if (L === p * q && rng.chance(0.5)) return null;
     const sq = rng.chance(0.4);
+    ka = coprimeTo(ka, p);
+    kb = coprimeTo(kb, q);
     const deg = (n: number, two: boolean) => (two ? poly(0, 0, n) : poly(0, n));
     s = {
       a: pSrc(deg(p, sq)),
@@ -534,6 +541,8 @@ function hnTask(rng: Rng): Exercise | null {
   } else {
     const [p, q] = rng.shuffle([2, 3, 4, 5, 6]).slice(0, 2);
     const L = lcm(p, q);
+    ka = coprimeTo(ka, p);
+    kb = coprimeTo(kb, q);
     s = {
       a: pSrc(scaleP(linP(c), p)),
       b: pSrc(scaleP(linP(c), q)),
@@ -621,6 +630,9 @@ function addSubExercise(s: AddSub): Exercise {
     return out as Poly;
   };
   const bracketTrap = s.sign < 0 && terms(BeB) > 1 ? addP(subP(AeA, lead(BeB)), subP(BeB, lead(BeB))) : null;
+  const plain = addP(s.A, scaleP(s.B, s.sign));
+  // Both slips can lead to the same numerator (5/(x − 5) − 5/(x + 5): both give 0). Then Blob names both.
+  const bothSlips = !!bracketTrap && pExpr(bracketTrap) === pExpr(plain);
   return {
     instruction: tx("Calculate", "Berechne"),
     text: tx("Bring the fractions to the common denominator and fill in the numerator (fully simplified).", "Bring die Brüche auf den Hauptnenner und ergänze den Zähler (vollständig zusammengefasst)."),
@@ -629,11 +641,20 @@ function addSubExercise(s: AddSub): Exercise {
     hint: tx(`Expand each fraction to $${s.hn}$. ${s.sign < 0 ? "Put the second numerator in brackets." : ""}`.trim(), `Erweitere jeden Bruch auf $${s.hn}$. ${s.sign < 0 ? "Setz den zweiten Zähler in Klammern." : ""}`.trim()),
     solution: frames,
     mistakes: mistakesFor(answer, [
-      {
-        expr: pExpr(addP(s.A, scaleP(s.B, s.sign))),
-        title: tx("Numerators not expanded", "Zähler nicht erweitert"),
-        say: tx("You changed the denominators, but not the numerators. Whatever a denominator is multiplied by, its numerator is multiplied by too.", "Du hast die Nenner verändert, aber nicht die Zähler. Womit ein Nenner multipliziert wird, damit auch sein Zähler."),
-      },
+      bothSlips
+        ? {
+            expr: pExpr(plain),
+            title: tx("Numerators or the minus?", "Zähler oder Minus?"),
+            say: tx(
+              `Check two things. Did you multiply each numerator by the same factor as its denominator? And the minus belongs to the **whole** second numerator $${pSrc(BeB)}$: put it in brackets, then every sign inside flips.`,
+              `Prüf zwei Dinge. Hast du jeden Zähler mit demselben Faktor multipliziert wie seinen Nenner? Und das Minus gehört zum **ganzen** zweiten Zähler $${pSrc(BeB)}$: Setz ihn in Klammern, dann dreht sich jedes Vorzeichen darin um.`,
+            ),
+          }
+        : {
+            expr: pExpr(plain),
+            title: tx("Numerators not expanded", "Zähler nicht erweitert"),
+            say: tx("You changed the denominators, but not the numerators. Whatever a denominator is multiplied by, its numerator is multiplied by too.", "Du hast die Nenner verändert, aber nicht die Zähler. Womit ein Nenner multipliziert wird, damit auch sein Zähler."),
+          },
       bracketTrap && {
         expr: pExpr(bracketTrap),
         title: tx("Bracket forgotten", "Klammer vergessen"),
@@ -787,7 +808,7 @@ function mulDivTask(rng: Rng): Exercise | null {
       ans: pExpr(poly(0, p / g)),
       slips: [
         g > 1 && { expr: pExpr(poly(0, p)), title: tx("Numbers not simplified", "Zahlen nicht gekürzt"), say: tx(`Nearly! $${p}$ and $${q}$ can still be simplified by $${g}$.`, `Fast! $${p}$ und $${q}$ kannst du noch durch $${g}$ kürzen.`), close: true },
-        { expr: String(p / g), title: tx("An x got lost", "Ein x ist verloren gegangen"), say: tx(`$x^2 + ${A}x = x(x + ${A})$: only $(x + ${A})$ cancels, the $x$ stays.`, `$x^2 + ${A}x = x(x + ${A})$: Nur $(x + ${A})$ kürzt sich, das $x$ bleibt.`) },
+        { expr: String(p / g), title: tx("An x got lost", "Ein x ist verloren gegangen"), say: tx(`$${pSrc(poly(0, A, 1))} = x(x + ${A})$: only $(x + ${A})$ cancels, the $x$ stays.`, `$${pSrc(poly(0, A, 1))} = x(x + ${A})$: Nur $(x + ${A})$ kürzt sich, das $x$ bleibt.`) },
       ],
     },
     true,
@@ -810,7 +831,8 @@ function equationExercise(s: Eq): Exercise {
         `Zuerst die Definitionsmenge: Die Nenner dürfen nicht $0$ werden, also $x \\ne ${s.gaps.join("$ und $x \\ne ")}$.`,
       ),
     },
-    ...s.steps,
+    // A step that only repeats the line before it (a factor 1) is left out.
+    ...s.steps.filter((st, i, all) => i === 0 || resolveText(st.math, "de") !== resolveText(all[i - 1].math, "de")),
   ];
   const bad = s.candidates.filter((c) => s.gaps.includes(c));
   frames.push({
@@ -848,6 +870,13 @@ function equationExercise(s: Eq): Exercise {
 }
 
 const step = (math: Text, note: Text): { math: Text; note: Text } => ({ math, note });
+/** k · x without a written 1: "x", "-x", "3x". */
+const kx = (k: number) => pSrc(poly(0, k));
+/** k · (x + a) without a written 1: "x + 3" or "4(x + 3)". */
+const kPar = (k: number, a: number) => (k === 1 ? lin(a) : `${k}${par(a)}`);
+/** The last step k x = k·x0 → x = x0 (for k = 1 the equation only needs reading the other way round). */
+const divideStep = (k: number, x: number) =>
+  step(`x = ${x}`, k === 1 ? tx(`So $x = ${x}$.`, `Also ist $x = ${x}$.`) : tx(`Divide by $${k}$.`, `Durch $${k}$ teilen.`));
 
 function equationTask(rng: Rng): Exercise | null {
   const t = rng.pick([1, 1, 2, 3, 4, 4, 5, 6, 7]);
@@ -864,10 +893,10 @@ function equationTask(rng: Rng): Exercise | null {
       eq: `\\frac{${a}}{x} = \\frac{${b}}{${lin(c)}}`,
       gaps: [0, -c].sort((p, q) => p - q),
       steps: [
-        step(`${a}${par(c)} = ${b}x`, tx(`Multiply both sides by the common denominator $x${par(c)}$: the denominators cancel ("cross-multiply").`, `Beide Seiten mal den Hauptnenner $x${par(c)}$: Die Nenner fallen weg („über Kreuz multiplizieren“).`)),
-        step(`${pSrc(poly(a * c, a))} = ${b}x`, tx("Multiply out.", "Ausmultiplizieren.")),
-        step(`${a * c} = ${pSrc(poly(0, b - a))}`, tx(`Subtract $${a}x$.`, `$${a}x$ abziehen.`)),
-        step(`x = ${x}`, tx(`Divide by $${b - a}$.`, `Durch $${b - a}$ teilen.`)),
+        step(`${kPar(a, c)} = ${kx(b)}`, tx(`Multiply both sides by the common denominator $x${par(c)}$: the denominators cancel ("cross-multiply").`, `Beide Seiten mal den Hauptnenner $x${par(c)}$: Die Nenner fallen weg („über Kreuz multiplizieren“).`)),
+        step(`${pSrc(poly(a * c, a))} = ${kx(b)}`, tx("Multiply out.", "Ausmultiplizieren.")),
+        step(`${a * c} = ${pSrc(poly(0, b - a))}`, tx(`Subtract $${kx(a)}$.`, `$${kx(a)}$ abziehen.`)),
+        divideStep(b - a, x),
       ],
       sols: [x],
       candidates: [x],
@@ -892,9 +921,9 @@ function equationTask(rng: Rng): Exercise | null {
       eq: `\\frac{${a}}{x} ${b < 0 ? "-" : "+"} ${Math.abs(b)} = \\frac{${c}}{x}`,
       gaps: [0],
       steps: [
-        step(`${a} ${b < 0 ? "-" : "+"} ${Math.abs(b)}x = ${c}`, tx(`Multiply **every** term by $x$: $\\frac{${a}}{x} \\cdot x = ${a}$ and $${Math.abs(b)} \\cdot x = ${Math.abs(b)}x$.`, `Multipliziere **jeden** Summanden mit $x$: $\\frac{${a}}{x} \\cdot x = ${a}$ und $${Math.abs(b)} \\cdot x = ${Math.abs(b)}x$.`)),
+        step(`${a} ${b < 0 ? "-" : "+"} ${kx(Math.abs(b))} = ${c}`, tx(`Multiply **every** term by $x$: $\\frac{${a}}{x} \\cdot x = ${a}$ and $${Math.abs(b)} \\cdot x = ${kx(Math.abs(b))}$.`, `Multipliziere **jeden** Summanden mit $x$: $\\frac{${a}}{x} \\cdot x = ${a}$ und $${Math.abs(b)} \\cdot x = ${kx(Math.abs(b))}$.`)),
         step(`${pSrc(poly(0, b))} = ${c - a}`, tx(`Subtract $${a}$.`, `$${a}$ abziehen.`)),
-        step(`x = ${x}`, tx(`Divide by $${b}$.`, `Durch $${b}$ teilen.`)),
+        divideStep(b, x),
       ],
       sols: [x],
       candidates: [x],
@@ -922,7 +951,7 @@ function equationTask(rng: Rng): Exercise | null {
         step(`${a} = ${b}${par(-p)}`, tx(`Multiply both sides by $${par(-p)}$.`, `Beide Seiten mal $${par(-p)}$.`)),
         step(`${a} = ${pSrc(poly(-b * p, b))}`, tx("Multiply out.", "Ausmultiplizieren.")),
         step(`${a + b * p} = ${b}x`, tx(`${-b * p > 0 ? "Subtract" : "Add"} $${Math.abs(b * p)}$.`, `$${Math.abs(b * p)}$ ${-b * p > 0 ? "abziehen" : "addieren"}.`)),
-        step(`x = ${x}`, tx(`Divide by $${b}$.`, `Durch $${b}$ teilen.`)),
+        divideStep(b, x),
       ],
       sols: [x],
       candidates: [x],
@@ -949,7 +978,7 @@ function equationTask(rng: Rng): Exercise | null {
         step(`${lin(a)} = ${k}${par(-b)}`, tx(`Multiply both sides by $${par(-b)}$.`, `Beide Seiten mal $${par(-b)}$.`)),
         step(`${lin(a)} = ${pSrc(poly(-k * b, k))}`, tx(`Multiply out: **both** terms in the bracket times $${k}$.`, `Ausmultiplizieren: **beide** Summanden in der Klammer mal $${k}$.`)),
         step(`${a + k * b} = ${pSrc(poly(0, k - 1))}`, tx("Collect $x$ on one side, numbers on the other.", "Bring $x$ auf eine Seite, die Zahlen auf die andere.")),
-        step(`x = ${x}`, tx(`Divide by $${k - 1}$.`, `Durch $${k - 1}$ teilen.`)),
+        divideStep(k - 1, x),
       ],
       sols: [x],
       candidates: [x],
@@ -974,7 +1003,7 @@ function equationTask(rng: Rng): Exercise | null {
         step(`x = ${p} + ${k}${par(-p)}`, tx(`Multiply every term by $${par(-p)}$.`, `Jeden Summanden mit $${par(-p)}$ multiplizieren.`)),
         step(`x = ${pSrc(poly(p - k * p, k))}`, tx("Multiply out and combine.", "Ausmultiplizieren und zusammenfassen.")),
         step(`${pSrc(poly(0, 1 - k))} = ${p - k * p}`, tx(`Subtract $${k}x$.`, `$${k}x$ abziehen.`)),
-        step(`x = ${p}`, tx(`Divide by $${1 - k}$.`, `Durch $${1 - k}$ teilen.`)),
+        divideStep(1 - k, p),
       ],
       sols: [],
       candidates: [p],
@@ -1012,19 +1041,55 @@ function equationTask(rng: Rng): Exercise | null {
   if (a + b === 0 || (a * p) % (a + b) !== 0) return null;
   const x = (a * p) / (a + b);
   if (x === 0 || x === p) return null;
-  const lhs2 = `${pSrc(poly(-a * p, a))} ${b < 0 ? "-" : "+"} ${Math.abs(b)}x = 0`;
+  const B = Math.abs(b);
+  const sg = b < 0 ? "-" : "+";
+  const lhs1 = `${kPar(a, -p)} ${sg} ${kx(B)} = 0`;
   return equationExercise({
-    eq: `\\frac{${a}}{x} ${b < 0 ? "-" : "+"} \\frac{${Math.abs(b)}}{${lin(-p)}} = 0`,
+    eq: `\\frac{${a}}{x} ${sg} \\frac{${B}}{${lin(-p)}} = 0`,
     gaps: [0, p].sort((u, v) => u - v),
     steps: [
-      step(`${a}${par(-p)} ${b < 0 ? "-" : "+"} ${Math.abs(b)}x = 0`, tx(`Multiply by the common denominator $x${par(-p)}$. Each fraction loses its own denominator.`, `Mal den Hauptnenner $x${par(-p)}$. Jeder Bruch verliert seinen eigenen Nenner.`)),
-      step(lhs2, tx("Multiply out.", "Ausmultiplizieren.")),
+      step(lhs1, tx(`Multiply by the common denominator $x${par(-p)}$. Each fraction loses its own denominator.`, `Mal den Hauptnenner $x${par(-p)}$. Jeder Bruch verliert seinen eigenen Nenner.`)),
+      step(`${pSrc(poly(-a * p, a))} ${sg} ${kx(B)} = 0`, tx("Multiply out.", "Ausmultiplizieren.")),
       step(`${pSrc(poly(0, a + b))} = ${a * p}`, tx("Combine and move the number across.", "Zusammenfassen und die Zahl rüberbringen.")),
-      step(`x = ${x}`, tx(`Divide by $${a + b}$.`, `Durch $${a + b}$ teilen.`)),
+      divideStep(a + b, x),
     ],
     sols: [x],
     candidates: [x],
-    slips: [],
+    slips: [
+      // a(x − p) + |b|x = 0
+      b < 0 && {
+        values: [(a * p) / (a + B)],
+        title: tx("The minus got lost", "Das Minus ist verloren gegangen"),
+        say: tx(
+          `The minus in front of the second fraction stays when you multiply: $${lhs1}$.`,
+          `Das Minus vor dem zweiten Bruch bleibt beim Multiplizieren stehen: $${lhs1}$.`,
+        ),
+      },
+      // a/x = b/(x − p) instead of a/x = −b/(x − p): a(x − p) = b x
+      b > 0 && {
+        values: a === b ? [] : [(a * p) / (a - b)],
+        title: tx("Sign lost on the way across", "Beim Rüberbringen das Vorzeichen verloren"),
+        say: tx(
+          `If you bring $\\frac{${B}}{${lin(-p)}}$ to the other side, it becomes **minus**: $\\frac{${a}}{x} = -\\frac{${B}}{${lin(-p)}}$. Or multiply straight away: $${lhs1}$.`,
+          `Bringst du $\\frac{${B}}{${lin(-p)}}$ auf die andere Seite, wird daraus **minus**: $\\frac{${a}}{x} = -\\frac{${B}}{${lin(-p)}}$. Oder multiplizier gleich: $${lhs1}$.`,
+        ),
+      },
+      // a x + b(x − p) = 0
+      {
+        values: [(b * p) / (a + b)],
+        title: tx("Wrong factor kept", "Falschen Faktor behalten"),
+        say: tx(
+          `Multiplying by $x${par(-p)}$ cancels each fraction's **own** denominator: $\\frac{${a}}{x} \\cdot x${par(-p)} = ${kPar(a, -p)}$, not $${kx(a)}$.`,
+          `Beim Multiplizieren mit $x${par(-p)}$ kürzt sich bei jedem Bruch sein **eigener** Nenner: $\\frac{${a}}{x} \\cdot x${par(-p)} = ${kPar(a, -p)}$, nicht $${kx(a)}$.`,
+        ),
+      },
+      // a x − p + b x = 0
+      a > 1 && {
+        values: [p / (a + b)],
+        title: tx("Bracket only half multiplied", "Klammer nur halb ausmultipliziert"),
+        say: tx(`$${a}${par(-p)}$: the $${-p}$ has to be multiplied by $${a}$ too.`, `$${a}${par(-p)}$: Auch die $${-p}$ muss mit $${a}$ multipliziert werden.`),
+      },
+    ],
   });
 }
 
@@ -1056,7 +1121,7 @@ export function generate3(rng: Rng): Exercise {
 // Lesson boards
 
 const domainFrames: Frame[] = [
-  { math: "\\frac{5#n}{x#x -#m 3#c}#f", note: tx("A **fraction term** (Bruchterm): a variable in the denominator.", "Ein **Bruchterm**: Im Nenner steht eine Variable.") },
+  { math: "\\frac{5#n}{x#x -#m 3#c}#f", note: tx("An **algebraic fraction** (Bruchterm): a variable in the denominator.", "Ein **Bruchterm**: Im Nenner steht eine Variable.") },
   {
     math: "\\frac{5#n}{3#x -#m 3#c}#f =#e \\frac{5#n2}{\\red{0#z}}#f2",
     note: tx("Put in $x = 3$: the denominator becomes $0$. Dividing by $0$ is impossible!", "Setz $x = 3$ ein: Der Nenner wird $0$. Durch $0$ teilen geht nicht!"),
@@ -1186,10 +1251,10 @@ export const level3: LevelLesson = {
   lesson: [
     {
       type: "explain",
-      title: tx("Fraction terms and their domain", "Bruchterme und ihre Definitionsmenge"),
+      title: tx("Algebraic fractions and their domain", "Bruchterme und ihre Definitionsmenge"),
       blob: tx("Rule number one: never divide by zero!", "Regel Nummer eins: Niemals durch null teilen!"),
       body: tx(
-        "In a **fraction term** the variable stands in a denominator. Numbers that make a denominator $0$ are not allowed: they are left out of the **domain** $D$.",
+        "In an **algebraic fraction** the variable stands in a denominator. Numbers that make a denominator $0$ are not allowed: they are left out of the **domain** $D$.",
         "Bei einem **Bruchterm** steht die Variable im Nenner. Zahlen, die einen Nenner $0$ machen, sind verboten: Sie gehören nicht zur **Definitionsmenge** $D$.",
       ),
       frames: domainFrames,
@@ -1221,7 +1286,7 @@ export const level3: LevelLesson = {
       blob: tx("Try cancelling summands. I dare you!", "Versuch ruhig mal, Summanden zu kürzen. Trau dich!"),
       body: tx(
         "Tap a piece on top and one at the bottom to cancel them. With summands that's not allowed. Factorise the term, then cancel the matching factors.",
-        "Tipp oben und unten ein Teil an, um sie zu kürzen. Bei Summanden geht das nicht. Faktorisiere den Term und kürze dann die passenden Faktoren.",
+        "Tipp oben und unten je ein Teil an, um beide zu kürzen. Bei Summanden geht das nicht. Faktorisiere den Term und kürze dann die passenden Faktoren.",
       ),
       widget: FractionsCancelWorkshop,
     },

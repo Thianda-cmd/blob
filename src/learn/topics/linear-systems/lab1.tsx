@@ -7,6 +7,7 @@ import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { MathView } from "@/learn/components/MathView";
 import { Inline } from "@/learn/components/Rich";
+import { Graph, type GraphProps } from "@/learn/visuals/Graph";
 import { Plane, PlaneDot, PlaneHandle, PlaneLine, PlaneTag, StepSlider, useSpringTo, type Pt } from "@/learn/visuals/LinesGraph";
 import { cn } from "@/lib/utils";
 import { plain, pt, side } from "../lines/level2";
@@ -587,6 +588,27 @@ export function ValueTable({ xs, rows }: { xs: number[]; rows: { name: string; v
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A graph with a legend under it, so a picture on its own page still says which line
+// belongs to which equation (line colours alone don't: the dark line is light in dark mode).
+
+export function LegendGraph({ legend, ...graph }: GraphProps & { legend: { name: string; src: string }[] }) {
+  const tones = ["blob", "ink"] as const;
+  return (
+    <div className="space-y-2">
+      <Graph {...graph} />
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+        {legend.map((l, i) => (
+          <span key={l.name} className="flex items-center gap-2">
+            <Chip tone={tones[i % 2]}>{l.name}</Chip>
+            <MathView src={l.src} size="sm" animate={false} />
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

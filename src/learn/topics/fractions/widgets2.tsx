@@ -94,11 +94,13 @@ export function FractionsDecimalKinds() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * 0.12, type: "spring", stiffness: 300, damping: 28 }}
-            className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-surface px-3 py-2.5"
           >
-            <MathView src={`\\frac{${n}}{${d}} =`} size="md" animate={false} />
-            <FractionDecimal n={n} d={d} className="text-[24px]" />
-            <span className="ml-auto text-right text-[12px] leading-tight">
+            <span className="flex shrink-0 items-center gap-3 whitespace-nowrap">
+              <MathView src={`\\frac{${n}}{${d}} =`} size="md" animate={false} />
+              <FractionDecimal n={n} d={d} className="text-[24px]" />
+            </span>
+            <span className="ml-auto min-w-0 text-right text-[12px] leading-tight">
               <span className={cn("block font-semibold", terminates(n, d) ? "text-ok" : "text-blob-ink")}>{kind(n, d)}</span>
               <span className="block text-ink-3">{why(n, d)}</span>
             </span>
@@ -192,6 +194,9 @@ export function FractionsDivisionMachine() {
 
   const digits = L.digits.slice(0, shown);
   const periodStart = done && repeating ? L.start : digits.length;
+  // The finished number (whole part, comma, every digit, the dots) fits the column on one line.
+  const chars = String(L.int).length + 2 + total;
+  const numberSize = `min(32px, ${(100 / (chars * 0.62)).toFixed(2)}cqw)`;
 
   return (
     <div className="space-y-5">
@@ -210,10 +215,10 @@ export function FractionsDivisionMachine() {
       </div>
 
       <div className="grid gap-5 rounded-xl border border-line bg-surface p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col items-center justify-center gap-3">
+        <div className="@container flex min-w-0 flex-col items-center justify-center gap-3">
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
             <MathView src={`\\frac{${n}}{${d}} = ${n} : ${d} =`} size="lg" animate={false} />
-            <span className="inline-flex flex-wrap items-end font-math text-[32px] leading-tight tabular-nums">
+            <span className="inline-flex items-end whitespace-nowrap font-math leading-tight tabular-nums" style={{ fontSize: numberSize }}>
               <span>
                 {L.int}
                 {total > 0 && (shown > 0 || done) ? comma : ""}
@@ -223,7 +228,7 @@ export function FractionsDivisionMachine() {
                   {q}
                 </motion.span>
               ))}
-              {done && repeating && <PeriodicNumber int="" period={p.period} className="text-[32px]" />}
+              {done && repeating && <PeriodicNumber int="" period={p.period} />}
               {!done && total > 0 && <span className="ml-0.5 animate-pulse text-ink-3">…</span>}
             </span>
           </div>

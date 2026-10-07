@@ -6,7 +6,7 @@ import type { Rng } from "@/learn/engine/rng";
 import type { AnswerSpec, Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import type { Pt } from "@/learn/visuals/LinesGraph";
 import { graphVisual, mistakeList, plain, pt, val, type Msg } from "../lines/level2";
-import { eqSrc, PairTester, rightAt, TableLab, ValueTable } from "./lab1";
+import { eqSrc, LegendGraph, PairTester, rightAt, TableLab, ValueTable } from "./lab1";
 import {
   checkPairMistakes,
   det,
@@ -318,9 +318,18 @@ function subMistakes(s: Solved, e: Std, extra: [AnswerSpec, Msg][] = []): Mistak
   const sv = s.v;
   const ov = sv === "x" ? "y" : "x";
   const known = (e.c - e[sv] * s.n) / (e[sv] * s.m + e[ov]);
-  const sol = sv === "y" ? xyWhen(known, s.m * known + s.n) : xyWhen(s.m * known + s.n, known);
-  const mk = mistakeList(sol);
+  const [px, py] = sv === "y" ? [known, s.m * known + s.n] : [s.m * known + s.n, known];
+  const mk = mistakeList(xyWhen(px, py));
   for (const [when, msg] of extra) mk.add(when, ...msg);
+  // Both values right, but in the wrong boxes (stories bring their own message for this in `extra`).
+  mk.add(
+    xyWhen(py, px),
+    tx("Swapped", "Vertauscht"),
+    tx(
+      `Both numbers are right, just in the wrong boxes! You worked out $${ov}$ first: that number goes in the box for $${ov}$.`,
+      `Beide Zahlen stimmen, nur in den falschen Feldern! Du hast zuerst $${ov}$ ausgerechnet: Diese Zahl gehört ins Feld für $${ov}$.`,
+    ),
+  );
   for (const m of substitutionMistakes(s, e)) mk.add(m.when, m.title ?? tx("Slip", "Kleiner Fehler"), m.say);
   // x + 2x read as 2x: the term that was already there gets lost.
   const qo = e[ov];
@@ -379,29 +388,35 @@ const sysLine = (a: string, b: string) => `${a} , \\quad ${b}`;
 const solvedLine = (s: Solved) => plain(solvedSrc(s, "1"));
 const stdLine = (e: Std) => plain(stdSrc(e, "1"));
 
-const REVERSED = (d: number): Msg => [
+/** [English, German] */
+type Say = [string, string];
+
+/** "y = d + x" written the wrong way round. `ask`: the question that decides which one is bigger. */
+const REVERSED = (d: number, ask: Say): Msg => [
   tx("The wrong way round", "Falsch herum"),
   tx(
-    `Read the sentence again: **who** has more? $y$ is the bigger one, so you add the ${d} to the **smaller** one: $y = x + ${d}$.`,
-    `Lies den Satz noch mal: **Wer** hat mehr? $y$ ist der größere Wert, also kommt die ${d} zum **kleineren** dazu: $y = x + ${d}$.`,
+    `Read the sentence again: ${ask[0]} $y$ is the bigger one, so you add the ${d} to the **smaller** one: $y = x + ${d}$.`,
+    `Lies den Satz noch mal: ${ask[1]} $y$ ist der größere Wert, also kommt die ${d} zum **kleineren** dazu: $y = x + ${d}$.`,
   ),
 ];
-const REVERSED_TIMES = (k: number): Msg => [
+const REVERSED_TIMES = (k: number, ask: Say): Msg => [
   tx("The wrong way round", "Falsch herum"),
   tx(
-    `Read the sentence again: **which** is bigger? $y$ is the bigger one, so it's ${k === 2 ? "twice" : `${k} times`} the **smaller** one: $y = ${k}x$.`,
-    `Lies den Satz noch mal: **Was** ist größer? $y$ ist der größere Wert, also ist $y$ das ${k === 2 ? "Doppelte" : `${k}-Fache`} des **kleineren**: $y = ${k}x$.`,
+    `Read the sentence again: ${ask[0]} $y$ is the bigger one, so it's ${k === 2 ? "twice" : `${k} times`} the **smaller** one: $y = ${k}x$.`,
+    `Lies den Satz noch mal: ${ask[1]} $y$ ist der größere Wert, also ist $y$ das ${k === 2 ? "Doppelte" : `${k}-Fache`} des **kleineren**: $y = ${k}x$.`,
   ),
 ];
-const TIMES: Msg = [
-  tx("More is not times", "Mehr heißt nicht mal"),
-  tx("\"More than\" means **plus**, not times. \"Twice as many\" would be times.", "„Mehr als“ heißt **plus**, nicht mal. „Doppelt so viele“ wäre mal."),
+/** "7 years older" read as times. `more`: the story's own phrase, `twice`: what times would sound like. */
+const TIMES = (more: Say, twice: Say): Msg => [
+  tx("Plus, not times", "Plus, nicht mal"),
+  tx(`"${more[0]}" means **plus**, not times. "${twice[0]}" would be times.`, `„${more[1]}“ heißt **plus**, nicht mal. „${twice[1]}“ wäre mal.`),
 ];
 const timesEn = (k: number) => (k === 2 ? "twice" : `${k} times`);
 const timesDe = (k: number) => (k === 2 ? "doppelt" : `${k}-mal`);
-const PLUS = (k: number): Msg => [
-  tx("Times is not more", "Mal heißt nicht mehr"),
-  tx(`"${timesEn(k)} as many" means **multiply**: $y = ${k}x$, not $y = x + ${k}$.`, `„${timesDe(k)} so viele“ heißt **multiplizieren**: $y = ${k}x$, nicht $y = x + ${k}$.`),
+/** "4 times as big" read as plus. `as`: the story's phrase after the factor ("as big", "as many"). */
+const PLUS = (k: number, as: Say): Msg => [
+  tx("Times, not plus", "Mal, nicht plus"),
+  tx(`"${timesEn(k)} ${as[0]}" means **multiply**: $y = ${k}x$, not $y = x + ${k}$.`, `„${timesDe(k)} ${as[1]}“ heißt **multiplizieren**: $y = ${k}x$, nicht $y = x + ${k}$.`),
 ];
 const TOGETHER: Msg = [
   tx("Together means plus", "Zusammen heißt plus"),
@@ -444,8 +459,8 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
             ]
           : [],
       wrong: [
-        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d)],
-        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES],
+        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d, ["**who** is older?", "**Wer** ist älter?"])],
+        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES([`${d} years older`, `${d} Jahre älter`], ["Twice as old", "Doppelt so alt"])],
         [sysLine(solvedLine({ v: "y", m: 1, n: d }), stdLine({ x: -1, y: 1, c: S })), TOGETHER],
       ],
     };
@@ -483,8 +498,11 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
         : tx("Ha, swapped! $x$ is the **smaller** number.", "Ha, vertauscht! $x$ ist die **kleinere** Zahl."),
       extra: [],
       wrong: [
-        [sysLine(solvedLine({ v: "x", m: k, n: 0 }), stdLine({ x: 1, y: 1, c: S })), REVERSED_TIMES(k)],
-        [sysLine(solvedLine({ v: "y", m: 1, n: k }), stdLine({ x: 1, y: 1, c: S })), PLUS(k)],
+        [
+          sysLine(solvedLine({ v: "x", m: k, n: 0 }), stdLine({ x: 1, y: 1, c: S })),
+          REVERSED_TIMES(k, farm ? ["are there more **cows** or more **chickens**?", "Gibt es mehr **Kühe** oder mehr **Hühner**?"] : ["**which** number is bigger?", "**Welche** Zahl ist größer?"]),
+        ],
+        [sysLine(solvedLine({ v: "y", m: 1, n: k }), stdLine({ x: 1, y: 1, c: S })), PLUS(k, farm ? ["as many", "so viele"] : ["as big", "so groß"])],
         [sysLine(solvedLine({ v: "y", m: k, n: 0 }), stdLine({ x: -1, y: 1, c: S })), TOGETHER],
       ],
     };
@@ -534,8 +552,8 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
       swapped: tx(`Ha, swapped! $x$ is the price of a **${it.en[0]}**, the cheaper one.`, `Ha, vertauscht! $x$ ist der Preis für **${it.deCheap}**, das Günstigere.`),
       extra: [],
       wrong: [
-        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d)],
-        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES],
+        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d, ["**which** one costs more?", "**Was** kostet mehr?"])],
+        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES([`${d} € more`, `${d} € mehr`], ["Twice as much", "Doppelt so teuer"])],
         [sysLine(solvedLine({ v: "y", m: 1, n: d }), stdLine({ x: -1, y: 1, c: S })), TOGETHER],
       ],
     };
@@ -570,8 +588,8 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
             ]
           : [],
       wrong: [
-        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d)],
-        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES],
+        [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 1, y: 1, c: S })), REVERSED(d, ["are there more **girls** or more **boys**?", "Gibt es mehr **Mädchen** oder mehr **Jungen**?"])],
+        [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 1, y: 1, c: S })), TIMES([`${d} more girls`, `${d} Mädchen mehr`], ["Twice as many", "Doppelt so viele"])],
         [sysLine(solvedLine({ v: "y", m: 1, n: d }), stdLine({ x: -1, y: 1, c: S })), TOGETHER],
       ],
     };
@@ -619,8 +637,8 @@ function makeStory(rng: Rng, kind: "ages" | "times" | "prices" | "class" | "rect
           tx("The perimeter goes **all the way round**: two widths and two lengths.", "Der Umfang geht **einmal ganz herum**: zwei Breiten und zwei Längen."),
         ],
       ],
-      [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 2, y: 2, c: U })), REVERSED(d)],
-      [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 2, y: 2, c: U })), TIMES],
+      [sysLine(solvedLine({ v: "x", m: 1, n: d }), stdLine({ x: 2, y: 2, c: U })), REVERSED(d, ["**which** side is longer?", "**Welche** Seite ist länger?"])],
+      [sysLine(solvedLine({ v: "y", m: d, n: 0 }), stdLine({ x: 2, y: 2, c: U })), TIMES([`${d} cm longer`, `${d} cm länger`], ["Twice as long", "Doppelt so lang"])],
     ],
   };
 }
@@ -946,8 +964,8 @@ const graphLessonFrames: Frame[] = [
   {
     math: sysSrc(solvedSrc({ v: "y", ...G1 }, "1"), solvedSrc({ v: "y", ...G2 }, "2")),
     note: tx(
-      "Both equations are solved for $y$. Each one gives a line: all its fitting pairs lie on it. Line I is purple, line II is dark.",
-      "Beide Gleichungen sind nach $y$ aufgelöst. Jede ergibt eine Gerade: Alle passenden Paare liegen darauf. Gerade I ist lila, Gerade II dunkel.",
+      "Both equations are solved for $y$. Each one gives a line: all its fitting pairs lie on it. Line I is purple, line II is labelled II.",
+      "Beide Gleichungen sind nach $y$ aufgelöst. Jede ergibt eine Gerade: Alle passenden Paare liegen darauf. Gerade I ist lila, Gerade II ist mit II beschriftet.",
     ),
   },
   {
@@ -1166,14 +1184,19 @@ export const level1: LevelLesson = {
         "Draw both equations as lines. A point on **both** lines fits both equations, so the intersection point is the solution.",
         "Zeichne beide Gleichungen als Geraden. Ein Punkt auf **beiden** Geraden passt zu beiden Gleichungen, also ist der Schnittpunkt die Lösung.",
       ),
-      visual: graphVisual({
+      visual: visual(LegendGraph, {
         xRange: [-1, 6],
         yRange: [-1, 6],
         functions: [
-          { f: (t) => t + 1, key: "I", color: "blob", label: "I" },
-          { f: (t) => -t + 5, key: "II", color: "ink", label: "II" },
+          // Drawn up to x = 5, where it leaves the picture at the top: that way its label sits inside.
+          { f: (t: number) => t + 1, key: "I", color: "blob", label: "I", to: 5 },
+          { f: (t: number) => -t + 5, key: "II", color: "ink", label: "II" },
         ],
         points: [{ x: 2, y: 3, label: "S(2 | 3)", color: "blob", key: "S" }],
+        legend: [
+          { name: "I", src: plain(solvedSrc({ v: "y", ...G1 }, "1")) },
+          { name: "II", src: plain(solvedSrc({ v: "y", ...G2 }, "2")) },
+        ],
       }),
       frames: graphLessonFrames,
     },

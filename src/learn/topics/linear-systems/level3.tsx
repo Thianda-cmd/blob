@@ -52,18 +52,18 @@ const sysOf = (rows: Row[], labels = LABELS, names: Names = XYZ) => plain(stack(
  */
 const sysCard = (rows: Row[]): Pick<Exercise, "visual"> => ({ visual: { component: SystemCard as never, props: { src: sysOf(rows) } } });
 
-/** A row with every term shown, a 0 faded ("0x"), for a written calculation. */
-function fullRowSrc(r: Row, id: string, label: string, names: Names = XYZ): string {
-  // Non-breaking spaces: a label like "(−2 · I)" must not wrap onto two lines.
-  const lab = label.replace(/ /g, "\u00a0");
-  const parts: string[] = [];
-  V3S.forEach((v, i) => {
-    const k = r[v];
-    const first = parts.length === 0;
-    if (k === 0) parts.push(`${first ? "" : "+ "}\\fade{0 ${names[i]}}`);
-    else parts.push(term(k, names[i], `${id}${v}`, first));
-  });
-  return `\\group{\\text{${lab}}#L${id} \\; ${parts.join(" ")} =#e${id} ${val(r.c, `${id}c`)}}#R${id}`;
+/**
+ * A row of a written-out calculation (row plus multiple of a row). No label column and no "0x"
+ * placeholders, so three of them fit at phone width: the notes name the rows, and the tint tells
+ * them apart (purple: the row that is changed, plain: the multiple added to it, green: the result).
+ */
+function calcRowSrc(r: Row, id: string, tone: "blob" | "group" | "green", names: Names = XYZ): string {
+  const terms = side([
+    [r.x, names[0], `${id}x`],
+    [r.y, names[1], `${id}y`],
+    [r.z, names[2], `${id}z`],
+  ]);
+  return `\\${tone}{${terms} =#e${id} ${val(r.c, `${id}c`)}}#R${id}`;
 }
 
 const wrap = (n: number) => (n < 0 ? `(${n})` : `${n}`);
@@ -125,7 +125,7 @@ function slipSolve(rows: Row[], slip: "rhs" | "sign" | "back"): Triple | null {
 const RHS: Msg = [
   tx("Right side not multiplied", "Rechte Seite nicht multipliziert"),
   tx(
-    "Ah, I see what happened! In a Gauss step you multiplied the coefficients, but the number on the **right side** has to be multiplied by the same factor.",
+    "Ah, I see what happened! In an elimination step you multiplied the coefficients, but the number on the **right side** has to be multiplied by the same factor.",
     "Ah, ich seh, was passiert ist! In einem Gauß-Schritt hast du die Koeffizienten multipliziert, aber die Zahl auf der **rechten Seite** muss mit demselben Faktor multipliziert werden.",
   ),
 ];
@@ -143,6 +143,36 @@ const BACK: Msg = [
     "Deine Elimination sieht gut aus! Aber als du $z$ in die mittlere Zeile eingesetzt und nach $y$ aufgelöst hast, ist ein Term ohne Vorzeichenwechsel über das Gleichheitszeichen gewandert.",
   ),
 ];
+/** The same slip when the system was already in echelon form (no elimination done). */
+const BACK_ONLY: Msg = [
+  tx("Sign slip going back up", "Vorzeichenfehler beim Rückwärtseinsetzen"),
+  tx(
+    "$z$ is right! But when you put it into the middle row and solved for $y$, a term crossed the equals sign without changing its sign.",
+    "$z$ stimmt! Aber als du es in die mittlere Zeile eingesetzt und nach $y$ aufgelöst hast, ist ein Term ohne Vorzeichenwechsel über das Gleichheitszeichen gewandert.",
+  ),
+];
+const SWAPPED: Msg = [
+  tx("Swapped", "Vertauscht"),
+  tx(
+    "Both numbers are right, just in the wrong boxes! Check which one is $x$ and which one is $y$.",
+    "Beide Zahlen stimmen, nur in den falschen Feldern! Prüf, welche Zahl $x$ ist und welche $y$.",
+  ),
+];
+
+/** y and z are right, but a sign slips when the known terms of (I) move to the right side. */
+function firstRowSlip(mk: ReturnType<typeof mistakeList>, A: Row, sol: Triple) {
+  const D = A.y * sol[1] + A.z * sol[2];
+  const x = (A.c + D) / A.x;
+  if (D === 0 || !nice(x)) return;
+  mk.add(
+    xyWhen(x, sol[1]),
+    tx("Sign slip in the first row", "Vorzeichenfehler in der ersten Zeile"),
+    tx(
+      `$y = ${sol[1]}$ is right! But in (I), when the numbers moved to the right side to get $x$ alone, a sign didn't flip.`,
+      `$y = ${sol[1]}$ stimmt! Aber in (I) hat beim Rüberbringen auf die rechte Seite ein Vorzeichen nicht gewechselt.`,
+    ),
+  );
+}
 
 function gaussMistakes(rows: Row[], sol: Triple): Mistake[] {
   const mk = mistakeList(xyWhen(sol[0], sol[1]));
@@ -155,7 +185,10 @@ function gaussMistakes(rows: Row[], sol: Triple): Mistake[] {
     const v = slipSolve(rows, slip);
     if (niceAll(v)) mk.add(xyWhen(v[0], v[1]), ...msg);
   }
-  return mk.list;
+  // Row (I) is never changed by the plan, so the slip there works on the task's own first row.
+  firstRowSlip(mk, rows[0], sol);
+  mk.add(xyWhen(sol[1], sol[0]), ...SWAPPED);
+  return mk.list.slice(0, 4);
 }
 
 /** Back substitution in a system that is already in step form. */
@@ -166,7 +199,7 @@ function backMistakes(rows: Row[], sol: Triple): Mistake[] {
   const Z = sol[2];
   if (B.z * Z !== 0) {
     const y = (B.c + B.z * Z) / B.y;
-    if (nice(y) && nice(xFrom(y, Z))) mk.add(xyWhen(xFrom(y, Z), y), ...BACK);
+    if (nice(y) && nice(xFrom(y, Z))) mk.add(xyWhen(xFrom(y, Z), y), ...BACK_ONLY);
   }
   if (Math.abs(B.y) !== 1) {
     const y = B.c - B.z * Z;
@@ -193,17 +226,8 @@ function backMistakes(rows: Row[], sol: Triple): Mistake[] {
       );
     }
   }
-  const D = A.y * sol[1] + A.z * Z;
-  if (D !== 0) {
-    mk.add(
-      xyWhen((A.c + D) / A.x, sol[1]),
-      tx("Sign slip in the first row", "Vorzeichenfehler in der ersten Zeile"),
-      tx(
-        `$y = ${sol[1]}$ is right! But in (I), when the numbers moved to the right side to get $x$ alone, a sign didn't flip.`,
-        `$y = ${sol[1]}$ stimmt! Aber in (I) hat beim Rüberbringen auf die rechte Seite ein Vorzeichen nicht gewechselt.`,
-      ),
-    );
-  }
+  firstRowSlip(mk, A, sol);
+  mk.add(xyWhen(sol[1], sol[0]), ...SWAPPED);
   return mk.list.slice(0, 4);
 }
 
@@ -218,7 +242,7 @@ function backExercise(rows: Row[]): Exercise {
   const b = backFrames(rows, LABELS) as { frames: Frame[]; values: Triple };
   return {
     instruction: tx("Solve by back substitution", "Löse durch Rückwärtseinsetzen"),
-    text: joinText(tx("The system is already in step form.", "Das LGS hat schon Stufenform."), GIVE_XY),
+    text: joinText(tx("The system is already in echelon form.", "Das LGS hat schon Stufenform."), GIVE_XY),
     ...sysCard(rows),
     answer: PAIR(sol),
     hint: tx(
@@ -226,7 +250,7 @@ function backExercise(rows: Row[]): Exercise {
       "Fang unten an: Die letzte Zeile liefert $z$. Setz $z$ in die mittlere Zeile ein, um $y$ zu bekommen, dann beides in (I) für $x$.",
     ),
     solution: [
-      { math: stack(rows.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))), note: tx("Step form: each row has one unknown fewer than the row above.", "Stufenform: Jede Zeile hat eine Unbekannte weniger als die darüber.") },
+      { math: stack(rows.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))), note: tx("Echelon form: each row has one unknown fewer than the row above.", "Stufenform: Jede Zeile hat eine Unbekannte weniger als die darüber.") },
       ...b.frames,
       { math: tripleSrc(sol), note: tx(`So $L = \\{ ${tripleText(sol)} \\}$.`, `Also ist $L = \\{ ${tripleText(sol)} \\}$.`) },
     ],
@@ -237,8 +261,8 @@ function backExercise(rows: Row[]): Exercise {
 function gaussExercise(rows: Row[]): Exercise {
   const s = solveFrames(rows) as { frames: Frame[]; values: Triple };
   return {
-    instruction: tx("Solve with the Gauss algorithm", "Löse mit dem Gauß-Verfahren"),
-    text: tx("Bring the system into step form, then solve it. Give $x$ and $y$ (you'll need $z$ on the way).", "Bring das LGS auf Stufenform und löse es. Gib $x$ und $y$ an (dafür brauchst du unterwegs auch $z$)."),
+    instruction: tx("Solve by Gaussian elimination", "Löse mit dem Gauß-Verfahren"),
+    text: tx("Bring the system into echelon form, then solve it. Give $x$ and $y$ (you'll need $z$ on the way).", "Bring das LGS auf Stufenform und löse es. Gib $x$ und $y$ an (dafür brauchst du unterwegs auch $z$)."),
     ...sysCard(rows),
     answer: PAIR(s.values),
     hint: tx(
@@ -304,35 +328,42 @@ function stepExercise(rows: Row[], order: number[]): Exercise | null {
   const mk = mistakeList(answer);
   msgs.forEach((m, k) => mk.add({ ...answer, correct: order.indexOf(k + 1) }, ...m));
   const scaledI = scale(I, q);
-  const top = p === 1 ? fullRowSrc(II, "2", "(II)") : fullRowSrc(scale(II, p), "2", `(${p} · II)`);
-  const qLabel = q === 1 ? "(I)" : q === -1 ? "(−I)" : `(${String(q).replace("-", "−")} · I)`;
+  // (I) written with its factor, as in the operation: "(I)", "−(I)", "3 · (I)".
+  const qI = q === 1 ? "(I)" : q === -1 ? "−(I)" : `$${q} \\cdot$ (I)`;
+  const pII = p === 1 ? "(II)" : `$${p} \\cdot$ (II)`;
   const intro: Text =
     p === 1 && q === 1
       ? tx(`**${opT}** means: add (I) to (II), term by term.`, `**${opT}** heißt: Addiere (I) zu (II), Term für Term.`)
       : p === 1 && q === -1
-        ? tx(`**${opT}** means: subtract (I) from (II). That's the same as adding $-1 \\cdot$ (I).`, `**${opT}** heißt: Ziehe (I) von (II) ab. Das ist dasselbe, wie $-1 \\cdot$ (I) zu addieren.`)
+        ? tx(`**${opT}** means: subtract (I) from (II). That's the same as adding −(I).`, `**${opT}** heißt: Ziehe (I) von (II) ab. Das ist dasselbe, wie −(I) zu addieren.`)
         : tx(`**${opT}** means: add $${q}$ times (I) to ${p === 1 ? "(II)" : `$${p}$ times (II)`}.`, `**${opT}** heißt: Addiere das $${wrap(q)}$-Fache von (I) zu ${p === 1 ? "(II)" : `$${p} \\cdot$ (II)`}.`);
+  const topNote: Text =
+    p === 1
+      ? tx("At the top, in purple: (II).", "Oben in Lila: (II).")
+      : tx(`At the top, in purple: ${pII}, so **every** term of (II) times $${p}$.`, `Oben in Lila: ${pII}, also **jeder** Term von (II) mal $${p}$.`);
   const scaleNote: Text =
     q === 1
-      ? tx("Write (I) under (II), column by column.", "Schreib (I) spaltenweise unter (II).")
+      ? tx("Below it: (I), written column by column.", "Darunter: (I), Spalte für Spalte.")
       : q === -1
-        ? tx("Subtracting (I) flips **every** sign of (I), the right side too.", "Wer (I) abzieht, dreht **jedes** Vorzeichen von (I) um, auch auf der rechten Seite.")
-        : tx(`Multiply **every** term of (I) by $${q}$, the right side too.`, `Multipliziere **jeden** Term von (I) mit $${q}$, auch die rechte Seite.`);
+        ? tx("Below it: −(I). Subtracting (I) flips **every** sign of (I), the right side too.", "Darunter: −(I). Wer (I) abzieht, dreht **jedes** Vorzeichen von (I) um, auch auf der rechten Seite.")
+        : tx(`Below it: ${qI}. Multiply **every** term of (I) by $${q}$, the right side too.`, `Darunter: ${qI}. Multipliziere **jeden** Term von (I) mit $${q}$, auch die rechte Seite.`);
+  const top = calcRowSrc(p === 1 ? II : scale(II, p), "2", "blob");
+  const added = calcRowSrc(scaledI, "m", "group");
   return {
-    instruction: tx("One Gauss step", "Ein Gauß-Schritt"),
+    instruction: tx("One elimination step", "Ein Gauß-Schritt"),
     text: tx(`Calculate **(IIa) = ${opT}**. Which equation do you get?`, `Berechne **(IIa) = ${opT}**. Welche Gleichung erhältst du?`),
     ...sysCard(rows),
     answer,
     hint: tx(
-      `Write $${wrap(q)} \\cdot$ (I) term by term under ${p === 1 ? "(II)" : `$${p} \\cdot$ (II)`} and add column by column, the right side too.`,
-      `Schreib $${wrap(q)} \\cdot$ (I) Term für Term unter ${p === 1 ? "(II)" : `$${p} \\cdot$ (II)`} und addiere spaltenweise, auch die rechten Seiten.`,
+      `Write ${qI} term by term under ${pII} and add column by column, the right side too.`,
+      `Schreib ${qI} Term für Term unter ${pII} und addiere spaltenweise, auch die rechten Seiten.`,
     ),
     solution: [
       { math: stack([rowSrc(I, "1", "I"), rowSrc(II, "2", "II")]), note: intro },
-      { math: stack([top, fullRowSrc(scaledI, "m", qLabel)]), note: scaleNote },
+      { math: stack([top, added]), note: joinText(topNote, scaleNote) },
       {
-        math: stack([top, fullRowSrc(scaledI, "m", qLabel), fullRowSrc(right, "n", "(IIa)")]),
-        note: tx(`Add column by column: $x$ cancels. (IIa) is $${all[0]}$.`, `Addiere spaltenweise: $x$ fällt weg. (IIa) lautet $${all[0]}$.`),
+        math: stack([top, added, calcRowSrc(right, "n", "green")]),
+        note: tx(`Add column by column: $x$ cancels. The green row is (IIa): $${all[0]}$.`, `Addiere spaltenweise: $x$ fällt weg. Die grüne Zeile ist (IIa): $${all[0]}$.`),
       },
     ],
     mistakes: mk.list,
@@ -370,14 +401,14 @@ function specialExercise(rows: Row[]): Exercise | null {
   const ONE_WRONG: Msg = [
     tx("Look at the last row", "Schau auf die letzte Zeile"),
     tx(
-      "In step form the last row has lost **all** unknowns. A row like that can't fix a value for $z$.",
+      "In echelon form the last row has lost **all** unknowns. A row like that can't fix a value for $z$.",
       "In der Stufenform hat die letzte Zeile **alle** Unbekannten verloren. So eine Zeile kann keinen Wert für $z$ festlegen.",
     ),
   ];
   if (kind === 0) {
     const msg: Msg = [
       tx("z is still there", "z ist noch da"),
-      tx("Bring it to step form first: the last row still contains $z$, so you can solve for it.", "Bring es erst auf Stufenform: Die letzte Zeile enthält noch $z$, du kannst also danach auflösen."),
+      tx("Bring it into echelon form first: the last row still contains $z$, so you can solve for it.", "Bring es erst auf Stufenform: Die letzte Zeile enthält noch $z$, du kannst also danach auflösen."),
     ];
     mk.add(pick(1), ...msg);
     mk.add(pick(2), ...msg);
@@ -390,11 +421,11 @@ function specialExercise(rows: Row[]): Exercise | null {
   }
   return {
     instruction: tx("How many solutions?", "Wie viele Lösungen?"),
-    text: tx("Use the Gauss algorithm. How many solutions does the system have?", "Nutze das Gauß-Verfahren. Wie viele Lösungen hat das LGS?"),
+    text: tx("Use Gaussian elimination. How many solutions does the system have?", "Nutze das Gauß-Verfahren. Wie viele Lösungen hat das LGS?"),
     ...sysCard(rows),
     answer,
     hint: tx(
-      "Bring it to step form. If the last row loses all three unknowns, read what's left: a true or a false statement?",
+      "Bring it into echelon form. If the last row loses all three unknowns, read what's left: a true or a false statement?",
       "Bring es auf Stufenform. Verliert die letzte Zeile alle drei Unbekannten, schau, was übrig bleibt: eine wahre oder eine falsche Aussage?",
     ),
     solution: frames,
@@ -413,7 +444,7 @@ const tSrc = (r: number, k: number, id: string) =>
  * A system with infinitely many solutions, built backwards from its step form
  * (I) x + b·y + c·z = d and (IIa) y + m·z = r, so that y and x come out as whole-number terms in t.
  */
-function paramExercise(rows: Row[], ask: "x" | "y"): Exercise | null {
+function paramExercise(rows: Row[], wanted: "x" | "y"): Exercise | null {
   const g = gaussFrames(rows);
   if (!g) return null;
   const [A, B, C] = g.final;
@@ -423,6 +454,9 @@ function paramExercise(rows: Row[], ask: "x" | "y"): Exercise | null {
   const r1 = -B.z / B.y;
   const s0 = A.c - A.y * r0;
   const s1 = -A.y * r1 - A.z;
+  // "Give x in terms of t" needs an x that really depends on t: otherwise ask for the other one.
+  const ask = (wanted === "x" ? s1 : r1) !== 0 ? wanted : wanted === "x" ? "y" : "x";
+  if ((ask === "x" ? s1 : r1) === 0) return null;
   const frames: Frame[] = [...g.frames];
   frames.push({
     math: stack(g.final.map((r, i) => rowSrc(r, IDS[i], g.labels[i], XYZ, i === 2 ? "green" : "group"))),
@@ -501,13 +535,13 @@ function paramExercise(rows: Row[], ask: "x" | "y"): Exercise | null {
   return {
     instruction: tx("Infinitely many solutions", "Unendlich viele Lösungen"),
     text: tx(
-      `This system has infinitely many solutions. Use the Gauss algorithm, set $z = t$ and give $${ask}$ in terms of $t$.`,
+      `This system has infinitely many solutions. Use Gaussian elimination, set $z = t$ and give $${ask}$ in terms of $t$.`,
       `Dieses LGS hat unendlich viele Lösungen. Nutze das Gauß-Verfahren, setze $z = t$ und gib $${ask}$ in Abhängigkeit von $t$ an.`,
     ),
     ...sysCard(rows),
     answer,
     hint: tx(
-      `After Gauss the last row is $0 = 0$. Put $z = t$ into the middle row and solve for $y$${ask === "x" ? ", then put $y$ and $t$ into (I)" : ""}.`,
+      `After elimination the last row is $0 = 0$. Put $z = t$ into the middle row and solve for $y$${ask === "x" ? ", then put $y$ and $t$ into (I)" : ""}.`,
       `Nach Gauß ist die letzte Zeile $0 = 0$. Setz $z = t$ in die mittlere Zeile ein und löse nach $y$ auf${ask === "x" ? ", dann $y$ und $t$ in (I) einsetzen" : ""}.`,
     ),
     solution: frames,
@@ -515,7 +549,7 @@ function paramExercise(rows: Row[], ask: "x" | "y"): Exercise | null {
   };
 }
 const BACK_T: Msg = [
-  tx("Sign of the t-term", "Vorzeichen vom t-Term"),
+  tx("Sign of the t-term", "Vorzeichen des t-Terms"),
   tx(
     "Nearly! When the $t$-term moves across the equals sign in the middle row, its sign has to change.",
     "Fast! Wenn der $t$-Term in der mittleren Zeile über das Gleichheitszeichen wandert, muss sich sein Vorzeichen ändern.",
@@ -631,7 +665,7 @@ function parabolaExercise(P: [number, number][], coef: Triple): Exercise | null 
     ),
     answer,
     hint: tx(
-      "Put each point into $f(x) = ax^2 + bx + c$: that gives three equations for $a$, $b$, $c$. Solve them with the Gauss algorithm.",
+      "Put each point into $f(x) = ax^2 + bx + c$: that gives three equations for $a$, $b$, $c$. Solve them by Gaussian elimination.",
       "Setz jeden Punkt in $f(x) = ax^2 + bx + c$ ein: Das ergibt drei Gleichungen für $a$, $b$, $c$. Löse sie mit dem Gauß-Verfahren.",
     ),
     solution: frames,
@@ -642,11 +676,15 @@ function parabolaExercise(P: [number, number][], coef: Triple): Exercise | null 
 // ---------------------------------------------------------------------------
 // Word problem: three prices
 
-type Shop = { defs: Text; items: { en: string; de: string }[]; unit: Text; words: [[string, string], [string, string]][]; say: (en: string, de: string, total: number) => Text; ask: (i: number) => Text; answer: (i: number, v: number) => Text };
+type Shop = { defs: Text; ordered: boolean; items: { en: string; de: string }[]; unit: Text; words: [[string, string], [string, string]][]; say: (en: string, de: string, total: number) => Text; ask: (i: number) => Text; answer: (i: number, v: number) => Text };
 
 const SHOPS: Shop[] = [
   {
-    defs: tx(`x ": notebook" \\quad y ": pen" \\quad z ": ruler"`, `x ": Heft" \\quad y ": Stift" \\quad z ": Lineal"`),
+    defs: tx(
+      `x ": price of a notebook" \\\\ y ": price of a pen" \\\\ z ": price of a ruler"`,
+      `x ": Preis eines Hefts" \\\\ y ": Preis eines Stifts" \\\\ z ": Preis eines Lineals"`,
+    ),
+    ordered: false,
     items: [{ en: "a notebook", de: "ein Heft" }, { en: "a pen", de: "einen Stift" }, { en: "a ruler", de: "ein Lineal" }],
     unit: "€",
     words: [
@@ -668,7 +706,12 @@ const SHOPS: Shop[] = [
     answer: (i, v) => [tx(`One notebook costs ${v} €.`, `Ein Heft kostet ${v} €.`), tx(`One pen costs ${v} €.`, `Ein Stift kostet ${v} €.`), tx(`One ruler costs ${v} €.`, `Ein Lineal kostet ${v} €.`)][i],
   },
   {
-    defs: tx(`x ": adult" \\quad y ": student" \\quad z ": child"`, `x ": Erwachsene" \\quad y ": Schüler" \\quad z ": Kinder"`),
+    defs: tx(
+      `x ": price of an adult ticket" \\\\ y ": price of a student ticket" \\\\ z ": price of a child ticket"`,
+      `x ": Preis einer Erwachsenenkarte" \\\\ y ": Preis einer Schülerkarte" \\\\ z ": Preis einer Kinderkarte"`,
+    ),
+    // Tickets: adults pay most, children least.
+    ordered: true,
     items: [{ en: "an adult ticket", de: "eine Erwachsenenkarte" }, { en: "a student ticket", de: "eine Schülerkarte" }, { en: "a child ticket", de: "eine Kinderkarte" }],
     unit: "€",
     words: [
@@ -685,7 +728,7 @@ const SHOPS: Shop[] = [
         ["Kind", "Kinder"],
       ],
     ],
-    say: (en, de, total) => tx(`${en} pay ${total} € for the zoo.`, `${de} zahlen ${total} € für den Zoo.`),
+    say: (en, de, total) => tx(`${en} pay ${total} € to get into the zoo.`, `${de} zahlen im Zoo ${total} € Eintritt.`),
     ask: (i) => [tx("What does an adult ticket cost?", "Was kostet eine Erwachsenenkarte?"), tx("What does a student ticket cost?", "Was kostet eine Schülerkarte?"), tx("What does a child ticket cost?", "Was kostet eine Kinderkarte?")][i],
     answer: (i, v) => [tx(`An adult ticket costs ${v} €.`, `Eine Erwachsenenkarte kostet ${v} €.`), tx(`A student ticket costs ${v} €.`, `Eine Schülerkarte kostet ${v} €.`), tx(`A child ticket costs ${v} €.`, `Eine Kinderkarte kostet ${v} €.`)][i],
   },
@@ -722,7 +765,7 @@ function wordExercise(shop: Shop, counts: Triple[], prices: Triple, ask: number)
     text: joinText(...counts.map((n, k) => purchase(shop, n, rows[k].c)), shop.ask(ask)),
     answer: { kind: "number", value: v, unit: shop.unit },
     hint: tx(
-      "One letter per price, one equation per sentence. Then the Gauss algorithm.",
+      "One letter per price, one equation per sentence. Then Gaussian elimination.",
       "Ein Buchstabe pro Preis, eine Gleichung pro Satz. Dann das Gauß-Verfahren.",
     ),
     solution: frames,
@@ -849,7 +892,12 @@ function parabolaTask(rng: Rng): Exercise {
 function wordTask(rng: Rng): Exercise {
   const shop = rng.pick(SHOPS);
   for (;;) {
-    const prices: Triple = [rng.int(2, 9), rng.int(1, 6), rng.int(1, 5)];
+    let prices: Triple;
+    if (shop.ordered) {
+      const adult = rng.int(6, 10);
+      const student = rng.int(4, adult - 1);
+      prices = [adult, student, rng.int(2, student - 1)];
+    } else prices = [rng.int(2, 9), rng.int(1, 6), rng.int(1, 5)];
     if (new Set(prices).size < 3) continue;
     const counts: Triple[] = [
       [1, rng.int(1, 3), rng.int(1, 3)],
@@ -912,7 +960,7 @@ const introFrames: Frame[] = (() => {
     {
       math: stack(STEP0.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
       note: tx(
-        "Here is a **different** system with the same solution. It's easy because it has **step form** (Stufenform): the last row only has $z$, the middle one only $y$ and $z$.",
+        "Here is a **different** system with the same solution. It's easy because it is in **echelon form** (triangular form): the last row only has $z$, the middle one only $y$ and $z$.",
         "Hier ein **anderes** LGS mit derselben Lösung. Es ist leicht, weil es **Stufenform** hat: Die letzte Zeile enthält nur $z$, die mittlere nur $y$ und $z$.",
       ),
     },
@@ -920,7 +968,7 @@ const introFrames: Frame[] = (() => {
     {
       math: tripleSrc(SOL0),
       note: tx(
-        "Solving from the bottom up is called **back substitution** (Rückwärtseinsetzen). $L = \\{ (1 | 2 | 3) \\}$, the same as for the first system. Next: how to bring the first system into step form.",
+        "Solving from the bottom up is called **back substitution** (Rückwärtseinsetzen). $L = \\{ (1 | 2 | 3) \\}$, the same as for the first system. Next: how to bring the first system into echelon form.",
         "Von unten nach oben auflösen heißt **Rückwärtseinsetzen**. $L = \\{ (1 | 2 | 3) \\}$, wie beim ersten LGS. Gleich siehst du, wie du das erste LGS auf Stufenform bringst.",
       ),
     },
@@ -936,24 +984,23 @@ const gauss1Frames: Frame[] = (() => {
     {
       math: stack(S0.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
       note: tx(
-        "No step form yet. The **Gauss algorithm** gets there with moves that don't change the solutions: multiply an equation by a number $≠ 0$, and add a multiple of one equation to another.",
+        "Not in echelon form yet. **Gaussian elimination** (the Gauss algorithm) gets there with moves that don't change the solutions: multiply an equation by a number $≠ 0$, and add a multiple of one equation to another.",
         "Noch keine Stufenform. Das **Gauß-Verfahren** bringt das LGS dorthin, mit Umformungen, die die Lösungen nicht ändern: eine Gleichung mit einer Zahl $≠ 0$ multiplizieren und ein Vielfaches einer Gleichung zu einer anderen addieren.",
       ),
     },
     {
-      math: stack([fullRowSrc(II, "2", "(II)"), fullRowSrc(scale(I, -2), "m", "(−2 · I)")]),
+      math: stack([calcRowSrc(II, "2", "blob"), calcRowSrc(scale(I, -2), "m", "group")]),
       note: tx(
-        "To eliminate $x$ from (II): add $-2$ times (I). Multiply **every** term of (I) by $-2$, the right side too.",
-        "Um $x$ aus (II) zu eliminieren, addierst du das $(-2)$-Fache von (I). Multipliziere **jeden** Term von (I) mit $-2$, auch die rechte Seite.",
+        "To eliminate $x$ from (II), add $-2$ times (I). At the top, in purple: (II). Below it: $-2 \\cdot$ (I), with **every** term of (I) multiplied by $-2$, the right side too.",
+        "Um $x$ aus (II) zu eliminieren, addierst du das $(-2)$-Fache von (I). Oben in Lila: (II). Darunter: $-2 \\cdot$ (I), also **jeder** Term von (I) mal $-2$, auch die rechte Seite.",
       ),
     },
     {
-      math: stack([fullRowSrc(II, "2", "(II)"), fullRowSrc(scale(I, -2), "m", "(−2 · I)"), fullRowSrc(IIa, "2a", "(IIa)")]),
+      math: stack([calcRowSrc(II, "2", "blob"), calcRowSrc(scale(I, -2), "m", "group"), calcRowSrc(IIa, "2a", "green")]),
       note: tx(
-        "Add column by column: $2x - 2x = 0$, $-y - 2y = -3y$, $z - 2z = -z$ and $3 - 12 = -9$. The $x$ is gone!",
-        "Addiere spaltenweise: $2x - 2x = 0$, $-y - 2y = -3y$, $z - 2z = -z$ und $3 - 12 = -9$. Das $x$ ist weg!",
+        "Add column by column: $2x - 2x = 0$, $-y - 2y = -3y$, $z - 2z = -z$ and $3 - 12 = -9$. The $x$ is gone! The green row is the new equation (IIa).",
+        "Addiere spaltenweise: $2x - 2x = 0$, $-y - 2y = -3y$, $z - 2z = -z$ und $3 - 12 = -9$. Das $x$ ist weg! Die grüne Zeile ist die neue Gleichung (IIa).",
       ),
-      highlight: ["L2a"],
     },
     {
       math: stack([rowSrc(I, "1", "I"), rowSrc(IIa, "2a", "IIa", XYZ, "blob"), rowSrc(III, "3", "III")]),
@@ -990,7 +1037,7 @@ const gauss2Frames: Frame[] = (() => {
     {
       math: stack(final.map((r, i) => rowSrc(r, IDS[i], labels[i], XYZ, i === 2 ? "blob" : "group"))),
       note: tx(
-        "**(IIIb) = 3 · IIIa + IIa**: $3y - 3y = 0$, $-6z - z = -7z$, $-12 - 9 = -21$. **Step form!**",
+        "**(IIIb) = 3 · IIIa + IIa**: $3y - 3y = 0$, $-6z - z = -7z$, $-12 - 9 = -21$. **Echelon form!**",
         "**(IIIb) = 3 · IIIa + IIa**: $3y - 3y = 0$, $-6z - z = -7z$, $-12 - 9 = -21$. **Stufenform!**",
       ),
     },
@@ -1009,7 +1056,7 @@ const specialFrames: Frame[] = (() => {
   return [
     {
       math: stack(NONE.map((r, i) => rowSrc(r, IDS[i], LABELS[i]))),
-      note: tx("First system. Gauss as usual: **II − I**, **III − 2 · I**, then **IIIa − IIa**.", "Erstes LGS. Gauß wie immer: **II − I**, **III − 2 · I**, dann **IIIa − IIa**."),
+      note: tx("First system. Eliminate as usual: **II − I**, **III − 2 · I**, then **IIIa − IIa**.", "Erstes LGS. Gauß wie immer: **II − I**, **III − 2 · I**, dann **IIIa − IIa**."),
     },
     {
       math: show(gn, "red"),
@@ -1063,18 +1110,18 @@ const paraFrames: Frame[] = (() => {
 export const level3: LevelLesson = {
   summary: [
     {
-      title: tx("Step form and back substitution", "Stufenform und Rückwärtseinsetzen"),
+      title: tx("Echelon form and back substitution", "Stufenform und Rückwärtseinsetzen"),
       body: tx(
-        "In step form each row has one unknown fewer. Solve from the bottom up: $z$, then $y$, then $x$.",
+        "In echelon form each row has one unknown fewer. Solve from the bottom up: $z$, then $y$, then $x$.",
         "In Stufenform hat jede Zeile eine Unbekannte weniger. Löse von unten nach oben: erst $z$, dann $y$, dann $x$.",
       ),
       examples: ['"(I)" \\; x + y + z = 6 \\\\ "(II)" \\; y + 2z = 8 \\\\ "(III)" \\; 3z = 9', "z = 3 , \\; y = 2 , \\; x = 1"],
       tone: "rule",
     },
     {
-      title: tx("The Gauss algorithm", "Das Gauß-Verfahren"),
+      title: tx("Gaussian elimination", "Das Gauß-Verfahren"),
       body: tx(
-        "Use (I) to eliminate $x$ from (II) and (III). Then use (IIa) to eliminate $y$ from (IIIa). Step form reached: back substitution.",
+        "Use (I) to eliminate $x$ from (II) and (III). Then use (IIa) to eliminate $y$ from (IIIa). Echelon form reached: back substitution.",
         "Eliminiere mit (I) das $x$ aus (II) und (III). Eliminiere dann mit (IIa) das $y$ aus (IIIa). Stufenform erreicht: rückwärts einsetzen.",
       ),
       examples: ["\\text{IIa} = \\text{II} - 2 \\cdot \\text{I} , \\quad \\text{IIIa} = \\text{III} - \\text{I}", "\\text{IIIb} = 3 \\cdot \\text{IIIa} + \\text{IIa}"],
@@ -1119,7 +1166,7 @@ export const level3: LevelLesson = {
   lesson: [
     {
       type: "explain",
-      title: tx("Three unknowns, step form", "Drei Unbekannte, Stufenform"),
+      title: tx("Three unknowns, echelon form", "Drei Unbekannte, Stufenform"),
       blob: tx("Three unknowns? No problem, we just go step by step!", "Drei Unbekannte? Kein Problem, wir gehen Stufe für Stufe vor!"),
       body: tx(
         "Each equation with three unknowns describes a plane in space. The solution of the system is what all three have in common.",
@@ -1134,7 +1181,7 @@ export const level3: LevelLesson = {
     },
     {
       type: "explain",
-      title: tx("The Gauss algorithm: eliminate x", "Das Gauß-Verfahren: x eliminieren"),
+      title: tx("Gaussian elimination: eliminate x", "Das Gauß-Verfahren: x eliminieren"),
       blob: tx("Make the x disappear from the lower rows. Watch the columns!", "Lass das x aus den unteren Zeilen verschwinden. Achte auf die Spalten!"),
       body: tx(
         "Carl Friedrich Gauss used this method about 200 years ago. Step 1: use (I) to eliminate $x$ from (II) and (III).",
@@ -1144,7 +1191,7 @@ export const level3: LevelLesson = {
     },
     {
       type: "explain",
-      title: tx("The Gauss algorithm: step form", "Das Gauß-Verfahren: Stufenform"),
+      title: tx("Gaussian elimination: echelon form", "Das Gauß-Verfahren: Stufenform"),
       blob: tx("One more zero, then it's downhill from there!", "Noch eine Null, dann geht's bergab!"),
       body: tx(
         "Step 2: use the new second row to eliminate $y$ from the third. Then back substitution, and finally a check in an original equation.",
@@ -1154,10 +1201,12 @@ export const level3: LevelLesson = {
     },
     {
       type: "widget",
-      title: tx("The Gauss workshop", "Die Gauß-Werkstatt"),
+      // The link was made under the old title.
+      id: "the-gauss-workshop",
+      title: tx("The elimination workshop", "Die Gauß-Werkstatt"),
       blob: tx("Your turn at the controls: make the dashed cells zero!", "Jetzt steuerst du: Mach die gestrichelten Felder zu null!"),
       body: tx(
-        "Pick a row, combine it with another one and choose the factors. When the three cells below the diagonal are zero, the system has step form. Try all four systems: two of them hold a surprise.",
+        "Pick a row, combine it with another one and choose the factors. When the three cells below the diagonal are zero, the system is in echelon form. Try all four systems: two of them hold a surprise.",
         "Wähl eine Zeile, kombinier sie mit einer anderen und stell die Faktoren ein. Sind die drei Felder unter der Diagonale null, hat das LGS Stufenform. Probier alle vier LGS aus: Zwei davon haben eine Überraschung.",
       ),
       widget: GaussLab,
