@@ -12,12 +12,14 @@ import { useText } from "@/i18n/useText";
 import type { LearnDay } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
 import { studyHref, topicHref } from "@/learn/catalog";
+import { showItems } from "@/learn/showcase";
 import { useTopic } from "@/learn/topics";
 import type { Feedback, LessonStep, Level } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent } from "./ExerciseCard";
 import { MathView } from "./MathView";
 import { Inline, Rich } from "./Rich";
+import { ShareVisual } from "./ShareVisual";
 import { SessionEnd, StudyButton, StudyTopBar } from "./StudyChrome";
 import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
@@ -71,6 +73,8 @@ export function LessonPlayer({
 
   const step = steps[index];
   const frames = step.type === "explain" ? (step.frames ?? []) : [];
+  // Pictures and widgets have a public page that can be shared from here.
+  const shared = showItems(topic).find((i) => i.level === level && i.step === index);
   const exitHref = topicHref(topic, level);
   const nextLevel = ([2, 3] as Level[]).find((l) => l > level && topic.lessons[l] && topic.levels[l].minutes);
   const title = `${names.title} · ${t.levels[level]}`;
@@ -231,7 +235,10 @@ export function LessonPlayer({
                 </>
               ) : (
                 <>
-                  <h1 className="font-display text-[26px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>
+                  <div className="flex items-start gap-3">
+                    <h1 className="min-w-0 flex-1 font-display text-[26px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>
+                    {shared && <ShareVisual topic={topic} level={level} id={shared.id} title={shared.title} className="mt-0.5" />}
+                  </div>
                   {step.body && <Rich text={step.body} className="max-w-[700px] text-[16px] leading-relaxed text-ink-2" />}
 
                   {step.type === "widget" && (

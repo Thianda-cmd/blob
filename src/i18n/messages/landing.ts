@@ -43,8 +43,8 @@ export const landingText = defineMessages({
     },
     learn: {
       kicker: "New · Learn with Blob",
-      title: "Maths and chemistry that finally click.",
-      body: "Twelve topics each, straight from your lessons. Blob explains everything step by step, spots what went wrong in your answers, and you practise until it sticks.",
+      title: "Maths, chemistry and biology that finally click.",
+      body: "Topics straight from your lessons, each in three levels from beginner to expert. Blob explains everything step by step, spots what went wrong in your answers, and you practise until it sticks.",
       demo: {
         label: "Live demo: removing brackets, step by step",
         solution: "Worked solution",
@@ -71,9 +71,10 @@ export const landingText = defineMessages({
       ],
       visuals: { level: "Level 2", correct: "Correct!", grade: "Grade", good: "Good", rule: "Minus in front" },
       topics: {
-        title: "24 topics from class",
+        title: (n: number) => `${n} topics from class`,
         subjects: { maths: "Maths", chemistry: "Chemistry", biology: "Biology" },
-        body: { maths: "From brackets to the pq formula.", chemistry: "From atoms to alkanes.", biology: "From the cell to whole ecosystems, in three levels." },
+        body: { maths: "From negative numbers to probability, in three levels.", chemistry: "From atoms to alkanes.", biology: "From the cell to whole ecosystems, in three levels." },
+        gallery: "Browse the interactive pictures, no sign-in needed",
         minutes: (n: number) => `${n} min`,
       },
     },
@@ -202,8 +203,8 @@ export const landingText = defineMessages({
     },
     learn: {
       kicker: "Neu · Lernen mit Blob",
-      title: "Mathe und Chemie, bei denen es endlich Klick macht.",
-      body: "Je zwölf Themen direkt aus dem Unterricht. Blob erklärt dir alles Schritt für Schritt, merkt, wo es in deiner Antwort hakt, und du übst, bis es sitzt.",
+      title: "Mathe, Chemie und Bio, bei denen es endlich Klick macht.",
+      body: "Themen direkt aus dem Unterricht, jedes in drei Stufen vom Einsteiger bis zum Experten. Blob erklärt dir alles Schritt für Schritt, merkt, wo es in deiner Antwort hakt, und du übst, bis es sitzt.",
       demo: {
         label: "Live-Demo: Klammern auflösen, Schritt für Schritt",
         solution: "Lösungsweg",
@@ -230,9 +231,10 @@ export const landingText = defineMessages({
       ],
       visuals: { level: "Stufe 2", correct: "Richtig!", grade: "Note", good: "Gut", rule: "Minus davor" },
       topics: {
-        title: "24 Themen aus dem Unterricht",
+        title: (n) => `${n} Themen aus dem Unterricht`,
         subjects: { maths: "Mathe", chemistry: "Chemie", biology: "Biologie" },
-        body: { maths: "Von der Klammer bis zur pq-Formel.", chemistry: "Vom Atombau bis zu den Alkanen.", biology: "Von der Zelle bis zum Ökosystem, in drei Stufen." },
+        body: { maths: "Von negativen Zahlen bis zur Wahrscheinlichkeit, in drei Stufen.", chemistry: "Vom Atombau bis zu den Alkanen.", biology: "Von der Zelle bis zum Ökosystem, in drei Stufen." },
+        gallery: "Interaktive Grafiken ansehen, ohne Anmeldung",
         minutes: (n) => `${n} Min.`,
       },
     },

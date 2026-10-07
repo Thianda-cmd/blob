@@ -1,23 +1,27 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, Printer, Timer } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, ImageIcon, MousePointerClick, Printer, Timer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
+import { showText } from "@/i18n/messages/show";
 import { useText } from "@/i18n/useText";
 import { type LearnDay, masteryLabel, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { studyHref, SUBJECTS, topicHref } from "@/learn/catalog";
 import { levelProgress, type LevelRows, suggestedLevel } from "@/learn/levels";
+import { showHref, showItems, showTopicHref } from "@/learn/showcase";
 import { useTopic } from "@/learn/topics";
 import { LEVELS, type Level, type SummaryBlock } from "@/learn/types";
 import { cn } from "@/lib/utils";
+import { LevelBars } from "./LevelBars";
 import { MathView } from "./MathView";
 import { Rich } from "./Rich";
 import { Ring } from "./Ring";
+import { ShareVisual } from "./ShareVisual";
 import { TopicGlyph } from "./TopicGlyph";
 import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
@@ -51,6 +55,8 @@ export function TopicView({
   const checks = content?.lesson.filter((s) => s.type === "check").length ?? 0;
   const summary = content?.summary ?? [];
   const tip = summary.find((b) => b.tone === "tip") ?? summary[0];
+  const s = useMessages(showText);
+  const shareable = meta.minutes ? showItems(topic).filter((i) => i.level === level) : [];
 
   function choose(l: Level) {
     setLevel(l);
@@ -191,6 +197,47 @@ export function TopicView({
             />
           </div>
 
+          {shareable.length > 0 && (
+            <section className="mt-8 print:hidden" aria-labelledby="topic-show">
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+                <div className="min-w-0">
+                  <h2 id="topic-show" className="font-display text-[19px] font-semibold tracking-[-0.01em]">
+                    {s.sectionTitle}
+                  </h2>
+                  <p className="max-w-[640px] text-[13px] text-ink-3">{s.sectionText}</p>
+                </div>
+                <Link href={showTopicHref(topic)} className="flex items-center gap-1 text-[13px] font-medium text-blob-ink hover:underline">
+                  {s.allPictures} <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+              <div key={level} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {shareable.map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(i, 8) * 0.03 }}
+                    className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-raised py-1.5 pl-3 pr-1.5 shadow-card"
+                  >
+                    <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
+                      {item.kind === "widget" ? <MousePointerClick className="size-3.5" /> : <ImageIcon className="size-3.5" />}
+                    </span>
+                    <a
+                      href={showHref(topic, level, item.id)}
+                      target="_blank"
+                      rel="noopener"
+                      aria-label={s.openPublic(tt(item.title))}
+                      className="min-w-0 flex-1 truncate text-[14px] font-medium hover:text-blob-ink"
+                    >
+                      {tt(item.title)}
+                    </a>
+                    <ShareVisual topic={topic} level={level} id={item.id} title={item.title} compact />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mt-10">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -227,16 +274,6 @@ export function TopicView({
   );
 }
 
-/** Three little bars, filled up to the level: one for beginner, three for expert. */
-export function LevelBars({ level, className }: { level: Level; className?: string }) {
-  return (
-    <span className={cn("flex items-end gap-[2px]", className)} aria-hidden>
-      {LEVELS.map((l) => (
-        <span key={l} className={cn("w-[3px] rounded-full", l <= level ? "bg-current" : "bg-current opacity-25")} style={{ height: 4 + l * 3 }} />
-      ))}
-    </span>
-  );
-}
 
 function LevelTab({
   level,

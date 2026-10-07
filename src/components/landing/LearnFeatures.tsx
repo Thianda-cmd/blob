@@ -1,13 +1,13 @@
 "use client";
 
-import { Flame } from "lucide-react";
+import { ArrowRight, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
-import { firstLessonMinutes, subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
+import { CATALOG, firstLessonMinutes, subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
 import { TopicGlyph } from "@/learn/components/TopicGlyph";
 import { cn } from "@/lib/utils";
@@ -164,7 +164,7 @@ export function TopicGrid() {
     <div className="mt-14">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em]">{t.title}</h3>
+          <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em]">{t.title(CATALOG.length)}</h3>
           <p className="text-[13.5px] text-ink-3">{t.body[subject]}</p>
         </div>
         <div className="flex rounded-xl border border-line bg-raised p-1 shadow-card" role="tablist">
@@ -209,6 +209,9 @@ export function TopicGrid() {
           ))}
         </AnimatePresence>
       </ul>
+      <Link href="/show" className="mt-5 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-blob-ink hover:underline">
+        {t.gallery} <ArrowRight className="size-3.5" />
+      </Link>
     </div>
   );
 }
