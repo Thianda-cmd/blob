@@ -6,7 +6,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
-import { clean, D, E, fixedChoice, lcm, mb, mistakesFor, NAMES, numAns, txs, weighted, type Say } from "./kit";
+import { clean, D, E, fixedChoice, hk, lcm, mb, mistakesFor, NAMES, numAns, txs, weighted, type Say } from "./kit";
 import { MapScale } from "./MapScale";
 import { MeanLevel } from "./MeanLevel";
 import { TariffLab } from "./TariffLab";
@@ -437,7 +437,7 @@ const findScale: Tpl = (rng) => {
       { math: mb((s) => `${d}#a "cm"#ua \\to#ar ${inKm ? `${s.m(m / 1000, "r")} "km"#ur` : `${s.m(m, "r")} "m"#ur`}`), note: txs(() => `**Given:** ${d} cm on the map. **Wanted:** the scale 1 : ?`, () => `**Gegeben:** ${d} cm auf der Karte. **Gesucht:** der Maßstab 1 : ?`) },
       { math: mb((s) => `${d}#a "cm"#ua \\to#ar ${s.m(cm, "r")} "cm"#ur`), note: txs(() => `Same unit on both sides: ${inKm ? "1 km = 100 000 cm" : "1 m = 100 cm"}.`, () => `Auf beiden Seiten dieselbe Einheit: ${inKm ? "1 km = 100.000 cm" : "1 m = 100 cm"}.`) },
       { math: mb((s) => `\\blob{${d}#a :#o1 ${d}#o1n} "cm"#ua \\to#ar \\blob{${s.m(cm, "r")} :#o2 ${d}#o2n} "cm"#ur`), note: txs(() => `Down to **1** cm on the map: divide both sides by ${d}.`, () => `Auf **1** cm Karte zurückrechnen: Teile beide Seiten durch ${d}.`) },
-      { math: mb((s) => `1#a "cm"#ua \\to#ar ${s.m(n, "r")} "cm"#ur`), highlight: ["r"], note: txs(() => `**Answer:** The scale is ${scaleProse(n)}.`, () => `**Antwort:** Der Maßstab ist ${scaleProse(n)}.`) },
+      { math: mb((s) => `1#a "cm"#ua \\to#ar ${s.m(n, "r")} "cm"#ur`), highlight: hk("r"), note: txs(() => `**Answer:** The scale is ${scaleProse(n)}.`, () => `**Antwort:** Der Maßstab ist ${scaleProse(n)}.`) },
     ],
   };
 };
@@ -1062,11 +1062,11 @@ const scaleFrames: Frame[] = [
   },
   {
     math: mb((s) => `1#a "cm"#ua \\to#ar ${s.m(25000, "b")} "cm"#ub`),
-    highlight: ["b"],
+    highlight: hk("b"),
     note: tx("Divide both sides by 2: 1 cm stands for 25 000 cm. The scale is **1 : 25 000**.", "Beide Seiten durch 2: 1 cm steht für 25.000 cm. Der Maßstab ist **1 : 25 000**."),
   },
   {
-    math: mb((s) => `4#a "cm"#ua \\to#ar 4 :#op 5 =#eq ${s.m(0.8, "b")} "cm"#ub`),
+    math: mb((s) => `4#a "cm"#ua :#op 5#k =#eq ${s.m(0.8, "b")} "cm"#ub`),
     highlight: ["b", "ub"],
     note: tx(
       "**Enlargements** are written the other way round: **5 : 1** means the photo is 5 times as big as reality. A beetle that is 4 cm long on the photo is 4 : 5 = 0.8 cm = 8 mm long in reality.",

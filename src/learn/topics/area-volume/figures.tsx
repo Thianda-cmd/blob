@@ -41,7 +41,7 @@ export type FigureSpec =
   | { kind: "house"; w: number; h: number; t: number; lw: Text; lh: Text; lt: Text }
   | { kind: "cuboid"; a: number; b: number; c: number; la?: Text; lb?: Text; lc?: Text; cubes?: boolean }
   | { kind: "net"; a: number; b: number; c: number; la?: Text; lb?: Text; lc?: Text }
-  | { kind: "prism"; g: number; ht: number; px: number; L: number; lg?: Text; lht?: Text; lL?: Text; ls?: Text; sideS?: number }
+  | { kind: "prism"; g: number; ht: number; px: number; L: number; lg?: Text; lht?: Text; lL?: Text; ls?: Text; sideS?: number; lsInside?: boolean }
   | { kind: "cyl"; r: number; h: number; lr?: Text; lh?: Text; diameter?: boolean }
   | { kind: "pyr"; a: number; b?: number; h: number; la?: Text; lb?: Text; lh?: Text; lhs?: Text; ls?: Text; tri?: boolean; hideH?: boolean }
   | { kind: "cone"; r: number; h: number; lr?: Text; lh?: Text; ls?: Text; hideH?: boolean; diameter?: boolean }
@@ -481,7 +481,9 @@ function build(s: FigureSpec): Prim[] {
       if (s.lL) out.push({ t: "label", text: s.lL, at: proj([g, L / 2, 0]), dir: DR });
       if (s.ls) {
         const side = s.sideS === 1 ? ([[g, 0], [px, ht]] as [P, P]) : ([[0, 0], [px, ht]] as [P, P]);
-        out.push({ t: "label", text: s.ls, at: mid(side[0], side[1]), dir: outward(side[0], side[1], [g / 2, ht / 3]) });
+        // Inside the front triangle when the outside of that side is covered by the faces behind it.
+        const out1 = outward(side[0], side[1], [g / 2, ht / 3]);
+        out.push({ t: "label", text: s.ls, at: mid(side[0], side[1]), dir: s.lsInside ? mul(out1, -1) : out1, ...(s.lsInside ? { dist: 3 } : {}) });
       }
       return out;
     }

@@ -18,7 +18,7 @@ const dec = (s: string): Text => {
 };
 
 /** "$-x + 9$" as a choice option or inline maths, decimal comma in German. */
-const inline = (items: LN[]): Text => txMap((_, l) => `$${src(items, l, false)}$`);
+const inline = (items: LN[]): Text => txMap((_, l) => `$${src(items, l, false, true)}$`);
 
 const SIMPLIFY = tx("Remove the brackets and simplify", "Löse die Klammern auf und fasse zusammen");
 
@@ -347,11 +347,12 @@ function mistakeTask(rng: Rng): Exercise {
     const keys = rng.shuffle([slip, ...rng.shuffle(pool).slice(0, 3)]);
     const options = keys.map((k) => MSLIP_OPTION[k]);
     const name = rng.pick(NAMES);
+    // One step per line, as in an exercise book: on a phone the break never lands in the middle of a step.
     const work = (s1: LN[], s2: LN[], mark: 0 | 1 | 2) =>
       txMap((_, l) => {
-        const a = src(s1, l, false);
-        const c = src(s2, l, false);
-        return `${src(items, l, false)} = ${mark === 1 ? `\\red{${a}}` : a} = ${mark === 2 ? `\\red{${c}}` : c}`;
+        const a = src(s1, l, false, true);
+        const c = src(s2, l, false, true);
+        return `${src(items, l, false, true)} \\\\ = ${mark === 1 ? `\\red{${a}}` : a} \\\\ = ${mark === 2 ? `\\red{${c}}` : c}`;
       });
     const flat = [items[0], ...termsOf(g.items).map((x) => ({ ...x, c: round(x.c * g.f) }))];
     const why: Record<MSlip, Text> = {
@@ -399,9 +400,9 @@ function factorTask(rng: Rng): Exercise {
     const vc = a + f * bb;
     if (vc === 0) continue;
     const result: LT[] = [lt("r", vc, v), lt("s", f * c)];
-    const innerSrc = src([lt("b", bb, v), lt("c", c)], "en", false);
-    const resSrc = src(result, "en", false);
     const lead = src([lt("a", a, v)], "en", false);
+    // The term in front, the box and the bracket stay together on a phone: "3x ☐(4x − 5)".
+    const task = `\\group{${src([lt("a", a, v)], "en", false, true)} \\box{\\,?\\,} (${src([lt("b", bb, v), lt("c", c)], "en", false, true)})} = ${src(result, "en", false, true)}`;
     const mistakes: Mistake[] = [
       {
         when: { kind: "number", value: -f },
@@ -424,11 +425,11 @@ function factorTask(rng: Rng): Exercise {
     return {
       instruction: tx("Find the factor", "Finde den Faktor"),
       text: tx("Which factor, with its sign, belongs in the box?", "Welcher Faktor gehört mit Vorzeichen in das Kästchen?"),
-      math: `${lead} \\box{\\,?\\,} (${innerSrc}) = ${resSrc}`,
+      math: task,
       answer: { kind: "number", value: f },
       hint: tx("Start with the number on its own: the factor times the number in the bracket gives the number on the right.", "Fang mit der Zahl ohne Variable an: Faktor mal Zahl in der Klammer ergibt die Zahl rechts."),
       solution: [
-        { math: `${lead} \\box{\\,?\\,} (${innerSrc}) = ${resSrc}`, note: tx("The factor multiplies both terms in the bracket. Start with the number on its own.", "Der Faktor wird mit beiden Termen in der Klammer multipliziert. Fang mit der Zahl ohne Variable an.") },
+        { math: task, note: tx("The factor multiplies both terms in the bracket. Start with the number on its own.", "Der Faktor wird mit beiden Termen in der Klammer multipliziert. Fang mit der Zahl ohne Variable an.") },
         { math: `? \\cdot ${c < 0 ? `(${c})` : c} = ${f * c} \\quad \\Rightarrow \\quad ? = ${f}`, note: tx(`$${f} \\cdot ${c < 0 ? `(${c})` : c} = ${f * c}$, so the factor is $${f}$.`, `$${f} \\cdot ${c < 0 ? `(${c})` : c} = ${f * c}$, also ist der Faktor $${f}$.`) },
         {
           math: `${lead} + ${fs} \\cdot ${bb === 1 ? "" : bb}${v} = ${src([result[0]], "en", false)}`,

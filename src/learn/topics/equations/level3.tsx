@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { tx, type Text } from "@/i18n/text";
+import { resolveText, tx, txMap, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import {
@@ -10,6 +10,10 @@ import {
   absCasesSolve,
   absCasesSrc,
   absIneqFrames,
+  absIneqLinBars,
+  absIneqLinBounds,
+  absIneqLinFrames,
+  absIneqLinSrc,
   absIneqSet,
   absIneqSrc,
   absLinearFrames,
@@ -35,6 +39,7 @@ import {
   rootRootSrc,
   type AbsCases,
   type AbsIneq,
+  type AbsIneqLin,
   type RootQuad,
 } from "./build3";
 import { mapText } from "./model";
@@ -148,6 +153,66 @@ function absIneqExercise(t: AbsIneq, order: number[]): Exercise {
   };
 }
 
+/** |ux + b| < c (or ≤, >, ≥) with u ≥ 2: which solution set fits? */
+function absIneqLinExercise(t: AbsIneqLin, order: number[]): Exercise {
+  const { u, b, c, rel } = t;
+  const inner = rel === "<" || rel === "≤";
+  const closed = rel === "≤" || rel === "≥";
+  const other: AbsIneq["rel"] = inner ? (closed ? "≥" : ">") : closed ? "≤" : "<";
+  const { lo, hi } = absIneqLinBounds(t);
+  const R = { "<": "<", "≤": "\\le", ">": ">", "≥": "\\ge" }[rel];
+  const inside = lin(u, b);
+  const ux = lin(u, 0);
+  const base: Text[] = [absIneqSet(lo, hi, rel), absIneqSet(lo, hi, other), absIneqSet(-c - b, c - b, rel), `L = \\{ x \\,|\\, x ${R} ${hi} \\}`];
+  const options = order.map((i) => mapText(base[i], (s) => `$${s}$`));
+  const at = (i: number) => order.indexOf(i);
+  const mistakes: Mistake[] = [
+    {
+      when: { kind: "choice", options, correct: at(1) },
+      title: inner ? tx("Inside, not outside", "Innen, nicht außen") : tx("Outside, not inside", "Außen, nicht innen"),
+      say: inner
+        ? tx(
+            `$|${inside}| ${R} ${c}$ means the inside is **close** to $0$: between $-${c}$ and $${c}$. That gives one stretch, not the two outer parts.`,
+            `$|${inside}| ${R} ${c}$ heißt: Das Innere liegt **nah** bei $0$, zwischen $-${c}$ und $${c}$. Das ergibt eine Strecke, nicht die beiden äußeren Teile.`,
+          )
+        : tx(
+            `$|${inside}| ${R} ${c}$ means the inside is **far** from $0$: below $-${c}$ or above $${c}$. That gives the two outer parts, not the stretch in between.`,
+            `$|${inside}| ${R} ${c}$ heißt: Das Innere liegt **weit weg** von $0$, unter $-${c}$ oder über $${c}$. Das ergibt die beiden äußeren Teile, nicht die Strecke dazwischen.`,
+          ),
+    },
+    {
+      when: { kind: "choice", options, correct: at(2) },
+      title: tx(`Not divided by ${u}`, `Nicht durch ${u} geteilt`),
+      say: tx(
+        `Nearly! Those are the bounds for $${ux}$, not for $x$. Divide every part by $${u}$ as well.`,
+        `Fast! Das sind die Grenzen für $${ux}$, nicht für $x$. Teile noch jeden Teil durch $${u}$.`,
+      ),
+      close: true,
+    },
+    {
+      when: { kind: "choice", options, correct: at(3) },
+      title: tx("Only one side", "Nur eine Seite"),
+      say: inner
+        ? tx(
+            `That's only half of it. The inside also has to stay above $-${c}$, so there's a second boundary at $${lo}$.`,
+            `Das ist nur die halbe Miete. Das Innere muss auch über $-${c}$ bleiben, es gibt also eine zweite Grenze bei $${lo}$.`,
+          )
+        : tx(
+            `That's only half of it. The inside can also be below $-${c}$, so the numbers below $${lo}$ belong to it too.`,
+            `Das ist nur die halbe Miete. Das Innere kann auch unter $-${c}$ liegen, also gehören die Zahlen unter $${lo}$ auch dazu.`,
+          ),
+    },
+  ];
+  return {
+    instruction: tx("Find the solution set of the inequality", "Bestimme die Lösungsmenge der Ungleichung"),
+    math: absIneqLinSrc(t),
+    answer: { kind: "choice", options, correct: at(0) },
+    hint: txMap((w, l) => `${w("Without the bars:", "Ohne Betragsstriche:")} $${resolveText(absIneqLinBars(t, -c, inside, c), l)}$. ${w("Then solve for $x$.", "Dann nach $x$ auflösen.")}`),
+    solution: absIneqLinFrames(t),
+    mistakes,
+  };
+}
+
 function rootQuadExercise(t: RootQuad, isolate?: number): Exercise {
   const { good } = rootQuadSolve(t);
   const math = isolate !== undefined ? `\\sqrt{${lin(t.u, t.a)}} ${isolate > 0 ? "+" : "-"} ${Math.abs(isolate)} = x` : rootQuadSrc(t);
@@ -207,9 +272,16 @@ function absTaskOnce(rng: Rng): Exercise | null {
 }
 
 function absIneqTask(rng: Rng): Exercise {
+  const rel = rng.pick(["<", "≤", ">", "≥"] as const);
+  if (rng.chance(0.45)) {
+    // |ux + b| ≷ c with whole-number boundaries: centre m, half-width s.
+    const u = rng.pick([2, 3]);
+    const m = rng.nonZero(-4, 4);
+    const s = rng.int(1, u === 2 ? 5 : 4);
+    return absIneqLinExercise({ u, b: -u * m, c: u * s, rel }, rng.shuffle([0, 1, 2, 3]));
+  }
   const a = rng.int(-5, 5);
   const r = rng.int(1, 6);
-  const rel = rng.pick(["<", "≤", ">", "≥"] as const);
   return absIneqExercise({ a, r, rel }, rng.shuffle([0, 1, 2, 3]));
 }
 
@@ -347,6 +419,8 @@ function distanceTask(rng: Rng): Exercise | null {
     "≥": [`at least ${r}`, `mindestens ${r}`],
   };
   const right = `|${lin(1, -a)}| ${R} ${r}`;
+  // |x − (−3)| = |x + 3|; a positive centre needs no brackets.
+  const dist = a < 0 ? `|x - (${a})| = |${lin(1, -a)}|` : `|${lin(1, -a)}|`;
   const base = [right, `|${lin(1, a)}| ${R} ${r}`, `|${lin(1, -a)}| ${wrongRel} ${r}`, `|${lin(1, -r)}| ${R} ${Math.abs(a)}`];
   if (new Set(base).size < 4) return null;
   const order = rng.shuffle([0, 1, 2, 3]);
@@ -357,8 +431,8 @@ function distanceTask(rng: Rng): Exercise | null {
       when: { kind: "choice", options, correct: at(1) },
       title: tx("Sign of the centre", "Vorzeichen der Mitte"),
       say: tx(
-        `Nearly! The distance from $${a}$ is $|x - (${a})| = |${lin(1, -a)}|$. Inside the bars you **subtract** the centre.`,
-        `Fast! Der Abstand von $${a}$ ist $|x - (${a})| = |${lin(1, -a)}|$. In den Strichen wird die Mitte **abgezogen**.`,
+        `Nearly! The distance from $${a}$ is $${dist}$. Inside the bars you **subtract** the centre.`,
+        `Fast! Der Abstand von $${a}$ ist $${dist}$. In den Strichen wird die Mitte **abgezogen**.`,
       ),
       close: true,
     },
@@ -380,9 +454,9 @@ function distanceTask(rng: Rng): Exercise | null {
     instruction: tx("Write it with an absolute value", "Schreib es mit einem Betrag"),
     text: tx(`All numbers $x$ whose distance from $${a}$ is ${phrase[kind][0]}.`, `Alle Zahlen $x$, deren Abstand von $${a}$ ${phrase[kind][1]} ist.`),
     answer: { kind: "choice", options, correct: at(0) },
-    hint: tx(`The distance between $x$ and $${a}$ is $|x - (${a})|$.`, `Der Abstand zwischen $x$ und $${a}$ ist $|x - (${a})|$.`),
+    hint: tx(`The distance between $x$ and $${a}$ is $|x - ${a < 0 ? `(${a})` : a}|$.`, `Der Abstand zwischen $x$ und $${a}$ ist $|x - ${a < 0 ? `(${a})` : a}|$.`),
     solution: [
-      { math: `|x - (${a})| = |${lin(1, -a)}|`, note: tx(`The distance between $x$ and $${a}$.`, `Der Abstand zwischen $x$ und $${a}$.`) },
+      { math: dist, note: tx(`The distance between $x$ and $${a}$.`, `Der Abstand zwischen $x$ und $${a}$.`) },
       { math: right, note: tx(`It should be ${phrase[kind][0]}.`, `Er soll ${phrase[kind][1]} sein.`) },
     ],
     mistakes,
@@ -393,7 +467,7 @@ function distanceTask(rng: Rng): Exercise | null {
 export function generate3(rng: Rng): Exercise {
   for (let tries = 0; tries < 80; tries++) {
     const r = rng.next();
-    const ex = r < 0.34 ? absTask(rng) : r < 0.5 ? absIneqTask(rng) : r < 0.78 ? rootTask(rng) : r < 0.89 ? probeTask(rng) : distanceTask(rng);
+    const ex = r < 0.32 ? absTask(rng) : r < 0.52 ? absIneqTask(rng) : r < 0.78 ? rootTask(rng) : r < 0.89 ? probeTask(rng) : distanceTask(rng);
     if (ex) return ex;
   }
   return absSimpleExercise(3, 5);
@@ -454,7 +528,7 @@ const noSolutionFrames: Frame[] = [
   },
   { math: "|2x - 1| = -3", note: tx("An absolute value is a distance, never negative: $L = \\{ \\}$.", "Ein Betrag ist ein Abstand, nie negativ: $L = \\{ \\}$.") },
   { math: "|x + 1| < 0", note: tx("A distance smaller than $0$? Never: $L = \\{ \\}$.", "Ein Abstand kleiner als $0$? Niemals: $L = \\{ \\}$.") },
-  { math: "|x - 5| \\ge 0", note: tx("A distance is always at least $0$, so this holds for every number: $L =$ ℝ.", "Ein Abstand ist immer mindestens $0$, das gilt also für jede Zahl: $L =$ ℝ.") },
+  { math: "|x - 5| \\ge 0", note: tx("A distance is always at least $0$, so this holds for every number: $L = \\R$.", "Ein Abstand ist immer mindestens $0$, das gilt also für jede Zahl: $L = \\R$.") },
   {
     math: "\\sqrt{x} = x - 6 \\;\\Rightarrow\\; x_1 = 9 \\quad x_2 = 4",
     note: tx(
@@ -502,7 +576,7 @@ export const level3: LevelLesson = {
     {
       title: tx("False solutions", "Scheinlösungen"),
       body: tx(
-        "Squaring can add solutions that don't work in the original equation. Only the check (Probe) tells you. A root is never negative.",
+        "Squaring can add solutions that don't work in the original equation. Only the check tells you. A root is never negative.",
         "Quadrieren kann Lösungen hinzufügen, die in der ursprünglichen Gleichung nicht passen. Nur die Probe verrät es. Eine Wurzel ist nie negativ.",
       ),
       examples: ["x = -1: \\; \\sqrt{4} = 2 \\ne -2"],
@@ -565,7 +639,7 @@ export const level3: LevelLesson = {
         "$|x - 2| < 3$: all numbers less than $3$ away from $2$, a stretch between two boundaries. $|x - 2| > 3$: everything outside that stretch.",
         "$|x - 2| < 3$: alle Zahlen, die weniger als $3$ von $2$ entfernt sind, eine Strecke zwischen zwei Grenzen. $|x - 2| > 3$: alles außerhalb dieser Strecke.",
       ),
-      visual: { component: DistancePicture as ComponentType<Record<string, unknown>>, props: { center: 2, radius: 3, rel: "<", from: -4, to: 8 } },
+      visual: { component: DistancePicture as ComponentType<Record<string, unknown>>, props: { center: 2, radius: 3, rel: "<", also: ">", from: -4, to: 8 } },
       frames: ineqIntro,
     },
     {

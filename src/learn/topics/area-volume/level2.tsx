@@ -524,8 +524,8 @@ const PRISM_O = tx("Find the surface area of the prism", "Berechne die Oberfläc
 function prismSurfaceTask(rng: Rng): Exercise {
   const unit = rng.pick(["cm", "m", "cm"]);
   const u2 = `${unit}²`;
-  // A lying prism whose base is a right triangle with whole sides.
-  const [a, b, c] = rng.pick(TRIPLES.filter((t) => t[0] <= 12 && t[1] <= 12));
+  // A lying prism whose base is a right triangle with whole sides, wider than tall (room for the labels).
+  const [a, b, c] = rng.pick(TRIPLES.filter((t) => t[0] <= 12 && t[0] > t[1]));
   const L = rng.int(3, 12);
   const G = (a * b) / 2;
   const per = a + b + c;
@@ -534,13 +534,13 @@ function prismSurfaceTask(rng: Rng): Exercise {
   const m = mistakeList(exact(O, u2, "O ="));
   m.add(G + M, tx("One base missing", "Eine Grundfläche fehlt"), tx("A prism has **two** triangles, front and back: $O = 2 \\cdot G + M$.", "Ein Prisma hat **zwei** Dreiecke, vorne und hinten: $O = 2 \\cdot G + M$."));
   m.add(M, tx("Only the rectangles", "Nur die Rechtecke"), tx("That's the lateral surface $M$. Add the two triangles too.", "Das ist der Mantel $M$. Dazu kommen noch die beiden Dreiecke."));
-  m.add(2 * a * b + M, tx("Triangle not halved", "Dreieck nicht halbiert"), tx("The base is a triangle: $G = \\frac{a \\cdot b}{2}$. Don't forget the halving.", "Die Grundfläche ist ein Dreieck: $G = \\frac{a \\cdot b}{2}$. Vergiss das Halbieren nicht."));
+  m.add(2 * a * b + M, tx("Triangle not halved", "Dreieck nicht halbiert"), tx("The base is a triangle: $G = \\frac{g \\cdot h}{2}$. Don't forget the halving.", "Die Grundfläche ist ein Dreieck: $G = \\frac{g \\cdot h}{2}$. Vergiss das Halbieren nicht."));
   m.add(2 * G + (a + b) * L, tx("Slanted face missing", "Schräge Fläche vergessen"), tx(`The lateral surface has **three** rectangles, one for each side of the triangle. The slanted one (${c} ${unit}) counts too.`, `Der Mantel hat **drei** Rechtecke, eins für jede Dreiecksseite. Das schräge (${c} ${unit}) zählt auch.`));
   m.add(G * L, tx("Volume instead of surface", "Volumen statt Oberfläche"), tx("$G \\cdot h_K$ is the volume. The surface is the two triangles plus the rectangles around them.", "$G \\cdot h_K$ ist das Volumen. Die Oberfläche sind die beiden Dreiecke plus die Rechtecke rundherum."));
   return {
     instruction: PRISM_O,
     text: tx("The prism lies on one of its faces. Its base is a right triangle.", "Das Prisma liegt auf einer Seitenfläche. Seine Grundfläche ist ein rechtwinkliges Dreieck."),
-    visual: figure({ kind: "prism", g: a, ht: b, px: 0, L, lg: `${a} ${unit}`, lht: `${b} ${unit}`, lL: `h_K = ${L} ${unit}`, ls: `${c} ${unit}`, sideS: 1 }),
+    visual: figure({ kind: "prism", g: a, ht: b, px: 0, L, lg: `${a} ${unit}`, lht: `${b} ${unit}`, lL: `h_K = ${L} ${unit}`, ls: `${c} ${unit}`, sideS: 1, lsInside: true }),
     answer: exact(O, u2, "O ="),
     hint: tx("Two triangles plus three rectangles: $O = 2 \\cdot G + M$ with $M = u \\cdot h_K$.", "Zwei Dreiecke plus drei Rechtecke: $O = 2 \\cdot G + M$ mit $M = u \\cdot h_K$."),
     solution: [

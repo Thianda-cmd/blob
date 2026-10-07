@@ -47,6 +47,9 @@ export const nt = (v: number, digits = 2): Text => both((l) => nf(v, l, digits))
  * A number in the display language: decimal comma in German, a thin space between
  * groups of three from five digits on ("25 000"). With a key, every group keeps one.
  */
+/** Highlight keys for keyed numbers: mn gives each digit group its own key (k, k_1, k_2 …). */
+export const hk = (...keys: string[]) => keys.flatMap((k) => [k, `${k}_1`, `${k}_2`, `${k}_3`]);
+
 export function mn(v: number, l: Locale, key?: string, digits = 2): string {
   const r = clean(v, digits);
   const [int, frac] = String(Math.abs(r)).split(".");

@@ -21,9 +21,22 @@ export const num = (x: number, l: Locale) => {
   return l === "de" ? s.replace(".", ",") : s;
 };
 
-/** Display source: sign `s<id>`, coefficient `c<id>`, variable `v<id>`; bracket sign `p<id>`, factor `f<id>`, brackets `b<id>`. */
-export function src(items: LN[], l: Locale = "en", keys = true): string {
+/**
+ * A sign glued to what follows it, as one `\group` that a line break can't split: "- 2(3x - 5)" never
+ * leaves "−" or "−2" at the end of a phone line. A sign that opens a group would look like the sign of
+ * a number, so a binary one (`first` false) gets the spacing of an operator by hand.
+ */
+export const glued = (sign: "" | "+" | "-", body: string, first: boolean) =>
+  !sign ? `\\group{${body}}` : first ? `\\group{${sign}${body}}` : `\\group{\\; ${sign} \\; ${body}}`;
+
+/**
+ * Display source: sign `s<id>`, coefficient `c<id>`, variable `v<id>`; bracket sign `p<id>`, factor `f<id>`, brackets `b<id>`.
+ * `glue` (only without keys, for task maths and options): a term like 3x, and a bracket with its sign and
+ * factor, each stay on one line, so a phone breaks only between them. Answer texts are never glued.
+ */
+export function src(items: LN[], l: Locale = "en", keys = true, glue = false): string {
   const k = (key: string) => (keys ? `#${key}` : "");
+  const tight = glue && !keys;
   if (items.length === 0) return "0";
   return items
     .map((it, i) => {
@@ -34,22 +47,26 @@ export function src(items: LN[], l: Locale = "en", keys = true): string {
         const abs = Math.abs(it.c);
         const coef = it.v && abs === 1 ? "" : `${num(abs, l)}${k(`c${it.id}`)}`;
         const v = it.v ? `${it.v}${k(`v${it.id}`)}` : "";
-        return `${sign}${[coef, v].filter(Boolean).join(keys ? " " : "")}`;
+        const body = [coef, v].filter(Boolean).join(keys ? " " : "");
+        if (tight && (first ? it.c < 0 || (coef && v) : coef && v)) return first ? glued(it.c < 0 ? "-" : "", body, true) : `${sign}\\group{${body}}`;
+        return `${sign}${body}`;
       }
       const sk = it.sk ?? `p${it.id}`;
       const sign = it.f < 0 ? `-${k(sk)}${first && !keys ? "" : " "}` : first ? "" : `+${k(sk)} `;
       const abs = Math.abs(it.f);
       const fac = abs === 1 ? "" : `${num(abs, l)}${k(`f${it.id}`)}${keys ? " " : ""}`;
       const close = it.open === "(" ? ")" : "]";
-      return `${sign}${fac}${it.open}${src(it.items, l, keys)}${close}${k(`b${it.id}`)}`;
+      const bracket = `${fac}${it.open}${src(it.items, l, keys, glue)}${close}${k(`b${it.id}`)}`;
+      if (tight && (fac || it.f < 0 || !first)) return glued(it.f < 0 ? "-" : first ? "" : "+", bracket, first);
+      return `${sign}${bracket}`;
     })
     .join(" ");
 }
 
-/** The same in both languages (only different when there are decimals). */
+/** The same in both languages (only different when there are decimals). Without keys it is glued for display. */
 export function show(items: LN[], keys = true): Text {
-  const en = src(items, "en", keys);
-  const de = src(items, "de", keys);
+  const en = src(items, "en", keys, !keys);
+  const de = src(items, "de", keys, !keys);
   return en === de ? en : tx(en, de);
 }
 

@@ -204,19 +204,26 @@ export function DistanceLine({
 
 const REL_TEX: Record<"=" | "<" | ">", string> = { "=": "=", "<": "<", ">": ">" };
 
-/** A static picture for explain steps (props come from the lesson): the statement, its solution set and the number line. */
-export function DistancePicture(props: { center: number; radius: number; rel: "=" | "<" | ">"; from?: number; to?: number }) {
-  const { center: a, radius: r, rel } = props;
-  const set: Text = rel === "=" ? setOf([a - r, a + r]) : absIneqSet(a - r, a + r, rel);
+/**
+ * A static picture for explain steps (props come from the lesson): the statement, its solution set and
+ * the number line. `also` adds a second row with another relation (|x − 2| < 3 and |x − 2| > 3).
+ */
+export function DistancePicture(props: { center: number; radius: number; rel: "=" | "<" | ">"; also?: "=" | "<" | ">"; from?: number; to?: number }) {
+  const { center: a, radius: r, from, to } = props;
+  const rels = props.also ? [props.rel, props.also] : [props.rel];
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
-        <MathView src={`|${lin(1, -a)}| ${REL_TEX[rel]} ${r}`} size="lg" animate={false} />
-        <MathView src={set} size="md" animate={false} className="text-ink-2" />
-      </div>
-      <div className="rounded-xl border border-line bg-surface px-2 pt-2">
-        <DistanceLine {...props} />
-      </div>
+    <div className="space-y-4">
+      {rels.map((rel) => (
+        <div key={rel} className="space-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1">
+            <MathView src={`|${lin(1, -a)}| ${REL_TEX[rel]} ${r}`} size="lg" animate={false} />
+            <MathView src={rel === "=" ? setOf([a - r, a + r]) : absIneqSet(a - r, a + r, rel)} size="md" animate={false} className="text-ink-2" />
+          </div>
+          <div className="rounded-xl border border-line bg-surface px-2 pt-2">
+            <DistanceLine center={a} radius={r} rel={rel} from={from} to={to} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -272,7 +279,7 @@ export function DistanceLab() {
           transition={{ type: "spring", stiffness: 520, damping: 22 }}
           className={cn("rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold text-white", holds ? "bg-ok" : "bg-danger")}
         >
-          {holds ? t(tx("solution", "Lösung")) : t(tx("no solution", "keine Lösung"))}
+          {holds ? t(tx(`${fmtNum(x, locale)} is a solution`, `${fmtNum(x, locale)} ist eine Lösung`)) : t(tx(`${fmtNum(x, locale)} is not a solution`, `${fmtNum(x, locale)} ist keine Lösung`))}
         </motion.span>
       </div>
 
@@ -350,7 +357,7 @@ export function RootLab() {
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start">
         <div className="rounded-xl border border-line bg-surface p-2">
           <Graph
-            xRange={[-4, 10]}
+            xRange={[-8, 10]}
             yRange={[-5, 6]}
             height={300}
             functions={[
@@ -371,7 +378,7 @@ export function RootLab() {
             {t(tx("Show the mirrored line (what squaring adds)", "Gespiegelte Gerade zeigen (was das Quadrieren dazunimmt)"))}
           </label>
           <div className="space-y-2 rounded-xl border border-line bg-surface px-4 py-3">
-            <Caption>{t(tx("Check (Probe)", "Probe"))}</Caption>
+            <Caption>{t(tx("Check", "Probe"))}</Caption>
             {rows.length === 0 && <p className="text-[13.5px] text-ink-2">{t(tx("Squaring gives no candidates at all: no solution.", "Das Quadrieren liefert gar keine Kandidaten: keine Lösung."))}</p>}
             <AnimatePresence initial={false}>
               {rows.map((r, i) => (

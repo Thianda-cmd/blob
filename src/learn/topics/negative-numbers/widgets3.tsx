@@ -110,6 +110,8 @@ export function NegPowerLab() {
     : `\\group{= -(${factors.map(() => a).join(" \\cdot ")})}`;
   const head = brackets ? `(${base})^{${n}}` : `-${a}^{${n}}`;
   const src = `${head} ${chain} \\group{= ${big(value)}}`;
+  // "−(10 · 10 · 10 · 10 · 10 · 10)" can't break inside the bracket: smaller on phones so it fits.
+  const long = !brackets && a === 10 && n >= 5;
   const pairs = Math.floor(n / 2);
   const odd = n % 2 === 1;
   const verdict = brackets
@@ -139,7 +141,7 @@ export function NegPowerLab() {
       </div>
 
       <div className="grid min-h-[96px] place-items-center rounded-xl border border-line bg-surface px-4 py-4">
-        <MathView src={src} size="lg" />
+        <MathView src={src} size="lg" className={long ? "max-sm:text-[21px]!" : undefined} />
       </div>
 
       <LayoutGroup id={scope}>

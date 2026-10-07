@@ -10,6 +10,7 @@ import type { Rng } from "@/learn/engine/rng";
 import { showTerms, type Term } from "@/learn/engine/terms";
 import { equivalentText } from "@/learn/engine/expr";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
+import { glued } from "./long";
 
 // ---------------------------------------------------------------------------
 // A small model of sums with brackets, rendered with stable token keys so each
@@ -22,9 +23,14 @@ type Item =
 const term = (id: string, c: number, v = ""): Item => ({ kind: "t", c, v, id });
 const group = (id: string, sign: 1 | -1, items: Item[], open: "(" | "[" = "("): Item => ({ kind: "g", sign, open, id, items });
 
-/** Display-language source with keys: sign `s<id>`, coefficient `c<id>`, variable `v<id>`, bracket `b<id>`. */
-export function render(items: Item[], keys = true): string {
+/**
+ * Display-language source with keys: sign `s<id>`, coefficient `c<id>`, variable `v<id>`, bracket `b<id>`.
+ * `glue` (only without keys, for task maths): a term like 3x, and a bracket with the sign in front of it,
+ * each stay on one line, so a phone never shows "13 −" at the end of a line and the bracket on the next.
+ */
+export function render(items: Item[], keys = true, glue = false): string {
   const k = (key: string) => (keys ? `#${key}` : "");
+  const tight = glue && !keys;
   if (items.length === 0) return "0";
   return items
     .map((it, i) => {
@@ -35,18 +41,24 @@ export function render(items: Item[], keys = true): string {
         const abs = Math.abs(it.c);
         const coef = it.v && abs === 1 ? "" : `${abs}${k(`c${it.id}`)}`;
         const v = it.v ? `${it.v}${k(`v${it.id}`)}` : "";
-        return `${sign}${[coef, v].filter(Boolean).join(keys ? " " : "")}`;
+        const body = [coef, v].filter(Boolean).join(keys ? " " : "");
+        if (tight && (first ? it.c < 0 || (coef && v) : coef && v)) return first ? glued(it.c < 0 ? "-" : "", body, true) : `${sign}\\group{${body}}`;
+        return `${sign}${body}`;
       }
       const sk = it.sk ?? `p${it.id}`;
       const sign = it.sign < 0 ? `-${k(sk)}${first && !keys ? "" : " "}` : first ? "" : `+${k(sk)} `;
       const close = it.open === "(" ? ")" : "]";
-      return `${sign}${it.open}${render(it.items, keys)}${close}${k(`b${it.id}`)}`;
+      const bracket = `${it.open}${render(it.items, keys, glue)}${close}${k(`b${it.id}`)}`;
+      if (tight && (it.sign < 0 || !first)) return glued(it.sign < 0 ? "-" : "+", bracket, first);
+      return `${sign}${bracket}`;
     })
     .join(" ");
 }
 
 /** Plain text without keys, for notes and answers. */
 const plain = (items: Item[]) => render(items, false);
+/** The same for task maths and options: terms and signed brackets stay on one line. */
+const shown = (items: Item[]) => render(items, false, true);
 
 function flip(it: Item, sign: 1 | -1): Item {
   if (sign === 1) return it;
@@ -259,7 +271,7 @@ function exercise(items: Item[], hint: Text): Exercise {
   const value = plain(result).replace(/\s+/g, "") || "0";
   return {
     instruction: INSTRUCTION,
-    math: plain(items),
+    math: shown(items),
     answer: { kind: "expr", value, form: "simplified" },
     hint,
     solution: frames,
@@ -383,7 +395,7 @@ function whichResultTask(rng: Rng): Exercise {
     for (const c of cands) if (c.items.length && !opts.some((o) => equivalentText(compact(o.items), compact(c.items)))) opts.push(c);
     if (opts.length < 4) continue;
     const order = rng.shuffle([0, 1, 2, 3]);
-    const options = order.map((i) => `$${plain(opts[i].items)}$`);
+    const options = order.map((i) => `$${shown(opts[i].items)}$`);
     const mistakes: Mistake[] = [];
     order.forEach((i, at) => {
       const o = opts[i];
@@ -391,7 +403,7 @@ function whichResultTask(rng: Rng): Exercise {
     });
     return {
       instruction: tx("Which result is correct?", "Welches Ergebnis ist richtig?"),
-      math: plain(items),
+      math: shown(items),
       answer: { kind: "choice", options, correct: order.indexOf(0) },
       hint: tx("Remove the brackets yourself first. A minus in front flips **every** sign inside.", "Löse die Klammern zuerst selbst auf. Ein Minus davor dreht **jedes** Vorzeichen darin um."),
       solution: solve(items).frames,
@@ -434,13 +446,14 @@ function findMistakeTask(rng: Rng): Exercise {
     if (!kept(result)) continue;
 
     const name = rng.pick(NAMES);
-    const step1 = `${plain(items)} = `;
+    // One step per line, as in an exercise book: on a phone the break never lands in the middle of a step.
+    const step1 = `${shown(items)} \\\\ = `;
     const marked =
       slip === "last" || slip === "plusFlip"
-        ? `${step1}\\red{${plain(work)}} = ${plain(result)}`
+        ? `${step1}\\red{${shown(work)}} \\\\ = ${shown(result)}`
         : slip === "combine"
-          ? `${step1}${plain(work)} = \\red{${plain(result)}}`
-          : `${step1}${plain(work)} = ${plain(result)}`;
+          ? `${step1}${shown(work)} \\\\ = \\red{${shown(result)}}`
+          : `${step1}${shown(work)} \\\\ = ${shown(result)}`;
     const keys = rng.shuffle<Slip>(["last", "plusFlip", "combine", "none"]);
     const options = keys.map((k) => SLIP_OPTION[k]);
     const last = g.items[g.items.length - 1];
@@ -466,7 +479,17 @@ function findMistakeTask(rng: Rng): Exercise {
     const mistakes: Mistake[] = [];
     keys.forEach((k, at) => {
       if (k === slip) return;
-      mistakes.push({ when: { kind: "choice", options, correct: at }, title: k === "none" ? tx("There is a mistake", "Da steckt ein Fehler") : tx("Look at the other step", "Schau dir den anderen Schritt an"), say: sayFor(k) });
+      // The title must not contradict the message: with no mistake at all there is no "other step".
+      const sameStep = k !== "combine" && slip !== "combine";
+      const title =
+        slip === "none"
+          ? tx("Everything is right", "Hier stimmt alles")
+          : k === "none"
+            ? tx("There is a mistake", "Da steckt ein Fehler")
+            : sameStep
+              ? tx("Right step, different slip", "Richtiger Schritt, anderer Fehler")
+              : tx("Look at the other step", "Schau dir den anderen Schritt an");
+      mistakes.push({ when: { kind: "choice", options, correct: at }, title, say: sayFor(k) });
     });
     const why: Text =
       slip === "last"
@@ -479,12 +502,12 @@ function findMistakeTask(rng: Rng): Exercise {
     return {
       instruction: tx("Find the mistake", "Finde den Fehler"),
       text: tx(`${name} simplified the term like this. Is there a mistake? If so, where?`, `${name} hat den Term so vereinfacht. Steckt ein Fehler drin? Wenn ja, wo?`),
-      math: `${step1}${plain(work)} = ${plain(result)}`,
+      math: `${step1}${shown(work)} \\\\ = ${shown(result)}`,
       answer: { kind: "choice", options, correct: keys.indexOf(slip) },
       hint: tx("Check each step on its own. Which sign stands in front of the bracket?", "Prüf jeden Schritt einzeln. Welches Zeichen steht vor der Klammer?"),
       solution: [
         { math: marked, note: why },
-        ...(slip === "none" ? [] : [{ math: `${step1}${plain(flat)} = ${plain(right)}`, note: tx(`Correct: $${plain(items)} = ${plain(right)}$.`, `Richtig ist: $${plain(items)} = ${plain(right)}$.`) }]),
+        ...(slip === "none" ? [] : [{ math: `${step1}${shown(flat)} \\\\ = ${shown(right)}`, note: tx(`Correct: $${plain(items)} = ${plain(right)}$.`, `Richtig ist: $${plain(items)} = ${plain(right)}$.`) }]),
       ],
       mistakes,
     };
@@ -500,7 +523,8 @@ function fillBracketTask(rng: Rng): Exercise {
     const items: Item[] = [lead, group("g", sign, inner)];
     const flat = flatten(items, "g");
     const value = compact(inner);
-    const gap = `${plain([lead])} ${sign < 0 ? "-" : "+"} (\\,\\box{\\,?\\,}\\,)`;
+    // The sign stays with its bracket: "13 −" never ends a phone line with the box on the next one.
+    const gap = `${shown([lead])} ${glued(sign < 0 ? "-" : "+", "(\\,\\box{\\,?\\,}\\,)", false)}`;
     const mistakes: Mistake[] = [];
     const add = (wrong: Item[], title: Text, say: Text) => {
       const w = compact(wrong);
@@ -527,7 +551,7 @@ function fillBracketTask(rng: Rng): Exercise {
     const rest = plain(flat).slice(leadText.length).trim();
     return {
       instruction: tx("What was in the bracket?", "Was stand in der Klammer?"),
-      math: `${gap} = ${plain(flat)}`,
+      math: `${gap} = ${shown(flat)}`,
       answer: { kind: "expr", value },
       hint:
         sign < 0

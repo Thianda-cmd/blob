@@ -6,6 +6,7 @@ import { gcd, type Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { FactorFinder } from "./FactorFinder";
 import { GroupingPuzzle } from "./Grouping";
+import { glued } from "./long";
 import { divMono, factorFrames, isOne, mono, monoPlain, monoSrc, mulMono, negMono, polyPlain, polySrc, type Mono } from "./mono";
 
 // ---------------------------------------------------------------------------
@@ -118,11 +119,17 @@ function bracketExercise(terms: Mono[], vars: string[], F: Mono): Exercise {
     // A negative number after a times sign gets brackets: −3x · (−1), never −3x · −1.
     const qc = q[oneAt].c < 0 ? `(${q[oneAt].c})` : String(q[oneAt].c);
     const prod = `${monoSrc(terms[oneAt], vars, { first: true })} = ${Fs === "-" ? "-1" : Fs} \\cdot ${qc}`;
-    m.add(polyPlain(q.filter((_, i) => i !== oneAt), vars), tx("The 1 is missing", "Die 1 fehlt"), tx(`When a term is the factor itself, a $1$ stays in the bracket: $${prod}$.`, `Ist ein Term der Faktor selbst, bleibt eine $1$ in der Klammer: $${prod}$.`));
+    // The term may be the factor itself (a 1 stays) or its negative (a −1 stays).
+    const say =
+      q[oneAt].c < 0
+        ? tx(`When a term is the negative of the factor, a $-1$ stays in the bracket: $${prod}$.`, `Ist ein Term das Negative des Faktors, bleibt eine $-1$ in der Klammer: $${prod}$.`)
+        : tx(`When a term is the factor itself, a $1$ stays in the bracket: $${prod}$.`, `Ist ein Term der Faktor selbst, bleibt eine $1$ in der Klammer: $${prod}$.`);
+    m.add(polyPlain(q.filter((_, i) => i !== oneAt), vars), tx("The 1 is missing", "Die 1 fehlt"), say);
   }
   return {
     instruction: FILL,
-    math: `${polySrc(terms, vars)} = ${Fs} (\\,\\box{\\,?\\,}\\,)`,
+    // "= 6y²(☐)" stays together: on a phone the line breaks before the equals sign, never after "6y²" or "−".
+    math: `${polySrc(terms, vars)} \\group{= ${Fs}(\\,\\box{\\,?\\,}\\,)}`,
     answer: { kind: "expr", value },
     hint: neg
       ? tx(`Divide every term by $${Fname}$. Dividing by a negative number flips every sign.`, `Teile jeden Term durch $${Fname}$. Teilen durch eine negative Zahl dreht jedes Vorzeichen um.`)
@@ -178,7 +185,15 @@ function fullyTask(rng: Rng): Exercise {
     if (!isOne(q[q.length - 1])) cands.push({ text: opt(F, [...q.slice(0, -1), last]), title: tx("Not every term divided", "Nicht jeden Term geteilt"), say: tx("Expand it to check: the last term doesn't come back. Every term has to be divided by the factor.", "Multiplizier zur Probe aus: Der letzte Term kommt nicht wieder heraus. Jeder Term muss durch den Faktor geteilt werden.") });
     cands.push({ text: opt(F, [...q.slice(0, -1), negMono(q[q.length - 1])]), title: tx("A sign slipped", "Ein Vorzeichen verrutscht"), say: tx("Check the signs by expanding: the last term comes back with the wrong sign.", "Prüf die Vorzeichen durch Ausmultiplizieren: Der letzte Term kommt mit dem falschen Vorzeichen heraus.") });
     const oneAt = q.findIndex(isOne);
-    if (oneAt >= 0) cands.push({ text: opt(F, q.filter((_, i) => i !== oneAt)), title: tx("The 1 is missing", "Die 1 fehlt"), say: tx("A term that equals the factor leaves a $1$ in the bracket. Without it, that term is lost.", "Ein Term, der gleich dem Faktor ist, hinterlässt eine $1$ in der Klammer. Ohne sie geht dieser Term verloren.") });
+    if (oneAt >= 0)
+      cands.push({
+        text: opt(F, q.filter((_, i) => i !== oneAt)),
+        title: tx("The 1 is missing", "Die 1 fehlt"),
+        say:
+          q[oneAt].c < 0
+            ? tx("A term that is the negative of the factor leaves a $-1$ in the bracket. Without it, that term is lost.", "Ein Term, der das Negative des Faktors ist, hinterlässt eine $-1$ in der Klammer. Ohne sie geht dieser Term verloren.")
+            : tx("A term that equals the factor leaves a $1$ in the bracket. Without it, that term is lost.", "Ein Term, der gleich dem Faktor ist, hinterlässt eine $1$ in der Klammer. Ohne sie geht dieser Term verloren."),
+      });
     const opts: typeof cands = [];
     for (const c of cands) if (!opts.some((o) => o.text === c.text)) opts.push(c);
     if (opts.length < 4) continue;
@@ -204,7 +219,8 @@ function fullyTask(rng: Rng): Exercise {
 /** p(B) + r(B), p(a − b) + r(b − a), and grouping four terms. */
 function commonBracketTask(rng: Rng): Exercise {
   const kind = rng.pick(["bracket", "bracket", "twist", "group", "group"] as const);
-  const fill = (lhs: string, B: string) => `${lhs} = (${B}) (\\,\\box{\\,?\\,}\\,)`;
+  // "= (x − 3)(☐)" stays together, so a phone breaks the line before the equals sign.
+  const fill = (lhs: string, B: string) => `${lhs} \\group{= (${B})(\\,\\box{\\,?\\,}\\,)}`;
   if (kind === "bracket") {
     const w = rng.pick(["a", "x", "y", "b"]);
     const u = w === "x" ? "a" : "x";
@@ -215,7 +231,7 @@ function commonBracketTask(rng: Rng): Exercise {
     const r = rng.chance(0.2) ? rng.sign() : nz(rng, 9);
     if (gcd(pc, r) !== 1) return commonBracketTask(rng);
     const rText = `${r < 0 ? "-" : "+"} ${Math.abs(r) === 1 ? "" : Math.abs(r)}`;
-    const lhs = `${p}(${B}) ${rText}(${B})`;
+    const lhs = `${glued("", `${p}(${B})`, true)} ${glued(r < 0 ? "-" : "+", `${Math.abs(r) === 1 ? "" : Math.abs(r)}(${B})`, false)}`;
     const value = `${p}${r < 0 ? "-" : "+"}${Math.abs(r)}`;
     const m = exprMistakes(value);
     m.add(`${p}${r < 0 ? "+" : "-"}${Math.abs(r)}`, tx("Sign of the second factor", "Vorzeichen des zweiten Faktors"), tx(`The sign in front of the second bracket belongs to its factor: $${r < 0 ? "-" : "+"}${Math.abs(r)}$ goes into the new bracket.`, `Das Zeichen vor der zweiten Klammer gehört zu ihrem Faktor: $${r < 0 ? "-" : "+"}${Math.abs(r)}$ kommt in die neue Klammer.`));
@@ -247,7 +263,7 @@ function commonBracketTask(rng: Rng): Exercise {
     const r = rng.int(2, 9);
     if (gcd(pc, r) !== 1) return commonBracketTask(rng);
     const B = `${w} - ${z}`;
-    const lhs = `${p}(${w} - ${z}) + ${r}(${z} - ${w})`;
+    const lhs = `${glued("", `${p}(${w} - ${z})`, true)} ${glued("+", `${r}(${z} - ${w})`, false)}`;
     const value = `${p}-${r}`;
     const m = exprMistakes(value);
     m.add(`${p}+${r}`, tx("The brackets are opposite", "Die Klammern sind entgegengesetzt"), tx(`Careful: $(${z} - ${w})$ is not the same bracket as $(${w} - ${z})$. $${z} - ${w} = -(${w} - ${z})$, so the sign of the $${r}$ flips.`, `Vorsicht: $(${z} - ${w})$ ist nicht dieselbe Klammer wie $(${w} - ${z})$. $${z} - ${w} = -(${w} - ${z})$, also dreht sich das Vorzeichen der $${r}$ um.`));
@@ -272,11 +288,14 @@ function commonBracketTask(rng: Rng): Exercise {
   const sorted = (a: string, b: string) => [a, b].sort().join("");
   const s = (c: number, first = false) => (c < 0 ? (first ? "-" : "- ") : first ? "" : "+ ");
   const coef = (c: number) => (Math.abs(c) === 1 ? "" : String(Math.abs(c)));
-  const lhs = `${sorted(mm, w)} ${s(q)}${coef(q)}${mm} ${s(n)}${coef(n)}${w} ${s(n * q)}${Math.abs(n * q)}`;
+  const unit = (c: string, v: string) => (c ? `\\group{${c}${v}}` : v);
+  const lhs = `\\group{${sorted(mm, w)}} ${s(q)}${unit(coef(q), mm)} ${s(n)}${unit(coef(n), w)} ${s(n * q)}${Math.abs(n * q)}`;
   const B = `${w} ${s(q)}${Math.abs(q)}`;
   const value = `${mm}${n < 0 ? "-" : "+"}${Math.abs(n)}`;
   const m = exprMistakes(value);
-  m.add(`${mm}${n < 0 ? "+" : "-"}${Math.abs(n)}`, tx("Sign of the second pair", "Vorzeichen beim zweiten Paar"), tx(`Factor the second pair so that the **same** bracket appears: $${coef(n) ? "" : ""}${s(n, true)}${coef(n)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-" : ""}${Math.abs(n)}(${B})$.`, `Klammere beim zweiten Paar so aus, dass **dieselbe** Klammer entsteht: $${s(n, true)}${coef(n)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-" : ""}${Math.abs(n)}(${B})$.`));
+  m.add(`${mm}${n < 0 ? "+" : "-"}${Math.abs(n)}`, tx("Sign of the second pair", "Vorzeichen beim zweiten Paar"), tx(`Factor the second pair so that the **same** bracket appears: $${s(n, true)}${coef(n)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-" : ""}${Math.abs(n)}(${B})$.`, `Klammere beim zweiten Paar so aus, dass **dieselbe** Klammer entsteht: $${s(n, true)}${coef(n)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-" : ""}${Math.abs(n)}(${B})$.`));
+  // Before the multiply mistake: for n = 1 both give the same value, and the forgotten 1 is the likelier slip.
+  if (Math.abs(n) === 1) m.add(mm, tx("The 1 is missing", "Die 1 fehlt"), tx(`The second pair is $${s(n, true)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-1" : "1"} \\cdot (${B})$. That $${n}$ goes into the new bracket: $(${B})(${mm} ${s(n)}1)$.`, `Das zweite Paar ist $${s(n, true)}${w} ${s(n * q)}${Math.abs(n * q)} = ${n < 0 ? "-1" : "1"} \\cdot (${B})$. Diese $${n}$ kommt mit in die neue Klammer: $(${B})(${mm} ${s(n)}1)$.`));
   m.add(`${n}${mm}`, tx("Added, not multiplied", "Addieren, nicht multiplizieren"), tx(`After grouping you have $${mm}(${B}) ${s(n)}${Math.abs(n)}(${B})$. The factors in front of the bracket are combined with their signs: $(${B})(${mm} ${s(n)}${Math.abs(n)})$.`, `Nach dem Gruppieren hast du $${mm}(${B}) ${s(n)}${Math.abs(n)}(${B})$. Die Faktoren vor der Klammer werden mit ihren Vorzeichen zusammengefasst: $(${B})(${mm} ${s(n)}${Math.abs(n)})$.`));
   return {
     instruction: tx("Factor by grouping", "Klammere durch Gruppieren aus"),
@@ -299,8 +318,12 @@ function solveTask(rng: Rng): Exercise {
   // a·x² − a·r·x = 0 has the solutions 0 and r
   const b = -a * r;
   const moved = rng.chance(0.3);
-  const ax = a === 1 ? "x^2" : `${a}x^2`;
-  const bx = (c: number, first = false) => `${c < 0 ? (first ? "-" : "- ") : first ? "" : "+ "}${Math.abs(c) === 1 ? "" : Math.abs(c)}x`;
+  const ax = a === 1 ? "x^2" : `\\group{${a}x^2}`;
+  const bx = (c: number, first = false) => {
+    const sign = c < 0 ? (first ? "-" : "- ") : first ? "" : "+ ";
+    const body = `${Math.abs(c) === 1 ? "" : Math.abs(c)}x`;
+    return first && c < 0 ? `\\group{-${body}}` : `${sign}${Math.abs(c) === 1 ? body : `\\group{${body}}`}`;
+  };
   const eq = moved ? `${ax} = ${bx(-b, true)}` : `${ax} ${bx(b)} = 0`;
   const std = `${ax} ${bx(b)} = 0`;
   const F = a === 1 ? "x" : `${a}x`;
@@ -358,6 +381,26 @@ function fractionTask(rng: Rng): Exercise {
   const kind = rng.pick([0, 1, 1, 2, 2]);
   const instruction = tx("Factor out, then simplify the fraction", "Klammere aus und kürze dann den Bruch");
   const hint = tx("Factor the numerator first. You may only cancel **factors**, never single summands.", "Klammere zuerst im Zähler aus. Kürzen darfst du nur **Faktoren**, nie einzelne Summanden.");
+  /**
+   * Kinds 0 and 1 are choices: a typed answer like "(3x - 18)/3" has the right value, and the checker
+   * can't tell an uncancelled fraction from the result. The options are the result and typical slips.
+   */
+  const choose = (cands: { value: string; text: string; title?: Text; say?: Text }[]) => {
+    const opts: typeof cands = [];
+    for (const c of cands) if (!opts.some((o) => equivalentText(o.value, c.value))) opts.push(c);
+    const order = rng.shuffle([0, ...rng.shuffle(opts.slice(1).map((_, i) => i + 1)).slice(0, 3)]);
+    const options = order.map((i) => opts[i].text);
+    const mistakes: Mistake[] = [];
+    order.forEach((i, k) => {
+      const o = opts[i];
+      if (i !== 0 && o.say) mistakes.push({ when: { kind: "choice", options, correct: k }, title: o.title, say: o.say });
+    });
+    return { answer: { kind: "choice" as const, options, correct: order.indexOf(0) }, mistakes };
+  };
+  const pick = tx("Factor out and simplify: which result is right?", "Klammere aus und kürze: Welches Ergebnis stimmt?");
+  const opt = (list: Mono[]) => ({ value: polyPlain(list, ["x"]), text: `$${polySrc(list, ["x"])}$` });
+  const SUMMAND = tx("Only one summand divided", "Nur einen Summanden geteilt");
+  const UNCANCELLED = tx("Not cancelled yet", "Noch nicht gekürzt");
   if (kind === 0) {
     // (g·a·x + g·b) / g
     const g = rng.int(2, 6);
@@ -366,21 +409,28 @@ function fractionTask(rng: Rng): Exercise {
     if (gcd(a, b) !== 1 && a !== 1) return fractionTask(rng);
     const num = polySrc([mono(g * a, 1), mono(g * b, 0)], ["x"]);
     const inner = polySrc([mono(a, 1), mono(b, 0)], ["x"]);
-    const value = polyPlain([mono(a, 1), mono(b, 0)], ["x"]);
-    const m = exprMistakes(value);
-    m.add(polyPlain([mono(a, 1), mono(g * b, 0)], ["x"]), tx("Only one summand divided", "Nur einen Summanden geteilt"), tx(`The fraction bar divides the **whole** numerator. Factor out $${g}$ first: then $${g}$ cancels completely.`, `Der Bruchstrich teilt den **ganzen** Zähler. Klammere zuerst $${g}$ aus: Dann kürzt sich $${g}$ ganz weg.`));
-    m.add(polyPlain([mono(g * a, 1), mono(b, 0)], ["x"]), tx("Only one summand divided", "Nur einen Summanden geteilt"), tx(`The fraction bar divides the **whole** numerator, so every summand gets divided by $${g}$.`, `Der Bruchstrich teilt den **ganzen** Zähler, also wird jeder Summand durch $${g}$ geteilt.`));
+    const { answer, mistakes } = choose([
+      opt([mono(a, 1), mono(b, 0)]),
+      { ...opt([mono(a, 1), mono(g * b, 0)]), title: SUMMAND, say: tx(`The fraction bar divides the **whole** numerator. Factor out $${g}$ first: then $${g}$ cancels completely.`, `Der Bruchstrich teilt den **ganzen** Zähler. Klammere zuerst $${g}$ aus: Dann kürzt sich $${g}$ ganz weg.`) },
+      { ...opt([mono(g * a, 1), mono(b, 0)]), title: SUMMAND, say: tx(`The fraction bar divides the **whole** numerator, so every summand gets divided by $${g}$.`, `Der Bruchstrich teilt den **ganzen** Zähler, also wird jeder Summand durch $${g}$ geteilt.`) },
+      {
+        value: polyPlain([mono(g * a, 1), mono(g * b, 0)], ["x"]),
+        text: `$${g}(${inner})$`,
+        title: UNCANCELLED,
+        say: tx(`That's only the numerator with $${g}$ factored out. The fraction bar still divides by $${g}$: cancel it.`, `Das ist nur der Zähler, aus dem du $${g}$ ausgeklammert hast. Der Bruchstrich teilt aber noch durch $${g}$: Kürze noch durch $${g}$.`),
+      },
+    ]);
     return {
-      instruction,
+      instruction: pick,
       math: `\\frac{${num}}{${g}}`,
-      answer: { kind: "expr", value, form: "simplified" },
+      answer,
       hint,
       solution: [
         { math: `\\frac{${num}}{${g}#d}`, note: tx(`Both terms of the numerator contain the factor $${g}$.`, `Beide Terme im Zähler enthalten den Faktor $${g}$.`) },
         { math: `\\frac{${g}#n (${inner})#br}{${g}#d}`, note: tx(`Factor out $${g}$: now it's a factor of the whole numerator.`, `Klammere $${g}$ aus: Jetzt ist sie Faktor des ganzen Zählers.`) },
         { math: `\\frac{\\strike{${g}#n} (${inner})#br}{\\strike{${g}#d}} = ${inner}`, note: tx(`Cancel $${g}$. Result: $${inner}$.`, `Kürze $${g}$. Ergebnis: $${inner}$.`) },
       ],
-      mistakes: m.list,
+      mistakes,
     };
   }
   if (kind === 1) {
@@ -391,21 +441,33 @@ function fractionTask(rng: Rng): Exercise {
     const num = polySrc([mono(c * a, 2), mono(c * b, 1)], ["x"]);
     const den = monoSrc(mono(c, 1), ["x"], { first: true });
     const inner = polySrc([mono(a, 1), mono(b, 0)], ["x"]);
-    const value = polyPlain([mono(a, 1), mono(b, 0)], ["x"]);
-    const m = exprMistakes(value);
-    m.add(polyPlain([mono(a, 1), mono(c * b, 1)], ["x"]), tx("Only one summand divided", "Nur einen Summanden geteilt"), tx(`You divided only the first summand by $${den}$. Factor out $${den}$ in the numerator first, then it cancels as a whole.`, `Du hast nur den ersten Summanden durch $${den}$ geteilt. Klammere im Zähler zuerst $${den}$ aus, dann kürzt es sich als Ganzes.`));
+    const { answer, mistakes } = choose([
+      opt([mono(a, 1), mono(b, 0)]),
+      // ax + cbx shown combined (as a student would write it), and only when it isn't 0.
+      ...(a + c * b !== 0 ? [{ ...opt([mono(a + c * b, 1)]), title: SUMMAND, say: tx(`You divided only the first summand by $${den}$. Factor out $${den}$ in the numerator first, then it cancels as a whole.`, `Du hast nur den ersten Summanden durch $${den}$ geteilt. Klammere im Zähler zuerst $${den}$ aus, dann kürzt es sich als Ganzes.`) }] : []),
+      { ...opt([mono(c * a, 2), mono(b, 0)]), title: SUMMAND, say: tx(`You divided only the second summand by $${den}$. The fraction bar divides the **whole** numerator: factor out $${den}$ first.`, `Du hast nur den zweiten Summanden durch $${den}$ geteilt. Der Bruchstrich teilt den **ganzen** Zähler: Klammere zuerst $${den}$ aus.`) },
+      ...(c > 1
+        ? [{ ...opt([mono(a, 2), mono(b, 1)]), title: tx("Only the number cancelled", "Nur die Zahl gekürzt"), say: tx(`You cancelled only the $${c}$. The $x$ in the denominator is a factor of the numerator too: factor out $${den}$ and cancel it as a whole.`, `Du hast nur die $${c}$ gekürzt. Das $x$ im Nenner steckt auch als Faktor im Zähler: Klammere $${den}$ aus und kürze es als Ganzes.`) }]
+        : []),
+      {
+        value: polyPlain([mono(c * a, 2), mono(c * b, 1)], ["x"]),
+        text: `$${den}(${inner})$`,
+        title: UNCANCELLED,
+        say: tx(`That's only the numerator with $${den}$ factored out. The fraction bar still divides by $${den}$: cancel it.`, `Das ist nur der Zähler, aus dem du $${den}$ ausgeklammert hast. Der Bruchstrich teilt aber noch durch $${den}$: Kürze noch durch $${den}$.`),
+      },
+    ]);
     return {
-      instruction,
+      instruction: pick,
       text: tx("Assume $x \\ne 0$.", "Es gilt $x \\ne 0$."),
       math: `\\frac{${num}}{${den}}`,
-      answer: { kind: "expr", value, form: "simplified" },
+      answer,
       hint,
       solution: [
         { math: `\\frac{${num}}{${den}}`, note: tx(`Both terms of the numerator contain $${den}$.`, `Beide Terme im Zähler enthalten $${den}$.`) },
         { math: `\\frac{${den} (${inner})}{${den}}`, note: tx(`Factor out $${den}$.`, `Klammere $${den}$ aus.`) },
         { math: `\\frac{\\strike{${den}} (${inner})}{\\strike{${den}}} = ${inner}`, note: tx(`Cancel $${den}$ (allowed because $x \\ne 0$). Result: $${inner}$.`, `Kürze $${den}$ (erlaubt, weil $x \\ne 0$). Ergebnis: $${inner}$.`) },
       ],
-      mistakes: m.list,
+      mistakes,
     };
   }
   // (k·x + k·b) / (x + b) = k
@@ -571,7 +633,7 @@ function groupingCheck(): Exercise {
   m.add("xy+3x+2y+6", tx("Only the bracket", "Nur die Klammer"), tx("Type only what goes into the second bracket. $(y + 3)$ is already there.", "Gib nur ein, was in die zweite Klammer kommt. $(y + 3)$ steht schon da."));
   return {
     instruction: tx("Factor by grouping", "Klammere durch Gruppieren aus"),
-    math: "xy + 3x + 2y + 6 = (y + 3) (\\,\\box{\\,?\\,}\\,)",
+    math: "\\group{xy} + \\group{3x} + \\group{2y} + 6 \\group{= (y + 3)(\\,\\box{\\,?\\,}\\,)}",
     answer: { kind: "expr", value },
     hint: tx("Pair $xy + 3x$ and $2y + 6$. What can you factor out of each pair?", "Bilde die Paare $xy + 3x$ und $2y + 6$. Was kannst du aus jedem Paar ausklammern?"),
     solution: [

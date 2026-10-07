@@ -620,16 +620,28 @@ export type Run = { value: Frac; rel: Rel; A: Frac; bx: Frac; ao: Frac };
 export const qsub = (a: Frac, b: Frac) => add(a, qneg(b));
 export const sameQ = (a: Frac, b: Frac) => a.n === b.n && a.d === b.d;
 
+/** The common denominator the worked solution multiplies by first: 1 unless two or more collected coefficients are fractions. */
+function slipScale(L: Term[], R: Term[]): number {
+  const fracs = ([0, 1, 2] as Pow[]).flatMap((p) => [coef(L, p), coef(R, p)]).filter((q) => q.d !== 1);
+  return fracs.length >= 2 ? fracs.reduce((m, q) => lcm(m, q.d), 1) : 1;
+}
+
+/** The equation with brackets expanded and like terms collected on each side, every term times k: "4x - 38 = 6". */
+export function collectedSrc(e: Eq, v: string, k = 1): string {
+  const side = (items: Item[]) => {
+    const list = expandAll(items);
+    return list.length ? sideSrc(combine(list).map((x) => ({ ...x, c: qmul(x.c, frac(k)) })), v, false) : "0";
+  };
+  return `${side(e.L)} ${e.rel} ${side(e.R)}`;
+}
+
 /** Solve the expanded equation the way the worked solution does, with at most one slip. */
 export function slipSolve(L: Term[], R: Term[], rel: Rel, slip: Slip = {}): Run | null {
   const side = (list: Term[]) => [coef(list, 0), coef(list, 1), coef(list, 2)];
   let [bL, aL, sL, bR, aR, sR] = [...side(L), ...side(R)];
   // Several fractions: the worked solution multiplies by the common denominator first.
-  const fracs = [bL, aL, sL, bR, aR, sR].filter((q) => q.d !== 1);
-  if (fracs.length >= 2) {
-    const k = frac(fracs.reduce((m, q) => lcm(m, q.d), 1));
-    [bL, aL, sL, bR, aR, sR] = [bL, aL, sL, bR, aR, sR].map((q) => qmul(q, k));
-  }
+  const k = slipScale(L, R);
+  if (k > 1) [bL, aL, sL, bR, aR, sR] = [bL, aL, sL, bR, aR, sR].map((q) => qmul(q, frac(k)));
   // x² has to cancel, otherwise this isn't a linear equation any more.
   if (!sameQ(sL, sR) || (isZero(aL) && isZero(aR))) return null;
   const both = !isZero(aL) && !isZero(aR);
@@ -705,7 +717,13 @@ export function wrongExpand(it: Item, how: WrongExpand): Term[] | null {
 /** Signed number for the messages: "+ 3", "- \frac{1}{2}". */
 export const signedQ = (q: Frac) => `${q.n < 0 ? "-" : "+"} ${qshow(absQ(q))}`;
 
-export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
+/**
+ * The typical slips on this equation, simulated from its numbers. `context` is said before the messages
+ * when the student never sees `e` itself (the equation after clearing fractions or decimals): `bracket`
+ * before slips while expanding, `slip` before the others. Without it, slips after the worked solution's
+ * "multiply by the common denominator" step name that equation first.
+ */
+export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel, context?: { slip: Text; bracket: Text }): Mistake[] {
   const L = expandAll(e.L);
   const R = expandAll(e.R);
   const base = slipSolve(L, R, e.rel);
@@ -715,14 +733,19 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
   const out: Mistake[] = [];
   const keyOf = (r: Run) => `${ineq ? r.rel : ""} ${r.value.n}/${r.value.d}`;
   const seen = new Set([keyOf(base)]);
+  // The numbers of the slips below come from the equation without fractions.
+  const scale = slipScale(L, R);
+  const scaled = collectedSrc(e, v, scale);
+  const slipCtx =
+    context?.slip ?? (scale > 1 ? tx(`After multiplying by $${scale}$ you have $${scaled}$.`, `Nach dem Multiplizieren mit $${scale}$ steht da $${scaled}$.`) : null);
   /** `close`: a near miss (right idea, one small slip), so Blob looks thoughtful and doesn't reveal the solution yet. */
-  const push = (run: Run | null, title: Text, say: (r: Run) => Text, close = false) => {
+  const push = (run: Run | null, title: Text, say: (r: Run) => Text, close = false, ctx: Text | null = slipCtx) => {
     if (!run || out.length >= 5 || seen.has(keyOf(run))) return;
     seen.add(keyOf(run));
     const when: AnswerSpec = ineq
       ? { kind: "inequality", variable: v, op: run.rel as Exclude<Rel, "=">, value: qvalue(run.value) }
       : { kind: "solutions", variable: v, values: [qvalue(run.value)] };
-    out.push({ when, title, say: say(run), close });
+    out.push({ when, title, say: ctx ? joinText(ctx, say(run)) : say(run), close });
   };
   const solve = (slip: Slip, l = L, r = R) => slipSolve(l, r, e.rel, slip);
   const xt = (q: Frac) => termSrc(term("", q, 1), v, true, false);
@@ -758,7 +781,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
     );
   }
 
-  // Brackets multiplied out wrongly, then everything else done right.
+  // Brackets multiplied out wrongly, then everything else done right (their message is about the bracket itself).
+  const bracketCtx = context?.bracket ?? null;
   const brackets = [...e.L.map((it) => [it, "L"] as const), ...e.R.map((it) => [it, "R"] as const)].filter(([it]) => it.kind !== "t");
   for (const how of ["first", "sign", "no2", "minus"] as WrongExpand[]) {
     for (const [it, where] of brackets) {
@@ -773,6 +797,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
             `Ah, I see what happened! The $${k}$ only reached the first term in the bracket. It has to multiply **every** term inside.`,
             `Ah, ich seh, was passiert ist! Die $${k}$ hat nur den ersten Term in der Klammer erwischt. Sie muss **jeden** Term darin multiplizieren.`,
           ),
+          false,
+          bracketCtx,
         );
       } else if (how === "sign") {
         push(run, tx("Only the first sign flipped", "Nur das erste Vorzeichen gedreht"), () =>
@@ -785,6 +811,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
                 `Careful with the signs! The $${k}$ multiplies **every** term in the bracket, minus included, so the last sign flips too.`,
                 `Vorsicht mit den Vorzeichen! Die $${k}$ multipliziert **jeden** Term in der Klammer, samt Minus. Also dreht sich auch das letzte Vorzeichen um.`,
               ),
+          false,
+          bracketCtx,
         );
       } else if (how === "no2") {
         push(run, tx("Middle term without the 2", "Mittelterm ohne die 2"), () =>
@@ -792,6 +820,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
             "Ooh, careful with the square! Its middle term is **twice** the product: $(a + b)^2 = a^2 + 2ab + b^2$. Your $2$ got lost.",
             "Vorsicht beim Quadrat! Der Mittelterm ist das **Doppelte** des Produkts: $(a + b)^2 = a^2 + 2ab + b^2$. Bei dir ist die $2$ verloren gegangen.",
           ),
+          false,
+          bracketCtx,
         );
       } else if (it.kind === "pp") {
         const [p, q] = [it.a[1].c, it.b[1].c];
@@ -800,6 +830,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
             `Careful with the signs: $${n(p)} \\cdot (${n(q)})$ is minus times minus, and that gives **plus**!`,
             `Vorsicht mit den Vorzeichen: $${n(p)} \\cdot (${n(q)})$ ist Minus mal Minus, und das ergibt **Plus**!`,
           ),
+          false,
+          bracketCtx,
         );
       }
     }
@@ -817,6 +849,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
           `Ooh, classic trap! $\\frac{${v}}{${a}} + \\frac{${v}}{${b}}$ is **not** $\\frac{2${v}}{${a + b}}$: you can't just add tops and bottoms. Use the common denominator $${lcm(a, b)}$.`,
           `Die klassische Falle! $\\frac{${v}}{${a}} + \\frac{${v}}{${b}}$ ist **nicht** $\\frac{2${v}}{${a + b}}$: Zähler und Nenner darfst du nicht einfach addieren. Nimm den Hauptnenner $${lcm(a, b)}$.`,
         ),
+        false,
+        null,
       );
     }
     // Fractions cleared, but the terms without a fraction never got multiplied.
@@ -830,6 +864,8 @@ export function eqMistakes(e: Eq, v: string, value: Frac, rel: Rel): Mistake[] {
           `Ah, I see what happened! You multiplied the ${many ? "fractions" : "fraction"} by $${K}$, but not the other terms. **Every** term has to be multiplied by $${K}$.`,
           `Ah, ich seh, was passiert ist! Du hast ${many ? "die Brüche" : "den Bruch"} mit $${K}$ multipliziert, aber nicht die anderen Terme. **Jeder** Term muss mit $${K}$ multipliziert werden.`,
         ),
+        false,
+        null,
       );
     }
   }

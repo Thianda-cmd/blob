@@ -16,6 +16,8 @@ const hasLetter = (m: Mono) => m.e.some((e) => e > 0);
 /**
  * Display source of one monomial. With `k`, tokens get keys: sign `${k}s` (or `signKey`), coefficient
  * `${k}c`, letter `${k}<v>`, exponent `${k}e<v>`. `bare`: no sign, absolute value.
+ * Without keys (task maths, options, notes) the term is one `\group`: a line break on a phone never
+ * splits 12ab² into "12a" and "b²". Keyed frames stay ungrouped, so their tokens glide freely.
  */
 export function monoSrc(m: Mono, vars: string[], o: { first?: boolean; k?: string; signKey?: string; bare?: boolean } = {}): string {
   const keyed = o.k !== undefined;
@@ -28,10 +30,11 @@ export function monoSrc(m: Mono, vars: string[], o: { first?: boolean; k?: strin
     if (e === 0) return;
     parts.push(e === 1 ? `${v}${key(v)}` : `${v}${key(v)}^{${e}${key(`e${v}`)}}`);
   });
-  const body = parts.join(keyed ? " " : "");
+  const body = keyed ? parts.join(" ") : parts.length > 1 ? `\\group{${parts.join("")}}` : parts.join("");
   if (o.bare) return body;
   const sk = o.signKey !== undefined ? `#${o.signKey}` : key("s");
-  if (m.c < 0) return o.first && !keyed ? `-${body}` : `-${sk} ${body}`;
+  // A leading minus belongs to its term too: "-12ab^2" as one unit.
+  if (m.c < 0) return o.first && !keyed ? `\\group{-${parts.join("")}}` : `-${sk} ${body}`;
   return o.first ? body : `+${sk} ${body}`;
 }
 

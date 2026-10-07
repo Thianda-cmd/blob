@@ -8,6 +8,7 @@ import type { Exercise, Frame, LevelLesson, Mistake } from "@/learn/types";
 import { NumberLine } from "@/learn/visuals/NumberLine";
 import {
   cancelFrames,
+  clearSpec,
   lead,
   decFrames,
   decMistakes,
@@ -24,6 +25,7 @@ import {
   ratioMistakes,
   ratioSrc,
   ratioValue,
+  rewrittenContext,
   setBuilder,
   type FracSpec,
   type Ratio,
@@ -68,7 +70,7 @@ function fracExercise(s: FracSpec, v: string, hint: Text): Exercise {
     answer: s.rel === "=" ? { kind: "solutions", variable: v, values: [value] } : { kind: "inequality", variable: v, op: res.rel as IneqRel, value },
     hint,
     solution: frames,
-    mistakes: fracMistakes(s, v, { value: res.value, rel: res.rel }, eqMistakes(res.cleared, v, res.value, res.rel)),
+    mistakes: fracMistakes(s, v, { value: res.value, rel: res.rel }, eqMistakes(res.cleared, v, res.value, res.rel, rewrittenContext(res.cleared, v, { k: res.k }))),
   };
 }
 
@@ -80,7 +82,7 @@ function decExercise(e: Eq, v: string): Exercise {
     answer: { kind: "solutions", variable: v, values: [qvalue(res.value)] },
     hint: tx("Multiply every term by $10$. Then the decimals are gone.", "Multipliziere jeden Term mit $10$. Dann sind die Kommazahlen weg."),
     solution: res.frames,
-    mistakes: decMistakes(e, v, { value: res.value, rel: "=" }, eqMistakes(e, v, res.value, "=")),
+    mistakes: decMistakes(e, v, { value: res.value, rel: "=" }, eqMistakes(e, v, res.value, "=", rewrittenContext(e, v, { k: 10 }))),
   };
 }
 
@@ -109,7 +111,7 @@ function setExercise(e: Eq, v: string, order: number[]): Exercise | null {
   const extra = kind === "one" ? -x0 : kind === "none" ? right - left : left;
   if (extra === 0) return null;
   const NONE = "$L = \\{ \\}$";
-  const ALL = "$L =$ ℚ";
+  const ALL = "$L = \\Q$";
   const ZERO = "$L = \\{ 0 \\}$";
   const one = (n: number) => `$L = \\{ ${lead(n)} \\}$`;
   const base = kind === "one" ? [NONE, ALL, one(x0), one(extra)] : [NONE, ALL, ZERO, one(extra)];
@@ -243,7 +245,7 @@ function crossExercise(a: number, p: number, b: number, q: number, v: string): E
       `Ich glaub, ich weiß, was du gemacht hast: Jeder Zähler hat seinen **eigenen** Nenner abbekommen. Über Kreuz heißt: linker Zähler mal **rechter** Nenner, $${q}(${v} ${b0(a)})$.`,
     ),
   );
-  bag.merge(eqMistakes(e, v, run.value, "="));
+  bag.merge(eqMistakes(e, v, run.value, "=", rewrittenContext(e, v, "cross")));
   return {
     instruction: tx("Solve the ratio equation", "Löse die Verhältnisgleichung"),
     math: fracSrc(s, v, false),
@@ -354,6 +356,8 @@ function fracTask(rng: Rng): Exercise | null {
     const a2 = q * rng.int(-3, 5) - u2 * x0;
     if (!ok(a1) || !ok(a2)) return null;
     const sg = rng.sign();
+    // u1/p − u2/q = 0: x cancels once the fractions are cleared.
+    if (u1 * q + sg * u2 * p === 0) return null;
     const c = (u1 * x0 + a1) / p + (sg * (u2 * x0 + a2)) / q;
     if (c === 0) return null;
     s = { L: [piece("G", 1, u1, a1, p), piece("H", sg, u2, a2, q)], R: [piece("C", 1, 0, c)], rel: "=" };
@@ -373,6 +377,9 @@ function fracTask(rng: Rng): Exercise | null {
     if (c === 0) return null;
     s = { L: [piece("G", 1, u, a, p), piece("C", -1, 0, c)], R: [piece("H", 1, 1, b, q)], rel: "=" };
   }
+  // Only tasks with exactly one solution (the solver can't divide by 0).
+  const cl = clearSpec(s);
+  if (!linSolve(cl.L, cl.R, s.rel)) return null;
   const k = lcm(p, q);
   const ex = fracExercise(
     s,
@@ -527,6 +534,8 @@ function ineqTask(rng: Rng): Exercise | null {
     if (!a || !b || Math.abs(a) > 12) return null;
     s = { L: [piece("G", 1, 1, a, p)], R: [piece("H", 1, 1, 0, 1), piece("B", 1, 0, b)], rel };
   }
+  const cl = clearSpec(s);
+  if (!linSolve(cl.L, cl.R, s.rel)) return null;
   const k = [...s.L, ...s.R].reduce((acc, pc) => lcm(acc, pc.den), 1);
   const ex = fracExercise(
     s,
@@ -617,10 +626,10 @@ export const level2: LevelLesson = {
     {
       title: tx("No solution or every number", "Keine Lösung oder jede Zahl"),
       body: tx(
-        "If $x$ cancels, look at what's left. A false statement: $L = \\{ \\}$. A true statement: every number works, $L =$ ℚ.",
-        "Fällt $x$ weg, schau, was übrig bleibt. Eine falsche Aussage: $L = \\{ \\}$. Eine wahre Aussage: Jede Zahl passt, $L =$ ℚ.",
+        "If $x$ cancels, look at what's left. A false statement: $L = \\{ \\}$. A true statement: every number works, $L = \\Q$.",
+        "Fällt $x$ weg, schau, was übrig bleibt. Eine falsche Aussage: $L = \\{ \\}$. Eine wahre Aussage: Jede Zahl passt, $L = \\Q$.",
       ),
-      examples: ["2x + 6 = 2x + 5 \\Rightarrow 6 = 5 \\Rightarrow L = \\{ \\}", "4x - 3 = 4x - 3 \\Rightarrow -3 = -3 \\Rightarrow L = ℚ"],
+      examples: ["2x + 6 = 2x + 5 \\Rightarrow 6 = 5 \\Rightarrow L = \\{ \\}", "4x - 3 = 4x - 3 \\Rightarrow -3 = -3 \\Rightarrow L = \\Q"],
       tone: "rule",
     },
     {
@@ -632,8 +641,8 @@ export const level2: LevelLesson = {
     {
       title: tx("Solution sets of inequalities", "Lösungsmengen von Ungleichungen"),
       body: tx(
-        "Write the answer as a set. On the number line: an open circle for $<$ and $>$, a filled dot for $\\le$ and $\\ge$. As an interval: $x \\le 6$ is (−∞, 6].",
-        "Schreib die Lösung als Menge. An der Zahlengeraden: ein offener Kreis bei $<$ und $>$, ein ausgefüllter Punkt bei $\\le$ und $\\ge$. Als Intervall: $x \\le 6$ ist ]−∞; 6].",
+        "Write the answer as a set. On the number line: an open circle for $<$ and $>$, a filled dot for $\\le$ and $\\ge$. As an interval: $x \\le 6$ is (−∞, 6].",
+        "Schreib die Lösung als Menge. An der Zahlengeraden: ein offener Kreis bei $<$ und $>$, ein ausgefüllter Punkt bei $\\le$ und $\\ge$. Als Intervall: $x \\le 6$ ist ]−∞; 6].",
       ),
       examples: ["L = \\{ x \\,|\\, x \\le 6 \\}"],
       tone: "tip",
@@ -674,8 +683,8 @@ export const level2: LevelLesson = {
       title: tx("No solution, or every number", "Keine Lösung oder jede Zahl"),
       blob: tx("Sometimes x just vanishes. Then the leftovers decide!", "Manchmal verschwindet das x einfach. Dann entscheidet der Rest!"),
       body: tx(
-        "If the $x$-terms cancel, a statement without $x$ is left. **False** (like $6 = 5$): no number works, $L = \\{ \\}$. **True** (like $-3 = -3$): every number works, $L =$ ℚ, the set of rational numbers.",
-        "Heben sich die $x$-Terme auf, bleibt eine Aussage ohne $x$. **Falsch** (wie $6 = 5$): Keine Zahl passt, $L = \\{ \\}$. **Wahr** (wie $-3 = -3$): Jede Zahl passt, $L =$ ℚ, die Menge der rationalen Zahlen.",
+        "If the $x$-terms cancel, a statement without $x$ is left. **False** (like $6 = 5$): no number works, $L = \\{ \\}$. **True** (like $-3 = -3$): every number works, $L = \\Q$, the set of rational numbers.",
+        "Heben sich die $x$-Terme auf, bleibt eine Aussage ohne $x$. **Falsch** (wie $6 = 5$): Keine Zahl passt, $L = \\{ \\}$. **Wahr** (wie $-3 = -3$): Jede Zahl passt, $L = \\Q$, die Menge der rationalen Zahlen.",
       ),
       frames: cancelIntro,
     },

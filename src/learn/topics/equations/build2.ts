@@ -11,6 +11,7 @@ import {
   applyOp,
   bodySrc,
   coef,
+  collectedSrc,
   combine,
   combineNote,
   eqSrc,
@@ -52,8 +53,8 @@ export const decTex = (v: number, l: Locale) => {
   const s = String(Math.round(v * 1e6) / 1e6);
   return l === "de" ? s.replace(".", ",") : s;
 };
-/** A number right after "{": grouped, so its minus reads as a sign, not as "minus". */
-export const lead = (s: string | number) => (String(s).startsWith("-") ? `\\group{${s}}` : String(s));
+/** A number right after "{" (the display reads a minus there as a sign, so nothing to do any more). */
+export const lead = (s: string | number) => String(s);
 /** "{ -2; 8 }" in German, "{ -2, 8 }" in English (the comma is the German decimal sign). */
 export const setOf = (values: number[]): Text => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -62,15 +63,16 @@ export const setOf = (values: number[]): Text => {
 /** "L = { x | x > 3 }" */
 export const setBuilder = (v: string, rel: Rel, b: number | string): Text =>
   txMap((_, l) => `L = \\{ ${v} \\,|\\, ${v} ${REL_TEXT[rel]} ${typeof b === "number" ? decTex(b, l) : b} \\}`);
-/** Interval notation as plain text: ]3; ∞[ in German, (3, ∞) in English. */
+/** Interval notation as plain text: ]3; ∞[ in German, (3, ∞) in English (a no-break space, so it never splits). */
 export function intervalText(rel: Exclude<Rel, "=">, b: number): Text {
   const n = (l: Locale) => decTex(b, l).replace("-", "−");
   return txMap((_, l) => {
     const de = l === "de";
-    if (rel === ">") return de ? `]${n(l)}; ∞[` : `(${n(l)}, ∞)`;
-    if (rel === "≥") return de ? `[${n(l)}; ∞[` : `[${n(l)}, ∞)`;
-    if (rel === "<") return de ? `]−∞; ${n(l)}[` : `(−∞, ${n(l)})`;
-    return de ? `]−∞; ${n(l)}]` : `(−∞, ${n(l)}]`;
+    const s = de ? ";\u00A0" : ",\u00A0";
+    if (rel === ">") return de ? `]${n(l)}${s}∞[` : `(${n(l)}${s}∞)`;
+    if (rel === "≥") return de ? `[${n(l)}${s}∞[` : `[${n(l)}${s}∞)`;
+    if (rel === "<") return de ? `]−∞${s}${n(l)}[` : `(−∞${s}${n(l)})`;
+    return de ? `]−∞${s}${n(l)}]` : `(−∞${s}${n(l)}]`;
   });
 }
 
@@ -117,6 +119,22 @@ export function mistakeBag(right: Run, v: string, max = 5) {
         out.push(m);
       }
     },
+  };
+}
+
+/**
+ * Blob's first sentence for slips on an equation the task never shows (after clearing fractions or
+ * decimals, or after multiplying crosswise): the numbers in the message come from this equation.
+ * `bracket` (for slips while expanding) doesn't give away the expanded form.
+ */
+export function rewrittenContext(e: Eq, v: string, how: { k: number } | "cross"): { slip: Text; bracket: Text } {
+  const full = eqSrc(e, v, false);
+  const short = collectedSrc(e, v);
+  const say = (en: string, de: string) =>
+    how === "cross" ? tx(`Multiplied crosswise you have ${en}.`, `Über Kreuz multipliziert steht da ${de}.`) : tx(`After multiplying by $${how.k}$ you have ${en}.`, `Nach dem Multiplizieren mit $${how.k}$ steht da ${de}.`);
+  return {
+    slip: short === full ? say(`$${full}$`, `$${full}$`) : say(`$${full}$, which is $${short}$`, `$${full}$, also $${short}$`),
+    bracket: say(`$${full}$`, `$${full}$`),
   };
 }
 
@@ -386,7 +404,7 @@ export function cancelFrames(start: Eq, v: string, maxEm = 13): { frames: Frame[
   frames.push(
     kind === "none"
       ? { math: "L = \\{ \\}", note: tx("No solution: the solution set is empty, $L = \\{ \\}$.", "Keine Lösung: Die Lösungsmenge ist leer, $L = \\{ \\}$.") }
-      : { math: "L = ℚ", note: tx("Every number is a solution: $L =$ ℚ, all rational numbers.", "Jede Zahl ist eine Lösung: $L =$ ℚ, alle rationalen Zahlen.") },
+      : { math: "L = \\Q", note: tx("Every number is a solution: $L = \\Q$, all rational numbers.", "Jede Zahl ist eine Lösung: $L = \\Q$, alle rationalen Zahlen.") },
   );
   return { frames, kind, left, right };
 }

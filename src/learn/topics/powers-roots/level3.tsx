@@ -1621,7 +1621,7 @@ export const level3: LevelLesson = {
       body: tx("Same root index: one root. Root of a root: multiply the indices. A root in the denominator: expand.", "Gleicher Wurzelexponent: eine Wurzel. Wurzel aus einer Wurzel: Wurzelexponenten multiplizieren. Wurzel im Nenner: erweitern."),
       examples: [
         "\\sqrt[n]{a} \\cdot \\sqrt[n]{b} = \\sqrt[n]{a \\cdot b} \\quad \\frac{\\sqrt[n]{a}}{\\sqrt[n]{b}} = \\sqrt[n]{\\frac{a}{b}}",
-        "\\sqrt[m]{\\sqrt[n]{a}} = \\sqrt[m \\cdot n]{a} \\quad \\sqrt{\\sqrt{625}} = \\sqrt[4]{625} = 5",
+        "\\sqrt[m]{\\sqrt[n]{a}} = \\sqrt[m \\cdot n]{a}",
         "\\frac{1}{\\sqrt{2}} = \\frac{\\sqrt{2}}{2}",
         "\\frac{2}{\\sqrt{3} - 1} = \\frac{2(\\sqrt{3} + 1)}{3 - 1} = \\sqrt{3} + 1",
       ],

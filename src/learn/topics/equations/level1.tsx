@@ -488,10 +488,10 @@ function findMistake(rng: Rng): Exercise | null {
 
 /** Multiples in words: "three times" / "das Dreifache" (and "dem Dreifachen"). */
 const TIMES: Record<number, { en: string; nom: string; dat: string; verb: string; verbEn: string }> = {
-  2: { en: "twice", nom: "das Doppelte", dat: "dem Doppelten", verb: "verdopple", verbEn: "double" },
-  3: { en: "three times", nom: "das Dreifache", dat: "dem Dreifachen", verb: "verdreifache", verbEn: "triple" },
-  4: { en: "four times", nom: "das Vierfache", dat: "dem Vierfachen", verb: "vervierfache", verbEn: "multiply by 4" },
-  5: { en: "five times", nom: "das Fünffache", dat: "dem Fünffachen", verb: "verfünffache", verbEn: "multiply by 5" },
+  2: { en: "twice", nom: "das Doppelte", dat: "dem Doppelten", verb: "verdopple", verbEn: "double the result" },
+  3: { en: "three times", nom: "das Dreifache", dat: "dem Dreifachen", verb: "verdreifache", verbEn: "triple the result" },
+  4: { en: "four times", nom: "das Vierfache", dat: "dem Vierfachen", verb: "vervierfache", verbEn: "multiply the result by 4" },
+  5: { en: "five times", nom: "das Fünffache", dat: "dem Fünffachen", verb: "verfünffache", verbEn: "multiply the result by 5" },
 };
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
@@ -527,7 +527,7 @@ function puzzle(rng: Rng): Exercise | null {
     e = equation([group("G", k, [inner(1, 1), inner(p)])], "=", [term("C", c)]);
     const w = TIMES[k];
     text = tx(
-      `I add ${p} to my number and then ${w.verbEn} the result. I get ${c}. What is my number?`,
+      `I add ${p} to my number and then ${w.verbEn}. I get ${c}. What is my number?`,
       `Ich addiere ${p} zu meiner Zahl und ${w.verb} dann das Ergebnis. Ich erhalte ${c}. Wie heißt meine Zahl?`,
     );
     setUp = tx(
@@ -573,7 +573,7 @@ function puzzle(rng: Rng): Exercise | null {
     e = equation([term("A", a, 1), term("B", -b)], "=", [term("C", c, 1), term("D", d)]);
     const w = TIMES[a];
     const cEn = c === 1 ? "my number" : `${TIMES[c].en} my number`;
-    const cDe = c === 1 ? "bei meiner Zahl" : `beim ${TIMES[c].dat.replace("dem ", "")} meiner Zahl`;
+    const cDe = c === 1 ? "meine Zahl" : `${TIMES[c].nom} meiner Zahl`;
     text = tx(
       `Subtract ${b} from ${w.en} my number and you get the same as ${cEn} plus ${d}. What is my number?`,
       `Subtrahierst du ${b} vom ${w.dat.replace("dem ", "")} meiner Zahl, erhältst du dasselbe wie ${cDe} plus ${d}. Wie heißt meine Zahl?`,

@@ -7,7 +7,7 @@
 import { tx, type Text } from "@/i18n/text";
 import type { Rng } from "@/learn/engine/rng";
 import type { Exercise, Frame, LevelLesson } from "@/learn/types";
-import { choice, clean, D, E, fixedChoice, mb, mistakesFor, NAMES, nf, numAns, txs, visual, weighted, type Opt, type Say } from "./kit";
+import { choice, clean, D, E, fixedChoice, hk, mb, mistakesFor, NAMES, nf, numAns, txs, visual, weighted, type Opt, type Say } from "./kit";
 import { FenceMax } from "./FenceMax";
 import { FermiLab } from "./FermiLab";
 import { ModelCycle } from "./ModelCycle";
@@ -371,7 +371,7 @@ const expModel: Tpl = (rng) => {
               : txs((s) => `After ${s.t(after)}: n = ${n}.`, (s) => `Nach ${s.t(after)}: n = ${n}.`),
         },
         { math: mb((s) => `f(${n})#f =#eq ${s.m(a, "a")} \\cdot#d ${s.m(c.q ** n, "q", 4)}`), note: txs((s) => `${s.n(c.q)}^${n} = ${s.n(c.q ** n, 4)}.`, (s) => `${s.n(c.q)} hoch ${n} = ${s.n(c.q ** n, 4)}.`) },
-        { math: mb((s) => `f(${n})#f =#eq ${s.m(v, "v")} "${s.t(c.unit)}"#u`), highlight: ["v", "u"], note: txs((s) => `**Answer:** ${s.n(v)} ${s.t(c.unit)}.`, (s) => `**Antwort:** ${s.n(v)} ${s.t(c.unit)}.`) },
+        { math: mb((s) => `f(${n})#f =#eq ${s.m(v, "v")} "${s.t(c.unit)}"#u`), highlight: [...hk("v"), "u"], note: txs((s) => `**Answer:** ${s.n(v)} ${s.t(c.unit)}.`, (s) => `**Antwort:** ${s.n(v)} ${s.t(c.unit)}.`) },
       ],
     };
   }
@@ -813,7 +813,7 @@ const fermi: Tpl = (rng) => {
       }),
       {
         math: mb((s) => `\\approx ${s.m(right, "r", 0)}`),
-        highlight: ["r"],
+        highlight: hk("r"),
         note: txs(
           (s) => `Rounded: **about ${s.n(right, 0)} ${s.t(q.unit)}**. That's the order of magnitude that counts.${guess ? " Any other sensible assumption lands at the same order of magnitude." : ""}`,
           (s) => `Gerundet: **etwa ${s.n(right, 0)} ${s.t(q.unit)}**. Auf diese Größenordnung kommt es an.${guess ? " Mit einer anderen sinnvollen Annahme landest du bei derselben Größenordnung." : ""}`,
@@ -1352,7 +1352,7 @@ export const level3: LevelLesson = {
         solution: [
           { math: mb((s) => `800 \\cdot ${s.m(0.5)} =#eq 400 "${s.de ? "l pro Tag" : "l a day"}"#u`), note: tx("Assumption: half a litre per student and school day.", "Annahme: ein halber Liter pro Person und Schultag.") },
           { math: mb((s) => `400 \\cdot 190 =#eq ${s.m(76000, "r")} "l"#u`), note: tx("About 190 school days a year.", "Rund 190 Schultage im Jahr.") },
-          { math: mb((s) => `\\approx ${s.m(80000, "r")} "l"#u`), highlight: ["r"], note: tx("**Answer:** about 80 000 litres. Even with 0.3 or 1 litre a day you stay at this order of magnitude.", "**Antwort:** etwa 80.000 Liter. Auch mit 0,3 oder 1 Liter pro Tag bleibst du in dieser Größenordnung.") },
+          { math: mb((s) => `\\approx ${s.m(80000, "r")} "l"#u`), highlight: hk("r"), note: tx("**Answer:** about 80 000 litres. Even with 0.3 or 1 litre a day you stay at this order of magnitude.", "**Antwort:** etwa 80.000 Liter. Auch mit 0,3 oder 1 Liter pro Tag bleibst du in dieser Größenordnung.") },
         ],
       },
     },

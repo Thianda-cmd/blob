@@ -121,9 +121,9 @@ export function absSimpleMistakes(t: AbsSimple, v = "x"): Mistake[] {
     );
     return b.out;
   }
-  if (a !== 0 && r > 0)
+  if (a !== 0)
     b.push(
-      [-a - r, -a + r],
+      r === 0 ? [-a] : [-a - r, -a + r],
       tx("Wrong centre", "Falscher Mittelpunkt"),
       a > 0
         ? tx(`Nearly! $|${v} - ${a}|$ is the distance from $+${a}$, not from $-${a}$. Count from $${a}$.`, `Fast! $|${v} - ${a}|$ ist der Abstand von $+${a}$, nicht von $-${a}$. Zähl von $${a}$ aus.`)
@@ -389,6 +389,61 @@ export function absIneqFrames(t: AbsIneq, v = "x"): Frame[] {
 }
 
 // ---------------------------------------------------------------------------
+// |ux + b| < c and friends (u ≥ 2): without the bars, then x alone in the middle.
+
+export type AbsIneqLin = { u: number; b: number; c: number; rel: AbsIneq["rel"] };
+
+export const absIneqLinSrc = ({ u, b, c, rel }: AbsIneqLin, v = "x") => `|${lin(u, b, v)}| ${RT[rel]} ${c}`;
+export const absIneqLinBounds = ({ u, b, c }: AbsIneqLin) => ({ lo: (-c - b) / u, hi: (c - b) / u });
+
+/** "−6 < 2x − 4 < 6", or "2x − 4 < −6 or 2x − 4 > 6" for > and ≥. */
+export function absIneqLinBars({ rel }: { rel: AbsIneq["rel"] }, lo: number, mid: string, hi: number): Text {
+  const inner = rel === "<" || rel === "≤";
+  return inner ? `${lo} ${RT[rel]} ${mid} ${RT[rel]} ${hi}` : withOr((or) => `${mid} ${rel === ">" ? "<" : "\\le"} ${lo} ${or} ${mid} ${RT[rel]} ${hi}`);
+}
+
+export function absIneqLinFrames(t: AbsIneqLin, v = "x"): Frame[] {
+  const { u, b, c, rel } = t;
+  const inner = rel === "<" || rel === "≤";
+  const close = rel === "≤" || rel === "≥";
+  const inside = lin(u, b, v);
+  const { lo, hi } = absIneqLinBounds(t);
+  const words: Record<AbsIneq["rel"], [string, string]> = { "<": ["less than", "weniger als"], "≤": ["at most", "höchstens"], ">": ["more than", "mehr als"], "≥": ["at least", "mindestens"] };
+  return [
+    {
+      math: absIneqLinSrc(t, v),
+      note: tx(`The inside, $${inside}$, is ${words[rel][0]} $${c}$ away from $0$.`, `Das Innere, $${inside}$, ist ${words[rel][1]} $${c}$ von $0$ entfernt.`),
+    },
+    {
+      math: absIneqLinBars(t, -c, inside, c),
+      note: inner
+        ? tx(`Without the bars: the inside lies between $-${c}$ and $${c}$.`, `Ohne Betragsstriche: Das Innere liegt zwischen $-${c}$ und $${c}$.`)
+        : tx(`Without the bars: the inside lies below $-${c}$ or above $${c}$.`, `Ohne Betragsstriche: Das Innere liegt unter $-${c}$ oder über $${c}$.`),
+    },
+    {
+      math: absIneqLinBars(t, -c - b, lin(u, 0, v), c - b),
+      note: b > 0 ? tx(`Subtract $${b}$ everywhere.`, `Subtrahiere überall $${b}$.`) : tx(`Add $${-b}$ everywhere.`, `Addiere überall $${-b}$.`),
+    },
+    {
+      math: absIneqLinBars(t, lo, v, hi),
+      note: tx(`Divide everything by $${u}$. It's positive, so the signs stay as they are.`, `Teile alles durch $${u}$. Das ist positiv, die Zeichen bleiben also, wie sie sind.`),
+    },
+    {
+      math: absIneqSet(lo, hi, rel, v),
+      note: inner
+        ? tx(
+            `On the number line: the stretch from $${lo}$ to $${hi}$, ends ${close ? "included" : "left out"}.`,
+            `An der Zahlengeraden: die Strecke von $${lo}$ bis $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
+          )
+        : tx(
+            `On the number line: everything outside $${lo}$ and $${hi}$, ends ${close ? "included" : "left out"}.`,
+            `An der Zahlengeraden: alles außerhalb von $${lo}$ und $${hi}$, Enden ${close ? "eingeschlossen" : "ausgeschlossen"}.`,
+          ),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Root equations √(ux + a) = x − b: square, solve the quadratic, check (Probe).
 
 export type RootQuad = { u: number; a: number; b: number };
@@ -632,8 +687,11 @@ export function rootRootFrames(t: RootRoot, v = "x"): Frame[] {
 }
 
 export function rootRootMistakes(t: RootRoot, v = "x"): Mistake[] {
+  const { u, a, w, d } = t;
   const { x, ok } = rootRootSolve(t);
   const out = bag(ok ? [x] : [], v);
+  const squared = `${lin(u, a, v)} = ${lin(w, d, v)}`;
+  const whole = (n: number) => (Number.isInteger(n) ? [n] : null);
   if (!ok) {
     out.push(
       [x],
@@ -645,6 +703,24 @@ export function rootRootMistakes(t: RootRoot, v = "x"): Mistake[] {
       true,
     );
   }
+  // After squaring it's a linear equation: the classic slips when terms change sides.
+  if (a !== 0)
+    out.push(
+      whole((d + a) / (u - w)),
+      tx("Sign not changed", "Vorzeichen nicht gewechselt"),
+      tx(
+        `Ah, I see what happened! Squaring gives $${squared}$. When the $${a > 0 ? `+ ${a}` : `- ${-a}`}$ changes sides, it changes its sign: $${lin(u - w, 0, v)} = ${d} ${a > 0 ? "-" : "+"} ${Math.abs(a)}$.`,
+        `Ah, ich seh, was passiert ist! Quadriert steht da $${squared}$. Wenn das $${a > 0 ? `+ ${a}` : `- ${-a}`}$ die Seite wechselt, wechselt es sein Vorzeichen: $${lin(u - w, 0, v)} = ${d} ${a > 0 ? "-" : "+"} ${Math.abs(a)}$.`,
+      ),
+    );
+  out.push(
+    whole((d - a) / (u + w)),
+    tx(`${v}-term kept its sign`, `${v}-Term ohne Vorzeichenwechsel`),
+    tx(
+      `I think I know what you did: after squaring, $${lin(w, 0, v)}$ went over to the left but kept its sign. Bringing it over means **subtracting** it: $${lin(u, 0, v)} - ${lin(w, 0, v)}$.`,
+      `Ich glaub, ich weiß, was du gemacht hast: Nach dem Quadrieren ist $${lin(w, 0, v)}$ nach links gewandert, hat aber sein Vorzeichen behalten. Rüberholen heißt **subtrahieren**: $${lin(u, 0, v)} - ${lin(w, 0, v)}$.`,
+    ),
+  );
   return out.out;
 }
 

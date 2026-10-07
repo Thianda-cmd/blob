@@ -194,6 +194,8 @@ export function ProbabilityAtLeastOnce() {
   ];
   const pct = (v: number) => `${num(v * 100, 1)}${locale === "de" ? " %" : "%"}`;
   const ev = t(KINDS[kind].event);
+  // 1 − (1/2)^1 is exactly 0.5: then "=" instead of "≈".
+  const exact = Number.isInteger(Math.round(at(n) * 1e6) / 1e3);
 
   return (
     <div className="space-y-4">
@@ -254,14 +256,14 @@ export function ProbabilityAtLeastOnce() {
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-blob/40 bg-blob-soft/50 px-4 py-3">
           <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-blob-ink">{t(tx("Right: via the complement", "Richtig: mit dem Gegenereignis"))}</div>
-          <MathView src={`1 - (${fracSrc(d - c, d)})^{${n}} \\approx ${num(at(n), 3)}`} size="md" animate={false} />
+          <MathView src={`1 - (${fracSrc(d - c, d)})^{${n}} ${exact ? "=" : "\\approx"} ${num(at(n), 3)}`} size="md" animate={false} />
           <div className="mt-1 text-[13px] text-ink-2">
-            P({ev}) ≈ {pct(at(n))}
+            P({ev}) {exact ? "=" : "≈"} {pct(at(n))}
           </div>
         </div>
         <div className="rounded-xl border border-line bg-surface px-4 py-3">
           <div className={cn("mb-1 text-[12px] font-semibold uppercase tracking-[0.06em]", n === 1 ? "text-ink-3" : "text-danger")}>
-            {n === 1 ? t(tx("Adding: n · p", "Addieren: n · p")) : t(tx("Wrong: adding", "Falsch: addieren"))}
+            {n === 1 ? t(tx("Adding", "Addieren")) : t(tx("Wrong: adding", "Falsch: addieren"))}
           </div>
           <MathView src={`${n} \\cdot ${fracSrc(c, d)} ${naive(n) > 1 ? ">" : Number.isInteger(Math.round(naive(n) * 1e6) / 1e3) ? "=" : "\\approx"} ${naive(n) > 1 ? "1" : num(naive(n), 3)}`} size="md" animate={false} className="text-ink-2" />
           <div className="mt-1 text-[13px] text-ink-2">

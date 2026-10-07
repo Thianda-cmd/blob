@@ -53,13 +53,13 @@ export function BothSidesLab() {
     },
     none: {
       title: tx("No solution", "Keine Lösung"),
-      text: tx("Same slope, different start: the lines are parallel and never meet.", "Gleiche Steigung, anderer Startwert: Die Geraden sind parallel und treffen sich nie."),
+      text: tx("Same slope, different y-intercept: the lines are parallel and never meet.", "Gleiche Steigung, anderer y-Achsenabschnitt: Die Geraden sind parallel und treffen sich nie."),
       set: "L = \\{ \\}",
     },
     all: {
       title: tx("Every number is a solution", "Jede Zahl ist eine Lösung"),
       text: tx("Both sides are the same line. Whatever x is, the sides are equal.", "Beide Seiten sind dieselbe Gerade. Egal, was x ist: Die Seiten sind gleich."),
-      set: "L = ℚ",
+      set: "L = \\Q",
     },
   };
   const s = status[kind];
@@ -132,7 +132,7 @@ export function BothSidesLab() {
               </div>
               <p className="text-[13.5px] text-ink-2">{t(s.text)}</p>
               <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
-                {t(tx("All x-terms to the left:", "Alle x-Terme nach links:"))}
+                {t(tx("x-terms left, numbers right:", "x-Terme links, Zahlen rechts:"))}
                 <MathView src={reduced} size="sm" animate={false} className="text-ink" />
               </div>
             </motion.div>

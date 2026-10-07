@@ -37,12 +37,17 @@ const N = 10000;
 const PER_DOT = 10;
 const DOTS = N / PER_DOT;
 
-/** Dots for each group: one for every 10 people, at least one for a group that isn't empty, the rest healthy and negative. */
-function dotCounts(tp: number, fn: number, fp: number) {
-  const d = (v: number) => (v > 0 ? Math.max(1, Math.round(v / PER_DOT)) : 0);
-  const out = { tp: d(tp), fn: d(fn), fp: d(fp), tn: 0 };
-  out.tn = DOTS - out.tp - out.fn - out.fp;
-  return out;
+/**
+ * Dots for each group, one for every 10 people. The ill get exactly their share of dots; a group
+ * that isn't empty always gets at least one dot, so even 5 ill people with a negative test show up.
+ */
+function dotCounts(sick: number, tp: number, fp: number) {
+  const sickDots = Math.round(sick / PER_DOT);
+  const healthyDots = DOTS - sickDots;
+  const keep = (v: number, n: number, rest: number, all: number) => Math.min(rest > 0 ? all - 1 : all, Math.max(n > 0 ? 1 : 0, v));
+  const tpDots = keep(Math.round(tp / PER_DOT), tp, sick - tp, sickDots);
+  const fpDots = keep(Math.round(fp / PER_DOT), fp, N - sick - fp, healthyDots);
+  return { tp: tpDots, fn: sickDots - tpDots, fp: fpDots, tn: healthyDots - fpDots };
 }
 
 export function ProbabilityBayesLab() {
@@ -66,7 +71,7 @@ export function ProbabilityBayesLab() {
   // Dots, row by row: sick and positive, sick and negative, healthy and positive, healthy and negative.
   const cols = 40;
   const cell = 10;
-  const dots = dotCounts(tp, fn, fp);
+  const dots = dotCounts(sick, tp, fp);
   const kinds: ("tp" | "fn" | "fp" | "tn")[] = [
     ...Array<"tp">(dots.tp).fill("tp"),
     ...Array<"fn">(dots.fn).fill("fn"),

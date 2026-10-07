@@ -160,10 +160,17 @@ function factorBinomialTask(rng: Rng, b: Bin, kind: "sq" | "conj" | "sum" | "neg
   let wrong: Opt[];
   let solution: Frame[];
   const take = (title: Text, say: Text, text: string): Opt => ({ text: $(text), title, say });
+  // "Not possible" is offered in about half of the tasks that do factorise, so it isn't a giveaway when it shows up.
+  const notPossible = (say: Text): Opt[] => (rng.chance(0.5) ? [{ text: NOT_POSSIBLE, title: tx("It does work", "Es geht doch"), say }] : []);
   if (kind === "sq") {
     math = expandedSq(b, s);
     right = $(factSq(b, s));
-    wrong = rng.shuffle([
+    const np = notPossible(
+      s > 0
+        ? tx(`It does work: $${A2(b)}$ and $${B2(b)}$ are squares, and the middle term $${MID(b)} = 2 \\cdot ${A} \\cdot ${B}$ is exactly $2ab$. That's the 1st binomial formula.`, `Es geht doch: $${A2(b)}$ und $${B2(b)}$ sind Quadrate, und der Mittelterm $${MID(b)} = 2 \\cdot ${A} \\cdot ${B}$ ist genau $2ab$. Das ist die 1. binomische Formel.`)
+        : tx(`It does work: $${A2(b)}$ and $${B2(b)}$ are squares, and the middle term $-${MID(b)} = -2 \\cdot ${A} \\cdot ${B}$ is exactly $-2ab$. That's the 2nd binomial formula.`, `Es geht doch: $${A2(b)}$ und $${B2(b)}$ sind Quadrate, und der Mittelterm $-${MID(b)} = -2 \\cdot ${A} \\cdot ${B}$ ist genau $-2ab$. Das ist die 2. binomische Formel.`),
+    );
+    wrong = [...np, ...rng.shuffle([
       take(tx("Look at the middle sign", "Schau aufs Vorzeichen in der Mitte"), SIGN_SAY(s), factSq(b, -s)),
       take(tx("The 3rd formula has no middle term", "Die 3. Formel hat keinen Mittelterm"), tx(`$(a + b)(a - b) = a^2 - b^2$ has no middle term. But your term has one: $${MID(b)}$.`, `$(a + b)(a - b) = a^2 - b^2$ hat keinen Mittelterm. Dein Term hat aber einen: $${MID(b)}$.`), factConj(b)),
       take(tx("Take the root", "Zieh die Wurzel"), tx(`$b^2 = ${B2(b)}$, so $b$ is its **root**: which term squared gives $${B2(b)}$?`, `$b^2 = ${B2(b)}$, also ist $b$ die **Wurzel** daraus: Welcher Term hoch 2 ergibt $${B2(b)}$?`), factSq({ ...b, q: b.q * b.q }, s)),
@@ -173,19 +180,25 @@ function factorBinomialTask(rng: Rng, b: Bin, kind: "sq" | "conj" | "sum" | "neg
       ...(b.p > 1
         ? [take(tx("Take the root of the first term too", "Auch vorne die Wurzel ziehen"), tx(`$a^2 = ${A2(b)}$, so $a$ is the root of it, not $${b.p * b.p}${b.v}$.`, `$a^2 = ${A2(b)}$, also ist $a$ die Wurzel daraus, nicht $${b.p * b.p}${b.v}$.`), factSq({ ...b, p: b.p * b.p }, s))]
         : []),
-    ]);
+    ])];
     solution = squareFrames(b, s);
   } else if (kind === "conj") {
     math = expandedConj(b);
     right = $(factConj(b));
-    wrong = rng.shuffle([
+    const np = notPossible(
+      tx(
+        `It does work: $${A2(b)}$ and $${B2(b)}$ are squares with a **minus** between them. That's the 3rd binomial formula: $a^2 - b^2 = (a + b)(a - b)$.`,
+        `Es geht doch: $${A2(b)}$ und $${B2(b)}$ sind Quadrate mit einem **Minus** dazwischen. Das ist die 3. binomische Formel: $a^2 - b^2 = (a + b)(a - b)$.`,
+      ),
+    );
+    wrong = [...np, ...rng.shuffle([
       take(tx("That would have a middle term", "Das hätte einen Mittelterm"), tx(`$(a - b)^2 = a^2 - 2ab + b^2$ has a middle term and ends with **plus** $b^2$. Here: no middle term, minus between the squares.`, `$(a - b)^2 = a^2 - 2ab + b^2$ hat einen Mittelterm und endet mit **plus** $b^2$. Hier: kein Mittelterm, Minus zwischen den Quadraten.`), factSq(b, -1)),
       take(tx("That would have a middle term", "Das hätte einen Mittelterm"), tx("$(a + b)^2 = a^2 + 2ab + b^2$: middle term and plus at the end. Here it's two squares with a **minus**: the 3rd formula.", "$(a + b)^2 = a^2 + 2ab + b^2$: Mittelterm und Plus am Ende. Hier sind es zwei Quadrate mit **Minus**: die 3. Formel."), factSq(b, 1)),
       take(tx("Take the root", "Zieh die Wurzel"), tx(`$b^2 = ${B2(b)}$, so $b$ is its **root**, not $${B2(b)}$ itself.`, `$b^2 = ${B2(b)}$, also ist $b$ die **Wurzel** daraus, nicht $${B2(b)}$ selbst.`), factConj({ ...b, q: b.q * b.q })),
       ...(b.p > 1
         ? [take(tx("Take the root of the first term too", "Auch vorne die Wurzel ziehen"), tx(`$a^2 = ${A2(b)}$, so $a$ is the root of it, not $${b.p * b.p}${b.v}$.`, `$a^2 = ${A2(b)}$, also ist $a$ die Wurzel daraus, nicht $${b.p * b.p}${b.v}$.`), factConj({ ...b, p: b.p * b.p }))]
         : []),
-    ]);
+    ])];
     solution = conjFrames(b);
   } else {
     math = kind === "sum" ? `${A2(b)} + ${B2(b)}` : `${A2(b)} + ${MID(b)} - ${B2(b)}`;
@@ -237,7 +250,8 @@ function factorCompleteTask(rng: Rng, kind: "kSq" | "kConj" | "xSq" | "kxConj", 
   const b: Bin = { p: 1, v, q, w: "" };
   const factored = kind === "kSq" || kind === "xSq" ? factSq(b, s) : factConj(b);
   const right = `${K}${factored}`;
-  const wrong: Opt[] = [{ text: $(`${K}(${innerSrc})`), ...EARLY }];
+  // Stopping after factoring out is always offered; the other slips take turns for the last two places.
+  const wrong: Opt[] = [];
   if (kind === "kSq" || kind === "xSq") {
     wrong.push({ text: $(`${K}${factSq(b, -s)}`), title: tx("Look at the middle sign", "Schau aufs Vorzeichen in der Mitte"), say: SIGN_SAY(s) });
     wrong.push({ text: $(`${K}${factConj(b)}`), title: tx("The 3rd formula has no middle term", "Die 3. Formel hat keinen Mittelterm"), say: tx(`Inside the bracket there's a middle term $${2 * q}${v}$, so it's the 1st or 2nd formula.`, `In der Klammer steht ein Mittelterm $${2 * q}${v}$, also ist es die 1. oder 2. Formel.`) });
@@ -249,7 +263,7 @@ function factorCompleteTask(rng: Rng, kind: "kSq" | "kConj" | "xSq" | "kxConj", 
   } else {
     wrong.push({ text: $(kind === "xSq" ? factored : `${k}${factored}`), title: tx(`The ${v} got lost`, `Das ${v} ging verloren`), say: tx(`You forgot the $${v}$ you factored out. It stays in front of the brackets.`, `Du hast das ausgeklammerte $${v}$ vergessen. Es bleibt vor den Klammern stehen.`) });
   }
-  const { answer, mistakes } = choiceTask(rng, $(right), wrong);
+  const { answer, mistakes } = choiceTask(rng, $(right), [{ text: $(`${K}(${innerSrc})`), ...EARLY }, ...rng.shuffle(wrong)]);
   const common = kind === "xSq" ? tx(`Every term contains $${v}$.`, `Jeder Term enthält $${v}$.`) : kind === "kxConj" ? tx(`Every term contains $${K}$.`, `Jeder Term enthält $${K}$.`) : tx(`Every term is divisible by $${k}$.`, `Jeder Term ist durch $${k}$ teilbar.`);
   return {
     instruction: FACTOR_COMPLETE,
@@ -432,7 +446,7 @@ function cubeTask(p: number, q: number, s: number, v: string): Exercise {
   const { out, add } = exprMistakes(value);
   add([s * q * q * q, 0, 0, p * p * p], v, tx("The middle terms are missing", "Die Mittelterme fehlen"), tx("Cubing a sum is not cubing each part: $(a + b)^3 \\ne a^3 + b^3$. Two middle terms belong in between: $3a^2b + 3ab^2$.", "Eine Summe hoch 3 ist nicht jeder Teil hoch 3: $(a + b)^3 \\ne a^3 + b^3$. Dazwischen gehören zwei Mittelterme: $3a^2b + 3ab^2$."));
   if (s < 0) add([-q * q * q, -3 * p * q * q, -3 * p * p * q, p * p * p], v, tx("The signs alternate", "Die Vorzeichen wechseln sich ab"), tx("With $(a - b)^3$ the signs alternate: $+, -, +, -$. The third term is plus, because $(-b)^2$ is positive.", "Bei $(a - b)^3$ wechseln die Vorzeichen: $+, -, +, -$. Der dritte Term ist plus, weil $(-b)^2$ positiv ist."));
-  if (p > 1) add([s * q * q * q, 3 * p * q * q, 3 * p * s * q, p], v, tx(`Raise the ${p} too`, `Die ${p} auch potenzieren`), tx(`$(${p}${v})^3 = ${p ** 3}${v}^3$ and $(${p}${v})^2 = ${p * p}${v}^2$: the number in front gets the power too.`, `$(${p}${v})^3 = ${p ** 3}${v}^3$ und $(${p}${v})^2 = ${p * p}${v}^2$: Die Zahl davor bekommt die Hochzahl mit ab.`));
+  if (p > 1) add([s * q * q * q, 3 * p * q * q, 3 * p * s * q, p], v, tx(`Raise the ${p} too`, `Die ${p} auch potenzieren`), tx(`$(${p}${v})^3 = ${p ** 3}${v}^3$ and $(${p}${v})^2 = ${p * p}${v}^2$: the number in front gets the power too.`, `$(${p}${v})^3 = ${p ** 3}${v}^3$ und $(${p}${v})^2 = ${p * p}${v}^2$: Auch die Zahl davor wird potenziert.`));
   add([s * q * q * q, 2 * p * q * q, 2 * s * p * p * q, p * p * p], v, tx("3, not 2", "3, nicht 2"), tx("That's the pattern of the square. For the cube the numbers in front are $1, 3, 3, 1$.", "Das ist das Muster vom Quadrat. Bei hoch 3 sind die Zahlen davor $1, 3, 3, 1$."));
   const A = p === 1 ? v : `${p}${v}`;
   const Ap = p === 1 ? v : `(${p}${v})`;
@@ -473,9 +487,9 @@ function pascalFrames(n: number, c: number, v: string): Frame[] {
     {
       math: row.map((_, k) => termSrc(k)).join(" + "),
       highlight: row.map((_, k) => `k${k}`),
-      note: tx(`The powers of $${v}$ go **down** from $${n}$ to $0$, the powers of $${cs}$ go **up** from $0$ to $${n}$. In front: the numbers from the row.`, `Die Hochzahlen von $${v}$ gehen **runter** von $${n}$ bis $0$, die von $${cs}$ gehen **hoch** von $0$ bis $${n}$. Davor: die Zahlen aus der Zeile.`),
+      note: tx(`The powers of $${v}$ go **down** from $${n}$ to $0$, the powers of $${cs}$ go **up** from $0$ to $${n}$. In front: the numbers from the row.`, `Die Exponenten von $${v}$ gehen **runter** von $${n}$ bis $0$, die von $${cs}$ gehen **hoch** von $0$ bis $${n}$. Davor: die Zahlen aus der Zeile.`),
     },
-    { math: polySrc(result, v, "r"), note: c < 0 ? tx("Work out each term. Odd powers of a negative number are negative, so the signs alternate.", "Rechne jeden Term aus. Ungerade Hochzahlen einer negativen Zahl sind negativ, darum wechseln die Vorzeichen.") : tx("Work out each term.", "Rechne jeden Term aus.") },
+    { math: polySrc(result, v, "r"), note: c < 0 ? tx("Work out each term. Odd powers of a negative number are negative, so the signs alternate.", "Rechne jeden Term aus. Ungerade Potenzen einer negativen Zahl sind negativ, darum wechseln die Vorzeichen.") : tx("Work out each term.", "Rechne jeden Term aus.") },
   ];
 }
 
@@ -490,7 +504,7 @@ function pascalTask(n: number, c: number, v: string): Exercise {
     return p;
   };
   add(build((k) => pow(c, k)), v, tx("The binomial coefficients are missing", "Die Binomialkoeffizienten fehlen"), tx(`Every term needs its number from row ${n} of Pascal's triangle in front: $${row.join(", ")}$.`, `Jeder Term braucht seine Zahl aus Zeile ${n} des Pascalschen Dreiecks davor: $${row.join(", ")}$.`));
-  if (Math.abs(c) > 1) add(build((k) => row[k] * (k === 0 ? 1 : c)), v, tx(`Powers of ${Math.abs(c)}`, `Potenzen von ${Math.abs(c)}`), tx(`The $${Math.abs(c)}$ gets a power too: $${Math.abs(c)}^2, ${Math.abs(c)}^3, …$, just like the $b^k$ in $a^{n-k}b^k$.`, `Die $${Math.abs(c)}$ bekommt auch eine Hochzahl: $${Math.abs(c)}^2, ${Math.abs(c)}^3, …$, genau wie $b^k$ in $a^{n-k}b^k$.`));
+  if (Math.abs(c) > 1) add(build((k) => row[k] * (k === 0 ? 1 : c)), v, tx(`Powers of ${Math.abs(c)}`, `Potenzen von ${Math.abs(c)}`), tx(`The $${Math.abs(c)}$ gets a power too: $${Math.abs(c)}^2, ${Math.abs(c)}^3, …$, just like the $b^k$ in $a^{n-k}b^k$.`, `Auch die $${Math.abs(c)}$ wird potenziert: $${Math.abs(c)}^2, ${Math.abs(c)}^3, …$, genau wie $b^k$ in $a^{n-k}b^k$.`));
   if (c < 0) add(build((k) => (k === 0 ? 1 : -row[k] * pow(-c, k))), v, tx("The signs alternate", "Die Vorzeichen wechseln sich ab"), tx(`$(${c})^2$ is positive, $(${c})^3$ is negative: the signs go $+, -, +, -, …$`, `$(${c})^2$ ist positiv, $(${c})^3$ ist negativ: Die Vorzeichen gehen $+, -, +, -, …$`));
   return {
     instruction: PASCAL,
@@ -509,8 +523,8 @@ function coefficientTask(n: number, c: number, j: number, v: string): Exercise {
   const C = choose(n, k);
   const right = C * pow(c, k);
   const { out, add } = numberMistakes(right);
-  if (Math.abs(c) > 1) add(C, tx("Only the binomial coefficient", "Nur der Binomialkoeffizient"), tx(`$${C}$ is the number from Pascal's triangle. But the $${c}$ is raised to a power too: multiply by $${c < 0 ? `(${c})` : c}^{${k}}$.`, `$${C}$ ist die Zahl aus dem Pascalschen Dreieck. Aber die $${c}$ hat auch eine Hochzahl: Multipliziere mit $${c < 0 ? `(${c})` : c}^{${k}}$.`));
-  if (j !== k && Math.abs(c) > 1) add(C * pow(c, j), tx("Wrong power", "Falsche Hochzahl"), tx(`The powers add up to $${n}$: with $${vj}$ the $${c}$ gets the power $${n} - ${j} = ${k}$.`, `Die Hochzahlen ergeben zusammen $${n}$: Zu $${vj}$ gehört die $${c}$ hoch $${n} - ${j} = ${k}$.`));
+  if (Math.abs(c) > 1) add(C, tx("Only the binomial coefficient", "Nur der Binomialkoeffizient"), tx(`$${C}$ is the number from Pascal's triangle. But the $${c}$ is raised to a power too: multiply by $${c < 0 ? `(${c})` : c}^{${k}}$.`, `$${C}$ ist die Zahl aus dem Pascalschen Dreieck. Aber auch die $${c}$ wird potenziert: Multipliziere mit $${c < 0 ? `(${c})` : c}^{${k}}$.`));
+  if (j !== k && Math.abs(c) > 1) add(C * pow(c, j), tx("Wrong power", "Falscher Exponent"), tx(`The powers add up to $${n}$: with $${vj}$ the $${c}$ gets the power $${n} - ${j} = ${k}$.`, `Die Exponenten ergeben zusammen $${n}$: Zu $${vj}$ gehört die $${c}$ hoch $${n} - ${j} = ${k}$.`));
   if (C !== 1) add(pow(c, k), tx("The binomial coefficient is missing", "Der Binomialkoeffizient fehlt"), tx(`Don't forget the number from row ${n} of Pascal's triangle in front.`, `Vergiss die Zahl aus Zeile ${n} des Pascalschen Dreiecks davor nicht.`));
   const cs = c < 0 ? `(${c})` : String(c);
   const csk = k === 1 ? cs : `${cs}^{${k}}`;
@@ -519,9 +533,9 @@ function coefficientTask(n: number, c: number, j: number, v: string): Exercise {
     text: tx(`Which number stands in front of $${vj}$ when you expand this?`, `Welche Zahl steht vor $${vj}$, wenn du das ausmultiplizierst?`),
     math: `(${v} ${c < 0 ? "-" : "+"} ${Math.abs(c)})^{${n}}`,
     answer: { kind: "number", value: right },
-    hint: tx(`In the term with $${vj}$ the $${cs}$ has the power $k = ${n} - ${j}$. In front stands “${n} choose k”.`, `Im Term mit $${vj}$ hat die $${cs}$ die Hochzahl $k = ${n} - ${j}$. Davor steht „${n} über k“.`),
+    hint: tx(`In the term with $${vj}$ the $${cs}$ has the power $k = ${n} - ${j}$. In front stands “${n} choose k”.`, `Im Term mit $${vj}$ hat die $${cs}$ den Exponenten $k = ${n} - ${j}$. Davor steht „${n} über k“.`),
     solution: [
-      { math: `(${v} ${c < 0 ? "-" : "+"} ${Math.abs(c)})^{${n}}`, note: tx(`In each term the powers add up to $${n}$. With $${vj}$ the $${cs}$ has the power $${n} - ${j} = ${k}$.`, `In jedem Term ergeben die Hochzahlen zusammen $${n}$. Bei $${vj}$ hat die $${cs}$ die Hochzahl $${n} - ${j} = ${k}$.`) },
+      { math: `(${v} ${c < 0 ? "-" : "+"} ${Math.abs(c)})^{${n}}`, note: tx(`In each term the powers add up to $${n}$. With $${vj}$ the $${cs}$ has the power $${n} - ${j} = ${k}$.`, `In jedem Term ergeben die Exponenten zusammen $${n}$. Bei $${vj}$ hat die $${cs}$ den Exponenten $${n} - ${j} = ${k}$.`) },
       { math: `${C}#C \\cdot#d ${vj} \\cdot#d2 ${csk}#p`, note: tx(`In front stands the binomial coefficient “${n} choose ${k}” $= ${C}$ (row ${n}, place ${k} of Pascal's triangle).`, `Davor steht der Binomialkoeffizient „${n} über ${k}“ $= ${C}$ (Zeile ${n}, Stelle ${k} im Pascalschen Dreieck).`) },
       { math: `${C}#C \\cdot#d ${pow(c, k) < 0 ? `(${pow(c, k)})` : pow(c, k)}#p \\cdot#d2 ${vj} = ${right} ${vj}`, note: tx(`$${csk} = ${pow(c, k)}$, so the coefficient is $${C} \\cdot ${pow(c, k) < 0 ? `(${pow(c, k)})` : pow(c, k)} = ${right}$.`, `$${csk} = ${pow(c, k)}$, der Koeffizient ist also $${C} \\cdot ${pow(c, k) < 0 ? `(${pow(c, k)})` : pow(c, k)} = ${right}$.`) },
     ],
@@ -681,7 +695,7 @@ const theoremFrames: Frame[] = [
   { math: "(x#x +#p 2#two)#br ^{4#e}", note: tx("Expand $(x + 2)^4$ without multiplying four brackets: row 4 of Pascal's triangle is $1, 4, 6, 4, 1$.", "$(x + 2)^4$ ausmultiplizieren, ohne vier Klammern zu multiplizieren: Zeile 4 des Pascalschen Dreiecks ist $1, 4, 6, 4, 1$.") },
   {
     math: "x^4 + 4#k1 x^3 \\cdot 2 + 6#k2 x^2 \\cdot 2^2 + 4#k3 x \\cdot 2^3 + 2^4#k4",
-    note: tx("The powers of $x$ go **down** from $4$ to $0$, the powers of $2$ go **up** from $0$ to $4$. In every term they add up to $4$.", "Die Hochzahlen von $x$ gehen **runter** von $4$ bis $0$, die von $2$ gehen **hoch** von $0$ bis $4$. In jedem Term ergeben sie zusammen $4$."),
+    note: tx("The powers of $x$ go **down** from $4$ to $0$, the powers of $2$ go **up** from $0$ to $4$. In every term they add up to $4$.", "Die Exponenten von $x$ gehen **runter** von $4$ bis $0$, die von $2$ gehen **hoch** von $0$ bis $4$. In jedem Term ergeben sie zusammen $4$."),
     highlight: ["k1", "k2", "k3"],
   },
   { math: "x^4 + 8#k1 x^3 + 24#k2 x^2 + 32#k3 x + 16#k4", note: tx("Work out each term: $4 \\cdot 2 = 8$, $6 \\cdot 4 = 24$, $4 \\cdot 8 = 32$ and $2^4 = 16$.", "Rechne jeden Term aus: $4 \\cdot 2 = 8$, $6 \\cdot 4 = 24$, $4 \\cdot 8 = 32$ und $2^4 = 16$.") },
@@ -735,7 +749,7 @@ export const level3: LevelLesson = {
       title: tx("Pascal's triangle and the binomial theorem", "Pascalsches Dreieck und binomischer Lehrsatz"),
       body: tx(
         "Row n holds the coefficients of $(a + b)^n$, the binomial coefficients “n choose k” $= \\frac{n!}{k! \\cdot (n - k)!}$. Powers of $a$ go down, powers of $b$ go up.",
-        "Zeile n enthält die Koeffizienten von $(a + b)^n$, die Binomialkoeffizienten „n über k“ $= \\frac{n!}{k! \\cdot (n - k)!}$. Die Hochzahlen von $a$ gehen runter, die von $b$ hoch.",
+        "Zeile n enthält die Koeffizienten von $(a + b)^n$, die Binomialkoeffizienten „n über k“ $= \\frac{n!}{k! \\cdot (n - k)!}$. Die Exponenten von $a$ gehen runter, die von $b$ hoch.",
       ),
       examples: ["(a + b)^4 = a^4 + 4a^3b + 6a^2b^2 + 4ab^3 + b^4", "(x + 2)^4 = x^4 + 8x^3 + 24x^2 + 32x + 16"],
       tone: "rule",
@@ -822,10 +836,10 @@ export const level3: LevelLesson = {
       type: "explain",
       id: "binomial-coefficients",
       title: tx("The binomial theorem", "Der binomische Lehrsatz"),
-      blob: tx("One formula for every power. Mathematicians love this one!", "Eine Formel für jede Hochzahl. Die lieben Mathematiker!"),
+      blob: tx("One formula for every power. Mathematicians love this one!", "Eine Formel für jeden Exponenten. Die lieben Mathematiker!"),
       body: tx(
-        "The numbers in row n are the **binomial coefficients** “n choose k”, written as n above k in round brackets. You can calculate them with factorials: $n! = 1 \\cdot 2 \\cdot … \\cdot n$. Change n and k in the box.",
-        "Die Zahlen in Zeile n sind die **Binomialkoeffizienten** „n über k“, geschrieben als n und k übereinander in runden Klammern. Du kannst sie mit Fakultäten berechnen: $n! = 1 \\cdot 2 \\cdot … \\cdot n$. Ändere n und k im Kasten.",
+        "The numbers in row n are the **binomial coefficients** “n choose k”, written as n above k in round brackets. You calculate them with factorials: “n choose k” $= \\frac{n!}{k! \\cdot (n - k)!}$ with $n! = 1 \\cdot 2 \\cdot … \\cdot n$ and $0! = 1$. Change n and k in the box.",
+        "Die Zahlen in Zeile n sind die **Binomialkoeffizienten** „n über k“, geschrieben als n und k übereinander in runden Klammern. Du berechnest sie mit Fakultäten: „n über k“ $= \\frac{n!}{k! \\cdot (n - k)!}$ mit $n! = 1 \\cdot 2 \\cdot … \\cdot n$ und $0! = 1$. Ändere n und k im Kasten.",
       ),
       visual: { component: ExpandingBinomCard as ComponentType<Record<string, unknown>>, props: {} },
       frames: theoremFrames,
