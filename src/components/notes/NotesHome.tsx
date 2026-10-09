@@ -32,6 +32,7 @@ import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { PageMenuArea } from "./PageMenuArea";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
@@ -220,7 +221,7 @@ export function NotesHome({
   const dueNotes = [...dueByPage.entries()].sort((a, b) => b[1] - a[1]);
 
   return (
-    <>
+    <PageMenuArea>
       <TopBar crumbs={[{ label: t.title }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[1320px] px-4 pb-24 pt-5 sm:px-8 lg:px-10 lg:pt-7">
@@ -536,7 +537,7 @@ export function NotesHome({
           )}
         </div>
       </div>
-    </>
+    </PageMenuArea>
   );
 }
 

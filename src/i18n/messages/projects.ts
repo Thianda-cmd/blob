@@ -137,6 +137,9 @@ export const projectsText = defineMessages({
     openCard: (title: string) => `Open “${title}”`,
     overdue: "Overdue",
 
+    /** Right-click on a card on the board. */
+    cardMenu: { label: "Card menu", moveTo: "Move to" },
+
     // Card drawer
     drawer: {
       close: "Close",
@@ -432,6 +435,8 @@ export const projectsText = defineMessages({
     assignedTo: (names) => `Zuständig: ${names}`,
     openCard: (title) => `„${title}“ öffnen`,
     overdue: "Überfällig",
+
+    cardMenu: { label: "Kartenmenü", moveTo: "Verschieben nach" },
 
     drawer: {
       close: "Schließen",

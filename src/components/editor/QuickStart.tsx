@@ -8,10 +8,21 @@ import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { insertFlashcard } from "./blocks/Flashcard";
 
-/** A quiet row of starters under the placeholder of an empty note. Gone as soon as you type. */
+/**
+ * A quiet row of starters under the placeholder of an empty note. Gone as soon as the note has
+ * anything in it: a word, a checkbox, a flashcard, even a second empty line.
+ */
 export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () => void }) {
   const t = useMessages(editorText).quickStart;
-  const empty = useEditorState({ editor, selector: ({ editor: e }) => e.isEmpty });
+  // Not editor.isEmpty: that only looks for text, so an empty checklist or flashcard still counts as
+  // empty and the row would sit on top of it.
+  const empty = useEditorState({
+    editor,
+    selector: ({ editor: e }) => {
+      const doc = e.state.doc;
+      return doc.childCount === 1 && doc.firstChild?.type.name === "paragraph" && doc.firstChild.content.size === 0;
+    },
+  });
 
   const items: { id: string; label: string; icon: LucideIcon; run: () => void }[] = [
     { id: "heading", label: t.heading, icon: Heading1, run: () => editor.chain().focus("start").setNode("heading", { level: 1 }).run() },

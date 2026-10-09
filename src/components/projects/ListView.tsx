@@ -96,6 +96,7 @@ export function ListView({
               key={card.id}
               role="row"
               tabIndex={0}
+              data-card={card.id}
               onClick={() => onOpen(card.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {

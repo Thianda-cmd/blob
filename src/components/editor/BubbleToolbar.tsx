@@ -40,7 +40,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 type BlockId = "text" | "h1" | "h2" | "h3" | "bullet" | "numbered" | "todo" | "quote";
 
 /** Labels come from `editorText.bubble.blocks[id]`. */
-const BLOCKS: { id: BlockId; icon: LucideIcon; run: (e: Editor) => void }[] = [
+export const BLOCKS: { id: BlockId; icon: LucideIcon; run: (e: Editor) => void }[] = [
   { id: "text", icon: Pilcrow, run: (e) => e.chain().focus().clearNodes().run() },
   { id: "h1", icon: Heading1, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 1 }).run() },
   { id: "h2", icon: Heading2, run: (e) => e.chain().focus().clearNodes().setHeading({ level: 2 }).run() },
@@ -51,7 +51,7 @@ const BLOCKS: { id: BlockId; icon: LucideIcon; run: (e: Editor) => void }[] = [
   { id: "quote", icon: TextQuote, run: (e) => e.chain().focus().clearNodes().toggleBlockquote().run() },
 ];
 
-function currentBlock(editor: Editor): BlockId {
+export function currentBlock(editor: Editor): BlockId {
   for (const level of [1, 2, 3] as const) if (editor.isActive("heading", { level })) return `h${level}`;
   if (editor.isActive("taskList")) return "todo";
   if (editor.isActive("orderedList")) return "numbered";

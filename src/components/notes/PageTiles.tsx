@@ -105,7 +105,7 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
 
   if (page.kind === "deck") {
     return (
-      <div className={cn(tileBase, "p-2")}>
+      <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
         <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
         <SlideThumb title={preview?.slideTitle?.trim() || title} theme={preview?.theme ?? null} className="pointer-events-none transition-transform duration-300 group-hover:scale-[1.012]" />
         <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
@@ -124,7 +124,7 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
 
   const snippet = page.kind === "folder" ? "" : preview?.snippet?.trim();
   return (
-    <div className={cn(tileBase, "min-h-[150px] p-3.5")}>
+    <div className={cn(tileBase, "min-h-[150px] p-3.5")} data-page-id={page.id}>
       <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
       <div className="pointer-events-none flex min-w-0 items-start gap-2">
         {page.kind === "folder" ? (
@@ -170,7 +170,10 @@ export function PageRow(props: TileProps & { first: boolean }) {
   const t = useMessages(notesText);
   const title = pageTitle(page.title, page.kind, locale);
   return (
-    <li className={cn("group relative flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover/50 sm:px-4 [content-visibility:auto] [contain-intrinsic-size:auto_56px]", !first && "border-t border-line")}>
+    <li
+      data-page-id={page.id}
+      className={cn("group relative flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover/50 sm:px-4 [content-visibility:auto] [contain-intrinsic-size:auto_56px]", !first && "border-t border-line")}
+    >
       <Link href={`/p/${page.id}`} className="absolute inset-0" aria-label={title} />
       <span className="pointer-events-none grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-surface">
         <PageIcon page={page} />

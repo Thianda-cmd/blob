@@ -130,6 +130,19 @@ export const notesText = defineMessages({
       cheatFrom: "From the learning center:",
       noteTitle: (topic: string) => topic,
     },
+
+    /** Right-click on a page in the sidebar or the notes overview. */
+    pageMenu: {
+      label: "Page menu",
+      open: "Open",
+      openNewTab: "Open in new tab",
+      favorite: "Add to favourites",
+      unfavorite: "Remove from favourites",
+      newInside: "New note inside",
+      copyLink: "Copy link",
+      linkCopied: "Link copied.",
+      trash: "Move to trash",
+    },
   },
   de: {
     title: "Notizen",
@@ -255,6 +268,18 @@ export const notesText = defineMessages({
       cheatTag: "Spickzettel",
       cheatFrom: "Aus dem Lernbereich:",
       noteTitle: (topic) => topic,
+    },
+
+    pageMenu: {
+      label: "Seitenmenü",
+      open: "Öffnen",
+      openNewTab: "In neuem Tab öffnen",
+      favorite: "Zu Favoriten hinzufügen",
+      unfavorite: "Aus Favoriten entfernen",
+      newInside: "Neue Notiz darin",
+      copyLink: "Link kopieren",
+      linkCopied: "Link kopiert.",
+      trash: "In den Papierkorb",
     },
   },
 });

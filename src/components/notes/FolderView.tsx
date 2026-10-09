@@ -26,6 +26,7 @@ import { DeckCard, NoteCard, type PagePreview } from "@/components/subjects/Page
 import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { PageMenuArea } from "./PageMenuArea";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
@@ -140,7 +141,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
   );
 
   return (
-    <>
+    <PageMenuArea>
       <PageTopBar pageId={page.id} saveState="saved" role={role} members={members} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1100px] px-4 pb-28 pt-5 sm:px-8 lg:px-10 lg:pt-8">
@@ -240,7 +241,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
           </DndContext>
         </div>
       </div>
-    </>
+    </PageMenuArea>
   );
 }
 
@@ -266,6 +267,7 @@ function Item({ page, draggable, droppable, dragging, children }: { page: PageMe
           e.stopPropagation();
         }
       }}
+      data-page-id={page.id}
       // No native link dragging or long-press menu: the card itself moves.
       onDragStart={(e) => e.preventDefault()}
       className={cn(

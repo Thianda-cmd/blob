@@ -148,6 +148,27 @@ export const editorText = defineMessages({
 
     quickStart: { heading: "Heading", checklist: "Checklist", flashcard: "Flashcard", image: "Image" },
 
+    /** The note's own right-click menu. */
+    menu: {
+      label: "Note menu",
+      undo: "Undo",
+      redo: "Redo",
+      cut: "Cut",
+      copy: "Copy",
+      paste: "Paste",
+      pasteHint: (mod: string) => `Your browser doesn't let me paste from here. Press ${mod}V instead.`,
+      selectAll: "Select all",
+      formula: "Make it a formula",
+      turnInto: "Turn into",
+      insert: "Insert below",
+      back: "Back",
+      duplicate: "Duplicate",
+      remove: "Delete",
+      copyLink: "Copy link to this note",
+      linkCopied: "Link copied. Paste it wherever you need it.",
+      browserMenu: "Shift + right-click for the browser's menu",
+    },
+
     upload: {
       uploading: "Uploading…",
       badType: "I can add PNG, JPG, GIF or WebP images.",
@@ -310,6 +331,26 @@ export const editorText = defineMessages({
     },
 
     quickStart: { heading: "Überschrift", checklist: "Checkliste", flashcard: "Karteikarte", image: "Bild" },
+
+    menu: {
+      label: "Notizmenü",
+      undo: "Rückgängig",
+      redo: "Wiederholen",
+      cut: "Ausschneiden",
+      copy: "Kopieren",
+      paste: "Einfügen",
+      pasteHint: (mod) => `Dein Browser lässt mich von hier aus nicht einfügen. Drück stattdessen ${mod}V.`,
+      selectAll: "Alles auswählen",
+      formula: "Als Formel",
+      turnInto: "Umwandeln in",
+      insert: "Darunter einfügen",
+      back: "Zurück",
+      duplicate: "Duplizieren",
+      remove: "Löschen",
+      copyLink: "Link zu dieser Notiz kopieren",
+      linkCopied: "Link kopiert. Füg ihn ein, wo du ihn brauchst.",
+      browserMenu: "Umschalt + Rechtsklick für das Browsermenü",
+    },
 
     upload: {
       uploading: "Wird hochgeladen…",

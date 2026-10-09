@@ -19,17 +19,15 @@ const ROUNDS = 20;
 
 /**
  * Who may start it. With CRON_SECRET set (Vercel then sends it as "Authorization: Bearer <secret>"
- * with every cron request), only that counts. Without it, production refuses: the only other sign,
- * Vercel's user agent "vercel-cron/1.0" with the x-vercel-cron-schedule header
- * (vercel.com/docs/cron-jobs), can be copied by anyone. Previews and local runs accept that.
+ * with every cron request), only that counts. Without it, requests that look like Vercel's cron
+ * requests: the user agent "vercel-cron/1.0" and the x-vercel-cron-schedule header
+ * (vercel.com/docs/cron-jobs). Those can be copied, but a copied request can do no more than run
+ * tonight's clean-up early: only files nothing refers to and whose note or project is gone go, and
+ * finding them is an indexed lookup (migration 0013).
  */
 function allowed(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (secret) return sameHash(sha256(request.headers.get("authorization") ?? ""), sha256(`Bearer ${secret}`));
-  if (process.env.VERCEL_ENV === "production") {
-    console.warn("cron/files: set CRON_SECRET in the project's environment variables to turn on the nightly clean-up");
-    return false;
-  }
   return (request.headers.get("user-agent") ?? "").startsWith("vercel-cron/") && request.headers.has("x-vercel-cron-schedule");
 }
 

@@ -37,6 +37,7 @@ import { collectLinks, pageIdFromHref } from "./links";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
+import { EditorContextMenu } from "./EditorContextMenu";
 import { QuickStart } from "./QuickStart";
 import { plainDoc, plainTextOf } from "./schema";
 import { SlashController } from "./slash/SlashCommand";
@@ -819,6 +820,24 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
                     className={cn("relative transition-opacity duration-300", !built ? "opacity-0" : reloading || !editor ? "opacity-60" : "opacity-100")}
                   />
                   {editor && canEdit && <QuickStart editor={editor} onImage={() => fileRef.current?.click()} />}
+                  {editor && (
+                    <EditorContextMenu
+                      editor={editor}
+                      canEdit={canEdit}
+                      pageId={page.id}
+                      runSlash={(item, e, range) =>
+                        item.run({
+                          editor: e,
+                          range,
+                          ctx: {
+                            pickImage: () => live.current?.pickImage(),
+                            pickFile: () => live.current?.pickFile(),
+                            createSubPage: async (x) => live.current?.createSubPage(x),
+                          },
+                        })
+                      }
+                    />
+                  )}
                 </div>
               </NoteBlocksProvider>
               <NoteConnections page={meta ?? page} title={title} />

@@ -28,6 +28,7 @@ import { deleteProject, leaveProject, setArchived } from "./actions";
 import { BoardView } from "./BoardView";
 import { DueChip } from "./CardFace";
 import { CardDrawer } from "./CardDrawer";
+import { CardMenuArea } from "./CardMenu";
 import { ListView } from "./ListView";
 import { PRIORITIES, boardColor, labelKey, projectLabels, projectProgress, type Priority } from "./model";
 import { PickRow, PriorityIcon } from "./pickers";
@@ -345,11 +346,13 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
         />
 
         <div className="relative min-h-0 flex-1">
-          {view === "board" ? (
-            <BoardView board={board} visible={visible} readOnly={readOnly} now={now} openId={openId} onOpen={open} meId={userId} />
-          ) : (
-            <ListView board={board} visible={visible} now={now} openId={openId} onOpen={open} />
-          )}
+          <CardMenuArea board={board} readOnly={readOnly} onOpen={open}>
+            {view === "board" ? (
+              <BoardView board={board} visible={visible} readOnly={readOnly} now={now} openId={openId} onOpen={open} meId={userId} />
+            ) : (
+              <ListView board={board} visible={visible} now={now} openId={openId} onOpen={open} />
+            )}
+          </CardMenuArea>
           {filtered && shown === 0 && cards.length > 0 && view === "board" && (
             <div className="pointer-events-none absolute inset-x-0 top-20 flex justify-center">
               <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-[13px] text-ink-2 shadow-pop">

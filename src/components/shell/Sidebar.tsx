@@ -39,6 +39,7 @@ import { Avatar } from "@/components/share/Avatar";
 import { applyTheme } from "@/components/theme";
 import { Kbd } from "@/components/ui/Kbd";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { PageMenuArea } from "@/components/notes/PageMenuArea";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -169,6 +170,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
     return (
       <div key={page.id}>
         <div
+          data-page-id={page.id}
           className={cn(
             "group relative flex h-7 items-center gap-1.5 rounded-md pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
             TOUCH_ROW,
@@ -345,54 +347,57 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {favorites.length > 0 && (
-          <Section title={t.favorites} {...sectionProps("favorites", favorites.length)}>
-            {favorites.map((p) => (
-              <Link
-                key={p.id}
-                href={`/p/${p.id}`}
-                title={pageTitle(p.title, p.kind, locale)}
-                className={cn(
-                  "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:bg-hover hover:text-ink",
-                  TOUCH_ROW,
-                  pathname === `/p/${p.id}` && "bg-hover font-medium text-ink",
-                )}
-              >
-                <Star className="size-3.5 shrink-0 fill-blob text-blob" />
-                <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
-              </Link>
-            ))}
+        <PageMenuArea>
+          {favorites.length > 0 && (
+            <Section title={t.favorites} {...sectionProps("favorites", favorites.length)}>
+              {favorites.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/p/${p.id}`}
+                  data-page-id={p.id}
+                  title={pageTitle(p.title, p.kind, locale)}
+                  className={cn(
+                    "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:bg-hover hover:text-ink",
+                    TOUCH_ROW,
+                    pathname === `/p/${p.id}` && "bg-hover font-medium text-ink",
+                  )}
+                >
+                  <Star className="size-3.5 shrink-0 fill-blob text-blob" />
+                  <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
+                </Link>
+              ))}
+            </Section>
+          )}
+
+          <Section title={t.subjects} action={<NewSubjectButton kind="subject" />} {...sectionProps("subjects", schoolSubjects.length)}>
+            {schoolSubjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
+            {schoolSubjects.map(renderSubject)}
           </Section>
-        )}
 
-        <Section title={t.subjects} action={<NewSubjectButton kind="subject" />} {...sectionProps("subjects", schoolSubjects.length)}>
-          {schoolSubjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
-          {schoolSubjects.map(renderSubject)}
-        </Section>
-
-        <Section title={t.notebooks} action={<NewSubjectButton kind="notebook" />} {...sectionProps("notebooks", notebooks.length)}>
-          {notebooks.length === 0 && <p className="px-1.5 py-1 text-[12.5px] leading-snug text-ink-3">{t.noNotebooks}</p>}
-          {notebooks.map(renderSubject)}
-        </Section>
-
-        {sharedRoots.length > 0 && (
-          <Section title={t.shared} {...sectionProps("shared", sharedRoots.length)}>
-            {sharedRoots.map((p) => {
-              const owner = shareInfo[p.id]?.owner;
-              return renderPage(
-                p,
-                0,
-                owner ? (
-                  <Avatar person={owner} size={16} className="ml-0.5 group-hover:hidden [@media(hover:none)]:hidden" title={t.sharedBy(owner.full_name || "?")} />
-                ) : null,
-              );
-            })}
+          <Section title={t.notebooks} action={<NewSubjectButton kind="notebook" />} {...sectionProps("notebooks", notebooks.length)}>
+            {notebooks.length === 0 && <p className="px-1.5 py-1 text-[12.5px] leading-snug text-ink-3">{t.noNotebooks}</p>}
+            {notebooks.map(renderSubject)}
           </Section>
-        )}
 
-        <Section title={t.notes} {...sectionProps("notes", unfiled.length)}>
-          {unfiled.length === 0 ? <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p> : unfiled.map((p) => renderPage(p, 0))}
-        </Section>
+          {sharedRoots.length > 0 && (
+            <Section title={t.shared} {...sectionProps("shared", sharedRoots.length)}>
+              {sharedRoots.map((p) => {
+                const owner = shareInfo[p.id]?.owner;
+                return renderPage(
+                  p,
+                  0,
+                  owner ? (
+                    <Avatar person={owner} size={16} className="ml-0.5 group-hover:hidden [@media(hover:none)]:hidden" title={t.sharedBy(owner.full_name || "?")} />
+                  ) : null,
+                );
+              })}
+            </Section>
+          )}
+
+          <Section title={t.notes} {...sectionProps("notes", unfiled.length)}>
+            {unfiled.length === 0 ? <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p> : unfiled.map((p) => renderPage(p, 0))}
+          </Section>
+        </PageMenuArea>
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-line px-2 py-2">
