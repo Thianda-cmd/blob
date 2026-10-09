@@ -11,13 +11,26 @@ export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 export type StoredFile = { path: string; name: string; size: number; mime: string };
 
-/** A file name safe for a storage path: no slashes, no control characters, at most 120 characters. */
+const UMLAUTS: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", Ä: "Ae", Ö: "Oe", Ü: "Ue", ß: "ss" };
+
+/**
+ * A file name for the storage path: Storage only takes plain ASCII keys, so "Brüche (Teil 2).pdf"
+ * becomes "Brueche (Teil 2).pdf" (umlauts written out, other accents dropped, anything else "_").
+ * At most 120 characters, the extension kept. The real name is kept for display.
+ */
 function safeName(name: string) {
-  const clean = name.replace(/[/\\\u0000-\u001f]/g, "_").trim() || "file";
-  if (clean.length <= 120) return clean;
-  const dot = clean.lastIndexOf(".");
-  const ext = dot > 0 && clean.length - dot <= 10 ? clean.slice(dot) : "";
-  return clean.slice(0, 120 - ext.length) + ext;
+  const ascii = name
+    .replace(/[äöüÄÖÜß]/g, (c) => UMLAUTS[c])
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9._ ()-]/g, "_")
+    .replace(/_+/g, "_")
+    .trim();
+  const dot = ascii.lastIndexOf(".");
+  const ext = dot > 0 && ascii.length - dot <= 10 ? ascii.slice(dot) : "";
+  // A name with nothing left but underscores ("数学.pdf") becomes "file.pdf".
+  const base = (ext ? ascii.slice(0, dot) : ascii).replace(/^[._ ]+|[._ ]+$/g, "");
+  return (/[A-Za-z0-9]/.test(base) ? base : "file").slice(0, 120 - ext.length) + ext;
 }
 
 /** Upload a file for a page or project. Null when it is too big or the upload fails. */
@@ -29,7 +42,9 @@ export async function uploadFile(target: { type: "page" | "project"; id: string 
     .storage.from(FILE_BUCKET)
     .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   if (error) return null;
-  return { path, name, size: file.size, mime: file.type || "application/octet-stream" };
+  // The note or card shows the name as the student knows it.
+  const shown = file.name.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 200) || name;
+  return { path, name: shown, size: file.size, mime: file.type || "application/octet-stream" };
 }
 
 /** A link to open or download a file, valid for an hour. `download` asks the browser to save it. */
