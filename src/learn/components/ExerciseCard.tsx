@@ -8,7 +8,7 @@ import { learnText } from "@/i18n/messages/learn";
 import { resolveText } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { answerDisplay, check, type AnswerValue } from "@/learn/engine/answers";
-import type { AnswerSpec, Exercise, Feedback } from "@/learn/types";
+import { LEVELS, type AnswerSpec, type Exercise, type Feedback } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { Blob } from "@/components/blob/Blob";
 import { AnswerInput, type AnswerStatus } from "./AnswerInput";
@@ -111,16 +111,17 @@ export function ExerciseCard({
     setFeedback(null);
   }
 
+  const listAnswer = exercise.answer.kind === "order" || exercise.answer.kind === "match" || exercise.answer.kind === "multi";
   const result: ExerciseResult = { correct: status === "correct", firstTry: status === "correct" && attempts === 1, usedHint: hint, revealed };
   const earned = earnedXp(xp ?? 0, result);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{tt(exercise.instruction)}</span>
+        <span className="min-w-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{tt(exercise.instruction)}</span>
         {level && (
-          <span className="flex gap-0.5" title={m.level(level)}>
-            {[1, 2, 3].map((n) => (
+          <span className="flex shrink-0 gap-0.5" title={m.level(level)}>
+            {LEVELS.map((n) => (
               <span key={n} className={cn("size-1.5 rounded-full", n <= level ? "bg-blob" : "bg-line-2")} />
             ))}
           </span>
@@ -130,7 +131,7 @@ export function ExerciseCard({
       {exercise.text && <Rich text={exercise.text} className="max-w-[640px] text-[16.5px] leading-relaxed text-ink" />}
 
       {exercise.math && (
-        <div className={cn("relative grid place-items-center overflow-x-auto rounded-2xl border border-line bg-surface px-6", compact ? "min-h-[110px] py-6" : "min-h-[150px] py-9")}>
+        <div className={cn("relative grid place-items-center overflow-x-auto rounded-2xl border border-line bg-surface px-4 sm:px-6", compact ? "min-h-[110px] py-6" : "min-h-[150px] py-9")}>
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" />
           <MathView src={exercise.math} size={compact ? "lg" : "xl"} scope={scope} className="relative" />
         </div>
@@ -168,7 +169,7 @@ export function ExerciseCard({
             onClick={() => submit()}
             className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.97]"
           >
-            {t.check} <span className="text-[11px] font-normal opacity-60">{t.enter}</span>
+            {t.check} <span className="hidden text-[11px] font-normal opacity-60 pointer-fine:inline">{t.enter}</span>
           </button>
           {mode !== "test" && exercise.hint && !hint && (
             <button
@@ -212,19 +213,20 @@ export function ExerciseCard({
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
             className={cn("space-y-4 rounded-2xl border p-4 sm:p-5", status === "correct" ? "border-ok/30 bg-ok/[0.06]" : "border-line bg-raised")}
           >
+            {/* The text keeps at least 10rem: when the row gets tight, Continue moves to its own (full-width) row. */}
             <div className="flex flex-wrap items-center gap-3">
               <motion.span
                 initial={{ scale: 0, rotate: -30 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 520, damping: 14 }}
-                className={cn("grid size-9 place-items-center rounded-full text-white", status === "correct" ? "bg-ok" : "bg-ink-3")}
+                className={cn("grid size-9 shrink-0 place-items-center rounded-full text-white", status === "correct" ? "bg-ok" : "bg-ink-3")}
               >
                 {status === "correct" ? <Check className="size-5" strokeWidth={3} /> : <X className="size-5" strokeWidth={3} />}
               </motion.span>
-              <div className="min-w-0 flex-1">
-                <div className="font-display text-[18px] font-semibold">{status === "correct" ? praise : t.howItWorks}</div>
-                {status !== "correct" && (
-                  <div className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+              <div className="min-w-0 flex-1 basis-40">
+                <div className="font-display text-[18px] font-semibold leading-snug">{status === "correct" ? praise : t.howItWorks}</div>
+                {status !== "correct" && !listAnswer && (
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2">
                     {t.answer}{" "}
                     <Solution spec={exercise.answer} />
                   </div>
@@ -235,7 +237,7 @@ export function ExerciseCard({
                   initial={{ opacity: 0, y: 8, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.15, type: "spring", stiffness: 500, damping: 20 }}
-                  className="rounded-full bg-blob px-3 py-1 text-[13px] font-semibold text-white"
+                  className="shrink-0 rounded-full bg-blob px-3 py-1 text-[13px] font-semibold text-white"
                 >
                   +{earned} XP
                 </motion.span>
@@ -243,11 +245,18 @@ export function ExerciseCard({
               <button
                 ref={continueRef}
                 onClick={() => onDone(result)}
-                className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper transition-transform hover:bg-ink/88 active:scale-[0.97]"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper transition-transform hover:bg-ink/88 active:scale-[0.97] max-sm:w-full"
               >
                 {t.continue} <ArrowRight className="size-4" />
               </button>
             </div>
+            {/* Orders, pairs and several picks get the full width of the card. */}
+            {status !== "correct" && listAnswer && (
+              <div className="space-y-1.5 text-[14px] text-ink-2">
+                <div>{t.answer}</div>
+                <Solution spec={exercise.answer} />
+              </div>
+            )}
             {(revealed || status === "wrong") && <SolutionPlayer frames={exercise.solution} size={compact ? "md" : "lg"} />}
             {status === "correct" && exercise.solution.length > 1 && !compact && (
               <details className="group text-[13.5px] text-ink-2">

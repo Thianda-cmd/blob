@@ -120,7 +120,10 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
               setEditing(true);
             }}
             className={cn(
-              "relative min-w-0 max-w-full truncate rounded px-0.5 text-left transition-colors duration-300 disabled:cursor-default",
+              "relative min-w-0 max-w-full rounded px-0.5 text-left transition-colors duration-300 disabled:cursor-default",
+              // Open tasks may wrap onto a second line where the row is narrow (phones, side panels):
+              // a title cut to two words is no use. Done tasks and widget rows stay on one line.
+              done || dense ? "truncate" : narrow ? "line-clamp-2 break-words" : "truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words",
               dense ? "text-[13.5px]" : "text-[14px]",
               done ? "text-ink-3" : "text-ink",
               editable && "cursor-text",
@@ -169,7 +172,8 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                   className={cn(
                     "flex h-7 w-[34px] items-center gap-1.5 rounded-md px-2 text-left transition-colors hover:bg-hover hover:text-ink sm:w-[132px]",
                     subject ? "text-ink-2" : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
-                    done && "opacity-70",
+                    // Only dim a real subject: on an empty one this would undo the opacity-0 above.
+                    done && subject && "opacity-70",
                   )}
                   title={subject ? t.subjectIs(subject.name) : t.addSubject}
                 >

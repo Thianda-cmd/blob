@@ -21,6 +21,9 @@ function CardText({ text }: { text: Text }) {
   return only ? <MathView src={raw.slice(1, -1)} size="md" animate={false} /> : <Inline text={text} />;
 }
 
+/** A card's text for screen readers: maths and bold without their markup ("$-9$" reads "-9"). */
+const plain = (text: string) => text.replace(/\$([^$]+)\$/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1");
+
 type OrderSpec = Extract<AnswerSpec, { kind: "order" }>;
 type MatchSpec = Extract<AnswerSpec, { kind: "match" }>;
 
@@ -61,8 +64,8 @@ export function OrderField({
             state={status === "idle" ? "idle" : item === pos ? "ok" : status === "wrong" ? "bad" : "idle"}
             disabled={disabled}
             onMove={(by) => move(pos, by)}
-            upLabel={t.moveUp(tt(spec.items[item]))}
-            downLabel={t.moveDown(tt(spec.items[item]))}
+            upLabel={t.moveUp(plain(tt(spec.items[item])))}
+            downLabel={t.moveDown(plain(tt(spec.items[item])))}
           />
         ))}
       </Reorder.Group>
@@ -118,13 +121,14 @@ function OrderRow({
       <span className="min-w-0 flex-1 py-1 leading-snug">
         <CardText text={text} />
       </span>
-      <span className="flex shrink-0 flex-col">
+      {/* Side by side on phones (two full-size tap targets), stacked on wider screens. */}
+      <span className="flex shrink-0 sm:flex-col">
         <button
           type="button"
           disabled={disabled || pos === 0}
           onClick={() => onMove(-1)}
           aria-label={upLabel}
-          className="grid size-6 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
+          className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-6"
         >
           <ArrowUp className="size-3.5" />
         </button>
@@ -133,7 +137,7 @@ function OrderRow({
           disabled={disabled || last}
           onClick={() => onMove(1)}
           aria-label={downLabel}
-          className="grid size-6 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
+          className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-6"
         >
           <ArrowDown className="size-3.5" />
         </button>
@@ -212,7 +216,7 @@ export function MatchField({
                     <button
                       type="button"
                       onClick={() => onChange(picks.map((p, i) => (i === row ? null : p)))}
-                      aria-label={t.matchClear(tt(left))}
+                      aria-label={t.matchClear(plain(tt(left)))}
                       className="grid size-8 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
                     >
                       <X className="size-3.5" />

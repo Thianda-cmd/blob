@@ -214,15 +214,18 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
               <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
             </div>
             {items.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Input
-                  icon={<Search />}
-                  placeholder={t.search}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="h-8 w-[220px] text-[13px]"
-                  aria-label={t.search}
-                />
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                {/* Full width on phones, so the placeholder isn't cut off next to the button. */}
+                <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none">
+                  <Input
+                    icon={<Search />}
+                    placeholder={t.search}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="h-8 text-[13px]"
+                    aria-label={t.search}
+                  />
+                </div>
                 <Button variant="secondary" size="md" className="h-8 text-danger" onClick={() => setConfirm({ kind: "all" })}>
                   <Trash2 className="size-3.5" /> {t.empty}
                 </Button>

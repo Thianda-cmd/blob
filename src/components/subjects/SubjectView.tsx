@@ -92,9 +92,14 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <h1 className="truncate font-display text-[30px] font-bold leading-tight tracking-[-0.025em]">{subject.name}</h1>
-                <SubjectMenu key={subject.id} subject={subject} trigger="button" />
+              <div className="flex items-start gap-1">
+                {/* Long names wrap onto a second line instead of losing their end. */}
+                <h1 className="line-clamp-2 min-w-0 break-words font-display text-[28px] font-bold leading-tight tracking-[-0.025em]" title={subject.name}>
+                  {subject.name}
+                </h1>
+                <span className="mt-[3px] shrink-0">
+                  <SubjectMenu key={subject.id} subject={subject} trigger="button" />
+                </span>
               </div>
               <p className="mt-0.5 text-[13px] text-ink-3">
                 {stats.join(" · ")}
@@ -128,7 +133,8 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
               </Section>
 
               <Section title={t.presentations} count={decks.length}>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
+                {/* Two slide thumbnails side by side on phones instead of one screen-wide picture each. */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
                   {decks.map((p) => (
                     <DeckCard key={p.id} page={p} preview={previews[p.id]} now={now} />
                   ))}

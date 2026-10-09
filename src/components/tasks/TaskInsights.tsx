@@ -203,7 +203,9 @@ export function SubjectFilter({
         )}
       >
         <span className="grid size-4 place-items-center">{icon}</span>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate" title={typeof label === "string" ? label : undefined}>
+          {label}
+        </span>
         <span className={cn("text-[11.5px] tabular-nums", count ? "text-ink-3" : "text-ink-3/50")}>{count}</span>
       </button>
     );

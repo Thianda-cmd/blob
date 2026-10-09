@@ -3,7 +3,7 @@
 import { animate, AnimatePresence, motion } from "motion/react";
 import { Flame, X, Zap } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
@@ -35,7 +35,7 @@ export function StudyTopBar({
   const t = useMessages(learnText).chrome;
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1360px] items-center gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <Link
           href={exitHref}
           className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink"
@@ -44,7 +44,9 @@ export function StudyTopBar({
         >
           <X className="size-5" />
         </Link>
-        <span className="hidden max-w-[220px] truncate text-[13px] font-medium text-ink-2 md:block">{title}</span>
+        <span className="hidden max-w-[220px] truncate text-[13px] font-medium text-ink-2 md:block lg:max-w-[280px]" title={title}>
+          {title}
+        </span>
         <div className="flex min-w-0 flex-1 items-center">
           {segments ? (
             <div className="flex w-full gap-1">
@@ -147,23 +149,26 @@ export function SessionEnd({
   const reachedGoal = today.from < today.goal && today.to >= today.goal;
   const m = useMessages(learnText);
   const locale = useLocale();
+  // Phones get a smaller Blob, so the result is visible without scrolling.
+  const roomy = useSyncExternalStore(subscribeRoomy, () => window.matchMedia(ROOMY).matches, () => true);
 
   return (
-    <div className="mx-auto grid w-full max-w-[920px] items-center gap-10 px-5 py-10 md:grid-cols-[260px_minmax(0,1fr)] md:py-16">
+    // From tablets up the result sits in the middle of the screen (below the top bar: 3.5rem and its border), not at its top.
+    <div className="mx-auto grid w-full max-w-[920px] items-center gap-5 px-5 py-6 sm:gap-10 sm:py-10 md:min-h-[calc(100dvh-3.5rem-1px)] md:grid-cols-[260px_minmax(0,1fr)] md:content-center md:py-12">
       {/* Clip the confetti so it never adds a horizontal scrollbar on phones. */}
       <div className="relative mx-auto grid place-items-center overflow-x-clip overflow-y-visible">
-        {happy && <Confetti seed={3} />}
+        {happy && <Confetti seed={3} spread={roomy ? 260 : 190} />}
         <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 16 }}>
-          <Blob ref={blob} size={210} mood={happy ? "excited" : "happy"} accessory="cap" />
+          <Blob ref={blob} size={roomy ? 210 : 150} mood={happy ? "excited" : "happy"} accessory="cap" />
         </motion.div>
       </div>
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         <div>
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em]"
+            className="text-balance font-display text-[30px] font-bold leading-tight tracking-[-0.02em] sm:text-[34px]"
           >
             {title}
           </motion.h1>
@@ -174,17 +179,18 @@ export function SessionEnd({
           )}
         </div>
         {badge}
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        {/* As many tiles per row as fit (three on a phone), so a fourth stat never needs a new layout. */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-2 sm:gap-2.5">
           {stats.map((s, i) => (
             <motion.div
               key={s.label}
               initial={{ opacity: 0, y: 14, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.25 + i * 0.08, type: "spring", stiffness: 380, damping: 26 }}
-              className="rounded-2xl border border-line bg-raised px-4 py-3 shadow-card"
+              className="flex flex-col justify-between rounded-2xl border border-line bg-raised px-3 py-2.5 shadow-card sm:px-4 sm:py-3"
             >
-              <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">{s.label}</div>
-              <div className={cn("mt-0.5 font-display text-[28px] font-bold tabular-nums", s.tone === "blob" ? "text-blob" : s.tone === "ok" ? "text-ok" : "text-ink")}>
+              <div className="text-[10.5px] font-semibold uppercase leading-snug tracking-[0.08em] text-ink-3 sm:text-[11.5px]">{s.label}</div>
+              <div className={cn("mt-0.5 whitespace-nowrap font-display text-[22px] font-bold tabular-nums sm:text-[28px]", s.tone === "blob" ? "text-blob" : s.tone === "ok" ? "text-ok" : "text-ink")}>
                 <CountUp value={s.value} from={0} delay={0.35 + i * 0.08} duration={0.9} />
                 {s.suffix}
               </div>
@@ -226,12 +232,20 @@ export function SessionEnd({
             </div>
           </div>
         </motion.div>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="flex flex-wrap gap-2">
+        {/* Phones: one full-width button per row; wider screens: a row that wraps. */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="grid gap-2 sm:flex sm:flex-wrap">
           {children}
         </motion.div>
       </div>
     </div>
   );
+}
+
+const ROOMY = "(min-width: 640px)";
+function subscribeRoomy(onChange: () => void) {
+  const query = window.matchMedia(ROOMY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
 }
 
 /** Big pill buttons used in the study screens. */

@@ -174,7 +174,9 @@ export function HomeView({
                       <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: subjectColor(s.color) }} />
                       <div className="flex items-center gap-2">
                         <span className="text-[16px] leading-none">{s.emoji ?? "📚"}</span>
-                        <span className="truncate text-[14px] font-medium">{s.name}</span>
+                        <span className="truncate text-[14px] font-medium" title={s.name}>
+                          {s.name}
+                        </span>
                         <ArrowUpRight className="ml-auto size-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                       <div className="mt-auto flex gap-3 text-[12px] text-ink-3">

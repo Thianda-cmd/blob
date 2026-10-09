@@ -77,11 +77,11 @@ export function TopicView({
       <div className="min-h-0 flex-1 overflow-y-auto print:overflow-visible">
         <div className="mx-auto w-full max-w-[1240px] px-5 pb-16 pt-3 sm:px-8 print:max-w-none print:p-0">
           <header className="mt-2 grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto] print:hidden">
-            <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="relative grid h-[120px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised shadow-card sm:w-[200px]"
+                className="relative grid h-[88px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised px-3 shadow-card sm:h-[120px] sm:w-[200px]"
               >
                 <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
                 <TopicGlyph topic={topic} size="lg" className="relative" />
@@ -90,8 +90,8 @@ export function TopicView({
                 <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
                   {subjectName} · {names.area}
                 </div>
-                <h1 className="mt-1 font-display text-[32px] font-bold leading-tight tracking-[-0.02em]">{names.title}</h1>
-                {names.school && <div className="text-[15px] text-ink-3">{names.school}</div>}
+                <h1 className="mt-1 hyphens-auto font-display text-[28px] font-bold leading-tight tracking-[-0.02em] break-words sm:text-[32px]">{names.title}</h1>
+                {names.school && <div className="text-[15px] text-ink-3 break-words">{names.school}</div>}
                 <p className="mt-2 max-w-[560px] text-[15px] leading-relaxed text-ink-2">{tt(topic.blurb)}</p>
               </div>
             </div>
@@ -101,14 +101,17 @@ export function TopicView({
                   <div className="whitespace-nowrap text-[19px] font-bold tabular-nums">{t.pct(progress.mastery)}</div>
                 </div>
               </Ring>
-              <div className="space-y-1 text-[13px]">
+              <div className="min-w-0 space-y-1 text-[13px]">
                 <div className="font-semibold text-ink">{masteryLabel(progress.mastery, locale)}</div>
-                <div className="text-ink-2">
-                  {t.topic.tasks(progress.attempts)}
-                  {accuracy !== null && ` · ${t.topic.right(t.pct(accuracy))}`}
+                {/* Below lg the card spans the page: the stats sit side by side instead of leaving it half empty. */}
+                <div className="grid gap-x-8 gap-y-1 md:grid-flow-col md:justify-start lg:grid-flow-row">
+                  <div className="text-ink-2">
+                    {t.topic.tasks(progress.attempts)}
+                    {accuracy !== null && ` · ${t.topic.right(t.pct(accuracy))}`}
+                  </div>
+                  <div className="text-ink-2">{t.topic.bestStreak(progress.best_streak)}</div>
+                  <div className="text-ink-3">{t.topic.xpToday(today.xp)}</div>
                 </div>
-                <div className="text-ink-2">{t.topic.bestStreak(progress.best_streak)}</div>
-                <div className="text-ink-3">{t.topic.xpToday(today.xp)}</div>
               </div>
             </div>
           </header>
@@ -120,7 +123,7 @@ export function TopicView({
               </h2>
               <span className="text-[13px] text-ink-3">{t.topic.levelsText}</span>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3" role="tablist" aria-labelledby="topic-levels">
+            <div className="grid gap-2 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] sm:gap-3" role="tablist" aria-labelledby="topic-levels">
               {LEVELS.map((l) => (
                 <LevelTab
                   key={l}
@@ -134,7 +137,7 @@ export function TopicView({
                 />
               ))}
             </div>
-            {meta.blurb && (
+            {meta.blurb && tt(meta.blurb) !== tt(topic.blurb) && (
               <motion.p key={level} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-3 max-w-[760px] text-[14px] leading-relaxed text-ink-2">
                 {tt(meta.blurb)}
               </motion.p>
@@ -206,7 +209,7 @@ export function TopicView({
                   </h2>
                   <p className="max-w-[640px] text-[13px] text-ink-3">{s.sectionText}</p>
                 </div>
-                <Link href={showTopicHref(topic)} className="flex items-center gap-1 text-[13px] font-medium text-blob-ink hover:underline">
+                <Link href={showTopicHref(topic)} className="-my-1.5 flex items-center gap-1 py-1.5 text-[13px] font-medium text-blob-ink hover:underline">
                   {s.allPictures} <ArrowRight className="size-3.5" />
                 </Link>
               </div>
@@ -217,7 +220,7 @@ export function TopicView({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(i, 8) * 0.03 }}
-                    className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-raised py-1.5 pl-3 pr-1.5 shadow-card"
+                    className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-raised pl-3 pr-1.5 shadow-card"
                   >
                     <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
                       {item.kind === "widget" ? <MousePointerClick className="size-3.5" /> : <ImageIcon className="size-3.5" />}
@@ -227,7 +230,7 @@ export function TopicView({
                       target="_blank"
                       rel="noopener"
                       aria-label={s.openPublic(tt(item.title))}
-                      className="min-w-0 flex-1 truncate text-[14px] font-medium hover:text-blob-ink"
+                      className="min-w-0 flex-1 truncate py-2.5 text-[14px] font-medium hover:text-blob-ink"
                     >
                       {tt(item.title)}
                     </a>
@@ -258,7 +261,7 @@ export function TopicView({
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
               <div key={level} className="grid content-start gap-3 md:grid-cols-2">
                 {summary.map((block, i) => (
-                  <SummaryCard key={i} block={block} delay={0.1 + i * 0.05} />
+                  <SummaryCard key={i} block={block} delay={0.1 + Math.min(i, 8) * 0.05} />
                 ))}
               </div>
               <aside className="hidden xl:block print:hidden">

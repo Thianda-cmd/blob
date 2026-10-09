@@ -40,6 +40,12 @@ import { createClient } from "@/lib/supabase/client";
 import type { PageMeta, Subject, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
+// Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
+// row actions: there is no hover to reveal them and 28 px rows are too small for a finger.
+const TOUCH_ROW = "[@media(hover:none)]:h-9";
+const TOUCH_ICON = "[@media(hover:none)]:size-7";
+const TOUCH_SHOW = "focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+
 function useStoredSet(key: string) {
   const [set, setSet] = useState<Set<string>>(() => new Set());
   useEffect(() => {
@@ -116,6 +122,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <div
           className={cn(
             "group relative flex h-7 items-center gap-1.5 rounded-md pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
+            TOUCH_ROW,
             active && "bg-hover font-medium text-ink",
           )}
           style={{ paddingLeft: 6 + depth * 14 }}
@@ -124,20 +131,21 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             onClick={() => toggleOpenPage(page.id)}
             className={cn(
               "grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink",
+              TOUCH_ICON,
               kids.length === 0 && page.kind !== "note" && "invisible",
             )}
             aria-label={open ? t.collapse : t.expand}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
-          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch">
+          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={pageTitle(page.title, page.kind, locale)}>
             <PageIcon page={page} />
             <span className="truncate">{pageTitle(page.title, page.kind, locale)}</span>
           </Link>
           {page.kind === "note" && (
             <button
               onClick={() => newPage("note", { parent_id: page.id, subject_id: page.subject_id })}
-              className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100"
+              className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink focus-visible:opacity-100 group-hover:opacity-100", TOUCH_ICON, TOUCH_SHOW)}
               aria-label={t.addInside}
               title={t.addInside}
             >
@@ -157,7 +165,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
               {kids.length ? (
                 kids.map((k) => renderPage(k, depth + 1))
               ) : (
-                <div className="flex h-7 items-center text-[12.5px] text-ink-3" style={{ paddingLeft: 30 + depth * 14 }}>
+                <div className={cn("flex h-7 items-center text-[12.5px] text-ink-3", TOUCH_ROW)} style={{ paddingLeft: 30 + depth * 14 }}>
                   {t.noPagesInside}
                 </div>
               )}
@@ -177,17 +185,18 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <div
           className={cn(
             "group flex h-7 items-center gap-1.5 rounded-md pl-1.5 pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
+            TOUCH_ROW,
             active && "bg-hover font-medium text-ink",
           )}
         >
           <button
             onClick={() => toggleFolded(subject.id)}
-            className="grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink"
+            className={cn("grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON)}
             aria-label={open ? t.collapseSubject : t.expandSubject}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
-          <Link href={`/subjects/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch">
+          <Link href={`/subjects/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={subject.name}>
             <span className="grid size-4 shrink-0 place-items-center">
               {subject.emoji ? (
                 <span className="text-[13px] leading-none">{subject.emoji}</span>
@@ -198,12 +207,12 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             <span className="truncate">{subject.name}</span>
             {subject.emoji && <span className="ml-auto size-1.5 shrink-0 rounded-full opacity-80" style={{ background: subjectColor(subject.color) }} />}
           </Link>
-          <div className="flex opacity-0 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100">
+          <div className={cn("flex opacity-0 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}>
             <SubjectMenu subject={subject} />
             <Popover
               align="start"
               trigger={(props) => (
-                <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={t.addTo(subject.name)} title={t.addTo(subject.name)}>
+                <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON)} aria-label={t.addTo(subject.name)} title={t.addTo(subject.name)}>
                   <Plus className="size-3.5" />
                 </button>
               )}
@@ -235,7 +244,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
               ) : (
                 <button
                   onClick={() => newPage("note", { subject_id: subject.id })}
-                  className="flex h-7 w-full items-center gap-2 rounded-md pl-[34px] text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink"
+                  className={cn("flex h-7 w-full items-center gap-2 rounded-md pl-[34px] text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ROW)}
                 >
                   <Plus className="size-3.5" /> {t.addNote}
                 </button>
@@ -271,7 +280,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         >
           <Search className="size-3.5" />
           {t.search}
-          <span className="ml-auto flex gap-0.5">
+          <span className="ml-auto flex gap-0.5 [@media(hover:none)]:hidden">
             <Kbd>⌘</Kbd>
             <Kbd>K</Kbd>
           </span>
@@ -297,8 +306,10 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
               <Link
                 key={p.id}
                 href={`/p/${p.id}`}
+                title={pageTitle(p.title, p.kind, locale)}
                 className={cn(
                   "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:bg-hover hover:text-ink",
+                  TOUCH_ROW,
                   pathname === `/p/${p.id}` && "bg-hover font-medium text-ink",
                 )}
               >
@@ -358,7 +369,7 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
     <div className="mb-3">
       <div className="group flex h-6 items-center px-1.5">
         <span className="text-[11.5px] font-medium text-ink-3">{title}</span>
-        <span className="ml-auto opacity-0 transition-opacity group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100">{action}</span>
+        <span className={cn("ml-auto opacity-0 transition-opacity group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}>{action}</span>
       </div>
       <div className="space-y-px">{children}</div>
     </div>
@@ -371,6 +382,7 @@ function NavLink({ href, icon, active, children }: { href: string; icon: ReactNo
       href={href}
       className={cn(
         "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink [&_svg]:size-4 [&_svg]:text-ink-3",
+        TOUCH_ROW,
         active && "bg-hover font-medium text-ink [&_svg]:text-ink",
       )}
     >
@@ -388,7 +400,7 @@ function NewSubjectButton() {
     <Popover
       align="end"
       trigger={(props) => (
-        <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.addSubject} title={t.addSubject}>
+        <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ICON)} aria-label={t.addSubject} title={t.addSubject}>
           <Plus className="size-3.5" />
         </button>
       )}
@@ -446,7 +458,9 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
           <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
-            <span className="block truncate text-[11.5px] leading-tight text-ink-3">{email}</span>
+            <span className="block truncate text-[11.5px] leading-tight text-ink-3" title={email}>
+              {email}
+            </span>
           </span>
           <Ellipsis className="size-4 text-ink-3" />
         </button>

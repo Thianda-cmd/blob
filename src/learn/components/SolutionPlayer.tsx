@@ -41,54 +41,59 @@ export function SolutionPlayer({
   }, [playing, i, frames.length, interval]);
 
   if (!frames.length) return null;
+  const stepped = frames.length > 1;
 
   return (
     <div className={cn("grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]", className)}>
-      <div className="relative grid min-h-[140px] place-items-center overflow-hidden rounded-2xl border border-line bg-surface px-6 py-8">
+      {/* The controls sit under the maths (not on top of it), and wide maths scrolls instead of being cut. */}
+      <div className="relative flex min-h-[140px] flex-col overflow-hidden rounded-2xl border border-line bg-surface">
         <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
-        <div className="relative">
+        <div className={cn("relative grid flex-1 place-items-center overflow-x-auto px-4 sm:px-6", stepped ? "pb-1 pt-7" : "py-7")}>
           <MathView src={frame.math} size={size} highlight={frame.highlight} arrows={frame.arrows} scope={scope} />
         </div>
-        <div className="absolute bottom-2 right-2 flex items-center gap-0.5">
-          <button
-            onClick={() => {
-              setPlaying(false);
-              setI((n) => Math.max(0, n - 1));
-            }}
-            disabled={i === 0}
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
-            aria-label={t.previous}
-            title={t.previous}
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <span className="w-10 text-center text-[11.5px] tabular-nums text-ink-3">
-            {i + 1}/{frames.length}
-          </span>
-          <button
-            onClick={() => {
-              setPlaying(false);
-              setI((n) => Math.min(frames.length - 1, n + 1));
-            }}
-            disabled={i >= frames.length - 1}
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30"
-            aria-label={t.next}
-            title={t.next}
-          >
-            <ChevronRight className="size-4" />
-          </button>
-          <button
-            onClick={() => {
-              setI(0);
-              setPlaying(true);
-            }}
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
-            aria-label={t.replay}
-            title={t.replay}
-          >
-            <RotateCcw className="size-3.5" />
-          </button>
-        </div>
+        {/* A one-frame solution has nothing to step through. */}
+        {stepped && (
+          <div className="relative flex items-center justify-end gap-0.5 px-2 pb-1.5">
+            <button
+              onClick={() => {
+                setPlaying(false);
+                setI((n) => Math.max(0, n - 1));
+              }}
+              disabled={i === 0}
+              className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-7"
+              aria-label={t.previous}
+              title={t.previous}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="w-10 text-center text-[11.5px] tabular-nums text-ink-3">
+              {i + 1}/{frames.length}
+            </span>
+            <button
+              onClick={() => {
+                setPlaying(false);
+                setI((n) => Math.min(frames.length - 1, n + 1));
+              }}
+              disabled={i >= frames.length - 1}
+              className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-30 sm:size-7"
+              aria-label={t.next}
+              title={t.next}
+            >
+              <ChevronRight className="size-4" />
+            </button>
+            <button
+              onClick={() => {
+                setI(0);
+                setPlaying(true);
+              }}
+              className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink sm:size-7"
+              aria-label={t.replay}
+              title={t.replay}
+            >
+              <RotateCcw className="size-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       <ol className="space-y-1.5 self-center">

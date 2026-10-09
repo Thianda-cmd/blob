@@ -38,12 +38,15 @@ export function NoteCard({ page, preview, parent, now }: { page: PageMeta; previ
   const t = useMessages(subjectsText);
   const snippet = preview?.snippet?.trim();
   return (
-    <Link href={`/p/${page.id}`} className={cn(cardBase, "h-[150px] p-3.5")}>
+    // Fixed height keeps a multi-column grid even; a phone's single column hugs the text instead.
+    <Link href={`/p/${page.id}`} className={cn(cardBase, "h-[150px] p-3.5 max-sm:h-auto max-sm:min-h-[104px]")}>
       <div className="flex min-w-0 items-center gap-2">
         <PageIcon page={page} />
-        <span className="truncate text-[14px] font-medium text-ink">{pageTitle(page.title, page.kind, locale)}</span>
+        <span className="truncate text-[14px] font-medium text-ink" title={pageTitle(page.title, page.kind, locale)}>
+          {pageTitle(page.title, page.kind, locale)}
+        </span>
       </div>
-      <p className={cn("mt-2 line-clamp-3 text-[12.5px] leading-[1.55]", snippet ? "text-ink-3" : "italic text-ink-3/70")}>
+      <p className={cn("mt-2 line-clamp-3 max-sm:line-clamp-2 text-[12.5px] leading-[1.55]", snippet ? "text-ink-3" : "italic text-ink-3/70")}>
         {snippet || t.emptyNote}
       </p>
       <div className="mt-auto flex min-w-0 items-center gap-2 pt-2 text-[11.5px] text-ink-3">
@@ -92,9 +95,11 @@ export function DeckCard({ page, preview, now }: { page: PageMeta; preview?: Pag
       <SlideThumb title={preview?.slideTitle?.trim() || name} theme={preview?.theme ?? null} className="transition-transform duration-300 group-hover:scale-[1.012]" />
       <div className="flex min-w-0 items-center gap-2 px-1.5 pb-1 pt-2.5">
         <PageIcon page={page} className="size-3.5" />
-        <span className="truncate text-[13.5px] font-medium text-ink">{name}</span>
+        <span className="truncate text-[13.5px] font-medium text-ink" title={name}>
+          {name}
+        </span>
       </div>
-      <div className="px-1.5 pb-0.5 text-[11.5px] text-ink-3">{edited(page.updated_at, now, locale)}</div>
+      <div className="truncate px-1.5 pb-0.5 text-[11.5px] text-ink-3">{edited(page.updated_at, now, locale)}</div>
     </Link>
   );
 }
@@ -109,6 +114,8 @@ export function NewCard({ kind, onClick, busy }: { kind: "note" | "deck"; onClic
       className={cn(
         "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[12.5px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink disabled:opacity-60",
         kind === "deck" ? "min-h-[150px]" : "h-[150px]",
+        // On a phone it spans the whole row: a slim button is enough there.
+        "max-sm:col-span-full max-sm:h-12 max-sm:min-h-0 max-sm:flex-row",
       )}
     >
       <Icon className="size-4" />

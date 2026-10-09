@@ -10,10 +10,10 @@ import { learnText } from "@/i18n/messages/learn";
 import type { Text } from "@/i18n/text";
 import { createRng } from "@/learn/engine/rng";
 import type { LearnDay } from "@/learn/progress";
-import { useStudySession, useTodayXp, useWide } from "@/learn/session";
+import { useStudySession, useTodayXp } from "@/learn/session";
 import { topicHref } from "@/learn/catalog";
 import { useTopic } from "@/learn/topics";
-import type { Exercise, Feedback, Level, Topic } from "@/learn/types";
+import { LEVELS, type Exercise, type Feedback, type Level, type Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent, type ExerciseResult } from "./ExerciseCard";
 import { SessionEnd, StudyButton, StudyTopBar, type SegmentState } from "./StudyChrome";
@@ -77,7 +77,6 @@ export function PracticePlayer({
 }) {
   const topic = useTopic(slug);
   const router = useRouter();
-  const wide = useWide();
   const today = useTodayXp(days);
   const session = useStudySession({ topic: slug, level, mastery, levelMastery, todayXp: today.xp });
   const blobRef = useRef<BlobHandle>(null);
@@ -152,8 +151,9 @@ export function PracticePlayer({
       const clean = right && r.firstTry && !r.usedHint;
       const up = clean ? streakUp + 1 : 0;
       setStreakUp(up);
-      if (up >= 4 && level < 3 && !suggested) {
-        line = t.practice.readyNext(t.levels[level + 1]);
+      const higher = LEVELS.find((l) => l > level);
+      if (up >= 4 && higher && !suggested) {
+        line = t.practice.readyNext(t.levels[higher]);
         setSuggested(true);
       }
     }
@@ -248,9 +248,10 @@ export function PracticePlayer({
         xp={session.xp}
         combo={session.combo}
       />
-      <div className="mx-auto grid w-full max-w-[1360px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
+      {/* content-start: on phones Blob and the task stack at the top instead of sharing out the spare height. */}
+      <div className="mx-auto grid w-full max-w-[1240px] flex-1 content-start gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <Tutor say={say} mood={mood} blobRef={blobRef} size={wide ? 170 : 84} side={wide ? "left" : "top"} />
+          <Tutor say={say} mood={mood} blobRef={blobRef} size={170} side="auto" />
         </aside>
         <main className="min-w-0">
           <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">

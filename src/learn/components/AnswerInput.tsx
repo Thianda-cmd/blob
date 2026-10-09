@@ -292,7 +292,7 @@ export function AnswerInput({
   switch (spec.kind) {
     case "number":
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {spec.label && <MathView src={spec.label} size="md" animate={false} className="text-ink-2" />}
           <MathField value={text} onChange={setText} onEnter={submitNow} status={status} keypad={false} preview={false} autoFocus={autoFocus} disabled={disabled} placeholder={t.number} className="w-56" />
           {spec.unit && <span className="text-[17px] text-ink-2">{tt(spec.unit)}</span>}
@@ -401,7 +401,7 @@ export function AnswerInput({
                 <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[12px] font-semibold", picked ? "border-blob bg-blob text-white" : "border-line-2 text-ink-3")}>
                   {String.fromCharCode(65 + i)}
                 </span>
-                <span>
+                <span className="min-w-0 break-words">
                   <Inline text={opt} />
                 </span>
               </motion.button>
@@ -442,7 +442,7 @@ export function AnswerInput({
                       </svg>
                     )}
                   </span>
-                  <span>
+                  <span className="min-w-0 break-words">
                     <Inline text={opt} />
                   </span>
                 </motion.button>

@@ -27,7 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale, useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
 import { resolveText } from "@/i18n/text";
-import { CATALOG, topicHref } from "@/learn/catalog";
+import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
 import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { PageIcon } from "./Sidebar";
@@ -42,6 +42,9 @@ type Item = {
   icon: ReactNode;
   run: () => void;
 };
+
+/** Learning topics shown for a search (the rest are one click away on /learn). */
+const MAX_TOPICS = 6;
 
 const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
 
@@ -186,17 +189,22 @@ function Palette({ onClose }: { onClose: () => void }) {
       }));
 
     // Match the shown title and the German name from class (and the English one, so either language finds it).
-    const topicItems: Item[] = CATALOG.filter((topic) => q && (match(resolveText(topic.title, locale)) || match(topic.de) || match(resolveText(topic.title, "en")))).map(
-      (topic) => ({
-        id: `topic-${topic.slug}`,
-        group: "learn",
-        label: resolveText(topic.title, locale),
-        // In English the German name helps students recognise it from class; in German it would repeat the title.
-        hint: locale === "en" ? topic.de : undefined,
-        icon: <GraduationCap />,
-        run: () => go(topicHref(topic)),
-      }),
-    );
+    // Capped: the catalog keeps growing, and a short query must not bury the actions below a wall of topics.
+    const topicItems: Item[] = CATALOG.filter((topic) => q && (match(resolveText(topic.title, locale)) || match(topic.de) || match(resolveText(topic.title, "en"))))
+      .slice(0, MAX_TOPICS)
+      .map((topic) => {
+        const subject = SUBJECTS.find((s) => s.slug === topic.subject);
+        const subjectName = subject ? resolveText(subject.title, locale) : "";
+        return {
+          id: `topic-${topic.slug}`,
+          group: "learn",
+          label: resolveText(topic.title, locale),
+          // The subject tells same-named topics apart; in English the German name from class helps too.
+          hint: locale === "en" ? [subjectName, topic.de].filter(Boolean).join(" · ") : subjectName,
+          icon: <GraduationCap />,
+          run: () => go(topicHref(topic)),
+        };
+      });
 
     // Actions that match what was typed ("cv" → „Neuer Lebenslauf“) come before the "new note named …"
     // fallbacks, so Enter opens the CV builder instead of making a note called "cv".
@@ -295,8 +303,14 @@ function Palette({ onClose }: { onClose: () => void }) {
                     />
                   )}
                   <span className="relative grid size-4 shrink-0 place-items-center text-ink-3 [&_svg]:size-4">{item.icon}</span>
-                  <span className={cn("relative min-w-0 shrink-[0.25] truncate", i === active ? "text-ink" : "text-ink-2")}>{item.label}</span>
-                  {item.hint && <span className="relative ml-auto min-w-0 max-w-[55%] truncate text-[12px] text-ink-3">{item.hint}</span>}
+                  <span className={cn("relative min-w-0 shrink-[0.25] truncate", i === active ? "text-ink" : "text-ink-2")} title={item.label}>
+                    {item.label}
+                  </span>
+                  {item.hint && (
+                    <span className="relative ml-auto min-w-0 max-w-[55%] truncate text-[12px] text-ink-3" title={item.hint}>
+                      {item.hint}
+                    </span>
+                  )}
                   {i === active && <CornerDownLeft className="relative size-3.5 shrink-0 text-ink-3" />}
                 </button>
               </div>

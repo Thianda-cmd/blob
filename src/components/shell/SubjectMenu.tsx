@@ -38,7 +38,7 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
             <Ellipsis className="size-4" />
           </button>
         ) : (
-          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink" aria-label={t.options} title={t.options}>
+          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink [@media(hover:none)]:size-7" aria-label={t.options} title={t.options}>
             <Ellipsis className="size-3.5" />
           </button>
         )

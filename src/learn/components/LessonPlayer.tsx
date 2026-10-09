@@ -10,11 +10,11 @@ import { learnText } from "@/i18n/messages/learn";
 import type { Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import type { LearnDay } from "@/learn/progress";
-import { useStudySession, useTodayXp, useWide } from "@/learn/session";
+import { useStudySession, useTodayXp } from "@/learn/session";
 import { studyHref, topicHref } from "@/learn/catalog";
 import { showItems } from "@/learn/showcase";
 import { useTopic } from "@/learn/topics";
-import type { Feedback, LessonStep, Level } from "@/learn/types";
+import { LEVELS, type Feedback, type LessonStep, type Level } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent } from "./ExerciseCard";
 import { MathView } from "./MathView";
@@ -59,7 +59,6 @@ export function LessonPlayer({
   const today = useTodayXp(days);
   const session = useStudySession({ topic: slug, level, mastery, levelMastery, todayXp: today.xp });
   const blobRef = useRef<BlobHandle>(null);
-  const wide = useWide();
   const t = useMessages(learnText);
   const tt = useText();
   const names = topicNames(topic, useLocale());
@@ -76,7 +75,7 @@ export function LessonPlayer({
   // Pictures and widgets have a public page that can be shared from here.
   const shared = showItems(topic).find((i) => i.level === level && i.step === index);
   const exitHref = topicHref(topic, level);
-  const nextLevel = ([2, 3] as Level[]).find((l) => l > level && topic.lessons[l] && topic.levels[l].minutes);
+  const nextLevel = LEVELS.find((l) => l > level && topic.lessons[l] && topic.levels[l].minutes);
   const title = `${names.title} · ${t.levels[level]}`;
   const progress = finished ? 1 : (index + (frames.length > 1 ? frame / frames.length : 0)) / steps.length;
   const canBack = frame > 0 || (index > 0 && steps[index - 1].type !== "check" && step.type !== "check");
@@ -195,9 +194,10 @@ export function LessonPlayer({
   return (
     <div className="flex min-h-dvh flex-col">
       <StudyTopBar exitHref={exitHref} title={title} progress={progress} xp={session.xp} combo={session.combo} />
-      <div className="mx-auto grid w-full max-w-[1360px] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
+      {/* content-start: on phones Blob and the step stack at the top instead of sharing out the spare height. */}
+      <div className="mx-auto grid w-full max-w-[1240px] flex-1 content-start gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <Tutor say={say} mood={mood} blobRef={blobRef} size={wide ? 170 : 84} side={wide ? "left" : "top"} />
+          <Tutor say={say} mood={mood} blobRef={blobRef} size={170} side="auto" />
         </aside>
 
         <main className="min-w-0">
@@ -223,7 +223,7 @@ export function LessonPlayer({
             >
               {step.type === "check" ? (
                 <>
-                  {step.title && <h1 className="font-display text-[26px] font-bold tracking-[-0.015em]">{tt(step.title)}</h1>}
+                  {step.title && <h1 className="text-balance font-display text-[24px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>}
                   <ExerciseCard
                     exercise={step.exercise}
                     mode="lesson"
@@ -238,7 +238,7 @@ export function LessonPlayer({
               ) : (
                 <>
                   <div className="flex items-start gap-3">
-                    <h1 className="min-w-0 flex-1 font-display text-[26px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>
+                    <h1 className="min-w-0 flex-1 text-balance font-display text-[24px] font-bold leading-tight tracking-[-0.015em] sm:text-[30px]">{tt(step.title)}</h1>
                     {shared && <ShareVisual topic={topic} level={level} id={shared.id} title={shared.title} className="mt-0.5" />}
                   </div>
                   {step.body && <Rich text={step.body} className="max-w-[700px] text-[16px] leading-relaxed text-ink-2" />}
@@ -257,20 +257,18 @@ export function LessonPlayer({
 
                   {f && (
                     <div className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
-                      <div className="relative grid min-h-[200px] place-items-center overflow-x-auto px-6 py-12 sm:min-h-[240px]">
+                      <div className="relative grid min-h-[200px] place-items-center overflow-x-auto px-4 py-10 sm:min-h-[240px] sm:px-6 sm:py-12">
                         <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
                         <MathView src={f.math} size="xl" highlight={f.highlight} arrows={f.arrows} scope={`${scope}-${index}`} className="relative" />
                       </div>
-                      <div className="flex items-start gap-3 border-t border-line bg-surface/60 px-5 py-4">
+                      {/* Phones: the frame dots sit above the note, so a long animation never squeezes the text. */}
+                      <div className="flex flex-col gap-2 border-t border-line bg-surface/60 px-4 py-3.5 sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:py-4">
                         {frames.length > 1 && (
-                          <div className="mt-1.5 flex shrink-0 gap-1">
+                          <div className="flex shrink-0 flex-wrap gap-x-1 gap-y-2 sm:mt-1.5 sm:max-w-[40%]">
                             {frames.map((_, n) => (
-                              <button
-                                key={n}
-                                onClick={() => setFrame(n)}
-                                className={cn("h-1.5 rounded-full transition-all", n === frame ? "w-5 bg-blob" : n < frame ? "w-1.5 bg-blob/50" : "w-1.5 bg-line-2")}
-                                aria-label={t.lesson.showStep(n + 1)}
-                              />
+                              <button key={n} onClick={() => setFrame(n)} className="-my-2 py-2" aria-label={t.lesson.showStep(n + 1)} aria-current={n === frame ? "step" : undefined}>
+                                <span className={cn("block h-1.5 rounded-full transition-all", n === frame ? "w-5 bg-blob" : n < frame ? "w-1.5 bg-blob/50" : "w-1.5 bg-line-2")} />
+                              </button>
                             ))}
                           </div>
                         )}
@@ -299,7 +297,8 @@ export function LessonPlayer({
                         <ArrowLeft className="size-4" /> {t.lesson.back}
                       </StudyButton>
                     )}
-                    <span className="ml-auto hidden text-[12px] text-ink-3 sm:block">{t.lesson.keys}</span>
+                    {/* Keyboard hints only where there is a mouse (and so most likely a keyboard). */}
+                    <span className="ml-auto hidden text-[12px] text-ink-3 pointer-fine:sm:block">{t.lesson.keys}</span>
                   </div>
                 </>
               )}
