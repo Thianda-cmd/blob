@@ -324,21 +324,39 @@ export function cvFileName(cv: Pick<Cv, "lang" | "person">) {
 
 // --- How complete is it? ------------------------------------------------------------------------
 
+/** Lena's contact details in the example CV (src/cv/samples.ts uses these). */
+export const SAMPLE_CONTACT = { email: "lena.schneider@example.com", phone: "0151 23456789", street: "Lindenstraße 12", postalCode: "20095" };
+
+/** The gap marker that examples leave for the student to fill ("Ich interessiere mich für …"). */
+export const GAP = "…";
+
+/**
+ * Whether the CV still has Lena's contact details from the example (her email, phone or address).
+ * Such a CV may look complete, but it isn't the student's yet.
+ */
+export function isSampleCv(cv: Pick<Cv, "person">) {
+  const p = cv.person;
+  const s = SAMPLE_CONTACT;
+  return p.email.trim() === s.email || p.phone.trim() === s.phone || (p.street.trim() === s.street && p.postalCode.trim() === s.postalCode);
+}
+
 export type CvCheck = "name" | "contact" | "address" | "photo" | "summary" | "education" | "practice" | "skills" | "languages" | "signature";
 
 /** What a good school CV has. The editor shows these as a checklist with tips. `optional` ones don't count against 100 %. */
 export function cvChecklist(cv: Cv): { id: CvCheck; done: boolean; optional?: boolean }[] {
   const p = cv.person;
-  const has = (kind: CvSectionKind) => cv.sections.some((s) => s.kind === kind && sectionHasContent(s));
+  const s = SAMPLE_CONTACT;
+  const has = (kind: CvSectionKind) => cv.sections.some((x) => x.kind === kind && sectionHasContent(x));
   return [
-    { id: "name", done: Boolean(p.firstName.trim() && p.lastName.trim()) },
-    { id: "contact", done: Boolean(p.email.trim() && p.phone.trim()) },
-    { id: "address", done: Boolean(p.city.trim()) },
+    { id: "name", done: Boolean(p.firstName.trim() && p.lastName.trim() && !p.headline.includes(GAP)) },
+    // Lena's details from the example don't count: they are not the student's.
+    { id: "contact", done: Boolean(p.email.trim() && p.phone.trim() && p.email.trim() !== s.email && p.phone.trim() !== s.phone) },
+    { id: "address", done: Boolean(p.city.trim() && p.street.trim() !== s.street) },
     { id: "education", done: has("education") },
     { id: "practice", done: has("internships") || has("experience") || has("volunteering") },
     { id: "skills", done: has("skills") },
     { id: "languages", done: has("languages") },
-    { id: "summary", done: cv.summary.trim().length >= 40 },
+    { id: "summary", done: cv.summary.trim().length >= 40 && !cv.summary.includes(GAP) },
     { id: "photo", done: Boolean(p.photo), optional: true },
     { id: "signature", done: !cv.closing.show || Boolean(cv.closing.signature), optional: true },
   ];

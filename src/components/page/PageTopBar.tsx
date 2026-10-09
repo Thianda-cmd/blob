@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderInput, Link2, Star, Trash2, Ellipsis, Check } from "lucide-react";
+import { FolderInput, FileUser, Link2, Star, Trash2, Ellipsis, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { blob } from "@/components/blob/bus";

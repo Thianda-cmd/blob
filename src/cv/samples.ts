@@ -1,6 +1,6 @@
 import type { Locale } from "@/i18n/config";
 import { templateMeta } from "./catalog";
-import { cvId, normalizeCv } from "./model";
+import { cvId, normalizeCv, SAMPLE_CONTACT } from "./model";
 import type { Cv, CvTemplateId } from "./types";
 
 // A made-up school student's CV, used for the design previews and "start with an example".
@@ -70,10 +70,7 @@ export function sampleCv(lang: Locale, template: CvTemplateId = "classic"): Cv {
         lastName: "Schneider",
         headline: t.headline,
         photo: null,
-        email: "lena.schneider@example.com",
-        phone: "0151 23456789",
-        street: "Lindenstraße 12",
-        postalCode: "20095",
+        ...SAMPLE_CONTACT,
         city: "Hamburg",
         birthDate: "2009-03-12",
         birthPlace: "Hamburg",

@@ -44,10 +44,12 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<{ item: CvItem; cv: Cv } | null>(null);
 
-  useRefreshOnBack();
+  const fresh = useRefreshOnBack(initialItems);
 
-  // Which CVs exist and what they are called comes from the workspace, which is always current (made,
-  // renamed or trashed anywhere). The server adds what the cards draw: the content and the last save.
+  // Which CVs exist and what they are called comes from the workspace, which is current for everything
+  // done in this tab (made, renamed, trashed). The server adds what the cards draw: the content and the
+  // last save. A CV only the workspace knows is new (its card waits for the server's fresh copy after
+  // Back), unless the server's list is fresh: then it was deleted elsewhere, e.g. in another tab.
   const items = useMemo(() => {
     const known = new Map<string, CvItem>();
     for (const i of [...made, ...initialItems]) {
@@ -55,13 +57,13 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
       if (!k || time(i.updated_at) > time(k.updated_at)) known.set(i.id, i);
     }
     return pages
-      .filter((p) => p.kind === "cv")
+      .filter((p) => p.kind === "cv" && (known.has(p.id) || !fresh))
       .map((p): CvItem => {
         const k = known.get(p.id);
         return { id: p.id, title: p.title, updated_at: k && time(k.updated_at) > time(p.updated_at) ? k.updated_at : p.updated_at, content: k?.content };
       })
       .sort((a, b) => time(b.updated_at) - time(a.updated_at));
-  }, [pages, made, initialItems]);
+  }, [pages, made, initialItems, fresh]);
 
   // /cv?new=1 (from Home or the command palette): open the dialog, then tidy the URL.
   const wantsNew = params.get("new") === "1";

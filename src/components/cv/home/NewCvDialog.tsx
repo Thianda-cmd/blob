@@ -2,7 +2,7 @@
 
 import { ArrowRight, BookOpenCheck, Check, FilePlus2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { memo, useDeferredValue, useMemo, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -48,6 +48,11 @@ function NewCv({ onClose }: { onClose: () => void }) {
   // The tiles show the example in every design; the big preview shows exactly what you'll get.
   const samples = useMemo(() => Object.fromEntries(CV_TEMPLATES.map((m) => [m.id, sampleCv(lang, m.id)])) as Record<CvTemplateId, Cv>, [lang]);
   const preview = useMemo(() => (start === "example" ? samples[template] : startCv("blank", lang, template, me)), [start, samples, template, lang, me]);
+  // Redrawing seven CVs (in another language, say) takes a moment on a phone: the choices answer at
+  // once, and the pictures follow in the background (dimmed if that takes a while).
+  const shownSamples = useDeferredValue(samples);
+  const shownPreview = useDeferredValue(preview);
+  const dim = "opacity-60 delay-150";
   const meta = templateMeta(template);
   const [previewRef, previewWidth] = useWidth<HTMLDivElement>();
 
@@ -83,9 +88,14 @@ function NewCv({ onClose }: { onClose: () => void }) {
       <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.4fr)] md:overflow-hidden">
         {/* What you'll get (tablets and up) */}
         <div className="hidden min-h-0 flex-col items-center border-r border-line bg-paper px-6 py-5 md:flex md:overflow-y-auto">
-          <div ref={previewRef} className="w-full max-w-[300px]" aria-label={t.preview} role="img">
+          <div
+            ref={previewRef}
+            className={cn("w-full max-w-[300px] transition-opacity", shownPreview !== preview && dim)}
+            aria-label={t.preview}
+            role="img"
+          >
             {previewWidth > 0 ? (
-              <Thumb cv={preview} width={previewWidth} className="rounded-[4px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.08),0_14px_32px_-12px_rgb(0_0_0/0.3)]" />
+              <Thumb cv={shownPreview} width={previewWidth} className="rounded-[4px] bg-white shadow-[0_1px_2px_rgb(0_0_0/0.08),0_14px_32px_-12px_rgb(0_0_0/0.3)]" />
             ) : (
               <div className="aspect-[210/297] w-full rounded-[4px] bg-white" />
             )}
@@ -99,11 +109,11 @@ function NewCv({ onClose }: { onClose: () => void }) {
         <div className="space-y-5 px-5 py-5 sm:px-6 md:overflow-y-auto">
           <fieldset>
             <Legend number={1}>{t.design}</Legend>
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            <div className={cn("grid grid-cols-3 gap-2.5 transition-opacity sm:gap-3", shownSamples !== samples && dim)}>
               {CV_TEMPLATES.map((m, i) => (
                 <DesignTile
                   key={m.id}
-                  cv={samples[m.id]}
+                  cv={shownSamples[m.id]}
                   name={tt(m.name)}
                   checked={template === m.id}
                   onPick={() => setTemplate(m.id)}
@@ -121,7 +131,9 @@ function NewCv({ onClose }: { onClose: () => void }) {
                   <label key={l} className="relative">
                     <input type="radio" name="cv-lang" value={l} checked={lang === l} onChange={() => setLang(l)} className="peer sr-only" />
                     <span className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-[14px] text-ink-2 transition-colors hover:text-ink peer-checked:bg-raised peer-checked:font-medium peer-checked:text-ink peer-checked:shadow-card peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-blob">
-                      <span className="rounded bg-ink/[0.07] px-1 text-[10.5px] font-semibold tracking-wide text-ink-3">{LOCALE_NAMES[l].short}</span>
+                      <span aria-hidden className="rounded bg-ink/[0.07] px-1 text-[10.5px] font-semibold tracking-wide text-ink-3">
+                        {LOCALE_NAMES[l].short}
+                      </span>
                       {LOCALE_NAMES[l].name}
                     </span>
                   </label>
@@ -163,7 +175,9 @@ function NewCv({ onClose }: { onClose: () => void }) {
 function Legend({ number, children }: { number: number; children: ReactNode }) {
   return (
     <legend className="mb-2.5 flex items-center gap-2 text-[13.5px] font-semibold text-ink">
-      <span className="grid size-5 place-items-center rounded-full bg-blob-soft text-[11px] font-bold tabular-nums text-blob-ink">{number}</span>
+      <span aria-hidden className="grid size-5 place-items-center rounded-full bg-blob-soft text-[11px] font-bold tabular-nums text-blob-ink">
+        {number}
+      </span>
       {children}
     </legend>
   );

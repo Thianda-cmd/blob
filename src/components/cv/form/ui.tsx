@@ -480,6 +480,7 @@ export function AddButton({ children, onClick, disabled, id }: { children: React
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-cv-add
       className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[13.5px] font-medium text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/50 hover:text-blob-ink active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 max-lg:h-11"
     >
       <Plus className="size-4" />

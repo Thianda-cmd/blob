@@ -66,6 +66,7 @@ export function EntryList({ section, lang, change }: { section: CvEntrySection; 
         <button
           type="button"
           onClick={add}
+          data-cv-add
           className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-blob-soft px-3.5 text-[13.5px] font-medium text-blob-ink transition-[background,transform] hover:bg-blob/15 active:scale-[0.97] max-lg:h-11 max-lg:px-4"
         >
           <Plus className="size-4" /> {words.add}

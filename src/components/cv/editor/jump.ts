@@ -12,7 +12,7 @@ const TEXT_FIELDS = 'input:not([type="file"]):not([type="hidden"]):not([type="ch
  * AddButton under a list (form/ui.tsx), or the button in an empty list's dashed box (EntryList).
  * Not the dashed suggestion chips, which are not full width.
  */
-const ADD_BUTTON = "button.w-full.border-dashed:has(> svg.lucide-plus), div.border-dashed > button:has(> svg.lucide-plus)";
+const ADD_BUTTON = "[data-cv-add]";
 
 export type PartTarget = {
   /** The part after "cv-part-". */
@@ -123,6 +123,12 @@ function findTarget(card: HTMLElement, selectors: string[]): HTMLElement | null 
   return null;
 }
 
+/** A field in the middle of the view; a very tall one (a long text) from its top. */
+function scrollToField(el: HTMLElement, behavior: ScrollBehavior) {
+  const tall = el.getBoundingClientRect().height > window.innerHeight * 0.6;
+  el.scrollIntoView({ behavior, block: tall ? "start" : "center" });
+}
+
 /** Unfolds one entry of a card (the form folds entries to a one-line summary) and shows its details. */
 function revealEntry(card: HTMLElement, entry: { id: string; heading: string }, smooth: boolean) {
   const textId = `cvf-${entry.id}-text`;
@@ -133,7 +139,7 @@ function revealEntry(card: HTMLElement, entry: { id: string; heading: string }, 
   window.setTimeout(() => {
     const text = document.getElementById(textId);
     if (!text) return;
-    text.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+    scrollToField(text, smooth ? "smooth" : "auto");
     if (window.matchMedia("(pointer: fine)").matches) text.focus({ preventScroll: true });
   }, 120);
 }
@@ -169,7 +175,7 @@ export function revealPart(part: string, focus?: string[], entry?: { id: string;
       const target = focus ? findTarget(el, focus) : null;
       if (focus && !target && frames++ < 8) return void window.requestAnimationFrame(land);
       // The field itself in the middle of the view: the top of a tall card can leave it below the fold.
-      if (target) target.scrollIntoView({ behavior, block: "center" });
+      if (target) scrollToField(target, behavior);
       else el.scrollIntoView({ behavior, block: "start" });
       // Only with a mouse: on a phone a keyboard popping up after a jump is more confusing than helpful.
       if (target && window.matchMedia("(pointer: fine)").matches) window.setTimeout(() => target.focus({ preventScroll: true }), reduced ? 0 : 480);
