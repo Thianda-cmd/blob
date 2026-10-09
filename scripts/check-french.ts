@@ -133,7 +133,8 @@ function checkUnit(u: Unit, index: number) {
     for (const lang of LANGS)
       for (const a of u.sentences)
         for (const b of u.sentences) {
-          if (a.id >= b.id) continue;
+          // Both ways: (a, b) and (b, a) each come up in this double loop.
+          if (a.id === b.id) continue;
           const promptA = dir === "toFr" ? a[lang] : a.fr;
           const promptB = dir === "toFr" ? b[lang] : b.fr;
           if (fold(promptA, dir === "toFr" ? lang : "fr") !== fold(promptB, dir === "toFr" ? lang : "fr")) continue;
@@ -250,7 +251,7 @@ function checkSteps(at: string, list: ReturnType<typeof lessonExercises>, lang: 
       if (right !== 1) bad(at, `${ex.key}: ${right} options are right`);
     }
     if (ex.kind === "picture" && new Set(ex.options.map((w) => w.emoji)).size !== ex.options.length) bad(at, `${ex.key}: two pictures look the same`);
-    if (ex.kind === "match" && new Set(ex.words.map((w) => norm(w.en))).size !== ex.words.length) warn(at, `${ex.key}: two words with the same English meaning`);
+    if (ex.kind === "match" && new Set(ex.words.map((w) => norm(w[lang]))).size !== ex.words.length) bad(at, `${ex.key}: two cards with the same ${lang} meaning`);
   }
 }
 

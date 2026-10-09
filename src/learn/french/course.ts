@@ -62,12 +62,26 @@ export const bare = (fr: string) => norm(fr).replace(/^(le|la|les|un|une)\s+/, "
  * and the dictionary hints. "Je m'appelle Hugo, et toi ?" → je-m-appelle, et-toi.
  */
 export function wordsInSentence(fr: string, words: Word[] = ALL_WORDS): Word[] {
-  const text = ` ${norm(fr)} `;
+  // Elided words count on their own ("de l'eau" uses l'eau, "je n'aime pas" uses ne … pas).
+  const split = (x: string) => x.replace(/\bn'/g, "ne ").replace(/'/g, "' ");
+  const text = ` ${split(norm(fr))} `;
   return words.filter((w) => {
-    const b = bare(w.fr);
-    return b.length > 0 && text.includes(` ${b} `);
+    // "ne … pas": each part, in order.
+    if (w.fr.includes("…")) {
+      let at = 0;
+      for (const part of w.fr.split("…").map((p) => split(norm(p)))) {
+        at = part ? text.indexOf(` ${part} `, at) : at;
+        if (at < 0) return false;
+      }
+      return true;
+    }
+    const b = split(bare(w.fr));
+    // A word that is also an article (the number un) would count in every "un croissant".
+    return b.length > 0 && !ARTICLE_FORMS.has(b) && text.includes(` ${b} `);
   });
 }
+
+const ARTICLE_FORMS = new Set(["un", "une", "le", "la", "les", "des", "du", "de"]);
 
 export type LessonState = "done" | "current" | "open" | "locked";
 

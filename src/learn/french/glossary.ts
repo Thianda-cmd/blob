@@ -25,7 +25,7 @@ const BASE: Record<string, Gloss> = {
   la: { en: "the", de: "die" },
   "l'": { en: "the", de: "der / die / das" },
   les: { en: "the", de: "die" },
-  un: { en: "a", de: "ein" },
+  un: { en: "a / one", de: "ein / eins" },
   une: { en: "a", de: "eine" },
   des: { en: "some", de: "(einige)" },
   du: { en: "some / of the", de: "etwas / vom" },
@@ -100,6 +100,8 @@ function dictionary(): Map<string, Gloss> {
     const k = fold(fr, "fr");
     if (k && !dict!.has(k)) dict!.set(k, g);
   };
+  // The little words first: "un" is "a" in every sentence, even once the number one is taught.
+  for (const [fr, g] of Object.entries(BASE)) add(fr, g);
   for (const w of ALL_WORDS) {
     const g = { en: w.en, de: w.de };
     add(w.fr, g);
@@ -107,7 +109,6 @@ function dictionary(): Map<string, Gloss> {
     add(bareForm, g);
   }
   for (const u of UNITS) for (const g of u.gloss ?? []) add(g.fr, { en: g.en, de: g.de });
-  for (const [fr, g] of Object.entries(BASE)) add(fr, g);
   return dict;
 }
 

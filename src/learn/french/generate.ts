@@ -158,7 +158,7 @@ export function lessonExercises(unit: Unit, n: number, earlier: Unit[], opts: Ge
   });
   out.push(...checks);
   const matchable = rng.shuffle([...fresh, ...introduced.filter((w) => !fresh.includes(w)), ...earlier.flatMap((u) => u.words)]).filter(
-    (w, i, all) => all.findIndex((x) => norm(x.fr) === norm(w.fr)) === i,
+    (w, i, all) => all.findIndex((x) => norm(x.fr) === norm(w.fr) || norm(x[opts.lang]) === norm(w[opts.lang])) === i,
   );
   if (matchable.length >= 4) out.push({ kind: "match", key: `match:${unit.slug}:${n}`, words: matchable.slice(0, 5) });
 
@@ -210,7 +210,7 @@ export function practiceExercises(units: Unit[], weak: string[], opts: GenOption
   const sequence = kindSequence(kinds, picked.length, rng);
   const out: Exercise[] = picked.map((s, i) => sentenceExercise(s, sequence[i], sentences, opts, rng, i));
   const weakWords = rng.shuffle(words.filter((w) => weakSet.has(w.id)));
-  const forMatch = [...weakWords, ...rng.shuffle(words.filter((w) => !weakSet.has(w.id)))].filter((w, i, all) => all.findIndex((x) => norm(x.fr) === norm(w.fr)) === i).slice(0, 5);
+  const forMatch = [...weakWords, ...rng.shuffle(words.filter((w) => !weakSet.has(w.id)))].filter((w, i, all) => all.findIndex((x) => norm(x.fr) === norm(w.fr) || norm(x[opts.lang]) === norm(w[opts.lang])) === i).slice(0, 5);
   if (forMatch.length >= 4) out.splice(2, 0, { kind: "match", key: "match:practice", words: forMatch });
   const pics = weakWords.map((w, i) => pictureFor(w, words, rng, i)).filter((e): e is Exercise => !!e).slice(0, 2);
   pics.forEach((p) => out.splice(rng.int(0, out.length), 0, p));

@@ -26,6 +26,7 @@ export function norm(s: string): string {
 const EN_CONTRACTIONS: [RegExp, string][] = [
   [/\bi'm\b/g, "i am"],
   [/\b(you|we|they)'re\b/g, "$1 are"],
+  [/\b(he|she|it|that|who|there)'s got\b/g, "$1 has got"],
   [/\b(he|she|it|that|what|where|who|there|here)'s\b/g, "$1 is"],
   [/\blet's\b/g, "let us"],
   [/\b(i|you|we|they)'ve\b/g, "$1 have"],
