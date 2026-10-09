@@ -4,7 +4,7 @@ import { animate, AnimatePresence, motion } from "motion/react";
 import { Flame, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Blob, type BlobHandle } from "@/components/blob/Blob";
+import { Blob, type BlobAccessory, type BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { masteryLabel } from "@/learn/progress";
@@ -130,6 +130,7 @@ export function SessionEnd({
   badge,
   children,
   happy = true,
+  accessory = "cap",
 }: {
   title: string;
   subtitle?: string;
@@ -140,6 +141,8 @@ export function SessionEnd({
   badge?: ReactNode;
   children?: ReactNode;
   happy?: boolean;
+  /** What Blob wears (the béret in the French course). */
+  accessory?: BlobAccessory;
 }) {
   const blob = useRef<BlobHandle>(null);
   useEffect(() => {
@@ -159,7 +162,7 @@ export function SessionEnd({
       <div className="relative mx-auto grid place-items-center overflow-x-clip overflow-y-visible">
         {happy && <Confetti seed={3} spread={roomy ? 260 : 190} />}
         <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 16 }}>
-          <Blob ref={blob} size={roomy ? 210 : 150} mood={happy ? "excited" : "happy"} accessory="cap" />
+          <Blob ref={blob} size={roomy ? 210 : 150} mood={happy ? "excited" : "happy"} accessory={accessory} />
         </motion.div>
       </div>
       <div className="space-y-5 sm:space-y-6">

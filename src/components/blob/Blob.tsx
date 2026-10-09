@@ -14,7 +14,7 @@ export type BlobMood =
   | "love"
   | "surprised";
 
-export type BlobAccessory = "cap" | "glasses";
+export type BlobAccessory = "cap" | "glasses" | "beret";
 
 export type BlobHandle = {
   /** Hop. `power` 0..1.5 */
@@ -808,6 +808,11 @@ export function Blob({
             <GradCap tasselRef={tasselRef} />
           </g>
         )}
+        {accessory === "beret" && (
+          <g ref={capRef}>
+            <Beret />
+          </g>
+        )}
       </g>
 
       {intro &&
@@ -836,6 +841,21 @@ function Arm({ gradient }: { gradient: string }) {
       <ellipse cx={ARM_X + 15} cy={ARM_Y} rx={18} ry={9.5} fill={`url(#${gradient})`} />
       <ellipse cx={ARM_X + 21} cy={ARM_Y - 3.6} rx={6.5} ry={2.2} fill="#fff" opacity={0.35} />
     </>
+  );
+}
+
+/** A French béret, worn at an angle (the French course). */
+function Beret() {
+  return (
+    <g transform={`rotate(-13 ${CX} 58)`}>
+      {/* The soft rim that sits on the head. */}
+      <path d={`M ${CX - 31} 62 Q ${CX} 71 ${CX + 33} 61 L ${CX + 31} 66 Q ${CX} 76 ${CX - 29} 67 Z`} fill={INK} />
+      {/* The puffy top, a little to one side. */}
+      <ellipse cx={CX + 5} cy={54} rx={43} ry={14.5} fill={INK} />
+      <ellipse cx={CX - 8} cy={48.5} rx={21} ry={4.6} fill="#fff" opacity={0.13} />
+      {/* The little stalk on top. */}
+      <path d={`M ${CX + 7} 41 q 1.5 -5.5 6.5 -7`} stroke={INK} strokeWidth={4.2} strokeLinecap="round" fill="none" />
+    </g>
   );
 }
 

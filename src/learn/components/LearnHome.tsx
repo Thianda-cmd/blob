@@ -146,7 +146,8 @@ export function LearnHome({
  * The subject tabs. More subjects than fit scroll sideways: the open one is scrolled into view
  * and the edges fade where more tabs wait.
  */
-function SubjectTabs({ subject }: { subject: Subject }) {
+/** The learning center's subjects as tabs (the French course is one of them). */
+export function SubjectTabs({ subject }: { subject: string }) {
   const t = useMessages(learnText);
   const tt = useText();
   const ref = useRef<HTMLElement>(null);
@@ -215,10 +216,10 @@ function SubjectTabs({ subject }: { subject: Subject }) {
 }
 
 /** A stat in the header: a tile on phones (icon above the number), a chip from sm. */
-const CHIP =
+export const CHIP =
   "flex min-w-0 flex-col items-start gap-1.5 rounded-xl border border-line bg-raised p-2.5 shadow-card sm:h-12 sm:flex-row sm:items-center sm:gap-2.5 sm:py-0 sm:pl-3.5 sm:pr-3.5";
 
-function StatChip({ icon, label, value, hot }: { icon: React.ReactNode; label: string; value: number; hot?: boolean }) {
+export function StatChip({ icon, label, value, hot }: { icon: React.ReactNode; label: string; value: number; hot?: boolean }) {
   return (
     <div className={CHIP}>
       <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", hot ? "bg-blob text-white" : "bg-hover text-ink-2")}>{icon}</span>

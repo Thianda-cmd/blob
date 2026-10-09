@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Every live subject with its topics that have pictures, grouped by area in the subject's order. */
 function gallerySubjects() {
-  return SUBJECTS.filter((s) => s.live).flatMap((info) => {
+  return SUBJECTS.filter((s) => s.live && !s.language).flatMap((info) => {
     // Topics without pictures stay out (a topic the manifest doesn't know yet is shown).
     const topics = subjectCatalog(info.slug as Subject).filter((topic) => manifestItems(topic.slug)?.length !== 0);
     if (!topics.length) return [];

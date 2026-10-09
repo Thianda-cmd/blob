@@ -1,0 +1,157 @@
+import { tx } from "@/i18n/text";
+import type { Unit } from "../types";
+
+/** Unit 1: hello, goodbye, your name, how are you. The reference for how a unit is written. */
+export const u01: Unit = {
+  slug: "bonjour",
+  n: 1,
+  cefr: "A1",
+  title: tx("Hello!", "Hallo!"),
+  goal: tx("Greet people, say your name and ask how they are", "Leute begrüßen, deinen Namen sagen und fragen, wie es geht"),
+  emoji: "👋",
+  words: [
+    { id: "bonjour", fr: "bonjour", en: "hello", de: "hallo", alt: { en: ["good morning", "good day", "hi"], de: ["guten Tag", "guten Morgen"] }, kind: "phrase", emoji: "☀️", note: tx("Literally «good day». It's the polite hello for the whole day.", "Wörtlich „guter Tag“. Das höfliche Hallo für den ganzen Tag.") },
+    { id: "salut", fr: "salut", en: "hi", de: "hallo", alt: { en: ["hello", "bye", "hey"], de: ["hi", "tschüss", "ciao"] }, kind: "phrase", emoji: "👋", note: tx("For friends, both hello and bye.", "Unter Freunden: hallo und tschüss zugleich.") },
+    { id: "merci", fr: "merci", en: "thank you", de: "danke", alt: { en: ["thanks"] }, kind: "phrase", emoji: "🙏" },
+    { id: "oui", fr: "oui", en: "yes", de: "ja", kind: "word", emoji: "👍" },
+    { id: "non", fr: "non", en: "no", de: "nein", kind: "word", emoji: "👎" },
+    { id: "bonsoir", fr: "bonsoir", en: "good evening", de: "guten Abend", kind: "phrase", emoji: "🌙", note: tx("Bon + soir: good + evening.", "Bon + soir: guter + Abend.") },
+    { id: "au-revoir", fr: "au revoir", en: "goodbye", de: "auf Wiedersehen", alt: { en: ["bye"], de: ["tschüss"] }, kind: "phrase", emoji: "🚶" },
+    { id: "a-bientot", fr: "à bientôt", en: "see you soon", de: "bis bald", kind: "phrase", emoji: "⏳" },
+    { id: "merci-beaucoup", fr: "merci beaucoup", en: "thank you very much", de: "vielen Dank", alt: { en: ["thanks a lot", "many thanks"], de: ["danke schön", "danke sehr"] }, kind: "phrase", emoji: "💐" },
+    { id: "madame", fr: "madame", en: "Mrs", de: "Frau", alt: { en: ["madam", "ma'am"] }, kind: "word", emoji: "👩" },
+    { id: "je-m-appelle", fr: "je m'appelle", en: "my name is", de: "ich heiße", alt: { en: ["I am called"] }, kind: "phrase" },
+    { id: "tu-t-appelles", fr: "tu t'appelles comment ?", en: "what's your name?", de: "wie heißt du?", alt: { fr: ["comment tu t'appelles ?"], en: ["what is your name?"] }, kind: "phrase" },
+    { id: "je-suis", fr: "je suis", en: "I am", de: "ich bin", kind: "phrase", note: tx("From être, «to be». The most important verb of all.", "Von être, „sein“. Das wichtigste Verb überhaupt.") },
+    { id: "tu-es", fr: "tu es", en: "you are", de: "du bist", kind: "phrase" },
+    { id: "enchante", fr: "enchanté", en: "nice to meet you", de: "freut mich", alt: { fr: ["enchantée"], en: ["pleased to meet you"], de: ["sehr erfreut"] }, kind: "phrase", emoji: "🤝", note: tx("A girl or woman writes enchantée, with an extra e.", "Mädchen und Frauen schreiben enchantée, mit einem e mehr.") },
+    { id: "comment-ca-va", fr: "comment ça va ?", en: "how are you?", de: "wie geht's?", alt: { fr: ["ça va ?"], en: ["how's it going?"], de: ["wie geht es dir?"] }, kind: "phrase" },
+    { id: "ca-va", fr: "ça va", en: "I'm fine", de: "es geht mir gut", alt: { en: ["fine", "I'm good"], de: ["gut", "mir geht's gut"] }, kind: "phrase", emoji: "🙂" },
+    { id: "bien", fr: "bien", en: "well", de: "gut", alt: { en: ["good", "fine"] }, kind: "adv" },
+    { id: "tres", fr: "très", en: "very", de: "sehr", kind: "adv" },
+    { id: "et-toi", fr: "et toi ?", en: "and you?", de: "und du?", alt: { de: ["und dir?"] }, kind: "phrase" },
+    { id: "moi-aussi", fr: "moi aussi", en: "me too", de: "ich auch", alt: { de: ["mir auch"] }, kind: "phrase" },
+    { id: "monsieur", fr: "monsieur", en: "Mr", de: "Herr", alt: { en: ["sir"] }, kind: "word", emoji: "👨" },
+  ],
+  lessons: [
+    { title: tx("Hello and thanks", "Hallo und danke"), words: ["bonjour", "salut", "merci", "oui", "non"] },
+    { title: tx("Good evening, goodbye", "Guten Abend, tschüss"), words: ["bonsoir", "au-revoir", "a-bientot", "merci-beaucoup", "madame"] },
+    { title: tx("My name is…", "Ich heiße …"), words: ["je-m-appelle", "tu-t-appelles", "je-suis", "tu-es", "enchante"] },
+    { title: tx("How are you?", "Wie geht's?"), words: ["comment-ca-va", "ca-va", "bien", "tres", "et-toi", "moi-aussi"] },
+    { title: tx("In the park", "Im Park"), words: ["monsieur"] },
+  ],
+  sentences: [
+    // Lesson 1
+    { id: "u01.01", lesson: 1, fr: "Bonjour, Léa !", en: "Hello, Léa!", de: "Hallo, Léa!", alt: { en: ["Hi, Léa!", "Good morning, Léa!"], de: ["Guten Tag, Léa!", "Guten Morgen, Léa!", "Hi, Léa!"] } },
+    { id: "u01.02", lesson: 1, fr: "Salut, Hugo !", en: "Hi, Hugo!", de: "Hallo, Hugo!", alt: { en: ["Hello, Hugo!", "Hey, Hugo!"], de: ["Hi, Hugo!"] } },
+    { id: "u01.03", lesson: 1, fr: "Oui, merci.", en: "Yes, thank you.", de: "Ja, danke.", alt: { en: ["Yes, thanks."] } },
+    { id: "u01.04", lesson: 1, fr: "Non, merci.", en: "No, thank you.", de: "Nein, danke.", alt: { en: ["No, thanks."] } },
+    { id: "u01.05", lesson: 1, fr: "Merci, Léa !", en: "Thank you, Léa!", de: "Danke, Léa!", alt: { en: ["Thanks, Léa!"] } },
+    { id: "u01.06", lesson: 1, fr: "Bonjour et merci !", en: "Hello and thank you!", de: "Hallo und danke!", alt: { en: ["Hello and thanks!", "Good morning and thank you!"], de: ["Guten Tag und danke!"] } },
+    // Lesson 2
+    { id: "u01.07", lesson: 2, fr: "Bonsoir, Madame Martin.", en: "Good evening, Mrs Martin.", de: "Guten Abend, Frau Martin." },
+    { id: "u01.08", lesson: 2, fr: "Au revoir, Hugo !", en: "Goodbye, Hugo!", de: "Auf Wiedersehen, Hugo!", alt: { en: ["Bye, Hugo!"], de: ["Tschüss, Hugo!"] } },
+    { id: "u01.09", lesson: 2, fr: "Salut, à bientôt !", en: "Bye, see you soon!", de: "Tschüss, bis bald!", alt: { en: ["Hi, see you soon!"], de: ["Ciao, bis bald!", "Hallo, bis bald!"] } },
+    { id: "u01.10", lesson: 2, fr: "Merci beaucoup, Madame Martin !", en: "Thank you very much, Mrs Martin!", de: "Vielen Dank, Frau Martin!", alt: { en: ["Thanks a lot, Mrs Martin!", "Many thanks, Mrs Martin!"], de: ["Danke schön, Frau Martin!", "Danke sehr, Frau Martin!"] } },
+    { id: "u01.11", lesson: 2, fr: "Au revoir et merci !", en: "Goodbye and thank you!", de: "Auf Wiedersehen und danke!", alt: { en: ["Goodbye and thanks!", "Bye and thank you!", "Bye and thanks!"], de: ["Tschüss und danke!"] } },
+    { id: "u01.12", lesson: 2, fr: "Bonsoir, Léa.", en: "Good evening, Léa.", de: "Guten Abend, Léa." },
+    // Lesson 3
+    { id: "u01.13", lesson: 3, fr: "Je m'appelle Blob.", en: "My name is Blob.", de: "Ich heiße Blob.", alt: { en: ["I am called Blob.", "I am Blob."], de: ["Mein Name ist Blob.", "Ich bin Blob."] } },
+    { id: "u01.14", lesson: 3, fr: "Tu t'appelles comment ?", en: "What's your name?", de: "Wie heißt du?", alt: { fr: ["Comment tu t'appelles ?", "Comment t'appelles-tu ?"], en: ["What is your name?"] } },
+    { id: "u01.15", lesson: 3, fr: "Je suis Léa.", en: "I am Léa.", de: "Ich bin Léa.", alt: { de: ["Ich heiße Léa."] } },
+    { id: "u01.16", lesson: 3, fr: "Tu es Hugo ?", en: "Are you Hugo?", de: "Bist du Hugo?", alt: { en: ["You are Hugo?"], de: ["Du bist Hugo?"] } },
+    { id: "u01.17", lesson: 3, fr: "Je m'appelle Hugo, et toi ?", en: "My name is Hugo, and you?", de: "Ich heiße Hugo, und du?", alt: { en: ["My name is Hugo, and yours?", "I am called Hugo, and you?", "I am Hugo, and you?"], de: ["Mein Name ist Hugo, und deiner?", "Ich bin Hugo, und du?"] } },
+    { id: "u01.18", lesson: 3, fr: "Bonjour, je suis Blob.", en: "Hello, I am Blob.", de: "Hallo, ich bin Blob.", alt: { en: ["Hi, I am Blob.", "Good morning, I am Blob."], de: ["Guten Tag, ich bin Blob.", "Hallo, ich heiße Blob."] } },
+    { id: "u01.19", lesson: 3, fr: "Enchanté, Léa !", en: "Nice to meet you, Léa!", de: "Freut mich, Léa!", alt: { fr: ["Enchantée, Léa !"], en: ["Pleased to meet you, Léa!"], de: ["Sehr erfreut, Léa!", "Schön, dich kennenzulernen, Léa!"] } },
+    // Lesson 4
+    { id: "u01.20", lesson: 4, fr: "Comment ça va ?", en: "How are you?", de: "Wie geht's?", alt: { fr: ["Ça va ?", "Comment vas-tu ?"], en: ["How's it going?", "How are things?"], de: ["Wie geht es dir?", "Wie geht es?"] } },
+    { id: "u01.21", lesson: 4, fr: "Ça va bien, merci.", en: "I'm fine, thank you.", de: "Mir geht's gut, danke.", alt: { en: ["I'm fine, thanks.", "I'm good, thanks.", "I'm good, thank you.", "I'm well, thank you.", "I'm well, thanks.", "Fine, thanks.", "Fine, thank you."], de: ["Es geht mir gut, danke.", "Gut, danke.", "Es geht gut, danke.", "Mir geht es gut, danke."] } },
+    { id: "u01.22", lesson: 4, fr: "Ça va très bien !", en: "I'm very well!", de: "Mir geht's sehr gut!", alt: { en: ["I'm very good!", "I'm doing very well!", "Very well!", "Very good!"], de: ["Es geht mir sehr gut!", "Sehr gut!", "Mir geht es sehr gut!"] } },
+    { id: "u01.23", lesson: 4, fr: "Et toi ?", en: "And you?", de: "Und du?", alt: { en: ["What about you?", "And yourself?"], de: ["Und dir?"] } },
+    { id: "u01.24", lesson: 4, fr: "Moi aussi.", en: "Me too.", de: "Ich auch.", alt: { en: ["Me as well.", "So am I."], de: ["Mir auch."] } },
+    { id: "u01.25", lesson: 4, fr: "Ça va, et toi ?", en: "I'm fine, and you?", de: "Gut, und dir?", alt: { en: ["Fine, and you?", "I'm good, and you?", "Good, and you?", "I'm well, and you?"], de: ["Mir geht's gut, und dir?", "Gut, und du?", "Es geht mir gut, und dir?", "Mir geht es gut, und dir?"] } },
+    { id: "u01.26", lesson: 4, fr: "Très bien, merci !", en: "Very well, thank you!", de: "Sehr gut, danke!", alt: { en: ["Very well, thanks!", "Very good, thanks!", "Very good, thank you!"] } },
+    // Lesson 5
+    { id: "u01.27", lesson: 5, fr: "Bonjour, Monsieur Martin !", en: "Hello, Mr Martin!", de: "Guten Tag, Herr Martin!", alt: { en: ["Good morning, Mr Martin!", "Hi, Mr Martin!", "Good day, Mr Martin!"], de: ["Hallo, Herr Martin!", "Guten Morgen, Herr Martin!"] } },
+    { id: "u01.28", lesson: 5, fr: "Oui, je suis Blob !", en: "Yes, I am Blob!", de: "Ja, ich bin Blob!" },
+    { id: "u01.29", lesson: 5, fr: "Au revoir, Monsieur Martin.", en: "Goodbye, Mr Martin.", de: "Auf Wiedersehen, Herr Martin.", alt: { en: ["Bye, Mr Martin."], de: ["Tschüss, Herr Martin."] } },
+    { id: "u01.30", lesson: 5, fr: "Bonsoir, Monsieur Martin !", en: "Good evening, Mr Martin!", de: "Guten Abend, Herr Martin!" },
+  ],
+  drills: [
+    { id: "u01.d1", lesson: 3, fr: "Je ___ Blob.", options: ["suis", "es", "est"], answer: 0, en: "I am Blob.", de: "Ich bin Blob.", why: tx("With **je** (I), être is **suis**: je suis.", "Mit **je** (ich) heißt être **suis**: je suis.") },
+    { id: "u01.d2", lesson: 3, fr: "Tu ___ Léa ?", options: ["es", "suis", "est"], answer: 0, en: "Are you Léa?", de: "Bist du Léa?", why: tx("With **tu** (you), it's **es**: tu es.", "Mit **tu** (du) heißt es **es**: tu es.") },
+    { id: "u01.d3", lesson: 3, fr: "Je m'___ Hugo.", options: ["appelle", "appelles", "appeler"], answer: 0, en: "My name is Hugo.", de: "Ich heiße Hugo.", why: tx("With **je** the ending is **-e**: je m'appell**e**.", "Mit **je** endet es auf **-e**: je m'appell**e**.") },
+    { id: "u01.d4", lesson: 3, fr: "Tu t'___ comment ?", options: ["appelles", "appelle", "appeler"], answer: 0, en: "What's your name?", de: "Wie heißt du?", why: tx("With **tu** the ending is **-es**: tu t'appell**es**. You don't hear the s.", "Mit **tu** endet es auf **-es**: tu t'appell**es**. Das s hört man nicht.") },
+    { id: "u01.d5", lesson: 3, fr: "Léa : « ___, Hugo ! »", options: ["Enchantée", "Enchanté"], answer: 0, en: "Léa: «Nice to meet you, Hugo!»", de: "Léa: „Freut mich, Hugo!“", why: tx("Léa is a girl, so she writes **enchantée** with an extra e. Hugo writes enchanté.", "Léa ist ein Mädchen, darum schreibt sie **enchantée** mit einem e mehr. Hugo schreibt enchanté.") },
+    { id: "u01.d6", lesson: 2, fr: "Il est 21 heures : « ___, Madame ! »", options: ["Bonsoir", "Bonjour", "Salut"], answer: 0, en: "It's 9 pm: «Good evening, madam!»", de: "Es ist 21 Uhr: „Guten Abend!“", why: tx("In the evening it's **bonsoir**. Bonjour is for the day, salut only for friends.", "Am Abend sagt man **bonsoir**. Bonjour ist für den Tag, salut nur für Freunde.") },
+    { id: "u01.d7", lesson: 4, fr: "Ça va ___ bien !", options: ["très", "beaucoup", "aussi"], answer: 0, en: "I'm very well!", de: "Mir geht's sehr gut!", why: tx("**Très** means very: très bien. Beaucoup goes with merci: merci beaucoup.", "**Très** heißt sehr: très bien. Beaucoup gehört zu merci: merci beaucoup.") },
+    { id: "u01.d8", lesson: 2, fr: "Merci ___ !", options: ["beaucoup", "très", "bien"], answer: 0, en: "Thank you very much!", de: "Vielen Dank!", why: tx("Thank you very much is **merci beaucoup**. (Très goes with words like bien: très bien.)", "Vielen Dank heißt **merci beaucoup**. (Très steht vor Wörtern wie bien: très bien.)") },
+    { id: "u01.d9", lesson: 4, fr: "Comment ça ___ ?", options: ["va", "es", "suis"], answer: 0, en: "How are you?", de: "Wie geht's?", why: tx("**Ça va** means «it goes». Comment ça va ? = How is it going?", "**Ça va** heißt „es geht“. Comment ça va ? = Wie geht's?") },
+    { id: "u01.d10", lesson: 4, fr: "— Ça va bien ! — Moi ___ !", options: ["aussi", "très", "toi"], answer: 0, en: "— I'm fine! — Me too!", de: "— Mir geht's gut! — Mir auch!", why: tx("**Moi aussi** = me too.", "**Moi aussi** = ich auch / mir auch.") },
+  ],
+  dialogue: {
+    id: "u01.dialogue",
+    lesson: 5,
+    title: tx("Blob meets Léa and Hugo", "Blob trifft Léa und Hugo"),
+    lines: [
+      { who: "blob", fr: "Bonjour ! Je m'appelle Blob.", en: "Hello! My name is Blob.", de: "Hallo! Ich heiße Blob." },
+      { who: "lea", fr: "Salut, Blob ! Je m'appelle Léa.", en: "Hi, Blob! My name is Léa.", de: "Hallo, Blob! Ich heiße Léa." },
+      { who: "blob", fr: "Enchanté, Léa ! Comment ça va ?", en: "Nice to meet you, Léa! How are you?", de: "Freut mich, Léa! Wie geht's?" },
+      { who: "lea", fr: "Ça va bien, merci. Et toi ?", en: "I'm fine, thank you. And you?", de: "Mir geht's gut, danke. Und dir?" },
+      { who: "blob", fr: "Très bien ! Et lui, il s'appelle comment ?", en: "Very well! And him, what's his name?", de: "Sehr gut! Und er, wie heißt er?" },
+      { who: "hugo", fr: "Je m'appelle Hugo. Enchanté, Blob !", en: "My name is Hugo. Nice to meet you, Blob!", de: "Ich heiße Hugo. Freut mich, Blob!" },
+      { who: "lea", fr: "Au revoir, Blob ! À bientôt !", en: "Goodbye, Blob! See you soon!", de: "Tschüss, Blob! Bis bald!" },
+      { who: "blob", fr: "Au revoir ! Merci !", en: "Goodbye! Thank you!", de: "Auf Wiedersehen! Danke!" },
+    ],
+    questions: [
+      { q: tx("What is the girl called?", "Wie heißt das Mädchen?"), options: ["Léa", "Hugo", tx("Mrs Martin", "Frau Martin")], answer: 0 },
+      { q: tx("How is Léa?", "Wie geht es Léa?"), options: [tx("She is fine.", "Ihr geht es gut."), tx("She is not well.", "Ihr geht es schlecht."), tx("She doesn't say.", "Sie sagt es nicht.")], answer: 0 },
+      { q: tx("What does Léa say at the end?", "Was sagt Léa am Ende?"), options: [tx("Goodbye, see you soon!", "Tschüss, bis bald!"), tx("Good evening!", "Guten Abend!"), tx("Thank you very much!", "Vielen Dank!")], answer: 0 },
+    ],
+  },
+  tips: [
+    {
+      title: tx("Hello and goodbye", "Hallo und tschüss"),
+      body: tx(
+        "**Bonjour** is the safe hello: for teachers, shops and people you don't know, all day long. With friends you say **salut**, which also means bye.\n\nIn the evening, **bonsoir**. To leave: **au revoir**, or **à bientôt** (see you soon).",
+        "**Bonjour** ist das sichere Hallo: für Lehrer, Geschäfte und Leute, die du nicht kennst, den ganzen Tag. Unter Freunden sagst du **salut**, das heißt auch tschüss.\n\nAm Abend: **bonsoir**. Zum Abschied: **au revoir** oder **à bientôt** (bis bald).",
+      ),
+      examples: [
+        { fr: "Bonjour, Madame Martin !", en: "Hello, Mrs Martin!", de: "Guten Tag, Frau Martin!" },
+        { fr: "Salut, Hugo !", en: "Hi, Hugo!", de: "Hallo, Hugo!" },
+        { fr: "Au revoir et à bientôt !", en: "Goodbye and see you soon!", de: "Tschüss und bis bald!" },
+      ],
+    },
+    {
+      title: tx("Je suis, tu es: I am, you are", "Je suis, tu es: ich bin, du bist"),
+      body: tx(
+        "**Être** (to be) is the most important verb. Start with two forms: **je suis** (I am) and **tu es** (you are).\n\nYour name: **je m'appelle** Léa, literally «I call myself Léa». Asking: **tu t'appelles comment ?**",
+        "**Être** (sein) ist das wichtigste Verb. Fang mit zwei Formen an: **je suis** (ich bin) und **tu es** (du bist).\n\nDein Name: **je m'appelle** Léa, wörtlich „ich nenne mich Léa“. Fragen: **tu t'appelles comment ?**",
+      ),
+      examples: [
+        { fr: "Je suis Blob.", en: "I am Blob.", de: "Ich bin Blob." },
+        { fr: "Tu es Léa ?", en: "Are you Léa?", de: "Bist du Léa?" },
+        { fr: "Je m'appelle Hugo.", en: "My name is Hugo.", de: "Ich heiße Hugo." },
+      ],
+      table: {
+        head: [tx("person", "Person"), "être", "s'appeler"],
+        rows: [
+          [tx("I", "ich"), "je suis", "je m'appelle"],
+          [tx("you", "du"), "tu es", "tu t'appelles"],
+        ],
+      },
+    },
+    {
+      title: tx("Ça va? How are you?", "Ça va? Wie geht's?"),
+      body: tx(
+        "**Ça va ?** is the everyday «how are you?». The answer is the same words: **ça va** (I'm fine). Add **bien** (well) or **très bien** (very well), and ask back: **et toi ?**\n\nA girl writes **enchantée**, a boy **enchanté**: it sounds the same.",
+        "**Ça va ?** ist das alltägliche „Wie geht's?“. Die Antwort sind dieselben Wörter: **ça va** (gut). Mit **bien** (gut) oder **très bien** (sehr gut) und zurückfragen: **et toi ?**\n\nEin Mädchen schreibt **enchantée**, ein Junge **enchanté**: Es klingt gleich.",
+      ),
+      examples: [
+        { fr: "Comment ça va ?", en: "How are you?", de: "Wie geht's?" },
+        { fr: "Ça va bien, merci. Et toi ?", en: "I'm fine, thank you. And you?", de: "Mir geht's gut, danke. Und dir?" },
+        { fr: "Moi aussi !", en: "Me too!", de: "Ich auch!" },
+      ],
+    },
+  ],
+};
