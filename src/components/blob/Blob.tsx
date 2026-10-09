@@ -845,16 +845,19 @@ function Arm({ gradient }: { gradient: string }) {
 }
 
 /** A French béret, worn at an angle (the French course). */
+/** Navy felt, with a faint light edge so it still shows on dark backgrounds. */
+const BERET = "#262b48";
+
 function Beret() {
   return (
     <g transform={`rotate(-13 ${CX} 58)`}>
       {/* The soft rim that sits on the head. */}
-      <path d={`M ${CX - 31} 62 Q ${CX} 71 ${CX + 33} 61 L ${CX + 31} 66 Q ${CX} 76 ${CX - 29} 67 Z`} fill={INK} />
+      <path d={`M ${CX - 31} 62 Q ${CX} 71 ${CX + 33} 61 L ${CX + 31} 66 Q ${CX} 76 ${CX - 29} 67 Z`} fill={BERET} />
       {/* The puffy top, a little to one side. */}
-      <ellipse cx={CX + 5} cy={54} rx={43} ry={14.5} fill={INK} />
-      <ellipse cx={CX - 8} cy={48.5} rx={21} ry={4.6} fill="#fff" opacity={0.13} />
+      <ellipse cx={CX + 5} cy={54} rx={43} ry={14.5} fill={BERET} stroke="#fff" strokeOpacity={0.2} strokeWidth={1.4} />
+      <ellipse cx={CX - 8} cy={48.5} rx={21} ry={4.6} fill="#fff" opacity={0.16} />
       {/* The little stalk on top. */}
-      <path d={`M ${CX + 7} 41 q 1.5 -5.5 6.5 -7`} stroke={INK} strokeWidth={4.2} strokeLinecap="round" fill="none" />
+      <path d={`M ${CX + 7} 41 q 1.5 -5.5 6.5 -7`} stroke={BERET} strokeWidth={4.2} strokeLinecap="round" fill="none" />
     </g>
   );
 }

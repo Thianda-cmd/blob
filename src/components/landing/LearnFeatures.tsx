@@ -219,6 +219,9 @@ export function TopicGrid() {
               </button>
             ))}
           </div>
+          <Link href="/learn/french" className="group inline-flex items-center gap-1 px-1 text-[12.5px] font-medium text-blob-ink hover:underline">
+            🇫🇷 {t.french} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+          </Link>
           {soon.length > 0 && <p className="px-1 text-[12px] text-ink-3">{t.soon(new Intl.ListFormat(intlLocale(locale), { type: "conjunction" }).format(soon))}</p>}
         </div>
       </div>
