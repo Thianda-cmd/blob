@@ -13,7 +13,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { createClient } from "@/lib/supabase/client";
-import type { Page } from "@/lib/types";
+import type { AccessRole, Member, Page } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { buildExtensions } from "./extensions";
@@ -82,7 +82,12 @@ type Live = {
   markBroken: () => void;
 };
 
-export function NoteEditor({ page }: { page: Page }) {
+/**
+ * `role` is your role on the page ("viewer": read only); `members` everyone on it (more than one:
+ * the note is shared, and edits go through useNoteCollab).
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- role and members are wired up by the working-together integration
+export function NoteEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const t = useMessages(editorText);
   const locale = useLocale();
   const router = useRouter();

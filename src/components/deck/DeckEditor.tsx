@@ -12,7 +12,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { deckText } from "@/i18n/messages/deck";
 import { createClient } from "@/lib/supabase/client";
-import type { Deck, DeckContent, DeckTheme, DeckThemeSpec, Page, Slide, SlideLayout, SlideTransition } from "@/lib/types";
+import type { AccessRole, Deck, DeckContent, DeckTheme, DeckThemeSpec, Member, Page, Slide, SlideLayout, SlideTransition } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   ALLOWED_IMAGE_TYPES,
@@ -30,6 +30,7 @@ import { DeckInspector, type InspectorTab } from "./DeckInspector";
 import { SlideMenu, SlideRail, SlideStrip } from "./SlideRail";
 import { SlideView } from "./SlideView";
 import { ThemePicker } from "./ThemePicker";
+import { useDeckCollab } from "./useDeckCollab";
 
 type DeckPatch = { content: DeckContent; title: string; plain_text: string };
 
@@ -53,10 +54,13 @@ const PHONE_SHEET = [
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
-export function DeckEditor({ page }: { page: Page }) {
+export function DeckEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { updatePage, userId } = useWorkspace();
+  const { updatePage, userId, profile } = useWorkspace();
+  // Shared with someone: saves go through save_deck and merge; others' saves arrive live.
+  const shared = members.length > 1;
+  const readOnly = role === "viewer";
   const t = useMessages(deckText);
 
   const [deck, setDeck] = useState<Deck>(() => normalizeDeck(page.content));
@@ -73,28 +77,61 @@ export function DeckEditor({ page }: { page: Page }) {
   const [tab, setTab] = useState<InspectorTab>("slide");
 
   const deckRef = useRef(deck);
+  const titleRef = useRef(title);
   const stageRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const scheduleRef = useRef<(patch: Partial<DeckPatch>) => void>(() => {});
+
+  const getLocal = useCallback(() => ({ deck: deckRef.current, title: titleRef.current }), []);
+  // Someone else's save, merged with ours: show it (and save the merge if it kept changes of ours).
+  const applyRemote = useCallback(
+    (next: { deck: Deck; title: string }, dirty: boolean) => {
+      deckRef.current = next.deck;
+      setDeck(next.deck);
+      if (next.title !== titleRef.current) {
+        titleRef.current = next.title;
+        setTitle(next.title);
+        void updatePage(page.id, { title: next.title }, { local: true });
+      }
+      if (dirty) scheduleRef.current({ content: next.deck, plain_text: deckPlainText(next.deck), title: next.title });
+    },
+    [page.id, updatePage],
+  );
+  const collab = useDeckCollab({
+    pageId: page.id,
+    enabled: shared,
+    rev: page.rev ?? 0,
+    initial: { deck, title: page.title },
+    getLocal,
+    applyRemote,
+    me: { user_id: userId, name: profile.full_name ?? "", avatar_url: profile.avatar_url },
+  });
 
   const save = useCallback(
     async (patch: Partial<DeckPatch>) => {
+      if (shared) return collab.save();
       const { error } = await createClient().from("pages").update(patch).eq("id", page.id);
       return !error;
     },
-    [page.id],
+    [page.id, shared, collab],
   );
   const { state, schedule, flush } = useAutosave<DeckPatch>(save);
+  useEffect(() => {
+    scheduleRef.current = schedule;
+  }, [schedule]);
 
   // Every structural or content change goes through here, so the saved row always matches the screen.
+  // Viewers of a shared presentation look, they don't change it.
   const change = useCallback(
     (fn: (d: Deck) => Deck) => {
+      if (readOnly) return;
       const next = fn(deckRef.current);
       if (next === deckRef.current) return;
       deckRef.current = next;
       setDeck(next);
       schedule({ content: next, plain_text: deckPlainText(next) });
     },
-    [schedule],
+    [schedule, readOnly],
   );
 
   const updateSlide = useCallback(
@@ -105,6 +142,9 @@ export function DeckEditor({ page }: { page: Page }) {
 
   const index = Math.max(0, deck.slides.findIndex((s) => s.id === selectedId));
   const selected = deck.slides[index];
+  // Others see which slide you're on.
+  const { focus } = collab;
+  useEffect(() => focus(selected?.id ?? null), [focus, selected?.id]);
   const palette = useMemo(() => deckPalette(deck.theme, deck.custom), [deck.theme, deck.custom]);
   const customPalette = useMemo(() => (deck.custom ? specPalette(deck.custom) : null), [deck.custom]);
   const sections = useMemo(() => sectionNumbers(deck.slides), [deck.slides]);
@@ -213,7 +253,9 @@ export function DeckEditor({ page }: { page: Page }) {
   };
 
   const onTitle = (value: string) => {
+    if (readOnly) return;
     const next = value.slice(0, 200);
+    titleRef.current = next;
     setTitle(next);
     void updatePage(page.id, { title: next }, { local: true });
     schedule({ title: next });
@@ -253,6 +295,7 @@ export function DeckEditor({ page }: { page: Page }) {
       <PageTopBar
         pageId={page.id}
         saveState={state}
+        peers={collab.peers}
         actions={
           <>
             <button
@@ -282,6 +325,7 @@ export function DeckEditor({ page }: { page: Page }) {
           </>
         }
       />
+      {readOnly && <p className="border-t border-line bg-blob-soft/60 px-4 py-2 text-[13px] text-blob-ink">{t.viewOnly}</p>}
       <div ref={bodyRef} className="@container/editor relative flex min-h-0 flex-1 border-t border-line">
         <SlideRail
           // Tablets: an opened panel takes the rail's place, so the slide stays big enough to see its changes.

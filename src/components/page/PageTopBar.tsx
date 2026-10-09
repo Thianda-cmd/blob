@@ -12,13 +12,14 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { pageText } from "@/i18n/messages/page";
 import { subjectColor } from "@/lib/subjects";
+import type { Peer } from "@/lib/live";
 import type { PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { SaveIndicator } from "./SaveIndicator";
 import type { SaveState } from "./useAutosave";
 
 /** Breadcrumbs, save state, favorite and the page menu. Shared by notes and presentations. */
-export function PageTopBar({ pageId, saveState, actions }: { pageId: string; saveState: SaveState; actions?: ReactNode }) {
+export function PageTopBar({ pageId, saveState, actions, peers = [] }: { pageId: string; saveState: SaveState; actions?: ReactNode; peers?: Peer[] }) {
   const t = useMessages(pageText);
   const cvs = useMessages(cvHomeText).title;
   const locale = useLocale();
@@ -68,6 +69,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
       crumbs={crumbs}
       actions={
         <>
+          <PeerStack peers={peers} />
           <SaveIndicator state={saveState} />
           {actions}
           <button
@@ -173,5 +175,26 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
         </>
       }
     />
+  );
+}
+
+/** Who else has the page open right now (one dot per person, in their colour). */
+function PeerStack({ peers }: { peers: Peer[] }) {
+  const people = [...new Map(peers.map((p) => [p.user_id, p])).values()];
+  if (!people.length) return null;
+  return (
+    <div className="mr-1 flex -space-x-1.5" aria-label={people.map((p) => p.name).join(", ")}>
+      {people.slice(0, 4).map((p) => (
+        <span
+          key={p.user_id}
+          title={p.name}
+          className="grid size-6 place-items-center rounded-full border-2 border-paper text-[10.5px] font-semibold text-white"
+          style={{ background: p.color }}
+        >
+          {(p.name.trim()[0] ?? "?").toUpperCase()}
+        </span>
+      ))}
+      {people.length > 4 && <span className="grid size-6 place-items-center rounded-full border-2 border-paper bg-hover text-[10.5px] font-semibold text-ink-2">+{people.length - 4}</span>}
+    </div>
   );
 }

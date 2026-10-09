@@ -17,8 +17,8 @@ export function safeNext(next: string | null | undefined, fallback = "/home") {
 }
 
 const UNTITLED: Record<Locale, Record<PageKind, string>> = {
-  en: { note: "Untitled", deck: "Untitled presentation", cv: "Untitled CV" },
-  de: { note: "Ohne Titel", deck: "Unbenannte Präsentation", cv: "Unbenannter Lebenslauf" },
+  en: { note: "Untitled", deck: "Untitled presentation", cv: "Untitled CV", folder: "New folder" },
+  de: { note: "Ohne Titel", deck: "Unbenannte Präsentation", cv: "Unbenannter Lebenslauf", folder: "Neuer Ordner" },
 };
 
 /** The page's title, or "Untitled" in the reader's language. Client: pass `useLocale()`; server: `await getLocale()`. */
