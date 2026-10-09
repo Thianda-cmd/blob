@@ -156,7 +156,6 @@ export const editorText = defineMessages({
     /** Working on a shared note together. */
     together: {
       viewOnly: "You can read this note. Ask its owner if you want to edit it too.",
-      connecting: "Connecting…",
       offline: "No connection. Your changes are kept and sent as soon as you're back.",
       catchingUp: "Catching up with the others…",
       switching: "One moment, getting the note ready for working together…",
@@ -317,7 +316,6 @@ export const editorText = defineMessages({
 
     together: {
       viewOnly: "Du kannst diese Notiz lesen. Frag die Besitzerin oder den Besitzer, wenn du mitschreiben möchtest.",
-      connecting: "Verbinde…",
       offline: "Keine Verbindung. Deine Änderungen bleiben erhalten und werden gesendet, sobald du wieder online bist.",
       catchingUp: "Hole die Änderungen der anderen…",
       switching: "Einen Moment, die Notiz wird fürs gemeinsame Arbeiten vorbereitet…",

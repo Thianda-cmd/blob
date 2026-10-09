@@ -342,7 +342,7 @@ function PlotView({ node, updateAttributes, selected }: ReactNodeViewProps) {
                   {t.add}
                 </button>
               )}
-              <span className="blob-plot-hint">{t.hint}</span>
+              <span className="blob-plot-hint">{fns.some((f) => f.trim()) ? t.hint : t.examples}</span>
             </div>
           )}
         </div>

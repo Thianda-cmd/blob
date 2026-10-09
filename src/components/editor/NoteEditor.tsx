@@ -105,7 +105,7 @@ type Live = {
   markBroken: () => void;
 };
 
-/** Where the editor's document comes from: what it was created with (and, together, at which step version). */
+/** The document an editor is created with: the stored content, and its plain text as a fallback. */
 type Source = { content: unknown; plain: string };
 
 /**

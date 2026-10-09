@@ -8,23 +8,18 @@ import { defineMessages } from "../define";
 export const noteBlocksText = defineMessages({
   en: {
     done: "Done",
-    remove: "Remove",
     edit: "Edit",
-    cancel: "Cancel",
 
     math: {
-      label: "Formula",
       empty: "Empty formula",
       add: "Click to write a formula",
       edit: "Edit formula",
       source: "Formula",
       placeholder: "e.g. a^2 + b^2 = c^2",
-      preview: "Preview",
       previewEmpty: "Your formula appears here as you type.",
       templates: "Insert",
       newLine: "new line",
       remove: "Remove formula",
-      toInline: "Formula in text",
       t: {
         fraction: "Fraction",
         root: "Root",
@@ -89,14 +84,12 @@ export const noteBlocksText = defineMessages({
       deleteCol: "Delete column",
       header: "Header row",
       deleteTable: "Delete table",
-      more: "More",
     },
 
     diagram: {
       label: "Diagram",
       edit: "Edit diagram",
       source: "Diagram code",
-      preview: "Preview",
       empty: "Pick a starter or write Mermaid code.",
       error: "This diagram has a mistake. Check the code.",
       loading: "Drawing…",
@@ -125,7 +118,6 @@ export const noteBlocksText = defineMessages({
       clear: "Clear all",
       color: (name: string) => `Colour: ${name}`,
       colors: { ink: "Black", blob: "Purple", sky: "Blue", moss: "Green", clay: "Orange", rose: "Red" },
-      done: "Done",
       draw: "Draw",
       taller: "Make taller",
     },
@@ -145,8 +137,6 @@ export const noteBlocksText = defineMessages({
     },
 
     file: {
-      label: "File",
-      upload: "Upload a file",
       uploading: "Uploading…",
       open: "Open",
       download: "Download",
@@ -184,7 +174,6 @@ export const noteBlocksText = defineMessages({
     },
 
     lesson: {
-      label: "Lesson",
       pick: "Link a lesson",
       search: "Search topics…",
       noMatch: "No topic matches.",
@@ -202,15 +191,12 @@ export const noteBlocksText = defineMessages({
 
     pageRef: {
       label: "Link to a page",
-      search: "Search pages…",
       empty: "Type to find a page",
       create: (q: string) => `New page “${q}”`,
-      createUntitled: "New page",
       noMatch: "No page matches",
     },
 
     knowledge: {
-      tags: "Tags",
       tag: "Tag",
       topic: "Learning topic",
       addTag: "Add tag",
@@ -218,36 +204,28 @@ export const noteBlocksText = defineMessages({
       newTag: (t: string) => `Create “${t}”`,
       removeTag: (t: string) => `Remove tag ${t}`,
       tooManyTags: "A note can have up to 20 tags.",
-      topics: "Learning topics",
       addTopic: "Link topic",
       topicSearch: "Search the learning center…",
       removeTopic: (t: string) => `Remove ${t}`,
-      anyLevel: "All levels",
       backlinks: "Linked from",
-      backlinksEmpty: "No other note links here yet. Type [[ in a note to link to this one.",
       similar: "Similar notes",
       similarWhy: { tags: (n: number) => (n === 1 ? "1 shared tag" : `${n} shared tags`), topics: "same topic", subject: "same subject" },
     },
   },
   de: {
     done: "Fertig",
-    remove: "Entfernen",
     edit: "Bearbeiten",
-    cancel: "Abbrechen",
 
     math: {
-      label: "Formel",
       empty: "Leere Formel",
       add: "Klicken, um eine Formel zu schreiben",
       edit: "Formel bearbeiten",
       source: "Formel",
       placeholder: "z. B. a^2 + b^2 = c^2",
-      preview: "Vorschau",
       previewEmpty: "Hier erscheint deine Formel, während du tippst.",
       templates: "Einfügen",
       newLine: "neue Zeile",
       remove: "Formel entfernen",
-      toInline: "Formel im Text",
       t: {
         fraction: "Bruch",
         root: "Wurzel",
@@ -312,14 +290,12 @@ export const noteBlocksText = defineMessages({
       deleteCol: "Spalte löschen",
       header: "Kopfzeile",
       deleteTable: "Tabelle löschen",
-      more: "Mehr",
     },
 
     diagram: {
       label: "Diagramm",
       edit: "Diagramm bearbeiten",
       source: "Diagramm-Code",
-      preview: "Vorschau",
       empty: "Wähl eine Vorlage oder schreib Mermaid-Code.",
       error: "In diesem Diagramm steckt ein Fehler. Prüf den Code.",
       loading: "Wird gezeichnet…",
@@ -347,7 +323,6 @@ export const noteBlocksText = defineMessages({
       clear: "Alles löschen",
       color: (name) => `Farbe: ${name}`,
       colors: { ink: "Schwarz", blob: "Lila", sky: "Blau", moss: "Grün", clay: "Orange", rose: "Rot" },
-      done: "Fertig",
       draw: "Zeichnen",
       taller: "Höher machen",
     },
@@ -367,8 +342,6 @@ export const noteBlocksText = defineMessages({
     },
 
     file: {
-      label: "Datei",
-      upload: "Datei hochladen",
       uploading: "Wird hochgeladen…",
       open: "Öffnen",
       download: "Herunterladen",
@@ -406,7 +379,6 @@ export const noteBlocksText = defineMessages({
     },
 
     lesson: {
-      label: "Lektion",
       pick: "Lektion verlinken",
       search: "Themen suchen…",
       noMatch: "Kein Thema passt.",
@@ -424,15 +396,12 @@ export const noteBlocksText = defineMessages({
 
     pageRef: {
       label: "Auf eine Seite verlinken",
-      search: "Seiten suchen…",
       empty: "Tippe, um eine Seite zu finden",
       create: (q) => `Neue Seite „${q}“`,
-      createUntitled: "Neue Seite",
       noMatch: "Keine Seite passt",
     },
 
     knowledge: {
-      tags: "Tags",
       tag: "Tag",
       topic: "Lernthema",
       addTag: "Tag hinzufügen",
@@ -440,13 +409,10 @@ export const noteBlocksText = defineMessages({
       newTag: (t) => `„${t}“ anlegen`,
       removeTag: (t) => `Tag ${t} entfernen`,
       tooManyTags: "Eine Notiz kann bis zu 20 Tags haben.",
-      topics: "Lernthemen",
       addTopic: "Thema verknüpfen",
       topicSearch: "Im Lernbereich suchen…",
       removeTopic: (t) => `${t} entfernen`,
-      anyLevel: "Alle Stufen",
       backlinks: "Verlinkt von",
-      backlinksEmpty: "Noch keine andere Notiz verlinkt hierher. Tippe [[ in einer Notiz, um auf diese zu verlinken.",
       similar: "Ähnliche Notizen",
       similarWhy: { tags: (n) => (n === 1 ? "1 gemeinsamer Tag" : `${n} gemeinsame Tags`), topics: "gleiches Thema", subject: "gleiches Fach" },
     },

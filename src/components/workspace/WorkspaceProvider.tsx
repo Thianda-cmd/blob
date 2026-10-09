@@ -189,8 +189,11 @@ export function WorkspaceProvider({
     [userId, t],
   );
 
-  const createPage = useCallback(
-    async (input: NewPage = {}) => {
+  // Requests for the same new page while one is on its way get that one (a button pressed again).
+  const creating = useRef(new Map<string, Promise<PageMeta | null>>());
+
+  const create = useCallback(
+    async (input: NewPage) => {
       const kind = input.kind ?? "note";
       const siblings = pages.filter((p) => p.parent_id === (input.parent_id ?? null));
       const position = siblings.reduce((max, p) => Math.max(max, p.position), 0) + 1;
@@ -223,6 +226,22 @@ export function WorkspaceProvider({
       return data as PageMeta;
     },
     [pages, locale, t, userId],
+  );
+
+  const createPage = useCallback(
+    (input: NewPage = {}) => {
+      // The button that asked for the page lets go of the keyboard: Space or Enter typed right after
+      // (while the new page is still opening) must not press it again and make more pages.
+      const el = typeof document === "undefined" ? null : document.activeElement;
+      if (el instanceof HTMLElement && (el.tagName === "BUTTON" || el.getAttribute("role")?.startsWith("menuitem"))) el.blur();
+      const key = JSON.stringify([input.kind ?? "note", input.parent_id ?? null, input.subject_id ?? null, input.title ?? ""]);
+      const running = creating.current.get(key);
+      if (running) return running;
+      const request = create(input).finally(() => creating.current.delete(key));
+      creating.current.set(key, request);
+      return request;
+    },
+    [create],
   );
 
   const updatePage = useCallback(async (id: string, patch: Partial<PageMeta>, opts?: { local?: boolean }) => {
