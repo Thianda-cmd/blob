@@ -107,7 +107,7 @@ export const u02: Unit = {
     { id: "u02.d3", lesson: 2, fr: "Léa est ___.", options: ["contente", "content"], answer: 0, en: "Léa is happy.", de: "Léa ist froh.", why: tx("For a girl or woman, add **-e**: content → **contente**. Now you hear the t.", "Bei Mädchen und Frauen kommt ein **-e** dazu: content → **contente**. Jetzt hört man das t.") },
     { id: "u02.d4", lesson: 2, fr: "Hugo, c'est ___ ami.", options: ["un", "une"], answer: 0, en: "Hugo is a friend.", de: "Hugo ist ein Freund.", why: tx("Hugo is a boy: **un ami**. A girl is une amie.", "Hugo ist ein Junge: **un ami**. Ein Mädchen ist une amie.") },
     { id: "u02.d5", lesson: 3, fr: "Léa est ___, elle est de Lyon.", options: ["française", "français"], answer: 0, en: "Léa is French, she is from Lyon.", de: "Léa ist Französin, sie ist aus Lyon.", why: tx("Léa is a girl: **française**, with an e.", "Léa ist ein Mädchen: **française**, mit e.") },
-    { id: "u02.d6", lesson: 3, fr: "Je suis ___ Paris.", options: ["de", "à", "en"], answer: 0, en: "I am from Paris.", de: "Ich bin aus Paris.", why: tx("Where you're from: **de** + the town. Je suis de Paris.", "Woher du kommst: **de** + Stadt. Je suis de Paris.") },
+    { id: "u02.d6", lesson: 3, fr: "— Tu es d'où ? — Je suis ___ Paris.", options: ["de", "à", "en"], answer: 0, en: "— Where are you from? — I am from Paris.", de: "— Woher kommst du? — Ich bin aus Paris.", why: tx("Where you're from: **de** + the town. Je suis de Paris. (Je suis à Paris means I am in Paris.)", "Woher du kommst: **de** + Stadt. Je suis de Paris. (Je suis à Paris heißt: Ich bin in Paris.)") },
     { id: "u02.d7", lesson: 4, fr: "Nous ___ français.", options: ["sommes", "êtes", "sont"], answer: 0, en: "We are French.", de: "Wir sind Franzosen.", why: tx("With **nous** (we), être is **sommes**.", "Mit **nous** (wir) heißt être **sommes**.") },
     { id: "u02.d8", lesson: 4, fr: "Monsieur Martin, vous ___ d'où ?", options: ["êtes", "es", "sommes"], answer: 0, en: "Mr Martin, where are you from?", de: "Herr Martin, woher kommen Sie?", why: tx("With **vous** it's **êtes**: vous êtes. Polite for one adult, or for several people.", "Mit **vous** heißt es **êtes**: vous êtes. Höflich für einen Erwachsenen (Sie) oder für mehrere (ihr).") },
     { id: "u02.d9", lesson: 4, fr: "Hugo et Léa ___ sympas.", options: ["sont", "est", "êtes"], answer: 0, en: "Hugo and Léa are nice.", de: "Hugo und Léa sind nett.", why: tx("Hugo and Léa = they, so it's **sont**, like ils sont.", "Hugo und Léa = sie, also **sont**, wie ils sont.") },
@@ -122,7 +122,7 @@ export const u02: Unit = {
     lines: [
       { who: "blob", fr: "Salut, Léa ! Qui est-ce ?", en: "Hi, Léa! Who's that?", de: "Hallo, Léa! Wer ist das?" },
       { who: "lea", fr: "C'est Max, un ami. Il est allemand, il est de Berlin.", en: "That's Max, a friend. He's German, he's from Berlin.", de: "Das ist Max, ein Freund. Er ist Deutscher, er ist aus Berlin." },
-      { who: "blob", fr: "Enchanté, Max ! Et la fille, elle est allemande aussi ?", en: "Nice to meet you, Max! And the girl, is she German too?", de: "Freut mich, Max! Und das Mädchen, ist sie auch Deutsche?" },
+      { who: "blob", fr: "Enchanté, Max ! Et la fille, elle est allemande aussi ?", en: "Nice to meet you, Max! And the girl, is she German too?", de: "Freut mich, Max! Und das Mädchen, ist das auch eine Deutsche?" },
       { who: "lea", fr: "Non, c'est Emma. Elle n'est pas allemande, elle est anglaise.", en: "No, that's Emma. She isn't German, she's English.", de: "Nein, das ist Emma. Sie ist keine Deutsche, sie ist Engländerin." },
       { who: "hugo", fr: "Et toi, Blob, tu es d'où ?", en: "And you, Blob, where are you from?", de: "Und du, Blob, woher kommst du?" },
       { who: "blob", fr: "Moi ? Je suis très français. Regarde mon béret !", en: "Me? I'm very French. Look at my beret!", de: "Ich? Ich bin sehr französisch. Schau, meine Baskenmütze!" },
@@ -133,7 +133,7 @@ export const u02: Unit = {
     questions: [
       { q: tx("Where is Max from?", "Woher kommt Max?"), options: ["Berlin", "Lyon", "Paris"], answer: 0 },
       { q: tx("What nationality is Emma?", "Welche Nationalität hat Emma?"), options: [tx("English", "Engländerin"), tx("German", "Deutsche"), tx("Swiss", "Schweizerin")], answer: 0 },
-      { q: tx("Why does Blob think he is French?", "Warum glaubt Blob, er ist Franzose?"), options: [tx("Because of his beret", "Wegen seiner Baskenmütze"), tx("Because he is from Paris", "Weil er aus Paris kommt"), tx("Because he is purple", "Weil er lila ist")], answer: 0 },
+      { q: tx("Why does Blob think he is French?", "Warum glaubt Blob, dass er Franzose ist?"), options: [tx("Because of his beret", "Wegen seiner Baskenmütze"), tx("Because he is from Paris", "Weil er aus Paris kommt"), tx("Because he is purple", "Weil er lila ist")], answer: 0 },
     ],
   },
   tips: [
@@ -155,7 +155,7 @@ export const u02: Unit = {
           [tx("you", "du"), "tu es"],
           [tx("he / she", "er / sie"), "il / elle est"],
           [tx("we", "wir"), "nous sommes"],
-          [tx("you (plural, polite)", "ihr / Sie"), "vous êtes"],
+          [tx("you (plural / polite)", "ihr / Sie"), "vous êtes"],
           [tx("they", "sie"), "ils / elles sont"],
         ],
       },
@@ -163,8 +163,8 @@ export const u02: Unit = {
     {
       title: tx("Français, française", "Français, française"),
       body: tx(
-        "Describing words change with the person. For a girl or woman, add **-e**: il est français, elle est français**e**. For several people, add **-s**: ils sont fatigué**s**, elles sont fatigué**es**.\n\nThe -e often lets you hear the last letter: française, allemande, contente. Words that already end in -e stay the same: **suisse**. **Sympa** doesn't change either.\n\nNationalities are written with a small letter: anglais.",
-        "Beschreibende Wörter passen sich der Person an. Bei Mädchen und Frauen kommt ein **-e** dazu: il est français, elle est français**e**. Bei mehreren ein **-s**: ils sont fatigué**s**, elles sont fatigué**es**.\n\nDurch das -e hört man oft den letzten Buchstaben: française, allemande, contente. Wörter, die schon auf -e enden, bleiben gleich: **suisse**. Auch **sympa** ändert sich nicht.\n\nNationalitäten schreibt man klein: anglais.",
+        "Describing words change with the person. For a girl or woman, add **-e**: il est français, elle est français**e**. For several people, add **-s**: ils sont fatigué**s**, elles sont fatigué**es**.\n\nThe -e often lets you hear the last letter: française, allemande, contente. A word that already ends in -e doesn't get a second one: il est **suisse**, elle est **suisse**. **Sympa** stays the same for girls too, only several people are sympa**s**.\n\nNationalities are written with a small letter: anglais.",
+        "Beschreibende Wörter passen sich der Person an. Bei Mädchen und Frauen kommt ein **-e** dazu: il est français, elle est français**e**. Bei mehreren ein **-s**: ils sont fatigué**s**, elles sont fatigué**es**.\n\nDurch das -e hört man oft den letzten Buchstaben: française, allemande, contente. Ein Wort, das schon auf -e endet, bekommt kein zweites: il est **suisse**, elle est **suisse**. Auch **sympa** bleibt bei Mädchen gleich, nur im Plural heißt es sympa**s**.\n\nNationalitäten schreibt man klein: anglais.",
       ),
       examples: [
         { fr: "Hugo est français.", en: "Hugo is French.", de: "Hugo ist Franzose." },

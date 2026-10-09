@@ -29,7 +29,7 @@ export const u09: Unit = {
     { id: "gris", fr: "gris", en: "grey", de: "grau", alt: { en: ["gray"] }, kind: "adj", emoji: "🩶", note: tx("Feminine: grise, and now you hear a z sound.", "Weiblich: grise, und jetzt hört man ein weiches s.") },
     { id: "joli", fr: "joli", en: "pretty", de: "schön", alt: { en: ["nice", "lovely"], de: ["hübsch"] }, kind: "adj", note: tx("Unlike colours, joli comes before the noun: une jolie robe.", "Anders als Farben steht joli vor dem Nomen: une jolie robe.") },
     { id: "chaussures", fr: "les chaussures", en: "the shoes", de: "die Schuhe", g: "f", kind: "noun", emoji: "👟", note: tx("Une chaussure, des chaussures: feminine.", "Une chaussure, des chaussures: weiblich.") },
-    { id: "couleur", fr: "la couleur", en: "the colour", de: "die Farbe", alt: { en: ["the color"] }, g: "f", kind: "noun", emoji: "🎨", note: tx("Feminine, even though it ends in -eur: la couleur.", "Weiblich, obwohl es auf -eur endet: la couleur.") },
+    { id: "couleur", fr: "la couleur", en: "the colour", de: "die Farbe", alt: { en: ["the color"] }, g: "f", kind: "noun", emoji: "🎨", note: tx("Feminine: la couleur, cette couleur, une jolie couleur.", "Weiblich, wie die Farbe: la couleur, cette couleur.") },
     { id: "beret", fr: "le béret", en: "the beret", de: "die Baskenmütze", alt: { de: ["das Barett"] }, g: "m", kind: "noun", note: tx("Blob's favourite: the most French hat there is!", "Blobs Liebling: die französischste Mütze, die es gibt!") },
     { id: "nouveau", fr: "nouveau", en: "new", de: "neu", kind: "adj", emoji: "🆕", note: tx("Before the noun, like joli: un nouveau béret. Feminine: une nouvelle robe.", "Steht vor dem Nomen, wie joli: un nouveau béret. Weiblich: une nouvelle robe.") },
   ],
@@ -136,8 +136,8 @@ export const u09: Unit = {
     {
       title: tx("Colours agree", "Farben passen sich an"),
       body: tx(
-        "In French a colour comes **after** the noun and **agrees** with it: add **-e** for a feminine noun, **-s** for a plural one. Un pull vert, une robe vert**e**, des chaussures vert**es**.\n\nColours that already end in -e (rouge, jaune) don't change. Watch out for **blanc → blanche**.",
-        "Im Französischen steht die Farbe **nach** dem Nomen und **passt sich an**: **-e** für ein weibliches Nomen, **-s** für den Plural. Un pull vert, une robe vert**e**, des chaussures vert**es**.\n\nFarben, die schon auf -e enden (rouge, jaune), bleiben gleich. Achtung: **blanc → blanche**.",
+        "In French a colour comes **after** the noun and **agrees** with it: add **-e** for a feminine noun, **-s** for a plural one. Un pull vert, une robe vert**e**, des chaussures vert**es**.\n\nColours that already end in -e (rouge, jaune) don't get a second one: une robe rouge, but des robes rouge**s**. Watch out for **blanc → blanche**.",
+        "Im Französischen steht die Farbe **nach** dem Nomen und **passt sich an**: **-e** für ein weibliches Nomen, **-s** für den Plural. Un pull vert, une robe vert**e**, des chaussures vert**es**.\n\nFarben, die schon auf -e enden (rouge, jaune), bekommen kein zweites: une robe rouge, aber des robes rouge**s**. Achtung: **blanc → blanche**.",
       ),
       examples: [
         { fr: "Je porte un pull vert.", en: "I'm wearing a green jumper.", de: "Ich trage einen grünen Pullover." },

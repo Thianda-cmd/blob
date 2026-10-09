@@ -36,9 +36,9 @@ export const u07: Unit = {
   ],
   gloss: [
     { fr: "allons", en: "go (we)", de: "gehen (wir)" },
-    { fr: "allez", en: "go (you, plural / polite)", de: "geht / gehen Sie" },
+    { fr: "allez", en: "go (you, plural / polite)", de: "geht / gehen (Sie)" },
     { fr: "vont", en: "go (they)", de: "gehen (sie)" },
-    { fr: "tournez", en: "turn (plural / polite)", de: "biegt ab / biegen Sie ab" },
+    { fr: "tournez", en: "turn (you, plural / polite)", de: "biegt ab / biegen (Sie) ab" },
     { fr: "puis", en: "then", de: "dann" },
     { fr: "derrière", en: "behind", de: "hinter" },
     { fr: "croissants", en: "croissants", de: "Croissants" },
@@ -59,7 +59,7 @@ export const u07: Unit = {
     { id: "u07.04", lesson: 1, fr: "Où est ta maison ?", en: "Where is your house?", de: "Wo ist dein Haus?", alt: { fr: ["Ta maison est où ?", "Où est votre maison ?", "Votre maison est où ?"], en: ["Where's your house?", "Where is your home?"] } },
     { id: "u07.05", lesson: 1, fr: "Ma maison est petite.", en: "My house is small.", de: "Mein Haus ist klein.", alt: { en: ["My house is little."] } },
     { id: "u07.06", lesson: 1, fr: "Il y a un parc dans la ville.", en: "There's a park in the town.", de: "In der Stadt gibt es einen Park.", alt: { fr: ["Dans la ville, il y a un parc."], en: ["There is a park in the city.", "There is a park in town."], de: ["Es gibt einen Park in der Stadt.", "In der Stadt ist ein Park."] } },
-    { id: "u07.07", lesson: 1, fr: "Je suis à la maison.", en: "I'm at home.", de: "Ich bin zu Hause.", alt: { en: ["I am at the house."], de: ["Ich bin zuhause.", "Ich bin daheim."] } },
+    { id: "u07.07", lesson: 1, fr: "Je suis à la maison.", en: "I'm at home.", de: "Ich bin zu Hause.", alt: { en: ["I am home.", "I am at the house."], de: ["Ich bin zuhause.", "Ich bin daheim."] } },
     // Lesson 2
     { id: "u07.08", lesson: 2, fr: "Je vais au cinéma.", en: "I'm going to the cinema.", de: "Ich gehe ins Kino.", alt: { en: ["I go to the cinema.", "I am going to the movies.", "I go to the movies."] } },
     { id: "u07.09", lesson: 2, fr: "Tu vas à la boulangerie ?", en: "Are you going to the bakery?", de: "Gehst du zur Bäckerei?", alt: { fr: ["Est-ce que tu vas à la boulangerie ?", "Vas-tu à la boulangerie ?", "Vous allez à la boulangerie ?", "Est-ce que vous allez à la boulangerie ?", "Allez-vous à la boulangerie ?"], en: ["You are going to the bakery?", "Do you go to the bakery?"], de: ["Gehst du in die Bäckerei?", "Gehst du zum Bäcker?", "Du gehst zur Bäckerei?"] } },
@@ -82,7 +82,7 @@ export const u07: Unit = {
     { id: "u07.24", lesson: 4, fr: "Allez tout droit !", en: "Go straight on!", de: "Gehen Sie geradeaus!", alt: { fr: ["Va tout droit !"], en: ["Go straight ahead!", "Keep going straight on!", "Keep going straight ahead!"], de: ["Geht geradeaus!", "Immer geradeaus!"] } },
     { id: "u07.25", lesson: 4, fr: "La boulangerie est à gauche.", en: "The bakery is on the left.", de: "Die Bäckerei ist links.", alt: { en: ["The bakery is to the left."], de: ["Die Bäckerei ist auf der linken Seite.", "Links ist die Bäckerei."] } },
     { id: "u07.26", lesson: 4, fr: "Tournez à droite, puis à gauche.", en: "Turn right, then left.", de: "Biegen Sie rechts ab, dann links.", alt: { fr: ["Tournez à droite et puis à gauche.", "Tourne à droite, puis à gauche."], en: ["Turn right and then left.", "Turn right, then turn left.", "Turn to the right, then to the left."], de: ["Biegen Sie rechts ab und dann links.", "Biegt rechts ab, dann links.", "Biegt rechts ab und dann links.", "Rechts abbiegen, dann links."] } },
-    { id: "u07.27", lesson: 4, fr: "Excusez-moi, Monsieur, la gare est à gauche ?", en: "Excuse me, is the station on the left?", de: "Entschuldigung, ist der Bahnhof links?", alt: { fr: ["Excusez-moi, Monsieur, est-ce que la gare est à gauche ?"], en: ["Excuse me, sir, is the station on the left?", "Excuse me, is the station to the left?", "Excuse me, sir, is the station to the left?"], de: ["Entschuldigen Sie, ist der Bahnhof links?"] } },
+    { id: "u07.27", lesson: 4, fr: "Excusez-moi, Monsieur, la gare est à gauche ?", en: "Excuse me, is the station on the left?", de: "Entschuldigung, ist der Bahnhof links?", alt: { fr: ["Excusez-moi, Monsieur, est-ce que la gare est à gauche ?", "Excusez-moi, la gare est à gauche ?", "Excusez-moi, est-ce que la gare est à gauche ?"], en: ["Excuse me, sir, is the station on the left?", "Excuse me, is the station to the left?", "Excuse me, sir, is the station to the left?"], de: ["Entschuldigen Sie, ist der Bahnhof links?"] } },
     { id: "u07.28", lesson: 4, fr: "Le cinéma est tout droit.", en: "The cinema is straight ahead.", de: "Das Kino ist geradeaus.", alt: { fr: ["Le cinéma, c'est tout droit."], en: ["The cinema is straight on."] } },
     // Lesson 5
     { id: "u07.29", lesson: 5, fr: "C'est loin ?", en: "Is it far?", de: "Ist es weit?", alt: { fr: ["Est-ce que c'est loin ?"], en: ["Is that far?", "Is it far away?", "Is that far away?"], de: ["Ist das weit?", "Ist es weit weg?", "Ist das weit weg?"] } },
@@ -101,7 +101,7 @@ export const u07: Unit = {
     { id: "u07.d6", lesson: 3, fr: "Nous ___ à la plage.", options: ["allons", "allez", "vont"], answer: 0, en: "We're going to the beach.", de: "Wir gehen an den Strand.", why: tx("With **nous**: nous **allons**.", "Mit **nous**: nous **allons**.") },
     { id: "u07.d7", lesson: 3, fr: "Léa et Hugo ___ au musée.", options: ["vont", "va", "allons"], answer: 0, en: "Léa and Hugo are going to the museum.", de: "Léa und Hugo gehen ins Museum.", why: tx("Léa and Hugo = **ils**: ils **vont**.", "Léa und Hugo = **ils** (sie): ils **vont**.") },
     { id: "u07.d8", lesson: 3, fr: "Vous ___ à la piscine ?", options: ["allez", "allons", "vas"], answer: 0, en: "Are you going to the swimming pool?", de: "Geht ihr ins Schwimmbad?", why: tx("With **vous**: vous **allez**, with -ez like vous parlez.", "Mit **vous**: vous **allez**, mit -ez wie vous parlez.") },
-    { id: "u07.d9", lesson: 3, fr: "Nous allons ___école.", options: ["à l'", "à la", "au"], answer: 0, en: "We're going to school.", de: "Wir gehen zur Schule.", why: tx("Before a vowel, à le and à la become **à l'**: à l'école.", "Vor einem Vokal werden à le und à la zu **à l'**: à l'école.") },
+    { id: "u07.d9", lesson: 3, fr: "Nous allons ___école.", options: ["à l'", "à la", "au"], answer: 0, en: "We're going to school.", de: "Wir gehen zur Schule.", why: tx("Before a vowel, le and la shrink to l', so it's **à l'**: à l'école. No au, no à la.", "Vor einem Vokal werden le und la zu l', also **à l'**: à l'école. Kein au, kein à la.") },
     { id: "u07.d10", lesson: 3, fr: "Le professeur parle ___ élèves.", options: ["aux", "à les", "au"], answer: 0, en: "The teacher is talking to the pupils.", de: "Der Lehrer spricht mit den Schülern.", why: tx("**À + les** melts into **aux**: aux élèves. Before a vowel you hear a z: aux‿élèves.", "**À + les** wird zu **aux**: aux élèves. Vor einem Vokal hört man ein weiches s: aux‿élèves.") },
     { id: "u07.d11", lesson: 4, fr: "La boulangerie est ___ gauche.", options: ["à", "au", "la"], answer: 0, en: "The bakery is on the left.", de: "Die Bäckerei ist links.", why: tx("Left and right: **à** gauche, **à** droite. Always with à.", "Links und rechts: **à** gauche, **à** droite. Immer mit à.") },
     { id: "u07.d12", lesson: 5, fr: "Le supermarché est près ___ la gare.", options: ["de", "à", "au"], answer: 0, en: "The supermarket is near the station.", de: "Der Supermarkt ist in der Nähe des Bahnhofs.", why: tx("Near is **près de**: près de la gare. With le it becomes du: près du parc.", "In der Nähe von heißt **près de**: près de la gare. Mit le wird es zu du: près du parc.") },

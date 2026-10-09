@@ -124,12 +124,12 @@ export const u04: Unit = {
       { who: "blob", fr: "Vous avez un chat aussi ?", en: "Do you have a cat too?", de: "Habt ihr auch eine Katze?" },
       { who: "lea", fr: "Non, nous avons un lapin. Et toi, tu as une famille ?", en: "No, we have a rabbit. And you, do you have a family?", de: "Nein, wir haben ein Kaninchen. Und du, hast du eine Familie?" },
       { who: "blob", fr: "Oui ! Une grande famille. Ils sont violets et ils ont des bérets !", en: "Yes! A big family. They're purple and they have berets!", de: "Ja! Eine große Familie. Sie sind lila und haben Baskenmützen!" },
-      { who: "lea", fr: "Une famille de Blobs avec des bérets ? J'adore !", en: "A family of Blobs with berets? I love it!", de: "Eine Blob-Familie mit Baskenmützen? Wie süß!" },
+      { who: "lea", fr: "Une famille de Blobs avec des bérets ? J'adore !", en: "A family of Blobs with berets? I love it!", de: "Eine Blob-Familie mit Baskenmützen? Wie toll!" },
     ],
     questions: [
       { q: tx("Who has a big dog?", "Wer hat einen großen Hund?"), options: [tx("Léa's grandfather", "Léas Opa"), tx("Léa's father", "Léas Vater"), tx("Léa's cousin", "Léas Cousin")], answer: 0 },
       { q: tx("Who is the baby?", "Wer ist das Baby?"), options: [tx("Léa's cousin", "Léas Cousin"), tx("Léa's sister", "Léas Schwester"), tx("Léa's brother", "Léas Bruder")], answer: 0 },
-      { q: tx("Which pet does Léa's family have?", "Welches Haustier hat Léas Familie?"), options: [tx("A rabbit", "Ein Kaninchen"), tx("A cat", "Eine Katze"), tx("A fish", "Einen Fisch")], answer: 0 },
+      { q: tx("Which pet does Léa have at home?", "Welches Haustier hat Léa zu Hause?"), options: [tx("A rabbit", "Ein Kaninchen"), tx("A cat", "Eine Katze"), tx("A fish", "Einen Fisch")], answer: 0 },
     ],
   },
   tips: [
@@ -151,7 +151,7 @@ export const u04: Unit = {
           [tx("you", "du"), "tu as"],
           [tx("he / she", "er / sie"), "il / elle a"],
           [tx("we", "wir"), "nous avons"],
-          [tx("you (plural, polite)", "ihr / Sie"), "vous avez"],
+          [tx("you (plural / polite)", "ihr / Sie"), "vous avez"],
           [tx("they", "sie"), "ils / elles ont"],
         ],
       },

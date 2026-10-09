@@ -177,7 +177,7 @@ export const u05: Unit = {
           [tx("you", "du"), "tu as quinze ans"],
           [tx("he / she", "er / sie"), "il / elle a dix ans"],
           [tx("we", "wir"), "nous avons treize ans"],
-          [tx("you (plural, polite)", "ihr / Sie"), "vous avez vingt ans"],
+          [tx("you (plural / polite)", "ihr / Sie"), "vous avez vingt ans"],
           [tx("they", "sie"), "ils / elles ont huit ans"],
         ],
       },
