@@ -515,3 +515,80 @@ function assignKeys(nodes: Raw[]): DNode[] {
     });
   return walk(nodes);
 }
+
+const SUPER: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "−": "⁻", n: "ⁿ", x: "ˣ" };
+const SUB: Record<string, string> = {
+  ...Object.fromEntries([..."0123456789"].map((d, i) => [d, String.fromCharCode(0x2080 + i)])),
+  "+": "₊", "−": "₋", a: "ₐ", e: "ₑ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ", l: "ₗ", m: "ₘ", n: "ₙ", o: "ₒ", p: "ₚ", r: "ᵣ", s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", x: "ₓ",
+};
+/** Small raised or lowered characters when every one has a Unicode form ("x²", "CO₂"), else undefined. */
+const script = (s: string, map: Record<string, string>) => ([...s].every((c) => map[c]) ? [...s].map((c) => map[c]).join("") : undefined);
+
+/**
+ * Maths as one line of plain text, for places that can't draw it (link previews):
+ * "\frac{1}{6} \approx 0,167" → "1/6 ≈ 0,167", "x^2 + \sqrt{x}" → "x² + √x".
+ */
+export function plainMath(src: string): string {
+  const line = (nodes: DNode[]): string => {
+    let out = "";
+    let prev: DNode | undefined;
+    for (const n of nodes) {
+      if (n.type === "op") {
+        const unary = (n.v === "−" || n.v === "+" || n.v === "±") && (!prev || prev.type === "op" || (prev.type === "space" && !out.trim()));
+        out += n.v === "," || n.v === ";" ? `${n.v} ` : n.v === "!" || n.v === "%" || n.v === "°" || n.v === "|" || unary ? n.v : ` ${n.v} `;
+      } else if (n.type === "space") out += " ";
+      else {
+        // A unit after its number ("1 cm"), and whatever follows a fraction ("1/2 x"), gets a space.
+        const unit = n.type === "pow" || n.type === "sub" ? n.base[0] : n;
+        if ((unit?.type === "text" && prev?.type === "num" && /^\p{L}/u.test(unit.v)) || prev?.type === "frac") out += " ";
+        out += node(n);
+      }
+      prev = n;
+    }
+    return out.replace(/\s+/g, " ").trim();
+  };
+  // Several tokens get brackets where a bar or a raised position kept them apart: (x + 1)/2.
+  const wrap = (nodes: DNode[]) => {
+    const s = line(nodes);
+    return (nodes.length > 1 || s.includes(" ")) && !(nodes.length === 1 && nodes[0].type === "paren") ? `(${s})` : s;
+  };
+  const node = (n: DNode): string => {
+    switch (n.type) {
+      case "num":
+      case "var":
+      case "text":
+      case "sym":
+        return n.v;
+      case "fn":
+        return `${n.v} `;
+      case "frac":
+        // Without a bar it is the inside of a binomial coefficient: (5 über 2) reads as C(5, 2).
+        return n.nobar ? `${line(n.num)}, ${line(n.den)}` : `${wrap(n.num)}/${wrap(n.den)}`;
+      case "pow": {
+        const exp = line(n.exp);
+        return `${line(n.base)}${script(exp, SUPER) ?? `^${wrap(n.exp)}`}`;
+      }
+      case "sub": {
+        const sub = line(n.sub);
+        return `${line(n.base)}${script(sub, SUB) ?? `_${sub} `}`;
+      }
+      case "sqrt": {
+        const index = n.index ? line(n.index) : "";
+        const root = index === "3" ? "∛" : index === "4" ? "∜" : index ? `${script(index, SUPER) ?? index}√` : "√";
+        return `${root}${wrap(n.body)}`;
+      }
+      case "paren":
+        return `${n.body.length === 1 && n.body[0].type === "frac" && n.body[0].nobar ? "C" : ""}${n.open}${line(n.body)}${n.close}`;
+      case "style":
+        // A bar on top (repeating digits) as a combining overline on each character: 0,3̅.
+        return n.style === "over" ? [...line(n.body)].map((c) => `${c}̅`).join("") : line(n.body);
+      default:
+        return "";
+    }
+  };
+  try {
+    return line(parseDisplay(src)).replace(/ ([)\]}])/g, "$1").replace(/([([{]) /g, "$1");
+  } catch {
+    return src;
+  }
+}

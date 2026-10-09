@@ -11,15 +11,16 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { resolveText } from "@/i18n/text";
 import { CATALOG } from "@/learn/catalog";
+import { plainMath } from "@/learn/engine/display";
 import { showItems } from "@/learn/showcase";
 import { loadTopic } from "@/learn/topics";
 import type { ShowEntry, ShowManifest } from "@/learn/showManifest";
 
 const OUT = resolve(process.cwd(), "src/learn/show-manifest.json");
 
-/** Rich text as plain text for a description: no ** or $, one line, at most 200 characters. */
+/** Rich text as plain text for a description: no **, maths written out ("1/6 ≈ 0,167"), one line, at most 200 characters. */
 function plain(text: string) {
-  const s = text.replace(/\*\*/g, "").replace(/\$([^$]*)\$/g, "$1").replace(/\s+/g, " ").trim();
+  const s = text.replace(/\*\*/g, "").replace(/\$([^$]+)\$/g, (_, math: string) => plainMath(math)).replace(/\s+/g, " ").trim();
   return s.length > 200 ? `${s.slice(0, 197).replace(/\s+\S*$/, "")} …` : s;
 }
 
