@@ -24,6 +24,9 @@ type StepRow = { version: number; steps: unknown[]; client_id: string };
 
 const PUSH_DELAY = 120;
 const SNAPSHOT_DELAY = 2500;
+/** Polling for steps (only while Realtime has been quiet for POLL_QUIET). */
+const POLL_EVERY = 2500;
+const POLL_QUIET = 15_000;
 
 const cursorKey = new PluginKey<DecorationSet>("collabCursors");
 
@@ -107,6 +110,8 @@ export function useNoteCollab({
   const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const snapTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const cursors = useRef(new Map<string, RemoteCursor>());
+  /** When the last step arrived through Realtime. */
+  const heard = useRef(0);
   const serializeRef = useRef(serialize);
   const resyncRef = useRef(onResync);
   useEffect(() => {
@@ -205,13 +210,20 @@ export function useNoteCollab({
         }
         const result = data as { ok: boolean; version?: number; reason?: string };
         if (result.ok) {
-          // Our steps are now the authority's: confirm them (they come back with our client id).
-          if (!editor.isDestroyed) editor.view.dispatch(receiveTransaction(editor.state, steps, steps.map(() => clientId)));
+          // Our steps are now the authority's: confirm them (they come back with our client id), unless a
+          // fetch in the meantime already brought them back to us.
+          if (!editor.isDestroyed && getVersion(editor.state) === sendable.version)
+            editor.view.dispatch(receiveTransaction(editor.state, steps, steps.map(() => clientId)));
           setStatus("live");
           continue;
         }
         if (result.reason === "denied") {
           setStatus("offline");
+          break;
+        }
+        // The server is behind us: the history was reset (the note was saved outside working-together).
+        if (typeof result.version === "number" && result.version < sendable.version) {
+          resync();
           break;
         }
         if (!(await pull())) {
@@ -265,9 +277,32 @@ export function useNoteCollab({
     if (payload.eventType !== "INSERT" || !editor || editor.isDestroyed) return;
     const row = payload.new as StepRow;
     if (row.client_id === clientId) return;
+    heard.current = Date.now();
     if (!apply([row])) void pull().then((ok) => !ok && resync());
     redrawCursors();
   });
+
+  // A safety net when Realtime is quiet (some school networks block it, connections drop): look for
+  // new steps every few seconds while the note is visible.
+  useEffect(() => {
+    if (!enabled || !editor) return;
+    const poll = async () => {
+      if (busy.current || editor.isDestroyed || document.hidden || Date.now() - heard.current < POLL_QUIET) return;
+      busy.current = true;
+      try {
+        if (!(await pull())) resync();
+      } finally {
+        busy.current = false;
+      }
+      redrawCursors();
+      if (again.current) {
+        again.current = false;
+        void pushRef.current();
+      }
+    };
+    const timer = setInterval(() => void poll(), POLL_EVERY);
+    return () => clearInterval(timer);
+  }, [enabled, editor, pull, resync, redrawCursors]);
 
   // Carets: send ours when the selection moves, draw theirs.
   useEffect(() => {

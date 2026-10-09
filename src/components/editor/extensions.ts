@@ -63,12 +63,18 @@ export function buildExtensions({
   runSlash,
   onExitTop,
   getLocale,
+  readOnly = false,
 }: {
   slash: SlashController;
   runSlash: (item: SlashItem, editor: Editor, range: Range) => void;
   onExitTop: () => void;
   /** The reader's language, read whenever text is shown (menus, placeholders, page links). */
   getLocale: () => Locale;
+  /**
+   * Viewers of a shared note: no empty paragraph appended at the end (it would be a change, and
+   * viewers make none).
+   */
+  readOnly?: boolean;
 }): AnyExtension[] {
   const text = () => editorText[getLocale()];
   return [
@@ -83,7 +89,7 @@ export function buildExtensions({
         defaultProtocol: "https",
         HTMLAttributes: { rel: "noopener noreferrer nofollow", target: null },
       },
-      trailingNode: { node: "paragraph" },
+      trailingNode: readOnly ? false : { node: "paragraph" },
     }),
     TaskList,
     TaskItem.configure({ nested: true }),

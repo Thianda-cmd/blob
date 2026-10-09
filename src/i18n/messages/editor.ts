@@ -133,6 +133,27 @@ export const editorText = defineMessages({
       tooBig: "That image is over 10 MB. Try a smaller one?",
       failed: "That upload didn't work. Check your connection and try again?",
     },
+
+    /** Working on a shared note together. */
+    together: {
+      viewOnly: "You can read this note. Ask its owner if you want to edit it too.",
+      connecting: "Connecting…",
+      offline: "No connection. Your changes are kept and sent as soon as you're back.",
+      catchingUp: "Catching up with the others…",
+      switching: "One moment, getting the note ready for working together…",
+    },
+
+    study: {
+      label: "Learn",
+      title: "Learn this note",
+      intro: "Turn this note into something to learn with.",
+      cards: "Flashcards",
+      cardsHint: "Learn it card by card",
+      quiz: "Quiz",
+      quizHint: "Test what you know",
+      summary: "Summary",
+      summaryHint: "The key points at a glance",
+    },
   },
   de: {
     untitled: "Ohne Titel",
@@ -253,6 +274,26 @@ export const editorText = defineMessages({
       badType: "Ich kann PNG-, JPG-, GIF- und WebP-Bilder einfügen.",
       tooBig: "Das Bild ist größer als 10 MB. Hast du ein kleineres?",
       failed: "Das Hochladen hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.",
+    },
+
+    together: {
+      viewOnly: "Du kannst diese Notiz lesen. Frag die Besitzerin oder den Besitzer, wenn du mitschreiben möchtest.",
+      connecting: "Verbinde…",
+      offline: "Keine Verbindung. Deine Änderungen bleiben erhalten und werden gesendet, sobald du wieder online bist.",
+      catchingUp: "Hole die Änderungen der anderen…",
+      switching: "Einen Moment, die Notiz wird fürs gemeinsame Arbeiten vorbereitet…",
+    },
+
+    study: {
+      label: "Lernen",
+      title: "Mit dieser Notiz lernen",
+      intro: "Mach aus dieser Notiz etwas zum Lernen.",
+      cards: "Karteikarten",
+      cardsHint: "Lerne sie Karte für Karte",
+      quiz: "Quiz",
+      quizHint: "Teste, was du schon weißt",
+      summary: "Zusammenfassung",
+      summaryHint: "Das Wichtigste auf einen Blick",
     },
   },
 });

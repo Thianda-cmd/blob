@@ -1,32 +1,38 @@
 "use client";
 
 import { rewriteUnknownContent, type Content, type Editor, type JSONContent } from "@tiptap/core";
-import { EditorContent, useEditor, type UseEditorOptions } from "@tiptap/react";
-import { ShieldAlert } from "lucide-react";
+import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from "@tiptap/react";
+import { sendableSteps } from "prosemirror-collab";
+import { CloudOff, Eye, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
 import { PageTopBar } from "@/components/page/PageTopBar";
-import { useAutosave } from "@/components/page/useAutosave";
+import { useAutosave, type SaveState } from "@/components/page/useAutosave";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
+import { useTableChanges } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
-import type { AccessRole, Member, Page } from "@/lib/types";
+import type { AccessRole, Member, Page, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
+import { NoteBlocksProvider, type NoteBlocks } from "./blocks/context";
 import { BubbleToolbar } from "./BubbleToolbar";
+import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
 import { IconPicker } from "./IconPicker";
 import { IMAGE_TYPES, dropPos, imageFiles, uploadImages } from "./imageUpload";
+import { collectLinks } from "./links";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
 import { QuickStart } from "./QuickStart";
 import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
+import { StudyMenu } from "./StudyMenu";
 
-type NotePatch = { title: string; content: JSONContent; plain_text: string };
+type NotePatch = { title: string; content: JSONContent; plain_text: string; links: string[] };
 
 const PLAIN_TEXT_LIMIT = 20_000;
 
@@ -74,7 +80,11 @@ type Live = {
   locale: Locale;
   text: EditorText;
   schedule: (patch: Partial<NotePatch>) => void;
+  /** Working together: the document is saved by useNoteCollab, not by us. */
+  collab: boolean;
+  readOnly: boolean;
   userId: string;
+  pageId: string;
   openHref: (href: string) => void;
   pickImage: () => void;
   createSubPage: (editor: Editor) => Promise<void>;
@@ -82,26 +92,37 @@ type Live = {
   markBroken: () => void;
 };
 
+/** Where the editor's document comes from: what it was created with (and, together, at which step version). */
+type Source = { content: unknown; plain: string };
+
 /**
  * `role` is your role on the page ("viewer": read only); `members` everyone on it (more than one:
  * the note is shared, and edits go through useNoteCollab).
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- role and members are wired up by the working-together integration
 export function NoteEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const t = useMessages(editorText);
   const locale = useLocale();
   const router = useRouter();
-  const { pages, userId, updatePage, createPage } = useWorkspace();
+  const { pages, userId, profile, updatePage, createPage } = useWorkspace();
   const meta = pages.find((p) => p.id === page.id);
   const icon = meta ? meta.icon : page.icon;
-  // Back/forward can hand us cached (older) props: start from what this tab last wrote.
-  const [initial] = useState(() => noteCache.freshest(page));
+  const shared = members.length > 1;
+  const readOnly = role === "viewer";
+  // Back/forward can hand us cached (older) props: start from what this tab last wrote. A shared note
+  // must start exactly at its saved version (the others' steps build on it), so it never does.
+  const [initial] = useState(() => (shared ? page : noteCache.freshest(page)));
 
   const [title, setTitle] = useState(initial.title);
   const [broken, setBroken] = useState(false);
+  /** The note is being reloaded from the server (switching to working together, or catching up). */
+  const [reloading, setReloading] = useState(false);
+  /** Working together: the step version the current editor started at (null: the note saves on its own). */
+  const [together, setTogether] = useState<{ version: number } | null>(() => (shared ? { version: page.doc_version ?? 0 } : null));
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const titleEditedAt = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const collabOn = shared && together !== null;
 
   const save = useCallback(
     async (patch: Partial<NotePatch>) => {
@@ -115,7 +136,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     },
     [page.id, updatePage],
   );
-  const { state: saveState, schedule, flush } = useAutosave<NotePatch>(save);
+  const { state: autosaveState, schedule, flush } = useAutosave<NotePatch>(save);
 
   const focusTitle = useCallback(() => {
     const el = titleRef.current;
@@ -130,7 +151,10 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       locale,
       text: t,
       schedule,
+      collab: collabOn,
+      readOnly,
       userId,
+      pageId: page.id,
       focusTitle,
       markBroken: () => setBroken(true),
       openHref: (href) => {
@@ -149,83 +173,239 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   });
 
   const [slash] = useState(() => new SlashController());
-  const [options] = useState<UseEditorOptions & { immediatelyRender: false }>(() => ({
-    immediatelyRender: false,
-    content: initialContent(initial.content, initial.plain_text ?? ""),
-    // Content we can't read must never be silently replaced by an empty doc and autosaved.
-    enableContentCheck: true,
-    onContentError: ({ editor }) => {
-      editor.setEditable(false, false);
-      live.current?.markBroken();
-    },
-    extensions: buildExtensions({
-      slash,
-      runSlash: (item, editor, range) =>
-        item.run({
-          editor,
-          range,
-          ctx: {
-            pickImage: () => live.current?.pickImage(),
-            createSubPage: async (e) => live.current?.createSubPage(e),
-          },
-        }),
-      onExitTop: () => live.current?.focusTitle(),
-      getLocale: () => live.current?.locale ?? locale,
-    }),
-    editorProps: {
-      attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
-      handlePaste: (view, event) => {
-        const files = imageFiles(event.clipboardData?.files);
-        if (!files.length || !live.current) return false;
-        // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
-        if (event.clipboardData?.getData("text/plain").trim()) return false;
-        event.preventDefault();
-        uploadImages(view, files, live.current.userId, live.current.text.upload);
-        return true;
+  /** Editor options for a document. A new options object creates a new editor (see useEditor below). */
+  const [makeOptions] = useState(() => (source: Source): UseEditorOptions & { immediatelyRender: false } => {
+    const viewer = live.current?.readOnly ?? readOnly;
+    return {
+      immediatelyRender: false,
+      content: initialContent(source.content, source.plain),
+      editable: !viewer,
+      // Content we can't read must never be silently replaced by an empty doc and autosaved.
+      enableContentCheck: true,
+      onContentError: ({ editor }) => {
+        editor.setEditable(false, false);
+        live.current?.markBroken();
       },
-      handleDrop: (view, event, _slice, moved) => {
-        if (moved || !live.current) return false;
-        const files = imageFiles(event.dataTransfer?.files);
-        if (!files.length) return false;
-        event.preventDefault();
-        uploadImages(view, files, live.current.userId, live.current.text.upload, dropPos(view, event));
-        return true;
+      extensions: buildExtensions({
+        slash,
+        runSlash: (item, editor, range) =>
+          item.run({
+            editor,
+            range,
+            ctx: {
+              pickImage: () => live.current?.pickImage(),
+              createSubPage: async (e) => live.current?.createSubPage(e),
+            },
+          }),
+        onExitTop: () => live.current?.focusTitle(),
+        getLocale: () => live.current?.locale ?? locale,
+        readOnly: viewer,
+      }),
+      editorProps: {
+        attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
+        handlePaste: (view, event) => {
+          const files = imageFiles(event.clipboardData?.files);
+          if (!files.length || !live.current) return false;
+          // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
+          if (event.clipboardData?.getData("text/plain").trim()) return false;
+          event.preventDefault();
+          uploadImages(view, files, live.current.userId, live.current.text.upload);
+          return true;
+        },
+        handleDrop: (view, event, _slice, moved) => {
+          if (moved || !live.current) return false;
+          const files = imageFiles(event.dataTransfer?.files);
+          if (!files.length) return false;
+          event.preventDefault();
+          uploadImages(view, files, live.current.userId, live.current.text.upload, dropPos(view, event));
+          return true;
+        },
+        handleClick: (view, _pos, event) => {
+          // Plain clicks open links (like Notion); shift/alt-clicks keep editing the selection.
+          if (event.button !== 0 || event.shiftKey || event.altKey) return false;
+          const link = (event.target as HTMLElement | null)?.closest?.("a[href]");
+          if (!link || !view.dom.contains(link)) return false;
+          const href = link.getAttribute("href");
+          if (!href) return false;
+          event.preventDefault();
+          live.current?.openHref(href);
+          return true;
+        },
       },
-      handleClick: (view, _pos, event) => {
-        // Plain clicks open links (like Notion); shift/alt-clicks keep editing the selection.
-        if (event.button !== 0 || event.shiftKey || event.altKey) return false;
-        const link = (event.target as HTMLElement | null)?.closest?.("a[href]");
-        if (!link || !view.dom.contains(link)) return false;
-        const href = link.getAttribute("href");
-        if (!href) return false;
-        event.preventDefault();
-        live.current?.openHref(href);
-        return true;
+      onUpdate: ({ editor, transaction }) => {
+        // Only real edits: skip transactions that merely append the trailing paragraph.
+        const l = live.current;
+        if (!transaction.docChanged || !l || l.collab || !editor.isEditable) return;
+        const content = contentToSave(editor);
+        noteCache.touch(l.pageId, { content });
+        l.schedule({ content, plain_text: plainText(editor), links: collectLinks(editor.state.doc, l.pageId) });
       },
-    },
-    onUpdate: ({ editor, transaction }) => {
-      // Only real edits: skip transactions that merely append the trailing paragraph.
-      if (!transaction.docChanged || !live.current) return;
-      const content = contentToSave(editor);
-      noteCache.touch(page.id, { content });
-      live.current.schedule({ content, plain_text: plainText(editor) });
-    },
-  }));
-  const editor = useEditor(options, []);
+    };
+  });
+  const [options, setOptions] = useState(() => makeOptions({ content: initial.content, plain: initial.plain_text ?? "" }));
+  // Reloading the note hands the editor new options, which builds a fresh editor on the new document.
+  const built = useEditor(options, [options]);
+  // The editor being replaced: nothing on the page touches it any more (it is destroyed during the swap).
+  const [stale, setStale] = useState<Editor | null>(null);
+  const editor = stale !== null && built === stale ? null : built;
 
   // Unreadable stored content: show a best-effort, read-only rendering (never saved).
   useEffect(() => {
     if (!broken || !editor) return;
+    const raw = options.content;
     let doc: JSONContent | null = null;
-    if (initial.content && typeof initial.content === "object") {
+    if (raw && typeof raw === "object") {
       try {
-        doc = rewriteUnknownContent(initial.content as JSONContent, editor.schema).json;
+        doc = rewriteUnknownContent(raw as JSONContent, editor.schema).json;
       } catch {}
     }
     try {
       editor.commands.setContent(doc ?? plainDoc(initial.plain_text ?? ""), { emitUpdate: false, errorOnInvalidContent: false });
     } catch {}
-  }, [broken, editor, initial]);
+  }, [broken, editor, options, initial]);
+
+  // Working together ----------------------------------------------------------
+
+  const canEdit = !readOnly && !broken && !reloading;
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && editor.isEditable !== canEdit) editor.setEditable(canEdit, false);
+  }, [editor, canEdit]);
+
+  /** Where the caret was before the editor was rebuilt (restored when the document is the same). */
+  const restore = useRef<{ json: string; from: number; to: number; focus: boolean } | null>(null);
+
+  /** Start (again) from the saved note at its current version and work on it together. */
+  const reloadTogether = useCallback(async () => {
+    await flush();
+    setReloading(true);
+    const current = editor && !editor.isDestroyed ? editor : null;
+    if (current) {
+      const { from, to } = current.state.selection;
+      restore.current = { json: JSON.stringify(current.getJSON()), from, to, focus: current.view.hasFocus() };
+    }
+    const { data } = await createClient().from("pages").select("content, plain_text, doc_version").eq("id", page.id).maybeSingle();
+    if (!data) {
+      setReloading(false);
+      return;
+    }
+    const row = data as { content: unknown; plain_text: string | null; doc_version: number | null };
+    setStale(current);
+    setBroken(false);
+    setOptions(makeOptions({ content: row.content, plain: row.plain_text ?? "" }));
+    setTogether({ version: row.doc_version ?? 0 });
+    setReloading(false);
+  }, [flush, editor, page.id, makeOptions]);
+
+  const serialize = useCallback(
+    (e: Editor) => ({
+      // Exactly the document at this version (with its trailing paragraph): the others' steps build on it.
+      content: e.getJSON(),
+      plain: plainText(e),
+      links: collectLinks(e.state.doc, page.id),
+    }),
+    [page.id],
+  );
+  const me = useMemo(() => ({ user_id: userId, name: profile.full_name ?? "", avatar_url: profile.avatar_url }), [userId, profile.full_name, profile.avatar_url]);
+  const collab = useNoteCollab({
+    editor: reloading ? null : editor,
+    pageId: page.id,
+    enabled: collabOn,
+    version: together?.version ?? 0,
+    serialize,
+    me,
+    onResync: () => void reloadTogether(),
+  });
+
+  // The note was shared (or stopped being shared) while open, or your role changed: switch modes cleanly.
+  const modeRef = useRef({ shared, readOnly });
+  useEffect(() => {
+    const before = modeRef.current;
+    if (before.shared === shared && before.readOnly === readOnly) return;
+    modeRef.current = { shared, readOnly };
+    if (shared && (!together || before.readOnly !== readOnly)) {
+      // (A new role rebuilds the editor too: viewers' editors are set up a little differently.)
+      void reloadTogether();
+    } else if (!shared && together) {
+      // Back on its own: keep everything on screen and save it the usual way.
+      void Promise.resolve().then(() => {
+        setTogether(null);
+        if (!editor || editor.isDestroyed || readOnly) return;
+        schedule({ content: contentToSave(editor), plain_text: plainText(editor), links: collectLinks(editor.state.doc, page.id) });
+      });
+    }
+  }, [shared, together, reloadTogether, editor, readOnly, schedule, page.id]);
+
+  // Put the caret back where it was after a rebuild with the same document.
+  useEffect(() => {
+    const r = restore.current;
+    if (!editor || editor.isDestroyed || !r || reloading) return;
+    restore.current = null;
+    if (JSON.stringify(editor.getJSON()) !== r.json) return;
+    const size = editor.state.doc.content.size;
+    editor.commands.setTextSelection({ from: Math.min(r.from, size), to: Math.min(r.to, size) });
+    if (r.focus) editor.view.focus();
+  }, [editor, reloading]);
+
+  // Someone joined through an invite link (or was added): reload the members so the note switches to
+  // working together. Members of a page above this one count too.
+  const chain = useMemo(() => {
+    const ids = [page.id];
+    let parent = pages.find((p) => p.id === (meta ?? page).parent_id);
+    while (parent && ids.length < 32) {
+      ids.push(parent.id);
+      parent = pages.find((p) => p.id === parent!.parent_id);
+    }
+    return ids.join(",");
+  }, [pages, meta, page]);
+  useTableChanges("page_members", `page_id=in.(${chain})`, () => router.refresh());
+  // Without Realtime (blocked networks) a note on its own still notices someone joining: a quick
+  // count now and then. Saving on its own while others work together would undo their changes.
+  const memberCount = useRef<number | null>(null);
+  useEffect(() => {
+    if (shared) return;
+    const check = async () => {
+      if (document.hidden) return;
+      const { count, error } = await createClient().from("page_members").select("user_id", { count: "exact", head: true }).in("page_id", chain.split(","));
+      if (error || count === null) return;
+      if (count > 0 && memberCount.current !== count) router.refresh();
+      memberCount.current = count;
+    };
+    const timer = setInterval(() => void check(), 8000);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", check);
+    };
+  }, [shared, chain, router]);
+
+  // The others' title, tags and topics, live.
+  useTableChanges<Pick<PageMeta, "title" | "tags" | "topics">>("pages", shared ? `id=eq.${page.id}` : null, (payload) => {
+    if (payload.eventType !== "UPDATE") return;
+    const row = payload.new as Partial<PageMeta>;
+    const patch: Partial<PageMeta> = {};
+    if (Array.isArray(row.tags)) patch.tags = row.tags;
+    if (Array.isArray(row.topics)) patch.topics = row.topics;
+    const typing = document.activeElement === titleRef.current || Date.now() - titleEditedAt.current < 4000;
+    if (typeof row.title === "string" && !typing) {
+      patch.title = row.title;
+      setTitle(row.title);
+    }
+    void updatePage(page.id, patch, { local: true });
+  });
+
+  // Save state: our own saves (title, or the whole note on its own), then the steps still on their way.
+  const unsent = useEditorState({
+    editor: collabOn ? editor : null,
+    selector: ({ editor: e }) => {
+      if (!e || e.isDestroyed) return false;
+      try {
+        return sendableSteps(e.state) !== null;
+      } catch {
+        return false;
+      }
+    },
+  });
+  const saveState: SaveState = autosaveState !== "saved" ? autosaveState : !collabOn ? "saved" : collab.status === "offline" ? "error" : unsent ? "saving" : "saved";
 
   // Title ---------------------------------------------------------------------
   const resizeTitle = useCallback(() => {
@@ -248,9 +428,11 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   }, [title, locale]);
 
   const changeTitle = (value: string) => {
+    if (readOnly) return;
     const next = value.replace(/[\r\n]+/g, " ").slice(0, 300);
     setTitle(next);
-    noteCache.touch(page.id, { title: next });
+    titleEditedAt.current = Date.now();
+    if (!collabOn) noteCache.touch(page.id, { title: next });
     schedule({ title: next });
     void updatePage(page.id, { title: next }, { local: true });
   };
@@ -261,7 +443,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     const first = editor.state.doc.firstChild;
     const firstIsEmptyText = first?.type.name === "paragraph" && first.content.size === 0;
     const chain = editor.chain();
-    if (newBlock && !firstIsEmptyText) chain.insertContentAt(0, { type: "paragraph" });
+    if (newBlock && !firstIsEmptyText && editor.isEditable) chain.insertContentAt(0, { type: "paragraph" });
     chain.setTextSelection(0).run();
     editor.view.focus();
   };
@@ -290,9 +472,36 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     }
   };
 
+  const blocks = useMemo<NoteBlocks>(() => ({ pageId: page.id, canEdit, uploadFiles: () => {} }), [page.id, canEdit]);
+
+  const notice = readOnly
+    ? { icon: <Eye className="size-3.5 shrink-0" />, text: t.together.viewOnly, tone: "calm" as const }
+    : reloading || collab.status === "resyncing"
+      ? { icon: <span className="blob-upload-spinner shrink-0" />, text: shared && !together ? t.together.switching : t.together.catchingUp, tone: "calm" as const }
+      : collab.status === "offline"
+        ? { icon: <CloudOff className="size-3.5 shrink-0" />, text: t.together.offline, tone: "warn" as const }
+        : null;
+
   return (
     <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture}>
-      <PageTopBar pageId={page.id} saveState={saveState} />
+      <PageTopBar
+        pageId={page.id}
+        saveState={readOnly ? "saved" : saveState}
+        peers={collab.peers}
+        actions={<StudyMenu pageId={page.id} beforeOpen={flush} />}
+      />
+      {notice && (
+        <p
+          role="status"
+          className={cn(
+            "flex items-center gap-2 border-t border-line px-4 py-2 text-[13px]",
+            notice.tone === "warn" ? "bg-danger/8 text-danger" : "bg-blob-soft/60 text-blob-ink",
+          )}
+        >
+          {notice.icon}
+          <span className="min-w-0">{notice.text}</span>
+        </p>
+      )}
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="relative min-h-full">
@@ -306,6 +515,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
                   ref={titleRef}
                   value={title}
                   rows={1}
+                  readOnly={readOnly}
                   onChange={(e) => changeTitle(e.target.value)}
                   onKeyDown={onTitleKeyDown}
                   placeholder={t.untitled}
@@ -325,15 +535,20 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
                 </div>
               )}
 
-              <div className="relative mt-7 min-h-[1.7em]">
-                <EditorContent editor={editor} className={cn("relative transition-opacity duration-300", editor ? "opacity-100" : "opacity-0")} />
-                {editor && !broken && <QuickStart editor={editor} onImage={() => fileRef.current?.click()} />}
-              </div>
+              <NoteBlocksProvider value={blocks}>
+                <div className="relative mt-7 min-h-[1.7em]">
+                  <EditorContent
+                    editor={built}
+                    className={cn("relative transition-opacity duration-300", !built ? "opacity-0" : reloading || !editor ? "opacity-60" : "opacity-100")}
+                  />
+                  {editor && canEdit && <QuickStart editor={editor} onImage={() => fileRef.current?.click()} />}
+                </div>
+              </NoteBlocksProvider>
               <div
                 aria-hidden
                 className="h-[18vh] cursor-text"
                 onMouseDown={(e) => {
-                  if (!editor) return;
+                  if (!editor || !canEdit) return;
                   e.preventDefault();
                   editor.commands.focus("end");
                 }}
@@ -351,7 +566,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         </div>
       </div>
 
-      {editor && <BubbleToolbar editor={editor} />}
+      {editor && canEdit && <BubbleToolbar editor={editor} />}
       <SlashMenu controller={slash} />
       <input
         ref={fileRef}
