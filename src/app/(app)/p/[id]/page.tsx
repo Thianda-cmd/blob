@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CvEditor } from "@/components/cv/CvEditor";
 import { DeckEditor } from "@/components/deck/DeckEditor";
 import { NoteEditor } from "@/components/editor/NoteEditor";
 import { TrashedNotice } from "@/components/page/TrashedNotice";
@@ -28,5 +29,6 @@ export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
   const page = await loadPage(id);
   if (!page) notFound();
   if (page.trashed_at) return <TrashedNotice page={page} />;
+  if (page.kind === "cv") return <CvEditor key={page.id} page={page} />;
   return page.kind === "deck" ? <DeckEditor key={page.id} page={page} /> : <NoteEditor key={page.id} page={page} />;
 }

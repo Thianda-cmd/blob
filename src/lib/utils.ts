@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import type { Locale } from "@/i18n/config";
+import type { PageKind } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -15,13 +16,13 @@ export function safeNext(next: string | null | undefined, fallback = "/home") {
   return next;
 }
 
-const UNTITLED: Record<Locale, Record<"note" | "deck", string>> = {
-  en: { note: "Untitled", deck: "Untitled presentation" },
-  de: { note: "Ohne Titel", deck: "Unbenannte Präsentation" },
+const UNTITLED: Record<Locale, Record<PageKind, string>> = {
+  en: { note: "Untitled", deck: "Untitled presentation", cv: "Untitled CV" },
+  de: { note: "Ohne Titel", deck: "Unbenannte Präsentation", cv: "Unbenannter Lebenslauf" },
 };
 
 /** The page's title, or "Untitled" in the reader's language. Client: pass `useLocale()`; server: `await getLocale()`. */
-export function pageTitle(title: string | null | undefined, kind: "note" | "deck", locale: Locale) {
+export function pageTitle(title: string | null | undefined, kind: PageKind, locale: Locale) {
   return title?.trim() || UNTITLED[locale][kind];
 }
 

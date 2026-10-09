@@ -24,7 +24,7 @@ export type Subject = {
   created_at: string;
 };
 
-export type PageKind = "note" | "deck";
+export type PageKind = "note" | "deck" | "cv";
 
 /** Page metadata used by the sidebar and lists (no content). */
 export type PageMeta = {
