@@ -6,7 +6,7 @@ export const u05: Unit = {
   slug: "nombres",
   n: 5,
   cefr: "A1",
-  title: tx("Numbers and days", "Zahlen und Tage"),
+  title: tx("Numbers and birthdays", "Zahlen und Geburtstage"),
   goal: tx("Count to twenty, say how old you are and ask how many there are", "Bis zwanzig zählen, sagen, wie alt du bist, und fragen, wie viele es gibt"),
   emoji: "🔢",
   words: [

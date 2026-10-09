@@ -21,7 +21,25 @@ const LESSON_SIZE = 13;
 
 export const targetOf = (s: Sentence, dir: "toFr" | "fromFr", lang: Lang) => (dir === "toFr" ? s.fr : s[lang]);
 export const acceptedOf = (s: Sentence, dir: "toFr" | "fromFr", lang: Lang) =>
-  dir === "toFr" ? [s.fr, ...(s.alt?.fr ?? [])] : [s[lang], ...(s.alt?.[lang] ?? [])];
+  dir === "toFr" ? [s.fr, ...(s.alt?.fr ?? []).filter((a) => fitsPrompt(a, s, lang))] : [s[lang], ...(s.alt?.[lang] ?? [])];
+
+const TU = /(^|[\s«(-])(tu|toi|te|ton|ta|tes|t')(?=[\s,.!?;:»)]|$)|\bt'/i;
+const VOUS = /(^|[\s«(-])(vous|votre|vos)(?=[\s,.!?;:»)]|$)/i;
+const DU = /\b(du|dir|dich|dein\w*)\b/;
+const IHR = /\b(ihr|euch|euer\w*|eure\w*|Ihnen)\b|(?<!^)\bSie\b/;
+
+/**
+ * French alternatives are written for both prompts, but "you" in English leaves tu and vous open
+ * where German doesn't: for „Bist du Hugo?“ the vous form isn't right, for „Habt ihr …?“ the tu form isn't.
+ */
+function fitsPrompt(alt: string, s: Sentence, lang: Lang) {
+  if (lang !== "de") return true;
+  const du = DU.test(s.de);
+  const ihr = IHR.test(s.de);
+  if (du && !ihr && VOUS.test(alt) && !VOUS.test(s.fr)) return false;
+  if (ihr && !du && TU.test(alt) && !TU.test(s.fr)) return false;
+  return true;
+}
 
 const wordCount = (s: string) => tilesOf(s, "fr").length;
 
