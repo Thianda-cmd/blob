@@ -24,6 +24,8 @@ export type NoteSnapshot = { content: JSONContent; plain: string; links: string[
 
 type StepRow = { version: number; steps: unknown[]; client_id: string };
 
+/** A page_steps row holds at most 500 steps (migration 0010): more go out in several pushes. */
+const MAX_STEPS = 500;
 const PUSH_DELAY = 120;
 const SNAPSHOT_DELAY = 2500;
 /** After a failed push: try again after 2 s, 4 s, 8 s … up to 30 s. */
@@ -110,14 +112,16 @@ async function flushOut({
   if (unsent) {
     let base = unsent.version;
     let rest = unsent.steps;
-    for (let tries = 0; tries < 3 && rest.length; tries++) {
-      const { data, error } = await supabase.rpc("push_steps", { p_page: pageId, p_version: base, p_steps: rest.map((s) => s.toJSON()), p_client: clientId });
+    for (let tries = 0; tries < 3 && rest.length; ) {
+      const chunk = rest.slice(0, MAX_STEPS);
+      const { data, error } = await supabase.rpc("push_steps", { p_page: pageId, p_version: base, p_steps: chunk.map((s) => s.toJSON()), p_client: clientId });
       if (error) return;
       if ((data as { ok?: boolean } | null)?.ok) {
-        base += rest.length;
-        rest = [];
-        break;
+        base += chunk.length;
+        rest = rest.slice(chunk.length);
+        continue;
       }
+      tries++;
       // Behind: if the newer rows are ours (a push still on its way when the editor closed), skip those steps.
       const { data: rows } = await supabase.from("page_steps").select("version, steps, client_id").eq("page_id", pageId).gte("version", base).order("version");
       let moved = false;
@@ -136,16 +140,32 @@ async function flushOut({
   await supabase.rpc("save_note_snapshot", { p_page: pageId, p_version: at, p_content: snapshot.content, p_plain: snapshot.plain, p_links: snapshot.links });
 }
 
+type Owed = { version: number; steps: readonly Step[]; client: string };
+
+/**
+ * Browsers refuse a beacon over 64 KiB (all of a page's beacons on their way count together), and
+ * the settle route takes at most MAX_STEPS steps. Past either, unsent steps can't leave with the tab.
+ */
+const BEACON_BYTES = 60_000;
+
+/** The settle beacon's body, or null when this browser can't send these steps with one. */
+function settleBody(owed: Owed | null) {
+  if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return null;
+  if (owed && owed.steps.length > MAX_STEPS) return null;
+  const body = owed ? { version: owed.version, steps: owed.steps.map((s) => s.toJSON()), client: owed.client } : {};
+  const blob = new Blob([JSON.stringify(body)], { type: "application/json" });
+  return blob.size > BEACON_BYTES ? null : blob;
+}
+
 /**
  * Ask the server to settle the note (src/app/api/notes/[id]/settle): send `owed` (steps this editor
  * hasn't sent) and store the note with every step applied. A beacon still goes out while the tab
  * closes, unlike a normal request. False when the browser wouldn't take it (then flushOut tries).
  */
-function settleBeacon(pageId: string, owed: { version: number; steps: Step[]; client: string } | null) {
-  if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return false;
-  const body = owed ? { version: owed.version, steps: owed.steps.map((s) => s.toJSON()), client: owed.client } : {};
+function settleBeacon(pageId: string, owed: Owed | null) {
   try {
-    return navigator.sendBeacon(`/api/notes/${pageId}/settle`, new Blob([JSON.stringify(body)], { type: "application/json" }));
+    const body = settleBody(owed);
+    return !!body && navigator.sendBeacon(`/api/notes/${pageId}/settle`, body);
   } catch {
     return false;
   }
@@ -339,11 +359,12 @@ export function useNoteCollab({
     const clientId = clientIdFor(editor);
     let sent = false;
     try {
-      for (let attempt = 0; attempt < 8; attempt++) {
+      // Up to 8 times behind someone else; pushes that go through (one per MAX_STEPS steps) don't count.
+      for (let behind = 0; behind < 8; ) {
         if (!usable(editor)) break;
         const sendable = unsentOf(editor.state);
         if (!sendable) break;
-        const steps = sendable.steps;
+        const steps = sendable.steps.slice(0, MAX_STEPS);
         const { data, error } = await createClient().rpc("push_steps", {
           p_page: pageId,
           p_version: sendable.version,
@@ -377,6 +398,7 @@ export function useNoteCollab({
           resync();
           break;
         }
+        behind++;
         if (!(await pull())) {
           resync();
           break;
@@ -385,11 +407,12 @@ export function useNoteCollab({
     } finally {
       busy.current = false;
     }
+    // Even when another push follows: it may find nothing left to send (it was asked for while this
+    // one sent everything), and then nothing else would store what this one sent.
+    if (sent) scheduleSnapshot();
     if (again.current) {
       again.current = false;
       void pushRef.current();
-    } else if (sent) {
-      scheduleSnapshot();
     }
   }, [editor, pageId, pull, resync, scheduleSnapshot, scheduleRetry, usable]);
   useEffect(() => {
@@ -478,9 +501,12 @@ export function useNoteCollab({
       handedOver = false;
       resync();
     };
-    // Steps not yet sent: the browser asks before the tab closes.
+    // Steps not yet sent that the settle beacon can't take (the connection is failing, or they are too
+    // big for a beacon, like a long paste still uploading): the browser asks before the tab closes.
+    // Otherwise the beacon takes them.
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (editor.isDestroyed || !unsentOf(editor.state)) return;
+      const unsent = editor.isDestroyed ? null : unsentOf(editor.state);
+      if (!unsent || (navigator.onLine && failures.current === 0 && settleBody({ ...unsent, client: clientId }))) return;
       void push();
       e.preventDefault();
     };

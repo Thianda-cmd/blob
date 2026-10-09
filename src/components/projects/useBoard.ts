@@ -8,17 +8,25 @@ import { projectsText } from "@/i18n/messages/projects";
 import { useLive, useTableChanges } from "@/lib/live";
 import { removeUnusedFiles } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
-import type { AccessRole, ChecklistItem, Member, Project, ProjectColumn, Task } from "@/lib/types";
+import type { AccessRole, Attachment, ChecklistItem, Member, Project, ProjectColumn, Task } from "@/lib/types";
 import { uid } from "@/lib/utils";
-import { applyChecklist, byPosition, checklistMoveIndex, positionBetween, spacedPositions, tooClose, type ChecklistChange } from "./model";
+import {
+  applyAttachments,
+  applyChecklist,
+  byPosition,
+  checklistMoveIndex,
+  positionBetween,
+  spacedPositions,
+  tooClose,
+  type AttachmentChange,
+  type ChecklistChange,
+} from "./model";
 
 export type BoardData = { project: Project; columns: ProjectColumn[]; cards: Task[]; members: Member[]; role: AccessRole };
 export type Me = { user_id: string; name: string; avatar_url: string | null };
 
-/** Checklists change one item at a time instead (changeChecklist). */
-export type CardPatch = Partial<
-  Pick<Task, "title" | "details" | "due_at" | "priority" | "assignees" | "labels" | "attachments" | "column_id" | "position" | "done">
->;
+/** Checklists and attachments change one item at a time instead (changeChecklist, changeAttachments). */
+export type CardPatch = Partial<Pick<Task, "title" | "details" | "due_at" | "priority" | "assignees" | "labels" | "column_id" | "position" | "done">>;
 export type ColumnPatch = Partial<Pick<ProjectColumn, "title" | "color" | "position" | "done">>;
 export type ProjectPatch = Partial<Pick<Project, "title" | "description" | "icon" | "color" | "subject_id" | "due_at" | "archived_at">>;
 
@@ -79,7 +87,10 @@ export function useBoard(initial: BoardData, me: Me) {
    * Per card with checklist changes of ours on their way: the checklist as the server last had it,
    * and our changes not yet confirmed, in order.
    */
-  const checklists = useRef(new Map<string, { base: ChecklistItem[]; queue: ChecklistChange[] }>());
+  // `heard`: someone else's change to the list arrived while ours were on their way.
+  const checklists = useRef(new Map<string, { base: ChecklistItem[]; queue: ChecklistChange[]; heard?: boolean }>());
+  /** Per card, our attachment changes not yet saved, in order, each told the list the server saved. */
+  const attachmentQueues = useRef(new Map<string, { change: AttachmentChange; settle: (saved: Attachment[] | null) => void }[]>());
 
   const live = useLive(gone ? null : `project:${id}`, me);
   const liveRef = useRef(live);
@@ -122,7 +133,12 @@ export function useBoard(initial: BoardData, me: Me) {
     const mine = table === "tasks" ? checklists.current.get(remote.id) : undefined;
     if (mine && Array.isArray(remote.checklist)) {
       mine.base = remote.checklist as ChecklistItem[];
+      mine.heard = true;
       out.checklist = mine.queue.reduce(applyChecklist, mine.base);
+    }
+    const files = table === "tasks" ? attachmentQueues.current.get(remote.id) : undefined;
+    if (files?.length && Array.isArray(remote.attachments)) {
+      out.attachments = files.reduce((list, q) => applyAttachments(list, q.change), remote.attachments as Attachment[]);
     }
     return out as T;
   }, []);
@@ -400,6 +416,9 @@ export function useBoard(initial: BoardData, me: Me) {
         commitCards((list) => list.map((c) => (c.id === cardId ? { ...c, checklist: next } : c)));
       }
       checklists.current.delete(cardId);
+      // Our answer and their live update can arrive in either order, and an older answer may have
+      // replaced a newer list: once ours are all through, show what the server has now.
+      if (entry?.heard) await refetchRow("tasks", cardId);
     },
     [commitCards, oops, refetchRow],
   );
@@ -424,6 +443,76 @@ export function useBoard(initial: BoardData, me: Me) {
       if (entry.queue.length === 1) void sendChecklist(cardId);
     },
     [commitCards, sendChecklist],
+  );
+
+  /**
+   * Save one attachment change on top of the card's attachments as the server has them now. The write
+   * only lands if nobody changed the card since we read it (same updated_at); otherwise it reads the
+   * card again and retries, so a list that missed someone's new file never overwrites it. The saved
+   * list, or null when it couldn't be saved.
+   */
+  const saveAttachment = useCallback(async (cardId: string, change: AttachmentChange) => {
+    const supabase = createClient();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: row, error } = await supabase.from("tasks").select("attachments, updated_at").eq("id", cardId).maybeSingle();
+      if (error || !row) return null;
+      const current = row.attachments as Attachment[];
+      const next = applyAttachments(current, change);
+      if (next === current) return current;
+      const saved = await supabase.from("tasks").update({ attachments: next }).eq("id", cardId).eq("updated_at", row.updated_at).select("attachments");
+      if (saved.error) return null;
+      if (saved.data.length) return saved.data[0].attachments as Attachment[];
+    }
+    return null;
+  }, []);
+
+  /** Send a card's attachment changes one after the other, until none is left. */
+  const sendAttachments = useCallback(
+    async (cardId: string) => {
+      const queue = attachmentQueues.current.get(cardId);
+      let failed = false;
+      while (queue?.length) {
+        const { change, settle } = queue[0];
+        const saved = await saveAttachment(cardId, change);
+        queue.shift();
+        settle(saved);
+        if (!saved) {
+          failed = true;
+          continue;
+        }
+        // The server's list has everyone's changes up to ours; the rest of ours go on top.
+        const next = queue.reduce((list, q) => applyAttachments(list, q.change), saved);
+        commitCards((list) => list.map((c) => (c.id === cardId ? { ...c, attachments: next } : c)));
+      }
+      attachmentQueues.current.delete(cardId);
+      if (failed) {
+        oops();
+        await refetchRow("tasks", cardId);
+      }
+    },
+    [saveAttachment, commitCards, oops, refetchRow],
+  );
+
+  /**
+   * Add or remove one attachment. The card changes at once; the change is saved on its own, after
+   * this card's earlier ones. Resolves with the list the server saved (null: not saved).
+   */
+  const changeAttachments = useCallback(
+    (cardId: string, change: AttachmentChange) => {
+      if (!cardsRef.current.some((c) => c.id === cardId)) return Promise.resolve(null);
+      return new Promise<Attachment[] | null>((settle) => {
+        let queue = attachmentQueues.current.get(cardId);
+        if (!queue) {
+          queue = [];
+          attachmentQueues.current.set(cardId, queue);
+        }
+        queue.push({ change, settle });
+        const now = new Date().toISOString();
+        commitCards((list) => list.map((c) => (c.id === cardId ? { ...c, attachments: applyAttachments(c.attachments, change), updated_at: now } : c)));
+        if (queue.length === 1) void sendAttachments(cardId);
+      });
+    },
+    [commitCards, sendAttachments],
   );
 
   /** Give every card of a column fresh, evenly spaced positions in `order`. */
@@ -676,6 +765,7 @@ export function useBoard(initial: BoardData, me: Me) {
       addCard,
       updateCard,
       changeChecklist,
+      changeAttachments,
       moveCard,
       deleteCard,
       undoDelete,
@@ -701,6 +791,7 @@ export function useBoard(initial: BoardData, me: Me) {
       addCard,
       updateCard,
       changeChecklist,
+      changeAttachments,
       moveCard,
       deleteCard,
       undoDelete,

@@ -69,6 +69,9 @@ function flatten(rows: StepRow[], from: number) {
   return { steps, end: at };
 }
 
+/** The document as plain JSON (ProseMirror's attributes have no prototype: React can't pass them on). */
+const jsonOf = (doc: PMNode) => JSON.parse(JSON.stringify(doc.toJSON())) as JSONContent;
+
 function parse(schema: Schema, steps: unknown[]): Step[] | null {
   try {
     return steps.map((json) => Step.fromJSON(schema, json));
@@ -165,10 +168,10 @@ export async function settleNote(supabase: SupabaseClient, pageId: string, local
     const flat = rows && flatten(rows, from);
     const steps = flat && parse(schema, flat.steps);
     if (!base || !flat || !steps) return null;
-    if (!steps.length) return { content: base.toJSON() as JSONContent, plain: page.plain_text ?? "", version: from, saved: true };
+    if (!steps.length) return { content: jsonOf(base), plain: page.plain_text ?? "", version: from, saved: true };
     const doc = replay(base, steps);
     if (!doc) return null;
-    const settled = { content: doc.toJSON() as JSONContent, plain: plainTextOf(doc), version: flat.end };
+    const settled = { content: jsonOf(doc), plain: plainTextOf(doc), version: flat.end };
     if (!canEdit) return { ...settled, saved: false };
     const { data: ok, error } = await supabase.rpc("save_note_snapshot", {
       p_page: pageId,

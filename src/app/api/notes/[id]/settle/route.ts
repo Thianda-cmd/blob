@@ -5,7 +5,10 @@ import { settleNote, type Owed } from "@/notes/settle";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The steps a closing editor sends along (optional): `{ version, steps, client }`. */
+/**
+ * The steps a closing editor sends along (optional): `{ version, steps, client }`. The editor
+ * (useNoteCollab, BEACON_STEPS) never sends more than 500; past that it keeps them and asks to stay.
+ */
 function owedOf(body: unknown): Owed | null {
   const b = body as Partial<Owed> | null;
   if (!b || typeof b !== "object") return null;

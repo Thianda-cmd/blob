@@ -99,7 +99,7 @@ type Live = {
   markBroken: () => void;
   /** How a page linked from the text is now (gone: deleted, or not shared with you). */
   linkStatus: (id: string) => "ok" | "trash" | "gone";
-  /** The linked pages' titles were just looked up: older links can start remembering them. */
+  /** At your first edit, links from before links remembered titles start remembering them (undefined: not looked up yet). */
   adoptTitles: (state: EditorState) => Transaction | null | undefined;
 };
 
@@ -598,8 +598,9 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     }
     return true;
   }, []);
+  /** Redraw how links look. Only that: it must not count as an edit (no empty line added at the end either). */
   const redrawLinks = useCallback((e: Editor) => {
-    if (!e.isDestroyed) e.view.dispatch(e.state.tr.setMeta(pageLinkStatusKey, true).setMeta("addToHistory", false));
+    if (!e.isDestroyed) e.view.dispatch(e.state.tr.setMeta(pageLinkStatusKey, true).setMeta("addToHistory", false).setMeta("skipTrailingNode", true));
   }, []);
 
   // Links to pages that are gone or in the trash look quiet: find out which, now and when links are added.

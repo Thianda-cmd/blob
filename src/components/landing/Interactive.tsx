@@ -1,5 +1,6 @@
 "use client";
 
+import { GraduationCap, Hash, Search } from "lucide-react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
@@ -22,6 +23,7 @@ const MOODS: Mood[] = [
 /** The big hero Blob: follows the cursor, cycles moods, jiggles when clicked. */
 export function HeroBlob() {
   const t = useMessages(landingText).hero;
+  const people = useMessages(landingText).together.board.people;
   const ref = useRef<BlobHandle>(null);
   const [i, setI] = useState(0);
 
@@ -50,7 +52,24 @@ export function HeroBlob() {
       <FloatCard className="left-0 top-[2%] -rotate-6" delay={0}>
         <div className="text-[11px] text-ink-3">{t.cards.subject}</div>
         <div className="font-display text-[15px] font-semibold">{t.cards.note}</div>
-        <div className="mt-2 h-1.5 w-32 rounded bg-line" />
+        {/* A shared note: two classmates have it open (their colours, as in the app). */}
+        <div className="mt-2 flex items-center gap-2.5">
+          <div className="h-1.5 w-24 rounded bg-line" />
+          <span className="flex">
+            {[
+              { name: people.lena, color: "#c4653e" },
+              { name: people.jonas, color: "#2f6f6a" },
+            ].map((p, i) => (
+              <span
+                key={p.name}
+                className={cn("grid size-[18px] place-items-center rounded-full text-[9px] font-semibold text-white ring-2 ring-raised", i > 0 && "-ml-1")}
+                style={{ background: p.color }}
+              >
+                {p.name.slice(0, 1)}
+              </span>
+            ))}
+          </span>
+        </div>
       </FloatCard>
       <FloatCard className="right-0 top-[7%] rotate-6" delay={0.8}>
         <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{t.cards.exam}</div>
@@ -217,97 +236,138 @@ function TaskLine({ title, due, fresh }: { title: string; due: string; fresh?: b
   );
 }
 
-// Slash menu demo: "/" opens the menu, the highlight moves to Checklist, Enter inserts it, one item gets ticked.
-const NOTE_PHASES = [
-  { menu: 0, ms: 1100 },
-  { menu: 1, ms: 1000 },
-  { menu: -1, checked: false, ms: 1100 },
-  { menu: -1, checked: true, ms: 2600 },
-] as const;
+type GraphNode = { key: keyof (typeof landingText)["en"]["organize"]["demo"]["nodes"]; kind: "page" | "tag" | "topic"; x: number; y: number };
 
-/** A note page where Blob's slash menu turns a line into a checklist. */
-export function NotesDemo() {
-  const t = useMessages(landingText).notes.demo;
+// A small knowledge graph of biology notes, drawn like the one on the notes home: pages are dots in their
+// subject's colour, a tag and a learning topic are rings with their symbol.
+const GRAPH: GraphNode[] = [
+  { key: "photo", kind: "page", x: 156, y: 62 },
+  { key: "chloro", kind: "page", x: 58, y: 30 },
+  { key: "leaf", kind: "page", x: 92, y: 112 },
+  { key: "cell", kind: "page", x: 28, y: 84 },
+  { key: "resp", kind: "page", x: 286, y: 100 },
+  { key: "exam", kind: "tag", x: 262, y: 26 },
+  { key: "topic", kind: "topic", x: 196, y: 122 },
+];
+const EDGES: { a: number; b: number; kind: "link" | "child" | "tag" }[] = [
+  { a: 0, b: 1, kind: "link" },
+  { a: 0, b: 2, kind: "child" },
+  { a: 1, b: 3, kind: "link" },
+  { a: 4, b: 3, kind: "link" },
+  { a: 0, b: 5, kind: "tag" },
+  { a: 4, b: 5, kind: "tag" },
+  { a: 0, b: 6, kind: "tag" },
+];
+/** The node each search query finds. */
+const FINDS = [1, 5];
+
+/** The notes home: a search types itself and the knowledge graph lights up what it finds. */
+export function KnowledgeDemo() {
+  const t = useMessages(landingText).organize.demo;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
   const reduce = useReducedAfterMount();
-  const [phase, setPhase] = useState(0);
-  const p = NOTE_PHASES[reduce ? 1 : phase];
+  const [typed, setTyped] = useState({ q: 0, count: 0 });
+  // The graph spreads out on wider cards (up to a point) while the labels keep their size.
+  const svg = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(320);
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, Math.round(entry.contentRect.width))));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const span = Math.min(width, 520);
+  const X = (x: number) => (width - span) / 2 + (x * span) / 320;
+  const query = t.queries[typed.q];
+  const count = reduce ? query.length : typed.count;
+  const focus = count >= query.length ? FINDS[typed.q] : null;
+  const lit = focus === null ? null : new Set([focus, ...EDGES.flatMap((e) => (e.a === focus ? [e.b] : e.b === focus ? [e.a] : []))]);
 
   useEffect(() => {
     if (!visible || reduce) return;
-    const timer = setTimeout(() => setPhase((n) => (n + 1) % NOTE_PHASES.length), NOTE_PHASES[phase].ms);
+    const done = typed.count >= query.length;
+    const delay = typed.count === 0 ? 700 : done ? 2800 : 110;
+    const timer = setTimeout(() => setTyped((s) => (done ? { q: (s.q + 1) % FINDS.length, count: 0 } : { q: s.q, count: s.count + 1 })), delay);
     return () => clearTimeout(timer);
-  }, [visible, reduce, phase]);
+  }, [visible, reduce, typed.count, query.length]);
+
+  const color = (n: GraphNode) => (n.kind === "tag" ? "var(--blob)" : n.kind === "topic" ? "var(--ok)" : "var(--subject-moss)");
 
   return (
     <div ref={ref} aria-hidden className="h-[224px] w-full rounded-xl border border-line bg-raised p-4 shadow-card">
-      <div className="font-display text-[17px] font-semibold">{t.page}</div>
-      <div className="mt-2 h-1.5 w-[82%] rounded bg-line" />
-      <div className="relative mt-2.5">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {p.menu >= 0 ? (
-            <motion.div
-              key="menu"
-              initial={{ opacity: 0, y: 4, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12 } }}
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            >
-              <div className="flex h-6 items-center text-[13.5px] text-ink-2">
-                /<span className="ml-px h-4 w-px animate-pulse bg-ink" />
-              </div>
-              <div className="relative mt-1 w-[72%] rounded-lg border border-line bg-surface p-1 text-[12.5px] shadow-pop">
-                {t.menu.map((item, i) => (
-                  <div key={item} className={cn("relative rounded-md px-2 py-[3px]", i === p.menu ? "text-ink" : "text-ink-2")}>
-                    {i === p.menu && (
-                      <motion.span
-                        layoutId="landing-slash-hl"
-                        className="absolute inset-0 rounded-md bg-hover"
-                        transition={{ type: "spring", stiffness: 520, damping: 38 }}
-                      />
-                    )}
-                    <span className="relative">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.ul key="list" className="space-y-1.5 pt-0.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.12 } }}>
-              {t.items.map((item, i) => {
-                const on = i === 0 && "checked" in p && p.checked;
-                return (
-                  <motion.li
-                    key={item}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.08 }}
-                    className="flex items-center gap-2 text-[13.5px]"
-                  >
-                    <span className={cn("grid size-4 place-items-center rounded-[5px] border transition-colors", on ? "border-blob bg-blob text-white" : "border-line-2")}>
-                      {on && (
-                        <svg viewBox="0 0 12 12" className="size-2.5">
-                          <motion.path
-                            d="M2.5 6.2 5 8.5 9.5 3.5"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                            strokeLinecap="round"
-                            initial={{ pathLength: 0 }}
-                            animate={{ pathLength: 1 }}
-                            transition={{ duration: 0.25 }}
-                          />
-                        </svg>
-                      )}
-                    </span>
-                    <span className={cn("transition-colors", on ? "text-ink-3 line-through" : "text-ink")}>{item}</span>
-                  </motion.li>
-                );
-              })}
-            </motion.ul>
-          )}
-        </AnimatePresence>
+      <div className="flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-[13.5px]">
+        <Search className="size-4 shrink-0 text-ink-3" />
+        {/* The caret sits before the placeholder, then after what's typed, like in a real field. */}
+        {count > 0 ? (
+          <>
+            <span className="whitespace-pre">{query.slice(0, count)}</span>
+            <span className="-ml-1.5 h-4 w-px shrink-0 animate-pulse bg-ink" />
+          </>
+        ) : (
+          <>
+            <span className="-mr-1.5 h-4 w-px shrink-0 animate-pulse bg-ink" />
+            <span className="truncate text-ink-3">{t.search}</span>
+          </>
+        )}
       </div>
+      <svg ref={svg} viewBox={`0 0 ${width} 150`} className="mt-2 h-[148px] w-full overflow-visible">
+        {EDGES.map((e, i) => {
+          const a = GRAPH[e.a];
+          const b = GRAPH[e.b];
+          const on = lit !== null && (e.a === focus || e.b === focus);
+          return (
+            <line
+              key={i}
+              x1={X(a.x)}
+              y1={a.y}
+              x2={X(b.x)}
+              y2={b.y}
+              stroke={on ? (e.kind === "link" ? "var(--blob)" : "var(--ink-3)") : "var(--line-2)"}
+              strokeWidth={e.kind === "link" ? 1.6 : 1.2}
+              strokeDasharray={e.kind === "child" ? "5 4" : e.kind === "tag" ? "1.5 4" : undefined}
+              strokeLinecap="round"
+              opacity={lit && !on ? 0.25 : 1}
+              className="transition-[opacity,stroke] duration-300"
+            />
+          );
+        })}
+        {GRAPH.map((n, i) => {
+          const c = color(n);
+          const r = i === 0 ? 7 : n.kind === "page" ? 5.5 : 7;
+          return (
+            <g key={n.key} transform={`translate(${X(n.x)} ${n.y})`} opacity={lit && !lit.has(i) ? 0.22 : 1} className="transition-opacity duration-300">
+              {n.kind === "page" ? (
+                <circle r={r} fill={c} stroke="var(--raised)" strokeWidth={1.5} />
+              ) : (
+                <>
+                  <circle r={r + 2} fill="var(--raised)" stroke={c} strokeWidth={1.8} />
+                  {n.kind === "tag" ? (
+                    <Hash x={-r * 0.75} y={-r * 0.75} width={r * 1.5} height={r * 1.5} color={c} strokeWidth={2.4} />
+                  ) : (
+                    <GraduationCap x={-r * 0.75} y={-r * 0.75} width={r * 1.5} height={r * 1.5} color={c} strokeWidth={2.4} />
+                  )}
+                </>
+              )}
+              {focus === i && <circle r={r + 5} fill="none" stroke={c} strokeWidth={1.5} opacity={0.5} />}
+              <text
+                y={r + 14}
+                textAnchor="middle"
+                fontSize={11}
+                fill={n.kind === "page" ? "var(--ink-2)" : c}
+                fontWeight={focus === i || n.kind !== "page" ? 600 : 450}
+                paintOrder="stroke"
+                stroke="var(--raised)"
+                strokeWidth={3.5}
+                strokeLinejoin="round"
+              >
+                {n.kind === "tag" ? `#${t.nodes[n.key]}` : t.nodes[n.key]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }

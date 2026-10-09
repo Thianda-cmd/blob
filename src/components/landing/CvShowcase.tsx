@@ -51,7 +51,7 @@ export function CvShowcase() {
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setFocused(true)}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setFocused(false)}
-        className="relative overflow-hidden rounded-3xl border border-line bg-paper p-5 shadow-card sm:p-8 lg:col-span-7"
+        className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8 lg:col-span-7"
       >
         <div className="bg-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_50%_45%,#000_20%,transparent_75%)]" />
         <div className="relative" role="img" aria-label={t.label(n)}>

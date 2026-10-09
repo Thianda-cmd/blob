@@ -69,25 +69,36 @@ export async function removeFiles(paths: string[]) {
   return removed;
 }
 
+export type UnusedOptions = { minAge?: string; whole?: boolean };
+
 /**
- * Remove the files of a note or project that nothing refers to any more (rpc unused_files,
- * migration 0012): no note and no card, uploaded at least `minAge` ago (a Postgres interval; the
- * server's default is a day, so a block that is still being added, or removed and maybe coming back
- * with undo, keeps its file). `whole`: the note or project is about to be deleted, so its own
- * references don't count. `only`: just these paths, when they are unused. Only people who can edit
- * get any files back. Returns how many went, or null when the server couldn't say.
+ * The files of a note or project that nothing refers to right now (rpc unused_files, migration 0012):
+ * no note and no card, uploaded at least `minAge` ago (a Postgres interval; the server's default is a
+ * day). The age is the upload's, not how long the file has been unused, so a file whose block was
+ * removed a minute ago is listed too. `whole`: the note or project is about to be deleted, so its
+ * own references don't count. Only people who can edit get any back; null when the server couldn't say.
  */
-export async function removeUnusedFiles(kind: "page" | "project", id: string, opts: { minAge?: string; whole?: boolean; only?: string[] } = {}) {
-  if (opts.only && !opts.only.length) return 0;
+export async function unusedFiles(kind: "page" | "project", id: string, opts: UnusedOptions = {}) {
   const { data, error } = await createClient().rpc("unused_files", {
     p_kind: kind,
     p_id: id,
     ...(opts.minAge !== undefined && { p_min_age: opts.minAge }),
     ...(opts.whole && { p_whole: true }),
   });
-  if (error) return null;
-  const only = opts.only && new Set(opts.only);
-  const paths = ((data ?? []) as string[]).filter((p) => !only || only.has(p));
+  return error ? null : ((data ?? []) as string[]);
+}
+
+/**
+ * Remove `only` these files of a note or project, those of them nothing refers to any more (see
+ * unusedFiles). For a file whose last reference was just removed on purpose: an attachment taken
+ * off a card, a deleted card whose undo is over. How many went, or null when the server couldn't say.
+ */
+export async function removeUnusedFiles(kind: "page" | "project", id: string, opts: UnusedOptions & { only: string[] }) {
+  if (!opts.only.length) return 0;
+  const unused = await unusedFiles(kind, id, opts);
+  if (!unused) return null;
+  const only = new Set(opts.only);
+  const paths = unused.filter((p) => only.has(p));
   return paths.length ? removeFiles(paths) : 0;
 }
 

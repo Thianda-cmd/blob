@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { deletePagesForever } from "@/components/files/deleteForever";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -16,7 +17,6 @@ import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { dateLocale } from "@/i18n/format";
 import { trashText } from "@/i18n/messages/trash";
-import { removeUnusedFiles } from "@/lib/files";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import { PAGE_META_COLUMNS, type PageMeta } from "@/lib/types";
@@ -80,12 +80,6 @@ function deletedAgo(iso: string, locale: Locale) {
   return t.deleted(formatDistanceToNowStrict(date, { addSuffix: true, locale: dateLocale(locale) }));
 }
 
-function chunks<T>(list: T[], size = 100) {
-  const out: T[][] = [];
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-  return out;
-}
-
 type Confirm = { kind: "one"; item: Item } | { kind: "all" } | null;
 
 export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
@@ -110,54 +104,17 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     blob.react("shake", "worried");
   }
 
-  /**
-   * Never let a cascade take your live pages with it: move them to the top level first. (Other
-   * people's pages in a shared page move up on their own when it is deleted: migration 0011.)
-   */
-  async function detachLiveChildren(ids: string[]) {
-    const supabase = createClient();
-    for (const part of chunks(ids)) {
-      const { data, error } = await supabase
-        .from("pages")
-        .update({ parent_id: null })
-        .in("parent_id", part)
-        .eq("user_id", userId)
-        .is("trashed_at", null)
-        .select(PAGE_META_COLUMNS);
-      if (error) return false;
-      if (data?.length) upsertPages(data as PageMeta[]);
-    }
-    return true;
-  }
-
-  /**
-   * Remove the files of the pages about to be deleted: `ids` and your pages inside them, which the
-   * database deletes with them (other people's pages move up instead). It has to happen first, as
-   * storage lets nobody remove a page's files once the page is gone. A file another note still
-   * refers to stays; whatever is left over goes in the nightly clean-up (api/cron/files).
-   */
-  async function removeFilesOf(ids: string[]) {
-    const supabase = createClient();
-    const all = new Set(ids);
-    let level = ids;
-    while (level.length) {
-      const next: string[] = [];
-      for (const part of chunks(level)) {
-        const { data } = await supabase.from("pages").select("id").in("parent_id", part).eq("user_id", userId);
-        for (const { id } of (data ?? []) as { id: string }[]) {
-          if (all.has(id)) continue;
-          all.add(id);
-          next.push(id);
-        }
-      }
-      level = next;
-    }
-    // A few at a time: emptying a big trash shouldn't flood the server.
-    const queue = [...all];
-    const worker = async () => {
-      for (let id = queue.shift(); id; id = queue.shift()) await removeUnusedFiles("page", id, { minAge: "0 seconds", whole: true });
-    };
-    await Promise.all(Array.from({ length: 4 }, worker));
+  /** Show the trash as the server has it. True when none of `ids` is left in it. */
+  async function reload(ids: string[]) {
+    const { data } = await createClient()
+      .from("pages")
+      .select(PAGE_META_COLUMNS)
+      .eq("user_id", userId)
+      .not("trashed_at", "is", null)
+      .order("trashed_at", { ascending: false });
+    if (!data) return false;
+    setTrash(data as PageMeta[]);
+    return !data.some((p) => ids.includes(p.id));
   }
 
   /** Put rows back into the list after a failed request, keeping newest first. */
@@ -201,13 +158,15 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setExit("delete");
     setTrash((t) => t.filter((p) => !ids.includes(p.id)));
 
-    let ok = await detachLiveChildren(ids);
-    if (ok) await removeFilesOf(ids);
-    ok = ok && !(await createClient().from("pages").delete().in("id", ids)).error;
-    if (!ok) {
+    // On the server: it deletes only what is still in the trash, then the files of what is gone.
+    const done = await deletePagesForever(ids).catch(() => null);
+    if (!done) {
       putBack(original);
-      oops(t.deleteFailed);
+      return oops(t.deleteFailed);
     }
+    if (done.detached.length) upsertPages(done.detached);
+    // Not all gone: restored meanwhile somewhere else (fine), or still in the trash (failed).
+    if (done.gone.length < ids.length && !(await reload(ids))) oops(t.deleteFailed);
   }
 
   async function emptyTrash() {
@@ -217,21 +176,10 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setTrash([]);
     blob.say(t.allClean, { mood: "happy" });
 
-    const supabase = createClient();
-    let ok = await detachLiveChildren(ids);
-    if (ok) await removeFilesOf(ids);
-    for (const part of ok ? chunks(ids) : []) {
-      if ((await supabase.from("pages").delete().in("id", part)).error) {
-        ok = false;
-        break;
-      }
-    }
-    if (!ok) {
-      // Show whatever is really left.
-      const { data } = await supabase.from("pages").select(PAGE_META_COLUMNS).eq("user_id", userId).not("trashed_at", "is", null).order("trashed_at", { ascending: false });
-      if (data) setTrash(data as PageMeta[]);
-      oops(t.someLeft);
-    }
+    const done = await deletePagesForever(ids).catch(() => null);
+    if (done?.detached.length) upsertPages(done.detached);
+    // Show whatever is really left (a page restored meanwhile somewhere else isn't).
+    if ((!done || done.gone.length < ids.length) && !(await reload(ids))) oops(t.someLeft);
   }
 
   const pending = confirm?.kind === "one" ? confirm.item : null;

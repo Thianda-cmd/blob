@@ -50,7 +50,7 @@ import type { Attachment, ChecklistItem, PageMeta, Task } from "@/lib/types";
 import { cn, pageTitle, uid } from "@/lib/utils";
 import { DueChip } from "./CardFace";
 import { restrictToVerticalAxis } from "./dndModifiers";
-import { checklistProgress, projectLabels, type ChecklistChange } from "./model";
+import { MAX_ATTACHMENTS, checklistProgress, projectLabels, type AttachmentChange, type ChecklistChange } from "./model";
 import { AssigneeMenu, ColumnDot, ColumnMenu, LabelChip, LabelMenu, PriorityIcon, PriorityMenu, parseLabels } from "./pickers";
 import { RichText, toggleTodo } from "./RichText";
 import type { Board } from "./useBoard";
@@ -386,7 +386,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
 
         <Checklist card={card} readOnly={readOnly} onChange={(change) => board.changeChecklist(card.id, change)} />
 
-        <Attachments ref={uploader} card={card} projectId={board.project.id} readOnly={readOnly} onChange={(attachments) => board.updateCard(card.id, { attachments })} />
+        <Attachments ref={uploader} card={card} projectId={board.project.id} readOnly={readOnly} onChange={(change) => board.changeAttachments(card.id, change)} />
 
         <footer className="mt-8 space-y-0.5 border-t border-line pt-3 text-[11.5px] text-ink-3" suppressHydrationWarning>
           <p>{d.created(creator ? personName(creator, d.someone) : d.someone, format(new Date(card.created_at), "PPp", { locale: dateLocale(locale) }))}</p>
@@ -807,8 +807,8 @@ function Attachments({
   card: Task;
   projectId: string;
   readOnly: boolean;
-  /** Saves the new list; true once it is saved. */
-  onChange: (list: Attachment[]) => Promise<boolean>;
+  /** Saves one change; the list the server saved, or null when it wasn't saved. */
+  onChange: (change: AttachmentChange) => Promise<Attachment[] | null>;
   ref: React.Ref<{ upload: (files: FileList | File[]) => void }>;
 }) {
   const t = useMessages(projectsText).drawer;
@@ -822,7 +822,7 @@ function Attachments({
 
   async function upload(files: FileList | File[]) {
     for (const file of Array.from(files)) {
-      if (listRef.current.length >= 30) break;
+      if (listRef.current.length >= MAX_ATTACHMENTS) break;
       if (file.size > MAX_FILE_BYTES) {
         blob.say(t.fileTooBig, { mood: "worried" });
         continue;
@@ -836,9 +836,12 @@ function Attachments({
         blob.react("shake", "worried");
         continue;
       }
-      const next = [...listRef.current, { id: uid(), type: "file" as const, ...stored }];
-      listRef.current = next;
-      void onChange(next);
+      const item = { id: uid(), type: "file" as const, ...stored };
+      listRef.current = [...listRef.current, item];
+      void onChange({ op: "add", item }).then((saved) => {
+        // It didn't make it onto the card (not saved, or the card is full or gone): nothing refers to the upload.
+        if (!saved?.some((a) => a.id === item.id)) void removeUnusedFiles("project", projectId, { minAge: "0 seconds", only: [item.path] });
+      });
     }
   }
 
@@ -846,8 +849,8 @@ function Attachments({
   useImperativeHandle(ref, () => ({ upload }));
 
   async function remove(a: Attachment) {
-    const saved = await onChange(list.filter((x) => x.id !== a.id));
-    // The file goes once the card no longer lists it, and only if no other card or note refers to it.
+    const saved = await onChange({ op: "remove", id: a.id });
+    // The file goes once the card as saved no longer lists it, and only if no other card or note refers to it.
     if (saved && a.type === "file") void removeUnusedFiles("project", projectId, { minAge: "0 seconds", only: [a.path] });
   }
 
@@ -873,7 +876,7 @@ function Attachments({
           ))}
         </ul>
       )}
-      {!readOnly && list.length < 30 && (
+      {!readOnly && list.length < MAX_ATTACHMENTS && (
         <div className={cn("flex flex-wrap gap-1.5", (list.length > 0 || uploading.length > 0) && "mt-2")}>
           <input
             ref={input}
@@ -890,9 +893,9 @@ function Attachments({
           </AddButton>
           <PagePicker
             exclude={new Set(list.flatMap((a) => (a.type === "page" ? [a.page_id] : [])))}
-            onPick={(page) => onChange([...list, { id: uid(), type: "page", page_id: page.id, title: page.title, kind: page.kind }])}
+            onPick={(page) => void onChange({ op: "add", item: { id: uid(), type: "page", page_id: page.id, title: page.title, kind: page.kind } })}
           />
-          <LinkForm onAdd={(url, title) => onChange([...list, { id: uid(), type: "link", url, title }])} />
+          <LinkForm onAdd={(url, title) => void onChange({ op: "add", item: { id: uid(), type: "link", url, title } })} />
         </div>
       )}
     </Section>

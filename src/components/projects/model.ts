@@ -1,4 +1,4 @@
-import type { ChecklistItem, ProjectColumn, Task } from "@/lib/types";
+import type { Attachment, ChecklistItem, ProjectColumn, Task } from "@/lib/types";
 
 // Pure helpers for project boards: colours, icons, fractional positions, priorities, labels and the
 // starter templates. No React, no Supabase: used by the board, the /projects list, Home and the server.
@@ -159,6 +159,20 @@ export function applyChecklist(list: ChecklistItem[], change: ChecklistChange): 
   if (change.op === "remove") return rest;
   const at = checklistMoveIndex(list, change);
   return [...rest.slice(0, at), item, ...rest.slice(at)];
+}
+
+/**
+ * One change to a card's attachments, saved on its own on top of the list as the server has it then
+ * (useBoard), so a file someone else just attached isn't dropped by a list that hadn't seen it yet.
+ */
+export type AttachmentChange = { op: "add"; item: Attachment } | { op: "remove"; id: string };
+
+export const MAX_ATTACHMENTS = 30;
+
+/** The attachments after a change (adding twice, or removing what is gone, changes nothing). */
+export function applyAttachments(list: Attachment[], change: AttachmentChange): Attachment[] {
+  if (change.op === "add") return list.length >= MAX_ATTACHMENTS || list.some((a) => a.id === change.item.id) ? list : [...list, change.item];
+  return list.some((a) => a.id === change.id) ? list.filter((a) => a.id !== change.id) : list;
 }
 
 /** Done cards and all cards of a project (cards in a "done" column count as done). */
