@@ -19,7 +19,8 @@ export default async function UnitGuidePage({ params }: PageProps<"/learn/french
   const unit = unitBySlug(slug);
   if (!unit) notFound();
   const { lessons } = await loadFrench();
-  const state = courseState(lessons).units.find((s) => s.unit.slug === slug)!;
+  const state = courseState(lessons).units.find((s) => s.unit.slug === slug);
+  if (!state) notFound();
   // Start where the student is in this unit; a finished unit starts again at lesson 1, a locked one not at all.
   const at = state.lessons.findIndex((l) => l === "current" || l === "open");
   const startHref = !state.unlocked ? null : `/study/french/${slug}/${at >= 0 ? at + 1 : 1}`;

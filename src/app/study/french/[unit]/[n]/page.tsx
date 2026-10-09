@@ -26,7 +26,8 @@ export default async function FrenchLessonPage({ params }: PageProps<"/study/fre
   const found = parse(slug, n);
   if (!found) notFound();
   const { lessons, days } = await loadFrench();
-  const state = courseState(lessons).units.find((s) => s.unit.slug === slug)!;
+  const state = courseState(lessons).units.find((s) => s.unit.slug === slug);
+  if (!state) notFound();
   const at = state.lessons[found.lesson - 1];
   // Locked lessons are not skipped into: back to the path, where the next one waits.
   if (at === "locked") redirect("/learn/french");

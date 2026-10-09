@@ -1,11 +1,23 @@
 import { tx, type Text } from "@/i18n/text";
 import type { TopicProgress } from "@/learn/progress";
-import { norm } from "./text";
+import { learnCase, norm } from "./text";
 import type { Unit, Word } from "./types";
 import { u01 } from "./units/u01-bonjour";
+import { u02 } from "./units/u02-qui-es-tu";
+import { u03 } from "./units/u03-manger";
+import { u04 } from "./units/u04-famille";
+import { u05 } from "./units/u05-nombres";
+import { u06 } from "./units/u06-ecole";
+import { u07 } from "./units/u07-ville";
+import { u08 } from "./units/u08-loisirs";
+import { u09 } from "./units/u09-vetements";
+import { u10 } from "./units/u10-cafe";
 
 /** Every unit in order. */
-export const UNITS: Unit[] = [u01];
+export const UNITS: Unit[] = [u01, u02, u03, u04, u05, u06, u07, u08, u09, u10];
+
+// Tiles keep names capitalised and German small words small, as the course writes them.
+learnCase(UNITS.flatMap((u) => [...u.sentences, ...(u.dialogue?.lines ?? []), ...u.drills.map((d) => ({ ...d, fr: d.fr.replace("___", d.options[d.answer]) }))]));
 
 export type Section = { n: number; cefr: string; title: Text; goal: Text; units: Unit[]; soon?: boolean };
 
@@ -16,14 +28,14 @@ export const SECTIONS: Section[] = [
     cefr: "A1",
     title: tx("First steps", "Erste Schritte"),
     goal: tx("Introduce yourself, order food, talk about family, school and free time", "Dich vorstellen, Essen bestellen, über Familie, Schule und Freizeit sprechen"),
-    units: UNITS.filter((u) => u.cefr === "A1"),
+    units: UNITS.filter((u) => u.cefr === "A1" && u.lessons.length > 0),
   },
   {
     n: 2,
     cefr: "A2",
     title: tx("Everyday life", "Alltag"),
     goal: tx("Your day, the past, plans, trips and shopping", "Dein Tag, die Vergangenheit, Pläne, Reisen und Einkaufen"),
-    units: UNITS.filter((u) => u.cefr === "A2"),
+    units: UNITS.filter((u) => u.cefr === "A2" && u.lessons.length > 0),
     soon: true,
   },
 ];
@@ -73,7 +85,8 @@ export type UnitState = {
 export function courseState(progress: Record<string, Pick<TopicProgress, "lesson_done">>): { units: UnitState[]; next: { unit: Unit; lesson: number } | null } {
   let next: { unit: Unit; lesson: number } | null = null;
   let open = true;
-  const units = UNITS.map((unit) => {
+  // A unit still being written (no lessons yet) isn't on the path.
+  const units = UNITS.filter((u) => u.lessons.length > 0).map((unit) => {
     const doneFlags = unit.lessons.map((_, i) => !!progress[lessonKey(unit, i + 1)]?.lesson_done);
     const unlocked = open;
     const lessons: LessonState[] = doneFlags.map((d, i) => {
