@@ -1,5 +1,5 @@
-import { ALL_WORDS, UNITS } from "./course";
-import { fold } from "./text";
+import { UNITS } from "./course";
+import { fold, norm } from "./text";
 
 // The dictionary behind "tap a word to see what it means": the course's words, every unit's
 // extra forms (gloss), and the small words every sentence needs.
@@ -90,27 +90,39 @@ const BASE: Record<string, Gloss> = {
   monsieur: { en: "Mr / sir", de: "Herr" },
 };
 
-let dict: Map<string, Gloss> | null = null;
+type Dictionary = { exact: Map<string, Gloss>; folded: Map<string, Gloss> };
+const dicts = new Map<number, Dictionary>();
 
-/** Every known French form, folded (no accents, no apostrophes) → its meaning. */
-function dictionary(): Map<string, Gloss> {
-  if (dict) return dict;
-  dict = new Map();
+/**
+ * Every known French form → its meaning, from the units before `upTo` (all by default). Looked up
+ * with its accents first ("où" is where, "ou" is or; "a" has, "à" to), then without.
+ */
+function dictionary(upTo = UNITS.length): Dictionary {
+  const cached = dicts.get(upTo);
+  if (cached) return cached;
+  const d: Dictionary = { exact: new Map(), folded: new Map() };
   const add = (fr: string, g: Gloss) => {
+    const e = norm(fr);
+    if (e && !d.exact.has(e)) d.exact.set(e, g);
     const k = fold(fr, "fr");
-    if (k && !dict!.has(k)) dict!.set(k, g);
+    if (k && !d.folded.has(k)) d.folded.set(k, g);
   };
+  const units = UNITS.slice(0, upTo);
   // The little words first: "un" is "a" in every sentence, even once the number one is taught.
   for (const [fr, g] of Object.entries(BASE)) add(fr, g);
-  for (const w of ALL_WORDS) {
+  for (const w of units.flatMap((u) => u.words)) {
     const g = { en: w.en, de: w.de };
     add(w.fr, g);
     const bareForm = w.fr.replace(/^(le|la|les|un|une)\s+/i, "").replace(/^l['’]/i, "").replace(/\s*\?$/, "");
-    add(bareForm, g);
+    // "chien" alone (as in "un chien") means dog, not "the dog".
+    if (bareForm !== w.fr) add(bareForm, { en: w.en.replace(/^(the|a|an)\s+/i, ""), de: w.de.replace(/^(der|die|das|den|ein|eine)\s+/i, "") });
   }
-  for (const u of UNITS) for (const g of u.gloss ?? []) add(g.fr, { en: g.en, de: g.de });
-  return dict;
+  for (const u of units) for (const g of u.gloss ?? []) add(g.fr, { en: g.en, de: g.de });
+  dicts.set(upTo, d);
+  return d;
 }
+
+const lookup = (d: Dictionary, text: string) => d.exact.get(norm(text)) ?? d.folded.get(fold(text, "fr")) ?? null;
 
 export type GlossSegment = { text: string; gloss: Gloss | null };
 
@@ -118,15 +130,15 @@ export type GlossSegment = { text: string; gloss: Gloss | null };
  * A French sentence cut into tappable pieces: the longest known phrase at each place (up to four
  * words, so "au revoir" and "il y a" stay together), the rest word by word.
  */
-export function glossSegments(sentence: string): GlossSegment[] {
-  const d = dictionary();
+export function glossSegments(sentence: string, upTo?: number): GlossSegment[] {
+  const d = dictionary(upTo);
   const tokens = sentence.split(/\s+/).filter(Boolean);
   const out: GlossSegment[] = [];
   for (let i = 0; i < tokens.length; ) {
     let found: GlossSegment | null = null;
     for (let len = Math.min(4, tokens.length - i); len >= 1 && !found; len--) {
       const text = tokens.slice(i, i + len).join(" ");
-      const g = d.get(fold(text, "fr"));
+      const g = lookup(d, text);
       if (g) {
         found = { text, gloss: g };
         i += len;
@@ -136,7 +148,7 @@ export function glossSegments(sentence: string): GlossSegment[] {
       // "m'appelle" unknown as a whole: try without the elided part ("appelle").
       const tok = tokens[i];
       const m = /^([a-zà-ÿ]{1,3}['’])(.+)$/i.exec(tok.replace(/[.,!?;:»«]/g, ""));
-      const g = m ? (d.get(fold(m[2], "fr")) ?? null) : null;
+      const g = m ? lookup(d, m[2]) : null;
       found = { text: tok, gloss: g };
       i += 1;
     }

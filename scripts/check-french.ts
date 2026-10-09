@@ -13,7 +13,8 @@
 //     translation without accepting each other (the student would be marked wrong for a right answer)
 //   - drills: exactly one "___", a valid answer, distinct options, Blob's bilingual why
 //   - dialogue and tips: speakers, questions with a valid answer, examples, table widths
-//   - tap-to-translate: every French word of sentences, drills and dialogues has a gloss (warning)
+//   - tap-to-translate: every French word of sentences, drills and dialogues has a gloss from this unit
+//     or an earlier one (a word only a later unit teaches isn't known yet) (warning)
 //   - names: a capitalised word only ever at the start of sentences (its tile would start small)
 //   - lessons and practice are generated for many seeds, both languages, with and without listening
 //     and speaking, without throwing, with enough steps, and each step's right answer is possible
@@ -195,8 +196,9 @@ function checkUnit(u: Unit, index: number) {
   const missing = new Set<string>();
   const french = [...u.sentences.map((s) => s.fr), ...u.drills.map((d) => d.fr.replace("___", d.options[d.answer])), ...(u.dialogue?.lines.map((l) => l.fr) ?? [])];
   for (const text of french)
-    for (const seg of glossSegments(text)) {
-      const word = seg.text.replace(/^[«"(—–-]+|[.,!?;:»")]+$/g, "");
+    // Only what this unit and the ones before teach: a word from a later unit isn't known yet.
+    for (const seg of glossSegments(text, index + 1)) {
+      const word = seg.text.replace(/^[«"(—–-]+|[.,!?;:»")…]+$/g, "");
       if (!seg.gloss && word && /[a-zà-ÿ]/i.test(word) && !isProper(word) && !/^\d/.test(word)) missing.add(word);
     }
   const names = [...missing].filter((w) => /^[A-ZÀ-Ý]/.test(w));
