@@ -47,11 +47,14 @@ export async function uploadFile(target: { type: "page" | "project"; id: string 
   return { path, name: shown, size: file.size, mime: file.type || "application/octet-stream" };
 }
 
-/** A link to open or download a file, valid for an hour. `download` asks the browser to save it. */
+/**
+ * A link to open or download a file, valid for an hour. `download` asks the browser to save it
+ * (true: under the stored name; a string: under that name, written in plain letters).
+ */
 export async function fileUrl(path: string, opts: { download?: string | boolean } = {}): Promise<string | null> {
   const { data, error } = await createClient()
     .storage.from(FILE_BUCKET)
-    .createSignedUrl(path, 3600, opts.download ? { download: opts.download === true ? true : opts.download } : undefined);
+    .createSignedUrl(path, 3600, opts.download ? { download: opts.download === true ? true : safeName(opts.download) } : undefined);
   return error ? null : data.signedUrl;
 }
 

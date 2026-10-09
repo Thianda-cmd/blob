@@ -118,7 +118,7 @@ export function Popover({
                 transition={{ type: "spring", stiffness: 600, damping: 32 }}
                 style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, transformOrigin: align === "start" ? "top left" : "top right" }}
                 className={cn(
-                  "fixed z-[60] min-w-[200px] rounded-xl border border-line bg-raised p-1 text-[13px] shadow-pop",
+                  "fixed z-[80] min-w-[200px] rounded-xl border border-line bg-raised p-1 text-[13px] shadow-pop",
                   className,
                 )}
                 role={role}
@@ -157,12 +157,12 @@ export function MenuItem({
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0",
-        danger && "text-danger hover:bg-danger/10 hover:text-danger",
+        "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0",
+        danger ? "text-danger hover:bg-danger/10" : "text-ink-2 hover:bg-hover hover:text-ink",
         active && "bg-hover text-ink",
       )}
     >
-      {icon && <span className={cn("text-ink-3", danger && "text-danger")}>{icon}</span>}
+      {icon && <span className={danger ? "text-danger" : "text-ink-3"}>{icon}</span>}
       <span className="flex-1 truncate" title={typeof children === "string" ? children : undefined}>
         {children}
       </span>
