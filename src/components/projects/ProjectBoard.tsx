@@ -301,7 +301,7 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
               </span>
             )}
             {subject && (
-              <Link href={`/subjects/${subject.id}`} className="flex items-center gap-1.5 rounded-md px-1 hover:bg-hover hover:text-ink">
+              <Link href={`/subjects/${subject.id}`} className="flex items-center gap-1.5 rounded-md px-1 hover:bg-hover hover:text-ink pointer-coarse:py-1.5">
                 {subject.emoji ? <span className="text-[12px]">{subject.emoji}</span> : <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />}
                 {subject.name}
               </Link>

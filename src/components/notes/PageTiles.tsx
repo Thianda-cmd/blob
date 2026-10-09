@@ -51,7 +51,7 @@ function Tags({ tags, onTag, max = 3 }: { tags: string[]; onTag: (tag: string) =
             e.stopPropagation();
             onTag(tag);
           }}
-          className="max-w-[140px] truncate rounded-full bg-hover px-1.5 py-px text-[11px] font-medium text-ink-2 transition-colors hover:bg-blob-soft hover:text-blob-ink"
+          className="max-w-[140px] truncate rounded-full bg-hover px-1.5 py-px text-[11px] font-medium text-ink-2 transition-colors hover:bg-blob-soft hover:text-blob-ink pointer-coarse:px-2 pointer-coarse:py-1.5"
         >
           #{tag}
         </button>

@@ -2369,6 +2369,12 @@
   .prose-blob .blob-btn-primary {
     height: 36px;
   }
+  .prose-blob .blob-lesson-level {
+    height: 32px;
+  }
+  .prose-blob .blob-lesson-title {
+    padding-block: 0.3rem;
+  }
 }
 
 /* Links to other pages in the text ("[[") ------------------------------------ */

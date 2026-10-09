@@ -421,7 +421,7 @@ export function makeCards(doc: unknown, title = ""): Card[] {
       const term = plain(cell0);
       if (!term || term.length > 80) continue;
       // A number in the first column ("0–6") reads better with its column's name: "pH-Wert 0–6".
-      const front: Line = firstHead && /^[\d\s–\-.,<>≤≥%]+$/.test(term) ? [{ text: `${firstHead} ` }, ...cell0] : cell0;
+      const front: Line = firstHead && /^[\d\s–−+\-.,<>≤≥%]+$/.test(term) ? [{ text: `${firstHead} ` }, ...cell0] : cell0;
       if (!head) {
         const rest = row.slice(1).filter((c) => c.length);
         if (!rest.length) continue;

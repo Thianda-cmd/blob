@@ -503,7 +503,11 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
         e.preventDefault();
         onChange(!on);
       }}
-      className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", on ? "bg-blob" : "bg-line-2")}
+      className={cn(
+        // The switch is small to look at; a finger gets a 40 px tall area around it.
+        "relative h-5 w-9 shrink-0 rounded-full transition-colors before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']",
+        on ? "bg-blob" : "bg-line-2",
+      )}
     >
       <motion.span className="absolute top-0.5 size-4 rounded-full bg-white shadow-card" animate={{ left: on ? 18 : 2 }} transition={{ type: "spring", stiffness: 600, damping: 34 }} />
     </button>
