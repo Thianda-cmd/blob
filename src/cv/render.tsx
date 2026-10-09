@@ -138,7 +138,8 @@ export function LevelBar({ level, on = "var(--cv-accent)", off = "var(--cv-line)
 export function SignatureMark({ signature, height = 13, color = "#1f2a44" }: { signature: CvSignature; height?: number; color?: string }) {
   return (
     <svg viewBox={`0 0 ${signature.w} ${signature.h}`} style={{ height: `${height}mm`, width: "auto", display: "block", overflow: "visible" }} aria-hidden>
-      <path d={signature.d} fill="none" stroke={color} strokeWidth={signature.w / 160} strokeLinecap="round" strokeLinejoin="round" />
+      {/* Never thinner than 1/48 of the height: a short, tall signature printed with a hairline otherwise. */}
+      <path d={signature.d} fill="none" stroke={color} strokeWidth={Math.max(signature.w / 160, signature.h / 48)} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -175,7 +176,10 @@ export function Closing({ cv, align = "left", children }: { cv: Cv; align?: "lef
   return (
     <div style={{ paddingTop: "1.6em", display: "flex", justifyContent: align === "right" ? "flex-end" : "flex-start" }}>
       <div style={{ minWidth: "58mm" }}>
-        <div style={{ color: "var(--cv-ink-2)" }}>{[place, date].filter(Boolean).join(", ") || l.placeDate}</div>
+        {/* Today's date can differ between the server and the browser (time zones, midnight). */}
+        <div style={{ color: "var(--cv-ink-2)" }} suppressHydrationWarning>
+          {[place, date].filter(Boolean).join(", ") || l.placeDate}
+        </div>
         <div style={{ height: "15mm", display: "flex", alignItems: "flex-end", paddingTop: "1mm" }}>
           {cv.closing.signature && <SignatureMark signature={cv.closing.signature} />}
         </div>

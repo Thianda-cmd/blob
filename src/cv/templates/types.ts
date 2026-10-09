@@ -11,7 +11,8 @@ import type { Cv, CvTemplateId } from "../types";
  * - Sizes in em (relative to the page's font size, which follows the "text size" setting) or mm.
  * - Colours from the page variables (--cv-ink, --cv-ink-2, --cv-ink-3, --cv-line, --cv-accent,
  *   --cv-accent-soft, --cv-on-accent, --cv-paper), never the app's theme colours: a CV is always
- *   printed on white paper, also when the app is in dark mode.
+ *   printed on white paper, also when the app is in dark mode. --cv-accent-ink is the accent made
+ *   dark enough for text and small marks on white (light accents like yellow need it).
  * - Fonts: var(--cv-heading) and var(--cv-body); --cv-heading-weight for headings.
  * - Images (the photo) need a fixed size, so they don't change a block's height once loaded.
  */

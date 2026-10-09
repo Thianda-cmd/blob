@@ -10,6 +10,8 @@ export type CvTemplateMeta = {
   fonts: CvFontPair;
   /** Whether the design shows a photo (the photo can still be left out). */
   photo: boolean;
+  /** false: the design shows only a real photo, never the initials in its place. */
+  initials?: boolean;
   /** One column, or a side column for contact, skills and languages. */
   columns: 1 | 2;
 };
@@ -39,13 +41,14 @@ export const CV_TEMPLATES: CvTemplateMeta[] = [
     blurb: tx("Lots of white space and one thin accent line.", "Viel Weißraum und eine feine Akzentlinie."),
     accent: "#3a3a3a",
     fonts: "friendly",
-    photo: false,
+    photo: true,
+    initials: false,
     columns: 1,
   },
   {
     id: "creative",
     name: tx("Creative", "Kreativ"),
-    blurb: tx("A bold colour band with your name and a round photo.", "Ein kräftiges Farbband mit Name und rundem Foto."),
+    blurb: tx("A bold colour band with a big name and your photo.", "Ein kräftiges Farbband mit großem Namen und Foto."),
     accent: "#6d3df5",
     fonts: "modern",
     photo: true,

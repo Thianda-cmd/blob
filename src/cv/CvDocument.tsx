@@ -28,14 +28,38 @@ function tint(hex: string, amount: number) {
   return `rgb(${mix((n >> 16) & 255)} ${mix((n >> 8) & 255)} ${mix(n & 255)})`;
 }
 
-/** Black or white, whichever reads better on the accent. */
-function onAccent(hex: string) {
+const rgb = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+/** Relative luminance (WCAG) of an [r, g, b] colour. */
+function luminance([r, g, b]: number[]) {
+  const lin = (c: number) => {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.42 ? "#16171a" : "#ffffff";
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/** Black or white, whichever has more contrast on the accent (#16171a has a luminance of about 0.009). */
+function onAccent(hex: string) {
+  const l = luminance(rgb(hex));
+  return 1.05 / (l + 0.05) >= (l + 0.05) / 0.059 ? "#ffffff" : "#16171a";
+}
+
+/**
+ * The accent for text and small marks on white paper: light accents (yellow, mint, sky blue) are
+ * darkened until they reach 4.5:1 on white, darker ones stay as they are. Computed here rather than
+ * with CSS relative colours, which older browsers drop.
+ */
+function accentInk(hex: string) {
+  const c = rgb(hex);
+  for (let k = 100; k > 0; k -= 2) {
+    const d = c.map((v) => Math.round((v * k) / 100));
+    if (1.05 / (luminance(d) + 0.05) >= 4.5) return k === 100 ? hex : `#${d.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  }
+  return "#000000";
 }
 
 /** The page's CSS variables: colours, fonts and text size. Blocks only use these. */
@@ -47,6 +71,7 @@ export function cvStyle(cv: Cv): CSSProperties {
     "--cv-accent-soft": tint(accent, 0.12),
     "--cv-accent-mid": tint(accent, 0.45),
     "--cv-on-accent": onAccent(accent),
+    "--cv-accent-ink": accentInk(accent),
     "--cv-ink": "#1d1e21",
     "--cv-ink-2": "#46474d",
     "--cv-ink-3": "#76777e",
@@ -258,9 +283,12 @@ function PageColumns({ page, layout, blocks, geometry }: { cv: Cv; page: number;
   const column = (list: number[], x: number, width: number, y: number): ReactNode =>
     list.length > 0 && (
       <div className="absolute" style={{ left: `${x}mm`, top: `${y}mm`, width: `${width}mm` }}>
-        {list.map((i) => (
-          <Block key={blocks[i].key} block={blocks[i]} index={i} />
-        ))}
+        {/* Right after the CV loses blocks, the old layout can point past the end until it is re-measured (before paint). */}
+        {list
+          .filter((i) => blocks[i])
+          .map((i) => (
+            <Block key={blocks[i].key} block={blocks[i]} index={i} />
+          ))}
       </div>
     );
   return (
