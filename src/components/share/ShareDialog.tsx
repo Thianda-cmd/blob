@@ -151,20 +151,20 @@ function SharePanel({
       return !error;
     });
 
+  /**
+   * Delete the links you may delete here: the owner every link of the page or project (older ones
+   * too, which the dialog doesn't show), an editor the links they made.
+   */
+  const deleteLinks = async () => !(await supabase.from("invites").delete().eq("target_type", target.type).eq("target_id", target.id)).error;
+
   const renewInvite = (old: Invite) =>
     run("renew", async () => {
-      const { error } = await supabase.from("invites").update({ revoked_at: new Date().toISOString() }).eq("token", old.token);
-      if (error) return false;
+      if (!(await deleteLinks())) return false;
       const res = await supabase.from("invites").insert({ target_type: target.type, target_id: target.id, role: old.role });
       return !res.error;
     });
 
-  const deleteInvite = (old: Invite) =>
-    run(
-      "revoke",
-      async () => !(await supabase.from("invites").update({ revoked_at: new Date().toISOString() }).eq("token", old.token)).error,
-      t.linkDeleted,
-    );
+  const deleteInvite = () => run("revoke", deleteLinks, t.linkDeleted);
 
   const setInviteRole = (old: Invite, role: MemberRole) =>
     run("invite-role", async () => !(await supabase.from("invites").update({ role }).eq("token", old.token)).error);
@@ -222,6 +222,7 @@ function SharePanel({
             {manager && (
               <InviteSection
                 invite={data.invite}
+                canManage={!!data.invite && (owner || data.invite.created_by === userId)}
                 busy={busy}
                 onCreate={createInvite}
                 onRenew={renewInvite}
@@ -310,6 +311,7 @@ function LoadingRows() {
 
 function InviteSection({
   invite,
+  canManage,
   busy,
   onCreate,
   onRenew,
@@ -317,10 +319,12 @@ function InviteSection({
   onRole,
 }: {
   invite: Invite | null;
+  /** The owner manages every link; an editor only the links they made. */
+  canManage: boolean;
   busy: string | null;
   onCreate: (role: MemberRole) => void;
   onRenew: (invite: Invite) => void;
-  onDelete: (invite: Invite) => void;
+  onDelete: () => void;
   onRole: (invite: Invite, role: MemberRole) => void;
 }) {
   const t = useMessages(shareText);
@@ -374,30 +378,36 @@ function InviteSection({
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-[12.5px] text-ink-2">
             <span>{t.linkRole}</span>
-            <RoleMenu value={invite.role} onChange={(r) => onRole(invite, r)} busy={busy === "invite-role"} compact />
+            {canManage ? (
+              <RoleMenu value={invite.role} onChange={(r) => onRole(invite, r)} busy={busy === "invite-role"} compact />
+            ) : (
+              <span className="font-medium text-ink">{t.linkRoleShort[invite.role]}</span>
+            )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[12px] text-ink-3">
             <span>
               {t.validUntil(format(new Date(invite.expires_at), t.expiryFormat, { locale: dateLocale(locale) }))}
               {invite.uses > 0 && ` · ${t.used(invite.uses)}`}
             </span>
-            <span className="ml-auto flex items-center gap-0.5">
-              <button
-                onClick={() => onRenew(invite)}
-                disabled={busy === "renew"}
-                title={t.newLinkHint}
-                className="flex h-7 items-center gap-1 rounded-md px-1.5 text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-50 [@media(hover:none)]:h-8"
-              >
-                <RefreshCw className={cn("size-3.5", busy === "renew" && "animate-spin")} /> {t.newLink}
-              </button>
-              <button
-                onClick={() => onDelete(invite)}
-                disabled={busy === "revoke"}
-                className="flex h-7 items-center gap-1 rounded-md px-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger disabled:opacity-50 [@media(hover:none)]:h-8"
-              >
-                <Trash2 className="size-3.5" /> {t.deleteLink}
-              </button>
-            </span>
+            {canManage && (
+              <span className="ml-auto flex items-center gap-0.5">
+                <button
+                  onClick={() => onRenew(invite)}
+                  disabled={busy === "renew"}
+                  title={t.newLinkHint}
+                  className="flex h-7 items-center gap-1 rounded-md px-1.5 text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-50 [@media(hover:none)]:h-8"
+                >
+                  <RefreshCw className={cn("size-3.5", busy === "renew" && "animate-spin")} /> {t.newLink}
+                </button>
+                <button
+                  onClick={onDelete}
+                  disabled={busy === "revoke"}
+                  className="flex h-7 items-center gap-1 rounded-md px-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger disabled:opacity-50 [@media(hover:none)]:h-8"
+                >
+                  <Trash2 className="size-3.5" /> {t.deleteLink}
+                </button>
+              </span>
+            )}
           </div>
         </>
       ) : (

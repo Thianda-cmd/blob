@@ -68,7 +68,8 @@ export function mergeDeck(base: Deck, mine: Deck, theirs: Deck): Deck {
     if (mineSlide && theirSlide) return mergeFields(b.get(id), mineSlide, theirSlide);
     return (mineSlide ?? theirSlide)!;
   });
-  return { ...top, slides };
+  // Both deleted the other's last slides: a deck always keeps at least one (theirs, as they saved it).
+  return { ...top, slides: slides.length ? slides : theirs.slides.length ? theirs.slides : mine.slides };
 }
 
 /** Merge a title the same way: mine if I changed it, else theirs. */

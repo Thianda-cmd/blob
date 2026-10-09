@@ -35,8 +35,9 @@ export async function finishCard(card: Pick<AssignedCard, "id" | "project_id">) 
     patch.column_id = column.id as string;
     patch.position = ((last?.position as number | undefined) ?? 0) + STEP;
   }
-  const { error } = await supabase.from("tasks").update(patch).eq("id", card.id);
-  return !error;
+  // Nothing changed (you only view this project): not done.
+  const { data, error } = await supabase.from("tasks").update(patch).eq("id", card.id).select("id");
+  return !error && (data?.length ?? 0) > 0;
 }
 
 /**
@@ -84,7 +85,13 @@ export function FromProjects({ initial, limit = 8, compact }: { initial: Assigne
               className="group flex min-h-10 items-start gap-2 rounded-lg px-1.5 py-1.5 hover:bg-hover/60 [@media(hover:none)]:min-h-11"
             >
               <span className="pt-px">
-                <TaskCheckbox checked={done} onChange={(next) => next && tick(card)} size={16} label={t.markCardDone(card.title)} />
+                {card.can_edit ? (
+                  <TaskCheckbox checked={done} onChange={(next) => next && tick(card)} size={16} label={t.markCardDone(card.title)} />
+                ) : (
+                  <span className="grid size-4 place-items-center" aria-hidden>
+                    <span className="size-1.5 rounded-full bg-ink-3/60" />
+                  </span>
+                )}
               </span>
               <Link href={`/projects/${card.project.id}?card=${card.id}`} className="min-w-0 flex-1">
                 <span className={cn("block truncate text-[13.5px] leading-snug", done ? "text-ink-3 line-through" : "text-ink")} title={card.title}>

@@ -228,15 +228,16 @@ export function useBoard(initial: BoardData, me: Me) {
     const offGone = live.listen(GONE, (data) => {
       const d = data as { table?: Table; id?: string } | null;
       if (!d?.table || !d.id) return;
-      if (d.table === "projects") setGone("deleted");
-      else applyRow(d.table, null, d.id);
+      // Only what the database says counts: ask it instead of trusting the message.
+      if (d.table === "projects") void refetchAll();
+      else if (d.table === "tasks" || d.table === "project_columns") void refetchRow(d.table, d.id);
     });
     const offMembers = live.listen(MEMBERS, () => void reloadMembers());
     return () => {
       offGone();
       offMembers();
     };
-  }, [live, applyRow, reloadMembers]);
+  }, [live, refetchAll, refetchRow, reloadMembers]);
 
   // Whatever changed between the server's render and the live channel joining.
   useEffect(() => {

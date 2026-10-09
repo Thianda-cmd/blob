@@ -88,7 +88,8 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
     const ok = await updatePage(item.id, {
       parent_id: target ? target.id : (page.parent_id ?? null),
       // At the top level a page keeps the folder's subject; inside a folder the folder's place decides.
-      ...(item.user_id === userId && { subject_id: target ? target.subject_id : page.subject_id }),
+      // Inside someone else's shared folder your page has no subject (their subjects aren't yours).
+      ...(item.user_id === userId && { subject_id: (target ?? page).user_id === userId ? (target ?? page).subject_id : null }),
     });
     const name = pageTitle(item.title, item.kind, locale);
     if (!ok) blob.say(t.moveFailed, { mood: "worried" });

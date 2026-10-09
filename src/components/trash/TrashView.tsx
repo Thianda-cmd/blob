@@ -109,7 +109,10 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     blob.react("shake", "worried");
   }
 
-  /** Never let a cascade take live pages with it: move them to the top level first. */
+  /**
+   * Never let a cascade take your live pages with it: move them to the top level first. (Other
+   * people's pages in a shared page move up on their own when it is deleted: migration 0011.)
+   */
   async function detachLiveChildren(ids: string[]) {
     const supabase = createClient();
     for (const part of chunks(ids)) {
@@ -117,6 +120,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
         .from("pages")
         .update({ parent_id: null })
         .in("parent_id", part)
+        .eq("user_id", userId)
         .is("trashed_at", null)
         .select(PAGE_META_COLUMNS);
       if (error) return false;

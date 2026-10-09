@@ -105,9 +105,12 @@ function mergePages(local: PageMeta[], server: PageMeta[]): PageMeta[] {
 /** Every descendant of `id` (children, grandchildren…). */
 export function descendantsOf(pages: PageMeta[], id: string): string[] {
   const out: string[] = [];
+  const seen = new Set([id]);
   const walk = (parent: string) => {
     for (const p of pages) {
-      if (p.parent_id === parent) {
+      // (Each page once, even if old data has a loop.)
+      if (p.parent_id === parent && !seen.has(p.id)) {
+        seen.add(p.id);
         out.push(p.id);
         walk(p.id);
       }
@@ -245,10 +248,25 @@ export function WorkspaceProvider({
   );
 
   const updatePage = useCallback(async (id: string, patch: Partial<PageMeta>, opts?: { local?: boolean }) => {
-    setPages((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch, updated_at: new Date().toISOString() } : p)));
+    let before: PageMeta | undefined;
+    setPages((ps) =>
+      ps.map((p) => {
+        if (p.id !== id) return p;
+        before = p;
+        return { ...p, ...patch, updated_at: new Date().toISOString() };
+      }),
+    );
     if (opts?.local) return true;
     const { error } = await createClient().from("pages").update(patch).eq("id", id);
-    if (error) oops(t.notSaved);
+    if (error) {
+      // Show the page where it really is again (a refused move, a lost connection).
+      const keys = Object.keys(patch) as (keyof PageMeta)[];
+      if (before) {
+        const was = before;
+        setPages((ps) => ps.map((p) => (p.id === id ? { ...p, ...Object.fromEntries(keys.map((k) => [k, was[k]])) } : p)));
+      }
+      oops(t.notSaved);
+    }
     return !error;
   }, [t]);
 

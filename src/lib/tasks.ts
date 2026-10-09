@@ -871,20 +871,34 @@ export async function loadUpcomingTasks(supabase: SupabaseClient, days = 7): Pro
 }
 
 /** A project card assigned to you, with its project (for "From projects" on Tasks and Home). */
-export type AssignedCard = Task & { project: { id: string; title: string; icon: string | null; color: string } };
+export type AssignedCard = Task & {
+  project: { id: string; title: string; icon: string | null; color: string };
+  /** False in projects you only view: the card can't be ticked off from outside its board. */
+  can_edit: boolean;
+};
 
 /** Open cards assigned to you in projects that aren't archived, soonest first. */
 export async function loadAssignedCards(supabase: SupabaseClient, userId: string, limit = 40): Promise<AssignedCard[]> {
   const { data } = await supabase
     .from("tasks")
-    .select("*, project:projects(id, title, icon, color, archived_at)")
+    .select("*, project:projects(id, title, icon, color, archived_at, user_id)")
     .not("project_id", "is", null)
     .contains("assignees", [userId])
     .eq("done", false)
     .order("due_at", { ascending: true, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(limit);
-  return ((data ?? []) as (Task & { project: (AssignedCard["project"] & { archived_at: string | null }) | null })[])
-    .filter((c) => c.project && !c.project.archived_at)
-    .map((c) => ({ ...c, project: { id: c.project!.id, title: c.project!.title, icon: c.project!.icon, color: c.project!.color } }));
+  const rows = ((data ?? []) as (Task & { project: (AssignedCard["project"] & { archived_at: string | null; user_id: string }) | null })[]).filter(
+    (c) => c.project && !c.project.archived_at,
+  );
+  const ids = [...new Set(rows.filter((c) => c.project!.user_id !== userId).map((c) => c.project!.id))];
+  const { data: viewing } = ids.length
+    ? await supabase.from("project_members").select("project_id").eq("user_id", userId).eq("role", "viewer").in("project_id", ids)
+    : { data: [] };
+  const viewOnly = new Set(((viewing ?? []) as { project_id: string }[]).map((m) => m.project_id));
+  return rows.map((c) => ({
+    ...c,
+    project: { id: c.project!.id, title: c.project!.title, icon: c.project!.icon, color: c.project!.color },
+    can_edit: !viewOnly.has(c.project!.id),
+  }));
 }

@@ -58,7 +58,8 @@ export function DeckEditor({ page, role = "owner", members = [] }: { page: Page;
   const router = useRouter();
   const searchParams = useSearchParams();
   const { updatePage, userId, profile } = useWorkspace();
-  // Shared with someone: saves go through save_deck and merge; others' saves arrive live.
+  // Shared with someone: others' saves arrive live. (Every save goes through save_deck and merges, so
+  // a deck opened before it was shared can't overwrite what someone who joined since has saved.)
   const shared = members.length > 1;
   const readOnly = role === "viewer";
   const t = useMessages(deckText);
@@ -107,14 +108,7 @@ export function DeckEditor({ page, role = "owner", members = [] }: { page: Page;
     me: { user_id: userId, name: profile.full_name ?? "", avatar_url: profile.avatar_url },
   });
 
-  const save = useCallback(
-    async (patch: Partial<DeckPatch>) => {
-      if (shared) return collab.save();
-      const { error } = await createClient().from("pages").update(patch).eq("id", page.id);
-      return !error;
-    },
-    [page.id, shared, collab],
-  );
+  const save = useCallback(() => collab.save(), [collab]);
   const { state, schedule, flush } = useAutosave<DeckPatch>(save);
   useEffect(() => {
     scheduleRef.current = schedule;
