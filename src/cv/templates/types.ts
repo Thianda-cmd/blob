@@ -39,6 +39,8 @@ export type CvBlock = {
   node: ReactNode;
   /** A heading: never the last block on a page, it moves over with the block after it. */
   keepWithNext?: boolean;
+  /** The closing (place, date, signature): never alone on a page, it takes the block before it along. */
+  keepWithPrevious?: boolean;
 };
 
 /** Decorations behind one page (side column fill, header band, rules), drawn in the 210 × 297 mm page box. */

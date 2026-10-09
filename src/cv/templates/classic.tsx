@@ -122,7 +122,7 @@ export const classic: CvTemplate = {
       }
     }
 
-    if (cv.closing.show) blocks.push({ key: "closing", column: "main", node: <Closing cv={cv} /> });
+    if (cv.closing.show) blocks.push({ key: "closing", column: "main", keepWithPrevious: true, node: <Closing cv={cv} /> });
     return blocks;
   },
   Overlay: ({ page, pages }) =>

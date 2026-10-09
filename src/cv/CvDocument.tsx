@@ -105,8 +105,17 @@ function paginate(blocks: CvBlock[], heights: number[], g: CvGeometry): Layout {
       // A heading needs room for itself and the first thing under it.
       const need = blocks[i].keepWithNext && next !== undefined ? h + heights[next] : h;
       if (used > 0 && used + need > room(p, column) + SLACK_MM) {
-        pages.push([]);
-        used = 0;
+        // A closing block takes the block before it along (and that block's heading), so it never sits alone.
+        const carried: number[] = [];
+        const current = pages[p];
+        if (blocks[i].keepWithPrevious) {
+          while (current.length > 1) {
+            carried.unshift(current.pop()!);
+            if (!blocks[current[current.length - 1]].keepWithNext) break;
+          }
+        }
+        pages.push(carried);
+        used = carried.reduce((sum, j) => sum + heights[j], 0);
       }
       if (h > room(pages.length - 1, column) + SLACK_MM) overflow = true;
       pages[pages.length - 1].push(i);
