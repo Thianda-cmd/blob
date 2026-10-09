@@ -187,7 +187,11 @@ export function HomeView({
                       </div>
                       <div className="mt-auto flex gap-3 text-[12px] text-ink-3">
                         <span className="shrink-0">{t.notes(notes)}</span>
-                        {decks > 0 && <span className="min-w-0 truncate">{t.decks(decks)}</span>}
+                        {decks > 0 && (
+                          <span className="min-w-0 truncate" title={t.decks(decks)}>
+                            {t.decks(decks)}
+                          </span>
+                        )}
                         <span className={cn("shrink-0", open > 0 && "font-medium text-blob-ink")}>{t.open(open)}</span>
                       </div>
                     </Link>
@@ -312,7 +316,9 @@ function RecentDeck({ page, preview, now }: { page: PageMeta; preview?: PagePrev
       </div>
       <div className="flex min-w-0 items-center gap-2 px-1.5 pt-2">
         <PageIcon page={page} className="size-3.5" />
-        <span className="truncate text-[13.5px] font-medium">{name}</span>
+        <span className="truncate text-[13.5px] font-medium" title={name}>
+          {name}
+        </span>
         <span className="ml-auto shrink-0 text-[11.5px] text-ink-3" suppressHydrationWarning>
           {now ? formatDistanceStrict(new Date(page.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }) : ""}
         </span>

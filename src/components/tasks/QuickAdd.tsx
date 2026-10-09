@@ -213,7 +213,8 @@ export function QuickAdd({
           animate={{ rotate: title ? 90 : 0, scale: title ? 1.06 : 1 }}
           transition={{ type: "spring", stiffness: 520, damping: 20 }}
           className={cn(
-            "grid shrink-0 place-items-center rounded-full transition-colors",
+            "relative grid shrink-0 place-items-center rounded-full transition-colors",
+            "[@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-2 [@media(hover:none)]:after:content-['']",
             sm ? "size-[18px]" : "size-5",
             title ? "bg-blob text-white" : "border-[1.5px] border-dashed border-line-2 text-ink-3",
           )}
