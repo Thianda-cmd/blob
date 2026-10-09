@@ -4,7 +4,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
-import { calloutKind } from "./blocks/Callout";
+import { calloutKind } from "./blocks/schema";
 
 type PlaceholderText = EditorText["placeholder"];
 

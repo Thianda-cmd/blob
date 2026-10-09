@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/client";
 // newest version; whoever is behind first receives the others' steps (page_steps, via Realtime or
 // a fetch), rebases their own and tries again. pages.content holds a snapshot at doc_version, saved
 // by any editor whose steps are all confirmed (save_note_snapshot). Migration 0010 has the SQL.
+// An editor that closes still owing the stored note something asks the server to settle it
+// (api/notes/[id]/settle, with a beacon that outlives the tab).
 
 export type CollabStatus = "off" | "connecting" | "live" | "offline" | "resyncing";
 
@@ -83,9 +85,9 @@ function clientIdFor(editor: Editor) {
 }
 
 /**
- * Best effort when an editor goes away (navigating, closing the tab, a rebuild): send what it
- * hasn't sent and save a snapshot, from data captured while it was still there. When someone else
- * wrote in between, the unsent steps can't be placed without the editor: they are dropped.
+ * When the browser won't send a settle beacon (see settleBeacon): send what the editor hasn't sent
+ * and save a snapshot, as far as we get, from data captured while it was still there. When someone
+ * else wrote in between, the unsent steps can't be placed without the editor: they are dropped.
  */
 async function flushOut({
   pageId,
@@ -132,6 +134,21 @@ async function flushOut({
   }
   if (!snapshot) return;
   await supabase.rpc("save_note_snapshot", { p_page: pageId, p_version: at, p_content: snapshot.content, p_plain: snapshot.plain, p_links: snapshot.links });
+}
+
+/**
+ * Ask the server to settle the note (src/app/api/notes/[id]/settle): send `owed` (steps this editor
+ * hasn't sent) and store the note with every step applied. A beacon still goes out while the tab
+ * closes, unlike a normal request. False when the browser wouldn't take it (then flushOut tries).
+ */
+function settleBeacon(pageId: string, owed: { version: number; steps: Step[]; client: string } | null) {
+  if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return false;
+  const body = owed ? { version: owed.version, steps: owed.steps.map((s) => s.toJSON()), client: owed.client } : {};
+  try {
+    return navigator.sendBeacon(`/api/notes/${pageId}/settle`, new Blob([JSON.stringify(body)], { type: "application/json" }));
+  } catch {
+    return false;
+  }
 }
 
 function cursorDecorations(state: EditorState, cursors: Map<string, RemoteCursor>) {
@@ -208,6 +225,9 @@ export function useNoteCollab({
   const cursors = useRef(new Map<string, RemoteCursor>());
   /** When the last step arrived through Realtime. */
   const heard = useRef(0);
+  /** Pushes of ours the server accepted, and how many of them the last snapshot held. */
+  const pushes = useRef(0);
+  const stored = useRef(0);
   const serializeRef = useRef(serialize);
   const resyncRef = useRef(onResync);
   const startRef = useRef(onStart);
@@ -281,6 +301,7 @@ export function useNoteCollab({
     if (!usable(editor) || unsentOf(editor.state)) return false;
     const at = versionOf(editor.state);
     if (at === null) return false;
+    const pushed = pushes.current;
     const snap = serializeRef.current(editor);
     const { data, error } = await createClient().rpc("save_note_snapshot", {
       p_page: pageId,
@@ -289,7 +310,9 @@ export function useNoteCollab({
       p_plain: snap.plain,
       p_links: snap.links,
     });
-    return !error && data !== false;
+    const ok = !error && data !== false;
+    if (ok) stored.current = Math.max(stored.current, pushed);
+    return ok;
   }, [editor, pageId, usable]);
 
   const scheduleSnapshot = useCallback(() => {
@@ -340,6 +363,7 @@ export function useNoteCollab({
           // fetch in the meantime already brought them back to us.
           if (versionOf(editor.state) === sendable.version) editor.view.dispatch(receiveTransaction(editor.state, steps, steps.map(() => clientId)));
           failures.current = 0;
+          pushes.current++;
           sent = true;
           setStatus("live");
           continue;
@@ -414,28 +438,45 @@ export function useNoteCollab({
     };
     editor.on("transaction", onUpdate as never);
 
-    /** What this editor still owes the server, captured now (the editor may be gone a moment later). */
+    /**
+     * What this editor still owes the stored note, captured now (the editor may be gone a moment
+     * later): steps it hasn't sent, or sent steps no snapshot holds yet. Null when it owes nothing.
+     */
     const capture = () => {
       if (editor.isDestroyed || closedSet.has(editor)) return null;
       const at = versionOf(editor.state);
       if (at === null) return null;
       const unsent = unsentOf(editor.state);
-      const snapshotDue = !!unsent || snapTimer.current !== undefined;
-      return {
-        pageId,
-        clientId,
-        version: at,
-        unsent: unsent ? { version: unsent.version, steps: [...unsent.steps] } : null,
-        snapshot: snapshotDue ? serializeRef.current(editor) : null,
-        waitIdle: async () => {
-          for (let i = 0; i < 30 && busy.current; i++) await new Promise((r) => setTimeout(r, 100));
-        },
-      };
+      if (!unsent && pushes.current <= stored.current) return null;
+      return { version: at, unsent: unsent ? { version: unsent.version, steps: [...unsent.steps] } : null };
     };
-    // Leaving the page (closing the tab, going to another site): send what's left, as far as we get.
+    const waitIdle = async () => {
+      for (let i = 0; i < 30 && busy.current; i++) await new Promise((r) => setTimeout(r, 100));
+    };
+    /**
+     * The server settles the note, with our unsent steps (a beacon gets out even while the tab
+     * closes). If the browser won't send one, flushOut does what it can from here. True when the
+     * beacon took unsent steps: this editor must not send them again.
+     */
+    const settle = (owed: NonNullable<ReturnType<typeof capture>>) => {
+      if (settleBeacon(pageId, owed.unsent && { ...owed.unsent, client: clientId })) return !!owed.unsent;
+      void flushOut({ pageId, clientId, version: owed.version, unsent: owed.unsent, snapshot: serializeRef.current(editor), waitIdle });
+      return false;
+    };
+    /** The beacon took our unsent steps as the page went away. */
+    let handedOver = false;
+    // Leaving the page (closing the tab, going to another site).
     const onPageHide = () => {
       const owed = capture();
-      if (owed && (owed.unsent || owed.snapshot)) void flushOut(owed);
+      if (!owed || !settle(owed)) return;
+      handedOver = true;
+      closedSet.add(editor);
+    };
+    // Back from the browser's back/forward cache after that: start again from the server's note.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted || !handedOver) return;
+      handedOver = false;
+      resync();
     };
     // Steps not yet sent: the browser asks before the tab closes.
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -449,9 +490,15 @@ export function useNoteCollab({
       void pushRef.current();
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible") onOnline();
+      if (document.visibilityState === "visible") return onOnline();
+      // Hidden (on a phone the tab may never come back): what's unsent goes now, and the stored note
+      // catches up with what's sent.
+      if (!usable(editor)) return;
+      if (unsentOf(editor.state)) void pushRef.current();
+      else if (pushes.current > stored.current) settleBeacon(pageId, null);
     };
     window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
@@ -460,6 +507,7 @@ export function useNoteCollab({
       clearTimeout(start);
       editor.off("transaction", onUpdate as never);
       window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
@@ -471,7 +519,7 @@ export function useNoteCollab({
       clearTimeout(snapTimer.current);
       snapTimer.current = undefined;
       closedSet.add(editor);
-      if (owed && (owed.unsent || owed.snapshot)) void flushOut(owed);
+      if (owed) settle(owed);
       // collab()'s plugin key is "collab$".
       if (!editor.isDestroyed) editor.unregisterPlugin(["collab$", cursorKey]);
     };

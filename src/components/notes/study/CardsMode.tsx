@@ -218,6 +218,11 @@ export function CardsMode({
           {t.cards.saveFailed}
         </p>
       )}
+      {edits.failed && (
+        <p className="mt-3 rounded-xl border border-line bg-surface px-3 py-2 text-[13px] text-ink-2" role="status">
+          {t.cards.editFailed}
+        </p>
+      )}
 
       <Preview cards={cards} generated={generated} states={states} reviews={reviews} day={day} edits={edits} onToggle={(card, off) => day && void save(setSuspended(reviews.get(card.id), card.id, off, day))} />
     </div>

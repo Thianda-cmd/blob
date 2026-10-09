@@ -16,6 +16,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { dateLocale } from "@/i18n/format";
 import { trashText } from "@/i18n/messages/trash";
+import { removeUnusedFiles } from "@/lib/files";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import { PAGE_META_COLUMNS, type PageMeta } from "@/lib/types";
@@ -129,6 +130,36 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     return true;
   }
 
+  /**
+   * Remove the files of the pages about to be deleted: `ids` and your pages inside them, which the
+   * database deletes with them (other people's pages move up instead). It has to happen first, as
+   * storage lets nobody remove a page's files once the page is gone. A file another note still
+   * refers to stays; whatever is left over goes in the nightly clean-up (api/cron/files).
+   */
+  async function removeFilesOf(ids: string[]) {
+    const supabase = createClient();
+    const all = new Set(ids);
+    let level = ids;
+    while (level.length) {
+      const next: string[] = [];
+      for (const part of chunks(level)) {
+        const { data } = await supabase.from("pages").select("id").in("parent_id", part).eq("user_id", userId);
+        for (const { id } of (data ?? []) as { id: string }[]) {
+          if (all.has(id)) continue;
+          all.add(id);
+          next.push(id);
+        }
+      }
+      level = next;
+    }
+    // A few at a time: emptying a big trash shouldn't flood the server.
+    const queue = [...all];
+    const worker = async () => {
+      for (let id = queue.shift(); id; id = queue.shift()) await removeUnusedFiles("page", id, { minAge: "0 seconds", whole: true });
+    };
+    await Promise.all(Array.from({ length: 4 }, worker));
+  }
+
   /** Put rows back into the list after a failed request, keeping newest first. */
   function putBack(rows: PageMeta[]) {
     setTrash((t) => {
@@ -170,7 +201,9 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setExit("delete");
     setTrash((t) => t.filter((p) => !ids.includes(p.id)));
 
-    const ok = (await detachLiveChildren(ids)) && !(await createClient().from("pages").delete().in("id", ids)).error;
+    let ok = await detachLiveChildren(ids);
+    if (ok) await removeFilesOf(ids);
+    ok = ok && !(await createClient().from("pages").delete().in("id", ids)).error;
     if (!ok) {
       putBack(original);
       oops(t.deleteFailed);
@@ -186,6 +219,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
 
     const supabase = createClient();
     let ok = await detachLiveChildren(ids);
+    if (ok) await removeFilesOf(ids);
     for (const part of ok ? chunks(ids) : []) {
       if ((await supabase.from("pages").delete().in("id", part)).error) {
         ok = false;

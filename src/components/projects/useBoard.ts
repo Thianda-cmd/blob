@@ -6,17 +6,18 @@ import { loadMembers } from "@/components/share/useMembers";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
 import { useLive, useTableChanges } from "@/lib/live";
-import { removeFile } from "@/lib/files";
+import { removeUnusedFiles } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
-import type { AccessRole, Member, Project, ProjectColumn, Task } from "@/lib/types";
+import type { AccessRole, ChecklistItem, Member, Project, ProjectColumn, Task } from "@/lib/types";
 import { uid } from "@/lib/utils";
-import { byPosition, positionBetween, spacedPositions, tooClose } from "./model";
+import { applyChecklist, byPosition, checklistMoveIndex, positionBetween, spacedPositions, tooClose, type ChecklistChange } from "./model";
 
 export type BoardData = { project: Project; columns: ProjectColumn[]; cards: Task[]; members: Member[]; role: AccessRole };
 export type Me = { user_id: string; name: string; avatar_url: string | null };
 
+/** Checklists change one item at a time instead (changeChecklist). */
 export type CardPatch = Partial<
-  Pick<Task, "title" | "details" | "due_at" | "priority" | "assignees" | "labels" | "checklist" | "attachments" | "column_id" | "position" | "done">
+  Pick<Task, "title" | "details" | "due_at" | "priority" | "assignees" | "labels" | "attachments" | "column_id" | "position" | "done">
 >;
 export type ColumnPatch = Partial<Pick<ProjectColumn, "title" | "color" | "position" | "done">>;
 export type ProjectPatch = Partial<Pick<Project, "title" | "description" | "icon" | "color" | "subject_id" | "due_at" | "archived_at">>;
@@ -74,6 +75,11 @@ export function useBoard(initial: BoardData, me: Me) {
   const cardsRef = useRef(cards);
   const inflight = useRef(new Map<string, Map<string, number>>());
   const stale = useRef(new Set<string>());
+  /**
+   * Per card with checklist changes of ours on their way: the checklist as the server last had it,
+   * and our changes not yet confirmed, in order.
+   */
+  const checklists = useRef(new Map<string, { base: ChecklistItem[]; queue: ChecklistChange[] }>());
 
   const live = useLive(gone ? null : `project:${id}`, me);
   const liveRef = useRef(live);
@@ -105,11 +111,18 @@ export function useBoard(initial: BoardData, me: Me) {
   const merge = useCallback(<T extends Row>(table: Table, local: T | undefined, remote: T): T => {
     const key = `${table}:${remote.id}`;
     const pending = inflight.current.get(key);
-    if (!local || !pending?.size) return remote;
     const out: Row = { ...remote };
-    for (const field of pending.keys()) {
-      if (JSON.stringify(local[field]) !== JSON.stringify(remote[field])) stale.current.add(key);
-      out[field] = local[field];
+    if (local && pending?.size) {
+      for (const field of pending.keys()) {
+        if (JSON.stringify(local[field]) !== JSON.stringify(remote[field])) stale.current.add(key);
+        out[field] = local[field];
+      }
+    }
+    // Everyone else's checklist changes show at once, with ours that are still on their way on top.
+    const mine = table === "tasks" ? checklists.current.get(remote.id) : undefined;
+    if (mine && Array.isArray(remote.checklist)) {
+      mine.base = remote.checklist as ChecklistItem[];
+      out.checklist = mine.queue.reduce(applyChecklist, mine.base);
     }
     return out as T;
   }, []);
@@ -356,6 +369,63 @@ export function useBoard(initial: BoardData, me: Me) {
     [commitCards, write],
   );
 
+  /** Send a card's checklist changes one after the other, until none is left. */
+  const sendChecklist = useCallback(
+    async (cardId: string) => {
+      const supabase = createClient();
+      const entry = checklists.current.get(cardId);
+      while (entry?.queue.length) {
+        const change = entry.queue[0];
+        const { data, error } = await supabase.rpc("task_checklist", {
+          p_task: cardId,
+          p_op: change.op,
+          p_item: change.op === "add" ? change.item.id : change.id,
+          p_text: change.op === "add" ? change.item.text : change.op === "set" ? (change.text ?? null) : null,
+          p_done: change.op === "add" ? change.item.done : change.op === "set" ? (change.done ?? null) : null,
+          // Counted on the list as the server has it, where the item it goes after may sit elsewhere.
+          p_index: change.op === "move" ? checklistMoveIndex(entry.base, change) : null,
+        });
+        entry.queue.shift();
+        if (error || !Array.isArray(data)) {
+          // Not saved (offline, or no longer allowed to change the card). The changes after it may
+          // build on it, so they are dropped too, and the card shows what the server has.
+          checklists.current.delete(cardId);
+          oops();
+          await refetchRow("tasks", cardId);
+          return;
+        }
+        // The server's list has everyone's changes up to ours; the rest of ours go on top.
+        entry.base = data as ChecklistItem[];
+        const next = entry.queue.reduce(applyChecklist, entry.base);
+        commitCards((list) => list.map((c) => (c.id === cardId ? { ...c, checklist: next } : c)));
+      }
+      checklists.current.delete(cardId);
+    },
+    [commitCards, oops, refetchRow],
+  );
+
+  /**
+   * Change one checklist item (add, tick, rename, remove, move). The card changes at once; the change
+   * goes to the server on its own, after this card's earlier ones, so it never overwrites what
+   * someone else did to the other items meanwhile.
+   */
+  const changeChecklist = useCallback(
+    (cardId: string, change: ChecklistChange) => {
+      const card = cardsRef.current.find((c) => c.id === cardId);
+      if (!card) return;
+      let entry = checklists.current.get(cardId);
+      if (!entry) {
+        entry = { base: card.checklist, queue: [] };
+        checklists.current.set(cardId, entry);
+      }
+      entry.queue.push(change);
+      const now = new Date().toISOString();
+      commitCards((list) => list.map((c) => (c.id === cardId ? { ...c, checklist: applyChecklist(c.checklist, change), updated_at: now } : c)));
+      if (entry.queue.length === 1) void sendChecklist(cardId);
+    },
+    [commitCards, sendChecklist],
+  );
+
   /** Give every card of a column fresh, evenly spaced positions in `order`. */
   const respace = useCallback(
     (order: Task[]) => {
@@ -393,15 +463,34 @@ export function useBoard(initial: BoardData, me: Me) {
     [cardsIn, updateCard, respace, celebrate],
   );
 
+  /**
+   * A deleted card is gone for good once its undo is no longer offered: its files go too, unless
+   * another card or a note still refers to them.
+   */
+  const dropFiles = useCallback(
+    (card: Task | null) => {
+      const paths = (card?.attachments ?? []).flatMap((a) => (a.type === "file" ? [a.path] : []));
+      if (paths.length) void removeUnusedFiles("project", id, { minAge: "0 seconds", only: paths });
+    },
+    [id],
+  );
+
+  /** The card the undo would bring back, kept next to `removed` for the handlers. */
+  const removedRef = useRef<Task | null>(null);
+
   const deleteCard = useCallback(
     async (cardId: string) => {
       const card = cardsRef.current.find((c) => c.id === cardId);
       if (!card) return false;
       commitCards((list) => list.filter((c) => c.id !== cardId));
+      // Only the last deleted card can be brought back: the one before is gone for good now.
+      if (removedRef.current && removedRef.current.id !== cardId) dropFiles(removedRef.current);
+      removedRef.current = card;
       setRemoved(card);
       const { error } = await createClient().from("tasks").delete().eq("id", cardId);
       if (error) {
         commitCards((list) => [...list, card]);
+        removedRef.current = null;
         setRemoved(null);
         oops();
         return false;
@@ -409,12 +498,13 @@ export function useBoard(initial: BoardData, me: Me) {
       liveRef.current.send(GONE, { table: "tasks", id: cardId });
       return true;
     },
-    [commitCards, oops],
+    [commitCards, oops, dropFiles],
   );
 
   const undoDelete = useCallback(async () => {
     const card = removed;
     if (!card) return;
+    removedRef.current = null;
     setRemoved(null);
     commitCards((list) => [...list.filter((c) => c.id !== card.id), card]);
     const columnStillThere = columnsRef.current.some((c) => c.id === card.column_id);
@@ -443,16 +533,15 @@ export function useBoard(initial: BoardData, me: Me) {
     }
   }, [removed, commitCards, id, oops]);
 
-  // Gone for good once the undo is no longer offered: its files go too.
-  const removedRef = useRef(removed);
-  useEffect(() => {
-    removedRef.current = removed;
-  });
   const dismissRemoved = useCallback(() => {
     const card = removedRef.current;
+    removedRef.current = null;
     setRemoved(null);
-    for (const a of card?.attachments ?? []) if (a.type === "file") void removeFile(a.path);
-  }, []);
+    dropFiles(card);
+  }, [dropFiles]);
+
+  // Leaving the board ends the undo too.
+  useEffect(() => () => dropFiles(removedRef.current), [dropFiles]);
 
   /* ----- Columns ----- */
 
@@ -586,6 +675,7 @@ export function useBoard(initial: BoardData, me: Me) {
       focus: live.focus,
       addCard,
       updateCard,
+      changeChecklist,
       moveCard,
       deleteCard,
       undoDelete,
@@ -610,6 +700,7 @@ export function useBoard(initial: BoardData, me: Me) {
       live.focus,
       addCard,
       updateCard,
+      changeChecklist,
       moveCard,
       deleteCard,
       undoDelete,

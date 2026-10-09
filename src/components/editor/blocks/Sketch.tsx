@@ -1,7 +1,7 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
+import { AttrStep, type Step } from "@tiptap/pm/transform";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { Eraser, Highlighter, MoveVertical, PenLine, Pencil, Redo2, Trash2, Undo2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -10,12 +10,10 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { caretAfter, openEditorAt } from "./insert";
+import { SKETCH_DEFAULT_HEIGHT, SketchSpec } from "./schema";
+import { AddStrokesStep, RemoveStrokesStep, SKETCH_COLORS, newStrokeId, strokesOf, type PlacedStroke, type SketchColor, type Stroke } from "./sketchSteps";
 
-/** One stroke: SVG path data in a 1000-unit-wide drawing, its colour, width and tool. */
-export type Stroke = { d: string; c: SketchColor; w: number; k: "pen" | "marker" };
-
-const COLORS = ["ink", "blob", "sky", "moss", "clay", "rose"] as const;
-type SketchColor = (typeof COLORS)[number];
+const COLORS = SKETCH_COLORS;
 /** Theme colours, so a drawing reads well in light and dark mode (ink turns light in the dark). */
 const COLOR_VAR: Record<SketchColor, string> = {
   ink: "var(--ink)",
@@ -27,7 +25,6 @@ const COLOR_VAR: Record<SketchColor, string> = {
 };
 type Tool = "pen" | "marker" | "eraser";
 const WIDTH = 1000;
-const DEFAULT_HEIGHT = 420;
 const MAX_HEIGHT = 2400;
 const PEN_WIDTH = 3.2;
 const MARKER_WIDTH = 18;
@@ -59,33 +56,48 @@ function pathPoints(d: string): Point[] {
   return out;
 }
 
-function normalizeStrokes(raw: unknown): Stroke[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (s): s is Stroke => !!s && typeof s === "object" && typeof (s as Stroke).d === "string" && /^[MQLlml0-9.\s-]+$/.test((s as Stroke).d),
-  );
-}
+/** One change of this drawing session, for its own undo: strokes drawn, or strokes erased (with where they were). */
+type Change = { kind: "add"; strokes: Stroke[] } | { kind: "remove"; placed: PlacedStroke[] };
 
-function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactNodeViewProps) {
+function SketchView({ node, editor, getPos, selected }: ReactNodeViewProps) {
   const t = useMessages(noteBlocksText);
   const s = t.sketch;
   const { canEdit } = useNoteBlocks();
-  const strokes = normalizeStrokes(node.attrs.paths);
-  const height = Math.min(MAX_HEIGHT, Math.max(200, Number(node.attrs.height) || DEFAULT_HEIGHT));
+  const strokes = strokesOf(node.attrs.paths);
+  const height = Math.min(MAX_HEIGHT, Math.max(200, Number(node.attrs.height) || SKETCH_DEFAULT_HEIGHT));
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState<SketchColor>("ink");
   const [live, setLive] = useState<Point[] | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const drawing = useRef<{ id: number; points: Point[] } | null>(null);
+  /** Strokes the eraser already took during this gesture (the drawing redraws a moment later). */
+  const erased = useRef(new Set<string>());
   const sawPen = useRef(false);
   // This drawing session's own undo (the note's undo works too, change by change).
-  const [history, setHistory] = useState<{ undo: Stroke[][]; redo: Stroke[][] }>({ undo: [], redo: [] });
+  const [history, setHistory] = useState<{ undo: Change[]; redo: Change[] }>({ undo: [], redo: [] });
 
-  const commit = (next: Stroke[], record = true) => {
-    if (record) setHistory((h) => ({ undo: [...h.undo.slice(-49), strokes], redo: [] }));
-    updateAttributes({ paths: next });
+  /** Make a change to this sketch: strokes are added and removed by id, so others drawing at the same time keep theirs. */
+  const run = (step: (pos: number) => Step) => {
+    const pos = getPos();
+    if (typeof pos !== "number" || editor.isDestroyed) return false;
+    editor.view.dispatch(editor.state.tr.step(step(pos)));
+    return true;
   };
+  const apply = (change: Change) =>
+    change.kind === "add"
+      ? run((pos) => new AddStrokesStep(pos, change.strokes.map((stroke) => ({ stroke }))))
+      : run((pos) => new RemoveStrokesStep(pos, change.placed.map((p) => p.stroke.id)));
+  const inverse = (change: Change): Change =>
+    change.kind === "add" ? { kind: "remove", placed: change.strokes.map((stroke) => ({ stroke })) } : { kind: "add", strokes: change.placed.map((p) => p.stroke) };
+  const commit = (change: Change) => {
+    if (apply(change)) setHistory((h) => ({ undo: [...h.undo.slice(-49), change], redo: [] }));
+  };
+  /** Strokes to erase, each with the stroke it was drawn after (so undo puts it back in its place). */
+  const removal = (ids: Set<string>): Change => ({
+    kind: "remove",
+    placed: strokes.flatMap((st, i) => (ids.has(st.id) ? [{ stroke: st, after: i ? strokes[i - 1].id : null }] : [])),
+  });
 
   const toPoint = (e: { clientX: number; clientY: number }): Point => {
     const r = svg.current!.getBoundingClientRect();
@@ -95,8 +107,10 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
 
   const eraseAt = (p: Point) => {
     const radius = 14;
-    const hit = strokes.findIndex((st) => pathPoints(st.d).some(([x, y]) => Math.hypot(x - p[0], y - p[1]) < radius + st.w / 2));
-    if (hit >= 0) commit(strokes.filter((_, i) => i !== hit));
+    const hit = strokes.find((st) => !erased.current.has(st.id) && pathPoints(st.d).some(([x, y]) => Math.hypot(x - p[0], y - p[1]) < radius + st.w / 2));
+    if (!hit) return;
+    erased.current.add(hit.id);
+    commit(removal(new Set([hit.id])));
   };
 
   const onDown = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -109,6 +123,7 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
     const p = toPoint(e);
     if (tool === "eraser") {
       drawing.current = { id: e.pointerId, points: [] };
+      erased.current = new Set();
       eraseAt(p);
       return;
     }
@@ -139,7 +154,7 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
     setLive(null);
     if (tool === "eraser" || !cur.points.length) return;
     const k = tool === "marker" ? "marker" : "pen";
-    commit([...strokes, { d: toPath(cur.points), c: color, w: k === "marker" ? MARKER_WIDTH : PEN_WIDTH, k }]);
+    commit({ kind: "add", strokes: [{ id: newStrokeId(), d: toPath(cur.points), c: color, w: k === "marker" ? MARKER_WIDTH : PEN_WIDTH, k }] });
   };
 
   const finish = () => {
@@ -150,17 +165,17 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
   };
 
   const doUndo = () => {
-    const prev = history.undo[history.undo.length - 1];
-    if (!prev) return;
-    setHistory((h) => ({ undo: h.undo.slice(0, -1), redo: [...h.redo, strokes] }));
-    commit(prev, false);
+    const last = history.undo[history.undo.length - 1];
+    if (!last || !apply(inverse(last))) return;
+    setHistory((h) => ({ undo: h.undo.slice(0, -1), redo: [...h.redo, last] }));
   };
   const doRedo = () => {
     const next = history.redo[history.redo.length - 1];
-    if (!next) return;
-    setHistory((h) => ({ undo: [...h.undo, strokes], redo: h.redo.slice(0, -1) }));
-    commit(next, false);
+    if (!next || !apply(next)) return;
+    setHistory((h) => ({ undo: [...h.undo, next], redo: h.redo.slice(0, -1) }));
   };
+  // The height is an attribute of its own: growing the sketch never touches the strokes.
+  const taller = () => run((pos) => new AttrStep(pos, "height", Math.min(MAX_HEIGHT, height + 200)));
   const undoRef = useRef(doUndo);
   const redoRef = useRef(doRedo);
   const finishRef = useRef(finish);
@@ -194,7 +209,7 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
     { id: "eraser", icon: Eraser, label: s.eraser },
   ];
 
-  const strokeEl = (st: Stroke, key: string | number, ghost = false) => (
+  const strokeEl = (st: Omit<Stroke, "id">, key: string, ghost = false) => (
     <path
       key={key}
       d={st.d}
@@ -240,8 +255,8 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
             <div className="flex items-center gap-0.5">
               <ToolButton label={s.undo} onClick={doUndo} icon={Undo2} disabled={!history.undo.length} />
               <ToolButton label={s.redo} onClick={doRedo} icon={Redo2} disabled={!history.redo.length} />
-              <ToolButton label={s.taller} onClick={() => updateAttributes({ height: Math.min(MAX_HEIGHT, height + 200) })} icon={MoveVertical} />
-              <ToolButton label={s.clear} onClick={() => strokes.length && commit([])} icon={Trash2} danger disabled={!strokes.length} />
+              <ToolButton label={s.taller} onClick={taller} icon={MoveVertical} />
+              <ToolButton label={s.clear} onClick={() => strokes.length && commit(removal(new Set(strokes.map((st) => st.id))))} icon={Trash2} danger disabled={!strokes.length} />
             </div>
             <button type="button" onClick={finish} className="blob-done ml-auto">
               {t.done}
@@ -260,7 +275,7 @@ function SketchView({ node, updateAttributes, editor, getPos, selected }: ReactN
           role="img"
           aria-label={s.label}
         >
-          {strokes.map((st, i) => strokeEl(st, i))}
+          {strokes.map((st) => strokeEl(st, st.id))}
           {live && strokeEl({ d: toPath(live), c: color, w: tool === "marker" ? MARKER_WIDTH : PEN_WIDTH, k: tool === "marker" ? "marker" : "pen" }, "live", true)}
         </svg>
         {!strokes.length && !live && <div className="blob-sketch-empty">{s.empty}</div>}
@@ -292,46 +307,7 @@ function ToolButton({ label, icon: Icon, onClick, active, disabled, danger }: { 
 }
 
 /** A hand-drawn sketch (pen, mouse or finger), stored as SVG paths. */
-export const Sketch = Node.create({
-  name: "sketch",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      paths: {
-        default: [],
-        parseHTML: (el) => {
-          try {
-            return JSON.parse(el.getAttribute("data-paths") ?? "[]");
-          } catch {
-            return [];
-          }
-        },
-        renderHTML: (attrs) => ({ "data-paths": JSON.stringify(attrs.paths ?? []) }),
-      },
-      height: {
-        default: DEFAULT_HEIGHT,
-        parseHTML: (el) => Number(el.getAttribute("data-height")) || DEFAULT_HEIGHT,
-        renderHTML: (attrs) => ({ "data-height": attrs.height }),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-sketch]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-sketch": "" })];
-  },
-
-  renderText() {
-    return "";
-  },
-
+export const Sketch = SketchSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(SketchView);
   },

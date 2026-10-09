@@ -1,6 +1,5 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { BookOpen, Check, Lightbulb, PencilLine, Pin, TriangleAlert, type LucideIcon } from "lucide-react";
 import { MenuItem, Popover } from "@/components/ui/Menu";
@@ -9,10 +8,7 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { suggestionOpen } from "../suggestKeys";
 import { useNoteBlocks } from "./context";
-
-export const CALLOUT_KINDS = ["idea", "definition", "rule", "example", "warning"] as const;
-/** idea: a plain callout. definition: "Begriff: Erklärung". rule: a Merksatz. */
-export type CalloutKind = (typeof CALLOUT_KINDS)[number];
+import { CALLOUT_KINDS, CalloutSpec, calloutKind, type CalloutKind } from "./schema";
 
 export const CALLOUT_ICONS: Record<CalloutKind, LucideIcon> = {
   idea: Lightbulb,
@@ -21,8 +17,6 @@ export const CALLOUT_ICONS: Record<CalloutKind, LucideIcon> = {
   example: PencilLine,
   warning: TriangleAlert,
 };
-
-export const calloutKind = (raw: unknown): CalloutKind => (CALLOUT_KINDS.includes(raw as CalloutKind) ? (raw as CalloutKind) : "idea");
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -91,30 +85,7 @@ function CalloutView({ node, updateAttributes }: ReactNodeViewProps) {
 }
 
 /** A soft box that makes something stand out: a key idea, a definition, a Merksatz, an example, a warning. */
-export const Callout = Node.create({
-  name: "callout",
-  group: "block",
-  content: "block+",
-  defining: true,
-
-  addAttributes() {
-    return {
-      kind: {
-        default: "idea",
-        parseHTML: (el) => calloutKind(el.getAttribute("data-kind")),
-        renderHTML: (attrs) => ({ "data-kind": attrs.kind }),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-callout]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-callout": "", class: "blob-callout" }), 0];
-  },
-
+export const Callout = CalloutSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(CalloutView);
   },

@@ -123,6 +123,44 @@ export function checklistProgress(list: ChecklistItem[]) {
   return { done: list.filter((i) => i.done).length, total: list.length };
 }
 
+/**
+ * One change to a card's checklist. Each is saved on its own (rpc task_checklist, migration 0012),
+ * so two people changing different items at once don't overwrite each other. A move names the item
+ * it goes after (null: to the top), so it lands in the right place even if others changed the list
+ * meanwhile; `index` is the fallback when that item is gone.
+ */
+export type ChecklistChange =
+  | { op: "add"; item: ChecklistItem }
+  | { op: "set"; id: string; text?: string; done?: boolean }
+  | { op: "remove"; id: string }
+  | { op: "move"; id: string; after: string | null; index: number };
+
+/** Where a moved item goes, counted in the list without it. */
+export function checklistMoveIndex(list: ChecklistItem[], change: Extract<ChecklistChange, { op: "move" }>) {
+  const rest = list.filter((i) => i.id !== change.id);
+  if (change.after === null) return 0;
+  const at = rest.findIndex((i) => i.id === change.after);
+  return at < 0 ? Math.max(0, Math.min(change.index, rest.length)) : at + 1;
+}
+
+/** The checklist after a change, the way the database makes it (adding twice or changing a removed item does nothing). */
+export function applyChecklist(list: ChecklistItem[], change: ChecklistChange): ChecklistItem[] {
+  if (change.op === "add") {
+    if (list.length >= 100 || list.some((i) => i.id === change.item.id)) return list;
+    return [...list, { ...change.item, text: change.item.text.slice(0, 500) }];
+  }
+  const item = list.find((i) => i.id === change.id);
+  if (!item) return list;
+  if (change.op === "set") {
+    const next = { ...item, ...(change.text !== undefined && { text: change.text.slice(0, 500) }), ...(change.done !== undefined && { done: change.done }) };
+    return list.map((i) => (i.id === change.id ? next : i));
+  }
+  const rest = list.filter((i) => i.id !== change.id);
+  if (change.op === "remove") return rest;
+  const at = checklistMoveIndex(list, change);
+  return [...rest.slice(0, at), item, ...rest.slice(at)];
+}
+
 /** Done cards and all cards of a project (cards in a "done" column count as done). */
 export function projectProgress(columns: Pick<ProjectColumn, "id" | "done">[], cards: Pick<Task, "column_id" | "done">[]) {
   const doneColumns = new Set(columns.filter((c) => c.done).map((c) => c.id));

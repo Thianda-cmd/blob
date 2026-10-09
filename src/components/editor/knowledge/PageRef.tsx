@@ -36,14 +36,18 @@ export function pageRefItems(pages: PageMeta[], self: string, query: string, whe
   return items;
 }
 
-/** Insert "[[" link text: the page's title, linked to it (a normal link, so the words stay words). */
-export function insertPageRef(editor: Editor, range: Range, id: string, title: string) {
+/**
+ * Insert "[[" link text: the page's title, linked to it (a normal link, so the words stay words).
+ * `title` is the page's own title ("" when it has none, `text` then names it), remembered so the
+ * words can follow when the page is renamed (linkTitles.ts).
+ */
+export function insertPageRef(editor: Editor, range: Range, id: string, title: string, text = title) {
   editor
     .chain()
     .focus()
     .deleteRange(range)
     .insertContent([
-      { type: "text", text: title, marks: [{ type: "link", attrs: { href: `/p/${id}` } }] },
+      { type: "text", text, marks: [{ type: "link", attrs: { href: `/p/${id}`, pageTitle: title } }] },
       { type: "text", text: " " },
     ])
     .run();

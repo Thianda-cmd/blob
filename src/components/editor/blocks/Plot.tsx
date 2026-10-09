@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { parseFunction } from "./fn";
 import { openEditorAt } from "./insert";
+import { PLOT_NAMES, PlotSpec } from "./schema";
 
 const COLORS = ["var(--blob)", "var(--subject-sky)", "var(--subject-moss)", "var(--subject-clay)", "var(--subject-rose)", "var(--subject-plum)"];
-const NAMES = ["f", "g", "h", "k", "p", "q"];
 const MAX_FUNCTIONS = 6;
 /** Pixels per unit when the plot opens, and how far it may zoom. */
 const START_SCALE = 42;
@@ -207,7 +207,7 @@ function PlotView({ node, updateAttributes, selected }: ReactNodeViewProps) {
             zoomAt(1.6, p.x, p.y);
           }}
           role="img"
-          aria-label={`${t.label}: ${fns.filter(Boolean).map((f, i) => `${NAMES[i]}(x) = ${f}`).join("; ")}`}
+          aria-label={`${t.label}: ${fns.filter(Boolean).map((f, i) => `${PLOT_NAMES[i]}(x) = ${f}`).join("; ")}`}
         >
           <svg width={w} height={h} className="block">
             <defs>
@@ -268,7 +268,7 @@ function PlotView({ node, updateAttributes, selected }: ReactNodeViewProps) {
               <span>x = {fmtValue(hover.x, locale)}</span>
               {hoverValues.map((v) => (
                 <span key={v.i} style={{ color: COLORS[v.i % COLORS.length] }}>
-                  {NAMES[v.i]}(x) = {fmtValue(v.y, locale)}
+                  {PLOT_NAMES[v.i]}(x) = {fmtValue(v.y, locale)}
                 </span>
               ))}
             </div>
@@ -292,7 +292,7 @@ function PlotView({ node, updateAttributes, selected }: ReactNodeViewProps) {
               <div key={i} className={cn("blob-plot-fn", invalid && "is-invalid")}>
                 <span className="blob-plot-swatch" style={{ background: COLORS[i % COLORS.length] }} aria-hidden />
                 <label className="blob-plot-name" htmlFor={`${clip}-f${i}`}>
-                  {NAMES[i]}(x) =
+                  {PLOT_NAMES[i]}(x) =
                 </label>
                 {canEdit ? (
                   <input
@@ -358,45 +358,7 @@ function fmtValue(n: number, locale: "de" | "en") {
 }
 
 /** Graphs of functions y = f(x), with zoom and panning. */
-export const Plot = Node.create({
-  name: "plot",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      fns: {
-        default: [],
-        parseHTML: (el) => {
-          try {
-            return JSON.parse(el.getAttribute("data-fns") ?? "[]");
-          } catch {
-            return [];
-          }
-        },
-        renderHTML: (attrs) => ({ "data-fns": JSON.stringify(attrs.fns ?? []) }),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-plot]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-plot": "" })];
-  },
-
-  renderText({ node }) {
-    const fns = Array.isArray(node.attrs.fns) ? (node.attrs.fns as string[]) : [];
-    return fns
-      .filter(Boolean)
-      .map((f, i) => `${NAMES[i]}(x) = ${f}`)
-      .join(", ");
-  },
-
+export const Plot = PlotSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(PlotView);
   },

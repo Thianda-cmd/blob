@@ -22,6 +22,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { fileKind, fileUrl, formatSize } from "@/lib/files";
 import { cn } from "@/lib/utils";
+import { FileSpec } from "./schema";
 
 type Kind = ReturnType<typeof fileKind>;
 
@@ -175,34 +176,7 @@ function FileView({ node, selected }: ReactNodeViewProps) {
 }
 
 /** A file attached to the note: a card that opens or downloads it; PDFs, pictures, audio and video preview inside. */
-export const FileBlock = Node.create({
-  name: "file",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    const attr = (name: string, fallback: unknown) => ({
-      default: fallback,
-      parseHTML: (el: HTMLElement) => el.getAttribute(`data-${name}`) ?? fallback,
-      renderHTML: (attrs: Record<string, unknown>) => ({ [`data-${name}`]: attrs[name] }),
-    });
-    return { path: attr("path", ""), name: attr("name", ""), size: attr("size", 0), mime: attr("mime", "") };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-file]" }];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-file": "" }), node.attrs.name as string];
-  },
-
-  renderText({ node }) {
-    return (node.attrs.name as string) ?? "";
-  },
-
+export const FileBlock = FileSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(FileView);
   },

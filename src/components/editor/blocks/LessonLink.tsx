@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { Picker, type PickerItem } from "./Picker";
+import { LessonLinkSpec } from "./schema";
 
 export const SUBJECT_ICON = { maths: Sigma, chemistry: FlaskConical, biology: Leaf } satisfies Record<Subject, unknown>;
 
@@ -243,41 +244,7 @@ function LessonView({ node, updateAttributes, selected }: ReactNodeViewProps) {
 }
 
 /** A lesson of the learning center, with your progress, to jump into from the note. */
-export const LessonLink = Node.create({
-  name: "lessonLink",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      slug: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-topic"),
-        renderHTML: (attrs) => (attrs.slug ? { "data-topic": attrs.slug } : {}),
-      },
-      level: {
-        default: null,
-        parseHTML: (el) => Number(el.getAttribute("data-level")) || null,
-        renderHTML: (attrs) => (attrs.level ? { "data-level": attrs.level } : {}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-lesson-link]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-lesson-link": "" })];
-  },
-
-  renderText({ node }) {
-    const meta = node.attrs.slug ? findTopicMeta(node.attrs.slug as string) : undefined;
-    return meta ? resolveText(meta.title, "de") : "";
-  },
-
+export const LessonLink = LessonLinkSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(LessonView);
   },

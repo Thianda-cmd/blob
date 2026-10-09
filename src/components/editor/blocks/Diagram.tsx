@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { caretAfter, openEditorAt } from "./insert";
 import { themeColor, useDark } from "./useDark";
+import { DiagramSpec } from "./schema";
 
 type Starter = keyof NoteBlocksText["diagram"]["starters"];
 const STARTERS: Starter[] = ["mindmap", "flow", "timeline", "cycle", "sequence", "pie"];
@@ -305,35 +306,7 @@ function DiagramView({ node, updateAttributes, editor, getPos, selected }: React
 }
 
 /** A Mermaid diagram (mind map, process, timeline…), drawn from its code. */
-export const Diagram = Node.create({
-  name: "diagram",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      src: {
-        default: "",
-        parseHTML: (el) => el.getAttribute("data-src") ?? el.textContent ?? "",
-        renderHTML: (attrs) => ({ "data-src": attrs.src }),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-diagram]" }];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-diagram": "" }), ["pre", {}, node.attrs.src as string]];
-  },
-
-  renderText() {
-    return "";
-  },
-
+export const Diagram = DiagramSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(DiagramView);
   },

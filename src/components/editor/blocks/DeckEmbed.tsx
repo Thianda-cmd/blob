@@ -15,6 +15,7 @@ import type { Deck } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { Picker } from "./Picker";
+import { DeckEmbedSpec } from "./schema";
 
 type Loaded = { deck: Deck; title: string } | "missing";
 
@@ -160,35 +161,7 @@ function DeckEmbedView({ node, updateAttributes, selected }: ReactNodeViewProps)
 }
 
 /** One of your presentations inside the note: its first slide, "Present" and "Open". */
-export const DeckEmbed = Node.create({
-  name: "deckEmbed",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-deck-id"),
-        renderHTML: (attrs) => (attrs.id ? { "data-deck-id": attrs.id } : {}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-deck-embed]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-deck-embed": "" })];
-  },
-
-  renderText() {
-    return "";
-  },
-
+export const DeckEmbed = DeckEmbedSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(DeckEmbedView);
   },

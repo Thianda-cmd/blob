@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { Floating } from "./Floating";
 import { caretAfter, insertBlock, openEditorAt } from "./insert";
+import { MathBlockSpec, MathInlineSpec, fromTypography, toDisplay } from "./schema";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -21,46 +22,6 @@ declare module "@tiptap/core" {
       /** Turn the selected text into a formula in the line (or insert an empty one). */
       selectionToMath: () => ReturnType;
     };
-  }
-}
-
-/**
- * Formulas are stored as the learning center's display language (engine/display.ts) and drawn by
- * its MathView. A few LaTeX habits are understood too (\dfrac, \leq, \left(…\right), \sum).
- */
-export function toDisplay(src: string) {
-  return fromTypography(src)
-    .replace(/\r?\n/g, " \\\\ ")
-    .replace(/\\[dt]frac(?![A-Za-z])/g, "\\frac")
-    .replace(/\\(left|right)(?![A-Za-z])/g, "")
-    .replace(/\\leq(?![A-Za-z])/g, "\\le")
-    .replace(/\\geq(?![A-Za-z])/g, "\\ge")
-    .replace(/\\neq(?![A-Za-z])/g, "\\ne")
-    .replace(/\\(rightarrow|longrightarrow)(?![A-Za-z])/g, "\\to")
-    .replace(/\\(mathrm|textrm|mathit)(?![A-Za-z])/g, "\\text")
-    .replace(/\\(sum|Sigma)(?![A-Za-z])/g, "Σ")
-    .replace(/\\prod(?![A-Za-z])/g, "∏")
-    .replace(/\\int(?![A-Za-z])/g, "∫");
-}
-
-/** Undo what typing in text did to a formula ("r^2" became "r²", "1/2" became "½"). */
-export function fromTypography(src: string) {
-  return src
-    .replace(/²/g, "^2")
-    .replace(/³/g, "^3")
-    .replace(/½/g, "\\frac12")
-    .replace(/¼/g, "\\frac14")
-    .replace(/¾/g, "\\frac34")
-    .replace(/[–—]/g, "-")
-    .replace(/[„“”]/g, '"');
-}
-
-/** A formula as plain text (search, previews, the note's plain text). */
-export function mathText(src: string) {
-  try {
-    return plainMath(toDisplay(src));
-  } catch {
-    return src;
   }
 }
 
@@ -278,14 +239,6 @@ function MathNodeView({ node, updateAttributes, editor, getPos, selected }: Reac
   );
 }
 
-const srcAttribute = {
-  src: {
-    default: "",
-    parseHTML: (el: HTMLElement) => el.getAttribute("data-src") ?? el.textContent ?? "",
-    renderHTML: (attrs: Record<string, unknown>) => ({ "data-src": attrs.src }),
-  },
-};
-
 /** Open the formula editor of a selected formula with Enter. */
 function enterOpens(editor: Editor, name: string) {
   const sel = editor.state.selection;
@@ -295,29 +248,7 @@ function enterOpens(editor: Editor, name: string) {
 }
 
 /** A formula inside a line of text: type $a^2$ (or press Ctrl+Shift+M). */
-export const MathInline = Node.create({
-  name: "mathInline",
-  group: "inline",
-  inline: true,
-  atom: true,
-  selectable: true,
-
-  addAttributes() {
-    return srcAttribute;
-  },
-
-  parseHTML() {
-    return [{ tag: "span[data-math-inline]" }];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    return ["span", mergeAttributes(HTMLAttributes, { "data-math-inline": "" }), node.attrs.src as string];
-  },
-
-  renderText({ node }) {
-    return mathText(node.attrs.src as string);
-  },
-
+export const MathInline = MathInlineSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(MathNodeView, { as: "span" });
   },
@@ -361,29 +292,7 @@ export const MathInline = Node.create({
 });
 
 /** A formula on its own line, centred: type $$ and a space at the start of a line. */
-export const MathBlock = Node.create({
-  name: "mathBlock",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return srcAttribute;
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-math-block]" }];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-math-block": "" }), node.attrs.src as string];
-  },
-
-  renderText({ node }) {
-    return mathText(node.attrs.src as string);
-  },
-
+export const MathBlock = MathBlockSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(MathNodeView);
   },

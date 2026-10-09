@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { suggestionOpen } from "../suggestKeys";
 import { nearestOfType } from "./insert";
+import { FlashcardSpec } from "./schema";
 import { newBlockId } from "./Toggle";
+
+export { FlashcardBack, FlashcardFront } from "./schema";
 
 /** A new, empty flashcard. */
 export function newFlashcard() {
@@ -136,31 +139,7 @@ function cardAround(state: EditorState) {
 }
 
 /** A card to learn with: a question on the front, the answer on the back (Blob's study mode reads them). */
-export const Flashcard = Node.create({
-  name: "flashcard",
-  group: "block",
-  content: "flashcardFront flashcardBack",
-  defining: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-id"),
-        renderHTML: (attrs) => (attrs.id ? { "data-id": attrs.id } : {}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-flashcard]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-flashcard": "" }), 0];
-  },
-
+export const Flashcard = FlashcardSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(FlashcardView);
   },
@@ -196,35 +175,5 @@ export const Flashcard = Node.create({
           .run();
       },
     };
-  },
-});
-
-export const FlashcardFront = Node.create({
-  name: "flashcardFront",
-  content: "paragraph+",
-  defining: true,
-  isolating: true,
-
-  parseHTML() {
-    return [{ tag: "div[data-flashcard-front]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-flashcard-front": "" }), 0];
-  },
-});
-
-export const FlashcardBack = Node.create({
-  name: "flashcardBack",
-  content: "(paragraph | bulletList | orderedList)+",
-  defining: true,
-  isolating: true,
-
-  parseHTML() {
-    return [{ tag: "div[data-flashcard-back]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-flashcard-back": "" }), 0];
   },
 });

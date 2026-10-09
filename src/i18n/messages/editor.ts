@@ -133,6 +133,8 @@ export const editorText = defineMessages({
       open: (title: string) => `Open ${title}`,
       trashed: "This page was moved to the trash",
       inTrash: "in trash",
+      /** A "[[" link to a page that was deleted or isn't shared with you. */
+      missing: "This page no longer exists or isn't shared with you",
     },
 
     icon: {
@@ -295,6 +297,7 @@ export const editorText = defineMessages({
       open: (title) => `„${title}“ öffnen`,
       trashed: "Diese Seite liegt im Papierkorb",
       inTrash: "im Papierkorb",
+      missing: "Diese Seite gibt es nicht mehr, oder sie ist nicht mit dir geteilt",
     },
 
     icon: {

@@ -1,7 +1,6 @@
 "use client";
 
 import type { Editor } from "@tiptap/core";
-import { TableKit } from "@tiptap/extension-table";
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
@@ -19,11 +18,6 @@ import { useCallback, useMemo } from "react";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
-
-/** Tables: a header row, cells with any blocks, columns you can widen; they scroll sideways on phones. */
-export const Tables = TableKit.configure({
-  table: { resizable: true, cellMinWidth: 72, renderWrapper: true, HTMLAttributes: { class: "blob-table" } },
-});
 
 /** A 3 × 3 table with a header row. */
 export const newTable = { rows: 3, cols: 3, withHeaderRow: true };

@@ -2402,6 +2402,27 @@
   background: color-mix(in oklab, var(--blob) 9%, transparent);
   text-decoration-color: var(--blob);
 }
+/* A link to a page that is gone (deleted, or not shared with you) or in the trash: quiet words with a
+   note on hover, not a broken link (decorations from editor/knowledge/linkTitles.ts). */
+.prose-blob a[href^="/p/"]:has(.blob-ref-gone),
+.prose-blob a[href^="/p/"]:has(.blob-ref-trash) {
+  color: var(--ink-3);
+  font-weight: inherit;
+  text-decoration-style: dashed;
+  text-decoration-color: var(--line-2);
+}
+.prose-blob a[href^="/p/"]:has(.blob-ref-gone) {
+  cursor: text;
+}
+.prose-blob a[href^="/p/"]:has(.blob-ref-gone)::before,
+.prose-blob a[href^="/p/"]:has(.blob-ref-trash)::before {
+  background: var(--ink-3);
+  opacity: 0.55;
+}
+.prose-blob a[href^="/p/"]:has(.blob-ref-gone):hover {
+  background: none;
+  text-decoration-color: var(--line-2);
+}
 
 /* Tags and learning topics under the title -------------------------------- */
 .blob-tag,

@@ -10,6 +10,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { cn, pageTitle } from "@/lib/utils";
+import { PageLinkSpec } from "./blocks/schema";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -51,44 +52,7 @@ function PageLinkView({ node, selected }: ReactNodeViewProps) {
   );
 }
 
-export const PageLink = Node.create<{ untitled: () => string }>({
-  name: "pageLink",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addOptions() {
-    return { untitled: () => editorText.en.untitled };
-  },
-
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-page-id"),
-        renderHTML: (attrs) => ({ "data-page-id": attrs.id }),
-      },
-      title: {
-        default: "",
-        parseHTML: (el) => el.textContent ?? "",
-        renderHTML: () => ({}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "a[data-page-link]" }];
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    return ["a", mergeAttributes(HTMLAttributes, { "data-page-link": "", href: `/p/${node.attrs.id}` }), (node.attrs.title as string) || this.options.untitled()];
-  },
-
-  renderText({ node }) {
-    return (node.attrs.title as string) || this.options.untitled();
-  },
-
+export const PageLink = PageLinkSpec.extend({
   addCommands() {
     return {
       insertPageLink:

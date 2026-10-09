@@ -44,13 +44,13 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { projectsText } from "@/i18n/messages/projects";
-import { MAX_FILE_BYTES, fileKind, fileUrl, formatSize, removeFile, uploadFile } from "@/lib/files";
+import { MAX_FILE_BYTES, fileKind, fileUrl, formatSize, removeUnusedFiles, uploadFile } from "@/lib/files";
 import { formatDueLong } from "@/lib/tasks";
 import type { Attachment, ChecklistItem, PageMeta, Task } from "@/lib/types";
 import { cn, pageTitle, uid } from "@/lib/utils";
 import { DueChip } from "./CardFace";
 import { restrictToVerticalAxis } from "./dndModifiers";
-import { checklistProgress, projectLabels } from "./model";
+import { checklistProgress, projectLabels, type ChecklistChange } from "./model";
 import { AssigneeMenu, ColumnDot, ColumnMenu, LabelChip, LabelMenu, PriorityIcon, PriorityMenu, parseLabels } from "./pickers";
 import { RichText, toggleTodo } from "./RichText";
 import type { Board } from "./useBoard";
@@ -384,9 +384,9 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
           <DescriptionField card={card} readOnly={readOnly} onSave={(details) => update({ details })} />
         </Section>
 
-        <Checklist card={card} readOnly={readOnly} onChange={(checklist) => update({ checklist })} />
+        <Checklist card={card} readOnly={readOnly} onChange={(change) => board.changeChecklist(card.id, change)} />
 
-        <Attachments ref={uploader} card={card} projectId={board.project.id} readOnly={readOnly} onChange={(attachments) => update({ attachments })} />
+        <Attachments ref={uploader} card={card} projectId={board.project.id} readOnly={readOnly} onChange={(attachments) => board.updateCard(card.id, { attachments })} />
 
         <footer className="mt-8 space-y-0.5 border-t border-line pt-3 text-[11.5px] text-ink-3" suppressHydrationWarning>
           <p>{d.created(creator ? personName(creator, d.someone) : d.someone, format(new Date(card.created_at), "PPp", { locale: dateLocale(locale) }))}</p>
@@ -612,7 +612,7 @@ function DescriptionField({ card, readOnly, onSave }: { card: Task; readOnly: bo
    Checklist
    --------------------------------------------------------------------------- */
 
-function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean; onChange: (list: ChecklistItem[]) => void }) {
+function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean; onChange: (change: ChecklistChange) => void }) {
   // dnd-kit numbers its screen reader hints; React's id is the same on the server and in the browser.
   const dndId = useId();
   const t = useMessages(projectsText).drawer;
@@ -628,14 +628,17 @@ function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean
   function add() {
     const text = value.trim().slice(0, 200);
     if (!text || list.length >= 100) return;
-    onChange([...list, { id: uid(), text, done: false }]);
+    onChange({ op: "add", item: { id: uid(), text, done: false } });
     setValue("");
   }
   function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
     const from = list.findIndex((i) => i.id === active.id);
     const to = list.findIndex((i) => i.id === over.id);
-    if (from >= 0 && to >= 0) onChange(arrayMove(list, from, to));
+    if (from < 0 || to < 0) return;
+    // Sent as "after this item", which still means the same place if someone changed the list meanwhile.
+    const order = arrayMove(list, from, to);
+    onChange({ op: "move", id: String(active.id), after: order[to - 1]?.id ?? null, index: to });
   }
 
   if (readOnly && !total) return null;
@@ -668,9 +671,9 @@ function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean
                 key={item.id}
                 item={item}
                 readOnly={readOnly}
-                onToggle={(next) => onChange(list.map((i) => (i.id === item.id ? { ...i, done: next } : i)))}
-                onText={(text) => onChange(list.map((i) => (i.id === item.id ? { ...i, text } : i)))}
-                onDelete={() => onChange(list.filter((i) => i.id !== item.id))}
+                onToggle={(done) => onChange({ op: "set", id: item.id, done })}
+                onText={(text) => onChange({ op: "set", id: item.id, text })}
+                onDelete={() => onChange({ op: "remove", id: item.id })}
               />
             ))}
           </ul>
@@ -804,7 +807,8 @@ function Attachments({
   card: Task;
   projectId: string;
   readOnly: boolean;
-  onChange: (list: Attachment[]) => void;
+  /** Saves the new list; true once it is saved. */
+  onChange: (list: Attachment[]) => Promise<boolean>;
   ref: React.Ref<{ upload: (files: FileList | File[]) => void }>;
 }) {
   const t = useMessages(projectsText).drawer;
@@ -834,16 +838,17 @@ function Attachments({
       }
       const next = [...listRef.current, { id: uid(), type: "file" as const, ...stored }];
       listRef.current = next;
-      onChange(next);
+      void onChange(next);
     }
   }
 
   // The drawer passes dropped files here.
   useImperativeHandle(ref, () => ({ upload }));
 
-  function remove(a: Attachment) {
-    onChange(list.filter((x) => x.id !== a.id));
-    if (a.type === "file") void removeFile(a.path);
+  async function remove(a: Attachment) {
+    const saved = await onChange(list.filter((x) => x.id !== a.id));
+    // The file goes once the card no longer lists it, and only if no other card or note refers to it.
+    if (saved && a.type === "file") void removeUnusedFiles("project", projectId, { minAge: "0 seconds", only: [a.path] });
   }
 
   if (readOnly && !list.length) return null;

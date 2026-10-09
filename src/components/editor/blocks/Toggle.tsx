@@ -11,6 +11,9 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { suggestionOpen } from "../suggestKeys";
 import { nearestOfType } from "./insert";
+import { ToggleSpec } from "./schema";
+
+export { ToggleContent, ToggleSummary } from "./schema";
 
 /**
  * Which toggles are open. Kept out of the document: opening one is just looking, it isn't an edit
@@ -104,30 +107,7 @@ function isOpen(node: PMNode) {
 }
 
 /** A line that hides what's below it until you open it ("aufklappen"). */
-export const Toggle = Node.create({
-  name: "toggle",
-  group: "block",
-  content: "toggleSummary toggleContent",
-  defining: true,
-
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-id"),
-        renderHTML: (attrs) => (attrs.id ? { "data-id": attrs.id } : {}),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-toggle]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-toggle": "" }), 0];
-  },
-
+export const Toggle = ToggleSpec.extend({
   addNodeView() {
     return ReactNodeViewRenderer(ToggleView);
   },
@@ -247,34 +227,6 @@ function skipClosed(editor: Editor, dir: "up" | "down") {
   view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, summaryEnd)).scrollIntoView());
   return true;
 }
-
-export const ToggleSummary = Node.create({
-  name: "toggleSummary",
-  content: "inline*",
-  defining: true,
-
-  parseHTML() {
-    return [{ tag: "div[data-toggle-summary]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-toggle-summary": "" }), 0];
-  },
-});
-
-export const ToggleContent = Node.create({
-  name: "toggleContent",
-  content: "block+",
-  defining: true,
-
-  parseHTML() {
-    return [{ tag: "div[data-toggle-content]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-toggle-content": "" }), 0];
-  },
-});
 
 /** When the caret ends up inside a closed toggle (a click, search, undo), the toggle opens. */
 export const ToggleReveal = Extension.create({

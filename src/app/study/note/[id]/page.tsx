@@ -4,6 +4,7 @@ import { NoteStudy, type StudyMode, type StudyPage } from "@/components/notes/st
 import { studyText } from "@/i18n/messages/study";
 import { getLocale } from "@/i18n/server";
 import { loadPool } from "@/notes/server";
+import { settleIfPending } from "@/notes/settle";
 import type { Review } from "@/notes/study/srs";
 import { createClient, getUser } from "@/lib/supabase/server";
 import type { AccessRole } from "@/lib/types";
@@ -18,10 +19,10 @@ async function loadPage(id: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("pages")
-    .select("id, user_id, kind, title, icon, content, subject_id, parent_id, tags, topics, trashed_at")
+    .select("id, user_id, kind, title, icon, content, subject_id, parent_id, tags, topics, trashed_at, doc_version")
     .eq("id", id)
     .maybeSingle();
-  return data as (StudyPage & { kind: string; trashed_at: string | null }) | null;
+  return data as (StudyPage & { kind: string; trashed_at: string | null; doc_version: number | null }) | null;
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps<"/study/note/[id]">): Promise<Metadata> {
@@ -34,12 +35,16 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/stu
 
 /** Flashcards, quiz and summary of one note, full screen. */
 export default async function NoteStudyPage({ params, searchParams }: PageProps<"/study/note/[id]">) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [{ id }, query, locale] = await Promise.all([params, searchParams, getLocale()]);
   const page = await loadPage(id);
   if (!page || page.trashed_at) notFound();
   if (page.kind !== "note") redirect(`/p/${page.id}`);
   const user = await getUser();
   const supabase = await createClient();
+  // Changes made together that no snapshot holds yet (the last editor closed the note right after
+  // typing): stored first, so the cards and quiz are made from the latest note.
+  const settled = await settleIfPending(supabase, page.id, page.doc_version ?? 0, locale);
+  if (settled) page.content = settled.content;
   const [reviewsRes, roleRes, pool] = await Promise.all([
     supabase.from("card_reviews").select("card_id, box, due_on, reviews, lapses, last_reviewed").eq("page_id", page.id),
     supabase.rpc("page_role", { p_page: page.id }),

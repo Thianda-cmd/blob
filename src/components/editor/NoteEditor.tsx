@@ -3,7 +3,7 @@
 import { rewriteUnknownContent, type Content, type Editor, type JSONContent, type Range } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from "@tiptap/react";
 import { getVersion, sendableSteps } from "prosemirror-collab";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -31,19 +31,19 @@ import { IconPicker } from "./IconPicker";
 import { IMAGE_TYPES, dropPos, imageFiles, uploadImages } from "./imageUpload";
 import { KnowledgeChips } from "./knowledge/Chips";
 import { NoteConnections } from "./knowledge/Connections";
+import { followRenames, pageLinkStatusKey, pageRefs, type LinkedPage } from "./knowledge/linkTitles";
 import { PageRefMenu, insertPageRef, pageRefItems, type PageRefItem } from "./knowledge/PageRef";
-import { collectLinks } from "./links";
+import { collectLinks, pageIdFromHref } from "./links";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
 import { QuickStart } from "./QuickStart";
+import { plainDoc, plainTextOf } from "./schema";
 import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
 
 type NotePatch = { title: string; content: JSONContent; plain_text: string; links: string[] };
-
-const PLAIN_TEXT_LIMIT = 20_000;
 
 function initialContent(content: unknown, plain: string): Content | undefined {
   if (content && typeof content === "object" && (content as JSONContent).type === "doc") return content as JSONContent;
@@ -51,13 +51,6 @@ function initialContent(content: unknown, plain: string): Content | undefined {
   // Never open a note as blank when we know it has words in it.
   if (plain.trim()) return plainDoc(plain);
   return undefined;
-}
-
-function plainDoc(plain: string): JSONContent {
-  return {
-    type: "doc",
-    content: plain.split("\n").map((line) => ({ type: "paragraph", content: line ? [{ type: "text", text: line }] : [] })),
-  };
 }
 
 /** The document without the empty paragraph the editor keeps at the end for typing. */
@@ -69,12 +62,9 @@ function contentToSave(editor: Editor): JSONContent {
   return json;
 }
 
+/** The note's plain text (the server works it out the same way when it settles a note). */
 function plainText(editor: Editor) {
-  return editor
-    .getText({ blockSeparator: "\n" })
-    .replace(/\n{2,}/g, "\n")
-    .trim()
-    .slice(0, PLAIN_TEXT_LIMIT);
+  return plainTextOf(editor.state.doc);
 }
 
 /** Holder for what the long-lived editor callbacks need from the latest render. */
@@ -107,6 +97,10 @@ type Live = {
   joinTogether: () => Promise<void>;
   focusTitle: () => void;
   markBroken: () => void;
+  /** How a page linked from the text is now (gone: deleted, or not shared with you). */
+  linkStatus: (id: string) => "ok" | "trash" | "gone";
+  /** The linked pages' titles were just looked up: older links can start remembering them. */
+  adoptTitles: (state: EditorState) => Transaction | null | undefined;
 };
 
 /** The document an editor is created with: the stored content, and its plain text as a fallback. */
@@ -148,6 +142,10 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const baseVersion = useRef(page.doc_version ?? 0);
   /** reloadTogether (declared further down, with the editor). */
   const reloadRef = useRef<(keepLocal?: boolean) => Promise<void>>(async () => {});
+  /** The pages the text links to ("[["), as they are now: looked up when the note opens and when links are added. */
+  const linked = useRef(new Map<string, LinkedPage>());
+  /** The titles were looked up fresh since the note opened. */
+  const freshTitles = useRef(false);
 
   const save = useCallback(
     async (patch: Partial<NotePatch>) => {
@@ -191,6 +189,15 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       focusTitle,
       joinTogether: () => reloadRef.current(true),
       markBroken: () => setBroken(true),
+      linkStatus: (id) => {
+        const known = pages.find((p) => p.id === id);
+        if (known) return known.trashed_at ? "trash" : "ok";
+        // Not looked up yet: nothing to say.
+        if (!linked.current.has(id)) return "ok";
+        const found = linked.current.get(id);
+        return !found ? "gone" : found.trashed ? "trash" : "ok";
+      },
+      adoptTitles: (state) => (readOnly ? null : freshTitles.current ? followRenames(state, linked.current, true) : undefined),
       openHref: (href) => {
         if (href.startsWith("/")) router.push(href);
         else window.open(href, "_blank", "noopener,noreferrer");
@@ -264,9 +271,14 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
             return pageRefItems(l.pages, l.pageId, query, l.where, (p) => pageTitle("", p.kind, l.locale));
           },
           run: (item, editor, range) => {
-            if (item.kind === "page") insertPageRef(editor, range, item.id, item.page.title || pageTitle("", item.page.kind, live.current?.locale ?? locale));
+            if (item.kind === "page") insertPageRef(editor, range, item.id, item.page.title, item.page.title || pageTitle("", item.page.kind, live.current?.locale ?? locale));
             else void live.current?.createLinkedPage(editor, range, item.title);
           },
+        },
+        pageStatus: {
+          status: (id) => live.current?.linkStatus(id) ?? "ok",
+          label: (status) => (live.current?.text ?? t).pageLink[status === "gone" ? "missing" : "trashed"],
+          adopt: (state) => live.current?.adoptTitles(state),
         },
       }),
       editorProps: {
@@ -305,6 +317,9 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
           if (!link || !view.dom.contains(link)) return false;
           const href = link.getAttribute("href");
           if (!href) return false;
+          // A page that's gone would only show "not found": the click just puts the caret there.
+          const target = pageIdFromHref(href);
+          if (target && live.current?.linkStatus(target) === "gone") return false;
           event.preventDefault();
           live.current?.openHref(href);
           return true;
@@ -570,6 +585,71 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     }
     void updatePage(page.id, patch, { local: true });
   });
+
+  // Links to other pages ("[[") --------------------------------------------------
+
+  /** Look up linked pages (false when that failed). */
+  const lookUp = useCallback(async (ids: string[]) => {
+    const { data, error } = await createClient().from("pages").select("id, title, kind, trashed_at").in("id", ids);
+    if (error) return false;
+    for (const id of ids) linked.current.set(id, null);
+    for (const row of (data ?? []) as Pick<PageMeta, "id" | "title" | "kind" | "trashed_at">[]) {
+      linked.current.set(row.id, { title: row.title ?? "", kind: row.kind, trashed: !!row.trashed_at });
+    }
+    return true;
+  }, []);
+  const redrawLinks = useCallback((e: Editor) => {
+    if (!e.isDestroyed) e.view.dispatch(e.state.tr.setMeta(pageLinkStatusKey, true).setMeta("addToHistory", false));
+  }, []);
+
+  // Links to pages that are gone or in the trash look quiet: find out which, now and when links are added.
+  useEffect(() => {
+    if (!editor) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = async () => {
+      if (editor.isDestroyed) return;
+      const ids = [...new Set(pageRefs(editor.state.doc).map((r) => r.id))].filter((id) => !linked.current.has(id));
+      if (ids.length && (await lookUp(ids)) && alive) redrawLinks(editor);
+    };
+    void refresh();
+    const onChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void refresh(), 1500);
+    };
+    editor.on("update", onChange);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+      editor.off("update", onChange);
+    };
+  }, [editor, lookUp, redrawLinks]);
+
+  // Your pages changed (one created, trashed or restored): links to them may look different now.
+  const pageSet = useMemo(() => pages.map((p) => (p.trashed_at ? `${p.id}:t` : p.id)).join(","), [pages]);
+  useEffect(() => {
+    if (editor) redrawLinks(editor);
+  }, [pageSet, editor, redrawLinks]);
+
+  // When someone who can edit opens the note (once it has caught up with the others), links whose
+  // page was renamed follow the new title, unless their words were changed. A normal change: it
+  // is saved, and sent to the others when working together.
+  const followed = useRef<Editor | null>(null);
+  const canFollow = !!editor && canEdit && (!collabOn || collab.status === "live");
+  useEffect(() => {
+    if (!canFollow || !editor || followed.current === editor) return;
+    followed.current = editor;
+    void (async () => {
+      // Fresh titles: the sidebar's may be older than the database's.
+      const ids = [...new Set(pageRefs(editor.state.doc).map((r) => r.id))];
+      if (ids.length && !(await lookUp(ids))) return;
+      freshTitles.current = true;
+      if (editor.isDestroyed || !editor.isEditable) return;
+      const tr = ids.length ? followRenames(editor.state, linked.current, false) : null;
+      if (tr) editor.view.dispatch(tr);
+      else redrawLinks(editor);
+    })();
+  }, [canFollow, editor, lookUp, redrawLinks]);
 
   // Save state: our own saves (title, or the whole note on its own), then the steps still on their way.
   const unsent = useEditorState({

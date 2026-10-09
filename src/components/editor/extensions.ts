@@ -1,12 +1,7 @@
 import { Extension, type AnyExtension, type Editor, type Range } from "@tiptap/core";
 import type { EditorState } from "@tiptap/pm/state";
-import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
-import { TaskItem } from "@tiptap/extension-task-item";
-import { TaskList } from "@tiptap/extension-task-list";
 import Typography from "@tiptap/extension-typography";
 import { Selection } from "@tiptap/extensions";
-import StarterKit from "@tiptap/starter-kit";
 import type { Locale } from "@/i18n/config";
 import { editorText } from "@/i18n/messages/editor";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
@@ -21,12 +16,13 @@ import { Plot } from "./blocks/Plot";
 import { Sketch } from "./blocks/Sketch";
 import { LessonLink } from "./blocks/LessonLink";
 import { MathBlock, MathInline } from "./blocks/Math";
-import { Tables } from "./blocks/Table";
 import { Toggle, ToggleContent, ToggleReveal, ToggleSummary } from "./blocks/Toggle";
 import { ImageUploadPlaceholder } from "./imageUpload";
+import { PageLinkStatus, type PageLinkStatusOptions } from "./knowledge/linkTitles";
 import { PageLink } from "./PageLink";
 import { BlobPlaceholder } from "./placeholder";
 import { PageRefSuggest, type PageRefItem } from "./knowledge/PageRef";
+import { documentExtensions } from "./schema";
 import { SlashCommand, type SlashController } from "./slash/SlashCommand";
 import { suggestionOpen } from "./suggestKeys";
 import { filterSlashItems, type SlashItem } from "./slash/items";
@@ -80,6 +76,7 @@ export function buildExtensions({
   getLocale,
   readOnly = false,
   pageRef,
+  pageStatus,
 }: {
   slash: SlashController;
   /** "[[" links: the pages to offer and what picking one does. */
@@ -88,6 +85,8 @@ export function buildExtensions({
     items: (query: string) => PageRefItem[];
     run: (item: PageRefItem, editor: Editor, range: Range) => void;
   };
+  /** Links to other pages: how each page is now, and what a quiet (gone or trashed) link says. */
+  pageStatus: Partial<PageLinkStatusOptions>;
   runSlash: (item: SlashItem, editor: Editor, range: Range) => void;
   onExitTop: () => void;
   /** The reader's language, read whenever text is shown (menus, placeholders, page links). */
@@ -100,47 +99,33 @@ export function buildExtensions({
 }): AnyExtension[] {
   const text = () => editorText[getLocale()];
   return [
-    StarterKit.configure({
-      heading: { levels: [1, 2, 3] },
-      codeBlock: { enableTabIndentation: true, tabSize: 2, HTMLAttributes: { spellcheck: "false" } },
-      dropcursor: { color: false, width: 2, class: "blob-dropcursor" },
-      link: {
-        openOnClick: false,
-        autolink: true,
-        linkOnPaste: true,
-        defaultProtocol: "https",
-        HTMLAttributes: { rel: "noopener noreferrer nofollow", target: null },
+    // The document itself (shared with the server, see schema.ts), with this editor's node views.
+    ...documentExtensions(
+      {
+        callout: Callout,
+        mathInline: MathInline,
+        mathBlock: MathBlock,
+        toggle: Toggle,
+        toggleSummary: ToggleSummary,
+        toggleContent: ToggleContent,
+        flashcard: Flashcard,
+        flashcardFront: FlashcardFront,
+        flashcardBack: FlashcardBack,
+        diagram: Diagram,
+        sketch: Sketch,
+        plot: Plot,
+        file: FileBlock,
+        deckEmbed: DeckEmbed,
+        lessonLink: LessonLink,
+        pageLink: PageLink.configure({ untitled: () => text().untitled }),
       },
-      trailingNode: readOnly ? false : { node: "paragraph" },
-    }),
-    TaskList,
-    TaskItem.configure({ nested: true }),
-    Highlight,
+      readOnly,
+    ),
     getLocale() === "de" ? Typography.configure(GERMAN_QUOTES) : Typography,
-    Image.configure({
-      HTMLAttributes: { loading: "lazy" },
-      resize: { enabled: true, directions: ["left", "right"], minWidth: 120, minHeight: 48, alwaysPreserveAspectRatio: true },
-    }),
-    Callout,
-    MathInline,
-    MathBlock,
-    Toggle,
-    ToggleSummary,
-    ToggleContent,
     ToggleReveal,
-    Flashcard,
-    FlashcardFront,
-    FlashcardBack,
-    Tables,
-    Diagram,
-    Sketch,
-    Plot,
-    FileBlock,
     FileUploadPlaceholder,
-    DeckEmbed,
-    LessonLink,
     BlockIds,
-    PageLink.configure({ untitled: () => text().untitled }),
+    PageLinkStatus.configure(pageStatus),
     Selection.configure({ className: "blob-selection" }),
     BlobPlaceholder.configure({ text: () => text().placeholder, blocks: () => noteBlocksText[getLocale()] }),
     ImageUploadPlaceholder,

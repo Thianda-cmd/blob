@@ -8,6 +8,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { FileSweep } from "@/components/files/FileSweep";
 import { AvatarStack } from "@/components/share/Avatar";
 import { ShareDialog } from "@/components/share/ShareDialog";
 import { TopBar } from "@/components/shell/TopBar";
@@ -365,6 +366,8 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
       </div>
 
       <UndoCardToast board={board} />
+      {/* Files no card uses any more: an upload that never made it onto a card, a tab closed while a deleted card could still come back. */}
+      {(role === "owner" || role === "editor") && <FileSweep kind="project" id={project.id} />}
 
       <ShareDialog
         open={sharing}

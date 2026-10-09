@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CvEditor } from "@/components/cv/CvEditor";
 import { DeckEditor } from "@/components/deck/DeckEditor";
 import { NoteEditor } from "@/components/editor/NoteEditor";
+import { FileSweep } from "@/components/files/FileSweep";
 import { themeSpecOf } from "@/components/deck/deck";
 import { FolderView } from "@/components/notes/FolderView";
 import type { PagePreview } from "@/components/subjects/PageCards";
@@ -71,9 +72,12 @@ export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
     return <FolderView key={page.id} page={page} role={role} members={members} previews={previews} />;
   }
   const { role, members } = await loadAccess(page.id);
-  return page.kind === "deck" ? (
-    <DeckEditor key={page.id} page={page} role={role} members={members} />
-  ) : (
-    <NoteEditor key={page.id} page={page} role={role} members={members} />
+  if (page.kind === "deck") return <DeckEditor key={page.id} page={page} role={role} members={members} />;
+  return (
+    <>
+      <NoteEditor key={page.id} page={page} role={role} members={members} />
+      {/* Files of deleted file blocks: removed once nobody uses them (only editors may). */}
+      {(role === "owner" || role === "editor") && <FileSweep key={`files-${page.id}`} kind="page" id={page.id} />}
+    </>
   );
 }

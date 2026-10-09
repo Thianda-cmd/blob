@@ -1,8 +1,7 @@
 "use client";
 
-import { removeFile } from "@/lib/files";
+import { removeUnusedFiles } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
-import type { Attachment } from "@/lib/types";
 
 // Whole-project actions shared by the /projects list and the board. The database decides who may:
 // only the owner archives or deletes, anyone can leave.
@@ -10,12 +9,14 @@ import type { Attachment } from "@/lib/types";
 /** Delete a project with its cards, and the files attached to them. */
 export async function deleteProject(projectId: string) {
   const supabase = createClient();
-  const { data } = await supabase.from("tasks").select("attachments").eq("project_id", projectId);
-  const files = ((data ?? []) as { attachments: Attachment[] }[]).flatMap((r) => r.attachments).filter((a) => a.type === "file");
+  // Only the owner may delete it: nobody else should get as far as removing its files.
+  const { data: role } = await supabase.rpc("project_role", { p_project: projectId });
+  if (role !== "owner") return false;
+  // The files go first: once the project is gone, storage lets nobody remove them. A file a note
+  // still refers to stays; anything left behind goes in the nightly clean-up (api/cron/files).
+  await removeUnusedFiles("project", projectId, { minAge: "0 seconds", whole: true });
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
-  if (error) return false;
-  await Promise.all(files.map((f) => (f.type === "file" ? removeFile(f.path) : null)));
-  return true;
+  return !error;
 }
 
 export async function setArchived(projectId: string, archived: boolean) {

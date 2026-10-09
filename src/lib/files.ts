@@ -58,9 +58,37 @@ export async function fileUrl(path: string, opts: { download?: string | boolean 
   return error ? null : data.signedUrl;
 }
 
-export async function removeFile(path: string) {
-  const { error } = await createClient().storage.from(FILE_BUCKET).remove([path]);
-  return !error;
+/** Remove files, a hundred per request. How many really went (storage skips what you may not remove). */
+export async function removeFiles(paths: string[]) {
+  const storage = createClient().storage.from(FILE_BUCKET);
+  let removed = 0;
+  for (let i = 0; i < paths.length; i += 100) {
+    const { data } = await storage.remove(paths.slice(i, i + 100));
+    removed += data?.length ?? 0;
+  }
+  return removed;
+}
+
+/**
+ * Remove the files of a note or project that nothing refers to any more (rpc unused_files,
+ * migration 0012): no note and no card, uploaded at least `minAge` ago (a Postgres interval; the
+ * server's default is a day, so a block that is still being added, or removed and maybe coming back
+ * with undo, keeps its file). `whole`: the note or project is about to be deleted, so its own
+ * references don't count. `only`: just these paths, when they are unused. Only people who can edit
+ * get any files back. Returns how many went, or null when the server couldn't say.
+ */
+export async function removeUnusedFiles(kind: "page" | "project", id: string, opts: { minAge?: string; whole?: boolean; only?: string[] } = {}) {
+  if (opts.only && !opts.only.length) return 0;
+  const { data, error } = await createClient().rpc("unused_files", {
+    p_kind: kind,
+    p_id: id,
+    ...(opts.minAge !== undefined && { p_min_age: opts.minAge }),
+    ...(opts.whole && { p_whole: true }),
+  });
+  if (error) return null;
+  const only = opts.only && new Set(opts.only);
+  const paths = ((data ?? []) as string[]).filter((p) => !only || only.has(p));
+  return paths.length ? removeFiles(paths) : 0;
 }
 
 /** "2,4 MB" / "2.4 MB" in the reader's language. */
