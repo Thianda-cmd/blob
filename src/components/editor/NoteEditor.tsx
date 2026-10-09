@@ -2,8 +2,9 @@
 
 import { rewriteUnknownContent, type Content, type Editor, type JSONContent, type Range } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from "@tiptap/react";
-import { sendableSteps } from "prosemirror-collab";
-import { CloudOff, Eye, ShieldAlert } from "lucide-react";
+import { getVersion, sendableSteps } from "prosemirror-collab";
+import { TextSelection } from "@tiptap/pm/state";
+import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
@@ -23,6 +24,7 @@ import { NoteBlocksProvider, type NoteBlocks } from "./blocks/context";
 import { uploadNoteFiles } from "./blocks/fileUpload";
 import { TableMenu } from "./blocks/Table";
 import { BubbleToolbar } from "./BubbleToolbar";
+import { localChange, sliceOf, type LocalChange } from "./collab/conflict";
 import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
 import { IconPicker } from "./IconPicker";
@@ -101,6 +103,8 @@ type Live = {
   where: (p: PageMeta) => string;
   createLinkedPage: (editor: Editor, range: Range, title: string) => Promise<void>;
   createSubPage: (editor: Editor) => Promise<void>;
+  /** Switch to working together, bringing over what was written on its own. */
+  joinTogether: () => Promise<void>;
   focusTitle: () => void;
   markBroken: () => void;
 };
@@ -137,13 +141,27 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const fileRef = useRef<HTMLInputElement>(null);
   const attachRef = useRef<HTMLInputElement>(null);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const collabOn = shared && together !== null;
+  // Working together is on for shared notes, and for a note that has steps nobody saved yet.
+  const collabOn = together !== null;
+  /** What the server holds from this tab's point of view (the last content saved alone, at baseVersion). */
+  const lastSaved = useRef<JSONContent | null>(initial.content && typeof initial.content === "object" ? (initial.content as JSONContent) : null);
+  const baseVersion = useRef(page.doc_version ?? 0);
+  /** reloadTogether (declared further down, with the editor). */
+  const reloadRef = useRef<(keepLocal?: boolean) => Promise<void>>(async () => {});
 
   const save = useCallback(
     async (patch: Partial<NotePatch>) => {
       const version = noteCache.version(page.id);
       const { data, error } = await createClient().from("pages").update(patch).eq("id", page.id).select("updated_at").maybeSingle();
+      if (error?.code === "BL409") {
+        // Others wrote to this note together meanwhile (their steps aren't in the saved text yet): the
+        // title is saved on its own, and the note switches to working together, bringing your text over.
+        if (patch.title !== undefined) await createClient().from("pages").update({ title: patch.title }).eq("id", page.id);
+        void reloadRef.current(true);
+        return true;
+      }
       if (error) return false;
+      if (patch.content) lastSaved.current = patch.content;
       noteCache.saved(page.id, version, (data as { updated_at?: string } | null)?.updated_at);
       // Bump updated_at locally so "Edited …" and recent lists stay honest.
       void updatePage(page.id, {}, { local: true });
@@ -171,6 +189,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       userId,
       pageId: page.id,
       focusTitle,
+      joinTogether: () => reloadRef.current(true),
       markBroken: () => setBroken(true),
       openHref: (href) => {
         if (href.startsWith("/")) router.push(href);
@@ -333,36 +352,89 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   /** Where the caret was before the editor was rebuilt (restored when the document is the same). */
   const restore = useRef<{ json: string; from: number; to: number; focus: boolean } | null>(null);
 
-  /** Start (again) from the saved note at its current version and work on it together. */
-  const reloadTogether = useCallback(async () => {
-    await flush();
-    // Changes still on their way go out first (the rebuilt editor starts from what the server has).
-    for (let i = 0; i < 30 && editor && !editor.isDestroyed; i++) {
+  /** A change written on its own, waiting to be brought over once the rebuilt editor has caught up. */
+  const pendingChange = useRef<{ change: LocalChange; focus: boolean } | null>(null);
+  const reloadBusy = useRef(false);
+  const [carryFailed, setCarryFailed] = useState(false);
+
+  /**
+   * Start (again) from the saved note at its current version and work on it together. `keepLocal`:
+   * coming from saving on its own, what you wrote since your last save is brought over on top of
+   * what the others wrote (it may not have been saved: a save is refused while others' steps wait).
+   */
+  const reloadTogether = useCallback(
+    async (keepLocal = false) => {
+      if (reloadBusy.current) return;
+      reloadBusy.current = true;
       try {
-        if (!sendableSteps(editor.state)) break;
-      } catch {
-        break;
+        await flush();
+        // Changes still on their way go out first (the rebuilt editor starts from what the server has).
+        for (let i = 0; i < 30 && editor && !editor.isDestroyed; i++) {
+          try {
+            if (!sendableSteps(editor.state)) break;
+          } catch {
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        setReloading(true);
+        const current = editor && !editor.isDestroyed ? editor : null;
+        if (current) {
+          const { from, to } = current.state.selection;
+          restore.current = { json: JSON.stringify(current.getJSON()), from, to, focus: current.view.hasFocus() };
+        }
+        const { data } = await createClient().from("pages").select("content, plain_text, doc_version").eq("id", page.id).maybeSingle();
+        if (!data) {
+          setReloading(false);
+          return;
+        }
+        const local = keepLocal && current && !current.isDestroyed && !together && !readOnly ? contentToSave(current) : null;
+        const row = data as { content: unknown; plain_text: string | null; doc_version: number | null };
+        // What you wrote since your last save, as one change on the stored note (it can't be worked
+        // out when the stored note isn't the one you last saved: then a calm note says so).
+        const change = local && current ? localChange(current.schema, row.content, lastSaved.current, local) : "same";
+        pendingChange.current = change && change !== "same" ? { change, focus: !!restore.current?.focus } : null;
+        setCarryFailed(change === null);
+        setStale(current);
+        setBroken(false);
+        setOptions(makeOptions({ content: row.content, plain: row.plain_text ?? "" }));
+        setTogether({ version: row.doc_version ?? 0 });
+        setReloading(false);
+      } finally {
+        reloadBusy.current = false;
       }
-      await new Promise((r) => setTimeout(r, 100));
+    },
+    [flush, editor, page.id, makeOptions, together, readOnly],
+  );
+  useEffect(() => {
+    reloadRef.current = reloadTogether;
+  }, [reloadTogether]);
+  // The note about a change that couldn't be brought over goes away after a while.
+  useEffect(() => {
+    if (!carryFailed) return;
+    const id = setTimeout(() => setCarryFailed(false), 15_000);
+    return () => clearTimeout(id);
+  }, [carryFailed]);
+
+  /**
+   * The rebuilt editor is plugged in at the stored version: what you wrote on your own goes in now,
+   * as your change, and is rebased over the others' steps as they arrive (nobody's text is lost).
+   */
+  const onStart = useCallback((e: Editor) => {
+    const pending = pendingChange.current;
+    if (!pending || e.isDestroyed) return;
+    pendingChange.current = null;
+    const c = pending.change;
+    try {
+      const slice = sliceOf(e.schema, c.slice);
+      const tr = e.state.tr.replace(c.from, c.to, slice).setMeta("addToHistory", false);
+      tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(c.from + slice.size, tr.doc.content.size))));
+      e.view.dispatch(tr);
+      if (pending.focus) e.view.focus();
+    } catch {
+      setCarryFailed(true);
     }
-    setReloading(true);
-    const current = editor && !editor.isDestroyed ? editor : null;
-    if (current) {
-      const { from, to } = current.state.selection;
-      restore.current = { json: JSON.stringify(current.getJSON()), from, to, focus: current.view.hasFocus() };
-    }
-    const { data } = await createClient().from("pages").select("content, plain_text, doc_version").eq("id", page.id).maybeSingle();
-    if (!data) {
-      setReloading(false);
-      return;
-    }
-    const row = data as { content: unknown; plain_text: string | null; doc_version: number | null };
-    setStale(current);
-    setBroken(false);
-    setOptions(makeOptions({ content: row.content, plain: row.plain_text ?? "" }));
-    setTogether({ version: row.doc_version ?? 0 });
-    setReloading(false);
-  }, [flush, editor, page.id, makeOptions]);
+  }, []);
 
   const serialize = useCallback(
     (e: Editor) => ({
@@ -382,7 +454,15 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     serialize,
     me,
     onResync: () => void reloadTogether(),
+    onStart,
   });
+
+  const collabFlush = collab.flush;
+  /** Working together: send everything and store a snapshot now. */
+  const flushTogether = useCallback(async () => {
+    await flush();
+    return collabFlush();
+  }, [flush, collabFlush]);
 
   // The note was shared (or stopped being shared) while open, or your role changed: switch modes cleanly.
   const modeRef = useRef({ shared, readOnly });
@@ -392,16 +472,46 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     modeRef.current = { shared, readOnly };
     if (shared && (!together || before.readOnly !== readOnly)) {
       // (A new role rebuilds the editor too: viewers' editors are set up a little differently.)
-      void reloadTogether();
+      void reloadTogether(true);
     } else if (!shared && together) {
-      // Back on its own: keep everything on screen and save it the usual way.
-      void Promise.resolve().then(() => {
+      // Back on its own: everything is sent and stored as a snapshot first (the plain saves that
+      // follow build on it), then the note saves itself the usual way. Offline, it stays together.
+      void (async () => {
+        if (!(await flushTogether())) return;
+        if (!editor || editor.isDestroyed) return;
+        let version: number | null = null;
+        try {
+          version = getVersion(editor.state);
+        } catch {}
         setTogether(null);
-        if (!editor || editor.isDestroyed || readOnly) return;
+        if (version !== null) baseVersion.current = version;
+        lastSaved.current = editor.getJSON();
+        if (readOnly) return;
         schedule({ content: contentToSave(editor), plain_text: plainText(editor), links: collectLinks(editor.state.doc, page.id) });
-      });
+      })();
     }
-  }, [shared, together, reloadTogether, editor, readOnly, schedule, page.id]);
+  }, [shared, together, reloadTogether, flushTogether, editor, readOnly, schedule, page.id]);
+
+  // A note opened on its own whose last steps nobody saved (someone typed and left within a moment):
+  // work on it together, which takes those steps in and stores them.
+  useEffect(() => {
+    if (shared) return;
+    let alive = true;
+    void createClient()
+      .from("page_steps")
+      .select("version")
+      .eq("page_id", page.id)
+      .gte("version", page.doc_version ?? 0)
+      .limit(1)
+      .then(({ data }) => {
+        if (alive && data?.length) void live.current?.joinTogether();
+      });
+    return () => {
+      alive = false;
+    };
+    // Once, when the note opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Put the caret back where it was after a rebuild with the same document.
   useEffect(() => {
@@ -551,7 +661,9 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       ? { icon: <span className="blob-upload-spinner shrink-0" />, text: shared && !together ? t.together.switching : t.together.catchingUp, tone: "calm" as const }
       : collab.status === "offline"
         ? { icon: <CloudOff className="size-3.5 shrink-0" />, text: t.together.offline, tone: "warn" as const }
-        : null;
+        : carryFailed
+          ? { icon: <Info className="size-3.5 shrink-0" />, text: t.together.carryFailed, tone: "calm" as const }
+          : null;
 
   return (
     <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture}>
@@ -561,7 +673,17 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         peers={collab.peers}
         role={role}
         members={members}
-        actions={<StudyMenu pageId={page.id} beforeOpen={flush} due={due ?? 0} />}
+        actions={
+          <StudyMenu
+            pageId={page.id}
+            // The study mode, search and backlinks read the stored note: store the latest first.
+            beforeOpen={async () => {
+              if (collabOn) await flushTogether();
+              else await flush();
+            }}
+            due={due ?? 0}
+          />
+        }
       />
       {notice && (
         <p

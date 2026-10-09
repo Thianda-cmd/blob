@@ -159,6 +159,7 @@ export const editorText = defineMessages({
       offline: "No connection. Your changes are kept and sent as soon as you're back.",
       catchingUp: "Catching up with the others…",
       switching: "One moment, getting the note ready for working together…",
+      carryFailed: "Someone else wrote here at the same time. Your last change couldn't be brought over, so please check the note.",
     },
 
     study: {
@@ -319,6 +320,7 @@ export const editorText = defineMessages({
       offline: "Keine Verbindung. Deine Änderungen bleiben erhalten und werden gesendet, sobald du wieder online bist.",
       catchingUp: "Hole die Änderungen der anderen…",
       switching: "Einen Moment, die Notiz wird fürs gemeinsame Arbeiten vorbereitet…",
+      carryFailed: "Jemand hat gleichzeitig hier geschrieben. Deine letzte Änderung ließ sich nicht übernehmen, schau bitte kurz drüber.",
     },
 
     study: {
