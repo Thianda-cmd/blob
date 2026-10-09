@@ -41,6 +41,26 @@ const BY_ENDING: Record<string, string> = {
   heic: "image/heic",
 };
 
+/**
+ * A name storage accepts: object keys must be plain ASCII ("Brüche.pdf" would be refused). The note
+ * keeps showing the real name.
+ */
+export function storageName(name: string) {
+  const plain = name
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9._ ()-]/g, "_")
+    .trim();
+  return plain || "file";
+}
+
 /** The file with a type the bucket accepts, or null when it can't be attached. */
 export function attachable(file: File): File | null {
   const ending = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -121,14 +141,14 @@ async function uploadOne(view: EditorView, file: File, pageId: string, text: Fil
   const id = crypto.randomUUID();
   const pos = at ?? insertionPos(view.state);
   view.dispatch(view.state.tr.setMeta(key, { add: { id, pos, name: file.name, label: text.uploading } } satisfies Meta));
-  const stored = await uploadFile({ type: "page", id: pageId }, file);
+  const stored = await uploadFile({ type: "page", id: pageId }, new File([file], storageName(file.name), { type: file.type }));
   if (view.isDestroyed) return;
   const { state } = view;
   const tr = state.tr.setMeta(key, { remove: { id } } satisfies Meta);
   const found = key.getState(state)?.find(undefined, undefined, (spec) => spec.id === id);
   const target = found?.length ? found[0].from : null;
   if (stored && target !== null) {
-    tr.insert(target, state.schema.nodes.file.create({ path: stored.path, name: stored.name, size: stored.size, mime: stored.mime }));
+    tr.insert(target, state.schema.nodes.file.create({ path: stored.path, name: file.name.slice(0, 200), size: stored.size, mime: stored.mime }));
   }
   view.dispatch(tr);
   if (!stored) {

@@ -164,7 +164,10 @@ export function useBoard(initial: BoardData, me: Me) {
     if (p.data) applyRow("projects", p.data as Row);
     if (cols.data) {
       const remote = cols.data as ProjectColumn[];
-      commitColumns((local) => remote.map((r) => merge("project_columns", local.find((c) => c.id === r.id) as unknown as Row, r as unknown as Row) as unknown as ProjectColumn));
+      commitColumns((local) => [
+        ...remote.map((r) => merge("project_columns", local.find((c) => c.id === r.id) as unknown as Row, r as unknown as Row) as unknown as ProjectColumn),
+        ...local.filter((c) => !remote.some((r) => r.id === c.id) && inflight.current.has(`project_columns:${c.id}`)),
+      ]);
     }
     if (list.data) {
       const remote = list.data as Task[];
@@ -467,7 +470,10 @@ export function useBoard(initial: BoardData, me: Me) {
         created_at: new Date().toISOString(),
       };
       commitColumns((cols) => [...cols, column]);
+      const key = `project_columns:${column.id}`;
+      begin(inflight.current, key, ["id"]);
       const { error } = await createClient().from("project_columns").insert({ id: column.id, project_id: id, title: clean, color: column.color, position: column.position });
+      end(inflight.current, key, ["id"]);
       if (error) {
         commitColumns((cols) => cols.filter((c) => c.id !== column.id));
         oops();

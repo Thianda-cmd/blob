@@ -6,6 +6,7 @@ import { Avatar, personName } from "@/components/share/Avatar";
 import { Popover } from "@/components/ui/Menu";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
+import { shareText } from "@/i18n/messages/share";
 import type { Member, ProjectColumn } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LABEL_COLORS, PRIORITIES, PROJECT_COLORS, boardColor, formatLabel, labelKey, parseLabel, type Label, type LabelColor, type Priority } from "./model";
@@ -140,6 +141,7 @@ export function AssigneeMenu({
   align?: "start" | "end";
 }) {
   const t = useMessages(projectsText);
+  const someone = useMessages(shareText).someone;
   // You first: assigning yourself is the most common.
   const list = [...members].sort((a, b) => (a.user_id === me ? -1 : b.user_id === me ? 1 : 0));
   return (
@@ -155,7 +157,7 @@ export function AssigneeMenu({
               icon={<Avatar person={m} size={20} />}
               onClick={() => onChange(on ? value.filter((id) => id !== m.user_id) : [...value, m.user_id])}
             >
-              {personName(m, t.drawer.someone)}
+              {personName(m, someone)}
               {m.user_id === me && <span className="text-ink-3"> ({t.you})</span>}
             </PickRow>
           );

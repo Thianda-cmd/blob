@@ -192,7 +192,27 @@ export function NotesGraph({
     const s = n.subjectId ? subjectOf.get(n.subjectId) : undefined;
     return s ? subjectColor(s.color) : "var(--ink-3)";
   };
-  const showLabel = (n: GNode, i: number) => (lit ? lit.has(i) : view.k >= 1.1 || n.degree >= 2 || n.kind !== "page" || graph.nodes.length <= 40);
+  // Labels that fit: the focused node and its neighbours first, then hubs and well-connected notes;
+  // a label that would overlap one already placed waits until you zoom in.
+  const labels = new Set<number>();
+  {
+    const order = graph.nodes
+      .map((n, i) => ({ n, i, rank: (lit?.has(i) ? 1000 : 0) + (i === focus ? 1000 : 0) + (n.kind !== "page" ? 50 : 0) + n.degree }))
+      .filter(({ i }) => !lit || lit.has(i))
+      .sort((a, b) => b.rank - a.rank);
+    const boxes: [number, number, number, number][] = [];
+    for (const { n, i } of order) {
+      const text = n.label.length > 28 ? 28 : n.label.length;
+      const w = text * 6.6 + 6;
+      const x = n.x * view.k + view.x;
+      const y = (n.y + r(n)) * view.k + view.y + 4;
+      const box: [number, number, number, number] = [x - w / 2, y, x + w / 2, y + 15];
+      if (boxes.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+      boxes.push(box);
+      labels.add(i);
+    }
+  }
+  const showLabel = (_n: GNode, i: number) => labels.has(i);
   const card = focus !== null ? graph.nodes[focus] : null;
   const cardPage = card?.kind === "page" ? pages.find((p) => p.id === card.id) : undefined;
 
