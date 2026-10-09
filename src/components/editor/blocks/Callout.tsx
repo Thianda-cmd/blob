@@ -7,6 +7,7 @@ import { MenuItem, Popover } from "@/components/ui/Menu";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
+import { suggestionOpen } from "../suggestKeys";
 import { useNoteBlocks } from "./context";
 
 export const CALLOUT_KINDS = ["idea", "definition", "rule", "example", "warning"] as const;
@@ -122,6 +123,7 @@ export const Callout = Node.create({
     return {
       // Enter on an empty last line leaves the box.
       Enter: ({ editor }) => {
+        if (suggestionOpen(editor.state)) return false;
         const { $from, empty } = editor.state.selection;
         if (!empty || $from.depth < 2 || $from.parent.type.name !== "paragraph" || $from.parent.content.size > 0) return false;
         const box = $from.node($from.depth - 1);

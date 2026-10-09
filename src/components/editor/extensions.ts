@@ -26,7 +26,9 @@ import { Toggle, ToggleContent, ToggleReveal, ToggleSummary } from "./blocks/Tog
 import { ImageUploadPlaceholder } from "./imageUpload";
 import { PageLink } from "./PageLink";
 import { BlobPlaceholder } from "./placeholder";
+import { PageRefSuggest, type PageRefItem } from "./knowledge/PageRef";
 import { SlashCommand, type SlashController } from "./slash/SlashCommand";
+import { suggestionOpen } from "./suggestKeys";
 import { filterSlashItems, type SlashItem } from "./slash/items";
 
 /** True when the caret is in the very first line of text, with nothing (e.g. an image) above it. */
@@ -55,7 +57,7 @@ const TitleBridge = Extension.create<{ onExitTop: () => void }>({
     return {
       ArrowUp: ({ editor }) => {
         const { state, view } = editor;
-        if (!state.selection.empty || !inFirstTextblock(state) || !view.endOfTextblock("up")) return false;
+        if (suggestionOpen(state) || !state.selection.empty || !inFirstTextblock(state) || !view.endOfTextblock("up")) return false;
         this.options.onExitTop();
         return true;
       },
@@ -77,8 +79,15 @@ export function buildExtensions({
   onExitTop,
   getLocale,
   readOnly = false,
+  pageRef,
 }: {
   slash: SlashController;
+  /** "[[" links: the pages to offer and what picking one does. */
+  pageRef: {
+    controller: SlashController<PageRefItem>;
+    items: (query: string) => PageRefItem[];
+    run: (item: PageRefItem, editor: Editor, range: Range) => void;
+  };
   runSlash: (item: SlashItem, editor: Editor, range: Range) => void;
   onExitTop: () => void;
   /** The reader's language, read whenever text is shown (menus, placeholders, page links). */
@@ -141,6 +150,7 @@ export function buildExtensions({
       items: (query) => filterSlashItems(query, getLocale()),
       emptyHint: () => text().placeholder.slashQuery,
     }),
+    PageRefSuggest.configure(pageRef),
     TitleBridge.configure({ onExitTop }),
   ];
 }

@@ -123,7 +123,7 @@ function SubjectBadge({ subject }: { subject: Subject }) {
 
 function SubjectChip({ page }: { page: PageMeta }) {
   const t = useMessages(editorText).meta;
-  const { pages, subjects, updatePage } = useWorkspace();
+  const { pages, subjects, updatePage, userId } = useWorkspace();
   // Nested pages live under their root page's subject.
   let root = page;
   for (let i = 0; i < 6 && root.parent_id; i++) {
@@ -134,7 +134,8 @@ function SubjectChip({ page }: { page: PageMeta }) {
   const subject = subjects.find((s) => s.id === root.subject_id);
   const chip = "flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-ink-2 transition-colors [@media(hover:none)]:h-8";
 
-  if (page.parent_id) {
+  // Sub-pages live in their root's subject; a page shared with you stays in its owner's (they decide).
+  if (page.parent_id || page.user_id !== userId) {
     return subject ? (
       <span className={cn(chip, "bg-hover/70")}>
         <SubjectBadge subject={subject} />

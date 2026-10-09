@@ -119,12 +119,24 @@ export function useTableChanges<T extends Record<string, unknown>>(
   useEffect(() => {
     if (!filter) return;
     const supabase = createClient();
-    const ch = supabase
-      .channel(`db:${table}:${filter}:${tabId()}`)
-      .on("postgres_changes" as never, { event: "*", schema: "public", table, filter }, (payload: RealtimePostgresChangesPayload<T>) => handler.current(payload))
-      .subscribe();
+    let ch: RealtimeChannel | null = null;
+    let live = true;
+    // Join with the signed-in user's token. Right after a page load the socket may not have it yet;
+    // a join without it counts as anonymous, and Realtime then refuses the subscription for good
+    // (after an "ok" reply, so it never retries), unlike a private channel, which rejoins.
+    void supabase.realtime
+      .setAuth()
+      .catch(() => {})
+      .then(() => {
+        if (!live) return;
+        ch = supabase
+          .channel(`db:${table}:${filter}:${tabId()}`)
+          .on("postgres_changes" as never, { event: "*", schema: "public", table, filter }, (payload: RealtimePostgresChangesPayload<T>) => handler.current(payload))
+          .subscribe();
+      });
     return () => {
-      void supabase.removeChannel(ch);
+      live = false;
+      if (ch) void supabase.removeChannel(ch);
     };
   }, [table, filter]);
 }

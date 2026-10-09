@@ -3,12 +3,14 @@
 // position), the key terms with their meaning, dates and formulas. Nothing is made up: every line
 // is the student's own text.
 
-import { flatBlocks, plain, splitLines, toBlocks, type Block, type Line } from "../doc";
+import { flatBlocks, plain, splitLines, toBlocks, type Block, type CalloutKind, type Line } from "../doc";
 import { contentWords, detectLang, fold, needsContext, sentences, stem, type Lang } from "../text";
 import { makeCards, type Card } from "./cards";
 
 export type Point =
-  | { kind: "sentence" | "item" | "rule"; line: Line; depth: number }
+  | { kind: "sentence" | "item"; line: Line; depth: number }
+  /** A rule, definition or warning from a callout (kept whole). */
+  | { kind: "rule"; line: Line; depth: number; callout: CalloutKind }
   | { kind: "math"; src: string; label?: string }
   | { kind: "table"; rows: Line[][]; header: boolean };
 
@@ -98,7 +100,8 @@ export function summarize(doc: unknown, title = "", cards?: Card[]): Summary {
     const introduces = new Set<number>();
     let firstSentence = true;
 
-    const visit = (b: Block, inRule: boolean, depth: number) => {
+    const visit = (b: Block, rule: CalloutKind | null, depth: number) => {
+      const inRule = rule !== null;
       switch (b.type) {
         case "para": {
           const para = paraId++;
@@ -112,7 +115,7 @@ export function summarize(doc: unknown, title = "", cards?: Card[]): Summary {
               prev = sc;
               firstSentence = false;
               if (inRule) {
-                points.push({ order: sc.order, point: { kind: "rule", line: s, depth } });
+                points.push({ order: sc.order, point: { kind: "rule", line: s, depth, callout: rule } });
                 keptSentences++;
                 keptWords += words(text);
               } else candidates.push(sc);
@@ -129,7 +132,7 @@ export function summarize(doc: unknown, title = "", cards?: Card[]): Summary {
           const first = sentences(b.line)[0] ?? b.line;
           const line = words(text) > 30 ? first : b.line;
           keptWords += words(plain(line));
-          points.push({ order: order++, point: { kind: inRule ? "rule" : "item", line, depth: b.ctx.depth + depth } });
+          points.push({ order: order++, point: rule ? { kind: "rule", line, depth: b.ctx.depth + depth, callout: rule } : { kind: "item", line, depth: b.ctx.depth + depth } });
           break;
         }
         case "math":
@@ -141,11 +144,11 @@ export function summarize(doc: unknown, title = "", cards?: Card[]): Summary {
         case "callout":
           // Rules, definitions and warnings always stay; examples go (the summary keeps the idea, not the practice).
           if (b.kind === "example") break;
-          b.body.forEach((x) => visit(x, b.kind !== "idea", depth));
+          b.body.forEach((x) => visit(x, b.kind === "idea" ? rule : b.kind, depth));
           break;
         case "toggle":
           if (b.summary.length) points.push({ order: order++, point: { kind: "item", line: b.summary, depth: 0 } });
-          b.body.forEach((x) => visit(x, inRule, depth + 1));
+          b.body.forEach((x) => visit(x, rule, depth + 1));
           break;
         case "flashcard":
           if (b.front.length && b.back.length) points.push({ order: order++, point: { kind: "item", line: [...b.front[0], { text: " – " }, ...b.back.flatMap((l, i) => (i ? [{ text: " " }, ...l] : l))], depth: 0 } });
@@ -155,7 +158,7 @@ export function summarize(doc: unknown, title = "", cards?: Card[]): Summary {
       }
     };
     sec.blocks.forEach((b, i) => {
-      visit(b, false, 0);
+      visit(b, null, 0);
       if (b.type === "para" && sec.blocks[i + 1]?.type === "item") introduces.add(paraId - 1);
     });
 

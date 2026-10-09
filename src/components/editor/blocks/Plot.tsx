@@ -1,6 +1,7 @@
 "use client";
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { Maximize2, Minus, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -10,6 +11,7 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { parseFunction } from "./fn";
+import { openEditorAt } from "./insert";
 
 const COLORS = ["var(--blob)", "var(--subject-sky)", "var(--subject-moss)", "var(--subject-clay)", "var(--subject-rose)", "var(--subject-plum)"];
 const NAMES = ["f", "g", "h", "k", "p", "q"];
@@ -397,5 +399,17 @@ export const Plot = Node.create({
 
   addNodeView() {
     return ReactNodeViewRenderer(PlotView);
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Enter on a selected plot: type in its first function.
+      Enter: ({ editor }) => {
+        const sel = editor.state.selection;
+        if (!(sel instanceof NodeSelection) || sel.node.type.name !== this.name || !editor.isEditable) return false;
+        openEditorAt(editor, sel.from, 0);
+        return true;
+      },
+    };
   },
 });

@@ -9,6 +9,7 @@ import { useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
+import { suggestionOpen } from "../suggestKeys";
 import { nearestOfType } from "./insert";
 import { newBlockId } from "./Toggle";
 
@@ -168,11 +169,13 @@ export const Flashcard = Node.create({
     return {
       // Tab: from the question to the answer (lists in the answer keep their own Tab).
       Tab: ({ editor }) => {
+        if (suggestionOpen(editor.state)) return false;
         const at = cardAround(editor.state);
         if (!at || at.side !== "front") return false;
         return goToSide(editor, at.pos, "back");
       },
       "Shift-Tab": ({ editor }) => {
+        if (suggestionOpen(editor.state)) return false;
         const at = cardAround(editor.state);
         if (!at || at.side !== "back" || editor.isActive("listItem")) return false;
         return goToSide(editor, at.pos, "front");

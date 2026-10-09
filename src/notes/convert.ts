@@ -38,7 +38,7 @@ export function summaryNote(summary: Summary, title: string, labels: SummaryLabe
       if (p.kind === "item" || p.kind === "sentence") items.push({ line: p.line });
       else {
         flush();
-        if (p.kind === "rule") out.push(callout("rule", [paragraph(p.line)]));
+        if (p.kind === "rule") out.push(callout(p.callout, [paragraph(p.line)]));
         else if (p.kind === "math") out.push(mathBlock(p.src));
         else if (p.kind === "table") out.push(table(p.rows, p.header));
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { rewriteUnknownContent, type Content, type Editor, type JSONContent } from "@tiptap/core";
+import { rewriteUnknownContent, type Content, type Editor, type JSONContent, type Range } from "@tiptap/core";
 import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from "@tiptap/react";
 import { sendableSteps } from "prosemirror-collab";
 import { CloudOff, Eye, ShieldAlert } from "lucide-react";
@@ -27,6 +27,9 @@ import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
 import { IconPicker } from "./IconPicker";
 import { IMAGE_TYPES, dropPos, imageFiles, uploadImages } from "./imageUpload";
+import { KnowledgeChips } from "./knowledge/Chips";
+import { NoteConnections } from "./knowledge/Connections";
+import { PageRefMenu, insertPageRef, pageRefItems, type PageRefItem } from "./knowledge/PageRef";
 import { collectLinks } from "./links";
 import { noteCache } from "./noteCache";
 import { NoteMeta } from "./NoteMeta";
@@ -93,6 +96,10 @@ type Live = {
   pickImage: () => void;
   pickFile: () => void;
   blocksText: NoteBlocksText;
+  pages: PageMeta[];
+  /** Where a page lives, for the "[[" menu (its parent page or subject). */
+  where: (p: PageMeta) => string;
+  createLinkedPage: (editor: Editor, range: Range, title: string) => Promise<void>;
   createSubPage: (editor: Editor) => Promise<void>;
   focusTitle: () => void;
   markBroken: () => void;
@@ -110,7 +117,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const tb = useMessages(noteBlocksText);
   const locale = useLocale();
   const router = useRouter();
-  const { pages, userId, profile, updatePage, createPage } = useWorkspace();
+  const { pages, subjects, userId, profile, updatePage, createPage } = useWorkspace();
   const meta = pages.find((p) => p.id === page.id);
   const icon = meta ? meta.icon : page.icon;
   const shared = members.length > 1;
@@ -172,6 +179,24 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       pickImage: () => fileRef.current?.click(),
       pickFile: () => attachRef.current?.click(),
       blocksText: tb,
+      pages,
+      where: (p) => {
+        const parent = p.parent_id ? pages.find((x) => x.id === p.parent_id) : undefined;
+        if (parent) return pageTitle(parent.title, parent.kind, locale);
+        return subjects.find((x) => x.id === p.subject_id)?.name ?? "";
+      },
+      createLinkedPage: async (editor, range, title) => {
+        // The new page sits next to this note: in its subject (when the note is yours).
+        let root: PageMeta | undefined = meta;
+        for (let i = 0; i < 8 && root?.parent_id; i++) root = pages.find((x) => x.id === root!.parent_id);
+        const mine = (meta ?? page).user_id === userId;
+        const at = range.from;
+        editor.chain().focus().deleteRange(range).run();
+        const created = await createPage({ kind: "note", title, subject_id: mine ? (root ?? page).subject_id : null });
+        if (!created || editor.isDestroyed) return;
+        insertPageRef(editor, { from: Math.min(at, editor.state.doc.content.size), to: Math.min(at, editor.state.doc.content.size) }, created.id, title);
+        blob.react("jump", "happy");
+      },
       createSubPage: async (editor) => {
         const created = await createPage({ kind: "note", parent_id: page.id, subject_id: meta ? meta.subject_id : page.subject_id });
         if (!created || editor.isDestroyed) return;
@@ -183,6 +208,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   });
 
   const [slash] = useState(() => new SlashController());
+  const [refs] = useState(() => new SlashController<PageRefItem>());
   /** Editor options for a document. A new options object creates a new editor (see useEditor below). */
   const [makeOptions] = useState(() => (source: Source): UseEditorOptions & { immediatelyRender: false } => {
     const viewer = live.current?.readOnly ?? readOnly;
@@ -211,6 +237,18 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         onExitTop: () => live.current?.focusTitle(),
         getLocale: () => live.current?.locale ?? locale,
         readOnly: viewer,
+        pageRef: {
+          controller: refs,
+          items: (query) => {
+            const l = live.current;
+            if (!l) return [];
+            return pageRefItems(l.pages, l.pageId, query, l.where, (p) => pageTitle("", p.kind, l.locale));
+          },
+          run: (item, editor, range) => {
+            if (item.kind === "page") insertPageRef(editor, range, item.id, item.page.title || pageTitle("", item.page.kind, live.current?.locale ?? locale));
+            else void live.current?.createLinkedPage(editor, range, item.title);
+          },
+        },
       }),
       editorProps: {
         attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
@@ -298,6 +336,15 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   /** Start (again) from the saved note at its current version and work on it together. */
   const reloadTogether = useCallback(async () => {
     await flush();
+    // Changes still on their way go out first (the rebuilt editor starts from what the server has).
+    for (let i = 0; i < 30 && editor && !editor.isDestroyed; i++) {
+      try {
+        if (!sendableSteps(editor.state)) break;
+      } catch {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
     setReloading(true);
     const current = editor && !editor.isDestroyed ? editor : null;
     if (current) {
@@ -512,6 +559,8 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         pageId={page.id}
         saveState={readOnly ? "saved" : saveState}
         peers={collab.peers}
+        role={role}
+        members={members}
         actions={<StudyMenu pageId={page.id} beforeOpen={flush} due={due ?? 0} />}
       />
       {notice && (
@@ -547,8 +596,9 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
                   spellCheck
                   className="block w-full resize-none overflow-hidden bg-transparent font-display text-[34px] font-bold leading-[1.15] tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/45 sm:text-[40px]"
                 />
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
                   <NoteMeta page={meta ?? page} editor={editor} />
+                  <KnowledgeChips page={meta ?? page} canEdit={!readOnly} />
                 </div>
               </header>
 
@@ -568,6 +618,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
                   {editor && canEdit && <QuickStart editor={editor} onImage={() => fileRef.current?.click()} />}
                 </div>
               </NoteBlocksProvider>
+              <NoteConnections page={meta ?? page} title={title} />
               <div
                 aria-hidden
                 className="h-[18vh] cursor-text"
@@ -593,6 +644,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       {editor && canEdit && <BubbleToolbar editor={editor} />}
       {editor && canEdit && <TableMenu editor={editor} />}
       <SlashMenu controller={slash} />
+      <PageRefMenu controller={refs} />
       <input
         ref={fileRef}
         type="file"

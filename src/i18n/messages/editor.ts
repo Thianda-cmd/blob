@@ -52,6 +52,7 @@ export const editorText = defineMessages({
         code: { title: "Code block", description: "Write a snippet of code", keywords: ["snippet", "pre", "program", "monospace"] },
         callout: { title: "Callout", description: "Make a key idea stand out", keywords: ["note", "tip", "info", "important", "box", "highlight"] },
         subpage: { title: "Sub-page", description: "Nest a new page inside this one", keywords: ["page", "child", "nested", "new", "link"] },
+        pageRef: { title: "Link to page", description: "Link to another note in the text", keywords: ["link", "mention", "reference", "wiki", "page", "backlink"] },
         date: { title: "Today's date", description: "Insert the current date", keywords: ["today", "now", "time", "day"] },
         toggle: { title: "Toggle", description: "Hide content under a line you can open", keywords: ["collapse", "details", "expand", "fold", "hide", "spoiler"] },
         math: { title: "Formula", description: "An equation on its own line", keywords: ["equation", "math", "maths", "latex", "tex", "katex"] },
@@ -143,7 +144,7 @@ export const editorText = defineMessages({
       add: "Add icon",
     },
 
-    quickStart: { heading: "Heading", checklist: "Checklist", image: "Image" },
+    quickStart: { heading: "Heading", checklist: "Checklist", flashcard: "Flashcard", image: "Image" },
 
     upload: {
       uploading: "Uploading…",
@@ -215,6 +216,7 @@ export const editorText = defineMessages({
         code: { title: "Codeblock", description: "Schreib ein Stück Code", keywords: ["programm", "quelltext", "programmieren"] },
         callout: { title: "Merkkasten", description: "Hebt einen wichtigen Gedanken hervor", keywords: ["merke", "merksatz", "hinweis", "tipp", "wichtig", "kasten", "box", "info"] },
         subpage: { title: "Unterseite", description: "Eine neue Seite in dieser Seite", keywords: ["seite", "neu", "verschachtelt", "verlinken"] },
+        pageRef: { title: "Link zu Seite", description: "Im Text auf eine andere Notiz verlinken", keywords: ["link", "verlinken", "verweis", "seite", "notiz", "querverweis"] },
         date: { title: "Heutiges Datum", description: "Fügt das aktuelle Datum ein", keywords: ["heute", "datum", "jetzt", "tag"] },
         toggle: { title: "Aufklappbar", description: "Inhalt unter einer Zeile verstecken", keywords: ["aufklappen", "zuklappen", "einklappen", "verstecken", "ausklappen"] },
         math: { title: "Formel", description: "Eine Gleichung in eigener Zeile", keywords: ["gleichung", "mathe", "rechnung", "latex", "term"] },
@@ -304,7 +306,7 @@ export const editorText = defineMessages({
       add: "Symbol hinzufügen",
     },
 
-    quickStart: { heading: "Überschrift", checklist: "Checkliste", image: "Bild" },
+    quickStart: { heading: "Überschrift", checklist: "Checkliste", flashcard: "Karteikarte", image: "Bild" },
 
     upload: {
       uploading: "Wird hochgeladen…",

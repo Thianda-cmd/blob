@@ -9,6 +9,7 @@ import {
   FlaskConical,
   GraduationCap,
   Layers,
+  Link2,
   Network,
   Paperclip,
   PencilLine,
@@ -276,6 +277,14 @@ const DEFS: SlashDef[] = [
       chainAt(editor, range).run();
       void ctx.createSubPage(editor);
     },
+  },
+  {
+    id: "pageRef",
+    group: "advanced",
+    icon: Link2,
+    hint: "[[",
+    // Opens the "[[" page search right where you are.
+    run: ({ editor, range }) => chainAt(editor, range).insertContent("[[").run(),
   },
   {
     id: "date",

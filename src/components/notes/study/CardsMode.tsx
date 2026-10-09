@@ -8,7 +8,7 @@ import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { useNow } from "@/components/tasks/useNow";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
-import { studyText } from "@/i18n/messages/study";
+import { studyText, type StudyText } from "@/i18n/messages/study";
 import { Confetti } from "@/learn/components/Confetti";
 import { CountUp, StudyButton } from "@/learn/components/StudyChrome";
 import { Tutor } from "@/learn/components/Tutor";
@@ -231,6 +231,9 @@ function whenLabel(due: string, day: string | null, locale: "de" | "en") {
   return locale === "de" ? `am ${format(new Date(y, m - 1, d), "EEEE, d. MMMM", { locale: dateLocale(locale) })}` : `on ${format(new Date(y, m - 1, d), "EEEE, d MMMM", { locale: dateLocale(locale) })}`;
 }
 
+/** Where a card comes from, as a chip ("Definition", "Datum", "Vokabel", "Lücke"…). */
+const sourceLabel = (card: Card, t: StudyText) => (card.group === "date" ? t.sources.date : card.group === "vocab" ? t.sources.vocab : t.sources[card.source]);
+
 /** One round: a card at a time, flip, then "knew it" or not (buttons, keys 1 and 2, or a swipe). */
 function Round({ session, title, onAnswer, onStop }: { session: Session; title: string; onAnswer: (knew: boolean) => void; onStop: () => void }) {
   const t = useMessages(studyText);
@@ -401,7 +404,7 @@ function FaceHead({ card, prompt }: { card: Card; prompt: string | null }) {
   const t = useMessages(studyText);
   return (
     <div className="flex items-center gap-2">
-      <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{t.sources[card.source]}</span>
+      <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{sourceLabel(card, t)}</span>
       {prompt && <span className="rounded-full bg-blob-soft px-2.5 py-0.5 text-[12.5px] font-semibold text-blob-ink">{prompt}</span>}
     </div>
   );
@@ -673,7 +676,7 @@ function PreviewRow({
           {card.source === "cloze" ? <span className="font-medium text-blob-ink">{card.answer}</span> : <RichLines lines={card.back} />}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-3">{t.sources[original.source]}</span>
+          <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-3">{sourceLabel(original, t)}</span>
           <span className={cn("rounded-full px-1.5 py-px font-medium", state === "due" ? "bg-blob/15 text-blob-ink" : state === "later" ? "bg-ok/12 text-ok" : "bg-hover text-ink-3")}>{chip}</span>
           {edited && <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-3">{t.cards.edited}</span>}
         </div>

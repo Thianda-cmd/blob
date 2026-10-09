@@ -4,7 +4,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useDraggable,
   useDroppable,
@@ -16,7 +16,7 @@ import {
 import { motion } from "motion/react";
 import { ArrowUpFromLine, Ellipsis, Eye, FilePlus2, Folder, FolderInput, FolderPlus, GripVertical, Presentation, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEventHandler, type MouseEventHandler, type ReactNode, type TouchEventHandler } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { SCHOOL_EMOJIS } from "@/components/editor/IconPicker";
@@ -44,8 +44,12 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
   const page = pages.find((p) => p.id === initial.id) ?? initial;
   const canEdit = role !== "viewer";
   const [title, setTitle] = useState(page.title);
+  // What the database has (the workspace copy changes while typing).
+  const [savedTitle, setSavedTitle] = useState(page.title);
   const [busy, setBusy] = useState<NewKind | null>(null);
   const [dragging, setDragging] = useState<PageMeta | null>(null);
+  // A stable id keeps dnd-kit's accessibility ids the same on the server and in the browser.
+  const dndId = useId();
 
   const children = useMemo(
     () =>
@@ -65,7 +69,9 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
 
   const saveTitle = () => {
     const next = title.replace(/\s+/g, " ").trim().slice(0, 300);
-    if (next !== page.title) void updatePage(page.id, { title: next });
+    if (next === savedTitle) return;
+    setSavedTitle(next);
+    void updatePage(page.id, { title: next });
   };
 
   async function create(kind: NewKind) {
@@ -90,14 +96,16 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
     else blob.say(t.movedUp(name), { mood: "happy" });
   }
 
+  // Mouse: a short move starts a drag. Touch: press and hold (so scrolling stays scrolling). Keys: the grip.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
   const onDragStart = (e: DragStartEvent) => setDragging(children.find((c) => c.id === e.active.id) ?? null);
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null);
+    lastDrop = Date.now();
     const item = children.find((c) => c.id === e.active.id);
     const over = e.over?.id ? String(e.over.id) : null;
     if (!item || !over) return;
@@ -136,7 +144,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1100px] px-4 pb-28 pt-5 sm:px-8 lg:px-10 lg:pt-8">
           <header className="flex flex-wrap items-end gap-x-4 gap-y-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3.5">
+            <div className="flex min-w-0 flex-1 basis-full items-center gap-3.5 sm:basis-auto">
               <FolderIcon icon={page.icon} editable={canEdit} onChange={(icon) => updatePage(page.id, { icon })} />
               <div className="min-w-0 flex-1">
                 <div className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-3">{t.label}</div>
@@ -151,6 +159,8 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
                     onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                     placeholder={t.namePlaceholder}
                     aria-label={t.nameLabel}
+                    // A brand-new folder asks for its name right away.
+                    autoFocus={!initial.title}
                     maxLength={300}
                     className="block w-full truncate bg-transparent font-display text-[28px] font-bold leading-tight tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/50"
                   />
@@ -181,7 +191,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
             </div>
           )}
 
-          <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+          <DndContext id={dndId} sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
             {children.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.97 }}
@@ -194,11 +204,12 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
               </motion.div>
             ) : (
               <div className="mt-8 space-y-8">
-                {canEdit && children.length > 1 && folders.length > 0 && (
-                  <p className="-mb-4 text-[12px] text-ink-3 [@media(hover:none)]:hidden">{t.dragHint}</p>
-                )}
                 {folders.length > 0 && (
-                  <Section title={t.folders} count={folders.length}>
+                  <Section
+                    title={t.folders}
+                    count={folders.length}
+                    hint={canEdit && children.length > folders.length ? t.dragHint : undefined}
+                  >
                     <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">{folders.map(card)}</div>
                   </Section>
                 )}
@@ -232,7 +243,10 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
   );
 }
 
-/** A card that can be dragged, and (folders) dropped onto. */
+/** When the last drag ended: the click that ends a drag must not open the card. */
+let lastDrop = 0;
+
+/** A card that can be dragged (all of it with a mouse or a long press; the grip with keys), and folders dropped onto. */
 function Item({ page, draggable, droppable, dragging, children }: { page: PageMeta; draggable: boolean; droppable: boolean; dragging: boolean; children: ReactNode }) {
   const t = useMessages(notesText).folder;
   const { setNodeRef: setDragRef, listeners, attributes } = useDraggable({ id: page.id, disabled: !draggable });
@@ -243,8 +257,18 @@ function Item({ page, draggable, droppable, dragging, children }: { page: PageMe
         setDragRef(el);
         setDropRef(el);
       }}
+      onMouseDown={draggable ? (listeners?.onMouseDown as MouseEventHandler | undefined) : undefined}
+      onTouchStart={draggable ? (listeners?.onTouchStart as TouchEventHandler | undefined) : undefined}
+      onClickCapture={(e) => {
+        if (Date.now() - lastDrop < 400) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      // No native link dragging or long-press menu: the card itself moves.
+      onDragStart={(e) => e.preventDefault()}
       className={cn(
-        "group/item relative rounded-xl transition-[opacity,box-shadow,transform] duration-150",
+        "group/item relative rounded-xl transition-[opacity,box-shadow,transform] duration-150 [-webkit-touch-callout:none]",
         dragging && "opacity-40",
         isOver && "scale-[1.02] shadow-[0_0_0_2px_var(--blob)]",
       )}
@@ -252,11 +276,11 @@ function Item({ page, draggable, droppable, dragging, children }: { page: PageMe
       {children}
       {draggable && (
         <button
-          {...listeners}
           {...attributes}
+          onKeyDown={listeners?.onKeyDown as KeyboardEventHandler | undefined}
           aria-label={t.dragHint}
           title={t.dragHint}
-          className="absolute left-1 top-1/2 z-[2] grid h-8 w-5 -translate-y-1/2 cursor-grab place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-hover hover:text-ink focus-visible:opacity-100 group-hover/item:opacity-100 active:cursor-grabbing [@media(hover:none)]:hidden"
+          className="absolute left-1 top-1/2 z-[2] grid h-8 w-5 -translate-y-1/2 cursor-grab place-items-center rounded-md bg-raised text-ink-3 opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 active:cursor-grabbing [@media(hover:none)]:hidden"
         >
           <GripVertical className="size-3.5" />
         </button>
@@ -420,12 +444,13 @@ function FolderIcon({ icon, editable, onChange }: { icon: string | null; editabl
   );
 }
 
-function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+function Section({ title, count, hint, children }: { title: string; count: number; hint?: string; children: ReactNode }) {
   return (
     <section>
       <div className="mb-3 flex h-6 items-center gap-2">
         <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
         <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium leading-[18px] tabular-nums text-ink-3">{count}</span>
+        {hint && <span className="ml-auto truncate text-[12px] text-ink-3 [@media(hover:none)]:hidden">{hint}</span>}
       </div>
       {children}
     </section>

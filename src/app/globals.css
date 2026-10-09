@@ -1575,6 +1575,16 @@
   gap: 0.3rem;
   min-width: 0;
 }
+/* Narrow: title, help and "Done" on top, the starters in a row of their own below. */
+@container (max-width: 599px) {
+  .prose-blob .blob-diagram-chips {
+    order: 5;
+    flex: 1 0 100%;
+  }
+  .prose-blob .blob-diagram-help {
+    margin-left: auto;
+  }
+}
 .prose-blob .blob-diagram-help {
   display: grid;
   place-items: center;
@@ -2359,6 +2369,163 @@
   .prose-blob .blob-btn-primary {
     height: 36px;
   }
+}
+
+/* Links to other pages in the text ("[[") ------------------------------------ */
+.prose-blob a[href^="/p/"] {
+  color: var(--ink);
+  font-weight: 550;
+  text-decoration-color: color-mix(in oklab, var(--blob) 45%, transparent);
+  border-radius: 4px;
+  transition:
+    background-color 0.15s,
+    text-decoration-color 0.15s;
+}
+/* An inline (not inline-block) box: the icon can't be left behind at the end of a line. */
+.prose-blob a[href^="/p/"]::before {
+  content: "";
+  display: inline;
+  padding-left: 0.86em;
+  margin-right: 0.24em;
+  background: var(--blob-ink);
+  opacity: 0.75;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M15 3v5h5'/%3E%3Cpath d='M9 13h6M9 17h4'/%3E%3C/svg%3E") left 52% / 0.86em 0.86em no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M15 3v5h5'/%3E%3Cpath d='M9 13h6M9 17h4'/%3E%3C/svg%3E") left 52% / 0.86em 0.86em no-repeat;
+}
+.prose-blob a[href^="/p/"]:hover {
+  background: color-mix(in oklab, var(--blob) 9%, transparent);
+  text-decoration-color: var(--blob);
+}
+
+/* Tags and learning topics under the title -------------------------------- */
+.blob-tag,
+.blob-topic {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  line-height: 1;
+  transition: background-color 0.15s;
+}
+.blob-tag {
+  background: color-mix(in oklab, var(--hover) 75%, transparent);
+  color: var(--ink-2);
+}
+.blob-tag:hover {
+  background: var(--hover);
+}
+.blob-topic {
+  background: color-mix(in oklab, var(--blob-soft) 80%, transparent);
+  color: var(--blob-ink);
+}
+.blob-topic:hover {
+  background: var(--blob-soft);
+}
+.blob-tag-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 100%;
+  padding: 0 0.5rem;
+  border-radius: inherit;
+}
+.blob-chip-x {
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 0 2px 0 -0.3rem;
+  border-radius: 5px;
+  opacity: 0.6;
+}
+.blob-chip-x:hover {
+  opacity: 1;
+  background: color-mix(in oklab, var(--ink) 8%, transparent);
+}
+.group\/chip:hover .blob-chip-x,
+.blob-chip-x:focus-visible {
+  display: grid;
+}
+.blob-chip-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 24px;
+  padding: 0 0.45rem;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+.blob-chip-add:hover,
+.blob-chip-add[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--ink-2);
+}
+/* A note without tags or topics keeps the buttons out of the way until you're near the title. */
+.blob-chips-empty .blob-chip-add {
+  opacity: 0;
+}
+.group\/header:hover .blob-chips-empty .blob-chip-add,
+.blob-chips-empty .blob-chip-add:focus-visible,
+.blob-chips-empty .blob-chip-add[aria-expanded="true"] {
+  opacity: 1;
+}
+.blob-chips-empty:first-child {
+  margin-left: -0.45rem;
+}
+@media (hover: none) {
+  .blob-tag,
+  .blob-topic,
+  .blob-chip-add {
+    height: 32px;
+  }
+  .blob-chip-x {
+    display: grid;
+    width: 28px;
+    height: 28px;
+  }
+  .blob-chips-empty .blob-chip-add {
+    opacity: 1;
+  }
+}
+
+/* Linked from / similar notes under the note -------------------------------- */
+.blob-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 4.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.blob-connection {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  transition:
+    border-color 0.15s,
+    transform 0.2s var(--ease-out-soft),
+    box-shadow 0.2s;
+}
+.blob-connection:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+.blob-connection-hit {
+  background: color-mix(in oklab, var(--blob) 18%, transparent);
+  color: var(--ink-2);
+  border-radius: 3px;
+  padding: 0 0.1em;
 }
 
 /* ---- end note blocks ---- */

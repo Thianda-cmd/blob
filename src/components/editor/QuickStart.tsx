@@ -2,10 +2,11 @@
 
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
-import { Heading1, ImagePlus, ListTodo, type LucideIcon } from "lucide-react";
+import { Heading1, ImagePlus, Layers, ListTodo, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
+import { insertFlashcard } from "./blocks/Flashcard";
 
 /** A quiet row of starters under the placeholder of an empty note. Gone as soon as you type. */
 export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () => void }) {
@@ -15,6 +16,15 @@ export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () =>
   const items: { id: string; label: string; icon: LucideIcon; run: () => void }[] = [
     { id: "heading", label: t.heading, icon: Heading1, run: () => editor.chain().focus("start").setNode("heading", { level: 1 }).run() },
     { id: "checklist", label: t.checklist, icon: ListTodo, run: () => editor.chain().focus("start").toggleTaskList().run() },
+    {
+      id: "flashcard",
+      label: t.flashcard,
+      icon: Layers,
+      run: () => {
+        editor.commands.focus("start");
+        insertFlashcard(editor, null);
+      },
+    },
     {
       id: "image",
       label: t.image,

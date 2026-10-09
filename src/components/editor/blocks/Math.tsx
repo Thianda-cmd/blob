@@ -194,7 +194,7 @@ function MathPanel({
             className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-md border border-line bg-surface px-1.5 text-ink-2 transition-colors hover:border-line-2 hover:bg-hover hover:text-ink"
           >
             <span className="pointer-events-none">
-              <MathView src={toDisplay(tpl.show)} size="sm" animate={false} className={tpl.id === "fraction" ? "text-[14px]" : undefined} />
+              <MathView src={toDisplay(tpl.show)} size="sm" animate={false} className={tpl.id === "fraction" ? "text-[12.5px]" : undefined} />
             </span>
           </button>
         ))}

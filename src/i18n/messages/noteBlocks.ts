@@ -211,6 +211,8 @@ export const noteBlocksText = defineMessages({
 
     knowledge: {
       tags: "Tags",
+      tag: "Tag",
+      topic: "Learning topic",
       addTag: "Add tag",
       tagPlaceholder: "Tag…",
       newTag: (t: string) => `Create “${t}”`,
@@ -431,6 +433,8 @@ export const noteBlocksText = defineMessages({
 
     knowledge: {
       tags: "Tags",
+      tag: "Tag",
+      topic: "Lernthema",
       addTag: "Tag hinzufügen",
       tagPlaceholder: "Tag…",
       newTag: (t) => `„${t}“ anlegen`,

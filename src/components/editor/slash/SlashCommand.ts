@@ -1,30 +1,31 @@
 import { Extension, type Editor, type Range } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { slashPluginKey } from "../suggestKeys";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
 import type { SlashItem } from "./items";
 
-export type SlashSnapshot = {
+export type SlashSnapshot<T = SlashItem> = {
   open: boolean;
   /** Increments every time the menu opens, so it can replay its entrance. */
   session: number;
   query: string;
-  items: SlashItem[];
+  items: T[];
   placement: "top" | "bottom";
 };
 
-const CLOSED: SlashSnapshot = { open: false, session: 0, query: "", items: [], placement: "bottom" };
+const CLOSED: SlashSnapshot<never> = { open: false, session: 0, query: "", items: [], placement: "bottom" };
 
 /**
  * Bridges the Suggestion plugin (imperative, lives inside ProseMirror) and the
  * React menu (declarative). The menu subscribes with useSyncExternalStore and
  * registers a key handler; the plugin positions the host element at the caret.
+ * Used by the "/" menu and the "[[" page links (T: what the menu lists).
  */
-export class SlashController {
-  private snapshot: SlashSnapshot = CLOSED;
+export class SlashController<T = SlashItem> {
+  private snapshot: SlashSnapshot<T> = CLOSED;
   private listeners = new Set<() => void>();
   private unmount: (() => void) | null = null;
   private hostEl: HTMLDivElement | null = null;
-  private select: ((item: SlashItem) => void) | null = null;
+  private select: ((item: T) => void) | null = null;
   /** Set by the React menu: returns true when it handled the key. */
   private keyHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
@@ -36,7 +37,7 @@ export class SlashController {
   };
 
   getSnapshot = () => this.snapshot;
-  getServerSnapshot = () => CLOSED;
+  getServerSnapshot = (): SlashSnapshot<T> => CLOSED;
 
   /** The element the menu is portalled into (created lazily in the browser). */
   get host() {
@@ -56,11 +57,11 @@ export class SlashController {
     this.keyHandler = fn;
   }
 
-  choose(item: SlashItem) {
+  choose(item: T) {
     this.select?.(item);
   }
 
-  private set(patch: Partial<SlashSnapshot>) {
+  private set(patch: Partial<SlashSnapshot<T>>) {
     this.snapshot = { ...this.snapshot, ...patch };
     this.listeners.forEach((fn) => fn());
   }
@@ -77,7 +78,7 @@ export class SlashController {
   };
 
   renderer = () => ({
-    onStart: (props: SuggestionProps<SlashItem, SlashItem>) => {
+    onStart: (props: SuggestionProps<T, T>) => {
       const host = this.host;
       if (!host) return;
       host.style.visibility = "hidden";
@@ -86,7 +87,7 @@ export class SlashController {
       this.select = props.command;
       this.set({ open: true, session: this.snapshot.session + 1, query: props.query, items: props.items, placement: "bottom" });
     },
-    onUpdate: (props: SuggestionProps<SlashItem, SlashItem>) => {
+    onUpdate: (props: SuggestionProps<T, T>) => {
       if (props.loading) return;
       this.select = props.command;
       this.set({ query: props.query, items: props.items });
@@ -104,7 +105,7 @@ export class SlashController {
   });
 }
 
-export const slashPluginKey = new PluginKey("slashCommand");
+export { slashPluginKey } from "../suggestKeys";
 
 type SlashOptions = {
   controller: SlashController | null;

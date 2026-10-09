@@ -327,7 +327,7 @@ export function NotesGraph({
       </div>
 
       {/* Legend and hint */}
-      <div className="pointer-events-none absolute bottom-2.5 left-3 right-3 flex flex-wrap items-end justify-between gap-2 text-[11px] text-ink-3">
+      <div className="pointer-events-none absolute bottom-2.5 left-3 right-3 flex flex-col items-start gap-1.5 text-[11px] text-ink-3">
         <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-raised/85 px-2 py-1 backdrop-blur-sm">
           <Legend dash={undefined} label={t.legendLink} />
           <Legend dash="4 3" label={t.legendChild} />

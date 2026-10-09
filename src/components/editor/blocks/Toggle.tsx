@@ -9,6 +9,7 @@ import { useSyncExternalStore } from "react";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
+import { suggestionOpen } from "../suggestKeys";
 import { nearestOfType } from "./insert";
 
 /**
@@ -152,6 +153,7 @@ export const Toggle = Node.create({
     return {
       // Enter in the summary opens the toggle and starts a line at the top of its content.
       Enter: ({ editor }) => {
+        if (suggestionOpen(editor.state)) return false;
         const { $from, empty } = editor.state.selection;
         // An empty last line in the content: leave the toggle (the line moves out below it).
         if (
@@ -226,7 +228,7 @@ export const Toggle = Node.create({
 
 function skipClosed(editor: Editor, dir: "up" | "down") {
   const { state, view } = editor;
-  if (!state.selection.empty || !view.endOfTextblock(dir)) return false;
+  if (suggestionOpen(state) || !state.selection.empty || !view.endOfTextblock(dir)) return false;
   const { $from } = state.selection;
   if (dir === "down") {
     const at = summaryAround(state);
