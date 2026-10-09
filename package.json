@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "show-manifest": "tsx --tsconfig tsconfig.json scripts/show-manifest.ts --check",
-    "check:learn": "tsx --tsconfig tsconfig.json scripts/check-learn.ts"
+    "check:learn": "tsx --tsconfig tsconfig.json scripts/check-learn.ts",
+    "check:french": "tsx --tsconfig tsconfig.json scripts/check-french.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

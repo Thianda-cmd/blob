@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Snail, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
 import { frenchText } from "@/i18n/messages/french";
@@ -131,36 +131,39 @@ export function Tappable({ text, className }: { text: string; className?: string
   return (
     <span className={cn("inline", className)} lang="fr">
       {segments.map((s, i) => (
-        <span key={i} className="relative inline-block">
-          {s.gloss ? (
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => setOpen(open === i ? null : i)}
-              className="rounded-[4px] underline decoration-ink-3/50 decoration-dotted decoration-2 underline-offset-[6px] transition-colors hover:bg-blob-soft hover:decoration-blob"
-              title={t.wordHint}
-            >
-              {s.text}
-            </button>
-          ) : (
-            <span>{s.text}</span>
-          )}
-          <AnimatePresence>
-            {open === i && s.gloss && (
-              <motion.span
-                initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.08 } }}
-                className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[13.5px] font-medium text-ink shadow-pop"
-                role="tooltip"
-                lang={locale}
+        <Fragment key={i}>
+          <span className="relative inline-block">
+            {s.gloss ? (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => setOpen(open === i ? null : i)}
+                className="rounded-[4px] underline decoration-ink-3/50 decoration-dotted decoration-2 underline-offset-[6px] transition-colors hover:bg-blob-soft hover:decoration-blob"
+                title={t.wordHint}
               >
-                {s.gloss[locale]}
-              </motion.span>
+                {s.text}
+              </button>
+            ) : (
+              <span>{s.text}</span>
             )}
-          </AnimatePresence>
-          {i < segments.length - 1 && " "}
-        </span>
+            <AnimatePresence>
+              {open === i && s.gloss && (
+                <motion.span
+                  initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.08 } }}
+                  className="absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[13.5px] font-medium text-ink shadow-pop"
+                  role="tooltip"
+                  lang={locale}
+                >
+                  {s.gloss[locale]}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </span>
+          {/* The space between words sits outside the inline-block, where it can't collapse; before ! ? : ; » and after « it doesn't break. */}
+          {i < segments.length - 1 && (/^[!?:;»]+$/.test(segments[i + 1].text) || s.text === "«" ? "\u00a0" : " ")}
+        </Fragment>
       ))}
     </span>
   );

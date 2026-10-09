@@ -260,7 +260,7 @@ export function FrenchPlayer(props: Props) {
           <>
             {again && <p className="mb-4 rounded-xl bg-blob-soft px-3.5 py-2 text-[14px] font-medium text-blob-ink">{t.player.retryRound}</p>}
             <AnimatePresence mode="wait">
-              <motion.div key={ex!.key} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
+              <motion.div key={ex!.key} data-ex={ex!.key} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
                 {exProps && <ExerciseView {...exProps} />}
               </motion.div>
             </AnimatePresence>

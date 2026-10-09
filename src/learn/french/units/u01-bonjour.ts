@@ -33,6 +33,7 @@ export const u01: Unit = {
     { id: "moi-aussi", fr: "moi aussi", en: "me too", de: "ich auch", alt: { de: ["mir auch"] }, kind: "phrase" },
     { id: "monsieur", fr: "monsieur", en: "Mr", de: "Herr", alt: { en: ["sir"] }, kind: "word", emoji: "👨" },
   ],
+  gloss: [{ fr: "enchantée", en: "nice to meet you (said by a girl)", de: "freut mich (von einem Mädchen)" }],
   lessons: [
     { title: tx("Hello and thanks", "Hallo und danke"), words: ["bonjour", "salut", "merci", "oui", "non"] },
     { title: tx("Good evening, goodbye", "Guten Abend, tschüss"), words: ["bonsoir", "au-revoir", "a-bientot", "merci-beaucoup", "madame"] },

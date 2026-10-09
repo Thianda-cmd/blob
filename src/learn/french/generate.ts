@@ -1,7 +1,7 @@
 import { createRng, type Rng } from "@/learn/engine/rng";
 import { ALL_WORDS, wordsInSentence } from "./course";
 import { norm, tilesOf } from "./text";
-import type { Exercise, Lang, Sentence, Unit, Word } from "./types";
+import type { Dialogue, Drill, Exercise, Lang, Sentence, Unit, Word } from "./types";
 
 // Turning a unit's material into a lesson: first the new words (each shown, then checked), then
 // sentences in ever-changing exercise types, the unit's grammar gaps, and the dialogue in its
@@ -39,12 +39,13 @@ function makeTiles(answer: string, lang: "fr" | Lang, others: string[], rng: Rng
   return rng.shuffle([...own, ...pool.slice(0, extra)]);
 }
 
-/** Two other sentences of about the same length, as wrong options. */
-function closeOptions(s: Sentence, pool: Sentence[], pick: (x: Sentence) => string, rng: Rng): string[] {
+/** Two other sentences of about the same length, as wrong options (never one that would also be right). */
+function closeOptions(s: Sentence, pool: Sentence[], pick: (x: Sentence) => string, rng: Rng, accepted: string[]): string[] {
   const right = pick(s);
   const len = wordCount(s.fr);
+  const alsoRight = new Set(accepted.map(norm));
   const others = rng
-    .shuffle(pool.filter((x) => x.id !== s.id && norm(pick(x)) !== norm(right)))
+    .shuffle(pool.filter((x) => x.id !== s.id && !alsoRight.has(norm(pick(x)))))
     .sort((a, b) => Math.abs(wordCount(a.fr) - len) - Math.abs(wordCount(b.fr) - len))
     .slice(0, 2)
     .map(pick);
@@ -71,19 +72,19 @@ function sentenceExercise(s: Sentence, kind: Kind, pool: Sentence[], opts: GenOp
   const single = wordCount(s.fr) < 2 || tilesOf(s[lang], lang).length < 2;
   switch (kind) {
     case "tiles-from":
-      if (single) return { kind: "choice", key, sentence: s, dir: "fromFr", options: closeOptions(s, pool, (x) => x[lang], rng) };
+      if (single) return { kind: "choice", key, sentence: s, dir: "fromFr", options: closeOptions(s, pool, (x) => x[lang], rng, acceptedOf(s, "fromFr", lang)) };
       return { kind: "tiles", key, sentence: s, dir: "fromFr", tiles: makeTiles(s[lang], lang, others.map((x) => x[lang]), rng) };
     case "tiles-to":
-      if (single) return { kind: "choice", key, sentence: s, dir: "toFr", options: closeOptions(s, pool, (x) => x.fr, rng) };
+      if (single) return { kind: "choice", key, sentence: s, dir: "toFr", options: closeOptions(s, pool, (x) => x.fr, rng, acceptedOf(s, "toFr", lang)) };
       return { kind: "tiles", key, sentence: s, dir: "toFr", tiles: makeTiles(s.fr, "fr", others.map((x) => x.fr), rng) };
     case "type-from":
       return { kind: "type", key, sentence: s, dir: "fromFr" };
     case "type-to":
       return { kind: "type", key, sentence: s, dir: "toFr" };
     case "choice-from":
-      return { kind: "choice", key, sentence: s, dir: "fromFr", options: closeOptions(s, pool, (x) => x[lang], rng) };
+      return { kind: "choice", key, sentence: s, dir: "fromFr", options: closeOptions(s, pool, (x) => x[lang], rng, acceptedOf(s, "fromFr", lang)) };
     case "choice-to":
-      return { kind: "choice", key, sentence: s, dir: "toFr", options: closeOptions(s, pool, (x) => x.fr, rng) };
+      return { kind: "choice", key, sentence: s, dir: "toFr", options: closeOptions(s, pool, (x) => x.fr, rng, acceptedOf(s, "toFr", lang)) };
     case "listen-tiles":
       return { kind: "listen", key, sentence: s, mode: "tiles", tiles: makeTiles(s.fr, "fr", others.map((x) => x.fr), rng) };
     case "listen-type":
@@ -110,6 +111,14 @@ function spreadIn<T>(list: T[], extra: T[]) {
   const gap = (list.length + extra.length) / (extra.length + 1);
   extra.forEach((x, i) => list.splice(Math.min(list.length, Math.max(1, Math.round(gap * (i + 1)))), 0, x));
 }
+
+/** Options in a new order, so the right one isn't always in the same place. */
+function shuffled<T extends { options: O[]; answer: number }, O>(item: T, rng: Rng): T {
+  const order = rng.shuffle(item.options.map((_, i) => i));
+  return { ...item, options: order.map((i) => item.options[i]), answer: order.indexOf(item.answer) };
+}
+const blankOf = (d: Drill, rng: Rng): Exercise => ({ kind: "blank", key: `blank:${d.id}`, drill: shuffled(d, rng) });
+const dialogueOf = (d: Dialogue, rng: Rng): Exercise => ({ kind: "dialogue", key: `dialogue:${d.id}`, dialogue: { ...d, questions: d.questions.map((q) => shuffled(q, rng)) } });
 
 /** A picture question for a word with an emoji, when there are enough other pictures to choose from. */
 function pictureFor(w: Word, pool: Word[], rng: Rng, i: number): Exercise | null {
@@ -174,13 +183,13 @@ export function lessonExercises(unit: Unit, n: number, earlier: Unit[], opts: Ge
 
   // 3. Grammar gaps of this lesson (and one from before), spread out between the sentences.
   const drills = [...rng.shuffle(unit.drills.filter((d) => d.lesson === n)).slice(0, 3), ...rng.shuffle(unit.drills.filter((d) => d.lesson < n)).slice(0, 1)];
-  spreadIn(steps, drills.map((d) => ({ kind: "blank" as const, key: `blank:${d.id}`, drill: d })));
+  spreadIn(steps, drills.map((d) => blankOf(d, rng)));
 
   const room = Math.max(6, LESSON_SIZE - out.filter((e) => e.kind !== "intro").length);
   out.push(...steps.slice(0, room));
 
   // 4. The unit's story, near the end of its lesson.
-  if (unit.dialogue && unit.dialogue.lesson === n) out.splice(Math.max(out.length - 2, 1), 0, { kind: "dialogue", key: `dialogue:${unit.dialogue.id}`, dialogue: unit.dialogue });
+  if (unit.dialogue && unit.dialogue.lesson === n) out.splice(Math.max(out.length - 2, 1), 0, dialogueOf(unit.dialogue, rng));
   return out;
 }
 
@@ -210,7 +219,7 @@ export function practiceExercises(units: Unit[], weak: string[], opts: GenOption
     rng
       .shuffle(units.flatMap((u) => u.drills))
       .slice(0, 2)
-      .map((d) => ({ kind: "blank" as const, key: `blank:${d.id}`, drill: d })),
+      .map((d) => blankOf(d, rng)),
   );
   return out;
 }

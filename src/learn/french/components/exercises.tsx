@@ -65,15 +65,9 @@ export function IntroEx({ ex, lang, voice, setCheck, blobRef }: ExProps<"intro">
   const translation = [w[lang], ...(w.alt?.[lang] ?? []).slice(0, 2)].join(", ");
   return (
     <div>
-      <Prompt
-        badge={
-          <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-blob-soft px-2.5 py-1 text-[12px] font-semibold uppercase tracking-wide text-blob-ink">
-            <Sparkles className="size-3.5" /> {t.player.newWord}
-          </span>
-        }
-      >
-        <span lang="fr">{w.fr}</span>
-      </Prompt>
+      <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-blob-soft px-2.5 py-1 text-[12px] font-semibold uppercase tracking-wide text-blob-ink">
+        <Sparkles className="size-3.5" /> {t.player.newWord}
+      </span>
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -420,7 +414,7 @@ export function BlankEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<
             {before}
             <span
               className={cn(
-                "mx-1 inline-block min-w-[4.5rem] rounded-lg border-b-[3px] px-2 text-center font-semibold",
+                "mx-0.5 inline-block min-w-[4.5rem] rounded-lg border-b-[3px] px-2 text-center font-semibold",
                 chosen === null ? "border-ink-3 text-transparent" : locked ? (chosen === d.answer ? "border-ok text-ok" : "border-danger text-danger") : "border-blob text-blob-ink",
               )}
             >

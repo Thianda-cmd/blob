@@ -147,7 +147,7 @@ export function grade(answer: string, accepted: string[], lang: Target): Grade {
 
 /** Names and words that keep their capital letter on a tile. */
 const PROPER = new Set([
-  "Blob", "Léa", "Hugo", "Martin", "Paris", "Lyon", "Marseille", "Nice", "France", "Berlin", "Allemagne", "Madame", "Monsieur",
+  "Blob", "Léa", "Hugo", "Martin", "Paris", "Lyon", "Marseille", "France", "Berlin", "Allemagne", "Madame", "Monsieur",
   "I", "French", "German", "English", "France", "Germany", "Mrs", "Mr", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 ]);
 
@@ -156,13 +156,39 @@ const DE_SMALL = new Set(
   "ich du er sie es wir ihr das der die den dem des ein eine einen einem einer wie was wo woher wohin wer wann warum ja nein hallo guten gute gut danke bitte tschüss auf und aber oder mein meine dein deine sein seine ihre unser euer ist bin bist sind seid hat habe hast haben heißt heiße heißen kommst komme kommt magst mag mögen isst esse trinke trinkst trinkt gibt nicht kein keine sehr zum im am um in mit für aus zu von bei nach sehr schon noch hier dort heute morgen jetzt man was's".split(" "),
 );
 
+/** Learned from the course's own sentences (see learnCase): names, and German words written small. */
+const SEEN_NAMES = new Set<string>();
+const SEEN_SMALL_DE = new Set<string>();
+
+/**
+ * Teach the tiles the course's spelling: a word written with a capital inside a sentence (not after
+ * a full stop, colon or quote) is a name and keeps it at the start too; a German word written small
+ * inside a sentence is written small at the start ("Wir", but "Brot").
+ */
+export function learnCase(texts: { fr: string; en: string; de: string }[]) {
+  const words = (text: string) => {
+    const out: string[] = [];
+    let start = true;
+    for (const raw of text.split(/\s+/)) {
+      const w = raw.replace(/^[«"„“(—–-]+|[.,!?;:»"“)…]+$/g, "");
+      if (w && !start && !/^[«"„“(—–-]/.test(raw)) out.push(w);
+      start = /[.!?:…]$/.test(raw) || /^[«"„“—–-]+$/.test(raw);
+    }
+    return out;
+  };
+  for (const t of texts) {
+    for (const w of [...words(t.fr), ...words(t.en)]) if (/^[A-ZÀ-Ý]/.test(w)) SEEN_NAMES.add(w);
+    for (const w of words(t.de)) if (/^[a-zäöüß]/.test(w)) SEEN_SMALL_DE.add(w);
+  }
+}
+
 /** The words of a sentence as tiles: no punctuation, the first word small unless it's a name. */
 export function tilesOf(sentence: string, lang: Target): string[] {
   const parts = sentence.replace(QUOTES, "'").replace(MARKS, " ").split(/\s+/).filter(Boolean);
   return parts.map((t, i) => {
-    if (i > 0 || PROPER.has(t)) return t;
+    if (i > 0 || PROPER.has(t) || SEEN_NAMES.has(t)) return t;
     const small = t.charAt(0).toLowerCase() + t.slice(1);
-    if (lang === "de") return DE_SMALL.has(small.toLowerCase()) ? small : t;
+    if (lang === "de") return DE_SMALL.has(small.toLowerCase()) || SEEN_SMALL_DE.has(small) ? small : t;
     return small;
   });
 }
