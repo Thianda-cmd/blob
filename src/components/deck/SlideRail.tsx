@@ -1,9 +1,9 @@
 "use client";
 
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, Ellipsis, Plus, Trash2 } from "lucide-react";
 import { motion, Reorder } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Popover } from "@/components/ui/Menu";
+import { MenuItem, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { useMessages } from "@/i18n/client";
 import { deckText } from "@/i18n/messages/deck";
 import type { Slide, SlideLayout } from "@/lib/types";
@@ -13,6 +13,8 @@ import { LayoutGlyph } from "./LayoutGlyph";
 import { SlideView } from "./SlideView";
 
 const THUMB_W = 150;
+/** Thumbnails in the phone filmstrip (the editor reserves room for it below the slide). */
+const STRIP_W = 112;
 
 /** Popover with a visual grid of layouts, grouped. */
 export function AddSlideMenu({
@@ -198,7 +200,12 @@ export function SlideRail({
                     width={THUMB_W}
                     frameClassName="rounded-[7px] ring-1 ring-ink/10 dark:ring-white/12"
                   />
-                  <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div
+                    className={cn(
+                      "absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
+                      selected && "[@media(hover:none)]:opacity-100",
+                    )}
+                  >
                     <ThumbAction label={t.duplicateSlide} onClick={() => onDuplicate(slide.id)}>
                       <Copy />
                     </ThumbAction>
@@ -265,5 +272,152 @@ function ThumbAction({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Phones: the slides as a horizontal filmstrip under the canvas (the rail needs more width).
+ * Tap to select; the last tile adds a slide.
+ */
+export function SlideStrip({
+  className,
+  slides,
+  palette,
+  sections,
+  selectedId,
+  onSelect,
+  onAdd,
+}: {
+  className?: string;
+  slides: Slide[];
+  palette: Palette;
+  sections: Map<string, number>;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onAdd: (layout: SlideLayout) => void;
+}) {
+  const t = useMessages(deckText);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Keep the selected slide in view. Only the strip scrolls.
+  useEffect(() => {
+    const list = listRef.current;
+    const el = list?.querySelector<HTMLElement>(`[data-slide-id="${selectedId}"]`);
+    if (!list || !el) return;
+    const l = list.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.left < l.left) list.scrollLeft -= l.left - r.left + 4;
+    else if (r.right > l.right) list.scrollLeft += r.right - l.right + 4;
+  }, [selectedId, slides.length]);
+
+  return (
+    <div
+      ref={listRef}
+      role="listbox"
+      aria-label={t.slides}
+      aria-orientation="horizontal"
+      className={cn("-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+    >
+      {slides.map((slide, i) => {
+        const selected = slide.id === selectedId;
+        return (
+          <button
+            key={slide.id}
+            type="button"
+            role="option"
+            aria-selected={selected}
+            aria-label={t.slideAria(i + 1, slide.title.trim())}
+            data-slide-id={slide.id}
+            onClick={() => onSelect(slide.id)}
+            className="shrink-0 text-left"
+          >
+            <div className={cn("rounded-[7px] outline-offset-2", selected ? "outline-2 outline-blob" : "outline-1 outline-transparent")}>
+              <SlideView
+                slide={slide}
+                palette={palette}
+                ordinal={sections.get(slide.id)}
+                mode="thumb"
+                width={STRIP_W}
+                frameClassName="rounded-[7px] ring-1 ring-ink/10 dark:ring-white/12"
+              />
+            </div>
+            <div className={cn("mt-1 text-[11.5px] tabular-nums", selected ? "font-semibold text-blob-ink" : "text-ink-3")}>{i + 1}</div>
+          </button>
+        );
+      })}
+      <AddSlideMenu
+        onAdd={onAdd}
+        align="end"
+        side="top"
+        trigger={(props) => (
+          <button
+            {...props}
+            className="grid aspect-video shrink-0 place-items-center rounded-[7px] border border-dashed border-line-2 text-ink-3 transition-colors hover:border-ink-3 hover:text-ink"
+            style={{ width: STRIP_W }}
+            aria-label={t.addSlide}
+            title={t.addSlide}
+          >
+            <Plus className="size-4" />
+          </button>
+        )}
+      />
+    </div>
+  );
+}
+
+/** Phones: duplicate, move and delete the current slide (the rail's hover actions and shortcuts need a mouse). */
+export function SlideMenu({
+  index,
+  total,
+  onDuplicate,
+  onMove,
+  onDelete,
+}: {
+  index: number;
+  total: number;
+  onDuplicate: () => void;
+  onMove: (delta: number) => void;
+  onDelete: () => void;
+}) {
+  const t = useMessages(deckText);
+  return (
+    <Popover
+      align="end"
+      className="w-[230px]"
+      trigger={(props) => (
+        <button
+          {...props}
+          className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink"
+          aria-label={t.slideOptions}
+          title={t.slideOptions}
+        >
+          <Ellipsis className="size-4" />
+        </button>
+      )}
+    >
+      {(close) => {
+        const run = (fn: () => void) => () => {
+          fn();
+          close();
+        };
+        return (
+          <>
+            <MenuItem icon={<Copy />} onSelect={run(onDuplicate)}>
+              {t.duplicateSlide}
+            </MenuItem>
+            <MenuItem icon={<ArrowLeft />} disabled={index === 0} onSelect={run(() => onMove(-1))}>
+              {t.moveEarlier}
+            </MenuItem>
+            <MenuItem icon={<ArrowRight />} disabled={index === total - 1} onSelect={run(() => onMove(1))}>
+              {t.moveLater}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem icon={<Trash2 />} danger disabled={total === 1} onSelect={run(onDelete)}>
+              {total === 1 ? t.lastSlide : t.deleteSlide}
+            </MenuItem>
+          </>
+        );
+      }}
+    </Popover>
   );
 }

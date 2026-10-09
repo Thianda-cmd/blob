@@ -57,18 +57,20 @@ export function UndoProvider({ change, children }: { change: CvChange; children:
               className="pointer-events-auto flex max-w-full items-center gap-1 rounded-xl border border-line bg-raised py-1 pl-3.5 pr-1 text-[13px] text-ink shadow-pop"
               role="status"
             >
-              <span className="min-w-0 truncate">{pending.message}</span>
+              {/* Two lines on a phone, so "„Nebenjobs & Erfahrung“ entfernt" keeps its last word. */}
+              <span className="line-clamp-2 min-w-0 py-1 leading-snug">{pending.message}</span>
               <button
                 type="button"
                 onClick={undo}
-                className="ml-2 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 font-medium text-blob-ink transition-colors hover:bg-blob-soft"
+                className="ml-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 font-medium text-blob-ink transition-colors hover:bg-blob-soft"
               >
                 <Undo2 className="size-3.5" /> {t.undo}
               </button>
               <button
                 type="button"
                 onClick={() => setPending(null)}
-                className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+                // Phones: the toast goes by itself, and the message needs the room.
+                className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink max-sm:hidden"
                 aria-label={t.dismiss}
               >
                 <X className="size-3.5" />

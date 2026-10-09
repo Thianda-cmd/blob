@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, ChevronRight, PanelRight, Play, Plus } from "lucide-react";
+import { PanelRight, Play } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
@@ -13,6 +13,7 @@ import { useMessages } from "@/i18n/client";
 import { deckText } from "@/i18n/messages/deck";
 import { createClient } from "@/lib/supabase/client";
 import type { Deck, DeckContent, DeckTheme, DeckThemeSpec, Page, Slide, SlideLayout, SlideTransition } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import {
   ALLOWED_IMAGE_TYPES,
   deckPalette,
@@ -26,7 +27,7 @@ import {
   switchLayout,
 } from "./deck";
 import { DeckInspector, type InspectorTab } from "./DeckInspector";
-import { AddSlideMenu, SlideRail } from "./SlideRail";
+import { SlideMenu, SlideRail, SlideStrip } from "./SlideRail";
 import { SlideView } from "./SlideView";
 import { ThemePicker } from "./ThemePicker";
 
@@ -34,6 +35,21 @@ type DeckPatch = { content: DeckContent; title: string; plain_text: string };
 
 /** Editor width (px) from which the right panel shows by default. Matches the container query below. */
 const INSPECTOR_MIN_WIDTH = 980;
+
+/**
+ * Below 560px of editor width (phones) the rail gives way to a filmstrip under the slide and the
+ * panel opens as a sheet below the slide. The stage reads these through CSS variables:
+ * side and top/bottom padding, and the filmstrip's height.
+ */
+const STAGE_VARS =
+  "[--pad-x:64px] [--pad-y:48px] [--strip:0px] @max-[559px]/editor:[--pad-x:32px] @max-[559px]/editor:[--pad-y:32px] @max-[559px]/editor:[--strip:100px]";
+
+/** Phones: the panel is a sheet over the lower part of the editor, starting just below the slide (title row + slide). */
+const PHONE_SHEET = [
+  "@max-[559px]/editor:absolute @max-[559px]/editor:inset-x-0 @max-[559px]/editor:bottom-0 @max-[559px]/editor:z-20 @max-[559px]/editor:w-auto",
+  "@max-[559px]/editor:top-[min(84px+(100cqw-32px)*9/16,50%)]",
+  "@max-[559px]/editor:rounded-t-2xl @max-[559px]/editor:border-l-0 @max-[559px]/editor:border-t @max-[559px]/editor:shadow-pop",
+].join(" ");
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
@@ -242,22 +258,34 @@ export function DeckEditor({ page }: { page: Page }) {
             <button
               type="button"
               onClick={toggleInspector}
-              className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+              className={cn(
+                "grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:size-9",
+                inspector === "open" && "bg-hover text-ink",
+              )}
               aria-label={t.panelToggle}
+              aria-pressed={inspector === "open"}
               title={t.panelTitle}
             >
               <PanelRight className="size-4" />
             </button>
             <ThemePicker theme={deck.theme} palette={palette} customPalette={customPalette} slide={selected} onChange={setTheme} onCustomize={customize} />
-            <Button variant="primary" size="sm" onClick={() => void present()} title={t.presentTitle} className="ml-1">
-              <Play className="size-3 fill-current" /> {t.present}
+            {/* Phones: just the play icon (the label stays for screen readers). The theme lives in the panel there. */}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void present()}
+              title={t.presentTitle}
+              className="ml-1 max-sm:aspect-square max-sm:px-0 [@media(hover:none)]:h-9"
+            >
+              <Play className="size-3 fill-current" /> <span className="max-sm:sr-only">{t.present}</span>
             </Button>
           </>
         }
       />
-      <div ref={bodyRef} className="@container/editor flex min-h-0 flex-1 border-t border-line">
+      <div ref={bodyRef} className="@container/editor relative flex min-h-0 flex-1 border-t border-line">
         <SlideRail
-          className="hidden @min-[560px]/editor:flex"
+          // Tablets: an opened panel takes the rail's place, so the slide stays big enough to see its changes.
+          className={inspector === "open" ? "hidden @min-[980px]/editor:flex" : "hidden @min-[560px]/editor:flex"}
           slides={deck.slides}
           palette={palette}
           sections={sections}
@@ -273,8 +301,10 @@ export function DeckEditor({ page }: { page: Page }) {
 
         <section className="relative flex min-w-0 flex-1 flex-col bg-paper" aria-label={t.editor}>
           <div className="relative min-h-0 flex-1 [container-type:size]">
-            <div className="absolute inset-0 flex items-center justify-center px-8 py-6">
-              <div className="flex flex-col" style={{ width: "min(100cqw - 64px, (100cqh - 48px - 56px) * 16 / 9)" }}>
+            <div className={cn("absolute inset-0 flex flex-col items-center px-8 py-6 @max-[559px]/editor:px-4 @max-[559px]/editor:py-4", STAGE_VARS)}>
+              {/* Spare height goes mostly below the slide, so a narrow (portrait) stage doesn't float mid-screen. */}
+              <div aria-hidden className="max-h-12 min-h-0 flex-1 @max-[559px]/editor:hidden" />
+              <div className="flex shrink-0 flex-col" style={{ width: "min(100cqw - var(--pad-x), (100cqh - var(--pad-y) - 56px - var(--strip)) * 16 / 9)" }}>
                 <div className="mb-3 flex h-11 items-end gap-3">
                   <input
                     value={title}
@@ -288,39 +318,20 @@ export function DeckEditor({ page }: { page: Page }) {
                     maxLength={200}
                     placeholder={t.untitled}
                     aria-label={t.titleLabel}
+                    title={title || undefined}
                     className="min-w-0 flex-1 truncate bg-transparent font-display text-[24px] font-semibold tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/60"
                   />
                   <span className="shrink-0 pb-1.5 text-[12px] tabular-nums text-ink-3">
                     {t.slideOf(index + 1, deck.slides.length)}
                   </span>
-                  {/* Compact slide navigation when the rail is hidden (phones). */}
-                  <div className="flex shrink-0 items-center pb-0.5 @min-[560px]/editor:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(deck.slides[Math.max(0, index - 1)].id)}
-                      disabled={index === 0}
-                      className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-40"
-                      aria-label={t.prevSlide}
-                    >
-                      <ChevronLeft className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(deck.slides[Math.min(deck.slides.length - 1, index + 1)].id)}
-                      disabled={index === deck.slides.length - 1}
-                      className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-40"
-                      aria-label={t.nextSlide}
-                    >
-                      <ChevronRight className="size-4" />
-                    </button>
-                    <AddSlideMenu
-                      onAdd={addSlide}
-                      align="end"
-                      trigger={(props) => (
-                        <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.addSlide}>
-                          <Plus className="size-4" />
-                        </button>
-                      )}
+                  {/* Phones: the rail's actions (the filmstrip below handles moving between slides). */}
+                  <div className="shrink-0 pb-0.5 @min-[560px]/editor:hidden">
+                    <SlideMenu
+                      index={index}
+                      total={deck.slides.length}
+                      onDuplicate={() => duplicateSlide(selected.id)}
+                      onMove={(delta) => moveSlide(selected.id, delta)}
+                      onDelete={() => deleteSlide(selected.id)}
                     />
                   </div>
                 </div>
@@ -336,7 +347,17 @@ export function DeckEditor({ page }: { page: Page }) {
                     frameClassName="rounded-xl shadow-[0_1px_2px_rgb(0_0_0/0.05),0_16px_40px_-16px_rgb(0_0_0/0.22)] ring-1 ring-ink/8 dark:ring-white/12"
                   />
                 </div>
+                <SlideStrip
+                  className="@min-[560px]/editor:hidden"
+                  slides={deck.slides}
+                  palette={palette}
+                  sections={sections}
+                  selectedId={selected.id}
+                  onSelect={setSelectedId}
+                  onAdd={addSlide}
+                />
               </div>
+              <div aria-hidden className="min-h-0 flex-1" />
             </div>
           </div>
 
@@ -366,7 +387,8 @@ export function DeckEditor({ page }: { page: Page }) {
         </section>
 
         <DeckInspector
-          className={inspector === "auto" ? "hidden @min-[980px]/editor:flex" : inspector === "open" ? "flex" : "hidden"}
+          className={cn(inspector === "auto" ? "hidden @min-[980px]/editor:flex" : inspector === "open" ? "flex" : "hidden", PHONE_SHEET)}
+          onClose={() => setInspector("closed")}
           tab={tab}
           onTab={setTab}
           deck={deck}

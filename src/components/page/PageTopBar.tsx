@@ -38,20 +38,30 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
 
   // CVs live on /cv, not in a subject.
   const cv = page.kind === "cv";
+  // On phones the parents shrink to their icons, so the page's own title keeps the room.
+  const parentLabel = (label: string) => <span className="max-sm:sr-only">{label}</span>;
   const crumbs: Crumb[] = [
-    ...(cv ? [{ label: cvs, href: "/cv", icon: <FileUser className="size-3.5 text-ink-3" /> }] : []),
+    ...(cv ? [{ label: parentLabel(cvs), title: cvs, href: "/cv", icon: <FileUser className="size-3.5 text-ink-3" /> }] : []),
     ...(subject && !cv
       ? [
           {
-            label: subject.name,
+            label: parentLabel(subject.name),
+            title: subject.name,
             href: `/subjects/${subject.id}`,
             icon: subject.emoji ? <span className="text-[12px]">{subject.emoji}</span> : <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />,
           },
         ]
       : []),
-    ...chain.map((p) => ({ label: pageTitle(p.title, p.kind, locale), href: `/p/${p.id}`, icon: <PageIcon page={p} className="size-3.5" /> })),
+    ...chain.map((p) => ({ label: parentLabel(pageTitle(p.title, p.kind, locale)), title: pageTitle(p.title, p.kind, locale), href: `/p/${p.id}`, icon: <PageIcon page={p} className="size-3.5" /> })),
     { label: pageTitle(page.title, page.kind, locale), icon: <PageIcon page={page} className="size-3.5" /> },
   ];
+
+  const toggleFavorite = () => {
+    updatePage(page.id, { is_favorite: !page.is_favorite });
+    if (!page.is_favorite) blob.react("jump", "love", 1400);
+  };
+  // Pages with their own actions (presentations) move the star into the menu on phones, so the title keeps some room.
+  const starInMenu = Boolean(actions);
 
   return (
     <TopBar
@@ -61,11 +71,8 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
           <SaveIndicator state={saveState} />
           {actions}
           <button
-            onClick={() => {
-              updatePage(page.id, { is_favorite: !page.is_favorite });
-              if (!page.is_favorite) blob.react("jump", "love", 1400);
-            }}
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
+            onClick={toggleFavorite}
+            className={cn("grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9", starInMenu && "max-sm:hidden")}
             aria-label={page.is_favorite ? t.removeFavorite : t.addFavorite}
             title={page.is_favorite ? t.removeFavorite : t.addFavorite}
           >
@@ -75,13 +82,27 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
             align="end"
             className="w-[230px]"
             trigger={(props) => (
-              <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.options}>
+              <button {...props} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9" aria-label={t.options} title={t.options}>
                 <Ellipsis className="size-4" />
               </button>
             )}
           >
             {(close) => (
               <>
+                {starInMenu && (
+                  <div className="sm:hidden">
+                    <MenuItem
+                      icon={<Star className={cn(page.is_favorite && "fill-blob text-blob")} />}
+                      onSelect={() => {
+                        toggleFavorite();
+                        close();
+                      }}
+                    >
+                      {page.is_favorite ? t.removeFavorite : t.addFavorite}
+                    </MenuItem>
+                    <MenuSeparator />
+                  </div>
+                )}
                 {!page.parent_id && !cv && (
                   <>
                     <MenuLabel>
@@ -93,18 +114,26 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                       {subjects.map((s) => (
                         <MenuItem
                           key={s.id}
-                          icon={s.emoji ? <span className="text-[13px]">{s.emoji}</span> : <span className="block size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}
+                          icon={
+                            <span className="grid w-4 place-items-center">
+                              {s.emoji ? <span className="text-[13px]">{s.emoji}</span> : <span className="block size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}
+                            </span>
+                          }
                           shortcut={page.subject_id === s.id ? <Check className="size-3.5" /> : undefined}
                           onSelect={() => {
                             updatePage(page.id, { subject_id: s.id });
                             close();
                           }}
                         >
-                          {s.name}
+                          <span title={s.name}>{s.name}</span>
                         </MenuItem>
                       ))}
                       <MenuItem
-                        icon={<span className="block size-2 rounded-full border border-ink-3" />}
+                        icon={
+                          <span className="grid w-4 place-items-center">
+                            <span className="block size-2 rounded-full border border-ink-3" />
+                          </span>
+                        }
                         shortcut={!page.subject_id ? <Check className="size-3.5" /> : undefined}
                         onSelect={() => {
                           updatePage(page.id, { subject_id: null });

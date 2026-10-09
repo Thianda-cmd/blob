@@ -202,7 +202,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     <>
       <TopBar crumbs={[{ label: t.title, icon: <Trash2 className="size-3.5 text-ink-3" /> }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[920px] px-5 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
+        <div className="mx-auto w-full max-w-[920px] px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
           <motion.header
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -386,13 +386,13 @@ function TrashRow({
       </span>
       <div className="flex shrink-0 items-center gap-1">
         {/* Icon only on phones, where "Wiederherstellen" would squeeze the title. */}
-        <Button variant="secondary" size="sm" onClick={onRestore} aria-label={t.restore}>
+        <Button variant="secondary" size="sm" onClick={onRestore} aria-label={t.restore} className="[@media(hover:none)]:h-9 [@media(hover:none)]:min-w-9">
           <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">{t.restore}</span>
         </Button>
         <IconButton
           label={t.deleteForever}
           onClick={onDelete}
-          className="hover:bg-danger/10 hover:text-danger"
+          className="hover:bg-danger/10 hover:text-danger [@media(hover:none)]:size-9"
         >
           <Trash2 className="size-4" />
         </IconButton>

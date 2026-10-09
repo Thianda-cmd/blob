@@ -33,13 +33,27 @@ function edited(updatedAt: string, now: number | null, locale: Locale) {
 const cardBase =
   "group relative flex flex-col rounded-xl border border-line bg-raised shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-2 hover:shadow-[0_1px_1px_rgb(28_27_24/0.04),0_8px_20px_-8px_rgb(28_27_24/0.18)] active:translate-y-0";
 
-export function NoteCard({ page, preview, parent, now }: { page: PageMeta; preview?: PagePreview; parent?: PageMeta; now: number | null }) {
+export function NoteCard({
+  page,
+  preview,
+  parent,
+  now,
+  fixed,
+}: {
+  page: PageMeta;
+  preview?: PagePreview;
+  parent?: PageMeta;
+  now: number | null;
+  /** Keep the fixed height on phones too (e.g. in a row of cards that should line up). */
+  fixed?: boolean;
+}) {
   const locale = useLocale();
   const t = useMessages(subjectsText);
   const snippet = preview?.snippet?.trim();
   return (
     // Fixed height keeps a multi-column grid even; a phone's single column hugs the text instead.
-    <Link href={`/p/${page.id}`} className={cn(cardBase, "h-[150px] p-3.5 max-sm:h-auto max-sm:min-h-[104px]")}>
+    // (cn is plain clsx, so the two heights are alternatives, never both.)
+    <Link href={`/p/${page.id}`} className={cn(cardBase, "p-3.5", fixed ? "h-[150px]" : "h-[150px] max-sm:h-auto max-sm:min-h-[104px]")}>
       <div className="flex min-w-0 items-center gap-2">
         <PageIcon page={page} />
         <span className="truncate text-[14px] font-medium text-ink" title={pageTitle(page.title, page.kind, locale)}>
@@ -104,7 +118,7 @@ export function DeckCard({ page, preview, now }: { page: PageMeta; preview?: Pag
   );
 }
 
-export function NewCard({ kind, onClick, busy }: { kind: "note" | "deck"; onClick: () => void; busy?: boolean }) {
+export function NewCard({ kind, onClick, busy, alone }: { kind: "note" | "deck"; onClick: () => void; busy?: boolean; alone?: boolean }) {
   const t = useMessages(subjectsText);
   const Icon = kind === "deck" ? Presentation : FilePlus2;
   return (
@@ -112,10 +126,11 @@ export function NewCard({ kind, onClick, busy }: { kind: "note" | "deck"; onClic
       onClick={onClick}
       disabled={busy}
       className={cn(
-        "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[12.5px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink disabled:opacity-60",
-        kind === "deck" ? "min-h-[150px]" : "h-[150px]",
-        // On a phone it spans the whole row: a slim button is enough there.
-        "max-sm:col-span-full max-sm:h-12 max-sm:min-h-0 max-sm:flex-row",
+        "flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[12.5px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink disabled:opacity-60",
+        // On a phone (or as the only thing in its section) it spans the whole row: a slim button is enough there.
+        alone
+          ? "col-span-full h-12 flex-row"
+          : cn("flex-col max-sm:col-span-full max-sm:h-12 max-sm:min-h-0 max-sm:flex-row", kind === "deck" ? "min-h-[150px]" : "h-[150px]"),
       )}
     >
       <Icon className="size-4" />

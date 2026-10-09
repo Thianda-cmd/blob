@@ -43,7 +43,7 @@ import { cn, pageTitle } from "@/lib/utils";
 // Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
 // row actions: there is no hover to reveal them and 28 px rows are too small for a finger.
 const TOUCH_ROW = "[@media(hover:none)]:h-9";
-const TOUCH_ICON = "[@media(hover:none)]:size-7";
+const TOUCH_ICON = "[@media(hover:none)]:size-8";
 const TOUCH_SHOW = "focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 function useStoredSet(key: string) {
@@ -85,6 +85,14 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   // Subjects start expanded; we remember the ones you fold.
   const [folded, toggleFolded] = useStoredSet("blob-folded-subjects");
   const [openPages, toggleOpenPage] = useStoredSet("blob-open-pages");
+  // Whole sections fold too, so a long list of favourites never pushes the subjects out of sight.
+  const [foldedSections, toggleSection] = useStoredSet("blob-folded-sections");
+  const sectionProps = (id: string, count: number) => ({
+    folded: foldedSections.has(id),
+    onToggle: () => toggleSection(id),
+    count,
+    toggleLabel: foldedSections.has(id) ? t.expand : t.collapse,
+  });
 
   const tree = useMemo(() => {
     const children = new Map<string | null, PageMeta[]>();
@@ -259,13 +267,13 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   return (
     <nav className="flex h-full w-full flex-col" aria-label={t.label}>
       <div className="flex h-12 shrink-0 items-center gap-2 px-3">
-        <Link href="/home" className="flex min-w-0 items-center gap-2 rounded-md">
+        <Link href="/home" className="flex min-w-0 items-center gap-2 rounded-md [@media(hover:none)]:h-9">
           <BlobMark size={22} />
           <span className="font-display text-[17px] font-bold tracking-[-0.03em]">Blob</span>
         </Link>
         <button
           onClick={onCollapse}
-          className="ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
+          className="ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9"
           aria-label={t.hide}
           title={t.hideTitle}
         >
@@ -301,7 +309,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {favorites.length > 0 && (
-          <Section title={t.favorites}>
+          <Section title={t.favorites} {...sectionProps("favorites", favorites.length)}>
             {favorites.map((p) => (
               <Link
                 key={p.id}
@@ -320,12 +328,12 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           </Section>
         )}
 
-        <Section title={t.subjects} action={<NewSubjectButton />}>
+        <Section title={t.subjects} action={<NewSubjectButton />} {...sectionProps("subjects", subjects.length)}>
           {subjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
           {subjects.map(renderSubject)}
         </Section>
 
-        <Section title={t.notes}>
+        <Section title={t.notes} {...sectionProps("notes", unfiled.length)}>
           {unfiled.length === 0 ? (
             <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p>
           ) : (
@@ -364,14 +372,45 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   );
 }
 
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function Section({
+  title,
+  action,
+  folded,
+  onToggle,
+  count,
+  toggleLabel,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  folded: boolean;
+  onToggle: () => void;
+  /** Shown next to the title while the section is folded. */
+  count: number;
+  toggleLabel: string;
+  children: ReactNode;
+}) {
   return (
     <div className="mb-3">
-      <div className="group flex h-6 items-center px-1.5">
-        <span className="text-[11.5px] font-medium text-ink-3">{title}</span>
+      <div className="group flex h-6 items-center pl-0.5 pr-1.5 [@media(hover:none)]:h-8">
+        <button
+          onClick={onToggle}
+          aria-expanded={!folded}
+          title={toggleLabel}
+          className="flex h-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-ink-3 transition-colors hover:text-ink-2"
+        >
+          {title}
+          {folded && count > 0 && <span className="tabular-nums text-ink-3/80">{count}</span>}
+          <ChevronRight
+            className={cn(
+              "size-3 transition-[transform,opacity] duration-200",
+              folded ? "opacity-100" : "rotate-90 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
+            )}
+          />
+        </button>
         <span className={cn("ml-auto opacity-0 transition-opacity group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}>{action}</span>
       </div>
-      <div className="space-y-px">{children}</div>
+      {!folded && <div className="space-y-px">{children}</div>}
     </div>
   );
 }

@@ -128,7 +128,7 @@ export function TopicView({
                 <LevelTab
                   key={l}
                   level={l}
-                  name={t.levels[l]}
+                  name={t.level(l)}
                   depth={tt(topic.levels[l].depth)}
                   written={!!topic.lessons[l] && !!topic.levels[l].minutes}
                   state={levelProgress(slug, l, progress, rows)}
@@ -230,6 +230,7 @@ export function TopicView({
                       target="_blank"
                       rel="noopener"
                       aria-label={s.openPublic(tt(item.title))}
+                      title={tt(item.title)}
                       className="min-w-0 flex-1 truncate py-2.5 text-[14px] font-medium hover:text-blob-ink"
                     >
                       {tt(item.title)}
@@ -245,7 +246,7 @@ export function TopicView({
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="font-display text-[22px] font-bold tracking-[-0.015em]">
-                  {t.topic.cheatSheet} <span className="font-medium text-ink-3">· {t.levels[level]}</span>
+                  {t.topic.cheatSheet} <span className="font-medium text-ink-3">· {t.level(level)}</span>
                 </h2>
                 <p className="text-[13.5px] text-ink-3 print:hidden">{summary.length ? t.topic.cheatSheetText : t.topic.cheatSheetSoon}</p>
               </div>

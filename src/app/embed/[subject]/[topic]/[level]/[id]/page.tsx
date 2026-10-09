@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { LocaleProvider } from "@/i18n/client";
 import { isLocale } from "@/i18n/config";
 import { learnText } from "@/i18n/messages/learn";
@@ -35,10 +34,9 @@ export default async function EmbedPage({ params, searchParams }: PageProps<"/em
   const level = parseLevel(raw);
   if (meta?.subject !== subject || !level || raw !== String(level) || !/^[a-z0-9-]{1,80}$/.test(id)) notFound();
   const lang = isLocale(query.lang) ? query.lang : undefined;
-  const picture = (
-    <Suspense fallback={<div className="min-h-[200px]" />}>
-      <EmbedVisual slug={topic} level={level} id={id} />
-    </Suspense>
-  );
+  // No Suspense boundary on purpose: the picture comes in the first HTML instead of being streamed in and
+  // revealed later. Browsers pause frames from other sites while they are off screen, and a streamed picture
+  // would then only appear (and the frame jump to its height) once the reader scrolls to it.
+  const picture = <EmbedVisual slug={topic} level={level} id={id} />;
   return lang ? <LocaleProvider locale={lang}>{picture}</LocaleProvider> : picture;
 }

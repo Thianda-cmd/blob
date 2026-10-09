@@ -1,15 +1,17 @@
 "use client";
 
-import { ArrowRight, Flame } from "lucide-react";
+import { ArrowRight, ChevronDown, Flame, Share2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
+import { intlLocale } from "@/i18n/format";
 import { landingText } from "@/i18n/messages/landing";
 import { resolveText } from "@/i18n/text";
-import { CATALOG, firstLessonMinutes, subjectCatalog, topicHref, type Subject } from "@/learn/catalog";
+import { CATALOG, firstLessonMinutes, isSubject, lessonLevels, subjectCatalog, SUBJECTS, topicHref, type Subject, type SubjectInfo, type TopicMeta } from "@/learn/catalog";
 import { MathView } from "@/learn/components/MathView";
 import { TopicGlyph } from "@/learn/components/TopicGlyph";
+import { LEVELS } from "@/learn/types";
 import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -153,34 +155,71 @@ function Streak() {
   );
 }
 
-/** Each subject's topics as compact tiles with their glyphs. */
+/** Rows of tiles shown before "Show all", per breakpoint: 3 rows at 2, 3 and 6 columns. */
+const CAP = { phone: 6, tablet: 9, desktop: 12 };
+
+/** Hides tiles past the cap of each breakpoint until the list is opened. */
+function capClass(i: number) {
+  if (i >= CAP.desktop) return "hidden";
+  if (i >= CAP.tablet) return "max-lg:hidden";
+  if (i >= CAP.phone) return "max-sm:hidden";
+  return undefined;
+}
+
+/** Where "Show all" is needed: wherever the subject has more topics than that breakpoint shows. */
+function toggleClass(n: number) {
+  if (n > CAP.desktop) return "flex";
+  if (n > CAP.tablet) return "flex lg:hidden";
+  if (n > CAP.phone) return "flex sm:hidden";
+  return "hidden";
+}
+
+/** Each subject's topics as compact tiles with their glyphs and levels; subjects come from the catalog. */
 export function TopicGrid() {
   const t = useMessages(landingText).learn.topics;
   const locale = useLocale();
   const scope = useId();
-  const [subject, setSubject] = useState<Subject>("maths");
+  const live = SUBJECTS.filter((s): s is SubjectInfo & { slug: Subject } => s.live && isSubject(s.slug));
+  const soon = SUBJECTS.filter((s) => !s.live).map((s) => resolveText(s.title, locale));
+  const [subject, setSubject] = useState<Subject>(live[0].slug);
+  const [open, setOpen] = useState(false);
   const catalog = subjectCatalog(subject);
   return (
-    <div className="mt-14">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+    <div className="mt-12 lg:mt-14">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
           <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em]">{t.title(CATALOG.length)}</h3>
-          <p className="text-[13.5px] text-ink-3">{t.body[subject]}</p>
+          <p className="mt-0.5 text-[13.5px] text-ink-3">{t.body[subject]}</p>
         </div>
-        <div className="flex rounded-xl border border-line bg-raised p-1 shadow-card" role="tablist">
-          {(["maths", "chemistry", "biology"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="tab"
-              aria-selected={subject === s}
-              onClick={() => setSubject(s)}
-              className={cn("relative h-8 rounded-lg px-3.5 text-[13.5px] font-medium transition-colors", subject === s ? "text-white" : "text-ink-2 hover:text-ink")}
-            >
-              {subject === s && <motion.span layoutId={`${scope}-subject`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
-              <span className="relative">{t.subjects[s]}</span>
-            </button>
-          ))}
+        <div className="flex max-w-full flex-col items-start gap-1.5 sm:items-end">
+          {/* Scrolls sideways once more subjects than fit are live. */}
+          <div
+            className="flex max-w-full overflow-x-auto rounded-xl border border-line bg-raised p-1 shadow-card [scrollbar-width:none]"
+            role="tablist"
+            aria-label={t.label}
+          >
+            {live.map((s) => (
+              <button
+                key={s.slug}
+                type="button"
+                role="tab"
+                aria-selected={subject === s.slug}
+                onClick={() => {
+                  setSubject(s.slug);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "relative flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-medium whitespace-nowrap transition-colors",
+                  subject === s.slug ? "text-white" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {subject === s.slug && <motion.span layoutId={`${scope}-subject`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+                <span className="relative">{resolveText(s.title, locale)}</span>
+                <span className={cn("relative text-[12px] tabular-nums", subject === s.slug ? "text-white/75" : "text-ink-3")}>{subjectCatalog(s.slug).length}</span>
+              </button>
+            ))}
+          </div>
+          {soon.length > 0 && <p className="px-1 text-[12px] text-ink-3">{t.soon(new Intl.ListFormat(intlLocale(locale), { type: "conjunction" }).format(soon))}</p>}
         </div>
       </div>
       <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 lg:gap-3">
@@ -193,25 +232,78 @@ export function TopicGrid() {
               whileInView={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
               viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor(i / 6) * 0.08, ease }}
+              transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor((i % CAP.desktop) / 6) * 0.08, ease }}
+              className={open ? undefined : capClass(i)}
             >
-              <Link
-                href={topicHref(topic)}
-                className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
-              >
-                <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">
-                  {topic.icon ? <TopicGlyph topic={topic} size="sm" /> : <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />}
-                </span>
-                <span className="mt-2.5 px-1 text-[13.5px] font-medium leading-snug">{resolveText(topic.title, locale)}</span>
-                <span className="mt-auto px-1 pb-0.5 pt-1 text-[12px] text-ink-3">{t.minutes(firstLessonMinutes(topic))}</span>
-              </Link>
+              <TopicTile topic={topic} />
             </motion.li>
           ))}
         </AnimatePresence>
       </ul>
-      <Link href="/show" className="mt-5 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-blob-ink hover:underline">
-        {t.gallery} <ArrowRight className="size-3.5" />
-      </Link>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className={cn(
+          "mx-auto mt-4 h-9 items-center gap-1.5 rounded-lg border border-line bg-raised px-3.5 text-[13.5px] font-medium text-ink-2 shadow-card transition-colors hover:text-ink",
+          toggleClass(catalog.length),
+        )}
+      >
+        {open ? t.less : t.more(catalog.length)}
+        <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+      </button>
+      <PicturesLink />
     </div>
+  );
+}
+
+function TopicTile({ topic }: { topic: TopicMeta }) {
+  const t = useMessages(landingText).learn.topics;
+  const locale = useLocale();
+  const ready = lessonLevels(topic).length;
+  const minutes = firstLessonMinutes(topic);
+  return (
+    <Link
+      href={topicHref(topic)}
+      className="group flex h-full flex-col rounded-xl border border-line bg-raised p-2.5 shadow-card transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-blob/45"
+    >
+      <span aria-hidden className="grid h-[52px] place-items-center overflow-hidden rounded-lg bg-surface text-ink transition-colors group-hover:bg-blob-soft/60">
+        {topic.icon ? <TopicGlyph topic={topic} size="sm" /> : <MathView src={topic.glyph} size="sm" animate={false} className="text-[17px]! sm:text-[19px]!" />}
+      </span>
+      <span className="mt-2.5 px-1 text-[13.5px] font-medium leading-snug hyphens-auto break-words">{resolveText(topic.title, locale)}</span>
+      <span className="mt-auto flex items-center gap-2 px-1 pb-0.5 pt-1 text-[12px] text-ink-3">
+        {minutes > 0 && t.minutes(minutes)}
+        {/* One dot per level, like the learning center: a ring when its lesson is ready, dashed while it's being written. */}
+        <span className="ml-auto flex items-center gap-[3px]" role="img" aria-label={t.levels(ready, LEVELS.length)} title={t.levels(ready, LEVELS.length)}>
+          {LEVELS.map((l) => (
+            <span key={l} className={cn("size-2 rounded-full border-[1.5px]", topic.levels[l].minutes ? "border-blob/70" : "border-dashed border-line-2")} />
+          ))}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/** The public picture pages (/show): a feature of its own, in the same shape as the CV builder's points. */
+function PicturesLink() {
+  const t = useMessages(landingText).learn.pictures;
+  return (
+    <Link
+      href="/show"
+      className="group mt-6 flex items-center gap-4 rounded-2xl border border-line bg-raised p-3.5 shadow-card transition-colors hover:border-blob/45 sm:p-4"
+    >
+      <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-surface text-blob-ink">
+        <Share2 className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11.5px] font-medium uppercase tracking-wider text-blob-ink">{t.kicker}</span>
+        <span className="mt-0.5 block text-[15px] font-semibold leading-snug tracking-[-0.01em]">{t.title}</span>
+        <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{t.body}</span>
+      </span>
+      <span className="hidden shrink-0 items-center gap-1.5 text-[13.5px] font-medium text-blob-ink group-hover:underline sm:flex">
+        {t.cta} <ArrowRight className="size-3.5" />
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-blob-ink sm:hidden" aria-hidden />
+    </Link>
   );
 }

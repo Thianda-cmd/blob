@@ -121,14 +121,14 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
             </div>
           </header>
 
-          <div className="mt-8 grid gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="mt-8 grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_380px]">
             <div className="min-w-0 space-y-9">
               <Section title={t.notes} count={notes.length}>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                   {notes.map((p) => (
                     <NoteCard key={p.id} page={p} preview={previews[p.id]} parent={p.parent_id ? byId.get(p.parent_id) : undefined} now={now} />
                   ))}
-                  <NewCard kind="note" onClick={() => create("note")} busy={creating === "note"} />
+                  <NewCard kind="note" onClick={() => create("note")} busy={creating === "note"} alone={notes.length === 0} />
                 </div>
               </Section>
 
@@ -138,7 +138,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                   {decks.map((p) => (
                     <DeckCard key={p.id} page={p} preview={previews[p.id]} now={now} />
                   ))}
-                  <NewCard kind="deck" onClick={() => create("deck")} busy={creating === "deck"} />
+                  <NewCard kind="deck" onClick={() => create("deck")} busy={creating === "deck"} alone={decks.length === 0} />
                 </div>
               </Section>
             </div>
@@ -148,7 +148,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                 title={t.tasks}
                 count={open.length}
                 action={
-                  <Link href="/tasks" className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
+                  <Link href="/tasks" className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2">
                     {t.allTasks} <ArrowRight className="size-3" />
                   </Link>
                 }

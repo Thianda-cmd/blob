@@ -34,6 +34,7 @@ const SPY_OFFSET = 140;
 export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] }) {
   const t = useMessages(settingsText);
   const scroller = useRef<HTMLDivElement>(null);
+  const chips = useRef<HTMLElement>(null);
   const [active, setActive] = useState<string>(SECTIONS[0].id);
   // While a nav click is smooth-scrolling, don't let the spy fight it.
   const steering = useRef(false);
@@ -96,6 +97,14 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
     };
   }, []);
 
+  // Keep the current chip in view in the phone nav.
+  useEffect(() => {
+    const row = chips.current;
+    const chip = row?.querySelector<HTMLElement>(`[data-section="${active}"]`);
+    if (!row || !chip || row.offsetParent === null) return;
+    row.scrollTo({ left: chip.offsetLeft - row.clientWidth / 2 + chip.clientWidth / 2, behavior: "smooth" });
+  }, [active]);
+
   function go(id: string) {
     const node = document.getElementById(`settings-${id}`);
     if (!node) return;
@@ -111,16 +120,42 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
     <>
       <TopBar crumbs={[{ label: t.title, icon: <Settings className="size-3.5 text-ink-3" /> }]} />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1080px] px-5 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
+        <div className="mx-auto w-full max-w-[1080px] px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
           <motion.header
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="mb-8 md:pl-[232px]"
+            className="mb-4 md:mb-8 md:pl-[232px]"
           >
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.title}</h1>
             <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
           </motion.header>
+
+          {/* Phones and small tablets: the sections as a sticky, swipeable row of chips. */}
+          <nav
+            ref={chips}
+            aria-label={t.navLabel}
+            className="sticky top-0 z-10 -mx-4 mb-4 flex gap-1.5 overflow-x-auto bg-surface/95 px-4 py-2 backdrop-blur-sm [scrollbar-width:none] sm:-mx-8 sm:px-8 md:hidden [&::-webkit-scrollbar]:hidden"
+          >
+            {SECTIONS.map((s) => {
+              const current = active === s.id;
+              return (
+                <button
+                  key={s.id}
+                  data-section={s.id}
+                  onClick={() => go(s.id)}
+                  aria-current={current ? "location" : undefined}
+                  className={cn(
+                    "flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] transition-colors [&_svg]:size-3.5 [&_svg]:shrink-0",
+                    current ? "border-ink bg-ink font-medium text-paper" : s.id === "danger" ? "border-line bg-raised text-danger" : "border-line bg-raised text-ink-2",
+                  )}
+                >
+                  {s.icon}
+                  {t.nav[s.id]}
+                </button>
+              );
+            })}
+          </nav>
 
           <div className="flex gap-8">
             <nav aria-label={t.navLabel} className="sticky top-6 hidden w-[200px] shrink-0 self-start pt-0.5 md:block">

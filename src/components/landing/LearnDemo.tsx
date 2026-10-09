@@ -77,12 +77,18 @@ export function LearnDemo({ className }: { className?: string }) {
           x
         </span>
         <div className="min-w-0 leading-tight">
-          <div className="truncate text-[13.5px] font-medium">{topic}</div>
+          <div className="truncate text-[13.5px] font-medium" title={topic}>
+            {topic}
+          </div>
           <div className="text-[11.5px] text-ink-3">{t.solution}</div>
         </div>
         <div className="ml-auto flex items-center gap-1">
-          <span className="mr-1 text-[12px] tabular-nums text-ink-3" aria-live="off">
-            {t.step(step + 1, FRAMES.length)}
+          {/* Phones show just "2/5": the full "Step 2 of 5" would squeeze the topic's name. */}
+          <span className="mr-1 whitespace-nowrap text-[12px] tabular-nums text-ink-3" aria-live="off">
+            <span className="sm:hidden" aria-hidden>
+              {step + 1}/{FRAMES.length}
+            </span>
+            <span className="max-sm:sr-only">{t.step(step + 1, FRAMES.length)}</span>
           </span>
           <IconButton label={playing ? t.pause : t.play} onClick={() => setMode(playing ? "paused" : "playing")}>
             {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
@@ -143,7 +149,7 @@ export function LearnDemo({ className }: { className?: string }) {
               onClick={() => go(i)}
               aria-label={t.goTo(i + 1)}
               aria-current={i === step ? "step" : undefined}
-              className="group flex h-4 flex-1 items-center"
+              className="group flex h-7 flex-1 items-center"
             >
               <span className="block h-1 w-full overflow-hidden rounded-full bg-line transition-colors group-hover:bg-line-2">
                 <motion.span
@@ -188,7 +194,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+      className="grid size-8 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink"
     >
       {children}
     </button>

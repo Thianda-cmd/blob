@@ -8,7 +8,7 @@ import { commandText, parseDisplay, type DNode, type StyleName } from "@/learn/e
 import { cn } from "@/lib/utils";
 
 // The big sizes shrink on phones, so a board line like "f(x) = x² − 6x + 5" still fits on one line.
-const SIZES = { inline: "1.05em", sm: "18px", md: "24px", lg: "clamp(26px, 7.5vw, 34px)", xl: "clamp(30px, 9vw, 46px)" } as const;
+const SIZES = { inline: "1.05em", sm: "18px", md: "24px", lg: "clamp(26px, 7.5vw, 34px)", xl: "clamp(26px, 8vw, 46px)" } as const;
 export type MathSize = keyof typeof SIZES;
 
 const leafMotion = {

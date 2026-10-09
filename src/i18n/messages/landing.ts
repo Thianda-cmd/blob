@@ -1,12 +1,13 @@
+import type { Subject } from "@/learn/catalog";
 import { defineMessages } from "../define";
 
 /** The public landing page (src/app/page.tsx and src/components/landing). */
 export const landingText = defineMessages({
   en: {
     meta: {
-      title: "Blob — notes, presentations, homework, maths and chemistry for school",
+      title: "Blob — notes, presentations, homework, lessons and your CV for school",
       description:
-        "One calm place for school: notes, presentations, homework, a CV builder and step-by-step maths and chemistry lessons with Blob, your jelly tutor. Free and without ads.",
+        "One calm place for school: notes, presentations, homework, a CV builder and step-by-step lessons in maths, chemistry and biology with Blob, your jelly tutor. Free and without ads.",
     },
     header: {
       home: "Blob, home",
@@ -20,7 +21,7 @@ export const landingText = defineMessages({
       badge: "New: write your CV with Blob",
       titleA: "Your school,",
       titleB: "sorted.",
-      body: "Notes, presentations, homework and lessons for maths and chemistry in one calm place. Blob, your jelly helper, saves everything as you go and explains every step.",
+      body: "Notes, presentations, homework, your CV and lessons for maths, chemistry and biology in one calm place. Blob, your jelly helper, saves everything as you go and explains every step.",
       cta: "Create your free space",
       haveAccount: "I have an account",
       fine: "Free. No ads. Your notes stay private to you.",
@@ -72,10 +73,19 @@ export const landingText = defineMessages({
       visuals: { level: "Level 2", correct: "Correct!", grade: "Grade", good: "Good", rule: "Minus in front" },
       topics: {
         title: (n: number) => `${n} topics from class`,
-        subjects: { maths: "Maths", chemistry: "Chemistry", biology: "Biology" },
-        body: { maths: "From negative numbers to probability, in three levels.", chemistry: "From atoms to alkanes.", biology: "From the cell to whole ecosystems, in three levels." },
-        gallery: "Browse the interactive pictures, no sign-in needed",
+        label: "Subjects",
+        body: { maths: "From negative numbers to probability, in three levels.", chemistry: "From atoms to alkanes.", biology: "From the cell to whole ecosystems, in three levels." } satisfies Record<Subject, string>,
+        soon: (names: string) => `Coming soon: ${names}`,
         minutes: (n: number) => `${n} min`,
+        levels: (ready: number, all: number) => (ready === all ? `${all} levels` : `${ready} of ${all} levels ready`),
+        more: (n: number) => `Show all ${n} topics`,
+        less: "Show fewer",
+      },
+      pictures: {
+        kicker: "Public pictures",
+        title: "Every picture from the lessons has its own page",
+        body: "Show it on the board, send it to your class or embed it on your site. No sign-in needed.",
+        cta: "Browse the pictures",
       },
     },
     slides: {
@@ -83,8 +93,8 @@ export const landingText = defineMessages({
       title: "Slides that look good by default.",
       body: "Pick a layout, type your points, press Present. Themes, transitions and a speaker view are built in, no design skills needed.",
       specs: {
-        layouts: { title: "17 layouts", body: "From title to timeline: stats, compare, formula and more." },
-        themes: { title: "10 themes, plus your own", body: "The theme editor lets you pick your own colours, fonts and backdrop." },
+        layouts: { title: (n: number) => `${n} layouts`, body: "From title to timeline: stats, compare, formula and more." },
+        themes: { title: (n: number) => `${n} themes, plus your own`, body: "The theme editor lets you pick your own colours, fonts and backdrop." },
         motion: { title: "Transitions and builds", body: "Fade, push, zoom or morph. Bring your points in click by click." },
         speaker: { title: "Speaker view", body: "Notes, the next slide and a timer, only on your screen." },
       },
@@ -160,26 +170,26 @@ export const landingText = defineMessages({
       kicker: "CV builder",
       title: "A CV that opens doors.",
       body: "For your internship, apprenticeship or first side job: fill in a friendly form, pick a design and save it as a PDF. Blob tells you what goes where, with examples.",
-      label: "The example CV in six designs",
+      label: (n: number) => `The example CV in ${n} designs`,
       pick: "Designs",
-      points: [
-        { title: "Six designs", body: "From the classic German CV to creative, all ready to print." },
-        { title: "German or English", body: "Headings and dates in the language you apply in." },
-        { title: "Tips at every step", body: "What to write, what to leave out, and examples to start from." },
-        { title: "PDF in one click", body: "Exactly what you see, ready to attach to your application." },
-      ],
+      points: {
+        designs: { title: (n: number) => `${n} designs`, body: "From the classic German CV to creative, all ready to print." },
+        language: { title: "German or English", body: "Headings and dates in the language you apply in." },
+        tips: { title: "Tips at every step", body: "What to write, what to leave out, and examples to start from." },
+        pdf: { title: "PDF in one click", body: "Exactly what you see, ready to attach to your application." },
+      },
     },
     cta: {
       title: "Ready for a calmer school year?",
       body: "Set up your subjects in under a minute. Blob will show you around.",
     },
-    footer: { tagline: "made for students" },
+    footer: { tagline: "made for students", pictures: "Pictures", developers: "Developers" },
   },
   de: {
     meta: {
-      title: "Blob – Notizen, Präsentationen, Hausaufgaben, Mathe und Chemie für die Schule",
+      title: "Blob – Notizen, Präsentationen, Hausaufgaben, Lernen und Lebenslauf für die Schule",
       description:
-        "Ein ruhiger Ort für die Schule: Notizen, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen in Mathe und Chemie, Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
+        "Ein ruhiger Ort für die Schule: Notizen, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen in Mathe, Chemie und Bio, Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
     },
     header: {
       home: "Blob, Startseite",
@@ -193,7 +203,7 @@ export const landingText = defineMessages({
       badge: "Neu: dein Lebenslauf mit Blob",
       titleA: "Deine Schule",
       titleB: "im Griff.",
-      body: "Notizen, Präsentationen, Hausaufgaben und Lektionen für Mathe und Chemie an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir jeden Schritt.",
+      body: "Notizen, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen für Mathe, Chemie und Bio an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir jeden Schritt.",
       cta: "Kostenlos loslegen",
       haveAccount: "Ich habe schon ein Konto",
       fine: "Kostenlos. Ohne Werbung. Deine Notizen siehst nur du.",
@@ -245,10 +255,19 @@ export const landingText = defineMessages({
       visuals: { level: "Stufe 2", correct: "Richtig!", grade: "Note", good: "Gut", rule: "Minus davor" },
       topics: {
         title: (n) => `${n} Themen aus dem Unterricht`,
-        subjects: { maths: "Mathe", chemistry: "Chemie", biology: "Biologie" },
+        label: "Fächer",
         body: { maths: "Von negativen Zahlen bis zur Wahrscheinlichkeit, in drei Stufen.", chemistry: "Vom Atombau bis zu den Alkanen.", biology: "Von der Zelle bis zum Ökosystem, in drei Stufen." },
-        gallery: "Interaktive Grafiken ansehen, ohne Anmeldung",
+        soon: (names) => `Bald auch: ${names}`,
         minutes: (n) => `${n} Min.`,
+        levels: (ready, all) => (ready === all ? `${all} Stufen` : `${ready} von ${all} Stufen fertig`),
+        more: (n) => `Alle ${n} Themen zeigen`,
+        less: "Weniger zeigen",
+      },
+      pictures: {
+        kicker: "Öffentliche Grafiken",
+        title: "Jede Grafik aus den Lektionen hat ihre eigene Seite",
+        body: "Zeig sie an der Tafel, schick sie deiner Klasse oder bau sie in deine Website ein. Ganz ohne Anmeldung.",
+        cta: "Grafiken ansehen",
       },
     },
     slides: {
@@ -256,8 +275,8 @@ export const landingText = defineMessages({
       title: "Folien, die von selbst gut aussehen.",
       body: "Layout wählen, Stichpunkte tippen, auf Präsentieren drücken. Designs, Übergänge und eine Referentenansicht sind schon dabei, ganz ohne Designkenntnisse.",
       specs: {
-        layouts: { title: "17 Layouts", body: "Vom Titel bis zum Zeitstrahl: Zahlen, Vergleich, Formel und mehr." },
-        themes: { title: "10 Designs und dein eigenes", body: "Im Design-Editor wählst du Farben, Schriften und Hintergrund selbst." },
+        layouts: { title: (n) => `${n} Layouts`, body: "Vom Titel bis zum Zeitstrahl: Zahlen, Vergleich, Formel und mehr." },
+        themes: { title: (n) => `${n} Designs und dein eigenes`, body: "Im Design-Editor wählst du Farben, Schriften und Hintergrund selbst." },
         motion: { title: "Übergänge und Animationen", body: "Überblenden, Schieben, Zoom oder Morphen. Stichpunkte erscheinen Klick für Klick." },
         speaker: { title: "Referentenansicht", body: "Notizen, nächste Folie und Timer siehst nur du." },
       },
@@ -333,19 +352,19 @@ export const landingText = defineMessages({
       kicker: "Lebenslauf",
       title: "Ein Lebenslauf, der Türen öffnet.",
       body: "Fürs Praktikum, die Ausbildung oder den ersten Nebenjob: Formular ausfüllen, Design wählen, als PDF speichern. Blob erklärt dir, was wohin gehört, mit Beispielen.",
-      label: "Der Beispiel-Lebenslauf in sechs Designs",
+      label: (n) => `Der Beispiel-Lebenslauf in ${n} Designs`,
       pick: "Designs",
-      points: [
-        { title: "Sechs Designs", body: "Vom klassischen tabellarischen bis zum kreativen Lebenslauf, alle druckfertig." },
-        { title: "Deutsch oder Englisch", body: "Überschriften und Daten in der Sprache deiner Bewerbung." },
-        { title: "Tipps bei jedem Schritt", body: "Was reingehört, was nicht, und Beispiele zum Anfangen." },
-        { title: "PDF mit einem Klick", body: "Genau so, wie du ihn siehst, fertig für deine Bewerbung." },
-      ],
+      points: {
+        designs: { title: (n) => `${n} Designs`, body: "Vom klassischen tabellarischen bis zum kreativen Lebenslauf, alle druckfertig." },
+        language: { title: "Deutsch oder Englisch", body: "Überschriften und Daten in der Sprache deiner Bewerbung." },
+        tips: { title: "Tipps bei jedem Schritt", body: "Was reingehört, was nicht, und Beispiele zum Anfangen." },
+        pdf: { title: "PDF mit einem Klick", body: "Genau so, wie du ihn siehst, fertig für deine Bewerbung." },
+      },
     },
     cta: {
       title: "Bereit für ein entspannteres Schuljahr?",
       body: "Deine Fächer sind in unter einer Minute eingerichtet. Den Rest zeigt dir Blob.",
     },
-    footer: { tagline: "für die Schule gemacht" },
+    footer: { tagline: "für die Schule gemacht", pictures: "Grafiken", developers: "Entwickler" },
   },
 });

@@ -10,10 +10,15 @@ import { landingText } from "@/i18n/messages/landing";
 import { useText } from "@/i18n/useText";
 import { cn } from "@/lib/utils";
 
-const ICONS = [LayoutTemplate, Languages, Lightbulb, FileDown];
+const POINTS = [
+  { key: "designs", Icon: LayoutTemplate },
+  { key: "language", Icon: Languages },
+  { key: "tips", Icon: Lightbulb },
+  { key: "pdf", Icon: FileDown },
+] as const;
 const IDS = CV_TEMPLATES.map((m) => m.id);
 
-/** The CV builder on the landing page: the example CV fanned out, cycling through the six designs, and what it does. */
+/** The CV builder on the landing page: the example CV fanned out, cycling through every design, and what it does. */
 export function CvShowcase() {
   const t = useMessages(landingText).cv;
   const locale = useLocale();
@@ -49,7 +54,7 @@ export function CvShowcase() {
         className="relative overflow-hidden rounded-3xl border border-line bg-paper p-5 shadow-card sm:p-8 lg:col-span-7"
       >
         <div className="bg-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_50%_45%,#000_20%,transparent_75%)]" />
-        <div className="relative" role="img" aria-label={t.label}>
+        <div className="relative" role="img" aria-label={t.label(n)}>
           <SampleFan lang={locale} designs={designs} maxPaper={210} className="mx-auto w-full max-w-[560px]" />
         </div>
         <div role="group" aria-label={t.pick} className="relative mt-6 flex flex-wrap justify-center gap-1.5">
@@ -74,12 +79,13 @@ export function CvShowcase() {
         </div>
       </div>
 
-      <ul className="flex flex-col justify-center gap-5 lg:col-span-5">
-        {t.points.map((point, i) => {
-          const Icon = ICONS[i] ?? Lightbulb;
+      <ul className="grid gap-5 sm:grid-cols-2 lg:col-span-5 lg:flex lg:flex-col lg:justify-center">
+        {POINTS.map(({ key, Icon }, i) => {
+          const point = t.points[key];
+          const title = typeof point.title === "function" ? point.title(n) : point.title;
           return (
             <motion.li
-              key={point.title}
+              key={key}
               initial={{ opacity: 0, x: 12 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, amount: 0.5 }}
@@ -90,7 +96,7 @@ export function CvShowcase() {
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0">
-                <h3 className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{point.title}</h3>
+                <h3 className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{title}</h3>
                 <p className="mt-0.5 text-[13.5px] leading-snug text-ink-2">{point.body}</p>
               </div>
             </motion.li>

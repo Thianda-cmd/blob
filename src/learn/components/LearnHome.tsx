@@ -344,7 +344,7 @@ function LevelDots({ topic, progress, levels }: { topic: TopicMeta; progress?: T
       {LEVELS.map((l) => {
         const written = !!topic.levels[l].minutes;
         const done = written && levelProgress(topic.slug, l, progress, levels).lesson_done;
-        const name = t.levels[l];
+        const name = t.level(l);
         return (
           <span
             key={l}

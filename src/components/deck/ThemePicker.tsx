@@ -52,7 +52,7 @@ export function ThemePicker({
       trigger={(props) => (
         <button
           {...props}
-          className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink"
+          className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink max-sm:hidden [@media(hover:none)]:h-9"
           title={t.themeTitle(current)}
         >
           <ThemeSwatch palette={palette} />

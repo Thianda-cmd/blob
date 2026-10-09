@@ -23,7 +23,13 @@ import { useWidth } from "./useWidth";
 /** "New CV": pick a design (live thumbnails of the example), the CV's language and how to start. Then opens the editor. */
 export function NewCvDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={open} onClose={onClose} labelledBy="new-cv-title" className="max-w-[920px]! overflow-hidden">
+    // Higher up on phones and short laptop screens, so all three steps fit without scrolling.
+    <Dialog
+      open={open}
+      onClose={onClose}
+      labelledBy="new-cv-title"
+      className="max-w-[920px]! overflow-hidden sm:[@media(max-height:860px)]:-mt-[6vh]"
+    >
       <NewCv onClose={onClose} />
     </Dialog>
   );
@@ -67,13 +73,13 @@ function NewCv({ onClose }: { onClose: () => void }) {
 
   return (
     <form
-      className="flex max-h-[calc(100dvh-12vh-16px)] flex-col"
+      className="flex max-h-[calc(100dvh-12vh-16px)] flex-col max-sm:max-h-[calc(100dvh-24px)] sm:[@media(max-height:860px)]:max-h-[calc(100dvh-6vh-16px)]"
       onSubmit={(e) => {
         e.preventDefault();
         create();
       }}
     >
-      <header className="flex shrink-0 items-start gap-3 border-b border-line px-5 pb-4 pt-5 sm:px-6">
+      <header className="flex shrink-0 items-start gap-3 border-b border-line px-5 pb-3.5 pt-4 sm:px-6">
         <div className="min-w-0 flex-1">
           <h2 id="new-cv-title" className="font-display text-[21px] font-bold tracking-[-0.015em]">
             {t.title}
@@ -106,7 +112,7 @@ function NewCv({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="space-y-5 px-5 py-5 sm:px-6 md:overflow-y-auto">
+        <div className="space-y-4 px-5 py-4 sm:px-6 md:overflow-y-auto">
           <fieldset>
             <Legend number={1}>{t.design}</Legend>
             <div className={cn("grid grid-cols-3 gap-2.5 transition-opacity sm:gap-3", shownSamples !== samples && dim)}>
@@ -130,7 +136,7 @@ function NewCv({ onClose }: { onClose: () => void }) {
                 {LOCALES.map((l) => (
                   <label key={l} className="relative">
                     <input type="radio" name="cv-lang" value={l} checked={lang === l} onChange={() => setLang(l)} className="peer sr-only" />
-                    <span className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-[14px] text-ink-2 transition-colors hover:text-ink peer-checked:bg-raised peer-checked:font-medium peer-checked:text-ink peer-checked:shadow-card peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-blob">
+                    <span className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-[14px] text-ink-2 transition-colors hover:text-ink peer-checked:bg-raised peer-checked:font-medium peer-checked:text-ink peer-checked:shadow-card peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-blob dark:peer-checked:bg-white/12 dark:peer-checked:ring-1 dark:peer-checked:ring-white/10">
                       <span aria-hidden className="rounded bg-ink/[0.07] px-1 text-[10.5px] font-semibold tracking-wide text-ink-3">
                         {LOCALE_NAMES[l].short}
                       </span>
@@ -174,7 +180,7 @@ function NewCv({ onClose }: { onClose: () => void }) {
 
 function Legend({ number, children }: { number: number; children: ReactNode }) {
   return (
-    <legend className="mb-2.5 flex items-center gap-2 text-[13.5px] font-semibold text-ink">
+    <legend className="mb-2 flex items-center gap-2 text-[13.5px] font-semibold text-ink">
       <span aria-hidden className="grid size-5 place-items-center rounded-full bg-blob-soft text-[11px] font-bold tabular-nums text-blob-ink">
         {number}
       </span>
@@ -191,7 +197,8 @@ function DesignTile({ cv, name, checked, onPick, autoFocus }: { cv: Cv; name: st
       <span
         ref={ref}
         className={cn(
-          "relative block aspect-[3/4] overflow-hidden rounded-lg border bg-white transition-[border-color,box-shadow,transform] duration-150 group-hover:-translate-y-0.5 md:aspect-[3/2]",
+          // Square on phones (the top of the page is what tells the designs apart), wide beside the preview.
+          "relative block aspect-square overflow-hidden rounded-lg border bg-white transition-[border-color,box-shadow,transform] duration-150 group-hover:-translate-y-0.5 md:aspect-[3/2]",
           "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blob",
           checked ? "border-blob shadow-[0_0_0_2px_var(--blob)]" : "border-line shadow-card group-hover:border-line-2",
         )}

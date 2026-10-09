@@ -14,8 +14,6 @@ import { SlideView } from "./SlideView";
 import { StageCanvas, StageSlide } from "./Stage";
 import { Block } from "./ThemeEditor";
 
-const PREVIEW_W = 240;
-
 /** Motion tab: how this slide arrives (transition) and how its content appears (build). */
 export function MotionPanel({
   deck,
@@ -60,7 +58,7 @@ export function MotionPanel({
           <button
             type="button"
             onClick={() => setRun((r) => r + 1)}
-            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-ink-3 hover:bg-hover hover:text-ink"
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2"
           >
             <Play className="size-3 fill-current" /> {t.replay}
           </button>
@@ -228,7 +226,6 @@ function MotionPreview({ prev, slide, palette, sections, kind }: { prev: Slide |
                   slide={prev}
                   palette={palette}
                   mode={hasContent(prev) ? "present" : "thumb"}
-                  width={PREVIEW_W}
                   reveal={prevUnits || undefined}
                   ordinal={sections.get(prev.id)}
                   canvasRef={ref}
@@ -244,7 +241,6 @@ function MotionPreview({ prev, slide, palette, sections, kind }: { prev: Slide |
                   slide={slide}
                   palette={palette}
                   mode={hasContent(slide) ? "present" : "thumb"}
-                  width={PREVIEW_W}
                   reveal={units ? step : undefined}
                   ordinal={sections.get(slide.id)}
                   canvasRef={ref}

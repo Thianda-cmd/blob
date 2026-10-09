@@ -46,7 +46,7 @@ export function LanguageSwitch({ compact, className }: { compact?: boolean; clas
             onClick={() => pick(locale)}
             className={cn(
               "relative rounded-md font-medium transition-colors",
-              compact ? "px-2 py-1 text-[12px]" : "px-3.5 py-1.5 text-[13px]",
+              compact ? "h-7 min-w-8 px-2 text-[12px] [@media(hover:none)]:h-8" : "px-3.5 py-1.5 text-[13px]",
               on ? "text-ink" : "text-ink-3 hover:text-ink",
             )}
           >

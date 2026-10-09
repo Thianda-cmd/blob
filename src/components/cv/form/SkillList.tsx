@@ -27,6 +27,7 @@ export function SkillList({ section, lang, change }: { section: CvSkillSection; 
   const tk = t.skills;
   const offerUndo = useOfferUndo();
   const sid = section.id;
+  const levelsId = `cvf-${sid}-levels`;
   const skills = section.skills;
   const update = (fn: (s: CvSkillSection) => CvSkillSection) => change(updateSection<CvSkillSection>(sid, fn));
   const setSkill = (id: string, patch: Partial<CvSkill>) => update((s) => ({ ...s, skills: s.skills.map((k) => (k.id === id ? { ...k, ...patch } : k)) }));
@@ -60,13 +61,14 @@ export function SkillList({ section, lang, change }: { section: CvSkillSection; 
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-hover/50 py-2 pl-3 pr-2">
-        <div className="min-w-0">
-          <div className="text-[13px] font-medium text-ink">{tk.showLevels}</div>
-          <div className="text-[12px] leading-snug text-ink-3">{tk.showLevelsHint}</div>
-        </div>
-        <Switch checked={section.showLevels} onChange={(v) => update((s) => ({ ...s, showLevels: v }))} label={tk.showLevels} />
-      </div>
+      {/* The whole row flips the switch (a bigger target than the switch on a phone). */}
+      <label htmlFor={levelsId} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-hover/50 py-2 pl-3 pr-2">
+        <span className="min-w-0">
+          <span className="block text-[13px] font-medium text-ink">{tk.showLevels}</span>
+          <span className="block text-[12px] leading-snug text-ink-3">{tk.showLevelsHint}</span>
+        </span>
+        <Switch id={levelsId} checked={section.showLevels} onChange={(v) => update((s) => ({ ...s, showLevels: v }))} label={tk.showLevels} />
+      </label>
 
       {skills.length > 0 && (
         <ul className="space-y-1.5">
@@ -158,7 +160,7 @@ function LevelDots({ name, value, onValue, className }: { name: string; value: n
             tabIndex={value === n || (value === 0 && n === 1) ? 0 : -1}
             onMouseEnter={() => setHover(n)}
             onClick={() => onValue(value === n ? 0 : n)}
-            className="group grid h-8 w-5 place-items-center max-lg:h-10 max-lg:w-6"
+            className="group grid h-8 w-5 place-items-center max-lg:h-10 max-lg:w-7"
           >
             <span
               className={cn(

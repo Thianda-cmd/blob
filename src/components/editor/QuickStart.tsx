@@ -42,7 +42,7 @@ export function QuickStart({ editor, onImage }: { editor: Editor; onImage: () =>
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={run}
-              className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised/70 px-2 text-[12.5px] text-ink-3 shadow-[0_1px_0_var(--line)] transition-[color,border,background,transform] duration-150 hover:border-line-2 hover:bg-raised hover:text-ink active:scale-[0.97]"
+              className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised/70 px-2 text-[12.5px] text-ink-3 [@media(hover:none)]:h-8 shadow-[0_1px_0_var(--line)] transition-[color,border,background,transform] duration-150 hover:border-line-2 hover:bg-raised hover:text-ink active:scale-[0.97]"
             >
               <Icon className="size-3.5" strokeWidth={1.9} />
               {label}

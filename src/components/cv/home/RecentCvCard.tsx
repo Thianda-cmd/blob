@@ -60,7 +60,9 @@ export function RecentCvCard({ page, content, now }: { page: PageMeta; content: 
       </div>
       <div className="flex min-w-0 items-center gap-2 px-1.5 pt-2">
         <PageIcon page={page} className="size-3.5" />
-        <span className="truncate text-[13.5px] font-medium">{name}</span>
+        <span className="truncate text-[13.5px] font-medium" title={name}>
+          {name}
+        </span>
         <span className="ml-auto shrink-0 text-[11.5px] text-ink-3" suppressHydrationWarning>
           {now ? formatDistanceStrict(new Date(page.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }) : ""}
         </span>

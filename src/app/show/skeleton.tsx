@@ -1,7 +1,7 @@
 /** Placeholder while a topic's lessons load. */
 export function ShowSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1040px] animate-pulse px-4 pt-8 sm:px-6" aria-hidden>
+    <div className="mx-auto w-full max-w-[1100px] animate-pulse px-4 pt-6 sm:px-6 sm:pt-8" aria-hidden>
       <div className="flex items-center gap-3">
         <div className="size-12 rounded-xl bg-hover" />
         <div className="h-5 w-48 rounded bg-hover" />

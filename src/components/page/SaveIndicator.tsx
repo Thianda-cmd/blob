@@ -33,7 +33,8 @@ export function SaveIndicator({ state }: { state: SaveState }) {
           </motion.span>
         )}
       </AnimatePresence>
-      <span className={state === "error" ? "text-danger" : undefined}>{label}</span>
+      {/* Phones keep just the icon (the label stays for screen readers); a failed save always says so. */}
+      <span className={state === "error" ? "text-danger" : "max-sm:sr-only"}>{label}</span>
     </div>
   );
 }

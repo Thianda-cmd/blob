@@ -16,6 +16,8 @@ export const showText = defineMessages({
     galleryIntro:
       "Every drawing and every interactive piece from Blob's lessons has its own page. Show it on the board, send it to your class or embed it in your own site. No sign-in needed.",
     galleryCount: (n: number) => (n === 1 ? "1 topic" : `${n} topics`),
+    subjectsNav: "Subjects",
+    levelsNav: "Levels",
     topicIntro: "Drawings and interactive pieces from the lessons of this topic. Open one to try it, share it or show it full screen.",
     noItems: "This topic has no pictures to show yet.",
     interactive: "Interactive",
@@ -73,6 +75,8 @@ export const showText = defineMessages({
     galleryIntro:
       "Jede Zeichnung und jedes interaktive Element aus Blobs Lektionen hat eine eigene Seite. Zeig sie an der Tafel, schick sie deiner Klasse oder bette sie auf deiner Website ein. Ohne Anmeldung.",
     galleryCount: (n: number) => (n === 1 ? "1 Thema" : `${n} Themen`),
+    subjectsNav: "Fächer",
+    levelsNav: "Stufen",
     topicIntro: "Zeichnungen und interaktive Elemente aus den Lektionen dieses Themas. Öffne eine, um sie auszuprobieren, zu teilen oder im Vollbild zu zeigen.",
     noItems: "Dieses Thema hat noch keine Grafiken zum Zeigen.",
     interactive: "Interaktiv",

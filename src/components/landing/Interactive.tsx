@@ -45,13 +45,14 @@ export function HeroBlob() {
   }, [i]);
 
   return (
-    <div className="relative mx-auto grid h-[340px] w-full max-w-[540px] place-items-center sm:h-[420px] lg:h-[520px]">
-      <FloatCard className="left-0 top-[12%] -rotate-6" delay={0}>
+    // From sm up the cards float around Blob; the top two sit above the speech bubble's band (top padding), never under it.
+    <div className="relative mx-auto grid h-[340px] w-full max-w-[540px] place-items-center sm:h-[460px] sm:pt-16 lg:h-[520px]">
+      <FloatCard className="left-0 top-[2%] -rotate-6" delay={0}>
         <div className="text-[11px] text-ink-3">{t.cards.subject}</div>
         <div className="font-display text-[15px] font-semibold">{t.cards.note}</div>
         <div className="mt-2 h-1.5 w-32 rounded bg-line" />
       </FloatCard>
-      <FloatCard className="right-0 top-[20%] rotate-6" delay={0.8}>
+      <FloatCard className="right-0 top-[7%] rotate-6" delay={0.8}>
         <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{t.cards.exam}</div>
         <div className="text-[13.5px] font-medium">{t.cards.examTitle}</div>
       </FloatCard>

@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { BlobHelper } from "@/components/blob/BlobHelper";
 import { watchTheme } from "@/components/theme";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
 import { Sidebar } from "./Sidebar";
 
@@ -103,7 +104,13 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
           )}
         </AnimatePresence>
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:border lg:border-line lg:shadow-card">
+        <main
+          className={cn(
+            "relative flex min-w-0 flex-1 flex-col overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:border lg:border-line lg:shadow-card",
+            // With the sidebar hidden the card keeps the same gap on its left as on its right.
+            !sidebarOpen && "lg:ml-2",
+          )}
+        >
           {children}
         </main>
       </div>

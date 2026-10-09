@@ -33,7 +33,7 @@ export default async function DevelopersPage() {
     <div className="min-h-dvh overflow-x-clip bg-paper">
       <header className="sticky top-0 z-30 border-b border-line/60 bg-paper/85 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-[1160px] items-center gap-3 px-4 sm:px-6">
-          <Link href="/" aria-label={t.header.home} className="flex items-center gap-2">
+          <Link href="/" aria-label={t.header.home} className="flex h-10 items-center gap-2">
             <BlobMark size={24} />
             <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
           </Link>
@@ -90,6 +90,19 @@ export default async function DevelopersPage() {
             </div>
           </nav>
 
+          {/* Phones and tablets: the contents as a row of chips that scrolls sideways. */}
+          <nav aria-label={t.toc.label} className="-mx-4 -mb-3 -mt-1 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden">
+            <ul className="flex w-max gap-1.5">
+              {SECTIONS.map((id) => (
+                <li key={id}>
+                  <a href={`#${id}`} className="flex h-8 items-center whitespace-nowrap rounded-full border border-line bg-raised px-3 text-[13px] text-ink-2 shadow-card transition-colors hover:text-ink">
+                    {t.toc[id]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
           <div className="min-w-0 max-w-[760px] space-y-16">
             <Section id="how" title={t.how.title}>
               <ol className="grid gap-3 sm:grid-cols-2">
@@ -112,7 +125,7 @@ export default async function DevelopersPage() {
                 </Step>
                 <Step n={2} title={t.quick.callback}>
                   <p>{t.quick.callbackBody}</p>
-                  <a href="/sdk/blob-callback.html" download="blob-callback.html" className="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-blob-ink hover:underline">
+                  <a href="/sdk/blob-callback.html" download="blob-callback.html" className="mt-1.5 inline-flex items-center gap-1.5 py-1.5 text-[13.5px] font-medium text-blob-ink hover:underline">
                     <Download className="size-4" /> {t.quick.download}
                   </a>
                 </Step>

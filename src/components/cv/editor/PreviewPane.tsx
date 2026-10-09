@@ -108,7 +108,8 @@ export function PreviewPane({
 
       {/* overflow-hidden: the engine's hidden measuring copy must not make the page around it scrollable. */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
+        {/* A container of its own: the notice above the pages answers to their width, not the panel's. */}
+        <div ref={scrollRef} className="@container/pages min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">
           {notice}
           <div className="mx-auto w-max" style={{ padding: `${fit && fit.pad > 20 ? 28 : 16}px ${fit?.pad ?? 16}px 40px` }}>
             <CvDocument

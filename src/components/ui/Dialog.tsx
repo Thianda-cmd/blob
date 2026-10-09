@@ -29,7 +29,7 @@ export function Dialog({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[70] grid place-items-start justify-center overflow-y-auto px-4 pt-[12vh]">
+        <div className="fixed inset-0 z-[70] grid place-items-start justify-center overflow-y-auto px-4 pt-[12vh] max-sm:pt-3">
           <motion.div
             className="fixed inset-0 bg-[rgb(20_18_14/0.32)] backdrop-blur-[2px]"
             initial={{ opacity: 0 }}

@@ -107,7 +107,7 @@ export function IconPicker({ icon, onChange }: { icon: string | null; onChange: 
         <button
           {...props}
           type="button"
-          className="-ml-1.5 flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] text-ink-3 opacity-0 transition-[opacity,background,color] duration-150 hover:bg-hover hover:text-ink-2 focus-visible:opacity-100 group-hover/header:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
+          className="-ml-1.5 flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] text-ink-3 opacity-0 [@media(hover:none)]:h-8 transition-[opacity,background,color] duration-150 hover:bg-hover hover:text-ink-2 focus-visible:opacity-100 group-hover/header:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
         >
           <SmilePlus className="size-4" /> {t.add}
         </button>

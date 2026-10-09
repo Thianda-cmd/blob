@@ -1054,16 +1054,33 @@ function imageFromDrop(e: DragEvent): File | string | null {
   return cleanImageUrl(uri.split("\n")[0] ?? "");
 }
 
+/** Below this on-screen width (px) an empty image slot drops its sentence and shows icon buttons. */
+const SLOT_COMPACT = 300;
+
 function ImageSlot({ className }: { className?: string }) {
   const { mode, slide, onChange, onUpload, uploading } = useSlide();
   const t = useMessages(deckText);
+  const scale = useContext(ScaleCtx);
   const [failed, setFailed] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const [linking, setLinking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const slotRef = useRef<HTMLDivElement>(null);
+  // The slot's width on the 1280px canvas; times the slide's scale, that's its width on screen.
+  const [slotW, setSlotW] = useState(0);
   const src = slide.image;
   const broken = src !== null && failed === src;
   const editing = mode === "edit";
+  const screenW = slotW * scale;
+  const compact = screenW > 0 && screenW < SLOT_COMPACT;
+
+  useLayoutEffect(() => {
+    const el = slotRef.current;
+    if (!editing || !el) return;
+    const ro = new ResizeObserver(() => setSlotW(el.offsetWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [editing]);
 
   const accept = (value: File | string | null) => {
     if (!value) return;
@@ -1101,6 +1118,7 @@ function ImageSlot({ className }: { className?: string }) {
   return (
     <div
       {...handlers}
+      ref={slotRef}
       data-morph="image"
       data-morph-box
       tabIndex={editing ? 0 : undefined}
@@ -1145,9 +1163,11 @@ function ImageSlot({ className }: { className?: string }) {
                 <div className={cn("grid size-10 place-items-center rounded-full", broken ? "bg-danger/10 text-danger" : "bg-blob-soft text-blob-ink")}>
                   {broken ? <ImageOff className="size-5" /> : <ImageIcon className="size-5" />}
                 </div>
-                <p className="text-[13px] font-medium text-[var(--s-fg)]">{broken ? t.imageBroken : t.imageDrop}</p>
+                {/* Small slots (phones, narrow windows) keep just the buttons, as icons. */}
+                {!compact && <p className="max-w-[260px] text-balance text-[13px] font-medium text-[var(--s-fg)]">{broken ? t.imageBroken : t.imageDrop}</p>}
                 {linking ? (
                   <LinkInput
+                    width={compact ? Math.max(120, screenW - 84) : undefined}
                     onDone={(url) => {
                       setLinking(false);
                       if (url) accept(url);
@@ -1155,11 +1175,17 @@ function ImageSlot({ className }: { className?: string }) {
                   />
                 ) : (
                   <div className="flex gap-1.5">
-                    <button type="button" className={uiButton} onClick={() => fileRef.current?.click()}>
-                      <Upload /> {t.upload}
+                    <button
+                      type="button"
+                      className={uiButton}
+                      onClick={() => fileRef.current?.click()}
+                      aria-label={compact ? t.upload : undefined}
+                      title={compact ? (broken ? t.imageBroken : t.imageDrop) : undefined}
+                    >
+                      <Upload /> {!compact && t.upload}
                     </button>
-                    <button type="button" className={uiButton} onClick={() => setLinking(true)}>
-                      <Link2 /> {t.pasteLink}
+                    <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label={compact ? t.pasteLink : undefined} title={compact ? t.pasteLink : undefined}>
+                      <Link2 /> {!compact && t.pasteLink}
                     </button>
                     {broken && (
                       <button type="button" className={uiButton} onClick={() => onChange?.({ image: null })} aria-label={t.removeImage}>
@@ -1177,6 +1203,7 @@ function ImageSlot({ className }: { className?: string }) {
             >
               {linking ? (
                 <LinkInput
+                  width={compact ? Math.max(120, screenW - 84) : undefined}
                   onDone={(url) => {
                     setLinking(false);
                     if (url) accept(url);
@@ -1184,8 +1211,8 @@ function ImageSlot({ className }: { className?: string }) {
                 />
               ) : (
                 <>
-                  <button type="button" className={uiButton} onClick={() => fileRef.current?.click()}>
-                    <Upload /> {t.replace}
+                  <button type="button" className={uiButton} onClick={() => fileRef.current?.click()} aria-label={compact ? t.replace : undefined} title={compact ? t.replace : undefined}>
+                    <Upload /> {!compact && t.replace}
                   </button>
                   <button type="button" className={uiButton} onClick={() => setLinking(true)} aria-label={t.useLink} title={t.useLink}>
                     <Link2 />
@@ -1212,7 +1239,7 @@ function ImageSlot({ className }: { className?: string }) {
   );
 }
 
-function LinkInput({ onDone }: { onDone: (url: string | null) => void }) {
+function LinkInput({ onDone, width }: { onDone: (url: string | null) => void; width?: number }) {
   const t = useMessages(deckText);
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -1247,6 +1274,7 @@ function LinkInput({ onDone }: { onDone: (url: string | null) => void }) {
         placeholder="https://…"
         aria-label={t.imageLink}
         aria-invalid={invalid}
+        style={width ? { width } : undefined}
         className="h-7 w-[220px] rounded-lg border border-line bg-raised px-2.5 text-[12.5px] text-ink shadow-card outline-none placeholder:text-ink-3 focus:border-blob aria-[invalid=true]:border-danger"
       />
       <button type="submit" className={cn(uiButton, "border-transparent bg-ink text-paper hover:bg-ink/88")}>

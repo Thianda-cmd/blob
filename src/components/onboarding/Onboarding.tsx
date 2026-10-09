@@ -573,7 +573,7 @@ export function Onboarding({
               type="button"
               onClick={signOut}
               disabled={busy}
-              className="rounded-md px-2 py-1 text-[12.5px] text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-0"
+              className="rounded-md px-2 py-1 text-[12.5px] text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-0 [@media(hover:none)]:py-2"
             >
               {t.notYou}
             </button>
@@ -626,7 +626,7 @@ export function Onboarding({
                       {step === 2 ? (error ? t.tryAgain : t.create) : step === 1 && picked.length === 0 ? t.skip : t.continue}
                       <ArrowRight className="size-4" />
                     </Button>
-                    <span className="ml-2 hidden items-center gap-1.5 text-[12px] text-ink-3 sm:flex">
+                    <span className="ml-2 hidden items-center gap-1.5 text-[12px] text-ink-3 sm:flex [@media(hover:none)]:hidden">
                       {t.orPress} <Kbd>Enter ↵</Kbd>
                     </span>
                   </motion.div>
@@ -701,7 +701,8 @@ function Progress({ steps, step, onJump }: { steps: string[]; step: number; onJu
             animate={{ width: i === step ? 28 : 8 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             className={cn(
-              "h-2 rounded-full transition-colors duration-300",
+              // An invisible 32 px tall hit area around the 8 px dot, for fingers.
+              "relative h-2 rounded-full transition-colors duration-300 after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']",
               i === step ? "bg-blob" : i < step ? "bg-ink-3 hover:bg-ink-2" : "bg-line-2",
               i < step && step < steps.length ? "cursor-pointer" : "cursor-default",
             )}

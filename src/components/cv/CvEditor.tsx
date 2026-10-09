@@ -236,7 +236,8 @@ function Editor({ page }: { page: Page }) {
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
       <div className="min-w-0 flex-1 text-[13px] leading-snug">
         <p className="text-ink">{lengthText(culprit)}</p>
-        <p className="mt-0.5 text-[12.5px] text-ink-3">{t.tooLongHint}</p>
+        {/* Not in a narrow column (the design panel open beside the pages): the warning alone says enough there. */}
+        <p className="mt-0.5 text-[12.5px] text-ink-3 @max-[420px]/pages:hidden">{t.tooLongHint}</p>
       </div>
       <Button size="sm" onClick={() => showCulprit(culprit)}>
         {t.tooLongShow}

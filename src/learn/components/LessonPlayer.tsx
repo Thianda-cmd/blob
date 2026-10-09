@@ -76,7 +76,7 @@ export function LessonPlayer({
   const shared = showItems(topic).find((i) => i.level === level && i.step === index);
   const exitHref = topicHref(topic, level);
   const nextLevel = LEVELS.find((l) => l > level && topic.lessons[l] && topic.levels[l].minutes);
-  const title = `${names.title} · ${t.levels[level]}`;
+  const title = `${names.title} · ${t.level(level)}`;
   const progress = finished ? 1 : (index + (frames.length > 1 ? frame / frames.length : 0)) / steps.length;
   const canBack = frame > 0 || (index > 0 && steps[index - 1].type !== "check" && step.type !== "check");
 
@@ -178,7 +178,7 @@ export function LessonPlayer({
           </StudyButton>
           {nextLevel && (
             <StudyButton href={studyHref(topic, "lesson", nextLevel)} variant="ink">
-              <BookOpen className="size-4" /> {t.lesson.nextLevel(t.levels[nextLevel])}
+              <BookOpen className="size-4" /> {t.lesson.nextLevel(t.level(nextLevel))}
             </StudyButton>
           )}
           <StudyButton href={exitHref} variant="ghost">

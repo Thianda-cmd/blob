@@ -68,7 +68,7 @@ export function ForgotForm() {
           title={common.checkInbox}
           subtitle={t.sent(<b className="font-medium text-ink">{email}</b>)}
         />
-        <Link href="/login" className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
+        <Link href="/login" className="-my-1.5 inline-flex items-center gap-1.5 py-1.5 text-[13.5px] text-ink-2 hover:text-ink">
           <ArrowLeft className="size-4" /> {common.backToSignIn}
         </Link>
       </div>
@@ -97,7 +97,7 @@ export function ForgotForm() {
           {t.submit} <ArrowRight className="size-4" />
         </Button>
       </form>
-      <Link href="/login" className="mt-7 inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
+      <Link href="/login" className="mt-5.5 inline-flex items-center gap-1.5 py-1.5 text-[13.5px] text-ink-2 hover:text-ink">
         <ArrowLeft className="size-4" /> {common.backToSignIn}
       </Link>
     </div>

@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { ChevronLeft, ChevronRight, Keyboard, LayoutGrid, Maximize, Minimize, MonitorSpeaker, NotebookText, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
@@ -31,6 +31,8 @@ type Message =
   | { t: "laser"; x: number; y: number }
   | { t: "laser-off" };
 
+const noSubscribe = () => () => {};
+
 /** Fullscreen slideshow. Lives outside the app shell. Two windows (audience + speaker) stay in sync. */
 export function Presenter({ pageId, title, deck, start, initialView = "audience" }: { pageId: string; title: string; deck: Deck; start: number; initialView?: View }) {
   const router = useRouter();
@@ -54,6 +56,8 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
   const [help, setHelp] = useState(false);
   const [timer, setTimer] = useState<Timer>({ acc: 0, since: null });
   const [notice, setNotice] = useState<string | null>(null);
+  // iPhones have no full screen API: no button that does nothing.
+  const canFullscreen = useSyncExternalStore(noSubscribe, () => document.fullscreenEnabled !== false, () => true);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -492,6 +496,8 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
       }}
       onPointerDown={(e) => {
         swipe.current = { x: e.clientX, y: e.clientY, swiped: false };
+        // Touch never hovers: every tap shows the controls for a moment (and still moves on).
+        if (e.pointerType !== "mouse") wake("pointer");
       }}
       onPointerUp={(e) => {
         const s = swipe.current;
@@ -552,11 +558,11 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
         onPointerUp={(e) => e.stopPropagation()}
       >
         <ChromeButton onClick={exit} label={t.exitPresentation}>
-          <X className="size-4" /> {t.exit} <Kbd className="ml-0.5 border-white/10 bg-white/5 text-white/50 shadow-none">Esc</Kbd>
+          <X className="size-4" /> {t.exit} <Kbd className="ml-0.5 border-white/10 bg-white/5 text-white/50 shadow-none [@media(hover:none)]:hidden">Esc</Kbd>
         </ChromeButton>
         <div className="flex gap-1.5">
           <ChromeButton onClick={() => setNotes((v) => !v)} label={t.notesKey} active={notes}>
-            <NotebookText className="size-4" /> {t.notes}
+            <NotebookText className="size-4" /> <span className="max-sm:hidden">{t.notes}</span>
           </ChromeButton>
           <ChromeButton onClick={() => setView("speaker")} label={t.speakerViewKey}>
             <MonitorSpeaker className="size-4" />
@@ -569,12 +575,14 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
               <span className={cn("size-2 rounded-full", laser ? "bg-[#ff2e55] shadow-[0_0_8px_2px_rgb(255_46_85/0.6)]" : "bg-current")} />
             </span>
           </ChromeButton>
-          <ChromeButton onClick={() => setHelp(true)} label={t.shortcutsKey}>
+          <ChromeButton onClick={() => setHelp(true)} label={t.shortcutsKey} className="[@media(hover:none)]:hidden">
             <Keyboard className="size-4" />
           </ChromeButton>
-          <ChromeButton onClick={toggleFullscreen} label={fullscreen ? t.exitFullscreen : t.fullscreen}>
-            {fullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
-          </ChromeButton>
+          {canFullscreen && (
+            <ChromeButton onClick={toggleFullscreen} label={fullscreen ? t.exitFullscreen : t.fullscreen}>
+              {fullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
+            </ChromeButton>
+          )}
         </div>
       </motion.div>
 
@@ -587,11 +595,11 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
         onClick={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), prev())} disabled={index === 0 && step === 0} aria-label={t.previous} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
+        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), prev())} disabled={index === 0 && step === 0} aria-label={t.previous} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 [@media(hover:none)]:size-9">
           <ChevronLeft className="size-4" />
         </button>
         <span className="min-w-[56px] px-1 text-center text-[12.5px] tabular-nums text-white/80">{ended ? t.end : `${index + 1} / ${total}`}</span>
-        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), next())} disabled={ended} aria-label={t.next} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30">
+        <button type="button" onClick={(e) => (e.detail > 0 && e.currentTarget.blur(), next())} disabled={ended} aria-label={t.next} className="grid size-7 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 [@media(hover:none)]:size-9">
           <ChevronRight className="size-4" />
         </button>
       </motion.div>
@@ -603,14 +611,18 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0, transition: { delay: 0.4, type: "spring", stiffness: 400, damping: 30 } }}
             exit={{ opacity: 0, y: 6, transition: { duration: 0.25 } }}
-            className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center"
+            className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center max-sm:bottom-20"
           >
             <div className="mx-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-xl border border-white/10 bg-[#1c1b18] px-3.5 py-2 text-[12.5px] text-white/70 shadow-pop">
-              <Hint keys={["←", "→"]}>{t.hintMove}</Hint>
-              <Hint keys={["S"]}>{t.hintSpeaker}</Hint>
-              <Hint keys={["G"]}>{t.hintAll}</Hint>
-              <Hint keys={["?"]}>{t.hintShortcuts}</Hint>
-              <Hint keys={["Esc"]}>{t.hintExit}</Hint>
+              <span className="contents [@media(hover:none)]:hidden">
+                <Hint keys={["←", "→"]}>{t.hintMove}</Hint>
+                <Hint keys={["S"]}>{t.hintSpeaker}</Hint>
+                <Hint keys={["G"]}>{t.hintAll}</Hint>
+                <Hint keys={["?"]}>{t.hintShortcuts}</Hint>
+                <Hint keys={["Esc"]}>{t.hintExit}</Hint>
+              </span>
+              {/* Touch screens have no keys to press. */}
+              <span className="hidden text-center [@media(hover:none)]:inline">{t.hintTouch}</span>
             </div>
           </motion.div>
         )}
@@ -643,7 +655,7 @@ export function Presenter({ pageId, title, deck, start, initialView = "audience"
                     t.lastSlide
                   )}
                 </span>
-                <button type="button" onClick={() => setNotes(false)} aria-label={t.hideNotes} className="-mr-2 grid size-6 place-items-center rounded-md text-white/50 hover:bg-white/10 hover:text-white">
+                <button type="button" onClick={() => setNotes(false)} aria-label={t.hideNotes} title={t.hideNotes} className="-mr-2 grid size-6 shrink-0 place-items-center rounded-md text-white/50 hover:bg-white/10 hover:text-white [@media(hover:none)]:size-8">
                   <X className="size-3.5" />
                 </button>
               </div>
@@ -671,7 +683,7 @@ function gridColumns(grid: HTMLElement | null) {
   return getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length || 4;
 }
 
-function ChromeButton({ children, onClick, label, active }: { children: ReactNode; onClick: () => void; label: string; active?: boolean }) {
+function ChromeButton({ children, onClick, label, active, className }: { children: ReactNode; onClick: () => void; label: string; active?: boolean; className?: string }) {
   return (
     <button
       type="button"
@@ -684,8 +696,9 @@ function ChromeButton({ children, onClick, label, active }: { children: ReactNod
       title={label}
       aria-pressed={active}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-[#1c1b18] px-2.5 text-[13px] text-white/75 transition-colors hover:bg-[#262623] hover:text-white",
+        "inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-[#1c1b18] px-2.5 text-[13px] text-white/75 transition-colors hover:bg-[#262623] hover:text-white [@media(hover:none)]:h-9",
         active && "border-blob/50 text-white",
+        className,
       )}
     >
       {children}
@@ -746,11 +759,12 @@ function Overview({
       onPointerUp={(e) => e.stopPropagation()}
       style={{ cursor: "default" }}
     >
-      <div className="flex h-14 shrink-0 items-center gap-3 px-6 text-[13px] text-white/55">
+      <div className="flex h-14 shrink-0 items-center gap-3 px-4 text-[13px] text-white/55 sm:px-6">
         <LayoutGrid className="size-4" />
         <span className="font-medium text-white/85">{t.allSlides}</span>
         <span className="tabular-nums">{deck.slides.length}</span>
-        <span className="ml-auto hidden items-center gap-1.5 sm:flex">
+        <span className="ml-auto" />
+        <span className="hidden items-center gap-1.5 sm:flex">
           <Kbd className="border-white/12 bg-white/5 text-white/60 shadow-none">↵</Kbd> {t.jump}
           <Kbd className="ml-2 border-white/12 bg-white/5 text-white/60 shadow-none">Esc</Kbd> {t.closeHint}
         </span>
@@ -760,7 +774,7 @@ function Overview({
       </div>
       <motion.div
         ref={gridRef}
-        className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-x-4 gap-y-5 overflow-y-auto px-6 pb-10"
+        className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(min(100%,clamp(150px,18vw,360px)),1fr))] gap-x-4 gap-y-5 overflow-y-auto px-4 pb-10 sm:px-6"
         initial={{ scale: 0.98, y: 8 }}
         animate={{ scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 380, damping: 34 }}
@@ -867,13 +881,13 @@ function EndScreen({ title, total, onRestart, onExit }: { title: string; total: 
   const t = useMessages(presentText);
   return (
     <div className="grid size-full place-items-center px-6">
-      <div className="flex flex-col items-center text-center" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+      <div className="flex max-w-full flex-col items-center text-center" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
         <Blob size={120} mood="excited" />
         <h1 className="mt-3 font-display text-[40px] font-semibold tracking-[-0.03em] text-[#f6f4ee]">{t.wrap}</h1>
-        <p className="mt-1 max-w-[520px] truncate text-[15px] text-white/55">
+        <p className="mt-1 max-w-full truncate text-[15px] text-white/55 sm:max-w-[520px]" title={title}>
           {title} · {t.slideCount(total)}
         </p>
-        <div className="mt-7 flex gap-2">
+        <div className="mt-7 flex flex-wrap justify-center gap-2">
           <Button variant="secondary" onClick={onRestart}>
             <RotateCcw className="size-4" /> {t.startOver}
           </Button>

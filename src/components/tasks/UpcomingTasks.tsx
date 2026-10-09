@@ -76,14 +76,14 @@ export function UpcomingTasks({
         <span className="ml-auto flex items-center gap-0.5">
           <button
             onClick={() => setAdding((a) => !a)}
-            className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink"
+            className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9"
             aria-label={adding ? t.close : t.addATask}
             title={adding ? t.close : t.addATask}
             aria-expanded={adding}
           >
             {adding ? <X className="size-4" /> : <Plus className="size-4" />}
           </button>
-          <Link href="/tasks" className="flex h-7 items-center gap-1 rounded-lg px-2 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink">
+          <Link href="/tasks" className="flex h-7 items-center gap-1 rounded-lg px-2 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:h-9">
             {t.viewAll} <ArrowRight className="size-3.5" />
           </Link>
         </span>

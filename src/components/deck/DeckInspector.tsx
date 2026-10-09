@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, ImageIcon, Link2, Trash2, Upload } from "lucide-react";
+import { Clock, ImageIcon, Link2, Trash2, Upload, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { GooSpinner } from "@/components/blob/GooSpinner";
@@ -37,6 +37,7 @@ export function DeckInspector({
   onTheme,
   onCustom,
   onDeckTransition,
+  onClose,
 }: {
   className?: string;
   tab: InspectorTab;
@@ -53,14 +54,16 @@ export function DeckInspector({
   onTheme: (theme: DeckTheme) => void;
   onCustom: (spec: DeckThemeSpec) => void;
   onDeckTransition: (t: SlideTransition, everywhere: boolean) => void;
+  /** Shown as a close button where the panel is a sheet over the editor (phones). */
+  onClose?: () => void;
 }) {
   const t = useMessages(deckText);
   const noteCount = deck.slides.filter((s) => s.notes.trim()).length;
 
   return (
     <aside className={cn("w-[272px] shrink-0 flex-col border-l border-line bg-surface", className)} aria-label={t.settings}>
-      <div className="shrink-0 border-b border-line px-3 py-2">
-        <div className="relative grid grid-cols-3 rounded-lg bg-hover/70 p-0.5" role="tablist" aria-label={t.panels}>
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3 py-2">
+        <div className="relative grid flex-1 grid-cols-3 rounded-lg bg-hover/70 p-0.5" role="tablist" aria-label={t.panels}>
           {TABS.map((id) => (
             <button
               key={id}
@@ -68,7 +71,7 @@ export function DeckInspector({
               role="tab"
               aria-selected={tab === id}
               onClick={() => onTab(id)}
-              className={cn("relative z-10 h-7 rounded-md text-[12.5px] transition-colors", tab === id ? "font-medium text-ink" : "text-ink-3 hover:text-ink-2")}
+              className={cn("relative z-10 h-7 rounded-md text-[12.5px] transition-colors [@media(hover:none)]:h-8", tab === id ? "font-medium text-ink" : "text-ink-3 hover:text-ink-2")}
             >
               {tab === id && (
                 <motion.span
@@ -81,6 +84,17 @@ export function DeckInspector({
             </button>
           ))}
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-8 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink @min-[560px]/editor:hidden"
+            aria-label={t.closePanel}
+            title={t.closePanel}
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-20" role="tabpanel" aria-label={t.tabs[tab]}>

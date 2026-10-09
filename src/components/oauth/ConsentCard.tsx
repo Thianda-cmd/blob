@@ -102,7 +102,7 @@ export function ConsentCard({ request, account, confirmOnly = false }: Props) {
               router.refresh();
             })
           }
-          className="shrink-0 rounded-lg px-2 py-1 text-[12.5px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+          className="h-8 shrink-0 rounded-lg px-2.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
           title={t.switchAccount}
         >
           {t.notYou}
@@ -173,15 +173,18 @@ export function ConsentCard({ request, account, confirmOnly = false }: Props) {
       </AnimatePresence>
 
       {(app.homepage_url || app.privacy_url) && (
-        <div className="mt-5 flex items-center justify-center gap-4 border-t border-line pt-4 text-[12px] text-ink-3">
-          <span className="truncate">{request.redirectOrigin.replace(/^https?:\/\//, "")}</span>
+        <div className="mt-5 flex items-center justify-center gap-4 border-t border-line pt-3 text-[12px] text-ink-3">
+          {/* A long address shrinks with an ellipsis; the links keep their place. */}
+          <span className="min-w-0 truncate" title={request.redirectOrigin}>
+            {request.redirectOrigin.replace(/^https?:\/\//, "")}
+          </span>
           {app.homepage_url && (
-            <a href={app.homepage_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-ink">
+            <a href={app.homepage_url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 py-1.5 hover:text-ink">
               {t.website} <ExternalLink className="size-3" />
             </a>
           )}
           {app.privacy_url && (
-            <a href={app.privacy_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-ink">
+            <a href={app.privacy_url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 py-1.5 hover:text-ink">
               {t.privacy} <ExternalLink className="size-3" />
             </a>
           )}

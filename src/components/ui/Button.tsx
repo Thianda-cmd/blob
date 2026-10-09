@@ -14,7 +14,7 @@ const variants: Record<Variant, string> = {
 
 const sizes: Record<Size, string> = {
   xs: "h-6 px-2 text-[12px] gap-1 rounded-md",
-  sm: "h-7 px-2.5 text-[13px] gap-1.5 rounded-lg",
+  sm: "h-7 px-2.5 text-[13px] gap-1.5 rounded-lg [@media(hover:none)]:h-8",
   md: "h-8.5 px-3.5 text-[13.5px] gap-2 rounded-lg",
   lg: "h-10 px-4.5 text-[14.5px] gap-2 rounded-xl",
 };
@@ -63,7 +63,7 @@ export function IconButton({
   size = "sm",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; size?: "xs" | "sm" | "md"; ref?: Ref<HTMLButtonElement> }) {
-  const s = size === "xs" ? "size-6 rounded-md" : size === "sm" ? "size-7 rounded-lg" : "size-8.5 rounded-lg";
+  const s = size === "xs" ? "size-6 rounded-md" : size === "sm" ? "size-7 rounded-lg [@media(hover:none)]:size-8" : "size-8.5 rounded-lg";
   return (
     <button
       aria-label={label}

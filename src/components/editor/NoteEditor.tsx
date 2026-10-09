@@ -291,7 +291,7 @@ export function NoteEditor({ page }: { page: Page }) {
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="relative min-h-full">
-          <article className="px-6 pb-[28vh] pt-8 sm:px-12 sm:pt-[8vh]">
+          <article className="px-4 pb-[28vh] pt-6 sm:px-12 sm:pt-[8vh]">
             <div className="mx-auto w-full max-w-[720px]">
               <header className="group/header">
                 <div className={cn("flex items-end", icon ? "mb-2" : "mb-1.5")}>

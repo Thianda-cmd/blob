@@ -160,9 +160,16 @@ function EntryItem({
   return (
     <div className={cn("rounded-xl border transition-colors", open ? "border-line-2 bg-surface" : "border-line bg-surface/70 hover:border-line-2")}>
       <div className="flex items-center gap-0.5 pr-1">
-        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 min-w-0 flex-1 flex-col justify-center py-2 pl-3 pr-1 text-left">
-          <span className={cn("block w-full truncate text-[13.5px] font-medium", heading ? "text-ink" : "text-ink-3")}>{heading || te.untitled}</span>
-          {meta && <span className="block w-full truncate text-[12px] text-ink-3">{meta}</span>}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          title={[heading, meta].filter(Boolean).join("\n") || undefined}
+          className="flex min-h-12 min-w-0 flex-1 flex-col justify-center py-2 pl-3 pr-1 text-left"
+        >
+          {/* Two lines for the title: on a phone "Mittlerer Schulabschluss (angestrebt, Sommer 2026)" needs them. */}
+          <span className={cn("line-clamp-2 block w-full text-[13.5px] font-medium leading-snug break-words", heading ? "text-ink" : "text-ink-3")}>{heading || te.untitled}</span>
+          {meta && <span className="mt-px block w-full truncate text-[12px] text-ink-3">{meta}</span>}
         </button>
         <MoreMenu label={te.options} size="xs">
           {(close) => {

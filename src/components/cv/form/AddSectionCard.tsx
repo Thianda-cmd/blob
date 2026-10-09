@@ -45,7 +45,7 @@ export const AddSectionCard = memo(function AddSectionCard({ sections, change }:
     <FormCard id="cv-part-add" icon={Plus} title={t.add.title} subtitle={t.add.subtitle}>
       <Tip id="add">{t.tips.add}</Tip>
       {full && <p className="text-[12.5px] text-ink-3">{t.add.max}</p>}
-      <div className="grid gap-1.5 @min-[400px]:grid-cols-2">
+      <div className="grid gap-1.5 @min-[380px]:grid-cols-2">
         {SECTION_KINDS.map((kind) => {
           const Icon = KIND_ICON[kind];
           const existing = SINGLE_KINDS.includes(kind) ? sections.find((s) => s.kind === kind) : undefined;

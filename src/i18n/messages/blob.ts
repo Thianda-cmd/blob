@@ -19,6 +19,14 @@ export const blobText = defineMessages({
       "Everything saves automatically. I keep an eye on it.",
       "Drop an image into a note to add it.",
     ],
+    // Phones and tablets: no keyboard shortcuts or drag and drop.
+    touchTips: [
+      "Type / in a note to add headings, checklists, quotes and more.",
+      "Open the menu and tap Search to jump to any note in a second.",
+      "Select text in a note to make it bold, highlighted or a link.",
+      "Add homework on the Tasks page. Try “Essay due friday”.",
+      "Everything saves automatically. I keep an eye on it.",
+    ],
     // The intro while the app opens
     opening: "Opening Blob",
     boot: ["Waking up Blob", "Gathering your notes", "Sharpening pencils", "Almost there"],
@@ -39,6 +47,13 @@ export const blobText = defineMessages({
       "Präsentationen haben einen Präsentieren-Button. Mit den Pfeiltasten gehst du durch die Folien.",
       "Alles speichert sich automatisch. Ich pass darauf auf.",
       "Zieh ein Bild in eine Notiz, um es einzufügen.",
+    ],
+    touchTips: [
+      "Tippe / in einer Notiz für Überschriften, Checklisten, Zitate und mehr.",
+      "Öffne das Menü und tippe auf Suchen, um blitzschnell zu jeder Notiz zu springen.",
+      "Markiere Text in einer Notiz, um ihn fett, hervorgehoben oder zum Link zu machen.",
+      "Trag Hausaufgaben auf der Aufgaben-Seite ein. Probier mal „Aufsatz bis Freitag“.",
+      "Alles speichert sich automatisch. Ich pass darauf auf.",
     ],
     opening: "Blob wird geöffnet",
     boot: ["Blob wacht auf", "Deine Notizen werden eingesammelt", "Bleistifte werden gespitzt", "Gleich geht’s los"],

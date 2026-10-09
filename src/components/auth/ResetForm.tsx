@@ -11,7 +11,7 @@ import { authText } from "@/i18n/messages/auth";
 import { authMessage } from "@/lib/auth/errors";
 import { passwordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
-import { AuthHeading } from "./AuthStage";
+import { AuthHeading, authLinkButton } from "./AuthStage";
 import { FormError } from "./FormError";
 import { StrengthMeter } from "./StrengthMeter";
 import { useFieldReactions } from "./useFieldReactions";
@@ -42,10 +42,8 @@ export function ResetForm({ email }: { email: string | null }) {
     return (
       <div>
         <AuthHeading title={t.expiredTitle} subtitle={t.expiredSubtitle} />
-        <Link href="/forgot-password">
-          <Button variant="primary" size="lg" className="w-full">
-            {t.requestNew} <ArrowRight className="size-4" />
-          </Button>
+        <Link href="/forgot-password" className={authLinkButton}>
+          {t.requestNew} <ArrowRight className="size-4" />
         </Link>
       </div>
     );

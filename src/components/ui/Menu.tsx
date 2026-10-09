@@ -59,7 +59,11 @@ export function Popover({
     const raf = requestAnimationFrame(place);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
+    // Content that grows while open (a panel that unfolds more) finds its place again too.
+    const grows = typeof ResizeObserver === "undefined" || !panel.current ? null : new ResizeObserver(place);
+    if (grows && panel.current) grows.observe(panel.current);
     return () => {
+      grows?.disconnect();
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
@@ -159,7 +163,9 @@ export function MenuItem({
       )}
     >
       {icon && <span className={cn("text-ink-3", danger && "text-danger")}>{icon}</span>}
-      <span className="flex-1 truncate">{children}</span>
+      <span className="flex-1 truncate" title={typeof children === "string" ? children : undefined}>
+        {children}
+      </span>
       {shortcut && <span className="text-[11px] text-ink-3">{shortcut}</span>}
     </button>
   );

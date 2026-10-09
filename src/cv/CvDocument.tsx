@@ -6,7 +6,7 @@ import { deckFontVars } from "@/components/deck/fonts";
 import { cn } from "@/lib/utils";
 import { CV_FONTS } from "./fonts";
 import { templateFor } from "./templates";
-import type { CvBlock, CvGeometry, CvTemplate } from "./templates/types";
+import type { CvBlock, CvGeometry } from "./templates/types";
 import type { Cv } from "./types";
 
 // The CV engine: cuts a CV into blocks (the design decides how), measures each block at its real
@@ -226,7 +226,6 @@ export function CvDocument({
       const el = root.querySelector<HTMLElement>(`[data-cv-block="${i}"]`);
       return el ? mm(el.getBoundingClientRect().height / (ratio || 1)) : 0;
     });
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the layout depends on measured DOM sizes
     setLayout(paginate(blocks, heights, geometry));
   }, [blocks, geometry, fonts]);
 

@@ -20,7 +20,8 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={`settings-${id}`} aria-labelledby={`settings-${id}-title`} className="scroll-mt-6">
+    // Below md the sticky chip row covers the top of the scroller, so stop a bit lower there.
+    <section id={`settings-${id}`} aria-labelledby={`settings-${id}-title`} className="scroll-mt-16 md:scroll-mt-6">
       <div className="mb-3 px-0.5">
         <h2 id={`settings-${id}-title`} className="font-display text-[17px] font-semibold tracking-[-0.015em]">
           {title}
@@ -148,6 +149,8 @@ export function Switch({
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full p-[3px] transition-colors duration-200 disabled:opacity-50",
+        // A 32 px tall hit area around the small switch.
+        "after:absolute after:-inset-x-1 after:-inset-y-[5px] after:content-['']",
         checked ? "bg-blob" : "bg-line-2",
       )}
     >

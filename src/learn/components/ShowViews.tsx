@@ -59,7 +59,11 @@ function TopicHeader({ topic, small }: { topic: Topic; small?: boolean }) {
         <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
           {subject ? tt(subject.title) : ""} · {names.area}
         </div>
-        <Link href={showTopicHref(topic)} className={cn("block truncate font-display font-bold tracking-[-0.015em] hover:text-blob-ink", small ? "text-[16px]" : "text-[19px]")}>
+        <Link
+          href={showTopicHref(topic)}
+          title={names.title}
+          className={cn("-my-1 block truncate py-1 font-display font-bold tracking-[-0.015em] hover:text-blob-ink", small ? "text-[16px]" : "text-[19px]")}
+        >
           {names.title}
         </Link>
       </div>
@@ -76,56 +80,75 @@ export function ShowTopicList({ slug }: { slug: string }) {
   const names = topicNames(topic, useLocale());
   const items = showItems(topic);
 
+  const groups = LEVELS.map((level) => ({ level, list: items.filter((i) => i.level === level) })).filter((g) => g.list.length > 0);
+
   return (
-    <div className="mx-auto w-full max-w-[1100px] px-4 pb-20 pt-8 sm:px-6">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div className="relative grid h-[120px] w-full shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-raised shadow-card sm:w-[200px]">
+    <div className="mx-auto w-full max-w-[1100px] px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
+      {/* Phones: a small picture next to the title, the intro below; wider: the big picture beside both. */}
+      <header className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 sm:gap-x-5">
+        <div className="relative grid h-16 w-[104px] place-items-center overflow-hidden rounded-2xl border border-line bg-raised px-1 shadow-card sm:row-span-2 sm:h-[120px] sm:w-[200px]">
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
-          <TopicGlyph topic={topic} size="lg" className="relative" />
+          <TopicGlyph topic={topic} size="md" className="relative max-w-full sm:hidden" />
+          <TopicGlyph topic={topic} size="lg" className="relative max-w-full max-sm:hidden" />
         </div>
-        <div className="min-w-0">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{tt(SUBJECTS.find((s) => s.slug === topic.subject)!.title)} · {names.area}</div>
-          <h1 className="mt-1 font-display text-[30px] font-bold leading-tight tracking-[-0.02em]">{names.title}</h1>
-          <p className="mt-1.5 max-w-[620px] text-[15px] leading-relaxed text-ink-2">{t.topicIntro}</p>
+        <div className="min-w-0 sm:self-end">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-blob-ink sm:text-[12px]">
+            {tt(SUBJECTS.find((s) => s.slug === topic.subject)!.title)} · {names.area}
+          </div>
+          <h1 className="mt-0.5 hyphens-auto break-words font-display text-[24px] font-bold leading-tight tracking-[-0.02em] sm:mt-1 sm:text-[30px]">{names.title}</h1>
         </div>
-      </div>
+        <p className="col-span-2 max-w-[620px] text-[14.5px] leading-relaxed text-ink-2 sm:col-span-1 sm:col-start-2 sm:self-start sm:text-[15px]">{t.topicIntro}</p>
+      </header>
 
-      {items.length === 0 && <p className="mt-10 rounded-2xl border border-dashed border-line-2 p-6 text-[14.5px] text-ink-3">{t.noItems}</p>}
-
-      {LEVELS.map((level) => {
-        const list = items.filter((i) => i.level === level);
-        if (!list.length) return null;
-        return (
-          <section key={level} id={`level-${level}`} className="mt-10 scroll-mt-20">
-            <h2 className="mb-3 flex items-baseline gap-2.5 font-display text-[19px] font-semibold tracking-[-0.01em]">
+      {/* Jump links to the levels: a topic with many pictures is a long page on a phone. */}
+      {groups.length > 1 && (
+        <nav aria-label={t.levelsNav} className="mt-5 flex flex-wrap gap-1.5 sm:mt-6">
+          {groups.map(({ level, list }) => (
+            <a
+              key={level}
+              href={`#level-${level}`}
+              className="flex h-9 items-center gap-2 rounded-full border border-line bg-raised px-3 text-[13px] font-medium text-ink-2 shadow-card transition-colors hover:border-blob/45 hover:text-ink"
+            >
               <LevelBars level={level} className="text-blob-ink" />
               {levels[level]}
-              <span className="text-[13px] font-normal text-ink-3">{tt(topic.levels[level].depth)}</span>
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {list.map((item, i) => (
-                <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }} className="min-w-0">
-                  <Link
-                    href={showHref(topic, level, item.id)}
-                    className="group flex h-full flex-col rounded-2xl border border-line bg-raised p-4 shadow-card transition-[border-color,transform] hover:-translate-y-0.5 hover:border-blob/45"
-                  >
+              <span className="tabular-nums text-ink-3">{list.length}</span>
+            </a>
+          ))}
+        </nav>
+      )}
+
+      {items.length === 0 && <p className="mt-8 rounded-2xl border border-dashed border-line-2 p-6 text-[14.5px] text-ink-3">{t.noItems}</p>}
+
+      {groups.map(({ level, list }) => (
+        <section key={level} id={`level-${level}`} className="mt-8 scroll-mt-20 sm:mt-10">
+          <h2 className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 font-display text-[18px] font-semibold tracking-[-0.01em] sm:text-[19px]">
+            <LevelBars level={level} className="self-center text-blob-ink" />
+            {levels[level]}
+            <span className="text-[13px] font-normal text-ink-3">{tt(topic.levels[level].depth)}</span>
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((item, i) => (
+              <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }} className="min-w-0">
+                <Link
+                  href={showHref(topic, level, item.id)}
+                  className="group flex h-full flex-col rounded-2xl border border-line bg-raised p-3.5 shadow-card transition-[border-color,transform] hover:-translate-y-0.5 hover:border-blob/45 sm:p-4"
+                >
+                  <span className="flex items-center justify-between gap-2">
                     <KindBadge kind={item.kind} />
-                    <span className="mt-2.5 font-display text-[16.5px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-blob-ink">{tt(item.title)}</span>
-                    {item.body && (
-                      <span className="mt-1.5 line-clamp-3 text-[13.5px] leading-snug text-ink-3">
-                        <Inline text={item.body} />
-                      </span>
-                    )}
-                    <span className="mt-auto flex items-center gap-1 pt-3 text-[13px] font-medium text-ink-2 group-hover:text-blob-ink">
-                      {t.openPage} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                    <ArrowRight className="size-4 shrink-0 text-ink-3 transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-blob-ink" aria-hidden />
+                  </span>
+                  <span className="mt-2 font-display text-[16px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-blob-ink sm:text-[16.5px]">{tt(item.title)}</span>
+                  {item.body && (
+                    <span className="mt-1 line-clamp-2 text-[13.5px] leading-snug text-ink-3 sm:line-clamp-3">
+                      <Inline text={item.body} />
                     </span>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+                  )}
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      ))}
 
       <LearnCard topic={topic} />
     </div>
@@ -136,13 +159,16 @@ export function ShowTopicList({ slug }: { slug: string }) {
 function LearnCard({ topic, level }: { topic: Topic; level?: Level }) {
   const t = useMessages(showText);
   return (
-    <section className="mt-12 flex flex-col gap-4 rounded-2xl border border-line bg-raised p-5 shadow-card sm:flex-row sm:items-center sm:p-6">
-      <BlobMark size={44} className="shrink-0" />
+    <section className="mt-10 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-line bg-raised p-4 shadow-card sm:flex-nowrap sm:p-5">
+      <BlobMark size={40} className="shrink-0 self-start sm:self-center" />
       <div className="min-w-0 flex-1">
-        <h2 className="font-display text-[18px] font-bold tracking-[-0.01em]">{t.learnTitle}</h2>
-        <p className="mt-0.5 text-[14px] leading-relaxed text-ink-2">{t.learnText}</p>
+        <h2 className="font-display text-[17px] font-bold tracking-[-0.01em] sm:text-[18px]">{t.learnTitle}</h2>
+        <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-2 sm:text-[14px]">{t.learnText}</p>
       </div>
-      <Link href={studyHref(topic, "lesson", level)} className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white hover:bg-blob/90">
+      <Link
+        href={studyHref(topic, "lesson", level)}
+        className="flex h-10 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white hover:bg-blob/90 sm:w-auto"
+      >
         <BookOpen className="size-4" /> {t.learnCta}
       </Link>
     </section>
@@ -186,7 +212,7 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
 
   if (!item) {
     return (
-      <div className="mx-auto w-full max-w-[880px] px-4 pb-20 pt-10 sm:px-6">
+      <div className="mx-auto w-full max-w-[1100px] px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
         <TopicHeader topic={topic} />
         <div className="mt-8 rounded-2xl border border-dashed border-line-2 p-6">
           <h1 className="font-display text-[22px] font-bold">{t.notFoundTitle}</h1>
@@ -201,13 +227,20 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
 
   const prev = items[index - 1];
   const next = items[index + 1];
-  const others = items.filter((i) => i !== item).slice(0, 8);
+  // The pictures around this one (in a big topic the first eight would all be beginner ones), in lesson order.
+  const others = items
+    .map((it, i) => ({ it, i }))
+    .filter(({ it }) => it !== item)
+    .sort((a, b) => Math.abs(a.i - index) - Math.abs(b.i - index) || a.i - b.i)
+    .slice(0, 8)
+    .sort((a, b) => a.i - b.i)
+    .map(({ it }) => it);
 
   return (
-    <div className="mx-auto w-full max-w-[1040px] px-4 pb-20 pt-6 sm:px-6 sm:pt-8">
+    <div className="mx-auto w-full max-w-[1100px] px-4 pb-16 pt-5 sm:px-6 sm:pt-8">
       <TopicHeader topic={topic} small />
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-6">
         <KindBadge kind={item.kind} />
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11.5px] font-medium text-ink-2">
           <LevelBars level={item.level} /> {levels[item.level]} · {tt(topic.levels[item.level].depth)}
@@ -248,16 +281,16 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
         <VisualCard item={item} className={cn(full && "mx-auto my-auto w-full max-w-[1200px]")} />
       </div>
 
-      <nav aria-label={t.pictureNav} className="mt-4 flex items-center justify-between gap-3 text-[13.5px]">
+      <nav aria-label={t.pictureNav} className="-mx-2 mt-3 flex items-center justify-between gap-3 text-[13.5px]">
         {prev ? (
-          <Link href={showHref(topic, prev.level, prev.id)} aria-label={`${t.previous}: ${tt(prev.title)}`} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <Link href={showHref(topic, prev.level, prev.id)} aria-label={`${t.previous}: ${tt(prev.title)}`} title={tt(prev.title)} className="flex h-10 min-w-0 items-center gap-1.5 rounded-lg px-2 font-medium text-ink-2 hover:bg-hover hover:text-ink">
             <ArrowLeft className="size-4 shrink-0" /> <span className="truncate">{tt(prev.title)}</span>
           </Link>
         ) : (
           <span />
         )}
         {next && (
-          <Link href={showHref(topic, next.level, next.id)} aria-label={`${t.next}: ${tt(next.title)}`} className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-right font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <Link href={showHref(topic, next.level, next.id)} aria-label={`${t.next}: ${tt(next.title)}`} title={tt(next.title)} className="flex h-10 min-w-0 items-center gap-1.5 rounded-lg px-2 text-right font-medium text-ink-2 hover:bg-hover hover:text-ink">
             <span className="truncate">{tt(next.title)}</span> <ArrowRight className="size-4 shrink-0" />
           </Link>
         )}
@@ -266,10 +299,10 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
       <LearnCard topic={topic} level={item.level} />
 
       {others.length > 0 && (
-        <section className="mt-10">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-display text-[19px] font-semibold tracking-[-0.01em]">{t.more}</h2>
-            <Link href={showTopicHref(topic)} className="text-[13.5px] font-medium text-blob-ink hover:underline">
+        <section className="mt-8 sm:mt-10">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3">
+            <h2 className="font-display text-[18px] font-semibold tracking-[-0.01em] sm:text-[19px]">{t.more}</h2>
+            <Link href={showTopicHref(topic)} className="flex h-8 items-center text-[13.5px] font-medium text-blob-ink hover:underline">
               {t.allOfTopic}
             </Link>
           </div>
@@ -278,9 +311,9 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
               <Link
                 key={`${o.level}-${o.id}`}
                 href={showHref(topic, o.level, o.id)}
-                className="flex items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-[13.5px] font-medium shadow-card hover:border-blob/45 hover:text-blob-ink"
+                className="flex min-h-9 min-w-0 items-center gap-2 rounded-xl border border-line bg-raised px-3 py-1.5 text-[13.5px] font-medium leading-snug shadow-card hover:border-blob/45 hover:text-blob-ink"
               >
-                <LevelBars level={o.level} className="text-ink-3" />
+                <LevelBars level={o.level} className="shrink-0 text-ink-3" />
                 {tt(o.title)}
               </Link>
             ))}
@@ -310,17 +343,25 @@ export function EmbedVisual({ slug, level, id }: { slug: string; level: Level; i
       // Only the height leaves the frame; public/sdk/blob-embed.js on the page around it resizes the iframe.
       window.parent.postMessage({ type: "blob-embed-size", height }, "*");
     };
+    // The observer only runs while the frame is on screen (browsers pause frames from other sites off screen);
+    // fonts and the page's load event come in regardless, so the frame has its height before the reader gets there.
     const observer = new ResizeObserver(report);
     observer.observe(el);
     report();
-    return () => observer.disconnect();
+    void document.fonts?.ready.then(report);
+    window.addEventListener("load", report);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("load", report);
+    };
   }, []);
 
   return (
-    <div ref={root} className="flex flex-col gap-3 p-3 sm:p-4">
+    // Fills its frame up to the width the pictures are drawn for (opened on its own on a wide screen, it stays centred).
+    <div ref={root} className="mx-auto flex w-full max-w-[1100px] flex-col gap-2.5 p-3 sm:gap-3 sm:p-4">
       {item ? (
         <>
-          <h1 className="min-w-0 truncate font-display text-[17px] font-bold tracking-[-0.01em]">{tt(item.title)}</h1>
+          <h1 className="min-w-0 font-display text-[17px] font-bold leading-snug tracking-[-0.01em]">{tt(item.title)}</h1>
           <VisualCard item={item} />
         </>
       ) : (
@@ -330,7 +371,7 @@ export function EmbedVisual({ slug, level, id }: { slug: string; level: Level; i
         href={item ? showHref(topic, level, id) : showTopicHref(topic)}
         target="_blank"
         rel="noopener"
-        className="flex items-center gap-1.5 self-end rounded-lg px-2 py-1 text-[12.5px] font-medium text-ink-3 hover:text-blob-ink"
+        className="-my-1 flex h-8 items-center gap-1.5 self-end rounded-lg px-2 text-[12.5px] font-medium text-ink-3 hover:text-blob-ink"
       >
         <BlobMark size={16} /> {t.openOnBlob} <ExternalLink className="size-3" />
       </a>

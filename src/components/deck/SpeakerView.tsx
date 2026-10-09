@@ -109,7 +109,9 @@ export function SpeakerView({
   return (
     <div className="fixed inset-0 flex flex-col bg-[#0b0b0a] text-[#f1efe8]" data-theme="dark">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/8 px-4 text-[13px]">
-        <span className="min-w-0 truncate font-medium text-white/85">{title}</span>
+        <span className="min-w-0 truncate font-medium text-white/85" title={title}>
+          {title}
+        </span>
         <span className="hidden shrink-0 rounded-md bg-white/6 px-1.5 py-0.5 text-[11.5px] text-white/50 sm:inline">{t.speakerView}</span>
         <div className="mx-auto flex items-center gap-1 rounded-xl border border-white/10 bg-[#161614] py-1 pl-3 pr-1">
           <span className={cn("min-w-[64px] font-mono text-[17px] tabular-nums tracking-tight", timer.since === null ? "text-white/45" : "text-white")} aria-label={t.elapsed}>
@@ -141,7 +143,8 @@ export function SpeakerView({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
+      {/* Landscape: slide | next + notes. Portrait (phones, upright tablets): the slide on top, then next and notes. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 p-4 sm:landscape:grid-cols-[minmax(0,1.65fr)_minmax(260px,1fr)] sm:landscape:grid-rows-1">
         <section className="flex min-h-0 flex-col" aria-label={t.currentSlide}>
           <PaneLabel>
             <span className="shrink-0 whitespace-nowrap font-medium text-white/85">{ended ? t.endOfPresentation : t.slideOf(index + 1, total)}</span>
@@ -154,7 +157,7 @@ export function SpeakerView({
             )}
             {blank && <span className="ml-auto min-w-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[11.5px] leading-snug text-white/80">{t.blankScreen(blank)}</span>}
           </PaneLabel>
-          <div className="relative min-h-0 flex-1">
+          <div className="relative min-h-0 flex-1 max-sm:aspect-video max-sm:flex-none portrait:aspect-video portrait:flex-none">
             {ended ? (
               <EndCard />
             ) : (
@@ -171,12 +174,13 @@ export function SpeakerView({
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-4" aria-label={t.nextAndNotes}>
-          <div className="shrink-0">
+        <aside className="flex min-h-0 flex-col gap-4 sm:portrait:flex-row" aria-label={t.nextAndNotes}>
+          <div className="shrink-0 max-sm:portrait:w-1/2 sm:portrait:w-2/5">
             <PaneLabel>
               <span>{moreBuilds ? t.nextClick(step + 1, built) : next ? t.nextSlide(index + 2) : ended ? "" : t.nextEnd}</span>
             </PaneLabel>
-            <div className="aspect-video w-full overflow-hidden rounded-lg bg-white/[0.03]">
+            {/* Short windows (a phone on its side) cap the preview, so the notes keep some room. */}
+            <div className="aspect-video w-full overflow-hidden rounded-lg bg-white/[0.03] [@media(max-height:560px)]:max-h-[28vh]">
               {next && !ended ? (
                 <SlideView
                   slide={next}

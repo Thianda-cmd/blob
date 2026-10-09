@@ -35,7 +35,8 @@ export const cvHomeText = defineMessages({
     emptyTitle: "Let's write your CV together",
     emptyBody: "Pick a design and fill in the form step by step. Blob helps with tips and examples. Or start with Lena's finished example and simply write over it.",
     emptyCta: "Start my CV",
-    emptyPoints: ["6 designs", "German or English", "PDF in one click"],
+    // The number of designs comes from the catalogue, so a new design shows up here by itself.
+    emptyPoints: (designs: number) => [`${designs} designs`, "German or English", "PDF in one click"],
     // The "new CV" dialog
     dialog: {
       title: "New CV",
@@ -57,7 +58,7 @@ export const cvHomeText = defineMessages({
     tipsTitle: "How to write a good CV",
     tipsIntro: "Six things that make companies keep reading.",
     tips: [
-      { title: "One page is enough", body: "While you're at school, everything fits on one page. Short and clear beats long." },
+      { title: "Short and clear", body: "At school, one page is ideal and two are the most. Leave out what doesn't help your application." },
       { title: "Newest first", body: "Start each section with what you're doing now, then work backwards." },
       { title: "Everything counts", body: "Work experience, babysitting, tutoring, a club or the school paper: it all shows you get things done." },
       { title: "Show, don't tell", body: "Instead of “team player”, write “Assistant handball coach since 2023”. Examples beat adjectives." },
@@ -95,7 +96,7 @@ export const cvHomeText = defineMessages({
     emptyTitle: "Lass uns deinen Lebenslauf schreiben",
     emptyBody: "Such dir ein Design aus und füll Schritt für Schritt das Formular aus. Blob hilft dir mit Tipps und Beispielen. Oder starte mit Lenas fertigem Beispiel und überschreib es einfach.",
     emptyCta: "Lebenslauf anfangen",
-    emptyPoints: ["6 Designs", "Deutsch oder Englisch", "PDF mit einem Klick"],
+    emptyPoints: (designs) => [`${designs} Designs`, "Deutsch oder Englisch", "PDF mit einem Klick"],
     dialog: {
       title: "Neuer Lebenslauf",
       intro: "Wähl ein Design und leg los. Design, Farbe und Schrift kannst du jederzeit ändern.",
@@ -115,7 +116,7 @@ export const cvHomeText = defineMessages({
     tipsTitle: "So wird dein Lebenslauf gut",
     tipsIntro: "Sechs Tipps, damit Betriebe gern weiterlesen.",
     tips: [
-      { title: "Eine Seite reicht", body: "In der Schulzeit passt alles auf eine Seite. Kurz und klar ist besser als lang." },
+      { title: "Kurz und klar", body: "In der Schulzeit ist eine Seite ideal, zwei sind das Maximum. Lass weg, was für deine Bewerbung nichts bringt." },
       { title: "Das Neueste zuerst", body: "Fang in jedem Abschnitt mit dem an, was du gerade machst, und geh dann zurück." },
       { title: "Alles zählt", body: "Schülerpraktikum, Babysitten, Nachhilfe, Verein oder Schülerzeitung: Das zeigt, dass du anpackst." },
       { title: "Zeigen statt behaupten", body: "Statt „teamfähig“ lieber „Co-Trainerin der F‑Jugend seit 2023“. Beispiele überzeugen mehr als Eigenschaften." },

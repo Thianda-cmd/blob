@@ -17,13 +17,15 @@ export default async function ShowLayout({ children }: LayoutProps<"/show">) {
   return (
     <div className="flex min-h-dvh flex-col overflow-x-clip bg-paper">
       <header className="sticky top-0 z-30 border-b border-line/60 bg-paper/85 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-3 px-4 sm:px-6">
-          <Link href="/" aria-label={t.home} className="flex items-center gap-2">
+        {/* As wide as the pages below, so the logo lines up with their content. */}
+        <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-2 px-4 sm:gap-3 sm:px-6">
+          <Link href="/" aria-label={t.home} className="flex h-10 items-center gap-2">
             <BlobMark size={24} />
             <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
           </Link>
-          <Link href="/show" aria-label={t.gallery} className="rounded-full bg-blob-soft px-2.5 py-0.5 text-[12.5px] font-semibold text-blob-ink hover:bg-blob-soft/70">
-            {t.brand}
+          {/* The link is as tall as the bar; the pill inside stays small. */}
+          <Link href="/show" aria-label={t.gallery} className="group flex h-10 items-center">
+            <span className="rounded-full bg-blob-soft px-2.5 py-0.5 text-[12.5px] font-semibold text-blob-ink group-hover:bg-blob-soft/70">{t.brand}</span>
           </Link>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <LanguageSwitch compact />
@@ -48,12 +50,12 @@ export default async function ShowLayout({ children }: LayoutProps<"/show">) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-line/60 py-6 text-center text-[12.5px] text-ink-3">
-        <Link href="/show" className="hover:text-ink">
+      <footer className="flex items-center justify-center gap-1 border-t border-line/60 py-3 text-[12.5px] text-ink-3">
+        <Link href="/show" className="flex h-10 items-center px-2 hover:text-ink">
           {t.gallery}
         </Link>
-        <span className="mx-2">·</span>
-        <Link href="/" className="hover:text-ink">
+        <span aria-hidden>·</span>
+        <Link href="/" className="flex h-10 items-center px-2 hover:text-ink">
           Blob
         </Link>
       </footer>

@@ -149,14 +149,14 @@ export function SlidesShowcase() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:order-1 lg:col-span-5">
-        <Spec title={t.specs.layouts.title} body={t.specs.layouts.body}>
+        <Spec title={t.specs.layouts.title(LAYOUTS.length)} body={t.specs.layouts.body}>
           <div className="grid grid-cols-6 gap-1">
             {LAYOUTS.map((l) => (
               <LayoutGlyph key={l.id} layout={l.id} active={l.id === current.layout} className={cn("rounded-[3px] transition-transform duration-300", l.id === current.layout && "scale-110")} />
             ))}
           </div>
         </Spec>
-        <Spec title={t.specs.themes.title} body={t.specs.themes.body}>
+        <Spec title={t.specs.themes.title(PRESETS.length)} body={t.specs.themes.body}>
           <div className="flex flex-wrap gap-1.5">
             {PRESETS.map((p) => (
               <span
@@ -231,7 +231,8 @@ export function SlidesShowcase() {
 function Spec({ title, body, children }: { title: string; body: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col rounded-xl border border-line bg-raised p-3.5 shadow-card">
-      <div aria-hidden className="min-h-[76px]">
+      {/* Side by side (sm+) the pictures share a height so the titles line up; stacked on phones they take only what they need. */}
+      <div aria-hidden className="sm:min-h-[76px]">
         {children}
       </div>
       <h3 className="mt-3 text-[15px] font-semibold leading-snug tracking-[-0.01em]">{title}</h3>

@@ -16,11 +16,14 @@ import { topicNames } from "./topicNames";
 /** Small learning card for the home dashboard: today's goal, streak and the suggested next topic. */
 export function LearnSnapshot({ progress, days }: { progress: Record<string, TopicProgress>; days: LearnDay[] }) {
   const today = useTodayXp(days);
-  const next = upNext(subjectCatalog(lastSubject(progress)), progress);
-  const started = progress[next.slug]?.lesson_done;
-  const mastery = progress[next.slug]?.mastery ?? 0;
   const t = useMessages(learnText);
   const locale = useLocale();
+  const catalog = subjectCatalog(lastSubject(progress));
+  // A subject without topics yet has nothing to suggest.
+  if (!catalog.length) return null;
+  const next = upNext(catalog, progress);
+  const started = progress[next.slug]?.lesson_done;
+  const mastery = progress[next.slug]?.mastery ?? 0;
   const names = topicNames(next, locale);
 
   return (

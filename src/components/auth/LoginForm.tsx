@@ -160,7 +160,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
                 label={common.password}
                 htmlFor="password"
                 action={
-                  <Link href="/forgot-password" className="text-[12.5px] text-ink-3 hover:text-ink">
+                  <Link href="/forgot-password" className="-my-1.5 py-1.5 text-[12.5px] text-ink-3 hover:text-ink">
                     {t.forgot}
                   </Link>
                 }
@@ -221,7 +221,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
         {t.newHere}{" "}
-        <Link href={next !== "/home" ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+        <Link href={next !== "/home" ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="-my-1.5 inline-block py-1.5 font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
           {t.createAccount}
         </Link>
       </p>

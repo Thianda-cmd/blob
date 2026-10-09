@@ -1,6 +1,6 @@
 # Blob
 
-A calm, Notion-style workspace for school: notes, presentations and homework, with **Blob**, a jelly mascot who reacts to what you do and keeps everything saved.
+A calm, Notion-style workspace for school: notes, presentations, homework, a learning center and a CV builder, with **Blob**, a jelly mascot who reacts to what you do and keeps everything saved.
 
 Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 and Supabase (Postgres, Auth, Storage). Deployed on Vercel.
 
@@ -9,14 +9,15 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 a
 - **Auth**: sign up with email confirmation, password sign-in, magic links, forgot/reset password, change email/password, sign out everywhere, delete account. Blob watches you type and covers its eyes for passwords.
 - **Onboarding**: name, school, subjects and theme in three steps; creates a welcome note and a first task.
 - **Notes**: Tiptap editor with `/` commands, formatting bubble, checklists, callouts, images (paste/drop/upload), sub-pages, outline, autosave.
-- **Learning center** (`/learn`), in maths and chemistry, 12 topics each:
-  - Maths: Klammern auflösen, Ausmultiplizieren, Formeln umstellen, Bruchrechnung, Potenzen und Wurzeln, Prozentrechnung, Gleichungen und Ungleichungen, Lineare Gleichungssysteme, pq-Formel, Geraden, Textaufgaben, Textaufgaben mit Unbekannten.
-  - Chemistry: Teilchenmodell, Stoffgemische, Atombau, Periodensystem, Ionenbindung, Elektronenpaarbindung, Chemische Reaktionen, Reaktionsgleichungen, Säuren und Basen, Redoxreaktionen, Stoffmenge, Alkane.
-  - Each topic has a guided lesson with Blob as tutor (animated step-by-step boards, interactive widgets, checks), endless adaptive practice in three levels, a graded quick test and a printable cheat sheet. XP, daily goal, streaks and mastery are saved per topic.
-  - Blob reads wrong answers and says what probably went wrong ("expanded, but not simplified yet", "the 2 belongs to the whole OH group", "count the O atoms"): generic diagnoses in `src/learn/engine/diagnose.ts` and `src/learn/chemistry/check.ts`, plus each topic's typical misconceptions (`mistakes`), simulated from the task's own numbers.
+- **Learning center** (`/learn`) in maths (15 topics), chemistry (12) and biology (16):
+  - Every topic has a guided lesson with Blob as tutor (animated step-by-step boards, interactive widgets, checks), a cheat sheet, endless adaptive practice and a graded quick test. Maths and biology topics have all three levels (Einsteiger, Fortgeschritten, Experte) with a lesson each; chemistry topics have one lesson and practice at every level. XP, daily goal, streaks and mastery are saved per topic and level.
+  - Blob reads wrong answers and says what probably went wrong ("expanded, but not simplified yet", "the 2 belongs to the whole OH group"): generic diagnoses in `src/learn/engine/diagnose.ts` and `src/learn/chemistry/check.ts`, plus each topic's typical misconceptions (`mistakes`), simulated from the task's own numbers.
+  - **Public pictures** (`/show`): every lesson picture and widget has its own page that works without signing in, with share links, link previews and embed code (`/embed/…`, resized by `public/sdk/blob-embed.js`).
+- **CV builder** (`/cv`): six designs (Klassisch, Modern, Kreativ, Kompakt, Minimal, Elegant), a guided form with tips and examples for school students, photo with cropping, drawn signature, a checklist, CVs in German or English, and a PDF through the print dialog. The engine (`src/cv/CvDocument.tsx`) measures the CV and fills A4 pages, so preview and PDF are the same pages.
 - **Presentations**: 17 layouts (incl. stats, timeline, compare, formula), 10 themes plus a custom theme editor, slide transitions (incl. morph), click-by-click builds, drag-to-reorder, and a presenter (`/present/[id]`) with speaker view, second window, overview, laser and black/white screen.
 - **Tasks**: quick add with natural dates (`Bio test fri #biology`), groups by due date, two-week heatmap, jelly check-off animation.
 - **Subjects**, **favorites**, **trash** with restore, **⌘K** search across titles and note contents, light/dark/system themes.
+- **Sign in with Blob**: Blob is an OpenID Connect provider for other school apps (developer docs at `/developers`, apps managed in `/admin`).
 - **German and English**: the whole site, lessons and auth emails in both languages. German is the default; the browser's language decides for new visitors, and the switch in Settings (or DE | EN on the public pages) is remembered per browser and on the account.
 - **Animations**: a physics-driven SVG mascot (squash and stretch, jiggle, eye tracking, moods), a gooey intro animation once per session, gooey loaders.
 
@@ -30,7 +31,7 @@ npm run dev                  # http://localhost:3000
 
 `npm run build` first runs `scripts/migrate.mjs`, which applies any new files in `supabase/migrations/` to the database in `POSTGRES_URL_NON_POOLING` and records them in `blob_meta.migrations`. Set `SKIP_MIGRATIONS=1` to build without touching the database. On Vercel, the Supabase integration provides the variable, so every deploy keeps the schema up to date.
 
-Other scripts: `npm run lint`, `npm run typecheck`, `npm run migrate`.
+Other scripts: `npm run lint`, `npm run typecheck`, `npm run migrate`, `npm run check:learn` (checks every lesson, cheat sheet and task generator in both languages; run it before committing learning content) and `npm run show-manifest` (the list of public pictures; also runs before every build).
 
 ## Auth emails (blob.bojes.org)
 
@@ -74,15 +75,20 @@ src/app/(auth)        sign in, sign up, password reset, check email, email link 
 src/app/(app)         the signed-in workspace (home, notes /p/[id], tasks, subjects, settings, trash)
 src/app/present       fullscreen presenter
 src/app/study         full-screen lessons, practice and tests
-src/learn             learning center: engine (maths parser, checker, display language), players, topics
+src/learn             learning center: engine (maths parser, checker, display language), players, maths topics
 src/learn/chemistry   elements, formula and equation parser, chemistry checkers, visuals, topics
+src/learn/biology     biology visuals and topics
+src/app/show, embed   public picture pages and embeds
+src/cv                CV builder: CV format, page engine, designs (templates/), sample CV
+src/components/cv     CV editor, form, design panel and the /cv home
 src/app/onboarding    first-run flow
 src/app/auth          PKCE callback and sign out route
 src/components/blob   the mascot, intro animation, loaders, helper and event bus
 src/lib/supabase      browser/server/admin clients and the session proxy
 supabase/migrations   SQL schema with row-level security
 supabase/templates     branded auth email templates
-scripts               build-time migrations, auth/email configuration
+scripts               build-time migrations, auth/email configuration, picture manifest, learning content checks
+docs                  guides (docs/learning-center.md: how the learning center works and how to add topics)
 ```
 
 ### Languages
@@ -91,6 +97,6 @@ scripts               build-time migrations, auth/email configuration
 
 ### Adding a learning topic
 
-Topic metadata lives in `src/learn/catalog.ts` (with its subject); the content (lesson, cheat sheet, seeded exercise generator and typical mistakes) is one file per topic in `src/learn/topics/` (maths) or `src/learn/chemistry/topics/` (chemistry). Chemical notation uses `\ce{…}` inside the display language (`\ce{2H2 + O2 -> 2H2O}`, `\ce{SO4^2-}`). Maths is written in a small display language (`src/learn/engine/display.ts`) where tokens keep keys, so they glide between the steps of a worked solution. All student-facing text sits in those files, ready for translation.
+Read `docs/learning-center.md`: it explains the catalog (`src/learn/catalog.ts`), the topic folders with one file per level, the seeded task generators, typical mistakes, the display language (tokens keep keys, so they glide between the steps of a worked solution; chemistry uses `\ce{…}`), bilingual text with `tx("English", "Deutsch")`, how to add a whole subject, and how public picture links stay stable. Run `npm run check:learn` before committing.
 
 All tables use row-level security, so every user can only read and write their own rows. Images go to the `uploads` storage bucket under the user's own folder.

@@ -101,20 +101,27 @@ export function FormCard({
             )}
           </AnimatePresence>
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1">
           {typeof title === "string" ? (
             <>
               <h2 id={`${id}-title`} className="font-display text-[15.5px] font-semibold tracking-[-0.01em] text-ink">
-                <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="block w-full min-w-0 truncate text-left">
+                {/* The whole title block (title and subtitle) folds the card: a thumb-sized target on phones. */}
+                <button
+                  type="button"
+                  onClick={toggle}
+                  aria-expanded={open}
+                  aria-controls={bodyId}
+                  className="block w-full min-w-0 truncate text-left after:absolute after:inset-0 after:content-['']"
+                >
                   {title}
                 </button>
               </h2>
-              {subtitle && <div className="truncate text-[12.5px] text-ink-3">{subtitle}</div>}
+              {subtitle && <Subtitle>{subtitle}</Subtitle>}
             </>
           ) : (
             <>
               {title}
-              {subtitle && <div className="truncate text-[12.5px] text-ink-3">{subtitle}</div>}
+              {subtitle && <Subtitle>{subtitle}</Subtitle>}
             </>
           )}
         </div>
@@ -146,6 +153,15 @@ export function FormCard({
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+/** The grey line under a card's title (a list of languages or hobbies can be long: the full text is its tooltip). */
+function Subtitle({ children }: { children: ReactNode }) {
+  return (
+    <div title={typeof children === "string" ? children : undefined} className="truncate text-[12.5px] text-ink-3">
+      {children}
+    </div>
   );
 }
 

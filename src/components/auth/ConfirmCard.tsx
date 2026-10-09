@@ -7,7 +7,7 @@ import { confirmEmail } from "@/app/(auth)/auth/confirm/actions";
 import { Button } from "@/components/ui/Button";
 import { useMessages } from "@/i18n/client";
 import { authText, type ConfirmKind } from "@/i18n/messages/auth";
-import { AuthHeading } from "./AuthStage";
+import { AuthHeading, authLinkButton } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
 
@@ -45,10 +45,8 @@ export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type
     return (
       <div>
         <AuthHeading title={t.badTitle} subtitle={t.badSubtitle} />
-        <Link href="/login">
-          <Button variant="primary" size="lg" className="w-full">
-            {all.common.backToSignIn} <ArrowRight className="size-4" />
-          </Button>
+        <Link href="/login" className={authLinkButton}>
+          {all.common.backToSignIn} <ArrowRight className="size-4" />
         </Link>
       </div>
     );

@@ -73,7 +73,7 @@ export function HomeView({
     <>
       <TopBar crumbs={[{ label: t.title }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1480px] px-6 pb-24 pt-4 sm:pb-16 lg:px-10">
+        <div className="mx-auto w-full max-w-[1320px] px-4 pb-24 pt-4 sm:px-8 sm:pb-16 lg:px-10">
           {/* Greeting */}
           <motion.section initial="hidden" animate="shown" className="flex flex-wrap items-end gap-x-6 gap-y-4">
             <motion.div variants={rise} custom={0} className="-mb-2 -ml-3 hidden sm:block">
@@ -91,7 +91,12 @@ export function HomeView({
                 {openTotal === 0 ? t.nothingOpen : t.openTasks(openTotal)}
               </p>
             </motion.div>
-            <motion.div variants={rise} custom={2} className="flex flex-wrap gap-1.5 pb-1">
+            {/* One swipeable row on phones instead of three wrapped rows of buttons. */}
+            <motion.div
+              variants={rise}
+              custom={2}
+              className="flex gap-1.5 pb-1 max-sm:-mx-4 max-sm:w-[calc(100%+2rem)] max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none] sm:flex-wrap max-sm:[&::-webkit-scrollbar]:hidden"
+            >
               <QuickAction icon={<FilePlus2 />} onClick={() => create("note")} busy={busy === "note"} primary>
                 {t.newNote}
               </QuickAction>
@@ -107,7 +112,7 @@ export function HomeView({
               </QuickAction>
               <QuickAction icon={<Search />} onClick={openSearch}>
                 {t.search}
-                <span className="ml-1 flex gap-0.5">
+                <span className="ml-1 flex gap-0.5 [@media(hover:none)]:hidden">
                   <Kbd>⌘</Kbd>
                   <Kbd>K</Kbd>
                 </span>
@@ -115,22 +120,23 @@ export function HomeView({
             </motion.div>
           </motion.section>
 
-          <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
             {/* Recent pages */}
             <motion.section initial="hidden" animate="shown" variants={rise} custom={3} className="min-w-0">
               <SectionTitle>{t.recent}</SectionTitle>
               {recent.length === 0 ? (
                 <EmptyRecent onCreate={() => create("note")} />
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
+                // A swipeable shelf on phones (like the recents in Notion's app); a grid from tablets up.
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 max-sm:-mx-4 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
                   {recent.map((page, i) => (
-                    <motion.div key={page.id} variants={rise} custom={4 + i} initial="hidden" animate="shown">
+                    <motion.div key={page.id} variants={rise} custom={4 + i} initial="hidden" animate="shown" className="max-sm:w-[78%] max-sm:max-w-[280px] max-sm:shrink-0 max-sm:snap-start">
                       {page.kind === "deck" ? (
                         <RecentDeck page={page} preview={previews[page.id]} now={now} />
                       ) : page.kind === "cv" ? (
                         <RecentCvCard page={page} content={cvs[page.id]} now={now} />
                       ) : (
-                        <NoteCard page={page} preview={previews[page.id]} parent={pages.find((p) => p.id === page.parent_id)} now={now} />
+                        <NoteCard page={page} preview={previews[page.id]} parent={pages.find((p) => p.id === page.parent_id)} now={now} fixed />
                       )}
                     </motion.div>
                   ))}
@@ -145,7 +151,7 @@ export function HomeView({
               <div className="mt-7">
                 <SectionTitle
                   action={
-                    <Link href="/learn" className="text-[12.5px] font-medium text-ink-3 hover:text-ink">
+                    <Link href="/learn" className="text-[12.5px] font-medium text-ink-3 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2">
                       {t.allTopics}
                     </Link>
                   }
@@ -157,10 +163,10 @@ export function HomeView({
             </motion.section>
           </div>
 
-          {/* Subjects */}
+          {/* Subjects (two columns on phones, so 15 of them stay a short list) */}
           <motion.section initial="hidden" animate="shown" variants={rise} custom={6} className="mt-10">
             <SectionTitle>{t.subjects}</SectionTitle>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3">
               {subjects.map((s, i) => {
                 const notes = pages.filter((p) => p.subject_id === s.id && p.kind === "note").length;
                 const decks = pages.filter((p) => p.subject_id === s.id && p.kind === "deck").length;
@@ -224,7 +230,7 @@ function QuickAction({
       onClick={onClick}
       disabled={busy}
       className={cn(
-        "flex h-8.5 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-[background,transform,border] active:scale-[0.97] disabled:opacity-60 [&>svg]:size-4",
+        "flex h-8.5 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-[background,transform,border] active:scale-[0.97] disabled:opacity-60 [&>svg]:size-4",
         primary ? "bg-ink text-paper hover:bg-ink/88" : "border border-line bg-raised text-ink-2 shadow-card hover:border-line-2 hover:text-ink",
       )}
     >

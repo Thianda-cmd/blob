@@ -26,23 +26,37 @@ export function useAuthBlob() {
   return ctx;
 }
 
-/** Split-screen frame for every auth page: the form on the left, Blob on the right. */
+/**
+ * Split-screen frame for every auth page: the form on the left, Blob on the right. Below lg the
+ * stage is hidden and a small Blob above the form says the same things, so phones keep the reactions.
+ */
 export function AuthShell({ children }: { children: ReactNode }) {
   const t = useMessages(authText).stage;
   const blobRef = useRef<BlobHandle>(null);
+  const miniRef = useRef<BlobHandle>(null);
   const [mood, setMood] = useState<BlobMood>("happy");
   const [speech, setSpeech] = useState<string | null>(t.hello);
   const [gaze, setGaze] = useState<{ x: number; y: number } | null>(null);
 
   const say = useCallback((text: string | null) => setSpeech(text), []);
-  const jump = useCallback(() => blobRef.current?.jump(1), []);
-  const shake = useCallback(() => blobRef.current?.shake(), []);
+  // Only one of the two Blobs is on screen (the other is display: none), so both get every gesture.
+  const jump = useCallback(() => {
+    blobRef.current?.jump(1);
+    miniRef.current?.jump(1);
+  }, []);
+  const shake = useCallback(() => {
+    blobRef.current?.shake();
+    miniRef.current?.shake();
+  }, []);
   const api = useMemo(() => ({ setMood, say, look: setGaze, jump, shake }), [say, jump, shake]);
   const { shown, typing } = useTypewriter(speech);
 
   // Say hi with a wave when the page opens.
   useEffect(() => {
-    const t = setTimeout(() => blobRef.current?.wave(), 500);
+    const t = setTimeout(() => {
+      blobRef.current?.wave();
+      miniRef.current?.wave();
+    }, 500);
     return () => clearTimeout(t);
   }, []);
 
@@ -51,14 +65,36 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <div className="grid min-h-dvh lg:grid-cols-[minmax(440px,560px)_1fr]">
         <div className="relative flex flex-col bg-surface px-6 py-6 sm:px-12 lg:border-r lg:border-line">
           <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="flex w-fit items-center gap-2 rounded-lg">
+            <Link href="/" className="flex h-9 w-fit items-center gap-2 rounded-lg">
               <BlobMark size={26} />
               <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
             </Link>
             <LanguageSwitch compact />
           </div>
           <div className="flex flex-1 items-center py-10">
-            <div className="mx-auto w-full max-w-[360px]">{children}</div>
+            <div className="mx-auto w-full max-w-[360px]">
+              <div className="relative mb-5 h-[72px] lg:hidden">
+                <Blob ref={miniRef} size={72} mood={mood} look={gaze} talking={typing} className="-ml-1.5" />
+                {/* Anchored at the bottom, so a longer line grows up into the free space, never pushing the form down. */}
+                <AnimatePresence mode="wait">
+                  {speech && (
+                    <motion.div
+                      key={speech}
+                      initial={{ opacity: 0, x: -6, scale: 0.95 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ transformOrigin: "bottom left" }}
+                      className="absolute bottom-3 left-[76px] right-0 w-fit rounded-2xl rounded-bl-md border border-line bg-raised px-3.5 py-2 text-[13.5px] leading-snug text-ink shadow-card"
+                      role="status"
+                    >
+                      <TypedText text={speech} shown={shown} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              {children}
+            </div>
           </div>
           <p className="text-[12px] text-ink-3">{t.privacy}</p>
         </div>
@@ -170,12 +206,17 @@ function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; te
   );
 }
 
+/** A link that looks like the primary large button (a button inside a link is not valid HTML). */
+export const authLinkButton =
+  "flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-ink px-4.5 text-[14.5px] font-medium text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-[background,transform] duration-150 hover:bg-ink/88 active:scale-[0.97]";
+
 /** Small animated heading block shared by the auth pages. */
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mb-7">
       <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em] text-balance">{title}</h1>
-      {subtitle && <p className="mt-1.5 text-[14px] text-ink-2">{subtitle}</p>}
+      {/* Long email addresses break anywhere instead of running out of the column. */}
+      {subtitle && <p className="mt-1.5 text-[14px] text-ink-2 [overflow-wrap:anywhere]">{subtitle}</p>}
     </motion.div>
   );
 }

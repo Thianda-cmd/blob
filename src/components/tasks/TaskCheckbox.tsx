@@ -72,7 +72,12 @@ export function TaskCheckbox({
         e.stopPropagation();
         toggle();
       }}
-      className={cn("group/check relative grid shrink-0 place-items-center rounded-md outline-offset-1", className)}
+      className={cn(
+        "group/check relative grid shrink-0 place-items-center rounded-md outline-offset-1",
+        // A finger-sized hit area on touch screens without changing the look.
+        "[@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-2 [@media(hover:none)]:after:content-['']",
+        className,
+      )}
       style={{ width: size + 6, height: size + 6 }}
     >
       <span

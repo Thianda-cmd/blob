@@ -129,6 +129,8 @@ export function BlobHelper() {
   const accessory: BlobAccessory | null = flashAccessory ?? (pathname.startsWith("/p/") ? "glasses" : null);
 
   const mood: BlobMood = flashMood ?? heldMood ?? (sleepy ? "sleepy" : open ? "happy" : "idle");
+  // Keyboard and drag-and-drop tips are no use on a phone. (The panel only renders after a tap, so no hydration mismatch.)
+  const tips = open && window.matchMedia("(hover: none)").matches ? t.touchTips : t.tips;
   const name = firstName(profile.full_name);
 
   async function newPage(kind: "note" | "deck") {
@@ -157,9 +159,13 @@ export function BlobHelper() {
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
                 <div className="font-display text-[15px] font-semibold">{t.needAHand(name)}</div>
-                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{t.tips[tip % t.tips.length]}</p>
+                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{tips[tip % tips.length]}</p>
               </div>
-              <button onClick={() => setOpen(false)} className="grid size-6 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.close}>
+              <button
+                onClick={() => setOpen(false)}
+                className="grid size-6 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-8"
+                aria-label={t.close}
+              >
                 <X className="size-3.5" />
               </button>
             </div>
@@ -202,21 +208,21 @@ export function BlobHelper() {
       </AnimatePresence>
 
       {/* Smaller on phones so it covers less of the page. */}
-      <div className="pointer-events-auto origin-bottom-right max-sm:-mt-7 max-sm:scale-75">
-        <Blob
-          ref={ref}
-          size={78}
-          mood={mood}
-          talking={typing}
-          accessory={accessory}
-          title={t.helperTitle}
-          onClick={() => {
-            setOpen((o) => !o);
-            setSpeech(null);
-            setTip((t) => t + 1);
-          }}
-        />
-      </div>
+      {/* A real button, so the helper opens with the keyboard too (Blob still wobbles under the mouse). */}
+      <button
+        type="button"
+        aria-label={t.helperTitle}
+        title={t.helperTitle}
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => !o);
+          setSpeech(null);
+          setTip((t) => t + 1);
+        }}
+        className="pointer-events-auto grid origin-bottom-right rounded-full outline-offset-[-6px] max-sm:-mt-7 max-sm:scale-75"
+      >
+        <Blob ref={ref} size={78} mood={mood} talking={typing} accessory={accessory} />
+      </button>
     </div>
   );
 }

@@ -182,12 +182,12 @@ function GroupHeader({
       {sub && <span className="text-[12px] text-ink-3">{sub}</span>}
       <span className="ml-auto" />
       {group.key === "overdue" && (
-        <button onClick={onMoveToToday} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
+        <button onClick={onMoveToToday} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
           {t.moveToToday}
         </button>
       )}
       {isDone && doneOpen && hidden > 0 && (
-        <button onClick={onShowAll} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink">
+        <button onClick={onShowAll} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
           {t.showMore(hidden)}
         </button>
       )}

@@ -56,6 +56,10 @@ function useCalm<T>(value: T, ms: number) {
   return calm;
 }
 
+/** Design thumbnails: at least this wide, 10 px apart. */
+const MIN_TILE = 92;
+const GAP = 10;
+
 const Thumb = memo(function Thumb({ cv, width }: { cv: Cv; width: number }) {
   return <CvThumbnail cv={cv} width={width} />;
 });
@@ -100,7 +104,8 @@ export function DesignPanel({
 
   return (
     <aside className={cn(deckFontVars, "flex min-h-0 flex-col bg-surface", className)} aria-label={t.panel}>
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+      {/* Full width on tablets: the content keeps to the form's column width (640 px), as in Edit. */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-line px-[max(0.75rem,calc((100%-640px)/2+0.75rem))] py-2">
         <Segmented
           kind="tabs"
           label={t.panel}
@@ -133,7 +138,9 @@ export function DesignPanel({
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-20" role="tabpanel" aria-label={t.tabs[tab]}>
-        {tab === "design" ? <DesignSettings cv={cv} change={change} /> : <Checklist cv={cv} onJump={(c) => onJump?.(c)} issue={issue} />}
+        <div className="@container/panel mx-auto w-full max-w-[640px]">
+          {tab === "design" ? <DesignSettings cv={cv} change={change} /> : <Checklist cv={cv} onJump={(c) => onJump?.(c)} issue={issue} />}
+        </div>
       </div>
     </aside>
   );
@@ -150,7 +157,8 @@ function DesignSettings({ cv, change }: CvEditorProps) {
   const noInitials = meta.initials === false;
   const noPicture = !meta.photo || d.portrait === "none" || (noInitials && d.portrait === "initials");
 
-  // Thumbnails: as many columns as fit, each a whole number of pixels wide.
+  // Thumbnails: as many columns as fit (at least two, one row for all on a tablet), each a whole
+  // number of pixels wide.
   const gridRef = useRef<HTMLDivElement>(null);
   const [grid, setGrid] = useState({ cols: 2, width: 124 });
   useEffect(() => {
@@ -158,8 +166,8 @@ function DesignSettings({ cv, change }: CvEditorProps) {
     if (!el) return;
     const measure = () => {
       const w = el.clientWidth;
-      const cols = w >= 560 ? 4 : w >= 330 ? 3 : 2;
-      const width = Math.floor((w - (cols - 1) * 10) / cols);
+      const cols = Math.max(2, Math.min(CV_TEMPLATES.length, Math.floor((w + GAP) / (MIN_TILE + GAP))));
+      const width = Math.floor((w - (cols - 1) * GAP) / cols);
       setGrid((g) => (g.cols === cols && g.width === width ? g : { cols, width }));
     };
     measure();
@@ -209,7 +217,8 @@ function DesignSettings({ cv, change }: CvEditorProps) {
       </Block>
 
       <Block title={t.colour} hint={t.colourHint}>
-        <div role="radiogroup" aria-label={t.colour} className="grid grid-cols-9 gap-1.5">
+        {/* One row of swatches that share the width, 24 to 36 px each; more colours wrap to a second row. */}
+        <div role="radiogroup" aria-label={t.colour} className="flex flex-wrap gap-1.5">
           {CV_ACCENTS.map((c) => {
             const active = c === d.accent;
             const name = t.accentNames[c] ?? c;
@@ -223,7 +232,7 @@ function DesignSettings({ cv, change }: CvEditorProps) {
                 title={name}
                 onClick={() => setDesign({ accent: c })}
                 className={cn(
-                  "grid aspect-square place-items-center rounded-full ring-offset-2 ring-offset-surface inset-ring inset-ring-black/10 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob dark:inset-ring-white/20",
+                  "grid aspect-square min-w-6 max-w-9 flex-1 place-items-center rounded-full ring-offset-2 ring-offset-surface inset-ring inset-ring-black/10 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob dark:inset-ring-white/20",
                   active && "ring-2 ring-ink/70",
                 )}
                 style={{ background: c }}
@@ -234,7 +243,7 @@ function DesignSettings({ cv, change }: CvEditorProps) {
           })}
           <label
             className={cn(
-              "relative grid aspect-square cursor-pointer place-items-center rounded-full ring-offset-2 ring-offset-surface inset-ring inset-ring-black/10 transition-transform focus-within:ring-2 focus-within:ring-blob hover:scale-110 dark:inset-ring-white/20",
+              "relative grid aspect-square min-w-6 max-w-9 flex-1 cursor-pointer place-items-center rounded-full ring-offset-2 ring-offset-surface inset-ring inset-ring-black/10 transition-transform focus-within:ring-2 focus-within:ring-blob hover:scale-110 dark:inset-ring-white/20",
               custom && "ring-2 ring-ink/70",
             )}
             style={{ background: custom ? d.accent : "conic-gradient(from 90deg, #f2b8b8, #f5e3a3, #b9e3c2, #b4d3f5, #d6c2f7, #f2b8b8)" }}
@@ -253,7 +262,7 @@ function DesignSettings({ cv, change }: CvEditorProps) {
       </Block>
 
       <Block title={t.fonts}>
-        <div role="radiogroup" aria-label={t.fonts} className="grid grid-cols-2 gap-1.5">
+        <div role="radiogroup" aria-label={t.fonts} className="grid grid-cols-2 gap-1.5 @min-[540px]/panel:grid-cols-3">
           {CV_FONT_IDS.map((id) => {
             const f = CV_FONTS[id];
             const active = id === d.fonts;

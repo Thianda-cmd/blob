@@ -64,7 +64,7 @@ function SlashPanel({ controller, snap }: { controller: SlashController; snap: S
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 560, damping: 30, mass: 0.7 }}
       style={{ transformOrigin: placement === "top" ? "bottom left" : "top left" }}
-      className="w-[300px] overflow-hidden rounded-xl border border-line bg-raised text-ink shadow-pop"
+      className="w-[min(300px,calc(100vw-16px))] overflow-hidden rounded-xl border border-line bg-raised text-ink shadow-pop"
       role="listbox"
       aria-label={t.label}
       onMouseDown={(e) => e.preventDefault()}
@@ -87,7 +87,8 @@ function SlashPanel({ controller, snap }: { controller: SlashController; snap: S
           })
         )}
       </div>
-      <div className="flex h-8 items-center gap-3 border-t border-line bg-surface/60 px-2.5 text-[11px] text-ink-3">
+      {/* Keyboard hints: not on touch screens, where there are no arrow keys to press. */}
+      <div className="flex h-8 items-center gap-3 border-t border-line bg-surface/60 px-2.5 text-[11px] text-ink-3 [@media(hover:none)]:hidden">
         <span className="flex items-center gap-1">
           <Kbd>↑</Kbd>
           <Kbd>↓</Kbd> {t.navigate}

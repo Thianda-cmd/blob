@@ -123,7 +123,7 @@ function areaFrames(a: number, b: number, unit: string, square: boolean): Frame[
 
 function areaMistakes(a: number, b: number, unit: string, square: boolean): Mistake[] {
   const m = mistakeList(exact(a * b, `${unit}²`, "A ="));
-  if (square) m.add(2 * a, tx("$a^2$ is not $2 \\cdot a$", "$a^2$ ist nicht $2 \\cdot a$"), tx("Squared means $a \\cdot a$, not $2 \\cdot a$.", "Hoch 2 heißt $a \\cdot a$, nicht $2 \\cdot a$."));
+  if (square) m.add(2 * a, tx("a² is not 2 · a", "a² ist nicht 2 · a"), tx("Squared means $a \\cdot a$, not $2 \\cdot a$.", "Hoch 2 heißt $a \\cdot a$, nicht $2 \\cdot a$."));
   m.add(
     2 * (a + b),
     tx("Perimeter instead of area", "Umfang statt Fläche"),

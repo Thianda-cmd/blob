@@ -49,7 +49,8 @@ export function ThemeEditor({
   const presets = (
     <>
       <Block title={t.presets}>
-        <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={t.theme}>
+        {/* Two columns in the side panel, more in the wider sheet on phones (and as presets are added). */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(116px,1fr))] gap-1.5" role="radiogroup" aria-label={t.theme}>
           {PRESETS.map((p) => {
             const active = p.id === theme;
             return (

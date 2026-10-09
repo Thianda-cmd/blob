@@ -1,6 +1,6 @@
 import { LEGACY_LESSON_LEVEL, lessonLevels, type TopicMeta } from "./catalog";
 import { EMPTY_PROGRESS, levelKey, type TopicProgress } from "./progress";
-import type { Level } from "./types";
+import { LEVELS, type Level } from "./types";
 
 export type LevelRows = Record<string, TopicProgress>;
 
@@ -30,5 +30,5 @@ export function suggestedLevel(meta: Pick<TopicMeta, "slug" | "levels">, topicRo
 
 export const parseLevel = (raw: unknown): Level | undefined => {
   const n = Number(Array.isArray(raw) ? raw[0] : raw);
-  return n === 1 || n === 2 || n === 3 ? n : undefined;
+  return LEVELS.includes(n as Level) ? (n as Level) : undefined;
 };

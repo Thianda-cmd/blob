@@ -13,6 +13,9 @@ export const errorsText = defineMessages({
       title: "This page wobbled away",
       body: "It may have been deleted, or the link is wrong. Your other notes are safe.",
       home: "Back to Home",
+      /** For visitors who aren't signed in: no notes to reassure about, and Home would ask them to sign in. */
+      guestBody: "It may have moved, or the link is wrong.",
+      guestHome: "To the start page",
     },
   },
   de: {
@@ -26,6 +29,8 @@ export const errorsText = defineMessages({
       title: "Diese Seite ist weggewabbelt",
       body: "Vielleicht wurde sie gelöscht oder der Link ist falsch. Deine anderen Notizen sind sicher.",
       home: "Zurück zum Start",
+      guestBody: "Vielleicht ist sie umgezogen oder der Link ist falsch.",
+      guestHome: "Zur Startseite",
     },
   },
 });

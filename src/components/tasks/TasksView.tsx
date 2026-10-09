@@ -109,7 +109,8 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto grid max-w-[1320px] gap-x-10 gap-y-8 px-4 pb-28 pt-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-10 lg:pt-7">
+      {/* grid-cols-1 (a minmax(0, 1fr) track): a long subject name in the filters must not widen the page. */}
+      <div className="mx-auto grid max-w-[1320px] grid-cols-1 gap-x-10 gap-y-8 px-4 pb-28 pt-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-10 lg:pt-7">
         <section className="min-w-0">
           <header className="mb-4 flex items-end gap-3">
             <div className="min-w-0">
@@ -124,7 +125,7 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                 )}
               </p>
             </div>
-            <span className="ml-auto hidden items-center gap-1.5 pb-1 text-[11.5px] text-ink-3 md:flex">
+            <span className="ml-auto hidden items-center gap-1.5 pb-1 text-[11.5px] text-ink-3 md:flex [@media(hover:none)]:hidden">
               {t.pressBefore} <Kbd>N</Kbd> {t.pressAfter}
             </span>
           </header>
@@ -215,10 +216,12 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
           />
         </section>
 
-        <aside className="space-y-3 lg:sticky lg:top-7 lg:self-start">
+        {/* Tablets: calendar on the left, filters on the right instead of three screen-wide panels.
+            Desktop: a sticky column that scrolls on its own once many subjects make it taller than the screen. */}
+        <aside className="grid min-w-0 grid-cols-1 content-start gap-3 md:grid-cols-2 lg:sticky lg:top-7 lg:max-h-[calc(100dvh-7.5rem)] lg:grid-cols-1 lg:self-start lg:overflow-y-auto lg:[scrollbar-width:thin]">
           {view && now ? (
             <>
-              <Panel title={t.nextTwoWeeks} action={<span className="text-[11.5px] text-ink-3">{format(now, t.monthFormat, { locale: dateLocale(locale) })}</span>}>
+              <Panel className="md:row-span-2 md:self-start lg:row-span-1" title={t.nextTwoWeeks} action={<span className="text-[11.5px] text-ink-3">{format(now, t.monthFormat, { locale: dateLocale(locale) })}</span>}>
                 <CalendarHeat
                   tasks={view.heatTasks}
                   now={now}
@@ -246,7 +249,7 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
               </Panel>
             </>
           ) : (
-            <div className="h-[420px] rounded-xl border border-line" aria-hidden />
+            <div className="h-[420px] rounded-xl border border-line md:col-span-2 lg:col-span-1" aria-hidden />
           )}
         </aside>
       </div>

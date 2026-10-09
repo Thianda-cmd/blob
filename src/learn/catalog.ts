@@ -1,6 +1,6 @@
 import { tx, type Text } from "@/i18n/text";
 import type { TopicProgress } from "./progress";
-import type { Area, Level } from "./types";
+import { LEVELS, type Area, type Level } from "./types";
 
 export type Subject = "maths" | "chemistry" | "biology";
 
@@ -30,7 +30,7 @@ export type TopicMeta = {
   blurb: Text;
   /** Display-language glyph for the topic card, e.g. "a(b + c)". */
   glyph: string;
-  /** A picture instead of the glyph: a name from components/topicIcons.ts (biology). */
+  /** A picture instead of the glyph: a name from the ICONS map in components/TopicGlyph.tsx (biology). */
   icon?: string;
   /** The three levels: how deep each goes and which lessons exist. */
   levels: Record<Level, LevelMeta>;
@@ -397,7 +397,7 @@ const BY_SUBJECT: Record<Subject, TopicMeta[]> = { maths: MATHS_CATALOG, chemist
 export const subjectCatalog = (subject: Subject) => BY_SUBJECT[subject];
 
 /** Levels whose lesson is written. */
-export const lessonLevels = (t: Pick<TopicMeta, "levels">) => ([1, 2, 3] as Level[]).filter((l) => t.levels[l].minutes);
+export const lessonLevels = (t: Pick<TopicMeta, "levels">) => LEVELS.filter((l) => t.levels[l].minutes);
 /** Minutes of the first written lesson (for cards). */
 export const firstLessonMinutes = (t: Pick<TopicMeta, "levels">) => t.levels[lessonLevels(t)[0] ?? 1].minutes ?? 0;
 

@@ -181,14 +181,14 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
               type="button"
               onClick={() => setBlocksOpen((o) => !o)}
               className={cn(
-                "flex h-7 items-center gap-1 rounded-lg pl-2 pr-1.5 text-[12.5px] font-medium transition-colors hover:bg-hover hover:text-ink",
+                "flex h-7 items-center gap-1 rounded-lg pl-2 pr-1.5 text-[12.5px] font-medium transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-8",
                 blocksOpen && "bg-hover text-ink",
               )}
               aria-haspopup="menu"
               aria-expanded={blocksOpen}
               title={t.turnInto}
             >
-              {t.blocks[s?.block ?? "text"]}
+              <BlockLabel block={s?.block ?? "text"} label={t.blocks[s?.block ?? "text"]} />
               <ChevronDown className={cn("size-3.5 text-ink-3 transition-transform duration-200", blocksOpen && "rotate-180")} />
             </button>
             <Divider />
@@ -260,6 +260,17 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
   );
 }
 
+/** The current block's name; phones show its icon instead, so the bubble fits beside the tools. */
+function BlockLabel({ block, label }: { block: BlockId; label: string }) {
+  const Icon = BLOCKS.find((b) => b.id === block)?.icon ?? Pilcrow;
+  return (
+    <>
+      <Icon className="size-[15px] sm:hidden" strokeWidth={1.9} aria-hidden />
+      <span className="max-sm:sr-only">{label}</span>
+    </>
+  );
+}
+
 function Divider() {
   return <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />;
 }
@@ -273,7 +284,7 @@ function Tool({ label, shortcut, active, onClick, children }: { label: string; s
       aria-pressed={!!active}
       title={shortcut ? `${label}  ${shortcut}` : label}
       className={cn(
-        "grid size-7 place-items-center rounded-lg transition-colors duration-100 [&_svg]:size-[15px]",
+        "grid size-7 place-items-center rounded-lg transition-colors duration-100 [&_svg]:size-[15px] [@media(hover:none)]:size-8",
         active ? "bg-blob-soft text-blob-ink" : "hover:bg-hover hover:text-ink",
       )}
     >
@@ -325,7 +336,7 @@ function LinkForm({ editor, initial, hasLink, onDone }: { editor: Editor; initia
           }
         }}
         placeholder={t.linkPlaceholder}
-        className="h-7 w-[232px] min-w-0 bg-transparent px-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
+        className="h-7 w-[min(232px,calc(100vw-180px))] min-w-0 bg-transparent px-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
         aria-label={t.linkAddress}
         spellCheck={false}
         autoComplete="off"

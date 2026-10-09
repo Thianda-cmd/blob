@@ -185,7 +185,7 @@ export function SignupForm({ next }: { next?: string }) {
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
         {t.haveAccount}{" "}
-        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="-my-1.5 inline-block py-1.5 font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
           {t.signIn}
         </Link>
       </p>

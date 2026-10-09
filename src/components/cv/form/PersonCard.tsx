@@ -115,7 +115,8 @@ export function PersonCard({ cv, change }: CvEditorProps) {
         <Field label={tp.street} htmlFor="cvf-street">
           <TextInput id="cvf-street" spellCheck={false} autoComplete="address-line1" value={p.street} onValue={(v) => set({ street: v })} maxLength={120} placeholder={tp.streetPlaceholder} />
         </Field>
-        <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2.5">
+        {/* Wide enough for the placeholder "z. B. 20095" at 16 px (phones). */}
+        <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2.5">
           <Field label={tp.postalCode} htmlFor="cvf-postalCode">
             <TextInput
               id="cvf-postalCode"

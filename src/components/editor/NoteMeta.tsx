@@ -114,7 +114,9 @@ function SubjectBadge({ subject }: { subject: Subject }) {
       ) : (
         <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
       )}
-      <span className="max-w-[160px] truncate">{subject.name}</span>
+      <span className="max-w-[160px] truncate" title={subject.name}>
+        {subject.name}
+      </span>
     </>
   );
 }
@@ -130,7 +132,7 @@ function SubjectChip({ page }: { page: PageMeta }) {
     root = parent;
   }
   const subject = subjects.find((s) => s.id === root.subject_id);
-  const chip = "flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-ink-2 transition-colors";
+  const chip = "flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[12.5px] text-ink-2 transition-colors [@media(hover:none)]:h-8";
 
   if (page.parent_id) {
     return subject ? (
@@ -169,18 +171,26 @@ function SubjectChip({ page }: { page: PageMeta }) {
             {subjects.map((s) => (
               <MenuItem
                 key={s.id}
-                icon={s.emoji ? <span className="text-[13px]">{s.emoji}</span> : <span className="block size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}
+                icon={
+                  <span className="grid w-4 place-items-center">
+                    {s.emoji ? <span className="text-[13px]">{s.emoji}</span> : <span className="block size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}
+                  </span>
+                }
                 shortcut={page.subject_id === s.id ? <Check className="size-3.5" /> : undefined}
                 onSelect={() => {
                   updatePage(page.id, { subject_id: s.id });
                   close();
                 }}
               >
-                {s.name}
+                <span title={s.name}>{s.name}</span>
               </MenuItem>
             ))}
             <MenuItem
-              icon={<span className="block size-2 rounded-full border border-ink-3" />}
+              icon={
+                <span className="grid w-4 place-items-center">
+                  <span className="block size-2 rounded-full border border-ink-3" />
+                </span>
+              }
               shortcut={!page.subject_id ? <Check className="size-3.5" /> : undefined}
               onSelect={() => {
                 updatePage(page.id, { subject_id: null });

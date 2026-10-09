@@ -275,7 +275,9 @@ function Palette({ onClose }: { onClose: () => void }) {
             aria-controls="palette-list"
             aria-activedescendant={items[active] ? `palette-${items[active].id}` : undefined}
           />
-          <Kbd>Esc</Kbd>
+          <span className="[@media(hover:none)]:hidden">
+            <Kbd>Esc</Kbd>
+          </span>
         </div>
 
         <div ref={listRef} id="palette-list" role="listbox" className="overflow-y-auto p-1.5">
@@ -303,11 +305,13 @@ function Palette({ onClose }: { onClose: () => void }) {
                     />
                   )}
                   <span className="relative grid size-4 shrink-0 place-items-center text-ink-3 [&_svg]:size-4">{item.icon}</span>
-                  <span className={cn("relative min-w-0 shrink-[0.25] truncate", i === active ? "text-ink" : "text-ink-2")} title={item.label}>
+                  {/* The hint gives way first (shrink 4), but the label can still shrink all the way: a flex-shrink
+                      below 1 would leave a long title running past the edge once the hint is gone. */}
+                  <span className={cn("relative min-w-0 truncate", i === active ? "text-ink" : "text-ink-2")} title={item.label}>
                     {item.label}
                   </span>
                   {item.hint && (
-                    <span className="relative ml-auto min-w-0 max-w-[55%] truncate text-[12px] text-ink-3" title={item.hint}>
+                    <span className="relative ml-auto min-w-0 max-w-[55%] shrink-[4] truncate text-[12px] text-ink-3" title={item.hint}>
                       {item.hint}
                     </span>
                   )}
@@ -319,14 +323,15 @@ function Palette({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex h-9 shrink-0 items-center gap-4 border-t border-line px-4 text-[11.5px] text-ink-3">
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 [@media(hover:none)]:hidden">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> {t.move}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 [@media(hover:none)]:hidden">
             <Kbd>↵</Kbd> {t.open}
           </span>
-          <span className="ml-auto hidden min-w-0 items-center gap-1.5 sm:flex">
+          {/* On touch screens the key hints go away and the tip takes the whole footer. */}
+          <span className="ml-auto hidden min-w-0 items-center gap-1.5 sm:flex [@media(hover:none)]:ml-0 [@media(hover:none)]:flex">
             <Sun className="size-3 shrink-0" /> <span className="truncate">{t.tip}</span>
           </span>
         </div>

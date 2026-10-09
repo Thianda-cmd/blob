@@ -15,10 +15,9 @@ export const deckText = defineMessages({
     presentTitle: "Present (Ctrl Enter)",
     panelToggle: "Toggle slide panel",
     panelTitle: "Slide panel",
+    closePanel: "Close panel",
     editor: "Slide editor",
     slideOf: (n: number, total: number) => `Slide ${n} of ${total}`,
-    prevSlide: "Previous slide",
-    nextSlide: "Next slide",
     addSlide: "Add a slide",
     deleted: (n: number) => `Slide ${n} deleted`,
     undo: "Undo",
@@ -34,6 +33,9 @@ export const deckText = defineMessages({
     duplicateSlide: "Duplicate slide",
     deleteSlide: "Delete slide",
     lastSlide: "A deck needs at least one slide",
+    slideOptions: "Slide options",
+    moveEarlier: "Move earlier",
+    moveLater: "Move later",
 
     // Layouts
     groups: { essentials: "Essentials", images: "Images", structure: "Structure", emphasis: "Emphasis" } satisfies Record<LayoutGroup, string>,
@@ -233,10 +235,9 @@ export const deckText = defineMessages({
     presentTitle: "Präsentieren (Strg + Enter)",
     panelToggle: "Seitenleiste ein- oder ausblenden",
     panelTitle: "Seitenleiste",
+    closePanel: "Seitenleiste schließen",
     editor: "Folieneditor",
     slideOf: (n, total) => `Folie ${n} von ${total}`,
-    prevSlide: "Vorherige Folie",
-    nextSlide: "Nächste Folie",
     addSlide: "Folie hinzufügen",
     deleted: (n) => `Folie ${n} gelöscht`,
     undo: "Rückgängig",
@@ -251,6 +252,9 @@ export const deckText = defineMessages({
     duplicateSlide: "Folie duplizieren",
     deleteSlide: "Folie löschen",
     lastSlide: "Eine Präsentation braucht mindestens eine Folie",
+    slideOptions: "Folienoptionen",
+    moveEarlier: "Nach vorne verschieben",
+    moveLater: "Nach hinten verschieben",
 
     groups: { essentials: "Grundlagen", images: "Bilder", structure: "Struktur", emphasis: "Blickfang" },
     layouts: {

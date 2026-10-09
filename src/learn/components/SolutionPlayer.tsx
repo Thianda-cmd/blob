@@ -45,8 +45,11 @@ export function SolutionPlayer({
 
   return (
     <div className={cn("grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]", className)}>
-      {/* The controls sit under the maths (not on top of it), and wide maths scrolls instead of being cut. */}
-      <div className="relative flex min-h-[140px] flex-col overflow-hidden rounded-2xl border border-line bg-surface">
+      {/*
+        The controls sit under the maths (not on top of it), and wide maths scrolls instead of being cut.
+        Next to a long list of steps the board keeps its own height and stays in view (below the top bar).
+      */}
+      <div className="relative flex min-h-[140px] flex-col overflow-hidden rounded-2xl border border-line bg-surface md:sticky md:top-20 md:self-start">
         <div className="bg-dots pointer-events-none absolute inset-0 opacity-30" />
         <div className={cn("relative grid flex-1 place-items-center overflow-x-auto px-4 sm:px-6", stepped ? "pb-1 pt-7" : "py-7")}>
           <MathView src={frame.math} size={size} highlight={frame.highlight} arrows={frame.arrows} scope={scope} />

@@ -116,7 +116,7 @@ export function CheckEmail({ email }: { email: string }) {
           {cooldown > 0 ? t.resendIn(cooldown) : sent ? t.resendAgain : t.resend}
         </Button>
       </div>
-      <Link href="/login" className="mt-6 inline-flex items-center gap-1.5 text-[13.5px] text-ink-2 hover:text-ink">
+      <Link href="/login" className="mt-4.5 inline-flex items-center gap-1.5 py-1.5 text-[13.5px] text-ink-2 hover:text-ink">
         <ArrowLeft className="size-4" /> {all.common.backToSignIn}
       </Link>
     </div>

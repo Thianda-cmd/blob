@@ -7,8 +7,8 @@ export default function OAuthLayout({ children }: LayoutProps<"/oauth">) {
   return (
     <div className="relative flex min-h-dvh flex-col bg-paper">
       <div className="bg-dots pointer-events-none absolute inset-0 opacity-50" aria-hidden />
-      <header className="relative flex items-center justify-between px-5 py-3 sm:px-8 sm:py-4">
-        <Link href="/" target="_blank" className="flex items-center gap-2 rounded-lg">
+      <header className="relative flex items-center justify-between px-5 py-2 sm:px-8 sm:py-3">
+        <Link href="/" target="_blank" className="flex h-9 items-center gap-2 rounded-lg">
           <BlobMark size={24} />
           <span className="font-display text-[17px] font-bold tracking-[-0.03em]">Blob</span>
         </Link>

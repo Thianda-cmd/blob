@@ -72,7 +72,7 @@ export const authText = defineMessages({
     } as Record<string, string>,
     signup: {
       title: "Create your Blob",
-      subtitle: "Notes, presentations and homework, all saved in one place.",
+      subtitle: "Notes, presentations, homework, lessons and your CV, all in one place.",
       hello: "Ooh, a new friend! Let's make your space.",
       niceToMeet: (name: string) => `Nice to meet you, ${name}!`,
       nameLabel: "Your name",
@@ -228,7 +228,7 @@ export const authText = defineMessages({
     },
     signup: {
       title: "Erstelle deinen Blob",
-      subtitle: "Notizen, Präsentationen und Hausaufgaben, alles an einem Ort gespeichert.",
+      subtitle: "Notizen, Präsentationen, Hausaufgaben, Lektionen und dein Lebenslauf an einem Ort.",
       hello: "Oh, jemand Neues! Lass uns deinen Bereich einrichten.",
       niceToMeet: (name) => `Schön, dich kennenzulernen, ${name}!`,
       nameLabel: "Dein Name",

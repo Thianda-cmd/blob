@@ -10,7 +10,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "migrate": "node scripts/migrate.mjs",
-    "show-manifest": "tsx --tsconfig tsconfig.json scripts/show-manifest.ts --check"
+    "show-manifest": "tsx --tsconfig tsconfig.json scripts/show-manifest.ts --check",
+    "check:learn": "tsx --tsconfig tsconfig.json scripts/check-learn.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

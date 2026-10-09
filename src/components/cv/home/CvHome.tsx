@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { CV_TEMPLATES } from "@/cv/catalog";
 import { cvPlainText, cvTitle, normalizeCv } from "@/cv/model";
 import type { Cv } from "@/cv/types";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -97,7 +98,7 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
     <>
       <TopBar crumbs={[{ label: t.title, icon: <FileUser className="size-3.5 text-ink-3" /> }]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-28 pt-3 sm:px-8 lg:pt-5">
+        <div className="mx-auto w-full max-w-[1320px] px-4 pb-28 pt-3 sm:px-8 lg:px-10 lg:pt-5">
           <motion.header initial="hidden" animate="shown" className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
             <motion.div variants={rise} custom={0} className="min-w-0">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
@@ -115,7 +116,7 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
             )}
           </motion.header>
 
-          <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="mt-7 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0">
               {items.length === 0 ? (
                 <EmptyHero onStart={() => setCreating(true)} />
@@ -127,7 +128,8 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
                     </h2>
                     <span className="text-[13px] text-ink-3">{t.count(items.length)}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
+                  {/* Three across beside the tips on a laptop, so ten CVs stay a few rows, not a long scroll. */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4">
                     <AnimatePresence mode="popLayout" initial={false}>
                       {items.map((item, i) => (
                         <motion.div
@@ -205,7 +207,7 @@ function EmptyHero({ onStart }: { onStart: () => void }) {
             <Plus className="size-4" /> {t.emptyCta}
           </Button>
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-ink-2">
-            {t.emptyPoints.map((point) => (
+            {t.emptyPoints(CV_TEMPLATES.length).map((point) => (
               <li key={point} className="flex items-center gap-1.5">
                 <Check className="size-3.5 text-ok" strokeWidth={2.5} /> {point}
               </li>
@@ -242,14 +244,14 @@ function RenameForm({ target, onClose, onSave }: { target: { item: CvItem; cv: C
       <label className="mt-3 block">
         <span className="sr-only">{t.renameLabel}</span>
         <Input
-            autoFocus
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            placeholder={auto}
-            maxLength={200}
-            className="h-10 text-[16px] sm:text-[14px]"
-          />
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          placeholder={auto}
+          maxLength={200}
+          className="h-10 text-[16px] sm:text-[14px]"
+        />
       </label>
       <p className="mt-2 text-[12.5px] leading-snug text-ink-3">{t.renameHint}</p>
       <div className="mt-5 flex justify-end gap-2">

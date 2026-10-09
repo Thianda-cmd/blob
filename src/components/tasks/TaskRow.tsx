@@ -88,7 +88,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
     <div
       className={cn(
         "group/row relative flex items-center gap-1.5 rounded-lg pl-1 pr-1 transition-colors",
-        dense ? "min-h-9" : "min-h-[38px] hover:bg-hover/60 [&:has([aria-expanded=true])]:bg-hover/60",
+        dense ? "min-h-9" : "min-h-[38px] hover:bg-hover/60 [&:has([aria-expanded=true])]:bg-hover/60 [@media(hover:none)]:min-h-11",
       )}
     >
       <TaskCheckbox checked={done} onChange={toggle} size={dense ? 16 : 17} label={done ? t.markNotDone(task.title) : t.markDone(task.title)} />
@@ -141,7 +141,12 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
           </button>
         )}
         {task.kind !== "homework" && !editing && (
-          <KindBadge kind={task.kind} className={cn(done && "opacity-60")} labelClassName={dense ? "hidden @min-[400px]:inline" : "hidden sm:inline"} />
+          <KindBadge
+            kind={task.kind}
+            className={cn(done && "opacity-60")}
+            // Icon only in narrow rows: the title needs the room more than the word "Project".
+            labelClassName={dense ? "hidden @min-[400px]:inline" : narrow ? "hidden" : "hidden sm:inline"}
+          />
         )}
       </div>
 
@@ -170,7 +175,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                 <button
                   {...props}
                   className={cn(
-                    "flex h-7 w-[34px] items-center gap-1.5 rounded-md px-2 text-left transition-colors hover:bg-hover hover:text-ink sm:w-[132px]",
+                    "flex h-7 w-[34px] items-center gap-1.5 rounded-md px-2 text-left transition-colors hover:bg-hover hover:text-ink sm:w-[132px] [@media(hover:none)]:h-9",
                     subject ? "text-ink-2" : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                     // Only dim a real subject: on an empty one this would undo the opacity-0 above.
                     done && subject && "opacity-70",
@@ -191,7 +196,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
               <button
                 {...props}
                 className={cn(
-                  "flex h-7 items-center justify-end gap-1 rounded-md px-2 text-right transition-colors hover:bg-hover",
+                  "flex h-7 items-center justify-end gap-1 rounded-md px-2 text-right transition-colors hover:bg-hover [@media(hover:none)]:h-9",
                   narrow ? "min-w-[60px] max-w-[140px]" : "w-[84px] sm:w-[150px]",
                   due ? dueClass : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                 )}
@@ -211,7 +216,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
             trigger={(props) => (
               <button
                 {...props}
-                className="grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-hover hover:text-ink focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
+                className="grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-hover hover:text-ink focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:h-9 [@media(hover:none)]:opacity-100"
                 aria-label={t.taskOptions}
                 title={t.taskOptions}
               >

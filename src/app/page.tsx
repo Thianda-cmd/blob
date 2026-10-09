@@ -36,7 +36,7 @@ export default async function LandingPage() {
     <div className="min-h-dvh overflow-x-clip bg-paper">
       <header className="sticky top-0 z-30 border-b border-line/60 bg-paper/85 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-[1240px] items-center gap-6 px-4 sm:px-6">
-          <Link href="/" aria-label={t.header.home} className="flex items-center gap-2">
+          <Link href="/" aria-label={t.header.home} className="flex h-10 items-center gap-2">
             <BlobMark size={24} />
             <span className="font-display text-[19px] font-bold tracking-[-0.03em]">Blob</span>
           </Link>
@@ -65,11 +65,11 @@ export default async function LandingPage() {
         {/* Hero */}
         <section className="relative overflow-hidden">
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_60%_40%,#000_30%,transparent_75%)]" />
-          <div className="relative mx-auto grid max-w-[1240px] items-center gap-4 px-4 pb-14 pt-12 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:pb-20 lg:pt-16">
+          <div className="relative mx-auto grid max-w-[1240px] items-center gap-4 px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-12 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:pb-20 lg:pt-16">
             <div>
               <a
                 href="#cv"
-                className="group mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-raised py-1 pl-3 pr-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:text-ink"
+                className="group mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-raised py-1.5 pl-3 pr-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:text-ink"
               >
                 <span className="size-1.5 rounded-full bg-blob" /> {t.hero.badge}
                 <ArrowRight className="size-3.5 text-ink-3 transition-transform group-hover:translate-x-0.5" />
@@ -84,8 +84,8 @@ export default async function LandingPage() {
                   </svg>
                 </span>
               </h1>
-              <p className="mt-7 max-w-[540px] text-[17px] leading-relaxed text-ink-2">{t.hero.body}</p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <p className="mt-6 max-w-[540px] text-[16px] leading-relaxed text-ink-2 sm:mt-7 sm:text-[17px]">{t.hero.body}</p>
+              <div className="mt-7 flex flex-wrap items-center gap-3 sm:mt-8">
                 <Link
                   href={primary.href}
                   className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-medium text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.98]"
@@ -106,9 +106,9 @@ export default async function LandingPage() {
 
         {/* Learning center */}
         <section id="learn" className="scroll-mt-14 border-t border-line bg-surface">
-          <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 lg:py-20">
+          <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.learn.kicker} title={t.learn.title} body={t.learn.body} />
-            <div className="mt-10 grid gap-8 lg:grid-cols-12 lg:gap-10">
+            <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-12 lg:gap-10">
               <Reveal className="lg:col-span-7">
                 <LearnDemo className="h-full" />
               </Reveal>
@@ -120,9 +120,9 @@ export default async function LandingPage() {
 
         {/* Presentations */}
         <section id="presentations" className="scroll-mt-14 border-t border-line">
-          <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 lg:py-20">
+          <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.slides.kicker} title={t.slides.title} body={t.slides.body} />
-            <Reveal className="mt-10">
+            <Reveal className="mt-8 lg:mt-10">
               <SlidesShowcase />
             </Reveal>
           </div>
@@ -130,7 +130,7 @@ export default async function LandingPage() {
 
         {/* Notes and homework */}
         <section className="border-t border-line bg-surface">
-          <div className="mx-auto grid max-w-[1240px] gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 lg:gap-8 lg:py-20">
+          <div className="mx-auto grid max-w-[1240px] gap-10 px-4 py-12 sm:px-6 sm:py-16 md:grid-cols-2 lg:gap-8 lg:py-20">
             <Feature id="notes" kicker={t.notes.kicker} title={t.notes.title} body={t.notes.body}>
               <NotesDemo />
             </Feature>
@@ -142,15 +142,15 @@ export default async function LandingPage() {
 
         {/* CV builder */}
         <section id="cv" className="scroll-mt-14 border-y border-line bg-surface">
-          <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 lg:py-20">
+          <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.cv.kicker} title={t.cv.title} body={t.cv.body} />
-            <Reveal className="mt-10">
+            <Reveal className="mt-8 lg:mt-10">
               <CvShowcase />
             </Reveal>
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1240px] px-4 py-20 text-center sm:px-6">
+        <section className="mx-auto max-w-[1240px] px-4 py-14 text-center sm:px-6 sm:py-20">
           <Reveal>
             <h2 className="font-display text-[clamp(30px,4vw,46px)] font-bold tracking-[-0.035em] text-balance">{t.cta.title}</h2>
             <p className="mx-auto mt-3 max-w-[480px] text-[15px] text-ink-2 text-balance">{t.cta.body}</p>
@@ -165,18 +165,25 @@ export default async function LandingPage() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-5 text-[12.5px] text-ink-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 text-[12.5px] text-ink-3 sm:px-6 sm:py-5">
           <span className="flex items-center gap-2">
             <BlobMark size={16} /> Blob · {t.footer.tagline}
           </span>
-          <nav aria-label={t.header.nav} className="flex gap-4 max-sm:hidden">
+          <LanguageSwitch compact className="ml-auto lg:order-last" />
+          {/* On phones the links get a row of their own, under the name and the language switch. */}
+          <nav aria-label={t.header.nav} className="-mx-1 flex flex-wrap gap-x-2 max-lg:w-full">
             {nav.map((item) => (
-              <a key={item.href} href={item.href} className="transition-colors hover:text-ink">
+              <a key={item.href} href={item.href} className="px-1 py-2 transition-colors hover:text-ink">
                 {item.label}
               </a>
             ))}
+            <Link href="/show" className="px-1 py-2 transition-colors hover:text-ink">
+              {t.footer.pictures}
+            </Link>
+            <Link href="/developers" className="px-1 py-2 transition-colors hover:text-ink">
+              {t.footer.developers}
+            </Link>
           </nav>
-          <LanguageSwitch compact className="ml-auto" />
         </div>
       </footer>
     </div>

@@ -84,7 +84,7 @@ export function PracticePlayer({
   const total = test ? TEST_TASKS : ROUND;
   const t = useMessages(learnText);
   const names = topicNames(topic, useLocale());
-  const levelName = t.levels[level];
+  const levelName = t.level(level);
 
   const [round, setRound] = useState(0);
   const [index, setIndex] = useState(0);
@@ -153,7 +153,7 @@ export function PracticePlayer({
       setStreakUp(up);
       const higher = LEVELS.find((l) => l > level);
       if (up >= 4 && higher && !suggested) {
-        line = t.practice.readyNext(t.levels[higher]);
+        line = t.practice.readyNext(t.level(higher));
         setSuggested(true);
       }
     }
