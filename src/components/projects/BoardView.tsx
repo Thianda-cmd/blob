@@ -347,6 +347,7 @@ function BoardColumn({
     id: columnKey(column.id),
     data: { type: "column" },
     disabled: readOnly,
+    attributes: { roleDescription: t.dnd.column },
   });
   const [renaming, setRenaming] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -661,7 +662,12 @@ const SortableCard = memo(function SortableCard({
   onOpen: (id: string) => void;
 }) {
   const t = useMessages(projectsText);
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: card.id, data: { type: "card" }, disabled: readOnly });
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    data: { type: "card" },
+    disabled: readOnly,
+    attributes: { roleDescription: t.dnd.card },
+  });
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();

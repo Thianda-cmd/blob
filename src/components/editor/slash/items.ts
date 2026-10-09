@@ -7,12 +7,14 @@ import {
   Code2,
   FilePlus2,
   FlaskConical,
+  GraduationCap,
   Layers,
   Network,
   Paperclip,
   PencilLine,
   PenTool,
   Pin,
+  Presentation,
   Radical,
   Sigma,
   Table2,
@@ -170,6 +172,12 @@ const DEFS: SlashDef[] = [
     run: ({ editor, range }) => insertBlock(editor, range, { type: "plot", attrs: { fns: [] } }),
   },
   {
+    id: "lesson",
+    group: "school",
+    icon: GraduationCap,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "lessonLink" }),
+  },
+  {
     id: "flashcard",
     group: "school",
     icon: Layers,
@@ -210,6 +218,12 @@ const DEFS: SlashDef[] = [
       chainAt(editor, range).run();
       ctx.pickFile(editor);
     },
+  },
+  {
+    id: "deck",
+    group: "media",
+    icon: Presentation,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "deckEmbed" }),
   },
   {
     id: "table",

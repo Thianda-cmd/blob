@@ -11,7 +11,6 @@ export const projectsText = defineMessages({
     newProject: "New project",
     yours: "Your projects",
     count: (n: number) => plural(n, "project", "projects"),
-    archive: "Archive",
     showArchived: (n: number) => `Show archive (${n})`,
     hideArchived: "Hide archive",
     untitled: "Untitled project",
@@ -24,8 +23,6 @@ export const projectsText = defineMessages({
     // Project card
     progress: (done: number, total: number) => `${done} of ${total} done`,
     noCards: "No cards yet",
-    dueShort: (date: string) => `Due ${date}`,
-    shared: "Shared",
     sharedBy: (name: string) => `Shared by ${name}`,
     forYou: (n: number) => `${n} for you`,
     viewOnly: "View only",
@@ -99,9 +96,7 @@ export const projectsText = defineMessages({
     priority: "Priority",
     due: "Due",
     dueFilter: { overdue: "Overdue", week: "Due this week", none: "No date" },
-    anyLabel: "All labels",
     clearFilters: "Clear",
-    filters: "Filters",
     showing: (shown: number, total: number) => `${shown} of ${total} cards`,
     nothingMatches: "No card matches these filters.",
     here: (name: string) => `${name} is here`,
@@ -116,7 +111,6 @@ export const projectsText = defineMessages({
     // Columns
     addColumn: "Add column",
     columnName: "Column name",
-    newColumn: "New column",
     columnOptions: "Column options",
     rename: "Rename",
     color: "Colour",
@@ -135,7 +129,6 @@ export const projectsText = defineMessages({
     addCard: "Add card",
     cardPlaceholder: "What needs doing?",
     addCardHint: "Enter adds, Esc closes",
-    untitledCard: "Untitled card",
     priorityNames: { 0: "No priority", 1: "Low", 2: "Medium", 3: "High" } as Record<0 | 1 | 2 | 3, string>,
     checklistCount: (done: number, total: number) => `${done} of ${total} checklist items done`,
     attachmentCount: (n: number) => plural(n, "attachment", "attachments"),
@@ -217,6 +210,8 @@ export const projectsText = defineMessages({
 
     // Drag and drop (screen readers)
     dnd: {
+      card: "movable card",
+      column: "movable column",
       instructions: "To pick up a card, press space. Move it with the arrow keys, press space again to drop it, or escape to cancel. Press enter to open it.",
       picked: (title: string) => `Picked up “${title}”.`,
       over: (title: string, column: string) => `“${title}” is over “${column}”.`,
@@ -320,7 +315,6 @@ export const projectsText = defineMessages({
     newProject: "Neues Projekt",
     yours: "Deine Projekte",
     count: (n) => plural(n, "Projekt", "Projekte"),
-    archive: "Archiv",
     showArchived: (n) => `Archiv anzeigen (${n})`,
     hideArchived: "Archiv ausblenden",
     untitled: "Unbenanntes Projekt",
@@ -331,8 +325,6 @@ export const projectsText = defineMessages({
 
     progress: (done, total) => `${done} von ${total} erledigt`,
     noCards: "Noch keine Karten",
-    dueShort: (date) => `Fällig ${date}`,
-    shared: "Geteilt",
     sharedBy: (name) => `Geteilt von ${name}`,
     forYou: (n) => `${n} für dich`,
     viewOnly: "Nur ansehen",
@@ -402,9 +394,7 @@ export const projectsText = defineMessages({
     priority: "Priorität",
     due: "Fällig",
     dueFilter: { overdue: "Überfällig", week: "Diese Woche fällig", none: "Ohne Datum" },
-    anyLabel: "Alle Labels",
     clearFilters: "Zurücksetzen",
-    filters: "Filter",
     showing: (shown, total) => `${shown} von ${total} Karten`,
     nothingMatches: "Zu diesen Filtern passt keine Karte.",
     here: (name) => `${name} ist gerade hier`,
@@ -418,7 +408,6 @@ export const projectsText = defineMessages({
 
     addColumn: "Spalte hinzufügen",
     columnName: "Name der Spalte",
-    newColumn: "Neue Spalte",
     columnOptions: "Optionen für die Spalte",
     rename: "Umbenennen",
     color: "Farbe",
@@ -436,7 +425,6 @@ export const projectsText = defineMessages({
     addCard: "Karte hinzufügen",
     cardPlaceholder: "Was ist zu tun?",
     addCardHint: "Enter fügt hinzu, Esc schließt",
-    untitledCard: "Karte ohne Titel",
     priorityNames: { 0: "Keine Priorität", 1: "Niedrig", 2: "Mittel", 3: "Hoch" },
     checklistCount: (done, total) => `${done} von ${total} Punkten erledigt`,
     attachmentCount: (n) => plural(n, "Anhang", "Anhänge"),
@@ -515,6 +503,8 @@ export const projectsText = defineMessages({
     },
 
     dnd: {
+      card: "verschiebbare Karte",
+      column: "verschiebbare Spalte",
       instructions: "Leertaste nimmt eine Karte auf. Mit den Pfeiltasten verschiebst du sie, mit der Leertaste legst du sie ab, mit Esc brichst du ab. Enter öffnet die Karte.",
       picked: (title) => `„${title}“ aufgenommen.`,
       over: (title, column) => `„${title}“ ist über „${column}“.`,

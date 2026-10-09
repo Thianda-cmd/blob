@@ -116,7 +116,8 @@ export function NoteStudy({
                   <motion.span layoutId="study-mode" className="absolute inset-0 rounded-[10px] bg-raised shadow-card" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
                 )}
                 <span className="relative">{tab.icon}</span>
-                <span className="relative max-[420px]:sr-only">{tab.label}</span>
+                {/* Phones show the label of the open mode only. */}
+                <span className={cn("relative", mode !== tab.mode && "max-[520px]:sr-only")}>{tab.label}</span>
               </button>
             ))}
           </nav>

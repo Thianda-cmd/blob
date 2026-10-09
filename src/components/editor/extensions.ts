@@ -12,12 +12,14 @@ import { editorText } from "@/i18n/messages/editor";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { Callout } from "./blocks/Callout";
 import { Flashcard, FlashcardBack, FlashcardFront } from "./blocks/Flashcard";
+import { DeckEmbed } from "./blocks/DeckEmbed";
 import { Diagram } from "./blocks/Diagram";
 import { FileBlock } from "./blocks/File";
 import { FileUploadPlaceholder } from "./blocks/fileUpload";
 import { BlockIds } from "./blocks/ids";
 import { Plot } from "./blocks/Plot";
 import { Sketch } from "./blocks/Sketch";
+import { LessonLink } from "./blocks/LessonLink";
 import { MathBlock, MathInline } from "./blocks/Math";
 import { Tables } from "./blocks/Table";
 import { Toggle, ToggleContent, ToggleReveal, ToggleSummary } from "./blocks/Toggle";
@@ -126,6 +128,8 @@ export function buildExtensions({
     Plot,
     FileBlock,
     FileUploadPlaceholder,
+    DeckEmbed,
+    LessonLink,
     BlockIds,
     PageLink.configure({ untitled: () => text().untitled }),
     Selection.configure({ className: "blob-selection" }),

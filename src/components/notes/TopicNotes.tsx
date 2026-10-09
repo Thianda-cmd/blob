@@ -16,7 +16,7 @@ import { dateLocale } from "@/i18n/format";
 import { learnText } from "@/i18n/messages/learn";
 import { notesText } from "@/i18n/messages/notes";
 import { resolveText, type Text } from "@/i18n/text";
-import type { Subject as LearnSubject } from "@/learn/catalog";
+import { topicHref, type Subject as LearnSubject } from "@/learn/catalog";
 import type { Level, SummaryBlock } from "@/learn/types";
 import { cheatSheetNote } from "@/notes/convert";
 import { guessSubject, insertNote } from "@/notes/pages";
@@ -30,9 +30,10 @@ export type TopicRef = { slug: string; subject: LearnSubject; title: Text };
 /** What a saved cheat sheet becomes: title, content, its topic (at this level) and a guessed subject. */
 function cheatSheetPage(topic: TopicRef, level: Level, blocks: SummaryBlock[], locale: Locale, subjects: Pick<Subject, "id" | "name" | "kind">[]) {
   const t = notesText[locale].topic;
-  const { content, plain_text } = cheatSheetNote(blocks, topic.slug, level, locale);
+  const levelName = learnText[locale].level(level);
+  const { content, plain_text } = cheatSheetNote(blocks, { intro: t.cheatFrom, label: `${resolveText(topic.title, locale)} · ${levelName}`, href: topicHref(topic, level) }, locale);
   return {
-    title: t.cheatTitle(resolveText(topic.title, locale), learnText[locale].level(level)),
+    title: t.cheatTitle(resolveText(topic.title, locale), levelName),
     content,
     plain_text,
     subject_id: guessSubject(subjects, topic.subject),
@@ -43,7 +44,8 @@ function cheatSheetPage(topic: TopicRef, level: Level, blocks: SummaryBlock[], l
 
 /** "Deine Notizen zu diesem Thema" on a topic page: notes linked to the topic, a new one, the cheat sheet as a note. */
 export function TopicNotes({ topic, level, summary }: { topic: TopicRef; level: Level; summary: SummaryBlock[] }) {
-  const t = useMessages(notesText).topic;
+  const all = useMessages(notesText);
+  const t = all.topic;
   const locale = useLocale();
   const router = useRouter();
   const now = useNow();
@@ -100,7 +102,7 @@ export function TopicNotes({ topic, level, summary }: { topic: TopicRef; level: 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-medium text-ink">{pageTitle(p.title, p.kind, locale)}</span>
                   <span className="block truncate text-[12px] text-ink-3" suppressHydrationWarning>
-                    {now ? formatDistanceStrict(new Date(p.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }) : " "}
+                    {!now ? " " : now - Date.parse(p.updated_at) < 60_000 ? all.editedJustNow : all.edited(formatDistanceStrict(new Date(p.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }))}
                   </span>
                 </span>
               </Link>

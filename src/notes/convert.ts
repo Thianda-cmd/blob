@@ -2,7 +2,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { resolveText } from "@/i18n/text";
-import type { Level, SummaryBlock } from "@/learn/types";
+import type { SummaryBlock } from "@/learn/types";
 import { docText, type JNode, type Line } from "./doc";
 import type { Summary } from "./study/summary";
 import { bulletList, callout, doc, heading, mathBlock, paragraph, richLine, table } from "./tiptap";
@@ -63,10 +63,21 @@ export function summaryNote(summary: Summary, title: string, labels: SummaryLabe
   return withText(doc(out));
 }
 
-/** A level's cheat sheet as a note, starting with a link to the lesson. */
-export function cheatSheetNote(blocks: SummaryBlock[], slug: string, level: Level, locale: Locale): NewNoteContent {
+/**
+ * A level's cheat sheet as a note, starting with a link back to the topic page (`source`: the
+ * link's words and address, e.g. "Bruchrechnung · Einsteiger", "/learn/maths/fractions?level=1").
+ */
+export function cheatSheetNote(blocks: SummaryBlock[], source: { label: string; intro: string; href: string }, locale: Locale): NewNoteContent {
   const t = (x: Parameters<typeof resolveText>[0]) => resolveText(x, locale);
-  const out: JNode[] = [{ type: "lessonLink", attrs: { slug, level } }];
+  const out: JNode[] = [
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: `${source.intro} `, marks: [{ type: "italic" }] },
+        { type: "text", text: source.label, marks: [{ type: "italic" }, { type: "link", attrs: { href: source.href } }] },
+      ],
+    },
+  ];
   for (const b of blocks) {
     const title = richLine(t(b.title));
     const body = (b.body ? t(b.body) : "").split(/\n{2,}/).filter((x) => x.trim()).map((x) => paragraph(richLine(x.trim())));

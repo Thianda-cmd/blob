@@ -32,7 +32,6 @@ export const homeText = defineMessages({
     allProjects: "All projects",
     forYou: "Assigned to you",
     projectsEmpty: "Plan presentations and group work on one board, and work on it together, live.",
-    startProject: "Start a project",
   },
   de: {
     title: "Start",
@@ -63,6 +62,5 @@ export const homeText = defineMessages({
     allProjects: "Alle Projekte",
     forYou: "Dir zugewiesen",
     projectsEmpty: "Plane Referate und Gruppenarbeiten auf einem Board und arbeitet live zusammen.",
-    startProject: "Projekt starten",
   },
 });

@@ -929,7 +929,9 @@ function AttachmentRow({ attachment: a, readOnly, onRemove }: { attachment: Atta
     if (a.type !== "file") return;
     // Open the tab first (browsers block tabs opened after waiting), then send it to the signed link.
     const tab = download ? null : window.open("", "_blank");
-    const url = await fileUrl(a.path, download ? { download: a.name } : {});
+    // Downloads take the name from the storage path: Storage mangles non-ASCII names ("Brüche" arrives
+    // as "Br%C3%BCche"), the path has the readable ASCII spelling ("Brueche").
+    const url = await fileUrl(a.path, download ? { download: true } : {});
     if (!url) {
       tab?.close();
       blob.say(t.uploadFailed, { mood: "worried" });

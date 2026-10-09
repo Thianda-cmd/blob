@@ -368,7 +368,7 @@ function PersonalCardFace({
 
 const SortableTask = memo(function SortableTask({ task, store, subjects, now }: { task: Task; store: TaskStore; subjects: Subject[]; now: number | null }) {
   const t = useMessages(tasksText);
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: task.id });
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: task.id, attributes: { roleDescription: t.dnd.task } });
   const [editing, setEditing] = useState<string | null>(null);
   const subject = subjects.find((s) => s.id === task.subject_id);
 

@@ -166,13 +166,12 @@ export const tasksText = defineMessages({
     viewBoard: "Board",
     status: { todo: "To do", doing: "Doing", done: "Done" },
     addToColumn: "Add a task",
-    addHere: "Add task",
     dropHere: "Drop tasks here",
     doneBoardHint: "Done in the last 7 days",
     showOlderDone: (n: number) => `Show ${n} more`,
-    openTask: (title: string) => `Edit “${title}”`,
     rename: "Rename",
     dnd: {
+      task: "movable task",
       instructions: "To pick up a task, press space. Move it with the arrow keys, press space again to drop it, or escape to cancel.",
       picked: (title: string) => `Picked up “${title}”.`,
       over: (title: string, column: string) => `“${title}” is over “${column}”.`,
@@ -182,7 +181,6 @@ export const tasksText = defineMessages({
 
     // From projects
     fromProjects: "From projects",
-    fromProjectsHint: "Cards assigned to you",
     noProjectCards: "Nothing assigned to you in projects right now.",
     allProjects: "All projects",
     markCardDone: (title: string) => `Mark “${title}” as done`,
@@ -335,13 +333,12 @@ export const tasksText = defineMessages({
     viewBoard: "Board",
     status: { todo: "Zu tun", doing: "In Arbeit", done: "Erledigt" },
     addToColumn: "Aufgabe hinzufügen",
-    addHere: "Aufgabe hinzufügen",
     dropHere: "Aufgaben hierher ziehen",
     doneBoardHint: "In den letzten 7 Tagen erledigt",
     showOlderDone: (n) => `${n} weitere anzeigen`,
-    openTask: (title) => `„${title}“ bearbeiten`,
     rename: "Umbenennen",
     dnd: {
+      task: "verschiebbare Aufgabe",
       instructions: "Leertaste nimmt eine Aufgabe auf. Mit den Pfeiltasten verschiebst du sie, mit der Leertaste legst du sie ab, mit Esc brichst du ab.",
       picked: (title) => `„${title}“ aufgenommen.`,
       over: (title, column) => `„${title}“ ist über „${column}“.`,
@@ -350,7 +347,6 @@ export const tasksText = defineMessages({
     },
 
     fromProjects: "Aus Projekten",
-    fromProjectsHint: "Dir zugewiesene Karten",
     noProjectCards: "In Projekten ist dir gerade nichts zugewiesen.",
     allProjects: "Alle Projekte",
     markCardDone: (title) => `„${title}“ als erledigt markieren`,

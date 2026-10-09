@@ -12,7 +12,6 @@ export const shareText = defineMessages({
     roles: { owner: "Owner", editor: "Can edit", viewer: "Can view" },
     roleHints: { editor: "Can write and change things", viewer: "Can only look" },
     you: "you",
-    loading: "Loading…",
     error: "That didn’t work. Try again?",
 
     // Invite link
@@ -47,7 +46,6 @@ export const shareText = defineMessages({
     removed: (name: string) => `${name} was removed.`,
     leave: "Leave",
     leaveAsk: "Leave? You won’t see it any more.",
-    yes: "Yes",
     no: "No",
     via: (title: string) => `via “${title}”`,
     viewerNote: "Only people who can edit can invite others.",
@@ -62,13 +60,10 @@ export const shareText = defineMessages({
     sharedWith: (n: number) => (n === 1 ? "Shared with 1 person" : `Shared with ${n} people`),
     sharedBy: (name: string) => `${name} shared this with you`,
     viewOnly: "View only",
-    canEdit: "Can edit",
     leavePage: "Leave page",
-    leaveProject: "Leave project",
     leftPage: "You left the page.",
     linkCopiedMembers: "Link copied. Everyone this page is shared with can open it.",
     here: (name: string) => `${name} is here now`,
-    alsoHere: (n: number) => `${n} more here`,
 
     // Join page
     join: {
@@ -94,7 +89,6 @@ export const shareText = defineMessages({
       notYou: "Not you? Sign out",
       toBlob: "Go to Blob",
       errJoin: "Joining didn’t work. Try again?",
-      welcome: (title: string) => `Welcome to “${title}”!`,
     },
   },
   de: {
@@ -107,7 +101,6 @@ export const shareText = defineMessages({
     roles: { owner: "Vollzugriff", editor: "Kann bearbeiten", viewer: "Kann ansehen" },
     roleHints: { editor: "Darf schreiben und ändern", viewer: "Darf nur ansehen" },
     you: "du",
-    loading: "Lädt…",
     error: "Das hat nicht geklappt. Nochmal versuchen?",
 
     linkTitle: "Einladungslink",
@@ -139,7 +132,6 @@ export const shareText = defineMessages({
     removed: (name) => `${name} wurde entfernt.`,
     leave: "Verlassen",
     leaveAsk: "Verlassen? Du siehst es dann nicht mehr.",
-    yes: "Ja",
     no: "Nein",
     via: (title) => `über „${title}“`,
     viewerNote: "Andere einladen kann nur, wer bearbeiten darf.",
@@ -152,13 +144,10 @@ export const shareText = defineMessages({
     sharedWith: (n) => (n === 1 ? "Mit 1 Person geteilt" : `Mit ${n} Personen geteilt`),
     sharedBy: (name) => `${name} hat das mit dir geteilt`,
     viewOnly: "Nur ansehen",
-    canEdit: "Kann bearbeiten",
     leavePage: "Seite verlassen",
-    leaveProject: "Projekt verlassen",
     leftPage: "Du hast die Seite verlassen.",
     linkCopiedMembers: "Link kopiert. Alle, mit denen die Seite geteilt ist, können ihn öffnen.",
     here: (name) => `${name} ist gerade hier`,
-    alsoHere: (n) => `${n} weitere hier`,
 
     join: {
       metaTitle: "Einladung",
@@ -183,7 +172,6 @@ export const shareText = defineMessages({
       notYou: "Nicht du? Abmelden",
       toBlob: "Zu Blob",
       errJoin: "Beitreten hat nicht geklappt. Nochmal versuchen?",
-      welcome: (title) => `Willkommen bei „${title}“!`,
     },
   },
 });
