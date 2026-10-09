@@ -68,6 +68,7 @@ export function DuePicker({
   trigger,
   align = "end",
   onOpenChange,
+  className,
 }: {
   value: string | null;
   kind: TaskKind;
@@ -75,9 +76,11 @@ export function DuePicker({
   trigger: Trigger;
   align?: "start" | "end";
   onOpenChange?: (open: boolean) => void;
+  /** E.g. "z-[80]!" inside a dialog. */
+  className?: string;
 }) {
   return (
-    <Popover align={align} className="w-[284px] p-2" trigger={trigger} onOpenChange={onOpenChange}>
+    <Popover align={align} className={cn("w-[284px] p-2", className)} trigger={trigger} onOpenChange={onOpenChange}>
       {(close) => <DuePanel value={value} kind={kind} onChange={onChange} close={close} />}
     </Popover>
   );

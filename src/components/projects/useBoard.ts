@@ -6,6 +6,7 @@ import { loadMembers } from "@/components/share/useMembers";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
 import { useLive, useTableChanges } from "@/lib/live";
+import { removeFile } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Member, Project, ProjectColumn, Task } from "@/lib/types";
 import { uid } from "@/lib/utils";
@@ -234,6 +235,12 @@ export function useBoard(initial: BoardData, me: Me) {
     };
   }, [live, applyRow, reloadMembers]);
 
+  // Whatever changed between the server's render and the live channel joining.
+  useEffect(() => {
+    const timer = setTimeout(() => void refetchAll(), 1500);
+    return () => clearTimeout(timer);
+  }, [refetchAll]);
+
   // Back after a while (laptop lid, other tab): catch up on what the live updates may have missed.
   useEffect(() => {
     let hiddenAt = 0;
@@ -432,7 +439,16 @@ export function useBoard(initial: BoardData, me: Me) {
     }
   }, [removed, commitCards, id, oops]);
 
-  const dismissRemoved = useCallback(() => setRemoved(null), []);
+  // Gone for good once the undo is no longer offered: its files go too.
+  const removedRef = useRef(removed);
+  useEffect(() => {
+    removedRef.current = removed;
+  });
+  const dismissRemoved = useCallback(() => {
+    const card = removedRef.current;
+    setRemoved(null);
+    for (const a of card?.attachments ?? []) if (a.type === "file") void removeFile(a.path);
+  }, []);
 
   /* ----- Columns ----- */
 

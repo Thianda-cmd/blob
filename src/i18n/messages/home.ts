@@ -27,6 +27,12 @@ export const homeText = defineMessages({
     addSubject: "Add subject",
     subjectName: "Subject name",
     enterToAdd: "Press Enter to add",
+    // Projects
+    projects: "Projects",
+    allProjects: "All projects",
+    forYou: "Assigned to you",
+    projectsEmpty: "Plan presentations and group work on one board, and work on it together, live.",
+    startProject: "Start a project",
   },
   de: {
     title: "Start",
@@ -53,5 +59,10 @@ export const homeText = defineMessages({
     addSubject: "Fach hinzufügen",
     subjectName: "Name des Fachs",
     enterToAdd: "Mit Enter hinzufügen",
+    projects: "Projekte",
+    allProjects: "Alle Projekte",
+    forYou: "Dir zugewiesen",
+    projectsEmpty: "Plane Referate und Gruppenarbeiten auf einem Board und arbeitet live zusammen.",
+    startProject: "Projekt starten",
   },
 });

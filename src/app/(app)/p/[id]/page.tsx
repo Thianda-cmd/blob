@@ -3,11 +3,15 @@ import { notFound } from "next/navigation";
 import { CvEditor } from "@/components/cv/CvEditor";
 import { DeckEditor } from "@/components/deck/DeckEditor";
 import { NoteEditor } from "@/components/editor/NoteEditor";
+import { themeSpecOf } from "@/components/deck/deck";
+import { FolderView } from "@/components/notes/FolderView";
+import type { PagePreview } from "@/components/subjects/PageCards";
+import { snippet } from "@/notes/snippet";
 import { TrashedNotice } from "@/components/page/TrashedNotice";
 import { pageText } from "@/i18n/messages/page";
 import { getLocale } from "@/i18n/server";
 import { createClient } from "@/lib/supabase/server";
-import type { AccessRole, Member, Page } from "@/lib/types";
+import type { AccessRole, Member, Page, PageKind } from "@/lib/types";
 import { pageTitle } from "@/lib/utils";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,12 +39,37 @@ async function loadAccess(id: string): Promise<{ role: AccessRole; members: Memb
   return { role: (role.data as AccessRole | null) ?? "owner", members: list };
 }
 
+type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
+
+/** Small previews of a folder's pages (the pages themselves come from the workspace). */
+async function loadFolderPreviews(id: string): Promise<Record<string, PagePreview>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("pages")
+    .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
+    .eq("parent_id", id)
+    .is("trashed_at", null);
+  const previews: Record<string, PagePreview> = {};
+  for (const row of (data ?? []) as unknown as PreviewRow[]) {
+    previews[row.id] = {
+      snippet: row.kind === "note" ? snippet(row.plain_text) : "",
+      slideTitle: row.kind === "deck" ? row.slide_title : null,
+      theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
+    };
+  }
+  return previews;
+}
+
 export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
   const { id } = await params;
   const page = await loadPage(id);
   if (!page) notFound();
   if (page.trashed_at) return <TrashedNotice page={page} />;
   if (page.kind === "cv") return <CvEditor key={page.id} page={page} />;
+  if (page.kind === "folder") {
+    const [{ role, members }, previews] = await Promise.all([loadAccess(page.id), loadFolderPreviews(page.id)]);
+    return <FolderView key={page.id} page={page} role={role} members={members} previews={previews} />;
+  }
   const { role, members } = await loadAccess(page.id);
   return page.kind === "deck" ? (
     <DeckEditor key={page.id} page={page} role={role} members={members} />

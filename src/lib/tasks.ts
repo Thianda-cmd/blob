@@ -840,10 +840,13 @@ export function suggestSubjects<S extends Pick<Subject, "id" | "name">>(query: s
 
 const RECENT_DONE_DAYS = 7;
 
-/** Open tasks plus anything completed in the last week, soonest first. */
+/**
+ * Your own tasks (not cards of projects, which `select *` also returns since migration 0010): open ones
+ * plus anything completed in the last week, soonest first.
+ */
 export async function loadTasks(supabase: SupabaseClient, opts: { subjectId?: string } = {}): Promise<Task[]> {
   const since = addDays(new Date(), -RECENT_DONE_DAYS).toISOString();
-  let query = supabase.from("tasks").select("*").or(`done.eq.false,completed_at.gte.${since}`);
+  let query = supabase.from("tasks").select("*").is("project_id", null).or(`done.eq.false,completed_at.gte.${since}`);
   if (opts.subjectId) query = query.eq("subject_id", opts.subjectId);
   const { data } = await query.order("due_at", { ascending: true, nullsFirst: false }).order("created_at").limit(500);
   return (data ?? []) as Task[];
@@ -858,10 +861,30 @@ export async function loadUpcomingTasks(supabase: SupabaseClient, days = 7): Pro
   const { data } = await supabase
     .from("tasks")
     .select("*")
+    .is("project_id", null)
     .eq("done", false)
     .not("due_at", "is", null)
     .lte("due_at", until)
     .order("due_at", { ascending: true })
     .limit(50);
   return (data ?? []) as Task[];
+}
+
+/** A project card assigned to you, with its project (for "From projects" on Tasks and Home). */
+export type AssignedCard = Task & { project: { id: string; title: string; icon: string | null; color: string } };
+
+/** Open cards assigned to you in projects that aren't archived, soonest first. */
+export async function loadAssignedCards(supabase: SupabaseClient, userId: string, limit = 40): Promise<AssignedCard[]> {
+  const { data } = await supabase
+    .from("tasks")
+    .select("*, project:projects(id, title, icon, color, archived_at)")
+    .not("project_id", "is", null)
+    .contains("assignees", [userId])
+    .eq("done", false)
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  return ((data ?? []) as (Task & { project: (AssignedCard["project"] & { archived_at: string | null }) | null })[])
+    .filter((c) => c.project && !c.project.archived_at)
+    .map((c) => ({ ...c, project: { id: c.project!.id, title: c.project!.title, icon: c.project!.icon, color: c.project!.color } }));
 }

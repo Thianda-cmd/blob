@@ -22,7 +22,7 @@ export const noteBlocksText = defineMessages({
       preview: "Preview",
       previewEmpty: "Your formula appears here as you type.",
       templates: "Insert",
-      hint: "Enter to finish · Shift+Enter for a new line",
+      newLine: "new line",
       remove: "Remove formula",
       toInline: "Formula in text",
       t: {
@@ -103,6 +103,15 @@ export const noteBlocksText = defineMessages({
       templates: "Start with",
       help: "Mermaid syntax",
       t: { mindmap: "Mind map", flow: "Process", timeline: "Timeline", sequence: "Sequence", cycle: "Cycle", pie: "Pie chart" },
+      /** Starter diagrams (Mermaid code), in the reader's language. */
+      starters: {
+        mindmap: "mindmap\n  root((Photosynthesis))\n    Light\n      Chlorophyll\n    Water\n    Carbon dioxide\n    Sugar\n      Glucose\n    Oxygen",
+        flow: "flowchart TD\n  A[Read the task] --> B{Understood?}\n  B -- Yes --> C[Plan the solution]\n  B -- No --> D[Ask]\n  D --> A\n  C --> E[Work it out]\n  E --> F[Check the answer]",
+        timeline: "timeline\n  title The French Revolution\n  1789 : Storming of the Bastille\n  1791 : First constitution\n  1793 : Reign of Terror\n  1799 : Napoleon takes power",
+        sequence: "sequenceDiagram\n  participant Blood\n  participant Cell\n  Blood->>Cell: Oxygen and glucose\n  Cell-->>Blood: Carbon dioxide",
+        cycle: "flowchart LR\n  A[Evaporation] --> B[Condensation]\n  B --> C[Precipitation]\n  C --> D[Collection]\n  D --> A",
+        pie: "pie title Air\n  \"Nitrogen\" : 78\n  \"Oxygen\" : 21\n  \"Other gases\" : 1",
+      },
     },
 
     sketch: {
@@ -130,7 +139,7 @@ export const noteBlocksText = defineMessages({
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
       reset: "Reset view",
-      hint: "Drag to move, scroll or pinch to zoom",
+      hint: "Drag to move · Ctrl + scroll or two fingers to zoom",
       functions: "Functions",
       examples: "Try: 2x + 1, x^2, sin(x), sqrt(x), 1/x, e^x, abs(x)",
     },
@@ -233,7 +242,7 @@ export const noteBlocksText = defineMessages({
       preview: "Vorschau",
       previewEmpty: "Hier erscheint deine Formel, während du tippst.",
       templates: "Einfügen",
-      hint: "Enter zum Beenden · Umschalt+Enter für eine neue Zeile",
+      newLine: "neue Zeile",
       remove: "Formel entfernen",
       toInline: "Formel im Text",
       t: {
@@ -314,6 +323,14 @@ export const noteBlocksText = defineMessages({
       templates: "Starte mit",
       help: "Mermaid-Syntax",
       t: { mindmap: "Mindmap", flow: "Ablauf", timeline: "Zeitstrahl", sequence: "Sequenz", cycle: "Kreislauf", pie: "Kreisdiagramm" },
+      starters: {
+        mindmap: "mindmap\n  root((Photosynthese))\n    Licht\n      Chlorophyll\n    Wasser\n    Kohlenstoffdioxid\n    Zucker\n      Glucose\n    Sauerstoff",
+        flow: "flowchart TD\n  A[Aufgabe lesen] --> B{Verstanden?}\n  B -- Ja --> C[Lösungsweg planen]\n  B -- Nein --> D[Nachfragen]\n  D --> A\n  C --> E[Rechnen]\n  E --> F[Probe machen]",
+        timeline: "timeline\n  title Deutsche Geschichte\n  1871 : Gründung des Kaiserreichs\n  1919 : Weimarer Republik\n  1949 : Gründung der Bundesrepublik\n  1989 : Mauerfall\n  1990 : Wiedervereinigung",
+        sequence: "sequenceDiagram\n  participant Blut\n  participant Zelle\n  Blut->>Zelle: Sauerstoff und Glucose\n  Zelle-->>Blut: Kohlenstoffdioxid",
+        cycle: "flowchart LR\n  A[Verdunstung] --> B[Kondensation]\n  B --> C[Niederschlag]\n  C --> D[Versickerung]\n  D --> A",
+        pie: "pie title Luft\n  \"Stickstoff\" : 78\n  \"Sauerstoff\" : 21\n  \"Andere Gase\" : 1",
+      },
     },
 
     sketch: {
@@ -341,7 +358,7 @@ export const noteBlocksText = defineMessages({
       zoomIn: "Vergrößern",
       zoomOut: "Verkleinern",
       reset: "Ansicht zurücksetzen",
-      hint: "Ziehen zum Verschieben, scrollen oder mit zwei Fingern zoomen",
+      hint: "Ziehen zum Verschieben · Strg + Scrollen oder zwei Finger zum Zoomen",
       functions: "Funktionen",
       examples: "Probier: 2x + 1, x^2, sin(x), sqrt(x), 1/x, e^x, abs(x)",
     },

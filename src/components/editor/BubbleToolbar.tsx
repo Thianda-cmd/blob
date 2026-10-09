@@ -21,6 +21,7 @@ import {
   ListOrdered,
   ListTodo,
   Pilcrow,
+  Sigma,
   Strikethrough,
   TextQuote,
   Underline,
@@ -209,6 +210,9 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
             </Tool>
             <Tool label={t.highlight} shortcut={`${mod}${shift}H`} active={s?.highlight} onClick={() => editor.chain().focus().toggleHighlight().run()}>
               <Highlighter />
+            </Tool>
+            <Tool label={t.formula} shortcut={`${mod}${shift}M`} onClick={() => editor.commands.selectionToMath()}>
+              <Sigma />
             </Tool>
             <Divider />
             <Tool label={s?.link ? t.editLink : t.addLink} active={s?.link} onClick={() => setMode("link")}>

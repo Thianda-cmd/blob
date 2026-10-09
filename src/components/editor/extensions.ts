@@ -9,7 +9,18 @@ import { Selection } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
 import type { Locale } from "@/i18n/config";
 import { editorText } from "@/i18n/messages/editor";
-import { Callout } from "./Callout";
+import { noteBlocksText } from "@/i18n/messages/noteBlocks";
+import { Callout } from "./blocks/Callout";
+import { Flashcard, FlashcardBack, FlashcardFront } from "./blocks/Flashcard";
+import { Diagram } from "./blocks/Diagram";
+import { FileBlock } from "./blocks/File";
+import { FileUploadPlaceholder } from "./blocks/fileUpload";
+import { BlockIds } from "./blocks/ids";
+import { Plot } from "./blocks/Plot";
+import { Sketch } from "./blocks/Sketch";
+import { MathBlock, MathInline } from "./blocks/Math";
+import { Tables } from "./blocks/Table";
+import { Toggle, ToggleContent, ToggleReveal, ToggleSummary } from "./blocks/Toggle";
 import { ImageUploadPlaceholder } from "./imageUpload";
 import { PageLink } from "./PageLink";
 import { BlobPlaceholder } from "./placeholder";
@@ -100,9 +111,25 @@ export function buildExtensions({
       resize: { enabled: true, directions: ["left", "right"], minWidth: 120, minHeight: 48, alwaysPreserveAspectRatio: true },
     }),
     Callout,
+    MathInline,
+    MathBlock,
+    Toggle,
+    ToggleSummary,
+    ToggleContent,
+    ToggleReveal,
+    Flashcard,
+    FlashcardFront,
+    FlashcardBack,
+    Tables,
+    Diagram,
+    Sketch,
+    Plot,
+    FileBlock,
+    FileUploadPlaceholder,
+    BlockIds,
     PageLink.configure({ untitled: () => text().untitled }),
     Selection.configure({ className: "blob-selection" }),
-    BlobPlaceholder.configure({ text: () => text().placeholder }),
+    BlobPlaceholder.configure({ text: () => text().placeholder, blocks: () => noteBlocksText[getLocale()] }),
     ImageUploadPlaceholder,
     SlashCommand.configure({
       controller: slash,

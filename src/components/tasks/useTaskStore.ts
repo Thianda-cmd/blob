@@ -7,7 +7,7 @@ import { useMessages } from "@/i18n/client";
 import { tasksText } from "@/i18n/messages/tasks";
 import { createClient } from "@/lib/supabase/client";
 import { isDueByToday, retimeForKind } from "@/lib/tasks";
-import type { Task, TaskKind } from "@/lib/types";
+import type { Task, TaskKind, TaskStatus } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
 export type NewTask = {
@@ -16,6 +16,9 @@ export type NewTask = {
   due_at?: string | null;
   subject_id?: string | null;
   details?: string | null;
+  /** The personal board's column and place in it (default: to do, at the top). */
+  status?: TaskStatus;
+  position?: number;
 };
 
 export type TaskPatch = Partial<Pick<Task, "title" | "kind" | "due_at" | "subject_id" | "details">>;
@@ -25,6 +28,8 @@ export type TaskStore = {
   add: (input: NewTask) => Promise<Task | null>;
   update: (id: string, patch: TaskPatch) => Promise<boolean>;
   setDone: (id: string, done: boolean) => Promise<boolean>;
+  /** Move a task on the personal board: its column (status) and place in it. Done follows the status. */
+  move: (id: string, status: TaskStatus, position: number) => Promise<boolean>;
   remove: (id: string) => Promise<boolean>;
   /** Put back the last deleted task. */
   undoRemove: () => Promise<boolean>;
@@ -78,12 +83,12 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
         details: input.details ?? null,
         kind: input.kind ?? "homework",
         due_at: input.due_at ?? null,
-        done: false,
-        completed_at: null,
-        status: "todo",
+        done: input.status === "done",
+        completed_at: input.status === "done" ? now : null,
+        status: input.status ?? "todo",
         project_id: null,
         column_id: null,
-        position: 0,
+        position: input.position ?? 0,
         priority: 0,
         assignees: [],
         labels: [],
@@ -104,6 +109,8 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
           kind: task.kind,
           due_at: task.due_at,
           subject_id: task.subject_id,
+          status: task.status,
+          position: task.position,
         })
         .select()
         .single();
@@ -151,7 +158,8 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       if (!before || before.done === done) return false;
       const now = new Date();
       const completed_at = done ? now.toISOString() : null;
-      replace(id, { ...before, done, completed_at });
+      const status: TaskStatus = done ? "done" : before.status === "done" ? "todo" : before.status;
+      replace(id, { ...before, done, completed_at, status });
 
       if (done) {
         const clearedToday = isDueByToday(before, now) && !ref.current.some((x) => isDueByToday(x, now));
@@ -175,7 +183,27 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       const { error } = await createClient().from("tasks").update({ done, completed_at }).eq("id", id);
       if (error) {
         const current = ref.current.find((x) => x.id === id);
-        if (current) replace(id, { ...current, done: before.done, completed_at: before.completed_at });
+        if (current) replace(id, { ...current, done: before.done, completed_at: before.completed_at, status: before.status });
+        oops(t.errSave);
+        return false;
+      }
+      return true;
+    },
+    [replace, t],
+  );
+
+  const move = useCallback(
+    async (id: string, status: TaskStatus, position: number) => {
+      const before = ref.current.find((x) => x.id === id);
+      if (!before) return false;
+      const done = status === "done";
+      const completed_at = done ? (before.done ? before.completed_at : new Date().toISOString()) : null;
+      replace(id, { ...before, status, position, done, completed_at });
+      if (done && !before.done) blob.react("jump", "excited");
+      const { error } = await createClient().from("tasks").update({ status, position }).eq("id", id);
+      if (error) {
+        const current = ref.current.find((x) => x.id === id);
+        if (current) replace(id, { ...current, status: before.status, position: before.position, done: before.done, completed_at: before.completed_at });
         oops(t.errSave);
         return false;
       }
@@ -216,6 +244,8 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
       subject_id: task.subject_id,
       done: task.done,
       completed_at: task.completed_at,
+      status: task.status,
+      position: task.position,
       created_at: task.created_at,
     });
     if (error) {
@@ -230,15 +260,15 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
   const dismissRemoved = useCallback(() => setRemoved(null), []);
 
   return useMemo(
-    () => ({ tasks, add, update, setDone, remove, undoRemove, fresh, removed, dismissRemoved }),
-    [tasks, add, update, setDone, remove, undoRemove, fresh, removed, dismissRemoved],
+    () => ({ tasks, add, update, setDone, move, remove, undoRemove, fresh, removed, dismissRemoved }),
+    [tasks, add, update, setDone, move, remove, undoRemove, fresh, removed, dismissRemoved],
   );
 }
 
 /** Fields the user changed locally since `original` was created. */
 function pickEdits(local: Task, original: Task): Partial<Task> {
   const out: Partial<Task> = {};
-  for (const key of ["title", "kind", "due_at", "subject_id", "details", "done", "completed_at"] as const) {
+  for (const key of ["title", "kind", "due_at", "subject_id", "details", "done", "completed_at", "status", "position"] as const) {
     if (local[key] !== original[key]) (out as Record<string, unknown>)[key] = local[key];
   }
   return out;

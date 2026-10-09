@@ -126,23 +126,23 @@ export function ListView({
                   {column && <ColumnDot column={column} />}
                   <span className="truncate">{column?.title}</span>
                 </span>
-                <span role="cell" className="flex min-w-0 items-center">
-                  {assignees.length > 0 ? <AvatarStack people={assignees} size={22} max={4} /> : <span className="hidden text-ink-3 md:inline">–</span>}
+                <span role="cell" className={cn("flex min-w-0 items-center", !assignees.length && "max-md:hidden")}>
+                  {assignees.length > 0 ? <AvatarStack people={assignees} size={22} max={4} /> : <span className="text-ink-3">–</span>}
                 </span>
-                <span role="cell" className="flex min-w-0 items-center">
-                  {card.due_at ? <DueChip due={card.due_at} now={now} done={done} className="-ml-1.5" /> : <span className="hidden text-ink-3 md:inline">–</span>}
+                <span role="cell" className={cn("flex min-w-0 items-center", !card.due_at && "max-md:hidden")}>
+                  {card.due_at ? <DueChip due={card.due_at} now={now} done={done} className="-ml-1.5" /> : <span className="text-ink-3">–</span>}
                 </span>
-                <span role="cell" className="flex min-w-0 items-center gap-1.5" title={t.priorityNames[card.priority]}>
+                <span role="cell" className={cn("flex min-w-0 items-center gap-1.5", card.priority === 0 && "max-md:hidden")} title={t.priorityNames[card.priority]}>
                   {card.priority > 0 ? (
                     <>
                       <PriorityIcon priority={card.priority} />
                       <span className="hidden truncate lg:inline">{t.priorityNames[card.priority]}</span>
                     </>
                   ) : (
-                    <span className="hidden text-ink-3 md:inline">–</span>
+                    <span className="text-ink-3">–</span>
                   )}
                 </span>
-                <span role="cell" className="flex min-w-0 flex-wrap gap-1 overflow-hidden md:h-5">
+                <span role="cell" className={cn("flex min-w-0 flex-wrap gap-1 overflow-hidden md:h-5", !labels.length && "max-md:hidden")}>
                   {labels.slice(0, 3).map((l) => (
                     <LabelChip key={l.raw} label={l} />
                   ))}

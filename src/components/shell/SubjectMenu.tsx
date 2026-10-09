@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Ellipsis, Trash2 } from "lucide-react";
+import { BookMarked, Check, Ellipsis, GraduationCap, Trash2 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
@@ -23,6 +23,8 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
   const pathname = usePathname();
   const [name, setName] = useState(subject.name);
   const [confirming, setConfirming] = useState(false);
+  const notebook = subject.kind === "notebook";
+  const options = notebook ? t.notebookOptions : t.options;
 
   return (
     <Popover
@@ -34,11 +36,11 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
       }}
       trigger={(props) =>
         trigger === "button" ? (
-          <button {...props} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9" aria-label={t.options}>
+          <button {...props} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9" aria-label={options}>
             <Ellipsis className="size-4" />
           </button>
         ) : (
-          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink [@media(hover:none)]:size-8" aria-label={t.options} title={t.options}>
+          <button {...props} className="grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink [@media(hover:none)]:size-8" aria-label={options} title={options}>
             <Ellipsis className="size-3.5" />
           </button>
         )
@@ -61,7 +63,7 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
               onBlur={() => name.trim() && name.trim() !== subject.name && updateSubject(subject.id, { name: name.trim().slice(0, 60) })}
               maxLength={60}
               className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
-              aria-label={t.name}
+              aria-label={notebook ? t.notebookName : t.name}
             />
           </form>
           <MenuLabel>{t.color}</MenuLabel>
@@ -92,6 +94,16 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
             ))}
           </div>
           <MenuSeparator />
+          {/* Notebooks are for everything outside school; a subject can become one (and back). */}
+          <MenuItem
+            icon={notebook ? <GraduationCap /> : <BookMarked />}
+            onSelect={() => {
+              updateSubject(subject.id, { kind: notebook ? "subject" : "notebook" });
+              close();
+            }}
+          >
+            {notebook ? t.asSubject : t.asNotebook}
+          </MenuItem>
           {confirming ? (
             <div className="p-1.5">
               <p className="mb-2 text-[12px] text-ink-2">{t.confirm(subject.name)}</p>
@@ -113,7 +125,7 @@ export function SubjectMenu({ subject, trigger }: { subject: Subject; trigger?: 
             </div>
           ) : (
             <MenuItem icon={<Trash2 />} danger onSelect={() => setConfirming(true)}>
-              {t.deleteSubject}
+              {notebook ? t.deleteNotebook : t.deleteSubject}
             </MenuItem>
           )}
         </div>

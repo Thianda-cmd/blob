@@ -2,31 +2,40 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
+  BookMarked,
   ChevronRight,
   Ellipsis,
   FilePlus2,
   FileText,
   FileUser,
+  Folder,
+  FolderOpen,
+  FolderPlus,
   GraduationCap,
   House,
   ListChecks,
   LogOut,
   Monitor,
   Moon,
+  NotebookPen,
   PanelLeftClose,
   Plus,
   Presentation,
   Search,
   Settings,
   ShieldCheck,
+  SquareKanban,
   Star,
   Sun,
   Trash2,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { useShareInfo } from "@/components/notes/useShared";
+import { Avatar } from "@/components/share/Avatar";
 import { applyTheme } from "@/components/theme";
 import { Kbd } from "@/components/ui/Kbd";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
@@ -37,7 +46,7 @@ import { adminText } from "@/i18n/messages/admin";
 import { shellText } from "@/i18n/messages/shell";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
-import type { PageMeta, Subject, Theme } from "@/lib/types";
+import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
 // Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
@@ -69,16 +78,25 @@ function useStoredSet(key: string) {
   return [set, toggle] as const;
 }
 
-export function PageIcon({ page, className }: { page: Pick<PageMeta, "icon" | "kind">; className?: string }) {
+export function PageIcon({ page, className, open }: { page: Pick<PageMeta, "icon" | "kind">; className?: string; open?: boolean }) {
   if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
-  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : FileText;
+  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? (open ? FolderOpen : Folder) : FileText;
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }
+
+/** The icon of a subject or notebook: its emoji, else a dot in its colour (notebooks: a notebook). */
+export function SubjectIcon({ subject, className }: { subject: Pick<Subject, "emoji" | "color" | "kind">; className?: string }) {
+  if (subject.emoji) return <span className={cn("text-[13px] leading-none", className)}>{subject.emoji}</span>;
+  if (subject.kind === "notebook") return <BookMarked className={cn("size-3.5", className)} style={{ color: subjectColor(subject.color) }} strokeWidth={2} />;
+  return <span className={cn("size-2 rounded-full", className)} style={{ background: subjectColor(subject.color) }} />;
+}
+
+type NewKind = Extract<PageKind, "note" | "deck" | "folder">;
 
 export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse: () => void; onSearch: () => void; isAdmin?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { pages, subjects, createPage, profile, email, setProfile } = useWorkspace();
+  const { pages, subjects, createPage, profile, email, setProfile, userId, sharedIds } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(shellText).sidebar;
   const adminLabel = useMessages(adminText).nav;
@@ -94,26 +112,45 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
     toggleLabel: foldedSections.has(id) ? t.expand : t.collapse,
   });
 
-  const tree = useMemo(() => {
+  const { tree, roots } = useMemo(() => {
+    const ids = new Set(pages.map((p) => p.id));
     const children = new Map<string | null, PageMeta[]>();
-    // CVs live on /cv (favourites still list them).
+    // CVs live on /cv (favourites still list them). A page whose parent you can't see (shared with
+    // you on its own, or left behind) is a top-level page.
     for (const p of pages) {
       if (p.kind === "cv") continue;
-      const key = p.parent_id;
+      const key = p.parent_id && ids.has(p.parent_id) ? p.parent_id : null;
       if (!children.has(key)) children.set(key, []);
       children.get(key)!.push(p);
     }
-    children.forEach((list) => list.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at)));
-    return children;
+    children.forEach((list) => list.sort((a, b) => (a.kind === "folder" ? 0 : 1) - (b.kind === "folder" ? 0 : 1) || a.position - b.position || a.created_at.localeCompare(b.created_at)));
+    return { tree: children, roots: children.get(null) ?? [] };
   }, [pages]);
 
-  const roots = tree.get(null) ?? [];
+  const mineRoots = roots.filter((p) => p.user_id === userId);
+  const sharedRoots = roots.filter((p) => p.user_id !== userId);
+  const shareInfo = useShareInfo(
+    sharedRoots.map((p) => p.id),
+    userId,
+  );
+  const schoolSubjects = subjects.filter((s) => s.kind !== "notebook");
+  const notebooks = subjects.filter((s) => s.kind === "notebook");
   // The page open right now (a CV keeps "CV" highlighted, since CVs are not in the tree).
   const openPage = pathname.startsWith("/p/") ? pages.find((p) => p.id === pathname.slice(3)) : undefined;
-  const favorites = pages.filter((p) => p.is_favorite).sort((a, b) => a.title.localeCompare(b.title));
-  const unfiled = roots.filter((p) => !p.subject_id || !subjects.some((s) => s.id === p.subject_id));
+  // Favourites are your own: someone else's star on a shared page isn't yours.
+  const favorites = pages.filter((p) => p.is_favorite && p.user_id === userId).sort((a, b) => a.title.localeCompare(b.title));
+  const unfiled = mineRoots.filter((p) => !p.subject_id || !subjects.some((s) => s.id === p.subject_id));
 
-  async function newPage(kind: "note" | "deck", extra: { subject_id?: string | null; parent_id?: string | null } = {}) {
+  /** Can you add pages inside this one? Not in a page shared with you for viewing. */
+  const canAddInside = (page: PageMeta): boolean => {
+    if (page.user_id === userId) return true;
+    let top: PageMeta | undefined = page;
+    while (top && top.parent_id && pages.some((p) => p.id === top!.parent_id)) top = pages.find((p) => p.id === top!.parent_id);
+    if (top && top.user_id === userId) return true;
+    return top ? shareInfo[top.id]?.role === "editor" : false;
+  };
+
+  async function newPage(kind: NewKind, extra: { subject_id?: string | null; parent_id?: string | null } = {}) {
     const page = await createPage({ kind, ...extra });
     if (!page) return;
     if (extra.parent_id) toggleOpenPage(extra.parent_id, true);
@@ -121,10 +158,14 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
     router.push(`/p/${page.id}`);
   }
 
-  const renderPage = (page: PageMeta, depth: number): ReactNode => {
+  const renderPage = (page: PageMeta, depth: number, trailing?: ReactNode): ReactNode => {
     const kids = tree.get(page.id) ?? [];
     const open = openPages.has(page.id);
     const active = pathname === `/p/${page.id}`;
+    const folder = page.kind === "folder";
+    const addable = (page.kind === "note" || folder) && canAddInside(page);
+    const title = pageTitle(page.title, page.kind, locale);
+    const sharedMark = page.user_id === userId && sharedIds.has(page.id);
     return (
       <div key={page.id}>
         <div
@@ -140,26 +181,36 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             className={cn(
               "grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink",
               TOUCH_ICON,
-              kids.length === 0 && page.kind !== "note" && "invisible",
+              kids.length === 0 && page.kind !== "note" && !folder && "invisible",
             )}
             aria-label={open ? t.collapse : t.expand}
+            aria-expanded={open}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
-          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={pageTitle(page.title, page.kind, locale)}>
-            <PageIcon page={page} />
-            <span className="truncate">{pageTitle(page.title, page.kind, locale)}</span>
+          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={title}>
+            <PageIcon page={page} open={folder && open} />
+            <span className="truncate">{title}</span>
+            {sharedMark && <Users className="size-3 shrink-0 text-ink-3" aria-label={t.sharedByYou} />}
           </Link>
-          {page.kind === "note" && (
-            <button
-              onClick={() => newPage("note", { parent_id: page.id, subject_id: page.subject_id })}
-              className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink focus-visible:opacity-100 group-hover:opacity-100", TOUCH_ICON, TOUCH_SHOW)}
-              aria-label={t.addInside}
-              title={t.addInside}
-            >
-              <Plus className="size-3.5" />
-            </button>
-          )}
+          {trailing}
+          {addable &&
+            (folder ? (
+              <AddMenu
+                label={t.addInside}
+                className={cn("opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}
+                onPick={(kind) => newPage(kind, { parent_id: page.id, subject_id: page.subject_id })}
+              />
+            ) : (
+              <button
+                onClick={() => newPage("note", { parent_id: page.id, subject_id: page.subject_id })}
+                className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 hover:bg-line hover:text-ink focus-visible:opacity-100 group-hover:opacity-100", TOUCH_ICON, TOUCH_SHOW)}
+                aria-label={t.addInside}
+                title={t.addInside}
+              >
+                <Plus className="size-3.5" />
+              </button>
+            ))}
         </div>
         <AnimatePresence initial={false}>
           {open && (
@@ -174,7 +225,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
                 kids.map((k) => renderPage(k, depth + 1))
               ) : (
                 <div className={cn("flex h-7 items-center text-[12.5px] text-ink-3", TOUCH_ROW)} style={{ paddingLeft: 30 + depth * 14 }}>
-                  {t.noPagesInside}
+                  {folder ? t.emptyFolder : t.noPagesInside}
                 </div>
               )}
             </motion.div>
@@ -185,9 +236,10 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   };
 
   const renderSubject = (subject: Subject) => {
-    const items = roots.filter((p) => p.subject_id === subject.id);
+    const items = mineRoots.filter((p) => p.subject_id === subject.id);
     const open = !folded.has(subject.id);
     const active = pathname === `/subjects/${subject.id}`;
+    const notebook = subject.kind === "notebook";
     return (
       <div key={subject.id}>
         <div
@@ -200,42 +252,21 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           <button
             onClick={() => toggleFolded(subject.id)}
             className={cn("grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON)}
-            aria-label={open ? t.collapseSubject : t.expandSubject}
+            aria-label={open ? (notebook ? t.collapseNotebook : t.collapseSubject) : notebook ? t.expandNotebook : t.expandSubject}
+            aria-expanded={open}
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
           <Link href={`/subjects/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={subject.name}>
             <span className="grid size-4 shrink-0 place-items-center">
-              {subject.emoji ? (
-                <span className="text-[13px] leading-none">{subject.emoji}</span>
-              ) : (
-                <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
-              )}
+              <SubjectIcon subject={subject} />
             </span>
             <span className="truncate">{subject.name}</span>
             {subject.emoji && <span className="ml-auto size-1.5 shrink-0 rounded-full opacity-80" style={{ background: subjectColor(subject.color) }} />}
           </Link>
           <div className={cn("flex opacity-0 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}>
             <SubjectMenu subject={subject} />
-            <Popover
-              align="start"
-              trigger={(props) => (
-                <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON)} aria-label={t.addTo(subject.name)} title={t.addTo(subject.name)}>
-                  <Plus className="size-3.5" />
-                </button>
-              )}
-            >
-              {(close) => (
-                <>
-                  <MenuItem icon={<FileText />} onSelect={() => (close(), newPage("note", { subject_id: subject.id }))}>
-                    {t.note}
-                  </MenuItem>
-                  <MenuItem icon={<Presentation />} onSelect={() => (close(), newPage("deck", { subject_id: subject.id }))}>
-                    {t.presentation}
-                  </MenuItem>
-                </>
-              )}
-            </Popover>
+            <AddMenu label={t.addTo(subject.name)} onPick={(kind) => newPage(kind, { subject_id: subject.id })} />
           </div>
         </div>
         <AnimatePresence initial={false}>
@@ -296,11 +327,17 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <NavLink href="/home" icon={<House />} active={pathname === "/home"}>
           {t.home}
         </NavLink>
+        <NavLink href="/notes" icon={<NotebookPen />} active={pathname === "/notes" || pathname.startsWith("/notes/")}>
+          {t.notesHome}
+        </NavLink>
         <NavLink href="/learn" icon={<GraduationCap />} active={pathname.startsWith("/learn")}>
           {t.learn}
         </NavLink>
         <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
           {t.tasks}
+        </NavLink>
+        <NavLink href="/projects" icon={<SquareKanban />} active={pathname === "/projects" || pathname.startsWith("/projects/")}>
+          {t.projects}
         </NavLink>
         <NavLink href="/cv" icon={<FileUser />} active={pathname === "/cv" || openPage?.kind === "cv"}>
           {t.cv}
@@ -328,17 +365,33 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           </Section>
         )}
 
-        <Section title={t.subjects} action={<NewSubjectButton />} {...sectionProps("subjects", subjects.length)}>
-          {subjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
-          {subjects.map(renderSubject)}
+        <Section title={t.subjects} action={<NewSubjectButton kind="subject" />} {...sectionProps("subjects", schoolSubjects.length)}>
+          {schoolSubjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
+          {schoolSubjects.map(renderSubject)}
         </Section>
 
+        <Section title={t.notebooks} action={<NewSubjectButton kind="notebook" />} {...sectionProps("notebooks", notebooks.length)}>
+          {notebooks.length === 0 && <p className="px-1.5 py-1 text-[12.5px] leading-snug text-ink-3">{t.noNotebooks}</p>}
+          {notebooks.map(renderSubject)}
+        </Section>
+
+        {sharedRoots.length > 0 && (
+          <Section title={t.shared} {...sectionProps("shared", sharedRoots.length)}>
+            {sharedRoots.map((p) => {
+              const owner = shareInfo[p.id]?.owner;
+              return renderPage(
+                p,
+                0,
+                owner ? (
+                  <Avatar person={owner} size={16} className="ml-0.5 group-hover:hidden [@media(hover:none)]:hidden" title={t.sharedBy(owner.full_name || "?")} />
+                ) : null,
+              );
+            })}
+          </Section>
+        )}
+
         <Section title={t.notes} {...sectionProps("notes", unfiled.length)}>
-          {unfiled.length === 0 ? (
-            <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p>
-          ) : (
-            unfiled.map((p) => renderPage(p, 0))
-          )}
+          {unfiled.length === 0 ? <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p> : unfiled.map((p) => renderPage(p, 0))}
         </Section>
       </div>
 
@@ -369,6 +422,35 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <AccountMenu name={profile.full_name} email={email} theme={profile.theme} onTheme={(t) => setProfile({ theme: t })} />
       </div>
     </nav>
+  );
+}
+
+/** "+" with a small menu: new note, presentation or folder. */
+function AddMenu({ label, onPick, className }: { label: string; onPick: (kind: NewKind) => void; className?: string }) {
+  const t = useMessages(shellText).sidebar;
+  return (
+    <Popover
+      align="start"
+      trigger={(props) => (
+        <button {...props} className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON, className)} aria-label={label} title={label}>
+          <Plus className="size-3.5" />
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          <MenuItem icon={<FileText />} onSelect={() => (close(), onPick("note"))}>
+            {t.note}
+          </MenuItem>
+          <MenuItem icon={<Presentation />} onSelect={() => (close(), onPick("deck"))}>
+            {t.presentation}
+          </MenuItem>
+          <MenuItem icon={<FolderPlus />} onSelect={() => (close(), onPick("folder"))}>
+            {t.folder}
+          </MenuItem>
+        </>
+      )}
+    </Popover>
   );
 }
 
@@ -431,37 +513,43 @@ function NavLink({ href, icon, active, children }: { href: string; icon: ReactNo
   );
 }
 
-function NewSubjectButton() {
+const COLORS = ["sky", "clay", "moss", "plum", "sand", "rose", "teal"] as const;
+
+/** "+" next to "Fächer" or "Notizbücher": a name, and it's there. */
+export function NewSubjectButton({ kind }: { kind: SubjectKind }) {
   const { createSubject } = useWorkspace();
   const t = useMessages(shellText).sidebar;
   const [name, setName] = useState("");
+  const notebook = kind === "notebook";
+  const label = notebook ? t.addNotebook : t.addSubject;
   return (
     <Popover
       align="end"
       trigger={(props) => (
-        <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ICON)} aria-label={t.addSubject} title={t.addSubject}>
+        <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ICON)} aria-label={label} title={label}>
           <Plus className="size-3.5" />
         </button>
       )}
       className="w-[240px] p-2"
+      role="dialog"
+      label={notebook ? t.newNotebook : t.newSubject}
     >
       {(close) => (
         <form
           onSubmit={async (e) => {
             e.preventDefault();
             if (!name.trim()) return;
-            const colors = ["sky", "clay", "moss", "plum", "sand", "rose", "teal"] as const;
-            await createSubject({ name, color: colors[Math.floor(Math.random() * colors.length)] });
+            await createSubject({ name, kind, color: COLORS[Math.floor(Math.random() * COLORS.length)] });
             setName("");
             close();
           }}
         >
-          <div className="mb-1.5 px-0.5 text-[12px] font-medium text-ink-2">{t.newSubject}</div>
+          <div className="mb-1.5 px-0.5 text-[12px] font-medium text-ink-2">{notebook ? t.newNotebook : t.newSubject}</div>
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={t.subjectPlaceholder}
+            placeholder={notebook ? t.notebookPlaceholder : t.subjectPlaceholder}
             maxLength={60}
             className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
           />

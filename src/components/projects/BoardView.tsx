@@ -25,7 +25,7 @@ import { arrayMove, horizontalListSortingStrategy, SortableContext, sortableKeyb
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Ellipsis, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
 import type { Person } from "@/components/share/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -69,6 +69,8 @@ export function BoardView({
   onOpen: (cardId: string) => void;
   meId: string;
 }) {
+  // dnd-kit numbers its screen reader hints; React's id is the same on the server and in the browser.
+  const dndId = useId();
   const t = useMessages(projectsText);
   const { columns, cards, members, peers } = board;
 
@@ -248,6 +250,7 @@ export function BoardView({
 
   return (
     <DndContext
+      id={dndId}
       sensors={sensors}
       collisionDetection={collision}
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
@@ -283,12 +286,13 @@ export function BoardView({
           ))}
         </SortableContext>
         {!readOnly && <AddColumn board={board} />}
-        <div className="w-px shrink-0" aria-hidden />
+        {/* Room to scroll the last columns out from under the open card (desktop). */}
+        <div className={cn("shrink-0", openId ? "w-px sm:w-[452px]" : "w-px")} aria-hidden />
       </div>
       <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
         {activeCard ? (
           <div className="w-[272px] max-sm:w-[calc(85vw-16px)]">
-            <BoardCardFace card={activeCard} column={columnOf(activeCard.id)} people={people} now={now} overlay />
+            <BoardCardFace card={activeCard} column={columns.find((c) => current[c.id]?.includes(activeCard.id))} people={people} now={now} overlay />
           </div>
         ) : activeColumn ? (
           <div className="w-[288px] rotate-[1deg] rounded-xl border border-line-2 bg-paper/95 p-3 shadow-pop">
@@ -372,7 +376,9 @@ function BoardColumn({
             <GripVertical className="size-3.5" />
           </button>
         )}
-        <ColumnDot column={column} />
+        <span title={column.done ? t.doneColumnHint : undefined} className="flex">
+          <ColumnDot column={column} />
+        </span>
         {renaming ? (
           <input
             autoFocus
@@ -409,11 +415,6 @@ function BoardColumn({
             {total}
           </span>
         )}
-        {column.done && !renaming && (
-          <span title={t.doneColumnHint} className="shrink-0 text-ok">
-            <CheckCircle2 className="size-3.5" />
-          </span>
-        )}
         <span className="ml-auto flex shrink-0 items-center">
           {!readOnly && (
             <button
@@ -435,7 +436,8 @@ function BoardColumn({
         </span>
       </header>
 
-      <div ref={listRef} className={cn("min-h-0 flex-1 overflow-y-auto px-2", cardIds.length === 0 && !adding ? "pb-2" : "pb-1")}>
+      {/* A little room above the first card for the picture of whoever is looking at it. */}
+      <div ref={listRef} className={cn("-mt-1.5 min-h-0 flex-1 overflow-y-auto px-2 pt-1.5", cardIds.length === 0 && !adding ? "pb-2" : "pb-1")}>
         <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           <div className="flex min-h-1 flex-col gap-2">
             {cardIds.map((id) => {

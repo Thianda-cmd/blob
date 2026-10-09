@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Dumbbell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import type { BlobHandle, BlobMood } from "@/components/blob/Blob";
+import { LessonCheatSheet } from "@/components/notes/TopicNotes";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import type { Text } from "@/i18n/text";
@@ -181,6 +182,8 @@ export function LessonPlayer({
               <BookOpen className="size-4" /> {t.lesson.nextLevel(t.level(nextLevel))}
             </StudyButton>
           )}
+          {/* The level's cheat sheet as one of your notes, to add your own examples to. */}
+          {topic.lessons[level]!.summary.length > 0 && <LessonCheatSheet topic={topic} level={level} summary={topic.lessons[level]!.summary} />}
           <StudyButton href={exitHref} variant="ghost">
             {t.backToTopic}
           </StudyButton>

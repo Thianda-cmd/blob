@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, ImageIcon, MousePointerClick, Printer, Timer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { SaveCheatSheet, TopicNotes } from "@/components/notes/TopicNotes";
 import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
@@ -200,6 +201,8 @@ export function TopicView({
             />
           </div>
 
+          <TopicNotes topic={topic} level={level} summary={summary} />
+
           {shareable.length > 0 && (
             <section className="mt-8 print:hidden" aria-labelledby="topic-show">
               <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
@@ -251,12 +254,15 @@ export function TopicView({
                 <p className="text-[13.5px] text-ink-3 print:hidden">{summary.length ? t.topic.cheatSheetText : t.topic.cheatSheetSoon}</p>
               </div>
               {summary.length > 0 && (
-                <button
-                  onClick={() => window.print()}
-                  className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink print:hidden"
-                >
-                  <Printer className="size-4" /> {t.topic.print}
-                </button>
+                <div className="flex flex-wrap items-center gap-1.5 print:hidden">
+                  <SaveCheatSheet topic={topic} level={level} summary={summary} />
+                  <button
+                    onClick={() => window.print()}
+                    className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
+                  >
+                    <Printer className="size-4" /> {t.topic.print}
+                  </button>
+                </div>
               )}
             </div>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">

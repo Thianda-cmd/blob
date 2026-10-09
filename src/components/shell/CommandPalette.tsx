@@ -2,17 +2,23 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
+  BookMarked,
   CornerDownLeft,
   FilePlus2,
   FileUser,
+  FolderPlus,
   GraduationCap,
+  Hash,
   House,
   ListChecks,
   ListPlus,
   Moon,
+  NotebookPen,
   Presentation,
   Search,
   Settings,
+  SquareKanban,
+  SquarePlus,
   Sun,
   Trash2,
 } from "lucide-react";
@@ -22,7 +28,6 @@ import { createPortal } from "react-dom";
 import { applyTheme } from "@/components/theme";
 import { Kbd } from "@/components/ui/Kbd";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
-import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale, useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
@@ -30,11 +35,11 @@ import { resolveText } from "@/i18n/text";
 import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
 import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
-import { PageIcon } from "./Sidebar";
+import { PageIcon, SubjectIcon } from "./Sidebar";
 
 type Item = {
   id: string;
-  group: "actions" | "pages" | "found" | "subjects" | "learn";
+  group: "actions" | "pages" | "found" | "subjects" | "tags" | "learn";
   label: string;
   hint?: string;
   /** Extra words that find an action (in both languages), e.g. "cv" for „Neuer Lebenslauf“. */
@@ -47,6 +52,13 @@ type Item = {
 const MAX_TOPICS = 6;
 
 const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
+const FOLDER_WORDS = "ordner folder";
+const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
+const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
+const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
+
+/** Tags shown for a search. */
+const MAX_TAGS = 5;
 
 function snippet(text: string, q: string) {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -62,7 +74,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
 function Palette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { pages, subjects, createPage } = useWorkspace();
+  const { pages, subjects, createPage, createSubject, userId } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(shellText).palette;
   const [query, setQuery] = useState("");
@@ -129,6 +141,34 @@ function Palette({ onClose }: { onClose: () => void }) {
         },
       },
       { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
+      // Not "new-…": these only show when they match what was typed.
+      {
+        id: "folder-new",
+        group: "actions",
+        label: t.newFolder,
+        keywords: FOLDER_WORDS,
+        icon: <FolderPlus />,
+        run: async () => {
+          onClose();
+          const p = await createPage({ kind: "folder" });
+          if (p) router.push(`/p/${p.id}`);
+        },
+      },
+      {
+        id: "notebook-new",
+        group: "actions",
+        label: t.newNotebook,
+        keywords: NOTEBOOK_WORDS,
+        icon: <BookMarked />,
+        run: async () => {
+          onClose();
+          const s = await createSubject({ name: t.newNotebook, kind: "notebook", color: "plum" });
+          if (s) router.push(`/subjects/${s.id}`);
+        },
+      },
+      { id: "project-new", group: "actions", label: t.newProject, hint: t.newProjectHint, keywords: PROJECT_WORDS, icon: <SquarePlus />, run: () => go("/projects?new=1") },
+      { id: "notes", group: "actions", label: t.goNotes, hint: t.goNotesHint, keywords: NOTES_WORDS, icon: <NotebookPen />, run: () => go("/notes") },
+      { id: "projects", group: "actions", label: t.goProjects, keywords: PROJECT_WORDS, icon: <SquareKanban />, run: () => go("/projects") },
       // Not "new-…": a CV gets no name from the search, so it only shows when it matches.
       { id: "cv-new", group: "actions", label: t.newCv, hint: t.newCvHint, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv?new=1") },
       { id: "home", group: "actions", label: t.goHome, icon: <House />, run: () => go("/home") },
@@ -150,21 +190,38 @@ function Palette({ onClose }: { onClose: () => void }) {
       },
     ];
 
+    // Titles and tags ("#klausur" or just "klausur") find pages, yours and the ones shared with you.
+    const tagQuery = lower.replace(/^#/, "");
+    const tagHit = (p: (typeof pages)[number]) => (tagQuery ? p.tags.find((tag) => tag.toLowerCase().includes(tagQuery)) : undefined);
     const pageItems: Item[] = [...pages]
-      .filter((p) => match(pageTitle(p.title, p.kind, locale)))
+      .filter((p) => (lower.startsWith("#") ? Boolean(tagHit(p)) : match(pageTitle(p.title, p.kind, locale)) || Boolean(tagHit(p))))
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
       .slice(0, q ? 12 : 6)
       .map((p) => {
         const subject = subjects.find((s) => s.id === p.subject_id);
+        const tag = q && !match(pageTitle(p.title, p.kind, locale)) ? tagHit(p) : undefined;
         return {
           id: `page-${p.id}`,
           group: "pages",
           label: pageTitle(p.title, p.kind, locale),
-          hint: subject?.name,
+          hint: tag ? `#${tag}` : p.user_id !== userId ? t.shared : subject?.name,
           icon: <PageIcon page={p} />,
           run: () => go(`/p/${p.id}`),
         };
       });
+
+    const tagCounts = new Map<string, { tag: string; n: number }>();
+    for (const p of pages) for (const tag of p.tags) {
+      const k = tag.toLowerCase();
+      tagCounts.set(k, { tag: tagCounts.get(k)?.tag ?? tag, n: (tagCounts.get(k)?.n ?? 0) + 1 });
+    }
+    const tagItems: Item[] = tagQuery
+      ? [...tagCounts.values()]
+          .filter(({ tag }) => tag.toLowerCase().includes(tagQuery))
+          .sort((a, b) => b.n - a.n)
+          .slice(0, MAX_TAGS)
+          .map(({ tag, n }) => ({ id: `tag-${tag}`, group: "tags", label: `#${tag}`, hint: t.tagPages(n), icon: <Hash />, run: () => go(`/notes?tag=${encodeURIComponent(tag)}`) }))
+      : [];
 
     const titleIds = new Set(pageItems.map((i) => i.id));
     const contentItems: Item[] = found
@@ -184,7 +241,11 @@ function Palette({ onClose }: { onClose: () => void }) {
         id: `subject-${s.id}`,
         group: "subjects",
         label: s.name,
-        icon: <span className="grid size-4 place-items-center">{s.emoji ?? <span className="size-2 rounded-full" style={{ background: subjectColor(s.color) }} />}</span>,
+        icon: (
+          <span className="grid size-4 place-items-center">
+            <SubjectIcon subject={s} />
+          </span>
+        ),
         run: () => go(`/subjects/${s.id}`),
       }));
 
@@ -212,9 +273,9 @@ function Palette({ onClose }: { onClose: () => void }) {
     const filteredActions = q
       ? [...actions.filter((a) => !a.id.startsWith("new") && hit(a)), ...actions.filter((a) => a.id.startsWith("new"))]
       : actions.slice(0, 3);
-    return q ? [...pageItems, ...contentItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
+    return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found, locale, t]);
+  }, [q, pages, subjects, found, locale, t, userId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing

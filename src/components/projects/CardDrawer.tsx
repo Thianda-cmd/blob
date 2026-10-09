@@ -3,7 +3,7 @@
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { format, formatDistanceStrict } from "date-fns";
 import { AnimatePresence, motion, useDragControls } from "motion/react";
 import {
   CalendarDays,
@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { Avatar, personName, type Person } from "@/components/share/Avatar";
 import { PageIcon } from "@/components/shell/Sidebar";
@@ -45,7 +45,6 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { projectsText } from "@/i18n/messages/projects";
 import { MAX_FILE_BYTES, fileKind, fileUrl, formatSize, removeFile, uploadFile } from "@/lib/files";
-import type { Peer } from "@/lib/live";
 import { formatDueLong } from "@/lib/tasks";
 import type { Attachment, ChecklistItem, PageMeta, Task } from "@/lib/types";
 import { cn, pageTitle, uid } from "@/lib/utils";
@@ -392,7 +391,13 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
         <footer className="mt-8 space-y-0.5 border-t border-line pt-3 text-[11.5px] text-ink-3" suppressHydrationWarning>
           <p>{d.created(creator ? personName(creator, d.someone) : d.someone, format(new Date(card.created_at), "PPp", { locale: dateLocale(locale) }))}</p>
           {now && card.updated_at !== card.created_at && (
-            <p>{d.updated(formatDistanceToNowStrict(new Date(card.updated_at), { addSuffix: true, locale: dateLocale(locale) }))}</p>
+            <p>
+              {d.updated(
+                now - new Date(card.updated_at).getTime() < 60_000
+                  ? d.justNow
+                  : formatDistanceStrict(new Date(card.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }),
+              )}
+            </p>
           )}
         </footer>
       </div>
@@ -608,6 +613,8 @@ function DescriptionField({ card, readOnly, onSave }: { card: Task; readOnly: bo
    --------------------------------------------------------------------------- */
 
 function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean; onChange: (list: ChecklistItem[]) => void }) {
+  // dnd-kit numbers its screen reader hints; React's id is the same on the server and in the browser.
+  const dndId = useId();
   const t = useMessages(projectsText).drawer;
   const list = card.checklist;
   const { done, total } = checklistProgress(list);
@@ -653,7 +660,7 @@ function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean
         )
       }
     >
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} modifiers={[restrictToVerticalAxis]}>
+      <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} modifiers={[restrictToVerticalAxis]}>
         <SortableContext items={list.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           <ul className="-mx-1.5">
             {list.map((item) => (

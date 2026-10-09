@@ -88,10 +88,11 @@ function chunks<T>(list: T[], size = 100) {
 type Confirm = { kind: "one"; item: Item } | { kind: "all" } | null;
 
 export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
-  const { pages: livePages, subjects, upsertPages, removePages } = useWorkspace();
+  const { pages: livePages, subjects, upsertPages, removePages, userId } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(trashText);
-  const [trash, setTrash] = useState(initialPages);
+  // Only your own pages: someone else's trash (a page shared with you) stays theirs.
+  const [trash, setTrash] = useState(() => initialPages.filter((p) => p.user_id === userId));
   const [query, setQuery] = useState("");
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [exit, setExit] = useState<"restore" | "delete">("delete");
@@ -189,7 +190,7 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     }
     if (!ok) {
       // Show whatever is really left.
-      const { data } = await supabase.from("pages").select(PAGE_META_COLUMNS).not("trashed_at", "is", null).order("trashed_at", { ascending: false });
+      const { data } = await supabase.from("pages").select(PAGE_META_COLUMNS).eq("user_id", userId).not("trashed_at", "is", null).order("trashed_at", { ascending: false });
       if (data) setTrash(data as PageMeta[]);
       oops(t.someLeft);
     }
@@ -360,7 +361,7 @@ function TrashRow({
                 <span className="truncate">{subject.name}</span>
               </span>
             ) : (
-              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : t.note}</span>
+              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : root.kind === "folder" ? t.folder : t.note}</span>
             )}
             {inside > 0 && (
               <>

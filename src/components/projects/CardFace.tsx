@@ -94,7 +94,7 @@ export function CardFace({
       style={watcher && !dragging ? { boxShadow: `0 0 0 1.5px ${watcher.color}` } : undefined}
     >
       {watcher && !dragging && (
-        <span className="absolute -right-1.5 -top-2 flex" title={t.lookingAt(watcher.name)}>
+        <span className="absolute -right-1 -top-1.5 flex" title={t.lookingAt(watcher.name)}>
           {watchers.slice(0, 2).map((w, i) => (
             <Avatar key={w.key} person={w} size={18} className={cn("ring-2 ring-raised", i > 0 && "-ml-1.5")} />
           ))}

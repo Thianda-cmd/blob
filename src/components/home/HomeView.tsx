@@ -13,6 +13,7 @@ import { useShell } from "@/components/shell/AppShell";
 import { TopBar } from "@/components/shell/TopBar";
 import { NoteCard, SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
 import { PageIcon } from "@/components/shell/Sidebar";
+import type { ProjectSummary } from "@/components/projects/load";
 import { UpcomingTasks } from "@/components/tasks/UpcomingTasks";
 import { useNow } from "@/components/tasks/useNow";
 import { Kbd } from "@/components/ui/Kbd";
@@ -23,9 +24,11 @@ import { homeText } from "@/i18n/messages/home";
 import { subjectColor } from "@/lib/subjects";
 import { LearnSnapshot } from "@/learn/components/LearnSnapshot";
 import type { LearnDay, TopicProgress } from "@/learn/progress";
+import type { AssignedCard } from "@/lib/tasks";
 import type { PageMeta, Task } from "@/lib/types";
 import { cn, firstName, greeting, pageTitle } from "@/lib/utils";
 import { formatDistanceStrict } from "date-fns";
+import { ProjectsBlock } from "./ProjectsBlock";
 
 const rise = {
   hidden: { opacity: 0, y: 10 },
@@ -39,6 +42,8 @@ export function HomeView({
   openTasks,
   openTotal,
   learn,
+  projects = [],
+  assigned = [],
 }: {
   tasks: Task[];
   previews: Record<string, PagePreview>;
@@ -47,6 +52,9 @@ export function HomeView({
   openTasks: Record<string, number>;
   openTotal: number;
   learn: { progress: Record<string, TopicProgress>; days: LearnDay[] };
+  /** Your active projects (most recently active first) and the project cards assigned to you. */
+  projects?: ProjectSummary[];
+  assigned?: AssignedCard[];
 }) {
   const router = useRouter();
   const now = useNow();
@@ -142,6 +150,9 @@ export function HomeView({
                   ))}
                 </div>
               )}
+              <div className="mt-8">
+                <ProjectsBlock projects={projects} assigned={assigned} title={(children, action) => <SectionTitle action={action}>{children}</SectionTitle>} />
+              </div>
             </motion.section>
 
             {/* Due soon */}

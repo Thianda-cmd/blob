@@ -10,11 +10,9 @@ export type NoteBlocks = {
   pageId: string;
   /** False for viewers of a shared note, while the note reloads, and for notes Blob can't read. */
   canEdit: boolean;
-  /** Upload files (any allowed kind) and place them as blocks at `at` (or near the caret). */
-  uploadFiles: (files: File[], at?: number) => void;
 };
 
-const Ctx = createContext<NoteBlocks>({ pageId: "", canEdit: false, uploadFiles: () => {} });
+const Ctx = createContext<NoteBlocks>({ pageId: "", canEdit: false });
 
 export const NoteBlocksProvider = Ctx.Provider;
 

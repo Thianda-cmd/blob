@@ -120,7 +120,6 @@ function SharePanel({
   }, [target, ancestorKey]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load when the dialog opens
     void load();
   }, [load]);
 
@@ -205,7 +204,7 @@ function SharePanel({
           <Users className="size-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="share-title" className="truncate font-display text-[18px] font-bold tracking-[-0.015em]" title={t.title(name)}>
+          <h2 id="share-title" className="line-clamp-2 break-words font-display text-[18px] font-bold leading-snug tracking-[-0.015em]" title={t.title(name)}>
             {t.title(name)}
           </h2>
           <p className="mt-0.5 text-[13px] leading-snug text-ink-2">{target.type === "page" ? t.explainPage : t.explainProject}</p>
@@ -446,7 +445,8 @@ export function RoleMenu({
   return (
     <Popover
       align="end"
-      className="w-[230px]"
+      // Above the share dialog (z-70).
+      className="z-[80]! w-[230px]"
       trigger={(props) => (
         <button
           {...props}

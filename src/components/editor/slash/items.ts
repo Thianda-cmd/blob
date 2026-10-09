@@ -1,8 +1,23 @@
 import type { Editor, Range } from "@tiptap/core";
 import {
+  BookOpen,
   CalendarDays,
+  ChartSpline,
+  ChevronRight,
   Code2,
   FilePlus2,
+  FlaskConical,
+  Layers,
+  Network,
+  Paperclip,
+  PencilLine,
+  PenTool,
+  Pin,
+  Radical,
+  Sigma,
+  Table2,
+  TriangleAlert,
+  Workflow,
   Heading1,
   Heading2,
   Heading3,
@@ -19,14 +34,21 @@ import {
 import type { Locale } from "@/i18n/config";
 import { intlLocale } from "@/i18n/format";
 import { editorText } from "@/i18n/messages/editor";
+import { noteBlocksText } from "@/i18n/messages/noteBlocks";
+import { insertBlock } from "../blocks/insert";
+import { insertFlashcard } from "../blocks/Flashcard";
+import { newTable } from "../blocks/Table";
+import { insertToggle } from "../blocks/Toggle";
 
-export const SLASH_GROUPS = ["basic", "lists", "media", "advanced"] as const;
+export const SLASH_GROUPS = ["basic", "lists", "school", "media", "advanced"] as const;
 /** Label it with `editorText.slash.groups[group]`. */
 export type SlashGroup = (typeof SLASH_GROUPS)[number];
 
 /** Things a slash command needs from the app (uploads, page creation). */
 export type SlashContext = {
   pickImage: (editor: Editor) => void;
+  /** Attach any file (PDF, worksheet, audio…). */
+  pickFile: (editor: Editor) => void;
   createSubPage: (editor: Editor) => Promise<void>;
 };
 
@@ -115,6 +137,63 @@ const DEFS: SlashDef[] = [
     run: ({ editor, range }) => chainAt(editor, range).toggleTaskList().run(),
   },
   {
+    id: "toggle",
+    group: "lists",
+    icon: ChevronRight,
+    hint: ">>",
+    run: ({ editor, range }) => insertToggle(editor, range),
+  },
+  {
+    id: "math",
+    group: "school",
+    icon: Sigma,
+    hint: "$$",
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "mathBlock", attrs: { src: "" } }),
+  },
+  {
+    id: "mathInline",
+    group: "school",
+    icon: Radical,
+    hint: "$…$",
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "mathInline", attrs: { src: "" } }),
+  },
+  {
+    id: "chem",
+    group: "school",
+    icon: FlaskConical,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "mathBlock", attrs: { src: "\\ce{}" } }),
+  },
+  {
+    id: "plot",
+    group: "school",
+    icon: ChartSpline,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "plot", attrs: { fns: [] } }),
+  },
+  {
+    id: "flashcard",
+    group: "school",
+    icon: Layers,
+    run: ({ editor, range }) => insertFlashcard(editor, range),
+  },
+  {
+    id: "definition",
+    group: "school",
+    icon: BookOpen,
+    run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout("definition").run(),
+  },
+  {
+    id: "rule",
+    group: "school",
+    icon: Pin,
+    run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout("rule").run(),
+  },
+  {
+    id: "example",
+    group: "school",
+    icon: PencilLine,
+    run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout("example").run(),
+  },
+  {
     id: "image",
     group: "media",
     icon: ImagePlus,
@@ -122,6 +201,39 @@ const DEFS: SlashDef[] = [
       chainAt(editor, range).run();
       ctx.pickImage(editor);
     },
+  },
+  {
+    id: "file",
+    group: "media",
+    icon: Paperclip,
+    run: ({ editor, range, ctx }) => {
+      chainAt(editor, range).run();
+      ctx.pickFile(editor);
+    },
+  },
+  {
+    id: "table",
+    group: "media",
+    icon: Table2,
+    run: ({ editor, range }) => chainAt(editor, range).insertTable(newTable).run(),
+  },
+  {
+    id: "diagram",
+    group: "media",
+    icon: Workflow,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "diagram", attrs: { src: "" } }),
+  },
+  {
+    id: "sketch",
+    group: "media",
+    icon: PenTool,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "sketch" }),
+  },
+  {
+    id: "mindmap",
+    group: "school",
+    icon: Network,
+    run: ({ editor, range, locale }) => insertBlock(editor, range, { type: "diagram", attrs: { src: noteBlocksText[locale].diagram.starters.mindmap } }),
   },
   {
     id: "code",
@@ -135,6 +247,12 @@ const DEFS: SlashDef[] = [
     group: "advanced",
     icon: Lightbulb,
     run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout().run(),
+  },
+  {
+    id: "warning",
+    group: "advanced",
+    icon: TriangleAlert,
+    run: ({ editor, range }) => chainAt(editor, range).setParagraph().toggleCallout("warning").run(),
   },
   {
     id: "subpage",

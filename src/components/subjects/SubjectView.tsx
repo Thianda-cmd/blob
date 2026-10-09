@@ -1,7 +1,7 @@
 "use client";
 
 import { differenceInCalendarDays, format, isSameYear } from "date-fns";
-import { ArrowRight, FilePlus2, Presentation } from "lucide-react";
+import { ArrowRight, FilePlus2, Folder, FolderPlus, Presentation } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
@@ -21,6 +21,7 @@ import { dateLocale } from "@/i18n/format";
 import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import type { PageKind, Subject, Task } from "@/lib/types";
+import { pageTitle } from "@/lib/utils";
 import { DeckCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
 
 /** Everything for one subject: notes, presentations and its tasks. */
@@ -35,9 +36,14 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
   const now = useNow();
   const [creating, setCreating] = useState<PageKind | null>(null);
 
-  const { notes, decks, byId } = useMemo(() => {
+  const { notes, decks, folders, byId } = useMemo(() => {
     const mine = pages.filter((p) => p.subject_id === subject.id).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-    return { notes: mine.filter((p) => p.kind === "note"), decks: mine.filter((p) => p.kind === "deck"), byId: new Map(pages.map((p) => [p.id, p])) };
+    return {
+      notes: mine.filter((p) => p.kind === "note"),
+      decks: mine.filter((p) => p.kind === "deck"),
+      folders: mine.filter((p) => p.kind === "folder"),
+      byId: new Map(pages.map((p) => [p.id, p])),
+    };
   }, [pages, subject.id]);
 
   const tasks = useMemo(() => store.tasks.filter((t) => t.subject_id === subject.id), [store.tasks, subject.id]);
@@ -70,7 +76,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
     <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
   );
 
-  const stats = [t.noteCount(notes.length), t.deckCount(decks.length), t.openTaskCount(open.length)];
+  const stats = [t.noteCount(notes.length), t.deckCount(decks.length), ...(folders.length ? [t.folderCount(folders.length)] : []), t.openTaskCount(open.length)];
 
   return (
     <>
@@ -118,11 +124,38 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
               <Button variant="secondary" onClick={() => create("deck")} loading={creating === "deck"}>
                 <Presentation className="size-4" /> {t.newDeck}
               </Button>
+              <Button variant="secondary" onClick={() => create("folder")} loading={creating === "folder"} aria-label={t.newFolder} title={t.newFolder}>
+                <FolderPlus className="size-4" />
+              </Button>
             </div>
           </header>
 
           <div className="mt-8 grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_380px]">
             <div className="min-w-0 space-y-9">
+              {folders.length > 0 && (
+                <Section title={t.folders} count={folders.length}>
+                  <div className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 xl:grid-cols-3">
+                    {folders.map((f) => {
+                      const inside = pages.filter((p) => p.parent_id === f.id).length;
+                      return (
+                        <Link
+                          key={f.id}
+                          href={`/p/${f.id}`}
+                          className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-raised p-3 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
+                        >
+                          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
+                            {f.icon ? <span className="text-[16px] leading-none">{f.icon}</span> : <Folder className="size-4.5" strokeWidth={1.8} />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-[14px] font-medium text-ink">{pageTitle(f.title, f.kind, locale)}</span>
+                            <span className="block text-[12px] text-ink-3">{t.pagesInside(inside)}</span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
               <Section title={t.notes} count={notes.length}>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
                   {notes.map((p) => (

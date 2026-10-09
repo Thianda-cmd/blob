@@ -7,17 +7,21 @@ import { CloudOff, Eye, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
+import { useDueCards } from "@/components/notes/useDueCards";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave, type SaveState } from "@/components/page/useAutosave";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
+import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
 import { useTableChanges } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Member, Page, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { NoteBlocksProvider, type NoteBlocks } from "./blocks/context";
+import { uploadNoteFiles } from "./blocks/fileUpload";
+import { TableMenu } from "./blocks/Table";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
@@ -87,6 +91,8 @@ type Live = {
   pageId: string;
   openHref: (href: string) => void;
   pickImage: () => void;
+  pickFile: () => void;
+  blocksText: NoteBlocksText;
   createSubPage: (editor: Editor) => Promise<void>;
   focusTitle: () => void;
   markBroken: () => void;
@@ -101,6 +107,7 @@ type Source = { content: unknown; plain: string };
  */
 export function NoteEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const t = useMessages(editorText);
+  const tb = useMessages(noteBlocksText);
   const locale = useLocale();
   const router = useRouter();
   const { pages, userId, profile, updatePage, createPage } = useWorkspace();
@@ -121,6 +128,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const titleEditedAt = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLInputElement>(null);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const collabOn = shared && together !== null;
 
@@ -162,6 +170,8 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         else window.open(href, "_blank", "noopener,noreferrer");
       },
       pickImage: () => fileRef.current?.click(),
+      pickFile: () => attachRef.current?.click(),
+      blocksText: tb,
       createSubPage: async (editor) => {
         const created = await createPage({ kind: "note", parent_id: page.id, subject_id: meta ? meta.subject_id : page.subject_id });
         if (!created || editor.isDestroyed) return;
@@ -194,6 +204,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
             range,
             ctx: {
               pickImage: () => live.current?.pickImage(),
+              pickFile: () => live.current?.pickFile(),
               createSubPage: async (e) => live.current?.createSubPage(e),
             },
           }),
@@ -204,20 +215,30 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       editorProps: {
         attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
         handlePaste: (view, event) => {
-          const files = imageFiles(event.clipboardData?.files);
-          if (!files.length || !live.current) return false;
+          const l = live.current;
+          const all = Array.from(event.clipboardData?.files ?? []);
+          if (!all.length || !l) return false;
           // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
           if (event.clipboardData?.getData("text/plain").trim()) return false;
           event.preventDefault();
-          uploadImages(view, files, live.current.userId, live.current.text.upload);
+          const images = imageFiles(event.clipboardData?.files);
+          if (images.length) uploadImages(view, images, l.userId, l.text.upload);
+          const others = all.filter((f) => !images.includes(f));
+          if (others.length) uploadNoteFiles(view, others, l.pageId, l.blocksText.file);
           return true;
         },
         handleDrop: (view, event, _slice, moved) => {
-          if (moved || !live.current) return false;
-          const files = imageFiles(event.dataTransfer?.files);
-          if (!files.length) return false;
+          const l = live.current;
+          if (moved || !l) return false;
+          const all = Array.from(event.dataTransfer?.files ?? []);
+          if (!all.length) return false;
           event.preventDefault();
-          uploadImages(view, files, live.current.userId, live.current.text.upload, dropPos(view, event));
+          const at = dropPos(view, event);
+          // Pictures become images in the text; anything else (PDFs, worksheets…) a file card.
+          const images = imageFiles(event.dataTransfer?.files);
+          if (images.length) uploadImages(view, images, l.userId, l.text.upload, at);
+          const others = all.filter((f) => !images.includes(f));
+          if (others.length) uploadNoteFiles(view, others, l.pageId, l.blocksText.file, at);
           return true;
         },
         handleClick: (view, _pos, event) => {
@@ -472,7 +493,10 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
     }
   };
 
-  const blocks = useMemo<NoteBlocks>(() => ({ pageId: page.id, canEdit, uploadFiles: () => {} }), [page.id, canEdit]);
+  // Flashcards of this note that are due again today (Builder B's study mode keeps track).
+  const due = useDueCards(page.id);
+
+  const blocks = useMemo<NoteBlocks>(() => ({ pageId: page.id, canEdit }), [page.id, canEdit]);
 
   const notice = readOnly
     ? { icon: <Eye className="size-3.5 shrink-0" />, text: t.together.viewOnly, tone: "calm" as const }
@@ -488,7 +512,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         pageId={page.id}
         saveState={readOnly ? "saved" : saveState}
         peers={collab.peers}
-        actions={<StudyMenu pageId={page.id} beforeOpen={flush} />}
+        actions={<StudyMenu pageId={page.id} beforeOpen={flush} due={due ?? 0} />}
       />
       {notice && (
         <p
@@ -567,6 +591,7 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
       </div>
 
       {editor && canEdit && <BubbleToolbar editor={editor} />}
+      {editor && canEdit && <TableMenu editor={editor} />}
       <SlashMenu controller={slash} />
       <input
         ref={fileRef}
@@ -578,6 +603,17 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
           const files = imageFiles(e.target.files);
           e.target.value = "";
           if (editor && files.length) uploadImages(editor.view, files, userId, t.upload);
+        }}
+      />
+      <input
+        ref={attachRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (editor && files.length) uploadNoteFiles(editor.view, files, page.id, tb.file);
         }}
       />
     </div>

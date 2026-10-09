@@ -4,9 +4,10 @@ import { HomeView } from "@/components/home/HomeView";
 import { homeText } from "@/i18n/messages/home";
 import { getMessages } from "@/i18n/server";
 import { loadLearnState } from "@/learn/server";
+import { loadProjectSummaries } from "@/components/projects/load";
 import type { PagePreview } from "@/components/subjects/PageCards";
-import { createClient } from "@/lib/supabase/server";
-import { loadUpcomingTasks } from "@/lib/tasks";
+import { createClient, getUser } from "@/lib/supabase/server";
+import { loadAssignedCards, loadUpcomingTasks } from "@/lib/tasks";
 import type { PageKind } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -21,8 +22,8 @@ function snippet(text: string | null) {
 }
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const [tasks, recentRes, openRes, learn, cvRes] = await Promise.all([
+  const [supabase, user] = await Promise.all([createClient(), getUser()]);
+  const [tasks, recentRes, openRes, learn, cvRes, projects, assigned] = await Promise.all([
     loadUpcomingTasks(supabase, 7),
     supabase
       .from("pages")
@@ -30,10 +31,13 @@ export default async function HomePage() {
       .is("trashed_at", null)
       .order("updated_at", { ascending: false })
       .limit(8),
-    supabase.from("tasks").select("subject_id").eq("done", false),
+    // Your own tasks (project cards are counted on their boards).
+    supabase.from("tasks").select("subject_id").is("project_id", null).eq("done", false),
     loadLearnState(),
     // Recent CVs show the top of their first page, which needs the whole CV (a few kilobytes).
     supabase.from("pages").select("id, content").eq("kind", "cv").is("trashed_at", null).order("updated_at", { ascending: false }).limit(6),
+    user ? loadProjectSummaries(supabase, user.id, { archived: false, limit: 4 }) : [],
+    user ? loadAssignedCards(supabase, user.id, 6) : [],
   ]);
 
   const previews: Record<string, PagePreview> = {};
@@ -53,5 +57,16 @@ export default async function HomePage() {
   const cvs: Record<string, unknown> = {};
   for (const row of cvRes.data ?? []) cvs[row.id] = row.content;
 
-  return <HomeView tasks={tasks} previews={previews} cvs={cvs} openTasks={openTasks} openTotal={openRes.data?.length ?? 0} learn={learn} />;
+  return (
+    <HomeView
+      tasks={tasks}
+      previews={previews}
+      cvs={cvs}
+      openTasks={openTasks}
+      openTotal={openRes.data?.length ?? 0}
+      learn={learn}
+      projects={projects}
+      assigned={assigned}
+    />
+  );
 }

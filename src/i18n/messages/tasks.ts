@@ -159,6 +159,33 @@ export const tasksText = defineMessages({
     errAdd: "I couldn't add that task. Try again?",
     errDelete: "I couldn't delete that task.",
     errRestore: "I couldn't bring that task back.",
+
+    // List | Board
+    view: "View",
+    viewList: "List",
+    viewBoard: "Board",
+    status: { todo: "To do", doing: "Doing", done: "Done" },
+    addToColumn: "Add a task",
+    addHere: "Add task",
+    dropHere: "Drop tasks here",
+    doneBoardHint: "Done in the last 7 days",
+    showOlderDone: (n: number) => `Show ${n} more`,
+    openTask: (title: string) => `Edit “${title}”`,
+    rename: "Rename",
+    dnd: {
+      instructions: "To pick up a task, press space. Move it with the arrow keys, press space again to drop it, or escape to cancel.",
+      picked: (title: string) => `Picked up “${title}”.`,
+      over: (title: string, column: string) => `“${title}” is over “${column}”.`,
+      dropped: (title: string, column: string) => `Dropped “${title}” in “${column}”.`,
+      cancelled: (title: string) => `Moving “${title}” cancelled.`,
+    },
+
+    // From projects
+    fromProjects: "From projects",
+    fromProjectsHint: "Cards assigned to you",
+    noProjectCards: "Nothing assigned to you in projects right now.",
+    allProjects: "All projects",
+    markCardDone: (title: string) => `Mark “${title}” as done`,
   },
   de: {
     title: "Aufgaben",
@@ -302,6 +329,31 @@ export const tasksText = defineMessages({
     errAdd: "Ich konnte die Aufgabe nicht hinzufügen. Nochmal versuchen?",
     errDelete: "Ich konnte die Aufgabe nicht löschen.",
     errRestore: "Ich konnte die Aufgabe nicht zurückholen.",
+
+    view: "Ansicht",
+    viewList: "Liste",
+    viewBoard: "Board",
+    status: { todo: "Zu tun", doing: "In Arbeit", done: "Erledigt" },
+    addToColumn: "Aufgabe hinzufügen",
+    addHere: "Aufgabe hinzufügen",
+    dropHere: "Aufgaben hierher ziehen",
+    doneBoardHint: "In den letzten 7 Tagen erledigt",
+    showOlderDone: (n) => `${n} weitere anzeigen`,
+    openTask: (title) => `„${title}“ bearbeiten`,
+    rename: "Umbenennen",
+    dnd: {
+      instructions: "Leertaste nimmt eine Aufgabe auf. Mit den Pfeiltasten verschiebst du sie, mit der Leertaste legst du sie ab, mit Esc brichst du ab.",
+      picked: (title) => `„${title}“ aufgenommen.`,
+      over: (title, column) => `„${title}“ ist über „${column}“.`,
+      dropped: (title, column) => `„${title}“ in „${column}“ abgelegt.`,
+      cancelled: (title) => `Verschieben von „${title}“ abgebrochen.`,
+    },
+
+    fromProjects: "Aus Projekten",
+    fromProjectsHint: "Dir zugewiesene Karten",
+    noProjectCards: "In Projekten ist dir gerade nichts zugewiesen.",
+    allProjects: "Alle Projekte",
+    markCardDone: (title) => `„${title}“ als erledigt markieren`,
   },
 });
 

@@ -2,7 +2,8 @@
 
 import { addWeeks, differenceInCalendarDays, format, startOfWeek } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "lucide-react";
+import { LayoutList, SquareKanban, X } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -12,10 +13,13 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { tasksText } from "@/i18n/messages/tasks";
 import { TASK_KINDS, dayKey, formatDue, isDueByToday, taskBucket } from "@/lib/tasks";
+import type { AssignedCard } from "@/lib/tasks";
 import type { Task, TaskKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { QuickAdd, type QuickAddHandle } from "./QuickAdd";
 import { TaskBoard, UndoToast } from "./TaskBoard";
+import { FromProjects } from "./FromProjects";
+import { PersonalBoard } from "./PersonalBoard";
 import { CalendarHeat, KindFilter, Panel, SubjectFilter, WeekProgress } from "./TaskInsights";
 import { useNow } from "./useNow";
 import { useTaskStore } from "./useTaskStore";
@@ -23,8 +27,14 @@ import { useTaskStore } from "./useTaskStore";
 type Filters = { day: string | null; kind: TaskKind | null; subject: string | null };
 const NO_FILTERS: Filters = { day: null, kind: null, subject: null };
 
-/** The full Tasks page: quick add + grouped list on the left, calendar and filters on the right. */
-export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
+type View = "list" | "board";
+const VIEW_KEY = "blob-tasks-view";
+
+/**
+ * The full Tasks page: quick add + grouped list (or the board: To do, Doing, Done) on the left,
+ * calendar, filters and cards assigned to you in projects on the right.
+ */
+export function TasksView({ initialTasks, assigned = [] }: { initialTasks: Task[]; assigned?: AssignedCard[] }) {
   const t = useMessages(tasksText);
   const locale = useLocale();
   const store = useTaskStore(initialTasks);
@@ -33,7 +43,22 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
   const params = useSearchParams();
   const quick = useRef<QuickAddHandle>(null);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [mode, setMode] = useState<View>("list");
   const tasks = store.tasks;
+
+  // List or board: the one you used last.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore a preference after mount
+      if (localStorage.getItem(VIEW_KEY) === "board") setMode("board");
+    } catch {}
+  }, []);
+  const chooseMode = (next: View) => {
+    setMode(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {}
+  };
 
   // /tasks?new=1 (from the command palette or Blob): focus the quick add, then tidy the URL.
   const wantsNew = params.get("new") === "1";
@@ -125,8 +150,33 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                 )}
               </p>
             </div>
-            <span className="ml-auto hidden items-center gap-1.5 pb-1 text-[11.5px] text-ink-3 md:flex [@media(hover:none)]:hidden">
-              {t.pressBefore} <Kbd>N</Kbd> {t.pressAfter}
+            <span className="ml-auto flex items-center gap-3 pb-1">
+              <span className="hidden items-center gap-1.5 text-[11.5px] text-ink-3 xl:flex [@media(hover:none)]:hidden">
+                {t.pressBefore} <Kbd>N</Kbd> {t.pressAfter}
+              </span>
+              <span className="flex shrink-0 rounded-lg bg-hover p-0.5" role="tablist" aria-label={t.view}>
+                {(
+                  [
+                    ["list", t.viewList, LayoutList],
+                    ["board", t.viewBoard, SquareKanban],
+                  ] as const
+                ).map(([v, label, Icon]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === v}
+                    onClick={() => chooseMode(v)}
+                    className={cn(
+                      "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors [@media(hover:none)]:h-8",
+                      mode === v ? "bg-raised text-ink shadow-card dark:bg-white/10" : "text-ink-3 hover:text-ink",
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </span>
             </span>
           </header>
 
@@ -196,24 +246,30 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
             )}
           </AnimatePresence>
 
-          <TaskBoard
-            className="mt-5"
-            store={store}
-            tasks={view?.visible ?? tasks}
-            subjects={subjects}
-            empty={
-              tasks.length === 0 ? (
-                <EmptyState onExample={(text) => quick.current?.fill(text)} />
-              ) : (
-                <div className="mt-10 flex flex-col items-center text-center">
-                  <p className="text-[13.5px] text-ink-2">{t.nothingMatches}</p>
-                  <button onClick={() => setFilters(NO_FILTERS)} className="mt-1 text-[13px] font-medium text-blob-ink hover:underline">
-                    {t.clearFilters}
-                  </button>
-                </div>
-              )
-            }
-          />
+          {mode === "board" && tasks.length > 0 ? (
+            <div className="mt-5">
+              <PersonalBoard store={store} tasks={view?.visible ?? tasks} subjects={subjects} now={now} />
+            </div>
+          ) : (
+            <TaskBoard
+              className="mt-5"
+              store={store}
+              tasks={view?.visible ?? tasks}
+              subjects={subjects}
+              empty={
+                tasks.length === 0 ? (
+                  <EmptyState onExample={(text) => quick.current?.fill(text)} />
+                ) : (
+                  <div className="mt-10 flex flex-col items-center text-center">
+                    <p className="text-[13.5px] text-ink-2">{t.nothingMatches}</p>
+                    <button onClick={() => setFilters(NO_FILTERS)} className="mt-1 text-[13px] font-medium text-blob-ink hover:underline">
+                      {t.clearFilters}
+                    </button>
+                  </div>
+                )
+              }
+            />
+          )}
         </section>
 
         {/* Tablets: calendar on the left, filters on the right instead of three screen-wide panels.
@@ -246,6 +302,16 @@ export function TasksView({ initialTasks }: { initialTasks: Task[] }) {
                   value={filters.subject}
                   onChange={(subject) => setFilters((f) => ({ ...f, subject }))}
                 />
+              </Panel>
+              <Panel
+                title={t.fromProjects}
+                action={
+                  <Link href="/projects" className="text-[11.5px] text-ink-3 hover:text-ink">
+                    {t.allProjects}
+                  </Link>
+                }
+              >
+                <FromProjects initial={assigned} />
               </Panel>
             </>
           ) : (

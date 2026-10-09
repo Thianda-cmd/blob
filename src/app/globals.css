@@ -435,8 +435,7 @@
   padding: 0.1em 0 0.1em 1em;
   color: var(--ink-2);
 }
-.prose-blob blockquote > * + *,
-.prose-blob .blob-callout > * + * {
+.prose-blob blockquote > * + * {
   margin-top: 0.45em;
 }
 
@@ -473,21 +472,7 @@
   border-radius: 0;
 }
 
-.prose-blob .blob-callout {
-  position: relative;
-  background: color-mix(in oklab, var(--blob-soft) 55%, var(--surface));
-  border: 1px solid color-mix(in oklab, var(--blob) 16%, var(--line));
-  border-radius: 10px;
-  padding: 0.7em 1em 0.7em 2.75em;
-}
-.prose-blob .blob-callout::before {
-  content: "💡";
-  position: absolute;
-  left: 0.9em;
-  top: 0.7em;
-  font-size: 1em;
-  line-height: inherit;
-}
+/* Callouts: see "Note blocks" below. */
 
 .prose-blob img {
   display: block;
@@ -985,3 +970,1131 @@
 .collab-selection {
   background: color-mix(in srgb, var(--peer) 22%, transparent);
 }
+
+/* ===========================================================================
+   Note blocks (editor/blocks/*): formulas, callouts, toggles, flashcards, tables,
+   diagrams, sketches, function plots, files, presentations, lesson links.
+   =========================================================================== */
+:root {
+  --callout-idea: var(--blob);
+  --callout-definition: var(--subject-sky);
+  --callout-rule: var(--subject-sand);
+  --callout-example: var(--subject-moss);
+  --callout-warning: var(--subject-clay);
+}
+
+/* Shared: a block that is an object (selected outline, hover). */
+.prose-blob .blob-node-selected:not(:focus-within),
+.prose-blob .ProseMirror-selectednode > .blob-object:not(.is-editing, :focus-within) {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px color-mix(in oklab, var(--blob) 70%, transparent);
+}
+
+/* Placeholders inside blocks */
+.prose-blob [data-toggle-summary].is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  opacity: 0.6;
+  float: left;
+  height: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Formulas ------------------------------------------------------------------ */
+.prose-blob .blob-math-inline .blob-math-face {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  vertical-align: middle;
+  margin: -0.15em 0.04em;
+  padding: 0.05em 0.14em;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob .blob-math-inline .blob-math {
+  font-size: 1.05em;
+}
+.prose-blob .blob-math-block .blob-math-face {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.6em 1em;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob .blob-math-face:hover {
+  background: var(--hover);
+}
+.prose-blob .is-readonly .blob-math-face {
+  cursor: default;
+}
+.prose-blob .is-readonly .blob-math-face:hover {
+  background: transparent;
+}
+.prose-blob .blob-math-inline.is-selected .blob-math-face,
+.prose-blob .blob-math-block.is-selected .blob-math-face {
+  background: color-mix(in oklab, var(--blob) 12%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--blob) 45%, transparent);
+}
+.prose-blob .blob-math-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-sans);
+  font-size: 0.86em;
+  line-height: 1.5;
+  color: var(--ink-3);
+  background: var(--hover);
+  border-radius: 6px;
+  padding: 0.1em 0.5em;
+}
+.prose-blob .blob-math-block .blob-math-empty {
+  padding: 0.45em 0.9em;
+  border-radius: 9px;
+}
+
+/* Callouts (Merkkasten, Definition, Merksatz, Beispiel, Achtung) ------------ */
+.prose-blob .blob-callout {
+  --c: var(--callout-idea);
+  display: flex;
+  gap: 0.55em;
+  padding: 0.7em 1em 0.75em 0.7em;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--c) 7%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--c) 22%, var(--line));
+}
+.prose-blob .blob-callout.is-definition {
+  --c: var(--callout-definition);
+}
+.prose-blob .blob-callout.is-rule {
+  --c: var(--callout-rule);
+}
+.prose-blob .blob-callout.is-example {
+  --c: var(--callout-example);
+}
+.prose-blob .blob-callout.is-warning {
+  --c: var(--callout-warning);
+}
+.prose-blob .blob-callout-side {
+  flex: none;
+  user-select: none;
+}
+.prose-blob .blob-callout-icon {
+  display: grid;
+  place-items: center;
+  width: 1.72em;
+  height: 1.72em;
+  border-radius: 7px;
+  color: var(--c);
+  transition: background-color 0.15s;
+}
+.prose-blob button.blob-callout-icon:hover {
+  background: color-mix(in oklab, var(--c) 14%, transparent);
+}
+.prose-blob .blob-callout-main {
+  flex: 1;
+  min-width: 0;
+}
+.prose-blob .blob-callout-label {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.72rem;
+  height: 1.72rem;
+  margin-bottom: -0.15em;
+  color: color-mix(in oklab, var(--c) 82%, var(--ink));
+  user-select: none;
+}
+.prose-blob .blob-callout-content [data-node-view-content-react] > * + * {
+  margin-top: 0.45em;
+}
+.prose-blob .blob-callout.is-definition .blob-callout-content strong:first-child {
+  color: color-mix(in oklab, var(--c) 70%, var(--ink));
+}
+@media (hover: none) {
+  .prose-blob .blob-callout-icon {
+    width: 2em;
+    height: 2em;
+    margin: -0.14em 0;
+  }
+}
+
+/* Toggles ------------------------------------------------------------------- */
+.prose-blob .blob-toggle {
+  position: relative;
+  padding-left: 1.75em;
+}
+.prose-blob .blob-toggle-chevron {
+  position: absolute;
+  left: 0.05em;
+  top: 0.16em;
+  display: grid;
+  place-items: center;
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.prose-blob .blob-toggle-chevron:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-toggle-chevron svg {
+  transition: transform 0.22s var(--ease-out-soft);
+}
+.prose-blob .blob-toggle.is-open > .blob-toggle-chevron svg {
+  transform: rotate(90deg);
+}
+.prose-blob .blob-toggle [data-toggle-summary] {
+  font-weight: 560;
+}
+.prose-blob .blob-toggle:not(.is-open) [data-toggle-content] {
+  display: none;
+}
+.prose-blob .blob-toggle [data-toggle-content] {
+  margin-top: 0.3em;
+}
+.prose-blob .blob-toggle [data-toggle-content] > * + * {
+  margin-top: 0.45em;
+}
+@media (hover: none) {
+  .prose-blob .blob-toggle-chevron {
+    width: 2em;
+    height: 2em;
+    left: -0.25em;
+    top: -0.14em;
+  }
+}
+
+/* Flashcards ---------------------------------------------------------------- */
+.prose-blob .blob-flashcard {
+  position: relative;
+  margin-block: 0.9em 1.1em;
+  padding: 0.65em 0.8em 0.9em;
+  border-radius: 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  /* A small stack of cards underneath. */
+  box-shadow:
+    var(--shadow-card),
+    0 5px 0 -2px var(--surface),
+    0 5px 0 -1px var(--line);
+}
+.prose-blob .blob-flashcard.is-readonly {
+  cursor: pointer;
+}
+.prose-blob .blob-flashcard-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35em;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  user-select: none;
+}
+.prose-blob .blob-flashcard-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  height: 22px;
+  padding: 0 0.6em 0 0.5em;
+  border-radius: 999px;
+  background: var(--blob-soft);
+  color: var(--blob-ink);
+  font-weight: 600;
+}
+.prose-blob .blob-flashcard-sides {
+  display: inline-flex;
+  gap: 0.5em;
+}
+.prose-blob .blob-flashcard-sides > span {
+  transition:
+    color 0.2s,
+    opacity 0.2s;
+  opacity: 0.55;
+}
+.prose-blob .blob-flashcard-sides > span.is-on {
+  opacity: 1;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.prose-blob .blob-flashcard-flip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  height: 26px;
+  padding: 0 0.6em;
+  border-radius: 8px;
+  color: var(--ink-2);
+  transition: background-color 0.15s;
+}
+.prose-blob .blob-flashcard-flip:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-flashcard-flip svg {
+  transition: transform 0.45s var(--ease-out-soft);
+}
+.prose-blob .blob-flashcard.is-flipped .blob-flashcard-flip svg {
+  transform: rotate(180deg);
+}
+.prose-blob .blob-flashcard-stage {
+  perspective: 1400px;
+}
+.prose-blob .blob-flashcard-faces > [data-node-view-content-react] {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.55s var(--ease-out-soft);
+}
+.prose-blob .blob-flashcard.is-flipped .blob-flashcard-faces > [data-node-view-content-react] {
+  transform: rotateY(180deg);
+}
+.prose-blob [data-flashcard-front],
+.prose-blob [data-flashcard-back] {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 4.2em;
+  padding: 0.35em 0.5em;
+  border-radius: 10px;
+}
+.prose-blob [data-flashcard-front] > * + *,
+.prose-blob [data-flashcard-back] > * + * {
+  margin-top: 0.35em;
+}
+.prose-blob [data-flashcard-front] {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.15em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+}
+.prose-blob [data-flashcard-back] {
+  transform: rotateY(180deg);
+  background: color-mix(in oklab, var(--blob-soft) 35%, var(--raised));
+}
+.prose-blob [data-flashcard-front] p.is-empty,
+.prose-blob [data-flashcard-back] p.is-empty {
+  position: relative;
+}
+.prose-blob [data-flashcard-front] p.is-empty::before {
+  position: absolute;
+  inset-inline: 0;
+  float: none;
+  text-align: center;
+}
+.prose-blob .blob-flashcard:not(.is-flipped) [data-flashcard-back],
+.prose-blob .blob-flashcard.is-flipped [data-flashcard-front] {
+  pointer-events: none;
+  user-select: none;
+}
+.prose-blob .blob-flashcard-hint {
+  position: absolute;
+  right: 0.9em;
+  bottom: 0.35em;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink-3);
+  opacity: 0.8;
+  pointer-events: none;
+  user-select: none;
+}
+@media (hover: none) {
+  .prose-blob .blob-flashcard-flip {
+    height: 32px;
+  }
+  .prose-blob .blob-flashcard:not(.is-readonly) .blob-flashcard-hint {
+    display: none;
+  }
+}
+
+/* Tables -------------------------------------------------------------------- */
+.prose-blob .tableWrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.prose-blob table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.94em;
+  line-height: 1.55;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--raised);
+}
+.prose-blob td,
+.prose-blob th {
+  position: relative;
+  min-width: 72px;
+  padding: 0.45em 0.7em;
+  vertical-align: top;
+  text-align: left;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.prose-blob tr > :last-child {
+  border-right: none;
+}
+.prose-blob tr:last-child > td,
+.prose-blob tr:last-child > th {
+  border-bottom: none;
+}
+.prose-blob th {
+  font-weight: 620;
+  background: color-mix(in oklab, var(--hover) 55%, var(--raised));
+  color: var(--ink);
+}
+.prose-blob td > p,
+.prose-blob th > p {
+  margin: 0;
+}
+.prose-blob td > * + *,
+.prose-blob th > * + * {
+  margin-top: 0.35em;
+}
+.prose-blob .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--blob) 14%, transparent);
+  pointer-events: none;
+}
+.prose-blob .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 3px;
+  z-index: 2;
+  background: var(--blob);
+  pointer-events: none;
+}
+.prose-blob.resize-cursor {
+  cursor: col-resize;
+}
+.prose-blob table .is-empty::before {
+  content: none;
+}
+
+/* Shared block chrome: chips, "Done", the edit button on objects ----------- */
+.blob-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.blob-chip:hover {
+  border-color: var(--line-2);
+  background: var(--hover);
+  color: var(--ink);
+}
+.blob-chip.is-on {
+  border-color: color-mix(in oklab, var(--blob) 45%, var(--line));
+  background: var(--blob-soft);
+  color: var(--blob-ink);
+}
+.blob-done {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 550;
+  transition: background-color 0.15s;
+}
+.blob-done:hover {
+  background: color-mix(in oklab, var(--ink) 88%, transparent);
+}
+.prose-blob .blob-block-edit {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  height: 28px;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ink-2);
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s;
+}
+.prose-blob .blob-block-edit:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-object:hover .blob-block-edit,
+.prose-blob .blob-node-selected .blob-block-edit,
+.prose-blob .blob-block-edit:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .blob-chip {
+    height: 32px;
+  }
+  .blob-done {
+    height: 32px;
+  }
+  .prose-blob .blob-block-edit {
+    opacity: 1;
+    height: 32px;
+  }
+}
+
+/* Diagrams (Mermaid) -------------------------------------------------------- */
+.prose-blob .blob-diagram {
+  border-radius: 12px;
+}
+.prose-blob .blob-diagram-canvas {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 5em;
+  padding: 1em;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  overflow-x: auto;
+}
+.prose-blob .blob-diagram-svg {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  transition: opacity 0.2s;
+}
+.prose-blob .blob-diagram-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose-blob .blob-diagram-svg.is-stale {
+  opacity: 0.4;
+}
+.prose-blob .blob-diagram-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 4.5em;
+  padding: 0.5em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.prose-blob .blob-diagram-error {
+  position: absolute;
+  left: 0.6em;
+  right: 0.6em;
+  bottom: 0.6em;
+  padding: 0.35em 0.65em;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--danger) 9%, var(--raised));
+  color: var(--danger);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.prose-blob .blob-diagram.is-editing {
+  padding: 0.6em;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.prose-blob .blob-diagram-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.prose-blob .blob-diagram-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.prose-blob .blob-diagram-chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.prose-blob .blob-diagram-help {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.prose-blob .blob-diagram-help:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-diagram-code {
+  display: block;
+  width: 100%;
+  min-height: 9em;
+  resize: vertical;
+  padding: 0.7em 0.8em;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob .blob-diagram-code:focus {
+  border-color: var(--blob);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--blob) 16%, transparent);
+}
+
+/* Sketches ------------------------------------------------------------------ */
+.prose-blob .blob-sketch {
+  border-radius: 12px;
+}
+.prose-blob .blob-sketch-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background-color: var(--raised);
+  background-image: radial-gradient(color-mix(in oklab, var(--ink) 11%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob .blob-sketch-canvas.is-drawing {
+  touch-action: none;
+  cursor: crosshair;
+  border-color: color-mix(in oklab, var(--blob) 45%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--blob) 12%, transparent);
+}
+.prose-blob .blob-sketch-canvas.tool-eraser {
+  cursor: cell;
+}
+.prose-blob .blob-sketch-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.prose-blob .blob-sketch.is-editing .blob-sketch-empty {
+  top: 3.4rem;
+}
+.prose-blob .blob-sketch-bar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-pop);
+}
+.prose-blob .blob-sketch-tool {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+.prose-blob .blob-sketch-tool:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-sketch-tool.is-on {
+  background: var(--blob-soft);
+  color: var(--blob-ink);
+}
+.prose-blob .blob-sketch-tool.is-danger:hover {
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+.prose-blob .blob-sketch-tool:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.prose-blob .blob-sketch-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  transition:
+    transform 0.15s var(--ease-jelly),
+    box-shadow 0.15s;
+}
+.prose-blob .blob-sketch-swatch:hover {
+  transform: scale(1.12);
+}
+.prose-blob .blob-sketch-swatch.is-on {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--swatch);
+}
+.prose-blob .blob-sketch-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+}
+@media (hover: none) {
+  .prose-blob .blob-sketch-tool {
+    width: 36px;
+    height: 36px;
+  }
+  .prose-blob .blob-sketch-swatch {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* Function plots ------------------------------------------------------------ */
+.prose-blob .blob-plot {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+}
+.prose-blob .blob-plot-canvas {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.prose-blob .blob-plot-canvas:active {
+  cursor: grabbing;
+}
+.prose-blob .blob-plot-grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.prose-blob .blob-plot-axes line,
+.prose-blob .blob-plot-axes path {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.prose-blob .blob-plot-labels text {
+  font-family: var(--font-math);
+  font-size: 12px;
+  fill: var(--ink-3);
+  paint-order: stroke;
+  stroke: var(--raised);
+  stroke-width: 3px;
+}
+.prose-blob .blob-plot-labels .blob-plot-axisname {
+  font-size: 14px;
+  font-style: italic;
+  fill: var(--ink-2);
+}
+.prose-blob .blob-plot-curve {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.prose-blob .blob-plot-cross {
+  stroke: var(--line-2);
+  stroke-dasharray: 3 3;
+}
+.prose-blob .blob-plot-dot {
+  stroke: var(--raised);
+  stroke-width: 2;
+}
+.prose-blob .blob-plot-readout {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.35rem 0.6rem;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--raised) 92%, transparent);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-math);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.prose-blob .blob-plot-zoom {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-card);
+}
+.prose-blob .blob-plot-zoom button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.prose-blob .blob-plot-zoom button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-plot-fns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem 0.6rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.prose-blob .blob-plot-fn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.prose-blob .blob-plot-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+.prose-blob .blob-plot-name {
+  font-family: var(--font-math);
+  font-size: 15.5px;
+  font-style: italic;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.prose-blob .blob-plot-input {
+  flex: 1;
+  min-width: 8rem;
+  height: 32px;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob span.blob-plot-input {
+  display: flex;
+  align-items: center;
+  border-color: transparent;
+  background: transparent;
+}
+.prose-blob .blob-plot-input:focus {
+  border-color: var(--blob);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--blob) 16%, transparent);
+}
+.prose-blob .blob-plot-fn.is-invalid .blob-plot-input {
+  border-color: var(--danger);
+}
+.prose-blob .blob-plot-error {
+  flex-basis: 100%;
+  padding-left: 1.15rem;
+  font-size: 12px;
+  color: var(--danger);
+}
+.prose-blob .blob-plot-remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--ink-3);
+}
+.prose-blob .blob-plot-remove:hover {
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+.prose-blob .blob-plot-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 28px;
+  padding: 0 0.5rem;
+  margin-left: -0.25rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.prose-blob .blob-plot-add:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-plot-hint {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+@media (hover: none) {
+  .prose-blob .blob-plot-zoom button,
+  .prose-blob .blob-plot-remove,
+  .prose-blob .blob-plot-add {
+    width: auto;
+    min-width: 34px;
+    height: 34px;
+  }
+}
+@media (max-width: 640px) {
+  .prose-blob .blob-plot-canvas {
+    height: 240px;
+  }
+}
+
+/* Files ----------------------------------------------------------------------- */
+.prose-blob .blob-file {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-card);
+}
+.prose-blob .blob-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.55rem 0.55rem 0.6rem;
+  font-family: var(--font-sans);
+}
+.prose-blob .blob-file-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--tint);
+  background: color-mix(in oklab, var(--tint) 13%, var(--raised));
+}
+.prose-blob .blob-file-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.35;
+}
+.prose-blob .blob-file-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 560;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s;
+}
+.prose-blob .blob-file-name:hover .blob-file-title {
+  text-decoration-color: var(--line-2);
+}
+.prose-blob .blob-file-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.prose-blob .blob-file-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.prose-blob .blob-file-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--ink-3);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.prose-blob .blob-file-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-file-btn.is-on {
+  color: var(--ink);
+}
+.prose-blob .blob-file-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.prose-blob .blob-file.is-missing .blob-file-icon {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.prose-blob .blob-file-preview {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.prose-blob .blob-file-preview img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 520px;
+  margin: 0 auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+.prose-blob .blob-file-preview iframe {
+  display: block;
+  width: 100%;
+  height: min(72vh, 700px);
+  border: 0;
+  background: #fff;
+}
+.prose-blob .blob-file-preview audio {
+  display: block;
+  width: calc(100% - 1.2rem);
+  margin: 0.6rem;
+}
+.prose-blob .blob-file-preview video {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  background: #000;
+}
+.prose-blob .blob-file-loading {
+  display: grid;
+  place-items: center;
+  height: 120px;
+}
+.prose-blob .blob-file-uploading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px dashed var(--line-2);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.prose-blob .blob-file-uploading-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.prose-blob .blob-file-uploading-note {
+  margin-left: auto;
+  flex: none;
+  color: var(--ink-3);
+}
+@media (hover: none) {
+  .prose-blob .blob-file-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ---- end note blocks ---- */

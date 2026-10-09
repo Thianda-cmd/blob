@@ -29,7 +29,7 @@ declare module "@tiptap/core" {
  * its MathView. A few LaTeX habits are understood too (\dfrac, \leq, \left(…\right), \sum).
  */
 export function toDisplay(src: string) {
-  return src
+  return fromTypography(src)
     .replace(/\r?\n/g, " \\\\ ")
     .replace(/\\[dt]frac(?![A-Za-z])/g, "\\frac")
     .replace(/\\(left|right)(?![A-Za-z])/g, "")
@@ -41,6 +41,18 @@ export function toDisplay(src: string) {
     .replace(/\\(sum|Sigma)(?![A-Za-z])/g, "Σ")
     .replace(/\\prod(?![A-Za-z])/g, "∏")
     .replace(/\\int(?![A-Za-z])/g, "∫");
+}
+
+/** Undo what typing in text did to a formula ("r^2" became "r²", "1/2" became "½"). */
+export function fromTypography(src: string) {
+  return src
+    .replace(/²/g, "^2")
+    .replace(/³/g, "^3")
+    .replace(/½/g, "\\frac12")
+    .replace(/¼/g, "\\frac14")
+    .replace(/¾/g, "\\frac34")
+    .replace(/[–—]/g, "-")
+    .replace(/[„“”]/g, '"');
 }
 
 /** A formula as plain text (search, previews, the note's plain text). */
@@ -179,18 +191,19 @@ function MathPanel({
             aria-label={t.math.t[tpl.id]}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => insert(tpl)}
-            className="grid h-8 min-w-8 place-items-center rounded-md border border-line bg-surface px-1.5 text-ink-2 transition-colors hover:border-line-2 hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [@media(hover:none)]:min-w-9"
+            className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-md border border-line bg-surface px-1.5 text-ink-2 transition-colors hover:border-line-2 hover:bg-hover hover:text-ink"
           >
             <span className="pointer-events-none">
-              <MathView src={toDisplay(tpl.show)} size="sm" animate={false} />
+              <MathView src={toDisplay(tpl.show)} size="sm" animate={false} className={tpl.id === "fraction" ? "text-[14px]" : undefined} />
             </span>
           </button>
         ))}
       </div>
       <div className="mt-2 flex items-center gap-2 border-t border-line pt-2">
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink-3 [@media(hover:none)]:hidden">
-          <Kbd>↵</Kbd> {t.done} · <Kbd>⇧</Kbd>
-          <Kbd>↵</Kbd>
+        <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-[11.5px] text-ink-3 [@media(hover:none)]:hidden">
+          <Kbd>↵</Kbd> {t.done}
+          <span className="ml-2" />
+          <Kbd>⇧↵</Kbd> {t.math.newLine}
         </span>
         <span className="flex-1 [@media(hover:hover)]:hidden" />
         <button
@@ -340,7 +353,7 @@ export const MathInline = Node.create({
         find: /(^|[\s([„"'])\$([^\s$](?:[^$]*?[^\s$])?)\$$/,
         handler: ({ state, range, match }) => {
           const start = range.from + match[1].length;
-          state.tr.replaceWith(start, range.to, this.type.create({ src: match[2] }));
+          state.tr.replaceWith(start, range.to, this.type.create({ src: fromTypography(match[2]) }));
         },
       }),
     ];
