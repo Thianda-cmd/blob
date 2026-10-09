@@ -6,6 +6,7 @@ import {
   Ellipsis,
   FilePlus2,
   FileText,
+  FileUser,
   GraduationCap,
   House,
   ListChecks,
@@ -64,7 +65,7 @@ function useStoredSet(key: string) {
 
 export function PageIcon({ page, className }: { page: Pick<PageMeta, "icon" | "kind">; className?: string }) {
   if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
-  const Icon = page.kind === "deck" ? Presentation : FileText;
+  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : FileText;
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }
 
@@ -81,7 +82,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
 
   const tree = useMemo(() => {
     const children = new Map<string | null, PageMeta[]>();
+    // CVs live on /cv (favourites still list them).
     for (const p of pages) {
+      if (p.kind === "cv") continue;
       const key = p.parent_id;
       if (!children.has(key)) children.set(key, []);
       children.get(key)!.push(p);
@@ -91,6 +94,8 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   }, [pages]);
 
   const roots = tree.get(null) ?? [];
+  // The page open right now (a CV keeps "CV" highlighted, since CVs are not in the tree).
+  const openPage = pathname.startsWith("/p/") ? pages.find((p) => p.id === pathname.slice(3)) : undefined;
   const favorites = pages.filter((p) => p.is_favorite).sort((a, b) => a.title.localeCompare(b.title));
   const unfiled = roots.filter((p) => !p.subject_id || !subjects.some((s) => s.id === p.subject_id));
 
@@ -119,7 +124,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             onClick={() => toggleOpenPage(page.id)}
             className={cn(
               "grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink",
-              kids.length === 0 && page.kind === "deck" && "invisible",
+              kids.length === 0 && page.kind !== "note" && "invisible",
             )}
             aria-label={open ? t.collapse : t.expand}
           >
@@ -279,6 +284,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         </NavLink>
         <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
           {t.tasks}
+        </NavLink>
+        <NavLink href="/cv" icon={<FileUser />} active={pathname === "/cv" || openPage?.kind === "cv"}>
+          {t.cv}
         </NavLink>
       </div>
 

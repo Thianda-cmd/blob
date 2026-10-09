@@ -141,7 +141,8 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
     setExit("restore");
     setTrash((t) => t.filter((p) => !item.ids.includes(p.id)));
     upsertPages(original.map((p) => ({ ...p, trashed_at: null, parent_id: p.id === root.id && detach ? null : p.parent_id })));
-    blob.say(t.restored(pageTitle(root.title, root.kind, locale)), { mood: "happy" });
+    const name = pageTitle(root.title, root.kind, locale);
+    blob.say(root.kind === "cv" ? t.restoredCv(name) : t.restored(name), { mood: "happy" });
     blob.react("jump", "happy");
 
     const supabase = createClient();
@@ -356,7 +357,7 @@ function TrashRow({
                 <span className="truncate">{subject.name}</span>
               </span>
             ) : (
-              <span>{root.kind === "deck" ? t.presentation : t.note}</span>
+              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : t.note}</span>
             )}
             {inside > 0 && (
               <>

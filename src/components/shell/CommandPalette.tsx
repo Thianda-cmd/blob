@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   CornerDownLeft,
   FilePlus2,
+  FileUser,
   GraduationCap,
   House,
   ListChecks,
@@ -27,6 +28,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
 import { resolveText } from "@/i18n/text";
 import { CATALOG, topicHref } from "@/learn/catalog";
+import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { PageIcon } from "./Sidebar";
 
@@ -35,9 +37,13 @@ type Item = {
   group: "actions" | "pages" | "found" | "subjects" | "learn";
   label: string;
   hint?: string;
+  /** Extra words that find an action (in both languages), e.g. "cv" for „Neuer Lebenslauf“. */
+  keywords?: string;
   icon: ReactNode;
   run: () => void;
 };
+
+const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
 
 function snippet(text: string, q: string) {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -58,7 +64,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   const t = useMessages(shellText).palette;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [found, setFound] = useState<{ id: string; title: string; kind: "note" | "deck"; icon: string | null; text: string }[]>([]);
+  const [found, setFound] = useState<{ id: string; title: string; kind: PageKind; icon: string | null; text: string }[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const q = query.trim();
 
@@ -120,8 +126,11 @@ function Palette({ onClose }: { onClose: () => void }) {
         },
       },
       { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
+      // Not "new-…": a CV gets no name from the search, so it only shows when it matches.
+      { id: "cv-new", group: "actions", label: t.newCv, hint: t.newCvHint, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv?new=1") },
       { id: "home", group: "actions", label: t.goHome, icon: <House />, run: () => go("/home") },
       { id: "tasks", group: "actions", label: t.goTasks, icon: <ListChecks />, run: () => go("/tasks") },
+      { id: "cv", group: "actions", label: t.goCv, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv") },
       { id: "learn", group: "actions", label: t.goLearn, hint: t.goLearnHint, icon: <GraduationCap />, run: () => go("/learn") },
       { id: "settings", group: "actions", label: t.settings, icon: <Settings />, run: () => go("/settings") },
       { id: "trash", group: "actions", label: t.trash, icon: <Trash2 />, run: () => go("/trash") },
@@ -189,7 +198,12 @@ function Palette({ onClose }: { onClose: () => void }) {
       }),
     );
 
-    const filteredActions = q ? actions.filter((a) => a.id.startsWith("new") || match(a.label)) : actions.slice(0, 3);
+    // Actions that match what was typed ("cv" → „Neuer Lebenslauf“) come before the "new note named …"
+    // fallbacks, so Enter opens the CV builder instead of making a note called "cv".
+    const hit = (a: Item) => match(a.label) || (lower.length > 1 && Boolean(a.keywords?.split(" ").some((w) => w.startsWith(lower))));
+    const filteredActions = q
+      ? [...actions.filter((a) => !a.id.startsWith("new") && hit(a)), ...actions.filter((a) => a.id.startsWith("new"))]
+      : actions.slice(0, 3);
     return q ? [...pageItems, ...contentItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, pages, subjects, found, locale, t]);

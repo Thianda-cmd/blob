@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { newCv } from "@/cv/model";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { workspaceText } from "@/i18n/messages/workspace";
@@ -29,7 +30,17 @@ export function newDeckContent(title: string | undefined, locale: Locale): DeckC
   };
 }
 
-type NewPage = { kind?: PageKind; subject_id?: string | null; parent_id?: string | null; title?: string; icon?: string | null };
+type NewPage = {
+  kind?: PageKind;
+  subject_id?: string | null;
+  parent_id?: string | null;
+  title?: string;
+  icon?: string | null;
+  /** What the page starts with (a CV from the "new CV" dialog, a copy); otherwise the kind's starter content. */
+  content?: unknown;
+  /** The searchable text of `content`. */
+  plain_text?: string;
+};
 
 type Workspace = {
   userId: string;
@@ -122,7 +133,8 @@ export function WorkspaceProvider({
           subject_id: input.subject_id ?? null,
           parent_id: input.parent_id ?? null,
           position,
-          content: kind === "deck" ? newDeckContent(input.title, locale) : {},
+          content: input.content ?? (kind === "deck" ? newDeckContent(input.title, locale) : kind === "cv" ? newCv(locale) : {}),
+          ...(input.plain_text !== undefined && { plain_text: input.plain_text }),
         })
         .select(PAGE_META_COLUMNS)
         .single();
@@ -148,9 +160,12 @@ export function WorkspaceProvider({
     async (id: string) => {
       const ids = [id, ...descendantsOf(pages, id)];
       const trashed_at = new Date().toISOString();
+      const removed = pages.filter((p) => ids.includes(p.id));
       setPages((ps) => ps.filter((p) => !ids.includes(p.id)));
       const { error } = await createClient().from("pages").update({ trashed_at }).in("id", ids);
       if (error) {
+        // Not trashed after all: put the pages back where they were (the sidebar, the CV home…).
+        setPages((ps) => [...ps, ...removed.filter((r) => !ps.some((p) => p.id === r.id))]);
         oops(t.notSaved);
         return false;
       }

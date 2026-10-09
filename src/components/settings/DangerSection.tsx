@@ -12,6 +12,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
+import { cvHomeText } from "@/i18n/messages/cvHome";
 import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
 import { Card, Row, Section } from "./primitives";
 
@@ -46,6 +47,7 @@ function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => 
 function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: boolean) => void }) {
   const { pages, subjects } = useWorkspace();
   const t = useMessages(settingsText).danger;
+  const cvCount = useMessages(cvHomeText).count;
   const blobRef = useRef<BlobHandle>(null);
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<"confirm" | "deleting">("confirm");
@@ -91,8 +93,9 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
   const deleting = phase === "deleting";
   const mood: BlobMood = deleting ? "sleepy" : startled ? "surprised" : "worried";
   const notes = pages.filter((p) => p.kind === "note").length;
-  const decks = pages.length - notes;
-  const summary = [t.notes(notes), decks ? t.decks(decks) : null, t.subjects(subjects.length)]
+  const decks = pages.filter((p) => p.kind === "deck").length;
+  const cvs = pages.filter((p) => p.kind === "cv").length;
+  const summary = [t.notes(notes), decks ? t.decks(decks) : null, cvs ? cvCount(cvs) : null, t.subjects(subjects.length)]
     .filter(Boolean)
     .join(", ");
 

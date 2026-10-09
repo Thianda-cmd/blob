@@ -2,11 +2,13 @@
 
 import { format } from "date-fns";
 import { motion } from "motion/react";
-import { ArrowUpRight, FilePlus2, ListPlus, Plus, Presentation, Search } from "lucide-react";
+import { ArrowUpRight, FilePlus2, FileUser, ListPlus, Plus, Presentation, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
+import { RecentCvCard } from "@/components/cv/home/RecentCvCard";
+import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
 import { useShell } from "@/components/shell/AppShell";
 import { TopBar } from "@/components/shell/TopBar";
 import { NoteCard, SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
@@ -33,12 +35,15 @@ const rise = {
 export function HomeView({
   tasks,
   previews,
+  cvs,
   openTasks,
   openTotal,
   learn,
 }: {
   tasks: Task[];
   previews: Record<string, PagePreview>;
+  /** The content of recent CVs, for their thumbnails. */
+  cvs: Record<string, unknown>;
   openTasks: Record<string, number>;
   openTotal: number;
   learn: { progress: Record<string, TopicProgress>; days: LearnDay[] };
@@ -51,6 +56,8 @@ export function HomeView({
   const t = useMessages(homeText);
   const blobRef = useRef<BlobHandle>(null);
   const [busy, setBusy] = useState<"note" | "deck" | null>(null);
+  // Back from a page you just edited: fetch the previews (and CV thumbnails) again instead of Next's old copy.
+  useRefreshOnBack();
 
   const recent = [...pages].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 6);
   const name = firstName(profile.full_name);
@@ -72,7 +79,7 @@ export function HomeView({
             <motion.div variants={rise} custom={0} className="-mb-2 -ml-3 hidden sm:block">
               <Blob ref={blobRef} size={104} mood="happy" onClick={() => blobRef.current?.jump(1)} title="Blob" />
             </motion.div>
-            <motion.div variants={rise} custom={1} className="min-w-0 flex-1 pb-1">
+            <motion.div variants={rise} custom={1} className="min-w-[min(100%,360px)] flex-1 pb-1">
               <p className="h-5 text-[13px] text-ink-3" suppressHydrationWarning>
                 {now ? format(now, t.dateFormat, { locale: dateLocale(locale) }) : ""}
               </p>
@@ -93,6 +100,10 @@ export function HomeView({
               </QuickAction>
               <QuickAction icon={<ListPlus />} onClick={() => router.push("/tasks?new=1")}>
                 {t.addTask}
+              </QuickAction>
+              {/* Your CVs, or straight to a new one if there are none yet. */}
+              <QuickAction icon={<FileUser />} onClick={() => router.push(pages.some((p) => p.kind === "cv") ? "/cv" : "/cv?new=1")}>
+                {t.cv}
               </QuickAction>
               <QuickAction icon={<Search />} onClick={openSearch}>
                 {t.search}
@@ -116,6 +127,8 @@ export function HomeView({
                     <motion.div key={page.id} variants={rise} custom={4 + i} initial="hidden" animate="shown">
                       {page.kind === "deck" ? (
                         <RecentDeck page={page} preview={previews[page.id]} now={now} />
+                      ) : page.kind === "cv" ? (
+                        <RecentCvCard page={page} content={cvs[page.id]} now={now} />
                       ) : (
                         <NoteCard page={page} preview={previews[page.id]} parent={pages.find((p) => p.id === page.parent_id)} now={now} />
                       )}

@@ -18,7 +18,7 @@ export const workspaceText = defineMessages({
   de: {
     notSaved: "Hm, das wurde nicht gespeichert. Ist deine Verbindung okay?",
     createFailed: "Ich konnte die Seite nicht erstellen. Nochmal versuchen?",
-    trashed: "In den Papierkorb verschoben. Du kannst sie jederzeit wiederherstellen.",
+    trashed: "Ab in den Papierkorb. Von dort kannst du alles jederzeit wiederherstellen.",
     subjectFailed: "Ich konnte das Fach nicht hinzufügen.",
     subjectAdded: (name) => `${name} hinzugefügt!`,
     deck: {

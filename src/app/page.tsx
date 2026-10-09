@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { CvShowcase } from "@/components/landing/CvShowcase";
 import { HeroBlob, NotesDemo, QuickAddDemo, Reveal } from "@/components/landing/Interactive";
 import { LearnDemo } from "@/components/landing/LearnDemo";
 import { LearnStages, TopicGrid } from "@/components/landing/LearnFeatures";
@@ -28,6 +29,7 @@ export default async function LandingPage() {
     { href: "#presentations", label: t.nav.presentations },
     { href: "#notes", label: t.nav.notes },
     { href: "#homework", label: t.nav.homework },
+    { href: "#cv", label: t.nav.cv },
   ];
 
   return (
@@ -66,7 +68,7 @@ export default async function LandingPage() {
           <div className="relative mx-auto grid max-w-[1240px] items-center gap-4 px-4 pb-14 pt-12 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:pb-20 lg:pt-16">
             <div>
               <a
-                href="#learn"
+                href="#cv"
                 className="group mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-raised py-1 pl-3 pr-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:text-ink"
               >
                 <span className="size-1.5 rounded-full bg-blob" /> {t.hero.badge}
@@ -135,6 +137,16 @@ export default async function LandingPage() {
             <Feature id="homework" kicker={t.homework.kicker} title={t.homework.title} body={t.homework.body}>
               <QuickAddDemo />
             </Feature>
+          </div>
+        </section>
+
+        {/* CV builder */}
+        <section id="cv" className="scroll-mt-14 border-y border-line bg-surface">
+          <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 lg:py-20">
+            <SectionHead kicker={t.cv.kicker} title={t.cv.title} body={t.cv.body} />
+            <Reveal className="mt-10">
+              <CvShowcase />
+            </Reveal>
           </div>
         </section>
 

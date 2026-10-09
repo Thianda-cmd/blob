@@ -9,6 +9,7 @@ import { TopBar, type Crumb } from "@/components/shell/TopBar";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
+import { cvHomeText } from "@/i18n/messages/cvHome";
 import { pageText } from "@/i18n/messages/page";
 import { subjectColor } from "@/lib/subjects";
 import type { PageMeta } from "@/lib/types";
@@ -19,6 +20,7 @@ import type { SaveState } from "./useAutosave";
 /** Breadcrumbs, save state, favorite and the page menu. Shared by notes and presentations. */
 export function PageTopBar({ pageId, saveState, actions }: { pageId: string; saveState: SaveState; actions?: ReactNode }) {
   const t = useMessages(pageText);
+  const cvs = useMessages(cvHomeText).title;
   const locale = useLocale();
   const router = useRouter();
   const { pages, subjects, updatePage, trashPage } = useWorkspace();
@@ -34,8 +36,11 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
   const rootSubjectId = (chain[0] ?? page).subject_id;
   const subject = subjects.find((s) => s.id === rootSubjectId);
 
+  // CVs live on /cv, not in a subject.
+  const cv = page.kind === "cv";
   const crumbs: Crumb[] = [
-    ...(subject
+    ...(cv ? [{ label: cvs, href: "/cv", icon: <FileUser className="size-3.5 text-ink-3" /> }] : []),
+    ...(subject && !cv
       ? [
           {
             label: subject.name,
@@ -77,7 +82,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
           >
             {(close) => (
               <>
-                {!page.parent_id && (
+                {!page.parent_id && !cv && (
                   <>
                     <MenuLabel>
                       <span className="flex items-center gap-1.5">
@@ -128,7 +133,7 @@ export function PageTopBar({ pageId, saveState, actions }: { pageId: string; sav
                   onSelect={async () => {
                     close();
                     const ok = await trashPage(page.id);
-                    if (ok) router.push(page.parent_id ? `/p/${page.parent_id}` : subject ? `/subjects/${subject.id}` : "/home");
+                    if (ok) router.push(cv ? "/cv" : page.parent_id ? `/p/${page.parent_id}` : subject ? `/subjects/${subject.id}` : "/home");
                   }}
                 >
                   {t.moveToTrash}

@@ -22,7 +22,7 @@ function snippet(text: string | null) {
 
 export default async function HomePage() {
   const supabase = await createClient();
-  const [tasks, recentRes, openRes, learn] = await Promise.all([
+  const [tasks, recentRes, openRes, learn, cvRes] = await Promise.all([
     loadUpcomingTasks(supabase, 7),
     supabase
       .from("pages")
@@ -32,6 +32,8 @@ export default async function HomePage() {
       .limit(8),
     supabase.from("tasks").select("subject_id").eq("done", false),
     loadLearnState(),
+    // Recent CVs show the top of their first page, which needs the whole CV (a few kilobytes).
+    supabase.from("pages").select("id, content").eq("kind", "cv").is("trashed_at", null).order("updated_at", { ascending: false }).limit(6),
   ]);
 
   const previews: Record<string, PagePreview> = {};
@@ -48,5 +50,8 @@ export default async function HomePage() {
     if (t.subject_id) openTasks[t.subject_id] = (openTasks[t.subject_id] ?? 0) + 1;
   }
 
-  return <HomeView tasks={tasks} previews={previews} openTasks={openTasks} openTotal={openRes.data?.length ?? 0} learn={learn} />;
+  const cvs: Record<string, unknown> = {};
+  for (const row of cvRes.data ?? []) cvs[row.id] = row.content;
+
+  return <HomeView tasks={tasks} previews={previews} cvs={cvs} openTasks={openTasks} openTotal={openRes.data?.length ?? 0} learn={learn} />;
 }
