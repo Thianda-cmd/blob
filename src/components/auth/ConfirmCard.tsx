@@ -1,15 +1,18 @@
 "use client";
 
-import { ArrowRight, MailCheck } from "lucide-react";
+import { ArrowRight, AppWindow, MailCheck } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useSyncExternalStore } from "react";
 import { confirmEmail } from "@/app/(auth)/auth/confirm/actions";
 import { Button } from "@/components/ui/Button";
 import { useMessages } from "@/i18n/client";
+import { blobApp } from "@/lib/native";
 import { authText, type ConfirmKind } from "@/i18n/messages/auth";
 import { AuthHeading, authLinkButton } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
+
+const noSubscribe = () => () => {};
 
 export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type: string; next: string }) {
   const all = useMessages(authText);
@@ -19,6 +22,13 @@ export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type
   const known = Object.hasOwn(t.kinds, type);
   const copy = known ? t.kinds[type as ConfirmKind] : t.kinds.email;
   const valid = Boolean(tokenHash && known);
+  // In a browser: the same link can open in the Blob app (it asks for the click there). Not in the app.
+  const inApp = useSyncExternalStore(
+    noSubscribe,
+    () => blobApp() !== null,
+    () => false,
+  );
+  const appLink = `blob://auth/confirm?${new URLSearchParams({ token_hash: tokenHash, type, next })}`;
 
   useEffect(() => {
     if (!valid) {
@@ -74,6 +84,14 @@ export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type
         </Button>
       </form>
       <p className="mt-5 text-[12.5px] text-ink-3">{t.scanners}</p>
+      {!inApp && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-ink-3">
+          <AppWindow className="size-3.5" /> {t.inApp}{" "}
+          <a href={appLink} className="font-medium text-blob-ink underline underline-offset-2">
+            {t.openApp}
+          </a>
+        </p>
+      )}
     </div>
   );
 }

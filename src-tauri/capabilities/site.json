@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "site",
+  "description": "What blob.bojes.org may ask the app for: open a link outside, print, say which app it is. Nothing else (no files, no shell). localhost is for `BLOB_SITE=http://localhost:3000` in debug builds; release builds never show it.",
+  "windows": ["main", "popup-*"],
+  "remote": {
+    "urls": ["https://blob.bojes.org/*", "http://localhost:3000/*"]
+  },
+  "permissions": ["allow-open-external", "allow-print-page", "allow-app-info"]
+}

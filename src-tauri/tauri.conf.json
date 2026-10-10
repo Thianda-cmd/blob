@@ -1,0 +1,49 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Blob",
+  "mainBinaryName": "blob",
+  "version": "0.1.0",
+  "identifier": "org.bojes.blob",
+  "build": {
+    "frontendDist": "shell"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://blob.bojes.org http://localhost:3000"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Blob",
+    "homepage": "https://blob.bojes.org",
+    "category": "Education",
+    "shortDescription": "Notes, learning and more with Blob",
+    "longDescription": "Blob is a calm place for school: notes, projects, a CV builder and a learning centre with maths, biology, chemistry and French, together with Blob, the purple mascot.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "deb": { "section": "education" }
+    },
+    "android": {
+      "minSdkVersion": 26,
+      "debugApplicationIdSuffix": ".debug"
+    },
+    "iOS": {
+      "minimumSystemVersion": "15.0"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["blob"] },
+      "mobile": [{ "scheme": ["blob"], "appLink": false }]
+    }
+  }
+}

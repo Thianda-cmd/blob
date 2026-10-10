@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "start-page",
+  "description": "The bundled start page. It only reads window.__BLOB_APP__ and moves on to the site: no native commands.",
+  "windows": ["main"],
+  "permissions": []
+}

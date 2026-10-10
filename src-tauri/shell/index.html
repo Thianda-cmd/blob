@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Blob</title>
+    <link rel="stylesheet" href="launch.css" />
+  </head>
+  <body>
+    <main>
+      <svg class="blob" viewBox="0 0 32 32" aria-hidden="true">
+        <defs>
+          <radialGradient id="g" cx="36%" cy="28%" r="80%">
+            <stop offset="0%" stop-color="#b9a2ff" />
+            <stop offset="45%" stop-color="#6d3df5" />
+            <stop offset="100%" stop-color="#5326d6" />
+          </radialGradient>
+        </defs>
+        <path d="M16 4.5c6.6 0 11.3 4.9 11.6 11.4.2 5-2.6 9.1-6.8 10.4-3 .9-6.6.9-9.6 0C7 25 4.2 20.9 4.4 15.9 4.7 9.4 9.4 4.5 16 4.5Z" fill="url(#g)" />
+        <ellipse cx="11.2" cy="10.4" rx="3" ry="1.5" transform="rotate(-28 11.2 10.4)" fill="#fff" opacity=".8" />
+        <g class="eyes">
+          <ellipse cx="12.6" cy="16.8" rx="1.35" ry="1.75" fill="#1d1030" />
+          <ellipse cx="19.4" cy="16.8" rx="1.35" ry="1.75" fill="#1d1030" />
+        </g>
+        <path class="mouth" d="M14.3 20.3q1.7 1.4 3.4 0" stroke="#1d1030" stroke-width="1.1" stroke-linecap="round" fill="none" />
+      </svg>
+      <div class="shadow" aria-hidden="true"></div>
+
+      <section id="loading" aria-live="polite">
+        <p class="dots" aria-hidden="true"><span></span><span></span><span></span></p>
+        <p class="hint" data-en="Getting things ready…" data-de="Einen Moment …"></p>
+      </section>
+
+      <section id="offline" hidden aria-live="polite">
+        <h1 data-en="Blob can't reach the internet" data-de="Blob erreicht das Internet nicht"></h1>
+        <p data-en="Your notes and lessons live online. Check your connection, then try again." data-de="Deine Notizen und Lektionen sind online. Prüf deine Verbindung und versuch es nochmal."></p>
+        <button id="retry" type="button" data-en="Try again" data-de="Nochmal versuchen"></button>
+      </section>
+    </main>
+    <script src="launch.js"></script>
+  </body>
+</html>

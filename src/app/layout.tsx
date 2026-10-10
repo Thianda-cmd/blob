@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
 import { MotionProvider } from "@/components/MotionProvider";
+import { NativeBridge } from "@/components/NativeBridge";
 import { LocaleProvider } from "@/i18n/client";
 import { metaText } from "@/i18n/messages/meta";
 import { getLocale, getMessages } from "@/i18n/server";
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <LocaleProvider locale={locale}>
           <MotionProvider>{children}</MotionProvider>
         </LocaleProvider>
+        <NativeBridge />
       </body>
     </html>
   );

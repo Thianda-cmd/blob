@@ -1,0 +1,141 @@
+# Builds the Blob apps (src-tauri/): Windows, macOS and Linux installers, and an Android APK.
+#
+# - On every push that changes the app (src-tauri/, this file): build everything, keep the results
+#   as workflow artifacts for 14 days. Download them from the run's summary page.
+# - On a tag like app-v0.1.0: the same, plus a draft GitHub release with the installers.
+# - By hand: Actions → Apps → Run workflow.
+#
+# Unsigned for now: Windows shows SmartScreen, macOS needs right-click → Open the first time, the
+# APK is a debug build to sideload. Signing (and iOS, which needs an Apple developer account) is
+# in docs/native-apps.md.
+name: Apps
+
+on:
+  push:
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/apps.yml"
+    tags:
+      - "app-v*"
+  workflow_dispatch:
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-22.04
+            args: ""
+          - name: Windows
+            os: windows-latest
+            args: ""
+          - name: macOS
+            os: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux libraries
+        if: matrix.name == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Unit tests of the shell
+        if: matrix.name == 'Linux'
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Build
+        uses: tauri-apps/tauri-action@v0
+        with:
+          tauriScript: npm run tauri
+          args: ${{ matrix.args }}
+          # A tag makes a draft release with the installers; other runs only build.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
+          releaseName: "Blob ${{ github.ref_name }}"
+          releaseDraft: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blob-${{ matrix.name }}
+          retention-days: 14
+          path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: NDK
+        run: |
+          sdkmanager --install "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      # The Android project (src-tauri/gen/android) is made fresh until it's committed (see docs).
+      - name: Android project
+        run: test -d src-tauri/gen/android || npm run tauri -- android init --ci
+
+      - name: Build (debug APK, 64-bit phones)
+        run: npm run tauri -- android build --debug --apk --target aarch64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blob-Android
+          retention-days: 14
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
