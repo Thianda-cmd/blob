@@ -10,10 +10,19 @@ export function uid() {
   return crypto.randomUUID();
 }
 
-/** Only allow same-origin relative redirects such as "/home" (never "//evil.com"). */
+/**
+ * Only allow same-origin relative redirects such as "/home". Read the way a browser reads it, so
+ * "//evil.com", "/\\evil.com" and "/\t/evil.com" (tabs and newlines vanish) all count as elsewhere.
+ */
 export function safeNext(next: string | null | undefined, fallback = "/home") {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
-  return next;
+  if (!next || !next.startsWith("/")) return fallback;
+  try {
+    const base = "https://blob.invalid";
+    const url = new URL(next, base);
+    return url.origin === base ? url.pathname + url.search + url.hash : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const UNTITLED: Record<Locale, Record<PageKind, string>> = {

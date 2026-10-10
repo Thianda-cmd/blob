@@ -65,25 +65,36 @@ Not considered further: **React Native / Expo / Flutter** (a rewrite of the whol
 
 ```
 app start → bundled start page (src-tauri/shell: Blob, checks the site answers)
-          → blob.bojes.org/home   (or the page from a blob:// link)
+          → blob.bojes.org/home   (or the page from an app link)
           → no internet: friendly offline screen, tries again when the connection is back
 ```
 
 Rules around the site (`src-tauri/src/lib.rs`):
 
-- **Navigation** stays on the site and the app's own pages. The Supabase Storage host is allowed
-  too, because the site previews files in an iframe and macOS/Linux apply the rule to frames.
-  Anything else opens in the system browser.
-- **Pop-ups** (desktop): the site's own pages become app windows, and the speaker view keeps its
-  opener. Other sites open in the browser. Phones have no pop-ups.
+- **Navigation** stays on the site and the app's own pages. Anything else opens in the system browser.
+  - The start page counts only at this platform's exact address (`tauri://localhost`, or
+    `http://tauri.localhost` on Windows/Android).
+  - `blob:` files count only when the site made them.
+  - Signed links into the `files` bucket are allowed, because the site previews files in an iframe
+    and macOS/Linux apply the rule to frames. That bucket takes no SVG (migration 0016), since an
+    SVG could carry a script.
+- **Pop-ups** (desktop): only the site's own pages become app windows, and the speaker view keeps
+  its opener. Anything else opens in the browser. Phones have no pop-ups.
 - **Downloads** go to the Downloads folder under a safe, unused name; the folder opens afterwards.
 - **Printing**: macOS's webview ignores `window.print()`, so the bridge asks the app to print there.
   Windows and Linux print on their own.
-- **Deep links**: `blob://auth/confirm?…`, `blob://learn/french`, … open that page in the app.
+- **App links**: `org.bojes.blob://auth/confirm?…`, `org.bojes.blob://learn/french`, … open that
+  page in the app.
+  - Not `blob://`: browsers keep `blob:` URLs to themselves and never hand them to an app.
   - Only known page prefixes are allowed (`LINK_PATHS`); anything else lands on `/home`.
   - On desktop a second start hands its link to the running app (single instance).
-  - The sign-in confirmation page offers "Open in the app" with the `blob://` version of the link,
-    so email links can end up in the app on any device. The token is only used on the click.
+  - While the app is still starting, the link waits in the app. The start page asks for it at the
+    last moment (`start_target`, a command only the start page may call), so a link's token is
+    never visible to the site's scripts. If the start page has just left, the site's first page
+    load picks it up.
+  - The sign-in confirmation page offers "Open in the app" with the app-link version of its link,
+    so email links can end up in the app on any device. The token is only used on the click, and
+    the `next` page after it is checked the way a browser reads it (`safeNext`).
 - **Window size and position** are remembered.
 
 The site's side (`NativeBridge`, mounted in the root layout, inert in browsers):
@@ -93,25 +104,43 @@ The site's side (`NativeBridge`, mounted in the root layout, inert in browsers):
 - `window.open`: the same rules, plus a stand-in for the "blank tab first" pattern;
 - `window.print` → native print on macOS.
 
+**Permissions** (`src-tauri/capabilities/`):
+
+- `site.json`: blob.bojes.org may call `open_external`, `print_page` and `app_info`, nothing else.
+- `start-page.json`: the start page may call `start_target`.
+- `site-dev.json`: the site rights for a local site (`localhost`). Only `npm run app` includes it,
+  through `tauri.dev.conf.json`; release builds don't.
+
 **Tested on Linux** (the real app under a virtual display, against the live site and a local dev
 server):
 
-- start page → live sign-in page;
-- the offline screen;
-- the site calls `app_info` from its own origin;
-- an external link, an external "new tab" link, the blank-tab-then-file pattern and an external
-  `window.open` all reach the system browser;
-- `open_external("file:///etc/passwd")` is refused;
-- a plugin command called directly from the site is refused by the permission system;
-- a second start with `blob://learn/french` hands the link over and the running app navigates;
-- Rust unit tests for the site and deep-link rules (`cargo test`).
+- **Start-up:**
+  - start page → live sign-in page;
+  - the offline screen;
+  - the release build.
+- **What the site may call:**
+  - `app_info` works from the site's own origin;
+  - `open_external("file:///etc/passwd")` is refused;
+  - `start_target` called from the site is refused, as is a plugin command called directly.
+- **Links:**
+  - an external link, an external "new tab" link, the blank-tab-then-file pattern and an external
+    `window.open` all reach the system browser;
+  - the site's own `blob:` page opens in the app;
+  - a cold start from `org.bojes.blob://show` opens that page;
+  - a second start with a link hands it to the running app, which navigates.
+- **Automated:** Rust unit tests for the address and link rules (`cargo test`); a type-check for
+  Android (`cargo check --target aarch64-linux-android`); CI builds for every desktop platform.
+
+An independent security review of the shell found the issues fixed above: pages from other origins
+counting as the app's own, a scheme browsers swallow, an open redirect in `next`, the start link's
+token visible to the site, a start-up race on macOS, and desktop-only calls in the phone build.
 
 ## Working on it
 
 ```bash
 npm run app                                     # the desktop app against blob.bojes.org
-BLOB_SITE=http://localhost:3000 npm run app     # against `npm run dev` (debug builds only)
-BLOB_START=/learn/french npm run app            # start on a page (debug builds only)
+BLOB_SITE=http://localhost:3000 npm run app     # against `npm run dev` (dev builds only)
+BLOB_START=/learn/french npm run app            # start on a page (dev builds only)
 npm run app:build                               # installers for this OS (src-tauri/target/release/bundle)
 cd src-tauri && cargo test                      # the shell's rules
 ```

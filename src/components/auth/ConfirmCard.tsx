@@ -28,7 +28,7 @@ export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type
     () => blobApp() !== null,
     () => false,
   );
-  const appLink = `blob://auth/confirm?${new URLSearchParams({ token_hash: tokenHash, type, next })}`;
+  const appLink = `org.bojes.blob://auth/confirm?${new URLSearchParams({ token_hash: tokenHash, type, next })}`;
 
   useEffect(() => {
     if (!valid) {

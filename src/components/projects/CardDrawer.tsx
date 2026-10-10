@@ -952,7 +952,10 @@ function AttachmentRow({ attachment: a, readOnly, onRemove }: { attachment: Atta
       const link = document.createElement("a");
       link.href = url;
       link.rel = "noopener";
+      // In the page, so the Blob app sees the click too (it sends file links to the browser).
+      document.body.appendChild(link);
       link.click();
+      link.remove();
     }
   }
 

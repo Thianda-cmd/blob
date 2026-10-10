@@ -13,7 +13,7 @@
     "show-manifest": "tsx --tsconfig tsconfig.json scripts/show-manifest.ts --check",
     "check:learn": "tsx --tsconfig tsconfig.json scripts/check-learn.ts",
     "check:french": "tsx --tsconfig tsconfig.json scripts/check-french.ts",
-    "app": "tauri dev",
+    "app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "app:build": "tauri build",
     "tauri": "tauri"
   },

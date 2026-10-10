@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "site-dev",
+  "description": "Development only (tauri.dev.conf.json, `npm run app`): the same for a local site from BLOB_SITE. Release builds don't include it.",
+  "windows": [
+    "main",
+    "popup-*"
+  ],
+  "remote": {
+    "urls": [
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*",
+      "http://10.0.2.2:*/*"
+    ]
+  },
+  "permissions": [
+    "allow-open-external",
+    "allow-print-page",
+    "allow-app-info"
+  ]
+}

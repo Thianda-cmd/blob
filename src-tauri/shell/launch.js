@@ -3,8 +3,7 @@
 (function () {
   var app = window.__BLOB_APP__ || {};
   var site = app.site || "https://blob.bojes.org/";
-  // A page from a blob:// link (checked by the app), else the home page (sign-in when signed out).
-  var target = app.start || new URL("/home", site).href;
+  var home = new URL("/home", site).href;
   var lang = (navigator.language || "en").toLowerCase().indexOf("de") === 0 ? "de" : "en";
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-en]").forEach(function (el) {
@@ -39,14 +38,34 @@
       });
   }
 
+  // Where to go, asked at the last moment: a page from an app link (checked by the app, which may
+  // have got it while this page was already up), else the home page (sign-in when signed out).
+  function target() {
+    var ipc = window.__TAURI_INTERNALS__;
+    if (!ipc || typeof ipc.invoke !== "function") return Promise.resolve(home);
+    return ipc.invoke("start_target").then(
+      function (to) {
+        return typeof to === "string" && to.indexOf(site) === 0 ? to : home;
+      },
+      function () {
+        return home;
+      },
+    );
+  }
+
   function go() {
     if (busy) return;
     busy = true;
     show("loading");
     reachable().then(function (ok) {
-      busy = false;
-      if (ok) location.replace(target);
-      else show("offline");
+      if (!ok) {
+        busy = false;
+        show("offline");
+        return;
+      }
+      target().then(function (to) {
+        location.replace(to);
+      });
     });
   }
 
