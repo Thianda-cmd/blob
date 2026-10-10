@@ -114,17 +114,20 @@ function dictionary(upTo = UNITS.length): Dictionary {
     const k = fold(fr, "fr");
     if (k && !d.folded.has(k)) d.folded.set(k, g);
   };
-  const units = UNITS.slice(0, upTo);
   // The little words first: "un" is "a" in every sentence, even once the number one is taught.
   for (const [fr, g] of Object.entries(BASE)) add(fr, g);
-  for (const w of units.flatMap((u) => u.words)) {
-    const g = { en: w.en, de: w.de };
-    add(w.fr, g);
-    const bareForm = w.fr.replace(/^(le|la|les|un|une)\s+/i, "").replace(/^l['’]/i, "").replace(/\s*\?$/, "");
-    // "chien" alone (as in "un chien") means dog, not "the dog".
-    if (bareForm !== w.fr) add(bareForm, { en: w.en.replace(/^(the|a|an)\s+/i, ""), de: w.de.replace(/^(der|die|das|den|ein|eine)\s+/i, "") });
+  // Then unit by unit, each with its forms: what a word means where students first meet it stays
+  // ("porte" is "wears" from unit 9, even after unit 12 teaches "la porte", the door).
+  for (const u of UNITS.slice(0, upTo)) {
+    for (const w of u.words) {
+      const g = { en: w.en, de: w.de };
+      add(w.fr, g);
+      const bareForm = w.fr.replace(/^(le|la|les|un|une)\s+/i, "").replace(/^l['’]/i, "").replace(/\s*\?$/, "");
+      // "chien" alone (as in "un chien") means dog, not "the dog".
+      if (bareForm !== w.fr) add(bareForm, { en: w.en.replace(/^(the|a|an)\s+/i, ""), de: w.de.replace(/^(der|die|das|den|ein|eine)\s+/i, "") });
+    }
+    for (const g of u.gloss ?? []) add(g.fr, { en: g.en, de: g.de });
   }
-  for (const u of units) for (const g of u.gloss ?? []) add(g.fr, { en: g.en, de: g.de });
   dicts.set(upTo, d);
   return d;
 }
@@ -134,8 +137,8 @@ const lookup = (d: Dictionary, text: string) => d.exact.get(norm(text)) ?? d.fol
 export type GlossSegment = { text: string; gloss: Gloss | null };
 
 /**
- * A French sentence cut into tappable pieces: the longest known phrase at each place (up to four
- * words, so "au revoir" and "il y a" stay together), the rest word by word.
+ * A French sentence cut into tappable pieces: the longest known phrase at each place (up to five
+ * words, so "au revoir", "il y a" and "il n'y a pas de" stay together), the rest word by word.
  */
 export function glossSegments(sentence: string, upTo?: number): GlossSegment[] {
   const d = dictionary(upTo);
@@ -143,7 +146,7 @@ export function glossSegments(sentence: string, upTo?: number): GlossSegment[] {
   const out: GlossSegment[] = [];
   for (let i = 0; i < tokens.length; ) {
     let found: GlossSegment | null = null;
-    for (let len = Math.min(4, tokens.length - i); len >= 1 && !found; len--) {
+    for (let len = Math.min(5, tokens.length - i); len >= 1 && !found; len--) {
       const text = tokens.slice(i, i + len).join(" ");
       const g = lookup(d, text);
       if (g) {

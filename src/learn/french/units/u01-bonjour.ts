@@ -40,7 +40,10 @@ export const u01: Unit = {
     { id: "elle-s-appelle", fr: "elle s'appelle", en: "her name is", de: "sie heißt", alt: { en: ["she is called"] }, kind: "phrase" },
     { id: "comme-ci-comme-ca", fr: "comme ci, comme ça", en: "so-so", de: "so lala", alt: { de: ["geht so", "es geht"] }, kind: "phrase", emoji: "🤷", note: tx("Literally «like this, like that»: not great, not bad.", "Wörtlich „so hier, so da“: nicht toll, nicht schlecht.") },
   ],
-  gloss: [{ fr: "enchantée", en: "nice to meet you (said by a girl)", de: "freut mich (von einem Mädchen)" }],
+  gloss: [
+    { fr: "enchantée", en: "nice to meet you (said by a girl)", de: "freut mich (von einem Mädchen)" },
+    { fr: "heures", en: "o'clock / hours", de: "Uhr / Stunden" },
+  ],
   lessons: [
     { title: tx("Hello and thanks", "Hallo und danke"), words: ["bonjour", "salut", "merci", "oui", "non"] },
     { title: tx("Good evening, goodbye", "Guten Abend, tschüss"), words: ["bonsoir", "au-revoir", "a-bientot", "merci-beaucoup", "madame"] },

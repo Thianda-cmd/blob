@@ -52,7 +52,7 @@ function bilingual(where: string, t: Text | undefined) {
 }
 
 // Read the PROPER names from text.ts through tilesOf: a proper name keeps its capital at the start.
-const isProper = (word: string) => tilesOf(`${word} x`, "fr")[0] === word;
+const isProper = (word: string) => /^[A-ZÀ-Ý]/.test(word) && tilesOf(`${word} x`, "fr")[0] === word;
 
 // Words ids across the course.
 const wordIds = new Map<string, string>();

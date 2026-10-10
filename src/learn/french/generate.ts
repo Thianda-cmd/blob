@@ -142,7 +142,10 @@ function articleFor(w: Word, rng: Rng, i: number): Exercise | null {
   if (!m) return null;
   const elided = !!m[2];
   if (elided && MASS.has(w.id)) return null;
-  const indefinite = elided || rng.chance(0.4);
+  // Countries: "la France", never "une France"; "l'Allemagne" has nothing to choose.
+  const proper = /^[A-ZÀ-Ý]/.test(m[3]);
+  if (proper && elided) return null;
+  const indefinite = !proper && (elided || rng.chance(0.4));
   const options = indefinite ? ["un", "une"] : ["le", "la"];
   return { kind: "article", key: `article:${w.id}:${i}`, word: w, options, answer: w.g === "m" ? 0 : 1 };
 }

@@ -8,7 +8,8 @@ except its material.
 - Types: `src/learn/french/types.ts`
 - The reference unit: `src/learn/french/units/u01-bonjour.ts`. Every unit is written like it.
 - Check before you commit: `npm run check:french` (or `npm run check:french -- ecole ville` for some
-  units). It must report 0 problems and 0 warnings.
+  units). It must report 0 problems and 0 warnings. A whole run takes long; while drafting, add
+  `--seeds=8` (fewer generated lessons per unit) and run units in parallel.
 
 ## What students do with a unit
 
@@ -90,7 +91,10 @@ the articles.
 
 **Gloss**: every form used in sentences, drills and dialogues that isn't a word of the course or in
 `BASE`: `{ fr: "mange", en: "eat / eats", de: "esse / isst" }`. Little words a unit needs that BASE
-doesn't have go here too (BASE is shared, don't edit it).
+doesn't have go here too (BASE is shared, don't edit it). A form keeps the meaning of the unit that
+first has it (as a word or a gloss): `porte` stays "wears" from unit 9 even though unit 12 teaches
+`la porte` (the door). So for a new meaning of a known form, gloss the phrase it comes in (`j'ai fait`,
+`il fait chaud`, `plus grand que`): tapping takes the longest known phrase, up to five words.
 
 ## Syllabus: section 1 (A1)
 

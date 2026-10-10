@@ -38,6 +38,7 @@ export const u09: Unit = {
     { id: "violet", fr: "violet", en: "purple", de: "lila", alt: { en: ["violet"], de: ["violett"] }, kind: "adj", emoji: "🟣", note: tx("Blob's colour! Feminine: violette, with a double t.", "Blobs Farbe! Weiblich: violette, mit Doppel-t.") },
   ],
   gloss: [
+    { fr: "noires", en: "black (feminine plural)", de: "schwarz" },
     { fr: "verte", en: "green (feminine)", de: "grün (weiblich)" },
     { fr: "bleue", en: "blue (feminine)", de: "blau (weiblich)" },
     { fr: "noire", en: "black (feminine)", de: "schwarz (weiblich)" },

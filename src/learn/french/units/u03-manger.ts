@@ -44,6 +44,8 @@ export const u03: Unit = {
     { id: "riz", fr: "le riz", en: "the rice", de: "der Reis", g: "m", kind: "noun", emoji: "🍚", note: tx("The z is silent: «ree».", "Das z ist stumm: „ri“.") },
   ],
   gloss: [
+    { fr: "bon", en: "good", de: "gut" },
+    { fr: "manges", en: "eat (you)", de: "isst (du)" },
     { fr: "mange", en: "eats / eat", de: "isst / esse" },
     { fr: "aime", en: "likes / like", de: "mag" },
     { fr: "boit", en: "drinks", de: "trinkt" },

@@ -50,7 +50,7 @@ export const u08: Unit = {
     { fr: "qu'est-ce que", en: "what", de: "was" },
     { fr: "super", en: "great", de: "super" },
     { fr: "rien", en: "nothing", de: "nichts" },
-    { fr: "après", en: "afterwards", de: "danach" },
+    { fr: "après", en: "after / afterwards", de: "nach / danach" },
     { fr: "pleut", en: "rains", de: "regnet" },
     { fr: "beau", en: "nice / beautiful", de: "schön" },
     { fr: "jouons", en: "play (we)", de: "spielen (wir)" },
