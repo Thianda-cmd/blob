@@ -222,6 +222,13 @@ function LessonNode({ unit, n, state, color, title, kind }: { unit: Unit; n: num
   const x = Math.round(Math.sin((n - 1) * 1.15) * 72);
   const Icon = state === "locked" ? Lock : state === "done" ? Check : kind === "story" ? BookOpen : kind === "review" ? Target : Star;
   const href = state === "locked" ? null : `/study/french/${unit.slug}/${n}`;
+  const item = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    // Far along the path, the page opens at the next lesson, not at unit 1.
+    const el = item.current;
+    if (state !== "current" || !el) return;
+    if (el.getBoundingClientRect().top > window.innerHeight - 140) el.scrollIntoView({ block: "center" });
+  }, [state]);
   const node = (
     <span
       className={cn(
@@ -236,7 +243,7 @@ function LessonNode({ unit, n, state, color, title, kind }: { unit: Unit; n: num
     </span>
   );
   return (
-    <li className="relative" style={{ transform: `translateX(${x}px)` }}>
+    <li ref={item} className="relative" style={{ transform: `translateX(${x}px)` }}>
       {state === "current" && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: [0, -4, 0] }} transition={{ y: { repeat: Infinity, duration: 1.8 } }} className="absolute -top-10 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-xl border-2 border-line bg-raised px-3 py-1 text-[13px] font-bold uppercase tracking-wide shadow-card" style={{ color }}>
           {t.home.startLesson}
