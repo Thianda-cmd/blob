@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { BlobLookProvider, cleanLook } from "@/components/blob/look";
+import { cleanLook } from "@/components/blob/look";
+import { BlobLookProvider } from "@/components/blob/LookContext";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 /** Full-screen study mode: no sidebar, just the lesson and Blob (in the student's look). */

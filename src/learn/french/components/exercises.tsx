@@ -9,9 +9,9 @@ import { frenchText } from "@/i18n/messages/french";
 import { resolveText } from "@/i18n/text";
 import { cn } from "@/lib/utils";
 import { acceptedOf, targetOf } from "../generate";
-import { accentWords, explainFrench, fold, grade, spotTokens } from "../text";
+import { accentWords, explainFrench, fold, grade, norm, spotTokens } from "../text";
 import type { Exercise, Lang, Sentence, Word } from "../types";
-import { bare } from "../course";
+import { ALL_WORDS, bare } from "../course";
 import { OptionCards, TileBoard, TypeBox } from "./inputs";
 import { BlobSays, Prompt, Tappable, type Outcome } from "./parts";
 
@@ -561,6 +561,13 @@ export function ArticleEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"arti
    Spell the word
    ------------------------------------------------------------------------------------------- */
 
+/** The word's French forms, and those of other course words that mean the same (hello: bonjour, salut). */
+function spellingsFor(w: Word, lang: Lang): string[] {
+  const meaning = norm(w[lang]);
+  const same = ALL_WORDS.filter((x) => x.id !== w.id && [x[lang], ...(x.alt?.[lang] ?? [])].some((m) => norm(m) === meaning));
+  return [w.fr, ...(w.alt?.fr ?? []), ...same.flatMap((x) => [x.fr, ...(x.alt?.fr ?? [])])];
+}
+
 export function SpellEx({ ex, lang, setCheck, locked, submit, blobRef }: ExProps<"spell">) {
   const t = useMessages(frenchText).player;
   const w = ex.word;
@@ -572,7 +579,7 @@ export function SpellEx({ ex, lang, setCheck, locked, submit, blobRef }: ExProps
         if (w.kind === "noun" && fold(answer, "fr") === fold(bare(w.fr), "fr") && fold(answer, "fr") !== fold(w.fr, "fr")) {
           return { correct: false, solution: w.fr, explain: t.needArticle(w.fr), meaning: w[lang] };
         }
-        const g = grade(answer, [w.fr, ...(w.alt?.fr ?? [])], "fr");
+        const g = grade(answer, spellingsFor(w, lang), "fr");
         if (g.verdict === "correct") return { correct: true, verdict: "correct", meaning: w[lang] };
         if (g.verdict === "accent" || g.verdict === "typo")
           return { correct: true, verdict: g.verdict, solution: g.best, marks: g.marks, note: (g.verdict === "accent" ? t.accentNote : t.typoNote)(accentWords(answer, g.best, "fr").join(", ")), meaning: w[lang] };

@@ -7,7 +7,8 @@ import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { workspaceText } from "@/i18n/messages/workspace";
 import { useTableChanges } from "@/lib/live";
-import { BlobLookProvider, cleanLook } from "@/components/blob/look";
+import { cleanLook } from "@/components/blob/look";
+import { BlobLookProvider } from "@/components/blob/LookContext";
 import { createClient } from "@/lib/supabase/client";
 import {
   PAGE_META_COLUMNS,

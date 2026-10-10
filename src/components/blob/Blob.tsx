@@ -3,7 +3,8 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { cn } from "@/lib/utils";
 import { ARM_X, ARM_Y, BODY_Y, BOTTOM, CX, EYE_X, FACE_Y, GROUND, INK, MOUTH_Y, N, R } from "./geometry";
-import { SKIN_COLORS, useBlobLook, type BlobEyes, type BlobHat, type BlobLook, type BlobNeck, type BlobSkin } from "./look";
+import { SKIN_COLORS, type BlobEyes, type BlobHat, type BlobLook, type BlobNeck, type BlobSkin } from "./look";
+import { useBlobLook } from "./LookContext";
 import { EyeWear, Hat, NeckWear, SWING_PIVOT } from "./outfits";
 
 export type BlobMood =

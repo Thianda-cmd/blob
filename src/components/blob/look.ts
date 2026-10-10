@@ -1,7 +1,3 @@
-"use client";
-
-import { createContext, useContext, type ReactNode } from "react";
-
 // What Blob wears and which colour he is. The student picks it in Blob's corner (/blob); it's saved
 // in profiles.blob_look and every Blob in the app wears it.
 
@@ -58,15 +54,6 @@ export function cleanLook(raw: unknown): BlobLook {
     secrets: Array.isArray(o.secrets) ? o.secrets.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
   };
 }
-
-const LookContext = createContext<BlobLook>({});
-
-/** Every Blob inside wears this look (unless it's given its own). */
-export function BlobLookProvider({ look, children }: { look: BlobLook; children: ReactNode }) {
-  return <LookContext value={look}>{children}</LookContext>;
-}
-
-export const useBlobLook = () => useContext(LookContext);
 
 /** A hat for the time of year (or night), when the student hasn't picked one. */
 export function seasonalHat(now: Date): BlobHat | null {

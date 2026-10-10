@@ -57,7 +57,7 @@ export const frenchText = defineMessages({
       articleHint: "Every French noun is masculine or feminine. Learn it with its article.",
       gender: (noun: string, g: "m" | "f", def: string, indef: string) =>
         `**${noun}** is ${g === "m" ? "masculine" : "feminine"}: **${def}**, **${indef}**. Learn every noun with its article.`,
-      spellHint: "With the article for nouns: la pomme, not just pomme.",
+      spellHint: "Write nouns with their article: le, la or l'.",
       needArticle: (form: string) => `Write the article too: **${form}**. It tells you if the noun is masculine or feminine.`,
       spot: "Tap the mistake",
       spotHint: "One word in this sentence is wrong. Which one?",
@@ -202,7 +202,7 @@ export const frenchText = defineMessages({
       articleHint: "Jedes französische Nomen ist männlich oder weiblich. Lerne es mit seinem Artikel.",
       gender: (noun, g, def, indef) =>
         `**${noun}** ist ${g === "m" ? "männlich" : "weiblich"}: **${def}**, **${indef}**. Lerne jedes Nomen mit seinem Artikel.`,
-      spellHint: "Bei Nomen mit Artikel: la pomme, nicht nur pomme.",
+      spellHint: "Schreib Nomen mit Artikel: le, la oder l'.",
       needArticle: (form) => `Schreib den Artikel mit: **${form}**. Er zeigt, ob das Nomen männlich oder weiblich ist.`,
       spot: "Tippe den Fehler an",
       spotHint: "Ein Wort in diesem Satz ist falsch. Welches?",
