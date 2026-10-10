@@ -22,8 +22,10 @@ export const acceptedOf = (s: Sentence, dir: "toFr" | "fromFr", lang: Lang) =>
 
 const TU = /(^|[\s«(-])(tu|toi|te|ton|ta|tes|t')(?=[\s,.!?;:»)]|$)|\bt'/i;
 const VOUS = /(^|[\s«(-])(vous|votre|vos)(?=[\s,.!?;:»)]|$)/i;
-const DU = /\b(du|dir|dich|dein\w*)\b/;
-const IHR = /\b(ihr|euch|euer\w*|eure\w*|Ihnen)\b|(?<!^)\bSie\b/;
+// German "you": du-forms and ihr/Sie-forms, small or (at the start) capitalised. "Sie" only counts
+// inside a sentence, where it can't be "she" or "they" starting it.
+const DU = /\b([Dd]u|[Dd]ir|[Dd]ich|[Dd]ein\w*)\b/;
+const IHR = /\b([Ii]hr|[Ee]uch|[Ee]uer\w*|[Ee]ure\w*|Ihnen)\b|(?<!^)\bSie\b/;
 
 /**
  * French alternatives are written for both prompts, but "you" in English leaves tu and vous open
@@ -135,9 +137,10 @@ const MASS = new Set(["eau", "lait", "pain", "fromage", "chocolat", "sport", "mu
 /** Le or la? For "l'…" nouns (where the article hides the gender) it's un or une. */
 function articleFor(w: Word, rng: Rng, i: number): Exercise | null {
   if (w.kind !== "noun" || !w.g || EITHER_GENDER.has(w.id)) return null;
-  const m = /^(le|la|l')\s*(.+)$/i.exec(w.fr);
+  // Singular nouns only: "le pain", "la pomme", "l'eau" (not "les frites").
+  const m = /^(?:(le|la)\s+|(l'))(.+)$/i.exec(w.fr);
   if (!m) return null;
-  const elided = m[1].toLowerCase() === "l'";
+  const elided = !!m[2];
   if (elided && MASS.has(w.id)) return null;
   const indefinite = elided || rng.chance(0.4);
   const options = indefinite ? ["un", "une"] : ["le", "la"];

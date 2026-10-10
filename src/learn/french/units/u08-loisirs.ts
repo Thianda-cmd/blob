@@ -181,7 +181,7 @@ export const u08: Unit = {
         { who: "hugo", fr: "Super ! Alors, on fait de la musique et on danse !", en: "Great! Then let's make music and dance!", de: "Super! Dann machen wir Musik und tanzen!" },
         { who: "lea", fr: "Je joue de la guitare et Hugo joue du piano.", en: "I'll play the guitar and Hugo will play the piano.", de: "Ich spiele Gitarre und Hugo spielt Klavier." },
         { who: "blob", fr: "Et moi, je danse !", en: "And I'll dance!", de: "Und ich tanze!" },
-        { who: "madame", fr: "Bonjour ! Qu'est-ce que vous faites ?", en: "Hello! What are you doing?", de: "Hallo! Was macht ihr da?" },
+        { who: "madame", fr: "Bonjour, les enfants ! Qu'est-ce que vous faites ?", en: "Hello, children! What are you doing?", de: "Hallo, Kinder! Was macht ihr da?" },
         { who: "blob", fr: "Nous dansons, Madame Martin ! Il pleut, mais c'est super !", en: "We're dancing, Mrs Martin! It's raining, but it's great!", de: "Wir tanzen, Frau Martin! Es regnet, aber es ist super!" },
       ],
       questions: [

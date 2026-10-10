@@ -34,7 +34,7 @@ out (`Monsieur`, not `M.`; `douze`, not `12`).
 **Audience**: teenagers and adults starting from zero, in English or German. Friendly, everyday,
 a bit funny; Blob (the purple mascot, who wears a béret in this course) is part of the stories.
 
-**Words** (18 to 26 per unit)
+**Words** (about 25 to 33 per unit: 18 to 26 in lessons 1 to 5, a few more in lessons 6 and 7)
 - `id`: unique in the whole course, lowercase with dashes: `pain`, `je-mange`, `grand-mere`. The
   syllabus below fixes the ids of the core words, so later units can count on them.
 - Nouns carry their article (`le pain`, `la pomme`, `l'eau`, `les parents`) and their gender `g`

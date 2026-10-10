@@ -476,7 +476,7 @@ export function DialogueEx({ ex, lang, locked, setCheck }: ExProps<"dialogue">) 
    ------------------------------------------------------------------------------------------- */
 
 /** "pomme" of "la pomme", "école" of "l'école". */
-const nounOf = (fr: string) => fr.replace(/^(le|la|l')\s*/i, "");
+const nounOf = (fr: string) => fr.replace(/^(?:(?:le|la)\s+|l')/i, "");
 
 export function ArticleEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"article">) {
   const t = useMessages(frenchText).player;
