@@ -12,13 +12,23 @@ import { u07 } from "./units/u07-ville";
 import { u08 } from "./units/u08-loisirs";
 import { u09 } from "./units/u09-vetements";
 import { u10 } from "./units/u10-cafe";
+import { u11 } from "./units/u11-ma-journee";
+import { u12 } from "./units/u12-chez-moi";
+import { u13 } from "./units/u13-projets";
+import { u14 } from "./units/u14-hier";
+import { u15 } from "./units/u15-voyage";
+import { u16 } from "./units/u16-marche";
+import { u17 } from "./units/u17-sante";
+import { u18 } from "./units/u18-saisons";
+import { u19 } from "./units/u19-sorties";
+import { u20 } from "./units/u20-comparer";
 
 /** Every unit closes with a review lesson: no new words, the whole unit mixed. */
 const REVIEW: LessonSpec = { title: tx("Unit review", "Wiederholung"), words: [], review: true };
 const withReview = (u: Unit): Unit => (u.lessons.length ? { ...u, lessons: [...u.lessons, REVIEW] } : u);
 
 /** Every unit in order. */
-export const UNITS: Unit[] = [u01, u02, u03, u04, u05, u06, u07, u08, u09, u10].map(withReview);
+export const UNITS: Unit[] = [u01, u02, u03, u04, u05, u06, u07, u08, u09, u10, u11, u12, u13, u14, u15, u16, u17, u18, u19, u20].map(withReview);
 
 /** The lessons that teach (all but the review). */
 export const teachingLessons = (u: Unit) => u.lessons.filter((l) => !l.review);
@@ -43,7 +53,6 @@ export const SECTIONS: Section[] = [
     title: tx("Everyday life", "Alltag"),
     goal: tx("Your day, the past, plans, trips and shopping", "Dein Tag, die Vergangenheit, Pläne, Reisen und Einkaufen"),
     units: UNITS.filter((u) => u.cefr === "A2" && u.lessons.length > 0),
-    soon: true,
   },
 ];
 

@@ -202,6 +202,33 @@ const ELIDE: Record<string, string> = { je: "j'", le: "l'", la: "l'", ne: "n'", 
 const VOWEL = /^[aeiouyhàâéèêëîïôûœ]/;
 const ARTICLES = new Set(["le", "la", "l'", "les", "un", "une", "du", "des", "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses", "ce", "cette"]);
 
+/** The reflexive pronoun of each subject: je me lève, nous nous levons. */
+const REFLEXIVE: Record<string, string> = { je: "me", tu: "te", il: "se", elle: "se", on: "se", nous: "nous", vous: "vous", ils: "se", elles: "se" };
+
+/** Past participles that take être (je suis allé), without agreement endings. */
+const ETRE_PP = new Set(["allé", "parti", "arrivé", "venu", "revenu", "devenu", "resté", "rentré", "sorti", "entré", "tombé", "né", "monté", "descendu", "retourné", "mort"]);
+const stem = (pp: string) => (ETRE_PP.has(pp) ? pp : pp.replace(/(?:es|e|s)$/, ""));
+const ETRE_FORMS = new Set(["suis", "es", "est", "sommes", "êtes", "sont"]);
+const AVOIR_FORMS = new Set(["ai", "as", "a", "avons", "avez", "ont"]);
+const unelide = (w: string[]) => w.join(" ").replace(/\bj'/g, "je ");
+const SUBJECTS = new Set(["je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles"]);
+
+/** The first passé composé of a sentence: its helper, its participle and the words around ("je suis allé"). */
+function pastOf(w: string[]): { aux: "être" | "avoir"; pp: string; text: string } | null {
+  for (let i = 0; i < w.length; i++) {
+    const x = w[i].replace(/^[jn]'/, "");
+    const aux = ETRE_FORMS.has(x) ? "être" : AVOIR_FORMS.has(x) ? "avoir" : null;
+    if (!aux) continue;
+    let j = i + 1;
+    while (j < w.length && ["pas", "jamais", "déjà", "encore", "bien", "beaucoup"].includes(w[j])) j++;
+    const pp = w[j];
+    if (!pp || !/(é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|it|ite|ts)$/.test(pp)) continue;
+    const from = i > 0 && (SUBJECTS.has(w[i - 1]) || w[i - 1] === "ne") ? (w[i - 1] === "ne" && i > 1 ? i - 2 : i - 1) : i;
+    return { aux, pp, text: w.slice(from, j + 1).join(" ") };
+  }
+  return null;
+}
+
 /** Nouns of the course by their bare form ("pomme" → the word), for gender hints. */
 export function nounIndex(words: Word[]): Map<string, Word> {
   const map = new Map<string, Word>();
@@ -214,12 +241,44 @@ export function nounIndex(words: Word[]): Map<string, Word> {
 }
 
 /**
- * Blob's explanation of a wrong French answer, when there is a typical reason: a missing
- * elision (je ai → j'ai), the wrong article for a noun's gender, half a negation. Null otherwise.
+ * Blob's explanation of a wrong French answer, when there is a typical reason: the wrong helper in
+ * the past (j'ai allé), a reflexive verb without its pronoun (je lève), a missing elision (je ai →
+ * j'ai), the wrong article for a noun's gender, half a negation. Null otherwise.
  */
 export function explainFrench(answer: string, best: string, nouns: Map<string, Word>): Text | null {
   const a = words(canon(answer, "fr"));
   const b = words(canon(best, "fr"));
+
+  // The past with the wrong helper: j'ai allé → je suis allé, je suis mangé → j'ai mangé.
+  const pa = pastOf(a);
+  const pb = pastOf(b);
+  if (pa && pb && pa.pp === pb.pp && pa.aux !== pb.aux) {
+    if (pb.aux === "être" && ETRE_PP.has(stem(pb.pp)))
+      return tx(
+        `Verbs of coming and going (aller, partir, arriver, rester…) make the past with **être**: **${pb.text}**, not "${pa.text}".`,
+        `Verben der Bewegung (aller, partir, arriver, rester …) bilden die Vergangenheit mit **être**: **${pb.text}**, nicht „${pa.text}“.`,
+      );
+    if (pb.aux === "avoir")
+      return tx(
+        `Most verbs make the past with **avoir**: **${pb.text}**, not "${pa.text}". Only verbs of coming and going (aller, partir, arriver…) take être.`,
+        `Die meisten Verben bilden die Vergangenheit mit **avoir**: **${pb.text}**, nicht „${pa.text}“. Nur Verben der Bewegung (aller, partir, arriver …) nehmen être.`,
+      );
+  }
+
+  // A reflexive verb without its little pronoun: je lève → je me lève, je habille → je m'habille.
+  for (let i = 1; i < b.length; i++) {
+    const subject = b[i - 1] === "ne" || b[i - 1] === "n'" ? b[i - 2] : b[i - 1];
+    const own = subject ? REFLEXIVE[subject] : undefined;
+    if (!own) continue;
+    const elided = /^([mts])'(.+)$/.exec(b[i]);
+    const without = b[i] === own ? [...b.slice(0, i), ...b.slice(i + 1)] : elided && `${elided[1]}e` === own ? [...b.slice(0, i), elided[2], ...b.slice(i + 1)] : null;
+    if (without && unelide(without) === unelide(a)) {
+      return tx(
+        `This verb is reflexive: it needs **${own}** after **${subject}** (je **me** lève, tu **te** lèves, il **se** lève).`,
+        `Das Verb ist reflexiv: Nach **${subject}** braucht es **${own}** (je **me** lève, tu **te** lèves, il **se** lève).`,
+      );
+    }
+  }
 
   // je ai, le ami, ne est…: French drops the vowel before another vowel.
   for (let i = 0; i < a.length - 1; i++) {
@@ -245,6 +304,16 @@ export function explainFrench(answer: string, best: string, nouns: Map<string, W
   }
 
   // One article or possessive swapped (la/le, un/une, mon/ma): the noun's gender.
+  if (a.length === b.length) {
+    const diffs = b.map((w, i) => (w !== a[i] ? i : -1)).filter((i) => i >= 0);
+    // The reflexive pronoun of another person: je se lève → je me lève.
+    const refl = (w: string) => /^(me|te|se|nous|vous|[mts]')/.test(w);
+    if (diffs.length === 1 && refl(a[diffs[0]]) && refl(b[diffs[0]]) && diffs[0] > 0 && REFLEXIVE[b[diffs[0] - 1]])
+      return tx(
+        "The little pronoun changes with the person: je **me**, tu **te**, il / elle **se**, nous **nous**, vous **vous**, ils **se**.",
+        "Das kleine Pronomen ändert sich mit der Person: je **me**, tu **te**, il / elle **se**, nous **nous**, vous **vous**, ils **se**.",
+      );
+  }
   if (a.length === b.length) {
     const diffs = b.map((w, i) => (w !== a[i] ? i : -1)).filter((i) => i >= 0);
     if (diffs.length === 1) {

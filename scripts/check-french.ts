@@ -40,7 +40,7 @@ const bad = (where: string, msg: string) => problems.push(`${where}: ${msg}`);
 const warn = (where: string, msg: string) => warnings.push(`${where}: ${msg}`);
 
 const LANGS: Lang[] = ["en", "de"];
-const SPEAKERS = new Set(["blob", "lea", "hugo", "madame", "serveur", "maman", "papa", "prof", "vendeur"]);
+const SPEAKERS = new Set(["blob", "lea", "hugo", "madame", "serveur", "maman", "papa", "prof", "vendeur", "medecin", "chloe"]);
 const RESERVED = new Set(["words", "practice"]);
 const ARTICLE = /^(le|la|les|un|une|l')\s*/i;
 
@@ -120,7 +120,8 @@ function checkUnit(u: Unit, index: number) {
     if (s.lesson < 1 || s.lesson > teach.length) bad(sat, `lesson ${s.lesson} out of range`);
     for (const k of ["fr", "en", "de"] as const) if (!s[k]?.trim()) bad(sat, `empty ${k}`);
     const n = tilesOf(s.fr, "fr").length;
-    if (n > 10) warn(sat, `${n} words is long for A1 (2 to 9)`);
+    const max = u.cefr === "A1" ? 10 : 12;
+    if (n > max) warn(sat, `${n} words is long for ${u.cefr} (2 to ${max - 1})`);
     // Grading accepts the sentence and its alternatives.
     for (const dir of ["toFr", "fromFr"] as const)
       for (const lang of LANGS)

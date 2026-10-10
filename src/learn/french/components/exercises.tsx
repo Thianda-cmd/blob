@@ -403,6 +403,8 @@ const SPEAKER_STYLE: Record<string, { emoji: string; tone: string }> = {
   papa: { emoji: "👨", tone: "bg-[#2f6f6a]/14 text-[#245853]" },
   prof: { emoji: "👩‍🏫", tone: "bg-[#8a5a9c]/14 text-[#6e4580]" },
   vendeur: { emoji: "🧑‍💼", tone: "bg-[#3f78b3]/12 text-[#2f5f93]" },
+  medecin: { emoji: "🧑‍⚕️", tone: "bg-[#2f7f8f]/14 text-[#23626f]" },
+  chloe: { emoji: "👩‍🦱", tone: "bg-[#b4508a]/13 text-[#933d6f]" },
 };
 
 export function DialogueEx({ ex, lang, locked, setCheck }: ExProps<"dialogue">) {

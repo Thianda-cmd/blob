@@ -50,7 +50,7 @@ combinations (questions, negation, plural forms, words of earlier units), and th
 lesson 7.
 
 **Sentences** (6 or 7 per lesson in lessons 1 to 5, 7 or 8 in lessons 6 and 7; about 50 per unit)
-- Short (2 to 9 words), natural, everyday French at A1.
+- Short (2 to 9 words), natural, everyday French at A1 (section 2: see below).
 - Use only words taught in this unit or before, the little words of `BASE` in `glossary.ts`, and
   forms listed in the unit's `gloss` (verb forms, plurals, feminine forms). The checker warns about
   every French word a student couldn't tap for a meaning.
@@ -110,4 +110,42 @@ the earlier ones.
 | 9 | vetements | Clothes and colours | adjective agreement and place, porter, ce/cette | rouge · bleu · vert · jaune · noir · blanc · gris · pantalon: le pantalon · robe: la robe · chemise: la chemise · t-shirt: le t-shirt · chaussures: les chaussures · pull: le pull · jupe: la jupe · veste: la veste · beret: le béret · je-porte: je porte · tu-portes: tu portes · il-porte: il porte · joli: joli |
 | 10 | cafe | At the café | je voudrais, vous (polite), prices | je-voudrais: je voudrais · s-il-vous-plait: s'il vous plaît · s-il-te-plait: s'il te plaît · addition: l'addition · carte: la carte · cafe: le café · the: le thé · limonade: la limonade · jus-d-orange: le jus d'orange · crepe: la crêpe · glace: la glace · gateau: le gâteau · c-est-combien: c'est combien ? · euros: euros · vous-desirez: vous désirez ? · voila: voilà · bien-sur: bien sûr |
 
-Section 2 (A2: past tense, near future, daily routine, travel, shopping) comes later.
+## Section 2 (A2): what changes
+
+Section 2 is for students who finished section 1: everything there is known and should come back
+often (that's how words stick). The rules above hold, with these differences:
+
+- **Sentences** may be a little longer: 3 to 11 words. Still everyday French, now at A2.
+- **Recycle**: about half of the sentences use words of section 1 in the unit's new grammar
+  (`Hier, j'ai mangé une crêpe.`, `Demain, je vais aller à la piscine.`).
+- **Cast**: Léa, Hugo, Blob and the Martins, plus **Chloé** (Léa's cousin from Lyon, speaker
+  `chloe`, she visits in unit 11 and stays for the section) and **the doctor** (speaker `medecin`,
+  a woman: `la médecin`, addressed as `Docteur`) in unit 17.
+- **The past** (units 14 and 15): the English prompt is the simple past (`I ate a pizza.`), with the
+  present perfect as an `alt` (`I have eaten a pizza.`); the German prompt is the Perfekt (`Ich habe
+  eine Pizza gegessen.`), with the Präteritum as an `alt` where people say it (`Ich war`, `Ich ging`).
+  With être, add the feminine and plural forms as French `alt`s whenever the prompt doesn't decide
+  (`I went to Paris.` → `Je suis allé à Paris.` and `Je suis allée à Paris.`). Participles are words
+  of their own (`mangé`, id `pp-mange`): en `eaten / ate`, de `gegessen`.
+- **The near future** (unit 13 on): `I'm going to …` with `I will …` as an `alt`; German `Ich werde
+  …` or the present with a time word (`Morgen gehe ich …`), each as an `alt` of the other.
+- **Explanations**: Blob already explains two typical A2 slips by himself (the wrong helper in the
+  past: `j'ai allé`; a reflexive verb without `me/te/se`). Drills and tips should teach exactly these.
+- Object pronouns (`le`, `la`, `les` before a verb: `je le prends`) and the reflexive pronouns
+  (`me`, `te`, `se`) are in `BASE`. Phrases the tap dictionary should keep together (`j'ai fait`,
+  `plus grand`) go into the unit's `gloss`.
+
+## Syllabus: section 2 (A2)
+
+| # | slug | title | grammar | core words (id: French) |
+|---|---|---|---|---|
+| 11 | ma-journee | My day | reflexive verbs (se lever, se réveiller, se laver, s'habiller, se coucher: all persons), telling the time, d'abord / ensuite / après | je-me-reveille: je me réveille · je-me-leve: je me lève · tu-te-leves: tu te lèves · il-se-leve: il se lève · nous-nous-levons: nous nous levons · je-me-lave: je me lave · je-m-habille: je m'habille · je-me-couche: je me couche · matin: le matin · soir: le soir · petit-dejeuner: le petit-déjeuner · dejeuner: le déjeuner · diner: le dîner · heure: l'heure · quelle-heure: quelle heure est-il ? · et-demie: et demie · et-quart: et quart · midi: midi · minuit: minuit · tot: tôt · tard: tard · d-abord: d'abord · ensuite: ensuite |
+| 12 | chez-moi | At home | habiter, rooms and furniture, places: devant, derrière, à côté de, entre (with dans, sur, sous), il n'y a pas de | j-habite: j'habite · tu-habites: tu habites · il-habite: il habite · appartement: l'appartement · chambre: la chambre · cuisine: la cuisine · salon: le salon · salle-de-bains: la salle de bains · jardin: le jardin · lit: le lit · table: la table · chaise: la chaise · canape: le canapé · fenetre: la fenêtre · porte: la porte · devant: devant · derriere: derrière · a-cote-de: à côté de · entre: entre · il-n-y-a-pas-de: il n'y a pas de |
+| 13 | projets | Plans | the near future: aller + infinitive (all persons), its negation (je ne vais pas manger), time words for later | demain: demain · ce-soir: ce soir · semaine-prochaine: la semaine prochaine · bientot: bientôt · plus-tard: plus tard · faire: faire · voir: voir · visiter: visiter · acheter: acheter · dormir: dormir · partir: partir · inviter: inviter · preparer: préparer · rester: rester |
+| 14 | hier | Yesterday | passé composé with avoir: -er verbs (mangé, regardé, joué, parlé), fait, vu, bu, pris, fini; negation (je n'ai pas mangé); tu as fait quoi ? | hier: hier · hier-soir: hier soir · semaine-derniere: la semaine dernière · deja: déjà · pas-encore: pas encore · pp-mange: mangé · pp-regarde: regardé · pp-joue: joué · pp-parle: parlé · pp-fait: fait · pp-vu: vu · pp-bu: bu · pp-pris: pris · pp-fini: fini · tu-as-fait-quoi: tu as fait quoi ? |
+| 15 | voyage | On the road | passé composé with être (aller, partir, arriver, venir, rester, rentrer) and its agreement (allé, allée, allés); en train, en avion, en voiture, à vélo; en France, en Allemagne | train: le train · avion: l'avion · voiture: la voiture · valise: la valise · billet: le billet · vacances: les vacances · mer: la mer · montagne: la montagne · pays: le pays · france: la France · allemagne: l'Allemagne · pp-alle: allé · pp-parti: parti · pp-arrive: arrivé · pp-venu: venu · pp-reste: resté · pp-rentre: rentré |
+| 16 | marche | At the market | acheter (all persons), quantities with de (un kilo de, une bouteille de, beaucoup de, pas de), numbers 30 to 100 by tens and prices | marche: le marché · fruits: les fruits · legumes: les légumes · tomate: la tomate · carotte: la carotte · fraise: la fraise · pomme-de-terre: la pomme de terre · kilo: le kilo · bouteille: la bouteille · beaucoup-de: beaucoup de · j-achete: j'achète · tu-achetes: tu achètes · il-achete: il achète · nous-achetons: nous achetons · cher: cher · num-30: trente · num-40: quarante · num-50: cinquante · num-60: soixante · num-100: cent |
+| 17 | sante | Feeling ill | avoir mal à (au, à la, à l', aux), body parts, devoir + infinitive (all persons), advice | tete: la tête · ventre: le ventre · dos: le dos · bras: le bras · jambe: la jambe · main: la main · pied: le pied · dents: les dents · gorge: la gorge · j-ai-mal: j'ai mal · malade: malade · medecin: le médecin · pharmacie: la pharmacie · je-dois: je dois · tu-dois: tu dois · il-doit: il doit · vous-devez: vous devez · fievre: la fièvre |
+| 18 | saisons | Seasons and weather | weather (il fait + adjective, il pleut, il neige, il y a du soleil / du vent), seasons (au printemps, en été…), months and dates (le premier mai, le quatorze juillet) | printemps: le printemps · ete: l'été · automne: l'automne · hiver: l'hiver · janvier · fevrier: février · mars · avril · mai · juin · juillet · aout: août · septembre · octobre · novembre · decembre: décembre · mois: le mois · saison: la saison · temps: le temps · quel-temps: quel temps fait-il ? · il-fait-chaud: il fait chaud · il-fait-froid: il fait froid · il-neige: il neige · soleil: le soleil · vent: le vent |
+| 19 | sorties | Going out | vouloir and pouvoir + infinitive (all persons), venir, inviting, saying yes and no politely | je-veux: je veux · tu-veux: tu veux · il-veut: il veut · vous-voulez: vous voulez · je-peux: je peux · tu-peux: tu peux · il-peut: il peut · vous-pouvez: vous pouvez · je-viens: je viens · tu-viens: tu viens · fete: la fête · concert: le concert · restaurant: le restaurant · film: le film · d-accord: d'accord · desole: désolé · rendez-vous: le rendez-vous · ensemble: ensemble · on-y-va: on y va ! |
+| 20 | comparer | Which one is better? | comparing (plus … que, moins … que, aussi … que, meilleur), the most (le plus …), object pronouns le / la / les (je le prends), shopping for things | plus-que: plus … que · moins-que: moins … que · aussi-que: aussi … que · meilleur: meilleur · le-plus: le plus · magasin: le magasin · taille: la taille · essayer: essayer · beau: beau · vieux: vieux · jeune: jeune · rapide: rapide · lent: lent · je-le-prends: je le prends · je-la-prends: je la prends · je-les-prends: je les prends |

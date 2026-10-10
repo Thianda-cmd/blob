@@ -145,7 +145,7 @@ export const frenchText = defineMessages({
       startUnit: "Start the unit",
       backToPath: "Back to the course",
     },
-    speakers: { blob: "Blob", lea: "Léa", hugo: "Hugo", madame: "Mme Martin", serveur: "Waiter", maman: "Mum", papa: "Dad", prof: "Teacher", vendeur: "Shop assistant" },
+    speakers: { blob: "Blob", lea: "Léa", hugo: "Hugo", madame: "Mme Martin", serveur: "Waiter", maman: "Mum", papa: "Dad", prof: "Teacher", vendeur: "Shop assistant", medecin: "Doctor", chloe: "Chloé" },
     genders: { m: "masculine", f: "feminine" },
   },
   de: {
@@ -289,7 +289,7 @@ export const frenchText = defineMessages({
       startUnit: "Einheit starten",
       backToPath: "Zurück zum Kurs",
     },
-    speakers: { blob: "Blob", lea: "Léa", hugo: "Hugo", madame: "Mme Martin", serveur: "Kellner", maman: "Mama", papa: "Papa", prof: "Lehrerin", vendeur: "Verkäufer" },
+    speakers: { blob: "Blob", lea: "Léa", hugo: "Hugo", madame: "Mme Martin", serveur: "Kellner", maman: "Mama", papa: "Papa", prof: "Lehrerin", vendeur: "Verkäufer", medecin: "Ärztin", chloe: "Chloé" },
     genders: { m: "männlich", f: "weiblich" },
   },
 });

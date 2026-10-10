@@ -56,7 +56,7 @@ export type Drill = {
 };
 
 /** People in the course's little stories. */
-export type Speaker = "blob" | "lea" | "hugo" | "madame" | "serveur" | "maman" | "papa" | "prof" | "vendeur";
+export type Speaker = "blob" | "lea" | "hugo" | "madame" | "serveur" | "maman" | "papa" | "prof" | "vendeur" | "medecin" | "chloe";
 
 export type DialogueLine = { who: Speaker; fr: string; en: string; de: string };
 
