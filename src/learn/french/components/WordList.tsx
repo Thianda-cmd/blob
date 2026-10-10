@@ -1,6 +1,6 @@
 "use client";
 
-import { Dumbbell, GraduationCap, Search, Volume2 } from "lucide-react";
+import { Dumbbell, GraduationCap, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -13,7 +13,6 @@ import { useToday } from "@/learn/session";
 import { cn } from "@/lib/utils";
 import { unitOfWord, wordById } from "../course";
 import type { WordRow } from "../server";
-import { say } from "../speech";
 import { fold } from "../text";
 
 /** Strength as shown: words not practised since they were due fade one step per missed interval. */
@@ -125,14 +124,6 @@ export function WordList({ words }: { words: WordRow[] }) {
                       <div className="sm:hidden">
                         <Bars value={strength} />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void say(word.fr)}
-                        aria-label={t.guide.listen(word.fr)}
-                        className="grid size-9 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink hover:bg-blob hover:text-white"
-                      >
-                        <Volume2 className="size-4" />
-                      </button>
                     </li>
                   ))}
                 </ul>

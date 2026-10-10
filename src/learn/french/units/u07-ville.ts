@@ -106,26 +106,28 @@ export const u07: Unit = {
     { id: "u07.d11", lesson: 4, fr: "La boulangerie est ___ gauche.", options: ["à", "au", "la"], answer: 0, en: "The bakery is on the left.", de: "Die Bäckerei ist links.", why: tx("Left and right: **à** gauche, **à** droite. Always with à.", "Links und rechts: **à** gauche, **à** droite. Immer mit à.") },
     { id: "u07.d12", lesson: 5, fr: "Le supermarché est près ___ la gare.", options: ["de", "à", "au"], answer: 0, en: "The supermarket is near the station.", de: "Der Supermarkt ist in der Nähe des Bahnhofs.", why: tx("Near is **près de**: près de la gare. With le it becomes du: près du parc.", "In der Nähe von heißt **près de**: près de la gare. Mit le wird es zu du: près du parc.") },
   ],
-  dialogue: {
-    id: "u07.dialogue",
-    lesson: 5,
-    title: tx("Where is the bakery?", "Wo ist die Bäckerei?"),
-    lines: [
-      { who: "blob", fr: "Excusez-moi, Madame Martin ! Où est la boulangerie ?", en: "Excuse me, Mrs Martin! Where is the bakery?", de: "Entschuldigung, Frau Martin! Wo ist die Bäckerei?" },
-      { who: "madame", fr: "Bonjour, Blob ! Tu vas à la boulangerie ?", en: "Hello, Blob! Are you going to the bakery?", de: "Hallo, Blob! Gehst du zur Bäckerei?" },
-      { who: "blob", fr: "Oui ! J'aime les croissants. C'est loin ?", en: "Yes! I love croissants. Is it far?", de: "Ja! Ich liebe Croissants. Ist es weit?" },
-      { who: "madame", fr: "Non, c'est très près. Regarde…", en: "No, it's very close. Look…", de: "Nein, ganz nah. Schau mal …" },
-      { who: "blob", fr: "Merci ! Je vais tout droit !", en: "Thanks! I'm going straight on!", de: "Danke! Ich gehe geradeaus!" },
-      { who: "madame", fr: "Non, Blob ! Pas tout droit ! La boulangerie est à gauche… derrière toi !", en: "No, Blob! Not straight on! The bakery is on the left… behind you!", de: "Nein, Blob! Nicht geradeaus! Die Bäckerei ist links … hinter dir!" },
-      { who: "blob", fr: "Oh ! Merci, Madame. Et vous, vous allez où ?", en: "Oh! Thank you. And you, where are you going?", de: "Oh! Danke. Und Sie, wohin gehen Sie?" },
-      { who: "madame", fr: "Moi ? Je vais à la boulangerie aussi. Pour les croissants !", en: "Me? I'm going to the bakery too. For the croissants!", de: "Ich? Ich gehe auch zur Bäckerei. Wegen der Croissants!" },
-    ],
-    questions: [
-      { q: tx("Where does Blob want to go?", "Wohin will Blob?"), options: [tx("To the bakery", "Zur Bäckerei"), tx("To the station", "Zum Bahnhof"), tx("To the supermarket", "Zum Supermarkt")], answer: 0 },
-      { q: tx("Where is the bakery?", "Wo ist die Bäckerei?"), options: [tx("On the left, behind Blob", "Links, hinter Blob"), tx("Straight on, very far away", "Geradeaus, sehr weit weg"), tx("On the right, near the station", "Rechts, beim Bahnhof")], answer: 0 },
-      { q: tx("Where is Mrs Martin going?", "Wohin geht Frau Martin?"), options: [tx("To the bakery too", "Auch zur Bäckerei"), tx("To the park", "In den Park"), tx("Home", "Nach Hause")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u07.dialogue",
+      lesson: 5,
+      title: tx("Where is the bakery?", "Wo ist die Bäckerei?"),
+      lines: [
+        { who: "blob", fr: "Excusez-moi, Madame Martin ! Où est la boulangerie ?", en: "Excuse me, Mrs Martin! Where is the bakery?", de: "Entschuldigung, Frau Martin! Wo ist die Bäckerei?" },
+        { who: "madame", fr: "Bonjour, Blob ! Tu vas à la boulangerie ?", en: "Hello, Blob! Are you going to the bakery?", de: "Hallo, Blob! Gehst du zur Bäckerei?" },
+        { who: "blob", fr: "Oui ! J'aime les croissants. C'est loin ?", en: "Yes! I love croissants. Is it far?", de: "Ja! Ich liebe Croissants. Ist es weit?" },
+        { who: "madame", fr: "Non, c'est très près. Regarde…", en: "No, it's very close. Look…", de: "Nein, ganz nah. Schau mal …" },
+        { who: "blob", fr: "Merci ! Je vais tout droit !", en: "Thanks! I'm going straight on!", de: "Danke! Ich gehe geradeaus!" },
+        { who: "madame", fr: "Non, Blob ! Pas tout droit ! La boulangerie est à gauche… derrière toi !", en: "No, Blob! Not straight on! The bakery is on the left… behind you!", de: "Nein, Blob! Nicht geradeaus! Die Bäckerei ist links … hinter dir!" },
+        { who: "blob", fr: "Oh ! Merci, Madame. Et vous, vous allez où ?", en: "Oh! Thank you. And you, where are you going?", de: "Oh! Danke. Und Sie, wohin gehen Sie?" },
+        { who: "madame", fr: "Moi ? Je vais à la boulangerie aussi. Pour les croissants !", en: "Me? I'm going to the bakery too. For the croissants!", de: "Ich? Ich gehe auch zur Bäckerei. Wegen der Croissants!" },
+      ],
+      questions: [
+        { q: tx("Where does Blob want to go?", "Wohin will Blob?"), options: [tx("To the bakery", "Zur Bäckerei"), tx("To the station", "Zum Bahnhof"), tx("To the supermarket", "Zum Supermarkt")], answer: 0 },
+        { q: tx("Where is the bakery?", "Wo ist die Bäckerei?"), options: [tx("On the left, behind Blob", "Links, hinter Blob"), tx("Straight on, very far away", "Geradeaus, sehr weit weg"), tx("On the right, near the station", "Rechts, beim Bahnhof")], answer: 0 },
+        { q: tx("Where is Mrs Martin going?", "Wohin geht Frau Martin?"), options: [tx("To the bakery too", "Auch zur Bäckerei"), tx("To the park", "In den Park"), tx("Home", "Nach Hause")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Aller: to go", "Aller: gehen"),

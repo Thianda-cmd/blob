@@ -44,7 +44,7 @@ export const learnText = defineMessages({
       topicsMastered: (n: number): string => (n === 1 ? "topic mastered" : "topics mastered"),
       averageMastery: "Average mastery",
       frenchTitle: "French with Blob",
-      frenchText: "A whole course from zero: words, sentences, listening and speaking, a few minutes a day.",
+      frenchText: "A whole course from zero: words, sentences, grammar and little stories, a few minutes a day.",
       frenchCta: "Start French",
       moreSoon: "More subjects soon",
       /** The subjects still to come, from the catalog. */
@@ -271,7 +271,7 @@ export const learnText = defineMessages({
       topicsMastered: (n) => (n === 1 ? "Thema gemeistert" : "Themen gemeistert"),
       averageMastery: "Können im Schnitt",
       frenchTitle: "Französisch mit Blob",
-      frenchText: "Ein ganzer Kurs von null an: Wörter, Sätze, Hören und Sprechen, ein paar Minuten am Tag.",
+      frenchText: "Ein ganzer Kurs von null an: Wörter, Sätze, Grammatik und kleine Geschichten, ein paar Minuten am Tag.",
       frenchCta: "Französisch starten",
       moreSoon: "Bald mehr Fächer",
       moreSoonText: (names) => `${new Intl.ListFormat("de-DE").format(names)} ${names.length === 1 ? "steht" : "stehen"} als Nächstes auf Blobs Liste.`,

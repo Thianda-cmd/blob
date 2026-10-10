@@ -1,8 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Snail, Volume2 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useState, type ReactNode, type RefObject } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
 import { frenchText } from "@/i18n/messages/french";
@@ -10,7 +9,6 @@ import type { Verdict } from "@/learn/french/text";
 import type { Text } from "@/i18n/text";
 import { cn } from "@/lib/utils";
 import { glossSegments } from "../glossary";
-import { prefs, say } from "../speech";
 
 /** What an exercise reports once it's answered. */
 export type Outcome = {
@@ -20,13 +18,13 @@ export type Outcome = {
   solution?: string;
   /** Words of `solution` to highlight. */
   marks?: boolean[];
-  /** What the solution means (after listening exercises). */
+  /** What the sentence means, shown with the feedback. */
   meaning?: string;
   /** Blob's explanation of the mistake. */
   explain?: Text | null;
   /** Spelling or typo note on an answer that still counts. */
   note?: string;
-  /** Skipped ("can't speak now"): neither right nor wrong. */
+  /** Skipped: neither right nor wrong. */
   skipped?: boolean;
 };
 
@@ -58,59 +56,6 @@ export function BlobSays({
         </div>
       )}
     </div>
-  );
-}
-
-/** Listen buttons: normal speed and slow. `auto` plays once when it appears. */
-export function PlayButtons({ text, auto, big, voice }: { text: string; auto?: boolean; big?: boolean; voice: boolean }) {
-  const t = useMessages(frenchText).player;
-  const [playing, setPlaying] = useState<"fast" | "slow" | null>(null);
-  const once = useRef(false);
-
-  async function play(slow: boolean) {
-    setPlaying(slow ? "slow" : "fast");
-    await say(text, { slow });
-    setPlaying(null);
-  }
-
-  useEffect(() => {
-    if (!auto || once.current || !voice || !prefs.soundOn()) return;
-    once.current = true;
-    const id = setTimeout(() => void play(false), 250);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when it first shows
-  }, [auto, voice]);
-
-  if (!voice) return null;
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => void play(false)}
-        aria-label={t.play}
-        title={t.play}
-        className={cn(
-          "grid place-items-center rounded-xl bg-blob text-white shadow-[0_3px_0_var(--blob-deep)] transition-transform active:translate-y-[2px] active:shadow-none",
-          big ? "size-16 rounded-2xl" : "size-10",
-          playing === "fast" && "animate-pulse",
-        )}
-      >
-        <Volume2 className={big ? "size-7" : "size-5"} />
-      </button>
-      <button
-        type="button"
-        onClick={() => void play(true)}
-        aria-label={t.slow}
-        title={t.slow}
-        className={cn(
-          "grid place-items-center rounded-xl border-2 border-line bg-raised text-blob-ink transition-colors hover:bg-hover",
-          big ? "size-12" : "size-9",
-          playing === "slow" && "animate-pulse",
-        )}
-      >
-        <Snail className={big ? "size-5" : "size-4"} />
-      </button>
-    </span>
   );
 }
 

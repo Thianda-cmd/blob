@@ -123,28 +123,30 @@ export const u06: Unit = {
     { id: "u06.d11", lesson: 5, fr: "Les devoirs sont ___.", options: ["difficiles", "difficile"], answer: 0, en: "The homework is difficult.", de: "Die Hausaufgaben sind schwer.", why: tx("**Les devoirs** is plural, so the adjective gets an **s** too: difficile**s**. You don't hear it.", "**Les devoirs** ist Plural, also bekommt das Adjektiv auch ein **s**: difficile**s**. Man hört es nicht.") },
     { id: "u06.d12", lesson: 5, fr: "Je ne travaille ___ aujourd'hui.", options: ["pas", "non", "ne"], answer: 0, en: "I'm not working today.", de: "Ich arbeite heute nicht.", why: tx("Not comes in two parts around the verb: je **ne** travaille **pas**.", "Die Verneinung hat zwei Teile um das Verb herum: je **ne** travaille **pas**.") },
   ],
-  dialogue: {
-    id: "u06.dialogue",
-    lesson: 5,
-    title: tx("Blob's first day at school", "Blobs erster Schultag"),
-    lines: [
-      { who: "prof", fr: "Bonjour ! Aujourd'hui, nous parlons français.", en: "Good morning! Today we're speaking French.", de: "Guten Morgen! Heute sprechen wir Französisch." },
-      { who: "blob", fr: "Bonjour, Monsieur ! J'ai une question.", en: "Good morning, sir! I have a question.", de: "Guten Morgen! Ich habe eine Frage." },
-      { who: "prof", fr: "Oui, Blob ?", en: "Yes, Blob?", de: "Ja, Blob?" },
-      { who: "blob", fr: "Est-ce que les devoirs sont difficiles ?", en: "Is the homework difficult?", de: "Sind die Hausaufgaben schwer?" },
-      { who: "prof", fr: "Non, c'est facile. Tu as ton livre et ton cahier ?", en: "No, it's easy. Do you have your book and your exercise book?", de: "Nein, das ist leicht. Hast du dein Buch und dein Heft?" },
-      { who: "blob", fr: "Euh… dans mon sac, il y a un croissant.", en: "Er… in my bag there's a croissant.", de: "Äh … in meiner Tasche ist ein Croissant." },
-      { who: "hugo", fr: "Blob, j'ai un stylo pour toi !", en: "Blob, I have a pen for you!", de: "Blob, ich habe einen Stift für dich!" },
-      { who: "lea", fr: "Et moi, j'ai un cahier !", en: "And I have an exercise book!", de: "Und ich habe ein Heft!" },
-      { who: "blob", fr: "Merci ! Et le croissant, c'est pour le professeur !", en: "Thank you! And the croissant is for the teacher!", de: "Danke! Und das Croissant ist für den Lehrer!" },
-      { who: "prof", fr: "Merci, Blob ! Mais maintenant, on travaille !", en: "Thank you, Blob! But now, let's get to work!", de: "Danke, Blob! Aber jetzt wird gearbeitet!" },
-    ],
-    questions: [
-      { q: tx("What is in Blob's bag?", "Was ist in Blobs Tasche?"), options: [tx("A croissant", "Ein Croissant"), tx("A book", "Ein Buch"), tx("An exercise book", "Ein Heft")], answer: 0 },
-      { q: tx("Is the homework difficult?", "Sind die Hausaufgaben schwer?"), options: [tx("No, it's easy.", "Nein, sie sind leicht."), tx("Yes, very difficult.", "Ja, sehr schwer."), tx("The teacher doesn't say.", "Der Lehrer sagt es nicht.")], answer: 0 },
-      { q: tx("What does Hugo have for Blob?", "Was hat Hugo für Blob?"), options: [tx("A pen", "Einen Stift"), tx("An exercise book", "Ein Heft"), tx("A croissant", "Ein Croissant")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u06.dialogue",
+      lesson: 5,
+      title: tx("Blob's first day at school", "Blobs erster Schultag"),
+      lines: [
+        { who: "prof", fr: "Bonjour ! Aujourd'hui, nous parlons français.", en: "Good morning! Today we're speaking French.", de: "Guten Morgen! Heute sprechen wir Französisch." },
+        { who: "blob", fr: "Bonjour, Monsieur ! J'ai une question.", en: "Good morning, sir! I have a question.", de: "Guten Morgen! Ich habe eine Frage." },
+        { who: "prof", fr: "Oui, Blob ?", en: "Yes, Blob?", de: "Ja, Blob?" },
+        { who: "blob", fr: "Est-ce que les devoirs sont difficiles ?", en: "Is the homework difficult?", de: "Sind die Hausaufgaben schwer?" },
+        { who: "prof", fr: "Non, c'est facile. Tu as ton livre et ton cahier ?", en: "No, it's easy. Do you have your book and your exercise book?", de: "Nein, das ist leicht. Hast du dein Buch und dein Heft?" },
+        { who: "blob", fr: "Euh… dans mon sac, il y a un croissant.", en: "Er… in my bag there's a croissant.", de: "Äh … in meiner Tasche ist ein Croissant." },
+        { who: "hugo", fr: "Blob, j'ai un stylo pour toi !", en: "Blob, I have a pen for you!", de: "Blob, ich habe einen Stift für dich!" },
+        { who: "lea", fr: "Et moi, j'ai un cahier !", en: "And I have an exercise book!", de: "Und ich habe ein Heft!" },
+        { who: "blob", fr: "Merci ! Et le croissant, c'est pour le professeur !", en: "Thank you! And the croissant is for the teacher!", de: "Danke! Und das Croissant ist für den Lehrer!" },
+        { who: "prof", fr: "Merci, Blob ! Mais maintenant, on travaille !", en: "Thank you, Blob! But now, let's get to work!", de: "Danke, Blob! Aber jetzt wird gearbeitet!" },
+      ],
+      questions: [
+        { q: tx("What is in Blob's bag?", "Was ist in Blobs Tasche?"), options: [tx("A croissant", "Ein Croissant"), tx("A book", "Ein Buch"), tx("An exercise book", "Ein Heft")], answer: 0 },
+        { q: tx("Is the homework difficult?", "Sind die Hausaufgaben schwer?"), options: [tx("No, it's easy.", "Nein, sie sind leicht."), tx("Yes, very difficult.", "Ja, sehr schwer."), tx("The teacher doesn't say.", "Der Lehrer sagt es nicht.")], answer: 0 },
+        { q: tx("What does Hugo have for Blob?", "Was hat Hugo für Blob?"), options: [tx("A pen", "Einen Stift"), tx("An exercise book", "Ein Heft"), tx("A croissant", "Ein Croissant")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("-er verbs: one pattern for hundreds", "Verben auf -er: ein Muster für Hunderte"),

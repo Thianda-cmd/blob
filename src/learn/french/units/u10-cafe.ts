@@ -110,27 +110,29 @@ export const u10: Unit = {
     { id: "u10.d11", lesson: 5, fr: "La limonade est ___.", options: ["froide", "froid"], answer: 0, en: "The lemonade is cold.", de: "Die Limonade ist kalt.", why: tx("**Limonade** is feminine: **froide**, with an e. Now you hear the d.", "**Limonade** ist weiblich: **froide**, mit e. Jetzt hört man das d.") },
     { id: "u10.d12", lesson: 5, fr: "Le thé est ___.", options: ["chaud", "chaude"], answer: 0, en: "The tea is hot.", de: "Der Tee ist heiß.", why: tx("**Thé** is masculine: **chaud**, no e.", "**Thé** ist männlich: **chaud**, ohne e.") },
   ],
-  dialogue: {
-    id: "u10.dialogue",
-    lesson: 5,
-    title: tx("Blob orders everything", "Blob bestellt alles"),
-    lines: [
-      { who: "serveur", fr: "Bonjour ! Vous désirez ?", en: "Hello! What would you like?", de: "Guten Tag! Was darf es sein?" },
-      { who: "lea", fr: "Je voudrais un jus d'orange, s'il vous plaît.", en: "I'd like an orange juice, please.", de: "Ich hätte gern einen Orangensaft, bitte." },
-      { who: "blob", fr: "Et pour moi, un chocolat chaud, une crêpe et une glace !", en: "And for me, a hot chocolate, a crêpe and an ice cream!", de: "Und für mich eine heiße Schokolade, eine Crêpe und ein Eis!" },
-      { who: "serveur", fr: "Bien sûr. Et avec ça ?", en: "Of course. Anything else?", de: "Natürlich. Sonst noch etwas?" },
-      { who: "blob", fr: "Euh… un gâteau au chocolat aussi !", en: "Er… a chocolate cake too!", de: "Äh … und auch einen Schokoladenkuchen!" },
-      { who: "lea", fr: "Blob ! C'est beaucoup !", en: "Blob! That's a lot!", de: "Blob! Das ist viel!" },
-      { who: "serveur", fr: "Voilà ! Et l'addition : vingt euros, s'il vous plaît.", en: "Here you are! And the bill: twenty euros, please.", de: "Bitte schön! Und die Rechnung: zwanzig Euro, bitte." },
-      { who: "blob", fr: "Vingt euros ? Euh, Léa, tu as vingt euros, s'il te plaît ?", en: "Twenty euros? Er, Léa, do you have twenty euros, please?", de: "Zwanzig Euro? Äh, Léa, hast du bitte zwanzig Euro?" },
-      { who: "lea", fr: "Bon, d'accord… mais la crêpe, c'est pour moi !", en: "Well, OK… but the crêpe is for me!", de: "Na gut … aber die Crêpe ist für mich!" },
-    ],
-    questions: [
-      { q: tx("What does Léa order?", "Was bestellt Léa?"), options: [tx("An orange juice", "Einen Orangensaft"), tx("A hot chocolate", "Eine heiße Schokolade"), tx("A coffee", "Einen Kaffee")], answer: 0 },
-      { q: tx("How much is the bill?", "Wie hoch ist die Rechnung?"), options: [tx("Twenty euros", "Zwanzig Euro"), tx("Twelve euros", "Zwölf Euro"), tx("Two euros", "Zwei Euro")], answer: 0 },
-      { q: tx("Who pays?", "Wer bezahlt?"), options: ["Léa", "Blob", tx("The waiter", "Der Kellner")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u10.dialogue",
+      lesson: 5,
+      title: tx("Blob orders everything", "Blob bestellt alles"),
+      lines: [
+        { who: "serveur", fr: "Bonjour ! Vous désirez ?", en: "Hello! What would you like?", de: "Guten Tag! Was darf es sein?" },
+        { who: "lea", fr: "Je voudrais un jus d'orange, s'il vous plaît.", en: "I'd like an orange juice, please.", de: "Ich hätte gern einen Orangensaft, bitte." },
+        { who: "blob", fr: "Et pour moi, un chocolat chaud, une crêpe et une glace !", en: "And for me, a hot chocolate, a crêpe and an ice cream!", de: "Und für mich eine heiße Schokolade, eine Crêpe und ein Eis!" },
+        { who: "serveur", fr: "Bien sûr. Et avec ça ?", en: "Of course. Anything else?", de: "Natürlich. Sonst noch etwas?" },
+        { who: "blob", fr: "Euh… un gâteau au chocolat aussi !", en: "Er… a chocolate cake too!", de: "Äh … und auch einen Schokoladenkuchen!" },
+        { who: "lea", fr: "Blob ! C'est beaucoup !", en: "Blob! That's a lot!", de: "Blob! Das ist viel!" },
+        { who: "serveur", fr: "Voilà ! Et l'addition : vingt euros, s'il vous plaît.", en: "Here you are! And the bill: twenty euros, please.", de: "Bitte schön! Und die Rechnung: zwanzig Euro, bitte." },
+        { who: "blob", fr: "Vingt euros ? Euh, Léa, tu as vingt euros, s'il te plaît ?", en: "Twenty euros? Er, Léa, do you have twenty euros, please?", de: "Zwanzig Euro? Äh, Léa, hast du bitte zwanzig Euro?" },
+        { who: "lea", fr: "Bon, d'accord… mais la crêpe, c'est pour moi !", en: "Well, OK… but the crêpe is for me!", de: "Na gut … aber die Crêpe ist für mich!" },
+      ],
+      questions: [
+        { q: tx("What does Léa order?", "Was bestellt Léa?"), options: [tx("An orange juice", "Einen Orangensaft"), tx("A hot chocolate", "Eine heiße Schokolade"), tx("A coffee", "Einen Kaffee")], answer: 0 },
+        { q: tx("How much is the bill?", "Wie hoch ist die Rechnung?"), options: [tx("Twenty euros", "Zwanzig Euro"), tx("Twelve euros", "Zwölf Euro"), tx("Two euros", "Zwei Euro")], answer: 0 },
+        { q: tx("Who pays?", "Wer bezahlt?"), options: ["Léa", "Blob", tx("The waiter", "Der Kellner")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Je voudrais: ordering politely", "Je voudrais: höflich bestellen"),

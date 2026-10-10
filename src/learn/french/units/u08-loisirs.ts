@@ -111,27 +111,29 @@ export const u08: Unit = {
     { id: "u08.d11", lesson: 4, fr: "___ lundi, je joue au foot.", options: ["Le", "Au", "En"], answer: 0, en: "On Mondays I play football.", de: "Montags spiele ich Fußball.", why: tx("Every Monday: **le** lundi. Just lundi means this Monday. And no word for «on»!", "Jeden Montag (montags): **le** lundi. Nur lundi heißt diesen Montag. Und kein Wort für „am“!") },
     { id: "u08.d12", lesson: 5, fr: "Le dimanche, je ne fais ___.", options: ["rien", "pas", "de"], answer: 0, en: "On Sundays I don't do anything.", de: "Sonntags mache ich nichts.", why: tx("Nothing is **ne … rien**: it goes around the verb, just like ne … pas.", "Nichts heißt **ne … rien**: Es steht um das Verb herum, genau wie ne … pas.") },
   ],
-  dialogue: {
-    id: "u08.dialogue",
-    lesson: 5,
-    title: tx("Blob's busy weekend", "Blobs volles Wochenende"),
-    lines: [
-      { who: "lea", fr: "Blob, qu'est-ce que tu fais ce week-end ?", en: "Blob, what are you doing this weekend?", de: "Blob, was machst du dieses Wochenende?" },
-      { who: "blob", fr: "Samedi, je joue au foot avec Hugo.", en: "On Saturday I'm playing football with Hugo.", de: "Am Samstag spiele ich mit Hugo Fußball." },
-      { who: "hugo", fr: "Et après, nous allons à la piscine !", en: "And afterwards we're going to the swimming pool!", de: "Und danach gehen wir ins Schwimmbad!" },
-      { who: "lea", fr: "Super ! Et dimanche ?", en: "Great! And on Sunday?", de: "Super! Und am Sonntag?" },
-      { who: "blob", fr: "Dimanche, je fais du vélo, je danse et je joue de la guitare !", en: "On Sunday I'm cycling, dancing and playing the guitar!", de: "Am Sonntag fahre ich Fahrrad, tanze und spiele Gitarre!" },
-      { who: "hugo", fr: "Tu joues de la guitare, Blob ?", en: "You play the guitar, Blob?", de: "Du spielst Gitarre, Blob?" },
-      { who: "blob", fr: "Euh… non. Mais j'aime la musique !", en: "Er… no. But I love music!", de: "Äh … nein. Aber ich liebe Musik!" },
-      { who: "lea", fr: "Et lundi ?", en: "And on Monday?", de: "Und am Montag?" },
-      { who: "blob", fr: "Lundi, je ne fais rien. Je suis très fatigué !", en: "On Monday I'm doing nothing. I'm very tired!", de: "Am Montag mache ich nichts. Ich bin sehr müde!" },
-    ],
-    questions: [
-      { q: tx("What does Blob do on Saturday?", "Was macht Blob am Samstag?"), options: [tx("He plays football with Hugo.", "Er spielt mit Hugo Fußball."), tx("He plays the guitar.", "Er spielt Gitarre."), tx("He does nothing.", "Er macht nichts.")], answer: 0 },
-      { q: tx("Where do Blob and Hugo go after football?", "Wohin gehen Blob und Hugo nach dem Fußball?"), options: [tx("To the swimming pool", "Ins Schwimmbad"), tx("To the cinema", "Ins Kino"), tx("To the beach", "An den Strand")], answer: 0 },
-      { q: tx("Does Blob play the guitar?", "Spielt Blob Gitarre?"), options: [tx("No, but he loves music.", "Nein, aber er liebt Musik."), tx("Yes, very well.", "Ja, sehr gut."), tx("Yes, on Mondays.", "Ja, montags.")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u08.dialogue",
+      lesson: 5,
+      title: tx("Blob's busy weekend", "Blobs volles Wochenende"),
+      lines: [
+        { who: "lea", fr: "Blob, qu'est-ce que tu fais ce week-end ?", en: "Blob, what are you doing this weekend?", de: "Blob, was machst du dieses Wochenende?" },
+        { who: "blob", fr: "Samedi, je joue au foot avec Hugo.", en: "On Saturday I'm playing football with Hugo.", de: "Am Samstag spiele ich mit Hugo Fußball." },
+        { who: "hugo", fr: "Et après, nous allons à la piscine !", en: "And afterwards we're going to the swimming pool!", de: "Und danach gehen wir ins Schwimmbad!" },
+        { who: "lea", fr: "Super ! Et dimanche ?", en: "Great! And on Sunday?", de: "Super! Und am Sonntag?" },
+        { who: "blob", fr: "Dimanche, je fais du vélo, je danse et je joue de la guitare !", en: "On Sunday I'm cycling, dancing and playing the guitar!", de: "Am Sonntag fahre ich Fahrrad, tanze und spiele Gitarre!" },
+        { who: "hugo", fr: "Tu joues de la guitare, Blob ?", en: "You play the guitar, Blob?", de: "Du spielst Gitarre, Blob?" },
+        { who: "blob", fr: "Euh… non. Mais j'aime la musique !", en: "Er… no. But I love music!", de: "Äh … nein. Aber ich liebe Musik!" },
+        { who: "lea", fr: "Et lundi ?", en: "And on Monday?", de: "Und am Montag?" },
+        { who: "blob", fr: "Lundi, je ne fais rien. Je suis très fatigué !", en: "On Monday I'm doing nothing. I'm very tired!", de: "Am Montag mache ich nichts. Ich bin sehr müde!" },
+      ],
+      questions: [
+        { q: tx("What does Blob do on Saturday?", "Was macht Blob am Samstag?"), options: [tx("He plays football with Hugo.", "Er spielt mit Hugo Fußball."), tx("He plays the guitar.", "Er spielt Gitarre."), tx("He does nothing.", "Er macht nichts.")], answer: 0 },
+        { q: tx("Where do Blob and Hugo go after football?", "Wohin gehen Blob und Hugo nach dem Fußball?"), options: [tx("To the swimming pool", "Ins Schwimmbad"), tx("To the cinema", "Ins Kino"), tx("To the beach", "An den Strand")], answer: 0 },
+        { q: tx("Does Blob play the guitar?", "Spielt Blob Gitarre?"), options: [tx("No, but he loves music.", "Nein, aber er liebt Musik."), tx("Yes, very well.", "Ja, sehr gut."), tx("Yes, on Mondays.", "Ja, montags.")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Faire: to do, to make", "Faire: machen, tun"),

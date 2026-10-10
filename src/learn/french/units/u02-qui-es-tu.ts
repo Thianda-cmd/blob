@@ -115,27 +115,29 @@ export const u02: Unit = {
     { id: "u02.d11", lesson: 5, fr: "Je ___ suis pas fatigué.", options: ["ne", "pas", "non"], answer: 0, en: "I am not tired.", de: "Ich bin nicht müde.", why: tx("Not is two words around the verb: **ne** suis **pas**.", "Nicht sind zwei Wörter um das Verb herum: **ne** suis **pas**.") },
     { id: "u02.d12", lesson: 5, fr: "Ce ___ pas Hugo, c'est Max !", options: ["n'est", "ne est", "est"], answer: 0, en: "That's not Hugo, it's Max!", de: "Das ist nicht Hugo, das ist Max!", why: tx("Before a vowel, ne shrinks to **n'**: ce **n'est** pas.", "Vor einem Vokal wird ne zu **n'**: ce **n'est** pas.") },
   ],
-  dialogue: {
-    id: "u02.dialogue",
-    lesson: 5,
-    title: tx("Blob, a French blob?", "Blob, ein französischer Blob?"),
-    lines: [
-      { who: "blob", fr: "Salut, Léa ! Qui est-ce ?", en: "Hi, Léa! Who's that?", de: "Hallo, Léa! Wer ist das?" },
-      { who: "lea", fr: "C'est Max, un ami. Il est allemand, il est de Berlin.", en: "That's Max, a friend. He's German, he's from Berlin.", de: "Das ist Max, ein Freund. Er ist Deutscher, er ist aus Berlin." },
-      { who: "blob", fr: "Enchanté, Max ! Et la fille, elle est allemande aussi ?", en: "Nice to meet you, Max! And the girl, is she German too?", de: "Freut mich, Max! Und das Mädchen, ist das auch eine Deutsche?" },
-      { who: "lea", fr: "Non, c'est Emma. Elle n'est pas allemande, elle est anglaise.", en: "No, that's Emma. She isn't German, she's English.", de: "Nein, das ist Emma. Sie ist keine Deutsche, sie ist Engländerin." },
-      { who: "hugo", fr: "Et toi, Blob, tu es d'où ?", en: "And you, Blob, where are you from?", de: "Und du, Blob, woher kommst du?" },
-      { who: "blob", fr: "Moi ? Je suis très français. Regarde mon béret !", en: "Me? I'm very French. Look at my beret!", de: "Ich? Ich bin sehr französisch. Schau, meine Baskenmütze!" },
-      { who: "hugo", fr: "Un béret, ce n'est pas un passeport, Blob !", en: "A beret isn't a passport, Blob!", de: "Eine Baskenmütze ist kein Pass, Blob!" },
-      { who: "lea", fr: "Blob n'est pas français, il est… violet !", en: "Blob isn't French, he's… purple!", de: "Blob ist kein Franzose, er ist … lila!" },
-      { who: "blob", fr: "Violet, français… et très content !", en: "Purple, French… and very happy!", de: "Lila, französisch … und sehr froh!" },
-    ],
-    questions: [
-      { q: tx("Where is Max from?", "Woher kommt Max?"), options: ["Berlin", "Lyon", "Paris"], answer: 0 },
-      { q: tx("What nationality is Emma?", "Welche Nationalität hat Emma?"), options: [tx("English", "Engländerin"), tx("German", "Deutsche"), tx("Swiss", "Schweizerin")], answer: 0 },
-      { q: tx("Why does Blob think he is French?", "Warum glaubt Blob, dass er Franzose ist?"), options: [tx("Because of his beret", "Wegen seiner Baskenmütze"), tx("Because he is from Paris", "Weil er aus Paris kommt"), tx("Because he is purple", "Weil er lila ist")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u02.dialogue",
+      lesson: 5,
+      title: tx("Blob, a French blob?", "Blob, ein französischer Blob?"),
+      lines: [
+        { who: "blob", fr: "Salut, Léa ! Qui est-ce ?", en: "Hi, Léa! Who's that?", de: "Hallo, Léa! Wer ist das?" },
+        { who: "lea", fr: "C'est Max, un ami. Il est allemand, il est de Berlin.", en: "That's Max, a friend. He's German, he's from Berlin.", de: "Das ist Max, ein Freund. Er ist Deutscher, er ist aus Berlin." },
+        { who: "blob", fr: "Enchanté, Max ! Et la fille, elle est allemande aussi ?", en: "Nice to meet you, Max! And the girl, is she German too?", de: "Freut mich, Max! Und das Mädchen, ist das auch eine Deutsche?" },
+        { who: "lea", fr: "Non, c'est Emma. Elle n'est pas allemande, elle est anglaise.", en: "No, that's Emma. She isn't German, she's English.", de: "Nein, das ist Emma. Sie ist keine Deutsche, sie ist Engländerin." },
+        { who: "hugo", fr: "Et toi, Blob, tu es d'où ?", en: "And you, Blob, where are you from?", de: "Und du, Blob, woher kommst du?" },
+        { who: "blob", fr: "Moi ? Je suis très français. Regarde mon béret !", en: "Me? I'm very French. Look at my beret!", de: "Ich? Ich bin sehr französisch. Schau, meine Baskenmütze!" },
+        { who: "hugo", fr: "Un béret, ce n'est pas un passeport, Blob !", en: "A beret isn't a passport, Blob!", de: "Eine Baskenmütze ist kein Pass, Blob!" },
+        { who: "lea", fr: "Blob n'est pas français, il est… violet !", en: "Blob isn't French, he's… purple!", de: "Blob ist kein Franzose, er ist … lila!" },
+        { who: "blob", fr: "Violet, français… et très content !", en: "Purple, French… and very happy!", de: "Lila, französisch … und sehr froh!" },
+      ],
+      questions: [
+        { q: tx("Where is Max from?", "Woher kommt Max?"), options: ["Berlin", "Lyon", "Paris"], answer: 0 },
+        { q: tx("What nationality is Emma?", "Welche Nationalität hat Emma?"), options: [tx("English", "Engländerin"), tx("German", "Deutsche"), tx("Swiss", "Schweizerin")], answer: 0 },
+        { q: tx("Why does Blob think he is French?", "Warum glaubt Blob, dass er Franzose ist?"), options: [tx("Because of his beret", "Wegen seiner Baskenmütze"), tx("Because he is from Paris", "Weil er aus Paris kommt"), tx("Because he is purple", "Weil er lila ist")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Être: I am, you are, we are…", "Être: ich bin, du bist, wir sind …"),

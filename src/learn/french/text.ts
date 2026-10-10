@@ -269,3 +269,25 @@ export function accentWords(answer: string, best: string, lang: Target = "fr"): 
   const a = new Set(words(canon(answer, lang)));
   return words(canon(best, lang)).filter((w) => !a.has(w));
 }
+
+/* -------------------------------------------------------------------------------------------
+   Spot the mistake
+   ------------------------------------------------------------------------------------------- */
+
+export type SpotToken = { text: string; wrong: boolean; word: boolean };
+
+/** The sentence with the wrong option in the gap, cut into words; the ones made of the gap are wrong. */
+export function spotTokens(fr: string, wrongOption: string): SpotToken[] {
+  const [before, after = ""] = fr.split("___");
+  const sentence = `${before}${wrongOption}${after}`;
+  const from = before.length;
+  const to = from + wrongOption.length;
+  const tokens: SpotToken[] = [];
+  const re = /\S+/g;
+  for (let m = re.exec(sentence); m; m = re.exec(sentence)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    tokens.push({ text: m[0], wrong: start < to && end > from, word: /[\p{L}\d]/u.test(m[0]) });
+  }
+  return tokens;
+}

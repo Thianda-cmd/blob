@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookOpen, GraduationCap, Volume2 } from "lucide-react";
+import { ArrowLeft, BookOpen, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { Blob } from "@/components/blob/Blob";
 import { TopBar } from "@/components/shell/TopBar";
@@ -9,27 +9,10 @@ import { frenchText } from "@/i18n/messages/french";
 import { learnText } from "@/i18n/messages/learn";
 import { resolveText } from "@/i18n/text";
 import { cn } from "@/lib/utils";
-import { say } from "../speech";
 import type { Unit } from "../types";
 import { Bold } from "./parts";
 
-/** A small speaker button that reads French aloud. */
-function Hear({ text, className }: { text: string; className?: string }) {
-  const t = useMessages(frenchText).guide;
-  return (
-    <button
-      type="button"
-      onClick={() => void say(text)}
-      aria-label={t.listen(text)}
-      title={t.listen(text)}
-      className={cn("grid size-8 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink transition-colors hover:bg-blob hover:text-white", className)}
-    >
-      <Volume2 className="size-4" />
-    </button>
-  );
-}
-
-/** The unit's guidebook: Blob's tips, the key phrases and all its words, each to listen to. */
+/** The unit's guidebook: Blob's tips, the key phrases and all its words. */
 export function UnitGuide({ unit, startHref }: { unit: Unit; startHref: string | null }) {
   const t = useMessages(frenchText);
   const lt = useMessages(learnText);
@@ -115,7 +98,6 @@ export function UnitGuide({ unit, startHref }: { unit: Unit; startHref: string |
                 <ul className="mt-4 space-y-2">
                   {tip.examples.map((ex, j) => (
                     <li key={j} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2">
-                      <Hear text={ex.fr} />
                       <div className="min-w-0">
                         <div lang="fr" className="font-medium text-ink">
                           {ex.fr}
@@ -133,7 +115,6 @@ export function UnitGuide({ unit, startHref }: { unit: Unit; startHref: string |
           <ul className="grid gap-2 sm:grid-cols-2">
             {phrases.map((s) => (
               <li key={s.id} className="flex items-center gap-3 rounded-2xl border border-line bg-raised px-3.5 py-2.5">
-                <Hear text={s.fr} />
                 <div className="min-w-0">
                   <div lang="fr" className="font-medium text-ink">
                     {s.fr}
@@ -157,7 +138,6 @@ export function UnitGuide({ unit, startHref }: { unit: Unit; startHref: string |
                     {w[lang]}
                   </div>
                 </div>
-                <Hear text={w.fr} />
               </li>
             ))}
           </ul>

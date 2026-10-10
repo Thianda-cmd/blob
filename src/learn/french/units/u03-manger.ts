@@ -113,27 +113,29 @@ export const u03: Unit = {
     { id: "u03.d11", lesson: 5, fr: "Je ne mange pas ___ poisson.", options: ["de", "du", "de la"], answer: 0, en: "I don't eat fish.", de: "Ich esse keinen Fisch.", why: tx("After ne … pas, du becomes just **de**: pas de poisson.", "Nach ne … pas wird du zu **de**: pas de poisson.") },
     { id: "u03.d12", lesson: 5, fr: "La pizza est ___.", options: ["délicieuse", "délicieux"], answer: 0, en: "The pizza is delicious.", de: "Die Pizza ist köstlich.", why: tx("Pizza is feminine: **délicieuse**.", "Pizza ist weiblich: **délicieuse**.") },
   ],
-  dialogue: {
-    id: "u03.dialogue",
-    lesson: 5,
-    title: tx("Dinner at Léa's", "Abendessen bei Léa"),
-    lines: [
-      { who: "maman", fr: "Il y a du pain, du fromage et du poisson. Bon appétit !", en: "There's bread, cheese and fish. Enjoy your meal!", de: "Es gibt Brot, Käse und Fisch. Guten Appetit!" },
-      { who: "blob", fr: "Merci ! J'adore le fromage français.", en: "Thank you! I love French cheese.", de: "Danke! Ich liebe französischen Käse." },
-      { who: "lea", fr: "Tu ne manges pas de poisson, Blob ?", en: "Aren't you having any fish, Blob?", de: "Isst du keinen Fisch, Blob?" },
-      { who: "blob", fr: "Non, merci. Je mange du fromage… et du fromage !", en: "No, thanks. I'm eating cheese… and cheese!", de: "Nein, danke. Ich esse Käse … und Käse!" },
-      { who: "maman", fr: "Et tu bois de l'eau ou du lait ?", en: "And are you drinking water or milk?", de: "Und trinkst du Wasser oder Milch?" },
-      { who: "blob", fr: "Du lait, merci. C'est bon avec le fromage !", en: "Milk, thanks. It's good with cheese!", de: "Milch, danke. Das passt gut zum Käse!" },
-      { who: "lea", fr: "Maman, Blob mange tout le fromage !", en: "Mum, Blob is eating all the cheese!", de: "Mama, Blob isst den ganzen Käse!" },
-      { who: "maman", fr: "Ce n'est pas grave. Il y a aussi des croissants !", en: "Never mind. There are croissants too!", de: "Macht nichts. Es gibt auch Croissants!" },
-      { who: "blob", fr: "Des croissants ? C'est délicieux !", en: "Croissants? They're delicious!", de: "Croissants? Die sind köstlich!" },
-    ],
-    questions: [
-      { q: tx("What does Blob love?", "Was liebt Blob?"), options: [tx("French cheese", "Französischen Käse"), tx("Fish", "Fisch"), tx("Salad", "Salat")], answer: 0 },
-      { q: tx("What does Blob drink?", "Was trinkt Blob?"), options: [tx("Milk", "Milch"), tx("Water", "Wasser"), tx("Chocolate milk", "Kakao")], answer: 0 },
-      { q: tx("What's the problem?", "Was ist das Problem?"), options: [tx("Blob is eating all the cheese.", "Blob isst den ganzen Käse."), tx("There's no bread.", "Es gibt kein Brot."), tx("Léa doesn't like fish.", "Léa mag keinen Fisch.")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u03.dialogue",
+      lesson: 5,
+      title: tx("Dinner at Léa's", "Abendessen bei Léa"),
+      lines: [
+        { who: "maman", fr: "Il y a du pain, du fromage et du poisson. Bon appétit !", en: "There's bread, cheese and fish. Enjoy your meal!", de: "Es gibt Brot, Käse und Fisch. Guten Appetit!" },
+        { who: "blob", fr: "Merci ! J'adore le fromage français.", en: "Thank you! I love French cheese.", de: "Danke! Ich liebe französischen Käse." },
+        { who: "lea", fr: "Tu ne manges pas de poisson, Blob ?", en: "Aren't you having any fish, Blob?", de: "Isst du keinen Fisch, Blob?" },
+        { who: "blob", fr: "Non, merci. Je mange du fromage… et du fromage !", en: "No, thanks. I'm eating cheese… and cheese!", de: "Nein, danke. Ich esse Käse … und Käse!" },
+        { who: "maman", fr: "Et tu bois de l'eau ou du lait ?", en: "And are you drinking water or milk?", de: "Und trinkst du Wasser oder Milch?" },
+        { who: "blob", fr: "Du lait, merci. C'est bon avec le fromage !", en: "Milk, thanks. It's good with cheese!", de: "Milch, danke. Das passt gut zum Käse!" },
+        { who: "lea", fr: "Maman, Blob mange tout le fromage !", en: "Mum, Blob is eating all the cheese!", de: "Mama, Blob isst den ganzen Käse!" },
+        { who: "maman", fr: "Ce n'est pas grave. Il y a aussi des croissants !", en: "Never mind. There are croissants too!", de: "Macht nichts. Es gibt auch Croissants!" },
+        { who: "blob", fr: "Des croissants ? C'est délicieux !", en: "Croissants? They're delicious!", de: "Croissants? Die sind köstlich!" },
+      ],
+      questions: [
+        { q: tx("What does Blob love?", "Was liebt Blob?"), options: [tx("French cheese", "Französischen Käse"), tx("Fish", "Fisch"), tx("Salad", "Salat")], answer: 0 },
+        { q: tx("What does Blob drink?", "Was trinkt Blob?"), options: [tx("Milk", "Milch"), tx("Water", "Wasser"), tx("Chocolate milk", "Kakao")], answer: 0 },
+        { q: tx("What's the problem?", "Was ist das Problem?"), options: [tx("Blob is eating all the cheese.", "Blob isst den ganzen Käse."), tx("There's no bread.", "Es gibt kein Brot."), tx("Léa doesn't like fish.", "Léa mag keinen Fisch.")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Le, la, les – un, une, des", "Le, la, les – un, une, des"),

@@ -90,26 +90,28 @@ export const u01: Unit = {
     { id: "u01.d9", lesson: 4, fr: "Comment ça ___ ?", options: ["va", "es", "suis"], answer: 0, en: "How are you?", de: "Wie geht's?", why: tx("**Ça va** means «it goes». Comment ça va ? = How is it going?", "**Ça va** heißt „es geht“. Comment ça va ? = Wie geht's?") },
     { id: "u01.d10", lesson: 4, fr: "— Ça va bien ! — Moi ___ !", options: ["aussi", "très", "toi"], answer: 0, en: "— I'm fine! — Me too!", de: "— Mir geht's gut! — Mir auch!", why: tx("**Moi aussi** = me too.", "**Moi aussi** = ich auch / mir auch.") },
   ],
-  dialogue: {
-    id: "u01.dialogue",
-    lesson: 5,
-    title: tx("Blob meets Léa and Hugo", "Blob trifft Léa und Hugo"),
-    lines: [
-      { who: "blob", fr: "Bonjour ! Je m'appelle Blob.", en: "Hello! My name is Blob.", de: "Hallo! Ich heiße Blob." },
-      { who: "lea", fr: "Salut, Blob ! Je m'appelle Léa.", en: "Hi, Blob! My name is Léa.", de: "Hallo, Blob! Ich heiße Léa." },
-      { who: "blob", fr: "Enchanté, Léa ! Comment ça va ?", en: "Nice to meet you, Léa! How are you?", de: "Freut mich, Léa! Wie geht's?" },
-      { who: "lea", fr: "Ça va bien, merci. Et toi ?", en: "I'm fine, thank you. And you?", de: "Mir geht's gut, danke. Und dir?" },
-      { who: "blob", fr: "Très bien ! Et lui, il s'appelle comment ?", en: "Very well! And him, what's his name?", de: "Sehr gut! Und er, wie heißt er?" },
-      { who: "hugo", fr: "Je m'appelle Hugo. Enchanté, Blob !", en: "My name is Hugo. Nice to meet you, Blob!", de: "Ich heiße Hugo. Freut mich, Blob!" },
-      { who: "lea", fr: "Au revoir, Blob ! À bientôt !", en: "Goodbye, Blob! See you soon!", de: "Tschüss, Blob! Bis bald!" },
-      { who: "blob", fr: "Au revoir ! Merci !", en: "Goodbye! Thank you!", de: "Auf Wiedersehen! Danke!" },
-    ],
-    questions: [
-      { q: tx("What is the girl called?", "Wie heißt das Mädchen?"), options: ["Léa", "Hugo", tx("Mrs Martin", "Frau Martin")], answer: 0 },
-      { q: tx("How is Léa?", "Wie geht es Léa?"), options: [tx("She is fine.", "Ihr geht es gut."), tx("She is not well.", "Ihr geht es schlecht."), tx("She doesn't say.", "Sie sagt es nicht.")], answer: 0 },
-      { q: tx("What does Léa say at the end?", "Was sagt Léa am Ende?"), options: [tx("Goodbye, see you soon!", "Tschüss, bis bald!"), tx("Good evening!", "Guten Abend!"), tx("Thank you very much!", "Vielen Dank!")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u01.dialogue",
+      lesson: 5,
+      title: tx("Blob meets Léa and Hugo", "Blob trifft Léa und Hugo"),
+      lines: [
+        { who: "blob", fr: "Bonjour ! Je m'appelle Blob.", en: "Hello! My name is Blob.", de: "Hallo! Ich heiße Blob." },
+        { who: "lea", fr: "Salut, Blob ! Je m'appelle Léa.", en: "Hi, Blob! My name is Léa.", de: "Hallo, Blob! Ich heiße Léa." },
+        { who: "blob", fr: "Enchanté, Léa ! Comment ça va ?", en: "Nice to meet you, Léa! How are you?", de: "Freut mich, Léa! Wie geht's?" },
+        { who: "lea", fr: "Ça va bien, merci. Et toi ?", en: "I'm fine, thank you. And you?", de: "Mir geht's gut, danke. Und dir?" },
+        { who: "blob", fr: "Très bien ! Et lui, il s'appelle comment ?", en: "Very well! And him, what's his name?", de: "Sehr gut! Und er, wie heißt er?" },
+        { who: "hugo", fr: "Je m'appelle Hugo. Enchanté, Blob !", en: "My name is Hugo. Nice to meet you, Blob!", de: "Ich heiße Hugo. Freut mich, Blob!" },
+        { who: "lea", fr: "Au revoir, Blob ! À bientôt !", en: "Goodbye, Blob! See you soon!", de: "Tschüss, Blob! Bis bald!" },
+        { who: "blob", fr: "Au revoir ! Merci !", en: "Goodbye! Thank you!", de: "Auf Wiedersehen! Danke!" },
+      ],
+      questions: [
+        { q: tx("What is the girl called?", "Wie heißt das Mädchen?"), options: ["Léa", "Hugo", tx("Mrs Martin", "Frau Martin")], answer: 0 },
+        { q: tx("How is Léa?", "Wie geht es Léa?"), options: [tx("She is fine.", "Ihr geht es gut."), tx("She is not well.", "Ihr geht es schlecht."), tx("She doesn't say.", "Sie sagt es nicht.")], answer: 0 },
+        { q: tx("What does Léa say at the end?", "Was sagt Léa am Ende?"), options: [tx("Goodbye, see you soon!", "Tschüss, bis bald!"), tx("Good evening!", "Guten Abend!"), tx("Thank you very much!", "Vielen Dank!")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Hello and goodbye", "Hallo und tschüss"),

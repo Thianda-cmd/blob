@@ -12,15 +12,22 @@ except its material.
 
 ## What students do with a unit
 
-Every unit is 4 or 5 lessons. A lesson introduces its new words (word card, then a picture question
-when the word has an emoji), then a pairs game, then about 10 steps with the lesson's sentences and
-some earlier ones: build the translation from word tiles (both directions), type it (both
-directions), pick the right translation, listen and write what you hear, say a sentence out loud, and
-fill grammar gaps (drills). The unit's dialogue comes near the end of its lesson. Practice mixes
-everything learned so far, weakest words first.
+Every unit is 7 teaching lessons and a unit review (the 8th, added by `course.ts`: no new words,
+the whole unit mixed, mostly writing). A lesson introduces its new words (word card, then a picture
+question when the word has an emoji), then a pairs game, then about 13 steps with the lesson's
+sentences and some earlier ones: build the translation from word tiles (both directions), type it
+(both directions), pick the right translation, fill grammar gaps (drills), and in between:
 
-So every sentence must work in every exercise: as tiles, typed, read aloud by a French voice, and
-recognised from speech. Write words out (`Monsieur`, not `M.`; `douze`, not `12`).
+- **Le or la?** (un or une for `l'…` nouns): made from the nouns and their gender `g`.
+- **Spell it**: write the French (with its article) for a picture and meaning: made from the words.
+- **Spot the mistake**: a drill's sentence with one of its wrong options in the gap; the student taps
+  the wrong word. So a drill's wrong options must be really wrong, never another correct sentence.
+- **Best reply**: a question from a story (a line ending in `?`) and the next person's answer, among
+  answers from other stories. So stories need clear question-and-answer exchanges.
+
+The unit's stories come near the end of their lessons (5 and 7). Practice mixes everything learned
+so far, weakest words first. There is no sound: everything is read, tapped and written. Write words
+out (`Monsieur`, not `M.`; `douze`, not `12`).
 
 ## How a unit is written
 
@@ -36,10 +43,13 @@ a bit funny; Blob (the purple mascot, who wears a béret in this course) is part
 - `alt`: other right translations a student might type (`thanks` for merci).
 - `note`: Blob's memory hook for words where one helps (not every word).
 
-**Lessons**: 2 to 6 new words each (numbers up to 7); the last lesson may have fewer and holds the
-dialogue. Every word is in exactly one lesson.
+**Lessons**: 7 per unit. 2 to 6 new words each (numbers up to 7); lessons 6 and 7 may have fewer.
+Every word is in exactly one lesson. Lessons 1 to 5 bring the unit's main words and grammar, with
+the first story in lesson 5. Lessons 6 and 7 go further: a few new words, the unit's grammar in new
+combinations (questions, negation, plural forms, words of earlier units), and the second story in
+lesson 7.
 
-**Sentences** (6 or 7 per lesson, 30 to 36 per unit)
+**Sentences** (6 or 7 per lesson in lessons 1 to 5, 7 or 8 in lessons 6 and 7; about 50 per unit)
 - Short (2 to 9 words), natural, everyday French at A1.
 - Use only words taught in this unit or before, the little words of `BASE` in `glossary.ts`, and
   forms listed in the unit's `gloss` (verb forms, plurals, feminine forms). The checker warns about
@@ -62,15 +72,19 @@ dialogue. Every word is in exactly one lesson.
   first names. A name must also come up inside some sentence (not only first), else its word tile
   starts with a small letter.
 
-**Drills** (8 to 12): one gap `___` and 2 to 4 options that test this unit's grammar (article and
-gender, verb form, agreement, negation, preposition). `why` is Blob's short explanation with
-**bold** for the key form, speaking to the student as "you" / "du".
+**Drills** (about 16: 2 to 3 per lesson): one gap `___` and 2 to 4 options that test this unit's
+grammar (article and gender, verb form, agreement, negation, preposition). `why` is Blob's short
+explanation with **bold** for the key form, speaking to the student as "you" / "du". Every wrong
+option must make a wrong sentence (it's also shown as the mistake to spot); the checker reports a
+wrong option that makes a sentence the course accepts.
 
-**Dialogue** (6 to 10 lines, in the last lesson): a little scene with Blob and the cast
-(`blob`, `lea`, `hugo`, `madame`, `serveur`, `maman`, `papa`, `prof`, `vendeur`), using the unit's
-words, then 3 questions about it (bilingual options, the first one or any one right via `answer`).
+**Stories** (`dialogues`, 2 per unit, in lessons 5 and 7; 6 to 10 lines each): a little scene with
+Blob and the cast (`blob`, `lea`, `hugo`, `madame`, `serveur`, `maman`, `papa`, `prof`, `vendeur`),
+using the unit's words, then 3 questions about it (bilingual options; `answer` is the right one's
+index). Put in at least two clear exchanges where one person asks (the line ends with `?`) and the
+next person answers in a way that only fits that question: they become "best reply" exercises.
 
-**Tips** (3 per unit): the unit's guidebook. One idea each, simple and short, `**bold**` for forms,
+**Tips** (4 per unit, one of them for lessons 6 and 7): the unit's guidebook. One idea each, simple and short, `**bold**` for forms,
 paragraphs split by a blank line (`\n\n`), 2 to 4 examples, and a small table for a conjugation or
 the articles.
 

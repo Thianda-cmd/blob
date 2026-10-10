@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/i18n/client";
 import { frenchText } from "@/i18n/messages/french";
 import { cn } from "@/lib/utils";
-import { prefs, sounds } from "../speech";
 
 const TILE =
   "select-none rounded-xl border-2 border-line border-b-[4px] bg-raised px-3 py-1.5 text-[16px] font-medium text-ink transition-colors sm:text-[17px] [@media(hover:hover)]:hover:bg-hover";
@@ -19,7 +18,6 @@ export function TileBoard({ tiles, locked, lang, onChange }: { tiles: string[]; 
 
   function toggle(i: number) {
     if (locked) return;
-    if (prefs.soundOn()) sounds.tap();
     const next = picked.includes(i) ? picked.filter((x) => x !== i) : [...picked, i];
     setPicked(next);
     onChange(next.map((x) => tiles[x]).join(" "));

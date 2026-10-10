@@ -111,26 +111,28 @@ export const u05: Unit = {
     { id: "u05.d10", lesson: 5, fr: "Aujourd'hui, Léa ___ quatorze ans.", options: ["a", "est"], answer: 0, en: "Léa is fourteen today.", de: "Léa wird heute vierzehn.", why: tx("Age with avoir: Léa **a** quatorze ans.", "Alter mit avoir: Léa **a** quatorze ans.") },
     { id: "u05.d11", lesson: 5, fr: "Je n'___ pas quinze ans.", options: ["ai", "suis"], answer: 0, en: "I'm not fifteen.", de: "Ich bin nicht fünfzehn.", why: tx("Age with avoir, also after ne: je **n'ai** pas quinze ans.", "Alter mit avoir, auch nach ne: je **n'ai** pas quinze ans.") },
   ],
-  dialogue: {
-    id: "u05.dialogue",
-    lesson: 5,
-    title: tx("Léa's birthday", "Léas Geburtstag"),
-    lines: [
-      { who: "hugo", fr: "Bon anniversaire, Léa ! Tu as quel âge aujourd'hui ?", en: "Happy birthday, Léa! How old are you today?", de: "Alles Gute zum Geburtstag, Léa! Wie alt wirst du heute?" },
-      { who: "lea", fr: "Merci ! J'ai quatorze ans.", en: "Thanks! I'm fourteen.", de: "Danke! Ich werde vierzehn." },
-      { who: "blob", fr: "Quatorze ? Alors il y a quatorze croissants pour toi !", en: "Fourteen? Then there are fourteen croissants for you!", de: "Vierzehn? Dann gibt es vierzehn Croissants für dich!" },
-      { who: "lea", fr: "Merci, Blob ! Un, deux, trois… treize croissants ?", en: "Thanks, Blob! One, two, three… thirteen croissants?", de: "Danke, Blob! Eins, zwei, drei … dreizehn Croissants?" },
-      { who: "hugo", fr: "Treize ? Blob, tu manges un croissant ?", en: "Thirteen? Blob, are you eating a croissant?", de: "Dreizehn? Blob, isst du etwa ein Croissant?" },
-      { who: "blob", fr: "Non ! Enfin… oui, un petit croissant.", en: "No! Well… yes, a little croissant.", de: "Nein! Na ja … doch, ein kleines Croissant." },
-      { who: "lea", fr: "Ce n'est pas grave, Blob. Et toi, tu as quel âge ?", en: "Never mind, Blob. And how old are you?", de: "Macht nichts, Blob. Und wie alt bist du?" },
-      { who: "blob", fr: "Moi ? J'ai deux ans… et un béret !", en: "Me? I'm two… and I've got a beret!", de: "Ich? Ich bin zwei … und habe eine Baskenmütze!" },
-    ],
-    questions: [
-      { q: tx("How old is Léa today?", "Wie alt wird Léa heute?"), options: ["14", "13", "2"], answer: 0 },
-      { q: tx("Who ate a croissant?", "Wer hat ein Croissant gegessen?"), options: ["Blob", "Hugo", "Léa"], answer: 0 },
-      { q: tx("How old is Blob?", "Wie alt ist Blob?"), options: ["2", "14", "20"], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u05.dialogue",
+      lesson: 5,
+      title: tx("Léa's birthday", "Léas Geburtstag"),
+      lines: [
+        { who: "hugo", fr: "Bon anniversaire, Léa ! Tu as quel âge aujourd'hui ?", en: "Happy birthday, Léa! How old are you today?", de: "Alles Gute zum Geburtstag, Léa! Wie alt wirst du heute?" },
+        { who: "lea", fr: "Merci ! J'ai quatorze ans.", en: "Thanks! I'm fourteen.", de: "Danke! Ich werde vierzehn." },
+        { who: "blob", fr: "Quatorze ? Alors il y a quatorze croissants pour toi !", en: "Fourteen? Then there are fourteen croissants for you!", de: "Vierzehn? Dann gibt es vierzehn Croissants für dich!" },
+        { who: "lea", fr: "Merci, Blob ! Un, deux, trois… treize croissants ?", en: "Thanks, Blob! One, two, three… thirteen croissants?", de: "Danke, Blob! Eins, zwei, drei … dreizehn Croissants?" },
+        { who: "hugo", fr: "Treize ? Blob, tu manges un croissant ?", en: "Thirteen? Blob, are you eating a croissant?", de: "Dreizehn? Blob, isst du etwa ein Croissant?" },
+        { who: "blob", fr: "Non ! Enfin… oui, un petit croissant.", en: "No! Well… yes, a little croissant.", de: "Nein! Na ja … doch, ein kleines Croissant." },
+        { who: "lea", fr: "Ce n'est pas grave, Blob. Et toi, tu as quel âge ?", en: "Never mind, Blob. And how old are you?", de: "Macht nichts, Blob. Und wie alt bist du?" },
+        { who: "blob", fr: "Moi ? J'ai deux ans… et un béret !", en: "Me? I'm two… and I've got a beret!", de: "Ich? Ich bin zwei … und habe eine Baskenmütze!" },
+      ],
+      questions: [
+        { q: tx("How old is Léa today?", "Wie alt wird Léa heute?"), options: ["14", "13", "2"], answer: 0 },
+        { q: tx("Who ate a croissant?", "Wer hat ein Croissant gegessen?"), options: ["Blob", "Hugo", "Léa"], answer: 0 },
+        { q: tx("How old is Blob?", "Wie alt ist Blob?"), options: ["2", "14", "20"], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Counting to twenty", "Bis zwanzig zählen"),

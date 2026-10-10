@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BookOpen, Check, Dumbbell, Flame, GraduationCap, Languages, Lock, Star, Trophy, Zap } from "lucide-react";
+import { BookOpen, Check, Dumbbell, Flame, GraduationCap, Languages, Lock, Star, Target, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { courseState, SECTIONS, type LessonState, type UnitState } from "../course";
 import type { WordRow } from "../server";
 import type { Unit } from "../types";
-import { say } from "../speech";
 
 /** Colours of the units on the path, in turn. */
 const UNIT_COLORS = ["#6d3df5", "#2f6f6a", "#c4653e", "#3f78b3", "#c05475", "#5d8a4c", "#b48e38", "#8a5a9c"];
@@ -127,9 +126,9 @@ function Greeting({ nextHref, nextLabel, started }: { nextHref: string | null; n
   return (
     <div className="overflow-hidden rounded-3xl border border-line bg-raised p-5 shadow-card">
       <div className="flex items-end gap-3">
-        <button type="button" onClick={() => void say(line.fr)} className="shrink-0" aria-label={line.fr}>
-          <Blob ref={blob} size={96} mood="happy" accessory="beret" />
-        </button>
+        <div className="shrink-0">
+          <Blob ref={blob} size={96} mood="happy" accessory="beret" onClick={() => blob.current?.jump(1)} />
+        </div>
         <div className="relative mb-5 min-w-0 flex-1 rounded-2xl rounded-bl-md border border-line bg-surface px-3.5 py-2.5">
           <div lang="fr" className="text-[15.5px] font-semibold text-ink">
             {line.fr}
@@ -199,7 +198,15 @@ function UnitPath({ state, color }: { state: UnitState; color: string }) {
       </div>
       <ol className="relative mx-auto mt-6 flex max-w-[360px] flex-col items-center gap-5">
         {unit.lessons.map((lesson, i) => (
-          <LessonNode key={i} unit={unit} n={i + 1} state={state.lessons[i]} color={color} title={resolveText(lesson.title, locale)} story={unit.dialogue?.lesson === i + 1} />
+          <LessonNode
+            key={i}
+            unit={unit}
+            n={i + 1}
+            state={state.lessons[i]}
+            color={color}
+            title={resolveText(lesson.title, locale)}
+            kind={lesson.review ? "review" : unit.dialogues.some((d) => d.lesson === i + 1) ? "story" : "lesson"}
+          />
         ))}
         <li className={cn("grid size-16 place-items-center rounded-full border-4 text-white", complete ? "border-[#b48e38] bg-[#e2b84b]" : "border-line bg-hover text-ink-3")} title={complete ? t.end.unitDone(resolveText(unit.title, locale)) : undefined}>
           <Trophy className={cn("size-7", complete ? "text-white" : "text-ink-3")} />
@@ -209,11 +216,11 @@ function UnitPath({ state, color }: { state: UnitState; color: string }) {
   );
 }
 
-function LessonNode({ unit, n, state, color, title, story }: { unit: Unit; n: number; state: LessonState; color: string; title: string; story: boolean }) {
+function LessonNode({ unit, n, state, color, title, kind }: { unit: Unit; n: number; state: LessonState; color: string; title: string; kind: "lesson" | "story" | "review" }) {
   const t = useMessages(frenchText);
   // Stepping stones swing left and right like a path.
   const x = Math.round(Math.sin((n - 1) * 1.15) * 72);
-  const Icon = state === "locked" ? Lock : state === "done" ? Check : story ? BookOpen : Star;
+  const Icon = state === "locked" ? Lock : state === "done" ? Check : kind === "story" ? BookOpen : kind === "review" ? Target : Star;
   const href = state === "locked" ? null : `/study/french/${unit.slug}/${n}`;
   const node = (
     <span
@@ -224,7 +231,7 @@ function LessonNode({ unit, n, state, color, title, story }: { unit: Unit; n: nu
       )}
       style={state === "locked" ? undefined : { background: state === "done" ? color : color, borderBottomColor: "rgba(0,0,0,0.22)", opacity: state === "done" ? 0.92 : 1 }}
     >
-      <Icon className="size-8" strokeWidth={state === "done" ? 3 : 2.2} fill={state === "current" && !story ? "currentColor" : "none"} />
+      <Icon className="size-8" strokeWidth={state === "done" ? 3 : 2.2} fill={state === "current" && kind === "lesson" ? "currentColor" : "none"} />
       {state === "current" && <span className="absolute -inset-2 animate-ping rounded-full border-4 opacity-30" style={{ borderColor: color }} />}
     </span>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowRight, Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -13,14 +13,13 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { ALL_WORDS, learnedPart, lessonKey, unitBySlug, UNITS } from "../course";
 import { lessonExercises, practiceExercises, wordsOf } from "../generate";
-import { frenchVoiceReady, prefs, sounds, stopSpeaking } from "../speech";
 import { nounIndex } from "../text";
 import type { Exercise, Lang, Unit } from "../types";
-import { BlankEx, ChoiceEx, DialogueEx, IntroEx, ListenEx, MatchEx, PictureEx, SentenceEx, SpeakEx, speakingPossible, type ExProps } from "./exercises";
+import { ArticleEx, BlankEx, ChoiceEx, DialogueEx, IntroEx, MatchEx, PictureEx, ReplyEx, SentenceEx, SpellEx, SpotEx, type ExProps } from "./exercises";
 import { BlobSays, Bold, Marked, type Outcome } from "./parts";
 
 /** Exercises that come back at the end of the lesson when they went wrong. */
-const RETRY = new Set(["picture", "tiles", "type", "choice", "listen", "blank"]);
+const RETRY = new Set(["picture", "tiles", "type", "choice", "blank", "article", "spell", "spot", "reply"]);
 
 type Props =
   | { mode: "lesson"; unit: string; lesson: number; seed: number; days: LearnDay[]; doneBefore: number; replay: boolean }
@@ -40,13 +39,24 @@ export function FrenchPlayer(props: Props) {
   const nouns = useMemo(() => nounIndex(ALL_WORDS), []);
   const exitHref = "/learn/french";
 
-  const [queue, setQueue] = useState<Exercise[] | null>(null);
-  const [voice, setVoice] = useState(false);
+  // The same seed builds the same lesson on the server and in the browser.
+  const [queue, setQueue] = useState<Exercise[]>(() => {
+    const opts = { lang, seed: props.seed };
+    return props.mode === "lesson"
+      ? lessonExercises(unit!, props.lesson, UNITS.filter((u) => u.n < unit!.n), opts)
+      : practiceExercises(
+          props.units.flatMap(({ slug, upTo }) => {
+            const u = unitBySlug(slug);
+            return u ? [learnedPart(u, upTo)] : [];
+          }),
+          props.weak,
+          opts,
+        );
+  });
   const [idx, setIdx] = useState(0);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [ready, setReady] = useState(false);
   const [combo, setCombo] = useState(0);
-  const [sound, setSound] = useState(true);
   const [done, setDone] = useState<null | { xp: number; accuracy: number; seconds: number; saved: boolean }>(null);
   const [splash, setSplash] = useState(true);
 
@@ -54,43 +64,13 @@ export function FrenchPlayer(props: Props) {
   const blob = useRef<BlobHandle>(null);
   const stats = useRef({ answered: 0, right: 0, maxCombo: 0, started: 0, words: new Map<string, { ok: number; bad: number }>() });
 
-  // Build the lesson in the browser: which exercises fit depends on its voices and microphone.
   useEffect(() => {
-    let alive = true;
-    void frenchVoiceReady().then((hasVoice) => {
-      if (!alive) return;
-      const listening = hasVoice && !prefs.listeningOff();
-      const opts = { lang, seed: props.seed, listening, speaking: speakingPossible() };
-      const list =
-        props.mode === "lesson"
-          ? lessonExercises(unit!, props.lesson, UNITS.filter((u) => u.n < unit!.n), opts)
-          : practiceExercises(
-              props.units.flatMap(({ slug, upTo }) => {
-                const u = unitBySlug(slug);
-                return u ? [learnedPart(u, upTo)] : [];
-              }),
-              props.weak,
-              opts,
-            );
-      setVoice(hasVoice);
-      setSound(prefs.soundOn());
-      setQueue(list);
-      stats.current.started = Date.now();
-    });
-    return () => {
-      alive = false;
-      stopSpeaking();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- built once per visit
-  }, []);
-
-  useEffect(() => {
-    if (!queue) return;
+    stats.current.started = Date.now();
     const id = setTimeout(() => setSplash(false), 1300);
     return () => clearTimeout(id);
-  }, [queue]);
+  }, []);
 
-  const ex = queue?.[idx] ?? null;
+  const ex = queue[idx] ?? null;
 
   const setCheck = useCallback((fn: (() => Outcome) | null) => {
     check.current = fn;
@@ -99,8 +79,7 @@ export function FrenchPlayer(props: Props) {
 
   const apply = useCallback(
     (o: Outcome) => {
-      if (!queue || !ex || outcome) return;
-      stopSpeaking();
+      if (!ex || outcome) return;
       if (ex.kind === "intro") {
         next();
         return;
@@ -123,12 +102,11 @@ export function FrenchPlayer(props: Props) {
       const nextCombo = o.skipped ? combo : o.correct ? combo + 1 : 0;
       setCombo(nextCombo);
       s.maxCombo = Math.max(s.maxCombo, nextCombo);
-      if (prefs.soundOn() && !o.skipped) (o.correct ? sounds.right : sounds.wrong)();
       if (o.correct && !o.skipped) {
         if (nextCombo >= 3 && nextCombo % (nextCombo >= 5 ? 5 : 3) === 0) blob.current?.celebrate();
         else blob.current?.jump(0.7);
       } else if (!o.skipped) blob.current?.shake();
-      if (!o.correct && first && RETRY.has(ex.kind)) setQueue((q) => [...q!, { ...ex, key: `${ex.key}:again` } as Exercise]);
+      if (!o.correct && first && RETRY.has(ex.kind)) setQueue((q) => [...q, { ...ex, key: `${ex.key}:again` } as Exercise]);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- next is stable enough for one answer
     [queue, ex, outcome, combo],
@@ -143,7 +121,6 @@ export function FrenchPlayer(props: Props) {
     setOutcome(null);
     check.current = null;
     setReady(false);
-    if (!queue) return;
     if (idx + 1 < queue.length) setIdx(idx + 1);
     else void finish();
   }
@@ -168,7 +145,6 @@ export function FrenchPlayer(props: Props) {
         ? supabase.rpc("lang_words_record", { p_course: "fr", p_day: todayKey(), p_items: [...s.words].map(([id, v]) => ({ id, ok: v.ok, bad: v.bad })) })
         : Promise.resolve(null),
     ]);
-    if (prefs.soundOn()) sounds.done();
     setDone({ xp, accuracy, seconds: Math.round((Date.now() - s.started) / 1000), saved });
   }
 
@@ -227,48 +203,23 @@ export function FrenchPlayer(props: Props) {
     );
   }
 
-  const progress = queue ? idx / queue.length : 0;
-  const again = ex?.key.endsWith(":again") && !queue?.[idx - 1]?.key.endsWith(":again");
-  const exProps = ex
-    ? ({ ex, lang, voice, locked: !!outcome, setCheck, finish: apply, submit: runCheck, nouns, blobRef: blob } as unknown as ExProps<"intro">)
-    : null;
+  const progress = idx / queue.length;
+  const again = ex?.key.endsWith(":again") && !queue[idx - 1]?.key.endsWith(":again");
+  const exProps = ex ? ({ ex, lang, locked: !!outcome, setCheck, finish: apply, submit: runCheck, nouns, blobRef: blob } as unknown as ExProps<"intro">) : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
       <StudyTopBar exitHref={exitHref} title={title} progress={progress} xp={0} combo={combo} />
-      <main className="mx-auto w-full max-w-[680px] flex-1 px-4 pb-48 pt-5 sm:pt-8">
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              prefs.setSound(!sound);
-              setSound(!sound);
-            }}
-            className="grid size-8 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink"
-            aria-label={sound ? t.player.soundOff : t.player.soundOn}
-            title={sound ? t.player.soundOff : t.player.soundOn}
-          >
-            {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-          </button>
-        </div>
-        {!queue ? (
-          <div className="grid place-items-center gap-4 py-24 text-center text-[15px] text-ink-2">
-            <Blob size={110} mood="thinking" accessory="beret" />
-            {t.player.loading}
-          </div>
-        ) : (
-          <>
-            {again && <p className="mb-4 rounded-xl bg-blob-soft px-3.5 py-2 text-[14px] font-medium text-blob-ink">{t.player.retryRound}</p>}
-            <AnimatePresence mode="wait">
-              <motion.div key={ex!.key} data-ex={ex!.key} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
-                {exProps && <ExerciseView {...exProps} />}
-              </motion.div>
-            </AnimatePresence>
-          </>
-        )}
+      <main className="mx-auto w-full max-w-[680px] flex-1 px-4 pb-48 pt-6 sm:pt-10">
+        {again && <p className="mb-4 rounded-xl bg-blob-soft px-3.5 py-2 text-[14px] font-medium text-blob-ink">{t.player.retryRound}</p>}
+        <AnimatePresence mode="wait">
+          <motion.div key={ex!.key} data-ex={ex!.key} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
+            {exProps && <ExerciseView {...exProps} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
-      {queue && ex && (
+      {ex && (
         <Footer
           outcome={outcome}
           ready={ready}
@@ -281,7 +232,7 @@ export function FrenchPlayer(props: Props) {
       )}
 
       <AnimatePresence>
-        {queue && splash && (
+        {splash && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -317,14 +268,18 @@ function ExerciseView(p: ExProps<"intro">) {
     case "tiles":
     case "type":
       return <SentenceEx {...as<"tiles">()} />;
-    case "listen":
-      return <ListenEx {...as<"listen">()} />;
-    case "speak":
-      return <SpeakEx {...as<"speak">()} />;
     case "blank":
       return <BlankEx {...as<"blank">()} />;
     case "match":
       return <MatchEx {...as<"match">()} />;
+    case "article":
+      return <ArticleEx {...as<"article">()} />;
+    case "spell":
+      return <SpellEx {...as<"spell">()} />;
+    case "spot":
+      return <SpotEx {...as<"spot">()} />;
+    case "reply":
+      return <ReplyEx {...as<"reply">()} />;
     case "dialogue":
       return <DialogueEx {...as<"dialogue">()} />;
   }

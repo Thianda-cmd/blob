@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Ear, Keyboard, Mic, MicOff, Sparkles } from "lucide-react";
+import { Check, Keyboard, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -9,18 +9,16 @@ import { frenchText } from "@/i18n/messages/french";
 import { resolveText } from "@/i18n/text";
 import { cn } from "@/lib/utils";
 import { acceptedOf, targetOf } from "../generate";
-import { prefs, say, sounds, listenOnce, canRecognize } from "../speech";
-import { accentWords, explainFrench, fold, grade, tilesOf } from "../text";
+import { accentWords, explainFrench, fold, grade, spotTokens } from "../text";
 import type { Exercise, Lang, Sentence, Word } from "../types";
+import { bare } from "../course";
 import { OptionCards, TileBoard, TypeBox } from "./inputs";
-import { BlobSays, PlayButtons, Prompt, Tappable, type Outcome } from "./parts";
+import { BlobSays, Prompt, Tappable, type Outcome } from "./parts";
 
 /** What every exercise gets from the lesson. */
 export type ExProps<K extends Exercise["kind"]> = {
   ex: Extract<Exercise, { kind: K }>;
   lang: Lang;
-  /** A French voice is available. */
-  voice: boolean;
   /** Answered: no more changes. */
   locked: boolean;
   /** Ready to check (or not yet): the lesson's Check button runs this. */
@@ -54,7 +52,7 @@ export function gradeSentence(answer: string, s: Sentence, dir: "toFr" | "fromFr
    A new word
    ------------------------------------------------------------------------------------------- */
 
-export function IntroEx({ ex, lang, voice, setCheck, blobRef }: ExProps<"intro">) {
+export function IntroEx({ ex, lang, setCheck, blobRef }: ExProps<"intro">) {
   const t = useMessages(frenchText);
   const locale = useLocale();
   const w = ex.word;
@@ -82,7 +80,6 @@ export function IntroEx({ ex, lang, voice, setCheck, blobRef }: ExProps<"intro">
           {w.g && <div className={cn("mt-1 text-[12.5px] font-semibold uppercase tracking-wide", w.g === "f" ? "text-[#c05475]" : "text-[#3f78b3]")}>{t.genders[w.g]}</div>}
           <div className="mt-2 text-[18px] text-ink-2">{translation}</div>
         </div>
-        <PlayButtons text={w.fr} auto voice={voice} />
       </motion.div>
       {w.note && (
         <BlobSays className="mt-5" size={70} blobRef={blobRef}>
@@ -97,7 +94,7 @@ export function IntroEx({ ex, lang, voice, setCheck, blobRef }: ExProps<"intro">
    Which picture?
    ------------------------------------------------------------------------------------------- */
 
-export function PictureEx({ ex, lang, voice, locked, setCheck }: ExProps<"picture">) {
+export function PictureEx({ ex, lang, locked, setCheck }: ExProps<"picture">) {
   const t = useMessages(frenchText).player;
   const [chosen, setChosen] = useState<number | null>(null);
   const right = ex.options.findIndex((o) => o.id === ex.word.id);
@@ -105,10 +102,9 @@ export function PictureEx({ ex, lang, voice, locked, setCheck }: ExProps<"pictur
     (i: number) => {
       if (locked) return;
       setChosen(i);
-      if (voice && prefs.soundOn()) void say(ex.options[i].fr);
       setCheck(() => (i === right ? { correct: true } : { correct: false, solution: `${ex.word.fr} = ${ex.word[lang]}` }));
     },
-    [locked, voice, ex, right, lang, setCheck],
+    [locked, ex, right, lang, setCheck],
   );
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -121,9 +117,7 @@ export function PictureEx({ ex, lang, voice, locked, setCheck }: ExProps<"pictur
   return (
     <div>
       <Prompt>
-        <span className="inline-flex flex-wrap items-center gap-3">
-          {t.whichPicture(ex.word.fr)} <PlayButtons text={ex.word.fr} auto voice={voice} />
-        </span>
+        {t.whichPicture(ex.word.fr)}
       </Prompt>
       <div className={cn("grid gap-3", ex.options.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
         {ex.options.map((o, i) => {
@@ -156,7 +150,7 @@ export function PictureEx({ ex, lang, voice, locked, setCheck }: ExProps<"pictur
    Pick the translation
    ------------------------------------------------------------------------------------------- */
 
-export function ChoiceEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<"choice">) {
+export function ChoiceEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"choice">) {
   const t = useMessages(frenchText).player;
   const [chosen, setChosen] = useState<number | null>(null);
   const s = ex.sentence;
@@ -174,10 +168,7 @@ export function ChoiceEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps
       <Prompt>{t.pickTranslation}</Prompt>
       {ex.dir === "fromFr" ? (
         <BlobSays blobRef={blobRef} className="mb-6">
-          <div className="flex items-center gap-3">
-            <PlayButtons text={s.fr} auto voice={voice} />
-            <Tappable text={s.fr} className="text-[19px] leading-relaxed" />
-          </div>
+          <Tappable text={s.fr} className="text-[19px] leading-relaxed" />
         </BlobSays>
       ) : (
         <BlobSays blobRef={blobRef} className="mb-6">
@@ -193,7 +184,7 @@ export function ChoiceEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps
    Translate with tiles or by typing
    ------------------------------------------------------------------------------------------- */
 
-export function SentenceEx({ ex, lang, voice, locked, setCheck, submit, nouns, blobRef }: ExProps<"tiles"> | ExProps<"type">) {
+export function SentenceEx({ ex, lang, locked, setCheck, submit, nouns, blobRef }: ExProps<"tiles"> | ExProps<"type">) {
   const t = useMessages(frenchText).player;
   const [keyboard, setKeyboard] = useState(ex.kind === "type");
   const s = ex.sentence;
@@ -210,10 +201,7 @@ export function SentenceEx({ ex, lang, voice, locked, setCheck, submit, nouns, b
         {toFr ? (
           <p className="text-[19px] leading-relaxed">{s[lang]}</p>
         ) : (
-          <div className="flex items-center gap-3">
-            <PlayButtons text={s.fr} auto voice={voice} />
-            <Tappable text={s.fr} className="text-[19px] leading-relaxed" />
-          </div>
+          <Tappable text={s.fr} className="text-[19px] leading-relaxed" />
         )}
       </BlobSays>
       {keyboard ? (
@@ -240,143 +228,10 @@ export function SentenceEx({ ex, lang, voice, locked, setCheck, submit, nouns, b
 }
 
 /* -------------------------------------------------------------------------------------------
-   Listening
-   ------------------------------------------------------------------------------------------- */
-
-export function ListenEx({ ex, lang, voice, locked, setCheck, submit, finish, nouns, blobRef }: ExProps<"listen">) {
-  const t = useMessages(frenchText).player;
-  const s = ex.sentence;
-  const notes = useMemo(() => ({ accent: t.accentNote, typo: t.typoNote }), [t]);
-  const onAnswer = useCallback(
-    (answer: string) => setCheck(answer.trim() ? () => gradeSentence(answer, s, "toFr", lang, nouns, notes) : null),
-    [setCheck, s, lang, nouns, notes],
-  );
-  return (
-    <div>
-      <Prompt>{ex.mode === "tiles" ? t.listenTiles : t.listenType}</Prompt>
-      <BlobSays blobRef={blobRef} className="mb-6">
-        <div className="flex items-center gap-3 py-1">
-          <PlayButtons text={s.fr} auto big voice={voice} />
-          <Ear className="size-5 text-ink-3" />
-        </div>
-      </BlobSays>
-      {ex.mode === "tiles" ? (
-        <TileBoard tiles={ex.tiles} locked={locked} lang="fr" onChange={onAnswer} />
-      ) : (
-        <TypeBox french locked={locked} onChange={onAnswer} onEnter={submit} placeholder={t.typeFrench} />
-      )}
-      {!locked && (
-        <div className="mt-5 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              prefs.pauseListening();
-              finish({ correct: true, skipped: true });
-            }}
-            className="rounded-lg px-2 py-1 text-[13px] font-medium text-ink-3 hover:bg-hover hover:text-ink"
-          >
-            {t.cantListen}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------------------------
-   Speaking
-   ------------------------------------------------------------------------------------------- */
-
-/** How much of the sentence was understood: share of its words heard, in any order. */
-function heardShare(heard: string, target: string) {
-  const want = tilesOf(target, "fr").map((w) => fold(w, "fr"));
-  const got = new Set(fold(heard, "fr").split(" "));
-  return want.filter((w) => got.has(w)).length / Math.max(1, want.length);
-}
-
-export function SpeakEx({ ex, lang, voice, locked, finish, blobRef }: ExProps<"speak">) {
-  const t = useMessages(frenchText).player;
-  const s = ex.sentence;
-  const [state, setState] = useState<"idle" | "listening" | "heard" | "missed">("idle");
-  const [heard, setHeard] = useState("");
-  const tries = useRef(0);
-  const stop = useRef<(() => void) | null>(null);
-
-  async function listen() {
-    if (state === "listening") {
-      stop.current?.();
-      return;
-    }
-    setState("listening");
-    const run = listenOnce();
-    stop.current = run.stop;
-    const guesses = await run.result;
-    stop.current = null;
-    tries.current++;
-    const best = guesses.sort((a, b) => heardShare(b, s.fr) - heardShare(a, s.fr))[0] ?? "";
-    setHeard(best);
-    if (best && heardShare(best, s.fr) >= 0.75) {
-      setState("heard");
-      finish({ correct: true, meaning: s[lang] });
-    } else if (tries.current >= 3) {
-      // Speech recognition isn't perfect: after three tries it doesn't count against you.
-      setState("missed");
-      finish({ correct: true, skipped: true, solution: s.fr, meaning: s[lang] });
-    } else {
-      setState("missed");
-      blobRef.current?.shake();
-    }
-  }
-
-  return (
-    <div>
-      <Prompt>{t.speak}</Prompt>
-      <BlobSays blobRef={blobRef} className="mb-8">
-        <div className="flex items-center gap-3">
-          <PlayButtons text={s.fr} auto voice={voice} />
-          <Tappable text={s.fr} className="text-[19px] leading-relaxed" />
-        </div>
-      </BlobSays>
-      <div className="flex flex-col items-center gap-3">
-        <motion.button
-          type="button"
-          disabled={locked}
-          onClick={() => void listen()}
-          animate={state === "listening" ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-          transition={state === "listening" ? { repeat: Infinity, duration: 1.1 } : undefined}
-          className={cn(
-            "flex h-16 w-full max-w-[420px] items-center justify-center gap-3 rounded-2xl border-2 border-b-[4px] text-[16px] font-semibold transition-colors",
-            state === "listening" ? "border-blob bg-blob text-white" : "border-line bg-raised text-blob-ink hover:bg-hover",
-          )}
-        >
-          <Mic className="size-6" /> {state === "listening" ? t.listening : t.tapToSpeak}
-        </motion.button>
-        {heard && <p className="text-[14px] text-ink-2">{t.heard(heard)}</p>}
-        {state === "missed" && !locked && <p className="text-[14px] text-ink-2">{t.notHeard}</p>}
-        {!locked && (
-          <button
-            type="button"
-            onClick={() => {
-              prefs.pauseSpeaking();
-              finish({ correct: true, skipped: true });
-            }}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-medium text-ink-3 hover:bg-hover hover:text-ink"
-          >
-            <MicOff className="size-4" /> {t.cantSpeak}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export const speakingPossible = () => canRecognize() && !prefs.speakingOff();
-
-/* -------------------------------------------------------------------------------------------
    Fill the gap
    ------------------------------------------------------------------------------------------- */
 
-export function BlankEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<"blank">) {
+export function BlankEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"blank">) {
   const t = useMessages(frenchText).player;
   const locale = useLocale();
   const d = ex.drill;
@@ -387,7 +242,6 @@ export function BlankEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<
     (i: number) => {
       if (locked) return;
       setChosen(i);
-      if (prefs.soundOn()) sounds.tap();
       setCheck(() =>
         i === d.answer
           ? { correct: true, meaning: d[lang] }
@@ -408,8 +262,7 @@ export function BlankEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<
     <div>
       <Prompt>{t.blank}</Prompt>
       <BlobSays blobRef={blobRef} className="mb-7">
-        <div className="flex items-center gap-3">
-          {locked && <PlayButtons text={full} voice={voice} />}
+        <div>
           <p lang="fr" className="text-[20px] leading-relaxed">
             {before}
             <span
@@ -449,7 +302,7 @@ export function BlankEx({ ex, lang, voice, locked, setCheck, blobRef }: ExProps<
    Matching pairs
    ------------------------------------------------------------------------------------------- */
 
-export function MatchEx({ ex, lang, voice, finish, blobRef }: ExProps<"match">) {
+export function MatchEx({ ex, lang, finish, blobRef }: ExProps<"match">) {
   const t = useMessages(frenchText).player;
   const [left] = useState(() => ex.words);
   const [right] = useState(() => [...ex.words].sort((a, b) => (a[lang] < b[lang] ? -1 : 1)));
@@ -466,7 +319,6 @@ export function MatchEx({ ex, lang, voice, finish, blobRef }: ExProps<"match">) 
     if (l === r) {
       const next = [...done, l];
       setDone(next);
-      if (prefs.soundOn()) sounds.tap();
       if (next.length === left.length) {
         blobRef.current?.jump(0.8);
         finish({ correct: mistakes.current === 0 });
@@ -503,7 +355,6 @@ export function MatchEx({ ex, lang, voice, finish, blobRef }: ExProps<"match">) 
               transition={{ duration: 0.4 }}
               disabled={done.includes(w.id)}
               onClick={() => {
-                if (voice && prefs.soundOn()) void say(w.fr);
                 setBad(null);
                 if (pickR) pair(w.id, pickR);
                 else setPickL(w.id);
@@ -554,7 +405,7 @@ const SPEAKER_STYLE: Record<string, { emoji: string; tone: string }> = {
   vendeur: { emoji: "🧑‍💼", tone: "bg-[#3f78b3]/12 text-[#2f5f93]" },
 };
 
-export function DialogueEx({ ex, lang, voice, locked, setCheck }: ExProps<"dialogue">) {
+export function DialogueEx({ ex, lang, locked, setCheck }: ExProps<"dialogue">) {
   const t = useMessages(frenchText);
   const locale = useLocale();
   const d = ex.dialogue;
@@ -589,11 +440,6 @@ export function DialogueEx({ ex, lang, voice, locked, setCheck }: ExProps<"dialo
               <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border-2 border-line bg-raised px-3.5 py-2">
                 <div className="flex items-center gap-2">
                   <span className={cn("text-[11.5px] font-semibold uppercase tracking-wide", style.tone.split(" ").find((c) => c.startsWith("text-")))}>{t.speakers[line.who]}</span>
-                  {voice && (
-                    <button type="button" onClick={() => void say(line.fr)} className="text-ink-3 hover:text-blob-ink" aria-label={t.player.play}>
-                      <Ear className="size-3.5" />
-                    </button>
-                  )}
                 </div>
                 <button type="button" onClick={() => setShown((s) => (open ? s.filter((x) => x !== i) : [...s, i]))} className="block w-full text-left">
                   <span lang="fr" className="text-[16.5px] leading-snug text-ink">
@@ -621,6 +467,222 @@ export function DialogueEx({ ex, lang, voice, locked, setCheck }: ExProps<"dialo
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------------------------
+   Le or la?
+   ------------------------------------------------------------------------------------------- */
+
+/** "pomme" of "la pomme", "école" of "l'école". */
+const nounOf = (fr: string) => fr.replace(/^(le|la|l')\s*/i, "");
+
+export function ArticleEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"article">) {
+  const t = useMessages(frenchText).player;
+  const [chosen, setChosen] = useState<number | null>(null);
+  const w = ex.word;
+  const noun = nounOf(w.fr);
+  const indefinite = ex.options[0] === "un";
+  const meaning = w[lang].replace(/^(the|a|an|der|die|das)\s+/i, "");
+  const pick = useCallback(
+    (i: number) => {
+      if (locked) return;
+      setChosen(i);
+      const indef = `${w.g === "m" ? "un" : "une"} ${noun}`;
+      const right = indefinite ? indef : w.fr;
+      setCheck(() =>
+        i === ex.answer
+          ? { correct: true, solution: right, meaning: w[lang] }
+          : { correct: false, solution: right, meaning: w[lang], explain: t.gender(noun, w.g!, w.fr, indef) },
+      );
+    },
+    [locked, w, noun, indefinite, ex.answer, lang, setCheck, t],
+  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (!locked && n >= 1 && n <= ex.options.length) pick(n - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pick, locked, ex.options.length]);
+  return (
+    <div>
+      <Prompt>{t.article(ex.options[0], ex.options[1])}</Prompt>
+      <BlobSays blobRef={blobRef} className="mb-7">
+        <div className="flex items-center gap-3">
+          {w.emoji && <span className="text-[38px] leading-none">{w.emoji}</span>}
+          <div className="min-w-0">
+            <p lang="fr" className="text-[24px] font-semibold leading-tight">
+              <span
+                className={cn(
+                  "mr-1.5 inline-block min-w-[3.2rem] rounded-lg border-b-[3px] px-1.5 text-center",
+                  chosen === null ? "border-ink-3 text-transparent" : locked ? (chosen === ex.answer ? "border-ok text-ok" : "border-danger text-danger") : "border-blob text-blob-ink",
+                )}
+              >
+                {chosen === null ? "___" : ex.options[chosen]}
+              </span>
+              {noun}
+            </p>
+            <p className="mt-0.5 text-[14px] text-ink-3">{meaning}</p>
+          </div>
+        </div>
+      </BlobSays>
+      <div className="grid grid-cols-2 gap-3" lang="fr">
+        {ex.options.map((o, i) => (
+          <button
+            key={o}
+            type="button"
+            disabled={locked}
+            onClick={() => pick(i)}
+            className={cn(
+              "flex h-20 flex-col items-center justify-center rounded-2xl border-2 border-b-[4px] font-display text-[26px] font-bold transition-colors",
+              locked && i === ex.answer
+                ? "border-ok bg-ok/10 text-ok"
+                : locked && chosen === i
+                  ? "border-danger/70 bg-danger/10 text-danger"
+                  : chosen === i
+                    ? "border-blob bg-blob-soft text-blob-ink"
+                    : "border-line bg-raised text-ink hover:bg-hover",
+            )}
+          >
+            {o}
+            <span className="font-sans text-[11px] font-medium text-ink-3">{i + 1}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-5 text-center text-[13px] text-ink-3">{t.articleHint}</p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------------------------
+   Spell the word
+   ------------------------------------------------------------------------------------------- */
+
+export function SpellEx({ ex, lang, setCheck, locked, submit, blobRef }: ExProps<"spell">) {
+  const t = useMessages(frenchText).player;
+  const w = ex.word;
+  const onAnswer = useCallback(
+    (answer: string) => {
+      if (!answer.trim()) return setCheck(null);
+      setCheck(() => {
+        // The noun without its article: wrong, but say exactly why.
+        if (w.kind === "noun" && fold(answer, "fr") === fold(bare(w.fr), "fr") && fold(answer, "fr") !== fold(w.fr, "fr")) {
+          return { correct: false, solution: w.fr, explain: t.needArticle(w.fr), meaning: w[lang] };
+        }
+        const g = grade(answer, [w.fr, ...(w.alt?.fr ?? [])], "fr");
+        if (g.verdict === "correct") return { correct: true, verdict: "correct", meaning: w[lang] };
+        if (g.verdict === "accent" || g.verdict === "typo")
+          return { correct: true, verdict: g.verdict, solution: g.best, marks: g.marks, note: (g.verdict === "accent" ? t.accentNote : t.typoNote)(accentWords(answer, g.best, "fr").join(", ")), meaning: w[lang] };
+        return { correct: false, verdict: "wrong", solution: g.best, marks: g.marks, meaning: w[lang] };
+      });
+    },
+    [w, lang, setCheck, t],
+  );
+  return (
+    <div>
+      <Prompt>{t.writeFrench}</Prompt>
+      <BlobSays blobRef={blobRef} className="mb-6">
+        <div className="flex items-center gap-3">
+          {w.emoji && <span className="text-[40px] leading-none">{w.emoji}</span>}
+          <p className="text-[20px] font-medium leading-snug">{w[lang]}</p>
+        </div>
+      </BlobSays>
+      <TypeBox french locked={locked} onChange={onAnswer} onEnter={submit} placeholder={t.typeFrench} />
+      {w.kind === "noun" && <p className="mt-3 text-[13px] text-ink-3">{t.spellHint}</p>}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------------------------
+   Spot the mistake
+   ------------------------------------------------------------------------------------------- */
+
+export function SpotEx({ ex, lang, locked, setCheck, blobRef }: ExProps<"spot">) {
+  const t = useMessages(frenchText).player;
+  const d = ex.drill;
+  const tokens = useMemo(() => spotTokens(d.fr, d.options[ex.wrong]), [d, ex.wrong]);
+  const full = d.fr.replace("___", d.options[d.answer]);
+  const [chosen, setChosen] = useState<number | null>(null);
+  function pick(i: number) {
+    if (locked) return;
+    setChosen(i);
+    setCheck(() => (tokens[i].wrong ? { correct: true, solution: full, explain: d.why, meaning: d[lang] } : { correct: false, solution: full, explain: d.why, meaning: d[lang] }));
+  }
+  return (
+    <div>
+      <Prompt>{t.spot}</Prompt>
+      <BlobSays blobRef={blobRef} mood="thinking" className="mb-6">
+        <p className="text-[14px] text-ink-3">{t.spotHint}</p>
+      </BlobSays>
+      <div lang="fr" className="flex flex-wrap items-center justify-center gap-2 rounded-3xl border-2 border-line bg-raised px-4 py-6 shadow-card">
+        {tokens.map((tok, i) =>
+          tok.word ? (
+            <button
+              key={i}
+              type="button"
+              disabled={locked}
+              onClick={() => pick(i)}
+              className={cn(
+                "rounded-xl border-2 border-b-[4px] px-3 py-1.5 text-[18px] font-medium transition-colors",
+                locked && tok.wrong
+                  ? "border-danger/70 bg-danger/10 text-danger line-through decoration-2"
+                  : locked && chosen === i
+                    ? "border-line bg-hover text-ink-3"
+                    : chosen === i
+                      ? "border-blob bg-blob-soft text-blob-ink"
+                      : "border-line bg-paper text-ink hover:bg-hover",
+              )}
+            >
+              {tok.text}
+            </button>
+          ) : (
+            <span key={i} className="text-[18px] text-ink-3">
+              {tok.text}
+            </span>
+          ),
+        )}
+      </div>
+      {locked && (
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-[15px] font-medium text-ok" lang="fr">
+          <Check className="size-4" strokeWidth={3} /> {full}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------------------------
+   The best reply
+   ------------------------------------------------------------------------------------------- */
+
+export function ReplyEx({ ex, lang, locked, setCheck }: ExProps<"reply">) {
+  const t = useMessages(frenchText);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const pick = useCallback(
+    (i: number) => {
+      if (locked) return;
+      setChosen(i);
+      setCheck(() =>
+        i === ex.answer ? { correct: true, meaning: ex.meaning[lang] } : { correct: false, solution: ex.options[ex.answer], meaning: ex.meaning[lang] },
+      );
+    },
+    [locked, ex, lang, setCheck],
+  );
+  const style = SPEAKER_STYLE[ex.line.who] ?? SPEAKER_STYLE.blob;
+  return (
+    <div>
+      <Prompt>{t.player.reply}</Prompt>
+      <div className="mb-6 flex items-start gap-3">
+        <span className={cn("grid size-12 shrink-0 place-items-center rounded-full text-[24px]", style.tone)}>{style.emoji}</span>
+        <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border-2 border-line bg-raised px-4 py-3 shadow-card">
+          <div className={cn("mb-0.5 text-[12px] font-semibold uppercase tracking-wide", style.tone.split(" ").find((c) => c.startsWith("text-")))}>{t.player.says(t.speakers[ex.line.who])}</div>
+          <Tappable text={ex.line.fr} className="text-[19px] leading-relaxed" />
+        </div>
+      </div>
+      <OptionCards options={ex.options} chosen={chosen} locked={locked} onPick={pick} lang="fr" result={locked ? ex.answer : null} />
     </div>
   );
 }

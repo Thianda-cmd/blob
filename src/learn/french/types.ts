@@ -1,6 +1,6 @@
 import type { Text } from "@/i18n/text";
 
-// The French course: units of words, sentences, grammar drills, a dialogue and tips, turned into
+// The French course: units of words, sentences, grammar drills, stories and tips, turned into
 // short Duolingo-style lessons by generate.ts. Students translate between French and their own
 // language (English or German), so every sentence carries both translations.
 
@@ -83,6 +83,8 @@ export type LessonSpec = {
   title: Text;
   /** Word ids introduced in this lesson (2 to 6). */
   words: string[];
+  /** The unit's closing review: no new words, everything of the unit mixed (added by course.ts). */
+  review?: boolean;
 };
 
 export type Unit = {
@@ -98,9 +100,10 @@ export type Unit = {
   words: Word[];
   sentences: Sentence[];
   drills: Drill[];
-  dialogue?: Dialogue;
+  /** Little stories, each in its `lesson` (one in lesson 5, one in lesson 7). */
+  dialogues: Dialogue[];
   tips: Tip[];
-  /** 4 or 5 lessons. The dialogue comes up in its `lesson`. */
+  /** 7 lessons; course.ts adds the unit review as the 8th. */
   lessons: LessonSpec[];
   /**
    * Forms used in the sentences that aren't words of their own (verb forms, plurals), so tapping
@@ -123,12 +126,16 @@ export type Exercise =
   | { kind: "type"; key: string; sentence: Sentence; dir: "toFr" | "fromFr" }
   /** Pick the right translation. */
   | { kind: "choice"; key: string; sentence: Sentence; dir: "toFr" | "fromFr"; options: string[] }
-  /** Listen and build (tiles) or write (type) what you hear. */
-  | { kind: "listen"; key: string; sentence: Sentence; mode: "tiles" | "type"; tiles: string[] }
-  /** Say the sentence out loud. */
-  | { kind: "speak"; key: string; sentence: Sentence }
   /** Fill the gap. */
   | { kind: "blank"; key: string; drill: Drill }
+  /** Le or la (un or une)? The article of a noun. */
+  | { kind: "article"; key: string; word: Word; options: string[]; answer: number }
+  /** Write the French word (with its article) for a picture and meaning. */
+  | { kind: "spell"; key: string; word: Word }
+  /** A drill's sentence with a wrong option in the gap: tap the word that's wrong. */
+  | { kind: "spot"; key: string; drill: Drill; wrong: number }
+  /** A line from a story: pick the reply that fits. */
+  | { kind: "reply"; key: string; line: DialogueLine; options: string[]; answer: number; meaning: { en: string; de: string } }
   /** Read a short scene and answer questions about it. */
   | { kind: "dialogue"; key: string; dialogue: Dialogue };
 

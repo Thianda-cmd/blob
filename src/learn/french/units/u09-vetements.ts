@@ -111,27 +111,29 @@ export const u09: Unit = {
     { id: "u09.d11", lesson: 4, fr: "C'est une ___ veste.", options: ["jolie", "joli", "jolis"], answer: 0, en: "It's a pretty jacket.", de: "Das ist eine schöne Jacke.", why: tx("**Veste** is feminine: **jolie**. And joli comes **before** the noun, unlike colours.", "**Veste** ist weiblich: **jolie**. Und joli steht **vor** dem Nomen, anders als Farben.") },
     { id: "u09.d12", lesson: 5, fr: "J'ai une ___ robe.", options: ["nouvelle", "nouveau"], answer: 0, en: "I have a new dress.", de: "Ich habe ein neues Kleid.", why: tx("**Robe** is feminine, so nouveau becomes **nouvelle**.", "**Robe** ist weiblich, also wird nouveau zu **nouvelle**.") },
   ],
-  dialogue: {
-    id: "u09.dialogue",
-    lesson: 5,
-    title: tx("Blob goes shopping", "Blob geht einkaufen"),
-    lines: [
-      { who: "vendeur", fr: "Bonjour ! Un t-shirt, un pull, une chemise ?", en: "Hello! A T-shirt, a jumper, a shirt?", de: "Guten Tag! Ein T-Shirt, einen Pullover, ein Hemd?" },
-      { who: "blob", fr: "Bonjour ! J'aime ce t-shirt jaune.", en: "Hello! I like this yellow T-shirt.", de: "Hallo! Ich mag dieses gelbe T-Shirt." },
-      { who: "lea", fr: "Blob, il est trop petit !", en: "Blob, it's too small!", de: "Blob, das ist zu klein!" },
-      { who: "vendeur", fr: "Et ce pantalon gris ? Il est très joli.", en: "And these grey trousers? They're very nice.", de: "Und diese graue Hose? Sie ist sehr schön." },
-      { who: "blob", fr: "Un pantalon ? Mais je n'ai pas de jambes !", en: "Trousers? But I don't have any legs!", de: "Eine Hose? Aber ich habe keine Beine!" },
-      { who: "hugo", fr: "Et ça, Blob ? Un béret noir !", en: "And this, Blob? A black beret!", de: "Und das hier, Blob? Eine schwarze Baskenmütze!" },
-      { who: "blob", fr: "Oh, il est joli ! Regarde, je porte le béret !", en: "Oh, it's nice! Look, I'm wearing the beret!", de: "Oh, die ist schön! Schau mal, ich trage die Baskenmütze!" },
-      { who: "lea", fr: "Parfait ! C'est très français !", en: "Perfect! It's very French!", de: "Perfekt! Das ist sehr französisch!" },
-      { who: "blob", fr: "Merci ! Je porte mon béret le lundi, le mardi, le mercredi… et le week-end !", en: "Thank you! I'll wear my beret on Mondays, Tuesdays, Wednesdays… and at weekends!", de: "Danke! Ich trage meine Baskenmütze montags, dienstags, mittwochs … und am Wochenende!" },
-    ],
-    questions: [
-      { q: tx("Why doesn't Blob take the yellow T-shirt?", "Warum nimmt Blob das gelbe T-Shirt nicht?"), options: [tx("It's too small.", "Es ist zu klein."), tx("Blob doesn't like yellow.", "Blob mag kein Gelb."), tx("It's too big.", "Es ist zu groß.")], answer: 0 },
-      { q: tx("What's the problem with the trousers?", "Was ist das Problem mit der Hose?"), options: [tx("Blob has no legs.", "Blob hat keine Beine."), tx("They're grey.", "Sie ist grau."), tx("They're too small.", "Sie ist zu klein.")], answer: 0 },
-      { q: tx("What colour is the beret?", "Welche Farbe hat die Baskenmütze?"), options: [tx("Black", "Schwarz"), tx("Yellow", "Gelb"), tx("Grey", "Grau")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u09.dialogue",
+      lesson: 5,
+      title: tx("Blob goes shopping", "Blob geht einkaufen"),
+      lines: [
+        { who: "vendeur", fr: "Bonjour ! Un t-shirt, un pull, une chemise ?", en: "Hello! A T-shirt, a jumper, a shirt?", de: "Guten Tag! Ein T-Shirt, einen Pullover, ein Hemd?" },
+        { who: "blob", fr: "Bonjour ! J'aime ce t-shirt jaune.", en: "Hello! I like this yellow T-shirt.", de: "Hallo! Ich mag dieses gelbe T-Shirt." },
+        { who: "lea", fr: "Blob, il est trop petit !", en: "Blob, it's too small!", de: "Blob, das ist zu klein!" },
+        { who: "vendeur", fr: "Et ce pantalon gris ? Il est très joli.", en: "And these grey trousers? They're very nice.", de: "Und diese graue Hose? Sie ist sehr schön." },
+        { who: "blob", fr: "Un pantalon ? Mais je n'ai pas de jambes !", en: "Trousers? But I don't have any legs!", de: "Eine Hose? Aber ich habe keine Beine!" },
+        { who: "hugo", fr: "Et ça, Blob ? Un béret noir !", en: "And this, Blob? A black beret!", de: "Und das hier, Blob? Eine schwarze Baskenmütze!" },
+        { who: "blob", fr: "Oh, il est joli ! Regarde, je porte le béret !", en: "Oh, it's nice! Look, I'm wearing the beret!", de: "Oh, die ist schön! Schau mal, ich trage die Baskenmütze!" },
+        { who: "lea", fr: "Parfait ! C'est très français !", en: "Perfect! It's very French!", de: "Perfekt! Das ist sehr französisch!" },
+        { who: "blob", fr: "Merci ! Je porte mon béret le lundi, le mardi, le mercredi… et le week-end !", en: "Thank you! I'll wear my beret on Mondays, Tuesdays, Wednesdays… and at weekends!", de: "Danke! Ich trage meine Baskenmütze montags, dienstags, mittwochs … und am Wochenende!" },
+      ],
+      questions: [
+        { q: tx("Why doesn't Blob take the yellow T-shirt?", "Warum nimmt Blob das gelbe T-Shirt nicht?"), options: [tx("It's too small.", "Es ist zu klein."), tx("Blob doesn't like yellow.", "Blob mag kein Gelb."), tx("It's too big.", "Es ist zu groß.")], answer: 0 },
+        { q: tx("What's the problem with the trousers?", "Was ist das Problem mit der Hose?"), options: [tx("Blob has no legs.", "Blob hat keine Beine."), tx("They're grey.", "Sie ist grau."), tx("They're too small.", "Sie ist zu klein.")], answer: 0 },
+        { q: tx("What colour is the beret?", "Welche Farbe hat die Baskenmütze?"), options: [tx("Black", "Schwarz"), tx("Yellow", "Gelb"), tx("Grey", "Grau")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Colours agree", "Farben passen sich an"),

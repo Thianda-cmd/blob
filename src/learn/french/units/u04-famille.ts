@@ -111,27 +111,29 @@ export const u04: Unit = {
     { id: "u04.d11", lesson: 5, fr: "C'est ___ cousine.", options: ["ma", "mon"], answer: 0, en: "This is my cousin.", de: "Das ist meine Cousine.", why: tx("A girl cousin is feminine: **ma** cousine. A boy is mon cousin.", "Cousine ist weiblich: **ma** cousine. Ein Junge ist mon cousin.") },
     { id: "u04.d12", lesson: 5, fr: "Je n'ai pas ___ cousin.", options: ["de", "un", "du"], answer: 0, en: "I don't have a cousin.", de: "Ich habe keinen Cousin.", why: tx("After ne … pas, un becomes **de**: pas de cousin.", "Nach ne … pas wird un zu **de**: pas de cousin.") },
   ],
-  dialogue: {
-    id: "u04.dialogue",
-    lesson: 5,
-    title: tx("The family photo", "Das Familienfoto"),
-    lines: [
-      { who: "lea", fr: "Blob, c'est une photo de ma famille.", en: "Blob, this is a photo of my family.", de: "Blob, das ist ein Foto von meiner Familie." },
-      { who: "blob", fr: "Qui est-ce ? C'est ton père ?", en: "Who's that? Is it your father?", de: "Wer ist das? Ist das dein Vater?" },
-      { who: "lea", fr: "Non, c'est mon grand-père. Il a un grand chien.", en: "No, that's my grandfather. He has a big dog.", de: "Nein, das ist mein Opa. Er hat einen großen Hund." },
-      { who: "blob", fr: "Et la petite fille, c'est ta sœur ?", en: "And the little girl, is that your sister?", de: "Und das kleine Mädchen, ist das deine Schwester?" },
-      { who: "lea", fr: "Oui, ma sœur Chloé. Et le bébé, c'est mon cousin.", en: "Yes, my sister Chloé. And the baby is my cousin.", de: "Ja, meine Schwester Chloé. Und das Baby ist mein Cousin." },
-      { who: "blob", fr: "Vous avez un chat aussi ?", en: "Do you have a cat too?", de: "Habt ihr auch eine Katze?" },
-      { who: "lea", fr: "Non, nous avons un lapin. Et toi, tu as une famille ?", en: "No, we have a rabbit. And you, do you have a family?", de: "Nein, wir haben ein Kaninchen. Und du, hast du eine Familie?" },
-      { who: "blob", fr: "Oui ! Une grande famille. Ils sont violets et ils ont des bérets !", en: "Yes! A big family. They're purple and they have berets!", de: "Ja! Eine große Familie. Sie sind lila und haben Baskenmützen!" },
-      { who: "lea", fr: "Une famille de Blobs avec des bérets ? J'adore !", en: "A family of Blobs with berets? I love it!", de: "Eine Blob-Familie mit Baskenmützen? Wie toll!" },
-    ],
-    questions: [
-      { q: tx("Who has a big dog?", "Wer hat einen großen Hund?"), options: [tx("Léa's grandfather", "Léas Opa"), tx("Léa's father", "Léas Vater"), tx("Léa's cousin", "Léas Cousin")], answer: 0 },
-      { q: tx("Who is the baby?", "Wer ist das Baby?"), options: [tx("Léa's cousin", "Léas Cousin"), tx("Léa's sister", "Léas Schwester"), tx("Léa's brother", "Léas Bruder")], answer: 0 },
-      { q: tx("Which pet does Léa have at home?", "Welches Haustier hat Léa zu Hause?"), options: [tx("A rabbit", "Ein Kaninchen"), tx("A cat", "Eine Katze"), tx("A fish", "Einen Fisch")], answer: 0 },
-    ],
-  },
+  dialogues: [
+    {
+      id: "u04.dialogue",
+      lesson: 5,
+      title: tx("The family photo", "Das Familienfoto"),
+      lines: [
+        { who: "lea", fr: "Blob, c'est une photo de ma famille.", en: "Blob, this is a photo of my family.", de: "Blob, das ist ein Foto von meiner Familie." },
+        { who: "blob", fr: "Qui est-ce ? C'est ton père ?", en: "Who's that? Is it your father?", de: "Wer ist das? Ist das dein Vater?" },
+        { who: "lea", fr: "Non, c'est mon grand-père. Il a un grand chien.", en: "No, that's my grandfather. He has a big dog.", de: "Nein, das ist mein Opa. Er hat einen großen Hund." },
+        { who: "blob", fr: "Et la petite fille, c'est ta sœur ?", en: "And the little girl, is that your sister?", de: "Und das kleine Mädchen, ist das deine Schwester?" },
+        { who: "lea", fr: "Oui, ma sœur Chloé. Et le bébé, c'est mon cousin.", en: "Yes, my sister Chloé. And the baby is my cousin.", de: "Ja, meine Schwester Chloé. Und das Baby ist mein Cousin." },
+        { who: "blob", fr: "Vous avez un chat aussi ?", en: "Do you have a cat too?", de: "Habt ihr auch eine Katze?" },
+        { who: "lea", fr: "Non, nous avons un lapin. Et toi, tu as une famille ?", en: "No, we have a rabbit. And you, do you have a family?", de: "Nein, wir haben ein Kaninchen. Und du, hast du eine Familie?" },
+        { who: "blob", fr: "Oui ! Une grande famille. Ils sont violets et ils ont des bérets !", en: "Yes! A big family. They're purple and they have berets!", de: "Ja! Eine große Familie. Sie sind lila und haben Baskenmützen!" },
+        { who: "lea", fr: "Une famille de Blobs avec des bérets ? J'adore !", en: "A family of Blobs with berets? I love it!", de: "Eine Blob-Familie mit Baskenmützen? Wie toll!" },
+      ],
+      questions: [
+        { q: tx("Who has a big dog?", "Wer hat einen großen Hund?"), options: [tx("Léa's grandfather", "Léas Opa"), tx("Léa's father", "Léas Vater"), tx("Léa's cousin", "Léas Cousin")], answer: 0 },
+        { q: tx("Who is the baby?", "Wer ist das Baby?"), options: [tx("Léa's cousin", "Léas Cousin"), tx("Léa's sister", "Léas Schwester"), tx("Léa's brother", "Léas Bruder")], answer: 0 },
+        { q: tx("Which pet does Léa have at home?", "Welches Haustier hat Léa zu Hause?"), options: [tx("A rabbit", "Ein Kaninchen"), tx("A cat", "Eine Katze"), tx("A fish", "Einen Fisch")], answer: 0 },
+      ],
+    },
+  ],
   tips: [
     {
       title: tx("Avoir: to have", "Avoir: haben"),
