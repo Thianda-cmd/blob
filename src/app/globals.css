@@ -738,6 +738,17 @@
   }
 }
 
+/* Disco Blob (a secret skin): his colours go round the rainbow. */
+.blob-disco {
+  animation: blob-disco 2.4s linear infinite;
+}
+
+@keyframes blob-disco {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
 /* ---- end note editor chrome ---- */
 
 @media (prefers-reduced-motion: reduce) {

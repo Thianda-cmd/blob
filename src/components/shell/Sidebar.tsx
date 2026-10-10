@@ -344,6 +344,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <NavLink href="/cv" icon={<FileUser />} active={pathname === "/cv" || openPage?.kind === "cv"}>
           {t.cv}
         </NavLink>
+        <NavLink href="/blob" icon={<BlobMark />} active={pathname === "/blob"}>
+          {t.blob}
+        </NavLink>
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">

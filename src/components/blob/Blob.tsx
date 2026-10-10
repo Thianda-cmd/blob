@@ -2,6 +2,9 @@
 
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { cn } from "@/lib/utils";
+import { ARM_X, ARM_Y, BODY_Y, BOTTOM, CX, EYE_X, FACE_Y, GROUND, INK, MOUTH_Y, N, R } from "./geometry";
+import { SKIN_COLORS, useBlobLook, type BlobEyes, type BlobHat, type BlobLook, type BlobNeck, type BlobSkin } from "./look";
+import { EyeWear, Hat, NeckWear, SWING_PIVOT } from "./outfits";
 
 export type BlobMood =
   | "idle"
@@ -12,7 +15,11 @@ export type BlobMood =
   | "worried"
   | "shy"
   | "love"
-  | "surprised";
+  | "surprised"
+  | "dizzy"
+  | "silly"
+  | "proud"
+  | "laughing";
 
 export type BlobAccessory = "cap" | "glasses" | "beret";
 
@@ -31,6 +38,17 @@ export type BlobHandle = {
   celebrate: () => void;
   /** Stretch the right arm out towards something on the right (a board, an answer). */
   point: () => void;
+  /** A full twirl with a little hop. */
+  spin: () => void;
+  /** Sway, wave both arms and bounce to the beat for `ms`. */
+  dance: (ms?: number) => void;
+  /** A quick "yes" twice. */
+  nod: () => void;
+  wink: () => void;
+  /** Breathe in… atchoum! */
+  sneeze: () => void;
+  /** Stretch the arms up and yawn. */
+  yawn: () => void;
 };
 
 type BlobProps = {
@@ -42,7 +60,12 @@ type BlobProps = {
   look?: { x: number; y: number } | null;
   /** Move the mouth like it's speaking. Pair with a typing speech bubble. */
   talking?: boolean;
+  /** A scene's own hat or glasses (learning cap, French béret, reading glasses): wins over the look. */
   accessory?: BlobAccessory | null;
+  /** What to wear (each part given wins over the student's look; null = nothing there). */
+  wear?: BlobLook;
+  /** Ignore the student's look (logo, marketing pages). */
+  plain?: boolean;
   /** Little jelly arms. On by default from 72px up. */
   arms?: boolean;
   /** Press-and-hold squish and petting. On by default. */
@@ -69,18 +92,6 @@ const INTRO_TOTAL = INTRO_DROPS.reduce((sum, d) => sum + d.r * d.r, 0);
 
 type Drop = { x: number; y: number; vy: number; r: number; fromX: number; fromY: number; startAt: number; mergeAt: number; state: 0 | 1 | 2 | 3; share: number };
 
-// Geometry (viewBox 0 0 200 200)
-const N = 12;
-const CX = 100;
-const R = 62;
-const GROUND = 172;
-const BOTTOM = R * 0.8;
-const BODY_Y = GROUND - BOTTOM;
-const FACE_Y = BODY_Y - 4;
-const MOUTH_Y = FACE_Y + 20;
-const ARM_X = CX + 57;
-const ARM_Y = FACE_Y + 21;
-const INK = "var(--blob-face)";
 
 // One shared pointer listener for every blob on the page.
 const pointer = { x: 0, y: 0, seen: false, movedAt: 0 };
@@ -131,6 +142,10 @@ function mouthPath(open: number) {
 }
 
 const MOOD_TUNING: Record<BlobMood, { wobble: number; breathe: number; hop: number }> = {
+  dizzy: { wobble: 0.04, breathe: 0.016, hop: 0 },
+  silly: { wobble: 0.028, breathe: 0.02, hop: 0 },
+  proud: { wobble: 0.016, breathe: 0.012, hop: 0 },
+  laughing: { wobble: 0.036, breathe: 0.045, hop: 0 },
   idle: { wobble: 0.018, breathe: 0.014, hop: 0 },
   happy: { wobble: 0.024, breathe: 0.018, hop: 0 },
   excited: { wobble: 0.034, breathe: 0.02, hop: 0.85 },
@@ -144,6 +159,10 @@ const MOOD_TUNING: Record<BlobMood, { wobble: number; breathe: number; hop: numb
 
 /** Arm angles in degrees, [left, right]. 0 points straight out, positive hangs down. */
 const ARM_POSE: Record<BlobMood, [number, number]> = {
+  dizzy: [30, -10],
+  silly: [-40, 50],
+  proud: [70, 70],
+  laughing: [20, 20],
   idle: [56, 56],
   happy: [38, 38],
   excited: [-52, -52],
@@ -162,6 +181,8 @@ export function Blob({
   look = null,
   talking = false,
   accessory = null,
+  wear: lookProp,
+  plain = false,
   arms,
   interactive = true,
   className,
@@ -172,6 +193,19 @@ export function Blob({
   ref,
 }: BlobProps) {
   const id = useId().replace(/:/g, "");
+  // What Blob wears: the scene's accessory, then the given look, then the student's own look.
+  const studentLook = useBlobLook();
+  const base: BlobLook = plain ? {} : studentLook;
+  const has = (k: keyof BlobLook) => !!lookProp && k in lookProp;
+  const hat: BlobHat | null = accessory === "cap" || accessory === "beret" ? accessory : has("hat") ? (lookProp!.hat ?? null) : (base.hat ?? null);
+  const eyes: BlobEyes | null = accessory === "glasses" ? "glasses" : has("eyes") ? (lookProp!.eyes ?? null) : (base.eyes ?? null);
+  const neck: BlobNeck | null = has("neck") ? (lookProp!.neck ?? null) : (base.neck ?? null);
+  const skin: BlobSkin = (has("skin") ? lookProp!.skin : base.skin) ?? "classic";
+  const [dancing, setDancing] = useState(false);
+  const [sneezing, setSneezing] = useState(false);
+  const [yawning, setYawning] = useState(false);
+  const fxTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const later = (fn: () => void, ms: number) => fxTimers.current.push(setTimeout(fn, ms));
   const gooId = `blob-goo-${id}`;
   const showArms = arms ?? size >= 72;
   const [reaction, setReaction] = useState<BlobMood | null>(null);
@@ -238,7 +272,18 @@ export function Blob({
     formed: !intro,
     lastMerge: 0,
     drops: [] as Drop[],
+    // Tricks.
+    spinAt: -1e9,
+    danceUntil: 0,
+    beat: 0,
+    nodAt: -1e9,
+    winkUntil: 0,
+    winking: false,
+    yawnUntil: 0,
+    inhaleUntil: 0,
+    clicks: [] as number[],
   });
+  const hatRef = useRef<BlobHat | null>(hat);
   const moodRef = useRef(shownMood);
   const lookRef = useRef(look);
   const trackRef = useRef(track);
@@ -253,7 +298,8 @@ export function Blob({
     lookRef.current = look;
     trackRef.current = track;
     talkingRef.current = talking;
-  }, [look, track, talking]);
+    hatRef.current = hat;
+  }, [look, track, talking, hat]);
 
   // A little "pop" whenever the mood changes, so transitions feel physical.
   useEffect(() => {
@@ -265,7 +311,13 @@ export function Blob({
     sim.current.vs -= 0.9;
   }, [shownMood]);
 
-  useEffect(() => () => clearTimeout(reactionTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(reactionTimer.current);
+      fxTimers.current.forEach(clearTimeout);
+    },
+    [],
+  );
 
   function react(next: BlobMood, ms: number) {
     clearTimeout(reactionTimer.current);
@@ -308,6 +360,46 @@ export function Blob({
       setTimeout(() => {
         if (st.y >= 0) st.vy = -720;
       }, 80);
+    },
+    spin() {
+      const st = sim.current;
+      st.spinAt = performance.now() + 90;
+      st.vs -= 1.8;
+      later(() => {
+        if (st.y >= 0) st.vy = -520;
+      }, 70);
+    },
+    dance(ms = 3200) {
+      sim.current.danceUntil = performance.now() + ms;
+      setDancing(true);
+      react("happy", ms);
+      later(() => setDancing(false), ms);
+    },
+    nod() {
+      sim.current.nodAt = performance.now();
+    },
+    wink() {
+      sim.current.winkUntil = performance.now() + 420;
+      react("happy", 700);
+    },
+    sneeze() {
+      const st = sim.current;
+      st.inhaleUntil = performance.now() + 700;
+      react("surprised", 760);
+      later(() => {
+        st.vs -= 4.2;
+        st.vx -= 380;
+        for (let i = 0; i < N; i++) st.voff[i] += (Math.random() - 0.5) * 1.4;
+        setSneezing(true);
+        react("silly", 900);
+      }, 720);
+      later(() => setSneezing(false), 1500);
+    },
+    yawn() {
+      sim.current.yawnUntil = performance.now() + 1700;
+      setYawning(true);
+      react("sleepy", 1700);
+      later(() => setYawning(false), 1700);
     },
   }));
 
@@ -414,12 +506,25 @@ export function Blob({
           ? -0.3
           : airborne
             ? Math.max(-0.12, Math.min(0.16, -st.vy / 4200))
-            : breathe + bob;
+            : now < st.inhaleUntil
+              ? 0.16
+              : now < st.yawnUntil
+                ? 0.08 + Math.sin(t * 3) * 0.02
+                : breathe + bob;
         [st.s, st.vs] = spring(st.s, st.vs, target, st.pressed ? 520 : 340, 11, dt);
         st.s = Math.max(-0.42, Math.min(0.4, st.s));
 
-        // Horizontal shake spring.
-        [st.x, st.vx] = spring(st.x, st.vx, 0, 900, 14, dt);
+        // Horizontal shake spring; dancing sways from side to side and bounces on the beat.
+        const dancingNow = now < st.danceUntil;
+        [st.x, st.vx] = spring(st.x, st.vx, dancingNow ? Math.sin(t * 6.4) * 9 : 0, 900, 14, dt);
+        if (dancingNow) {
+          const beat = Math.floor((t * 6.4) / Math.PI);
+          if (beat !== st.beat && st.y >= 0 && st.vy === 0) {
+            st.vy = -240;
+            st.vs -= 0.5;
+          }
+          st.beat = beat;
+        }
 
         // Jelly membrane: springs coupled to their neighbours make waves.
         for (let i = 0; i < N; i++) {
@@ -448,6 +553,14 @@ export function Blob({
         if (now < st.cheerUntil) {
           tl = -74 + Math.sin(t * 17) * 10;
           tr = -74 + Math.sin(t * 17 + Math.PI) * 10;
+        }
+        if (now < st.danceUntil) {
+          tl = -25 + Math.sin(t * 6.4) * 45;
+          tr = -25 - Math.sin(t * 6.4) * 45;
+        }
+        if (now < st.yawnUntil) {
+          tl = -78 + Math.sin(t * 2) * 4;
+          tr = -78 - Math.sin(t * 2) * 4;
         }
         if (st.pressed) {
           tl = 4;
@@ -571,13 +684,19 @@ export function Blob({
       const sx = 1 - st.s * 0.62;
       const sy = 1 + st.s;
       const form = Math.max(0, st.form);
+      // A twirl: once round in 650 ms, easing in and out.
+      const sp = (now - st.spinAt) / 650;
+      const spin = !reduce && sp >= 0 && sp < 1 ? (sp < 0.5 ? 2 * sp * sp : 1 - (-2 * sp + 2) ** 2 / 2) * 360 : 0;
       jellyRef.current?.setAttribute(
         "transform",
-        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) skewX(${lean.toFixed(2)}) scale(${(sx * form).toFixed(4)} ${(sy * form).toFixed(4)}) translate(${-CX} ${-GROUND})`,
+        `translate(${(CX + st.x).toFixed(2)} ${(GROUND + st.y).toFixed(2)}) rotate(${spin.toFixed(1)} 0 ${-BOTTOM}) skewX(${lean.toFixed(2)}) scale(${(sx * form).toFixed(4)} ${(sy * form).toFixed(4)}) translate(${-CX} ${-GROUND})`,
       );
+      // Nodding: the face dips twice.
+      const np = (now - st.nodAt) / 700;
+      const nod = !reduce && np >= 0 && np < 1 ? Math.max(0, Math.sin(np * Math.PI * 4)) * 4.5 * (1 - np * 0.5) : 0;
       faceRef.current?.setAttribute(
         "transform",
-        `translate(${(st.lookX * 11).toFixed(2)} ${(st.lookY * 7).toFixed(2)}) rotate(${(st.lookX * 4).toFixed(2)} ${CX} ${FACE_Y})`,
+        `translate(${(st.lookX * 11).toFixed(2)} ${(st.lookY * 7 + nod).toFixed(2)}) rotate(${(st.lookX * 4).toFixed(2)} ${CX} ${FACE_Y})`,
       );
       const armK = Math.max(0, st.armScale).toFixed(3);
       const armGrow = `translate(${ARM_X} ${ARM_Y}) scale(${armK}) translate(${-ARM_X} ${-ARM_Y})`;
@@ -590,7 +709,8 @@ export function Blob({
         const dyTop = ys[0] - (BODY_Y - R);
         capRef.current.setAttribute("transform", `translate(${(st.lookX * 4).toFixed(2)} ${dyTop.toFixed(2)})`);
         [st.tassel, st.vTassel] = spring(st.tassel, st.vTassel, -lean * 2 + Math.sin(t * 1.7) * 5 - st.vy * 0.03, 60, 3, dt);
-        tasselRef.current?.setAttribute("transform", `rotate(${st.tassel.toFixed(1)} ${CX + 40} 54)`);
+        const pivot = hatRef.current ? SWING_PIVOT[hatRef.current] : undefined;
+        if (pivot) tasselRef.current?.setAttribute("transform", `rotate(${st.tassel.toFixed(1)} ${pivot[0]} ${pivot[1]})`);
       }
 
       // Talking mouth.
@@ -606,6 +726,16 @@ export function Blob({
       }
       const blink = now < st.blinkUntil ? 0.1 : 1;
       eyesRef.current?.setAttribute("transform", `translate(0 ${FACE_Y}) scale(1 ${blink}) translate(0 ${-FACE_Y})`);
+      // A wink closes just the left eye (when the face has two separate eyes).
+      const eyesEl = eyesRef.current;
+      const leftEye = eyesEl && eyesEl.children.length > 1 ? eyesEl.children[0] : null;
+      if (now < st.winkUntil && leftEye) {
+        leftEye.setAttribute("transform", `translate(0 ${FACE_Y}) scale(1 0.1) translate(0 ${-FACE_Y})`);
+        st.winking = true;
+      } else if (st.winking) {
+        leftEye?.removeAttribute("transform");
+        st.winking = false;
+      }
 
       // Ground shadow shrinks while airborne.
       const lift = Math.min(1, -st.y / 140);
@@ -668,6 +798,17 @@ export function Blob({
   }
 
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
+    // Lots of quick clicks make Blob dizzy.
+    if (interactive) {
+      const st = sim.current;
+      const now = performance.now();
+      st.clicks = [...st.clicks.filter((c) => now - c < 1800), now];
+      if (st.clicks.length >= 6) {
+        st.clicks = [];
+        react("dizzy", 2800);
+        st.vx += 300;
+      }
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const angle = Math.atan2(e.clientY - (rect.top + rect.height * 0.55), e.clientX - (rect.left + rect.width / 2));
     const st = sim.current;
@@ -686,6 +827,10 @@ export function Blob({
   const glow = `blob-glow-${id}`;
   const rimLight = `blob-rimlight-${id}`;
   const bodyId = `blob-body-${id}`;
+  const colors = skin === "classic" || skin === "disco" ? null : SKIN_COLORS[skin];
+  const light = colors?.light ?? "var(--blob-light)";
+  const baseColor = colors?.base ?? "var(--blob)";
+  const deep = colors?.deep ?? "var(--blob-deep)";
 
   return (
     <svg
@@ -694,6 +839,7 @@ export function Blob({
       width={size}
       height={size}
       className={cn("select-none overflow-visible", (onClick || interactive) && "cursor-pointer", className)}
+      style={colors?.face ? ({ "--blob-face": colors.face } as React.CSSProperties) : undefined}
       role={title ? "img" : undefined}
       aria-label={title}
       aria-hidden={title ? undefined : true}
@@ -704,17 +850,23 @@ export function Blob({
       onPointerLeave={handlePointerUp}
       onPointerCancel={handlePointerUp}
       onClick={handleClick}
+      onDoubleClick={() => {
+        if (!interactive) return;
+        const st = sim.current;
+        st.spinAt = performance.now();
+        st.vy = st.y >= 0 ? -480 : st.vy;
+      }}
     >
       <defs>
         {/* User-space gradients so the arms share the body's lighting. */}
         <radialGradient id={gradient} gradientUnits="userSpaceOnUse" cx={82} cy={80} r={118}>
-          <stop offset="0%" style={{ stopColor: "var(--blob-light)" }} />
-          <stop offset="40%" style={{ stopColor: "var(--blob)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--blob-deep)" }} />
+          <stop offset="0%" style={{ stopColor: light }} />
+          <stop offset="40%" style={{ stopColor: baseColor }} />
+          <stop offset="100%" style={{ stopColor: deep }} />
         </radialGradient>
         <radialGradient id={core} gradientUnits="userSpaceOnUse" cx={108} cy={134} r={46}>
-          <stop offset="0%" style={{ stopColor: "var(--blob-light)" }} stopOpacity="0.45" />
-          <stop offset="100%" style={{ stopColor: "var(--blob-light)" }} stopOpacity="0" />
+          <stop offset="0%" style={{ stopColor: light }} stopOpacity="0.45" />
+          <stop offset="100%" style={{ stopColor: light }} stopOpacity="0" />
         </radialGradient>
         <radialGradient id={glow} cx="50%" cy="92%" r="55%">
           <stop offset="0%" stopColor="#fff" stopOpacity="0.36" />
@@ -742,7 +894,7 @@ export function Blob({
       <ellipse ref={shadowRef} cx={CX} cy={GROUND + 3} rx={intro ? 0 : R} ry={7} fill="var(--ink)" opacity={0.16} />
 
       <g ref={gooRef}>
-      <g ref={jellyRef} transform={intro ? HIDDEN : undefined}>
+      <g ref={jellyRef} transform={intro ? HIDDEN : undefined} className={skin === "disco" ? "blob-disco" : undefined}>
         {showArms && (
           <>
             <g transform={`translate(${CX * 2} 0) scale(-1 1)`}>
@@ -756,7 +908,7 @@ export function Blob({
           </>
         )}
 
-        <path ref={bodyRef} id={bodyId} d={REST_PATH} fill={`url(#${gradient})`} />
+        <path ref={bodyRef} id={bodyId} d={REST_PATH} fill={`url(#${gradient})`} fillOpacity={skin === "ghost" ? 0.86 : undefined} />
 
         <g clipPath={`url(#${clip})`}>
           {/* light scattered inside the jelly */}
@@ -775,10 +927,20 @@ export function Blob({
               <animate attributeName="cy" values={`${GROUND - 14};${GROUND - 40};${GROUND - 14}`} dur="6s" repeatCount="indefinite" />
             </circle>
           </g>
+          {/* a galaxy of tiny stars inside */}
+          {skin === "galaxy" && (
+            <g fill="#fff">
+              {GALAXY_STARS.map(([x, y, r, d], i) => (
+                <circle key={i} cx={x} cy={y} r={r}>
+                  <animate attributeName="opacity" values="0.25;1;0.25" dur={`${d}s`} repeatCount="indefinite" />
+                </circle>
+              ))}
+            </g>
+          )}
           {/* inner rim shading at the bottom */}
           <path
             d={`M ${CX - R * 1.1} ${GROUND - 4} Q ${CX} ${GROUND + 16} ${CX + R * 1.1} ${GROUND - 4}`}
-            stroke="var(--blob-deep)"
+            stroke={deep}
             strokeWidth={10}
             fill="none"
             opacity={0.35}
@@ -799,18 +961,15 @@ export function Blob({
         />
         <circle cx={CX - 4} cy={BODY_Y - 49} r={3.2} fill="#fff" opacity={0.75} />
 
+        {neck && <NeckWear neck={neck} clip={clip} />}
+
         <g ref={faceRef}>
-          <Face mood={shownMood} talking={talking} glasses={accessory === "glasses"} eyesRef={eyesRef} mouthRef={mouthRef} />
+          <Face mood={shownMood} talking={talking} yawning={yawning} eyes={eyes} eyesRef={eyesRef} mouthRef={mouthRef} />
         </g>
 
-        {accessory === "cap" && (
+        {hat && (
           <g ref={capRef}>
-            <GradCap tasselRef={tasselRef} />
-          </g>
-        )}
-        {accessory === "beret" && (
-          <g ref={capRef}>
-            <Beret />
+            <Hat hat={hat} id={id} swingRef={tasselRef} />
           </g>
         )}
       </g>
@@ -831,6 +990,8 @@ export function Blob({
       </g>
 
       {!forming && <MoodExtras mood={shownMood} />}
+      {dancing && <MusicNotes />}
+      {sneezing && <SneezeDrops />}
     </svg>
   );
 }
@@ -844,54 +1005,33 @@ function Arm({ gradient }: { gradient: string }) {
   );
 }
 
-/** A French béret, worn at an angle (the French course). */
-/** Navy felt, with a faint light edge so it still shows on dark backgrounds. */
-const BERET = "#262b48";
-
-function Beret() {
-  return (
-    <g transform={`rotate(-13 ${CX} 58)`}>
-      {/* The soft rim that sits on the head. */}
-      <path d={`M ${CX - 31} 62 Q ${CX} 71 ${CX + 33} 61 L ${CX + 31} 66 Q ${CX} 76 ${CX - 29} 67 Z`} fill={BERET} />
-      {/* The puffy top, a little to one side. */}
-      <ellipse cx={CX + 5} cy={54} rx={43} ry={14.5} fill={BERET} stroke="#fff" strokeOpacity={0.2} strokeWidth={1.4} />
-      <ellipse cx={CX - 8} cy={48.5} rx={21} ry={4.6} fill="#fff" opacity={0.16} />
-      {/* The little stalk on top. */}
-      <path d={`M ${CX + 7} 41 q 1.5 -5.5 6.5 -7`} stroke={BERET} strokeWidth={4.2} strokeLinecap="round" fill="none" />
-    </g>
-  );
-}
-
-function GradCap({ tasselRef }: { tasselRef: Ref<SVGGElement> }) {
-  // Mortarboard tilted a little to one side, sitting on top of the head.
-  return (
-    <g transform={`rotate(-9 ${CX} 60)`}>
-      <path d={`M ${CX - 22} 61 Q ${CX - 22} 74 ${CX} 75 Q ${CX + 22} 74 ${CX + 22} 61 Z`} fill={INK} />
-      <path d={`M ${CX - 44} 56 L ${CX} 42 L ${CX + 44} 56 L ${CX} 70 Z`} fill={INK} />
-      <path d={`M ${CX - 44} 56 L ${CX} 42 L ${CX + 44} 56`} stroke="#fff" strokeOpacity={0.18} strokeWidth={1.5} fill="none" />
-      <circle cx={CX} cy={56} r={2.6} fill="var(--blob-light)" />
-      <g ref={tasselRef}>
-        <path d={`M ${CX} 56 L ${CX + 40} 54 L ${CX + 40} 74`} stroke="var(--blob-light)" strokeWidth={2} fill="none" strokeLinecap="round" />
-        <path d={`M ${CX + 36} 72 L ${CX + 44} 72 L ${CX + 45} 84 L ${CX + 35} 84 Z`} fill="var(--blob-light)" />
-      </g>
-    </g>
-  );
+/** A little spiral for dizzy eyes. */
+function spiral(x: number, y: number) {
+  let d = `M ${x} ${y}`;
+  for (let i = 1; i <= 22; i++) {
+    const a = i * 0.62;
+    const r = i * 0.42;
+    d += ` L ${(x + Math.cos(a) * r).toFixed(2)} ${(y + Math.sin(a) * r).toFixed(2)}`;
+  }
+  return d;
 }
 
 function Face({
   mood,
   talking,
-  glasses,
+  yawning,
+  eyes: eyeWear,
   eyesRef,
   mouthRef,
 }: {
   mood: BlobMood;
   talking: boolean;
-  glasses: boolean;
+  yawning: boolean;
+  eyes: BlobEyes | null;
   eyesRef: Ref<SVGGElement>;
   mouthRef: Ref<SVGPathElement>;
 }) {
-  const ex = 22;
+  const ex = EYE_X;
   const ey = FACE_Y;
   const my = MOUTH_Y;
 
@@ -957,6 +1097,41 @@ function Face({
         </>
       );
       break;
+    case "dizzy":
+      eyes = (
+        <g stroke={INK} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" fill="none">
+          {[CX - ex, CX + ex].map((x) => (
+            <path key={x} d={spiral(x, ey)}>
+              <animateTransform attributeName="transform" type="rotate" from={`0 ${x} ${ey}`} to={`360 ${x} ${ey}`} dur="1.1s" repeatCount="indefinite" />
+            </path>
+          ))}
+        </g>
+      );
+      break;
+    case "silly":
+      eyes = (
+        <>
+          <path d={`M ${CX - ex - 8} ${ey + 2} Q ${CX - ex} ${ey - 7} ${CX - ex + 8} ${ey + 2}`} stroke={INK} strokeWidth={4.4} strokeLinecap="round" fill="none" />
+          {openEye(CX + ex, 1.18)}
+        </>
+      );
+      break;
+    case "proud":
+      eyes = (
+        <g stroke={INK} strokeWidth={4.2} strokeLinecap="round" fill="none">
+          <path d={`M ${CX - ex - 7} ${ey + 2} Q ${CX - ex} ${ey - 5} ${CX - ex + 7} ${ey + 2}`} />
+          <path d={`M ${CX + ex - 7} ${ey + 2} Q ${CX + ex} ${ey - 5} ${CX + ex + 7} ${ey + 2}`} />
+        </g>
+      );
+      break;
+    case "laughing":
+      eyes = (
+        <g stroke={INK} strokeWidth={4.4} strokeLinecap="round" strokeLinejoin="round" fill="none">
+          <path d={`M ${CX - ex - 6} ${ey - 6} L ${CX - ex + 5} ${ey} L ${CX - ex - 6} ${ey + 6}`} />
+          <path d={`M ${CX + ex + 6} ${ey - 6} L ${CX + ex - 5} ${ey} L ${CX + ex + 6} ${ey + 6}`} />
+        </g>
+      );
+      break;
     default:
       eyes = (
         <>
@@ -967,7 +1142,13 @@ function Face({
   }
 
   let mouth: React.ReactNode;
-  if (talking) {
+  if (yawning) {
+    mouth = (
+      <ellipse cx={CX} cy={my + 4} rx={7.5} ry={3} fill={INK}>
+        <animate attributeName="ry" values="2;12;12;2" keyTimes="0;0.35;0.8;1" dur="1.6s" fill="freeze" />
+      </ellipse>
+    );
+  } else if (talking) {
     mouth = (
       <g>
         <path ref={mouthRef} d={mouthPath(0)} fill={INK} />
@@ -1010,12 +1191,34 @@ function Face({
       case "shy":
         mouth = <path d={`M ${CX - 5} ${my} Q ${CX} ${my + 4} ${CX + 5} ${my}`} stroke={INK} strokeWidth={3.4} strokeLinecap="round" fill="none" />;
         break;
+      case "dizzy":
+        mouth = <path d={`M ${CX - 10} ${my + 3} q 3.3 -4 6.6 0 t 6.6 0 t 6.6 0`} stroke={INK} strokeWidth={3.2} strokeLinecap="round" fill="none" />;
+        break;
+      case "silly":
+        mouth = (
+          <g>
+            <path d={`M ${CX - 11} ${my - 2} Q ${CX} ${my + 12} ${CX + 11} ${my - 2} Q ${CX} ${my + 2} ${CX - 11} ${my - 2} Z`} fill={INK} />
+            <path d={`M ${CX - 1} ${my + 3} Q ${CX - 1} ${my + 15} ${CX + 5} ${my + 15} Q ${CX + 11} ${my + 15} ${CX + 10} ${my + 3} Z`} fill="#ff8fb0" stroke={INK} strokeWidth={1.4} />
+          </g>
+        );
+        break;
+      case "proud":
+        mouth = <path d={`M ${CX - 9} ${my + 1} Q ${CX + 2} ${my + 8} ${CX + 11} ${my - 3}`} stroke={INK} strokeWidth={3.6} strokeLinecap="round" fill="none" />;
+        break;
+      case "laughing":
+        mouth = (
+          <g>
+            <path d={`M ${CX - 14} ${my - 3} Q ${CX} ${my + 22} ${CX + 14} ${my - 3} Z`} fill={INK} />
+            <path d={`M ${CX - 7} ${my + 9} Q ${CX} ${my + 4} ${CX + 7} ${my + 9} Q ${CX} ${my + 15} ${CX - 7} ${my + 9} Z`} fill="#ff8fb0" />
+          </g>
+        );
+        break;
       default:
         mouth = <path d={`M ${CX - 9} ${my} Q ${CX} ${my + 8} ${CX + 9} ${my}`} stroke={INK} strokeWidth={3.8} strokeLinecap="round" fill="none" />;
     }
   }
 
-  const blush = mood === "shy" || mood === "love" ? 0.6 : mood === "happy" || mood === "excited" ? 0.45 : 0.3;
+  const blush = mood === "shy" || mood === "love" || mood === "laughing" ? 0.6 : mood === "happy" || mood === "excited" || mood === "proud" ? 0.45 : 0.3;
 
   return (
     <>
@@ -1034,24 +1237,100 @@ function Face({
       )}
       <g ref={eyesRef}>{eyes}</g>
       {mouth}
-      {glasses && (
-        <g>
-          {[CX - ex, CX + ex].map((x) => (
-            <g key={x}>
-              <circle cx={x} cy={ey} r={14} fill="#fff" fillOpacity={0.14} stroke={INK} strokeWidth={3} />
-              <path d={`M ${x - 7} ${ey - 7} L ${x - 2} ${ey - 10}`} stroke="#fff" strokeOpacity={0.8} strokeWidth={2} strokeLinecap="round" />
-            </g>
-          ))}
-          <path d={`M ${CX - ex + 14} ${ey - 2} Q ${CX} ${ey - 7} ${CX + ex - 14} ${ey - 2}`} stroke={INK} strokeWidth={3} fill="none" />
-          <path d={`M ${CX - ex - 14} ${ey - 3} L ${CX - ex - 26} ${ey - 6}`} stroke={INK} strokeWidth={3} strokeLinecap="round" />
-          <path d={`M ${CX + ex + 14} ${ey - 3} L ${CX + ex + 26} ${ey - 6}`} stroke={INK} strokeWidth={3} strokeLinecap="round" />
-        </g>
-      )}
+      {eyeWear && <EyeWear eyes={eyeWear} />}
     </>
   );
 }
 
+/** Stars inside the galaxy skin: x, y, radius, twinkle seconds. */
+const GALAXY_STARS: [number, number, number, number][] = [
+  [72, 92, 1.4, 2.1],
+  [118, 82, 1.1, 2.9],
+  [138, 120, 1.6, 1.7],
+  [64, 138, 1.2, 2.4],
+  [96, 160, 1.5, 3.2],
+  [128, 154, 1, 2.2],
+  [84, 112, 0.9, 1.9],
+  [150, 98, 1.1, 2.6],
+];
+
+const STAR5 = "M 0 -5 L 1.5 -1.6 L 5 -1.5 L 2.3 0.8 L 3.1 4.4 L 0 2.4 L -3.1 4.4 L -2.3 0.8 L -5 -1.5 L -1.5 -1.6 Z";
+
+/** Notes floating up while Blob dances. */
+function MusicNotes() {
+  return (
+    <g fontFamily="var(--font-display)" fontWeight={700} fill="var(--blob)">
+      {[
+        ["♪", 34, 70, 0],
+        ["♫", 160, 56, 0.45],
+        ["♪", 150, 96, 0.9],
+      ].map(([ch, x, y, delay]) => (
+        <text key={`${x}`} x={x as number} y={y as number} fontSize={20} opacity={0}>
+          {ch}
+          <animate attributeName="opacity" values="0;1;0" dur="1.4s" begin={`${delay}s`} repeatCount="indefinite" />
+          <animateTransform attributeName="transform" type="translate" values="0 6;4 -16" dur="1.4s" begin={`${delay}s`} repeatCount="indefinite" />
+        </text>
+      ))}
+    </g>
+  );
+}
+
+/** Atchoum: a few droplets fly off. */
+function SneezeDrops() {
+  return (
+    <g fill="#9fd6ff">
+      {[
+        [40, -30, 3.2],
+        [52, -6, 2.4],
+        [36, 18, 2.8],
+        [-38, -22, 2.2],
+      ].map(([dx, dy, r], i) => (
+        <circle key={i} cx={CX} cy={MOUTH_Y} r={r} opacity={0}>
+          <animate attributeName="cx" values={`${CX};${CX + dx}`} dur="0.6s" fill="freeze" />
+          <animate attributeName="cy" values={`${MOUTH_Y};${MOUTH_Y + dy}`} dur="0.6s" fill="freeze" />
+          <animate attributeName="opacity" values="1;0" dur="0.7s" fill="freeze" />
+        </circle>
+      ))}
+    </g>
+  );
+}
+
 function MoodExtras({ mood }: { mood: BlobMood }) {
+  if (mood === "dizzy") {
+    const orbit = `M ${CX - 36} 46 a 36 9 0 1 0 72 0 a 36 9 0 1 0 -72 0`;
+    return (
+      <g fill="#ffd23f" stroke="#e0a800" strokeWidth={0.8}>
+        {[0, 1, 2].map((i) => (
+          <path key={i} d={STAR5}>
+            <animateMotion dur="1.3s" begin={`${-i * 0.43}s`} repeatCount="indefinite" path={orbit} />
+          </path>
+        ))}
+      </g>
+    );
+  }
+  if (mood === "proud") {
+    return (
+      <path d="M 156 50 L 158.5 56 L 165 58 L 158.5 60 L 156 66 L 153.5 60 L 147 58 L 153.5 56 Z" fill="#ffd23f">
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite" />
+      </path>
+    );
+  }
+  if (mood === "laughing") {
+    return (
+      <g fontFamily="var(--font-display)" fontWeight={700} fill="var(--ink-3)" fontSize={13}>
+        {[
+          [150, 62, 0],
+          [34, 70, 0.5],
+        ].map(([x, y, delay]) => (
+          <text key={x} x={x} y={y} opacity={0}>
+            ha
+            <animate attributeName="opacity" values="0;1;0" dur="1.2s" begin={`${delay}s`} repeatCount="indefinite" />
+            <animateTransform attributeName="transform" type="translate" values="0 4;3 -10" dur="1.2s" begin={`${delay}s`} repeatCount="indefinite" />
+          </text>
+        ))}
+      </g>
+    );
+  }
   if (mood === "sleepy") {
     return (
       <g fontFamily="var(--font-display)" fontWeight={700} fill="var(--ink-3)">

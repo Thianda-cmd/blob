@@ -6,7 +6,7 @@ import type { BlobAccessory, BlobMood } from "./Blob";
  *   blob.react("jump", "excited")
  *   blob.react("celebrate", "excited", 3000, "cap")
  */
-export type BlobReaction = "jump" | "squish" | "shake" | "poke" | "wave" | "celebrate";
+export type BlobReaction = "jump" | "squish" | "shake" | "poke" | "wave" | "celebrate" | "spin" | "dance" | "nod" | "wink" | "sneeze" | "yawn";
 
 type Extras = { mood?: BlobMood; ms?: number; accessory?: BlobAccessory };
 

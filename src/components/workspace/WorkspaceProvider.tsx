@@ -7,6 +7,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { workspaceText } from "@/i18n/messages/workspace";
 import { useTableChanges } from "@/lib/live";
+import { BlobLookProvider, cleanLook } from "@/components/blob/look";
 import { createClient } from "@/lib/supabase/client";
 import {
   PAGE_META_COLUMNS,
@@ -359,6 +360,13 @@ export function WorkspaceProvider({
     [userId, email, profile, subjects, pages, setProfile, createPage, updatePage, trashPage, createSubject, updateSubject, deleteSubject, upsertPages, removePages, sharedIds, reloadPages],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  // Every Blob in the workspace wears the student's look.
+  const blobLook = useMemo(() => cleanLook(profile.blob_look), [profile.blob_look]);
+
+  return (
+    <Ctx.Provider value={value}>
+      <BlobLookProvider look={blobLook}>{children}</BlobLookProvider>
+    </Ctx.Provider>
+  );
 }
 

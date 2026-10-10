@@ -1,23 +1,28 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { FilePlus2, ListPlus, MonitorPlay, X } from "lucide-react";
+import { FilePlus2, ListPlus, MonitorPlay, Shirt, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "./Blob";
 import { blob, type BlobEvent } from "./bus";
+import { cleanLook, seasonalHat, useBlobLook, type BlobHat } from "./look";
+import { KONAMI } from "./wardrobe";
 import { TypedText, useTypewriter } from "./speech";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { blobText } from "@/i18n/messages/blob";
+import { blobCornerText } from "@/i18n/messages/blobCorner";
 import { cn, firstName } from "@/lib/utils";
 
 /** The little jelly in the corner: reacts to saves, completions and errors, and offers help. */
 export function BlobHelper() {
   const router = useRouter();
   const pathname = usePathname();
-  const { profile, createPage } = useWorkspace();
+  const { profile, setProfile, createPage } = useWorkspace();
   const t = useMessages(blobText);
+  const corner = useMessages(blobCornerText);
+  const look = useBlobLook();
   const ref = useRef<BlobHandle>(null);
   const [heldMood, setHeldMood] = useState<BlobMood | null>(null);
   const [flashMood, setFlashMood] = useState<BlobMood | null>(null);
@@ -63,6 +68,12 @@ export function BlobHelper() {
         if (e.reaction === "poke") r?.poke();
         if (e.reaction === "wave") r?.wave();
         if (e.reaction === "celebrate") r?.celebrate();
+        if (e.reaction === "spin") r?.spin();
+        if (e.reaction === "dance") r?.dance(e.ms ?? 3000);
+        if (e.reaction === "nod") r?.nod();
+        if (e.reaction === "wink") r?.wink();
+        if (e.reaction === "sneeze") r?.sneeze();
+        if (e.reaction === "yawn") r?.yawn();
       }
     });
   }, []);
@@ -120,10 +131,69 @@ export function BlobHelper() {
     return () => clearTimeout(t);
   }, []);
 
+  // A hat for the season (or the night), when no hat is picked. Checked in the browser, by its clock.
+  const [seasonal, setSeasonal] = useState<BlobHat | null>(null);
+  useEffect(() => {
+    const check = () => setSeasonal(seasonalHat(new Date()));
+    const first = setTimeout(check, 0);
+    const every = setInterval(check, 10 * 60_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, []);
+
+  // Now and then Blob does a little something on his own, unless you're busy with him.
+  const busy = useRef(false);
+  useEffect(() => {
+    busy.current = open || !!speech || sleepy;
+  }, [open, speech, sleepy]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timer = setTimeout(run, 50_000 + Math.random() * 50_000);
+    };
+    const run = () => {
+      const b = ref.current;
+      if (b && document.visibilityState === "visible" && !busy.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const h = new Date().getHours();
+        const antics = ["wave", "spin", "wink", "nod", "dance", h >= 21 || h < 7 ? "yawn" : "wave", Math.random() < 0.2 ? "sneeze" : "spin"] as const;
+        const a = antics[Math.floor(Math.random() * antics.length)];
+        if (a === "dance") b.dance(2400);
+        else b[a]();
+      }
+      schedule();
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ↑ ↑ ↓ ↓ ← → ← → B A: Disco Blob.
+  const profileRef = useRef(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+  useEffect(() => {
+    let at = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      at = key === KONAMI[at] ? at + 1 : key === KONAMI[0] ? 1 : 0;
+      if (at < KONAMI.length) return;
+      at = 0;
+      const current = cleanLook(profileRef.current.blob_look);
+      const secrets = current.secrets ?? [];
+      void setProfile({ blob_look: { ...current, skin: "disco", secrets: secrets.includes("disco") ? secrets : [...secrets, "disco"] } });
+      blob.react("dance", "excited", 3200);
+      blob.say(corner.discoFound, { mood: "excited", ms: 4200 });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setProfile, corner.discoFound]);
+
   const { shown, typing } = useTypewriter(speech && !open ? speech : null);
 
   // On learning pages Blob is already on screen as the tutor; one Blob at a time.
-  if (!profile.blob_tips || pathname.startsWith("/learn")) return null;
+  if (!profile.blob_tips || pathname.startsWith("/learn") || pathname === "/blob") return null;
 
   // Reading glasses while you're studying a note or presentation.
   const accessory: BlobAccessory | null = flashAccessory ?? (pathname.startsWith("/p/") ? "glasses" : null);
@@ -181,6 +251,15 @@ export function BlobHelper() {
               >
                 {t.addTask}
               </HelperAction>
+              <HelperAction
+                icon={<Shirt />}
+                onClick={() => {
+                  setOpen(false);
+                  router.push("/blob");
+                }}
+              >
+                {t.dressUp}
+              </HelperAction>
             </div>
             <button onClick={() => setTip((t) => t + 1)} className="mt-2 text-[12px] text-ink-3 hover:text-ink">
               {t.anotherTip}
@@ -221,7 +300,7 @@ export function BlobHelper() {
         }}
         className="pointer-events-auto grid origin-bottom-right rounded-full outline-offset-[-6px] max-sm:-mt-7 max-sm:scale-75"
       >
-        <Blob ref={ref} size={78} mood={mood} talking={typing} accessory={accessory} />
+        <Blob ref={ref} size={78} mood={mood} talking={typing} accessory={accessory} wear={!look.hat && seasonal ? { hat: seasonal } : undefined} />
       </button>
     </div>
   );

@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check } from "lucide-react";
+import { ArrowRight, Check, Shirt } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
@@ -74,6 +75,9 @@ export function BlobSection() {
                 </li>
               ))}
             </ul>
+            <Link href="/blob" className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-blob-ink hover:underline">
+              <Shirt className="size-4" /> {t.corner} <ArrowRight className="size-3.5" />
+            </Link>
           </div>
 
           <div className="relative flex min-h-[170px] flex-col items-center justify-end overflow-hidden border-t border-line bg-paper pb-3 sm:border-l sm:border-t-0">

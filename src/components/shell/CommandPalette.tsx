@@ -22,6 +22,7 @@ import {
   Sun,
   Trash2,
 } from "lucide-react";
+import { BlobMark } from "@/components/blob/BlobMark";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -175,6 +176,15 @@ function Palette({ onClose }: { onClose: () => void }) {
       { id: "tasks", group: "actions", label: t.goTasks, icon: <ListChecks />, run: () => go("/tasks") },
       { id: "cv", group: "actions", label: t.goCv, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv") },
       { id: "learn", group: "actions", label: t.goLearn, hint: t.goLearnHint, icon: <GraduationCap />, run: () => go("/learn") },
+      {
+        id: "blob",
+        group: "actions",
+        label: t.goBlob,
+        hint: t.goBlobHint,
+        keywords: "blob wardrobe outfit hat tricks colour kleiderschrank hut anziehen farbe",
+        icon: <BlobMark />,
+        run: () => go("/blob"),
+      },
       { id: "settings", group: "actions", label: t.settings, icon: <Settings />, run: () => go("/settings") },
       { id: "trash", group: "actions", label: t.trash, icon: <Trash2 />, run: () => go("/trash") },
       {

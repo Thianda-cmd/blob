@@ -8,6 +8,8 @@ export type Profile = {
   avatar_url: string | null;
   theme: Theme;
   blob_tips: boolean;
+  /** What Blob wears (migration 0015): see components/blob/look.tsx. */
+  blob_look: Record<string, unknown> | null;
   onboarded: boolean;
   created_at: string;
 };

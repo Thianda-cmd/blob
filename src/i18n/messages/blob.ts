@@ -9,6 +9,7 @@ export const blobText = defineMessages({
     newNote: "New note",
     newDeck: "New presentation",
     addTask: "Add homework or exam",
+    dressUp: "Dress me up",
     anotherTip: "Another tip →",
     tips: [
       "Type / in a note to add headings, checklists, quotes and more.",
@@ -38,6 +39,7 @@ export const blobText = defineMessages({
     newNote: "Neue Notiz",
     newDeck: "Neue Präsentation",
     addTask: "Hausaufgabe oder Test eintragen",
+    dressUp: "Zieh mich an",
     anotherTip: "Noch ein Tipp →",
     tips: [
       "Tippe / in einer Notiz für Überschriften, Checklisten, Zitate und mehr.",

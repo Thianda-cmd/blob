@@ -89,6 +89,7 @@ export const settingsText = defineMessages({
       huh: "Huh? Oh, it's you.",
       awake: "Awake and helping",
       napping: "Napping",
+      corner: "Dress Blob up in Blob's corner",
     },
     danger: {
       title: "Danger zone",
@@ -203,6 +204,7 @@ export const settingsText = defineMessages({
       huh: "Hä? Ach, du bist’s.",
       awake: "Wach und hilfsbereit",
       napping: "Macht ein Nickerchen",
+      corner: "Zieh Blob in Blobs Ecke an",
     },
     danger: {
       title: "Gefahrenzone",
