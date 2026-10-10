@@ -33,6 +33,9 @@ export const u07: Unit = {
     { id: "supermarche", fr: "le supermarché", en: "the supermarket", de: "der Supermarkt", g: "m", kind: "noun", emoji: "🛒" },
     { id: "loin", fr: "loin", en: "far", de: "weit", alt: { en: ["far away"], de: ["weit weg"] }, kind: "adv" },
     { id: "pres", fr: "près", en: "near", de: "nah", alt: { en: ["close"], de: ["in der Nähe"] }, kind: "adv", note: tx("Near the station: près de la gare. Near the park: près du parc.", "In der Nähe des Bahnhofs: près de la gare. Beim Park: près du parc.") },
+    { id: "bus", fr: "le bus", en: "the bus", de: "der Bus", g: "m", kind: "noun", emoji: "🚌", note: tx("By bus is en bus: je vais en ville en bus.", "Mit dem Bus heißt en bus: je vais en ville en bus.") },
+    { id: "a-pied", fr: "à pied", en: "on foot", de: "zu Fuß", alt: { en: ["walking"] }, kind: "phrase", emoji: "👣", note: tx("On foot is à pied, but by bus is en bus.", "Zu Fuß heißt à pied, aber mit dem Bus heißt en bus.") },
+    { id: "toilettes", fr: "les toilettes", en: "the toilets", de: "die Toilette", alt: { en: ["the toilet", "the loo", "the bathroom"], de: ["die Toiletten", "das Klo", "das WC"] }, g: "f", kind: "noun", emoji: "🚻", note: tx("Always plural in French: les toilettes. So it's aux toilettes!", "Im Französischen immer Plural: les toilettes. Also aux toilettes!") },
   ],
   gloss: [
     { fr: "allons", en: "go (we)", de: "gehen (wir)" },
@@ -43,6 +46,8 @@ export const u07: Unit = {
     { fr: "derrière", en: "behind", de: "hinter" },
     { fr: "croissants", en: "croissants", de: "Croissants" },
     { fr: "oh", en: "oh", de: "oh" },
+    { fr: "oh là là", en: "oh dear", de: "oje" },
+    { fr: "en route", en: "let's go", de: "los geht's" },
   ],
   lessons: [
     { title: tx("Where is it?", "Wo ist das?"), words: ["ville", "maison", "parc", "gare", "ou"] },
@@ -50,6 +55,8 @@ export const u07: Unit = {
     { title: tx("We're going to the beach", "Wir fahren an den Strand"), words: ["nous-allons", "vous-allez", "ils-vont", "piscine", "plage", "musee"] },
     { title: tx("Left, right, straight on", "Links, rechts, geradeaus"), words: ["excusez-moi", "a-droite", "a-gauche", "tout-droit"] },
     { title: tx("Near or far?", "Nah oder weit?"), words: ["supermarche", "loin", "pres"] },
+    { title: tx("By bus or on foot?", "Mit dem Bus oder zu Fuß?"), words: ["bus", "a-pied"] },
+    { title: tx("Where are the toilets?", "Wo ist die Toilette?"), words: ["toilettes"] },
   ],
   sentences: [
     // Lesson 1
@@ -91,6 +98,24 @@ export const u07: Unit = {
     { id: "u07.32", lesson: 5, fr: "Mes parents vont au supermarché.", en: "My parents are going to the supermarket.", de: "Meine Eltern gehen in den Supermarkt.", alt: { en: ["My parents go to the supermarket."], de: ["Meine Eltern gehen zum Supermarkt.", "Meine Eltern fahren zum Supermarkt.", "Meine Eltern fahren in den Supermarkt."] } },
     { id: "u07.33", lesson: 5, fr: "Où sont Léa et Hugo ?", en: "Where are Léa and Hugo?", de: "Wo sind Léa und Hugo?", alt: { fr: ["Léa et Hugo sont où ?"] } },
     { id: "u07.34", lesson: 5, fr: "La plage est très loin.", en: "The beach is very far away.", de: "Der Strand ist sehr weit weg.", alt: { en: ["The beach is very far.", "The beach is a long way away."], de: ["Der Strand ist sehr weit.", "Der Strand ist sehr weit entfernt."] } },
+    // Lesson 6
+    { id: "u07.35", lesson: 6, fr: "Je vais à l'école à pied.", en: "I walk to school.", de: "Ich gehe zu Fuß zur Schule.", alt: { fr: ["Je vais à pied à l'école."], en: ["I go to school on foot.", "I am walking to school.", "I am going to school on foot."], de: ["Ich gehe zu Fuß in die Schule.", "Ich laufe zur Schule."] } },
+    { id: "u07.36", lesson: 6, fr: "Tu vas en ville en bus ?", en: "Are you going into town by bus?", de: "Fährst du mit dem Bus in die Stadt?", alt: { fr: ["Est-ce que tu vas en ville en bus ?", "Vas-tu en ville en bus ?", "Vous allez en ville en bus ?", "Est-ce que vous allez en ville en bus ?", "Allez-vous en ville en bus ?"], en: ["Are you going to town by bus?", "Do you go into town by bus?", "Do you go to town by bus?", "Are you taking the bus into town?", "You are going into town by bus?"], de: ["Du fährst mit dem Bus in die Stadt?", "Gehst du mit dem Bus in die Stadt?", "Fährst du in die Stadt mit dem Bus?"] } },
+    { id: "u07.37", lesson: 6, fr: "Nous allons chez Léa.", en: "We're going to Léa's.", de: "Wir gehen zu Léa.", alt: { fr: ["On va chez Léa."], en: ["We are going to Léa's house.", "We are going to Léa's place.", "We go to Léa's."], de: ["Wir gehen zu Léa nach Hause.", "Wir fahren zu Léa."] } },
+    { id: "u07.38", lesson: 6, fr: "Est-ce que le bus va à la gare ?", en: "Does the bus go to the station?", de: "Fährt der Bus zum Bahnhof?", alt: { fr: ["Le bus va à la gare ?", "Le bus va-t-il à la gare ?"], en: ["Is the bus going to the station?", "Does the bus go to the train station?"], de: ["Geht der Bus zum Bahnhof?"] } },
+    { id: "u07.39", lesson: 6, fr: "Ils ne vont pas à la plage.", en: "They're not going to the beach.", de: "Sie gehen nicht an den Strand.", alt: { fr: ["Elles ne vont pas à la plage."], en: ["They aren't going to the beach.", "They don't go to the beach."], de: ["Sie gehen nicht zum Strand.", "Sie fahren nicht an den Strand.", "Sie fahren nicht zum Strand."] } },
+    { id: "u07.40", lesson: 6, fr: "Elle va chez sa grand-mère à pied.", en: "She walks to her grandmother's.", de: "Sie geht zu Fuß zu ihrer Großmutter.", alt: { fr: ["Elle va à pied chez sa grand-mère."], en: ["She is walking to her grandmother's.", "She goes to her grandmother's on foot.", "She is going to her grandmother's on foot.", "She walks to her grandma's.", "She is walking to her grandma's."], de: ["Sie geht zu Fuß zu ihrer Oma.", "Sie läuft zu ihrer Oma.", "Sie läuft zu ihrer Großmutter."] } },
+    { id: "u07.41", lesson: 6, fr: "On va au parc à pied ?", en: "Shall we walk to the park?", de: "Gehen wir zu Fuß in den Park?", alt: { fr: ["Est-ce qu'on va au parc à pied ?", "On va à pied au parc ?", "Nous allons au parc à pied ?"], en: ["Shall we go to the park on foot?", "Are we walking to the park?", "Are we going to the park on foot?", "Should we walk to the park?"], de: ["Laufen wir in den Park?", "Gehen wir zu Fuß zum Park?"] } },
+    { id: "u07.42", lesson: 6, fr: "Tu vas à l'école en bus ou à pied ?", en: "Do you go to school by bus or on foot?", de: "Fährst du mit dem Bus zur Schule oder gehst du zu Fuß?", alt: { fr: ["Est-ce que tu vas à l'école en bus ou à pied ?", "Vas-tu à l'école en bus ou à pied ?", "Vous allez à l'école en bus ou à pied ?", "Est-ce que vous allez à l'école en bus ou à pied ?"], en: ["Do you go to school by bus or walk?", "Are you going to school by bus or on foot?", "Do you take the bus to school or walk?"], de: ["Kommst du mit dem Bus oder zu Fuß zur Schule?", "Gehst du zu Fuß zur Schule oder fährst du mit dem Bus?", "Fährst du mit dem Bus oder gehst du zu Fuß zur Schule?"] } },
+    // Lesson 7
+    { id: "u07.43", lesson: 7, fr: "Excusez-moi, où sont les toilettes ?", en: "Excuse me, where are the toilets?", de: "Entschuldigung, wo ist die Toilette?", alt: { fr: ["Excuse-moi, où sont les toilettes ?", "Excusez-moi, les toilettes sont où ?"], en: ["Excuse me, where is the toilet?", "Excuse me, where are the loos?", "Excuse me, where is the loo?", "Excuse me, where is the bathroom?"], de: ["Entschuldigen Sie, wo ist die Toilette?", "Entschuldigung, wo sind die Toiletten?", "Entschuldigen Sie, wo sind die Toiletten?", "Entschuldigung, wo ist das Klo?"] } },
+    { id: "u07.44", lesson: 7, fr: "Je vais aux toilettes.", en: "I'm going to the toilet.", de: "Ich gehe auf die Toilette.", alt: { en: ["I am going to the loo.", "I go to the toilet.", "I am going to the bathroom."], de: ["Ich gehe aufs Klo.", "Ich gehe zur Toilette.", "Ich gehe aufs WC."] } },
+    { id: "u07.45", lesson: 7, fr: "Les toilettes sont à droite.", en: "The toilets are on the right.", de: "Die Toilette ist rechts.", alt: { en: ["The toilet is on the right.", "The toilets are to the right.", "The toilet is to the right."], de: ["Die Toiletten sind rechts.", "Die Toilette ist auf der rechten Seite.", "Rechts ist die Toilette."] } },
+    { id: "u07.46", lesson: 7, fr: "Tu vas chez Hugo aujourd'hui ?", en: "Are you going to Hugo's today?", de: "Gehst du heute zu Hugo?", alt: { fr: ["Est-ce que tu vas chez Hugo aujourd'hui ?", "Aujourd'hui, tu vas chez Hugo ?", "Vas-tu chez Hugo aujourd'hui ?", "Vous allez chez Hugo aujourd'hui ?", "Est-ce que vous allez chez Hugo aujourd'hui ?"], en: ["Are you going to Hugo's house today?", "Are you going to Hugo's place today?", "You are going to Hugo's today?"], de: ["Gehst du heute zu Hugo nach Hause?", "Du gehst heute zu Hugo?", "Fährst du heute zu Hugo?"] } },
+    { id: "u07.47", lesson: 7, fr: "Où est-ce que tes parents vont ?", en: "Where are your parents going?", de: "Wohin gehen deine Eltern?", alt: { fr: ["Où vont tes parents ?", "Tes parents vont où ?", "Où est-ce que vos parents vont ?", "Où vont vos parents ?", "Vos parents vont où ?"], en: ["Where do your parents go?"], de: ["Wo gehen deine Eltern hin?", "Wohin fahren deine Eltern?"] } },
+    { id: "u07.48", lesson: 7, fr: "Le professeur parle aux parents.", en: "The teacher is talking to the parents.", de: "Der Lehrer spricht mit den Eltern.", alt: { en: ["The teacher talks to the parents.", "The teacher is speaking to the parents.", "The teacher speaks to the parents."], de: ["Der Lehrer redet mit den Eltern.", "Der Lehrer spricht zu den Eltern."] } },
+    { id: "u07.49", lesson: 7, fr: "Le cinéma est près du parc.", en: "The cinema is near the park.", de: "Das Kino ist in der Nähe des Parks.", alt: { en: ["The cinema is close to the park."], de: ["Das Kino ist in der Nähe vom Park.", "Das Kino ist nah am Park.", "Das Kino ist beim Park."] } },
+    { id: "u07.50", lesson: 7, fr: "Où est la maison de Léa ?", en: "Where is Léa's house?", de: "Wo ist Léas Haus?", alt: { fr: ["La maison de Léa est où ?"], en: ["Where is Léa's home?"], de: ["Wo ist das Haus von Léa?"] } },
   ],
   drills: [
     { id: "u07.d1", lesson: 1, fr: "___ est la gare ?", options: ["Où", "Ou"], answer: 0, en: "Where is the station?", de: "Wo ist der Bahnhof?", why: tx("**Où** with an accent means where. Ou without it means or.", "**Où** mit Akzent heißt wo. Ou ohne Akzent heißt oder.") },
@@ -105,6 +130,12 @@ export const u07: Unit = {
     { id: "u07.d10", lesson: 3, fr: "Le professeur parle ___ élèves.", options: ["aux", "à les", "au"], answer: 0, en: "The teacher is talking to the pupils.", de: "Der Lehrer spricht mit den Schülern.", why: tx("**À + les** melts into **aux**: aux élèves. Before a vowel you hear a z: aux‿élèves.", "**À + les** wird zu **aux**: aux élèves. Vor einem Vokal hört man ein weiches s: aux‿élèves.") },
     { id: "u07.d11", lesson: 4, fr: "La boulangerie est ___ gauche.", options: ["à", "au", "la"], answer: 0, en: "The bakery is on the left.", de: "Die Bäckerei ist links.", why: tx("Left and right: **à** gauche, **à** droite. Always with à.", "Links und rechts: **à** gauche, **à** droite. Immer mit à.") },
     { id: "u07.d12", lesson: 5, fr: "Le supermarché est près ___ la gare.", options: ["de", "à", "au"], answer: 0, en: "The supermarket is near the station.", de: "Der Supermarkt ist in der Nähe des Bahnhofs.", why: tx("Near is **près de**: près de la gare. With le it becomes du: près du parc.", "In der Nähe von heißt **près de**: près de la gare. Mit le wird es zu du: près du parc.") },
+    { id: "u07.d13", lesson: 6, fr: "Je vais à l'école ___ pied.", options: ["à", "en", "au"], answer: 0, en: "I walk to school.", de: "Ich gehe zu Fuß zur Schule.", why: tx("On foot is **à pied**. By bus is en bus.", "Zu Fuß heißt **à pied**. Mit dem Bus heißt en bus.") },
+    { id: "u07.d14", lesson: 6, fr: "Nous allons ___ Léa.", options: ["chez", "à la", "au"], answer: 0, en: "We're going to Léa's.", de: "Wir gehen zu Léa.", why: tx("To someone's home: **chez** + the person: chez Léa, chez ma grand-mère. À is for places.", "Zu jemandem nach Hause: **chez** + Person: chez Léa, chez ma grand-mère. À ist für Orte.") },
+    { id: "u07.d15", lesson: 6, fr: "Ils ne ___ pas à la plage.", options: ["vont", "va", "allez"], answer: 0, en: "They're not going to the beach.", de: "Sie gehen nicht an den Strand.", why: tx("With **ils**: ils **vont**. Ne … pas goes around it: ils **ne** vont **pas**.", "Mit **ils**: ils **vont**. Ne … pas steht drumherum: ils **ne** vont **pas**.") },
+    { id: "u07.d16", lesson: 7, fr: "Je vais ___ toilettes.", options: ["aux", "à les", "au"], answer: 0, en: "I'm going to the toilet.", de: "Ich gehe auf die Toilette.", why: tx("**Les toilettes** is plural, and à + les = **aux**: aux toilettes.", "**Les toilettes** ist Plural, und à + les = **aux**: aux toilettes.") },
+    { id: "u07.d17", lesson: 7, fr: "Où ___ les toilettes ?", options: ["sont", "est", "va"], answer: 0, en: "Where are the toilets?", de: "Wo ist die Toilette?", why: tx("**Les toilettes** is plural: où **sont** les toilettes ? Où est is for one thing: où est la gare ?", "**Les toilettes** ist Plural: où **sont** les toilettes ? Où est steht bei einer Sache: où est la gare ?") },
+    { id: "u07.d18", lesson: 7, fr: "Le cinéma est près ___ parc.", options: ["du", "de le", "de la"], answer: 0, en: "The cinema is near the park.", de: "Das Kino ist in der Nähe des Parks.", why: tx("**De + le** melts into **du**: près du parc. Just like à + le = au.", "**De + le** wird zu **du**: près du parc. Genau wie à + le = au.") },
   ],
   dialogues: [
     {
@@ -125,6 +156,28 @@ export const u07: Unit = {
         { q: tx("Where does Blob want to go?", "Wohin will Blob?"), options: [tx("To the bakery", "Zur Bäckerei"), tx("To the station", "Zum Bahnhof"), tx("To the supermarket", "Zum Supermarkt")], answer: 0 },
         { q: tx("Where is the bakery?", "Wo ist die Bäckerei?"), options: [tx("On the left, behind Blob", "Links, hinter Blob"), tx("Straight on, very far away", "Geradeaus, sehr weit weg"), tx("On the right, near the station", "Rechts, beim Bahnhof")], answer: 0 },
         { q: tx("Where is Mrs Martin going?", "Wohin geht Frau Martin?"), options: [tx("To the bakery too", "Auch zur Bäckerei"), tx("To the park", "In den Park"), tx("Home", "Nach Hause")], answer: 0 },
+      ],
+    },
+    {
+      id: "u07.dialogue2",
+      lesson: 7,
+      title: tx("Blob at the museum", "Blob im Museum"),
+      lines: [
+        { who: "prof", fr: "Aujourd'hui, nous allons au musée !", en: "Today we're going to the museum!", de: "Heute gehen wir ins Museum!" },
+        { who: "hugo", fr: "Comment est-ce que nous allons au musée ?", en: "How are we getting to the museum?", de: "Wie kommen wir zum Museum?" },
+        { who: "prof", fr: "À pied ! Allez, en route !", en: "On foot! Come on, let's go!", de: "Zu Fuß! Los, auf geht's!" },
+        { who: "blob", fr: "À pied ? Oh non… je suis fatigué !", en: "On foot? Oh no… I'm tired!", de: "Zu Fuß? Oh nein … ich bin müde!" },
+        { who: "lea", fr: "Blob, tu regardes le tableau ?", en: "Blob, are you looking at the painting?", de: "Blob, schaust du dir das Gemälde an?" },
+        { who: "blob", fr: "Non, je ne regarde pas le tableau. Je cherche les toilettes !", en: "No, I'm not looking at the painting. I'm looking for the toilets!", de: "Nein, ich schaue mir das Gemälde nicht an. Ich suche die Toilette!" },
+        { who: "blob", fr: "Excusez-moi, Madame ! Où sont les toilettes ?", en: "Excuse me! Where are the toilets?", de: "Entschuldigung! Wo ist die Toilette?" },
+        { who: "madame", fr: "Les toilettes ? Tout droit, puis à gauche.", en: "The toilets? Straight on, then left.", de: "Die Toilette? Geradeaus, dann links." },
+        { who: "hugo", fr: "Blob ! À gauche, pas à droite !", en: "Blob! Left, not right!", de: "Blob! Links, nicht rechts!" },
+        { who: "blob", fr: "Oh là là ! Merci, Hugo !", en: "Oh dear! Thanks, Hugo!", de: "Oje! Danke, Hugo!" },
+      ],
+      questions: [
+        { q: tx("How does the class get to the museum?", "Wie kommt die Klasse zum Museum?"), options: [tx("On foot", "Zu Fuß"), tx("By bus", "Mit dem Bus"), tx("By bike", "Mit dem Fahrrad")], answer: 0 },
+        { q: tx("What is Blob looking for in the museum?", "Was sucht Blob im Museum?"), options: [tx("The toilets", "Die Toilette"), tx("A painting", "Ein Gemälde"), tx("The bus", "Den Bus")], answer: 0 },
+        { q: tx("Where are the toilets?", "Wo ist die Toilette?"), options: [tx("Straight on, then left", "Geradeaus, dann links"), tx("On the right", "Rechts"), tx("Near the station", "Beim Bahnhof")], answer: 0 },
       ],
     },
   ],
@@ -184,6 +237,28 @@ export const u07: Unit = {
         { fr: "Allez tout droit, puis à gauche.", en: "Go straight on, then left.", de: "Gehen Sie geradeaus, dann links." },
         { fr: "C'est loin ? Non, c'est près.", en: "Is it far? No, it's close.", de: "Ist es weit? Nein, es ist nah." },
       ],
+    },
+    {
+      title: tx("Chez Léa, à pied, en bus", "Chez Léa, à pied, en bus"),
+      body: tx(
+        "To go to someone's home, French uses **chez** + the person: je vais **chez** Léa (to Léa's), chez ma grand-mère. No à and no maison needed!\n\nHow you get there: **à pied** (on foot), but **en bus**, like en ville. And the toilets are always plural in French, so: je vais **aux** toilettes, où **sont** les toilettes ?",
+        "Zu jemandem nach Hause heißt **chez** + Person: je vais **chez** Léa (zu Léa), chez ma grand-mère. Ohne à und ohne maison!\n\nWie du hinkommst: **à pied** (zu Fuß), aber **en bus** (mit dem Bus), wie en ville. Und die Toilette ist auf Französisch immer Plural: je vais **aux** toilettes, où **sont** les toilettes ?",
+      ),
+      examples: [
+        { fr: "Nous allons chez Léa.", en: "We're going to Léa's.", de: "Wir gehen zu Léa." },
+        { fr: "Je vais à l'école à pied.", en: "I walk to school.", de: "Ich gehe zu Fuß zur Schule." },
+        { fr: "Excusez-moi, où sont les toilettes ?", en: "Excuse me, where are the toilets?", de: "Entschuldigung, wo ist die Toilette?" },
+      ],
+      table: {
+        head: [tx("meaning", "Bedeutung"), tx("French", "Französisch")],
+        rows: [
+          [tx("to Léa's", "zu Léa"), "chez Léa"],
+          [tx("on foot", "zu Fuß"), "à pied"],
+          [tx("by bus", "mit dem Bus"), "en bus"],
+          [tx("into town", "in die Stadt"), "en ville"],
+          [tx("to the toilet", "auf die Toilette"), "aux toilettes"],
+        ],
+      },
     },
   ],
 };
