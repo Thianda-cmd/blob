@@ -83,9 +83,9 @@ export function UnitGuide({ unit, startHref }: { unit: Unit; startHref: string |
                       </thead>
                       <tbody>
                         {tip.table.rows.map((row, j) => (
-                          <tr key={j}>
+                          <tr key={j} className="[&:last-child>td]:border-b-0">
                             {row.map((cell, k) => (
-                              <td key={k} lang={k > 0 ? "fr" : undefined} className={cn("border-b border-line px-3 py-2 last:border-b-0", k > 0 && "font-medium text-ink")}>
+                              <td key={k} lang={k > 0 ? "fr" : undefined} className={cn("border-b border-line px-3 py-2", k > 0 && "font-medium text-ink")}>
                                 {resolveText(cell, locale)}
                               </td>
                             ))}
