@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, AnimatePresence, motion, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
-import { Minus, Plus, Sparkles } from "lucide-react";
+import { Minus, Plus, Square } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { tx } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
@@ -134,7 +134,7 @@ export function ExpandingSquarePuzzle() {
           disabled={perfect}
           className="ml-auto flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-40"
         >
-          <Sparkles className="size-3.5" /> {t(tx("Complete the square", "Zum Quadrat ergänzen"))}
+          <Square className="size-3.5" /> {t(tx("Complete the square", "Zum Quadrat ergänzen"))}
         </button>
       </div>
 

@@ -3,7 +3,7 @@
 import type { Editor, Range } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
 import { NodeSelection, TextSelection, type Selection } from "@tiptap/pm/state";
-import { ArrowLeft, ChevronRight, ClipboardPaste, Copy, CopyPlus, Link2, Redo2, Scissors, Sigma, SquarePlus, TextSelect, Trash2, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, ClipboardPaste, Copy, CopyPlus, Link2, Redo2, Scissors, Sigma, SquarePlus, TextSelect, Replace, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { ContextMenu, useContextMenu, useLastPointer, wantsOwnMenu } from "@/components/ui/ContextMenu";
@@ -215,7 +215,7 @@ export function EditorContextMenu({
                 </MenuItem>
               )}
               {kind !== "node" && (
-                <MenuItem icon={<Wand2 />} shortcut={<ChevronRight className="size-3.5" />} onSelect={() => setPanel("turn")}>
+                <MenuItem icon={<Replace />} shortcut={<ChevronRight className="size-3.5" />} onSelect={() => setPanel("turn")}>
                   {m.turnInto}
                 </MenuItem>
               )}

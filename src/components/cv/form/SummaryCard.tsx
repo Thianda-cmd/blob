@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, MessageSquareQuote, WandSparkles } from "lucide-react";
+import { ArrowRight, Lightbulb, MessageSquareQuote } from "lucide-react";
 import { memo, useRef } from "react";
 import { MenuItem, Popover } from "@/components/ui/Menu";
 import type { Cv } from "@/cv/types";
@@ -63,7 +63,7 @@ export const SummaryCard = memo(function SummaryCard({ summary, lang, change }: 
                 {...p}
                 className="-mr-1 flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium text-blob-ink transition-colors hover:bg-blob-soft aria-expanded:bg-blob-soft max-lg:h-9"
               >
-                <WandSparkles className="size-3.5" /> {ts.example}
+                <Lightbulb className="size-3.5" /> {ts.example}
               </button>
             )}
           >

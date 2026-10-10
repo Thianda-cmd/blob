@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpLeft, Sparkles } from "lucide-react";
+import { ArrowUpLeft, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { PageIcon } from "@/components/shell/Sidebar";
@@ -115,7 +115,7 @@ export function NoteConnections({ page, title }: { page: PageMeta; title: string
       )}
       {similar.length > 0 && (
         <div>
-          <Heading icon={<Sparkles className="size-3.5" />}>{t.similar}</Heading>
+          <Heading icon={<Link2 className="size-3.5" />}>{t.similar}</Heading>
           <div className="grid gap-2 sm:grid-cols-2">
             {similar.map(({ page: p, topics, tags }) => (
               <Link key={p.id} href={`/p/${p.id}`} className="blob-connection">

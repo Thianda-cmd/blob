@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Check, Keyboard, Sparkles } from "lucide-react";
+import { BookPlus, Check, Keyboard } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -64,7 +64,7 @@ export function IntroEx({ ex, lang, setCheck, blobRef }: ExProps<"intro">) {
   return (
     <div>
       <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-blob-soft px-2.5 py-1 text-[12px] font-semibold uppercase tracking-wide text-blob-ink">
-        <Sparkles className="size-3.5" /> {t.player.newWord}
+        <BookPlus className="size-3.5" /> {t.player.newWord}
       </span>
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.98 }}

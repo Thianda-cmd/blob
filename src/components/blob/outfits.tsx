@@ -17,9 +17,6 @@ export const SWING_PIVOT: Partial<Record<BlobHat, [number, number]>> = {
 const GOLD = "#f6c431";
 const GOLD_DEEP = "#c8920c";
 
-/** A 4-pointed sparkle. */
-const sparkle = (x: number, y: number, r: number) => `M ${x} ${y - r} L ${x + r * 0.3} ${y - r * 0.3} L ${x + r} ${y} L ${x + r * 0.3} ${y + r * 0.3} L ${x} ${y + r} L ${x - r * 0.3} ${y + r * 0.3} L ${x - r} ${y} L ${x - r * 0.3} ${y - r * 0.3} Z`;
-
 /** A 5-pointed star. */
 function star(x: number, y: number, outer: number, inner: number) {
   let d = "";
@@ -100,12 +97,8 @@ export function Hat({ hat, id, swingRef }: { hat: BlobHat; id: string; swingRef:
           <path d={`M ${CX - 26} 66 Q ${CX - 12} 40 ${CX + 2} 10 Q ${CX + 9} 0 ${CX + 24} 5 Q ${CX + 11} 12 ${CX + 11} 26 Q ${CX + 15} 48 ${CX + 26} 66 Z`} fill="#373e9e" />
           <path d={`M ${CX - 25} 62 Q ${CX} 67 ${CX + 25} 62`} stroke="#ffd84d" strokeWidth={3} fill="none" />
           <g fill="#ffd84d">
-            <path d={sparkle(CX - 7, 46, 5.5)}>
-              <animate attributeName="opacity" values="1;0.35;1" dur="1.8s" repeatCount="indefinite" />
-            </path>
-            <path d={sparkle(CX + 7, 30, 4)}>
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="1.4s" repeatCount="indefinite" />
-            </path>
+            <path d={star(CX - 7, 46, 5.2, 2.3)} />
+            <path d={star(CX + 7, 30, 3.8, 1.7)} />
             <circle cx={CX + 9} cy={52} r={1.8} />
             <circle cx={CX - 4} cy={28} r={1.4} />
           </g>
@@ -118,7 +111,7 @@ export function Hat({ hat, id, swingRef }: { hat: BlobHat; id: string; swingRef:
           <path d={`M ${CX - 22} 66 L ${CX + 1} 16 Q ${CX + 6} 7 ${CX + 21} 10 Q ${CX + 12} 16 ${CX + 12} 30 L ${CX + 22} 66 Z`} fill="#2f2b3d" />
           <path d={`M ${CX - 20.5} 57 L ${CX + 20.5} 57 L ${CX + 22} 66 L ${CX - 22} 66 Z`} fill="#8a4dff" />
           <rect x={CX - 5.5} y={56} width={11} height={10} rx={1.5} fill="none" stroke="#ffd84d" strokeWidth={2.2} />
-          <path d={sparkle(CX + 8, 38, 3.5)} fill="#ff9f43" />
+          <path d={star(CX + 8, 38, 3.6, 1.6)} fill="#ff9f43" />
         </g>
       );
     case "santa":
@@ -249,8 +242,8 @@ function FloppyCap({ mirror, body, shade, trim, pom, stars, swingRef }: { mirror
       <path d={`M ${CX - 14} 60 C ${CX - 12} 46 ${CX - 2} 36 ${CX + 10} 34`} stroke={shade} strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.6} />
       {stars && (
         <g fill="#ffd84d">
-          <path d={sparkle(CX - 8, 50, 3.4)} />
-          <path d={sparkle(CX + 8, 38, 2.6)} />
+          <path d={star(CX - 8, 50, 3.4, 1.5)} />
+          <path d={star(CX + 8, 38, 2.6, 1.2)} />
         </g>
       )}
       <path d={`M ${CX - 32} 60 Q ${CX} 53 ${CX + 32} 60 L ${CX + 32} 69 Q ${CX} 62 ${CX - 32} 69 Z`} fill={trim} stroke={shade} strokeOpacity={0.25} strokeWidth={1.2} />

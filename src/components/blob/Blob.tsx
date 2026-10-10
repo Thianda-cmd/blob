@@ -1313,10 +1313,14 @@ function MoodExtras({ mood }: { mood: BlobMood }) {
     );
   }
   if (mood === "proud") {
+    // A little "ta-da": three short lines beside the head.
     return (
-      <path d="M 156 50 L 158.5 56 L 165 58 L 158.5 60 L 156 66 L 153.5 60 L 147 58 L 153.5 56 Z" fill="#ffd23f">
-        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite" />
-      </path>
+      <g stroke="var(--ink-3)" strokeWidth={2.6} strokeLinecap="round" opacity={0}>
+        <path d="M 152 62 L 160 56" />
+        <path d="M 154 72 L 164 72" />
+        <path d="M 152 82 L 160 88" />
+        <animate attributeName="opacity" values="0;0.9;0" dur="1.6s" repeatCount="indefinite" />
+      </g>
     );
   }
   if (mood === "laughing") {
@@ -1383,20 +1387,19 @@ function MoodExtras({ mood }: { mood: BlobMood }) {
     );
   }
   if (mood === "excited") {
+    // Confetti, not sparkles.
     return (
-      <g fill="var(--blob)">
+      <g>
         {[
-          [40, 52, 0],
-          [162, 44, 0.5],
-          [150, 88, 1],
-        ].map(([x, y, delay]) => (
-          <path
-            key={`${x}-${y}`}
-            d={`M ${x} ${y - 7} L ${x + 2} ${y - 2} L ${x + 7} ${y} L ${x + 2} ${y + 2} L ${x} ${y + 7} L ${x - 2} ${y + 2} L ${x - 7} ${y} L ${x - 2} ${y - 2} Z`}
-            opacity={0}
-          >
+          [40, 54, 0, "#ffd23f", 20],
+          [160, 46, 0.5, "#ff6fae", -25],
+          [152, 88, 1, "#4aa3f5", 40],
+          [48, 92, 0.75, "#3fcf9a", -10],
+        ].map(([x, y, delay, color, turn]) => (
+          <rect key={`${x}-${y}`} x={x as number} y={y as number} width={7} height={3.6} rx={1.4} fill={color as string} opacity={0} transform={`rotate(${turn} ${x} ${y})`}>
             <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin={`${delay}s`} repeatCount="indefinite" />
-          </path>
+            <animate attributeName="y" values={`${(y as number) - 4};${(y as number) + 8}`} dur="1.6s" begin={`${delay}s`} repeatCount="indefinite" />
+          </rect>
         ))}
       </g>
     );

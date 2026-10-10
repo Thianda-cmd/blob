@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
-import { Check, Minus, Plus, RotateCcw, Shuffle, Wand2 } from "lucide-react";
+import { Check, Minus, Plus, RotateCcw, Shuffle, Split } from "lucide-react";
 import { useId, useState } from "react";
 import { useLocale } from "@/i18n/client";
 import { MathView } from "@/learn/components/MathView";
@@ -435,7 +435,7 @@ export function FractionsCancelWorkshop() {
           disabled={factored}
           className="flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-[13px] font-semibold text-paper hover:bg-ink/88 disabled:opacity-35"
         >
-          <Wand2 className="size-3.5" /> {t("Factorise", "Faktorisieren")}
+          <Split className="size-3.5" /> {t("Factorise", "Faktorisieren")}
         </button>
         <button
           type="button"

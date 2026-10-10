@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { RotateCcw, Shuffle, Sparkles } from "lucide-react";
+import { CircleCheck, RotateCcw, Shuffle } from "lucide-react";
 import { useId, useState } from "react";
 import { tx, txMap } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
@@ -307,7 +307,7 @@ export function NegCleverSum() {
                 )}
               >
                 {c.v > 0 ? `+${c.v}` : signed(c.v)}
-                {c.round && !done && <Sparkles className="absolute -right-1.5 -top-1.5 size-4 text-ok" />}
+                {c.round && !done && <CircleCheck className="absolute -right-1.5 -top-1.5 size-4 text-ok" />}
               </motion.button>
             ))}
           </AnimatePresence>

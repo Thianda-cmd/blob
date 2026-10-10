@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowUpRight, Check, FilePlus2, Layers, Printer, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, FilePlus2, Layers, Lightbulb, Printer } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -111,7 +111,7 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
         {summary.gist.length > 0 && (
           <section className="mt-6 rounded-2xl border border-blob/25 bg-blob-soft/40 px-4 py-4 sm:px-5 print:break-inside-avoid">
             <h2 className="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-blob-ink">
-              <Sparkles className="size-4" /> {t.summary.gist}
+              <Lightbulb className="size-4" /> {t.summary.gist}
             </h2>
             <ol className="mt-2.5 space-y-2">
               {summary.gist.map((l, i) => (

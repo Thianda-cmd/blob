@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Eraser, Minus, Plus, RotateCcw, Shuffle, Wand2 } from "lucide-react";
+import { Check, Eraser, Eye, Minus, Plus, RotateCcw, Shuffle } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { BlobMood } from "@/components/blob/Blob";
 import { resolveText, tx, type Text } from "@/i18n/text";
@@ -2633,7 +2633,7 @@ function BuildRound({ c, index, onNext }: { c: BuildCase; index: number; onNext:
           </button>
           {tries > 0 && (
             <button onClick={showMe} className="flex h-10 items-center gap-1.5 rounded-xl px-3 text-[14px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
-              <Wand2 className="size-4" /> {t(tx("Show me", "Zeig’s mir"))}
+              <Eye className="size-4" /> {t(tx("Show me", "Zeig’s mir"))}
             </button>
           )}
         </div>

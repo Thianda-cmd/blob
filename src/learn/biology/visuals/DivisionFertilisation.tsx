@@ -4,7 +4,7 @@
 // Pick a living thing, fertilise, and see what would happen if sex cells were not halved.
 
 import { motion, useReducedMotion } from "motion/react";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { tx, type Text } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
@@ -111,7 +111,7 @@ export function DivisionFertilisation() {
           onClick={() => setDone(!done)}
           className="flex h-10 items-center gap-2 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white active:scale-[0.97]"
         >
-          {done ? <RotateCcw className="size-4" /> : <Sparkles className="size-4" />}
+          {done ? <RotateCcw className="size-4" /> : <Play className="size-4" />}
           {t(done ? tx("Start again", "Noch mal") : tx("Fertilise", "Befruchten"))}
         </button>
         <div className="font-math text-[19px] text-ink">

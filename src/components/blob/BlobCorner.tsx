@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Dices, Lock, Shirt, Sparkles } from "lucide-react";
+import { Check, Dices, Lock, Shirt } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
@@ -136,7 +136,7 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0 max-w-[560px]">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <Sparkles className="size-3.5" /> {t.kicker}
+                <BlobMark size={14} /> {t.kicker}
               </div>
               <h1 className="mt-1 font-display text-[30px] font-bold leading-tight tracking-[-0.02em]">{t.title}</h1>
               <p className="mt-1.5 text-[14.5px] text-ink-2">{t.intro}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Lock, Mail, Wand2 } from "lucide-react";
+import { ArrowRight, Link2, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -210,7 +210,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
       >
         {mode === "password" ? (
           <>
-            <Wand2 className="size-4" /> {t.useMagic}
+            <Link2 className="size-4" /> {t.useMagic}
           </>
         ) : (
           <>

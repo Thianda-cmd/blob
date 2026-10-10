@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, BookOpen, Check, Clock, Dumbbell, Flame, GraduationCap, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Dumbbell, Flame, GraduationCap, Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
@@ -78,7 +78,7 @@ export function LearnHome({
                   <div className="text-[11.5px] text-ink-3">{today.xp >= DAILY_GOAL ? t.home.goalReached : t.dailyGoal}</div>
                 </div>
               </div>
-              <StatChip icon={<Sparkles className="size-4" />} label={t.home.totalXp} value={totalXp} />
+              <StatChip icon={<Trophy className="size-4" />} label={t.home.totalXp} value={totalXp} />
             </div>
           </header>
 

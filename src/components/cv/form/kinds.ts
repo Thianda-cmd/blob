@@ -1,4 +1,4 @@
-import { BadgeCheck, Briefcase, GraduationCap, HandCoins, Heart, HeartHandshake, Languages, Shapes, Sparkles, Trophy, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Briefcase, GraduationCap, HandCoins, Heart, HeartHandshake, Languages, Shapes, Trophy, Wrench, type LucideIcon } from "lucide-react";
 import type { CvSectionKind } from "@/cv/types";
 
 /** The icon of each kind of section, in the form and the "add section" list. */
@@ -10,7 +10,7 @@ export const KIND_ICON: Record<CvSectionKind, LucideIcon> = {
   courses: BadgeCheck,
   awards: Trophy,
   custom: Shapes,
-  skills: Sparkles,
+  skills: Wrench,
   languages: Languages,
   interests: Heart,
 };

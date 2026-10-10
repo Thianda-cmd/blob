@@ -1,12 +1,12 @@
 "use client";
 
-import { AtSign, FileText, History, Lightbulb, Quote, Sparkles, SpellCheck } from "lucide-react";
+import { AtSign, FileText, History, Lightbulb, PenLine, Quote, SpellCheck } from "lucide-react";
 import { useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { cn } from "@/lib/utils";
 
 // One icon per tip, in the order of cvHomeText.tips.
-const ICONS = [FileText, History, Sparkles, Quote, AtSign, SpellCheck];
+const ICONS = [FileText, History, PenLine, Quote, AtSign, SpellCheck];
 
 /** "How to write a good CV": six short tips for school students. A column beside the CVs on wide screens. */
 export function CvTips({ className }: { className?: string }) {
