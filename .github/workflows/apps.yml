@@ -12,6 +12,9 @@ name: Apps
 
 on:
   push:
+    # Branches only when the app changed (paths don't apply to tags); every app-v* tag.
+    branches:
+      - "**"
     paths:
       - "src-tauri/**"
       - ".github/workflows/apps.yml"
