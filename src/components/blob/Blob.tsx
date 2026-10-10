@@ -282,6 +282,7 @@ export function Blob({
     yawnUntil: 0,
     inhaleUntil: 0,
     clicks: [] as number[],
+    dizzyUntil: 0,
   });
   const hatRef = useRef<BlobHat | null>(hat);
   const moodRef = useRef(shownMood);
@@ -784,7 +785,8 @@ export function Blob({
     const st = sim.current;
     st.pressed = true;
     st.pressedAt = performance.now();
-    react("excited", 60_000);
+    // A dizzy spell isn't cut short by more clicks.
+    if (st.pressedAt > st.dizzyUntil) react("excited", 60_000);
   }
 
   function handlePointerUp() {
@@ -794,7 +796,7 @@ export function Blob({
     const held = performance.now() - st.pressedAt;
     st.vs += held > 220 ? 4.2 : 1.6;
     if (held > 220) setTimeout(() => st.y >= 0 && (st.vy = -560), 40);
-    react("happy", 900);
+    if (performance.now() > st.dizzyUntil) react("happy", 900);
   }
 
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
@@ -803,8 +805,9 @@ export function Blob({
       const st = sim.current;
       const now = performance.now();
       st.clicks = [...st.clicks.filter((c) => now - c < 1800), now];
-      if (st.clicks.length >= 6) {
+      if (st.clicks.length >= 6 && now > st.dizzyUntil) {
         st.clicks = [];
+        st.dizzyUntil = now + 2800;
         react("dizzy", 2800);
         st.vx += 300;
       }
