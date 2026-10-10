@@ -3,6 +3,7 @@
 //   npm run check:french                 every unit
 //   npm run check:french -- bonjour      some units (slugs)
 //   npm run check:french -- --strict     warnings fail too
+//   npm run check:french -- --seeds=8    fewer generated lessons per unit (faster, for drafts; default 40)
 //
 // For every unit in course.ts it checks:
 //   - unit: slug (URL-safe, unique, not a reserved route), its place n, bilingual title and goal
@@ -33,6 +34,7 @@ import type { Lang, Unit } from "@/learn/french/types";
 const args = process.argv.slice(2);
 const strict = args.includes("--strict");
 const only = args.filter((a) => !a.startsWith("--"));
+const SEEDS = Number(args.find((a) => a.startsWith("--seeds="))?.slice(8)) || 40;
 
 const problems: string[] = [];
 const warnings: string[] = [];
@@ -224,7 +226,7 @@ function checkUnit(u: Unit, index: number) {
 
   // Generation.
   const earlier = UNITS.slice(0, index);
-  for (let seed = 1; seed <= 40; seed++)
+  for (let seed = 1; seed <= SEEDS; seed++)
     for (const lang of LANGS) {
       const opts: GenOptions = { lang, seed };
       for (let n = 1; n <= u.lessons.length; n++) {
