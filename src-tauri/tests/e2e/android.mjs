@@ -52,8 +52,8 @@ const resumed = () => {
 };
 
 /** The app's web view over the DevTools protocol (it changes when the app restarts). */
-async function devtools() {
-  for (let i = 0; i < 60; i++) {
+async function devtools(tries = 60) {
+  for (let i = 0; i < tries; i++) {
     // The socket of the app's current process (an old one may still be listed after a restart).
     const pid = adbQuiet("shell", "pidof", PKG);
     const socket = pid && adbQuiet("shell", "grep", "-o", `@webview_devtools_remote_${pid}`, "/proc/net/unix").split("\n")[0];
@@ -238,19 +238,38 @@ try {
   const swiped = await until(() => path(dt), (p) => p === first, 20000);
   check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
 
-  // Back on the first page leaves the app, like any Android app.
+  // Back on the first page puts the app in the background (the home screen shows), like any
+  // Android app opened from the home screen.
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await sleep(2500);
   check("back on the first page leaves the app", !resumed().includes(PKG), resumed());
 
-  // An app link opens its page (and starts the app again).
+  // App links: Android knows the app opens org.bojes.blob://, and a link opens its page both
+  // right after Back closed the app (its process still there) and from a cold start.
   dt.close();
-  adb("shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", "org.bojes.blob://show", PKG);
-  dt = await devtools();
-  const linked = await until(() => path(dt), (p) => p === "/show", 90000);
-  check("an org.bojes.blob:// link opens its page", linked === "/show", linked);
+  const handlers = adbQuiet("shell", "cmd", "package", "query-activities", "--brief", "-a", "android.intent.action.VIEW", "-d", "org.bojes.blob://show");
+  check("Android sends org.bojes.blob:// links to the app", handlers.includes(PKG), handlers.replace(/\s+/g, " ").slice(0, 200));
+  const openLink = async (name) => {
+    adb("logcat", "-c");
+    const started = adbQuiet("shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", "org.bojes.blob://show", PKG);
+    console.log(`info am start (${name}): ${started.replace(/\s+/g, " ")}`);
+    let linked;
+    try {
+      dt = await devtools(30);
+      linked = await until(() => path(dt), (p) => p === "/show", 90000);
+    } catch (e) {
+      linked = e.message;
+    }
+    writeFileSync(join(out, `logcat-link-${name.replace(/\s+/g, "-")}.txt`), adbQuiet("logcat", "-d", "-t", "3000"));
+    check(`an org.bojes.blob:// link opens its page (${name})`, linked === "/show", linked);
+    shot(`app-link-${name.replace(/\s+/g, "-")}`);
+  };
+  await openLink("after Back");
+  dt?.close?.();
+  adb("shell", "am", "force-stop", PKG);
+  await sleep(1500);
+  await openLink("cold start");
   await sleep(2000);
-  shot("app-link");
 
   // Links to other sites never open inside the app.
   await dt.js("(() => { const a = document.createElement('a'); a.href = 'https://example.com/'; a.id = 'out'; document.body.appendChild(a); a.click(); })()");

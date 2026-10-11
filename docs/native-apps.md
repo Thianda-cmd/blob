@@ -100,7 +100,8 @@ Rules around the site (`src-tauri/src/lib.rs`):
   - **Android** (`gen/android/.../MainActivity.kt`):
     - the page sits between the status bar, the navigation bar, the camera cut-out and the keyboard,
       with the page colour behind the bars (light and dark);
-    - the back button walks the page history and leaves the app on the first page;
+    - Back (button or edge swipe) walks the page history; on the first page it puts Blob in the
+      background (like apps opened from the home screen), so a link or the icon brings it straight back;
     - printing uses Android's print dialog, with "Save as PDF" (`window.BlobAndroid.print()`).
   - **iPhone and iPad**:
     - the edge swipe goes back and forward;

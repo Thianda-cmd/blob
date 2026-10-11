@@ -7,6 +7,7 @@ import android.print.PrintManager
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -30,6 +31,14 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     // window.BlobAndroid.print(): the system print dialog for the page, with "Save as PDF" (the CV).
     webView.addJavascriptInterface(PrintBridge(this, webView), "BlobAndroid")
+    // Back (button or swipe) goes back a page; on the first page it puts Blob in the background, as
+    // Android does for apps opened from the home screen, instead of closing it. The app keeps its
+    // place, and a link or the icon brings it straight back.
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        if (webView.canGoBack()) webView.goBack() else moveTaskToBack(true)
+      }
+    })
   }
 }
 
