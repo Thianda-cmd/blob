@@ -40,17 +40,24 @@ DEVICE=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[
 echo "simulator: $DEVICE"
 xcrun simctl boot "$DEVICE" 2> /dev/null
 xcrun simctl bootstatus "$DEVICE" -b > /dev/null
-# idb talks to the simulator through its companion.
+# idb talks to the simulator through its companion (which may take a while to listen, on IPv6).
 idb_companion --udid "$DEVICE" > "$OUT/idb-companion.log" 2>&1 &
-sleep 8
-idb connect localhost 10882 >> "$OUT/idb.log" 2>&1 || true
-idb list-targets >> "$OUT/idb.log" 2>&1 || true
+CONNECTED=0
+for i in $(seq 1 30); do
+  for host in localhost 127.0.0.1 ::1; do
+    if idb connect "$host" 10882 >> "$OUT/idb.log" 2>&1; then CONNECTED=1; break 2; fi
+  done
+  sleep 2
+done
+echo "idb connected: $CONNECTED"
+idb list-targets 2>&1 | grep -i "$DEVICE" >> "$OUT/idb.log" || true
 xcrun simctl install "$DEVICE" "$APP"
 xcrun simctl launch "$DEVICE" "$BUNDLE"
 sleep 30
 shot start
 
 # The page below the status bar: the top of the sign-in page (the Blob logo, the DE/EN switch).
+idb ui describe-all --udid "$DEVICE" --json > "$OUT/describe-raw.txt" 2>&1 || true
 screen > "$OUT/screen-start.json"
 TOP=$(num "$(jq '[.[] | select((.AXLabel // "") | test("^(Blob|DE|EN|Welcome back|Willkommen zurück)$"; "i")) | .frame.y] | min // -1' "$OUT/screen-start.json")")
 check "the page starts below the status bar" "$(echo "$TOP >= 44" | bc)" "top element at y=$TOP"

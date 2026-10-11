@@ -16,6 +16,7 @@
 //! side is reachable from web pages.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -25,7 +26,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
 #[cfg(desktop)]
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 #[cfg(desktop)]
 use tauri::webview::NewWindowResponse;
 
@@ -131,14 +132,20 @@ impl Pending {
   }
 }
 
+/// Whether the main window shows the site yet (a site page has finished loading since the start
+/// page). Kept from page loads rather than asking the web view for its address: on Android that
+/// question waits for the UI thread, which is where links arrive, and the app would hang and abort.
+#[derive(Default)]
+struct SiteShown(AtomicBool);
+
 /// Shows an app link's page in the main window (and brings the window to the front). While the
 /// app is still on its start page, the page waits there (see `start_target`).
 fn open_link<R: Runtime>(app: &AppHandle<R>, link: &Url) {
   let Some(target) = link_target(link) else { return };
   let window = app.get_webview_window("main");
-  // Still starting (the start page, or nothing loaded yet)? Then the start page asks for it before
-  // it moves on; if it has just moved on, the site's first page load picks it up (`on_page_load`).
-  let starting = window.as_ref().is_none_or(|w| w.url().map_or(true, |u| is_start_page(&u) || u.scheme() == "about"));
+  // Still starting? Then the start page asks for it before it moves on; if it has just moved on,
+  // the site's first page load picks it up (`on_page_load`).
+  let starting = !app.state::<SiteShown>().0.load(Ordering::SeqCst);
   match &window {
     Some(w) if !starting => {
       let _ = w.navigate(target);
@@ -212,12 +219,22 @@ fn site_window<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str, url: WebviewU
       }
       false
     })
-    // A link that came while the start page was already leaving: go there once the site is up.
+    // Keeps track of whether the site is up; a link that came while the start page was already
+    // leaving goes there once it is.
     .on_page_load(move |webview, payload| {
-      if payload.event() == PageLoadEvent::Finished && webview.label() == "main" && is_site(payload.url()) {
-        if let Some(target) = load_app.state::<Pending>().take() {
-          let _ = webview.navigate(target);
+      if webview.label() != "main" {
+        return;
+      }
+      let shown = &load_app.state::<SiteShown>().0;
+      match payload.event() {
+        PageLoadEvent::Started if is_start_page(payload.url()) => shown.store(false, Ordering::SeqCst),
+        PageLoadEvent::Finished if is_site(payload.url()) => {
+          shown.store(true, Ordering::SeqCst);
+          if let Some(target) = load_app.state::<Pending>().take() {
+            let _ = webview.navigate(target);
+          }
         }
+        _ => {}
       }
     })
     .on_download(move |_webview, event| {
@@ -383,6 +400,7 @@ pub fn run() {
     .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_deep_link::init())
     .manage(Pending::default())
+    .manage(SiteShown::default())
     .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target])
     .setup(|app| {
       let handle = app.handle().clone();
