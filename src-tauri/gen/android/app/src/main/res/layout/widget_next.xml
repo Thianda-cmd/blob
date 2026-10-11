@@ -117,6 +117,32 @@
                     android:text=""
                     android:textColor="@color/widget_ink_3"
                     android:textSize="12sp" />
+
+                <TextView
+
+                    android:id="@+id/next_place"
+
+                    android:layout_width="match_parent"
+
+                    android:layout_height="wrap_content"
+
+                    android:layout_marginTop="2dp"
+
+                    android:drawablePadding="3dp"
+
+                    android:ellipsize="end"
+
+                    android:fontFamily="sans-serif-medium"
+
+                    android:maxLines="1"
+
+                    android:text=""
+
+                    android:textColor="@color/widget_ink_2"
+
+                    android:textSize="13sp"
+
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 

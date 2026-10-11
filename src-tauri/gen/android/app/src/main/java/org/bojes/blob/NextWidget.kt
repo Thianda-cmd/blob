@@ -111,12 +111,12 @@ class NextWidget : AppWidgetProvider() {
       views.setTextViewText(R.id.next_label, if (running) word("now", "Now") else word("next", "Next"))
       views.setInt(R.id.next_bar, "setColorFilter", item.color)
       views.setTextViewText(R.id.next_title, item.title)
-      val where = listOfNotNull(
-        if (item.allDay || item.kind != "event") null else "${time.format(Date(item.start))} – ${time.format(Date(item.end))}",
-        item.place.ifEmpty { null },
-      ).joinToString(" · ")
-      views.setTextViewText(R.id.next_sub, where)
-      views.setViewVisibility(R.id.next_sub, if (where.isEmpty()) View.GONE else View.VISIBLE)
+      // The time on one line, the room on its own below (it matters most, and it never gets cut off).
+      val hours = if (item.allDay || item.kind != "event") "" else "${time.format(Date(item.start))} – ${time.format(Date(item.end))}"
+      views.setTextViewText(R.id.next_sub, hours)
+      views.setViewVisibility(R.id.next_sub, if (hours.isEmpty()) View.GONE else View.VISIBLE)
+      views.setTextViewText(R.id.next_place, item.place)
+      views.setViewVisibility(R.id.next_place, if (item.place.isEmpty()) View.GONE else View.VISIBLE)
       views.setOnClickPendingIntent(R.id.next_item, TodayWidget.open(context, item.link, 9500 + id))
 
       when {

@@ -17,6 +17,5 @@
     <string name="widget_next_name">"Next up in Blob"</string>
     <string name="widget_next_description">"The one thing that's on now or next, with a countdown and its room."</string>
     <string name="widget_next_sample_label">"Now"</string>
-    <string name="widget_next_sample_sub" translatable="false">"08:00 – 09:30 · R 204"</string>
     <string name="widget_next_sample_when">"until 09:30"</string>
 </resources>
