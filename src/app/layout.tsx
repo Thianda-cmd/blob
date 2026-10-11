@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
+import { AppUpdater } from "@/components/AppUpdater";
 import { MotionProvider } from "@/components/MotionProvider";
 import { NativeBridge } from "@/components/NativeBridge";
 import { LocaleProvider } from "@/i18n/client";
@@ -50,7 +51,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-dvh bg-paper text-ink">
         <LocaleProvider locale={locale}>
-          <MotionProvider>{children}</MotionProvider>
+          <MotionProvider>
+            {children}
+            <AppUpdater />
+          </MotionProvider>
           <NativeBridge />
         </LocaleProvider>
       </body>

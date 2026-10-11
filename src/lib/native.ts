@@ -1,7 +1,7 @@
 // The Blob app (desktop and phones, src-tauri/) shows this site in a native window. Inside it, the
 // app sets window.__BLOB_APP__ before any script runs, and the site may call a few app commands
 // (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready,
-// set_widget. In a browser all of this is inert.
+// set_widget, and on computers the update_* commands. In a browser all of this is inert.
 
 export type AppPlatform = "linux" | "macos" | "windows" | "android" | "ios";
 
@@ -26,7 +26,16 @@ export function blobApp(): BlobApp | null {
 
 export const isPhoneApp = (app: BlobApp | null) => app?.platform === "android" || app?.platform === "ios";
 
-type Command = "open_external" | "print_page" | "app_info" | "set_offline_ready" | "set_widget";
+type Command =
+  | "open_external"
+  | "print_page"
+  | "app_info"
+  | "set_offline_ready"
+  | "set_widget"
+  | "update_check"
+  | "update_download"
+  | "update_progress"
+  | "update_apply";
 
 async function call<T>(command: Command, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -82,3 +91,38 @@ export async function setWidget(json: string): Promise<void> {
     // An older app without widgets.
   }
 }
+
+/** A newer Blob for this computer (src-tauri/src/update.rs). */
+export type AppUpdate = {
+  version: string;
+  current: string;
+  /** The release notes (Markdown). */
+  notes: string;
+  /** The release page, where every file is. */
+  page: string;
+  published: string | null;
+  /** The app can download and install it itself (else: from the release page). */
+  installable: boolean;
+  size: number;
+};
+
+export type UpdateProgress = { downloaded: number; total: number; ready: boolean; busy: boolean };
+
+/** "0.10.2" > "0.9.0" */
+export function newerVersion(a: string, b: string): boolean {
+  const pa = a.split(/[.+-]/).map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(/[.+-]/).map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+  return false;
+}
+
+/** The first app version that updates itself (older ones only learn there's a new one). */
+export const SELF_UPDATING = "0.3.0";
+
+/** A computer app that can update itself. */
+export const canSelfUpdate = (app: BlobApp | null) => !!app && !isPhoneApp(app) && !newerVersion(SELF_UPDATING, app.version);
+
+export const checkUpdate = () => call<AppUpdate | null>("update_check");
+export const downloadUpdate = () => call<void>("update_download");
+export const updateProgress = () => call<UpdateProgress>("update_progress");
+export const applyUpdate = () => call<void>("update_apply");

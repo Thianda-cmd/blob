@@ -9,7 +9,7 @@ export const settingsText = defineMessages({
     title: "Settings",
     intro: "Your profile, how Blob looks and speaks, and your account.",
     navLabel: "Settings sections",
-    nav: { profile: "Profile", appearance: "Appearance & language", security: "Account & security", connected: "Connected apps", reminders: "Calendar & reminders", blob: "Blob", danger: "Danger zone" },
+    nav: { profile: "Profile", appearance: "Appearance & language", security: "Account & security", connected: "Connected apps", reminders: "Calendar & reminders", app: "The app", blob: "Blob", danger: "Danger zone" },
     saved: "Saved",
     cancel: "Cancel",
     profile: {
@@ -124,7 +124,7 @@ export const settingsText = defineMessages({
     title: "Einstellungen",
     intro: "Dein Profil, wie Blob aussieht und spricht, und dein Konto.",
     navLabel: "Bereiche der Einstellungen",
-    nav: { profile: "Profil", appearance: "Darstellung & Sprache", security: "Konto & Sicherheit", connected: "Verbundene Apps", reminders: "Kalender & Erinnerungen", blob: "Blob", danger: "Gefahrenzone" },
+    nav: { profile: "Profil", appearance: "Darstellung & Sprache", security: "Konto & Sicherheit", connected: "Verbundene Apps", reminders: "Kalender & Erinnerungen", app: "Die App", blob: "Blob", danger: "Gefahrenzone" },
     saved: "Gespeichert",
     cancel: "Abbrechen",
     profile: {

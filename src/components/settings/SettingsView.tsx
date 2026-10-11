@@ -1,15 +1,17 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BellRing, Link2, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { BellRing, Link2, MonitorDown, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
 import { useMessages } from "@/i18n/client";
 import { settingsText } from "@/i18n/messages/settings";
+import { blobApp, isPhoneApp } from "@/lib/native";
 import type { ConnectedApp } from "@/lib/oauth/connected";
 import { cn } from "@/lib/utils";
 import { AppearanceSection } from "./AppearanceSection";
+import { AppSection } from "./AppSection";
 import { BlobSection } from "./BlobSection";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { DangerSection } from "./DangerSection";
@@ -26,9 +28,17 @@ const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
   { id: "security", icon: <ShieldCheck /> },
   { id: "connected", icon: <Link2 /> },
   { id: "reminders", icon: <BellRing /> },
+  // Only in the Blob app on a computer.
+  { id: "app", icon: <MonitorDown /> },
   { id: "blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
   { id: "danger", icon: <TriangleAlert /> },
 ];
+
+const noSubscribe = () => () => {};
+const inDesktopApp = () => {
+  const app = blobApp();
+  return !!app && !isPhoneApp(app);
+};
 
 /** How far below the top of the scroller a section has to reach to count as "current". */
 const SPY_OFFSET = 140;
@@ -38,6 +48,8 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
   const scroller = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLElement>(null);
   const [active, setActive] = useState<string>(SECTIONS[0].id);
+  const desktopApp = useSyncExternalStore(noSubscribe, inDesktopApp, () => false);
+  const sections = desktopApp ? SECTIONS : SECTIONS.filter((s) => s.id !== "app");
   // While a nav click is smooth-scrolling, don't let the spy fight it.
   const steering = useRef(false);
 
@@ -139,7 +151,7 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
             aria-label={t.navLabel}
             className="sticky top-0 z-10 -mx-4 mb-4 flex gap-1.5 overflow-x-auto bg-surface/95 px-4 py-2 backdrop-blur-sm [scrollbar-width:none] sm:-mx-8 sm:px-8 md:hidden [&::-webkit-scrollbar]:hidden"
           >
-            {SECTIONS.map((s) => {
+            {sections.map((s) => {
               const current = active === s.id;
               return (
                 <button
@@ -162,7 +174,7 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
           <div className="flex gap-8">
             <nav aria-label={t.navLabel} className="sticky top-6 hidden w-[200px] shrink-0 self-start pt-0.5 md:block">
               <ul className="space-y-0.5">
-                {SECTIONS.map((s) => {
+                {sections.map((s) => {
                   const current = active === s.id;
                   return (
                     <li key={s.id}>
@@ -199,6 +211,7 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
               <SecuritySection />
               <ConnectedAppsSection apps={connectedApps} />
               <RemindersSection />
+              {desktopApp && <AppSection />}
               <BlobSection />
               <DangerSection />
             </div>

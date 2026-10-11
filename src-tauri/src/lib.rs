@@ -25,6 +25,10 @@ use tauri::{AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindow, Webview
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
 
+/// Updates for the desktop apps (GitHub releases).
+#[cfg(desktop)]
+mod update;
+
 #[cfg(desktop)]
 use std::sync::atomic::AtomicU32;
 #[cfg(desktop)]
@@ -463,15 +467,34 @@ pub fn run() {
     }))
     .plugin(tauri_plugin_window_state::Builder::default().build());
 
-  builder
+  let builder = builder
     .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_deep_link::init())
     // Reminders (calendar, homework, exams, cards), planned by the site: scheduled with the system
     // on phones, shown while open on computers.
     .plugin(tauri_plugin_notification::init())
     .manage(Pending::default())
-    .manage(SiteShown::default())
-    .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget])
+    .manage(SiteShown::default());
+
+  // Computers also update themselves (src/update.rs); phones through their stores.
+  #[cfg(desktop)]
+  let builder = builder.manage(update::Updates::default()).invoke_handler(tauri::generate_handler![
+    open_external,
+    print_page,
+    app_info,
+    start_target,
+    set_offline_ready,
+    offline_ready,
+    set_widget,
+    update::update_check,
+    update::update_download,
+    update::update_progress,
+    update::update_apply
+  ]);
+  #[cfg(mobile)]
+  let builder = builder.invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget]);
+
+  builder
     .setup(|app| {
       let handle = app.handle().clone();
 

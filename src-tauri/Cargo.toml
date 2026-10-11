@@ -1,6 +1,6 @@
 [package]
 name = "blob-app"
-version = "0.2.0"
+version = "0.3.0"
 description = "Blob for desktop and phones: a native shell around blob.bojes.org"
 authors = ["Blob"]
 license = "UNLICENSED"
@@ -35,6 +35,16 @@ webkit2gtk = { version = "2.0", features = ["v2_24"] }
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
+# Updates (src/update.rs): downloads with the system's certificates and proxy, checked by SHA-256.
+ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier"] }
+sha2 = "0.10"
+hex = "0.4"
+semver = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Unpacking the new Blob.app.
+flate2 = "1"
+tar = "0.4"
 
 [profile.release]
 codegen-units = 1

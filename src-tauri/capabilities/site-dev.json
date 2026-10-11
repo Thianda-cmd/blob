@@ -19,6 +19,10 @@
     "allow-app-info",
     "allow-set-offline-ready",
     "allow-set-widget",
+    "allow-update-check",
+    "allow-update-download",
+    "allow-update-progress",
+    "allow-update-apply",
     "notification:default"
   ]
 }
