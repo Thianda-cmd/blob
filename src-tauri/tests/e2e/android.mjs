@@ -21,7 +21,15 @@ const PKG = arg("package", "org.bojes.blob.debug");
 const ACTIVITY = "org.bojes.blob.MainActivity";
 mkdirSync(out, { recursive: true });
 
-const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", timeout: 180000 }).trim();
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", timeout: 180000, maxBuffer: 64 << 20 }).trim();
+/** adb, but an error (e.g. nothing found) is just an empty answer. */
+const adbQuiet = (...a) => {
+  try {
+    return adb(...a);
+  } catch {
+    return "";
+  }
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 const check = (name, ok, detail = "") => {
@@ -32,7 +40,7 @@ const check = (name, ok, detail = "") => {
 let shots = 0;
 const shot = (name) => {
   try {
-    writeFileSync(join(out, `${String(++shots).padStart(2, "0")}-${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { timeout: 60000 }));
+    writeFileSync(join(out, `${String(++shots).padStart(2, "0")}-${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { timeout: 60000, maxBuffer: 64 << 20 }));
   } catch (e) {
     console.log(`(no screenshot ${name}: ${e.message})`);
   }
@@ -46,15 +54,14 @@ const resumed = () => {
 /** The app's web view over the DevTools protocol (it changes when the app restarts). */
 async function devtools() {
   for (let i = 0; i < 60; i++) {
-    const sockets = adb("shell", "cat", "/proc/net/unix")
-      .split("\n")
-      .map((l) => l.trim().split(/\s+/).pop())
-      .filter((n) => n && n.startsWith("@webview_devtools_remote"));
-    if (sockets.length) {
+    // The socket of the app's current process (an old one may still be listed after a restart).
+    const pid = adbQuiet("shell", "pidof", PKG);
+    const socket = pid && adbQuiet("shell", "grep", "-o", `@webview_devtools_remote_${pid}`, "/proc/net/unix").split("\n")[0];
+    if (socket) {
       adb("forward", "--remove-all");
-      adb("forward", "tcp:9222", `localabstract:${sockets[sockets.length - 1].slice(1)}`);
+      adb("forward", "tcp:9222", `localabstract:${socket.slice(1)}`);
       try {
-        const pages = await (await fetch("http://127.0.0.1:9222/json")).json();
+        const pages = await (await fetch("http://127.0.0.1:9222/json", { signal: AbortSignal.timeout(5000) })).json();
         const page = pages.find((p) => p.type === "page" && p.webSocketDebuggerUrl);
         if (page) return await connect(page.webSocketDebuggerUrl);
       } catch {
@@ -167,31 +174,50 @@ try {
   const scale = await dt.js("visualViewport ? visualViewport.scale : 1");
   check("a pinch doesn't zoom", Math.abs(scale - 1) < 0.01, scale);
 
-  // The keyboard: tap the email field; the page shrinks above the keyboard and the field stays visible.
+  // Taps like a finger: a spot given in page pixels, on the screen.
+  const tapAt = (x, y) => adb("shell", "input", "tap", String(Math.round(bounds[0] + x * page.dpr)), String(Math.round(bounds[1] + y * page.dpr)));
+  const tapCenter = (r) => tapAt(r.left + r.width / 2, r.top + r.height / 2);
+  const rect = async (selector) => JSON.parse(await dt.js(`JSON.stringify(document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect())`));
+
+  // The keyboard: tap a field near the bottom of the screen. The page gets shorter above the
+  // keyboard and the field moves up into view instead of hiding behind it.
   if (first === "/login" && bounds) {
-    const r = JSON.parse(await dt.js("JSON.stringify(document.querySelector('input[type=email]').getBoundingClientRect())"));
-    const x = Math.round(bounds[0] + (r.left + r.width / 2) * page.dpr);
-    const y = Math.round(bounds[1] + (r.top + r.height / 2) * page.dpr);
-    adb("shell", "input", "tap", String(x), String(y));
-    await sleep(2500);
-    const after = JSON.parse(await dt.js("JSON.stringify({ focus: document.activeElement && document.activeElement.type, h: innerHeight, bottom: document.querySelector('input[type=email]').getBoundingClientRect().bottom })"));
-    check("tapping the email field focuses it", after.focus === "email", after);
-    check("the keyboard pushes the page up instead of covering it", after.h < page.h, { before: page.h, after: after.h });
-    check("the focused field stays visible above the keyboard", after.bottom <= after.h, after);
+    await dt.js(`(() => { const i = document.createElement('input'); i.id = 'e2e-field'; i.type = 'text';
+      i.style.cssText = 'position:fixed;left:16px;right:16px;bottom:24px;height:48px;z-index:99999;font-size:18px;border:2px solid #7c5cff';
+      document.body.appendChild(i); })()`);
+    await tapCenter(await rect("#e2e-field"));
+    const up = await until(
+      async () => JSON.parse(await dt.js("JSON.stringify({ focus: document.activeElement && document.activeElement.id, h: innerHeight, vh: visualViewport.height, bottom: document.getElementById('e2e-field').getBoundingClientRect().bottom })")),
+      (v) => v.h < page.h || v.vh < page.h - 1,
+      8000,
+    );
+    const viewUp = webViewBounds();
+    check("tapping a field focuses it", up.focus === "e2e-field", up);
+    check("the keyboard makes the page shorter instead of covering it", up.h < page.h || up.vh < page.h - 1, { before: page.h, after: up, webView: viewUp });
+    check("the focused field stays visible above the keyboard", up.bottom <= Math.min(up.h, up.vh) + 1, up);
     adb("shell", "input", "text", "student");
     await sleep(800);
-    check("typing works", (await dt.js("document.querySelector('input[type=email]').value")) === "student");
+    check("typing works", (await dt.js("document.getElementById('e2e-field').value")) === "student");
     shot("keyboard");
     // Leaving the field closes the keyboard (Back would leave the app if the keyboard weren't up).
-    await dt.js("document.activeElement && document.activeElement.blur()");
+    await dt.js("document.activeElement && document.activeElement.blur(); document.getElementById('e2e-field').remove()");
     const closed = await until(() => dt.js("innerHeight"), (h) => h >= page.h, 10000);
     check("the keyboard closes when the field is left, and the page gets its height back", closed >= page.h, { before: page.h, after: closed });
   }
 
+  // Opens a page by tapping a link, as a person would. (Chromium skips history entries that a
+  // page made without a tap, so the back checks need real taps.)
+  const tapLink = async (href) => {
+    await dt.js(`(() => { const a = document.createElement('a'); a.id = 'e2e-link'; a.href = ${JSON.stringify(href)}; a.textContent = 'Go';
+      a.style.cssText = 'position:fixed;left:16px;top:96px;z-index:99999;padding:16px 32px;background:#fff;color:#000;font-size:20px;border:2px solid #7c5cff';
+      document.body.appendChild(a); })()`);
+    await tapCenter(await rect("#e2e-link"));
+    return until(() => path(dt), (p) => p === href, 60000);
+  };
+
   // Navigation, scrolling by swiping, and the back button walking the history.
-  await dt.js("location.assign('/show')");
-  const show = await until(() => path(dt), (p) => p === "/show", 60000);
-  check("going to another page works", show === "/show", show);
+  const show = await tapLink("/show");
+  check("tapping a link opens its page", show === "/show", show);
   await sleep(3000);
   shot("show");
   adb("shell", "input", "swipe", String(Math.round(screenW / 2)), String(Math.round(screenH * 0.75)), String(Math.round(screenW / 2)), String(Math.round(screenH * 0.3)), "350");
@@ -204,8 +230,8 @@ try {
   check("the back button goes back a page", back === first, back);
 
   // The back gesture: a swipe in from the left edge of the screen (gesture navigation) goes back too.
-  await dt.js("location.assign('/developers')");
-  await until(() => path(dt), (p) => p === "/developers", 60000);
+  await sleep(1500);
+  await tapLink("/developers");
   await sleep(2000);
   const mid = String(Math.round(screenH / 2));
   adb("shell", "input", "swipe", "1", mid, String(Math.round(screenW * 0.6)), mid, "300");

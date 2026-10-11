@@ -326,8 +326,13 @@ jobs:
           brew install xcodegen || true
           test -d src-tauri/gen/apple || npm run tauri -- ios init --ci
 
+      # The deep-link plugin writes the org.bojes.blob link scheme into the iOS project when its build
+      # script runs; with a cached target folder it wouldn't, so it's cleaned first. (Android has the
+      # same block committed in gen/android's AndroidManifest.xml.)
       - name: Build (simulator)
-        run: npm run tauri -- ios build --debug --target aarch64-sim
+        run: |
+          cargo clean -p tauri-plugin-deep-link --target aarch64-apple-ios-sim --manifest-path src-tauri/Cargo.toml || true
+          npm run tauri -- ios build --debug --target aarch64-sim
 
       - name: Test in the simulator
         run: |
@@ -338,6 +343,7 @@ jobs:
           APP=$(find src-tauri/gen/apple/build -name "*.app" -type d | grep -i simulator | head -1)
           [ -n "$APP" ] || APP=$(find src-tauri/gen/apple/build -name "*.app" -type d | head -1)
           echo "app: $APP"
+          plutil -p "$APP/Info.plist" | grep -q org.bojes.blob || echo "::warning::the org.bojes.blob link scheme is missing from Info.plist"
           bash src-tauri/tests/e2e/ios.sh "$APP" e2e-iOS
 
       - uses: actions/upload-artifact@v4
