@@ -107,7 +107,7 @@ Rules around the site (`src-tauri/src/lib.rs`):
     - the edge swipe goes back and forward;
     - a long press on a link doesn't open a page preview;
     - printing uses the system print sheet;
-    - no scroll bounce of the whole page.
+    - scrolling bounces at the ends like in other iOS apps (Tauri turns it off; the app turns it back on).
   - **Phones** (both): no pinch or double-tap zoom of the app, no grey tap flash, and no text
     selection or callout from long-pressing buttons. Where printing fails, a dialog offers the
     browser.
