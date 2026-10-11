@@ -234,9 +234,21 @@ try {
   await tapLink("/developers");
   await sleep(2000);
   const mid = String(Math.round(screenH / 2));
-  adb("shell", "input", "swipe", "1", mid, String(Math.round(screenW * 0.6)), mid, "300");
-  const swiped = await until(() => path(dt), (p) => p === first, 20000);
+  const edgeSwipe = () => adb("shell", "input", "swipe", "2", mid, String(Math.round(screenW * 0.65)), mid, "350");
+  edgeSwipe();
+  let swiped = await until(() => path(dt), (p) => p === first, 8000);
+  if (swiped !== first) {
+    // An injected swipe is sometimes not taken as the gesture by the emulator; one more try.
+    console.log("info the first edge swipe wasn't taken as Back, swiping again");
+    edgeSwipe();
+    swiped = await until(() => path(dt), (p) => p === first, 12000);
+  }
   check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
+  // Back on the first page for the next check, whatever happened above.
+  for (let i = 0; i < 3 && (await path(dt).catch(() => first)) !== first; i++) {
+    adb("shell", "input", "keyevent", "KEYCODE_BACK");
+    await sleep(2000);
+  }
 
   // Back on the first page puts the app in the background (the home screen shows), like any
   // Android app opened from the home screen.
