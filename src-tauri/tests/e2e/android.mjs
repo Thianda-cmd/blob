@@ -128,8 +128,15 @@ async function until(probe, ok, timeoutMs = 30000) {
 
 /** Where the web view is on the screen, in pixels: [left, top, right, bottom]. */
 function webViewBounds() {
-  adb("shell", "uiautomator", "dump", "/sdcard/ui.xml");
-  const xml = adb("shell", "cat", "/sdcard/ui.xml");
+  // uiautomator sometimes can't dump while the screen is still settling ("could not get idle
+  // state"): a few tries.
+  let xml = "";
+  for (let i = 0; i < 4 && !xml.includes("android.webkit.WebView"); i++) {
+    adbQuiet("shell", "rm", "-f", "/sdcard/ui.xml");
+    adbQuiet("shell", "uiautomator", "dump", "/sdcard/ui.xml");
+    xml = adbQuiet("shell", "cat", "/sdcard/ui.xml");
+    if (!xml.includes("android.webkit.WebView")) execFileSync("sleep", ["1.5"]);
+  }
   const m = /class="android\.webkit\.WebView"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml) ?? /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*class="android\.webkit\.WebView"/.exec(xml);
   return m ? m.slice(1, 5).map(Number) : null;
 }
