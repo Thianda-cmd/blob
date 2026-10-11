@@ -10,8 +10,10 @@ export type BlobApp = { platform: AppPlatform; version: string; site: string };
 declare global {
   interface Window {
     __BLOB_APP__?: BlobApp;
-    /** Android app only (gen/android MainActivity.kt): the system print dialog, the home screen widget. */
-    BlobAndroid?: { print(): void; updateWidget?(json: string): void };
+    /** Android app only (gen/android MainActivity.kt): the system print dialog. */
+    BlobAndroid?: { print(): void };
+    /** Android app only, on the site's own pages: the home screen widget's data (TodayWidget.kt). */
+    BlobWidget?: { postMessage(data: string): void };
   }
 }
 
@@ -74,7 +76,7 @@ export async function setWidget(json: string): Promise<void> {
   const app = blobApp();
   if (!app) return;
   try {
-    if (window.BlobAndroid?.updateWidget) window.BlobAndroid.updateWidget(json);
+    if (window.BlobWidget) window.BlobWidget.postMessage(json);
     else if (app.platform === "ios") await call("set_widget", { json });
   } catch {
     // An older app without widgets.

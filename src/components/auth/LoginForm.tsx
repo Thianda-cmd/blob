@@ -13,6 +13,7 @@ import { authText } from "@/i18n/messages/auth";
 import { APP_SIGN_IN_KEY, challengeOf, randomToken, type AppSignInRequest } from "@/lib/auth/appSignIn";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
+import { forgetSignedOut } from "@/lib/offline/device";
 import { blobApp, openOutside } from "@/lib/native";
 import { createClient } from "@/lib/supabase/client";
 import { AuthHeading } from "./AuthStage";
@@ -49,6 +50,12 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
   );
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const ab = all.appSignIn;
+
+  // In the app, the sign-in page means nobody is signed in here: if that happened elsewhere (signed
+  // out everywhere, account deleted), the account's widgets, reminders and pages go now.
+  useEffect(() => {
+    if (blobApp()) void forgetSignedOut();
+  }, []);
 
   useEffect(() => {
     if (initialError) {

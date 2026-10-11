@@ -20,7 +20,14 @@ type PageRow = { kind: string; content: unknown; plain_text: string | null; doc_
 export type Owed = { version: number; steps: unknown[]; client: string };
 
 /** The note at `version` (`saved`: stored as the snapshot; false for viewers, who can only read it). */
-export type Settled = { content: JSONContent; plain: string; version: number; saved: boolean };
+export type Settled = {
+  content: JSONContent;
+  plain: string;
+  version: number;
+  saved: boolean;
+  /** What became of the closing editor's steps, when there were any. */
+  placed?: Placed;
+};
 
 /** The stored document as the editor opens it (null when only a browser could read it). */
 function storedDoc(schema: Schema, page: PageRow): PMNode | null {
@@ -110,31 +117,41 @@ function rebase(ours: Step[], over: Step[], doc: PMNode): Step[] {
 }
 
 /**
+ * What became of a closed editor's steps: on the note ("placed"), not placeable any more ("lost":
+ * not allowed, the note was saved on its own since, or its history is gone), or not known because
+ * of an error ("error", worth trying again).
+ */
+export type Placed = "placed" | "lost" | "error";
+
+/**
  * Send a closed editor's last steps. When others wrote in between, the steps of ours that arrived
  * anyway (a push still on its way) are skipped and the rest is rebased over theirs.
  */
-async function pushOwed(supabase: SupabaseClient, schema: Schema, pageId: string, owed: Owed) {
+async function pushOwed(supabase: SupabaseClient, schema: Schema, pageId: string, owed: Owed): Promise<Placed> {
   let version = owed.version;
   let steps = parse(schema, owed.steps);
-  for (let tries = 0; tries < 4 && steps?.length; tries++) {
+  if (!steps) return "lost";
+  for (let tries = 0; tries < 4 && steps.length; tries++) {
     const { data, error } = await supabase.rpc("push_steps", { p_page: pageId, p_version: version, p_steps: steps.map((s) => s.toJSON()), p_client: owed.client });
-    if (error) return;
+    if (error) return "error";
     const result = data as { ok: boolean; version?: number; reason?: string };
-    // Done; or not allowed; or the history was reset (the note was saved on its own since).
-    if (result.ok || result.reason === "denied" || (typeof result.version === "number" && result.version < version)) return;
+    if (result.ok) return "placed";
+    // Not allowed; or the history was reset (the note was saved on its own since).
+    if (result.reason === "denied" || (typeof result.version === "number" && result.version < version)) return "lost";
     const page = await loadPage(supabase, pageId);
     const stored = page?.doc_version ?? 0;
     const rows = page && (await rowsFrom(supabase, pageId, Math.min(version, stored)));
-    if (!page || !rows) return;
+    if (!page) return "lost";
+    if (!rows) return "error";
     let later = rows.filter((r) => r.version + r.steps.length > version);
     while (later.length && later[0].version === version && later[0].client_id === owed.client) {
       version += later[0].steps.length;
       steps = steps.slice(later[0].steps.length);
       later = later.slice(1);
     }
-    if (!steps.length) return;
+    if (!steps.length) return "placed";
     // More of our own steps further on can't be told apart from these: leave the note as it is.
-    if (later.some((r) => r.client_id === owed.client)) return;
+    if (later.some((r) => r.client_id === owed.client)) return "lost";
     if (!later.length) continue;
     const theirs = flatten(later, version);
     const all = flatten(rows, stored);
@@ -142,10 +159,12 @@ async function pushOwed(supabase: SupabaseClient, schema: Schema, pageId: string
     const over = theirs && parse(schema, theirs.steps);
     const allSteps = all && parse(schema, all.steps);
     const latest = base && allSteps && replay(base, allSteps);
-    if (!theirs || !all || !over || !latest || theirs.end !== all.end) return;
+    // A gap in the history (older steps are pruned) or steps that don't apply: can't be placed.
+    if (!theirs || !all || !over || !latest || theirs.end !== all.end) return "lost";
     steps = rebase(steps, over, latest);
     version = all.end;
   }
+  return steps.length ? "error" : "placed";
 }
 
 /**
@@ -158,7 +177,7 @@ export async function settleNote(supabase: SupabaseClient, pageId: string, local
   const { data: role } = await supabase.rpc("page_role", { p_page: pageId });
   if (!role) return null;
   const canEdit = role === "owner" || role === "editor";
-  if (canEdit && owed?.steps.length) await pushOwed(supabase, schema, pageId, owed);
+  const placed: Placed | undefined = owed?.steps.length ? (canEdit ? await pushOwed(supabase, schema, pageId, owed) : "lost") : undefined;
   for (let tries = 0; tries < 3; tries++) {
     const page = await loadPage(supabase, pageId);
     if (!page || page.kind !== "note") return null;
@@ -168,10 +187,10 @@ export async function settleNote(supabase: SupabaseClient, pageId: string, local
     const flat = rows && flatten(rows, from);
     const steps = flat && parse(schema, flat.steps);
     if (!base || !flat || !steps) return null;
-    if (!steps.length) return { content: jsonOf(base), plain: page.plain_text ?? "", version: from, saved: true };
+    if (!steps.length) return { content: jsonOf(base), plain: page.plain_text ?? "", version: from, saved: true, placed };
     const doc = replay(base, steps);
     if (!doc) return null;
-    const settled = { content: jsonOf(doc), plain: plainTextOf(doc), version: flat.end };
+    const settled = { content: jsonOf(doc), plain: plainTextOf(doc), version: flat.end, placed };
     if (!canEdit) return { ...settled, saved: false };
     const { data: ok, error } = await supabase.rpc("save_note_snapshot", {
       p_page: pageId,

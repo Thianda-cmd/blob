@@ -1,6 +1,6 @@
 [package]
 name = "blob-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Blob for desktop and phones: a native shell around blob.bojes.org"
 authors = ["Blob"]
 license = "UNLICENSED"

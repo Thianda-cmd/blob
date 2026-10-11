@@ -26,6 +26,8 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
   const failed = useRef(false);
   const inFlight = useRef<Promise<void> | null>(null);
   const retry = useRef<() => void>(() => {});
+  /** Still on the page. A closed note's editor doesn't keep retrying: its text waits on the device. */
+  const alive = useRef(true);
 
   useEffect(() => {
     saveRef.current = save;
@@ -43,6 +45,9 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
       const ok = await saveRef.current(patch);
       if (!ok) {
         pending.current = { ...patch, ...(pending.current ?? {}) };
+        // Closed: notes leave it to the background save of waiting notes (src/lib/offline/notes.ts),
+        // which starts from what this device knows now, not from this editor's old state.
+        if (!alive.current && onDevice) return;
         const offline = typeof navigator !== "undefined" && (navigator.onLine === false || !isOnline());
         if (offline) reportNetworkError();
         if (offline && onDevice) {
@@ -72,6 +77,13 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
   useEffect(() => {
     retry.current = () => void flush();
   }, [flush]);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   // Back online: what's waiting goes now.
   useEffect(

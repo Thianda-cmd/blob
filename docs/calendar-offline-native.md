@@ -163,8 +163,9 @@ a row opens that day or the tasks (`org.bojes.blob://calendar?date=…`). Signin
 - **Android:** "Today in Blob" (`gen/android/…/TodayWidget.kt`, RemoteViews).
   - One widget from 2×2 up: header with the date and streak, as many rows as fit, cards at the
     bottom.
-  - The site hands the JSON to `window.BlobAndroid.updateWidget(json)`, which keeps it in the
-    app's settings and redraws. It also redraws every 30 minutes.
+  - The site hands the JSON to `window.BlobWidget.postMessage(json)`, which only the site's own
+    pages get (not frames of other sites). The widget keeps it in the app's settings and redraws,
+    and also redraws every 30 minutes. Rows only link to Blob's own pages.
 - **iPhone and iPad:** a WidgetKit extension (`src-tauri/ios/BlobWidget`).
   - Home screen: small (what's next), medium and large (the list).
   - Lock screen: the next two things, the streak (round), the next thing (one line).

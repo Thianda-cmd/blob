@@ -38,6 +38,7 @@ import { followRenames, pageLinkStatusKey, pageRefs, type LinkedPage } from "./k
 import { PageRefMenu, insertPageRef, pageRefItems, type PageRefItem } from "./knowledge/PageRef";
 import { collectLinks, pageIdFromHref } from "./links";
 import { noteCache } from "./noteCache";
+import { keepAsCopy } from "@/lib/offline/notes";
 import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
 import { EditorContextMenu } from "./EditorContextMenu";
@@ -153,7 +154,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
   const offline = useMessages(offlineText).notes;
   const locale = useLocale();
   const router = useRouter();
-  const { pages, subjects, userId, profile, updatePage, createPage } = useWorkspace();
+  const { pages, subjects, userId, profile, updatePage, createPage, reloadPages } = useWorkspace();
   const meta = pages.find((p) => p.id === page.id);
   const icon = meta ? meta.icon : page.icon;
   const shared = members.length > 1;
@@ -186,8 +187,11 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
    * text written offline never silently replaces what another device saved meanwhile.
    */
   const baseRev = useRef<number>(start ? start.baseRev : page.rev);
-  /** Shows the server's note after a conflict (set once the editor exists, further down). */
-  const conflictRef = useRef<(row: ServerNote, local: Partial<NotePatch>) => Promise<void>>(async () => {});
+  /**
+   * Keeps this device's text as a copy and shows the server's note after a conflict (set once the
+   * editor exists, further down). False when the copy couldn't be stored yet: then nothing changes.
+   */
+  const conflictRef = useRef<(row: ServerNote, local: Partial<NotePatch>) => Promise<boolean>>(async () => false);
   /** reloadTogether (declared further down, with the editor). */
   const reloadRef = useRef<(keepLocal?: boolean) => Promise<void>>(async () => {});
   /** The pages the text links to ("[["), as they are now: looked up when the note opens and when links are added. */
@@ -223,9 +227,16 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
             baseRev.current = server.rev;
             return again ? attempt(false) : false;
           }
+          // This device saved it meanwhile (an earlier editor of this note, or the background save of
+          // text written offline): this text builds on that.
+          const own = noteCache.base(page.id);
+          if (own?.rev === server.rev && own.content && sameJson(server.content, own.content)) {
+            baseRev.current = server.rev;
+            lastSaved.current = own.content;
+            return again ? attempt(false) : false;
+          }
           // Another device saved other text: ours is kept as a copy, theirs shows here.
-          await conflictRef.current(server, patch);
-          return true;
+          return conflictRef.current(server, patch);
         }
         const saved = data as { updated_at?: string; rev?: number } | null;
         if (patch.content) {
@@ -504,20 +515,30 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
 
   // Another device saved different text while this one was offline: what was written here becomes
   // a copy (nothing is lost), and the editor shows the note as it is now.
+  const copyFailedSaid = useRef(false);
   useEffect(() => {
     conflictRef.current = async (row, local) => {
-      discard();
       const current = editor && !editor.isDestroyed ? editor : null;
-      const mine = local.content ?? (current ? contentToSave(current) : null);
-      const name = offline.copyTitle(local.title ?? title);
+      // Nothing typed from here on can get lost, or be saved over the other device's text.
+      const wasEditable = !!current?.isEditable;
+      current?.setEditable(false, false);
+      // All of it, also what was typed while this save was on its way.
+      const mine = current ? contentToSave(current) : (local.content ?? null);
+      const name = offline.copyTitle(title || local.title || row.title);
       const where = meta ?? page;
-      const copy = mine ? await createPage({ kind: "note", title: name, subject_id: where.subject_id, parent_id: where.parent_id }) : null;
-      if (copy && mine) {
-        await createClient()
-          .from("pages")
-          .update({ content: mine, plain_text: local.plain_text ?? (current ? plainText(current) : ""), links: local.links ?? [] })
-          .eq("id", copy.id);
+      const kept = mine
+        ? await keepAsCopy({ title: name, content: mine, plain_text: current ? plainText(current) : (local.plain_text ?? ""), links: current ? collectLinks(current.state.doc, page.id) : (local.links ?? []), subject_id: where.subject_id, parent_id: where.parent_id })
+        : true;
+      if (!kept) {
+        // Stays here, unsaved (on the device too); the next save tries again.
+        if (current && !current.isDestroyed && wasEditable) current.setEditable(true, false);
+        if (!copyFailedSaid.current) blob.say(offline.copyFailed, { mood: "worried", ms: 8000 });
+        copyFailedSaid.current = true;
+        return false;
       }
+      copyFailedSaid.current = false;
+      discard();
+      void reloadPages();
       const content = row.content && typeof row.content === "object" ? (row.content as JSONContent) : null;
       lastSaved.current = content;
       baseRev.current = row.rev;
@@ -527,11 +548,14 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
       if (current) setStale(current);
       setOptions(makeOptions({ content: row.content, plain: row.plain_text ?? "" }));
       blob.say(offline.conflict(name), { mood: "thinking", ms: 8000 });
+      return true;
     };
   });
 
-  // This editor saves the note (the background save of waiting notes leaves it alone).
+  // This editor saves the note (the background save of waiting notes leaves it alone), and saves
+  // at once when asked (signing out).
   useEffect(() => (shared ? undefined : noteCache.opened(page.id)), [shared, page.id]);
+  useEffect(() => noteCache.addFlusher(flush), [flush]);
 
   // Opened from the server's text: remember what it builds on (saving after time offline needs it).
   useEffect(() => {
@@ -547,7 +571,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
     replayed.current = true;
     if (!noteCache.unsaved(page.id)) return;
     const patch: Partial<NotePatch> = { content: contentToSave(editor), plain_text: plainText(editor), links: collectLinks(editor.state.doc, page.id) };
-    if (initial.title !== page.title) patch.title = initial.title;
+    if (noteCache.titleEdited(page.id)) patch.title = initial.title;
     schedule(patch);
   }, [editor, shared, readOnly, together, page.id, page.title, initial.title, schedule]);
   // The note about a change that couldn't be brought over goes away after a while.

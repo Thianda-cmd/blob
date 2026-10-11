@@ -13,6 +13,10 @@ const OFFLINE = "/offline";
 const MAX_PAGES = 120;
 const MAX_ASSETS = 600;
 const NETWORK_WAIT = 9000;
+/** Bumped by every wipe: a page fetched before it (for the account that left) is never kept after. */
+let generation = 0;
+/** What the account marker says after signing out (the next account is always a different one). */
+const SIGNED_OUT = "-";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -76,9 +80,10 @@ function timeout(ms) {
 /** A page: the network, then the copy from before, then the offline page. */
 async function page(req, url) {
   if (self.navigator.onLine !== false) {
+    const gen = generation;
     try {
       const res = await Promise.race([fetch(req), timeout(NETWORK_WAIT)]);
-      if (res.ok && !res.redirected && (res.headers.get("content-type") || "").includes("text/html")) void keep(url, res.clone());
+      if (res.ok && !res.redirected && (res.headers.get("content-type") || "").includes("text/html")) void keep(url, res.clone(), gen);
       return res;
     } catch {
       // No connection: the copy from before.
@@ -101,11 +106,13 @@ async function page(req, url) {
 }
 
 /** Keeps a page for later, with the files it needs and its title (for the offline page's list). */
-async function keep(url, res) {
+async function keep(url, res, gen) {
   // A signed-out page (the sign-in form) is never kept in place of the real one.
   if (url.pathname === "/login" || url.pathname === "/signup") return;
   const html = await res.clone().text();
   if (/<meta[^>]+name="blob-no-offline"/.test(html)) return;
+  // Fetched before a wipe (for the account that just left): not kept.
+  if (gen !== generation) return;
   const cache = await caches.open(PAGES);
   await cache.put(url.href, res);
   if (url.search) await cache.put(url.origin + url.pathname, new Response(html, { headers: res.headers }));
@@ -189,20 +196,24 @@ async function trim(name, max) {
 }
 
 async function wipe() {
+  generation++;
   const keys = await caches.keys();
   await Promise.all(keys.filter((k) => k.startsWith("blob-")).map((k) => caches.delete(k)));
+  await (await caches.open(META)).put("/__blob/user", new Response(SIGNED_OUT));
 }
 
 /** Loads pages in the background so they open without a connection later. */
 async function warm(urls) {
   let done = 0;
+  const gen = generation;
   for (const href of urls) {
+    if (gen !== generation) break;
     try {
       const url = new URL(href, self.location.origin);
       if (url.origin !== self.location.origin || skip(url)) continue;
       const res = await Promise.race([fetch(url.href, { credentials: "same-origin", headers: { "x-blob-warm": "1" } }), timeout(20000)]);
       if (res.ok && !res.redirected && (res.headers.get("content-type") || "").includes("text/html")) {
-        await keep(url, res);
+        await keep(url, res, gen);
         done++;
       }
     } catch {
@@ -212,7 +223,7 @@ async function warm(urls) {
   // The offline page itself (it may have changed with a release).
   try {
     const res = await fetch(OFFLINE, { credentials: "same-origin" });
-    if (res.ok) {
+    if (res.ok && gen === generation) {
       await (await caches.open(PAGES)).put(OFFLINE, res.clone());
       await fetchAssets(await res.text());
     }
@@ -234,6 +245,7 @@ self.addEventListener("message", (event) => {
     event.waitUntil(
       (async () => {
         const meta = await caches.open(META);
+        // A different account than the one whose pages are here, or than the one that signed out.
         const known = await (await meta.match("/__blob/user"))?.text();
         if (known && known !== data.id) await wipe();
         await (await caches.open(META)).put("/__blob/user", new Response(data.id));

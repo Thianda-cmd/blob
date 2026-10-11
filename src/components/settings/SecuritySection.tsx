@@ -17,7 +17,8 @@ import { authMessage, isEmail } from "@/lib/auth/errors";
 import { passwordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Reveal, Row, SavedBadge, Section } from "./primitives";
-import { flushDevice, forgetDevice } from "@/lib/offline/device";
+import { forgetDevice } from "@/lib/offline/device";
+import { useSignOutGuard } from "@/components/offline/useSignOutGuard";
 
 export function SecuritySection() {
   const t = useMessages(settingsText).security;
@@ -246,12 +247,13 @@ function SessionsRow() {
   const t = all.security;
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
+  const guard = useSignOutGuard();
   const [error, setError] = useState<string | null>(null);
 
   async function signOutEverywhere() {
     setLoading(true);
     setError(null);
-    await flushDevice();
+    if (!(await guard.ready())) return setLoading(false);
     const { error } = await createClient().auth.signOut({ scope: "global" });
     if (error) {
       setLoading(false);
@@ -307,6 +309,7 @@ function SessionsRow() {
           <FormError message={error} />
         </div>
       )}
+      {guard.dialog}
     </div>
   );
 }

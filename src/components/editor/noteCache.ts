@@ -25,6 +25,8 @@ type Entry = {
   baseRev?: number;
   /** The content of that save (what the server had when we last knew). */
   baseContent?: JSONContent;
+  /** The title was changed here and not saved yet (otherwise saves leave the title alone). */
+  titleEdited?: boolean;
 };
 
 type Stored = Entry & { id: string };
@@ -37,16 +39,26 @@ let owner: string | null = null;
 let loaded: string | null = null;
 /** Notes open in an editor on this page (their editor saves them). */
 const open = new Map<string, number>();
+/** The open editors' "save now" (signing out sends what they still hold first). */
+const flushers = new Set<() => Promise<void>>();
 let loading: Promise<void> | null = null;
 const readyListeners = new Set<() => void>();
 
 const asDoc = (content: unknown) => (content && typeof content === "object" ? (content as JSONContent) : null);
+
+/** A note's unsaved text that no editor is saving (title only when it was changed here). */
+export type Waiting = { id: string; title?: string; content?: JSONContent; version: number; baseRev?: number; baseContent?: JSONContent; copy?: NoteCopy };
 
 /** Where an editor starts: the text, whether it came from this device, and what it builds on. */
 export type Start = { page: Page; local: boolean; baseRev: number; baseContent: JSONContent | null };
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Notes kept on the device besides those with unsaved text. */
 const KEEP = 60;
+
+function writeOut(user: string, id: string) {
+  const entry = entries.get(id);
+  void write(user, "notes", entry ? [{ id, ...entry }] : [], entry ? [] : [id]);
+}
 
 function persist(id: string) {
   if (!owner) return;
@@ -56,10 +68,26 @@ function persist(id: string) {
     id,
     setTimeout(() => {
       timers.delete(id);
-      const entry = entries.get(id);
-      void write(user, "notes", entry ? [{ id, ...entry }] : [], entry ? [] : [id]);
+      writeOut(user, id);
     }, 400),
   );
+}
+
+/** Writes what is still waiting for its timer right away (the app is being closed or hidden). */
+function persistNow() {
+  if (!owner) return;
+  for (const [id, t] of timers) {
+    clearTimeout(t);
+    writeOut(owner, id);
+  }
+  timers.clear();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", persistNow);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") persistNow();
+  });
 }
 
 export const noteCache = {
@@ -110,8 +138,25 @@ export const noteCache = {
 
   touch(id: string, patch: { title?: string; content?: JSONContent }) {
     const prev = entries.get(id) ?? { version: 0, savedVersion: 0, savedAt: 0 };
-    entries.set(id, { ...prev, ...patch, version: prev.version + 1 });
+    entries.set(id, { ...prev, ...patch, version: prev.version + 1, titleEdited: prev.titleEdited || patch.title !== undefined });
     persist(id);
+  },
+
+  /** The title was changed on this device and isn't saved yet. */
+  titleEdited(id: string) {
+    const entry = entries.get(id);
+    return !!entry?.titleEdited && entry.version > entry.savedVersion;
+  },
+
+  /** What this device last saved of the note (its `rev` and text), whichever editor or job saved it. */
+  base(id: string): { rev?: number; content?: JSONContent } | null {
+    const entry = entries.get(id);
+    return entry ? { rev: entry.baseRev, content: entry.baseContent } : null;
+  },
+
+  /** An editor has the note open. */
+  isOpen(id: string) {
+    return open.has(id);
   },
 
   version(id: string) {
@@ -125,6 +170,7 @@ export const noteCache = {
     if (!Number.isNaN(at)) entry.savedAt = Math.max(entry.savedAt, at);
     if (after?.rev !== undefined) entry.baseRev = after.rev;
     if (after?.content) entry.baseContent = after.content;
+    if (entry.savedVersion >= entry.version) entry.titleEdited = false;
     entries.set(id, entry);
     persist(id);
   },
@@ -185,13 +231,41 @@ export const noteCache = {
     };
   },
 
+  /** An open editor's "save now"; returns the function that removes it. */
+  addFlusher(fn: () => Promise<void>) {
+    flushers.add(fn);
+    return () => {
+      flushers.delete(fn);
+    };
+  },
+
+  /** Has every open editor save what it holds now. */
+  async flushOpen() {
+    await Promise.all([...flushers].map((fn) => fn().catch(() => {})));
+  },
+
+  /** Notes with text this device hasn't saved yet (open or not). */
+  unsavedCount() {
+    let n = 0;
+    for (const e of entries.values()) if (e.version > e.savedVersion) n++;
+    return n;
+  },
+
   /** Notes with text written on this device that isn't saved, and no editor open to save it. */
-  waiting(): { id: string; title?: string; content?: JSONContent; version: number; baseRev?: number; baseContent?: JSONContent; copy?: NoteCopy }[] {
-    const out = [];
-    for (const [id, e] of entries) {
-      if (e.version > e.savedVersion && !open.has(id)) out.push({ id, title: e.title, content: e.content, version: e.version, baseRev: e.baseRev, baseContent: e.baseContent, copy: copies.get(id) });
+  waiting(): Waiting[] {
+    const out: Waiting[] = [];
+    for (const id of entries.keys()) {
+      const w = noteCache.waitingOne(id);
+      if (w) out.push(w);
     }
     return out;
+  },
+
+  /** The note's unsaved text as it is now, if it is still waiting (no editor has it open). */
+  waitingOne(id: string): Waiting | null {
+    const e = entries.get(id);
+    if (!e || e.version <= e.savedVersion || open.has(id)) return null;
+    return { id, title: e.titleEdited ? e.title : undefined, content: e.content, version: e.version, baseRev: e.baseRev, baseContent: e.baseContent, copy: copies.get(id) };
   },
 
   /** Signing out: nothing stays in memory either. */

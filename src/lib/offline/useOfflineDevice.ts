@@ -37,12 +37,13 @@ export function useOfflineDevice() {
 
     const catchUp = async () => {
       if (!alive || !isOnline()) return;
-      await Promise.all([settleOwed(userId), flushReviews(userId)]);
-      // Notes written offline whose editor was closed before they were saved.
-      await flushWaitingNotes(userId, latest.current.words, (message) => {
+      const onConflict = (message: string) => {
         blob.say(message, { mood: "thinking", ms: 8000 });
         void latest.current.reloadPages();
-      });
+      };
+      await Promise.all([settleOwed(userId, latest.current.words, onConflict), flushReviews(userId)]);
+      // Notes written offline whose editor was closed before they were saved.
+      await flushWaitingNotes(userId, latest.current.words, onConflict);
       if (!app) return;
       await syncNoteCopies(userId, latest.current.pages);
       await noteCache.loadCopies(userId);

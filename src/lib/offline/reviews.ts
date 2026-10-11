@@ -35,6 +35,11 @@ export async function keptReviews(userId: string, pageId: string): Promise<Revie
   return all.filter((k) => k.id.startsWith(`review:${pageId}:`)).map((k) => k.row);
 }
 
+/** Refused because of the sign-in (expired or not renewed yet), not because of the answer itself. */
+function isAuthError(error: { code?: string; message?: string }, status?: number) {
+  return status === 401 || (error.code ?? "").startsWith("PGRST30") || /jwt/i.test(error.message ?? "");
+}
+
 let sending = false;
 
 /** Sends the answers kept on this device. */
@@ -50,6 +55,8 @@ export async function flushReviews(userId: string) {
         reportNetworkError();
         return;
       }
+      // The sign-in ran out (it renews in a moment): keep it for the next try.
+      if (error && isAuthError(error, status)) return;
       // Sent, or refused for good (the note is gone): either way it's done.
       await write(userId, "notes", [], [k.id]);
     }

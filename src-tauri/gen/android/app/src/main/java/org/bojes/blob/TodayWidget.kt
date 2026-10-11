@@ -41,6 +41,8 @@ class TodayWidget : AppWidgetProvider() {
     private const val PREFS = "blob_widget"
     private const val KEY = "today"
     private const val MAX_JSON = 64 * 1024
+    /** The pages a row may open (anything else opens the calendar). */
+    private val LINKS = Regex("^/(calendar|tasks|notes|learn|home)(\\?[A-Za-z0-9=&_.:-]*)?$|^/p/[0-9a-fA-F-]{36}$")
 
     private val ROWS = arrayOf(
       intArrayOf(R.id.widget_row1, R.id.widget_bar1, R.id.widget_title1, R.id.widget_time1),
@@ -141,7 +143,8 @@ class TodayWidget : AppWidgetProvider() {
         } catch (e: IllegalArgumentException) {
           Color.parseColor("#6d3df5")
         }
-        out.add(Item(o.optString("t"), o.optLong("s"), o.optLong("e"), o.optBoolean("a"), color, o.optString("k", "event"), o.optString("l", "/calendar")))
+        val link = o.optString("l", "/calendar").takeIf { LINKS.matches(it) } ?: "/calendar"
+        out.add(Item(o.optString("t"), o.optLong("s"), o.optLong("e"), o.optBoolean("a"), color, o.optString("k", "event"), link))
       }
       return out
     }

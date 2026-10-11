@@ -25,7 +25,12 @@ struct BlobData: Decodable {
 
     var start: Date { Date(timeIntervalSince1970: s / 1000) }
     var end: Date { Date(timeIntervalSince1970: e / 1000) }
-    var url: URL? { URL(string: "org.bojes.blob://" + l.drop(while: { $0 == "/" })) }
+    /// Only the pages a row may open (anything else opens the calendar).
+    var url: URL? {
+      let allowed = l.range(of: "^/(calendar|tasks|notes|learn|home)(\\?[A-Za-z0-9=&_.:-]*)?$|^/p/[0-9a-fA-F-]{36}$", options: .regularExpression) != nil
+      let path = allowed ? l : "/calendar"
+      return URL(string: "org.bojes.blob://" + path.drop(while: { $0 == "/" }))
+    }
   }
 
   struct Words: Decodable {

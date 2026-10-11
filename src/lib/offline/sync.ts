@@ -89,8 +89,10 @@ export class Sync {
   private refusalListeners = new Set<(r: Refusal) => void>();
   private dirty: Record<SyncTable, Set<string>> = { events: new Set(), tasks: new Set() };
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
-  private flushing = false;
+  private running: Promise<void> | null = null;
   private again = false;
+  /** Signed out: nothing is written to the device any more (its data is being wiped). */
+  private stopped = false;
   private channels: RealtimeChannel[] = [];
   private stops: (() => void)[] = [];
   private bc: BroadcastChannel | null = null;
@@ -220,56 +222,71 @@ export class Sync {
     this.persistSoon();
   }
 
-  /** Sends waiting changes, oldest first; stops at the first one that needs the connection. */
-  async flush(): Promise<void> {
-    if (this.flushing) {
+  /**
+   * Sends waiting changes, oldest first; stops at the first one that needs the connection. While a
+   * flush is running, this waits for it (and for one more round with what was added meanwhile).
+   */
+  flush(): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+    if (this.running) {
       this.again = true;
-      return;
+      return this.running;
     }
+    this.running = (async () => {
+      try {
+        do {
+          this.again = false;
+          await this.flushOnce();
+        } while (this.again && !this.stopped);
+      } finally {
+        this.running = null;
+      }
+    })();
+    return this.running;
+  }
+
+  /** Changes waiting to be sent. */
+  get waiting() {
+    return this.outbox.length;
+  }
+
+  private async flushOnce(): Promise<void> {
     if (!this.outbox.length) return;
     if (!isOnline() && typeof navigator !== "undefined" && navigator.onLine === false) return;
-    this.flushing = true;
-    try {
-      await withLock(`blob-outbox:${this.userId}`, async () => {
-        // Other tabs queue and send changes too: the stored outbox is the truth, plus this tab's
-        // changes that aren't stored yet. (One stored before but gone now was sent by another tab.)
-        this.adoptStored(await getAll<Entry>(this.userId, "outbox"));
-        const db = createClient();
-        let renewed = false;
-        while (this.outbox.length) {
-          const entry = this.outbox[0];
-          const result = await this.send(db, entry);
-          if (result === "wait") {
-            reportNetworkError();
-            break;
-          }
-          if (result === "auth") {
-            // The sign-in expired: renew it once, else keep everything for later.
-            if (renewed) break;
-            renewed = true;
-            const { error } = await db.auth.refreshSession();
-            if (error) break;
-            continue;
-          }
-          reportOk();
-          // A refused new row takes the changes queued for it along.
-          const drop = result === "refused" && entry.op === "insert" ? this.outbox.filter((e) => e.table === entry.table && e.id === entry.id) : [entry];
-          const gone = new Set(drop.map((e) => e.key));
-          this.outbox = this.outbox.filter((e) => !gone.has(e.key));
-          for (const k of gone) this.unsaved.delete(k);
-          await write(this.userId, "outbox", [], [...gone]);
-          this.emit([entry.table]);
-          this.persistSoon();
-          this.announce();
+    await withLock(`blob-outbox:${this.userId}`, async () => {
+      // Other tabs queue and send changes too: the stored outbox is the truth, plus this tab's
+      // changes that aren't stored yet. (One stored before but gone now was sent by another tab.)
+      this.adoptStored(await getAll<Entry>(this.userId, "outbox"));
+      const db = createClient();
+      let renewed = false;
+      while (this.outbox.length && !this.stopped) {
+        const entry = this.outbox[0];
+        const result = await this.send(db, entry);
+        if (result === "wait") {
+          reportNetworkError();
+          break;
         }
-      });
-    } finally {
-      this.flushing = false;
-      if (this.again) {
-        this.again = false;
-        void this.flush();
+        if (result === "auth") {
+          // The sign-in expired: renew it once, else keep everything for later.
+          if (renewed) break;
+          renewed = true;
+          const { error } = await db.auth.refreshSession();
+          if (error) break;
+          continue;
+        }
+        reportOk();
+        // A refused new row takes the changes queued for it along.
+        const drop = result === "refused" && entry.op === "insert" ? this.outbox.filter((e) => e.table === entry.table && e.id === entry.id) : [entry];
+        const gone = new Set(drop.map((e) => e.key));
+        this.outbox = this.outbox.filter((e) => !gone.has(e.key));
+        for (const k of gone) this.unsaved.delete(k);
+        if (this.stopped) break;
+        await write(this.userId, "outbox", [], [...gone]);
+        this.emit([entry.table]);
+        this.persistSoon();
+        this.announce();
       }
-    }
+    });
   }
 
   private async send(db: SupabaseClient, e: Entry): Promise<"sent" | "refused" | "wait" | "auth"> {
@@ -421,6 +438,7 @@ export class Sync {
     const full = forceFull || !spec.since || !cursor || Date.now() - lastFull > FULL_EVERY;
 
     const res = full ? await spec.load(db) : await spec.since!(db, cursor!);
+    if (this.stopped) return;
     if (res.error) {
       if (isNetworkError(res.error, res.status)) reportNetworkError();
       return;
@@ -442,7 +460,8 @@ export class Sync {
     let latest = cursor ?? "";
     for (const row of rows) {
       if (row.updated_at && row.updated_at > latest) latest = row.updated_at;
-      this.put(table, row);
+      // Not over a newer row (one the outbox had confirmed while this list was on its way).
+      if (newer(map.get(row.id), row)) this.put(table, row);
     }
     this.loaded[table] = true;
     if (spec.since && latest) await setMeta(this.userId, cursorKey, latest);
@@ -559,7 +578,7 @@ export class Sync {
   }
 
   private persistSoon() {
-    if (this.persistTimer) return;
+    if (this.persistTimer || this.stopped) return;
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
       void this.persist();
@@ -569,6 +588,7 @@ export class Sync {
   private goneDirty = false;
 
   private async persist() {
+    if (this.stopped) return;
     if (this.goneDirty) {
       this.goneDirty = false;
       await setMeta(this.userId, "gone:tasks", [...this.gone.tasks].slice(-2000));
@@ -586,6 +606,9 @@ export class Sync {
   }
 
   stop() {
+    this.stopped = true;
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+    this.persistTimer = null;
     this.live = false;
     this.stops.forEach((fn) => fn());
     this.stops = [];
@@ -645,9 +668,10 @@ export async function forgetAccount(userId: string) {
   await wipeDb(userId);
 }
 
-/** Sends what's waiting, for at most `ms` (before signing out). */
-export async function flushAllSyncs(ms = 5000) {
+/** Sends what's waiting, for at most `ms` (before signing out). How many changes are still waiting. */
+export async function flushAllSyncs(ms = 5000): Promise<number> {
   await Promise.race([Promise.all([...syncs.values()].map((s) => s.flush())), new Promise((r) => setTimeout(r, ms))]);
+  return [...syncs.values()].reduce((n, s) => n + s.waiting, 0);
 }
 
 /** Stops syncing every account on this page (signing out). */

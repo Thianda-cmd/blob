@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { useMessages } from "@/i18n/client";
 import { offlineText } from "@/i18n/messages/offline";
+import { DEVICE_USER_KEY } from "@/lib/offline/device";
 import { getAll } from "@/lib/offline/idb";
 import type { NoteCopy } from "@/lib/offline/notes";
 
@@ -25,10 +26,10 @@ async function onDevice(): Promise<{ pages: Item[]; notes: Item[] }> {
     // No caches here.
   }
   try {
-    const dbs = typeof indexedDB.databases === "function" ? await indexedDB.databases() : [];
-    const name = dbs.find((d) => d.name?.startsWith("blob:"))?.name;
-    if (name) {
-      const copies = await getAll<NoteCopy>(name.slice(5), "pages");
+    // Only the notes of the account signed in on this device (none after signing out).
+    const userId = localStorage.getItem(DEVICE_USER_KEY);
+    if (userId) {
+      const copies = await getAll<NoteCopy>(userId, "pages");
       for (const c of copies) notes.push({ href: `/p/${c.id}`, title: c.title, at: Date.parse(c.updated_at) || 0 });
     }
   } catch {

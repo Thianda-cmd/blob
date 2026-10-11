@@ -468,7 +468,7 @@ export function useNoteCollab({
     const keepUnsent = () => {
       if (editor.isDestroyed) return;
       const unsent = unsentOf(editor.state);
-      void keepOwed(me.user_id, pageId, clientId, unsent ? { version: unsent.version, steps: unsent.steps.map((s) => s.toJSON()), client: clientId } : null);
+      void keepOwed(me.user_id, pageId, clientId, unsent ? { version: unsent.version, steps: unsent.steps.map((s) => s.toJSON()), client: clientId } : null, unsent ? editor.getJSON() : undefined);
     };
     const onAny = ({ transaction }: { transaction: { docChanged: boolean; getMeta: (k: string) => unknown } }) => {
       if (!transaction.docChanged && !transaction.getMeta("collab$")) return;

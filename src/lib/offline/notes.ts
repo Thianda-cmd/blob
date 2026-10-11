@@ -27,6 +27,8 @@ export type NoteCopy = {
   doc_version: number;
   /** Your role on someone else's note (from its members; none: only through a folder above it). */
   role?: "editor" | "viewer" | null;
+  /** Others can open it (someone else's, or yours shared, itself or through a folder above it). */
+  shared?: boolean;
   tags: string[];
   topics: string[];
   is_favorite: boolean;
@@ -73,12 +75,23 @@ async function run(userId: string, pages: PageMeta[]) {
   const gone = stored.filter((c) => !want.has(c.id)).map((c) => c.id);
   if (gone.length) await write(userId, "pages", [], gone);
   const db = createClient();
-  // Your role on notes others shared with you (editing them offline needs it).
-  const shared = wanted.some((p) => p.user_id !== userId);
-  const { data: memberships } = shared ? await db.from("page_members").select("page_id, role").eq("user_id", userId) : { data: [] };
-  const roles = new Map(((memberships ?? []) as { page_id: string; role: "editor" | "viewer" }[]).map((m) => [m.page_id, m.role]));
+  // Who else is on which page: your role on notes shared with you, and which of yours are shared
+  // (a shared note is only read offline: its edits go through working together).
+  const { data: memberships, error: membersError } = await db.from("page_members").select("page_id, user_id, role").limit(5000);
+  if (membersError) return;
+  const rows = (memberships ?? []) as { page_id: string; user_id: string; role: "editor" | "viewer" }[];
+  const roles = new Map(rows.filter((m) => m.user_id === userId).map((m) => [m.page_id, m.role]));
+  const withOthers = new Set(rows.filter((m) => m.user_id !== userId).map((m) => m.page_id));
+  const parents = new Map(pages.map((p) => [p.id, p.parent_id]));
+  const sharedOf = (c: { id: string; user_id: string }) => {
+    if (c.user_id !== userId) return true;
+    for (let id: string | null | undefined = c.id, n = 0; id && n < 50; id = parents.get(id), n++) if (withOthers.has(id)) return true;
+    return false;
+  };
   const roleOf = (c: { id: string; user_id: string }) => (c.user_id === userId ? null : (roles.get(c.id) ?? null));
-  const moved = stored.filter((c) => want.has(c.id) && !stale.some((p) => p.id === c.id) && (c.role ?? null) !== roleOf(c)).map((c) => ({ ...c, role: roleOf(c) }));
+  const moved = stored
+    .filter((c) => want.has(c.id) && !stale.some((p) => p.id === c.id) && ((c.role ?? null) !== roleOf(c) || c.shared !== sharedOf(c)))
+    .map((c) => ({ ...c, role: roleOf(c), shared: sharedOf(c) }));
   if (moved.length) await write(userId, "pages", moved);
   for (let i = 0; i < stale.length; i += BATCH) {
     const ids = stale.slice(i, i + BATCH).map((p) => p.id);
@@ -91,7 +104,7 @@ async function run(userId: string, pages: PageMeta[]) {
     await write(
       userId,
       "pages",
-      ((data ?? []) as NoteCopy[]).map((c) => ({ ...c, role: roleOf(c) })),
+      ((data ?? []) as NoteCopy[]).map((c) => ({ ...c, role: roleOf(c), shared: sharedOf(c) })),
     );
   }
 }
@@ -112,15 +125,16 @@ export async function noteCopies(userId: string): Promise<NoteCopy[]> {
 /** Steps a shared note's editor made on top of `version`, as the settle route takes them. */
 export type OwedSteps = { version: number; steps: unknown[]; client: string };
 
-type OwedRecord = { id: string; page: string; owed: OwedSteps; at: number };
+/** `doc`: the editor's whole text then, kept as a copy if the steps can't be placed any more. */
+type OwedRecord = { id: string; page: string; owed: OwedSteps; at: number; doc?: unknown };
 
 /** One record per editor (a reloaded note gets a new editor; the old one's steps stay until settled). */
 const owedKey = (pageId: string, client: string) => `owed:${pageId}:${client}`;
 
-/** Keeps (or, with null, forgets) the unsent steps of one shared-note editor on the device. */
-export function keepOwed(userId: string, pageId: string, client: string, owed: OwedSteps | null) {
+/** Keeps (or, with null, forgets) the unsent steps of one shared-note editor on the device, with its text. */
+export function keepOwed(userId: string, pageId: string, client: string, owed: OwedSteps | null, doc?: unknown) {
   if (!owed || !owed.steps.length) return write(userId, "notes", [], [owedKey(pageId, client)]);
-  const record: OwedRecord = { id: owedKey(pageId, client), page: pageId, owed, at: Date.now() };
+  const record: OwedRecord = { id: owedKey(pageId, client), page: pageId, owed, at: Date.now(), doc };
   return write(userId, "notes", [record]);
 }
 
@@ -129,9 +143,10 @@ let settling = false;
 /**
  * Sends kept steps to the server, which places them on the note as it is now. Sending steps the
  * server already has is harmless (it recognises the editor's own steps), so after a crash they can
- * simply go again. Steps it can no longer place (the note moved on too far) are dropped after a week.
+ * simply go again. When it can no longer place them (the note moved on too far, or you can't edit
+ * it any more), the editor's text then becomes a note of your own ("… (offline copy)").
  */
-export async function settleOwed(userId: string) {
+export async function settleOwed(userId: string, words?: { copyTitle: (t: string) => string; conflict: (t: string) => string }, onConflict?: (message: string) => void) {
   if (settling || typeof window === "undefined" || !isOnline()) return;
   settling = true;
   try {
@@ -145,11 +160,25 @@ export async function settleOwed(userId: string) {
         return;
       }
       reportOk();
-      // Done (or the note is gone / not ours any more): forget them. Signed out or a server
-      // hiccup: try again later. Refused: try again for a week.
-      const done = res.ok || res.status === 404 || res.status === 413 || res.status === 400;
-      const tooOld = Date.now() - r.at > 7 * 864e5;
-      if (done || (res.status === 409 && tooOld)) await write(userId, "notes", [], [r.id]);
+      // Placed: forget them. Can't be placed: the text becomes a copy first. Signed out or a
+      // server hiccup: try again later.
+      if (res.ok || res.status === 400 || res.status === 413) {
+        await write(userId, "notes", [], [r.id]);
+        continue;
+      }
+      if (res.status !== 409 && res.status !== 404) continue;
+      const answer = (await res.json().catch(() => null)) as { lost?: boolean } | null;
+      if (res.status === 404 || answer?.lost) {
+        if (r.doc && words) {
+          const note = await noteCopy(userId, r.page);
+          const name = words.copyTitle(note?.title ?? "");
+          if (!(await keepAsCopy({ title: name, content: r.doc, plain_text: textOf(r.doc), subject_id: null, parent_id: null }))) continue;
+          onConflict?.(words.conflict(name));
+        }
+        await write(userId, "notes", [], [r.id]);
+      } else if (Date.now() - r.at > 7 * 864e5) {
+        await write(userId, "notes", [], [r.id]);
+      }
     }
   } finally {
     settling = false;
@@ -179,6 +208,23 @@ function sortKeys(v: unknown): unknown {
   return v;
 }
 
+/** A note's text that can't be saved over the note (another device saved other text meanwhile). */
+export type CopyOf = { title: string; content: unknown; plain_text: string; links?: unknown[]; subject_id: string | null; parent_id: string | null };
+
+/**
+ * Keeps text as a note of its own ("… (offline copy)"), next to the note it came from, in one
+ * insert with its text. True only once it is safely stored: until then the text stays where it is.
+ */
+export async function keepAsCopy(copy: CopyOf): Promise<boolean> {
+  const db = createClient();
+  const row = { kind: "note", title: copy.title.slice(0, 300), content: copy.content, plain_text: copy.plain_text, links: copy.links ?? [], subject_id: copy.subject_id, parent_id: copy.parent_id };
+  let { error, status } = await db.from("pages").insert(row);
+  // Under a page that isn't yours (a shared note), or a subject that isn't: among your own notes instead.
+  if (error && !isNetworkError(error, status) && (row.parent_id || row.subject_id)) ({ error, status } = await db.from("pages").insert({ ...row, parent_id: null, subject_id: null }));
+  if (error && isNetworkError(error, status)) reportNetworkError();
+  return !error;
+}
+
 let flushing = false;
 
 /**
@@ -191,7 +237,10 @@ export async function flushWaitingNotes(userId: string, words: { copyTitle: (t: 
   flushing = true;
   try {
     const db = createClient();
-    for (const n of noteCache.waiting()) {
+    for (const { id } of noteCache.waiting()) {
+      // As it is now: an editor may have opened it, or saved it, while earlier notes went out.
+      const n = noteCache.waitingOne(id);
+      if (!n) continue;
       const patch: Record<string, unknown> = {};
       if (n.title !== undefined) patch.title = n.title;
       if (n.content) {
@@ -218,17 +267,19 @@ export async function flushWaitingNotes(userId: string, words: { copyTitle: (t: 
       const { data: server, error } = await db.from("pages").select("title, content, rev, subject_id, parent_id").eq("id", n.id).maybeSingle();
       if (error || !server) continue;
       const row = server as { title: string; content: unknown; rev: number; subject_id: string | null; parent_id: string | null };
-      // Only the bookkeeping was behind (the server still has what this text builds on): save over it.
-      if (same(row.content, n.content) || (n.baseContent && same(row.content, n.baseContent))) {
+      if (noteCache.waitingOne(id)?.version !== n.version) continue;
+      // Only the bookkeeping was behind (the server has what this text builds on, or what this
+      // device itself saved meanwhile): save over it.
+      const own = noteCache.base(id);
+      if (same(row.content, n.content) || (n.baseContent && same(row.content, n.baseContent)) || (own?.rev === row.rev && own.content && same(row.content, own.content))) {
         result = await attempt(row.rev);
         if (result === "wait") return;
         continue;
       }
-      // Another device saved other text: this device's becomes a copy.
+      // Another device saved other text: this device's becomes a copy (and stays here until it is).
       const name = words.copyTitle(n.title ?? row.title);
-      const { error: copyError } = await db.from("pages").insert({ kind: "note", title: name.slice(0, 300), content: n.content, plain_text: textOf(n.content), subject_id: row.subject_id, parent_id: row.parent_id });
-      if (copyError) continue;
-      noteCache.forget(n.id);
+      if (!(await keepAsCopy({ title: name, content: n.content, plain_text: textOf(n.content), subject_id: row.subject_id, parent_id: row.parent_id }))) continue;
+      if (noteCache.waitingOne(id)?.version === n.version) noteCache.forget(n.id);
       onConflict(words.conflict(name));
     }
   } finally {

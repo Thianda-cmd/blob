@@ -11,6 +11,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,8 +32,14 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     // window.BlobAndroid.print(): the system print dialog for the page, with "Save as PDF" (the CV).
-    // window.BlobAndroid.updateWidget(json): the home screen widget's data (TodayWidget.kt).
-    webView.addJavascriptInterface(AppBridge(this, webView), "BlobAndroid")
+    webView.addJavascriptInterface(PrintBridge(this, webView), "BlobAndroid")
+    // window.BlobWidget.postMessage(json): the home screen widget's data (TodayWidget.kt). Only the
+    // site's own pages get it (not frames of other sites, such as file previews).
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+      WebViewCompat.addWebMessageListener(webView, "BlobWidget", setOf(SITE)) { _, message, _, isMainFrame, _ ->
+        if (isMainFrame) TodayWidget.save(applicationContext, message.data ?: "")
+      }
+    }
     // Back (button or swipe) goes back a page; on the first page it puts Blob in the background, as
     // Android does for apps opened from the home screen, instead of closing it. The app keeps its
     // place, and a link or the icon brings it straight back.
@@ -43,7 +51,10 @@ class MainActivity : TauriActivity() {
   }
 }
 
-private class AppBridge(private val activity: MainActivity, private val webView: WebView) {
+/** The site the app shows (src-tauri/src/lib.rs SITE). */
+private const val SITE = "https://blob.bojes.org"
+
+private class PrintBridge(private val activity: MainActivity, private val webView: WebView) {
   @JavascriptInterface
   fun print() {
     activity.runOnUiThread {
@@ -51,10 +62,5 @@ private class AppBridge(private val activity: MainActivity, private val webView:
       val title = webView.title?.takeIf { it.isNotBlank() } ?: "Blob"
       manager.print(title, webView.createPrintDocumentAdapter(title), PrintAttributes.Builder().build())
     }
-  }
-
-  @JavascriptInterface
-  fun updateWidget(json: String) {
-    TodayWidget.save(activity.applicationContext, json)
   }
 }

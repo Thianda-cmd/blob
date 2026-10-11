@@ -2,7 +2,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
 import { getMessages } from "@/i18n/server";
 import { sessionUser } from "@/lib/oauth/session";
@@ -31,11 +30,12 @@ async function listFiles(admin: SupabaseClient, prefix: string): Promise<string[
   return out;
 }
 
-export type DeleteAccountResult = { error: string };
+export type DeleteAccountResult = { error: string; deleted?: undefined } | { deleted: true; error?: undefined };
 
 /**
  * Permanently deletes the signed-in user: their uploaded files, then the auth user
- * (profiles, subjects, pages and tasks cascade). On success it signs out and redirects to "/".
+ * (profiles, subjects, pages and tasks cascade). On success it signs out; the page then clears the
+ * device and goes to "/".
  * `confirmation` is the word typed in the dialog: "löschen" in German, "delete" in English.
  */
 export async function deleteAccount(confirmation: string): Promise<DeleteAccountResult | undefined> {
@@ -67,9 +67,10 @@ export async function deleteAccount(confirmation: string): Promise<DeleteAccount
   }
 
   // The user is gone; clear the session cookies so no request treats this browser as signed in.
+  // (The page then clears this device and leaves for the start page.)
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/");
+  return { deleted: true };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

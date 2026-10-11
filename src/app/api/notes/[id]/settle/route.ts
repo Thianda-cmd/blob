@@ -37,7 +37,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/notes/[
   try {
     body = text ? JSON.parse(text) : null;
   } catch {}
-  const settled = await settleNote(supabase, id.toLowerCase(), await getLocale(), owedOf(body));
+  const owed = owedOf(body);
+  const settled = await settleNote(supabase, id.toLowerCase(), await getLocale(), owed);
+  // The steps sent along can't be placed on the note any more (lost: the device keeps its text as
+  // a copy instead), or it isn't known yet (error: the device tries again later).
+  if (owed && (!settled || settled.placed === "lost")) return Response.json({ ok: false, lost: true }, { status: 409 });
+  if (owed && settled?.placed === "error") return Response.json({ ok: false }, { status: 503 });
   if (!settled) return Response.json({ ok: false }, { status: 409 });
   return Response.json({ ok: settled.saved, version: settled.version });
 }

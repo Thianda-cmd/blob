@@ -16,11 +16,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A note opened from this device's copy (src/lib/offline/notes.ts), for when the note's own page
- * can't load. It edits like the note itself: what you write is kept on the device and saved once
- * the connection is back, without replacing what another device saved meanwhile.
+ * can't load. Your own notes edit like the note itself: what you write is kept on the device and
+ * saved once the connection is back, without replacing what another device saved meanwhile.
+ * Shared notes are only read here.
  */
 export function OfflineNote() {
-  const t = useMessages(offlineText).page;
+  const all = useMessages(offlineText);
+  const t = all.page;
+  const notes = all.notes;
   const { userId } = useWorkspace();
   const online = useOnline();
   const [copy, setCopy] = useState<NoteCopy | null | undefined>(undefined);
@@ -58,14 +61,16 @@ export function OfflineNote() {
   }
 
   const page: Page = { ...copy, content: copy.content, plain_text: copy.plain_text ?? "", links: copy.links ?? [] } as Page;
-  // Your own notes edit as usual; someone else's only with your own role on it (else read only).
-  const role: AccessRole = copy.user_id === userId ? "owner" : copy.role === "editor" ? "editor" : "viewer";
+  // Your own notes edit as usual. Shared notes (or ones not yet known to be unshared) only read:
+  // their edits go through working together, which needs the connection.
+  const shared = copy.shared !== false || copy.user_id !== userId;
+  const role: AccessRole = shared ? "viewer" : "owner";
 
   return (
     <>
       <div className="flex shrink-0 items-center gap-2 border-b border-line bg-blob-soft/60 px-4 py-2 text-[12.5px] text-blob-ink" role="status">
         <CloudOff className="size-3.5 shrink-0" />
-        <span className="min-w-0 flex-1">{role === "viewer" ? t.readOnly : t.fromDevice}</span>
+        <span className="min-w-0 flex-1">{shared ? notes.sharedOffline : t.fromDevice}</span>
         {online && (
           <Link href={`/p/${copy.id}`} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 font-medium hover:bg-blob-soft">
             <RefreshCw className="size-3.5" /> {t.openLatest}

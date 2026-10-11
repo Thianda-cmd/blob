@@ -152,14 +152,23 @@ export async function wipeDb(userId: string): Promise<void> {
   });
 }
 
-/** Removes every Blob database on this device (signing out without knowing whose data is here). */
-export async function wipeAllDbs(): Promise<void> {
+/**
+ * Removes every Blob database on this device (signing out without knowing whose data is here), or
+ * every one but `keep`'s (another account signed in on this device).
+ */
+export async function wipeAllDbs(keep?: string): Promise<void> {
   if (typeof indexedDB === "undefined" || typeof indexedDB.databases !== "function") return;
+  // Open connections would hold the deletion back until the page closes.
+  for (const [id, db] of opened) {
+    if (id === keep) continue;
+    (await db)?.close();
+    opened.delete(id);
+  }
   try {
     const list = await indexedDB.databases();
     await Promise.all(
       list
-        .filter((d) => d.name?.startsWith("blob:"))
+        .filter((d) => d.name?.startsWith("blob:") && (!keep || d.name !== dbName(keep)))
         .map(
           (d) =>
             new Promise<void>((resolve) => {
@@ -171,5 +180,4 @@ export async function wipeAllDbs(): Promise<void> {
   } catch {
     // Nothing to remove.
   }
-  opened.clear();
 }

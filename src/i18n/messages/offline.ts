@@ -12,6 +12,14 @@ export const offlineText = defineMessages({
     notes: {
       copyTitle: (title: string) => `${title || "Untitled"} (offline copy)`,
       conflict: (title: string) => `This note was changed on another device while you were offline. I kept your version as “${title}”.`,
+      copyFailed: "This note was changed on another device. I couldn't keep your version as a copy yet, so it stays here on this device and I'll try again.",
+      sharedOffline: "This note is shared. You can read it here; changes to it need a connection.",
+    },
+    signOut: {
+      title: "Not everything is saved yet",
+      body: (n: number) =>
+        `${n === 1 ? "1 change" : `${n} changes`} on this device couldn't be sent yet (no connection). Signing out now deletes ${n === 1 ? "it" : "them"} from this device. Sign out once you're online, and nothing is lost.`,
+      confirm: "Sign out anyway",
     },
     refused: {
       events: "I couldn't save that change to your calendar, so I put it back.",
@@ -43,6 +51,14 @@ export const offlineText = defineMessages({
     notes: {
       copyTitle: (title) => `${title || "Ohne Titel"} (Offline-Kopie)`,
       conflict: (title) => `Diese Notiz wurde auf einem anderen Gerät geändert, während du offline warst. Deine Fassung habe ich als „${title}“ behalten.`,
+      copyFailed: "Diese Notiz wurde auf einem anderen Gerät geändert. Deine Fassung konnte ich noch nicht als Kopie ablegen, sie bleibt hier auf dem Gerät und ich versuche es gleich nochmal.",
+      sharedOffline: "Diese Notiz ist geteilt. Du kannst sie hier lesen; ändern geht nur mit Verbindung.",
+    },
+    signOut: {
+      title: "Noch nicht alles gespeichert",
+      body: (n) =>
+        `${n === 1 ? "1 Änderung" : `${n} Änderungen`} auf diesem Gerät ${n === 1 ? "konnte" : "konnten"} noch nicht gesendet werden (keine Verbindung). Wenn du dich jetzt abmeldest, ${n === 1 ? "wird sie" : "werden sie"} von diesem Gerät gelöscht. Melde dich ab, wenn du online bist, dann geht nichts verloren.`,
+      confirm: "Trotzdem abmelden",
     },
     refused: {
       events: "Diese Änderung am Kalender konnte ich nicht speichern, deshalb habe ich sie zurückgenommen.",

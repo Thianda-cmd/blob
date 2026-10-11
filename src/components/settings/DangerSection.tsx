@@ -15,6 +15,7 @@ import { useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { isConfirmWord, settingsText } from "@/i18n/messages/settings";
 import { Card, Row, Section } from "./primitives";
+import { forgetDevice } from "@/lib/offline/device";
 
 export function DangerSection() {
   const t = useMessages(settingsText).danger;
@@ -75,10 +76,17 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
     setPhase("deleting");
     onBusy(true);
     resetBoot();
-    // On success the action signs out and redirects, so this only returns on failure.
     let failure: string | undefined;
     try {
-      failure = (await deleteAccount(text))?.error;
+      const result = await deleteAccount(text);
+      if (result?.deleted) {
+        // Nothing of the account stays on this device (its copies, widgets, reminders).
+        await forgetDevice();
+        // A fresh start (nothing of the account is left in memory either).
+        window.location.replace(`${window.location.origin}/`);
+        return;
+      }
+      failure = result?.error ?? t.unreachable;
     } catch {
       failure = t.unreachable;
     }

@@ -15,7 +15,8 @@ import { shareText } from "@/i18n/messages/share";
 import { createClient } from "@/lib/supabase/client";
 import type { MemberRole, PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
-import { flushDevice, forgetDevice } from "@/lib/offline/device";
+import { forgetDevice } from "@/lib/offline/device";
+import { useSignOutGuard } from "@/components/offline/useSignOutGuard";
 
 /** What invite_preview returns (migration 0010). */
 export type InvitePreview =
@@ -41,6 +42,7 @@ export function JoinView({ token, preview, me }: { token: string; preview: Invit
   const untitledProject = useMessages(projectsText).untitled;
   const locale = useLocale();
   const router = useRouter();
+  const guard = useSignOutGuard();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
 
@@ -65,7 +67,7 @@ export function JoinView({ token, preview, me }: { token: string; preview: Invit
   }
 
   async function signOut() {
-    await flushDevice();
+    if (!(await guard.ready())) return;
     await createClient().auth.signOut();
     await forgetDevice();
     router.replace(`/login?next=${encodeURIComponent(`/join/${token}`)}`);
@@ -153,6 +155,7 @@ export function JoinView({ token, preview, me }: { token: string; preview: Invit
           </p>
         </motion.div>
       </main>
+      {guard.dialog}
     </div>
   );
 }

@@ -50,7 +50,8 @@ import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
-import { flushDevice, forgetDevice } from "@/lib/offline/device";
+import { forgetDevice } from "@/lib/offline/device";
+import { useSignOutGuard } from "@/components/offline/useSignOutGuard";
 
 // Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
 // row actions: there is no hover to reveal them and 28 px rows are too small for a finger.
@@ -574,6 +575,7 @@ export function NewSubjectButton({ kind }: { kind: SubjectKind }) {
 
 function AccountMenu({ name, email, theme, onTheme }: { name: string | null; email: string; theme: Theme; onTheme: (t: Theme) => void }) {
   const router = useRouter();
+  const guard = useSignOutGuard();
   const t = useMessages(shellText).sidebar;
   const initial = (name || email || "?").trim()[0]?.toUpperCase();
 
@@ -583,7 +585,7 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
   }
 
   async function signOut() {
-    await flushDevice();
+    if (!(await guard.ready())) return;
     await createClient().auth.signOut();
     // Nothing of the account stays on this device (its offline copies, unsent changes).
     await forgetDevice();
@@ -592,56 +594,59 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
   }
 
   return (
-    <Popover
-      side="top"
-      align="start"
-      className="w-[244px]"
-      trigger={(props) => (
-        <button {...props} className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
-          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
-            <span className="block truncate text-[11.5px] leading-tight text-ink-3" title={email}>
-              {email}
+    <>
+      <Popover
+        side="top"
+        align="start"
+        className="w-[244px]"
+        trigger={(props) => (
+          <button {...props} className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
+              <span className="block truncate text-[11.5px] leading-tight text-ink-3" title={email}>
+                {email}
+              </span>
             </span>
-          </span>
-          <Ellipsis className="size-4 text-ink-3" />
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          <MenuLabel>{t.theme}</MenuLabel>
-          <div className="mx-1 mb-1 grid grid-cols-3 gap-0.5 rounded-lg bg-paper p-0.5">
-            {(
-              [
-                ["light", <Sun key="l" />, t.light],
-                ["dark", <Moon key="d" />, t.dark],
-                ["system", <Monitor key="s" />, t.auto],
-              ] as const
-            ).map(([value, icon, label]) => (
-              <button
-                key={value}
-                onClick={() => pick(value)}
-                className={cn(
-                  "flex h-7 items-center justify-center gap-1 rounded-md text-[12px] text-ink-3 transition-colors [&_svg]:size-3.5",
-                  theme === value ? "bg-raised font-medium text-ink shadow-card" : "hover:text-ink",
-                )}
-              >
-                {icon}
-                {label}
-              </button>
-            ))}
-          </div>
-          <MenuSeparator />
-          <MenuItem icon={<Settings />} onSelect={() => (close(), router.push("/settings"))}>
-            {t.settings}
-          </MenuItem>
-          <MenuItem icon={<LogOut />} onSelect={signOut}>
-            {t.signOut}
-          </MenuItem>
-        </>
-      )}
-    </Popover>
+            <Ellipsis className="size-4 text-ink-3" />
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            <MenuLabel>{t.theme}</MenuLabel>
+            <div className="mx-1 mb-1 grid grid-cols-3 gap-0.5 rounded-lg bg-paper p-0.5">
+              {(
+                [
+                  ["light", <Sun key="l" />, t.light],
+                  ["dark", <Moon key="d" />, t.dark],
+                  ["system", <Monitor key="s" />, t.auto],
+                ] as const
+              ).map(([value, icon, label]) => (
+                <button
+                  key={value}
+                  onClick={() => pick(value)}
+                  className={cn(
+                    "flex h-7 items-center justify-center gap-1 rounded-md text-[12px] text-ink-3 transition-colors [&_svg]:size-3.5",
+                    theme === value ? "bg-raised font-medium text-ink shadow-card" : "hover:text-ink",
+                  )}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+            <MenuSeparator />
+            <MenuItem icon={<Settings />} onSelect={() => (close(), router.push("/settings"))}>
+              {t.settings}
+            </MenuItem>
+            <MenuItem icon={<LogOut />} onSelect={signOut}>
+              {t.signOut}
+            </MenuItem>
+          </>
+        )}
+      </Popover>
+      {guard.dialog}
+    </>
   );
 }
