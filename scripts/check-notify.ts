@@ -69,6 +69,25 @@ const off = plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: prefs
 eq("all off", off.length, 0);
 const morning = plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: prefsOf({ events: false, homework: false, exams: false, reminders: false, cards: false, streak: false, morning: true }), words });
 eq("morning overviews", morning.map(line).slice(0, 2), ["10/15 07:00 Your day: 0/2", "10/16 07:00 Your day: 1/0"]);
+// Kinds (Android channels and grouping), rooms, subjects and the expanded lists.
+const rich = plan({
+  now,
+  events: events.map((e) => (e.id === "e1" ? { ...e, location: "R 204" } : e)),
+  tasks: tasks.map((t) => (t.id === "x1" ? { ...t, subject_id: "s-en" } : t)),
+  cardsDue: { "2026-10-14": 3 },
+  learnDays: [],
+  prefs: { ...DEFAULT_PREFS, morning: true },
+  words,
+  subjects: [{ id: "s-en", name: "Englisch" }, { id: "s-x", name: "Mathe" }],
+});
+const byKey = (prefix: string) => rich.filter((p) => p.key.startsWith(prefix));
+eq("lesson reminder says the room", byKey("e:")[0] && line(byKey("e:")[0]), "10/14 09:50 Chor: in 10 · R 204");
+eq("exam named with its subject only when the title doesn't say it", byKey("ex:").map((p) => p.body)[0], "Englisch");
+eq("kinds", [byKey("e:")[0].kind, byKey("hw:")[0].kind, byKey("ex:")[0].kind, byKey("cards:")[0].kind, byKey("am:")[0].kind], ["events", "school", "school", "learning", "daily"]);
+eq("homework lists every title when expanded", byKey("hw:")[0].lines, ["Bio", "Mathe"]);
+eq("morning overview lists the day", byKey("am:10-15").length === 0 && byKey("am:2026-10-15")[0]?.lines, ["Bio", "Mathe"]);
+const otherExam = plan({ now, events: [], tasks: [task({ id: "x2", title: "Klausur", kind: "exam", subject_id: "s-x", due_at: at(10, 22, 8).toISOString() })], cardsDue: {}, learnDays: [], prefs: DEFAULT_PREFS, words, subjects: [{ id: "s-x", name: "Mathe" }] });
+eq("exam with its subject", otherExam[0]?.body, "Klausur · Mathe");
 eq("cap", plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: DEFAULT_PREFS, words, max: 3 }).length, 3);
 
 // The widgets' data (src/lib/widget/snapshot.ts).

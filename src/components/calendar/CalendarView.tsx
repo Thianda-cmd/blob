@@ -27,6 +27,7 @@ import { fmt } from "./describe";
 import { EventForm, Floating, ItemPeek, ScopeDialog, UndoBar, type EditorTarget } from "./EventEditor";
 import { MiniMonth } from "./MiniMonth";
 import { MonthGrid } from "./MonthGrid";
+import { ticker, ZOOM, type Move } from "./move";
 import { TimeGrid, type CommitMode, type Held } from "./TimeGrid";
 import { useCalendarStore } from "./useCalendarStore";
 import { useStored } from "./useStored";
@@ -81,7 +82,7 @@ export function CalendarView({
   const [anchorState, setAnchor] = useState<Date | null>(() => fromYmd(initialDate ?? null));
   const today = now === null ? null : startOfDay(now);
   const anchor = anchorState ?? today;
-  const [direction, setDirection] = useState(0);
+  const [move, setMove] = useState<Move>(null);
   const [agendaDays, setAgendaDays] = useState(42);
 
   const [filtersRaw, storeFilters] = useStored("blob-cal-filters");
@@ -143,7 +144,7 @@ export function CalendarView({
   const go = useCallback(
     (to: Date, dir?: number) => {
       const from = anchor ?? to;
-      setDirection(dir ?? (to > from ? 1 : to < from ? -1 : 0));
+      setMove({ dir: dir ?? (to > from ? 1 : to < from ? -1 : 0), zoom: 0 });
       setAnchor(startOfDay(to));
     },
     [anchor],
@@ -163,10 +164,11 @@ export function CalendarView({
 
   const chooseView = useCallback(
     (v: View) => {
+      setMove({ dir: 0, zoom: Math.sign(ZOOM[v] - ZOOM[view]) });
       setChosenView(v);
       storeView(v);
     },
-    [storeView],
+    [storeView, view],
   );
 
   // Keep the address in step (shareable, and the place to come back to).
@@ -346,6 +348,21 @@ export function CalendarView({
   // Drawing ------------------------------------------------------------------------------------
 
   const title = anchor ? periodTitle(view, anchor, days, t, locale) : "";
+  // Where today is from here: the Today button points there.
+  const todayDir =
+    !today || !range || !anchor
+      ? 0
+      : view === "month"
+        ? isSameMonth(today, anchor)
+          ? 0
+          : today < anchor
+            ? -1
+            : 1
+        : today < range.from
+          ? -1
+          : today >= addDays(range.from, view === "agenda" ? 1 : range.days)
+            ? 1
+            : 0;
   const viewOptions = (phone ? PHONE_VIEWS : VIEWS).map((v) => ({ value: v, label: t.view[v], title: `${t.view[v]} (${t.viewKey[v]})` }));
   const draft = panel?.kind === "edit" && panel.target.mode === "create" ? panel.target.span : null;
   const rangeKey = range ? `${view}:${ymd(range.from)}` : "none";
@@ -357,17 +374,10 @@ export function CalendarView({
   return (
     <>
       <TopBar
-        crumbs={[{ label: t.title, icon: <CalendarDays className="size-3.5 text-ink-3" /> }, ...(phone ? [] : [{ label: <span className="capitalize">{title}</span>, title }])]}
+        crumbs={[{ label: t.title, icon: <CalendarDays className="size-3.5 text-ink-3" /> }, ...(phone ? [] : [{ label: <Ticker text={title} dir={move?.dir ?? 0} />, title }])]}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => go(new Date())}
-              className="h-7 rounded-lg border border-line bg-raised px-2.5 text-[12.5px] font-medium text-ink shadow-card hover:bg-hover [@media(hover:none)]:h-9"
-              title={`${t.today} (T)`}
-            >
-              {t.today}
-            </button>
+            <TodayButton dir={todayDir} label={t.today} onClick={() => go(new Date())} />
             {!phone && (
               <div className="flex items-center">
                 <button type="button" onClick={() => step(-1)} className="grid size-7 place-items-center rounded-lg text-ink-2 hover:bg-hover hover:text-ink" aria-label={t.previous} title={`${t.previous} (←)`}>
@@ -418,6 +428,7 @@ export function CalendarView({
           t={t}
           locale={locale}
           range={range}
+          move={move}
         />
       )}
 
@@ -438,7 +449,7 @@ export function CalendarView({
               selectedKey={selected}
               held={held}
               draft={draft}
-              direction={direction}
+              move={move}
               rangeKey={rangeKey}
               weekNumbers={!phone}
               onOpen={open}
@@ -459,6 +470,7 @@ export function CalendarView({
               locale={locale}
               t={t}
               now={now}
+              move={move}
               selectedKey={selected}
               onOpen={open}
               onToggleTask={toggleTask}
@@ -480,7 +492,7 @@ export function CalendarView({
               selectedKey={selected}
               draft={draft}
               held={held}
-              direction={direction}
+              move={move}
               rangeKey={rangeKey}
               viewKey={view}
               header={!(phone && view === "day")}
@@ -638,6 +650,62 @@ function periodTitle(view: View, anchor: Date, days: Date[], t: (typeof calendar
     : `${fmt(first, t.format.monthShort, locale)} – ${fmt(last, t.format.monthShort, locale)}`;
 }
 
+/** The period's name: a new one rolls in from the side the calendar went (a new view: it fades). */
+function Ticker({ text, dir }: { text: string; dir: number }) {
+  return (
+    <span className="relative inline-grid min-w-0 overflow-hidden">
+      <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+        <motion.span
+          key={text}
+          custom={dir}
+          variants={ticker}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          className="truncate capitalize"
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** "Today", with an arrow to the side today is on when it's out of sight. */
+function TodayButton({ dir, label, onClick }: { dir: number; label: string; onClick: () => void }) {
+  const arrow = (side: number) => (
+    <AnimatePresence initial={false}>
+      {dir === side && (
+        <motion.span
+          initial={{ width: 0, opacity: 0, x: side * -4 }}
+          animate={{ width: "auto", opacity: 1, x: 0 }}
+          exit={{ width: 0, opacity: 0, x: side * -4 }}
+          transition={{ type: "spring", stiffness: 520, damping: 38 }}
+          className="flex overflow-hidden"
+        >
+          {side < 0 ? <ChevronLeft className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex h-7 items-center gap-0.5 rounded-lg border bg-raised px-2.5 text-[12.5px] font-medium shadow-card transition-colors hover:bg-hover [@media(hover:none)]:h-9",
+        dir ? "border-blob/35 text-blob-ink" : "border-line text-ink",
+      )}
+      title={`${label} (T)`}
+    >
+      {arrow(-1)}
+      {label}
+      {arrow(1)}
+    </button>
+  );
+}
+
 function CheckRow({ checked, onChange, color, children }: { checked: boolean; onChange: (v: boolean) => void; color: string; children: React.ReactNode }) {
   return (
     <label className="flex h-7 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-[13px] text-ink-2 hover:bg-hover hover:text-ink [@media(hover:none)]:h-9">
@@ -672,6 +740,7 @@ function PhoneHeader({
   t,
   locale,
   range,
+  move,
 }: {
   view: View;
   anchor: Date;
@@ -685,6 +754,7 @@ function PhoneHeader({
   t: (typeof calendarText)["en"];
   locale: Parameters<typeof fmt>[2];
   range: { from: Date; days: number } | null;
+  move: Move;
 }) {
   const [monthOpen, setMonthOpen] = useState(false);
   const week = weekStart(anchor, weekStartsOn);
@@ -694,7 +764,7 @@ function PhoneHeader({
     <div className="shrink-0 border-b border-line">
       <div className="flex items-center gap-2 px-3 pb-1.5">
         <button type="button" onClick={() => setMonthOpen((o) => !o)} className="flex min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 font-display text-[18px] font-semibold capitalize tracking-[-0.01em] text-ink" aria-expanded={monthOpen}>
-          <span className="truncate">{view === "day" ? fmt(anchor, t.format.month, locale) : title}</span>
+          <Ticker text={view === "day" ? fmt(anchor, t.format.month, locale) : title} dir={move?.dir ?? 0} />
           <motion.span animate={{ rotate: monthOpen ? 180 : 0 }} className="text-ink-3">
             <ChevronDown className="size-4" />
           </motion.span>
@@ -725,7 +795,7 @@ function PhoneHeader({
       </AnimatePresence>
       {(view === "day" || view === "three") && (
         <div
-          className="grid grid-cols-7 px-1 pb-1.5"
+          className="overflow-hidden px-1 pb-1.5"
           style={{ touchAction: "pan-y" }}
           onPointerDown={(e) => {
             if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, id: e.pointerId };
@@ -738,25 +808,36 @@ function PhoneHeader({
             if (Math.abs(dx) > 50) onPick(addDays(anchor, dx < 0 ? 7 : -7));
           }}
         >
-          {strip.map((d) => {
-            const on = range ? d >= range.from && d < addDays(range.from, range.days) : false;
-            const isToday = now !== null && isSameDay(d, now);
-            return (
-              <button key={d.getTime()} type="button" onClick={() => onPick(d)} className="flex flex-col items-center gap-0.5 py-0.5">
-                <span className={cn("text-[10.5px] font-medium uppercase", isToday ? "text-blob-ink" : "text-ink-3")}>{fmt(d, t.format.weekdayLetter, locale)}</span>
-                <span
-                  className={cn(
-                    "relative grid size-8 place-items-center rounded-full text-[14px] font-semibold tabular-nums transition-colors",
-                    on && isSameDay(d, anchor) ? "bg-ink text-paper" : on ? "bg-blob-soft text-blob-ink" : isToday ? "text-blob-ink" : "text-ink",
-                    isToday && on && isSameDay(d, anchor) && "bg-blob text-white",
-                  )}
-                >
-                  {d.getDate()}
-                  {busy.has(ymd(d)) && <span className={cn("absolute -bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full", on && isSameDay(d, anchor) ? "bg-ink-3" : "bg-blob")} />}
-                </span>
-              </button>
-            );
-          })}
+          {/* Another week slides in from its side; the chosen day's circle glides to the tapped day. */}
+          <motion.div key={ymd(week)} initial={move && move.dir ? { x: move.dir * 40, opacity: 0 } : false} animate={{ x: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 420, damping: 38 }} className="grid grid-cols-7">
+            {strip.map((d) => {
+              const on = range ? d >= range.from && d < addDays(range.from, range.days) : false;
+              const isToday = now !== null && isSameDay(d, now);
+              const chosen = on && isSameDay(d, anchor);
+              return (
+                <button key={d.getTime()} type="button" onClick={() => onPick(d)} className="flex flex-col items-center gap-0.5 py-0.5">
+                  <span className={cn("text-[10.5px] font-medium uppercase", isToday ? "text-blob-ink" : "text-ink-3")}>{fmt(d, t.format.weekdayLetter, locale)}</span>
+                  <span
+                    className={cn(
+                      "relative grid size-8 place-items-center rounded-full text-[14px] font-semibold tabular-nums transition-colors",
+                      chosen ? "text-paper" : on ? "bg-blob-soft text-blob-ink" : isToday ? "text-blob-ink" : "text-ink",
+                      chosen && isToday && "text-white",
+                    )}
+                  >
+                    {chosen && (
+                      <motion.span
+                        layoutId="cal-phone-day"
+                        className={cn("absolute inset-0 rounded-full", isToday ? "bg-blob" : "bg-ink")}
+                        transition={{ type: "spring", stiffness: 560, damping: 38 }}
+                      />
+                    )}
+                    <span className="relative">{d.getDate()}</span>
+                    {busy.has(ymd(d)) && <span className={cn("absolute -bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full", chosen ? "bg-ink-3" : "bg-blob")} />}
+                  </span>
+                </button>
+              );
+            })}
+          </motion.div>
         </div>
       )}
     </div>

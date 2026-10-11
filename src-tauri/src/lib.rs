@@ -517,6 +517,21 @@ pub fn run() {
         app.state::<Pending>().set(start);
       }
 
+      // Computers: a click on one of Blob's notifications brings Blob to the front (the site then
+      // opens the notification's page).
+      #[cfg(desktop)]
+      {
+        use tauri_plugin_notification::NotificationExt;
+        let front = handle.clone();
+        let _ = app.notification().on_action(move |_| {
+          if let Some(window) = front.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+          }
+        });
+      }
+
       let links = handle.clone();
       app.deep_link().on_open_url(move |event| {
         for link in event.urls() {

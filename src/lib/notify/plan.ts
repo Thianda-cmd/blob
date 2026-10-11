@@ -33,7 +33,20 @@ export function prefsOf(raw: unknown): NotifyPrefs {
   return out;
 }
 
-export type Planned = { id: number; key: string; at: Date; title: string; body: string; link: string };
+/** Which group a notification belongs to: on Android a channel each (settings per group), and grouped together. */
+export type NotifyKind = "events" | "school" | "learning" | "daily";
+
+export type Planned = {
+  id: number;
+  key: string;
+  at: Date;
+  title: string;
+  body: string;
+  link: string;
+  kind: NotifyKind;
+  /** The longer list shown when it's expanded (homework due, the day's plan). */
+  lines?: string[];
+};
 
 /** The words (src/i18n/messages/notify.ts). */
 export type NotifyWords = {
@@ -71,6 +84,8 @@ export type PlanInput = {
   horizon?: number;
   /** At most this many (iOS keeps 64 at a time). */
   max?: number;
+  /** For the subject's name next to an exam. */
+  subjects?: { id: string; name: string }[];
 };
 
 /** A stable 31-bit id for a notification's key (FNV-1a). */
@@ -89,10 +104,11 @@ export function plan(input: PlanInput): Planned[] {
   const { now, prefs, words: w } = input;
   const horizon = addDays(startOfDay(now), (input.horizon ?? 14) + 1);
   const out: Planned[] = [];
-  const add = (key: string, when: Date, title: string, body: string, link: string) => {
+  const add = (key: string, when: Date, title: string, body: string, link: string, kind: NotifyKind, lines?: string[]) => {
     if (when.getTime() <= now.getTime() + 30_000 || when >= horizon) return;
-    out.push({ id: notifyId(key), key, at: when, title, body, link });
+    out.push({ id: notifyId(key), key, at: when, title, body, link, kind, ...(lines?.length ? { lines } : {}) });
   };
+  const subjectName = (id: string | null) => (id ? input.subjects?.find((s) => s.id === id)?.name : undefined);
 
   // Events: their own reminders.
   if (prefs.events) {
@@ -103,7 +119,9 @@ export function plan(input: PlanInput): Planned[] {
       for (const m of e.reminders) {
         const when = item.allDay ? atMinutes(startOfDay(item.start), -m) : new Date(item.start.getTime() - m * 60_000);
         const body = item.allDay ? w.eventAllDay(w.day(item.start, when)) : m > 0 && m <= 120 ? w.eventSoon(m) : w.eventAt(`${w.day(item.start, when)}, ${w.time(item.start)}`);
-        add(`e:${item.key}:${m}`, when, item.title, body, `/calendar?date=${ymd(item.start)}&event=${e.series_id ?? e.id}`);
+        // Where: the room of a lesson matters most when it's about to start.
+        const place = e.location?.trim();
+        add(`e:${item.key}:${m}`, when, item.title, place ? `${body} · ${place}` : body, `/calendar?date=${ymd(item.start)}&event=${e.series_id ?? e.id}`, "events");
       }
     }
   }
@@ -123,14 +141,14 @@ export function plan(input: PlanInput): Planned[] {
       entry.titles.push(t.title);
       byDay.set(k, entry);
     }
-    for (const [k, { day, titles }] of byDay) add(`hw:${k}`, at(addDays(day, -1), 18), w.homeworkTitle, w.homeworkBody(titles), `/tasks`);
+    for (const [k, { day, titles }] of byDay) add(`hw:${k}`, at(addDays(day, -1), 18), w.homeworkTitle, w.homeworkBody(titles), `/tasks`, "school", titles.length > 1 ? titles : undefined);
   }
 
   // Reminders: at their time (or 8:00 on the day).
   if (prefs.reminders) {
     for (const t of open) {
       if (t.kind !== "reminder") continue;
-      add(`rem:${t.id}:${t.due_at}`, new Date(t.due_at!), w.reminderTitle, t.title, `/tasks`);
+      add(`rem:${t.id}:${t.due_at}`, new Date(t.due_at!), w.reminderTitle, t.title, `/tasks`, "events");
     }
   }
 
@@ -139,8 +157,10 @@ export function plan(input: PlanInput): Planned[] {
     for (const t of open) {
       if (t.kind !== "exam") continue;
       const day = startOfDay(new Date(t.due_at!));
-      for (const n of [7, 2, 1]) add(`ex:${t.id}:${ymd(day)}:${n}`, at(addDays(day, -n), 18), w.examIn(n), t.title, `/calendar?date=${ymd(day)}`);
-      add(`ex:${t.id}:${ymd(day)}:0`, at(day, 7), w.examToday, t.title, `/calendar?date=${ymd(day)}`);
+      const subject = subjectName(t.subject_id);
+      const what = subject && !t.title.toLowerCase().includes(subject.toLowerCase()) ? `${t.title} · ${subject}` : t.title;
+      for (const n of [7, 2, 1]) add(`ex:${t.id}:${ymd(day)}:${n}`, at(addDays(day, -n), 18), w.examIn(n), what, `/calendar?date=${ymd(day)}`, "school");
+      add(`ex:${t.id}:${ymd(day)}:0`, at(day, 7), w.examToday, what, `/calendar?date=${ymd(day)}`, "school");
     }
   }
 
@@ -149,7 +169,7 @@ export function plan(input: PlanInput): Planned[] {
     for (const d of [0, 1]) {
       const day = addDays(startOfDay(now), d);
       const n = input.cardsDue[ymd(day)] ?? 0;
-      if (n > 0) add(`cards:${ymd(day)}`, at(day, 17), w.cardsTitle, w.cardsBody(n), `/notes`);
+      if (n > 0) add(`cards:${ymd(day)}`, at(day, 17), w.cardsTitle, w.cardsBody(n), `/notes`, "learning");
     }
   }
 
@@ -160,7 +180,7 @@ export function plan(input: PlanInput): Planned[] {
     if (!days.has(ymd(today)) && days.has(ymd(addDays(today, -1)))) {
       let n = 0;
       for (let d = addDays(today, -1); days.has(ymd(d)); d = addDays(d, -1)) n++;
-      add(`streak:${ymd(today)}`, at(today, 19, 30), w.streakTitle(n), w.streakBody, `/learn`);
+      add(`streak:${ymd(today)}`, at(today, 19, 30), w.streakTitle(n), w.streakBody, `/learn`, "learning");
     }
   }
 
@@ -169,9 +189,12 @@ export function plan(input: PlanInput): Planned[] {
     const items = buildItems({ events: input.events, tasks: input.tasks, cards: [], subjects: [], from: startOfDay(now), to: addDays(startOfDay(now), 8) });
     for (let d = 0; d < 7; d++) {
       const day = addDays(startOfDay(now), d);
-      const events = items.filter((i) => i.source === "event" && differenceInCalendarDays(i.start, day) === 0).length;
-      const due = items.filter((i) => i.source === "task" && !i.done && differenceInCalendarDays(i.start, day) === 0).length;
-      if (events + due > 0) add(`am:${ymd(day)}`, at(day, 7), w.morningTitle, w.morningBody(events, due), `/calendar?date=${ymd(day)}&view=day`);
+      const onDay = items.filter((i) => differenceInCalendarDays(i.start, day) === 0 && !(i.source === "task" && i.done));
+      const events = onDay.filter((i) => i.source === "event").length;
+      const due = onDay.filter((i) => i.source === "task").length;
+      // Expanded: the day's plan, "8:00 Mathe".
+      const lines = onDay.slice(0, 8).map((i) => (i.allDay ? i.title : `${w.time(i.start)} ${i.title}`));
+      if (events + due > 0) add(`am:${ymd(day)}`, at(day, 7), w.morningTitle, w.morningBody(events, due), `/calendar?date=${ymd(day)}&view=day`, "daily", lines);
     }
   }
 

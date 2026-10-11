@@ -1,7 +1,7 @@
 "use client";
 
 import { blobApp, isPhoneApp } from "@/lib/native";
-import type { Planned } from "./plan";
+import type { NotifyKind, Planned } from "./plan";
 
 // Hands the planned notifications to the system (tauri-plugin-notification). Phones schedule them
 // with the system, so they come even when Blob is closed; computers show the ones due while the
@@ -41,7 +41,47 @@ export async function requestNotifyPermission(): Promise<Permission> {
 }
 
 const KEY = "blob-notify-scheduled";
-const signature = (p: Planned) => `${p.at.getTime()}|${p.title}|${p.body}|${p.link}`;
+const signature = (p: Planned) => `${p.at.getTime()}|${p.title}|${p.body}|${p.link}|${p.kind}|${p.lines?.join("\n") ?? ""}`;
+
+/** The groups' names, in the account's language (Android lists them in Blob's notification settings). */
+export type ChannelWords = Record<NotifyKind, { name: string; description: string }>;
+
+// Android: a channel per group. Calendar and school ones pop up and buzz; learning ones arrive
+// quietly; the morning overview only sits in the list.
+const CHANNELS: Record<NotifyKind, { importance: number; vibration: boolean }> = {
+  events: { importance: 4, vibration: true },
+  school: { importance: 4, vibration: true },
+  learning: { importance: 3, vibration: false },
+  daily: { importance: 2, vibration: false },
+};
+const channelId = (kind: NotifyKind) => `blob-${kind}`;
+/** Blob's own status bar icon (gen/android res/drawable/ic_stat_blob.xml) in Blob's purple. */
+const ICON = "ic_stat_blob";
+const ACCENT = "#6D3DF5";
+
+let channelsMade: string | null = null;
+async function makeChannels(words: ChannelWords) {
+  const signature = JSON.stringify(words);
+  if (channelsMade === signature) return;
+  for (const kind of Object.keys(CHANNELS) as NotifyKind[]) {
+    const c = CHANNELS[kind];
+    try {
+      await invoke("plugin:notification|create_channel", {
+        id: channelId(kind),
+        name: words[kind].name,
+        description: words[kind].description,
+        importance: c.importance,
+        visibility: 0,
+        vibration: c.vibration,
+        lights: c.vibration,
+        lightsColor: ACCENT,
+      });
+    } catch {
+      // An older Android without channels.
+    }
+  }
+  channelsMade = signature;
+}
 
 function readScheduled(): Record<string, string> {
   try {
@@ -56,26 +96,27 @@ let running: Promise<void> | null = null;
 let queued: Planned[] | null = null;
 
 /** Brings the system's notifications in step with `planned` (only what changed is touched). */
-export function scheduleNotifications(planned: Planned[]): Promise<void> {
+export function scheduleNotifications(planned: Planned[], channels: ChannelWords): Promise<void> {
   if (running) {
     queued = planned;
     return running;
   }
-  running = apply(planned).finally(() => {
+  running = apply(planned, channels).finally(() => {
     running = null;
     if (queued) {
       const next = queued;
       queued = null;
-      void scheduleNotifications(next);
+      void scheduleNotifications(next, channels);
     }
   });
   return running;
 }
 
-async function apply(planned: Planned[]) {
+async function apply(planned: Planned[], channels: ChannelWords) {
   const app = blobApp();
   if (!app || (await notifyPermission()) !== "granted") return;
   if (!isPhoneApp(app)) return showWhileOpen(planned);
+  if (app.platform === "android") await makeChannels(channels);
 
   const had = readScheduled();
   const want = new Map(planned.map((p) => [String(p.id), signature(p)]));
@@ -104,7 +145,20 @@ async function apply(planned: Planned[]) {
     if (!there) {
       try {
         await invoke("plugin:notification|notify", {
-          options: { id: p.id, title: p.title, body: p.body, schedule: { at: { date: p.at.toISOString(), allowWhileIdle: true } }, extra: { link: p.link }, autoCancel: true },
+          options: {
+            id: p.id,
+            title: p.title,
+            body: p.body,
+            schedule: { at: { date: p.at.toISOString(), allowWhileIdle: true } },
+            extra: { link: p.link },
+            autoCancel: true,
+            channelId: channelId(p.kind),
+            // Grouped in the list (Android), threads on iOS.
+            group: channelId(p.kind),
+            icon: ICON,
+            iconColor: ACCENT,
+            ...(p.lines ? { inboxLines: p.lines.slice(0, 6), summary: p.lines.length > 6 ? `+${p.lines.length - 6}` : undefined } : {}),
+          },
         });
       } catch {
         continue;
@@ -127,6 +181,8 @@ function showWhileOpen(planned: Planned[]) {
     if (wait < 0 || wait > 24 * 3600e3) continue;
     timers.push(
       setTimeout(() => {
+        // The computer slept through it: a reminder for long ago is no help now.
+        if (Date.now() - p.at.getTime() > 15 * 60_000) return;
         void invoke("plugin:notification|notify", { options: { id: p.id, title: p.title, body: p.body, extra: { link: p.link } } }).catch(() => {});
       }, wait),
     );

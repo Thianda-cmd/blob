@@ -47,6 +47,13 @@ export const notifyText = defineMessages({
       weekStart: "Week starts on",
     },
     ask: "Shall I remind you of events, homework and exams? Your phone will ask once.",
+    /** Android lists these in Blob's notification settings. */
+    channels: {
+      events: { name: "Calendar", description: "Your events' reminders and your reminders" },
+      school: { name: "Homework & exams", description: "What's due tomorrow, and exams coming up" },
+      learning: { name: "Learning", description: "Flashcards to review and your streak" },
+      daily: { name: "Morning overview", description: "What's on today, at 7:00" },
+    },
     /** The home and lock screen widgets (they get these words with their data). */
     widget: {
       today: "Today",
@@ -104,6 +111,12 @@ export const notifyText = defineMessages({
       weekStart: "Woche beginnt am",
     },
     ask: "Soll ich dich an Termine, Hausaufgaben und Prüfungen erinnern? Dein Handy fragt einmal nach.",
+    channels: {
+      events: { name: "Kalender", description: "Erinnerungen deiner Termine und deine Erinnerungen" },
+      school: { name: "Hausaufgaben & Prüfungen", description: "Was morgen fällig ist und anstehende Prüfungen" },
+      learning: { name: "Lernen", description: "Karteikarten zum Wiederholen und deine Serie" },
+      daily: { name: "Morgenübersicht", description: "Was heute ansteht, um 7:00" },
+    },
     widget: {
       today: "Heute",
       tomorrow: "Morgen",

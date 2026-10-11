@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { fmt, fmtRange, fmtTime } from "./describe";
 import { edgeScroller, track } from "./gesture";
 import { Bar, GridBlock, colorVar } from "./ItemViews";
+import { enter, type Move } from "./move";
 
 type T = (typeof calendarText)["en"];
 
@@ -41,8 +42,8 @@ type Props = {
   /** The ghost of an event being created (its editor is open). */
   draft: Span | null;
   held: Held;
-  /** Slide direction of the last move through time (-1 back, 1 forward), for the animation. */
-  direction: number;
+  /** How the calendar got here, for the way the grid comes in (move.ts). */
+  move: Move;
   /** Changes when the visible days change (the content slides). */
   rangeKey: string;
   /** Changes when the view changes (scrolls to the morning or now again). */
@@ -61,7 +62,7 @@ type Props = {
 };
 
 export function TimeGrid(props: Props) {
-  const { days, items, locale, t, now, touch, phone, selectedKey, draft, held, direction, rangeKey, viewKey, header, weekNumbers } = props;
+  const { days, items, locale, t, now, touch, phone, selectedKey, draft, held, move, rangeKey, viewKey, header, weekNumbers } = props;
   const n = days.length;
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
@@ -108,6 +109,15 @@ export function TimeGrid(props: Props) {
     const minute = today ? minutesInto(today, new Date(now)) - 90 : Math.min(first - 30, 7.5 * 60);
     el.scrollTop = Math.max(0, (minute / 60) * hour);
   }, [viewKey, now, days, items, hour]);
+
+  // The hours grow or shrink (the window, the first measure, zooming by keys): the same time stays on top.
+  const hourBefore = useRef(hour);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const before = hourBefore.current;
+    hourBefore.current = hour;
+    if (el && before !== hour && before > 0) el.scrollTop = (el.scrollTop / before) * hour;
+  }, [hour]);
 
   // Ctrl/⌘ + wheel (and trackpad pinch) zooms around the pointer; a sideways swipe changes days.
   useEffect(() => {
@@ -491,7 +501,7 @@ export function TimeGrid(props: Props) {
   const handlesFor = (item: CalItem) => item.resizable && (!touch || selectedKey === item.key);
 
   const gutter = phone ? 44 : 52;
-  const slide = { initial: { x: direction * 28, opacity: 0.4 }, animate: { x: 0, opacity: 1 }, transition: { type: "spring" as const, stiffness: 420, damping: 38 } };
+  const slide = enter(move);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col select-none [-webkit-touch-callout:none]" onPointerDown={onPointerDown}>

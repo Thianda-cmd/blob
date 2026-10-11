@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { fmt } from "./describe";
 import { track } from "./gesture";
 import { Bar } from "./ItemViews";
+import { enter, type Move } from "./move";
 import type { CommitMode, Held } from "./TimeGrid";
 
 type T = (typeof calendarText)["en"];
@@ -35,7 +36,7 @@ export function MonthGrid({
   selectedKey,
   held,
   draft,
-  direction,
+  move,
   rangeKey,
   weekNumbers,
   onOpen,
@@ -56,7 +57,8 @@ export function MonthGrid({
   selectedKey: string | null;
   held: Held;
   draft: Span | null;
-  direction: number;
+  /** How the calendar got here, for the way the grid comes in (move.ts). */
+  move: Move;
   rangeKey: string;
   weekNumbers: boolean;
   onOpen: (item: CalItem, rect: DOMRect) => void;
@@ -216,9 +218,7 @@ export function MonthGrid({
         <motion.div
           ref={gridRef}
           key={rangeKey}
-          initial={{ x: direction * 28, opacity: 0.4 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 420, damping: 38 }}
+          {...enter(move)}
           className="grid h-full"
           style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`, touchAction: "pan-y" }}
           role="grid"

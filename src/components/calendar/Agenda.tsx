@@ -10,6 +10,7 @@ import type { calendarText } from "@/i18n/messages/calendar";
 import { cn } from "@/lib/utils";
 import { fmt, fmtRange, fmtTime } from "./describe";
 import { ItemIcon, TaskTick, colorVar } from "./ItemViews";
+import type { Move } from "./move";
 
 type T = (typeof calendarText)["en"];
 
@@ -21,6 +22,7 @@ export function Agenda({
   locale,
   t,
   now,
+  move,
   selectedKey,
   onOpen,
   onToggleTask,
@@ -33,6 +35,8 @@ export function Agenda({
   locale: Locale;
   t: T;
   now: number | null;
+  /** How the calendar got here: on the first paint the days are just there (move.ts). */
+  move: Move;
   selectedKey: string | null;
   onOpen: (item: CalItem, rect: DOMRect) => void;
   onToggleTask: (item: CalItem) => void;
@@ -61,7 +65,7 @@ export function Agenda({
           return (
             <motion.section
               key={day.getTime()}
-              initial={{ opacity: 0, y: 8 }}
+              initial={move ? { opacity: 0, y: 8 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(gi, 10) * 0.025, type: "spring", stiffness: 420, damping: 34 }}
               className="flex gap-3 border-b border-line py-2.5 last:border-b-0 sm:gap-5"

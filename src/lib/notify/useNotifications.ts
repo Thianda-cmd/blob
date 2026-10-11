@@ -102,7 +102,7 @@ export function useNotifications() {
   useEffect(() => {
     if (!app || !extra || now === null) return;
     const timer = setTimeout(async () => {
-      const planned = plan({ now: new Date(), events, tasks, cardsDue: extra.cardsDue, learnDays: extra.learnDays, prefs, words });
+      const planned = plan({ now: new Date(), events, tasks, cardsDue: extra.cardsDue, learnDays: extra.learnDays, prefs, words, subjects });
       let permission = await notifyPermission();
       // Phones: ask once, when there is something to remind of.
       if (permission === "prompt" && planned.length && isPhoneApp(blobApp())) {
@@ -117,12 +117,12 @@ export function useNotifications() {
           permission = await requestNotifyPermission();
         }
       }
-      if (permission === "granted") await scheduleNotifications(planned);
+      if (permission === "granted") await scheduleNotifications(planned, t.channels);
     }, 2500);
     return () => clearTimeout(timer);
     // `now` ticks every 30 s: re-plan only when the hour turns (or the data changes).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [app, extra, events, tasks, prefs, words, hour]);
+  }, [app, extra, events, tasks, prefs, words, subjects, hour]);
 
   // The home and lock screen widgets (phones): the coming days, the streak, the cards to review.
   useEffect(() => {
