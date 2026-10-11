@@ -53,20 +53,43 @@ async function signInAs(userId: string): Promise<boolean> {
 }
 
 /**
+ * A confirmed sign-in the app already used moments ago (by its link or by asking), when the answer
+ * with the session didn't reach it: the link and the app's own asking can cross, and a page that
+ * moves on drops the other's answer. Only the app's verifier redeems it, so this lets nobody else in.
+ */
+const AGAIN_MS = 2 * 60_000;
+
+/**
  * In the app, from the link: the code from the browser and the app's own verifier become a
- * session. The code is used up on the first try, also when the verifier doesn't match.
+ * session. The code is used up on the first try (also when the verifier doesn't match); the app
+ * that holds the verifier may redeem it again for a short while (AGAIN_MS).
  */
 export async function finishAppSignIn(code: string, verifier: string): Promise<{ ok: true } | { error: "failed" }> {
   if (!isCode(code) || !isVerifier(verifier)) return { error: "failed" };
-  const { data: row, error } = await createAdminClient()
+  const admin = createAdminClient();
+  const codeHash = hex(await sha256(code));
+  const now = new Date();
+  const { data: fresh, error } = await admin
     .from("app_sign_ins")
-    .update({ used_at: new Date().toISOString() })
-    .eq("code_hash", hex(await sha256(code)))
+    .update({ used_at: now.toISOString() })
+    .eq("code_hash", codeHash)
     .is("used_at", null)
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", now.toISOString())
     .select("user_id, challenge")
     .maybeSingle();
-  if (error || !row) return { error: "failed" };
+  if (error) return { error: "failed" };
+  const row =
+    fresh ??
+    (
+      await admin
+        .from("app_sign_ins")
+        .select("user_id, challenge")
+        .eq("code_hash", codeHash)
+        .gt("used_at", new Date(now.getTime() - AGAIN_MS).toISOString())
+        .gt("expires_at", now.toISOString())
+        .maybeSingle()
+    ).data;
+  if (!row) return { error: "failed" };
 
   const expected = Buffer.from(row.challenge as string);
   const got = Buffer.from(await challengeOf(verifier));
@@ -81,16 +104,33 @@ export async function finishAppSignIn(code: string, verifier: string): Promise<{
  */
 export async function pollAppSignIn(state: string, verifier: string): Promise<{ status: "ok" | "waiting" | "failed" }> {
   if (!isState(state) || !isVerifier(verifier)) return { status: "failed" };
-  const { data: row, error } = await createAdminClient()
+  const admin = createAdminClient();
+  const stateHash = hex(await sha256(state));
+  const challenge = await challengeOf(verifier);
+  const now = new Date();
+  const { data: fresh, error } = await admin
     .from("app_sign_ins")
-    .update({ used_at: new Date().toISOString() })
-    .eq("state_hash", hex(await sha256(state)))
-    .eq("challenge", await challengeOf(verifier))
+    .update({ used_at: now.toISOString() })
+    .eq("state_hash", stateHash)
+    .eq("challenge", challenge)
     .is("used_at", null)
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", now.toISOString())
     .select("user_id")
     .maybeSingle();
   if (error) return { status: "failed" };
+  // Used by the app's link a moment ago, and that answer got lost: the same app may have it again.
+  const row =
+    fresh ??
+    (
+      await admin
+        .from("app_sign_ins")
+        .select("user_id")
+        .eq("state_hash", stateHash)
+        .eq("challenge", challenge)
+        .gt("used_at", new Date(now.getTime() - AGAIN_MS).toISOString())
+        .gt("expires_at", now.toISOString())
+        .maybeSingle()
+    ).data;
   if (!row) return { status: "waiting" };
   return { status: (await signInAs(row.user_id as string)) ? "ok" : "failed" };
 }
