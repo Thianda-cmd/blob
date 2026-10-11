@@ -8,8 +8,9 @@
 #   builds and their tests have passed.
 # - By hand: Actions → Apps → Run workflow.
 #
-# Not signed by a store yet (docs/native-apps.md): Windows shows SmartScreen, macOS asks for
-# right-click → Open the first time. The APK is signed with secrets.ANDROID_KEYSTORE if set, else
+# Not signed by a store yet (docs/native-apps.md): Windows shows SmartScreen; the Mac app is only
+# ad-hoc signed, so macOS asks for Privacy & Security → Open Anyway the first time (without any
+# signature it would call the app damaged). The APK is signed with secrets.ANDROID_KEYSTORE if set, else
 # with a new key each time (then updating needs an uninstall first).
 name: Apps
 
@@ -38,7 +39,7 @@ env:
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
-    - **macOS** (Apple silicon and Intel): `Blob_…_universal.dmg`, drag Blob into Applications. The first time: right-click Blob → *Open*.
+    - **macOS** (Apple silicon and Intel): `Blob_…_universal.dmg`, drag Blob into Applications. The first time macOS says it can't check Blob: open *System Settings → Privacy & Security* and choose *Open Anyway*.
     - **Linux**: `.deb` (Ubuntu, Debian), `.rpm` (Fedora) or the `.AppImage`.
     - **Android** (8.0 or newer): `Blob_…_android.apk`, allow installing from your browser or files app when asked.
     - **iPhone and iPad**: coming with the App Store.

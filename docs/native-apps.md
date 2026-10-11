@@ -210,7 +210,9 @@ The bundle id **`org.bojes.blob`** is permanent once an app is in a store.
 
 **Phase 2: ready to hand out.**
 - Code signing:
-  - macOS: Developer ID and notarization (needs the Apple Developer Program, $99/year).
+  - macOS: Developer ID and notarization (needs the Apple Developer Program, $99/year). Until
+    then the app is ad-hoc signed (`signingIdentity: "-"`), so macOS asks once for Privacy &
+    Security → Open Anyway; with no signature at all it would call a downloaded copy damaged.
   - Windows: a code-signing certificate or Azure Trusted Signing, otherwise SmartScreen warns.
 - **Auto-updates** with `tauri-plugin-updater`: generate a signing key, publish `latest.json` with
   the GitHub releases.

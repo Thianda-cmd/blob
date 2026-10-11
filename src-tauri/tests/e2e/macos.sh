@@ -12,6 +12,10 @@ check() {
   if [ "$2" = 1 ]; then echo "ok   $1 ${3:-}"; else echo "FAIL $1 ${3:-}"; FAILED=1; fi
 }
 
+# Signed (ad hoc) as a whole, so a downloaded copy isn't called damaged.
+check "the app's signature is valid" "$(codesign --verify --deep --strict "$APP" > "$OUT/codesign.txt" 2>&1 && echo 1 || echo 0)" "$(head -c 200 "$OUT/codesign.txt")"
+codesign -dv "$APP" >> "$OUT/codesign.txt" 2>&1
+
 open "$APP"
 sleep 30
 screencapture -x "$OUT/01-start.png"
