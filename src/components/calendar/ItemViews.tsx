@@ -161,11 +161,14 @@ export function Bar({
   fromBefore,
   goesOn,
   handles,
+  compact,
 }: {
   item: CalItem;
   locale: Locale;
   /** A timed item in the month grid: a dot and its time instead of a filled bar. */
   timed?: boolean;
+  /** Narrow cells (phones): the title only. */
+  compact?: boolean;
   selected?: boolean;
   ghost?: boolean;
   dimmed?: boolean;
@@ -179,7 +182,8 @@ export function Bar({
   return (
     <div
       className={cn(
-        "relative flex h-full w-full min-w-0 items-center gap-1 overflow-hidden px-1.5 text-[12px] leading-none transition-[box-shadow,opacity] duration-150",
+        "relative flex h-full w-full min-w-0 items-center gap-1 overflow-hidden leading-none transition-[box-shadow,opacity] duration-150",
+        compact ? "px-1 text-[10.5px]" : "px-1.5 text-[12px]",
         "rounded-[6px]",
         timed
           ? "text-ink hover:bg-hover"
@@ -197,13 +201,13 @@ export function Bar({
       )}
       style={colorVar(item.color)}
     >
-      {item.source === "task" ? (
+      {item.source === "task" && !compact ? (
         <TaskTick item={item} onToggle={onToggleTask} size={12} />
       ) : timed ? (
         <span className="size-[7px] shrink-0 rounded-full bg-[var(--c)]" />
       ) : null}
-      <ItemIcon item={item} className={item.exam ? "text-blob-ink" : "text-[var(--c)]"} />
-      {timed && <span className="shrink-0 tabular-nums text-ink-3">{fmtTime(item.start, locale)}</span>}
+      {!compact && <ItemIcon item={item} className={item.exam ? "text-blob-ink" : "text-[var(--c)]"} />}
+      {timed && !compact && <span className="shrink-0 tabular-nums text-ink-3">{fmtTime(item.start, locale)}</span>}
       <span className={cn("min-w-0 truncate", item.done && "line-through decoration-ink-3")}>{title}</span>
       {handles}
     </div>

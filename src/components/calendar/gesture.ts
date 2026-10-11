@@ -41,6 +41,17 @@ function installBlocker() {
   );
 }
 
+/** Ignores the click a browser sends right after a touch tap (for a moment only). */
+function swallowClick() {
+  const stop = (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.removeEventListener("click", stop, true);
+  };
+  window.addEventListener("click", stop, true);
+  setTimeout(() => window.removeEventListener("click", stop, true), 450);
+}
+
 /** A short buzz where the device has one (Android; iOS ignores it). */
 export function buzz(ms = 8) {
   try {
@@ -117,7 +128,12 @@ export function track(down: PointerEvent | React.PointerEvent, h: GestureHandler
     y = e.clientY;
     if (active) h.end(x, y, e);
     else if (swiping) h.swipe?.(x - x0, y - y0, "end", e);
-    else if (Math.hypot(x - x0, y - y0) <= (touch ? slop : threshold)) h.tap?.(x, y, e);
+    else if (Math.hypot(x - x0, y - y0) <= (touch ? slop : threshold)) {
+      // The browser follows a tap with a click; it would land on whatever the tap just opened
+      // (a sheet's backdrop) and close it again.
+      if (touch) swallowClick();
+      h.tap?.(x, y, e);
+    }
     finish();
   };
 

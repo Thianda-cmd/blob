@@ -313,13 +313,13 @@ export function EventForm({
             <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5">
               <span className="text-[12px] text-ink-3">{t.form.starts}</span>
               <div className="flex gap-1.5">
-                <input type="date" required value={f.startDate} onChange={(e) => e.target.value && setStart(e.target.value, f.startTime)} className={cn(inputClass, "h-9 min-w-0 flex-1 px-2 text-[13px]")} aria-label={`${t.form.starts} ${t.form.date}`} />
-                {!f.allDay && <input type="time" required step={300} value={f.startTime} onChange={(e) => e.target.value && setStart(f.startDate, e.target.value)} className={cn(inputClass, "h-9 w-[104px] px-2 text-[13px]")} aria-label={`${t.form.starts} ${t.form.time}`} />}
+                <input type="date" required value={f.startDate} onChange={(e) => e.target.value && setStart(e.target.value, f.startTime)} className={cn(inputClass, "h-9 min-w-0 px-2 text-[13px]")} style={{ flex: "1 1 0" }} aria-label={`${t.form.starts} ${t.form.date}`} />
+                {!f.allDay && <input type="time" required step={300} value={f.startTime} onChange={(e) => e.target.value && setStart(f.startDate, e.target.value)} className={cn(inputClass, "h-9 shrink-0 px-2 text-[13px]")} style={{ width: 108 }} aria-label={`${t.form.starts} ${t.form.time}`} />}
               </div>
               <span className="text-[12px] text-ink-3">{t.form.ends}</span>
               <div className="flex gap-1.5">
-                <input type="date" required value={f.endDate} min={f.startDate} onChange={(e) => e.target.value && set({ endDate: e.target.value })} className={cn(inputClass, "h-9 min-w-0 flex-1 px-2 text-[13px]")} aria-label={`${t.form.ends} ${t.form.date}`} />
-                {!f.allDay && <input type="time" required step={300} value={f.endTime} onChange={(e) => e.target.value && set({ endTime: e.target.value })} className={cn(inputClass, "h-9 w-[104px] px-2 text-[13px]")} aria-label={`${t.form.ends} ${t.form.time}`} aria-invalid={bad} />}
+                <input type="date" required value={f.endDate} min={f.startDate} onChange={(e) => e.target.value && set({ endDate: e.target.value })} className={cn(inputClass, "h-9 min-w-0 px-2 text-[13px]")} style={{ flex: "1 1 0" }} aria-label={`${t.form.ends} ${t.form.date}`} />
+                {!f.allDay && <input type="time" required step={300} value={f.endTime} onChange={(e) => e.target.value && set({ endTime: e.target.value })} className={cn(inputClass, "h-9 shrink-0 px-2 text-[13px]")} style={{ width: 108 }} aria-label={`${t.form.ends} ${t.form.time}`} aria-invalid={bad} />}
               </div>
             </div>
             {bad && <p className="text-[12px] text-danger">{t.form.endBeforeStart}</p>}
@@ -492,7 +492,8 @@ function RepeatField({ value, start, onChange, t, locale }: { value: Recurrence 
               max={99}
               value={r.interval ?? 1}
               onChange={(e) => onChange({ ...r, interval: Math.max(1, Math.min(99, Number(e.target.value) || 1)) })}
-              className={cn(inputClass, "h-8 w-16 px-2 text-[13px]")}
+              className={cn(inputClass, "h-8 px-2 text-[13px]")}
+              style={{ width: 64 }}
             />
             <select
               value={r.freq}
@@ -500,7 +501,8 @@ function RepeatField({ value, start, onChange, t, locale }: { value: Recurrence 
                 const freq = e.target.value as RepeatFreq;
                 onChange({ ...r, freq, byDay: freq === "weekly" ? (r.byDay?.length ? r.byDay : [start.getDay()]) : undefined });
               }}
-              className={cn(inputClass, "h-8 w-auto px-2 text-[13px]")}
+              className={cn(inputClass, "h-8 px-2 text-[13px]")}
+              style={{ width: "auto" }}
             >
               {(["daily", "weekly", "monthly", "yearly"] as const).map((fq) => (
                 <option key={fq} value={fq}>
@@ -541,16 +543,17 @@ function RepeatField({ value, start, onChange, t, locale }: { value: Recurrence 
                 else if (v === "on") onChange({ ...r, count: null, until: ymd(addDays(start, 90)) });
                 else onChange({ ...r, until: null, count: 10 });
               }}
-              className={cn(inputClass, "h-8 w-auto px-2 text-[13px]")}
+              className={cn(inputClass, "h-8 px-2 text-[13px]")}
+              style={{ width: "auto" }}
             >
               <option value="never">{t.repeat.endsNever}</option>
               <option value="on">{t.repeat.endsOn}</option>
               <option value="after">{t.repeat.endsAfter}</option>
             </select>
-            {r.until && <input type="date" value={r.until} min={ymd(start)} onChange={(e) => e.target.value && onChange({ ...r, until: e.target.value })} className={cn(inputClass, "h-8 w-auto px-2 text-[13px]")} />}
+            {r.until && <input type="date" value={r.until} min={ymd(start)} onChange={(e) => e.target.value && onChange({ ...r, until: e.target.value })} className={cn(inputClass, "h-8 px-2 text-[13px]")} style={{ width: "auto" }} />}
             {r.count ? (
               <span className="flex items-center gap-1.5">
-                <input type="number" min={1} max={999} value={r.count} onChange={(e) => onChange({ ...r, count: Math.max(1, Math.min(999, Number(e.target.value) || 1)) })} className={cn(inputClass, "h-8 w-16 px-2 text-[13px]")} />
+                <input type="number" min={1} max={999} value={r.count} onChange={(e) => onChange({ ...r, count: Math.max(1, Math.min(999, Number(e.target.value) || 1)) })} className={cn(inputClass, "h-8 px-2 text-[13px]")} style={{ width: 64 }} />
                 <span className="text-ink-2">{t.repeat.times(r.count)}</span>
               </span>
             ) : null}

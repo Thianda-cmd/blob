@@ -458,6 +458,8 @@ export function TimeGrid(props: Props) {
     const blockEl = target.closest<HTMLElement>("[data-key]");
     const item = blockEl ? byKey.get(blockEl.dataset.key!) : undefined;
     const handle = target.closest<HTMLElement>("[data-handle]");
+    // A mouse drag here moves things; it shouldn't select text on the page.
+    if (e.pointerType === "mouse") e.preventDefault();
     if (item && handle) return startResize(e, item, handle.dataset.handle as "start" | "end");
     if (item && blockEl) return startMove(e, item, blockEl);
     if (target.closest("[data-slot]")) return;
@@ -536,7 +538,9 @@ export function TimeGrid(props: Props) {
               {laneOpen ? "−" : `+${lane.rows - LANE_ROWS}`}
             </button>
           ) : (
-            <span className="leading-tight">{t.allDay}</span>
+            <span lang={locale} className="text-right leading-[1.15] [hyphens:auto] [overflow-wrap:anywhere]">
+              {t.allDay}
+            </span>
           )}
         </div>
         <motion.div

@@ -194,6 +194,7 @@ export function MonthGrid({
     if (target.closest("[data-no-drag]")) return;
     const el = target.closest<HTMLElement>("[data-key]");
     const item = el ? byKey.get(el.dataset.key!) : undefined;
+    if (e.pointerType === "mouse") e.preventDefault();
     if (item && el) return startMove(e, item, el);
     startCreate(e);
   };
@@ -275,6 +276,7 @@ export function MonthGrid({
                       item={b.item}
                       locale={locale}
                       timed={timed}
+                      compact={phone}
                       untitled={t.untitled}
                       selected={selectedKey === b.item.key}
                       dimmed={moving === b.item.key}
