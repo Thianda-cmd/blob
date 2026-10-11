@@ -44,11 +44,18 @@ env:
     Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Calendar**: day, week, month and agenda views; drag to create, move and resize events; repeating events; your homework and exams in it.
-    - **Works offline**: notes, calendar and tasks stay on the device and are saved to the cloud once you're back online.
-    - **Reminders** for events, homework, exams, flashcards and your streak.
-    - **Android home screen widget** "Today in Blob".
-    - **Sign in with your browser**: sign the app in with the account you're already signed in to on the web.
+    - **Updates by itself** (computers): when a new version is out, Blob shows what's new and updates with one click.
+    - **Calendar**: smoother switching between days, weeks and months; Today shows the way when it's out of sight.
+    - **Reminders** say the room, name the exam's subject and list your homework; on Android they have their own channels and Blob's icon.
+    - **New Android widget "Next up"**: what's on now or next, with a live countdown. The Today widget shows rooms too.
+    - **Sign in with your browser** works every time, even when the browser doesn't open the app.
+
+    **Neu in dieser Version**
+    - **Aktualisiert sich selbst** (Computer): Gibt es eine neue Version, zeigt Blob, was neu ist, und aktualisiert sich mit einem Klick.
+    - **Kalender**: flüssigerer Wechsel zwischen Tagen, Wochen und Monaten; „Heute“ zeigt die Richtung, wenn heute nicht zu sehen ist.
+    - **Erinnerungen** nennen den Raum, das Fach der Prüfung und deine Hausaufgaben; auf Android mit eigenen Kanälen und Blobs Symbol.
+    - **Neues Android-Widget „Als Nächstes“**: was gerade läuft oder als Nächstes kommt, mit Live-Countdown. Das Heute-Widget zeigt jetzt auch Räume.
+    - **Mit dem Browser anmelden** klappt jedes Mal, auch wenn der Browser die App nicht öffnet.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
