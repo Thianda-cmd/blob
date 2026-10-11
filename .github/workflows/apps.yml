@@ -41,7 +41,14 @@ permissions:
 
 env:
   RELEASE_BODY: |
-    Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, projects, CV and the learning centre.
+    Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
+
+    **New in this version**
+    - **Calendar**: day, week, month and agenda views; drag to create, move and resize events; repeating events; your homework and exams in it.
+    - **Works offline**: notes, calendar and tasks stay on the device and are saved to the cloud once you're back online.
+    - **Reminders** for events, homework, exams, flashcards and your streak.
+    - **Android home screen widget** "Today in Blob".
+    - **Sign in with your browser**: sign the app in with the account you're already signed in to on the web.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
@@ -50,7 +57,7 @@ env:
     - **Android** (8.0 or newer): `Blob_…_android.apk`, allow installing from your browser or files app when asked.
     - **iPhone and iPad**: coming with the App Store.
 
-    The apps show the live site, so they need the internet, and everything you do is the same as on the web.
+    The apps show the live site: everything you do is the same as on the web, and what you did offline is saved to the cloud once you're back online.
 
 jobs:
   desktop:
