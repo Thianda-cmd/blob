@@ -1,6 +1,9 @@
 package org.bojes.blob
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
@@ -28,6 +31,25 @@ class MainActivity : TauriActivity() {
       view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
       WindowInsetsCompat.CONSUMED
     }
+    pinForTest(intent)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    pinForTest(intent)
+  }
+
+  /**
+   * Debug builds only (the emulator test, src-tauri/tests/e2e/android.mjs): `--es pin_widget today`
+   * or `next` asks the home screen to add that widget, for screenshots of it where it lives.
+   */
+  private fun pinForTest(intent: Intent?) {
+    if (!BuildConfig.DEBUG) return
+    val which = intent?.getStringExtra("pin_widget") ?: return
+    val manager = AppWidgetManager.getInstance(this)
+    if (!manager.isRequestPinAppWidgetSupported) return
+    val provider = ComponentName(this, if (which == "next") NextWidget::class.java else TodayWidget::class.java)
+    manager.requestPinAppWidget(provider, null, null)
   }
 
   override fun onWebViewCreate(webView: WebView) {

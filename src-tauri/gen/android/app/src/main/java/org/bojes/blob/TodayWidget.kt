@@ -24,7 +24,8 @@ import java.util.Locale
  * streak and the cards to review. The site hands over its data through window.BlobAndroid
  * (MainActivity.kt; src/lib/widget on the site), with the words in the account's language, and it
  * is kept here, so the widget works while Blob isn't running. It is drawn again whenever new data
- * comes and every half hour, leaving out what has ended. A tap opens that day or task in Blob.
+ * comes and every half hour (and with "Next up", NextWidget.kt, at the moments things start and
+ * end), leaving out what has ended. A tap opens that day or task in Blob.
  */
 class TodayWidget : AppWidgetProvider() {
   override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -35,7 +36,10 @@ class TodayWidget : AppWidgetProvider() {
     draw(context, manager, id)
   }
 
-  private class Item(val title: String, val start: Long, val end: Long, val allDay: Boolean, val color: Int, val kind: String, val link: String)
+  internal class Item(val title: String, val start: Long, val end: Long, val allDay: Boolean, val color: Int, val kind: String, val link: String, val place: String) {
+    /** Under way: started, timed, not over. */
+    fun running(now: Long) = !allDay && start <= now && end > now
+  }
 
   companion object {
     private const val PREFS = "blob_widget"
@@ -51,10 +55,15 @@ class TodayWidget : AppWidgetProvider() {
       intArrayOf(R.id.widget_row4, R.id.widget_bar4, R.id.widget_title4, R.id.widget_time4),
     )
 
-    /** New data from the site ("" after signing out). */
+    /** New data from the site ("" after signing out): both widgets are drawn again. */
     fun save(context: Context, json: String) {
       if (json.length > MAX_JSON) return
       context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, json).apply()
+      drawAll(context)
+      NextWidget.drawAll(context)
+    }
+
+    fun drawAll(context: Context) {
       val manager = AppWidgetManager.getInstance(context)
       for (id in manager.getAppWidgetIds(ComponentName(context, TodayWidget::class.java))) draw(context, manager, id)
     }
@@ -123,7 +132,7 @@ class TodayWidget : AppWidgetProvider() {
       manager.updateAppWidget(id, views)
     }
 
-    private fun read(context: Context): JSONObject? {
+    internal fun read(context: Context): JSONObject? {
       val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
       if (raw.isNullOrEmpty()) return null
       return try {
@@ -133,7 +142,7 @@ class TodayWidget : AppWidgetProvider() {
       }
     }
 
-    private fun items(data: JSONObject, night: Boolean): List<Item> {
+    internal fun items(data: JSONObject, night: Boolean): List<Item> {
       val list = data.optJSONArray("items") ?: return emptyList()
       val out = ArrayList<Item>()
       for (i in 0 until list.length()) {
@@ -144,13 +153,18 @@ class TodayWidget : AppWidgetProvider() {
           Color.parseColor("#6d3df5")
         }
         val link = o.optString("l", "/calendar").takeIf { LINKS.matches(it) } ?: "/calendar"
-        out.add(Item(o.optString("t"), o.optLong("s"), o.optLong("e"), o.optBoolean("a"), color, o.optString("k", "event"), link))
+        out.add(Item(o.optString("t"), o.optLong("s"), o.optLong("e"), o.optBoolean("a"), color, o.optString("k", "event"), link, o.optString("p", "").take(60)))
       }
       return out
     }
 
-    /** "08:00 – 09:30", "Tomorrow · All day", "Due 14:00", "Exam · Friday". */
-    private fun subtitle(item: Item, now: Long, words: JSONObject, locale: Locale, time: java.text.DateFormat): String {
+    /** "08:00 – 09:30 · R 204", "Now · until 09:30", "Tomorrow · All day", "Due 14:00", "Exam · Friday". */
+    internal fun subtitle(item: Item, now: Long, words: JSONObject, locale: Locale, time: java.text.DateFormat): String {
+      val place = if (item.place.isNotEmpty()) " · ${item.place}" else ""
+      if (item.running(now) && item.kind == "event") {
+        val until = words.optString("until", "").ifEmpty { "– {t}" }.replace("{t}", time.format(Date(item.end)))
+        return "${words.optString("now", "").ifEmpty { "Now" }} · $until$place"
+      }
       val day = dayLabel(item.start, now, words, locale)
       val today = daysBetween(now, item.start) <= 0
       val prefix = when (item.kind) {
@@ -163,16 +177,16 @@ class TodayWidget : AppWidgetProvider() {
         item.kind == "event" -> "${time.format(Date(item.start))} – ${time.format(Date(item.end))}"
         else -> time.format(Date(item.start))
       }
-      return listOf(prefix, if (today) "" else day, clock).filter { it.isNotEmpty() }.joinToString(" · ")
+      return listOf(prefix, if (today) "" else day, clock).filter { it.isNotEmpty() }.joinToString(" · ") + place
     }
 
-    private fun daysBetween(from: Long, to: Long): Int {
+    internal fun daysBetween(from: Long, to: Long): Int {
       val a = Calendar.getInstance().apply { timeInMillis = from; set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }
       val b = Calendar.getInstance().apply { timeInMillis = to; set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0) }
       return Math.round((b.timeInMillis - a.timeInMillis) / 86_400_000.0).toInt()
     }
 
-    private fun dayLabel(at: Long, now: Long, words: JSONObject, locale: Locale): String =
+    internal fun dayLabel(at: Long, now: Long, words: JSONObject, locale: Locale): String =
       when (daysBetween(now, at)) {
         0 -> words.optString("today")
         1 -> words.optString("tomorrow")
@@ -180,7 +194,7 @@ class TodayWidget : AppWidgetProvider() {
       }
 
     /** Blob at that page (org.bojes.blob://calendar?date=…, which the app opens like any app link). */
-    private fun open(context: Context, path: String, code: Int): PendingIntent {
+    internal fun open(context: Context, path: String, code: Int): PendingIntent {
       val intent = Intent(Intent.ACTION_VIEW, Uri.parse("org.bojes.blob://" + path.trimStart('/')), context, MainActivity::class.java)
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       return PendingIntent.getActivity(context, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

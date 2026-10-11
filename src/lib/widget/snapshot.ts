@@ -24,6 +24,8 @@ export type WidgetItem = {
   k: "event" | "task" | "exam";
   /** Where tapping it leads in the app. */
   l: string;
+  /** Where it is (a lesson's room), when it says. */
+  p?: string;
 };
 
 export type WidgetWords = {
@@ -39,6 +41,10 @@ export type WidgetWords = {
   /** "+{n} more" */
   more: string;
   open: string;
+  /** What's running now: "Now", "until {t}"; what starts within the hour: "in {t}". */
+  now: string;
+  until: string;
+  soon: string;
 };
 
 export type WidgetData = {
@@ -103,6 +109,7 @@ export function widgetData(input: {
     .map((i): WidgetItem => {
       const [c, cd] = colours(i.color);
       const series = i.occurrence?.series.id ?? i.event?.series_id ?? i.event?.id;
+      const place = i.event?.location?.trim();
       return {
         t: i.title,
         s: i.start.getTime(),
@@ -112,6 +119,7 @@ export function widgetData(input: {
         cd,
         k: i.exam ? "exam" : i.source === "task" ? "task" : "event",
         l: i.source === "event" ? `/calendar?date=${ymd(i.start)}${series ? `&event=${series}` : ""}` : `/tasks`,
+        ...(place ? { p: place.slice(0, 60) } : {}),
       };
     });
   return {

@@ -340,11 +340,52 @@ try {
   // The home screen widget: Android knows it, and the site's data reaches it (kept in its settings).
   const providers = adbQuiet("shell", "dumpsys", "appwidget");
   check("the Today widget is offered on the home screen", providers.includes(`${PKG}/org.bojes.blob.TodayWidget`), providers.slice(0, 200));
+  check("the Next up widget is offered on the home screen", providers.includes(`${PKG}/org.bojes.blob.NextWidget`), providers.slice(0, 200));
   const sample = { v: 1, at: Date.now(), locale: "en", items: [{ t: "E2E event", s: Date.now() + 3600e3, e: Date.now() + 7200e3, a: false, c: "#3f78b3", cd: "#3f78b3", k: "event", l: "/calendar" }], streak: 3, practisedToday: false, cards: 2, w: { today: "Today", tomorrow: "Tomorrow", nothing: "-", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "days", cards: "cards", more: "+{n}", open: "Open" } };
   await dt.js(`window.BlobWidget.postMessage(${JSON.stringify(JSON.stringify(sample))})`);
   await sleep(800);
   const kept = adbQuiet("shell", "run-as", PKG, "cat", "shared_prefs/blob_widget.xml");
   check("the widget keeps the site's data", kept.includes("E2E event"), kept.slice(0, 200));
+
+  // Both widgets on the home screen, with a school day in them (light and dark), for the screenshots.
+  // Pinning goes through the launcher's own "Add" dialog; if a launcher has none, there are no shots.
+  const now = Date.now();
+  const at = (min) => now + min * 60e3;
+  const day = { v: 1, at: now, locale: "en", streak: 6, practisedToday: false, cards: 12, items: [
+    { t: "Biology", s: at(-35), e: at(55), a: false, c: "#5d8a4c", cd: "#5d8a4c", k: "event", l: "/calendar", p: "Bio lab" },
+    { t: "Maths", s: at(70), e: at(160), a: false, c: "#3f78b3", cd: "#3f78b3", k: "event", l: "/calendar", p: "R 204" },
+    { t: "English essay", s: at(24 * 60), e: at(25 * 60), a: true, c: "#c4653e", cd: "#c4653e", k: "task", l: "/tasks" },
+    { t: "Chemistry exam", s: at(48 * 60), e: at(49 * 60), a: true, c: "#3a8c87", cd: "#3a8c87", k: "exam", l: "/calendar" },
+  ], w: { ...sample.w, nothing: "Nothing planned. Enjoy it!", streak: "day streak", cards: "cards to review", more: "+{n} more", next: "Next", now: "Now", until: "until {t}", soon: "in {t}" } };
+  await dt.js(`window.BlobWidget.postMessage(${JSON.stringify(JSON.stringify(day))})`);
+  await sleep(800);
+  const pin = async (which) => {
+    adbQuiet("shell", "am", "start", "-n", `${PKG}/${ACTIVITY}`, "--es", "pin_widget", which);
+    await sleep(2500);
+    adbQuiet("shell", "uiautomator", "dump", "/sdcard/ui.xml");
+    const ui = adbQuiet("shell", "cat", "/sdcard/ui.xml");
+    const node = [...ui.matchAll(/<node [^>]*>/g)].map((m) => m[0]).find((n) => /clickable="true"/.test(n) && /(text|content-desc|resource-id)="[^"]*(add|Add|ADD)[^"]*"/.test(n));
+    const bounds = node && /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(node);
+    if (!bounds) return false;
+    const [, x1, y1, x2, y2] = bounds.map(Number);
+    adb("shell", "input", "tap", String((x1 + x2) >> 1), String((y1 + y2) >> 1));
+    await sleep(2000);
+    return true;
+  };
+  const pinned = [await pin("today"), await pin("next")];
+  console.log(`widgets pinned: today ${pinned[0]}, next ${pinned[1]}`);
+  if (pinned.some(Boolean)) {
+    adb("shell", "input", "keyevent", "KEYCODE_HOME");
+    await sleep(2500);
+    shot("widgets-home");
+    adbQuiet("shell", "cmd", "uimode", "night", "yes");
+    await sleep(3000);
+    shot("widgets-home-dark");
+    adbQuiet("shell", "cmd", "uimode", "night", "no");
+    await sleep(1500);
+    adbQuiet("shell", "am", "start", "-n", `${PKG}/${ACTIVITY}`);
+    await sleep(2000);
+  }
   await dt.js(`window.BlobWidget.postMessage("")`);
 
   // No crash along the way.

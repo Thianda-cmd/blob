@@ -8,4 +8,8 @@
     <string name="widget_sample_3">"Mathe Arbeitsblatt S. 42"</string>
     <string name="widget_sample_3_time">"Fällig morgen"</string>
     <string name="widget_sample_cards">"12 Karten zum Wiederholen"</string>
+    <string name="widget_next_name">"Als Nächstes in Blob"</string>
+    <string name="widget_next_description">"Das, was gerade läuft oder als Nächstes kommt, mit Countdown und Raum."</string>
+    <string name="widget_next_sample_label">"Jetzt"</string>
+    <string name="widget_next_sample_when">"bis 09:30"</string>
 </resources>

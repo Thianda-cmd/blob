@@ -13,7 +13,7 @@ private let appGroup = "group.org.bojes.blob"
 
 struct BlobData: Decodable {
   struct Item: Decodable, Hashable {
-    /// Title, start and end (ms since 1970), all day, colour (light, dark), kind, link.
+    /// Title, start and end (ms since 1970), all day, colour (light, dark), kind, link, place.
     let t: String
     let s: Double
     let e: Double
@@ -22,9 +22,12 @@ struct BlobData: Decodable {
     let cd: String
     let k: String
     let l: String
+    var p: String? = nil
 
     var start: Date { Date(timeIntervalSince1970: s / 1000) }
     var end: Date { Date(timeIntervalSince1970: e / 1000) }
+    /// Under way at `date`: started, timed, not over.
+    func running(at date: Date) -> Bool { !a && start <= date && end > date }
     /// Only the pages a row may open (anything else opens the calendar).
     var url: URL? {
       let allowed = l.range(of: "^/(calendar|tasks|notes|learn|home)(\\?[A-Za-z0-9=&_.:-]*)?$|^/p/[0-9a-fA-F-]{36}$", options: .regularExpression) != nil
@@ -45,6 +48,10 @@ struct BlobData: Decodable {
     let cards: String
     let more: String
     let open: String
+    /// "Now", "until {t}", "in {t}" (newer data has them).
+    var now: String? = nil
+    var until: String? = nil
+    var soon: String? = nil
   }
 
   let v: Int
@@ -73,7 +80,7 @@ struct BlobData: Decodable {
       v: 1,
       locale: english ? "en" : "de",
       items: [
-        Item(t: english ? "Biology" : "Biologie", s: at(8), e: at(9.5), a: false, c: "#3f78b3", cd: "#3f78b3", k: "event", l: "/calendar"),
+        Item(t: english ? "Biology" : "Biologie", s: at(8), e: at(9.5), a: false, c: "#3f78b3", cd: "#3f78b3", k: "event", l: "/calendar", p: "R 204"),
         Item(t: english ? "Choir" : "Chor", s: at(14.5), e: at(16), a: false, c: "#5d8a4c", cd: "#5d8a4c", k: "event", l: "/calendar"),
         Item(t: english ? "Maths worksheet p. 42" : "Mathe Arbeitsblatt S. 42", s: at(24), e: at(48), a: true, c: "#c4653e", cd: "#c4653e", k: "task", l: "/tasks"),
       ],
@@ -81,8 +88,8 @@ struct BlobData: Decodable {
       practisedToday: false,
       cards: 12,
       w: english
-        ? Words(today: "Today", tomorrow: "Tomorrow", nothing: "Nothing planned. Enjoy it!", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "day streak", cards: "cards to review", more: "+{n} more", open: "Open Blob to see your day")
-        : Words(today: "Heute", tomorrow: "Morgen", nothing: "Nichts geplant. Genieß es!", allDay: "Ganztägig", due: "Fällig", exam: "Prüfung", next: "Als Nächstes", streak: "Tage in Folge", cards: "Karten zum Wiederholen", more: "+{n} weitere", open: "Öffne Blob, um deinen Tag zu sehen")
+        ? Words(today: "Today", tomorrow: "Tomorrow", nothing: "Nothing planned. Enjoy it!", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "day streak", cards: "cards to review", more: "+{n} more", open: "Open Blob to see your day", now: "Now", until: "until {t}", soon: "in {t}")
+        : Words(today: "Heute", tomorrow: "Morgen", nothing: "Nichts geplant. Genieß es!", allDay: "Ganztägig", due: "Fällig", exam: "Prüfung", next: "Als Nächstes", streak: "Tage in Folge", cards: "Karten zum Wiederholen", more: "+{n} weitere", open: "Öffne Blob, um deinen Tag zu sehen", now: "Jetzt", until: "bis {t}", soon: "in {t}")
     )
   }
 }
@@ -102,15 +109,18 @@ struct Provider: TimelineProvider {
     completion(BlobEntry(date: Date(), data: data ?? (context.isPreview ? .sample : nil)))
   }
 
-  /// An entry now, whenever something ends (it drops off) and at midnight (a new day). The app asks
-  /// for a new timeline whenever the data changes; otherwise once an hour.
+  /// An entry now, an hour before something starts (the countdown), when it starts ("Now") and
+  /// when it ends (it drops off), and at midnight (a new day). The app asks for a new timeline
+  /// whenever the data changes; otherwise once an hour.
   func getTimeline(in context: Context, completion: @escaping (Timeline<BlobEntry>) -> Void) {
     let now = Date()
     let data = BlobData.load()
     let midnight = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) ?? now.addingTimeInterval(86400)
     var dates: Set<Date> = [now, midnight]
-    for item in data?.items ?? [] where item.end > now && item.end < midnight {
-      dates.insert(item.end)
+    for item in data?.items ?? [] where item.end > now {
+      for date in [item.start.addingTimeInterval(-3600), item.start, item.end] where date > now && date < midnight {
+        dates.insert(date)
+      }
     }
     let entries = dates.sorted().prefix(24).map { BlobEntry(date: $0, data: data) }
     completion(Timeline(entries: Array(entries), policy: .after(min(midnight, now.addingTimeInterval(3600)))))
@@ -171,12 +181,17 @@ struct BlobMark: View {
   }
 }
 
-/// "08:00 – 09:30", "Tomorrow · All day", "Due · Friday".
+/// "08:00 – 09:30 · R 204", "Now · until 09:30", "Tomorrow · All day", "Due · Friday".
 func subtitle(_ item: BlobData.Item, data: BlobData, now: Date) -> String {
   let cal = Calendar.current
   let time = DateFormatter()
   time.timeStyle = .short
   time.dateStyle = .none
+  let place = (item.p ?? "").isEmpty ? "" : " · \(item.p ?? "")"
+  if item.running(at: now) && item.k == "event" {
+    let until = (data.w.until ?? "– {t}").replacingOccurrences(of: "{t}", with: time.string(from: item.end))
+    return "\(data.w.now ?? "Now") · \(until)\(place)"
+  }
   let today = cal.isDate(item.start, inSameDayAs: now) || item.start < now
   var day = ""
   if !today {
@@ -198,7 +213,7 @@ func subtitle(_ item: BlobData.Item, data: BlobData, now: Date) -> String {
   } else {
     clock = time.string(from: item.start)
   }
-  return [prefix, day, clock].filter { !$0.isEmpty }.joined(separator: " · ")
+  return [prefix, day, clock].filter { !$0.isEmpty }.joined(separator: " · ") + place
 }
 
 func headerDate(_ now: Date, locale: String) -> String {
@@ -283,7 +298,8 @@ struct SmallView: View {
         Header(data: data, now: entry.date, scheme: scheme, compact: true)
         Spacer(minLength: 0)
         if let next = next {
-          Text(data.w.next.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundColor(Palette.ink3(scheme))
+          let running = next.running(at: entry.date)
+          Text((running ? (data.w.now ?? data.w.next) : data.w.next).uppercased()).font(.system(size: 10, weight: .semibold)).foregroundColor(running ? Palette.accent(scheme) : Palette.ink3(scheme))
           HStack(alignment: .top, spacing: 7) {
             RoundedRectangle(cornerRadius: 2).fill(Color(hex: scheme == .dark ? next.cd : next.c)).frame(width: 4, height: 34)
             VStack(alignment: .leading, spacing: 2) {
@@ -291,6 +307,7 @@ struct SmallView: View {
               Text(subtitle(next, data: data, now: entry.date)).font(.system(size: 11.5)).foregroundColor(Palette.ink3(scheme)).lineLimit(1)
             }
           }
+          NextLive(item: next, data: data, now: entry.date, scheme: scheme)
         } else {
           Text(data.w.nothing).font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ink3(scheme))
         }
@@ -301,6 +318,28 @@ struct SmallView: View {
       .widgetURL(next?.url ?? URL(string: "org.bojes.blob://calendar"))
     } else {
       SignedOut(scheme: scheme)
+    }
+  }
+}
+
+/// Under what's next: how far through it is (live) while it runs, or a live countdown once it's
+/// within the hour.
+struct NextLive: View {
+  let item: BlobData.Item
+  let data: BlobData
+  let now: Date
+  let scheme: ColorScheme
+  var body: some View {
+    if item.running(at: now) {
+      ProgressView(timerInterval: item.start...item.end, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+        .progressViewStyle(.linear)
+        .tint(Palette.accent(scheme))
+    } else if !item.a && item.start.timeIntervalSince(now) <= 3600 {
+      let parts = (data.w.soon ?? "in {t}").components(separatedBy: "{t}")
+      (Text(parts.first ?? "") + Text(item.start, style: .timer) + Text(parts.count > 1 ? parts[1] : ""))
+        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+        .foregroundColor(Palette.accent(scheme))
+        .lineLimit(1)
     }
   }
 }

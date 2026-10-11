@@ -91,7 +91,7 @@ eq("exam with its subject", otherExam[0]?.body, "Klausur · Mathe");
 eq("cap", plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: DEFAULT_PREFS, words, max: 3 }).length, 3);
 
 // The widgets' data (src/lib/widget/snapshot.ts).
-const ww = { today: "Today", tomorrow: "Tomorrow", nothing: "-", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "days", cards: "cards", more: "+{n}", open: "Open" };
+const ww = { today: "Today", tomorrow: "Tomorrow", nothing: "-", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "days", cards: "cards", more: "+{n}", open: "Open", now: "Now", until: "until {t}", soon: "in {t}" };
 const wd = widgetData({ now: at(10, 14, 10, 30), events, tasks, subjects: [], cardsDue: { "2026-10-14": 3 }, learnDays: [{ day: "2026-10-13", xp: 40 }, { day: "2026-10-12", xp: 10 }], words: ww, locale: "en" });
 const wline = (i: (typeof wd.items)[number]) => `${hm(new Date(i.s))} ${i.k} ${i.t}${i.a ? " (all day)" : ""}`;
 eq("widget: running and coming items (default-time tasks all day), ended and done ones left out", wd.items.map(wline).slice(0, 5), ["10/14 10:00 event Chor", "10/15 00:00 task Bio (all day)", "10/15 00:00 task Mathe (all day)", "10/16 00:00 event Ausflug (all day)", "10/20 00:00 exam Englisch (all day)"]);
@@ -100,6 +100,8 @@ eq("widget: streak up to yesterday", [wd.streak, wd.practisedToday], [2, false])
 eq("widget: cards due today", wd.cards, 3);
 eq("widget: colours are hex", wd.items.every((i) => /^#[0-9a-f]{6}$/.test(i.c) && /^#[0-9a-f]{6}$/.test(i.cd)), true);
 eq("widget: event links open the calendar on that day", wd.items[0].l, "/calendar?date=2026-10-14&event=e1");
+const wdp = widgetData({ now: at(10, 14, 10, 30), events: events.map((e) => (e.id === "e1" ? { ...e, location: " R 204 " } : e)), tasks: [], subjects: [], cardsDue: {}, learnDays: [], words: ww, locale: "en" });
+eq("widget: the room comes along (and only when there is one)", [wdp.items[0].p, "p" in wd.items[0]], ["R 204", false]);
 eq("streak with today", streakOf([{ day: "2026-10-14", xp: 5 }, { day: "2026-10-13", xp: 5 }, { day: "2026-10-11", xp: 5 }], at(10, 14, 12)), { streak: 2, practisedToday: true });
 eq("no streak", streakOf([{ day: "2026-10-12", xp: 5 }], at(10, 14, 12)), { streak: 0, practisedToday: false });
 

@@ -67,6 +67,9 @@ export const notifyText = defineMessages({
       cards: "cards to review",
       more: "+{n} more",
       open: "Open Blob to see your day",
+      now: "Now",
+      until: "until {t}",
+      soon: "in {t}",
     },
   },
   de: {
@@ -129,6 +132,9 @@ export const notifyText = defineMessages({
       cards: "Karten zum Wiederholen",
       more: "+{n} weitere",
       open: "Öffne Blob, um deinen Tag zu sehen",
+      now: "Jetzt",
+      until: "bis {t}",
+      soon: "in {t}",
     },
   },
 });
