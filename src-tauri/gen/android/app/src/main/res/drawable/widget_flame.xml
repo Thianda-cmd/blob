@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The streak's flame. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/widget_accent"
+        android:pathData="M12.4,2.2C12.9,5.1 11,6.9 9.5,8.7C8,10.5 6.6,12.3 6.6,15C6.6,18.6 9,21.6 12,21.6C15,21.6 17.4,18.8 17.4,15.3C17.4,12.6 16.1,10.6 14.8,9.1C14.6,10.6 13.9,11.7 12.7,12.2C13.6,8.8 13.9,5.1 12.4,2.2Z" />
+</vector>

@@ -404,6 +404,40 @@ fn offline_ready<R: Runtime>(app: AppHandle<R>) -> bool {
   offline_flag(&app).is_some_and(|p| p.exists())
 }
 
+/// The app group the iPhone app shares with its widgets (src-tauri/ios/BlobWidget).
+#[cfg(target_os = "ios")]
+const APP_GROUP: &std::ffi::CStr = c"group.org.bojes.blob";
+
+/// What the home and lock screen widgets show: the site's JSON (src/lib/widget), or "" after signing
+/// out. On iPhone and iPad it goes into the app group's settings, where the widget reads it; the
+/// app's WidgetBridge.swift notices the change and has the widgets drawn again. (Android's widget
+/// gets it through window.BlobAndroid, see gen/android TodayWidget.kt; computers have none.)
+#[tauri::command]
+fn set_widget(json: String) -> Result<(), String> {
+  if json.len() > 64 * 1024 {
+    return Err("too long".into());
+  }
+  #[cfg(target_os = "ios")]
+  {
+    use objc2::rc::{autoreleasepool, Allocated, Retained};
+    use objc2::runtime::{AnyClass, AnyObject};
+    let text = std::ffi::CString::new(json).map_err(|e| e.to_string())?;
+    autoreleasepool(|_| unsafe {
+      let (Some(defaults_class), Some(string_class)) = (AnyClass::get(c"NSUserDefaults"), AnyClass::get(c"NSString")) else { return };
+      let string = |c: &std::ffi::CStr| -> Option<Retained<AnyObject>> { objc2::msg_send![string_class, stringWithUTF8String: c.as_ptr()] };
+      let (Some(suite), Some(key), Some(value)) = (string(APP_GROUP), string(c"today"), string(&text)) else { return };
+      let blank: Allocated<AnyObject> = objc2::msg_send![defaults_class, alloc];
+      let defaults: Option<Retained<AnyObject>> = objc2::msg_send![blank, initWithSuiteName: &*suite];
+      if let Some(defaults) = defaults {
+        let _: () = objc2::msg_send![&*defaults, setObject: &*value, forKey: &*key];
+      }
+    });
+  }
+  #[cfg(not(target_os = "ios"))]
+  let _ = json;
+  Ok(())
+}
+
 /// The start page asks where to go, just before it leaves: a page from an app link, else nothing
 /// (the home page). Asked once: the answer is used up.
 #[tauri::command]
@@ -437,7 +471,7 @@ pub fn run() {
     .plugin(tauri_plugin_notification::init())
     .manage(Pending::default())
     .manage(SiteShown::default())
-    .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready])
+    .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget])
     .setup(|app| {
       let handle = app.handle().clone();
 

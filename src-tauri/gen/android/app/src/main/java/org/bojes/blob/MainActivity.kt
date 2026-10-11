@@ -30,7 +30,8 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     // window.BlobAndroid.print(): the system print dialog for the page, with "Save as PDF" (the CV).
-    webView.addJavascriptInterface(PrintBridge(this, webView), "BlobAndroid")
+    // window.BlobAndroid.updateWidget(json): the home screen widget's data (TodayWidget.kt).
+    webView.addJavascriptInterface(AppBridge(this, webView), "BlobAndroid")
     // Back (button or swipe) goes back a page; on the first page it puts Blob in the background, as
     // Android does for apps opened from the home screen, instead of closing it. The app keeps its
     // place, and a link or the icon brings it straight back.
@@ -42,7 +43,7 @@ class MainActivity : TauriActivity() {
   }
 }
 
-private class PrintBridge(private val activity: MainActivity, private val webView: WebView) {
+private class AppBridge(private val activity: MainActivity, private val webView: WebView) {
   @JavascriptInterface
   fun print() {
     activity.runOnUiThread {
@@ -50,5 +51,10 @@ private class PrintBridge(private val activity: MainActivity, private val webVie
       val title = webView.title?.takeIf { it.isNotBlank() } ?: "Blob"
       manager.print(title, webView.createPrintDocumentAdapter(title), PrintAttributes.Builder().build())
     }
+  }
+
+  @JavascriptInterface
+  fun updateWidget(json: String) {
+    TodayWidget.save(activity.applicationContext, json)
   }
 }

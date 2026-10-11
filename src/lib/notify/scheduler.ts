@@ -9,6 +9,9 @@ import type { Planned } from "./plan";
 
 export type Permission = "granted" | "denied" | "prompt" | "unavailable";
 
+/** Where the last cards-due and learning-days counts wait for when there is no connection. */
+export const NOTIFY_EXTRA_KEY = "blob-notify-extra";
+
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(command, args);

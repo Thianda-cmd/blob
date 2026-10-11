@@ -199,8 +199,9 @@ cd src-tauri && cargo test                      # the shell's rules
   - **Signing the APK:** set the secrets `ANDROID_KEYSTORE` (the keystore, base64) and
     `ANDROID_KEY_PASSWORD` so every release is signed with the same key. Otherwise each release
     gets a new key, and updating needs an uninstall first.
-- **The Android project** (`src-tauri/gen/android`) is committed, since `MainActivity.kt` and the
-  themes are ours. The iOS project is still made fresh in CI.
+- **The Android project** (`src-tauri/gen/android`) is committed, since `MainActivity.kt`, the
+  "Today" widget (`TodayWidget.kt`) and the themes are ours. The iOS project is still made fresh
+  in CI, and `src-tauri/ios/add-widget.rb` then adds the widget extension to it.
 
 The bundle id **`org.bojes.blob`** is permanent once an app is in a store.
 
@@ -227,15 +228,18 @@ The bundle id **`org.bojes.blob`** is permanent once an app is in a store.
 - Done already: Android's bars, keyboard and back button; phone printing; iOS swipe-back.
 
 **Phase 3: native value (and App Store 4.2).**
-- Daily-goal and streak reminders with local notifications (`tauri-plugin-notification`, official,
-  all platforms).
+- Done (`docs/calendar-offline-native.md`):
+  - reminders as local notifications (`tauri-plugin-notification`);
+  - offline mode: pages, notes, calendar and tasks on the device;
+  - home and lock screen widgets;
+  - signing in the app through the browser.
 - The share sheet for notes and lesson pictures, and haptics on right answers.
-- Push notifications for shared notes and comments (community plugin, or Capacitor for the phone shell).
-- Reading notes offline (cache the last opened pages).
+- Push notifications for shared notes and comments: needs Firebase (Android) and an APNs key (iOS).
 
 ## What only the owner can do
 
 - **Apple Developer Program** ($99/year): team id, signing certificates, App Store Connect entry.
+  Enable the app group `group.org.bojes.blob` for `org.bojes.blob` and `org.bojes.blob.widget`.
 - **Google Play Console** ($25 once): the app entry and the upload key.
 - Optional: **Windows code signing**, so installers don't trigger SmartScreen.
 - Store listings: screenshots, descriptions (English/German), privacy details (what Blob stores:

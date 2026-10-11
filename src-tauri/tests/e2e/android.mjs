@@ -337,6 +337,16 @@ try {
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await sleep(1500);
 
+  // The home screen widget: Android knows it, and the site's data reaches it (kept in its settings).
+  const providers = adbQuiet("shell", "dumpsys", "appwidget");
+  check("the Today widget is offered on the home screen", providers.includes(`${PKG}/org.bojes.blob.TodayWidget`), providers.slice(0, 200));
+  const sample = { v: 1, at: Date.now(), locale: "en", items: [{ t: "E2E event", s: Date.now() + 3600e3, e: Date.now() + 7200e3, a: false, c: "#3f78b3", cd: "#3f78b3", k: "event", l: "/calendar" }], streak: 3, practisedToday: false, cards: 2, w: { today: "Today", tomorrow: "Tomorrow", nothing: "-", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "days", cards: "cards", more: "+{n}", open: "Open" } };
+  await dt.js(`window.BlobAndroid.updateWidget(${JSON.stringify(JSON.stringify(sample))})`);
+  await sleep(800);
+  const kept = adbQuiet("shell", "run-as", PKG, "cat", "shared_prefs/blob_widget.xml");
+  check("the widget keeps the site's data", kept.includes("E2E event"), kept.slice(0, 200));
+  await dt.js(`window.BlobAndroid.updateWidget("")`);
+
   // No crash along the way.
   const crashes = adb("logcat", "-d", "-s", "AndroidRuntime:E").split("\n").filter((l) => l.includes("FATAL") || l.includes(PKG));
   check("no crash", crashes.length === 0, crashes.slice(0, 5).join(" | "));

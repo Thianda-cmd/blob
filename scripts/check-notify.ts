@@ -1,6 +1,7 @@
 // Checks what Blob plans to remind of (src/lib/notify/plan.ts):
 //   TZ=Europe/Berlin npx tsx --tsconfig tsconfig.json scripts/check-notify.ts
 import { DEFAULT_PREFS, notifyId, plan, prefsOf, type NotifyWords } from "../src/lib/notify/plan";
+import { streakOf, widgetData } from "../src/lib/widget/snapshot";
 import type { CalEvent, Task } from "../src/lib/types";
 
 let failed = 0;
@@ -69,6 +70,19 @@ eq("all off", off.length, 0);
 const morning = plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: prefsOf({ events: false, homework: false, exams: false, reminders: false, cards: false, streak: false, morning: true }), words });
 eq("morning overviews", morning.map(line).slice(0, 2), ["10/15 07:00 Your day: 0/2", "10/16 07:00 Your day: 1/0"]);
 eq("cap", plan({ now, events, tasks, cardsDue: {}, learnDays: [], prefs: DEFAULT_PREFS, words, max: 3 }).length, 3);
+
+// The widgets' data (src/lib/widget/snapshot.ts).
+const ww = { today: "Today", tomorrow: "Tomorrow", nothing: "-", allDay: "All day", due: "Due", exam: "Exam", next: "Next", streak: "days", cards: "cards", more: "+{n}", open: "Open" };
+const wd = widgetData({ now: at(10, 14, 10, 30), events, tasks, subjects: [], cardsDue: { "2026-10-14": 3 }, learnDays: [{ day: "2026-10-13", xp: 40 }, { day: "2026-10-12", xp: 10 }], words: ww, locale: "en" });
+const wline = (i: (typeof wd.items)[number]) => `${hm(new Date(i.s))} ${i.k} ${i.t}${i.a ? " (all day)" : ""}`;
+eq("widget: running and coming items (default-time tasks all day), ended and done ones left out", wd.items.map(wline).slice(0, 5), ["10/14 10:00 event Chor", "10/15 00:00 task Bio (all day)", "10/15 00:00 task Mathe (all day)", "10/16 00:00 event Ausflug (all day)", "10/20 00:00 exam Englisch (all day)"]);
+eq("widget: no project cards, no done tasks", wd.items.some((i) => i.t === "Projektkarte" || i.t === "Done"), false);
+eq("widget: streak up to yesterday", [wd.streak, wd.practisedToday], [2, false]);
+eq("widget: cards due today", wd.cards, 3);
+eq("widget: colours are hex", wd.items.every((i) => /^#[0-9a-f]{6}$/.test(i.c) && /^#[0-9a-f]{6}$/.test(i.cd)), true);
+eq("widget: event links open the calendar on that day", wd.items[0].l, "/calendar?date=2026-10-14&event=e1");
+eq("streak with today", streakOf([{ day: "2026-10-14", xp: 5 }, { day: "2026-10-13", xp: 5 }, { day: "2026-10-11", xp: 5 }], at(10, 14, 12)), { streak: 2, practisedToday: true });
+eq("no streak", streakOf([{ day: "2026-10-12", xp: 5 }], at(10, 14, 12)), { streak: 0, practisedToday: false });
 
 console.log(`${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -2,4 +2,10 @@
 <resources>
     <!-- The site's background in dark mode. -->
     <color name="page">#FF141413</color>
+    <color name="widget_bg">#FF1A1A18</color>
+    <color name="widget_ink">#FFEDEBE4</color>
+    <color name="widget_ink_2">#FFB6B4AB</color>
+    <color name="widget_ink_3">#FF7D7B73</color>
+    <color name="widget_accent">#FFB8A1FF</color>
+    <color name="widget_accent_soft">#FF272040</color>
 </resources>

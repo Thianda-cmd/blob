@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_name">"Heute in Blob"</string>
+    <string name="widget_description">"Was ansteht: Termine, Hausaufgaben und Prüfungen, deine Serie und Karten zum Wiederholen."</string>
+    <string name="widget_open">"Öffne Blob, um hier deinen Tag zu sehen."</string>
+    <string name="widget_sample_day">"Heute · Mo. 12. Okt."</string>
+    <string name="widget_sample_1">"Biologie"</string>
+    <string name="widget_sample_2">"Chor"</string>
+    <string name="widget_sample_3">"Mathe Arbeitsblatt S. 42"</string>
+    <string name="widget_sample_3_time">"Fällig morgen"</string>
+    <string name="widget_sample_cards">"12 Karten zum Wiederholen"</string>
+</resources>

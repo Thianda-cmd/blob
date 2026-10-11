@@ -18,6 +18,7 @@
     "allow-print-page",
     "allow-app-info",
     "allow-set-offline-ready",
+    "allow-set-widget",
     "notification:default"
   ]
 }

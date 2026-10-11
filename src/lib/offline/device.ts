@@ -2,7 +2,8 @@
 
 import { noteCache } from "@/components/editor/noteCache";
 import { blobApp, setOfflineReady } from "@/lib/native";
-import { clearNotifications } from "@/lib/notify/scheduler";
+import { clearNotifications, NOTIFY_EXTRA_KEY } from "@/lib/notify/scheduler";
+import { publishWidget } from "@/lib/widget/publish";
 import { wipeAllDbs } from "./idb";
 import { isOnline } from "./net";
 import { flushAllSyncs, stopAllSyncs } from "./sync";
@@ -71,8 +72,8 @@ export function flushDevice() {
 export async function forgetDevice() {
   stopAllSyncs();
   noteCache.reset();
-  await Promise.all([ask({ type: "wipe" }, 10_000), wipeAllDbs(), setOfflineReady(false), clearNotifications()]);
+  await Promise.all([ask({ type: "wipe" }, 10_000), wipeAllDbs(), setOfflineReady(false), clearNotifications(), publishWidget(null)]);
   try {
-    for (const key of Object.keys(localStorage)) if (key === WARM_KEY || key.startsWith("blob-card-reviews")) localStorage.removeItem(key);
+    for (const key of Object.keys(localStorage)) if (key === WARM_KEY || key.startsWith("blob-card-reviews") || key === NOTIFY_EXTRA_KEY) localStorage.removeItem(key);
   } catch {}
 }

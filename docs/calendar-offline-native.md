@@ -21,8 +21,9 @@ the native parts are kept small and say so.
     - For all-day events the start is local midnight, so "on the day at 9:00" is `-540`.
   - Other columns: `subject_id`, `color` (a subject colour key), `kind` (event, lesson, study,
     birthday, break), `location`, `details`, `time_zone` (IANA, where it was made).
-  - `deleted_at` is a tombstone, so offline devices learn about deletions. A cron removes
-    tombstones after 60 days.
+  - `deleted_at` is a tombstone, so offline devices learn about deletions. Devices keep their
+    copy of a tombstone for 60 days; the nightly job (`/api/cron/files`) deletes the rows 90 days
+    after deletion.
   - RLS: own rows only. Realtime: in the `supabase_realtime` publication.
 - `profiles` gains:
   - `week_starts_on` (0..6, default Monday)
@@ -79,11 +80,11 @@ needs create and resize, not sorting.
 - After sign-in it warms the cache in the background:
   - Home, Notes, Calendar, Tasks, Learn and Settings.
   - The 25 most recently changed notes, plus the scripts, styles and fonts each page needs.
-- A note that isn't cached opens at `/offline/note?id=…`, which renders the editor from the local
-  copy.
+- A note that isn't cached opens at `/notes/offline?id=…`, which renders the editor from the
+  device's copy of the note (the apps keep a copy of every note, up to 500).
 - On sign-out, or when another account signs in, the caches and the local database are wiped.
 - iOS needs "app-bound domains" for service workers: `limit_navigations_to_app_bound_domains` plus
-  `WKAppBoundDomains` (`localhost`, `bojes.org`) in `src-tauri/Info.ios.plist`.
+  `WKAppBoundDomains` (`localhost`, `bojes.org`, `supabase.co`) in `src-tauri/Info.ios.plist`.
 - The start page knows when the site is ready offline (`offline_ready`, stored by the app). With
   no connection it then opens the site anyway, and the service worker answers.
 
@@ -150,31 +151,50 @@ the system by stable ids whenever the data changes or the app opens.
 
 ## 5. Widgets
 
-- **Android:** a home-screen widget (`TodayWidget`, RemoteViews, three sizes).
-  - It shows what's next today and the following days (events, due tasks, exams), the number of
-    cards due, and Blob.
-  - The site sends the data through `window.BlobAndroid.updateWidget(json)`; it is stored and
-    shown offline.
-  - Tapping a row opens it (`org.bojes.blob://calendar?date=…`, `…/tasks`).
-- **iOS:** a WidgetKit extension (home screen: small/medium/large; lock screen: rectangular,
-  circular, inline) with the same data.
-  - The data goes through an App Group, written by the app's Swift bridge.
-  - `src-tauri/gen/apple` is committed for this.
+The site works out what the widgets show (`src/lib/widget/snapshot.ts`) from the same data on the
+device as the reminders:
+- the coming week's events, due tasks and exams (up to 24);
+- the learning streak and the cards to review today;
+- the words in the account's language.
 
-## 6. Desktop: sign in with your browser
+The widgets leave out what has ended themselves, so they stay right while Blob is closed. Tapping
+a row opens that day or the tasks (`org.bojes.blob://calendar?date=…`). Signing out empties them.
+
+- **Android:** "Today in Blob" (`gen/android/…/TodayWidget.kt`, RemoteViews).
+  - One widget from 2×2 up: header with the date and streak, as many rows as fit, cards at the
+    bottom.
+  - The site hands the JSON to `window.BlobAndroid.updateWidget(json)`, which keeps it in the
+    app's settings and redraws. It also redraws every 30 minutes.
+- **iPhone and iPad:** a WidgetKit extension (`src-tauri/ios/BlobWidget`).
+  - Home screen: small (what's next), medium and large (the list).
+  - Lock screen: the next two things, the streak (round), the next thing (one line).
+  - The site calls `set_widget`, and the app writes the JSON into the app group
+    `group.org.bojes.blob`.
+  - `WidgetBridge.swift` in the app sees the change and reloads the widgets. Their own timeline
+    also moves on as things end, and at midnight.
+  - `gen/apple` isn't committed. `src-tauri/ios/add-widget.rb` adds the extension, the app group
+    and the bridge to the project that `tauri ios init` generates (CI runs it, then
+    `xcodegen generate`).
+  - On a real device, the app group must be enabled for both bundle ids in the Apple developer
+    account.
+
+## 6. Sign in the app with your browser
+
+All apps; meant mainly for the desktop.
 
 1. The app's sign-in page offers "Sign in with your browser".
-2. The app makes a PKCE verifier and a `state`, keeps them in the app's storage, and opens
-   `https://blob.bojes.org/auth/app?challenge=…&state=…` in the system browser.
-3. The browser page (sign-in first if needed) asks "Sign in to the Blob app as Name?".
-   Continue (a server action, CSRF-protected) stores a one-time code:
-   - only its SHA-256 is kept
-   - it expires after 2 minutes, is single use, and is bound to the user and the challenge
-4. The browser then opens `org.bojes.blob://auth/app?code=…&state=…`.
-5. The app checks `state` and posts code + verifier to `/api/auth/app/exchange`.
-6. The server checks the challenge, uses the code up, makes a magic-link token for the user
-   (`admin.generateLink`, nothing is emailed) and verifies it on the app's own session. The app
-   gets its own session cookies.
+2. The app makes a PKCE verifier and a random `state` and keeps them in its own storage. It opens
+   `/auth/app/approve?challenge=…&state=…&device=…` in the system browser.
+3. The browser page (sign-in first if needed) asks "Sign in the Blob app?". It names the account
+   and warns to continue only if you started this yourself. The page can't be framed.
+4. Continue (a server action, CSRF-protected) stores a one-time code:
+   - only its SHA-256 is kept, in `app_sign_ins`;
+   - it expires after 2 minutes, works once, and is bound to the user and the challenge.
+5. The browser opens `org.bojes.blob://auth/app?code=…&state=…`, and the app shows `/auth/app`.
+6. The page checks that `state` is its own, then calls `finishAppSignIn(code, verifier)`.
+7. The server uses the code up (also when the verifier is wrong) and compares the challenge. It
+   makes a magic-link token for the user (`admin.generateLink`, nothing is emailed) and verifies
+   it, so the session cookies land in the app.
 
-A stolen link is useless without the verifier, and a link the app didn't ask for is refused
-(`state`).
+A caught link is useless without the verifier, and a link the app didn't ask for is refused
+(`state`). The nightly job removes old codes.

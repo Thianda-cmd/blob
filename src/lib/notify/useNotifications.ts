@@ -17,9 +17,23 @@ import type { CalEvent, Task } from "@/lib/types";
 import { SUSPENDED, today as dayOf } from "@/notes/study/srs";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { plan, prefsOf, type NotifyWords } from "./plan";
-import { notifyPermission, onNotificationTap, requestNotifyPermission, scheduleNotifications } from "./scheduler";
+import { publishWidget } from "@/lib/widget/publish";
+import { widgetData } from "@/lib/widget/snapshot";
+import { NOTIFY_EXTRA_KEY, notifyPermission, onNotificationTap, requestNotifyPermission, scheduleNotifications } from "./scheduler";
 
 const ASKED = "blob-notify-asked";
+
+type Extra = { cardsDue: Record<string, number>; learnDays: { day: string; xp: number }[] };
+
+/** The counts from last time (without a connection the widgets and reminders still have them). */
+function keptExtra(): Extra | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return JSON.parse(localStorage.getItem(NOTIFY_EXTRA_KEY) ?? "null") as Extra | null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Inside the apps: keeps the device's notifications in step with your calendar, tasks, cards and
@@ -27,7 +41,7 @@ const ASKED = "blob-notify-asked";
  * zone on the profile. Does nothing in a browser.
  */
 export function useNotifications() {
-  const { userId, profile, setProfile } = useWorkspace();
+  const { userId, profile, setProfile, subjects } = useWorkspace();
   const router = useRouter();
   const locale = useLocale();
   const t = useMessages(notifyText);
@@ -36,7 +50,7 @@ export function useNotifications() {
   const tasks = useRows<Task>("tasks");
   const now = useNow();
   const hour = now === null ? null : Math.floor(now / 3600e3);
-  const [extra, setExtra] = useState<{ cardsDue: Record<string, number>; learnDays: { day: string; xp: number }[] } | null>(null);
+  const [extra, setExtra] = useState<Extra | null>(keptExtra);
   const prefs = useMemo(() => prefsOf(profile.notify), [profile.notify]);
   const app = typeof window !== "undefined" && !!blobApp();
 
@@ -60,8 +74,12 @@ export function useNotifications() {
       const count = (day: string) => db.from("card_reviews").select("card_id", { count: "exact", head: true }).gt("reviews", 0).lte("due_on", day).lt("due_on", SUSPENDED);
       const since = dayOf(addDays(new Date(), -40));
       const [c0, c1, days] = await Promise.all([count(d0), count(d1), db.from("learn_days").select("day, xp").gte("day", since)]);
-      if (!alive || c0.error || c1.error) return;
-      setExtra({ cardsDue: { [d0]: c0.count ?? 0, [d1]: c1.count ?? 0 }, learnDays: (days.data ?? []) as { day: string; xp: number }[] });
+      if (!alive || c0.error || c1.error || days.error) return;
+      const next: Extra = { cardsDue: { [d0]: c0.count ?? 0, [d1]: c1.count ?? 0 }, learnDays: (days.data ?? []) as Extra["learnDays"] };
+      setExtra(next);
+      try {
+        localStorage.setItem(NOTIFY_EXTRA_KEY, JSON.stringify(next));
+      } catch {}
     })();
     return () => {
       alive = false;
@@ -105,6 +123,19 @@ export function useNotifications() {
     // `now` ticks every 30 s: re-plan only when the hour turns (or the data changes).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app, extra, events, tasks, prefs, words, hour]);
+
+  // The home and lock screen widgets (phones): the coming days, the streak, the cards to review.
+  useEffect(() => {
+    if (!app || now === null || !isPhoneApp(blobApp())) return;
+    const timer = setTimeout(() => {
+      void publishWidget(
+        widgetData({ now: new Date(), events, tasks, subjects, cardsDue: extra?.cardsDue ?? {}, learnDays: extra?.learnDays ?? [], words: t.widget, locale }),
+      );
+    }, 3000);
+    return () => clearTimeout(timer);
+    // As above: again when the hour turns, not every 30 s.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app, extra, events, tasks, subjects, t, locale, hour]);
 
   // Tapping a notification opens its page.
   useEffect(() => {

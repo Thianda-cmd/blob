@@ -1,7 +1,7 @@
 // The Blob app (desktop and phones, src-tauri/) shows this site in a native window. Inside it, the
 // app sets window.__BLOB_APP__ before any script runs, and the site may call a few app commands
-// (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready. In a
-// browser all of this is inert.
+// (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready,
+// set_widget. In a browser all of this is inert.
 
 export type AppPlatform = "linux" | "macos" | "windows" | "android" | "ios";
 
@@ -10,8 +10,8 @@ export type BlobApp = { platform: AppPlatform; version: string; site: string };
 declare global {
   interface Window {
     __BLOB_APP__?: BlobApp;
-    /** Android app only (gen/android MainActivity.kt): the system print dialog. */
-    BlobAndroid?: { print(): void };
+    /** Android app only (gen/android MainActivity.kt): the system print dialog, the home screen widget. */
+    BlobAndroid?: { print(): void; updateWidget?(json: string): void };
   }
 }
 
@@ -24,7 +24,7 @@ export function blobApp(): BlobApp | null {
 
 export const isPhoneApp = (app: BlobApp | null) => app?.platform === "android" || app?.platform === "ios";
 
-type Command = "open_external" | "print_page" | "app_info" | "set_offline_ready";
+type Command = "open_external" | "print_page" | "app_info" | "set_offline_ready" | "set_widget";
 
 async function call<T>(command: Command, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -66,5 +66,17 @@ export async function setOfflineReady(ready: boolean): Promise<void> {
     await call("set_offline_ready", { ready });
   } catch {
     // An older app without the command: it just won't start offline.
+  }
+}
+
+/** Hands the home and lock screen widgets their data (src/lib/widget); "" empties them. */
+export async function setWidget(json: string): Promise<void> {
+  const app = blobApp();
+  if (!app) return;
+  try {
+    if (window.BlobAndroid?.updateWidget) window.BlobAndroid.updateWidget(json);
+    else if (app.platform === "ios") await call("set_widget", { json });
+  } catch {
+    // An older app without widgets.
   }
 }

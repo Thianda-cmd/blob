@@ -1,4 +1,16 @@
 <resources>
-    <string name="app_name">"Blob"</string>
-    <string name="main_activity_title">"Blob"</string>
+    <string name="app_name" translatable="false">"Blob"</string>
+    <string name="main_activity_title" translatable="false">"Blob"</string>
+    <!-- The home screen widget (until the app has given it the account's own words). -->
+    <string name="widget_name">"Today in Blob"</string>
+    <string name="widget_description">"What's next: events, homework and exams, your streak and cards to review."</string>
+    <string name="widget_open">"Open Blob to see your day here."</string>
+    <string name="widget_sample_day">"Today · Mon 12 Oct"</string>
+    <string name="widget_sample_1">"Biology"</string>
+    <string name="widget_sample_1_time" translatable="false">"08:00 – 09:30"</string>
+    <string name="widget_sample_2">"Choir"</string>
+    <string name="widget_sample_2_time" translatable="false">"14:30 – 16:00"</string>
+    <string name="widget_sample_3">"Maths worksheet p. 42"</string>
+    <string name="widget_sample_3_time">"Due tomorrow"</string>
+    <string name="widget_sample_cards">"12 cards to review"</string>
 </resources>

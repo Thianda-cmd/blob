@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "site",
-  "description": "What blob.bojes.org may ask the app for: open a link outside, print, say which app it is, note that it can start offline, and show and schedule its notifications. Nothing else (no files, no shell).",
+  "description": "What blob.bojes.org may ask the app for: open a link outside, print, say which app it is, note that it can start offline, show and schedule its notifications, and fill the home screen widgets. Nothing else (no files, no shell).",
   "windows": [
     "main",
     "popup-*"
@@ -16,6 +16,7 @@
     "allow-print-page",
     "allow-app-info",
     "allow-set-offline-ready",
+    "allow-set-widget",
     "notification:default"
   ]
 }

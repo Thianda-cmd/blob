@@ -2,6 +2,13 @@
 <resources>
     <!-- The site's paper colour (light), see src/app/layout.tsx themeColor. -->
     <color name="page">#FFF4F3EE</color>
+    <!-- The home screen widget (TodayWidget.kt): Blob's surface, text and purple. -->
+    <color name="widget_bg">#FFFDFCFA</color>
+    <color name="widget_ink">#FF1C1B18</color>
+    <color name="widget_ink_2">#FF4B4A44</color>
+    <color name="widget_ink_3">#FF8B8981</color>
+    <color name="widget_accent">#FF6D3DF5</color>
+    <color name="widget_accent_soft">#FFEFE9FF</color>
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
