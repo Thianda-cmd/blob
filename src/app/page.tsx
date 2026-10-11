@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { BoardShowcase, TogetherPoints } from "@/components/landing/BoardShowcase";
+import { CalendarPoints, CalendarShowcase } from "@/components/landing/CalendarShowcase";
 import { CvShowcase } from "@/components/landing/CvShowcase";
 import { HeroBlob, KnowledgeDemo, QuickAddDemo, Reveal } from "@/components/landing/Interactive";
 import { LearnDemo } from "@/components/landing/LearnDemo";
@@ -31,6 +32,7 @@ export default async function LandingPage() {
     { href: "#notes", label: t.nav.notes },
     { href: "#together", label: t.nav.together },
     { href: "#homework", label: t.nav.homework },
+    { href: "#calendar", label: t.nav.calendar },
     { href: "#presentations", label: t.nav.presentations },
     { href: "#cv", label: t.nav.cv },
   ];
@@ -71,7 +73,7 @@ export default async function LandingPage() {
           <div className="relative mx-auto grid max-w-[1240px] items-center gap-4 px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-12 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:pb-20 lg:pt-16">
             <div>
               <a
-                href="#together"
+                href="#calendar"
                 className="group mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-raised py-1.5 pl-3 pr-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:text-ink"
               >
                 <span className="size-1.5 rounded-full bg-blob" /> {t.hero.badge}
@@ -159,8 +161,21 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* Calendar: a school week that plans itself, with a reminder and the "Next up" widget */}
+        <section id="calendar" className="scroll-mt-14 border-t border-line bg-surface">
+          <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+            <SectionHead kicker={t.calendar.kicker} title={t.calendar.title} body={t.calendar.body} />
+            <div className="mt-8 grid gap-10 lg:mt-12 lg:grid-cols-12 lg:gap-10">
+              <Reveal className="lg:col-span-7">
+                <CalendarShowcase className="md:mb-6" />
+              </Reveal>
+              <CalendarPoints className="content-center sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1" />
+            </div>
+          </div>
+        </section>
+
         {/* Presentations */}
-        <section id="presentations" className="scroll-mt-14 border-t border-line bg-surface">
+        <section id="presentations" className="scroll-mt-14 border-t border-line">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.slides.kicker} title={t.slides.title} body={t.slides.body} />
             <Reveal className="mt-8 lg:mt-10">
@@ -170,7 +185,7 @@ export default async function LandingPage() {
         </section>
 
         {/* CV builder */}
-        <section id="cv" className="scroll-mt-14 border-t border-line">
+        <section id="cv" className="scroll-mt-14 border-t border-line bg-surface">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.cv.kicker} title={t.cv.title} body={t.cv.body} />
             <Reveal className="mt-8 lg:mt-10">
@@ -179,7 +194,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="border-t border-line bg-surface">
+        <section className="border-t border-line">
           <Reveal className="mx-auto max-w-[1240px] px-4 py-14 text-center sm:px-6 sm:py-20">
             <h2 className="font-display text-[clamp(30px,4vw,46px)] font-bold tracking-[-0.035em] text-balance">{t.cta.title}</h2>
             <p className="mx-auto mt-3 max-w-[480px] text-[15px] text-ink-2 text-balance">{t.cta.body}</p>
