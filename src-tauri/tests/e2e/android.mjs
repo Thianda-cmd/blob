@@ -135,7 +135,10 @@ function webViewBounds() {
     adbQuiet("shell", "rm", "-f", "/sdcard/ui.xml");
     adbQuiet("shell", "uiautomator", "dump", "/sdcard/ui.xml");
     xml = adbQuiet("shell", "cat", "/sdcard/ui.xml");
-    if (!xml.includes("android.webkit.WebView")) execFileSync("sleep", ["1.5"]);
+    if (!xml.includes("android.webkit.WebView")) {
+      adbQuiet("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS");
+      execFileSync("sleep", ["1.5"]);
+    }
   }
   const m = /class="android\.webkit\.WebView"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(xml) ?? /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*class="android\.webkit\.WebView"/.exec(xml);
   return m ? m.slice(1, 5).map(Number) : null;
@@ -146,6 +149,10 @@ const path = (dt) => dt.js("location.pathname");
 
 let dt;
 try {
+  // The emulator's own apps (its launcher) sometimes stall right after boot, and their "isn't
+  // responding" dialog would cover the app: no such dialogs during the test.
+  adbQuiet("shell", "settings", "put", "global", "hide_error_dialogs", "1");
+  adbQuiet("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS");
   if (apk) adb("install", "-r", "-g", apk);
   adb("logcat", "-c");
   const [screenW, screenH] = /(\d+)x(\d+)/.exec(adb("shell", "wm", "size")).slice(1).map(Number);
