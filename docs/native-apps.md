@@ -191,7 +191,8 @@ cd src-tauri && cargo test                      # the shell's rules
   - `macos.sh`: start-up, an app link while running, quitting.
   - Locally (Linux): `tauri-driver &` then
     `node src-tauri/tests/e2e/desktop.mjs --app src-tauri/target/release/blob`.
-- **Releases**: push a tag like `app-v0.1.0` (the version in `tauri.conf.json`). The workflow builds
+- **Releases**: push a tag like `app-v0.1.0` (the version in `tauri.conf.json`), or run the Apps
+  workflow by hand with "release" ticked (GitHub then makes the tag). The workflow builds
   everything and runs the tests. Once the builds and their tests pass, it publishes a GitHub
   pre-release with the Windows (`.exe`, `.msi`), macOS (`.dmg`, universal), Linux (`.deb`, `.rpm`,
   `.AppImage`) and Android (`.apk`) files.

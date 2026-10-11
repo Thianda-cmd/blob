@@ -6,7 +6,8 @@
 #   screenshots are workflow artifacts for 14 days.
 # - A tag like app-v0.1.0: the same, then a GitHub release with the installers and the APK, once the
 #   builds and their tests have passed.
-# - By hand: Actions → Apps → Run workflow.
+# - By hand: Actions → Apps → Run workflow; tick "release" to publish app-v<version> from that
+#   commit the same way (GitHub then creates the tag).
 #
 # Not signed by a store yet (docs/native-apps.md): Windows shows SmartScreen; the Mac app is only
 # ad-hoc signed, so macOS asks for Privacy & Security → Open Anyway the first time (without any
@@ -25,6 +26,11 @@ on:
     tags:
       - "app-v*"
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Also publish the GitHub release app-v<version> (from tauri.conf.json) from this commit"
+        type: boolean
+        default: false
 
 concurrency:
   group: apps-${{ github.ref }}
@@ -99,8 +105,10 @@ jobs:
         with:
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
-          # A tag makes the (draft) release with the installers; the publish job shows it once all is green.
-          tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
+          # A tag, or a run by hand with "release", makes the (draft) release with the installers; the
+          # publish job shows it once all is green. GitHub creates the tag on this commit when it's published.
+          tagName: ${{ (startsWith(github.ref, 'refs/tags/app-v') && github.ref_name) || (inputs.release && 'app-v__VERSION__') || '' }}
+          releaseCommitish: ${{ github.sha }}
           releaseName: "Blob __VERSION__"
           releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
@@ -356,11 +364,13 @@ jobs:
 
   publish:
     name: Publish the release
-    if: startsWith(github.ref, 'refs/tags/app-v')
+    if: startsWith(github.ref, 'refs/tags/app-v') || inputs.release
     # The installers and the APK, once they and the Android emulator checks have passed.
     needs: [desktop, android, android-test]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: blob-Android
@@ -370,5 +380,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" android/*.apk --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          case "$GITHUB_REF" in
+            refs/tags/app-v*) TAG="$GITHUB_REF_NAME" ;;
+            *) TAG="app-v$(jq -r .version src-tauri/tauri.conf.json)" ;;
+          esac
+          gh release upload "$TAG" android/*.apk --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$TAG" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
