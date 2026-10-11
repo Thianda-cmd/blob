@@ -122,7 +122,8 @@ export const SELF_UPDATING = "0.3.0";
 /** A computer app that can update itself. */
 export const canSelfUpdate = (app: BlobApp | null) => !!app && !isPhoneApp(app) && !newerVersion(SELF_UPDATING, app.version);
 
-export const checkUpdate = () => call<AppUpdate | null>("update_check");
+/** `force`: ask GitHub now (the app otherwise answers from its last check, up to 20 minutes old). */
+export const checkUpdate = (force = false) => call<AppUpdate | null>("update_check", { force });
 export const downloadUpdate = () => call<void>("update_download");
 export const updateProgress = () => call<UpdateProgress>("update_progress");
 export const applyUpdate = () => call<void>("update_apply");

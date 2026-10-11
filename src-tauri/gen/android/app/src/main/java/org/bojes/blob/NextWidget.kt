@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.text.format.DateFormat
@@ -164,8 +165,13 @@ class NextWidget : AppWidgetProvider() {
         if (item.running(now)) next = minOf(next, now + RUNNING_TICK)
       }
       if (next == Long.MAX_VALUE) return alarms.cancel(refresh(context))
-      // Not exact (no special permission needed); a minute late at most, usually.
-      alarms.set(AlarmManager.RTC, next, refresh(context))
+      // On time (Blob may set exact alarms: it's a calendar, see AndroidManifest.xml), else within a
+      // minute: a plain alarm can come much later, and the countdown would run past zero.
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
+        alarms.setExactAndAllowWhileIdle(AlarmManager.RTC, next, refresh(context))
+      } else {
+        alarms.setWindow(AlarmManager.RTC, next, 60_000, refresh(context))
+      }
     }
 
     private fun refresh(context: Context): PendingIntent {

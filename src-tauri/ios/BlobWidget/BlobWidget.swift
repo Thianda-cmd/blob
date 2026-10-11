@@ -71,6 +71,15 @@ struct BlobData: Decodable {
   /// What's still to come at `date`.
   func upcoming(at date: Date) -> [Item] { items.filter { $0.end > date } }
 
+  /// The one thing to show big (as Android's "Next up"): what runs now, else the next timed thing
+  /// today, else whatever comes first (all-day items come first in the list, but a running lesson matters more).
+  func next(at date: Date) -> Item? {
+    let coming = upcoming(at: date)
+    if let running = coming.first(where: { $0.running(at: date) }) { return running }
+    if let timed = coming.first(where: { !$0.a && $0.start > date }), Calendar.current.isDate(timed.start, inSameDayAs: date) { return timed }
+    return coming.first
+  }
+
   /// For the widget gallery.
   static var sample: BlobData {
     let day = Calendar.current.startOfDay(for: Date())
@@ -293,7 +302,7 @@ struct SmallView: View {
   @Environment(\.colorScheme) private var scheme
   var body: some View {
     if let data = entry.data {
-      let next = data.upcoming(at: entry.date).first
+      let next = data.next(at: entry.date)
       VStack(alignment: .leading, spacing: 6) {
         Header(data: data, now: entry.date, scheme: scheme, compact: true)
         Spacer(minLength: 0)
@@ -386,7 +395,9 @@ struct LockRectangular: View {
   let entry: BlobEntry
   var body: some View {
     if let data = entry.data {
-      let items = data.upcoming(at: entry.date)
+      let all = data.upcoming(at: entry.date)
+      let first = data.next(at: entry.date)
+      let items = first.map { pick in [pick] + all.filter { $0 != pick } } ?? all
       VStack(alignment: .leading, spacing: 1) {
         if items.isEmpty {
           Text(data.w.today).font(.headline)
@@ -424,7 +435,7 @@ struct LockCircular: View {
 struct LockInline: View {
   let entry: BlobEntry
   var body: some View {
-    if let data = entry.data, let next = data.upcoming(at: entry.date).first {
+    if let data = entry.data, let next = data.next(at: entry.date) {
       Text("\(Image(systemName: "calendar")) \(next.a ? "" : shortTime(next.start) + " ")\(next.t)")
     } else {
       Text("\(Image(systemName: "calendar")) Blob")

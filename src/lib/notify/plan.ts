@@ -193,7 +193,7 @@ export function plan(input: PlanInput): Planned[] {
       const events = onDay.filter((i) => i.source === "event").length;
       const due = onDay.filter((i) => i.source === "task").length;
       // Expanded: the day's plan, "8:00 Mathe".
-      const lines = onDay.slice(0, 8).map((i) => (i.allDay ? i.title : `${w.time(i.start)} ${i.title}`));
+      const lines = onDay.slice(0, 30).map((i) => (i.allDay ? i.title : `${w.time(i.start)} ${i.title}`));
       if (events + due > 0) add(`am:${ymd(day)}`, at(day, 7), w.morningTitle, w.morningBody(events, due), `/calendar?date=${ymd(day)}&view=day`, "daily", lines);
     }
   }

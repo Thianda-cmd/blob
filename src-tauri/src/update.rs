@@ -14,10 +14,10 @@
 //! one this side found itself: the site never hands over a link or a digest.
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -67,7 +67,7 @@ struct Found {
 }
 
 /// What the site shows on the update card.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateInfo {
   version: String,
@@ -92,10 +92,16 @@ pub struct Progress {
   busy: bool,
 }
 
+/// Checks without asking GitHub again for a while (pages that load anew, several windows; GitHub
+/// allows few unsigned checks per hour from one network, a school's for instance).
+const CHECK_AGAIN: Duration = Duration::from_secs(20 * 60);
+
 #[derive(Default)]
 pub struct Updates {
   found: Mutex<Option<Found>>,
-  staged: Mutex<Option<(String, PathBuf)>>,
+  checked: Mutex<Option<(Instant, Option<UpdateInfo>)>>,
+  /// The downloaded update: version, file, its SHA-256 (checked again right before it runs).
+  staged: Mutex<Option<(String, PathBuf, String)>>,
   downloaded: AtomicU64,
   total: AtomicU64,
   busy: AtomicBool,
@@ -164,6 +170,41 @@ fn pick(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
   assets.iter().find(|a| a.name.ends_with(wanted))
 }
 
+/// Whether this copy of Blob can be replaced where it is. macOS: not while it runs from the disk
+/// image or from the copy macOS moves aside until the app sits in a folder of its own (a folder
+/// that needs a password is fine: macOS asks for it). AppImage: a folder Blob may write to.
+fn replaceable() -> bool {
+  #[cfg(target_os = "macos")]
+  {
+    let Ok(exe) = std::env::current_exe() else { return false };
+    let path = exe.to_string_lossy();
+    !(path.starts_with("/Volumes/") || path.contains("/AppTranslocation/"))
+  }
+  #[cfg(target_os = "linux")]
+  {
+    std::env::var_os("APPIMAGE").map(PathBuf::from).and_then(|p| p.parent().map(writable)).unwrap_or(false)
+  }
+  #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+  {
+    true
+  }
+}
+
+#[cfg(target_os = "linux")]
+fn writable(dir: &Path) -> bool {
+  let probe = dir.join(format!(".blob-write-test-{}", std::process::id()));
+  let ok = std::fs::File::create(&probe).is_ok();
+  let _ = std::fs::remove_file(&probe);
+  ok
+}
+
+fn sha256_of(path: &Path) -> Result<String, String> {
+  let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+  let mut hasher = Sha256::new();
+  std::io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
+  Ok(hex::encode(hasher.finalize()))
+}
+
 fn check_blocking(current: semver::Version) -> Result<Option<(Found, UpdateInfo)>, String> {
   let agent = agent(&current.to_string());
   let mut res = get(&agent, RELEASES, Some("application/vnd.github+json"))?;
@@ -178,7 +219,7 @@ fn check_blocking(current: semver::Version) -> Result<Option<(Found, UpdateInfo)
   if version <= current {
     return Ok(None);
   }
-  let asset = pick(&release.assets).and_then(|a| {
+  let asset = pick(&release.assets).filter(|_| replaceable()).and_then(|a| {
     let sha256 = a.digest.as_deref()?.strip_prefix("sha256:")?.to_ascii_lowercase();
     let ok = a.browser_download_url.starts_with(&format!("{DOWNLOADS}{version}/")) && sha256.len() == 64 && a.size > 0 && a.size <= MAX_SIZE;
     ok.then(|| Asset { url: a.browser_download_url.clone(), name: a.name.clone(), size: a.size, sha256 })
@@ -196,11 +237,21 @@ fn check_blocking(current: semver::Version) -> Result<Option<(Found, UpdateInfo)
   Ok(Some((Found { version: version.to_string(), asset }, info)))
 }
 
-/// Looks for a newer version. None: Blob is up to date.
+/// Looks for a newer version. None: Blob is up to date. Asks GitHub at most every 20 minutes,
+/// unless `force` (you asked in the settings).
 #[tauri::command]
-pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<Option<UpdateInfo>, String> {
+pub async fn update_check<R: Runtime>(app: AppHandle<R>, force: Option<bool>) -> Result<Option<UpdateInfo>, String> {
   if cfg!(mobile) {
     return Ok(None);
+  }
+  if force != Some(true) {
+    let state = app.state::<Updates>();
+    let checked = state.checked.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((at, info)) = checked.as_ref() {
+      if at.elapsed() < CHECK_AGAIN {
+        return Ok(info.clone());
+      }
+    }
   }
   let mut current = app.package_info().version.clone();
   // Development: pretend to be an older version, to try updating against the real releases.
@@ -212,7 +263,7 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<Option<Update
   let result = tauri::async_runtime::spawn_blocking(move || check_blocking(current)).await.map_err(|e| e.to_string())??;
   let state = app.state::<Updates>();
   let mut found = state.found.lock().unwrap_or_else(|e| e.into_inner());
-  Ok(match result {
+  let info = match result {
     Some((f, info)) => {
       *found = Some(f);
       Some(info)
@@ -221,7 +272,9 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<Option<Update
       *found = None;
       None
     }
-  })
+  };
+  *state.checked.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), info.clone()));
+  Ok(info)
 }
 
 fn download_blocking(asset: &Asset, to: &PathBuf, state: &Updates, version: &str) -> Result<(), String> {
@@ -263,7 +316,8 @@ pub async fn update_download<R: Runtime>(app: AppHandle<R>) -> Result<(), String
   let state = app.state::<Updates>();
   let found = state.found.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("no update to download")?;
   let asset = found.asset.clone().ok_or("this update can't be installed by the app")?;
-  if let Some((version, path)) = state.staged.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+  let asset_sha = asset.sha256.clone();
+  if let Some((version, path, _)) = state.staged.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
     if *version == found.version && path.exists() {
       return Ok(());
     }
@@ -287,22 +341,29 @@ pub async fn update_download<R: Runtime>(app: AppHandle<R>) -> Result<(), String
   .and_then(|r| r);
   state.busy.store(false, Ordering::SeqCst);
   result?;
-  *state.staged.lock().unwrap_or_else(|e| e.into_inner()) = Some((found.version, to));
+  *state.staged.lock().unwrap_or_else(|e| e.into_inner()) = Some((found.version, to, asset_sha));
   Ok(())
 }
 
 #[tauri::command]
 pub fn update_progress<R: Runtime>(app: AppHandle<R>) -> Progress {
   let state = app.state::<Updates>();
-  let ready = state.staged.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|(_, p)| p.exists());
+  let ready = state.staged.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|(_, p, _)| p.exists());
   Progress { downloaded: state.downloaded.load(Ordering::Relaxed), total: state.total.load(Ordering::Relaxed), ready, busy: state.busy.load(Ordering::Relaxed) }
 }
 
-/// Puts the downloaded update in place and starts the new Blob.
-#[tauri::command]
+/// Puts the downloaded update in place and starts the new Blob. Off the main thread: macOS may
+/// ask for a password meanwhile, and the window must not freeze.
+#[tauri::command(async)]
 pub fn update_apply<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
   let state = app.state::<Updates>();
-  let (_, path) = state.staged.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("nothing downloaded")?;
+  let (_, path, sha256) = state.staged.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("nothing downloaded")?;
+  // The file waited in the cache (maybe for days, after "Later"): it must still be the one checked.
+  if sha256_of(&path)? != sha256 {
+    let _ = std::fs::remove_file(&path);
+    *state.staged.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    return Err("the downloaded update changed since it was checked; download it again".into());
+  }
   install(&app, &path)
 }
 
@@ -330,17 +391,39 @@ fn install<R: Runtime>(app: &AppHandle<R>, path: &PathBuf) -> Result<(), String>
   let fresh = parent.join(".Blob-update.app");
   let _ = std::fs::remove_dir_all(&fresh);
   let unpack = (|| -> std::io::Result<()> {
+    use std::path::Component;
+    let outside = || std::io::Error::other("the update has a file outside the app");
+    std::fs::create_dir_all(&fresh)?;
+    let root = fresh.canonicalize()?;
     let mut archive = tar::Archive::new(GzDecoder::new(std::fs::File::open(path)?));
     for entry in archive.entries()? {
       let mut entry = entry?;
       // "Blob.app/Contents/…" → "Contents/…"
       let inner: PathBuf = entry.path()?.iter().skip(1).collect();
-      if inner.as_os_str().is_empty() || inner.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+      if inner.as_os_str().is_empty() {
         continue;
+      }
+      if !inner.components().all(|c| matches!(c, Component::Normal(_))) {
+        return Err(outside());
+      }
+      let kind = entry.header().entry_type();
+      if kind.is_hard_link() {
+        return Err(outside());
+      }
+      // Links inside the bundle only (relative, never upwards).
+      if kind.is_symlink() {
+        let target = entry.link_name()?.ok_or_else(outside)?;
+        if !target.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)) {
+          return Err(outside());
+        }
       }
       let dest = fresh.join(&inner);
       if let Some(dir) = dest.parent() {
         std::fs::create_dir_all(dir)?;
+        // A folder reached through a link of an earlier entry must still be inside.
+        if !dir.canonicalize()?.starts_with(&root) {
+          return Err(outside());
+        }
       }
       entry.unpack(&dest)?;
     }
@@ -370,15 +453,15 @@ fn install<R: Runtime>(app: &AppHandle<R>, path: &PathBuf) -> Result<(), String>
 
 #[cfg(target_os = "macos")]
 fn install_as_admin<R: Runtime>(app: &AppHandle<R>, archive: &PathBuf, bundle: &std::path::Path) -> Result<(), String> {
-  let quote = |p: &std::path::Path| p.display().to_string().replace('\'', "'\\''");
   let parent = bundle.parent().ok_or("no folder around Blob.app")?;
-  let script = format!(
-    "do shell script \"cd '{dir}' && rm -rf .Blob-update && mkdir .Blob-update && tar -xzf '{archive}' -C .Blob-update && rm -rf '{app}' && mv .Blob-update/*.app '{app}' && rm -rf .Blob-update\" with administrator privileges",
-    dir = quote(parent),
-    archive = quote(archive),
-    app = quote(bundle),
-  );
-  let status = std::process::Command::new("osascript").args(["-e", &script]).status().map_err(|e| e.to_string())?;
+  // The paths go in as arguments, quoted by AppleScript itself (any character in a folder name is fine).
+  let script = r#"on run argv
+  set folderPath to quoted form of item 1 of argv
+  set archivePath to quoted form of item 2 of argv
+  set bundlePath to quoted form of item 3 of argv
+  do shell script "cd " & folderPath & " && rm -rf .Blob-update && mkdir .Blob-update && tar -xzf " & archivePath & " -C .Blob-update && test -d .Blob-update/*.app && rm -rf " & bundlePath & " && mv .Blob-update/*.app " & bundlePath & " && rm -rf .Blob-update" with administrator privileges
+end run"#;
+  let status = std::process::Command::new("osascript").arg("-e").arg(script).arg(parent).arg(archive).arg(bundle).status().map_err(|e| e.to_string())?;
   if !status.success() {
     return Err("the update wasn't allowed".into());
   }

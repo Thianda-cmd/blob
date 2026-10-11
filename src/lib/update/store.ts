@@ -90,16 +90,19 @@ export async function check({ manual = false } = {}) {
   try {
     let update: AppUpdate | null;
     const legacy = !canSelfUpdate(app);
-    if (!legacy) update = await checkUpdate();
-    else {
-      const res = await fetch("/api/app/latest");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const r = (await res.json()) as { version?: string; notes?: string; page?: string; published?: string | null };
+    // The site's answer (kept for an hour, for everyone): is there a newer one at all? Only then does
+    // the app ask GitHub itself, which allows few checks per hour from one network (a school's).
+    const latest = await fetch("/api/app/latest")
+      .then((res) => (res.ok ? (res.json() as Promise<{ version?: string; notes?: string; page?: string; published?: string | null }>) : null))
+      .catch(() => null);
+    if (legacy) {
+      if (!latest) throw new Error("no answer");
       update =
-        r.version && r.page && newerVersion(r.version, app.version)
-          ? { version: r.version, current: app.version, notes: r.notes ?? "", page: r.page, published: r.published ?? null, installable: false, size: 0 }
+        latest.version && latest.page && newerVersion(latest.version, app.version)
+          ? { version: latest.version, current: app.version, notes: latest.notes ?? "", page: latest.page, published: latest.published ?? null, installable: false, size: 0 }
           : null;
-    }
+    } else if (!manual && latest?.version && !newerVersion(latest.version, app.version)) update = null;
+    else update = await checkUpdate(manual);
     write(CHECKED_KEY, { at: Date.now(), found: !!update });
     if (!update) return set({ phase: "current", update: null });
     if (manual) write(LATER_KEY, null);
