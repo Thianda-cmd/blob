@@ -102,6 +102,9 @@ jobs:
 
       - name: Build
         uses: tauri-apps/tauri-action@v0
+        env:
+          # Makes and fills the release (only when tagName is set).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
