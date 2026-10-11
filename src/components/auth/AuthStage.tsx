@@ -62,7 +62,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={api}>
-      <div className="grid min-h-dvh lg:grid-cols-[minmax(440px,560px)_1fr]">
+      <div className="safe-top safe-x safe-bottom grid min-h-dvh lg:grid-cols-[minmax(440px,560px)_1fr]">
         <div className="relative flex flex-col bg-surface px-6 py-6 sm:px-12 lg:border-r lg:border-line">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="flex h-9 w-fit items-center gap-2 rounded-lg">

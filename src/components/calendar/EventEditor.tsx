@@ -807,7 +807,7 @@ export function UndoBar({ entry, onUndo, onDismiss, t, raised }: { entry: { id: 
           transition={{ type: "spring", stiffness: 520, damping: 32 }}
           className={cn(
             "fixed left-1/2 z-[65] flex -translate-x-1/2 items-center gap-1 rounded-xl border border-line bg-raised py-1 pl-3.5 pr-1 text-[13px] text-ink shadow-pop",
-            raised ? "bottom-[calc(76px+env(safe-area-inset-bottom))]" : "bottom-6",
+            raised ? "bottom-[calc(72px+env(safe-area-inset-bottom))]" : "bottom-6",
           )}
           role="status"
         >

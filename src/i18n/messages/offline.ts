@@ -9,6 +9,10 @@ export const offlineText = defineMessages({
     offlineHint: "You're offline. What you change is kept on this device and saved as soon as you're back.",
     waitingHint: "These changes are on this device and will be saved when the connection is back.",
     backOnline: "Back online. Everything's saved.",
+    notes: {
+      copyTitle: (title: string) => `${title || "Untitled"} (offline copy)`,
+      conflict: (title: string) => `This note was changed on another device while you were offline. I kept your version as “${title}”.`,
+    },
     refused: {
       events: "I couldn't save that change to your calendar, so I put it back.",
       tasks: "I couldn't save that change to a task, so I put it back.",
@@ -21,7 +25,12 @@ export const offlineText = defineMessages({
       notesHeading: "Notes on this device",
       noNotes: "No notes saved on this device yet.",
       noteMissing: "This note isn't on this device.",
-      readOnly: "Shared notes can only be read while you're offline.",
+      readOnly: "You can read this note here. To change it, open it again when you're online.",
+      noteTitle: "Note on this device",
+      fromDevice: "Opened from this device. What you write is saved here and goes to the cloud when you're back online.",
+      openLatest: "Open the latest version",
+      pagesHeading: "Pages on this device",
+      empty: "Nothing is saved on this device yet. Open Blob once with a connection.",
     },
   },
   de: {
@@ -31,6 +40,10 @@ export const offlineText = defineMessages({
     offlineHint: "Du bist offline. Was du änderst, bleibt auf diesem Gerät und wird gespeichert, sobald du wieder online bist.",
     waitingHint: "Diese Änderungen sind auf diesem Gerät und werden gespeichert, sobald die Verbindung zurück ist.",
     backOnline: "Wieder online. Alles ist gespeichert.",
+    notes: {
+      copyTitle: (title) => `${title || "Ohne Titel"} (Offline-Kopie)`,
+      conflict: (title) => `Diese Notiz wurde auf einem anderen Gerät geändert, während du offline warst. Deine Fassung habe ich als „${title}“ behalten.`,
+    },
     refused: {
       events: "Diese Änderung am Kalender konnte ich nicht speichern, deshalb habe ich sie zurückgenommen.",
       tasks: "Diese Änderung an einer Aufgabe konnte ich nicht speichern, deshalb habe ich sie zurückgenommen.",
@@ -43,7 +56,12 @@ export const offlineText = defineMessages({
       notesHeading: "Notizen auf diesem Gerät",
       noNotes: "Noch keine Notizen auf diesem Gerät gespeichert.",
       noteMissing: "Diese Notiz ist nicht auf diesem Gerät.",
-      readOnly: "Geteilte Notizen kannst du offline nur lesen.",
+      readOnly: "Du kannst diese Notiz hier lesen. Ändern kannst du sie, wenn du wieder online bist.",
+      noteTitle: "Notiz auf diesem Gerät",
+      fromDevice: "Von diesem Gerät geöffnet. Was du schreibst, wird hier gespeichert und kommt in die Cloud, sobald du wieder online bist.",
+      openLatest: "Neueste Fassung öffnen",
+      pagesHeading: "Seiten auf diesem Gerät",
+      empty: "Auf diesem Gerät ist noch nichts gespeichert. Öffne Blob einmal mit Verbindung.",
     },
   },
 });

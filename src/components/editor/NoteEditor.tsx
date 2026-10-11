@@ -6,16 +6,18 @@ import { getVersion, sendableSteps } from "prosemirror-collab";
 import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
 import { useDueCards } from "@/components/notes/useDueCards";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave, type SaveState } from "@/components/page/useAutosave";
+import { useTouch } from "@/components/ui/useMediaQuery";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
+import { offlineText } from "@/i18n/messages/offline";
 import { useTableChanges } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Member, Page, PageMeta } from "@/lib/types";
@@ -24,6 +26,7 @@ import { NoteBlocksProvider, type NoteBlocks } from "./blocks/context";
 import { uploadNoteFiles } from "./blocks/fileUpload";
 import { TableMenu } from "./blocks/Table";
 import { BubbleToolbar } from "./BubbleToolbar";
+import { KeyboardBar } from "./KeyboardBar";
 import { localChange, sliceOf, type LocalChange } from "./collab/conflict";
 import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
@@ -45,6 +48,23 @@ import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
 
 type NotePatch = { title: string; content: JSONContent; plain_text: string; links: string[] };
+
+/** The note as the server has it (after a save was refused for being behind). */
+type ServerNote = { title: string; content: unknown; plain_text: string | null; rev: number; updated_at: string };
+
+/** The same JSON, whatever the order of keys (the database stores objects with sorted keys). */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const bb = b as unknown[];
+    return a.length === bb.length && a.every((x, i) => sameJson(x, bb[i]));
+  }
+  const ka = Object.keys(a).filter((k) => (a as Record<string, unknown>)[k] !== undefined);
+  const kb = Object.keys(b).filter((k) => (b as Record<string, unknown>)[k] !== undefined);
+  return ka.length === kb.length && ka.every((k) => sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
 
 function initialContent(content: unknown, plain: string): Content | undefined {
   if (content && typeof content === "object" && (content as JSONContent).type === "doc") return content as JSONContent;
@@ -111,9 +131,26 @@ type Source = { content: unknown; plain: string };
  * `role` is your role on the page ("viewer": read only); `members` everyone on it (more than one:
  * the note is shared, and edits go through useNoteCollab).
  */
-export function NoteEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
+export function NoteEditor(props: { page: Page; role?: AccessRole; members?: Member[] }) {
+  const { userId } = useWorkspace();
+  // Text this device kept (written offline, not saved yet) must be in memory before the editor
+  // starts: it starts from it. Reading it takes a moment, once per page load.
+  const ready = useSyncExternalStore(
+    noteCache.onReady,
+    () => noteCache.isReady(userId),
+    () => false,
+  );
+  useEffect(() => {
+    void noteCache.load(userId);
+  }, [userId]);
+  if (!ready) return <div className="min-h-0 flex-1" aria-busy="true" />;
+  return <NoteEditorReady {...props} />;
+}
+
+function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const t = useMessages(editorText);
   const tb = useMessages(noteBlocksText);
+  const offline = useMessages(offlineText).notes;
   const locale = useLocale();
   const router = useRouter();
   const { pages, subjects, userId, profile, updatePage, createPage } = useWorkspace();
@@ -121,9 +158,12 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const icon = meta ? meta.icon : page.icon;
   const shared = members.length > 1;
   const readOnly = role === "viewer";
-  // Back/forward can hand us cached (older) props: start from what this tab last wrote. A shared note
-  // must start exactly at its saved version (the others' steps build on it), so it never does.
-  const [initial] = useState(() => (shared ? page : noteCache.freshest(page)));
+  // Back/forward (and pages opened offline from the app's cache) can hand us older props: start from
+  // the newest text this device knows, the server's or its own unsaved text (noteCache.ts). A shared
+  // note must start exactly at its saved version (the others' steps build on it), so it never does.
+  const touch = useTouch();
+  const [start] = useState(() => (shared ? null : noteCache.startOf(page)));
+  const initial = start?.page ?? page;
 
   const [title, setTitle] = useState(initial.title);
   const [broken, setBroken] = useState(false);
@@ -139,8 +179,15 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   // Working together is on for shared notes, and for a note that has steps nobody saved yet.
   const collabOn = together !== null;
   /** What the server holds from this tab's point of view (the last content saved alone, at baseVersion). */
-  const lastSaved = useRef<JSONContent | null>(initial.content && typeof initial.content === "object" ? (initial.content as JSONContent) : null);
+  const lastSaved = useRef<JSONContent | null>(start ? start.baseContent : page.content && typeof page.content === "object" ? (page.content as JSONContent) : null);
   const baseVersion = useRef(page.doc_version ?? 0);
+  /**
+   * The note's `rev` the text here builds on. A note saved on its own saves only over that `rev`:
+   * text written offline never silently replaces what another device saved meanwhile.
+   */
+  const baseRev = useRef<number>(start ? start.baseRev : page.rev);
+  /** Shows the server's note after a conflict (set once the editor exists, further down). */
+  const conflictRef = useRef<(row: ServerNote, local: Partial<NotePatch>) => Promise<void>>(async () => {});
   /** reloadTogether (declared further down, with the editor). */
   const reloadRef = useRef<(keepLocal?: boolean) => Promise<void>>(async () => {});
   /** The pages the text links to ("[["), as they are now: looked up when the note opens and when links are added. */
@@ -149,26 +196,52 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   const freshTitles = useRef(false);
 
   const save = useCallback(
-    async (patch: Partial<NotePatch>) => {
-      const version = noteCache.version(page.id);
-      const { data, error } = await createClient().from("pages").update(patch).eq("id", page.id).select("updated_at").maybeSingle();
-      if (error?.code === "BL409") {
-        // Others wrote to this note together meanwhile (their steps aren't in the saved text yet): the
-        // title is saved on its own, and the note switches to working together, bringing your text over.
-        if (patch.title !== undefined) await createClient().from("pages").update({ title: patch.title }).eq("id", page.id);
-        void reloadRef.current(true);
+    (patch: Partial<NotePatch>): Promise<boolean> => {
+      const attempt = async (again: boolean): Promise<boolean> => {
+        const version = noteCache.version(page.id);
+        const db = createClient();
+        const guarded = patch.content !== undefined;
+        let query = db.from("pages").update(patch).eq("id", page.id);
+        if (guarded) query = query.eq("rev", baseRev.current);
+        const { data, error } = await query.select("updated_at, rev").maybeSingle();
+        if (error?.code === "BL409") {
+          // Others wrote to this note together meanwhile (their steps aren't in the saved text yet): the
+          // title is saved on its own, and the note switches to working together, bringing your text over.
+          if (patch.title !== undefined) await db.from("pages").update({ title: patch.title }).eq("id", page.id);
+          void reloadRef.current(true);
+          return true;
+        }
+        if (error) return false;
+        if (!data && guarded) {
+          // The note isn't at the rev this text builds on.
+          const { data: row, error: rowError } = await db.from("pages").select("title, content, plain_text, rev, updated_at").eq("id", page.id).maybeSingle();
+          if (rowError) return false;
+          if (!row) return true;
+          const server = row as ServerNote;
+          // Our own last save got through (its answer was lost), or only the title changed: go on from there.
+          if (sameJson(server.content, patch.content) || sameJson(server.content, lastSaved.current)) {
+            baseRev.current = server.rev;
+            return again ? attempt(false) : false;
+          }
+          // Another device saved other text: ours is kept as a copy, theirs shows here.
+          await conflictRef.current(server, patch);
+          return true;
+        }
+        const saved = data as { updated_at?: string; rev?: number } | null;
+        if (patch.content) {
+          lastSaved.current = patch.content;
+          if (typeof saved?.rev === "number") baseRev.current = saved.rev;
+        }
+        noteCache.saved(page.id, version, saved?.updated_at, patch.content ? { rev: saved?.rev, content: patch.content } : undefined);
+        // Bump updated_at locally so "Edited …" and recent lists stay honest.
+        void updatePage(page.id, {}, { local: true });
         return true;
-      }
-      if (error) return false;
-      if (patch.content) lastSaved.current = patch.content;
-      noteCache.saved(page.id, version, (data as { updated_at?: string } | null)?.updated_at);
-      // Bump updated_at locally so "Edited …" and recent lists stay honest.
-      void updatePage(page.id, {}, { local: true });
-      return true;
+      };
+      return attempt(true);
     },
     [page.id, updatePage],
   );
-  const { state: autosaveState, schedule, flush } = useAutosave<NotePatch>(save);
+  const { state: autosaveState, schedule, flush, discard } = useAutosave<NotePatch>(save, 700, { onDevice: !shared });
 
   const focusTitle = useCallback(() => {
     const el = titleRef.current;
@@ -318,6 +391,9 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
           if (!link || !view.dom.contains(link)) return false;
           const href = link.getAttribute("href");
           if (!href) return false;
+          // Phones and tablets while editing: a tap puts the caret in the link (the bar above the
+          // keyboard offers to open it), as a tap on a word would.
+          if (view.editable && matchMedia("(hover: none) and (pointer: coarse)").matches) return false;
           // A page that's gone would only show "not found": the click just puts the caret there.
           const target = pageIdFromHref(href);
           if (target && live.current?.linkStatus(target) === "gone") return false;
@@ -425,6 +501,55 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
   useEffect(() => {
     reloadRef.current = reloadTogether;
   }, [reloadTogether]);
+
+  // Another device saved different text while this one was offline: what was written here becomes
+  // a copy (nothing is lost), and the editor shows the note as it is now.
+  useEffect(() => {
+    conflictRef.current = async (row, local) => {
+      discard();
+      const current = editor && !editor.isDestroyed ? editor : null;
+      const mine = local.content ?? (current ? contentToSave(current) : null);
+      const name = offline.copyTitle(local.title ?? title);
+      const where = meta ?? page;
+      const copy = mine ? await createPage({ kind: "note", title: name, subject_id: where.subject_id, parent_id: where.parent_id }) : null;
+      if (copy && mine) {
+        await createClient()
+          .from("pages")
+          .update({ content: mine, plain_text: local.plain_text ?? (current ? plainText(current) : ""), links: local.links ?? [] })
+          .eq("id", copy.id);
+      }
+      const content = row.content && typeof row.content === "object" ? (row.content as JSONContent) : null;
+      lastSaved.current = content;
+      baseRev.current = row.rev;
+      noteCache.forget(page.id);
+      noteCache.startFrom({ ...page, title: row.title, content: row.content, rev: row.rev, updated_at: row.updated_at });
+      setTitle(row.title);
+      if (current) setStale(current);
+      setOptions(makeOptions({ content: row.content, plain: row.plain_text ?? "" }));
+      blob.say(offline.conflict(name), { mood: "thinking", ms: 8000 });
+    };
+  });
+
+  // This editor saves the note (the background save of waiting notes leaves it alone).
+  useEffect(() => (shared ? undefined : noteCache.opened(page.id)), [shared, page.id]);
+
+  // Opened from the server's text: remember what it builds on (saving after time offline needs it).
+  useEffect(() => {
+    if (!shared && !noteCache.unsaved(page.id)) noteCache.startFrom(initial);
+    // Once, when the note opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Text written here that was never saved (the app closed while offline) goes out now.
+  const replayed = useRef(false);
+  useEffect(() => {
+    if (replayed.current || !editor || editor.isDestroyed || shared || readOnly || together) return;
+    replayed.current = true;
+    if (!noteCache.unsaved(page.id)) return;
+    const patch: Partial<NotePatch> = { content: contentToSave(editor), plain_text: plainText(editor), links: collectLinks(editor.state.doc, page.id) };
+    if (initial.title !== page.title) patch.title = initial.title;
+    schedule(patch);
+  }, [editor, shared, readOnly, together, page.id, page.title, initial.title, schedule]);
   // The note about a change that couldn't be brought over goes away after a while.
   useEffect(() => {
     if (!carryFailed) return;
@@ -863,7 +988,8 @@ export function NoteEditor({ page, role = "owner", members = [] }: { page: Page;
         </div>
       </div>
 
-      {editor && canEdit && <BubbleToolbar editor={editor} />}
+      {editor && canEdit && !touch && <BubbleToolbar editor={editor} />}
+      {editor && canEdit && touch && <KeyboardBar editor={editor} onOpenLink={(href) => live.current?.openHref(href)} />}
       {editor && canEdit && <TableMenu editor={editor} />}
       <SlashMenu controller={slash} />
       <PageRefMenu controller={refs} />

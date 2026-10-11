@@ -15,7 +15,7 @@ import { Tutor } from "@/learn/components/Tutor";
 import { plain, type Line } from "@/notes/doc";
 import type { Card } from "@/notes/study/cards";
 import { addDays, answer, cardState, setSuspended, today, type CardState, type Review } from "@/notes/study/srs";
-import { createClient } from "@/lib/supabase/client";
+import { keptReviews, saveReview } from "@/lib/offline/reviews";
 import { cn } from "@/lib/utils";
 import { RichLines } from "./RichLine";
 import type { CardEdits } from "./useCardEdits";
@@ -71,12 +71,26 @@ export function CardsMode({
     return later.map((r) => r.due_on).sort()[0] ?? null;
   }, [reviews, day, cards]);
 
+  // Answers given here without a connection (kept on the device) count straight away.
+  useEffect(() => {
+    let alive = true;
+    void keptReviews(userId, pageId).then((rows) => {
+      if (!alive || !rows.length) return;
+      setReviews((m) => {
+        const next = new Map(m);
+        for (const r of rows as unknown as Review[]) next.set(r.card_id, r);
+        return next;
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userId, pageId]);
+
   async function save(row: Review) {
     setReviews((m) => new Map(m).set(row.card_id, row));
-    const { error } = await createClient()
-      .from("card_reviews")
-      .upsert({ ...row, user_id: userId, page_id: pageId }, { onConflict: "user_id,page_id,card_id" });
-    if (error) setSaveError(true);
+    // Offline, the answer waits on the device and goes out when the connection is back.
+    if ((await saveReview(userId, pageId, row)) === "error") setSaveError(true);
   }
 
   function start(practice: boolean, only?: Card[]) {

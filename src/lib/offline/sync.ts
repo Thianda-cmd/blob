@@ -102,6 +102,11 @@ export class Sync {
   private recent = new Map<string, number>();
   /** Outbox entries not yet stored on the device. */
   private unsaved = new Set<string>();
+  /**
+   * Rows deleted for good (tables without tombstones), id → when: an older copy of the row (a page
+   * rendered before, opened offline) doesn't bring them back.
+   */
+  private gone: Record<SyncTable, Map<string, number>> = { events: new Map(), tasks: new Map() };
 
   constructor(userId: string) {
     this.userId = userId;
@@ -198,6 +203,8 @@ export class Sync {
     let changed = false;
     for (const row of rows) {
       if (!row?.id) continue;
+      const goneAt = this.gone[table].get(row.id);
+      if (goneAt && Date.parse(row.updated_at ?? "") <= goneAt) continue;
       if (newer(this.base[table].get(row.id), row)) {
         this.base[table].set(row.id, row);
         this.dirty[table].add(row.id);
@@ -289,30 +296,61 @@ export class Sync {
       if (!error) {
         if (data) return this.confirmed(e.table, data as Row);
         // The row is gone (deleted on another device): nothing left to change.
-        this.base[e.table].delete(e.id);
-        this.dirty[e.table].add(e.id);
+        this.forget(e.table, e.id);
         return "sent";
       }
       if (isNetworkError(error, status)) return "wait";
       if (isAuthError(error, status)) return "auth";
       return this.refused(e, error);
     }
-    const res = spec.soft ? await table.update({ deleted_at: new Date().toISOString() }).eq("id", e.id) : await table.delete().eq("id", e.id);
+    if (spec.soft) {
+      const res = await table.update({ deleted_at: new Date().toISOString() }).eq("id", e.id).select().maybeSingle();
+      if (res.error) {
+        if (isNetworkError(res.error, res.status)) return "wait";
+        if (isAuthError(res.error, res.status)) return "auth";
+        return this.refused(e, res.error);
+      }
+      if (res.data) return this.confirmed(e.table, res.data as Row);
+      this.forget(e.table, e.id);
+      return "sent";
+    }
+    const res = await table.delete().eq("id", e.id);
     if (res.error) {
       if (isNetworkError(res.error, res.status)) return "wait";
       if (isAuthError(res.error, res.status)) return "auth";
       return this.refused(e, res.error);
     }
-    this.base[e.table].delete(e.id);
-    this.dirty[e.table].add(e.id);
+    this.forget(e.table, e.id);
     return "sent";
+  }
+
+  /** A row that is gone for good. */
+  private forget(table: SyncTable, id: string) {
+    this.base[table].delete(id);
+    this.dirty[table].add(id);
+    if (!SPECS[table].soft) {
+      this.gone[table].set(id, Date.now());
+      this.goneDirty = true;
+    }
+  }
+
+  /** Keeps a row from the server: a tombstone too (tables that have them), so older copies can't revive it. */
+  private put(table: SyncTable, row: Row) {
+    const keep = SPECS[table].keep;
+    if (row.deleted_at && !SPECS[table].soft) this.forget(table, row.id);
+    else if (keep && !keep(row)) {
+      this.base[table].delete(row.id);
+      this.dirty[table].add(row.id);
+    } else {
+      this.base[table].set(row.id, row);
+      this.dirty[table].add(row.id);
+      if (!row.deleted_at && this.gone[table].delete(row.id)) this.goneDirty = true;
+    }
   }
 
   private confirmed(table: SyncTable, row: Row): "sent" {
     this.recent.set(row.id, Date.now());
-    if (row.deleted_at) this.base[table].delete(row.id);
-    else this.base[table].set(row.id, row);
-    this.dirty[table].add(row.id);
+    this.put(table, row);
     return "sent";
   }
 
@@ -327,9 +365,8 @@ export class Sync {
   private async reloadRow(table: SyncTable, id: string) {
     const { data, error } = await createClient().from(table).select("*").eq("id", id).maybeSingle();
     if (error) return;
-    if (data && !(data as Row).deleted_at) this.base[table].set(id, data as Row);
-    else this.base[table].delete(id);
-    this.dirty[table].add(id);
+    if (data) this.put(table, data as Row);
+    else this.forget(table, id);
     this.emit([table]);
     this.persistSoon();
   }
@@ -337,7 +374,14 @@ export class Sync {
   // Loading ---------------------------------------------------------------------------------------
 
   private async hydrate() {
-    const [events, tasks, outbox] = await Promise.all([getAll<Row>(this.userId, "events"), getAll<Row>(this.userId, "tasks"), getAll<Entry>(this.userId, "outbox")]);
+    const [events, tasks, outbox, gone] = await Promise.all([
+      getAll<Row>(this.userId, "events"),
+      getAll<Row>(this.userId, "tasks"),
+      getAll<Entry>(this.userId, "outbox"),
+      getMeta<[string, number][]>(this.userId, "gone:tasks"),
+    ]);
+    const month = Date.now() - 30 * 864e5;
+    for (const [id, at] of gone ?? []) if (at > month && !this.gone.tasks.has(id)) this.gone.tasks.set(id, at);
     for (const [table, rows] of [["events", events], ["tasks", tasks]] as const) {
       for (const row of rows) if (newer(this.base[table].get(row.id), row)) this.base[table].set(row.id, row);
     }
@@ -386,20 +430,19 @@ export class Sync {
     const map = this.base[table];
     if (full) {
       const ids = new Set(rows.map((r) => r.id));
-      for (const id of map.keys()) {
-        // (Not rows confirmed a moment ago: the list may have been read just before they existed.)
-        if (!ids.has(id) && Date.now() - (this.recent.get(id) ?? 0) > 60_000) {
-          map.delete(id);
-          this.dirty[table].add(id);
-        }
+      const old = Date.now() - 60 * 864e5;
+      for (const [id, row] of map) {
+        if (ids.has(id)) continue;
+        // Tombstones stay a while (a full list leaves them out); rows confirmed a moment ago stay too
+        // (the list may have been read just before they existed).
+        if (row.deleted_at && Date.parse(row.deleted_at) > old) continue;
+        if (Date.now() - (this.recent.get(id) ?? 0) > 60_000) this.forget(table, id);
       }
     }
     let latest = cursor ?? "";
     for (const row of rows) {
       if (row.updated_at && row.updated_at > latest) latest = row.updated_at;
-      if (row.deleted_at || (spec.keep && !spec.keep(row))) map.delete(row.id);
-      else map.set(row.id, row);
-      this.dirty[table].add(row.id);
+      this.put(table, row);
     }
     this.loaded[table] = true;
     if (spec.since && latest) await setMeta(this.userId, cursorKey, latest);
@@ -478,18 +521,14 @@ export class Sync {
 
   private onRemote(table: SyncTable, payload: { eventType: string; new: Row; old: Partial<Row> }) {
     const map = this.base[table];
-    const keep = SPECS[table].keep;
     if (payload.eventType === "DELETE") {
       const id = payload.old?.id;
       if (!id) return;
-      map.delete(id);
-      this.dirty[table].add(id);
+      this.forget(table, id);
     } else {
       const row = payload.new;
       if (!row?.id) return;
-      if (row.deleted_at || (keep && !keep(row))) map.delete(row.id);
-      else if (newer(map.get(row.id), row)) map.set(row.id, row);
-      this.dirty[table].add(row.id);
+      if (newer(map.get(row.id), row)) this.put(table, row);
       if (row.updated_at) {
         void getMeta<string>(this.userId, `cursor:${table}`).then((c) => {
           if (SPECS[table].since && (!c || row.updated_at! > c)) void setMeta(this.userId, `cursor:${table}`, row.updated_at);
@@ -527,7 +566,13 @@ export class Sync {
     }, 300);
   }
 
+  private goneDirty = false;
+
   private async persist() {
+    if (this.goneDirty) {
+      this.goneDirty = false;
+      await setMeta(this.userId, "gone:tasks", [...this.gone.tasks].slice(-2000));
+    }
     for (const table of TABLES) {
       const ids = [...this.dirty[table]];
       if (!ids.length) continue;
@@ -598,4 +643,15 @@ export async function forgetAccount(userId: string) {
   s?.stop();
   syncs.delete(userId);
   await wipeDb(userId);
+}
+
+/** Sends what's waiting, for at most `ms` (before signing out). */
+export async function flushAllSyncs(ms = 5000) {
+  await Promise.race([Promise.all([...syncs.values()].map((s) => s.flush())), new Promise((r) => setTimeout(r, ms))]);
+}
+
+/** Stops syncing every account on this page (signing out). */
+export function stopAllSyncs() {
+  for (const s of syncs.values()) s.stop();
+  syncs.clear();
 }

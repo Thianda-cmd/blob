@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
+import { OfflinePill } from "@/components/offline/OfflinePill";
 import { cn } from "@/lib/utils";
 import { useShell } from "./AppShell";
 
@@ -48,6 +49,7 @@ export function TopBar({ crumbs, actions, className }: { crumbs: Crumb[]; action
           );
         })}
       </nav>
+      <OfflinePill />
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
     </header>
   );

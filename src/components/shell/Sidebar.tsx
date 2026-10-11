@@ -50,6 +50,7 @@ import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
+import { flushDevice, forgetDevice } from "@/lib/offline/device";
 
 // Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
 // row actions: there is no hover to reveal them and 28 px rows are too small for a finger.
@@ -582,7 +583,10 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
   }
 
   async function signOut() {
+    await flushDevice();
     await createClient().auth.signOut();
+    // Nothing of the account stays on this device (its offline copies, unsent changes).
+    await forgetDevice();
     router.replace("/login");
     router.refresh();
   }

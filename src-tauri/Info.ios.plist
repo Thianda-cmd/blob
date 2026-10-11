@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Merged into the app's Info.plist by Tauri. App-bound domains let the web view use service
+       workers (the site's offline copies, public/sw.js): the site, its files and the app's own
+       localhost (start page, IPC). -->
+  <key>WKAppBoundDomains</key>
+  <array>
+    <string>localhost</string>
+    <string>bojes.org</string>
+    <string>supabase.co</string>
+  </array>
+</dict>
+</plist>

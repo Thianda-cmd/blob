@@ -6,5 +6,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|sdk/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)"],
+  // (sw.js: the apps' offline helper, a plain file that needs no session.)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|sdk/|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)"],
 };

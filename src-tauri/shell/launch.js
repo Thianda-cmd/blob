@@ -1,5 +1,6 @@
 // The app's start page: Blob, while the app checks it can reach the site, then the site itself.
-// Without internet: a friendly screen that tries again by itself until the connection is back.
+// Without internet: the site anyway when it keeps offline copies on this device (public/sw.js on
+// the site answers then), else a friendly screen that tries again until the connection is back.
 (function () {
   var app = window.__BLOB_APP__ || {};
   var site = app.site || "https://blob.bojes.org/";
@@ -54,6 +55,20 @@
     );
   }
 
+  // Whether the site said it can start without a connection (its offline copies are on this device).
+  function offlineReady() {
+    var ipc = window.__TAURI_INTERNALS__;
+    if (!ipc || typeof ipc.invoke !== "function") return Promise.resolve(false);
+    return ipc.invoke("offline_ready").then(
+      function (ready) {
+        return ready === true;
+      },
+      function () {
+        return false;
+      },
+    );
+  }
+
   // While the offline screen shows, it quietly checks again every few seconds: a connection that
   // is just slow to start (a phone waking up, a train) never fires "online".
   function later() {
@@ -73,15 +88,19 @@
     clearTimeout(again);
     show("loading");
     reachable().then(function (ok) {
-      if (!ok) {
+      if (ok) return leave();
+      offlineReady().then(function (ready) {
+        if (ready) return leave();
         busy = false;
         show("offline");
         later();
-        return;
-      }
-      target().then(function (to) {
-        location.replace(to);
       });
+    });
+  }
+
+  function leave() {
+    target().then(function (to) {
+      location.replace(to);
     });
   }
 

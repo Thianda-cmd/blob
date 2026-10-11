@@ -1,7 +1,7 @@
 // The Blob app (desktop and phones, src-tauri/) shows this site in a native window. Inside it, the
-// app sets window.__BLOB_APP__ before any script runs, and the site may call three app commands:
-// open_external, print_page, app_info (src-tauri/capabilities/site.json). In a browser all of this
-// is inert.
+// app sets window.__BLOB_APP__ before any script runs, and the site may call a few app commands
+// (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready. In a
+// browser all of this is inert.
 
 export type AppPlatform = "linux" | "macos" | "windows" | "android" | "ios";
 
@@ -24,7 +24,9 @@ export function blobApp(): BlobApp | null {
 
 export const isPhoneApp = (app: BlobApp | null) => app?.platform === "android" || app?.platform === "ios";
 
-async function call<T>(command: "open_external" | "print_page" | "app_info", args?: Record<string, unknown>): Promise<T> {
+type Command = "open_external" | "print_page" | "app_info" | "set_offline_ready";
+
+async function call<T>(command: Command, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(command, args);
 }
@@ -54,5 +56,15 @@ export async function printPage(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Tells the app the site can start without a connection now (its start page then opens it offline). */
+export async function setOfflineReady(ready: boolean): Promise<void> {
+  if (!blobApp()) return;
+  try {
+    await call("set_offline_ready", { ready });
+  } catch {
+    // An older app without the command: it just won't start offline.
   }
 }

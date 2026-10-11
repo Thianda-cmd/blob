@@ -21,6 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
+  // The page may use the whole screen (behind the iPhone's notch and home indicator); the app shell
+  // keeps its content clear of them (.safe-top and friends in globals.css).
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f3ee" },
     { media: "(prefers-color-scheme: dark)", color: "#141413" },

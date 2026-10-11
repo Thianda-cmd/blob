@@ -213,7 +213,7 @@ export function BlobHelper() {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed bottom-2 right-2 z-40 flex flex-col items-end transition-transform duration-300 ease-out sm:bottom-3 sm:right-4",
+        "pointer-events-none fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-2 z-40 flex flex-col items-end transition-transform duration-300 ease-out sm:bottom-[calc(12px+env(safe-area-inset-bottom))] sm:right-4",
         tucked && !open && !speech && "max-sm:translate-y-[calc(100%+12px)]",
       )}
     >

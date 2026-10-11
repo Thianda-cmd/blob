@@ -71,9 +71,20 @@ export class SlashController<T = SlashItem> {
     if (!host) return;
     const width = host.offsetWidth || 320;
     const left = Math.max(8, Math.min(x, window.innerWidth - width - 8));
-    host.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(y)}px, 0)`;
+    let top = y;
+    let side: "top" | "bottom" = placement.startsWith("top") ? "top" : "bottom";
+    // Phones: the menu stays in the part of the screen the keyboard (and the bar above it) leaves.
+    const vv = window.visualViewport;
+    if (vv && side === "bottom") {
+      const bottom = vv.offsetTop + vv.height - (matchMedia("(hover: none)").matches ? 52 : 8);
+      const height = host.offsetHeight || 280;
+      if (top + height > bottom) {
+        top = Math.max(vv.offsetTop + 8, y - height - 36);
+        side = "top";
+      }
+    }
+    host.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
     host.style.visibility = "visible";
-    const side = placement.startsWith("top") ? "top" : "bottom";
     if (side !== this.snapshot.placement) this.set({ placement: side });
   };
 

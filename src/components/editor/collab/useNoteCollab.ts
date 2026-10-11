@@ -7,6 +7,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { collab, getVersion, receiveTransaction, sendableSteps } from "prosemirror-collab";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tabId, useLive, useTableChanges, type Peer } from "@/lib/live";
+import { keepOwed } from "@/lib/offline/notes";
 import { createClient } from "@/lib/supabase/client";
 
 // Working on one note together, with the database as the authority (ProseMirror's collab model):
@@ -461,6 +462,21 @@ export function useNoteCollab({
     };
     editor.on("transaction", onUpdate as never);
 
+    // Unsent steps also wait on the device, so closing the app without a connection loses nothing:
+    // the server places them on the note later (settleOwed in src/lib/offline/notes.ts).
+    let owedTimer: ReturnType<typeof setTimeout> | undefined;
+    const keepUnsent = () => {
+      if (editor.isDestroyed) return;
+      const unsent = unsentOf(editor.state);
+      void keepOwed(me.user_id, pageId, clientId, unsent ? { version: unsent.version, steps: unsent.steps.map((s) => s.toJSON()), client: clientId } : null);
+    };
+    const onAny = ({ transaction }: { transaction: { docChanged: boolean; getMeta: (k: string) => unknown } }) => {
+      if (!transaction.docChanged && !transaction.getMeta("collab$")) return;
+      clearTimeout(owedTimer);
+      owedTimer = setTimeout(keepUnsent, 600);
+    };
+    editor.on("transaction", onAny as never);
+
     /**
      * What this editor still owes the stored note, captured now (the editor may be gone a moment
      * later): steps it hasn't sent, or sent steps no snapshot holds yet. Null when it owes nothing.
@@ -532,6 +548,9 @@ export function useNoteCollab({
     return () => {
       clearTimeout(start);
       editor.off("transaction", onUpdate as never);
+      editor.off("transaction", onAny as never);
+      clearTimeout(owedTimer);
+      keepUnsent();
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("beforeunload", onBeforeUnload);

@@ -16,6 +16,8 @@
   "permissions": [
     "allow-open-external",
     "allow-print-page",
-    "allow-app-info"
+    "allow-app-info",
+    "allow-set-offline-ready",
+    "notification:default"
   ]
 }

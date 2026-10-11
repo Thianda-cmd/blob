@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The apps' offline helper (public/sw.js): always the latest, for the whole site.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
         // Only lesson pictures (/embed) are made to sit in other sites' frames. Everything else may be framed
         // by Blob itself at most, so no other site can trick a signed-in student into clicks (clickjacking).
         source: "/((?!embed/|oauth/).*)",

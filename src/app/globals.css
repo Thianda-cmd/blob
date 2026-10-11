@@ -2579,3 +2579,16 @@ html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [ro
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Room for the iPhone's status bar, rounded corners and home indicator (the viewport covers the
+   whole screen: viewport-fit=cover). Zero on other devices; Android's app pads natively. */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

@@ -15,6 +15,7 @@ import { shareText } from "@/i18n/messages/share";
 import { createClient } from "@/lib/supabase/client";
 import type { MemberRole, PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
+import { flushDevice, forgetDevice } from "@/lib/offline/device";
 
 /** What invite_preview returns (migration 0010). */
 export type InvitePreview =
@@ -64,7 +65,9 @@ export function JoinView({ token, preview, me }: { token: string; preview: Invit
   }
 
   async function signOut() {
+    await flushDevice();
     await createClient().auth.signOut();
+    await forgetDevice();
     router.replace(`/login?next=${encodeURIComponent(`/join/${token}`)}`);
     router.refresh();
   }

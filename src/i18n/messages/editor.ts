@@ -74,6 +74,22 @@ export const editorText = defineMessages({
       } satisfies Record<string, SlashText>,
     },
 
+    keyboard: {
+      label: "Formatting",
+      insert: "Insert a block",
+      bold: "Bold",
+      italic: "Italic",
+      strike: "Strikethrough",
+      heading: "Heading",
+      bullet: "Bulleted list",
+      todo: "Checklist",
+      indent: "Indent",
+      outdent: "Outdent",
+      openLink: "Open",
+      undo: "Undo",
+      redo: "Redo",
+      hide: "Hide keyboard",
+    },
     bubble: {
       turnInto: "Turn into",
       blocks: {
@@ -261,6 +277,22 @@ export const editorText = defineMessages({
       },
     },
 
+    keyboard: {
+      label: "Formatierung",
+      insert: "Block einfügen",
+      bold: "Fett",
+      italic: "Kursiv",
+      strike: "Durchgestrichen",
+      heading: "Überschrift",
+      bullet: "Aufzählung",
+      todo: "Checkliste",
+      indent: "Einrücken",
+      outdent: "Ausrücken",
+      openLink: "Öffnen",
+      undo: "Rückgängig",
+      redo: "Wiederholen",
+      hide: "Tastatur ausblenden",
+    },
     bubble: {
       turnInto: "Umwandeln in",
       blocks: {

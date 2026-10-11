@@ -205,8 +205,12 @@ fn site_window<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str, url: WebviewU
     site = site().to_string(),
   );
 
-  let builder = WebviewWindowBuilder::new(app, label, url)
-    .initialization_script(script)
+  let builder = WebviewWindowBuilder::new(app, label, url).initialization_script(script);
+  // iPhone and iPad: service workers (the site's offline copies) need "app-bound domains"
+  // (WKAppBoundDomains in Info.ios.plist lists the site, its files and localhost).
+  #[cfg(target_os = "ios")]
+  let builder = builder.limit_navigations_to_app_bound_domains(true);
+  let builder = builder
     // Stay on the site: other sites open in the browser, app links open in the app.
     .on_navigation(move |url| {
       if is_site(url) || is_local(url) || is_files(url) {
@@ -371,6 +375,35 @@ fn app_info<R: Runtime>(app: AppHandle<R>) -> AppInfo {
   AppInfo { platform: std::env::consts::OS, version: app.package_info().version.to_string() }
 }
 
+/// The file that says the site can start without a connection (the site warmed its offline copies).
+fn offline_flag<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+  app.path().app_local_data_dir().ok().map(|dir| dir.join("offline-ready"))
+}
+
+/// The site says whether it can start offline: its pages and data are on this device (or, after
+/// signing out, no longer are).
+#[tauri::command]
+fn set_offline_ready<R: Runtime>(app: AppHandle<R>, ready: bool) -> Result<(), String> {
+  let path = offline_flag(&app).ok_or("no data folder")?;
+  if ready {
+    if let Some(dir) = path.parent() {
+      std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, b"1").map_err(|e| e.to_string())
+  } else {
+    match std::fs::remove_file(&path) {
+      Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+      _ => Ok(()),
+    }
+  }
+}
+
+/// The start page asks whether the site can start without a connection.
+#[tauri::command]
+fn offline_ready<R: Runtime>(app: AppHandle<R>) -> bool {
+  offline_flag(&app).is_some_and(|p| p.exists())
+}
+
 /// The start page asks where to go, just before it leaves: a page from an app link, else nothing
 /// (the home page). Asked once: the answer is used up.
 #[tauri::command]
@@ -399,9 +432,12 @@ pub fn run() {
   builder
     .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_deep_link::init())
+    // Reminders (calendar, homework, exams, cards), planned by the site: scheduled with the system
+    // on phones, shown while open on computers.
+    .plugin(tauri_plugin_notification::init())
     .manage(Pending::default())
     .manage(SiteShown::default())
-    .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target])
+    .invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready])
     .setup(|app| {
       let handle = app.handle().clone();
 

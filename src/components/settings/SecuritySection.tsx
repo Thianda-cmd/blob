@@ -17,6 +17,7 @@ import { authMessage, isEmail } from "@/lib/auth/errors";
 import { passwordStrength } from "@/lib/auth/password";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Reveal, Row, SavedBadge, Section } from "./primitives";
+import { flushDevice, forgetDevice } from "@/lib/offline/device";
 
 export function SecuritySection() {
   const t = useMessages(settingsText).security;
@@ -250,12 +251,14 @@ function SessionsRow() {
   async function signOutEverywhere() {
     setLoading(true);
     setError(null);
+    await flushDevice();
     const { error } = await createClient().auth.signOut({ scope: "global" });
     if (error) {
       setLoading(false);
       return setError(authMessage(error, locale));
     }
     resetBoot();
+    await forgetDevice();
     router.replace("/login");
     router.refresh();
   }

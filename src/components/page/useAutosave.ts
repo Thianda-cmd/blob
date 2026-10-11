@@ -4,14 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { useMessages } from "@/i18n/client";
 import { pageText } from "@/i18n/messages/page";
+import { isOnline, onConnectivity, reportNetworkError } from "@/lib/offline/net";
 
-export type SaveState = "saved" | "pending" | "saving" | "error";
+/** "device": no connection, but what was written is kept on this device until it can be saved. */
+export type SaveState = "saved" | "pending" | "saving" | "error" | "device";
 
 /**
  * Debounced, merge-friendly autosave. Call `schedule(patch)` on every change;
  * patches are merged and written after `delay` ms of quiet. Failed writes retry.
+ * `onDevice`: the caller keeps unsaved changes on the device (notes), so being offline is calm.
  */
-export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promise<boolean>, delay = 700) {
+export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promise<boolean>, delay = 700, opts: { onDevice?: boolean } = {}) {
+  const onDevice = !!opts.onDevice;
   const t = useMessages(pageText);
   const [state, setState] = useState<SaveState>("saved");
   const pending = useRef<Partial<T> | null>(null);
@@ -39,6 +43,15 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
       const ok = await saveRef.current(patch);
       if (!ok) {
         pending.current = { ...patch, ...(pending.current ?? {}) };
+        const offline = typeof navigator !== "undefined" && (navigator.onLine === false || !isOnline());
+        if (offline) reportNetworkError();
+        if (offline && onDevice) {
+          // Kept on the device: it goes out as soon as the connection is back (or in a while).
+          setState("device");
+          failed.current = true;
+          timer.current = setTimeout(() => retry.current(), 30_000);
+          return;
+        }
         setState("error");
         if (!failed.current) blob.say(textRef.current.cantReach, { mood: "worried" });
         failed.current = true;
@@ -47,18 +60,35 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
       }
       if (failed.current) {
         failed.current = false;
-        blob.say(textRef.current.backOnline, { mood: "happy" });
+        if (!onDevice) blob.say(textRef.current.backOnline, { mood: "happy" });
       }
       setState(pending.current ? "pending" : "saved");
     })();
     inFlight.current = run;
     await run;
     inFlight.current = null;
-  }, []);
+  }, [onDevice]);
 
   useEffect(() => {
     retry.current = () => void flush();
   }, [flush]);
+
+  // Back online: what's waiting goes now.
+  useEffect(
+    () =>
+      onConnectivity(() => {
+        if (isOnline() && pending.current && failed.current) retry.current();
+      }),
+    [],
+  );
+
+  /** Drops what's waiting (it was kept some other way). */
+  const discard = useCallback(() => {
+    clearTimeout(timer.current);
+    pending.current = null;
+    failed.current = false;
+    setState("saved");
+  }, []);
 
   const schedule = useCallback(
     (patch: Partial<T>) => {
@@ -74,14 +104,15 @@ export function useAutosave<T extends object>(save: (patch: Partial<T>) => Promi
     const onUnload = (e: BeforeUnloadEvent) => {
       if (!pending.current) return;
       void flush();
-      e.preventDefault();
+      // Notes keep unsaved text on the device: nothing is lost by leaving.
+      if (!onDevice) e.preventDefault();
     };
     window.addEventListener("beforeunload", onUnload);
     return () => {
       window.removeEventListener("beforeunload", onUnload);
       void flush();
     };
-  }, [flush]);
+  }, [flush, onDevice]);
 
-  return { state, schedule, flush };
+  return { state, schedule, flush, discard };
 }

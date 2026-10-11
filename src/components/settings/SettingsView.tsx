@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Link2, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
+import { BellRing, Link2, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
@@ -14,6 +14,7 @@ import { BlobSection } from "./BlobSection";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { DangerSection } from "./DangerSection";
 import { ProfileSection } from "./ProfileSection";
+import { RemindersSection } from "./RemindersSection";
 import { SecuritySection } from "./SecuritySection";
 
 type SectionId = keyof (typeof settingsText)["en"]["nav"];
@@ -24,6 +25,7 @@ const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
   { id: "appearance", icon: <Palette /> },
   { id: "security", icon: <ShieldCheck /> },
   { id: "connected", icon: <Link2 /> },
+  { id: "reminders", icon: <BellRing /> },
   { id: "blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
   { id: "danger", icon: <TriangleAlert /> },
 ];
@@ -196,6 +198,7 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
               <AppearanceSection />
               <SecuritySection />
               <ConnectedAppsSection apps={connectedApps} />
+              <RemindersSection />
               <BlobSection />
               <DangerSection />
             </div>

@@ -6,9 +6,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { BlobHelper } from "@/components/blob/BlobHelper";
 import { watchTheme } from "@/components/theme";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useOfflineDevice } from "@/lib/offline/useOfflineDevice";
 import { useStartSync } from "@/lib/offline/useSync";
+import { useNotifications } from "@/lib/notify/useNotifications";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
+import { PhoneTabs } from "./PhoneTabs";
 import { Sidebar } from "./Sidebar";
 
 type Shell = { sidebarOpen: boolean; toggleSidebar: () => void; openSearch: () => void };
@@ -19,8 +22,11 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
   const pathname = usePathname();
   const { profile } = useWorkspace();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // Events and tasks on this device, kept in step with the server (src/lib/offline).
+  // Events, tasks and notes on this device, kept in step with the server (src/lib/offline).
   useStartSync();
+  useOfflineDevice();
+  // Reminders on this device (the apps only).
+  useNotifications();
 
   // The profile is the source of truth for the theme across devices.
   useEffect(() => watchTheme(profile.theme), [profile.theme]);
@@ -72,7 +78,8 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
 
   return (
     <ShellCtx.Provider value={shell}>
-      <div className="flex h-dvh overflow-hidden bg-paper">
+      {/* safe-*: room for the iPhone's status bar, rounded corners and home indicator (zero elsewhere). */}
+      <div className="safe-top safe-x flex h-dvh overflow-hidden bg-paper">
         <motion.aside
           initial={false}
           animate={{ width: sidebarOpen ? 256 : 0, opacity: sidebarOpen ? 1 : 0 }}
@@ -107,15 +114,18 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
           )}
         </AnimatePresence>
 
-        <main
-          className={cn(
-            "relative flex min-w-0 flex-1 flex-col overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:border lg:border-line lg:shadow-card",
-            // With the sidebar hidden the card keeps the same gap on its left as on its right.
-            !sidebarOpen && "lg:ml-2",
-          )}
-        >
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col sm:pb-[env(safe-area-inset-bottom)]">
+          <main
+            className={cn(
+              "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:border lg:border-line lg:shadow-card",
+              // With the sidebar hidden the card keeps the same gap on its left as on its right.
+              !sidebarOpen && "lg:ml-2",
+            )}
+          >
+            {children}
+          </main>
+          <PhoneTabs onMore={() => setMobileNav(true)} />
+        </div>
       </div>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <BlobHelper />

@@ -17,6 +17,7 @@ export const pageText = defineMessages({
     saved: "Saved",
     saving: "Saving",
     offline: "Offline, retrying",
+    onDevice: "Saved on this device",
     cantReach: "I can't reach the server. I'll keep trying.",
     backOnline: "Back online. Everything is saved!",
     // Trashed page
@@ -39,6 +40,7 @@ export const pageText = defineMessages({
     saved: "Gespeichert",
     saving: "Speichert",
     offline: "Offline, versuche erneut",
+    onDevice: "Auf diesem Gerät gespeichert",
     cantReach: "Ich erreiche den Server gerade nicht. Ich versuche es weiter.",
     backOnline: "Wieder online. Alles ist gespeichert!",
     trash: "Papierkorb",

@@ -229,7 +229,7 @@ export function UndoToast({ store }: { store: TaskStore }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.15 } }}
           transition={{ type: "spring", stiffness: 520, damping: 32 }}
-          className="fixed bottom-6 left-1/2 z-[65] flex -translate-x-1/2 items-center gap-1 rounded-xl border border-line bg-raised py-1 pl-3.5 pr-1 text-[13px] text-ink shadow-pop"
+          className="fixed bottom-6 max-sm:bottom-[calc(72px+env(safe-area-inset-bottom))] left-1/2 z-[65] flex -translate-x-1/2 items-center gap-1 rounded-xl border border-line bg-raised py-1 pl-3.5 pr-1 text-[13px] text-ink shadow-pop"
           role="status"
         >
           {/* The title shrinks, "Deleted" / "gelöscht" stays readable. */}
