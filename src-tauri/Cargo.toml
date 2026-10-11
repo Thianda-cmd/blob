@@ -23,6 +23,14 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
 
+# The native webviews, for what Tauri doesn't offer itself (swipe back/forward, printing on iPhone).
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "2.0", features = ["v2_24"] }
+
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"

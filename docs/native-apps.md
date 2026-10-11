@@ -96,6 +96,26 @@ Rules around the site (`src-tauri/src/lib.rs`):
     so email links can end up in the app on any device. The token is only used on the click, and
     the `next` page after it is checked the way a browser reads it (`safeNext`).
 - **Window size and position** are remembered.
+- **Native behaviour per platform:**
+  - **Android** (`gen/android/.../MainActivity.kt`):
+    - the page sits between the status bar, the navigation bar, the camera cut-out and the keyboard,
+      with the page colour behind the bars (light and dark);
+    - the back button walks the page history and leaves the app on the first page;
+    - printing uses Android's print dialog, with "Save as PDF" (`window.BlobAndroid.print()`).
+  - **iPhone and iPad**:
+    - the edge swipe goes back and forward;
+    - a long press on a link doesn't open a page preview;
+    - printing uses the system print sheet;
+    - no scroll bounce of the whole page.
+  - **Phones** (both): no pinch or double-tap zoom of the app, no grey tap flash, and no text
+    selection or callout from long-pressing buttons. Where printing fails, a dialog offers the
+    browser.
+  - **macOS**: two-finger swipes go back and forward; ⌘[ ⌘] ⌘R; the mouse's back and forward
+    buttons; printing through the app.
+  - **Linux**: touchpad swipes; Alt+← Alt+→ Ctrl+R F5; the mouse buttons.
+  - **Windows**: WebView2 has all of these already.
+  - **Desktop** (all): no browser menu (Back, Reload, Inspect…) on a right-click outside text.
+  - The site's intro (Blob waking up) doesn't play in the app, whose start screen already shows Blob.
 
 The site's side (`NativeBridge`, mounted in the root layout, inert in browsers):
 
@@ -150,11 +170,32 @@ cd src-tauri && cargo test                      # the shell's rules
 - **Android:** Android Studio (SDK + NDK), then `npm run tauri android init` and
   `npm run tauri android dev`.
 - **iOS:** a Mac with Xcode, then `npm run tauri ios init` and `npm run tauri ios dev`.
-- Commit `src-tauri/gen/android` and `src-tauri/gen/apple` once they exist, since native settings
-  (permissions, entitlements) live there.
-- **CI** (`.github/workflows/apps.yml`): every push that touches `src-tauri/` builds the Windows,
-  macOS and Linux installers and an Android debug APK, as downloadable artifacts. A tag `app-v0.1.0`
-  also makes a draft GitHub release.
+- Commit `src-tauri/gen/apple` once it's set up for the App Store (signing, entitlements).
+- **CI** (`.github/workflows/apps.yml`): every push that touches `src-tauri/` builds every app and
+  tests it as an app. Installers, the APK, screenshots and `results.json` files are downloadable
+  artifacts.
+- **Tests** (`src-tauri/tests/e2e/`):
+  - `desktop.mjs` drives the real app through WebDriver (tauri-driver): start-up, what the site may
+    call, public pages, history and keys, links to other sites, app links. With `BLOB_E2E_EMAIL` and
+    `BLOB_E2E_PASSWORD` it also covers every signed-in area, typing in a note, and the phone-width
+    layout. CI runs it on Linux (the installed `.deb`) and Windows (the installed setup).
+  - `android.mjs` runs the debug APK in an Android 15 emulator over adb and the web view's DevTools:
+    bars and keyboard, pinch, back button, swipes, app links, links to other sites, rotation, dark
+    mode, the print dialog, crashes.
+  - `ios.sh` runs the simulator build with simctl and idb: status bar, keyboard, app links, swipes,
+    the edge swipe back, dark mode.
+  - `macos.sh`: start-up, an app link while running, quitting.
+  - Locally (Linux): `tauri-driver &` then
+    `node src-tauri/tests/e2e/desktop.mjs --app src-tauri/target/release/blob`.
+- **Releases**: push a tag like `app-v0.1.0` (the version in `tauri.conf.json`). The workflow builds
+  everything and runs the tests. Once the builds and their tests pass, it publishes a GitHub
+  pre-release with the Windows (`.exe`, `.msi`), macOS (`.dmg`, universal), Linux (`.deb`, `.rpm`,
+  `.AppImage`) and Android (`.apk`) files.
+  - **Signing the APK:** set the secrets `ANDROID_KEYSTORE` (the keystore, base64) and
+    `ANDROID_KEY_PASSWORD` so every release is signed with the same key. Otherwise each release
+    gets a new key, and updating needs an uninstall first.
+- **The Android project** (`src-tauri/gen/android`) is committed, since `MainActivity.kt` and the
+  themes are ours. The iOS project is still made fresh in CI.
 
 The bundle id **`org.bojes.blob`** is permanent once an app is in a store.
 
@@ -174,17 +215,14 @@ The bundle id **`org.bojes.blob`** is permanent once an app is in a store.
   - Needs `public/.well-known/apple-app-site-association` (Apple team id) and `assetlinks.json`
     (the Android signing certificate's SHA-256).
   - Then add the https entries to `plugins.deep-link.mobile`.
-- Phones:
-  - safe areas: `viewport-fit=cover` and `env(safe-area-inset-*)` in the app shell layout;
-  - Android's back button;
-  - file uploads from the camera;
-  - commit `gen/android` and `gen/apple`.
+- Phones: safe areas on iPhone if the simulator screenshots show the page under the status bar
+  (Android's are done natively); file uploads from the camera; commit `gen/apple`.
+- Done already: Android's bars, keyboard and back button; phone printing; iOS swipe-back.
 
 **Phase 3: native value (and App Store 4.2).**
 - Daily-goal and streak reminders with local notifications (`tauri-plugin-notification`, official,
   all platforms).
 - The share sheet for notes and lesson pictures, and haptics on right answers.
-- Printing and PDF export on phones.
 - Push notifications for shared notes and comments (community plugin, or Capacitor for the phone shell).
 - Reading notes offline (cache the last opened pages).
 

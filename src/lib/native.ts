@@ -9,7 +9,9 @@ export type BlobApp = { platform: AppPlatform; version: string; site: string };
 
 declare global {
   interface Window {
-    __BLOB_APP__?: BlobApp & { start?: string };
+    __BLOB_APP__?: BlobApp;
+    /** Android app only (gen/android MainActivity.kt): the system print dialog. */
+    BlobAndroid?: { print(): void };
   }
 }
 
@@ -37,8 +39,16 @@ export async function openOutside(url: string): Promise<boolean> {
   }
 }
 
-/** Prints the page with the system's print dialog (desktop apps). */
+/** Prints the page with the system's print dialog (macOS, iOS and Android, where the webview can't). */
 export async function printPage(): Promise<boolean> {
+  if (window.BlobAndroid) {
+    try {
+      window.BlobAndroid.print();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     await call("print_page");
     return true;

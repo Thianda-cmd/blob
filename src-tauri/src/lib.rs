@@ -257,7 +257,10 @@ fn site_window<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str, url: WebviewU
         })
         .build();
       match built {
-        Ok(window) => NewWindowResponse::Create { window },
+        Ok(window) => {
+          swipe_navigation(&window);
+          NewWindowResponse::Create { window }
+        }
         Err(e) => {
           eprintln!("blob: pop-up failed: {e}");
           NewWindowResponse::Deny
@@ -280,16 +283,55 @@ fn open_external<R: Runtime>(app: AppHandle<R>, url: String) -> Result<(), Strin
   Ok(())
 }
 
-/// Prints the page (macOS's webview ignores window.print on its own). Desktop only.
+/// Prints the page: macOS's and iOS's webviews ignore window.print on their own. (Android prints
+/// through window.BlobAndroid, see gen/android MainActivity.kt.)
 #[tauri::command]
 fn print_page<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
   #[cfg(desktop)]
   return window.print().map_err(|e| e.to_string());
-  #[cfg(mobile)]
+  #[cfg(target_os = "ios")]
+  return window
+    .with_webview(|webview| unsafe {
+      use objc2::runtime::{AnyClass, AnyObject};
+      // UIPrintInteractionController.shared, printing the web view: the system print sheet.
+      let Some(web) = (webview.inner() as *mut AnyObject).as_ref() else { return };
+      let Some(class) = AnyClass::get(c"UIPrintInteractionController") else { return };
+      let controller: *mut AnyObject = objc2::msg_send![class, sharedPrintController];
+      let Some(controller) = controller.as_ref() else { return };
+      let formatter: *mut AnyObject = objc2::msg_send![web, viewPrintFormatter];
+      let _: () = objc2::msg_send![controller, setPrintFormatter: formatter];
+      let done: Option<&block2::Block<dyn Fn(*mut AnyObject, bool, *mut AnyObject)>> = None;
+      let _: bool = objc2::msg_send![controller, presentAnimated: true, completionHandler: done];
+    })
+    .map_err(|e| e.to_string());
+  #[cfg(target_os = "android")]
   {
     let _ = window;
-    Err("printing isn't available on phones yet".into())
+    Err("Android prints through window.BlobAndroid".into())
   }
+}
+
+/// Swipe back and forward like a browser: the edge swipe on iPhone and iPad, two fingers on a Mac
+/// trackpad or a Linux touchpad. (Android has its back gesture already; Tauri doesn't switch these on.)
+/// On iPhone and iPad, a long press on a link doesn't open a page preview inside the app either.
+fn swipe_navigation<R: Runtime>(window: &WebviewWindow<R>) {
+  #[cfg(any(target_os = "macos", target_os = "ios"))]
+  let _ = window.with_webview(|webview| unsafe {
+    if let Some(web) = (webview.inner() as *mut objc2::runtime::AnyObject).as_ref() {
+      let _: () = objc2::msg_send![web, setAllowsBackForwardNavigationGestures: true];
+      #[cfg(target_os = "ios")]
+      let _: () = objc2::msg_send![web, setAllowsLinkPreview: false];
+    }
+  });
+  #[cfg(target_os = "linux")]
+  let _ = window.with_webview(|webview| {
+    use webkit2gtk::{SettingsExt, WebViewExt};
+    if let Some(settings) = webview.inner().settings() {
+      settings.set_enable_back_forward_navigation_gestures(true);
+    }
+  });
+  #[cfg(any(windows, target_os = "android"))]
+  let _ = window;
 }
 
 #[derive(Serialize)]
@@ -366,7 +408,7 @@ pub fn run() {
       let window = site_window(&handle, "main", WebviewUrl::App("index.html".into()));
       #[cfg(desktop)]
       let window = window.title("Blob").inner_size(1280.0, 820.0).min_inner_size(380.0, 560.0).center();
-      window.build()?;
+      swipe_navigation(&window.build()?);
       Ok(())
     })
     .run(tauri::generate_context!())

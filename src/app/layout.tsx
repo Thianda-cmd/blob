@@ -27,10 +27,11 @@ export const viewport: Viewport = {
   ],
 };
 
-// Runs before first paint: applies the saved theme and marks the intro as already played.
+// Runs before first paint: applies the saved theme, marks the intro as already played (always inside
+// the Blob app, src-tauri, which has its own start screen) and there marks the platform (html[data-app]).
 // An embedded picture (/embed/…?theme=dark) takes its theme from the address. Storage can throw inside a
 // frame on another site, so the theme doesn't depend on it.
-const bootScript = `(function(){var h=document.documentElement,t='system',q=location.pathname.indexOf('/embed/')===0?new URLSearchParams(location.search).get('theme'):null;try{t=localStorage.getItem('blob-theme')||'system'}catch(e){}if(q==='light'||q==='dark')t=q;var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);h.dataset.theme=d?'dark':'light';var b=false;try{b=!!sessionStorage.getItem('blob-booted')}catch(e){}if(b||matchMedia('(prefers-reduced-motion: reduce)').matches)h.dataset.booted='1'})()`;
+const bootScript = `(function(){var h=document.documentElement,t='system',q=location.pathname.indexOf('/embed/')===0?new URLSearchParams(location.search).get('theme'):null;try{t=localStorage.getItem('blob-theme')||'system'}catch(e){}if(q==='light'||q==='dark')t=q;var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);h.dataset.theme=d?'dark':'light';var b=false,a=window.__BLOB_APP__;try{b=!!sessionStorage.getItem('blob-booted')}catch(e){}if(b||a||matchMedia('(prefers-reduced-motion: reduce)').matches)h.dataset.booted='1';if(a&&a.platform)h.dataset.app=a.platform})()`;
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await getLocale();
@@ -47,8 +48,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh bg-paper text-ink">
         <LocaleProvider locale={locale}>
           <MotionProvider>{children}</MotionProvider>
+          <NativeBridge />
         </LocaleProvider>
-        <NativeBridge />
       </body>
     </html>
   );

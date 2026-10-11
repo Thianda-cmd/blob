@@ -15,6 +15,8 @@ function subscribe() {
 }
 function shouldBoot() {
   try {
+    // The Blob app (src-tauri) has its own start screen with Blob: no second intro.
+    if (window.__BLOB_APP__) return false;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
     return !sessionStorage.getItem(KEY);
   } catch {

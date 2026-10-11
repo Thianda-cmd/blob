@@ -265,6 +265,8 @@ dependencies = [
 name = "blob-app"
 version = "0.1.0"
 dependencies = [
+ "block2",
+ "objc2",
  "serde",
  "serde_json",
  "tauri",
@@ -274,6 +276,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
  "url",
+ "webkit2gtk",
 ]
 
 [[package]]

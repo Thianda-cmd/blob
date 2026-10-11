@@ -2567,3 +2567,15 @@
 }
 
 /* ---- end note blocks ---- */
+
+/* Inside the Blob app on phones (src-tauri, NativeBridge): taps without the grey flash or the
+   double-tap delay, and buttons that don't start a text selection or a callout on a long press. */
+html:is([data-app="ios"], [data-app="android"]) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [role="tab"], [role="menuitem"]):not([contenteditable="true"] *) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

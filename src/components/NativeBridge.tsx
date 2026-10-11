@@ -1,19 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { useMessages } from "@/i18n/client";
+import { nativeText } from "@/i18n/messages/native";
 import { blobApp, isPhoneApp, openOutside, printPage } from "@/lib/native";
 
 /**
  * Inside the Blob app (src-tauri/): links to other sites open in the system browser, pages the site
- * opens "in a new tab" work, and printing works where the webview can't do it alone. In a browser
- * it does nothing.
+ * opens "in a new tab" work, printing goes through the system's print dialog, and the app answers
+ * the keys and mouse buttons a browser would (back, forward, reload). In a browser it does nothing.
  */
 export function NativeBridge() {
+  const t = useMessages(nativeText);
+  const [cantPrint, setCantPrint] = useState(false);
+
   useEffect(() => {
     const app = blobApp();
     if (!app) return;
     const phone = isPhoneApp(app);
-    document.documentElement.dataset.app = app.platform;
+    const root = document.documentElement;
+    root.dataset.app = app.platform;
+
+    // Phones: no pinch or double-tap zoom of the whole app (native apps don't zoom their screens).
+    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const viewportBefore = viewport?.content;
+    if (phone && viewport && !/maximum-scale/.test(viewport.content)) viewport.content += ", maximum-scale=1, user-scalable=no";
 
     const own = (url: URL) => url.origin === location.origin;
     const outside = (url: URL) => ["http:", "https:", "mailto:", "tel:"].includes(url.protocol) && !own(url);
@@ -64,25 +77,95 @@ export function NativeBridge() {
       }
     };
 
-    // macOS's webview ignores window.print: the app prints instead. (Windows and Linux print fine on
-    // their own, and on Windows the app's print is window.print itself.)
+    // Printing: Windows and Linux print on their own (and on Windows the app's print is
+    // window.print itself). macOS, iOS and Android go through the app; if that fails, say so.
     const print = window.print;
-    if (app.platform === "macos") {
+    if (app.platform === "macos" || phone) {
       window.print = () => {
         void printPage().then((ok) => {
-          if (!ok) print.call(window);
+          if (ok) return;
+          if (phone) setCantPrint(true);
+          else print.call(window);
         });
       };
     }
 
+    // Desktop keys and mouse buttons a browser has: back, forward, reload. (Windows' webview has
+    // them already.) macOS: ⌘[ ⌘] ⌘R; Linux: Alt+← Alt+→ Ctrl+R F5.
+    const desktopKeys = app.platform === "macos" || app.platform === "linux";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat) return;
+      const mac = app.platform === "macos";
+      const mod = mac ? e.metaKey && !e.ctrlKey && !e.altKey : e.altKey && !e.ctrlKey && !e.metaKey;
+      const back = mac ? e.key === "[" : e.key === "ArrowLeft";
+      const forward = mac ? e.key === "]" : e.key === "ArrowRight";
+      if (mod && !e.shiftKey && (back || forward)) {
+        e.preventDefault();
+        if (back) history.back();
+        else history.forward();
+      } else if (((mac ? e.metaKey : e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "r") || (!mac && e.key === "F5")) {
+        e.preventDefault();
+        location.reload();
+      }
+    };
+    const onMouse = (e: MouseEvent) => {
+      if (e.button !== 3 && e.button !== 4) return;
+      e.preventDefault();
+      if (e.button === 3) history.back();
+      else history.forward();
+    };
+    if (desktopKeys) {
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("mouseup", onMouse);
+    }
+
+    // No browser menu (Back, Reload, Inspect…) on a right-click outside text: the app's pages have
+    // their own menus where they need one. Text, fields and selections keep the system menu.
+    const onContextMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      const el = e.target as Element | null;
+      const editable = el?.closest?.("input, textarea, [contenteditable=''], [contenteditable='true']");
+      const selected = (window.getSelection()?.toString() ?? "").length > 0;
+      if (!editable && !selected) e.preventDefault();
+    };
+    if (!phone) window.addEventListener("contextmenu", onContextMenu);
+
     return () => {
       document.removeEventListener("click", onClick, true);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mouseup", onMouse);
+      window.removeEventListener("contextmenu", onContextMenu);
       window.open = original;
       window.print = print;
-      delete document.documentElement.dataset.app;
+      if (viewport && viewportBefore !== undefined) viewport.content = viewportBefore;
+      delete root.dataset.app;
     };
   }, []);
-  return null;
+
+  return (
+    <Dialog open={cantPrint} onClose={() => setCantPrint(false)} labelledBy="cant-print-title">
+      <div className="p-5">
+        <h2 id="cant-print-title" className="font-display text-[18px] font-semibold">
+          {t.printTitle}
+        </h2>
+        <p className="mt-2 text-[14px] text-ink-2">{t.printBody}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setCantPrint(false)}>
+            {t.close}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setCantPrint(false);
+              void openOutside(location.href);
+            }}
+          >
+            {t.openBrowser}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 /** A pretend window for window.open("about:blank"): the address it's sent to opens for real. */

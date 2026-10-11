@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.blob_app" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Behind the status and navigation bars, and before the page is there: the page colour. -->
+        <item name="android:windowBackground">@color/page</item>
+    </style>
+</resources>
