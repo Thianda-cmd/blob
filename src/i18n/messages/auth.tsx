@@ -15,6 +15,7 @@ export const authText = defineMessages({
       reset: "New password",
       checkEmail: "Confirm your email",
       confirm: "Confirm",
+      appSignIn: "Sign in the app",
     },
     stage: {
       hello: "Hi! I'm Blob. I keep your school stuff safe.",
@@ -151,6 +152,38 @@ export const authText = defineMessages({
       incomplete: "This link is incomplete. Request a new email and try again.",
       expired: "This link has expired or was already used. Request a new one.",
     },
+    appSignIn: {
+      button: "Sign in with your browser",
+      say: "Already signed in in your browser? Then that's all it takes.",
+      waitingTitle: "Continue in your browser",
+      waitingSubtitle: "Blob opened in your browser. Confirm there, and you're signed in here.",
+      waitingSay: "I'm waiting for your browser…",
+      openAgain: "Open the browser again",
+      cancel: "Use another way",
+      approveTitle: "Sign in the Blob app?",
+      approveSubtitle: (email: ReactNode, device: string): ReactNode => (
+        <>
+          The Blob app on {device} will be signed in as {email}.
+        </>
+      ),
+      approveWarning: "Only continue if you just chose \u201cSign in with your browser\u201d in the Blob app yourself.",
+      approve: "Sign in the app",
+      deny: "Cancel",
+      approveSay: "One click and the app is signed in too.",
+      doneTitle: "Back to the app",
+      doneSubtitle: "Your browser asks to open Blob: allow it, and the app is signed in. You can close this tab then.",
+      doneSay: "Off you go to the app!",
+      openApp: "Open the Blob app",
+      deniedTitle: "Cancelled",
+      deniedSubtitle: "Nothing happened: the app stays signed out.",
+      badRequest: "This sign-in request is incomplete. Start again in the app.",
+      finishing: "Signing you in…",
+      failedTitle: "That didn't work",
+      failed: "This sign-in has expired or was already used. Start again in the app.",
+      notHere: "This sign-in wasn't started in this app. Start it again here.",
+      offline: "No connection. Try again once you're online.",
+      devices: { windows: "Windows", macos: "this Mac", linux: "Linux", android: "Android", ios: "this iPhone or iPad", other: "this device" },
+    },
     errors: {
       invalidCredentials: "That email and password don't match.",
       notConfirmed: "Please confirm your email first. Check your inbox for the link.",
@@ -174,6 +207,7 @@ export const authText = defineMessages({
       reset: "Neues Passwort",
       checkEmail: "E-Mail bestätigen",
       confirm: "Bestätigen",
+      appSignIn: "App anmelden",
     },
     stage: {
       hello: "Hi! Ich bin Blob. Ich passe auf deinen Schulkram auf.",
@@ -308,6 +342,38 @@ export const authText = defineMessages({
       openApp: "In der App öffnen",
       incomplete: "Dieser Link ist unvollständig. Fordere eine neue E-Mail an und versuch es nochmal.",
       expired: "Dieser Link ist abgelaufen oder wurde schon benutzt. Fordere einen neuen an.",
+    },
+    appSignIn: {
+      button: "Mit deinem Browser anmelden",
+      say: "Im Browser schon angemeldet? Dann reicht ein Klick.",
+      waitingTitle: "Weiter im Browser",
+      waitingSubtitle: "Blob hat sich in deinem Browser geöffnet. Bestätige dort, dann bist du hier angemeldet.",
+      waitingSay: "Ich warte auf deinen Browser…",
+      openAgain: "Browser nochmal öffnen",
+      cancel: "Anders anmelden",
+      approveTitle: "Die Blob-App anmelden?",
+      approveSubtitle: (email, device) => (
+        <>
+          Die Blob-App auf {device} wird als {email} angemeldet.
+        </>
+      ),
+      approveWarning: "Mach nur weiter, wenn du gerade selbst in der Blob-App \u201eMit deinem Browser anmelden\u201c gewählt hast.",
+      approve: "App anmelden",
+      deny: "Abbrechen",
+      approveSay: "Ein Klick und die App ist auch angemeldet.",
+      doneTitle: "Zurück zur App",
+      doneSubtitle: "Dein Browser fragt, ob er Blob öffnen darf: Erlaube es, dann ist die App angemeldet. Danach kannst du diesen Tab schließen.",
+      doneSay: "Ab in die App!",
+      openApp: "Blob-App öffnen",
+      deniedTitle: "Abgebrochen",
+      deniedSubtitle: "Nichts passiert: Die App bleibt abgemeldet.",
+      badRequest: "Diese Anmeldung ist unvollständig. Starte sie nochmal in der App.",
+      finishing: "Ich melde dich an…",
+      failedTitle: "Das hat nicht geklappt",
+      failed: "Diese Anmeldung ist abgelaufen oder wurde schon benutzt. Starte sie nochmal in der App.",
+      notHere: "Diese Anmeldung wurde nicht in dieser App gestartet. Starte sie hier nochmal.",
+      offline: "Keine Verbindung. Versuch es nochmal, wenn du online bist.",
+      devices: { windows: "Windows", macos: "diesem Mac", linux: "Linux", android: "Android", ios: "diesem iPhone oder iPad", other: "diesem Gerät" },
     },
     errors: {
       invalidCredentials: "E-Mail-Adresse und Passwort passen nicht zusammen.",

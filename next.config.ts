@@ -29,6 +29,14 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Confirming a sign-in for the Blob app: never inside any frame, not even Blob's own.
+        source: "/auth/app/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
+      {
         // The consent screen must never be shown inside someone else's frame (clickjacking).
         source: "/oauth/:path*",
         headers: [

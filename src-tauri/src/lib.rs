@@ -11,9 +11,9 @@
 //! - downloads land in the Downloads folder; printing works where the webview can't do it alone;
 //! - one running app at a time (a second start focuses the first), and it remembers its window.
 //!
-//! The site may call exactly three commands (capabilities/site.json): `open_external`,
-//! `print_page`, `app_info`. The start page may call `start_target`. Nothing else of the native
-//! side is reachable from web pages.
+//! The site may call only the commands in capabilities/site.json (`open_external`, `print_page`,
+//! `app_info`, `set_offline_ready`, and the notification plugin's). The start page may call
+//! `start_target` and `offline_ready`. Nothing else of the native side is reachable from web pages.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -518,6 +518,7 @@ mod tests {
     assert_eq!(t("org.bojes.blob://auth/confirm?token_hash=abc&type=email&next=%2Fhome").as_deref(), Some("https://blob.bojes.org/auth/confirm?token_hash=abc&type=email&next=%2Fhome"));
     assert_eq!(t("https://blob.bojes.org/learn/french").as_deref(), Some("https://blob.bojes.org/learn/french"));
     assert_eq!(t("org.bojes.blob://p/123").as_deref(), Some("https://blob.bojes.org/p/123"));
+    assert_eq!(t("org.bojes.blob://auth/app?code=abc&state=def").as_deref(), Some("https://blob.bojes.org/auth/app?code=abc&state=def"));
     // Unknown or odd pages land on home.
     assert_eq!(t("org.bojes.blob://auth/signout").as_deref(), Some("https://blob.bojes.org/home"));
     // Dot segments are resolved inside the link: they can't climb out of it.

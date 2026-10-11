@@ -1,21 +1,25 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Link2, Lock, Mail } from "lucide-react";
+import { ArrowRight, Globe, Link2, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { resetBoot } from "@/components/blob/BlobBoot";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, PasswordInput } from "@/components/ui/Input";
 import { useLocale, useMessages } from "@/i18n/client";
 import { authText } from "@/i18n/messages/auth";
+import { APP_SIGN_IN_KEY, challengeOf, randomToken, type AppSignInRequest } from "@/lib/auth/appSignIn";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
+import { blobApp, openOutside } from "@/lib/native";
 import { createClient } from "@/lib/supabase/client";
 import { AuthHeading } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
+
+const noSubscribe = () => () => {};
 
 /**
  * `initialError` and `notice` come from the URL (/login?error=…&notice=…): either a code from
@@ -37,6 +41,14 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  // In the Blob app: signing in through the browser, where you may be signed in already.
+  const inApp = useSyncExternalStore(
+    noSubscribe,
+    () => blobApp() !== null,
+    () => false,
+  );
+  const [browserUrl, setBrowserUrl] = useState<string | null>(null);
+  const ab = all.appSignIn;
 
   useEffect(() => {
     if (initialError) {
@@ -105,6 +117,34 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
     }, 650);
   }
 
+  async function signInWithBrowser() {
+    const app = blobApp();
+    if (!app) return;
+    setError(null);
+    const verifier = randomToken(32);
+    const state = randomToken(16);
+    const request: AppSignInRequest = { state, verifier, at: Date.now(), next };
+    try {
+      localStorage.setItem(APP_SIGN_IN_KEY, JSON.stringify(request));
+    } catch {
+      return fail(all.errors.generic);
+    }
+    const url = `${window.location.origin}/auth/app/approve?${new URLSearchParams({ challenge: await challengeOf(verifier), state, device: app.platform })}`;
+    if (!(await openOutside(url))) return fail(all.errors.generic);
+    setBrowserUrl(url);
+    blob.setMood("thinking");
+    blob.say(ab.waitingSay);
+  }
+
+  function stopBrowser() {
+    try {
+      localStorage.removeItem(APP_SIGN_IN_KEY);
+    } catch {}
+    setBrowserUrl(null);
+    blob.setMood("happy");
+    blob.say(t.hello);
+  }
+
   async function resend() {
     const supabase = createClient();
     const { error } = await supabase.auth.resend({
@@ -114,6 +154,25 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
     });
     if (error) return fail(authMessage(error, locale));
     router.push(`/check-email?email=${encodeURIComponent(email.trim())}`);
+  }
+
+  if (browserUrl) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="mb-6 grid size-12 place-items-center rounded-2xl bg-blob-soft text-blob-ink">
+          <Globe className="size-6" />
+        </div>
+        <AuthHeading title={ab.waitingTitle} subtitle={ab.waitingSubtitle} />
+        <div className="space-y-2.5">
+          <Button variant="primary" size="lg" className="w-full" onClick={() => void openOutside(browserUrl)}>
+            {ab.openAgain} <ArrowRight className="size-4" />
+          </Button>
+          <Button variant="secondary" size="lg" className="w-full" onClick={stopBrowser}>
+            {ab.cancel}
+          </Button>
+        </div>
+      </motion.div>
+    );
   }
 
   if (magicSent) {
@@ -197,6 +256,17 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
         <span className="h-px flex-1 bg-line" /> {t.or} <span className="h-px flex-1 bg-line" />
       </div>
 
+      {inApp && (
+        <Button
+          variant="secondary"
+          size="lg"
+          className="mb-2.5 w-full"
+          onClick={() => void signInWithBrowser()}
+          onPointerEnter={() => blob.say(ab.say)}
+        >
+          <Globe className="size-4" /> {ab.button}
+        </Button>
+      )}
       <Button
         variant="secondary"
         size="lg"
