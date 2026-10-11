@@ -5,7 +5,8 @@ import { blob } from "@/components/blob/bus";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { tasksText } from "@/i18n/messages/tasks";
-import { createClient } from "@/lib/supabase/client";
+import type { Row } from "@/lib/offline/sync";
+import { useRows, useSync } from "@/lib/offline/useSync";
 import { isDueByToday, retimeForKind } from "@/lib/tasks";
 import type { Task, TaskKind, TaskStatus } from "@/lib/types";
 import { uid } from "@/lib/utils";
@@ -42,35 +43,29 @@ export type TaskStore = {
 
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
-function oops(message: string) {
-  blob.say(message, { mood: "worried" });
-  blob.react("shake", "worried");
-}
-
 /** Blob's lines for kinds that deserve a special cheer. */
 function kindCheers(t: (typeof tasksText)["en"], kind: TaskKind): string[] | undefined {
   return kind === "exam" ? t.examCheers : kind === "project" ? t.projectCheers : undefined;
 }
 
-/** Client-side task list with optimistic writes to Supabase and Blob reactions. */
-export function useTaskStore(initialTasks: Task[]): TaskStore {
+/**
+ * Personal tasks, shared by every page that shows them (Tasks, Home, subjects, the calendar) and
+ * kept on the device: a change shows at once, is saved in order and waits for the connection
+ * when there is none (src/lib/offline/sync.ts). Changes made on other devices arrive live.
+ * `subjectId` narrows the list to one subject.
+ */
+export function useTaskStore(initialTasks: Task[], opts: { subjectId?: string } = {}): TaskStore {
   const t = useMessages(tasksText);
   const { userId } = useWorkspace();
-  const [tasks, setTasks] = useState(initialTasks);
+  const sync = useSync();
+  const rows = useRows<Task>("tasks", initialTasks);
+  const { subjectId } = opts;
+  const tasks = useMemo(() => rows.filter((x) => !x.project_id && (!subjectId || x.subject_id === subjectId)), [rows, subjectId]);
   const [fresh, setFresh] = useState<string | null>(null);
   const [removed, setRemoved] = useState<Task | null>(null);
-  // Mirror of `tasks` so async handlers always build on the latest list.
-  const ref = useRef(initialTasks);
   const lastSaid = useRef(0);
 
-  const commit = useCallback((fn: (prev: Task[]) => Task[]) => {
-    ref.current = fn(ref.current);
-    setTasks(ref.current);
-  }, []);
-
-  const replace = useCallback((id: string, next: Task | null) => {
-    commit((ts) => (next ? ts.map((x) => (x.id === id ? next : x)) : ts.filter((x) => x.id !== id)));
-  }, [commit]);
+  const current = useCallback((id: string) => (sync?.row("tasks", id) as Task | undefined) ?? undefined, [sync]);
 
   const add = useCallback(
     async (input: NewTask) => {
@@ -97,40 +92,18 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
         created_at: now,
         updated_at: now,
       };
-      if (!task.title) return null;
-      commit((ts) => [...ts, task]);
+      if (!task.title || !sync) return null;
+      sync.mutate({ op: "insert", table: "tasks", id: task.id, row: task as unknown as Row });
       setFresh(task.id);
-      const { data, error } = await createClient()
-        .from("tasks")
-        .insert({
-          id: task.id,
-          title: task.title,
-          details: task.details,
-          kind: task.kind,
-          due_at: task.due_at,
-          subject_id: task.subject_id,
-          status: task.status,
-          position: task.position,
-        })
-        .select()
-        .single();
-      if (error || !data) {
-        replace(task.id, null);
-        oops(t.errAdd);
-        return null;
-      }
-      // Keep local edits made while the insert was in flight.
-      const local = ref.current.find((x) => x.id === task.id);
-      if (local) replace(task.id, { ...(data as Task), ...pickEdits(local, task) });
-      return data as Task;
+      return task;
     },
-    [commit, replace, userId, t],
+    [sync, userId],
   );
 
   const update = useCallback(
     async (id: string, patch: TaskPatch) => {
-      const before = ref.current.find((x) => x.id === id);
-      if (!before) return false;
+      const before = current(id);
+      if (!before || !sync) return false;
       const full: TaskPatch = { ...patch };
       if (patch.kind && patch.kind !== before.kind && patch.due_at === undefined) {
         full.due_at = retimeForKind(before.due_at, before.kind, patch.kind);
@@ -139,30 +112,25 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
         full.title = full.title.trim().slice(0, 200);
         if (!full.title) return false;
       }
-      replace(id, { ...before, ...full, updated_at: new Date().toISOString() });
-      const { error } = await createClient().from("tasks").update(full).eq("id", id);
-      if (error) {
-        const current = ref.current.find((x) => x.id === id);
-        if (current) replace(id, { ...current, ...revert(before, full) });
-        oops(t.errSave);
-        return false;
-      }
+      sync.mutate({ op: "update", table: "tasks", id, values: full, local: { updated_at: new Date().toISOString() } });
       return true;
     },
-    [replace, t],
+    [current, sync],
   );
 
   const setDone = useCallback(
     async (id: string, done: boolean) => {
-      const before = ref.current.find((x) => x.id === id);
-      if (!before || before.done === done) return false;
+      const before = current(id);
+      if (!before || before.done === done || !sync) return false;
       const now = new Date();
       const completed_at = done ? now.toISOString() : null;
       const status: TaskStatus = done ? "done" : before.status === "done" ? "todo" : before.status;
-      replace(id, { ...before, done, completed_at, status });
+      // The database works out the status from `done`.
+      sync.mutate({ op: "update", table: "tasks", id, values: { done, completed_at }, local: { status } });
 
       if (done) {
-        const clearedToday = isDueByToday(before, now) && !ref.current.some((x) => isDueByToday(x, now));
+        const open = (sync.rows("tasks") as unknown as Task[]).filter((x) => !x.project_id);
+        const clearedToday = isDueByToday(before, now) && !open.some((x) => isDueByToday(x, now));
         if (clearedToday) {
           // Everything due today is done: graduation cap and a victory hop.
           blob.react("celebrate", "excited", 2600, "cap");
@@ -179,83 +147,44 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
           }
         }
       }
-
-      const { error } = await createClient().from("tasks").update({ done, completed_at }).eq("id", id);
-      if (error) {
-        const current = ref.current.find((x) => x.id === id);
-        if (current) replace(id, { ...current, done: before.done, completed_at: before.completed_at, status: before.status });
-        oops(t.errSave);
-        return false;
-      }
       return true;
     },
-    [replace, t],
+    [current, sync, t],
   );
 
   const move = useCallback(
     async (id: string, status: TaskStatus, position: number) => {
-      const before = ref.current.find((x) => x.id === id);
-      if (!before) return false;
+      const before = current(id);
+      if (!before || !sync) return false;
       const done = status === "done";
       const completed_at = done ? (before.done ? before.completed_at : new Date().toISOString()) : null;
-      replace(id, { ...before, status, position, done, completed_at });
+      // The database works out `done` and `completed_at` from the status.
+      sync.mutate({ op: "update", table: "tasks", id, values: { status, position }, local: { done, completed_at } });
       if (done && !before.done) blob.react("jump", "excited");
-      const { error } = await createClient().from("tasks").update({ status, position }).eq("id", id);
-      if (error) {
-        const current = ref.current.find((x) => x.id === id);
-        if (current) replace(id, { ...current, status: before.status, position: before.position, done: before.done, completed_at: before.completed_at });
-        oops(t.errSave);
-        return false;
-      }
       return true;
     },
-    [replace, t],
+    [current, sync],
   );
 
   const remove = useCallback(
     async (id: string) => {
-      const before = ref.current.find((x) => x.id === id);
-      if (!before) return false;
-      replace(id, null);
+      const before = current(id);
+      if (!before || !sync) return false;
+      sync.mutate({ op: "delete", table: "tasks", id });
       setRemoved(before);
-      const { error } = await createClient().from("tasks").delete().eq("id", id);
-      if (error) {
-        commit((ts) => [...ts, before]);
-        setRemoved(null);
-        oops(t.errDelete);
-        return false;
-      }
       return true;
     },
-    [commit, replace, t],
+    [current, sync],
   );
 
   const undoRemove = useCallback(async () => {
     const task = removed;
-    if (!task) return false;
+    if (!task || !sync) return false;
     setRemoved(null);
-    commit((ts) => [...ts.filter((x) => x.id !== task.id), task]);
-    const { error } = await createClient().from("tasks").insert({
-      id: task.id,
-      title: task.title,
-      details: task.details,
-      kind: task.kind,
-      due_at: task.due_at,
-      subject_id: task.subject_id,
-      done: task.done,
-      completed_at: task.completed_at,
-      status: task.status,
-      position: task.position,
-      created_at: task.created_at,
-    });
-    if (error) {
-      replace(task.id, null);
-      oops(t.errRestore);
-      return false;
-    }
+    sync.mutate({ op: "insert", table: "tasks", id: task.id, row: task as unknown as Row, restore: true });
     blob.react("squish", "happy");
     return true;
-  }, [commit, removed, replace, t]);
+  }, [removed, sync]);
 
   const dismissRemoved = useCallback(() => setRemoved(null), []);
 
@@ -263,20 +192,4 @@ export function useTaskStore(initialTasks: Task[]): TaskStore {
     () => ({ tasks, add, update, setDone, move, remove, undoRemove, fresh, removed, dismissRemoved }),
     [tasks, add, update, setDone, move, remove, undoRemove, fresh, removed, dismissRemoved],
   );
-}
-
-/** Fields the user changed locally since `original` was created. */
-function pickEdits(local: Task, original: Task): Partial<Task> {
-  const out: Partial<Task> = {};
-  for (const key of ["title", "kind", "due_at", "subject_id", "details", "done", "completed_at", "status", "position"] as const) {
-    if (local[key] !== original[key]) (out as Record<string, unknown>)[key] = local[key];
-  }
-  return out;
-}
-
-/** The values from `before` for every key in `patch`. */
-function revert(before: Task, patch: TaskPatch): Partial<Task> {
-  const out: Partial<Task> = {};
-  for (const key of Object.keys(patch) as (keyof TaskPatch)[]) (out as Record<string, unknown>)[key] = before[key];
-  return out;
 }

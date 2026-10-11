@@ -32,7 +32,7 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
   const t = useMessages(subjectsText);
   // Prefer the live copy so renames, recolors and new emojis show up immediately.
   const subject = subjects.find((s) => s.id === initial.id) ?? initial;
-  const store = useTaskStore(initialTasks);
+  const store = useTaskStore(initialTasks, { subjectId: subject.id });
   const now = useNow();
   const [creating, setCreating] = useState<PageKind | null>(null);
 

@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { BlobHelper } from "@/components/blob/BlobHelper";
 import { watchTheme } from "@/components/theme";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { useStartSync } from "@/lib/offline/useSync";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
 import { Sidebar } from "./Sidebar";
@@ -18,6 +19,8 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
   const pathname = usePathname();
   const { profile } = useWorkspace();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Events and tasks on this device, kept in step with the server (src/lib/offline).
+  useStartSync();
 
   // The profile is the source of truth for the theme across devices.
   useEffect(() => watchTheme(profile.theme), [profile.theme]);

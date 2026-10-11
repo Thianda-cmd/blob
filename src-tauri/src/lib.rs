@@ -42,7 +42,7 @@ const FILES_HOST: &str = "nrxywlbbbafpyukcbruy.supabase.co";
 const FILES_PATH: &str = "/storage/v1/object/sign/files/";
 
 /// Pages an app link may open (the start of the path). Everything else lands on the home page.
-const LINK_PATHS: &[&str] = &["auth/confirm", "home", "learn", "study", "join", "p/", "notes", "projects", "cv", "blob", "show"];
+const LINK_PATHS: &[&str] = &["auth/confirm", "auth/app", "home", "learn", "study", "join", "p/", "notes", "projects", "cv", "blob", "show", "calendar", "tasks", "settings"];
 
 /// The site, or in debug builds `BLOB_SITE` (e.g. http://localhost:3000 next to `next dev`).
 fn site() -> Url {

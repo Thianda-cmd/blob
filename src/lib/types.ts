@@ -11,6 +11,12 @@ export type Profile = {
   /** What Blob wears (migration 0015): see components/blob/look.tsx. */
   blob_look: Record<string, unknown> | null;
   onboarded: boolean;
+  /** The calendar's first weekday: 0 Sunday … 6 Saturday (migration 0017). */
+  week_starts_on?: number;
+  /** IANA time zone the student's devices are in (kept up to date by the app). */
+  time_zone?: string | null;
+  /** Notification choices (see src/lib/notify/prefs.ts). */
+  notify?: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -153,6 +159,53 @@ export type Task = {
   labels: string[];
   checklist: ChecklistItem[];
   attachments: Attachment[];
+  created_at: string;
+  updated_at: string;
+};
+
+// Calendar ------------------------------------------------------------------------
+
+export type EventKind = "event" | "lesson" | "study" | "birthday" | "break";
+
+export type RepeatFreq = "daily" | "weekly" | "monthly" | "yearly";
+
+/** How an event repeats (a small part of iCalendar's RRULE). */
+export type Recurrence = {
+  freq: RepeatFreq;
+  /** Every n days/weeks/months/years (default 1). */
+  interval?: number;
+  /** Weekly: the weekdays, 0 Sunday … 6 Saturday (default: the start's weekday). */
+  byDay?: number[];
+  /** Last day it can happen on (yyyy-mm-dd, local). */
+  until?: string | null;
+  /** How many times it happens in all. */
+  count?: number | null;
+};
+
+export type CalEvent = {
+  id: string;
+  user_id: string;
+  subject_id: string | null;
+  title: string;
+  details: string | null;
+  location: string | null;
+  kind: EventKind;
+  /** A subject colour key; null takes the subject's colour (or Blob's). */
+  color: SubjectColor | null;
+  all_day: boolean;
+  /** All-day events: UTC midnights standing for dates (end exclusive). */
+  starts_at: string;
+  ends_at: string;
+  time_zone: string | null;
+  recurrence: Recurrence | null;
+  /** Removed occurrences of a series (their original start). */
+  exdates: string[];
+  /** A changed occurrence: its series and the start it replaces. */
+  series_id: string | null;
+  series_start: string | null;
+  /** Minutes before the start (all-day: before local midnight, so -540 is 9:00 on the day). */
+  reminders: number[];
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -11,6 +11,8 @@ import {
   Hash,
   House,
   ListChecks,
+  CalendarDays,
+  CalendarPlus,
   ListPlus,
   Moon,
   NotebookPen,
@@ -57,6 +59,7 @@ const FOLDER_WORDS = "ordner folder";
 const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
 const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
 const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
+const CALENDAR_WORDS = "kalender calendar termin event stundenplan timetable schedule geburtstag birthday woche week monat month";
 
 /** Tags shown for a search. */
 const MAX_TAGS = 5;
@@ -142,6 +145,7 @@ function Palette({ onClose }: { onClose: () => void }) {
         },
       },
       { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
+      { id: "new-event", group: "actions", label: t.newEvent, hint: t.newEventHint, keywords: CALENDAR_WORDS, icon: <CalendarPlus />, run: () => go("/calendar?new=1") },
       // Not "new-…": these only show when they match what was typed.
       {
         id: "folder-new",
@@ -174,6 +178,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       { id: "cv-new", group: "actions", label: t.newCv, hint: t.newCvHint, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv?new=1") },
       { id: "home", group: "actions", label: t.goHome, icon: <House />, run: () => go("/home") },
       { id: "tasks", group: "actions", label: t.goTasks, icon: <ListChecks />, run: () => go("/tasks") },
+      { id: "calendar", group: "actions", label: t.goCalendar, keywords: CALENDAR_WORDS, icon: <CalendarDays />, run: () => go("/calendar") },
       { id: "cv", group: "actions", label: t.goCv, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv") },
       { id: "learn", group: "actions", label: t.goLearn, hint: t.goLearnHint, icon: <GraduationCap />, run: () => go("/learn") },
       {

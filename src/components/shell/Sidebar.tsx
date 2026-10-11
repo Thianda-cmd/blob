@@ -14,6 +14,7 @@ import {
   GraduationCap,
   House,
   ListChecks,
+  CalendarDays,
   LogOut,
   Monitor,
   Moon,
@@ -337,6 +338,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         </NavLink>
         <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
           {t.tasks}
+        </NavLink>
+        <NavLink href="/calendar" icon={<CalendarDays />} active={pathname === "/calendar"}>
+          {t.calendar}
         </NavLink>
         <NavLink href="/projects" icon={<SquareKanban />} active={pathname === "/projects" || pathname.startsWith("/projects/")}>
           {t.projects}
