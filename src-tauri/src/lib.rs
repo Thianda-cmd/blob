@@ -300,7 +300,8 @@ fn print_page<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
       let Some(controller) = controller.as_ref() else { return };
       let formatter: *mut AnyObject = objc2::msg_send![web, viewPrintFormatter];
       let _: () = objc2::msg_send![controller, setPrintFormatter: formatter];
-      let done: Option<&block2::Block<dyn Fn(*mut AnyObject, Bool, *mut AnyObject)>> = None;
+      type Done = block2::Block<dyn Fn(*mut AnyObject, Bool, *mut AnyObject)>;
+      let done: Option<&Done> = None;
       let _: bool = objc2::msg_send![controller, presentAnimated: true, completionHandler: done];
     })
     .map_err(|e| e.to_string());
@@ -313,14 +314,21 @@ fn print_page<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
 
 /// Swipe back and forward like a browser: the edge swipe on iPhone and iPad, two fingers on a Mac
 /// trackpad or a Linux touchpad. (Android has its back gesture already; Tauri doesn't switch these on.)
-/// On iPhone and iPad, a long press on a link doesn't open a page preview inside the app either.
+/// On iPhone and iPad, a long press on a link doesn't open a page preview inside the app either, and
+/// scrolling bounces at the ends like in every iOS app (Tauri turns the bounce off).
 fn swipe_navigation<R: Runtime>(window: &WebviewWindow<R>) {
   #[cfg(any(target_os = "macos", target_os = "ios"))]
   let _ = window.with_webview(|webview| unsafe {
     if let Some(web) = (webview.inner() as *mut objc2::runtime::AnyObject).as_ref() {
       let _: () = objc2::msg_send![web, setAllowsBackForwardNavigationGestures: true];
       #[cfg(target_os = "ios")]
-      let _: () = objc2::msg_send![web, setAllowsLinkPreview: false];
+      {
+        let _: () = objc2::msg_send![web, setAllowsLinkPreview: false];
+        let scroll: *mut objc2::runtime::AnyObject = objc2::msg_send![web, scrollView];
+        if let Some(scroll) = scroll.as_ref() {
+          let _: () = objc2::msg_send![scroll, setBounces: true];
+        }
+      }
     }
   });
   #[cfg(target_os = "linux")]

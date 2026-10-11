@@ -56,7 +56,9 @@ jobs:
             os: ubuntu-22.04
             args: ""
           - name: Windows
-            os: windows-latest
+            # Not windows-2025 (windows-latest): its WebView2 can't be driven by msedgedriver
+            # ("DevToolsActivePort file doesn't exist", actions/runner-images#14738).
+            os: windows-2022
             args: ""
           - name: macOS
             os: macos-latest
@@ -146,11 +148,22 @@ jobs:
           Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
           Start-Sleep 2
 
-          # The WebDriver checks, straight through msedgedriver (with its log).
+          # The WebDriver checks: the app runs with its WebView2 DevTools on a port and msedgedriver
+          # joins it (msedgedriver starting WebView2 apps itself is unreliable on new WebView2s).
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222'
+          $app = Start-Process $exe -PassThru
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = $null
+          $up = $false
+          for ($i = 0; $i -lt 60 -and -not $up; $i++) {
+            try { Invoke-RestMethod http://127.0.0.1:9222/json/version | Out-Null; $up = $true } catch { Start-Sleep 1 }
+          }
+          if (-not $up) { throw "the app's DevTools port didn't open" }
           Start-Process $driver.FullName -ArgumentList '--port=4444', '--verbose', "--log-path=$PWD\msedgedriver.log"
           Start-Sleep 3
-          node src-tauri/tests/e2e/desktop.mjs --edge --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node src-tauri/tests/e2e/desktop.mjs --attach 127.0.0.1:9222 --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"'
+          $code = $LASTEXITCODE
+          Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+          if ($code -ne 0) { exit $code }
 
       - name: Test (macOS)
         if: matrix.name == 'macOS'
@@ -318,7 +331,9 @@ jobs:
 
       - name: Test in the simulator
         run: |
-          brew tap facebook/fb && brew install idb-companion
+          brew tap facebook/fb
+          brew trust facebook/fb || true
+          brew install idb-companion
           pip3 install --break-system-packages fb-idb || pip3 install fb-idb
           APP=$(find src-tauri/gen/apple/build -name "*.app" -type d | grep -i simulator | head -1)
           [ -n "$APP" ] || APP=$(find src-tauri/gen/apple/build -name "*.app" -type d | head -1)

@@ -178,10 +178,12 @@ cd src-tauri && cargo test                      # the shell's rules
   - `desktop.mjs` drives the real app through WebDriver (tauri-driver): start-up, what the site may
     call, public pages, history and keys, links to other sites, app links. With `BLOB_E2E_EMAIL` and
     `BLOB_E2E_PASSWORD` it also covers every signed-in area, typing in a note, and the phone-width
-    layout. CI runs it on Linux (the installed `.deb`) and Windows (the installed setup).
-  - `android.mjs` runs the debug APK in an Android 15 emulator over adb and the web view's DevTools:
-    bars and keyboard, pinch, back button, swipes, app links, links to other sites, rotation, dark
-    mode, the print dialog, crashes.
+    layout. CI runs it on Linux (the installed `.deb`, through tauri-driver) and Windows (the
+    installed setup: started with its WebView2 DevTools on port 9222, then msedgedriver joins it
+    with `--attach 127.0.0.1:9222`).
+  - `android.mjs` runs the debug APK in an Android 15 emulator (Pixel 6 size) over adb and the web
+    view's DevTools: bars and keyboard, pinch, the back button and the edge back swipe, swipes, app
+    links, links to other sites, rotation, dark mode, the print dialog, crashes.
   - `ios.sh` runs the simulator build with simctl and idb: status bar, keyboard, app links, swipes,
     the edge swipe back, dark mode.
   - `macos.sh`: start-up, an app link while running, quitting.

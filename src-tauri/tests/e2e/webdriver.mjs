@@ -10,12 +10,14 @@ export class Session {
   }
 
   /**
-   * Starts the app under tauri-driver (which starts WebKitWebDriver or msedgedriver), or with
-   * `edge` straight under msedgedriver on Windows (the same capabilities tauri-driver would send).
+   * Starts the app under tauri-driver (which starts WebKitWebDriver or msedgedriver). On Windows,
+   * `attach` ("host:port") instead joins an app that is already running with its WebView2's
+   * DevTools on that port (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…),
+   * straight through msedgedriver.
    */
-  static async start(base, application, { edge = false, timeoutMs = 120000 } = {}) {
-    const caps = edge
-      ? { browserName: "webview2", "ms:edgeChromium": true, "ms:edgeOptions": { binary: application, args: [] } }
+  static async start(base, application, { attach, timeoutMs = 120000 } = {}) {
+    const caps = attach
+      ? { browserName: "webview2", "ms:edgeOptions": { debuggerAddress: attach } }
       : { "tauri:options": { application } };
     const body = { capabilities: { alwaysMatch: caps } };
     const res = await request(base, "POST", "/session", body, timeoutMs);

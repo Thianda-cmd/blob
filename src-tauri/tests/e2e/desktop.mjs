@@ -22,8 +22,9 @@ const driver = arg("driver", "http://127.0.0.1:4444");
 const site = arg("site", "https://blob.bojes.org");
 // A command that opens org.bojes.blob://show the way the system would (the running app takes it).
 const deepLink = arg("deep-link");
-// Windows: --edge talks to msedgedriver directly (--driver is then msedgedriver's address).
-const edge = process.argv.includes("--edge");
+// Windows: --attach host:port joins the running app through its WebView2 DevTools port, with
+// --driver pointing at msedgedriver itself (webview2 launching under msedgedriver is unreliable).
+const attach = arg("attach");
 const email = process.env.BLOB_E2E_EMAIL;
 const password = process.env.BLOB_E2E_PASSWORD;
 if (!app) throw new Error("--app path/to/the/app is required");
@@ -67,7 +68,7 @@ async function settled(s, name, { wide = true } = {}) {
   await shot(s, name.replace(/[^a-z0-9]+/gi, "-").toLowerCase());
 }
 
-const s = await Session.start(driver, app, { edge });
+const s = await Session.start(driver, app, { attach });
 try {
   // The start page moves on to the site (signed out: the sign-in page).
   const first = await s.until(() => path(s), (p) => p === "/login" || p === "/home", 90000, 1000);
