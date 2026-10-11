@@ -186,7 +186,8 @@ cd src-tauri && cargo test                      # the shell's rules
     view's DevTools: bars and keyboard, pinch, the back button and the edge back swipe, swipes, app
     links, links to other sites, rotation, dark mode, the print dialog, crashes.
   - `ios.sh` runs the simulator build with simctl and idb: status bar, keyboard, app links, swipes,
-    the edge swipe back, dark mode.
+    the edge swipe back, dark mode. When idb can't reach the simulator (as on GitHub's runners in
+    October 2026) those checks are skipped and only start-up, staying up and screenshots remain.
   - `macos.sh`: start-up, an app link while running, quitting.
   - Locally (Linux): `tauri-driver &` then
     `node src-tauri/tests/e2e/desktop.mjs --app src-tauri/target/release/blob`.

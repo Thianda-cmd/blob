@@ -1,5 +1,5 @@
 // The app's start page: Blob, while the app checks it can reach the site, then the site itself.
-// Without internet: a friendly screen that tries again by itself when the connection is back.
+// Without internet: a friendly screen that tries again by itself until the connection is back.
 (function () {
   var app = window.__BLOB_APP__ || {};
   var site = app.site || "https://blob.bojes.org/";
@@ -13,6 +13,7 @@
   var loading = document.getElementById("loading");
   var offline = document.getElementById("offline");
   var busy = false;
+  var again = 0;
 
   function show(state) {
     loading.hidden = state !== "loading";
@@ -53,14 +54,29 @@
     );
   }
 
+  // While the offline screen shows, it quietly checks again every few seconds: a connection that
+  // is just slow to start (a phone waking up, a train) never fires "online".
+  function later() {
+    clearTimeout(again);
+    again = setTimeout(function () {
+      if (busy) return;
+      reachable().then(function (ok) {
+        if (ok) go();
+        else later();
+      });
+    }, 5000);
+  }
+
   function go() {
     if (busy) return;
     busy = true;
+    clearTimeout(again);
     show("loading");
     reachable().then(function (ok) {
       if (!ok) {
         busy = false;
         show("offline");
+        later();
         return;
       }
       target().then(function (to) {
