@@ -19,21 +19,40 @@ check() {
   if [ "$2" = 1 ]; then echo "ok   $1 ${3:-}"; else echo "FAIL $1 ${3:-}"; FAILED=1; fi
   printf '{"name":%s,"ok":%s,"detail":%s}\n' "$(jq -Rn --arg v "$1" '$v')" "$([ "$2" = 1 ] && echo true || echo false)" "$(jq -Rn --arg v "${3:-}" '$v')" >> "$OUT/results.jsonl"
 }
-# What idb sees on screen: [{label, y, h, type}].
-screen() { idb ui describe-all --udid "$DEVICE" --json 2> /dev/null || echo "[]"; }
+# What idb sees on screen: [{AXLabel, AXValue, frame, type, role}] (idb's errors go to idb.log).
+screen() {
+  local s
+  s=$(idb ui describe-all --udid "$DEVICE" --json 2>> "$OUT/idb.log")
+  if echo "$s" | jq -e 'type == "array"' > /dev/null 2>&1; then echo "$s"; else echo "[]"; fi
+}
+# Numbers for bc: an empty or odd value becomes the fallback.
+num() { case "$1" in '' | null | *[!0-9.-]*) echo "${2:--1}" ;; *) echo "$1" ;; esac; }
+# Taps the button with this label if it's on screen (e.g. iOS asking "Open in “Blob”?").
+tap_label() {
+  local b
+  b=$(screen | find_label "$1")
+  [ -n "$b" ] || return 1
+  idb ui tap --udid "$DEVICE" "$(echo "$b" | jq '.frame.x + .frame.width / 2')" "$(echo "$b" | jq '.frame.y + .frame.height / 2')" 2>> "$OUT/idb.log"
+}
 find_label() { jq -r --arg re "$1" '[.[] | select((.AXLabel // "") | test($re; "i"))] | first // empty'; }
 
 DEVICE=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.key | test("iOS")) | .value[] | select(.name | test("^iPhone 1[5-9]"))] | sort_by(.name) | last | .udid')
 echo "simulator: $DEVICE"
 xcrun simctl boot "$DEVICE" 2> /dev/null
 xcrun simctl bootstatus "$DEVICE" -b > /dev/null
+# idb talks to the simulator through its companion.
+idb_companion --udid "$DEVICE" > "$OUT/idb-companion.log" 2>&1 &
+sleep 8
+idb connect localhost 10882 >> "$OUT/idb.log" 2>&1 || true
+idb list-targets >> "$OUT/idb.log" 2>&1 || true
 xcrun simctl install "$DEVICE" "$APP"
 xcrun simctl launch "$DEVICE" "$BUNDLE"
 sleep 30
 shot start
 
 # The page below the status bar: the top of the sign-in page (the Blob logo, the DE/EN switch).
-TOP=$(screen | jq '[.[] | select((.AXLabel // "") | test("^(Blob|DE|EN|Welcome back|Willkommen zurück)$"; "i")) | .frame.y] | min // -1')
+screen > "$OUT/screen-start.json"
+TOP=$(num "$(jq '[.[] | select((.AXLabel // "") | test("^(Blob|DE|EN|Welcome back|Willkommen zurück)$"; "i")) | .frame.y] | min // -1' "$OUT/screen-start.json")")
 check "the page starts below the status bar" "$(echo "$TOP >= 44" | bc)" "top element at y=$TOP"
 WELCOME=$(screen | find_label "Welcome back|Willkommen")
 check "the start page opens the site's sign-in" "$([ -n "$WELCOME" ] && echo 1 || echo 0)"
@@ -50,8 +69,8 @@ if [ -n "$FIELD" ]; then
   shot keyboard
   AFTER=$(screen | jq -c '[.[] | select(.type == "TextField" or .role == "AXTextField")] | first // empty')
   VALUE=$(echo "$AFTER" | jq -r '.AXValue // ""')
-  FY=$(echo "$AFTER" | jq '.frame.y + .frame.height')
-  KB=$(screen | jq '[.[] | select((.AXLabel // "") | test("^(return|space|Leerzeichen|Return|go|Go|next|Next)$"))] | map(.frame.y) | min // 9999')
+  FY=$(num "$(echo "$AFTER" | jq '.frame.y + .frame.height')" 9999)
+  KB=$(num "$(screen | jq '[.[] | select((.AXLabel // "") | test("^(return|space|Leerzeichen|Return|go|Go|next|Next)$"))] | map(.frame.y) | min // 9999')" 9999)
   check "typing in the email field works" "$(echo "$VALUE" | grep -q student && echo 1 || echo 0)" "value=$VALUE"
   check "the field stays visible above the keyboard" "$(echo "$FY < $KB" | bc)" "field bottom=$FY keyboard keys from y=$KB"
 else
@@ -63,17 +82,20 @@ sleep 20
 
 # An app link opens its page.
 xcrun simctl openurl "$DEVICE" "org.bojes.blob://show"
-sleep 12
+sleep 3
+# iOS asks before a link opens an app ("Open in “Blob”?").
+tap_label "^(Open|Öffnen)$" && echo "(tapped Open)"
+sleep 10
 shot app-link
 SHOW=$(screen | find_label "Interactive pictures|Interaktive Bilder")
 check "an org.bojes.blob:// link opens its page" "$([ -n "$SHOW" ] && echo 1 || echo 0)"
 
 # A swipe up scrolls.
-Y0=$(echo "$SHOW" | jq '.frame.y // 0')
+Y0=$(num "$(echo "$SHOW" | jq '.frame.y // 0')" 0)
 idb ui swipe --udid "$DEVICE" --duration 0.4 200 650 200 250
 sleep 2
 shot scrolled
-Y1=$(screen | find_label "Interactive pictures|Interaktive Bilder" | jq '.frame.y // -999')
+Y1=$(num "$(screen | find_label "Interactive pictures|Interaktive Bilder" | jq '.frame.y // -999')" -999)
 check "swiping up scrolls the page" "$(echo "$Y1 < $Y0" | bc)" "heading y $Y0 → $Y1"
 
 # The edge swipe goes back to the page before.

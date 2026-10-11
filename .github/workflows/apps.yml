@@ -356,7 +356,8 @@ jobs:
   publish:
     name: Publish the release
     if: startsWith(github.ref, 'refs/tags/app-v')
-    needs: [desktop, android]
+    # The installers and the APK, once they and the Android emulator checks have passed.
+    needs: [desktop, android, android-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
