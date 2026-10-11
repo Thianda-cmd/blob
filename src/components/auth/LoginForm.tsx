@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/Button";
 import { Field, Input, PasswordInput } from "@/components/ui/Input";
 import { useLocale, useMessages } from "@/i18n/client";
 import { authText } from "@/i18n/messages/auth";
-import { APP_SIGN_IN_KEY, challengeOf, randomToken, type AppSignInRequest } from "@/lib/auth/appSignIn";
+import { pollAppSignIn } from "@/app/(auth)/auth/app/actions";
+import { APP_SIGN_IN_KEY, challengeOf, randomToken, REQUEST_TTL_MS, type AppSignInRequest } from "@/lib/auth/appSignIn";
 import { authMessage, isEmail } from "@/lib/auth/errors";
 import { callbackUrl } from "@/lib/auth/redirect";
 import { forgetSignedOut } from "@/lib/offline/device";
 import { blobApp, openOutside } from "@/lib/native";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/utils";
 import { AuthHeading } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
@@ -123,6 +125,47 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
       router.refresh();
     }, 650);
   }
+
+  // Waiting for the browser: the app asks every two seconds (and when it comes back to the front)
+  // whether the sign-in was confirmed there, and then signs in by itself.
+  useEffect(() => {
+    if (!browserUrl) return;
+    let alive = true;
+    let asking = false;
+    const ask = async () => {
+      if (!alive || asking) return;
+      let request: AppSignInRequest | null = null;
+      try {
+        request = JSON.parse(localStorage.getItem(APP_SIGN_IN_KEY) ?? "null") as AppSignInRequest | null;
+      } catch {}
+      if (!request || Date.now() - request.at > REQUEST_TTL_MS) return;
+      asking = true;
+      const res = await pollAppSignIn(request.state, request.verifier).catch(() => null);
+      asking = false;
+      if (!alive || res?.status !== "ok") return;
+      alive = false;
+      try {
+        localStorage.removeItem(APP_SIGN_IN_KEY);
+      } catch {}
+      blob.setMood("excited");
+      blob.jump();
+      blob.say(t.signedIn);
+      resetBoot();
+      setTimeout(() => window.location.replace(safeNext(request.next)), 500);
+    };
+    const timer = setInterval(() => void ask(), 2000);
+    const onBack = () => {
+      if (document.visibilityState === "visible") void ask();
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [browserUrl, blob, t.signedIn]);
 
   async function signInWithBrowser() {
     const app = blobApp();

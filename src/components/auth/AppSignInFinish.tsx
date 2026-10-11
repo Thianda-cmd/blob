@@ -8,6 +8,7 @@ import { resetBoot } from "@/components/blob/BlobBoot";
 import { useMessages } from "@/i18n/client";
 import { authText } from "@/i18n/messages/auth";
 import { APP_SIGN_IN_KEY, isCode, isState, REQUEST_TTL_MS, type AppSignInRequest } from "@/lib/auth/appSignIn";
+import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/utils";
 import { AuthHeading, authLinkButton } from "./AuthStage";
 import { useFieldReactions } from "./useFieldReactions";
@@ -39,11 +40,16 @@ export function AppSignInFinish({ code, state }: { code: string; state: string }
     if (started.has(code)) return;
     started.add(code);
     // The code is in the address: out of the history right away.
-    window.history.replaceState(null, "", "/auth/app");
+    window.history.replaceState(null, "", window.location.pathname);
     const req = isCode(code) && isState(state) ? takeRequest(state) : null;
     if (!req) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the outcome of reading this device's storage
-      setProblem(t.notHere);
+      // The app may have picked the sign-in up itself already (it asks while it waits): then on.
+      void createClient()
+        .auth.getSession()
+        .then(({ data }) => {
+          if (data.session) window.location.replace("/home");
+          else setProblem(t.notHere);
+        });
       return;
     }
     blob.setMood("thinking");
@@ -60,7 +66,13 @@ export function AppSignInFinish({ code, state }: { code: string; state: string }
           setTimeout(() => window.location.replace(safeNext(req.next)), 500);
           return;
         }
-        setProblem(res.error === "offline" ? t.offline : t.failed);
+        // Used up already, by the app itself while it waited: signed in all the same.
+        void createClient()
+          .auth.getSession()
+          .then(({ data }) => {
+            if (data.session) window.location.replace(safeNext(req.next));
+            else setProblem(res.error === "offline" ? t.offline : t.failed);
+          });
       });
   }, [code, state, blob, t, all.login.signedIn]);
 
