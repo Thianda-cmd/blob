@@ -9,9 +9,15 @@ export class Session {
     this.id = id;
   }
 
-  /** Starts the app under tauri-driver (which starts WebKitWebDriver or msedgedriver). */
-  static async start(base, application, timeoutMs = 120000) {
-    const body = { capabilities: { alwaysMatch: { "tauri:options": { application } } } };
+  /**
+   * Starts the app under tauri-driver (which starts WebKitWebDriver or msedgedriver), or with
+   * `edge` straight under msedgedriver on Windows (the same capabilities tauri-driver would send).
+   */
+  static async start(base, application, { edge = false, timeoutMs = 120000 } = {}) {
+    const caps = edge
+      ? { browserName: "webview2", "ms:edgeChromium": true, "ms:edgeOptions": { binary: application, args: [] } }
+      : { "tauri:options": { application } };
+    const body = { capabilities: { alwaysMatch: caps } };
     const res = await request(base, "POST", "/session", body, timeoutMs);
     return new Session(base, res.sessionId);
   }

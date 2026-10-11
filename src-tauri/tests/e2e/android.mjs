@@ -4,9 +4,9 @@
 //   node src-tauri/tests/e2e/android.mjs --apk app-debug.apk --out shots/
 //
 // What it looks at: the page sits between the status bar, the navigation bar and the keyboard; no
-// pinch zoom; the back button walks the page history and then leaves the app; swipes scroll; app
-// links open their page; links to other sites never open inside the app; rotation, dark mode, the
-// print dialog; no crash. Exits 1 if a check fails. Screenshots and results.json go to --out.
+// pinch zoom; the back button and the edge back swipe walk the page history, then Back leaves the
+// app; swipes scroll; app links open their page; links to other sites never open inside the app;
+// rotation, dark mode, the print dialog; no crash. Exits 1 if a check fails. Screenshots and results.json go to --out.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -77,14 +77,24 @@ async function connect(url) {
   ws.onmessage = (m) => {
     const msg = JSON.parse(m.data);
     if (msg.id && waiting.has(msg.id)) {
-      waiting.get(msg.id)(msg);
+      waiting.get(msg.id).res(msg);
       waiting.delete(msg.id);
     }
   };
+  // When the web view goes away (the app closed), every open call fails instead of waiting forever.
+  ws.onclose = () => {
+    for (const w of waiting.values()) w.rej(new Error("the web view went away"));
+    waiting.clear();
+  };
   const send = (method, params = {}) =>
-    new Promise((res) => {
+    new Promise((res, rej) => {
       const id = ++next;
-      waiting.set(id, res);
+      if (ws.readyState !== WebSocket.OPEN) return rej(new Error("the web view went away"));
+      const timer = setTimeout(() => {
+        waiting.delete(id);
+        rej(new Error(`${method} got no answer`));
+      }, 30000);
+      waiting.set(id, { res: (v) => (clearTimeout(timer), res(v)), rej: (e) => (clearTimeout(timer), rej(e)) });
       ws.send(JSON.stringify({ id, method, params }));
     });
   const js = async (expression) => {
@@ -172,9 +182,10 @@ try {
     await sleep(800);
     check("typing works", (await dt.js("document.querySelector('input[type=email]').value")) === "student");
     shot("keyboard");
-    adb("shell", "input", "keyevent", "KEYCODE_BACK"); // closes the keyboard
-    await sleep(1200);
-    await dt.js("document.querySelector('input[type=email]').blur()");
+    // Leaving the field closes the keyboard (Back would leave the app if the keyboard weren't up).
+    await dt.js("document.activeElement && document.activeElement.blur()");
+    const closed = await until(() => dt.js("innerHeight"), (h) => h >= page.h, 10000);
+    check("the keyboard closes when the field is left, and the page gets its height back", closed >= page.h, { before: page.h, after: closed });
   }
 
   // Navigation, scrolling by swiping, and the back button walking the history.
@@ -191,6 +202,15 @@ try {
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   const back = await until(() => path(dt), (p) => p === first, 20000);
   check("the back button goes back a page", back === first, back);
+
+  // The back gesture: a swipe in from the left edge of the screen (gesture navigation) goes back too.
+  await dt.js("location.assign('/developers')");
+  await until(() => path(dt), (p) => p === "/developers", 60000);
+  await sleep(2000);
+  const mid = String(Math.round(screenH / 2));
+  adb("shell", "input", "swipe", "1", mid, String(Math.round(screenW * 0.6)), mid, "300");
+  const swiped = await until(() => path(dt), (p) => p === first, 20000);
+  check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
 
   // Back on the first page leaves the app, like any Android app.
   adb("shell", "input", "keyevent", "KEYCODE_BACK");

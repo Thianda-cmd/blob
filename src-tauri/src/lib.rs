@@ -292,7 +292,7 @@ fn print_page<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
   #[cfg(target_os = "ios")]
   return window
     .with_webview(|webview| unsafe {
-      use objc2::runtime::{AnyClass, AnyObject};
+      use objc2::runtime::{AnyClass, AnyObject, Bool};
       // UIPrintInteractionController.shared, printing the web view: the system print sheet.
       let Some(web) = (webview.inner() as *mut AnyObject).as_ref() else { return };
       let Some(class) = AnyClass::get(c"UIPrintInteractionController") else { return };
@@ -300,7 +300,7 @@ fn print_page<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
       let Some(controller) = controller.as_ref() else { return };
       let formatter: *mut AnyObject = objc2::msg_send![web, viewPrintFormatter];
       let _: () = objc2::msg_send![controller, setPrintFormatter: formatter];
-      let done: Option<&block2::Block<dyn Fn(*mut AnyObject, bool, *mut AnyObject)>> = None;
+      let done: Option<&block2::Block<dyn Fn(*mut AnyObject, Bool, *mut AnyObject)>> = None;
       let _: bool = objc2::msg_send![controller, presentAnimated: true, completionHandler: done];
     })
     .map_err(|e| e.to_string());

@@ -118,19 +118,38 @@ jobs:
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
-          cargo install tauri-driver --locked
           # The Edge driver that matches this machine's WebView2.
           $v = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}').pv
+          Write-Host "WebView2 $v"
           try { Invoke-WebRequest "https://msedgedriver.microsoft.com/$v/edgedriver_win64.zip" -OutFile edgedriver.zip }
           catch { Invoke-WebRequest "https://msedgedriver.azureedge.net/$v/edgedriver_win64.zip" -OutFile edgedriver.zip }
           Expand-Archive edgedriver.zip -DestinationPath edgedriver
+          $driver = Get-ChildItem edgedriver -Recurse -Filter msedgedriver.exe | Select-Object -First 1
           $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           Start-Process -Wait $setup.FullName -ArgumentList '/S'
           $exe = "$env:LOCALAPPDATA\Blob\blob.exe"
           if (-not (Test-Path $exe)) { throw "not installed at $exe" }
-          Start-Process tauri-driver -ArgumentList '--native-driver', "$PWD\edgedriver\msedgedriver.exe" -RedirectStandardOutput tauri-driver.log -RedirectStandardError tauri-driver.err
+          New-Item -ItemType Directory -Force e2e-Windows | Out-Null
+
+          # The installed app on its own: it starts, stays up and shows its window.
+          $app = Start-Process $exe -PassThru
+          Start-Sleep 20
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\e2e-Windows\00-installed-app.png")
+          Get-Process | Where-Object { $_.ProcessName -match '^(blob|msedgewebview2)$' } | Format-Table ProcessName, Id, MainWindowTitle -AutoSize | Out-String | Write-Host
+          if ($app.HasExited) { throw "the app quit by itself (exit code $($app.ExitCode))" }
+          Stop-Process -Id $app.Id
           Start-Sleep 3
-          node src-tauri/tests/e2e/desktop.mjs --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"'
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep 2
+
+          # The WebDriver checks, straight through msedgedriver (with its log).
+          Start-Process $driver.FullName -ArgumentList '--port=4444', '--verbose', "--log-path=$PWD\msedgedriver.log"
+          Start-Sleep 3
+          node src-tauri/tests/e2e/desktop.mjs --edge --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test (macOS)
@@ -151,6 +170,7 @@ jobs:
             src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
             e2e-*/
             tauri-driver.*
+            msedgedriver.log
 
   android:
     name: Android
@@ -256,6 +276,7 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
+          profile: pixel_6
           disable-animations: true
           script: node src-tauri/tests/e2e/android.mjs --apk "$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -1)" --out e2e-Android
 
