@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   FilePlus2,
+  FileUp,
   FolderPlus,
   GraduationCap,
   Hash,
@@ -36,6 +37,7 @@ import { PageMenuArea } from "./PageMenuArea";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
+import { transferText } from "@/i18n/messages/transfer";
 import { resolveText } from "@/i18n/text";
 import { CATALOG } from "@/learn/catalog";
 import type { DueRow } from "@/notes/server";
@@ -46,6 +48,7 @@ import type { PageKind, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { NotesGraph } from "./NotesGraph";
 import { PageRow, PageTile } from "./PageTiles";
+import { useImporter } from "./useImporter";
 import { useShareInfo } from "./useShared";
 
 /** The filters, as they stand in the address (?tag=…&kind=…). */
@@ -650,6 +653,8 @@ function Segmented<T extends string>({
 
 function NewMenu({ onPick, busy }: { onPick: (kind: "note" | "deck" | "folder") => void; busy: PageKind | null }) {
   const t = useMessages(notesText);
+  const ti = useMessages(transferText).import;
+  const { pick } = useImporter();
   return (
     <Popover
       align="end"
@@ -670,6 +675,10 @@ function NewMenu({ onPick, busy }: { onPick: (kind: "note" | "deck" | "folder") 
           </MenuItem>
           <MenuItem icon={<FolderPlus />} onSelect={() => (close(), onPick("folder"))}>
             {t.newFolder}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem icon={<FileUp />} onSelect={() => (close(), pick())}>
+            {ti.action}
           </MenuItem>
         </>
       )}
