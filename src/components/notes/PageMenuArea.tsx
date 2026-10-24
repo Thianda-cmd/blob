@@ -1,14 +1,16 @@
 "use client";
 
-import { ExternalLink, FilePlus2, Link2, Star, StarOff, SquareArrowOutUpRight, Trash2 } from "lucide-react";
+import { Columns2, ExternalLink, FilePlus2, Link2, Star, StarOff, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { usePanes } from "@/components/shell/Panes";
 import { ContextMenu, useContextMenu, useLastPointer, wantsOwnMenu } from "@/components/ui/ContextMenu";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
+import { panesText } from "@/i18n/messages/panes";
 
 /**
  * Right-click on any page inside (an element with data-page-id) opens Blob's page menu: open, open in
@@ -17,6 +19,8 @@ import { notesText } from "@/i18n/messages/notes";
  */
 export function PageMenuArea({ children }: { children: ReactNode }) {
   const t = useMessages(notesText).pageMenu;
+  const tp = useMessages(panesText).switcher;
+  const { openBeside } = usePanes();
   const router = useRouter();
   const pathname = usePathname();
   const { pages, userId, updatePage, trashPage, createPage } = useWorkspace();
@@ -49,6 +53,13 @@ export function PageMenuArea({ children }: { children: ReactNode }) {
             <MenuItem icon={<SquareArrowOutUpRight />} onSelect={act(() => router.push(`/p/${page.id}`))}>
               {t.open}
             </MenuItem>
+            {page.kind === "note" && pathname !== `/p/${page.id}` && (
+              <div className="max-lg:hidden">
+                <MenuItem icon={<Columns2 />} shortcut="" onSelect={act(() => openBeside(page.id))}>
+                  {tp.openBeside}
+                </MenuItem>
+              </div>
+            )}
             <MenuItem icon={<ExternalLink />} onSelect={act(() => window.open(`/p/${page.id}`, "_blank", "noopener"))}>
               {t.openNewTab}
             </MenuItem>

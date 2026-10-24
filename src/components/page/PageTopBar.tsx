@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderInput, FileUser, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus } from "lucide-react";
+import { ArrowLeftRight, FolderInput, FileUser, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
@@ -13,6 +13,7 @@ import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Men
 import { descendantsOf, useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
+import { panesText } from "@/i18n/messages/panes";
 import { pageText } from "@/i18n/messages/page";
 import { shareText } from "@/i18n/messages/share";
 import { subjectColor } from "@/lib/subjects";
@@ -35,6 +36,8 @@ export function PageTopBar({
   peers = [],
   role: initialRole,
   members: initialMembers,
+  menu,
+  pane,
 }: {
   pageId: string;
   saveState: SaveState;
@@ -42,9 +45,14 @@ export function PageTopBar({
   peers?: Peer[];
   role?: AccessRole;
   members?: Member[];
+  /** The page's own entries at the top of its "…" menu (a note's export, side by side…). */
+  menu?: (close: () => void) => ReactNode;
+  /** Shown beside another page: buttons to swap the two and to close this one. */
+  pane?: { onClose: () => void; onSwap: () => void };
 }) {
   const t = useMessages(pageText);
   const s = useMessages(shareText);
+  const tp = useMessages(panesText).split;
   const cvs = useMessages(cvHomeText).title;
   const locale = useLocale();
   const router = useRouter();
@@ -127,7 +135,8 @@ export function PageTopBar({
   return (
     <>
       <TopBar
-        crumbs={crumbs}
+        crumbs={pane ? crumbs.slice(-1) : crumbs}
+        inPane={!!pane}
         actions={
           <>
             <PeerStack peers={peers} />
@@ -181,6 +190,7 @@ export function PageTopBar({
             >
               {(close) => (
                 <>
+                  {menu?.(close)}
                   {starInMenu && mine && (
                     <div className="sm:hidden">
                       <MenuItem
@@ -288,6 +298,17 @@ export function PageTopBar({
                 </>
               )}
             </Popover>
+            {pane && (
+              <>
+                <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
+                <button type="button" onClick={pane.onSwap} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={tp.swap} title={tp.swap}>
+                  <ArrowLeftRight className="size-4" />
+                </button>
+                <button type="button" onClick={pane.onClose} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={tp.close} title={tp.close}>
+                  <X className="size-4" />
+                </button>
+              </>
+            )}
           </>
         }
       />

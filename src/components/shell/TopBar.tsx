@@ -13,14 +13,14 @@ import { useShell } from "./AppShell";
 export type Crumb = { label: ReactNode; href?: string; icon?: ReactNode; title?: string };
 
 /** Thin bar at the top of every workspace page: sidebar toggle, breadcrumbs, actions. */
-export function TopBar({ crumbs, actions, className }: { crumbs: Crumb[]; actions?: ReactNode; className?: string }) {
+export function TopBar({ crumbs, actions, className, inPane = false }: { crumbs: Crumb[]; actions?: ReactNode; className?: string; inPane?: boolean }) {
   const { sidebarOpen, toggleSidebar } = useShell();
   const t = useMessages(shellText).topBar;
   return (
     <header className={cn("flex h-11 shrink-0 items-center gap-1 px-3", className)}>
       <button
         onClick={toggleSidebar}
-        className={cn("grid size-7 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9", sidebarOpen && "lg:hidden")}
+        className={cn("grid size-7 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9", (sidebarOpen || inPane) && "lg:hidden")}
         aria-label={t.show}
         title={t.showTitle}
       >

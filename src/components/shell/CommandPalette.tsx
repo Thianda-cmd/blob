@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Hash,
   House,
+  Keyboard,
   ListChecks,
   CalendarDays,
   CalendarPlus,
@@ -38,6 +39,8 @@ import { resolveText } from "@/i18n/text";
 import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
 import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
+import { panesText } from "@/i18n/messages/panes";
+import { usePanes } from "./Panes";
 import { PageIcon, SubjectIcon } from "./Sidebar";
 
 type Item = {
@@ -49,6 +52,8 @@ type Item = {
   keywords?: string;
   icon: ReactNode;
   run: () => void;
+  /** Shift+Enter: a note opens beside the page you're on. */
+  beside?: () => void;
 };
 
 /** Learning topics shown for a search (the rest are one click away on /learn). */
@@ -79,6 +84,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 function Palette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { pages, subjects, createPage, createSubject, userId } = useWorkspace();
+  const { openBeside, showShortcuts } = usePanes();
+  const tp = useMessages(panesText);
   const locale = useLocale();
   const t = useMessages(shellText).palette;
   const [query, setQuery] = useState("");
@@ -193,6 +200,17 @@ function Palette({ onClose }: { onClose: () => void }) {
       { id: "settings", group: "actions", label: t.settings, icon: <Settings />, run: () => go("/settings") },
       { id: "trash", group: "actions", label: t.trash, icon: <Trash2 />, run: () => go("/trash") },
       {
+        id: "shortcuts",
+        group: "actions",
+        label: tp.shortcuts.open,
+        keywords: "keyboard shortcuts hotkeys keys tastenkürzel tastatur kürzel",
+        icon: <Keyboard />,
+        run: () => {
+          onClose();
+          showShortcuts();
+        },
+      },
+      {
         id: "theme",
         group: "actions",
         label: t.toggleDark,
@@ -222,6 +240,13 @@ function Palette({ onClose }: { onClose: () => void }) {
           hint: tag ? `#${tag}` : p.user_id !== userId ? t.shared : subject?.name,
           icon: <PageIcon page={p} />,
           run: () => go(`/p/${p.id}`),
+          beside:
+            p.kind === "note"
+              ? () => {
+                  onClose();
+                  openBeside(p.id);
+                }
+              : undefined,
         };
       });
 
@@ -290,7 +315,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       : actions.slice(0, 3);
     return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found, locale, t, userId]);
+  }, [q, pages, subjects, found, locale, t, tp, userId, openBeside, showShortcuts]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing
@@ -310,7 +335,9 @@ function Palette({ onClose }: { onClose: () => void }) {
       setActive((a) => Math.max(0, a - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      items[active]?.run();
+      const item = items[active];
+      if (e.shiftKey && item?.beside) item.beside();
+      else item?.run();
     } else if (e.key === "Escape") {
       onClose();
     }
@@ -406,6 +433,11 @@ function Palette({ onClose }: { onClose: () => void }) {
           <span className="flex items-center gap-1 [@media(hover:none)]:hidden">
             <Kbd>↵</Kbd> {t.open}
           </span>
+          {items[active]?.beside && (
+            <span className="flex items-center gap-1 max-lg:hidden">
+              <Kbd>⇧↵</Kbd> {tp.switcher.keys.beside}
+            </span>
+          )}
           {/* On touch screens the key hints go away and the tip takes the whole footer. */}
           <span className="ml-auto hidden min-w-0 items-center gap-1.5 sm:flex [@media(hover:none)]:ml-0 [@media(hover:none)]:flex">
             <Sun className="size-3 shrink-0" /> <span className="truncate">{t.tip}</span>

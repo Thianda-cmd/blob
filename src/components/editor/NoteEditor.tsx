@@ -18,6 +18,7 @@ import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
 import { offlineText } from "@/i18n/messages/offline";
+import { usePanes } from "@/components/shell/Panes";
 import { useTableChanges } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Member, Page, PageMeta } from "@/lib/types";
@@ -110,6 +111,8 @@ type Live = {
   userId: string;
   pageId: string;
   openHref: (href: string) => void;
+  /** Ctrl/Cmd+click on a link to another note: that note opens beside this one. */
+  openBeside: (id: string) => void;
   pickImage: () => void;
   pickFile: () => void;
   blocksText: NoteBlocksText;
@@ -131,11 +134,14 @@ type Live = {
 /** The document an editor is created with: the stored content, and its plain text as a fallback. */
 type Source = { content: unknown; plain: string };
 
+/** A note shown beside another page (Panes.tsx): its own buttons, and it reloads itself, not the route. */
+export type NotePane = { onClose: () => void; onSwap: () => void; onRefresh: () => void };
+
 /**
  * `role` is your role on the page ("viewer": read only); `members` everyone on it (more than one:
  * the note is shared, and edits go through useNoteCollab).
  */
-export function NoteEditor(props: { page: Page; role?: AccessRole; members?: Member[] }) {
+export function NoteEditor(props: { page: Page; role?: AccessRole; members?: Member[]; pane?: NotePane }) {
   const { userId } = useWorkspace();
   // Text this device kept (written offline, not saved yet) must be in memory before the editor
   // starts: it starts from it. Reading it takes a moment, once per page load.
@@ -151,12 +157,15 @@ export function NoteEditor(props: { page: Page; role?: AccessRole; members?: Mem
   return <NoteEditorReady {...props} />;
 }
 
-function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
+function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: Page; role?: AccessRole; members?: Member[]; pane?: NotePane }) {
   const t = useMessages(editorText);
   const tb = useMessages(noteBlocksText);
   const offline = useMessages(offlineText).notes;
   const locale = useLocale();
   const router = useRouter();
+  const panes = usePanes();
+  // Beside another page this note reloads itself; the route is the other page's.
+  const refreshRoute = pane?.onRefresh ?? router.refresh;
   const { pages, subjects, userId, profile, updatePage, createPage, reloadPages } = useWorkspace();
   const meta = pages.find((p) => p.id === page.id);
   const icon = meta ? meta.icon : page.icon;
@@ -290,6 +299,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
         if (href.startsWith("/")) router.push(href);
         else window.open(href, "_blank", "noopener,noreferrer");
       },
+      openBeside: (id) => (id === page.id ? undefined : pane ? router.push(`/p/${id}`) : panes.openBeside(id)),
       pickImage: () => fileRef.current?.click(),
       pickFile: () => attachRef.current?.click(),
       blocksText: tb,
@@ -412,7 +422,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
           const target = pageIdFromHref(href);
           if (target && live.current?.linkStatus(target) === "gone") return false;
           event.preventDefault();
-          live.current?.openHref(href);
+          if (target && (event.metaKey || event.ctrlKey)) live.current?.openBeside(target);
+          else live.current?.openHref(href);
           return true;
         },
       },
@@ -703,7 +714,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
     }
     return ids.join(",");
   }, [pages, meta, page]);
-  useTableChanges("page_members", `page_id=in.(${chain})`, () => router.refresh());
+  useTableChanges("page_members", `page_id=in.(${chain})`, () => refreshRoute());
   // Without Realtime (blocked networks) a note on its own still notices someone joining: a quick
   // count now and then. Saving on its own while others work together would undo their changes.
   const memberCount = useRef<number | null>(null);
@@ -713,7 +724,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
       if (document.hidden) return;
       const { count, error } = await createClient().from("page_members").select("user_id", { count: "exact", head: true }).in("page_id", chain.split(","));
       if (error || count === null) return;
-      if (count > 0 && memberCount.current !== count) router.refresh();
+      if (count > 0 && memberCount.current !== count) refreshRoute();
       memberCount.current = count;
     };
     const timer = setInterval(() => void check(), 8000);
@@ -722,7 +733,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
       clearInterval(timer);
       window.removeEventListener("focus", check);
     };
-  }, [shared, chain, router]);
+  }, [shared, chain, refreshRoute]);
 
   // The others' title, tags and topics, live.
   useTableChanges<Pick<PageMeta, "title" | "tags" | "topics">>("pages", shared ? `id=eq.${page.id}` : null, (payload) => {
@@ -836,8 +847,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
   }, [resizeTitle]);
 
   useEffect(() => {
-    document.title = `${pageTitle(title, "note", locale)} · Blob`;
-  }, [title, locale]);
+    if (!pane) document.title = `${pageTitle(title, "note", locale)} · Blob`;
+  }, [title, locale, pane]);
 
   const changeTitle = (value: string) => {
     if (readOnly) return;
@@ -945,6 +956,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
         peers={collab.peers}
         role={role}
         members={members}
+        pane={pane}
         actions={
           <>
           <ViewMenu />
@@ -1049,7 +1061,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
             </div>
           </article>
 
-          {editor && (
+          {/* Two notes side by side leave no room for the outline beside the text. */}
+          {editor && !panes.side && (
             <div className="note-chrome pointer-events-none absolute inset-y-0 right-0 hidden xl:block">
               <div className="pointer-events-auto sticky top-[16vh] pr-4">
                 <PageOutline editor={editor} scroller={scroller} />

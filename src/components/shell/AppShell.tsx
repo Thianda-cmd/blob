@@ -11,6 +11,7 @@ import { useStartSync } from "@/lib/offline/useSync";
 import { useNotifications } from "@/lib/notify/useNotifications";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
+import { PanesLayout, PanesProvider } from "./Panes";
 import { PhoneTabs } from "./PhoneTabs";
 import { Sidebar } from "./Sidebar";
 
@@ -78,6 +79,7 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
 
   return (
     <ShellCtx.Provider value={shell}>
+      <PanesProvider>
       {/* safe-*: room for the iPhone's status bar, rounded corners and home indicator (zero elsewhere). */}
       <div className="safe-top safe-x flex h-dvh overflow-hidden bg-paper">
         <motion.aside
@@ -122,13 +124,14 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
               !sidebarOpen && "lg:ml-2",
             )}
           >
-            {children}
+            <PanesLayout>{children}</PanesLayout>
           </main>
           <PhoneTabs onMore={() => setMobileNav(true)} />
         </div>
       </div>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <BlobHelper />
+      </PanesProvider>
     </ShellCtx.Provider>
   );
 }
