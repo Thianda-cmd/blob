@@ -12,7 +12,11 @@ export async function loadLearnState() {
   // Topic rows and per-level rows ("<slug>@<level>") apart, so totals never count a level twice.
   const progress: Record<string, TopicProgress> = {};
   const levels: Record<string, TopicProgress> = {};
-  for (const row of (progressRes.data ?? []) as TopicProgress[]) (isLevelKey(row.topic) ? levels : progress)[row.topic] = row;
+  for (const row of (progressRes.data ?? []) as TopicProgress[]) {
+    // Rows of the French course (removed) stay in the table, but count no more.
+    if (row.topic.startsWith("fr:")) continue;
+    (isLevelKey(row.topic) ? levels : progress)[row.topic] = row;
+  }
   return { progress, levels, days: (daysRes.data ?? []) as LearnDay[] };
 }
 

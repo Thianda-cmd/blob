@@ -141,7 +141,7 @@ export function SessionEnd({
   badge?: ReactNode;
   children?: ReactNode;
   happy?: boolean;
-  /** What Blob wears (the béret in the French course). */
+  /** What Blob wears for this result (a scene's own hat). */
   accessory?: BlobAccessory;
 }) {
   const blob = useRef<BlobHandle>(null);

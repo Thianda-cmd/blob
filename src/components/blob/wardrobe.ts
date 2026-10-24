@@ -7,18 +7,13 @@ import type { BlobEyes, BlobHat, BlobNeck, BlobSkin } from "./look";
 export type BlobStats = {
   xp: number;
   lessons: number;
-  frenchLessons: number;
-  frenchUnits: number;
-  /** The French unit "Bon appétit!" is finished (the chef's hat). */
-  chef: boolean;
   bestStreak: number;
   activeDays: number;
 };
 
 export type Need =
   | { kind: "free" }
-  | { kind: "xp" | "lessons" | "frenchLessons" | "frenchUnits" | "bestStreak" | "activeDays"; n: number }
-  | { kind: "chef" }
+  | { kind: "xp" | "lessons" | "bestStreak" | "activeDays"; n: number }
   /** In this month (1-12); once worn, it stays. */
   | { kind: "month"; month: number }
   | { kind: "secret" };
@@ -40,10 +35,10 @@ export const WARDROBE: WardrobeItem[] = [
   { slot: "hat", id: "bow", need: free },
   { slot: "hat", id: "nightcap", need: free },
   { slot: "hat", id: "cap", need: { kind: "lessons", n: 1 } },
-  { slot: "hat", id: "beret", need: { kind: "frenchLessons", n: 1 } },
+  { slot: "hat", id: "beret", need: { kind: "lessons", n: 3 } },
   { slot: "hat", id: "propeller", need: { kind: "xp", n: 300 } },
   { slot: "hat", id: "viking", need: { kind: "bestStreak", n: 3 } },
-  { slot: "hat", id: "chef", need: { kind: "chef" } },
+  { slot: "hat", id: "chef", need: { kind: "xp", n: 600 } },
   { slot: "hat", id: "tophat", need: { kind: "bestStreak", n: 7 } },
   { slot: "hat", id: "wizard", need: { kind: "lessons", n: 25 } },
   { slot: "hat", id: "crown", need: { kind: "xp", n: 1000 } },
@@ -55,7 +50,7 @@ export const WARDROBE: WardrobeItem[] = [
   { slot: "eyes", id: "starglasses", need: { kind: "lessons", n: 10 } },
   { slot: "neck", id: "bowtie", need: free },
   { slot: "neck", id: "medal", need: { kind: "bestStreak", n: 5 } },
-  { slot: "neck", id: "scarf", need: { kind: "frenchUnits", n: 1 } },
+  { slot: "neck", id: "scarf", need: { kind: "activeDays", n: 7 } },
   { slot: "skin", id: "classic", need: free },
   { slot: "skin", id: "mint", need: free },
   { slot: "skin", id: "sky", need: free },
@@ -73,8 +68,6 @@ export function itemProgress(item: WardrobeItem, stats: BlobStats, secrets: stri
   switch (need.kind) {
     case "free":
       return { open: true, have: 1, goal: 1 };
-    case "chef":
-      return { open: stats.chef, have: stats.chef ? 1 : 0, goal: 1 };
     case "month": {
       const open = month === need.month || secrets.includes(item.id);
       return { open, have: open ? 1 : 0, goal: 1 };

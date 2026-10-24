@@ -1,5 +1,4 @@
 import type { BlobStats } from "@/components/blob/wardrobe";
-import { courseState } from "@/learn/french/course";
 import { loadLearnState } from "@/learn/server";
 
 /** The longest run of consecutive days with XP. */
@@ -16,20 +15,14 @@ function bestStreak(days: string[]) {
   return best;
 }
 
-/** What unlocks things in Blob's wardrobe: XP, lessons, French, streaks and days. */
+/** What unlocks things in Blob's wardrobe: XP, lessons, streaks and days. */
 export async function loadBlobStats(): Promise<BlobStats> {
   const { progress, days } = await loadLearnState();
-  const rows = Object.entries(progress);
-  const french = Object.fromEntries(rows.filter(([key]) => key.startsWith("fr:")));
-  const units = courseState(french).units;
-  const finished = (u: (typeof units)[number]) => u.done === u.unit.lessons.length;
+  const rows = Object.values(progress);
   const active = days.filter((d) => d.xp > 0).map((d) => d.day);
   return {
-    xp: rows.reduce((n, [, p]) => n + (p.xp ?? 0), 0),
-    lessons: rows.filter(([key, p]) => p.lesson_done && key !== "fr:practice").length,
-    frenchLessons: rows.filter(([key, p]) => key.startsWith("fr:") && key !== "fr:practice" && p.lesson_done).length,
-    frenchUnits: units.filter(finished).length,
-    chef: units.some((u) => u.unit.slug === "manger" && finished(u)),
+    xp: rows.reduce((n, p) => n + (p.xp ?? 0), 0),
+    lessons: rows.filter((p) => p.lesson_done).length,
     bestStreak: bestStreak(active),
     activeDays: active.length,
   };

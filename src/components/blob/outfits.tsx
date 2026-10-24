@@ -273,7 +273,7 @@ function GradCap({ swingRef }: { swingRef: Ref<SVGGElement> }) {
 /** Navy felt, with a faint light edge so it still shows on dark backgrounds. */
 const BERET = "#262b48";
 
-/** A French béret, worn at an angle (the French course). */
+/** A béret, worn at an angle. */
 function Beret() {
   return (
     <g transform={`rotate(-13 ${CX} 58)`}>

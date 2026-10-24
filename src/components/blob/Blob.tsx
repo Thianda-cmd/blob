@@ -22,7 +22,7 @@ export type BlobMood =
   | "proud"
   | "laughing";
 
-export type BlobAccessory = "cap" | "glasses" | "beret";
+export type BlobAccessory = "cap" | "glasses";
 
 export type BlobHandle = {
   /** Hop. `power` 0..1.5 */
@@ -61,7 +61,7 @@ type BlobProps = {
   look?: { x: number; y: number } | null;
   /** Move the mouth like it's speaking. Pair with a typing speech bubble. */
   talking?: boolean;
-  /** A scene's own hat or glasses (learning cap, French béret, reading glasses): wins over the look. */
+  /** A scene's own hat or glasses (learning cap, reading glasses): wins over the look. */
   accessory?: BlobAccessory | null;
   /** What to wear (each part given wins over the student's look; null = nothing there). */
   wear?: BlobLook;
@@ -198,7 +198,7 @@ export function Blob({
   const studentLook = useBlobLook();
   const base: BlobLook = plain ? {} : studentLook;
   const has = (k: keyof BlobLook) => !!lookProp && k in lookProp;
-  const hat: BlobHat | null = accessory === "cap" || accessory === "beret" ? accessory : has("hat") ? (lookProp!.hat ?? null) : (base.hat ?? null);
+  const hat: BlobHat | null = accessory === "cap" ? accessory : has("hat") ? (lookProp!.hat ?? null) : (base.hat ?? null);
   const eyes: BlobEyes | null = accessory === "glasses" ? "glasses" : has("eyes") ? (lookProp!.eyes ?? null) : (base.eyes ?? null);
   const neck: BlobNeck | null = has("neck") ? (lookProp!.neck ?? null) : (base.neck ?? null);
   const skin: BlobSkin = (has("skin") ? lookProp!.skin : base.skin) ?? "classic";

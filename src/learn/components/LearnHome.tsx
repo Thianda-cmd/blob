@@ -128,19 +128,6 @@ export function LearnHome({
                   </div>
                 </div>
               </div>
-              <Link
-                href="/learn/french"
-                className="group flex items-center gap-3 rounded-2xl border border-line bg-raised p-4 shadow-card transition-[transform,border-color] hover:-translate-y-0.5 hover:border-line-2"
-              >
-                <Blob size={64} mood="happy" accessory="beret" interactive={false} className="shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[13px] font-semibold">🇫🇷 {t.home.frenchTitle}</div>
-                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-2">{t.home.frenchText}</p>
-                  <span className="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-semibold text-blob-ink">
-                    {t.home.frenchCta} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </div>
-              </Link>
               {soon.length > 0 && (
                 <div className="rounded-2xl border border-dashed border-line-2 p-4 sm:col-span-2 xl:col-span-1">
                   <div className="text-[13px] font-semibold">{t.home.moreSoon}</div>
@@ -159,7 +146,6 @@ export function LearnHome({
  * The subject tabs. More subjects than fit scroll sideways: the open one is scrolled into view
  * and the edges fade where more tabs wait.
  */
-/** The learning center's subjects as tabs (the French course is one of them). */
 export function SubjectTabs({ subject }: { subject: string }) {
   const t = useMessages(learnText);
   const tt = useText();

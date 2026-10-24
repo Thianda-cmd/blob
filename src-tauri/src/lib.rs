@@ -505,7 +505,7 @@ pub fn run() {
       }
 
       // Started from a link: the start page goes there instead of the home page. Debug builds also
-      // take a path in BLOB_START (e.g. BLOB_START=/learn/french).
+      // take a path in BLOB_START (e.g. BLOB_START=/learn/maths).
       let start = app
         .deep_link()
         .get_current()
@@ -588,7 +588,7 @@ mod tests {
   fn app_links() {
     let t = |s: &str| link_target(&url(s)).map(|u| u.to_string());
     assert_eq!(t("org.bojes.blob://auth/confirm?token_hash=abc&type=email&next=%2Fhome").as_deref(), Some("https://blob.bojes.org/auth/confirm?token_hash=abc&type=email&next=%2Fhome"));
-    assert_eq!(t("https://blob.bojes.org/learn/french").as_deref(), Some("https://blob.bojes.org/learn/french"));
+    assert_eq!(t("https://blob.bojes.org/learn/maths").as_deref(), Some("https://blob.bojes.org/learn/maths"));
     assert_eq!(t("org.bojes.blob://p/123").as_deref(), Some("https://blob.bojes.org/p/123"));
     assert_eq!(t("org.bojes.blob://auth/app?code=abc&state=def").as_deref(), Some("https://blob.bojes.org/auth/app?code=abc&state=def"));
     // Unknown or odd pages land on home.

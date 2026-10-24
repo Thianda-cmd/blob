@@ -83,7 +83,7 @@ Rules around the site (`src-tauri/src/lib.rs`):
 - **Downloads** go to the Downloads folder under a safe, unused name; the folder opens afterwards.
 - **Printing**: macOS's webview ignores `window.print()`, so the bridge asks the app to print there.
   Windows and Linux print on their own.
-- **App links**: `org.bojes.blob://auth/confirm?…`, `org.bojes.blob://learn/french`, … open that
+- **App links**: `org.bojes.blob://auth/confirm?…`, `org.bojes.blob://learn/maths`, … open that
   page in the app.
   - Not `blob://`: browsers keep `blob:` URLs to themselves and never hand them to an app.
   - Only known page prefixes are allowed (`LINK_PATHS`); anything else lands on `/home`.
@@ -161,7 +161,7 @@ token visible to the site, a start-up race on macOS, and desktop-only calls in t
 ```bash
 npm run app                                     # the desktop app against blob.bojes.org
 BLOB_SITE=http://localhost:3000 npm run app     # against `npm run dev` (dev builds only)
-BLOB_START=/learn/french npm run app            # start on a page (dev builds only)
+BLOB_START=/learn/maths npm run app            # start on a page (dev builds only)
 npm run app:build                               # installers for this OS (src-tauri/target/release/bundle)
 cd src-tauri && cargo test                      # the shell's rules
 ```

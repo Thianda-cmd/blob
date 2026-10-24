@@ -272,7 +272,7 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
                 const needText =
                   need.kind === "free"
                     ? t.need.free
-                    : need.kind === "chef" || need.kind === "secret"
+                    : need.kind === "secret"
                       ? t.need[need.kind]
                       : need.kind === "month"
                         ? t.need.month(need.month)

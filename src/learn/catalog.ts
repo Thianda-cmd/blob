@@ -419,8 +419,6 @@ export type SubjectInfo = {
   title: Text;
   live: boolean;
   areas?: Area[];
-  /** A language course: its own page (/learn/<slug>) with a course path instead of topics. */
-  language?: boolean;
 };
 
 /** Subjects shown in the learning center. */
@@ -428,12 +426,11 @@ export const SUBJECTS: SubjectInfo[] = [
   { slug: "maths", title: tx("Maths", "Mathe"), live: true, areas: ["numbers", "algebra", "equations", "functions", "geometry", "stochastics", "applied"] },
   { slug: "chemistry", title: tx("Chemistry", "Chemie"), live: true, areas: ["matter", "atoms", "bonding", "reactions", "chemcalc", "organic"] },
   { slug: "biology", title: tx("Biology", "Biologie"), live: true, areas: ["cells", "botany", "zoology", "human", "genetics", "evolution", "ecology"] },
-  { slug: "french", title: tx("French", "Französisch"), live: true, language: true },
   { slug: "physics", title: tx("Physics", "Physik"), live: false },
   { slug: "english", title: tx("English", "Englisch"), live: false },
 ];
 
-export const isSubject = (s: string): s is Subject => SUBJECTS.some((x) => x.slug === s && x.live && !x.language);
+export const isSubject = (s: string): s is Subject => SUBJECTS.some((x) => x.slug === s && x.live);
 
 /** The subject the student worked on most recently (maths for a fresh start). */
 export function lastSubject(progress: Record<string, TopicProgress>): Subject {
