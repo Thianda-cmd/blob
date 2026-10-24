@@ -1,5 +1,6 @@
-// Starting points for a new note (the "Template" chip of an empty note): lesson notes, a lab report,
-// a vocabulary list, an essay plan, exam prep and a book report, in the reader's language. Built as
+// Starting points for a new note (the "Template" chip of an empty note): lesson notes, Cornell notes,
+// a lab report, a vocabulary list, an essay plan, a talk, exam prep and a book report, in the
+// reader's language. Built as
 // note content (Tiptap JSON) with the same blocks the editor makes.
 
 import type { JSONContent } from "@tiptap/core";
@@ -8,8 +9,8 @@ import { templatesText } from "@/i18n/messages/templates";
 import type { JNode } from "./doc";
 import { callout, doc, heading, paragraph, table } from "./tiptap";
 
-export type TemplateId = "lecture" | "lab" | "vocab" | "essay" | "exam" | "book";
-export const TEMPLATES: TemplateId[] = ["lecture", "lab", "vocab", "essay", "exam", "book"];
+export type TemplateId = "lecture" | "cornell" | "lab" | "vocab" | "essay" | "talk" | "exam" | "book";
+export const TEMPLATES: TemplateId[] = ["lecture", "cornell", "lab", "vocab", "essay", "talk", "exam", "book"];
 
 const line = (text: string) => [{ text }];
 const p = (text = "") => paragraph(text ? line(text) : []);
@@ -35,6 +36,18 @@ function build(id: TemplateId, t: (typeof templatesText)["en"]): JNode {
     case "lecture": {
       const x = t.lecture;
       return doc([p(x.date), h2(x.points), items("bulletList", [x.point, x.point, x.point]), h2(x.questions), todos([x.question]), callout("rule", [p(x.summary)])]);
+    }
+    case "cornell": {
+      // Cues on the left, notes on the right; the summary goes underneath once the lesson is over.
+      const x = t.cornell;
+      const row = () => [[], []];
+      const grid = table([x.columns.map(line), row(), row(), row(), row()], true);
+      // A narrow cue column; the notes column takes the rest.
+      for (const r of grid.content ?? []) {
+        const cue = r.content?.[0];
+        if (cue) cue.attrs = { ...cue.attrs, colwidth: [180] };
+      }
+      return doc([p(x.date), grid, h2(x.summary), italic(x.summaryHint)]);
     }
     case "lab": {
       const x = t.lab;
@@ -73,6 +86,21 @@ function build(id: TemplateId, t: (typeof templatesText)["en"]): JNode {
         items("orderedList", [x.argument, x.argument]),
         h2(x.conclusion),
         italic(x.conclusionHint),
+      ]);
+    }
+    case "talk": {
+      const x = t.talk;
+      return doc([
+        h2(x.topic),
+        italic(x.topicHint),
+        h2(x.outline),
+        items("orderedList", [x.intro, x.main, x.end]),
+        h2(x.sources),
+        items("bulletList", ["", ""]),
+        h2(x.cards),
+        callout("idea", [p(x.cardsHint)]),
+        h2(x.questions),
+        todos([x.question]),
       ]);
     }
     case "exam": {

@@ -2,7 +2,7 @@
 
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
-import { BookOpen, ClipboardList, FlaskConical, GraduationCap, Heading1, ImagePlus, Languages, Layers, LayoutTemplate, ListTodo, NotebookPen, Scale, type LucideIcon } from "lucide-react";
+import { BookOpen, ClipboardList, Columns2, FlaskConical, GraduationCap, Heading1, ImagePlus, Languages, Layers, LayoutTemplate, ListTodo, NotebookPen, Presentation, Scale, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Popover } from "@/components/ui/Menu";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -11,7 +11,16 @@ import { templatesText } from "@/i18n/messages/templates";
 import { TEMPLATES, templateDoc, type TemplateId } from "@/notes/templates";
 import { insertFlashcard } from "./blocks/Flashcard";
 
-const TEMPLATE_ICONS: Record<TemplateId, LucideIcon> = { lecture: NotebookPen, lab: FlaskConical, vocab: Languages, essay: Scale, exam: GraduationCap, book: BookOpen };
+const TEMPLATE_ICONS: Record<TemplateId, LucideIcon> = {
+  lecture: NotebookPen,
+  cornell: Columns2,
+  lab: FlaskConical,
+  vocab: Languages,
+  essay: Scale,
+  talk: Presentation,
+  exam: GraduationCap,
+  book: BookOpen,
+};
 const CHIP =
   "flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised/70 px-2 text-[12.5px] text-ink-3 [@media(hover:none)]:h-8 shadow-[0_1px_0_var(--line)] transition-[color,border,background,transform] duration-150 hover:border-line-2 hover:bg-raised hover:text-ink active:scale-[0.97]";
 
