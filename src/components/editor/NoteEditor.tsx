@@ -54,6 +54,7 @@ import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
 import { useNoteExport } from "./useNoteExport";
+import { useFindBar } from "./FindBar";
 import { ViewMenu } from "./ViewMenu";
 import { useViewPrefs } from "./viewPrefs";
 
@@ -937,6 +938,8 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
     beforeExport: async () => (collabOn ? flushTogether() : flush()),
   });
   const rootRef = useRef<HTMLDivElement>(null);
+  // Find and replace (Ctrl/Cmd+F while in this note).
+  const finder = useFindBar({ editor, root: rootRef, canEdit });
   const startPdf = exporter.pdf;
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -1010,7 +1013,12 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
         role={role}
         members={members}
         pane={pane}
-        menu={exporter.items}
+        menu={(close) => (
+          <>
+            {finder.menuItem(close)}
+            {exporter.items(close)}
+          </>
+        )}
         actions={
           <>
           <ViewMenu />
@@ -1041,6 +1049,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
       )}
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {finder.bar}
         <div className="relative min-h-full">
           <article className="px-4 pb-[28vh] pt-6 sm:px-12 sm:pt-[8vh]" style={{ "--note-text": `${view.textSize}px` } as CSSProperties}>
             <div className={cn("mx-auto w-full", view.width === "full" ? "max-w-none" : view.width === "wide" ? "max-w-[960px]" : "max-w-[720px]")}>

@@ -3270,3 +3270,15 @@ html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [ro
 .note-print :is(h1, h2, h3) {
   break-after: avoid;
 }
+
+/* Find and replace in a note (editor/find.ts, FindBar.tsx): every match, the current one stronger. */
+.prose-blob .blob-find-match {
+  background: color-mix(in oklab, var(--subject-sand) 30%, transparent);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.prose-blob .blob-find-match.is-current {
+  background: color-mix(in oklab, var(--subject-sand) 70%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--subject-sand) 85%, var(--ink));
+}

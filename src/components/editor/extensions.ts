@@ -13,6 +13,7 @@ import { FileBlock } from "./blocks/File";
 import { FileUploadPlaceholder } from "./blocks/fileUpload";
 import { BlockMoves } from "./blockMoves";
 import { BlobCaret } from "./caret";
+import { FindReplace } from "./find";
 import { ListKeys } from "./formatting";
 import { BlockIds } from "./blocks/ids";
 import { Plot } from "./blocks/Plot";
@@ -134,6 +135,7 @@ export function buildExtensions({
     PageLinkStatus.configure(pageStatus),
     Selection.configure({ className: "blob-selection" }),
     BlobCaret.configure({ enabled: () => boldCaret(), subscribe: viewPrefs.subscribe }),
+    FindReplace,
     BlobPlaceholder.configure({ text: () => text().placeholder, blocks: () => noteBlocksText[getLocale()] }),
     ImageUploadPlaceholder,
     SlashCommand.configure({

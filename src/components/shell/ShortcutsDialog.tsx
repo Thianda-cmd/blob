@@ -29,6 +29,8 @@ const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
       ["slash", [["/"]]],
       ["link", [["[", "["]]],
       ["save", [["mod", "S"]]],
+      ["find", [["mod", "F"]]],
+      ["replace", [["mod", "H"]]],
       ["pdf", [["mod", "P"]]],
       ["undo", [["mod", "Z"], ["mod", "shift", "Z"]]],
     ],
