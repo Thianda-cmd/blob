@@ -9,6 +9,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useOfflineDevice } from "@/lib/offline/useOfflineDevice";
 import { useStartSync } from "@/lib/offline/useSync";
 import { useNotifications } from "@/lib/notify/useNotifications";
+import { FileDrop } from "@/components/notes/FileDrop";
 import { useOpenedFiles } from "@/components/notes/useOpenedFiles";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
@@ -134,6 +135,7 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
       </div>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <BlobHelper />
+      <FileDrop />
       </PanesProvider>
     </ShellCtx.Provider>
   );

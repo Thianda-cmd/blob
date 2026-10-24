@@ -287,7 +287,11 @@ fn site_window<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str, url: WebviewU
     site = site().to_string(),
   );
 
-  let builder = WebviewWindowBuilder::new(app, label, url).initialization_script(script);
+  let builder = WebviewWindowBuilder::new(app, label, url)
+    .initialization_script(script)
+    // Files dragged onto the window go to the page (pictures into a note, Blob files to import),
+    // not to Tauri's own drop events; on Windows these would take every drop.
+    .disable_drag_drop_handler();
   // iPhone and iPad: service workers (the site's offline copies) need "app-bound domains"
   // (WKAppBoundDomains in Info.ios.plist lists the site, its files and localhost).
   #[cfg(target_os = "ios")]

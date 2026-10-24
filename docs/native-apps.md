@@ -109,6 +109,10 @@ Rules around the site (`src-tauri/src/lib.rs`):
   - Android: "Open with" from Files or Downloads, or a share, reaches `MainActivity.kt`, which reads
     the file in the background and hands it over through `window.BlobFiles` (the site's own pages
     only, like the widget's channel).
+- **Dropped files go to the page**: Tauri's own drop handler is off (`disable_drag_drop_handler`;
+  on Windows it would take every drop), so a note takes pictures and files dragged onto it, and
+  anything dropped elsewhere reaches the site's `FileDrop` (Blob files, Markdown and text are
+  imported).
 - **Window size and position** are remembered.
 - **Native behaviour per platform:**
   - **Android** (`gen/android/.../MainActivity.kt`):

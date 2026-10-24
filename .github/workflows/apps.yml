@@ -49,6 +49,7 @@ env:
     - **Two notes side by side**, and Ctrl+Shift+L (Ctrl+Tab in the app) switches to the last note; hold it for a list of recent pages.
     - **Diagrams without code**: mind maps, processes, timelines and more from simple rows, with a large view and downloads.
     - **Export and import**: PDF, Markdown and Blob files, and all your notes as one backup in Settings.
+    - **Drag and drop in the app**: pictures and files dragged onto a note land in it, and a Blob file, Markdown or text dropped anywhere else comes in as a new note.
     - **A text cursor you can see**: Blob draws its own thick cursor in the app on computers.
     - The French course has been removed.
 
@@ -58,6 +59,7 @@ env:
     - **Zwei Notizen nebeneinander**, und Strg+Umschalt+L (in der App Strg+Tab) wechselt zur letzten Notiz; gedrückt halten zeigt die zuletzt geöffneten Seiten.
     - **Diagramme ohne Code**: Mindmaps, Abläufe, Zeitstrahlen und mehr aus einfachen Zeilen, mit Großansicht und Download.
     - **Export und Import**: PDF, Markdown und Blob-Dateien, und in den Einstellungen alle Notizen als eine Sicherung.
+    - **Ziehen und Ablegen in der App**: Bilder und Dateien, die du auf eine Notiz ziehst, landen darin, und eine Blob-Datei, Markdown oder Text, die du woanders ablegst, wird eine neue Notiz.
     - **Ein Textcursor, den man sieht**: Blob zeichnet in der App am Computer einen eigenen, kräftigen Cursor.
     - Der Französischkurs wurde entfernt.
 
