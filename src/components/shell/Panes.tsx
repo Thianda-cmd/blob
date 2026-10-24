@@ -142,7 +142,8 @@ export function PanesProvider({ children }: { children: ReactNode }) {
   }, [side, recent, current, openBeside, t.split, mac]);
 
   // The switcher ----------------------------------------------------------------------------
-  const [switcher, setSwitcher] = useState<{ list: PageMeta[]; index: number; visible: boolean; sticky: boolean } | null>(null);
+  /** `held`: the key that keeps the list open (letting go of it opens the pick). */
+  const [switcher, setSwitcher] = useState<{ list: PageMeta[]; index: number; visible: boolean; sticky: boolean; held: "Meta" | "Control" } | null>(null);
   const switcherRef = useRef(switcher);
   useEffect(() => {
     switcherRef.current = switcher;
@@ -176,7 +177,8 @@ export function PanesProvider({ children }: { children: ReactNode }) {
         // The open page first: one press goes to the page before it.
         const here = list.findIndex((p) => p.id === current);
         if (here > 0) list.unshift(...list.splice(here, 1));
-        setSwitcher({ list, index: list.length > 1 ? 1 : 0, visible: false, sticky: false });
+        // Ctrl+Tab is held by Ctrl, also on a Mac; Cmd+Shift+L by Cmd.
+        setSwitcher({ list, index: list.length > 1 ? 1 : 0, visible: false, sticky: false, held: e.key === "Tab" || !mac ? "Control" : "Meta" });
         clearTimeout(showTimer);
         showTimer = setTimeout(() => setSwitcher((x) => (x ? { ...x, visible: true } : x)), 220);
         return;
@@ -210,7 +212,7 @@ export function PanesProvider({ children }: { children: ReactNode }) {
       const s = switcherRef.current;
       if (!s || s.sticky) return;
       // Letting go of Ctrl/Cmd opens what is picked.
-      if (e.key !== (mac ? "Meta" : "Control")) return;
+      if (e.key !== s.held) return;
       clearTimeout(showTimer);
       const target = s.list[s.index];
       // Two notes side by side and a quick press: jump between them.
