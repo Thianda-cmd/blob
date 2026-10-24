@@ -26,20 +26,24 @@ export function themeColor(name: string, fallback: string) {
 /** Where theme colours come from: the page as it is (themeColor), or the light theme (withLightTheme). */
 export type ColorSource = (name: string, fallback: string) => string;
 
-/** The light theme's colour variables, as globals.css sets them on :root (dark mode overrides them). */
+/**
+ * The light theme's colour variables, as globals.css sets them on :root (dark mode overrides them),
+ * with Tailwind's tokens built on them (":root, :host" inside @layer theme).
+ */
 function lightVariables(): [string, string][] {
   const out: [string, string][] = [];
-  for (const sheet of document.styleSheets) {
-    let rules: CSSRuleList;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue;
-    }
+  const read = (rules: CSSRuleList) => {
     for (const rule of rules) {
-      if (!(rule instanceof CSSStyleRule) || rule.selectorText !== ":root") continue;
-      for (const name of rule.style) if (name.startsWith("--")) out.push([name, rule.style.getPropertyValue(name)]);
+      if (rule instanceof CSSLayerBlockRule) read(rule.cssRules);
+      else if (rule instanceof CSSStyleRule && rule.selectorText.split(",").some((s) => s.trim() === ":root")) {
+        for (const name of rule.style) if (name.startsWith("--")) out.push([name, rule.style.getPropertyValue(name)]);
+      }
     }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      read(sheet.cssRules);
+    } catch {}
   }
   return out;
 }
