@@ -418,5 +418,7 @@ jobs:
             *) TAG="app-v$(jq -r .version src-tauri/tauri.conf.json)" ;;
           esac
           gh release upload "$TAG" android/*.apk --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit "$TAG" --target "$GITHUB_SHA" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          # The notes come from RELEASE_BODY every time: a draft left by an earlier, cancelled run
+          # keeps the notes it was made with otherwise.
+          gh release edit "$TAG" --target "$GITHUB_SHA" --draft=false --prerelease --notes "$RELEASE_BODY" --repo "$GITHUB_REPOSITORY"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
