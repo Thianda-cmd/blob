@@ -231,7 +231,8 @@
    Note editor (ProseMirror)
    --------------------------------------------------------------------------- */
 .prose-blob {
-  font-size: 16px;
+  /* The reader's text size (the note's view menu), 16px unless they changed it. */
+  font-size: var(--note-text, 16px);
   line-height: 1.72;
   color: var(--ink);
   caret-color: var(--blob);
@@ -361,6 +362,10 @@
 .prose-blob li::marker {
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+}
+/* Text written under an item (Shift+Enter in a list): a paragraph of the item, without a marker. */
+.prose-blob li > p + p {
+  margin-top: 0.15em;
 }
 
 /* To-do lists */
@@ -609,6 +614,95 @@
 /* Cursors & selection */
 .prose-blob .ProseMirror-gapcursor::after {
   border-top-color: var(--ink);
+}
+/* Blob's own text cursor (editor/caret.ts): the system one hides while it is drawn, except in
+   fields inside blocks (formulas, diagrams), which keep theirs. */
+.prose-blob.has-blob-caret,
+.prose-blob.has-blob-caret pre {
+  caret-color: transparent;
+}
+.prose-blob.has-blob-caret :is(input, textarea) {
+  caret-color: var(--blob);
+}
+.blob-caret {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: none;
+  width: 2.5px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--blob);
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, var(--blob) 40%, transparent);
+  pointer-events: none;
+  will-change: transform;
+}
+.blob-caret.is-gliding {
+  transition: transform 80ms var(--ease-out-soft);
+}
+.blob-caret.is-blinking {
+  animation: blob-caret-blink 1.1s steps(1, end) infinite;
+}
+@keyframes blob-caret-blink {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob-caret.is-gliding {
+    transition: none;
+  }
+  .blob-caret.is-blinking {
+    animation: none;
+  }
+}
+
+/* Focus mode (the note's view menu): while you type, everything around the text fades. */
+.note-chrome,
+.note-focus-fade {
+  transition: opacity 0.35s var(--ease-out-soft);
+}
+[data-focus-typing] .note-chrome,
+html[data-note-typing] .note-focus-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Small square tool buttons (text size steppers, list tools). */
+.blob-tool-btn {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border-radius: 0.5rem;
+  color: var(--ink-2);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.blob-tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+.blob-tool-btn:disabled {
+  opacity: 0.35;
+}
+.blob-tool-btn svg {
+  width: 15px;
+  height: 15px;
+}
+@media (hover: none) {
+  .blob-tool-btn {
+    width: 2rem;
+    height: 2rem;
+  }
 }
 .prose-blob.is-linking .blob-selection {
   background: color-mix(in oklab, var(--blob) 24%, transparent);

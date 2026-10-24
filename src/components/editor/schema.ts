@@ -7,6 +7,7 @@ import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import type { Locale } from "@/i18n/config";
 import { editorText } from "@/i18n/messages/editor";
+import { ListLook, TextStyle } from "./formatting";
 import {
   CalloutSpec,
   DeckEmbedSpec,
@@ -98,6 +99,8 @@ export function documentExtensions(blocks: NoteBlocks, readOnly = false): AnyExt
       trailingNode: readOnly ? false : { node: "paragraph" },
     }),
     PageRefTitle,
+    TextStyle,
+    ListLook,
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight,

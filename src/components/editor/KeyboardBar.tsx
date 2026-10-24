@@ -3,12 +3,16 @@
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bold, ExternalLink, Heading2, IndentDecrease, IndentIncrease, Italic, KeyboardOff, List, ListTodo, Plus, Redo2, Strikethrough, Undo2, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { ALargeSmall, Bold, ExternalLink, Heading2, IndentDecrease, IndentIncrease, Italic, KeyboardOff, List, ListTodo, Plus, Redo2, SlidersHorizontal, Strikethrough, Undo2, type LucideIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useKeyboard } from "@/components/ui/useKeyboard";
 import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
+import { noteToolsText } from "@/i18n/messages/noteTools";
 import { cn } from "@/lib/utils";
+import { sizeAtSelection, type TextColor } from "./formatting";
+import { ListPanel, useListState } from "./ListTools";
+import { TextColorPanel, TextSizePanel } from "./TextTools";
 
 /**
  * Phones and tablets: the editing tools on a bar right above the keyboard (like Notes or Notion on a
@@ -24,7 +28,11 @@ function openBlockMenu(editor: Editor) {
 
 export function KeyboardBar({ editor, onOpenLink }: { editor: Editor; onOpenLink: (href: string) => void }) {
   const t = useMessages(editorText).keyboard;
+  const tt = useMessages(noteToolsText);
   const keyboard = useKeyboard();
+  const list = useListState(editor);
+  /** The panel above the bar: text size and colour, or the list's options. */
+  const [panel, setPanel] = useState<"text" | "list" | null>(null);
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -39,9 +47,12 @@ export function KeyboardBar({ editor, onOpenLink }: { editor: Editor; onOpenLink
       href: e.isActive("link") ? ((e.getAttributes("link").href as string | undefined) ?? "") : "",
       canUndo: e.can().undo(),
       canRedo: e.can().redo(),
+      ownSize: (e.getAttributes("textStyle").size as number | null | undefined) ?? null,
+      color: (e.getAttributes("textStyle").color as TextColor | null | undefined) ?? null,
     }),
   });
   const show = keyboard.open && s.focused && editor.isEditable;
+  const open = show ? (panel === "list" && !list ? null : panel) : null;
   const item = editor.isActive("taskItem") ? "taskItem" : "listItem";
 
   return (
@@ -62,17 +73,40 @@ export function KeyboardBar({ editor, onOpenLink }: { editor: Editor; onOpenLink
             if ((e.target as HTMLElement).closest("button")) e.preventDefault();
           }}
         >
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                key={open}
+                initial={{ y: 8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 6, opacity: 0, transition: { duration: 0.1 } }}
+                transition={{ type: "spring", stiffness: 560, damping: 40 }}
+                className="absolute bottom-full left-1.5 mb-1.5 max-h-[45vh] overflow-y-auto rounded-xl border border-line bg-raised shadow-pop"
+              >
+                {open === "text" ? (
+                  <div className="divide-y divide-line">
+                    <TextSizePanel editor={editor} size={sizeAtSelection(editor)} own={s.ownSize} typing={false} />
+                    <TextColorPanel editor={editor} color={s.color} />
+                  </div>
+                ) : (
+                  list && <ListPanel editor={editor} state={list} typing={false} />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div className="flex h-11 items-center gap-0.5 overflow-x-auto px-1.5 [scrollbar-width:none]">
             <Tool icon={Plus} label={t.insert} onClick={() => openBlockMenu(editor)} strong />
             <Sep />
             <Tool icon={Bold} label={t.bold} on={s.bold} onClick={() => editor.chain().focus().toggleBold().run()} />
             <Tool icon={Italic} label={t.italic} on={s.italic} onClick={() => editor.chain().focus().toggleItalic().run()} />
             <Tool icon={Strikethrough} label={t.strike} on={s.strike} onClick={() => editor.chain().focus().toggleStrike().run()} />
+            <Tool icon={ALargeSmall} label={tt.size.label} on={open === "text" || !!s.ownSize || !!s.color} onClick={() => setPanel((p) => (p === "text" ? null : "text"))} />
             <Tool icon={Heading2} label={t.heading} on={s.heading} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
             <Tool icon={List} label={t.bullet} on={s.bullet} onClick={() => editor.chain().focus().toggleBulletList().run()} />
             <Tool icon={ListTodo} label={t.todo} on={s.todo} onClick={() => editor.chain().focus().toggleTaskList().run()} />
             {s.inList && (
               <>
+                <Tool icon={SlidersHorizontal} label={tt.list.label} on={open === "list"} onClick={() => setPanel((p) => (p === "list" ? null : "list"))} />
                 <Tool icon={IndentDecrease} label={t.outdent} onClick={() => editor.chain().focus().liftListItem(item).run()} />
                 <Tool icon={IndentIncrease} label={t.indent} onClick={() => editor.chain().focus().sinkListItem(item).run()} />
               </>

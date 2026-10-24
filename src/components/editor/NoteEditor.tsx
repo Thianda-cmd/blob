@@ -6,7 +6,7 @@ import { getVersion, sendableSteps } from "prosemirror-collab";
 import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
 import { blob } from "@/components/blob/bus";
 import { useDueCards } from "@/components/notes/useDueCards";
 import { PageTopBar } from "@/components/page/PageTopBar";
@@ -27,6 +27,7 @@ import { uploadNoteFiles } from "./blocks/fileUpload";
 import { TableMenu } from "./blocks/Table";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { KeyboardBar } from "./KeyboardBar";
+import { ListMenu } from "./ListTools";
 import { localChange, sliceOf, type LocalChange } from "./collab/conflict";
 import { useNoteCollab } from "./collab/useNoteCollab";
 import { buildExtensions } from "./extensions";
@@ -47,6 +48,8 @@ import { plainDoc, plainTextOf } from "./schema";
 import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
+import { ViewMenu } from "./ViewMenu";
+import { useViewPrefs } from "./viewPrefs";
 
 type NotePatch = { title: string; content: JSONContent; plain_text: string; links: string[] };
 
@@ -886,6 +889,43 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
 
   const blocks = useMemo<NoteBlocks>(() => ({ pageId: page.id, canEdit }), [page.id, canEdit]);
 
+  // How notes look on this device (the view menu), and focus mode: everything around the text
+  // fades while you type, and comes back when the mouse moves.
+  const view = useViewPrefs();
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!view.focus || !editor) return;
+    const dom = editor.view.dom;
+    let from: { x: number; y: number } | null = null;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key === "Escape") return;
+      from = null;
+      setTyping(true);
+    };
+    const onMove = (e: MouseEvent) => {
+      from ??= { x: e.clientX, y: e.clientY };
+      if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 12) setTyping(false);
+    };
+    const stop = () => setTyping(false);
+    dom.addEventListener("keydown", onKey);
+    dom.addEventListener("blur", stop);
+    window.addEventListener("mousemove", onMove);
+    return () => {
+      dom.removeEventListener("keydown", onKey);
+      dom.removeEventListener("blur", stop);
+      window.removeEventListener("mousemove", onMove);
+      setTyping(false);
+    };
+  }, [view.focus, editor]);
+  const fading = view.focus && typing;
+  useEffect(() => {
+    if (!fading) return;
+    document.documentElement.dataset.noteTyping = "";
+    return () => {
+      delete document.documentElement.dataset.noteTyping;
+    };
+  }, [fading]);
+
   const notice = readOnly
     ? { icon: <Eye className="size-3.5 shrink-0" />, text: t.together.viewOnly, tone: "calm" as const }
     : reloading || collab.status === "resyncing"
@@ -897,7 +937,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
           : null;
 
   return (
-    <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture}>
+    <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture} data-focus-typing={fading ? "" : undefined}>
+      <div className="note-chrome">
       <PageTopBar
         pageId={page.id}
         saveState={readOnly ? "saved" : saveState}
@@ -905,6 +946,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
         role={role}
         members={members}
         actions={
+          <>
+          <ViewMenu />
           <StudyMenu
             pageId={page.id}
             // The study mode, search and backlinks read the stored note: store the latest first.
@@ -914,8 +957,10 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
             }}
             due={due ?? 0}
           />
+          </>
         }
       />
+      </div>
       {notice && (
         <p
           role="status"
@@ -931,8 +976,8 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="relative min-h-full">
-          <article className="px-4 pb-[28vh] pt-6 sm:px-12 sm:pt-[8vh]">
-            <div className="mx-auto w-full max-w-[720px]">
+          <article className="px-4 pb-[28vh] pt-6 sm:px-12 sm:pt-[8vh]" style={{ "--note-text": `${view.textSize}px` } as CSSProperties}>
+            <div className={cn("mx-auto w-full", view.width === "full" ? "max-w-none" : view.width === "wide" ? "max-w-[960px]" : "max-w-[720px]")}>
               <header className="group/header">
                 <div className={cn("flex items-end", icon ? "mb-2" : "mb-1.5")}>
                   <IconPicker icon={icon} onChange={changeIcon} />
@@ -949,7 +994,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
                   spellCheck
                   className="block w-full resize-none overflow-hidden bg-transparent font-display text-[34px] font-bold leading-[1.15] tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/45 sm:text-[40px]"
                 />
-                <div className="mt-3 space-y-2">
+                <div className="note-chrome mt-3 space-y-2">
                   <NoteMeta page={meta ?? page} editor={editor} />
                   <KnowledgeChips page={meta ?? page} canEdit={!readOnly} />
                 </div>
@@ -989,7 +1034,9 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
                   )}
                 </div>
               </NoteBlocksProvider>
-              <NoteConnections page={meta ?? page} title={title} />
+              <div className="note-chrome">
+                <NoteConnections page={meta ?? page} title={title} />
+              </div>
               <div
                 aria-hidden
                 className="h-[18vh] cursor-text"
@@ -1003,7 +1050,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
           </article>
 
           {editor && (
-            <div className="pointer-events-none absolute inset-y-0 right-0 hidden xl:block">
+            <div className="note-chrome pointer-events-none absolute inset-y-0 right-0 hidden xl:block">
               <div className="pointer-events-auto sticky top-[16vh] pr-4">
                 <PageOutline editor={editor} scroller={scroller} />
               </div>
@@ -1015,6 +1062,7 @@ function NoteEditorReady({ page, role = "owner", members = [] }: { page: Page; r
       {editor && canEdit && !touch && <BubbleToolbar editor={editor} />}
       {editor && canEdit && touch && <KeyboardBar editor={editor} onOpenLink={(href) => live.current?.openHref(href)} />}
       {editor && canEdit && <TableMenu editor={editor} />}
+      {editor && canEdit && !touch && <ListMenu editor={editor} />}
       <SlashMenu controller={slash} />
       <PageRefMenu controller={refs} />
       <input

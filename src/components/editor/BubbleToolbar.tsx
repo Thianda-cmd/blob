@@ -32,7 +32,10 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
+import { noteToolsText } from "@/i18n/messages/noteTools";
 import { cn } from "@/lib/utils";
+import { colorVar, sizeAtSelection, type TextColor } from "./formatting";
+import { TextColorPanel, TextSizePanel } from "./TextTools";
 
 const BUBBLE_KEY = "blobBubbleMenu";
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -80,10 +83,14 @@ export function normalizeHref(raw: string) {
 /** Formatting bubble that appears over a text selection. */
 export function BubbleToolbar({ editor }: { editor: Editor }) {
   const t = useMessages(editorText).bubble;
+  const tt = useMessages(noteToolsText);
   const mod = isMac ? "⌘" : t.ctrl;
   const shift = isMac ? "⇧" : t.shift;
   const [mode, setMode] = useState<"tools" | "link">("tools");
-  const [blocksOpen, setBlocksOpen] = useState(false);
+  /** The list unfolded under the tools: "Turn into", text size or text colour. */
+  const [panel, setPanel] = useState<"blocks" | "size" | "color" | null>(null);
+  const blocksOpen = panel === "blocks";
+  const togglePanel = (p: "blocks" | "size" | "color") => setPanel((open) => (open === p ? null : p));
   const pointerDown = useRef(false);
 
   const s = useEditorState({
@@ -98,6 +105,10 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
       link: e.isActive("link"),
       href: (e.getAttributes("link").href as string | undefined) ?? "",
       block: currentBlock(e),
+      // Read from the page only while there is a selection (the bubble is hidden otherwise).
+      size: e.state.selection.empty ? 16 : sizeAtSelection(e),
+      ownSize: (e.getAttributes("textStyle").size as number | null | undefined) ?? null,
+      color: (e.getAttributes("textStyle").color as TextColor | null | undefined) ?? null,
     }),
   });
 
@@ -115,7 +126,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
       shift: { padding: 12 },
       onHide: () => {
         setMode("tools");
-        setBlocksOpen(false);
+        setPanel(null);
       },
     }),
     [],
@@ -150,12 +161,12 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || editor.state.selection.empty) return;
       e.preventDefault();
-      if (blocksOpen) setBlocksOpen(false);
+      if (panel) setPanel(null);
       else editor.view.dispatch(editor.state.tr.setMeta(BUBBLE_KEY, "hide"));
     };
     dom.addEventListener("keydown", onKey);
     return () => dom.removeEventListener("keydown", onKey);
-  }, [editor, blocksOpen]);
+  }, [editor, panel]);
 
   return (
     <BubbleMenu editor={editor} pluginKey={BUBBLE_KEY} updateDelay={120} shouldShow={shouldShow} options={options} className="z-40">
@@ -180,7 +191,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
           <div className="flex items-center gap-0.5 rounded-xl border border-line bg-raised p-1 text-ink-2 shadow-pop">
             <button
               type="button"
-              onClick={() => setBlocksOpen((o) => !o)}
+              onClick={() => togglePanel("blocks")}
               className={cn(
                 "flex h-7 items-center gap-1 rounded-lg pl-2 pr-1.5 text-[12.5px] font-medium transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-8",
                 blocksOpen && "bg-hover text-ink",
@@ -215,6 +226,35 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
               <Sigma />
             </Tool>
             <Divider />
+            <button
+              type="button"
+              onClick={() => togglePanel("size")}
+              className={cn(
+                "flex h-7 min-w-8 items-center justify-center gap-0.5 rounded-lg px-1.5 text-[12.5px] font-medium tabular-nums transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-8",
+                (panel === "size" || s?.ownSize) && "bg-blob-soft text-blob-ink",
+              )}
+              aria-haspopup="dialog"
+              aria-expanded={panel === "size"}
+              aria-label={`${tt.size.label}: ${tt.size.px(s?.size ?? 16)}`}
+              title={`${tt.size.label}  ${tt.size.keys(`${mod}${shift},`, `${mod}${shift}.`)}`}
+            >
+              {s?.size ?? 16}
+            </button>
+            <button
+              type="button"
+              onClick={() => togglePanel("color")}
+              className={cn("grid size-7 place-items-center rounded-lg transition-colors hover:bg-hover [@media(hover:none)]:size-8", panel === "color" && "bg-hover")}
+              aria-haspopup="dialog"
+              aria-expanded={panel === "color"}
+              aria-label={tt.color.label}
+              title={tt.color.label}
+            >
+              <span className="relative text-[14px] font-semibold leading-none text-ink">
+                A
+                <span className="absolute inset-x-[-1px] -bottom-[3px] h-[3px] rounded-full" style={{ background: s?.color ? colorVar(s.color) : "var(--ink-3)" }} />
+              </span>
+            </button>
+            <Divider />
             <Tool label={s?.link ? t.editLink : t.addLink} active={s?.link} onClick={() => setMode("link")}>
               <Link2 />
             </Tool>
@@ -222,6 +262,21 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
         )}
 
         <AnimatePresence>
+          {(panel === "size" || panel === "color") && mode === "tools" && (
+            <motion.div
+              key={panel}
+              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -2, scale: 0.98, transition: { duration: 0.1 } }}
+              transition={{ type: "spring", stiffness: 600, damping: 32 }}
+              style={{ transformOrigin: "top right" }}
+              className="absolute right-0 top-full z-10 mt-1.5 rounded-xl border border-line bg-raised shadow-pop"
+              role="dialog"
+              aria-label={panel === "size" ? tt.size.label : tt.color.label}
+            >
+              {panel === "size" ? <TextSizePanel editor={editor} size={s?.size ?? 16} own={s?.ownSize ?? null} /> : <TextColorPanel editor={editor} color={s?.color ?? null} />}
+            </motion.div>
+          )}
           {blocksOpen && mode === "tools" && (
             <motion.div
               initial={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -243,7 +298,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
                     role="menuitem"
                     onClick={() => {
                       b.run(editor);
-                      setBlocksOpen(false);
+                      setPanel(null);
                     }}
                     className={cn(
                       "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",

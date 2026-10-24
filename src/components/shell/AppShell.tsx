@@ -84,7 +84,7 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
           initial={false}
           animate={{ width: sidebarOpen ? 256 : 0, opacity: sidebarOpen ? 1 : 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 40 }}
-          className="hidden shrink-0 overflow-hidden lg:block"
+          className="note-focus-fade hidden shrink-0 overflow-hidden lg:block"
         >
           <div className="h-full w-[256px]">
             <Sidebar onCollapse={toggleSidebar} onSearch={() => setSearchOpen(true)} isAdmin={isAdmin} />

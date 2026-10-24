@@ -11,6 +11,8 @@ import { DeckEmbed } from "./blocks/DeckEmbed";
 import { Diagram } from "./blocks/Diagram";
 import { FileBlock } from "./blocks/File";
 import { FileUploadPlaceholder } from "./blocks/fileUpload";
+import { BlobCaret } from "./caret";
+import { ListKeys } from "./formatting";
 import { BlockIds } from "./blocks/ids";
 import { Plot } from "./blocks/Plot";
 import { Sketch } from "./blocks/Sketch";
@@ -25,6 +27,7 @@ import { PageRefSuggest, type PageRefItem } from "./knowledge/PageRef";
 import { documentExtensions } from "./schema";
 import { SlashCommand, type SlashController } from "./slash/SlashCommand";
 import { suggestionOpen } from "./suggestKeys";
+import { boldCaret, viewPrefs } from "./viewPrefs";
 import { filterSlashItems, type SlashItem } from "./slash/items";
 
 /** True when the caret is in the very first line of text, with nothing (e.g. an image) above it. */
@@ -123,10 +126,12 @@ export function buildExtensions({
     ),
     getLocale() === "de" ? Typography.configure(GERMAN_QUOTES) : Typography,
     ToggleReveal,
+    ListKeys,
     FileUploadPlaceholder,
     BlockIds,
     PageLinkStatus.configure(pageStatus),
     Selection.configure({ className: "blob-selection" }),
+    BlobCaret.configure({ enabled: () => boldCaret(), subscribe: viewPrefs.subscribe }),
     BlobPlaceholder.configure({ text: () => text().placeholder, blocks: () => noteBlocksText[getLocale()] }),
     ImageUploadPlaceholder,
     SlashCommand.configure({

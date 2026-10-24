@@ -1,0 +1,123 @@
+import { defineMessages } from "../define";
+
+/**
+ * The note's own tools around the text: text sizes and colours, list options, the view menu
+ * (text size, width, the text cursor, focus mode).
+ */
+export const noteToolsText = defineMessages({
+  en: {
+    size: {
+      label: "Text size",
+      /** The size shown on the button (px). */
+      px: (n: number) => `${n} px`,
+      smaller: "Smaller",
+      larger: "Larger",
+      custom: "Size in px",
+      apply: "Set",
+      reset: "Normal size",
+      keys: (smaller: string, larger: string) => `${smaller} smaller · ${larger} larger`,
+    },
+    color: {
+      label: "Text colour",
+      reset: "Normal colour",
+      names: { "ink-3": "Grey", blob: "Purple", sky: "Blue", teal: "Teal", moss: "Green", sand: "Yellow", clay: "Orange", rose: "Red", plum: "Plum" },
+    },
+    list: {
+      label: "List options",
+      kind: "List",
+      kinds: { bulletList: "Bullets", orderedList: "Numbers", taskList: "To-do" },
+      style: "Style",
+      auto: "Auto",
+      markers: {
+        disc: "Dot",
+        circle: "Circle",
+        square: "Square",
+        dash: "Dash",
+        arrow: "Arrow",
+        check: "Tick",
+        "1": "1, 2, 3",
+        a: "a, b, c",
+        A: "A, B, C",
+        i: "i, ii, iii",
+        I: "I, II, III",
+      } as Record<string, string>,
+      start: "Start at",
+      size: "List size",
+      textUnder: "Text under this item",
+      continueBelow: "Continue below the list",
+      indent: "Indent",
+      outdent: "Outdent",
+    },
+    view: {
+      label: "View",
+      intro: "How notes look on this device.",
+      textSize: "Text size",
+      width: "Width",
+      widths: { normal: "Normal", wide: "Wide", full: "Full" },
+      caret: "Text cursor",
+      carets: { auto: "Auto", bold: "Bold", system: "System" },
+      caretHint: "Bold draws a thick, clearly visible cursor that glides as you type. Auto uses it in the Blob app on computers.",
+      focus: "Focus mode",
+      focusHint: "Hides everything but the text while you type.",
+      reset: "Reset",
+    },
+  },
+  de: {
+    size: {
+      label: "Textgröße",
+      px: (n) => `${n} px`,
+      smaller: "Kleiner",
+      larger: "Größer",
+      custom: "Größe in px",
+      apply: "Setzen",
+      reset: "Normale Größe",
+      keys: (smaller, larger) => `${smaller} kleiner · ${larger} größer`,
+    },
+    color: {
+      label: "Textfarbe",
+      reset: "Normale Farbe",
+      names: { "ink-3": "Grau", blob: "Lila", sky: "Blau", teal: "Türkis", moss: "Grün", sand: "Gelb", clay: "Orange", rose: "Rot", plum: "Pflaume" },
+    },
+    list: {
+      label: "Listenoptionen",
+      kind: "Liste",
+      kinds: { bulletList: "Punkte", orderedList: "Nummern", taskList: "To-do" },
+      style: "Stil",
+      auto: "Auto",
+      markers: {
+        disc: "Punkt",
+        circle: "Kreis",
+        square: "Quadrat",
+        dash: "Strich",
+        arrow: "Pfeil",
+        check: "Haken",
+        "1": "1, 2, 3",
+        a: "a, b, c",
+        A: "A, B, C",
+        i: "i, ii, iii",
+        I: "I, II, III",
+      },
+      start: "Beginnt bei",
+      size: "Listengröße",
+      textUnder: "Text unter diesem Punkt",
+      continueBelow: "Unter der Liste weiterschreiben",
+      indent: "Einrücken",
+      outdent: "Ausrücken",
+    },
+    view: {
+      label: "Ansicht",
+      intro: "So sehen Notizen auf diesem Gerät aus.",
+      textSize: "Textgröße",
+      width: "Breite",
+      widths: { normal: "Normal", wide: "Breit", full: "Voll" },
+      caret: "Textcursor",
+      carets: { auto: "Auto", bold: "Kräftig", system: "System" },
+      caretHint: "Kräftig zeichnet einen dicken, gut sichtbaren Cursor, der beim Tippen mitgleitet. Auto nutzt ihn in der Blob-App am Computer.",
+      focus: "Fokusmodus",
+      focusHint: "Blendet beim Tippen alles außer dem Text aus.",
+      reset: "Zurücksetzen",
+    },
+  },
+});
+
+export type NoteToolsText = (typeof noteToolsText)["en"];
