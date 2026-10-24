@@ -51,6 +51,9 @@ const WORDS = {
   },
 };
 
+/** What the exports write for Blob's own blocks (also the Word export, docx.ts). */
+export const exportWords = (locale: Locale) => WORDS[locale];
+
 /** Callout labels in both languages (and GitHub's alerts), for reading them back. */
 const CALLOUT_LABELS = new Map<string, CalloutKind>([
   ...(["en", "de"] as const).flatMap((l) => Object.entries(WORDS[l].callout).map(([kind, label]) => [label.toLowerCase(), kind as CalloutKind] as [string, CalloutKind])),

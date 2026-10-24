@@ -1,6 +1,6 @@
 import { defineMessages } from "../define";
 
-/** Exporting notes (PDF, Blob file, Markdown, text) and bringing files in. */
+/** Exporting notes (PDF, Word, Blob file, Markdown, text) and bringing files in. */
 export const transferText = defineMessages({
   en: {
     export: {
@@ -8,6 +8,9 @@ export const transferText = defineMessages({
       pdf: "Save as PDF",
       blob: "Blob file (.blob)",
       blobHint: "Everything, to open again in Blob",
+      word: "Word (.docx)",
+      wordHint: "To hand in, or to keep working on in Word",
+      wordDone: "Saved as a Word file. Formulas are Word equations you can still edit.",
       markdown: "Markdown (.md)",
       text: "Plain text (.txt)",
       copyMarkdown: "Copy as Markdown",
@@ -55,6 +58,9 @@ export const transferText = defineMessages({
       pdf: "Als PDF speichern",
       blob: "Blob-Datei (.blob)",
       blobHint: "Alles, um es in Blob wieder zu öffnen",
+      word: "Word (.docx)",
+      wordHint: "Zum Abgeben oder zum Weiterarbeiten in Word",
+      wordDone: "Als Word-Datei gespeichert. Formeln sind Word-Formeln, die du noch bearbeiten kannst.",
       markdown: "Markdown (.md)",
       text: "Reiner Text (.txt)",
       copyMarkdown: "Als Markdown kopieren",

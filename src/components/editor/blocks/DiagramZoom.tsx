@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
-import { themeColor } from "./useDark";
+import { themeColor, type ColorSource } from "./useDark";
 
 // A diagram opened large (zoom and pan), and diagrams as files: SVG and PNG.
 
@@ -27,8 +27,8 @@ function cssColor(expr: string, ctx: CanvasRenderingContext2D): string | null {
 }
 
 /** The page's colours written into CSS, so the drawing looks the same outside the page. */
-function resolveCss(css: string, ctx: CanvasRenderingContext2D): string {
-  let out = css.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^)]+))?\)/g, (m, name: string, fallback?: string) => themeColor(name, fallback?.trim() ?? m));
+function resolveCss(css: string, ctx: CanvasRenderingContext2D, color: ColorSource): string {
+  let out = css.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^)]+))?\)/g, (m, name: string, fallback?: string) => color(name, fallback?.trim() ?? m));
   // color-mix() has brackets inside: find each one's end by counting them.
   for (let at = out.indexOf("color-mix("); at >= 0; at = out.indexOf("color-mix(", at + 1)) {
     let depth = 0;
@@ -38,8 +38,8 @@ function resolveCss(css: string, ctx: CanvasRenderingContext2D): string {
       else if (out[end] === ")" && --depth === 0) break;
     }
     const expr = out.slice(at, end + 1);
-    const color = cssColor(expr, ctx);
-    if (color) out = out.slice(0, at) + color + out.slice(end + 1);
+    const resolved = cssColor(expr, ctx);
+    if (resolved) out = out.slice(0, at) + resolved + out.slice(end + 1);
   }
   return out;
 }
@@ -91,8 +91,9 @@ async function embeddedFont(family: string): Promise<string> {
 /**
  * The drawing as a file of its own: real colours instead of the page's variables, the page's
  * background behind it (dark diagrams stay readable on white paper), its font inside, its own size.
+ * `color`: where the colours come from (the light theme's for the Word export).
  */
-export async function standaloneSvg(svg: string): Promise<{ text: string; w: number; h: number } | null> {
+export async function standaloneSvg(svg: string, color: ColorSource = themeColor): Promise<{ text: string; w: number; h: number } | null> {
   const root = new DOMParser().parseFromString(svg, "text/html").body.querySelector("svg");
   if (!root) return null;
   const ctx = document.createElement("canvas").getContext("2d");
@@ -104,7 +105,7 @@ export async function standaloneSvg(svg: string): Promise<{ text: string; w: num
   root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   const styles = root.querySelectorAll("style");
   styles.forEach((s) => {
-    s.textContent = resolveCss(s.textContent ?? "", ctx);
+    s.textContent = resolveCss(s.textContent ?? "", ctx, color);
   });
   const family = (styles[0]?.textContent ?? "").match(/font-family:\s*([^;}]+)/)?.[1] ?? getComputedStyle(document.body).fontFamily;
   const font = await embeddedFont(family);
@@ -112,7 +113,7 @@ export async function standaloneSvg(svg: string): Promise<{ text: string; w: num
   for (const el of root.querySelectorAll("[style], [fill], [stroke]")) {
     for (const name of ["style", "fill", "stroke"]) {
       const v = el.getAttribute(name);
-      if (v && /var\(|color-mix\(/.test(v)) el.setAttribute(name, resolveCss(v, ctx));
+      if (v && /var\(|color-mix\(/.test(v)) el.setAttribute(name, resolveCss(v, ctx, color));
     }
   }
   const bg = root.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -120,13 +121,13 @@ export async function standaloneSvg(svg: string): Promise<{ text: string; w: num
   bg.setAttribute("y", String(y));
   bg.setAttribute("width", String(w));
   bg.setAttribute("height", String(h));
-  bg.setAttribute("fill", themeColor("--raised", "#ffffff"));
+  bg.setAttribute("fill", color("--raised", "#ffffff"));
   root.insertBefore(bg, root.firstChild);
   return { text: `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(root)}`, w, h };
 }
 
 /** The file drawn on a canvas, twice as sharp as on screen (at most 4096 pixels a side). */
-async function svgToPng(file: { text: string; w: number; h: number }): Promise<Blob> {
+export async function svgToPng(file: { text: string; w: number; h: number }): Promise<Blob> {
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(file.text)}`;
   await img.decode();

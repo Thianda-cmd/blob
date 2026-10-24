@@ -14,7 +14,7 @@ import { DiagramGallery, DiagramRows, KIND_ICONS, fromDraft, toDraft, type Draft
 import { DIAGRAM_KINDS, SECTION_VARS, convertModel, hasContent, modelFromMermaid, readModel, starterModel, toMermaid, type DiagramKind, type DiagramModel } from "./diagramModel";
 import { DiagramViewer, diagramFileName, downloadDiagram, type DiagramFormat } from "./DiagramZoom";
 import { caretAfter, openEditorAt } from "./insert";
-import { themeColor, useDark } from "./useDark";
+import { themeColor, useDark, type ColorSource } from "./useDark";
 import { DiagramSpec } from "./schema";
 
 type Starter = keyof NoteBlocksText["diagram"]["starters"];
@@ -63,8 +63,8 @@ const SECTION_CSS = [
  * Mermaid's look, from Blob's theme (it needs real colours, not CSS variables). `plain`: labels as
  * SVG text only (no HTML inside), for turning a drawing into a PNG.
  */
-function mermaidConfig(dark: boolean, plain = false) {
-  const c = (name: string, fallback: string) => themeColor(name, fallback);
+function mermaidConfig(dark: boolean, plain = false, color: ColorSource = themeColor) {
+  const c = color;
   const raised = c("--raised", dark ? "#22221f" : "#ffffff");
   const ink = c("--ink", dark ? "#edebe4" : "#1c1b18");
   const ink3 = c("--ink-3", "#8b8981");
@@ -147,10 +147,10 @@ let queue: Promise<unknown> = Promise.resolve();
 let counter = 0;
 
 /** Draw a diagram (one at a time: Mermaid's settings are global). Mermaid itself loads on first use. */
-function renderDiagram(src: string, dark: boolean, plain = false): Promise<Rendered> {
+function renderDiagram(src: string, dark: boolean, plain = false, color?: ColorSource): Promise<Rendered> {
   const run = async (): Promise<Rendered> => {
     const mermaid = (await import("mermaid")).default;
-    mermaid.initialize(mermaidConfig(dark, plain));
+    mermaid.initialize(mermaidConfig(dark, plain, color));
     const valid = await mermaid.parse(src, { suppressErrors: true });
     if (!valid) return { svg: null, error: true };
     const id = `blob-mermaid-${++counter}`;
@@ -169,6 +169,9 @@ function renderDiagram(src: string, dark: boolean, plain = false): Promise<Rende
   queue = next.catch(() => undefined);
   return next;
 }
+
+/** A drawing of `src` in the light theme with its labels as SVG text (the Word export, in withLightTheme). */
+export const plainDiagramSvg = (src: string, color: ColorSource) => renderDiagram(src, false, true, color).then((r) => r.svg);
 
 /** The latest drawing of `src` (the last good one stays while a newer one is wrong or loading). */
 function useDiagram(src: string, delay: number) {

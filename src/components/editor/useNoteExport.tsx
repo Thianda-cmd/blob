@@ -1,7 +1,7 @@
 "use client";
 
 import type { Editor } from "@tiptap/core";
-import { ChevronDown, Copy, FileArchive, FileDown, FileText, Hash, Keyboard, Smartphone } from "lucide-react";
+import { ChevronDown, Copy, FileArchive, FileDown, FileText, FileType, Hash, Keyboard, Smartphone } from "lucide-react";
 import { useCallback, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { download, exportPages } from "@/components/notes/transfer";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { useIsMac } from "@/components/ui/useMediaQuery";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { panesText } from "@/i18n/messages/panes";
@@ -28,8 +29,10 @@ function explained() {
   }
 }
 
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 /**
- * A note's ways out: PDF (through the print window), Blob file, Markdown and text. `items` go into
+ * A note's ways out: PDF (through the print window), Word, Blob file, Markdown and text. `items` go into
  * the note's "…" menu; `dialog` is the first-time PDF explanation; `pdf` starts the PDF (Ctrl+P).
  * `beforeExport` stores the latest text first (sub-pages are read from the database).
  */
@@ -40,6 +43,7 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
   const locale = useLocale();
   const mac = useIsMac();
   const { showShortcuts } = usePanes();
+  const { pages } = useWorkspace();
   const [asking, setAsking] = useState(false);
   const [dontShow, setDontShow] = useState(false);
   const name = (ext: string) => fileNameFor(title, ext, untitled);
@@ -80,6 +84,27 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     }
   };
 
+  const word = async () => {
+    if (!editor || editor.isDestroyed) return;
+    blob.say(t.export.preparing, { mood: "thinking", ms: 4000 });
+    try {
+      const [{ noteToDocx }, { docxDrawings, docxImage }] = await Promise.all([import("@/notes/docx"), import("./docxAssets")]);
+      const file = await noteToDocx(editor.state.doc.toJSON(), {
+        locale,
+        title: title || untitled,
+        pageHref: (id) => `${location.origin}/p/${id}`,
+        absolute: (href) => new URL(href, location.origin).href,
+        pageTitle: (id) => pages.find((p) => p.id === id)?.title || undefined,
+        image: docxImage,
+        drawings: await docxDrawings(editor),
+      });
+      download(name(".docx"), file, DOCX_MIME);
+      blob.say(t.export.wordDone, { mood: "happy", ms: 6000 });
+    } catch {
+      blob.say(t.export.failed, { mood: "worried" });
+    }
+  };
+
   const text = () => {
     if (!editor || editor.isDestroyed) return;
     download(name(".txt"), `${title || untitled}\n\n${editor.getText({ blockSeparator: "\n\n" })}\n`, "text/plain;charset=utf-8");
@@ -95,6 +120,9 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
         <MenuLabel>{t.export.label}</MenuLabel>
         <MenuItem icon={<FileDown />} shortcut={mac ? "⌘P" : locale === "de" ? "Strg+P" : "Ctrl+P"} onSelect={run(pdf)}>
           {t.export.pdf}
+        </MenuItem>
+        <MenuItem icon={<FileType />} onSelect={run(word)}>
+          <span title={t.export.wordHint}>{t.export.word}</span>
         </MenuItem>
         <MenuItem icon={<FileArchive />} onSelect={run(blobFile)}>
           <span title={t.export.blobHint}>{t.export.blob}</span>

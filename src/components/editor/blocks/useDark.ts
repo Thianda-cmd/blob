@@ -22,3 +22,44 @@ export function themeColor(name: string, fallback: string) {
   if (typeof document === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
+
+/** Where theme colours come from: the page as it is (themeColor), or the light theme (withLightTheme). */
+export type ColorSource = (name: string, fallback: string) => string;
+
+/** The light theme's colour variables, as globals.css sets them on :root (dark mode overrides them). */
+function lightVariables(): [string, string][] {
+  const out: [string, string][] = [];
+  for (const sheet of document.styleSheets) {
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of rules) {
+      if (!(rule instanceof CSSStyleRule) || rule.selectorText !== ":root") continue;
+      for (const name of rule.style) if (name.startsWith("--")) out.push([name, rule.style.getPropertyValue(name)]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Runs `fn` with the light theme's colours, whatever the page shows: for files that end up on white
+ * paper (the Word export). `host` is an element off screen with the light colours, for copies of
+ * the page's drawings to take their styles from; it goes when `fn` is done. The page itself keeps
+ * its theme (switching it would flicker).
+ */
+export async function withLightTheme<T>(fn: (scope: { color: ColorSource; host: HTMLElement }) => Promise<T>): Promise<T> {
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText = "position:fixed;left:-20000px;top:0;pointer-events:none;color-scheme:light;";
+  for (const [name, value] of lightVariables()) host.style.setProperty(name, value);
+  document.body.appendChild(host);
+  const color: ColorSource = (name, fallback) => getComputedStyle(host).getPropertyValue(name).trim() || fallback;
+  try {
+    return await fn({ color, host });
+  } finally {
+    host.remove();
+  }
+}
