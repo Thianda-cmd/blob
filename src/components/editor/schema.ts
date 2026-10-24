@@ -1,4 +1,4 @@
-import { Extension, getSchema, getText, getTextSerializersFromSchema, type AnyExtension, type JSONContent } from "@tiptap/core";
+import { Extension, getSchema, getText, getTextSerializersFromSchema, type AnyExtension, type Editor, type JSONContent } from "@tiptap/core";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import { TaskItem } from "@tiptap/extension-task-item";
@@ -146,6 +146,15 @@ export function plainDoc(plain: string): JSONContent {
     type: "doc",
     content: plain.split("\n").map((line) => ({ type: "paragraph", content: line ? [{ type: "text", text: line }] : [] })),
   };
+}
+
+/** The document without the empty paragraph the editor keeps at the end for typing. */
+export function contentToSave(editor: Editor): JSONContent {
+  const json = editor.getJSON();
+  const blocks = json.content ?? [];
+  const last = blocks[blocks.length - 1];
+  if (blocks.length > 1 && last?.type === "paragraph" && !last.content?.length) return { ...json, content: blocks.slice(0, -1) };
+  return json;
 }
 
 /** The note's plain text (search, previews, study tools), as the editor writes it. */

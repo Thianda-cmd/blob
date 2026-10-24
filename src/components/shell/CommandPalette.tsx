@@ -5,6 +5,7 @@ import {
   BookMarked,
   CornerDownLeft,
   FilePlus2,
+  FileUp,
   FileUser,
   FolderPlus,
   GraduationCap,
@@ -40,6 +41,8 @@ import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
 import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { panesText } from "@/i18n/messages/panes";
+import { transferText } from "@/i18n/messages/transfer";
+import { useImporter } from "@/components/notes/useImporter";
 import { usePanes } from "./Panes";
 import { PageIcon, SubjectIcon } from "./Sidebar";
 
@@ -86,6 +89,8 @@ function Palette({ onClose }: { onClose: () => void }) {
   const { pages, subjects, createPage, createSubject, userId } = useWorkspace();
   const { openBeside, showShortcuts } = usePanes();
   const tp = useMessages(panesText);
+  const tt = useMessages(transferText);
+  const importer = useImporter();
   const locale = useLocale();
   const t = useMessages(shellText).palette;
   const [query, setQuery] = useState("");
@@ -199,6 +204,18 @@ function Palette({ onClose }: { onClose: () => void }) {
       },
       { id: "settings", group: "actions", label: t.settings, icon: <Settings />, run: () => go("/settings") },
       { id: "trash", group: "actions", label: t.trash, icon: <Trash2 />, run: () => go("/trash") },
+      {
+        id: "import",
+        group: "actions",
+        label: tt.import.action,
+        hint: tt.import.actionHint,
+        keywords: "import importieren upload hochladen blob markdown md txt datei file backup sicherung öffnen open",
+        icon: <FileUp />,
+        run: () => {
+          onClose();
+          importer.pick();
+        },
+      },
       {
         id: "shortcuts",
         group: "actions",
@@ -315,7 +332,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       : actions.slice(0, 3);
     return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found, locale, t, tp, userId, openBeside, showShortcuts]);
+  }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing

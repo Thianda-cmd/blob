@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BellRing, Link2, MonitorDown, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
+import { BellRing, FileArchive, Link2, MonitorDown, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { TopBar } from "@/components/shell/TopBar";
@@ -15,6 +15,7 @@ import { AppSection } from "./AppSection";
 import { BlobSection } from "./BlobSection";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { DangerSection } from "./DangerSection";
+import { DataSection } from "./DataSection";
 import { ProfileSection } from "./ProfileSection";
 import { RemindersSection } from "./RemindersSection";
 import { SecuritySection } from "./SecuritySection";
@@ -30,6 +31,7 @@ const SECTIONS: { id: SectionId; icon: ReactNode }[] = [
   { id: "reminders", icon: <BellRing /> },
   // Only in the Blob app on a computer.
   { id: "app", icon: <MonitorDown /> },
+  { id: "data", icon: <FileArchive /> },
   { id: "blob", icon: <BlobMark size={16} className="grayscale-[0.2]" /> },
   { id: "danger", icon: <TriangleAlert /> },
 ];
@@ -212,6 +214,7 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
               <ConnectedAppsSection apps={connectedApps} />
               <RemindersSection />
               {desktopApp && <AppSection />}
+              <DataSection />
               <BlobSection />
               <DangerSection />
             </div>

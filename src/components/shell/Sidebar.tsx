@@ -7,6 +7,7 @@ import {
   Ellipsis,
   FilePlus2,
   FileText,
+  FileUp,
   FileUser,
   Folder,
   FolderOpen,
@@ -35,6 +36,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { useImporter } from "@/components/notes/useImporter";
 import { useShareInfo } from "@/components/notes/useShared";
 import { Avatar } from "@/components/share/Avatar";
 import { applyTheme } from "@/components/theme";
@@ -46,6 +48,7 @@ import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { useLocale, useMessages } from "@/i18n/client";
 import { adminText } from "@/i18n/messages/admin";
 import { shellText } from "@/i18n/messages/shell";
+import { transferText } from "@/i18n/messages/transfer";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
 import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
@@ -101,6 +104,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   const router = useRouter();
   const pathname = usePathname();
   const { pages, subjects, createPage, profile, email, setProfile, userId, sharedIds } = useWorkspace();
+  const importer = useImporter();
   const locale = useLocale();
   const t = useMessages(shellText).sidebar;
   const adminLabel = useMessages(adminText).nav;
@@ -205,6 +209,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
                 label={t.addInside}
                 className={cn("opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}
                 onPick={(kind) => newPage(kind, { parent_id: page.id, subject_id: page.subject_id })}
+                onImport={() => importer.pick({ parentId: page.id })}
               />
             ) : (
               <button
@@ -271,7 +276,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           </Link>
           <div className={cn("flex opacity-0 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}>
             <SubjectMenu subject={subject} />
-            <AddMenu label={t.addTo(subject.name)} onPick={(kind) => newPage(kind, { subject_id: subject.id })} />
+            <AddMenu label={t.addTo(subject.name)} onPick={(kind) => newPage(kind, { subject_id: subject.id })} onImport={() => importer.pick({ subjectId: subject.id })} />
           </div>
         </div>
         <AnimatePresence initial={false}>
@@ -440,8 +445,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
 }
 
 /** "+" with a small menu: new note, presentation or folder. */
-function AddMenu({ label, onPick, className }: { label: string; onPick: (kind: NewKind) => void; className?: string }) {
+function AddMenu({ label, onPick, onImport, className }: { label: string; onPick: (kind: NewKind) => void; onImport?: () => void; className?: string }) {
   const t = useMessages(shellText).sidebar;
+  const ti = useMessages(transferText).import;
   return (
     <Popover
       align="start"
@@ -462,6 +468,14 @@ function AddMenu({ label, onPick, className }: { label: string; onPick: (kind: N
           <MenuItem icon={<FolderPlus />} onSelect={() => (close(), onPick("folder"))}>
             {t.folder}
           </MenuItem>
+          {onImport && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={<FileUp />} onSelect={() => (close(), onImport())}>
+                {ti.action}
+              </MenuItem>
+            </>
+          )}
         </>
       )}
     </Popover>

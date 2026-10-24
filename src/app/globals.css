@@ -2686,3 +2686,80 @@ html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [ro
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* A note on paper (editor/notePrint.ts): laid out off screen, the only thing the print shows. */
+.note-print {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 720px;
+  visibility: hidden;
+  background: #fff;
+  color: var(--ink);
+}
+.note-print * {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.note-print-header {
+  margin-bottom: 1.6em;
+}
+.note-print-icon {
+  margin-bottom: 0.2em;
+  font-size: 40px;
+  line-height: 1.1;
+}
+.note-print-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+}
+.note-print .prose-blob {
+  font-size: 15px;
+}
+.note-print-field {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+/* No buttons or editing bars on paper; closed toggles open, flashcards show both sides. */
+.note-print
+  :is(
+    .blob-block-edit,
+    .blob-file-actions,
+    .blob-plot-zoom,
+    .blob-plot-add,
+    .blob-plot-remove,
+    .blob-plot-hint,
+    .blob-plot-readout,
+    .blob-sketch-bar,
+    .blob-flashcard-flip,
+    .blob-flashcard-hint,
+    .blob-flashcard-sides,
+    .blob-diagram-bar,
+    .blob-toggle-chevron
+  ) {
+  display: none !important;
+}
+.note-print .blob-toggle [data-toggle-content] {
+  display: block !important;
+}
+.note-print .blob-flashcard-faces > [data-node-view-content-react] {
+  display: block !important;
+  transform: none !important;
+}
+.note-print :is([data-flashcard-front], [data-flashcard-back]) {
+  transform: none !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+}
+.note-print [data-flashcard-back] {
+  margin-top: 0.4em;
+}
+.note-print :is(img, pre, table, blockquote, li, .blob-object, .blob-callout) {
+  break-inside: avoid;
+}
+.note-print :is(h1, h2, h3) {
+  break-after: avoid;
+}

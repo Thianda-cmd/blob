@@ -4,6 +4,7 @@ import { rewriteUnknownContent, type Content, type Editor, type JSONContent, typ
 import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from "@tiptap/react";
 import { getVersion, sendableSteps } from "prosemirror-collab";
 import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
@@ -18,6 +19,7 @@ import type { Locale } from "@/i18n/config";
 import { editorText, type EditorText } from "@/i18n/messages/editor";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
 import { offlineText } from "@/i18n/messages/offline";
+import { isBlobFile, useImporter } from "@/components/notes/useImporter";
 import { usePanes } from "@/components/shell/Panes";
 import { useTableChanges } from "@/lib/live";
 import { createClient } from "@/lib/supabase/client";
@@ -45,10 +47,11 @@ import { NoteMeta } from "./NoteMeta";
 import { PageOutline } from "./PageOutline";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { QuickStart } from "./QuickStart";
-import { plainDoc, plainTextOf } from "./schema";
+import { contentToSave, plainDoc, plainTextOf } from "./schema";
 import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
+import { useNoteExport } from "./useNoteExport";
 import { ViewMenu } from "./ViewMenu";
 import { useViewPrefs } from "./viewPrefs";
 
@@ -79,15 +82,6 @@ function initialContent(content: unknown, plain: string): Content | undefined {
   return undefined;
 }
 
-/** The document without the empty paragraph the editor keeps at the end for typing. */
-function contentToSave(editor: Editor): JSONContent {
-  const json = editor.getJSON();
-  const blocks = json.content ?? [];
-  const last = blocks[blocks.length - 1];
-  if (blocks.length > 1 && last?.type === "paragraph" && !last.content?.length) return { ...json, content: blocks.slice(0, -1) };
-  return json;
-}
-
 /** The note's plain text (the server works it out the same way when it settles a note). */
 function plainText(editor: Editor) {
   return plainTextOf(editor.state.doc);
@@ -115,6 +109,8 @@ type Live = {
   openBeside: (id: string) => void;
   pickImage: () => void;
   pickFile: () => void;
+  /** Blob files dropped or pasted into the note: imported as its sub-pages, linked where they landed. */
+  importHere: (view: EditorView, files: File[], at?: number) => void;
   blocksText: NoteBlocksText;
   pages: PageMeta[];
   /** Where a page lives, for the "[[" menu (its parent page or subject). */
@@ -164,6 +160,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
   const locale = useLocale();
   const router = useRouter();
   const panes = usePanes();
+  const { importFiles } = useImporter();
   // Beside another page this note reloads itself; the route is the other page's.
   const refreshRoute = pane?.onRefresh ?? router.refresh;
   const { pages, subjects, userId, profile, updatePage, createPage, reloadPages } = useWorkspace();
@@ -302,6 +299,15 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
       openBeside: (id) => (id === page.id ? undefined : pane ? router.push(`/p/${id}`) : panes.openBeside(id)),
       pickImage: () => fileRef.current?.click(),
       pickFile: () => attachRef.current?.click(),
+      importHere: (view, files, at) => {
+        void importFiles(files, { parentId: page.id, open: false }).then((roots) => {
+          if (view.isDestroyed || !roots.length) return;
+          const { state } = view;
+          const pos = Math.min(at ?? state.selection.to, state.doc.content.size);
+          const links = roots.map((r) => state.schema.nodes.pageLink.create({ id: r.id, title: "" }));
+          view.dispatch(state.tr.insert(state.doc.resolve(pos).depth ? state.doc.resolve(pos).after(1) : pos, links));
+        });
+      },
       blocksText: tb,
       pages,
       where: (p) => {
@@ -383,11 +389,14 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
         attributes: { class: "prose-blob", spellcheck: "true", "aria-label": t.contentLabel },
         handlePaste: (view, event) => {
           const l = live.current;
-          const all = Array.from(event.clipboardData?.files ?? []);
+          let all = Array.from(event.clipboardData?.files ?? []);
           if (!all.length || !l) return false;
           // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
           if (event.clipboardData?.getData("text/plain").trim()) return false;
           event.preventDefault();
+          const blobs = all.filter(isBlobFile);
+          if (blobs.length) l.importHere(view, blobs);
+          all = all.filter((f) => !isBlobFile(f));
           const images = imageFiles(event.clipboardData?.files);
           if (images.length) uploadImages(view, images, l.userId, l.text.upload);
           const others = all.filter((f) => !images.includes(f));
@@ -397,10 +406,13 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
         handleDrop: (view, event, _slice, moved) => {
           const l = live.current;
           if (moved || !l) return false;
-          const all = Array.from(event.dataTransfer?.files ?? []);
+          let all = Array.from(event.dataTransfer?.files ?? []);
           if (!all.length) return false;
           event.preventDefault();
           const at = dropPos(view, event);
+          const blobs = all.filter(isBlobFile);
+          if (blobs.length) l.importHere(view, blobs, at);
+          all = all.filter((f) => !isBlobFile(f));
           // Pictures become images in the text; anything else (PDFs, worksheets…) a file card.
           const images = imageFiles(event.dataTransfer?.files);
           if (images.length) uploadImages(view, images, l.userId, l.text.upload, at);
@@ -898,6 +910,30 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
   // Flashcards of this note that are due again today (Builder B's study mode keeps track).
   const due = useDueCards(page.id);
 
+  // Exporting: PDF, Blob file, Markdown and text, in the note's "…" menu. Ctrl/Cmd+P makes the PDF
+  // of the note you're in (the one beside, when the focus is there).
+  const exporter = useNoteExport({
+    editor,
+    pageId: page.id,
+    title,
+    icon,
+    beforeExport: async () => (collabOn ? flushTogether() : flush()),
+  });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const startPdf = exporter.pdf;
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "p") return;
+      const focusedSide = !!document.activeElement?.closest('[data-pane="side"]');
+      const mine = pane ? rootRef.current?.contains(document.activeElement) : !focusedSide;
+      if (!mine) return;
+      e.preventDefault();
+      startPdf();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pane, startPdf]);
+
   const blocks = useMemo<NoteBlocks>(() => ({ pageId: page.id, canEdit }), [page.id, canEdit]);
 
   // How notes look on this device (the view menu), and focus mode: everything around the text
@@ -948,7 +984,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
           : null;
 
   return (
-    <div className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture} data-focus-typing={fading ? "" : undefined}>
+    <div ref={rootRef} className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture} data-focus-typing={fading ? "" : undefined}>
       <div className="note-chrome">
       <PageTopBar
         pageId={page.id}
@@ -957,6 +993,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
         role={role}
         members={members}
         pane={pane}
+        menu={exporter.items}
         actions={
           <>
           <ViewMenu />
@@ -1077,6 +1114,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
       {editor && canEdit && <TableMenu editor={editor} />}
       {editor && canEdit && !touch && <ListMenu editor={editor} />}
       <SlashMenu controller={slash} />
+      {exporter.dialog}
       <PageRefMenu controller={refs} />
       <input
         ref={fileRef}
