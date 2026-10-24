@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ALargeSmall,
   ArrowLeft,
   BookOpen,
   BookOpenCheck,
@@ -8,6 +9,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  FileDown,
   FilePlus2,
   FileText,
   Folder,
@@ -647,6 +649,8 @@ export function NoteFeatures({ className }: { className?: string }) {
           { key: "learn", Icon: GraduationCap, ...t.points.learn },
           { key: "links", Icon: Link2, ...t.points.links },
           { key: "lessons", Icon: BookOpen, ...t.points.lessons },
+          { key: "style", Icon: ALargeSmall, ...t.points.style },
+          { key: "export", Icon: FileDown, ...t.points.export },
         ]}
       />
     </div>

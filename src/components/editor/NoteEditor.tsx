@@ -1006,34 +1006,34 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
   return (
     <div ref={rootRef} className={"flex min-h-0 flex-1 flex-col"} onKeyDownCapture={onKeyDownCapture} data-focus-typing={fading ? "" : undefined}>
       <div className="note-chrome">
-      <PageTopBar
-        pageId={page.id}
-        saveState={readOnly ? "saved" : saveState}
-        peers={collab.peers}
-        role={role}
-        members={members}
-        pane={pane}
-        menu={(close) => (
-          <>
-            {finder.menuItem(close)}
-            {exporter.items(close)}
-          </>
-        )}
-        actions={
-          <>
-          <ViewMenu />
-          <StudyMenu
-            pageId={page.id}
-            // The study mode, search and backlinks read the stored note: store the latest first.
-            beforeOpen={async () => {
-              if (collabOn) await flushTogether();
-              else await flush();
-            }}
-            due={due ?? 0}
-          />
-          </>
-        }
-      />
+        <PageTopBar
+          pageId={page.id}
+          saveState={readOnly ? "saved" : saveState}
+          peers={collab.peers}
+          role={role}
+          members={members}
+          pane={pane}
+          menu={(close) => (
+            <>
+              {finder.menuItem(close)}
+              {exporter.items(close)}
+            </>
+          )}
+          actions={
+            <>
+              <ViewMenu />
+              <StudyMenu
+                pageId={page.id}
+                // The study mode, search and backlinks read the stored note: store the latest first.
+                beforeOpen={async () => {
+                  if (collabOn) await flushTogether();
+                  else await flush();
+                }}
+                due={due ?? 0}
+              />
+            </>
+          }
+        />
       </div>
       {notice && (
         <p

@@ -94,7 +94,9 @@ export function useImporter() {
     (target: ImportTarget = {}) => {
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = IMPORT_ACCEPT;
+      // Phones and tablets only offer files of types they know: a .blob would be greyed out. They
+      // get every file; what isn't a Blob file, Markdown or text is turned away when it's read.
+      if (!matchMedia("(pointer: coarse)").matches) input.accept = IMPORT_ACCEPT;
       input.multiple = true;
       input.onchange = () => {
         const files = Array.from(input.files ?? []);

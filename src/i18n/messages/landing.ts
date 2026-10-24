@@ -219,6 +219,8 @@ export const landingText = defineMessages({
         learn: { title: "Learn from any note", body: "Flashcards that come back just before you'd forget them, a quiz or a summary, all made from what you wrote. Cards you put in your own words go with you to every device." },
         links: { title: "Notes that link up", body: "Tags and [[links]] connect your notes, and a link's words follow when a page is renamed. Every note shows where it's linked from and which notes are similar." },
         lessons: { title: "Linked to subjects and lessons", body: "Sort notes into your school subjects and link a lesson from the learning center. Its card shows how far you've got." },
+        style: { title: "Written your way", body: "Text sizes and colours, highlighters, lists in any style, templates for lab reports and essay plans, find and replace, and two notes side by side." },
+        export: { title: "Take it anywhere", body: "Save a note as a PDF or Markdown, or as a Blob file with every picture inside that opens again in any Blob, also with a double-click in the app." },
       },
     },
     together: {
@@ -536,6 +538,8 @@ export const landingText = defineMessages({
         learn: { title: "Mit jeder Notiz lernen", body: "Karteikarten, die kurz vor dem Vergessen wiederkommen, ein Quiz oder eine Zusammenfassung, alles aus dem, was du geschrieben hast. Karten in deinen eigenen Worten hast du auf jedem Gerät dabei." },
         links: { title: "Notizen, die sich verbinden", body: "Tags und [[Links]] verbinden deine Notizen, und der Linktext zieht mit, wenn eine Seite umbenannt wird. Jede Notiz zeigt, wo sie verlinkt ist und welche Notizen ähnlich sind." },
         lessons: { title: "Mit Fächern und Lektionen verknüpft", body: "Ordne Notizen deinen Schulfächern zu und verknüpfe eine Lektion aus dem Lernbereich. Ihre Karte zeigt, wie weit du schon bist." },
+        style: { title: "So, wie du schreibst", body: "Textgrößen und Farben, Textmarker, Listen in jedem Stil, Vorlagen für Versuchsprotokolle und Erörterungen, Suchen und Ersetzen und zwei Notizen nebeneinander." },
+        export: { title: "Nimm sie überallhin mit", body: "Speichere eine Notiz als PDF oder Markdown, oder als Blob-Datei mit allen Bildern, die sich in jedem Blob wieder öffnet, in der App auch per Doppelklick." },
       },
     },
     together: {
