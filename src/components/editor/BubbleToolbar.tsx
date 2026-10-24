@@ -34,8 +34,8 @@ import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { noteToolsText } from "@/i18n/messages/noteTools";
 import { cn } from "@/lib/utils";
-import { colorVar, sizeAtSelection, type TextColor } from "./formatting";
-import { TextColorPanel, TextSizePanel } from "./TextTools";
+import { colorVar, sizeAtSelection, type HighlightColor, type TextAlign, type TextColor } from "./formatting";
+import { AlignGlyph, AlignRow, TextColorPanel, TextSizePanel } from "./TextTools";
 
 const BUBBLE_KEY = "blobBubbleMenu";
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -88,9 +88,9 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
   const shift = isMac ? "⇧" : t.shift;
   const [mode, setMode] = useState<"tools" | "link">("tools");
   /** The list unfolded under the tools: "Turn into", text size or text colour. */
-  const [panel, setPanel] = useState<"blocks" | "size" | "color" | null>(null);
+  const [panel, setPanel] = useState<"blocks" | "size" | "color" | "align" | null>(null);
   const blocksOpen = panel === "blocks";
-  const togglePanel = (p: "blocks" | "size" | "color") => setPanel((open) => (open === p ? null : p));
+  const togglePanel = (p: "blocks" | "size" | "color" | "align") => setPanel((open) => (open === p ? null : p));
   const pointerDown = useRef(false);
 
   const s = useEditorState({
@@ -109,6 +109,8 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
       size: e.state.selection.empty ? 16 : sizeAtSelection(e),
       ownSize: (e.getAttributes("textStyle").size as number | null | undefined) ?? null,
       color: (e.getAttributes("textStyle").color as TextColor | null | undefined) ?? null,
+      highlightColor: e.isActive("highlight") ? (((e.getAttributes("highlight").color as HighlightColor | null | undefined) ?? "blob") as HighlightColor | "blob") : null,
+      align: ((e.getAttributes("paragraph").align ?? e.getAttributes("heading").align) as TextAlign | null | undefined) ?? null,
     }),
   });
 
@@ -254,6 +256,9 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
                 <span className="absolute inset-x-[-1px] -bottom-[3px] h-[3px] rounded-full" style={{ background: s?.color ? colorVar(s.color) : "var(--ink-3)" }} />
               </span>
             </button>
+            <Tool label={tt.align.label} active={panel === "align" || !!s?.align} onClick={() => togglePanel("align")}>
+              <AlignGlyph align={s?.align ?? null} />
+            </Tool>
             <Divider />
             <Tool label={s?.link ? t.editLink : t.addLink} active={s?.link} onClick={() => setMode("link")}>
               <Link2 />
@@ -262,7 +267,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
         )}
 
         <AnimatePresence>
-          {(panel === "size" || panel === "color") && mode === "tools" && (
+          {(panel === "size" || panel === "color" || panel === "align") && mode === "tools" && (
             <motion.div
               key={panel}
               initial={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -272,9 +277,15 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
               style={{ transformOrigin: "top right" }}
               className="absolute right-0 top-full z-10 mt-1.5 rounded-xl border border-line bg-raised shadow-pop"
               role="dialog"
-              aria-label={panel === "size" ? tt.size.label : tt.color.label}
+              aria-label={panel === "size" ? tt.size.label : panel === "color" ? tt.color.label : tt.align.label}
             >
-              {panel === "size" ? <TextSizePanel editor={editor} size={s?.size ?? 16} own={s?.ownSize ?? null} /> : <TextColorPanel editor={editor} color={s?.color ?? null} />}
+              {panel === "size" ? (
+                <TextSizePanel editor={editor} size={s?.size ?? 16} own={s?.ownSize ?? null} />
+              ) : panel === "color" ? (
+                <TextColorPanel editor={editor} color={s?.color ?? null} highlight={s?.highlightColor ?? null} />
+              ) : (
+                <AlignRow editor={editor} align={s?.align ?? null} />
+              )}
             </motion.div>
           )}
           {blocksOpen && mode === "tools" && (

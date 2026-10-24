@@ -5,6 +5,8 @@ import { EditorContent, useEditor, useEditorState, type UseEditorOptions } from 
 import { getVersion, sendableSteps } from "prosemirror-collab";
 import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
+import { Slice } from "@tiptap/pm/model";
+import { looksLikeMarkdown, markdownToBlocks } from "@/notes/markdown";
 import { CloudOff, Eye, Info, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
@@ -390,6 +392,21 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
         handlePaste: (view, event) => {
           const l = live.current;
           let all = Array.from(event.clipboardData?.files ?? []);
+          // Markdown pasted as plain text (from a chat, a README, another app) comes in formatted.
+          // Ctrl/Cmd+Shift+V still pastes the text as it is.
+          const text = event.clipboardData?.getData("text/plain") ?? "";
+          const plainPaste = (view as unknown as { input?: { shiftKey?: boolean } }).input?.shiftKey;
+          if (!all.length && !event.clipboardData?.getData("text/html") && !plainPaste && !view.state.selection.$from.parent.type.spec.code && looksLikeMarkdown(text)) {
+            try {
+              const doc = view.state.schema.nodeFromJSON({ type: "doc", content: markdownToBlocks(text) });
+              doc.check();
+              event.preventDefault();
+              view.dispatch(view.state.tr.replaceSelection(Slice.maxOpen(doc.content)).scrollIntoView());
+              return true;
+            } catch {
+              return false;
+            }
+          }
           if (!all.length || !l) return false;
           // Rich content (e.g. from Word) also carries a picture of itself: prefer the text.
           if (event.clipboardData?.getData("text/plain").trim()) return false;

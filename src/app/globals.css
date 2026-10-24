@@ -315,6 +315,22 @@
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
+/* Highlighter colours (editor/formatting.ts); purple stays the default. */
+.prose-blob mark[data-highlight="sand"] {
+  background: color-mix(in oklab, var(--subject-sand) 32%, transparent);
+}
+.prose-blob mark[data-highlight="moss"] {
+  background: color-mix(in oklab, var(--subject-moss) 32%, transparent);
+}
+.prose-blob mark[data-highlight="sky"] {
+  background: color-mix(in oklab, var(--subject-sky) 32%, transparent);
+}
+.prose-blob mark[data-highlight="rose"] {
+  background: color-mix(in oklab, var(--subject-rose) 32%, transparent);
+}
+.prose-blob mark[data-highlight="clay"] {
+  background: color-mix(in oklab, var(--subject-clay) 32%, transparent);
+}
 .prose-blob code {
   font-family: var(--font-mono);
   font-size: 0.85em;

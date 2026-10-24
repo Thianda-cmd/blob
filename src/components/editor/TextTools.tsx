@@ -1,12 +1,12 @@
 "use client";
 
 import type { Editor } from "@tiptap/core";
-import { Check, Minus, Plus, RotateCcw } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Ban, Check, Minus, Plus, RotateCcw, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useMessages } from "@/i18n/client";
 import { noteToolsText } from "@/i18n/messages/noteTools";
 import { cn } from "@/lib/utils";
-import { MAX_SIZE, MIN_SIZE, TEXT_COLORS, TEXT_SIZES, clampSize, colorVar, stepSize, type TextColor } from "./formatting";
+import { HIGHLIGHTS, MAX_SIZE, MIN_SIZE, TEXT_COLORS, TEXT_SIZES, clampSize, colorVar, stepSize, type HighlightColor, type TextAlign, type TextColor } from "./formatting";
 
 /** A px size with − and + and a field to type any size (the selection's text, a list, the note's text). */
 export function SizeStepper({ value, onChange, label, typing = true }: { value: number; onChange: (px: number) => void; label: string; typing?: boolean }) {
@@ -101,10 +101,12 @@ export function TextSizePanel({ editor, size, own, typing }: { editor: Editor; s
   );
 }
 
-/** Colour of the selected text, from the theme's own colours. */
-export function TextColorPanel({ editor, color }: { editor: Editor; color: TextColor | null }) {
+/** Colour of the selected text, from the theme's own colours, and the highlighter's colour. */
+export function TextColorPanel({ editor, color, highlight }: { editor: Editor; color: TextColor | null; highlight?: HighlightColor | "blob" | null }) {
   const t = useMessages(noteToolsText).color;
   const set = (c: TextColor | null) => editor.chain().focus().setTextColor(c).run();
+  const mark = (c: HighlightColor | "blob" | null) =>
+    c === null ? editor.chain().focus().unsetHighlight().run() : editor.chain().focus().setHighlight({ color: (c === "blob" ? null : c) as string }).run();
   return (
     <div className="w-[208px] p-1.5">
       <div className="px-0.5 pb-1.5 text-[11px] font-medium text-ink-3">{t.label}</div>
@@ -135,6 +137,65 @@ export function TextColorPanel({ editor, color }: { editor: Editor; color: TextC
           </button>
         ))}
       </div>
+      {highlight !== undefined && (
+        <>
+          <div className="px-0.5 pb-1.5 pt-2.5 text-[11px] font-medium text-ink-3">{t.highlight}</div>
+          <div className="grid grid-cols-5 gap-1">
+            <button type="button" onClick={() => mark(null)} title={t.noHighlight} aria-label={t.noHighlight} aria-pressed={highlight === null} className={cn("grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover", highlight === null && "bg-hover")}>
+              <Ban className="size-3.5" />
+            </button>
+            {(["blob", ...HIGHLIGHTS] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => mark(c)}
+                title={t.names[c === "blob" ? "blob" : c]}
+                aria-label={`${t.highlight}: ${t.names[c === "blob" ? "blob" : c]}`}
+                aria-pressed={highlight === c}
+                className={cn("grid size-8 place-items-center rounded-lg transition-colors hover:bg-hover", highlight === c && "bg-hover")}
+              >
+                <span className="relative grid h-4.5 w-6 place-items-center rounded-[4px] text-[11px] font-semibold text-ink" style={{ background: `color-mix(in oklab, var(${c === "blob" ? "--blob" : `--subject-${c}`}) ${c === "blob" ? 26 : 32}%, transparent)` }}>
+                  ab
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const ALIGN_ICONS: { align: TextAlign | null; key: "left" | TextAlign; icon: LucideIcon }[] = [
+  { align: null, key: "left", icon: AlignLeft },
+  { align: "center", key: "center", icon: AlignCenter },
+  { align: "right", key: "right", icon: AlignRight },
+  { align: "justify", key: "justify", icon: AlignJustify },
+];
+/** The icon of an alignment. */
+export function AlignGlyph({ align }: { align: TextAlign | null }) {
+  const Icon = ALIGN_ICONS.find((x) => x.align === align)?.icon ?? AlignLeft;
+  return <Icon />;
+}
+
+/** Left, centre, right or justified, for the paragraphs and headings in the selection. */
+export function AlignRow({ editor, align }: { editor: Editor; align: TextAlign | null }) {
+  const t = useMessages(noteToolsText).align;
+  return (
+    <div className="flex items-center gap-0.5 p-1" role="group" aria-label={t.label}>
+      {ALIGN_ICONS.map(({ align: a, key, icon: Icon }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => editor.chain().focus().setTextAlign(a).run()}
+          aria-label={t[key]}
+          aria-pressed={align === a}
+          title={t[key]}
+          className={cn("blob-tool-btn", align === a && "bg-blob-soft! text-blob-ink!")}
+        >
+          <Icon />
+        </button>
+      ))}
     </div>
   );
 }

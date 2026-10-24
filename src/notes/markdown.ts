@@ -1011,6 +1011,31 @@ const plain = (nodes: JSONContent[]) => nodes.map((n) => (n.type === "text" ? n.
  * Markdown as a note. A first line "# Title" becomes the title (not part of the text); when no other
  * "#" heading follows, the headings under it move up a level ("##" becomes the note's first level).
  */
+/** Markdown as note blocks, every heading kept as it is (pasting into a note). */
+export function markdownToBlocks(md: string): JSONContent[] {
+  return parseBlocks(md.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n"));
+}
+
+/**
+ * Whether pasted plain text is Markdown worth turning into formatting (headings, lists, tables,
+ * code fences, bold, links…), rather than text that happens to contain a star or a dash.
+ */
+export function looksLikeMarkdown(text: string): boolean {
+  const lines = text.split(/\r?\n/);
+  let score = 0;
+  if (/^#{1,6}[ \t]+\S/m.test(text)) score += 2;
+  if (/^(```|~~~)/m.test(text)) score += 2;
+  if (/^\s*\|.+\|\s*$/m.test(text) && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/m.test(text)) score += 2;
+  if (lines.filter((l) => /^\s*([-*+]|\d{1,3}[.)])[ \t]+\S/.test(l)).length >= 2) score += 2;
+  if (/^\s*[-*+][ \t]+\[[ xX]\][ \t]/m.test(text)) score += 2;
+  if (/^>[ \t]?\S/m.test(text)) score += 1;
+  if (/\*\*[^*\n]+\*\*|__[^_\n]+__/.test(text)) score += 1;
+  if (/\[[^\]\n]+\]\((https?:\/\/|\/)[^)\s]+\)/.test(text)) score += 1;
+  if (/(^|[^`])`[^`\n]+`/.test(text)) score += 1;
+  if (/\$\$[\s\S]+?\$\$/.test(text)) score += 1;
+  return score >= 2;
+}
+
 export function markdownToNote(md: string): { title: string | null; doc: JSONContent } {
   const lines = md.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
   let title: string | null = null;

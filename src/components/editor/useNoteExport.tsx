@@ -1,7 +1,7 @@
 "use client";
 
 import type { Editor } from "@tiptap/core";
-import { ChevronDown, FileArchive, FileDown, FileText, Hash, Keyboard, Smartphone } from "lucide-react";
+import { ChevronDown, Copy, FileArchive, FileDown, FileText, Hash, Keyboard, Smartphone } from "lucide-react";
 import { useCallback, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { download, exportPages } from "@/components/notes/transfer";
@@ -69,6 +69,17 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     download(name(".md"), noteToMarkdown(contentToSave(editor), { locale, title: title || untitled, pageHref: (id) => `${location.origin}/p/${id}` }), "text/markdown;charset=utf-8");
   };
 
+  const copyMarkdown = async () => {
+    if (!editor || editor.isDestroyed) return;
+    const { noteToMarkdown } = await import("@/notes/markdown");
+    try {
+      await navigator.clipboard.writeText(noteToMarkdown(contentToSave(editor), { locale, title: title || untitled, pageHref: (id) => `${location.origin}/p/${id}` }));
+      blob.say(t.export.copied, { mood: "happy" });
+    } catch {
+      blob.say(t.export.failed, { mood: "worried" });
+    }
+  };
+
   const text = () => {
     if (!editor || editor.isDestroyed) return;
     download(name(".txt"), `${title || untitled}\n\n${editor.getText({ blockSeparator: "\n\n" })}\n`, "text/plain;charset=utf-8");
@@ -93,6 +104,9 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
         </MenuItem>
         <MenuItem icon={<FileText />} onSelect={run(text)}>
           {t.export.text}
+        </MenuItem>
+        <MenuItem icon={<Copy />} onSelect={run(copyMarkdown)}>
+          {t.export.copyMarkdown}
         </MenuItem>
         <MenuSeparator />
         <MenuItem icon={<Keyboard />} shortcut={mac ? "⌘/" : locale === "de" ? "Strg+/" : "Ctrl+/"} onSelect={run(showShortcuts)}>

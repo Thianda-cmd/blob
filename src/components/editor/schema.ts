@@ -1,5 +1,4 @@
 import { Extension, getSchema, getText, getTextSerializersFromSchema, type AnyExtension, type Editor, type JSONContent } from "@tiptap/core";
-import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { TaskList } from "@tiptap/extension-task-list";
@@ -7,7 +6,7 @@ import type { Node as PMNode, Schema } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import type { Locale } from "@/i18n/config";
 import { editorText } from "@/i18n/messages/editor";
-import { ListLook, TextStyle } from "./formatting";
+import { ColoredHighlight, ListLook, TextAlignment, TextStyle } from "./formatting";
 import {
   CalloutSpec,
   DeckEmbedSpec,
@@ -101,9 +100,10 @@ export function documentExtensions(blocks: NoteBlocks, readOnly = false): AnyExt
     PageRefTitle,
     TextStyle,
     ListLook,
+    TextAlignment,
     TaskList,
     TaskItem.configure({ nested: true }),
-    Highlight,
+    ColoredHighlight,
     Image.configure({
       HTMLAttributes: { loading: "lazy" },
       resize: { enabled: true, directions: ["left", "right"], minWidth: 120, minHeight: 48, alwaysPreserveAspectRatio: true },

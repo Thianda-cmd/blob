@@ -60,7 +60,15 @@ const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
       ["lineBreak", [["shift", "↵"]]],
     ],
   },
-  { group: "blocks", items: [["toggle", [["mod", "↵"]]]] },
+  {
+    group: "blocks",
+    items: [
+      ["moveBlock", [["mod", "shift", "↑"], ["↓"]]],
+      ["duplicate", [["mod", "D"]]],
+      ["toggle", [["mod", "↵"]]],
+      ["pasteMarkdown", [["mod", "shift", "V"]]],
+    ],
+  },
 ];
 
 /** Every keyboard shortcut, in one list (Ctrl/Cmd+/). */

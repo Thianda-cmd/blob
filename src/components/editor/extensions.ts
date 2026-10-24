@@ -11,6 +11,7 @@ import { DeckEmbed } from "./blocks/DeckEmbed";
 import { Diagram } from "./blocks/Diagram";
 import { FileBlock } from "./blocks/File";
 import { FileUploadPlaceholder } from "./blocks/fileUpload";
+import { BlockMoves } from "./blockMoves";
 import { BlobCaret } from "./caret";
 import { ListKeys } from "./formatting";
 import { BlockIds } from "./blocks/ids";
@@ -127,6 +128,7 @@ export function buildExtensions({
     getLocale() === "de" ? Typography.configure(GERMAN_QUOTES) : Typography,
     ToggleReveal,
     ListKeys,
+    BlockMoves,
     FileUploadPlaceholder,
     BlockIds,
     PageLinkStatus.configure(pageStatus),

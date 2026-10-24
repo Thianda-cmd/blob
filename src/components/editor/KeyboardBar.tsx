@@ -10,9 +10,9 @@ import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { noteToolsText } from "@/i18n/messages/noteTools";
 import { cn } from "@/lib/utils";
-import { sizeAtSelection, type TextColor } from "./formatting";
+import { sizeAtSelection, type HighlightColor, type TextAlign, type TextColor } from "./formatting";
 import { ListPanel, useListState } from "./ListTools";
-import { TextColorPanel, TextSizePanel } from "./TextTools";
+import { AlignRow, TextColorPanel, TextSizePanel } from "./TextTools";
 
 /**
  * Phones and tablets: the editing tools on a bar right above the keyboard (like Notes or Notion on a
@@ -49,6 +49,8 @@ export function KeyboardBar({ editor, onOpenLink }: { editor: Editor; onOpenLink
       canRedo: e.can().redo(),
       ownSize: (e.getAttributes("textStyle").size as number | null | undefined) ?? null,
       color: (e.getAttributes("textStyle").color as TextColor | null | undefined) ?? null,
+      highlightColor: e.isActive("highlight") ? (((e.getAttributes("highlight").color as HighlightColor | null | undefined) ?? "blob") as HighlightColor | "blob") : null,
+      align: ((e.getAttributes("paragraph").align ?? e.getAttributes("heading").align) as TextAlign | null | undefined) ?? null,
     }),
   });
   const show = keyboard.open && s.focused && editor.isEditable;
@@ -86,7 +88,8 @@ export function KeyboardBar({ editor, onOpenLink }: { editor: Editor; onOpenLink
                 {open === "text" ? (
                   <div className="divide-y divide-line">
                     <TextSizePanel editor={editor} size={sizeAtSelection(editor)} own={s.ownSize} typing={false} />
-                    <TextColorPanel editor={editor} color={s.color} />
+                    <TextColorPanel editor={editor} color={s.color} highlight={s.highlightColor} />
+                    <AlignRow editor={editor} align={s.align} />
                   </div>
                 ) : (
                   list && <ListPanel editor={editor} state={list} typing={false} />

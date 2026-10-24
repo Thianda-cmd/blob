@@ -21,6 +21,15 @@ export const noteToolsText = defineMessages({
       label: "Text colour",
       reset: "Normal colour",
       names: { "ink-3": "Grey", blob: "Purple", sky: "Blue", teal: "Teal", moss: "Green", sand: "Yellow", clay: "Orange", rose: "Red", plum: "Plum" },
+      highlight: "Highlighter",
+      noHighlight: "No highlight",
+    },
+    align: {
+      label: "Alignment",
+      left: "Left",
+      center: "Centre",
+      right: "Right",
+      justify: "Justify",
     },
     list: {
       label: "List options",
@@ -77,6 +86,15 @@ export const noteToolsText = defineMessages({
       label: "Textfarbe",
       reset: "Normale Farbe",
       names: { "ink-3": "Grau", blob: "Lila", sky: "Blau", teal: "Türkis", moss: "Grün", sand: "Gelb", clay: "Orange", rose: "Rot", plum: "Pflaume" },
+      highlight: "Textmarker",
+      noHighlight: "Kein Textmarker",
+    },
+    align: {
+      label: "Ausrichtung",
+      left: "Links",
+      center: "Zentriert",
+      right: "Rechts",
+      justify: "Blocksatz",
     },
     list: {
       label: "Listenoptionen",

@@ -1,4 +1,5 @@
 import { Extension, Mark, mergeAttributes, type CommandProps, type Editor } from "@tiptap/core";
+import Highlight from "@tiptap/extension-highlight";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 
 // Text sizes, text colours and list looks: part of the note's document (schema.ts), so the server
@@ -17,6 +18,16 @@ export const TEXT_COLORS = ["ink-3", "blob", "sky", "teal", "moss", "sand", "cla
 export type TextColor = (typeof TEXT_COLORS)[number];
 
 export const colorVar = (c: TextColor) => (c === "ink-3" ? "var(--ink-3)" : c === "blob" ? "var(--blob-ink)" : `var(--subject-${c})`);
+
+/** Highlighter colours besides Blob's purple (null). */
+export const HIGHLIGHTS = ["sand", "moss", "sky", "rose", "clay"] as const;
+export type HighlightColor = (typeof HIGHLIGHTS)[number];
+const readHighlight = (raw: unknown): HighlightColor | null => ((HIGHLIGHTS as readonly string[]).includes(raw as string) ? (raw as HighlightColor) : null);
+
+/** Paragraph and heading alignment (left is the default and isn't stored). */
+export const ALIGNS = ["center", "right", "justify"] as const;
+export type TextAlign = (typeof ALIGNS)[number];
+const readAlign = (raw: unknown): TextAlign | null => ((ALIGNS as readonly string[]).includes(raw as string) ? (raw as TextAlign) : null);
 
 export const clampSize = (px: number) => Math.round(Math.min(MAX_SIZE, Math.max(MIN_SIZE, px)));
 
@@ -40,6 +51,10 @@ declare module "@tiptap/core" {
       /** Text size in px for the selection (null: the size of its block again). */
       setTextSize: (px: number | null) => ReturnType;
       setTextColor: (color: TextColor | null) => ReturnType;
+    };
+    blobAlign: {
+      /** Alignment of the paragraphs and headings in the selection (null: left again). */
+      setTextAlign: (align: TextAlign | null) => ReturnType;
     };
     blobLists: {
       /** Size in px of the list around the caret, markers included (null: as the text around it). */
@@ -110,6 +125,61 @@ export const TextStyle = Mark.create({
   addKeyboardShortcuts() {
     const step = (dir: 1 | -1) => () => this.editor.commands.setTextSize(stepSize(sizeAtSelection(this.editor), dir));
     return { "Mod-Shift-.": step(1), "Mod-Shift-,": step(-1) };
+  },
+});
+
+/** The highlighter in more colours (purple stays the default, so older notes look the same). */
+export const ColoredHighlight = Highlight.extend({
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (el) => readHighlight(el.getAttribute("data-highlight")),
+        renderHTML: (attrs) => (readHighlight(attrs.color) ? { "data-highlight": attrs.color as string } : {}),
+      },
+    };
+  },
+});
+
+/** Centred, right-aligned or justified paragraphs and headings. */
+export const TextAlignment = Extension.create({
+  name: "blobAlign",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph", "heading"],
+        attributes: {
+          align: {
+            default: null,
+            parseHTML: (el) => readAlign(el.getAttribute("data-align")),
+            renderHTML: (attrs) => {
+              const a = readAlign(attrs.align);
+              return a ? { "data-align": a, style: `text-align: ${a}` } : {};
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setTextAlign:
+        (align) =>
+        ({ state, tr, dispatch }) => {
+          const { from, to } = state.selection;
+          let changed = false;
+          state.doc.nodesBetween(from, to, (node, pos) => {
+            if (node.type.name !== "paragraph" && node.type.name !== "heading") return true;
+            if (node.attrs.align !== align) {
+              tr.setNodeAttribute(pos, "align", align);
+              changed = true;
+            }
+            return false;
+          });
+          if (changed) dispatch?.(tr);
+          return changed;
+        },
+    };
   },
 });
 
