@@ -1,20 +1,27 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
-import { CircleHelp, Pencil, Workflow } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useMessages } from "@/i18n/client";
+import { ArrowDownToLine, ArrowRightToLine, CircleHelp, Download, Maximize2, Pencil, Workflow } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { blob } from "@/components/blob/bus";
+import { MenuItem, Popover } from "@/components/ui/Menu";
+import { useLocale, useMessages } from "@/i18n/client";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
+import { DiagramGallery, DiagramRows, KIND_ICONS, fromDraft, toDraft, type Draft } from "./DiagramBuilder";
+import { DIAGRAM_KINDS, SECTION_VARS, convertModel, hasContent, modelFromMermaid, readModel, starterModel, toMermaid, type DiagramKind, type DiagramModel } from "./diagramModel";
+import { DiagramViewer, diagramFileName, downloadDiagram, type DiagramFormat } from "./DiagramZoom";
 import { caretAfter, openEditorAt } from "./insert";
 import { themeColor, useDark } from "./useDark";
 import { DiagramSpec } from "./schema";
 
 type Starter = keyof NoteBlocksText["diagram"]["starters"];
 const STARTERS: Starter[] = ["mindmap", "flow", "timeline", "cycle", "sequence", "pie"];
+
+/** Editing a diagram: picking its kind (a new one), in the builder, or as Mermaid code. */
+type Mode = "gallery" | "builder" | "code";
 
 // Rendering ---------------------------------------------------------------------------------------
 
@@ -31,8 +38,6 @@ function mixHex(a: string, b: string, t: number) {
   const [x, y] = [parse(a), parse(b)];
   return `#${x.map((v, i) => Math.round(v * t + y[i] * (1 - t)).toString(16).padStart(2, "0")).join("")}`;
 }
-
-const SECTION_VARS = ["--blob", "--subject-sky", "--subject-moss", "--subject-sand", "--subject-clay", "--subject-rose", "--subject-teal", "--subject-plum"];
 
 /**
  * Colours for mind map and timeline sections. Mermaid darkens the ones it is given, so they are set
@@ -54,8 +59,11 @@ const SECTION_CSS = [
   }),
 ].join("\n");
 
-/** Mermaid's look, from Blob's theme (it needs real colours, not CSS variables). */
-function mermaidConfig(dark: boolean) {
+/**
+ * Mermaid's look, from Blob's theme (it needs real colours, not CSS variables). `plain`: labels as
+ * SVG text only (no HTML inside), for turning a drawing into a PNG.
+ */
+function mermaidConfig(dark: boolean, plain = false) {
   const c = (name: string, fallback: string) => themeColor(name, fallback);
   const raised = c("--raised", dark ? "#22221f" : "#ffffff");
   const ink = c("--ink", dark ? "#edebe4" : "#1c1b18");
@@ -77,6 +85,7 @@ function mermaidConfig(dark: boolean) {
     securityLevel: "strict" as const,
     theme: "base" as const,
     fontFamily,
+    ...(plain && { htmlLabels: false }),
     flowchart: { htmlLabels: false, curve: "basis" as const, padding: 12 },
     themeCSS: SECTION_CSS,
     themeVariables: {
@@ -138,10 +147,10 @@ let queue: Promise<unknown> = Promise.resolve();
 let counter = 0;
 
 /** Draw a diagram (one at a time: Mermaid's settings are global). Mermaid itself loads on first use. */
-function renderDiagram(src: string, dark: boolean): Promise<Rendered> {
+function renderDiagram(src: string, dark: boolean, plain = false): Promise<Rendered> {
   const run = async (): Promise<Rendered> => {
     const mermaid = (await import("mermaid")).default;
-    mermaid.initialize(mermaidConfig(dark));
+    mermaid.initialize(mermaidConfig(dark, plain));
     const valid = await mermaid.parse(src, { suppressErrors: true });
     if (!valid) return { svg: null, error: true };
     const id = `blob-mermaid-${++counter}`;
@@ -186,46 +195,139 @@ function useDiagram(src: string, delay: number) {
 
 // The block ---------------------------------------------------------------------------------------
 
+const sameModel = (a: DiagramModel | null, b: DiagramModel | null) => JSON.stringify(a) === JSON.stringify(b);
+
+/** What the diagram is called in file names and the large view: its title or first row. */
+function diagramTitle(model: DiagramModel | null) {
+  if (!model) return "";
+  if (model.title?.trim()) return model.title.trim();
+  if (model.kind === "sequence") return "";
+  return model.rows.find((r) => r.text.trim())?.text.trim() ?? "";
+}
+
 function DiagramView({ node, updateAttributes, editor, getPos, selected }: ReactNodeViewProps) {
   const t = useMessages(noteBlocksText);
+  const locale = useLocale();
+  const dark = useDark();
   const { canEdit } = useNoteBlocks();
   const src = (node.attrs.src as string) ?? "";
+  // The builder's rows, when the diagram was made with it.
+  const stored = useMemo(() => readModel(node.attrs.model), [node.attrs.model]);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(src);
+  const [mode, setMode] = useState<Mode>("code");
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [code, setCode] = useState(src);
+  /** The code was changed by hand: the diagram becomes a code diagram (no builder rows). */
+  const [codeEdited, setCodeEdited] = useState(false);
+  /** Asking whether the builder may start over (it can't read this code). */
+  const [fresh, setFresh] = useState(false);
+  const [large, setLarge] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
-  const shown = editing ? draft : src;
+
+  const model = useMemo(() => (draft ? fromDraft(draft) : null), [draft]);
+  const built = useMemo(() => (model ? toMermaid(model) : ""), [model]);
+  const shown = !editing ? src : mode === "builder" ? built : mode === "code" ? code : "";
   const { svg, error, loading } = useDiagram(shown, editing ? 350 : 0);
 
+  /** What editing has made of the node so far (null: nothing to save). */
+  const pendingAttrs = (): { src: string; model: DiagramModel | null } | null => {
+    if (mode === "builder" && model) return built !== src || !sameModel(model, stored) ? { src: built, model } : null;
+    if (mode === "code" && codeEdited) return code !== src || stored ? { src: code, model: null } : null;
+    return null;
+  };
+
   // Save while typing (a moment after the last key), so nothing is lost and the others see it.
+  const next = editing ? pendingAttrs() : null;
+  const nextKey = next ? JSON.stringify(next) : "";
   useEffect(() => {
-    if (!editing || draft === src) return;
-    const timer = setTimeout(() => updateAttributes({ src: draft }), 700);
+    if (!nextKey) return;
+    const timer = setTimeout(() => updateAttributes(JSON.parse(nextKey)), 700);
     return () => clearTimeout(timer);
-  }, [editing, draft, src, updateAttributes]);
+  }, [nextKey, updateAttributes]);
+
+  const focusCode = () => requestAnimationFrame(() => area.current?.focus());
 
   const open = () => {
     if (!canEdit) return;
-    setDraft(src);
+    setFresh(false);
+    setCodeEdited(false);
+    setCode(src);
+    if (stored) {
+      setDraft(toDraft(stored));
+      setMode("builder");
+    } else if (src.trim()) {
+      setDraft(null);
+      setMode("code");
+      focusCode();
+    } else {
+      setDraft(null);
+      setMode("gallery");
+    }
     setEditing(true);
-    requestAnimationFrame(() => area.current?.focus());
   };
 
   const finish = () => {
     setEditing(false);
+    setFresh(false);
     const pos = getPos();
     if (typeof pos !== "number" || editor.isDestroyed) return;
-    if (!draft.trim()) {
+    const empty = mode === "builder" ? !model || !hasContent(model) : mode === "code" ? !code.trim() : !src.trim();
+    if (empty) {
       editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
       return;
     }
-    if (draft !== src) updateAttributes({ src: draft });
+    const attrs = pendingAttrs();
+    if (attrs) updateAttributes(attrs);
     caretAfter(editor, pos);
   };
 
+  /** A kind picked in the gallery: the builder with its example, or the code. */
+  const pick = (kind: DiagramKind | "code") => {
+    setFresh(false);
+    if (kind === "code") {
+      setMode("code");
+      focusCode();
+      return;
+    }
+    setDraft(toDraft(starterModel(kind, locale)));
+    setMode("builder");
+  };
+
+  const toCode = () => {
+    setFresh(false);
+    setCode(built);
+    setCodeEdited(false);
+    setMode("code");
+    focusCode();
+  };
+
+  const toBuilder = () => {
+    // Straight back when the code wasn't changed since the builder made it.
+    if (!codeEdited && draft) return setMode("builder");
+    if (!code.trim()) return setMode("gallery");
+    const read = modelFromMermaid(code);
+    if (!read) return setFresh(true);
+    setDraft(toDraft(read));
+    setCodeEdited(false);
+    setMode("builder");
+  };
+
+  const switchKind = (kind: DiagramKind) => {
+    if (!draft || kind === draft.kind) return;
+    setDraft(toDraft(convertModel(fromDraft(draft), kind, locale)));
+  };
+
   const starter = (id: Starter) => {
-    const code = t.diagram.starters[id];
-    setDraft(code);
-    requestAnimationFrame(() => area.current?.focus());
+    setCode(t.diagram.starters[id]);
+    setCodeEdited(true);
+    focusCode();
+  };
+
+  const title = diagramTitle(stored);
+  const download = (format: DiagramFormat) => {
+    if (!svg) return;
+    const name = diagramFileName(title, t.diagram.label);
+    downloadDiagram(svg, format, name, () => renderDiagram(src, dark, true).then((r) => r.svg)).catch(() => blob.say(t.diagram.downloadFailed, { mood: "worried" }));
   };
 
   const preview = (
@@ -233,74 +335,201 @@ function DiagramView({ node, updateAttributes, editor, getPos, selected }: React
       {svg ? (
         <div className={cn("blob-diagram-svg", (error || loading) && "is-stale")} dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
-        <div className="blob-diagram-placeholder">{loading ? t.diagram.loading : editing ? t.diagram.empty : null}</div>
+        <div className="blob-diagram-placeholder">{loading ? t.diagram.loading : editing ? (mode === "builder" ? t.diagram.startEmpty : t.diagram.empty) : null}</div>
       )}
       {error && <div className="blob-diagram-error">{t.diagram.error}</div>}
+    </div>
+  );
+
+  /** Processes and cycles go down or to the right. */
+  const dir = mode === "builder" && (draft?.kind === "flow" || draft?.kind === "cycle") ? (draft.dir ?? (draft.kind === "cycle" ? "right" : "down")) : null;
+
+  const kindBar = draft && mode === "builder" && (
+    <div className="blob-diagram-chips" role="group" aria-label={t.diagram.kind}>
+      {DIAGRAM_KINDS.map((kind) => {
+        const Icon = KIND_ICONS[kind];
+        const on = draft.kind === kind;
+        return (
+          <button key={kind} type="button" onClick={() => switchKind(kind)} className={cn("blob-chip gap-1", on && "is-on")} aria-pressed={on}>
+            <Icon className="size-3" />
+            {t.diagram.kinds[kind].name}
+          </button>
+        );
+      })}
     </div>
   );
 
   return (
     <NodeViewWrapper className={cn("blob-diagram blob-object", editing && "is-editing", selected && !editing && "blob-node-selected")} data-drag-handle={editing ? undefined : ""}>
       {editing ? (
-        <div contentEditable={false} className="@container">
+        <div
+          contentEditable={false}
+          className="@container"
+          onKeyDown={(e) => {
+            // Escape anywhere in the editor (a button, a chip) finishes, like in the rows and the code.
+            if (e.key === "Escape" && !e.defaultPrevented) {
+              e.preventDefault();
+              finish();
+            }
+          }}
+        >
           <div className="blob-diagram-bar">
             <span className="blob-diagram-title">
               <Workflow className="size-3.5" />
               {t.diagram.label}
             </span>
-            <div className="blob-diagram-chips" role="group" aria-label={t.diagram.templates}>
-              {STARTERS.map((id) => (
-                <button key={id} type="button" onClick={() => starter(id)} className="blob-chip">
-                  {t.diagram.t[id]}
+            {kindBar}
+            {mode === "code" && (
+              <div className="blob-diagram-chips" role="group" aria-label={t.diagram.templates}>
+                {STARTERS.map((id) => (
+                  <button key={id} type="button" onClick={() => starter(id)} className="blob-chip">
+                    {t.diagram.t[id]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {mode === "gallery" && <span className="flex-1" />}
+            {dir && draft && (
+              <button
+                type="button"
+                className="blob-diagram-help"
+                onClick={() => setDraft({ ...draft, dir: dir === "down" ? "right" : "down" })}
+                aria-label={`${t.diagram.direction.label}: ${t.diagram.direction[dir]}`}
+                title={`${t.diagram.direction.label}: ${t.diagram.direction[dir]}`}
+              >
+                {dir === "down" ? <ArrowDownToLine className="size-4" /> : <ArrowRightToLine className="size-4" />}
+              </button>
+            )}
+            {mode !== "gallery" && (
+              <div className="blob-seg" role="group">
+                <button type="button" aria-pressed={mode === "builder"} onClick={mode === "builder" ? undefined : toBuilder} title={t.diagram.builderTitle}>
+                  {t.diagram.builder}
                 </button>
-              ))}
-            </div>
-            <a href="https://mermaid.js.org/intro/syntax-reference.html" target="_blank" rel="noopener noreferrer" className="blob-diagram-help" title={t.diagram.help} aria-label={t.diagram.help}>
-              <CircleHelp className="size-4" />
-            </a>
-            <button type="button" onClick={finish} className="blob-done">
+                <button type="button" aria-pressed={mode === "code"} onClick={mode === "code" ? undefined : toCode} title={t.diagram.codeTitle}>
+                  {t.diagram.code}
+                </button>
+              </div>
+            )}
+            {mode === "code" && (
+              <a href="https://mermaid.js.org/intro/syntax-reference.html" target="_blank" rel="noopener noreferrer" className="blob-diagram-help" title={t.diagram.help} aria-label={t.diagram.help}>
+                <CircleHelp className="size-4" />
+              </a>
+            )}
+            <button type="button" onClick={finish} className="blob-done" data-diagram-done>
               {t.done}
             </button>
           </div>
-          <div className="grid gap-2 @min-[600px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-            <textarea
-              ref={area}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
-                  e.preventDefault();
-                  finish();
-                }
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  const el = e.currentTarget;
-                  const at = el.selectionStart;
-                  setDraft(draft.slice(0, at) + "  " + draft.slice(el.selectionEnd));
-                  requestAnimationFrame(() => el.setSelectionRange(at + 2, at + 2));
-                }
-              }}
-              aria-label={t.diagram.source}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              rows={Math.min(16, Math.max(6, draft.split("\n").length + 1))}
-              className="blob-diagram-code"
-            />
-            {preview}
-          </div>
+          {fresh && (
+            <div className="blob-diagram-fresh" role="alert">
+              <span>{t.diagram.fresh}</span>
+              <span className="flex gap-1.5">
+                <button
+                  type="button"
+                  className="blob-done"
+                  onClick={() => {
+                    setFresh(false);
+                    setMode("gallery");
+                  }}
+                >
+                  {t.diagram.freshYes}
+                </button>
+                <button type="button" className="blob-chip" onClick={() => setFresh(false)}>
+                  {t.diagram.freshNo}
+                </button>
+              </span>
+            </div>
+          )}
+          {mode === "gallery" ? (
+            <DiagramGallery onPick={pick} onDone={finish} />
+          ) : (
+            <div className="grid gap-2 @min-[600px]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+              {mode === "builder" && draft ? (
+                <DiagramRows draft={draft} onChange={setDraft} onDone={finish} />
+              ) : (
+                <div className="min-w-0">
+                  {draft && !codeEdited && <p className="blob-diagram-note">{t.diagram.codeNote}</p>}
+                  <textarea
+                    ref={area}
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value);
+                      setCodeEdited(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
+                        e.preventDefault();
+                        finish();
+                      }
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        const el = e.currentTarget;
+                        const at = el.selectionStart;
+                        setCode(code.slice(0, at) + "  " + code.slice(el.selectionEnd));
+                        setCodeEdited(true);
+                        requestAnimationFrame(() => el.setSelectionRange(at + 2, at + 2));
+                      }
+                    }}
+                    aria-label={t.diagram.source}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    rows={Math.min(16, Math.max(6, code.split("\n").length + 1))}
+                    className="blob-diagram-code"
+                  />
+                </div>
+              )}
+              {preview}
+            </div>
+          )}
         </div>
       ) : (
         <div contentEditable={false} className="relative" onDoubleClick={open}>
           {src.trim() ? preview : <div className="blob-diagram-placeholder">{t.diagram.empty}</div>}
-          {canEdit && (
-            <button type="button" data-open-editor onClick={open} className="blob-block-edit" aria-label={t.diagram.edit} title={t.diagram.edit}>
-              <Pencil className="size-3.5" />
-              <span>{t.edit}</span>
-            </button>
-          )}
+          <div className="blob-diagram-actions">
+            {svg && (
+              <>
+                <button type="button" onClick={() => setLarge(true)} className="blob-block-edit is-icon" aria-label={t.diagram.enlarge} title={t.diagram.enlarge}>
+                  <Maximize2 className="size-3.5" />
+                </button>
+                <Popover
+                  align="end"
+                  className="w-[220px]"
+                  trigger={(props) => (
+                    <button {...props} type="button" className="blob-block-edit is-icon" aria-label={t.diagram.download} title={t.diagram.download}>
+                      <Download className="size-3.5" />
+                    </button>
+                  )}
+                >
+                  {(close) => (
+                    <>
+                      {(["svg", "png"] as const).map((format) => (
+                        <MenuItem
+                          key={format}
+                          icon={<Download />}
+                          shortcut={format === "svg" ? t.diagram.svgHint : t.diagram.pngHint}
+                          onSelect={() => {
+                            close();
+                            download(format);
+                          }}
+                        >
+                          {format === "svg" ? t.diagram.svg : t.diagram.png}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
+                </Popover>
+              </>
+            )}
+            {canEdit && (
+              <button type="button" data-open-editor onClick={open} className="blob-block-edit" aria-label={t.diagram.edit} title={t.diagram.edit}>
+                <Pencil className="size-3.5" />
+                <span>{t.edit}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
+      {large && svg && !editing && <DiagramViewer svg={svg} title={title} onClose={() => setLarge(false)} onDownload={download} />}
     </NodeViewWrapper>
   );
 }
@@ -317,6 +546,16 @@ export const Diagram = DiagramSpec.extend({
         const sel = editor.state.selection;
         if (!(sel instanceof NodeSelection) || sel.node.type.name !== this.name || !editor.isEditable) return false;
         openEditorAt(editor, sel.from, 0);
+        return true;
+      },
+      // A click on the editor's buttons leaves the caret in the note (buttons there don't take focus):
+      // Escape then still finishes the diagram being edited.
+      Escape: ({ editor }) => {
+        const sel = editor.state.selection;
+        if (!(sel instanceof NodeSelection) || sel.node.type.name !== this.name) return false;
+        const done = (editor.view.nodeDOM(sel.from) as HTMLElement | null)?.querySelector?.<HTMLElement>(".is-editing [data-diagram-done]");
+        if (!done) return false;
+        done.click();
         return true;
       },
     };

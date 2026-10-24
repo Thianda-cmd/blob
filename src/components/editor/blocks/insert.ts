@@ -1,4 +1,5 @@
 import type { Editor, JSONContent, Range } from "@tiptap/core";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import { TextSelection } from "@tiptap/pm/state";
 
@@ -35,10 +36,21 @@ export function openEditorAt(editor: Editor, pos: number, tries = 8) {
  * its editor right away (an empty formula, a new diagram…).
  */
 export function insertBlock(editor: Editor, range: Range | null, content: JSONContent, open = true) {
+  // The blocks of this type already there (unchanged nodes stay the same objects after the insert).
+  const before = new Set<PMNode>();
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === content.type) before.add(node);
+  });
   const chain = editor.chain().focus();
   if (range) chain.deleteRange(range);
   chain.insertContent(content).run();
-  const pos = nearestOfType(editor.state, content.type!);
+  // The new one: right after another block of its type, the nearest to the caret can be the old one.
+  let pos: number | null = null;
+  editor.state.doc.descendants((node, at) => {
+    if (pos === null && node.type.name === content.type && !before.has(node)) pos = at;
+    return pos === null;
+  });
+  pos ??= nearestOfType(editor.state, content.type!);
   if (pos === null) return;
   editor.commands.setNodeSelection(pos);
   if (open) openEditorAt(editor, pos);

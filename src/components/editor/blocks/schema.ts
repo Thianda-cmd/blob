@@ -269,7 +269,10 @@ export const Tables = TableKit.configure({
 
 // Diagrams, sketches and plots -------------------------------------------------------------------
 
-/** A Mermaid diagram, stored as its source. */
+/**
+ * A Mermaid diagram, stored as its source. One made in the builder also keeps the builder's rows
+ * (`model`, see diagramModel.ts): `src` is then made from them, so everything else reads `src` only.
+ */
 export const DiagramSpec = Node.create({
   name: "diagram",
   group: "block",
@@ -283,6 +286,17 @@ export const DiagramSpec = Node.create({
         default: "",
         parseHTML: (el) => el.getAttribute("data-src") ?? el.textContent ?? "",
         renderHTML: (attrs) => ({ "data-src": attrs.src }),
+      },
+      model: {
+        default: null,
+        parseHTML: (el) => {
+          try {
+            return JSON.parse(el.getAttribute("data-model") ?? "null");
+          } catch {
+            return null;
+          }
+        },
+        renderHTML: (attrs) => (attrs.model ? { "data-model": JSON.stringify(attrs.model) } : {}),
       },
     };
   },

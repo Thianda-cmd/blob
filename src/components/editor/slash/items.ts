@@ -37,7 +37,7 @@ import {
 import type { Locale } from "@/i18n/config";
 import { intlLocale } from "@/i18n/format";
 import { editorText } from "@/i18n/messages/editor";
-import { noteBlocksText } from "@/i18n/messages/noteBlocks";
+import { newDiagramAttrs } from "../blocks/diagramModel";
 import { insertBlock } from "../blocks/insert";
 import { insertFlashcard } from "../blocks/Flashcard";
 import { newTable } from "../blocks/Table";
@@ -248,7 +248,8 @@ const DEFS: SlashDef[] = [
     id: "mindmap",
     group: "school",
     icon: Network,
-    run: ({ editor, range, locale }) => insertBlock(editor, range, { type: "diagram", attrs: { src: noteBlocksText[locale].diagram.starters.mindmap } }),
+    // Straight into the builder, with an example mind map to change.
+    run: ({ editor, range, locale }) => insertBlock(editor, range, { type: "diagram", attrs: newDiagramAttrs("mindmap", locale) }),
   },
   {
     id: "code",
