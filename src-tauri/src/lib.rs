@@ -221,6 +221,12 @@ fn blob_paths(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<PathBuf
 /// then brings the window to the front.
 fn open_files<R: Runtime>(app: &AppHandle<R>, paths: &[PathBuf]) {
   let files: Vec<OpenedFile> = paths.iter().filter_map(|p| read_opened(p)).collect();
+  // iPhone and iPad copy a file opened with Blob into the app's Documents/Inbox; once it's read,
+  // the copy isn't needed.
+  #[cfg(target_os = "ios")]
+  for path in paths.iter().filter(|p| p.parent().is_some_and(|d| d.ends_with("Inbox"))) {
+    let _ = std::fs::remove_file(path);
+  }
   if files.is_empty() {
     return;
   }

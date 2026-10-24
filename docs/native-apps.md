@@ -97,7 +97,9 @@ Rules around the site (`src-tauri/src/lib.rs`):
     the `next` page after it is checked the way a browser reads it (`safeNext`).
 - **Blob files** (`.blob`, `src/notes/blobFile.ts`) open with the app: double-click, *Open with*, or
   dropped on its icon. The installers register the type (`bundle.fileAssociations`; Linux also gets
-  a MIME type from `src-tauri/linux/org.bojes.blob.xml`).
+  a MIME type from `src-tauri/linux/org.bojes.blob.xml`). iOS doesn't read `fileAssociations`, so
+  `src-tauri/Info.ios.plist` declares the same type; files come in as copies in the app's Inbox,
+  which the app deletes once it has read them.
   - Windows and Linux hand the app the file's path as an argument (a running app gets it from the
     second start, through the single-instance plugin); macOS and iOS as a `file://` link (the
     deep-link plugin passes those on).

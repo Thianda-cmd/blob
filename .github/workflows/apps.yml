@@ -381,6 +381,7 @@ jobs:
           [ -n "$APP" ] || APP=$(find src-tauri/gen/apple/build -name "*.app" -type d | head -1)
           echo "app: $APP"
           plutil -p "$APP/Info.plist" | grep -q org.bojes.blob || echo "::warning::the org.bojes.blob link scheme is missing from Info.plist"
+          plutil -p "$APP/Info.plist" | grep -q org.bojes.blob.file || { echo "::error::the Blob file type (Info.ios.plist) is missing from Info.plist"; exit 1; }
           test -d "$APP/PlugIns/BlobWidget.appex" || { echo "::error::the widget extension is missing from the app"; exit 1; }
           plutil -p "$APP/PlugIns/BlobWidget.appex/Info.plist" | grep -q com.apple.widgetkit-extension || { echo "::error::the widget extension has no WidgetKit Info.plist"; exit 1; }
           bash src-tauri/tests/e2e/ios.sh "$APP" e2e-iOS

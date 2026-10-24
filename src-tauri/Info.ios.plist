@@ -11,5 +11,52 @@
     <string>bojes.org</string>
     <string>supabase.co</string>
   </array>
+
+  <!-- Blob files (.blob, src/notes/blobFile.ts): Files, Mail and the share sheet offer Blob for
+       them. bundle.fileAssociations in tauri.conf.json only reaches the computer installers, so
+       iOS gets the same type here. The file is copied into the app (not opened in place), so the
+       app can read it straight away (src-tauri/src/lib.rs open_files). -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Blob file</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.bojes.blob.file</string>
+      </array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>org.bojes.blob.file</string>
+      <key>UTTypeDescription</key>
+      <string>Blob notes</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.json</string>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>blob</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>application/vnd.blob+json</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
+  <key>LSSupportsOpeningDocumentsInPlace</key>
+  <false/>
 </dict>
 </plist>
