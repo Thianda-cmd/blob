@@ -4,7 +4,9 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.view.View
@@ -16,8 +18,15 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.io.ByteArrayOutputStream
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : TauriActivity() {
+  /** Blob files opened with the app that the site hasn't taken yet (only touched on the UI thread). */
+  private val openedFiles = mutableListOf<JSONObject>()
+  private var webView: WebView? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -32,11 +41,63 @@ class MainActivity : TauriActivity() {
       WindowInsetsCompat.CONSUMED
     }
     pinForTest(intent)
+    takeFiles(intent)
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     pinForTest(intent)
+    takeFiles(intent)
+  }
+
+  /**
+   * Blob files (.blob) opened with the app: "Open with" in Files or Downloads, or shared to it. They
+   * are read in the background (they can be big) and kept for the site, which takes them through
+   * window.BlobFiles and imports them (src/components/notes/useOpenedFiles.ts).
+   */
+  @Suppress("DEPRECATION")
+  private fun takeFiles(intent: Intent?) {
+    if (intent == null) return
+    val uris: List<Uri> = when (intent.action) {
+      Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+      Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+      Intent.ACTION_SEND_MULTIPLE -> intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+      else -> emptyList()
+    }.filter { it.scheme == "content" || it.scheme == "file" }
+    if (uris.isEmpty()) return
+    Thread {
+      val read = uris.mapNotNull { readBlobFile(it) }
+      if (read.isNotEmpty()) runOnUiThread {
+        openedFiles.addAll(read)
+        webView?.evaluateJavascript("window.dispatchEvent(new Event('blob-opened-files'))", null)
+      }
+    }.start()
+  }
+
+  /** A Blob file's name and text, or null for another kind of file, one that's too big or unreadable. */
+  private fun readBlobFile(uri: Uri): JSONObject? = try {
+    val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+      if (c.moveToFirst()) c.getString(0) else null
+    } ?: uri.lastPathSegment ?: "Blob.blob"
+    if (!name.endsWith(".blob", ignoreCase = true) && contentResolver.getType(uri) != BLOB_MIME) {
+      null
+    } else {
+      contentResolver.openInputStream(uri)?.use { input ->
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+          val n = input.read(buffer)
+          if (n < 0) break
+          total += n
+          if (total > MAX_OPENED_BYTES) return null
+          out.write(buffer, 0, n)
+        }
+        JSONObject().put("name", name).put("text", out.toString("UTF-8"))
+      }
+    }
+  } catch (e: Exception) {
+    null
   }
 
   /**
@@ -53,6 +114,7 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onWebViewCreate(webView: WebView) {
+    this.webView = webView
     // window.BlobAndroid.print(): the system print dialog for the page, with "Save as PDF" (the CV).
     webView.addJavascriptInterface(PrintBridge(this, webView), "BlobAndroid")
     // window.BlobWidget.postMessage(json): the home screen widget's data (TodayWidget.kt). Only the
@@ -60,6 +122,15 @@ class MainActivity : TauriActivity() {
     if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
       WebViewCompat.addWebMessageListener(webView, "BlobWidget", setOf(SITE)) { _, message, _, isMainFrame, _ ->
         if (isMainFrame) TodayWidget.save(applicationContext, message.data ?: "")
+      }
+      // window.BlobFiles.postMessage("take"): the Blob files opened with the app, as JSON
+      // ([{ name, text }]), for the site's own pages only.
+      WebViewCompat.addWebMessageListener(webView, "BlobFiles", setOf(SITE)) { _, message, _, isMainFrame, reply ->
+        if (isMainFrame && message.data == "take") {
+          val files = JSONArray(openedFiles.toList())
+          openedFiles.clear()
+          reply.postMessage(files.toString())
+        }
       }
     }
     // Back (button or swipe) goes back a page; on the first page it puts Blob in the background, as
@@ -75,6 +146,10 @@ class MainActivity : TauriActivity() {
 
 /** The site the app shows (src-tauri/src/lib.rs SITE). */
 private const val SITE = "https://blob.bojes.org"
+
+/** Blob files (src/notes/blobFile.ts): their type, and how big a file the app reads. */
+private const val BLOB_MIME = "application/vnd.blob+json"
+private const val MAX_OPENED_BYTES = 100L * 1024 * 1024
 
 private class PrintBridge(private val activity: MainActivity, private val webView: WebView) {
   @JavascriptInterface

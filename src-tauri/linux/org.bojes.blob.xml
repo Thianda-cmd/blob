@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Blob files (.blob) on Linux: the file type, so file managers open them with Blob (the .deb and
+     .rpm install it to /usr/share/mime/packages; see tauri.conf.json bundle.linux). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.blob+json">
+    <comment>Blob file</comment>
+    <comment xml:lang="de">Blob-Datei</comment>
+    <sub-class-of type="application/json"/>
+    <generic-icon name="text-x-generic"/>
+    <glob pattern="*.blob"/>
+  </mime-type>
+</mime-info>

@@ -19,6 +19,7 @@
     "allow-app-info",
     "allow-set-offline-ready",
     "allow-set-widget",
+    "allow-take-opened-files",
     "allow-update-check",
     "allow-update-download",
     "allow-update-progress",

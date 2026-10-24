@@ -95,6 +95,18 @@ Rules around the site (`src-tauri/src/lib.rs`):
   - The sign-in confirmation page offers "Open in the app" with the app-link version of its link,
     so email links can end up in the app on any device. The token is only used on the click, and
     the `next` page after it is checked the way a browser reads it (`safeNext`).
+- **Blob files** (`.blob`, `src/notes/blobFile.ts`) open with the app: double-click, *Open with*, or
+  dropped on its icon. The installers register the type (`bundle.fileAssociations`; Linux also gets
+  a MIME type from `src-tauri/linux/org.bojes.blob.xml`).
+  - Windows and Linux hand the app the file's path as an argument (a running app gets it from the
+    second start, through the single-instance plugin); macOS and iOS as a `file://` link (the
+    deep-link plugin passes those on).
+  - The app reads the file (`.blob` only, at most 100 MB) and keeps it; the site takes it with
+    `take_opened_files` when it starts signed in, and right away when the app says
+    `blob-opened-files`, then imports it and opens the first page (`useOpenedFiles`).
+  - Android: "Open with" from Files or Downloads, or a share, reaches `MainActivity.kt`, which reads
+    the file in the background and hands it over through `window.BlobFiles` (the site's own pages
+    only, like the widget's channel).
 - **Window size and position** are remembered.
 - **Native behaviour per platform:**
   - **Android** (`gen/android/.../MainActivity.kt`):
@@ -142,7 +154,9 @@ server):
 - **What the site may call:**
   - `app_info` works from the site's own origin;
   - `open_external("file:///etc/passwd")` is refused;
-  - `start_target` called from the site is refused, as is a plugin command called directly.
+  - `start_target` called from the site is refused, as is a plugin command called directly;
+  - a Blob file opened with the running app reaches the site once (`take_opened_files`), and signed
+    in it comes in as a note.
 - **Links:**
   - an external link, an external "new tab" link, the blank-tab-then-file pattern and an external
     `window.open` all reach the system browser;

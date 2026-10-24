@@ -44,18 +44,22 @@ env:
     Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Updates by itself** (computers): when a new version is out, Blob shows what's new and updates with one click.
-    - **Calendar**: smoother switching between days, weeks and months; Today shows the way when it's out of sight.
-    - **Reminders** say the room, name the exam's subject and list your homework; on Android they have their own channels and Blob's icon.
-    - **New Android widget "Next up"**: what's on now or next, with a live countdown. The Today widget shows rooms too.
-    - **Sign in with your browser** works every time, even when the browser doesn't open the app.
+    - **Open Blob files**: double-click a `.blob` file (or choose *Open with → Blob*) and it comes into your notes with its sub-pages, pictures and files. On Android, open it from Files or Downloads, or share it to Blob.
+    - **Notes can do much more**: text sizes in px, text and highlighter colours, alignment, lists with their own size and style, text under a list item, find and replace, moving blocks, templates, and Markdown pasted as formatting.
+    - **Two notes side by side**, and Ctrl+Shift+L (Ctrl+Tab in the app) switches to the last note; hold it for a list of recent pages.
+    - **Diagrams without code**: mind maps, processes, timelines and more from simple rows, with a large view and downloads.
+    - **Export and import**: PDF, Markdown and Blob files, and all your notes as one backup in Settings.
+    - **A text cursor you can see**: Blob draws its own thick cursor in the app on computers.
+    - The French course has been removed.
 
     **Neu in dieser Version**
-    - **Aktualisiert sich selbst** (Computer): Gibt es eine neue Version, zeigt Blob, was neu ist, und aktualisiert sich mit einem Klick.
-    - **Kalender**: flüssigerer Wechsel zwischen Tagen, Wochen und Monaten; „Heute“ zeigt die Richtung, wenn heute nicht zu sehen ist.
-    - **Erinnerungen** nennen den Raum, das Fach der Prüfung und deine Hausaufgaben; auf Android mit eigenen Kanälen und Blobs Symbol.
-    - **Neues Android-Widget „Als Nächstes“**: was gerade läuft oder als Nächstes kommt, mit Live-Countdown. Das Heute-Widget zeigt jetzt auch Räume.
-    - **Mit dem Browser anmelden** klappt jedes Mal, auch wenn der Browser die App nicht öffnet.
+    - **Blob-Dateien öffnen**: Doppelklick auf eine `.blob`-Datei (oder *Öffnen mit → Blob*), und sie kommt mit Unterseiten, Bildern und Dateien in deine Notizen. Auf Android öffnest du sie aus „Dateien“ oder „Downloads“ oder teilst sie mit Blob.
+    - **Notizen können viel mehr**: Textgrößen in px, Text- und Markerfarben, Ausrichtung, Listen mit eigener Größe und eigenem Stil, Text unter einem Listenpunkt, Suchen und Ersetzen, Blöcke verschieben, Vorlagen und eingefügtes Markdown mit Formatierung.
+    - **Zwei Notizen nebeneinander**, und Strg+Umschalt+L (in der App Strg+Tab) wechselt zur letzten Notiz; gedrückt halten zeigt die zuletzt geöffneten Seiten.
+    - **Diagramme ohne Code**: Mindmaps, Abläufe, Zeitstrahlen und mehr aus einfachen Zeilen, mit Großansicht und Download.
+    - **Export und Import**: PDF, Markdown und Blob-Dateien, und in den Einstellungen alle Notizen als eine Sicherung.
+    - **Ein Textcursor, den man sieht**: Blob zeichnet in der App am Computer einen eigenen, kräftigen Cursor.
+    - Der Französischkurs wurde entfernt.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
@@ -140,7 +144,7 @@ jobs:
           dbus-run-session -- xvfb-run -a -s "-screen 0 1400x900x24" bash -c '
             tauri-driver > tauri-driver.log 2>&1 &
             sleep 3
-            node src-tauri/tests/e2e/desktop.mjs --app /usr/bin/blob --out e2e-Linux --deep-link "/usr/bin/blob org.bojes.blob://show"'
+            node src-tauri/tests/e2e/desktop.mjs --app /usr/bin/blob --out e2e-Linux --deep-link "/usr/bin/blob org.bojes.blob://show" --open-file "/usr/bin/blob {file}"'
 
       - name: Test (Windows)
         if: matrix.name == 'Windows'
@@ -186,7 +190,7 @@ jobs:
           if (-not $up) { throw "the app's DevTools port didn't open" }
           Start-Process $driver.FullName -ArgumentList '--port=4444', '--verbose', "--log-path=$PWD\msedgedriver.log"
           Start-Sleep 3
-          node src-tauri/tests/e2e/desktop.mjs --attach 127.0.0.1:9222 --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"'
+          node src-tauri/tests/e2e/desktop.mjs --attach 127.0.0.1:9222 --app $exe --out e2e-Windows --deep-link 'cmd /c start "" "org.bojes.blob://show"' --open-file "`"$exe`" {file}"
           $code = $LASTEXITCODE
           Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
           if ($code -ne 0) { exit $code }

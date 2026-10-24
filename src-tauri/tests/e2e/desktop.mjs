@@ -5,11 +5,13 @@
 //
 // Signed out it checks the start page, the bridge to the app, public pages, links, history and the
 // keys; with --deep-link "<command>" also an app link from outside (the command opens
-// org.bojes.blob://show, e.g. `blob org.bojes.blob://show` on Linux). With BLOB_E2E_EMAIL and BLOB_E2E_PASSWORD it also signs in and opens every area of the app,
+// org.bojes.blob://show, e.g. `blob org.bojes.blob://show` on Linux); with --open-file "<command>"
+// a Blob file opened with the running app ("{file}" in the command is its path, e.g.
+// `blob {file}`), which the site can then take. With BLOB_E2E_EMAIL and BLOB_E2E_PASSWORD it also signs in and opens every area of the app,
 // writes in a new note, and looks at the narrow (phone-sized) layout. Exits 1 if a check fails.
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Session, sleep } from "./webdriver.mjs";
 
 const arg = (name, fallback) => {
@@ -22,6 +24,8 @@ const driver = arg("driver", "http://127.0.0.1:4444");
 const site = arg("site", "https://blob.bojes.org");
 // A command that opens org.bojes.blob://show the way the system would (the running app takes it).
 const deepLink = arg("deep-link");
+// A command that opens a Blob file with the app the way a double-click would ({file}: its path).
+const openFile = arg("open-file");
 // Windows: --attach host:port joins the running app through its WebView2 DevTools port, with
 // --driver pointing at msedgedriver itself (webview2 launching under msedgedriver is unreliable).
 const attach = arg("attach");
@@ -29,6 +33,20 @@ const email = process.env.BLOB_E2E_EMAIL;
 const password = process.env.BLOB_E2E_PASSWORD;
 if (!app) throw new Error("--app path/to/the/app is required");
 mkdirSync(out, { recursive: true });
+
+/** Writes a Blob file with one note (in --out), and opens it with the running app. Returns its text. */
+function openBlob(name, title, text) {
+  const file = resolve(out, name);
+  const content = text ? { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] } : null;
+  const json = JSON.stringify({ format: "blob", version: 1, exportedAt: new Date().toISOString(), app: "Blob", pages: [{ ref: "e2e", kind: "note", title, icon: null, tags: [], topics: [], content, children: [] }], assets: {} });
+  writeFileSync(file, json);
+  try {
+    execSync(openFile.replaceAll("{file}", `"${file}"`), { timeout: 30000, stdio: "ignore" });
+  } catch (e) {
+    console.log(`(the open command ended with ${e.status})`);
+  }
+  return json;
+}
 
 const results = [];
 const check = (name, ok, detail = "") => {
@@ -148,6 +166,22 @@ try {
     await shot(s, "app-link");
   }
 
+  // A Blob file opened with the running app (a second start with its path): the app reads it and
+  // keeps it for the site, which takes it once (signed out nobody imports it, so the test can).
+  if (openFile) {
+    const text = openBlob("e2e note.blob", "E2E", "");
+    const take = "const done = arguments[arguments.length - 1]; window.__TAURI_INTERNALS__.invoke('take_opened_files').then((r) => done(r), (e) => done('refused: ' + e));";
+    let taken = [];
+    for (let i = 0; i < 20 && Array.isArray(taken) && !taken.length; i++) {
+      await sleep(1000);
+      taken = await s.execAsync(take);
+    }
+    const got = Array.isArray(taken) ? taken[0] : null;
+    check("a Blob file opened with the app reaches the site (take_opened_files)", got && got.name === "e2e note.blob" && got.text === text, Array.isArray(taken) ? taken.map((f) => f.name) : taken);
+    const again = await s.execAsync(take);
+    check("each opened file is handed over once", Array.isArray(again) && again.length === 0, again);
+  }
+
   if (email && password) {
     // Signed in from an earlier start (the app keeps its session), or sign in now.
     await s.go(site + "/login");
@@ -160,7 +194,7 @@ try {
     check("signed in inside the app", home.startsWith("/home") || home.startsWith("/onboarding"), home);
     await settled(s, "signed in home");
 
-    for (const p of ["/notes", "/tasks", "/projects", "/learn", "/learn/french", "/study/french/bonjour/1", "/cv", "/blob", "/settings"]) {
+    for (const p of ["/notes", "/tasks", "/calendar", "/projects", "/learn", "/learn/maths", "/cv", "/blob", "/settings"]) {
       await s.go(site + p);
       await settled(s, `app ${p}`);
     }
@@ -187,9 +221,22 @@ try {
       }
     } else check("the notes page has a New note button", false);
 
+    // Signed in, a Blob file opened with the app comes in as a note, and the note opens.
+    if (openFile) {
+      openBlob("Opened in the app.blob", "Opened in the app", "This note came from a Blob file.");
+      const imported = await s.until(
+        () => s.exec("return location.pathname.startsWith('/p/') && document.querySelector('.ProseMirror') ? document.querySelector('.ProseMirror').innerText : ''"),
+        (t) => t.includes("This note came from a Blob file."),
+        45000,
+        1000,
+      );
+      check("a Blob file opened with the app comes in as a note and opens", imported.includes("This note came from a Blob file."), imported.slice(0, 80));
+      await shot(s, "opened-blob-file");
+    }
+
     // The phone-sized layout inside the desktop app.
     await s.setSize(420, 860);
-    for (const p of ["/home", "/learn/french", "/notes"]) {
+    for (const p of ["/home", "/learn", "/notes"]) {
       await s.go(site + p);
       await settled(s, `narrow ${p}`, { wide: false });
     }

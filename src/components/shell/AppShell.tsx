@@ -9,6 +9,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useOfflineDevice } from "@/lib/offline/useOfflineDevice";
 import { useStartSync } from "@/lib/offline/useSync";
 import { useNotifications } from "@/lib/notify/useNotifications";
+import { useOpenedFiles } from "@/components/notes/useOpenedFiles";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
 import { PanesLayout, PanesProvider } from "./Panes";
@@ -28,6 +29,8 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
   useOfflineDevice();
   // Reminders on this device (the apps only).
   useNotifications();
+  // Blob files opened with the app come in as pages (the apps only).
+  useOpenedFiles();
 
   // The profile is the source of truth for the theme across devices.
   useEffect(() => watchTheme(profile.theme), [profile.theme]);

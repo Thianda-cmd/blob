@@ -9,11 +9,14 @@
 //!   confirmation page);
 //! - pop-up windows of the site (the presenter's speaker view) become app windows;
 //! - downloads land in the Downloads folder; printing works where the webview can't do it alone;
+//! - Blob files (.blob) open with the app: double-click, "Open with", or dropped on its icon; the
+//!   site imports them (`take_opened_files`);
 //! - one running app at a time (a second start focuses the first), and it remembers its window.
 //!
 //! The site may call only the commands in capabilities/site.json (`open_external`, `print_page`,
-//! `app_info`, `set_offline_ready`, and the notification plugin's). The start page may call
-//! `start_target` and `offline_ready`. Nothing else of the native side is reachable from web pages.
+//! `app_info`, `set_offline_ready`, `take_opened_files`, and the notification plugin's). The start
+//! page may call `start_target` and `offline_ready`. Nothing else of the native side is reachable
+//! from web pages.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -161,6 +164,75 @@ fn open_link<R: Runtime>(app: &AppHandle<R>, link: &Url) {
     let _ = w.unminimize();
     let _ = w.show();
     let _ = w.set_focus();
+  }
+}
+
+/// A Blob file the app was asked to open: its name and its text (JSON), for the site to import.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+struct OpenedFile {
+  name: String,
+  text: String,
+}
+
+/// Blob files opened with the app that the site hasn't taken yet (it may still be starting, or
+/// signed out: it takes them once it can import them).
+#[derive(Default)]
+struct OpenedFiles(Mutex<Vec<OpenedFile>>);
+
+/// The Blob file extension (src/notes/blobFile.ts BLOB_EXT).
+const BLOB_EXT: &str = "blob";
+/// Bigger files aren't read (the site imports at most 100 MB too).
+const MAX_OPENED_BYTES: u64 = 100 * 1024 * 1024;
+
+/// Whether a path names a Blob file (by its extension).
+fn is_blob_file(path: &Path) -> bool {
+  path.extension().is_some_and(|e| e.eq_ignore_ascii_case(BLOB_EXT))
+}
+
+/// Reads a Blob file the app was asked to open. Anything else (another kind of file, a folder,
+/// too big, not text) is left alone.
+fn read_opened(path: &Path) -> Option<OpenedFile> {
+  if !is_blob_file(path) {
+    return None;
+  }
+  let meta = std::fs::metadata(path).ok()?;
+  if !meta.is_file() || meta.len() > MAX_OPENED_BYTES {
+    return None;
+  }
+  let text = std::fs::read_to_string(path).ok()?;
+  let name = path.file_name()?.to_string_lossy().into_owned();
+  Some(OpenedFile { name, text })
+}
+
+/// The Blob files among command-line arguments: Windows and Linux start the app (or hand a running
+/// one, through the single-instance plugin) the paths of the files to open. Relative paths are
+/// relative to `cwd`; links and options are not files.
+fn blob_paths(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<PathBuf> {
+  args
+    .into_iter()
+    .filter(|a| !a.starts_with('-') && !a.contains("://"))
+    .map(PathBuf::from)
+    .filter(|p| is_blob_file(p))
+    .map(|p| if p.is_absolute() { p } else { cwd.join(p) })
+    .collect()
+}
+
+/// Keeps opened Blob files for the site and lets it know (the site asks itself when it starts),
+/// then brings the window to the front.
+fn open_files<R: Runtime>(app: &AppHandle<R>, paths: &[PathBuf]) {
+  let files: Vec<OpenedFile> = paths.iter().filter_map(|p| read_opened(p)).collect();
+  if files.is_empty() {
+    return;
+  }
+  app.state::<OpenedFiles>().0.lock().unwrap_or_else(|e| e.into_inner()).extend(files);
+  if let Some(window) = app.get_webview_window("main") {
+    if app.state::<SiteShown>().0.load(Ordering::SeqCst) {
+      let _ = window.eval("window.dispatchEvent(new Event('blob-opened-files'))");
+    }
+    #[cfg(desktop)]
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
   }
 }
 
@@ -442,6 +514,12 @@ fn set_widget(json: String) -> Result<(), String> {
   Ok(())
 }
 
+/// The site takes the Blob files opened with the app since it last asked (and imports them).
+#[tauri::command]
+fn take_opened_files<R: Runtime>(app: AppHandle<R>) -> Vec<OpenedFile> {
+  std::mem::take(&mut *app.state::<OpenedFiles>().0.lock().unwrap_or_else(|e| e.into_inner()))
+}
+
 /// The start page asks where to go, just before it leaves: a page from an app link, else nothing
 /// (the home page). Asked once: the answer is used up.
 #[tauri::command]
@@ -457,13 +535,14 @@ pub fn run() {
   // and focuses it. Must be the first plugin.
   #[cfg(desktop)]
   let builder = builder
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-      // The link itself comes through the deep-link plugin (`on_open_url`).
+    .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+      // A link comes through the deep-link plugin (`on_open_url`); Blob files come as paths.
       if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
       }
+      open_files(app, &blob_paths(args.into_iter().skip(1), Path::new(&cwd)));
     }))
     .plugin(tauri_plugin_window_state::Builder::default().build());
 
@@ -474,7 +553,8 @@ pub fn run() {
     // on phones, shown while open on computers.
     .plugin(tauri_plugin_notification::init())
     .manage(Pending::default())
-    .manage(SiteShown::default());
+    .manage(SiteShown::default())
+    .manage(OpenedFiles::default());
 
   // Computers also update themselves (src/update.rs); phones through their stores.
   #[cfg(desktop)]
@@ -486,13 +566,14 @@ pub fn run() {
     set_offline_ready,
     offline_ready,
     set_widget,
+    take_opened_files,
     update::update_check,
     update::update_download,
     update::update_progress,
     update::update_apply
   ]);
   #[cfg(mobile)]
-  let builder = builder.invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget]);
+  let builder = builder.invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget, take_opened_files]);
 
   builder
     .setup(|app| {
@@ -504,14 +585,18 @@ pub fn run() {
         let _ = app.deep_link().register_all();
       }
 
+      // Started to open Blob files (Windows and Linux: their paths; macOS and iPhone: file links,
+      // below and in `on_open_url`): the site takes them once it's up.
+      #[cfg(desktop)]
+      open_files(&handle, &blob_paths(std::env::args().skip(1), &std::env::current_dir().unwrap_or_default()));
+
       // Started from a link: the start page goes there instead of the home page. Debug builds also
       // take a path in BLOB_START (e.g. BLOB_START=/learn/maths).
-      let start = app
-        .deep_link()
-        .get_current()
-        .ok()
-        .flatten()
-        .and_then(|links| links.iter().find_map(link_target))
+      let current = app.deep_link().get_current().ok().flatten().unwrap_or_default();
+      open_files(&handle, &current.iter().filter(|u| u.scheme() == "file").filter_map(|u| u.to_file_path().ok()).collect::<Vec<_>>());
+      let start = current
+        .iter()
+        .find_map(link_target)
         .or_else(|| if cfg!(debug_assertions) { std::env::var("BLOB_START").ok().and_then(|p| site().join(&p).ok()) } else { None });
       if let Some(start) = start {
         app.state::<Pending>().set(start);
@@ -534,9 +619,12 @@ pub fn run() {
 
       let links = handle.clone();
       app.deep_link().on_open_url(move |event| {
-        for link in event.urls() {
+        // macOS and iPhone hand over opened files as file links, together with app links.
+        let (files, others): (Vec<Url>, Vec<Url>) = event.urls().into_iter().partition(|u| u.scheme() == "file");
+        for link in others {
           open_link(&links, &link);
         }
+        open_files(&links, &files.iter().filter_map(|u| u.to_file_path().ok()).collect::<Vec<_>>());
       });
 
       let window = site_window(&handle, "main", WebviewUrl::App("index.html".into()));
@@ -582,6 +670,25 @@ mod tests {
     assert!(!is_files(&url("https://nrxywlbbbafpyukcbruy.supabase.co/storage/v1/object/public/other/x.svg")));
     assert!(!is_files(&url("https://nrxywlbbbafpyukcbruy.supabase.co/auth/v1/verify")));
     assert!(!is_files(&url("https://other.supabase.co/storage/v1/object/sign/files/x.pdf")));
+  }
+
+  #[test]
+  fn opened_blob_files() {
+    let cwd = std::env::temp_dir().join(format!("blob-open-{}", std::process::id()));
+    std::fs::create_dir_all(&cwd).unwrap();
+    let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    // Paths of Blob files only: relative ones from where the app was started; links and options aren't files.
+    let found = blob_paths(args(&["Notes.blob", "/tmp/x/Bio.BLOB", "--flag", "org.bojes.blob://p/1", "photo.png", "notes.blob.txt"]), &cwd);
+    assert_eq!(found, vec![cwd.join("Notes.blob"), PathBuf::from("/tmp/x/Bio.BLOB")]);
+    // Read: name and text; other files, missing ones and folders aren't.
+    std::fs::write(cwd.join("Notes.blob"), r#"{"format":"blob"}"#).unwrap();
+    std::fs::write(cwd.join("photo.png"), "png").unwrap();
+    std::fs::create_dir_all(cwd.join("folder.blob")).unwrap();
+    assert_eq!(read_opened(&cwd.join("Notes.blob")), Some(OpenedFile { name: "Notes.blob".into(), text: r#"{"format":"blob"}"#.into() }));
+    assert_eq!(read_opened(&cwd.join("photo.png")), None);
+    assert_eq!(read_opened(&cwd.join("missing.blob")), None);
+    assert_eq!(read_opened(&cwd.join("folder.blob")), None);
+    let _ = std::fs::remove_dir_all(&cwd);
   }
 
   #[test]

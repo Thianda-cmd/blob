@@ -1,7 +1,8 @@
 // The Blob app (desktop and phones, src-tauri/) shows this site in a native window. Inside it, the
 // app sets window.__BLOB_APP__ before any script runs, and the site may call a few app commands
 // (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready,
-// set_widget, and on computers the update_* commands. In a browser all of this is inert.
+// set_widget, take_opened_files, and on computers the update_* commands. In a browser all of this
+// is inert.
 
 export type AppPlatform = "linux" | "macos" | "windows" | "android" | "ios";
 
@@ -14,6 +15,8 @@ declare global {
     BlobAndroid?: { print(): void };
     /** Android app only, on the site's own pages: the home screen widget's data (TodayWidget.kt). */
     BlobWidget?: { postMessage(data: string): void };
+    /** Android app only, on the site's own pages: "take" answers with the Blob files opened with the app. */
+    BlobFiles?: { postMessage(data: string): void; onmessage: ((event: MessageEvent<string>) => void) | null };
   }
 }
 
@@ -32,6 +35,7 @@ type Command =
   | "app_info"
   | "set_offline_ready"
   | "set_widget"
+  | "take_opened_files"
   | "update_check"
   | "update_download"
   | "update_progress"
@@ -67,6 +71,41 @@ export async function printPage(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** A Blob file (.blob) opened with the app: double-click, "Open with", or shared to it on Android. */
+export type OpenedFile = { name: string; text: string };
+
+/**
+ * The Blob files opened with the app since the site last asked (each is handed over once). Empty in
+ * a browser and in older apps.
+ */
+export async function takeOpenedFiles(): Promise<OpenedFile[]> {
+  if (!blobApp()) return [];
+  const valid = (v: unknown): OpenedFile[] =>
+    Array.isArray(v) ? v.filter((f): f is OpenedFile => !!f && typeof f.name === "string" && typeof f.text === "string") : [];
+  const channel = window.BlobFiles;
+  if (channel) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 10_000);
+      channel.onmessage = (event) => {
+        clearTimeout(timer);
+        channel.onmessage = null;
+        try {
+          resolve(valid(JSON.parse(event.data)));
+        } catch {
+          resolve([]);
+        }
+      };
+      channel.postMessage("take");
+    });
+  }
+  try {
+    return valid(await call<unknown>("take_opened_files"));
+  } catch {
+    // An older app without the command (or a phone app without the channel).
+    return [];
   }
 }
 
