@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowLeftRight, FolderInput, FileUser, Globe, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
+import { ArrowLeftRight, FolderInput, FolderKanban, FileUser, Globe, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { AddToProjectDialog } from "@/components/projects/AddToProject";
+import { PageProjectsChip, usePageCards } from "@/components/projects/PageProjects";
 import { AvatarStack, personName } from "@/components/share/Avatar";
 import { ShareDialog } from "@/components/share/ShareDialog";
 import { useMembers } from "@/components/share/useMembers";
@@ -15,6 +17,7 @@ import { descendantsOf, useWorkspace } from "@/components/workspace/WorkspacePro
 import { useLocale, useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { panesText } from "@/i18n/messages/panes";
+import { projectLinksText } from "@/i18n/messages/projectLinks";
 import { pageText } from "@/i18n/messages/page";
 import { publicText } from "@/i18n/messages/public";
 import { shareText } from "@/i18n/messages/share";
@@ -57,6 +60,7 @@ export function PageTopBar({
   const pub = useMessages(publicText);
   const tp = useMessages(panesText).split;
   const cvs = useMessages(cvHomeText).title;
+  const tl = useMessages(projectLinksText);
   const locale = useLocale();
   const router = useRouter();
   const { pages, subjects, updatePage, trashPage, userId, removePages } = useWorkspace();
@@ -68,7 +72,11 @@ export function PageTopBar({
   );
   // Owners and editors see the page's public link (a badge while there is one).
   const publicLink = usePublicLink(page && (page.user_id === userId || access.role === "owner" || access.role === "editor") ? pageId : null);
+  // The project cards the page is on (CVs are never on one).
+  const pageCards = usePageCards(page && page.kind !== "cv" ? pageId : null);
+  const inProjects = useMemo(() => new Set(pageCards.cards.map((c) => c.project.id)), [pageCards.cards]);
   const [sharing, setSharing] = useState(false);
+  const [adding, setAdding] = useState(false);
   if (!page) return <TopBar crumbs={[]} />;
 
   const chain: PageMeta[] = [];
@@ -161,6 +169,7 @@ export function PageTopBar({
                 {role === "viewer" ? s.viewOnly : s.sharedBadge}
               </button>
             )}
+            {!cv && <PageProjectsChip cards={pageCards.cards} onAdd={() => setAdding(true)} />}
             {publicLink.link && (
               <button
                 type="button"
@@ -275,6 +284,17 @@ export function PageTopBar({
                       {s.share}
                     </MenuItem>
                   )}
+                  {!cv && (
+                    <MenuItem
+                      icon={<FolderKanban />}
+                      onSelect={() => {
+                        close();
+                        setAdding(true);
+                      }}
+                    >
+                      {tl.addToProject}
+                    </MenuItem>
+                  )}
                   <MenuItem
                     icon={<Link2 />}
                     onSelect={() => {
@@ -339,6 +359,19 @@ export function PageTopBar({
         onChanged={cv ? undefined : changed}
         onLeft={leftPage}
       />
+      {!cv && (
+        <AddToProjectDialog
+          open={adding}
+          onClose={() => setAdding(false)}
+          page={page}
+          canShare={canShare}
+          already={inProjects}
+          onAdded={(_project, _card, shared) => {
+            void pageCards.reload();
+            if (shared) changed();
+          }}
+        />
+      )}
     </>
   );
 }

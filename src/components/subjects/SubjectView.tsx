@@ -1,12 +1,14 @@
 "use client";
 
 import { differenceInCalendarDays, format, isSameYear } from "date-fns";
-import { ArrowRight, FilePlus2, Folder, FolderPlus, Presentation } from "lucide-react";
+import { ArrowRight, FilePlus2, Folder, FolderPlus, Plus, Presentation } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { ProjectRow } from "@/components/home/ProjectsBlock";
+import type { ProjectSummary } from "@/components/projects/load";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { TopBar } from "@/components/shell/TopBar";
 import { QuickAdd } from "@/components/tasks/QuickAdd";
@@ -18,18 +20,31 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { dateLocale } from "@/i18n/format";
+import { projectLinksText } from "@/i18n/messages/projectLinks";
 import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import type { PageKind, Subject, Task } from "@/lib/types";
 import { pageTitle } from "@/lib/utils";
 import { DeckCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
 
-/** Everything for one subject: notes, presentations and its tasks. */
-export function SubjectView({ subject: initial, previews, initialTasks }: { subject: Subject; previews: Record<string, PagePreview>; initialTasks: Task[] }) {
+/** Everything for one subject: notes, presentations, its projects and its tasks. */
+export function SubjectView({
+  subject: initial,
+  previews,
+  initialTasks,
+  projects,
+}: {
+  subject: Subject;
+  previews: Record<string, PagePreview>;
+  initialTasks: Task[];
+  /** The subject's active projects (yours and the ones you're in). */
+  projects: ProjectSummary[];
+}) {
   const router = useRouter();
   const { subjects, pages, createPage } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(subjectsText);
+  const tl = useMessages(projectLinksText);
   // Prefer the live copy so renames, recolors and new emojis show up immediately.
   const subject = subjects.find((s) => s.id === initial.id) ?? initial;
   const store = useTaskStore(initialTasks, { subjectId: subject.id });
@@ -174,6 +189,27 @@ export function SubjectView({ subject: initial, previews, initialTasks }: { subj
                   <NewCard kind="deck" onClick={() => create("deck")} busy={creating === "deck"} alone={decks.length === 0} />
                 </div>
               </Section>
+
+              {projects.length > 0 && (
+                <Section
+                  title={tl.projects}
+                  count={projects.length}
+                  action={
+                    <Link
+                      href={`/projects?new=1&subject=${subject.id}`}
+                      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2"
+                    >
+                      <Plus className="size-3" /> {tl.newProjectFor}
+                    </Link>
+                  }
+                >
+                  <div className="grid grid-cols-1 gap-2.5 min-[720px]:grid-cols-2">
+                    {projects.map((p) => (
+                      <ProjectRow key={p.id} project={p} />
+                    ))}
+                  </div>
+                </Section>
+              )}
             </div>
 
             <aside className="min-w-0 rounded-2xl border border-line bg-raised/50 p-3.5 lg:sticky lg:top-7 lg:self-start dark:bg-raised/40">

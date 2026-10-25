@@ -30,6 +30,7 @@ import { DueChip } from "./CardFace";
 import { CardDrawer } from "./CardDrawer";
 import { CardMenuArea } from "./CardMenu";
 import { ListView } from "./ListView";
+import { MaterialsButton } from "./Materials";
 import { PRIORITIES, boardColor, labelKey, projectLabels, projectProgress, type Priority } from "./model";
 import { PickRow, PriorityIcon } from "./pickers";
 import { ConfirmDialog, ProjectIcon, ProjectSettingsDialog } from "./ProjectDialogs";
@@ -318,6 +319,7 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
                 <AvatarStack people={members} here={here} size={22} max={6} />
               </button>
             )}
+            <MaterialsButton board={board} readOnly={readOnly} onOpenCard={open} />
           </div>
         </Header>
 

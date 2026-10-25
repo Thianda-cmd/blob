@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { themeSpecOf } from "@/components/deck/deck";
+import { loadProjectSummaries } from "@/components/projects/load";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { SubjectView } from "@/components/subjects/SubjectView";
 import { subjectsText } from "@/i18n/messages/subjects";
 import { getMessages } from "@/i18n/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { loadTasks } from "@/lib/tasks";
 import type { PageKind, Subject } from "@/lib/types";
 
@@ -35,14 +36,15 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
   const subject = await loadSubject(id);
   if (!subject) notFound();
 
-  const supabase = await createClient();
-  const [pagesRes, tasks] = await Promise.all([
+  const [supabase, user] = await Promise.all([createClient(), getUser()]);
+  const [pagesRes, tasks, projects] = await Promise.all([
     supabase
       .from("pages")
       .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
       .eq("subject_id", id)
       .is("trashed_at", null),
     loadTasks(supabase, { subjectId: id }),
+    user ? loadProjectSummaries(supabase, user.id, { archived: false }) : [],
   ]);
 
   // Only small previews travel to the client; the page list itself comes from the workspace.
@@ -55,5 +57,5 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
     };
   }
 
-  return <SubjectView key={subject.id} subject={subject} previews={previews} initialTasks={tasks} />;
+  return <SubjectView key={subject.id} subject={subject} previews={previews} initialTasks={tasks} projects={projects.filter((p) => p.subject_id === id)} />;
 }

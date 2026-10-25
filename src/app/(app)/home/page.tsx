@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { loadEvents } from "@/calendar/load";
 import { themeSpecOf } from "@/components/deck/deck";
 import { HomeView } from "@/components/home/HomeView";
 import { homeText } from "@/i18n/messages/home";
@@ -23,7 +24,7 @@ function snippet(text: string | null) {
 
 export default async function HomePage() {
   const [supabase, user] = await Promise.all([createClient(), getUser()]);
-  const [tasks, recentRes, openRes, learn, cvRes, projects, assigned] = await Promise.all([
+  const [tasks, recentRes, openRes, learn, cvRes, projects, assigned, events] = await Promise.all([
     loadUpcomingTasks(supabase, 7),
     supabase
       .from("pages")
@@ -38,6 +39,8 @@ export default async function HomePage() {
     supabase.from("pages").select("id, content").eq("kind", "cv").is("trashed_at", null).order("updated_at", { ascending: false }).limit(6),
     user ? loadProjectSummaries(supabase, user.id, { archived: false, limit: 4 }) : [],
     user ? loadAssignedCards(supabase, user.id, 6) : [],
+    // Today's events, worked out in the browser (the student's day, not the server's).
+    loadEvents(supabase),
   ]);
 
   const previews: Record<string, PagePreview> = {};
@@ -67,6 +70,7 @@ export default async function HomePage() {
       learn={learn}
       projects={projects}
       assigned={assigned}
+      events={events}
     />
   );
 }

@@ -17,6 +17,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
 import { shareText } from "@/i18n/messages/share";
+import { subjectColor } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 import { deleteProject, leaveProject, setArchived } from "./actions";
 import { DueChip } from "./CardFace";
@@ -41,7 +42,7 @@ export function ProjectsHome({ initial }: { initial: ProjectSummary[] }) {
   useRefreshOnBack(initial);
   // Changes made here until the server's list has them too.
   const [changes, setChanges] = useState<Record<string, { archived_at?: string | null; gone?: boolean }>>({});
-  const [creating, setCreating] = useState<{ template?: TemplateId } | null>(null);
+  const [creating, setCreating] = useState<{ template?: TemplateId; subject?: string } | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [confirm, setConfirm] = useState<{ kind: "delete" | "leave"; project: ProjectSummary } | null>(null);
 
@@ -52,15 +53,16 @@ export function ProjectsHome({ initial }: { initial: ProjectSummary[] }) {
   const active = all.filter((p) => !p.archived_at);
   const archived = all.filter((p) => p.archived_at);
 
-  // /projects?new=1 (command palette, Home) opens the dialog, optionally with &template=…
+  // /projects?new=1 (command palette, Home, a subject) opens the dialog, optionally with &template=… and &subject=…
   const wantsNew = params.get("new") === "1";
   const wantedTemplate = params.get("template");
+  const wantedSubject = params.get("subject");
   useEffect(() => {
     if (!wantsNew) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- open once the page is in the browser
-    setCreating({ template: isTemplate(wantedTemplate) ? wantedTemplate : undefined });
+    setCreating({ template: isTemplate(wantedTemplate) ? wantedTemplate : undefined, subject: wantedSubject ?? undefined });
     window.history.replaceState(null, "", "/projects");
-  }, [wantsNew, wantedTemplate]);
+  }, [wantsNew, wantedTemplate, wantedSubject]);
 
   async function archive(p: ProjectSummary) {
     const next = await setArchived(p.id, !p.archived_at);
@@ -150,7 +152,7 @@ export function ProjectsHome({ initial }: { initial: ProjectSummary[] }) {
         </div>
       </div>
 
-      <NewProjectDialog open={!!creating} onClose={() => setCreating(null)} template={creating?.template} />
+      <NewProjectDialog open={!!creating} onClose={() => setCreating(null)} template={creating?.template} subject={creating?.subject} />
       <ConfirmDialog
         open={confirm?.kind === "delete"}
         onClose={() => setConfirm(null)}
@@ -211,8 +213,10 @@ function ProjectCard({
 }) {
   const t = useMessages(projectsText);
   const s = useMessages(shareText);
+  const { subjects } = useWorkspace();
   const title = p.title.trim() || t.untitled;
   const owner = p.members.find((m) => m.role === "owner");
+  const subject = subjects.find((x) => x.id === p.subject_id);
   const shared = p.members.length > 1;
   const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
   return (
@@ -240,6 +244,12 @@ function ProjectCard({
               </p>
             ) : (
               p.description && <p className="mt-0.5 truncate text-[12.5px] text-ink-3">{p.description}</p>
+            )}
+            {subject && (
+              <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-hover/80 px-2 py-0.5 text-[11.5px] font-medium text-ink-2">
+                {subject.emoji ? <span className="text-[11.5px] leading-none">{subject.emoji}</span> : <span className="size-2 shrink-0 rounded-full" style={{ background: subjectColor(subject.color) }} />}
+                <span className="truncate">{subject.name}</span>
+              </span>
             )}
           </div>
         </div>

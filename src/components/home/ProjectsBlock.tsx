@@ -53,35 +53,9 @@ export function ProjectsBlock({ projects, assigned, title }: { projects: Project
     <>
       {title(t.projects, all)}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {projects.map((project) => {
-          const pct = project.total ? Math.round((project.done / project.total) * 100) : 0;
-          const name = project.title.trim() || p.untitled;
-          return (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              className="group flex items-center gap-3 rounded-xl border border-line bg-raised p-3 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
-            >
-              <ProjectIcon project={project} size={36} />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-[14px] font-medium text-ink" title={name}>
-                    {name}
-                  </span>
-                  {project.mine > 0 && <span className="shrink-0 rounded-full bg-blob-soft px-1.5 text-[11px] font-medium leading-[18px] text-blob-ink">{p.forYou(project.mine)}</span>}
-                </span>
-                <span className="mt-1.5 flex items-center gap-2">
-                  <span className="h-1 flex-1 overflow-hidden rounded-full bg-hover">
-                    <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: boardColor(project.color) }} />
-                  </span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums text-ink-3">{project.total ? `${project.done}/${project.total}` : p.noCards}</span>
-                </span>
-              </span>
-              {project.members.length > 1 && <AvatarStack people={project.members} size={20} max={3} className="shrink-0 max-[420px]:hidden" />}
-              <ArrowRight className="size-3.5 shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
-            </Link>
-          );
-        })}
+        {projects.map((project) => (
+          <ProjectRow key={project.id} project={project} />
+        ))}
       </div>
       {assigned.length > 0 && (
         <div className="mt-3 rounded-xl border border-line bg-raised/50 px-3.5 pb-2 pt-3 dark:bg-raised/40">
@@ -90,5 +64,36 @@ export function ProjectsBlock({ projects, assigned, title }: { projects: Project
         </div>
       )}
     </>
+  );
+}
+
+/** A project in a short list (Home, a subject's page): icon, name, what is yours to do, progress, people. */
+export function ProjectRow({ project }: { project: ProjectSummary }) {
+  const p = useMessages(projectsText);
+  const pct = project.total ? Math.round((project.done / project.total) * 100) : 0;
+  const name = project.title.trim() || p.untitled;
+  return (
+    <Link
+      href={`/projects/${project.id}`}
+      className="group flex items-center gap-3 rounded-xl border border-line bg-raised p-3 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
+    >
+      <ProjectIcon project={project} size={36} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[14px] font-medium text-ink" title={name}>
+            {name}
+          </span>
+          {project.mine > 0 && <span className="shrink-0 rounded-full bg-blob-soft px-1.5 text-[11px] font-medium leading-[18px] text-blob-ink">{p.forYou(project.mine)}</span>}
+        </span>
+        <span className="mt-1.5 flex items-center gap-2">
+          <span className="h-1 flex-1 overflow-hidden rounded-full bg-hover">
+            <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: boardColor(project.color) }} />
+          </span>
+          <span className="shrink-0 text-[11.5px] tabular-nums text-ink-3">{project.total ? `${project.done}/${project.total}` : p.noCards}</span>
+        </span>
+      </span>
+      {project.members.length > 1 && <AvatarStack people={project.members} size={20} max={3} className="shrink-0 max-[420px]:hidden" />}
+      <ArrowRight className="size-3.5 shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
+    </Link>
   );
 }

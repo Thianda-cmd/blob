@@ -185,15 +185,15 @@ function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: string })
    New project
    --------------------------------------------------------------------------- */
 
-export function NewProjectDialog({ open, onClose, template }: { open: boolean; onClose: () => void; template?: TemplateId }) {
+export function NewProjectDialog({ open, onClose, template, subject }: { open: boolean; onClose: () => void; template?: TemplateId; subject?: string | null }) {
   return (
     <Dialog open={open} onClose={onClose} labelledBy="new-project-title" className="max-w-[640px]! overflow-hidden">
-      {open && <NewProjectForm key={template ?? "none"} onClose={onClose} initialTemplate={template ?? "referat"} />}
+      {open && <NewProjectForm key={template ?? "none"} onClose={onClose} initialTemplate={template ?? "referat"} initialSubject={subject ?? null} />}
     </Dialog>
   );
 }
 
-function NewProjectForm({ onClose, initialTemplate }: { onClose: () => void; initialTemplate: TemplateId }) {
+function NewProjectForm({ onClose, initialTemplate, initialSubject }: { onClose: () => void; initialTemplate: TemplateId; initialSubject: string | null }) {
   const t = useMessages(projectsText);
   const d = t.dialog;
   const router = useRouter();
@@ -202,7 +202,9 @@ function NewProjectForm({ onClose, initialTemplate }: { onClose: () => void; ini
   const [color, setColor] = useState<string>(TEMPLATES[initialTemplate].color);
   const [icon, setIcon] = useState<string>(TEMPLATES[initialTemplate].icon);
   const [touched, setTouched] = useState(false);
-  const [subject, setSubject] = useState<string | null>(null);
+  const { subjects } = useWorkspace();
+  // A subject from the address (a subject's "New project") only when it is one of yours.
+  const [subject, setSubject] = useState<string | null>(() => (initialSubject && subjects.some((x) => x.id === initialSubject && x.kind !== "notebook") ? initialSubject : null));
   const [due, setDue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const spec = TEMPLATES[template];

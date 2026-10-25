@@ -25,10 +25,11 @@ import { subjectColor } from "@/lib/subjects";
 import { LearnSnapshot } from "@/learn/components/LearnSnapshot";
 import type { LearnDay, TopicProgress } from "@/learn/progress";
 import type { AssignedCard } from "@/lib/tasks";
-import type { PageMeta, Task } from "@/lib/types";
+import type { CalEvent, PageMeta, Task } from "@/lib/types";
 import { cn, firstName, greeting, pageTitle } from "@/lib/utils";
 import { formatDistanceStrict } from "date-fns";
 import { ProjectsBlock } from "./ProjectsBlock";
+import { TodaySchedule } from "./TodaySchedule";
 
 const rise = {
   hidden: { opacity: 0, y: 10 },
@@ -44,6 +45,7 @@ export function HomeView({
   learn,
   projects = [],
   assigned = [],
+  events = [],
 }: {
   tasks: Task[];
   previews: Record<string, PagePreview>;
@@ -55,6 +57,8 @@ export function HomeView({
   /** Your active projects (most recently active first) and the project cards assigned to you. */
   projects?: ProjectSummary[];
   assigned?: AssignedCard[];
+  /** The calendar's events, for today's. */
+  events?: CalEvent[];
 }) {
   const router = useRouter();
   const now = useNow();
@@ -155,8 +159,9 @@ export function HomeView({
               </div>
             </motion.section>
 
-            {/* Due soon */}
+            {/* Today in the calendar, then what is due soon */}
             <motion.section initial="hidden" animate="shown" variants={rise} custom={4} className="min-w-0">
+              <TodaySchedule events={events} now={now} title={(children, action) => <SectionTitle action={action}>{children}</SectionTitle>} />
               <SectionTitle>{t.comingUp}</SectionTitle>
               <UpcomingTasks initialTasks={tasks} limit={7} days={7} />
               <div className="mt-7">

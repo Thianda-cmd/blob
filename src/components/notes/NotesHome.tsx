@@ -8,6 +8,7 @@ import {
   ChevronDown,
   FilePlus2,
   FileUp,
+  FolderKanban,
   FolderPlus,
   GraduationCap,
   Hash,
@@ -44,7 +45,7 @@ import type { DueRow } from "@/notes/server";
 import { today } from "@/notes/study/srs";
 import { fold } from "@/notes/text";
 import { createClient } from "@/lib/supabase/client";
-import type { PageKind, PageMeta } from "@/lib/types";
+import type { PageKind, PageMeta, Project } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { NotesGraph } from "./NotesGraph";
 import { PageRow, PageTile } from "./PageTiles";
@@ -52,7 +53,7 @@ import { useImporter } from "./useImporter";
 import { useShareInfo } from "./useShared";
 
 /** The filters, as they stand in the address (?tag=…&kind=…). */
-export type NotesQuery = { q: string; subject: string; tag: string; kind: string; owner: string; topic: string; sort: string; view: string };
+export type NotesQuery = { q: string; subject: string; tag: string; kind: string; owner: string; project: string; topic: string; sort: string; view: string };
 
 type Sort = "recent" | "created" | "alpha";
 type View = "grid" | "list" | "graph";
@@ -73,11 +74,16 @@ export function NotesHome({
   links,
   due,
   initialQuery,
+  projects = [],
+  pageProjects = {},
 }: {
   previews: Record<string, PagePreview>;
   links: Record<string, string[]>;
   due: DueRow[];
   initialQuery: NotesQuery;
+  /** The projects your pages are on cards in, and for each page the projects it is in. */
+  projects?: Pick<Project, "id" | "title" | "icon" | "color">[];
+  pageProjects?: Record<string, string[]>;
 }) {
   const router = useRouter();
   const t = useMessages(notesText);
@@ -161,7 +167,7 @@ export function NotesHome({
     return meta ? resolveText(meta.title, locale) : slug;
   };
 
-  // Filters (search, subject, tag, kind, owner, topic), then the order.
+  // Filters (search, subject, tag, kind, owner, project, topic), then the order.
   const results = useMemo(() => {
     const words = fold(q).split(/\s+/).filter(Boolean);
     const list = pages.filter((p) => {
@@ -170,6 +176,7 @@ export function NotesHome({
       if (query.kind && p.kind !== query.kind) return false;
       if (query.owner === "mine" && p.user_id !== userId) return false;
       if (query.owner === "shared" && p.user_id === userId) return false;
+      if (query.project && !pageProjects[p.id]?.includes(query.project)) return false;
       if (query.topic && !p.topics.some((x) => x.split("@")[0] === query.topic)) return false;
       if (!words.length) return true;
       if (found.has(p.id)) return true;
@@ -184,7 +191,7 @@ export function NotesHome({
           ? b.created_at.localeCompare(a.created_at)
           : b.updated_at.localeCompare(a.updated_at),
     );
-  }, [pages, q, found, query.subject, query.tag, query.kind, query.owner, query.topic, sort, subjects, userId, previews, locale]);
+  }, [pages, q, found, query.subject, query.tag, query.kind, query.owner, query.project, query.topic, sort, subjects, userId, previews, locale, pageProjects]);
 
   const counts = useMemo(() => {
     const c = { note: 0, deck: 0, folder: 0 } as Record<PageKind, number>;
@@ -216,8 +223,10 @@ export function NotesHome({
   }
 
   const subject = subjects.find((s) => s.id === query.subject);
-  const active = Boolean(query.subject || query.tag || query.kind || query.owner || query.topic || q);
-  const resetFilters = () => set({ q: "", subject: "", tag: "", kind: "", owner: "", topic: "" });
+  const active = Boolean(query.subject || query.tag || query.kind || query.owner || query.project || query.topic || q);
+  const resetFilters = () => set({ q: "", subject: "", tag: "", kind: "", owner: "", project: "", topic: "" });
+  const project = projects.find((p) => p.id === query.project);
+  const inProject = (id: string) => pages.filter((p) => pageProjects[p.id]?.includes(id)).length;
   const schoolSubjects = subjects.filter((s) => s.kind !== "notebook");
   const notebooks = subjects.filter((s) => s.kind === "notebook");
 
@@ -432,6 +441,33 @@ export function NotesHome({
                   </>
                 )}
               </FilterChip>
+              {projects.length > 0 && (
+                <FilterChip
+                  icon={project ? <span className="text-[13px] leading-none">{project.icon || "📋"}</span> : <FolderKanban />}
+                  label={project ? project.title.trim() || t.filters.project : t.filters.project}
+                  active={Boolean(query.project)}
+                  onClear={() => set({ project: "" })}
+                >
+                  {(close) => (
+                    <div className="max-h-[280px] overflow-y-auto">
+                      <MenuItem active={!query.project} onSelect={() => (set({ project: "" }), close())}>
+                        {t.filters.allProjects}
+                      </MenuItem>
+                      {projects.map((p) => (
+                        <MenuItem
+                          key={p.id}
+                          icon={<span className="grid w-4 place-items-center text-[13px] leading-none">{p.icon || "📋"}</span>}
+                          active={query.project === p.id}
+                          shortcut={inProject(p.id)}
+                          onSelect={() => (set({ project: p.id }), close())}
+                        >
+                          <span className="truncate">{p.title.trim() || t.filters.project}</span>
+                        </MenuItem>
+                      ))}
+                    </div>
+                  )}
+                </FilterChip>
+              )}
               {topics.length > 0 && (
                 <FilterChip icon={<GraduationCap />} label={query.topic ? topicLabel(query.topic) : t.filters.topic} active={Boolean(query.topic)} onClear={() => set({ topic: "" })}>
                   {(close) => (
