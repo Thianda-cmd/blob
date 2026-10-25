@@ -1,12 +1,13 @@
 "use client";
 
 import { MonitorDown } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { blob } from "@/components/blob/bus";
 import { Button } from "@/components/ui/Button";
 import { useMessages } from "@/i18n/client";
 import { nativeText } from "@/i18n/messages/native";
 import { settingsText } from "@/i18n/messages/settings";
-import { blobApp, canSelfUpdate, type AppPlatform } from "@/lib/native";
+import { autostartEnabled, blobApp, canSelfUpdate, setAutostart, type AppPlatform } from "@/lib/native";
 import { autoUpdates, check, install, serverUpdateState, setAutoUpdates, subscribeUpdate, tuck, updateState, download } from "@/lib/update/store";
 import { Card, Row, Section, Switch } from "./primitives";
 
@@ -17,7 +18,7 @@ const appVersion = () => blobApp()?.version ?? "";
 const appPlatform = () => blobApp()?.platform ?? "linux";
 const selfUpdating = () => canSelfUpdate(blobApp());
 
-/** The Blob app on this computer: its version, updates, and whether it updates by itself. */
+/** The Blob app on this computer: its version, updates, whether it updates by itself and starts with the computer. */
 export function AppSection() {
   const t = useMessages(nativeText).update;
   const nav = useMessages(settingsText).nav;
@@ -27,6 +28,26 @@ export function AppSection() {
   const canUpdate = useSyncExternalStore(noSubscribe, selfUpdating, () => false);
   const auto = useSyncExternalStore(subscribeUpdate, autoUpdates, () => false);
   const pct = s.total > 0 ? Math.round((s.downloaded / s.total) * 100) : 0;
+  // Whether Blob starts at login; null until known, and in apps older than 0.5.0 (the row stays away).
+  const [startup, setStartup] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void autostartEnabled().then((on) => alive && setStartup(on));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function toggleStartup(on: boolean) {
+    setStartup(on);
+    const now = await setAutostart(on);
+    if (now === null) {
+      setStartup(!on);
+      blob.say(t.startupFailed, { mood: "worried" });
+    } else {
+      setStartup(now);
+    }
+  }
 
   const status =
     s.phase === "checking"
@@ -86,6 +107,13 @@ export function AppSection() {
             <Switch checked={canUpdate && auto} onChange={setAutoUpdates} label={t.auto} disabled={!canUpdate} />
           </Row>
         </div>
+        {startup !== null && (
+          <div className="border-t border-line">
+            <Row title={t.startup} description={t.startupHint(PLATFORMS[platform] ?? platform)}>
+              <Switch checked={startup} onChange={(on) => void toggleStartup(on)} label={t.startup} />
+            </Row>
+          </div>
+        )}
       </Card>
     </Section>
   );

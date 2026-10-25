@@ -35,6 +35,9 @@ webkit2gtk = { version = "2.0", features = ["v2_24"] }
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
+# Starting with the computer (Settings → App): the Run key on Windows, a launch agent on macOS,
+# an autostart entry on Linux.
+tauri-plugin-autostart = "2"
 # Updates (src/update.rs): downloads with the system's certificates and proxy, checked by SHA-256.
 ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier"] }
 sha2 = "0.10"

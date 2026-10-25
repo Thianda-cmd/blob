@@ -1,8 +1,8 @@
 // The Blob app (desktop and phones, src-tauri/) shows this site in a native window. Inside it, the
 // app sets window.__BLOB_APP__ before any script runs, and the site may call a few app commands
 // (src-tauri/capabilities/site.json): open_external, print_page, app_info, set_offline_ready,
-// set_widget, take_opened_files, and on computers the update_* commands. In a browser all of this
-// is inert.
+// set_widget, take_opened_files, and on computers autostart_get/autostart_set and the update_*
+// commands. In a browser all of this is inert.
 
 export type AppPlatform = "linux" | "macos" | "windows" | "android" | "ios";
 
@@ -36,6 +36,8 @@ type Command =
   | "set_offline_ready"
   | "set_widget"
   | "take_opened_files"
+  | "autostart_get"
+  | "autostart_set"
   | "update_check"
   | "update_download"
   | "update_progress"
@@ -106,6 +108,29 @@ export async function takeOpenedFiles(): Promise<OpenedFile[]> {
   } catch {
     // An older app without the command (or a phone app without the channel).
     return [];
+  }
+}
+
+/**
+ * Whether the app on this computer starts when you log in (Settings → App). Null in a browser, on
+ * phones and in apps older than 0.5.0, which can't.
+ */
+export async function autostartEnabled(): Promise<boolean | null> {
+  const app = blobApp();
+  if (!app || isPhoneApp(app)) return null;
+  try {
+    return await call<boolean>("autostart_get");
+  } catch {
+    return null;
+  }
+}
+
+/** Starts the app with the computer, or stops that. How it is afterwards, or null when it couldn't. */
+export async function setAutostart(enabled: boolean): Promise<boolean | null> {
+  try {
+    return await call<boolean>("autostart_set", { enabled });
+  } catch {
+    return null;
   }
 }
 

@@ -10,7 +10,8 @@
 // `blob {file}`), which the site can then take. With BLOB_E2E_EMAIL and BLOB_E2E_PASSWORD it also signs in and opens every area of the app,
 // writes in a new note, and looks at the narrow (phone-sized) layout. Exits 1 if a check fails.
 import { execSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { Session, sleep } from "./webdriver.mjs";
 
@@ -108,6 +109,35 @@ try {
     "const done = arguments[arguments.length - 1]; window.__TAURI_INTERNALS__.invoke('open_external', { url: 'file:///etc/hosts' }).then(() => done('allowed'), (e) => done('refused'));",
   );
   check("open_external refuses files", fileUrl === "refused", fileUrl);
+
+  // Starting with the computer (Settings → App): the site switches it on and off, and the system
+  // gets (and loses) its entry: an autostart file on Linux, the Run key on Windows.
+  const autostart = (enabled) =>
+    s.execAsync(
+      `const done = arguments[arguments.length - 1]; window.__TAURI_INTERNALS__.invoke(${enabled === undefined ? "'autostart_get'" : `'autostart_set', { enabled: ${enabled} }`}).then((r) => done(r), (e) => done('refused: ' + e));`,
+    );
+  const entry = () => {
+    try {
+      if (process.platform === "linux") {
+        const dir = join(homedir(), ".config", "autostart");
+        return existsSync(dir) && readdirSync(dir).some((f) => f.endsWith(".desktop") && readFileSync(join(dir, f), "utf8").includes("--autostart"));
+      }
+      if (process.platform === "win32") return execSync('reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"', { encoding: "utf8" }).includes("--autostart");
+    } catch {
+      return false;
+    }
+    return null;
+  };
+  const wasOn = await autostart();
+  const on = await autostart(true);
+  const onNow = await autostart();
+  const entryOn = entry();
+  check("the site may switch starting with the computer on (autostart_set)", on === true && onNow === true && entryOn !== false, { wasOn, on, onNow, entryOn });
+  const off = await autostart(false);
+  const offNow = await autostart();
+  const entryOff = entry();
+  check("…and off again, entry gone", off === false && offNow === false && !entryOff, { off, offNow, entryOff });
+  if (wasOn === true) await autostart(true);
 
   // Public pages.
   for (const p of ["/show", "/developers", "/"]) {

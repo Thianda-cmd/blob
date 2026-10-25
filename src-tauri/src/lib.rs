@@ -530,6 +530,28 @@ fn take_opened_files<R: Runtime>(app: AppHandle<R>) -> Vec<OpenedFile> {
   std::mem::take(&mut *app.state::<OpenedFiles>().0.lock().unwrap_or_else(|e| e.into_inner()))
 }
 
+/// The argument Blob is started with when it starts with the computer (Settings → App).
+#[cfg(desktop)]
+const AUTOSTART_ARG: &str = "--autostart";
+
+/// Whether Blob starts when you log in to your computer.
+#[cfg(desktop)]
+#[tauri::command]
+fn autostart_get<R: Runtime>(app: AppHandle<R>) -> Result<bool, String> {
+  use tauri_plugin_autostart::ManagerExt;
+  app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Starts Blob with the computer, or stops doing so; answers how it is now.
+#[cfg(desktop)]
+#[tauri::command]
+fn autostart_set<R: Runtime>(app: AppHandle<R>, enabled: bool) -> Result<bool, String> {
+  use tauri_plugin_autostart::ManagerExt;
+  let launch = app.autolaunch();
+  if enabled { launch.enable() } else { launch.disable() }.map_err(|e| e.to_string())?;
+  launch.is_enabled().map_err(|e| e.to_string())
+}
+
 /// The start page asks where to go, just before it leaves: a page from an app link, else nothing
 /// (the home page). Asked once: the answer is used up.
 #[tauri::command]
@@ -554,7 +576,8 @@ pub fn run() {
       }
       open_files(app, &blob_paths(args.into_iter().skip(1), Path::new(&cwd)));
     }))
-    .plugin(tauri_plugin_window_state::Builder::default().build());
+    .plugin(tauri_plugin_window_state::Builder::default().build())
+    .plugin(tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build());
 
   let builder = builder
     .plugin(tauri_plugin_opener::init())
@@ -577,6 +600,8 @@ pub fn run() {
     offline_ready,
     set_widget,
     take_opened_files,
+    autostart_get,
+    autostart_set,
     update::update_check,
     update::update_download,
     update::update_progress,
@@ -640,7 +665,14 @@ pub fn run() {
       let window = site_window(&handle, "main", WebviewUrl::App("index.html".into()));
       #[cfg(desktop)]
       let window = window.title("Blob").inner_size(1280.0, 820.0).min_inner_size(380.0, 560.0).center();
-      swipe_navigation(&window.build()?);
+      let window = window.build()?;
+      // Started with the computer: Blob waits in the taskbar (reminders still come) instead of
+      // opening over everything else.
+      #[cfg(desktop)]
+      if std::env::args().skip(1).any(|a| a == AUTOSTART_ARG) {
+        let _ = window.minimize();
+      }
+      swipe_navigation(&window);
       Ok(())
     })
     .run(tauri::generate_context!())

@@ -46,6 +46,9 @@ export const nativeText = defineMessages({
       auto: "Update by itself",
       autoHint: "New versions download in the background; Blob asks before it restarts.",
       autoLegacy: "Comes with the next version.",
+      startup: "Start with my computer",
+      startupHint: (os: string) => `Blob opens in the background when you log in to ${os}, so reminders reach you on time.`,
+      startupFailed: "That didn't work. Your computer may not allow apps to start by themselves.",
     },
   },
   de: {
@@ -92,6 +95,9 @@ export const nativeText = defineMessages({
       auto: "Selbst aktualisieren",
       autoHint: "Neue Versionen laden im Hintergrund; Blob fragt, bevor er neu startet.",
       autoLegacy: "Kommt mit der nächsten Version.",
+      startup: "Mit dem Computer starten",
+      startupHint: (os: string) => `Blob öffnet sich beim Anmelden an ${os} im Hintergrund, damit Erinnerungen pünktlich ankommen.`,
+      startupFailed: "Das hat nicht geklappt. Vielleicht erlaubt dein Computer nicht, dass Apps von selbst starten.",
     },
   },
 });

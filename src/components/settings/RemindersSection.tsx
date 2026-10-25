@@ -1,7 +1,7 @@
 "use client";
 
 import { BellRing } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { weekdayName } from "@/components/calendar/describe";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
@@ -16,6 +16,10 @@ import { Card, Row, Section, Switch } from "./primitives";
 
 const KINDS: (keyof NotifyPrefs)[] = ["events", "homework", "exams", "reminders", "cards", "streak", "morning"];
 
+const noSubscribe = () => () => {};
+// The app around the site, read after hydration (the server renders the browser's version).
+const appSnapshot = () => window.__BLOB_APP__ ?? null;
+
 /** Calendar and reminders: the week's first day, and which notifications this account gets. */
 export function RemindersSection() {
   const { profile, setProfile } = useWorkspace();
@@ -24,7 +28,7 @@ export function RemindersSection() {
   const locale = useLocale();
   const prefs = prefsOf(profile.notify);
   const [permission, setPermission] = useState<Permission | null>(null);
-  const app = typeof window !== "undefined" ? blobApp() : null;
+  const app = useSyncExternalStore(noSubscribe, appSnapshot, () => null) ? blobApp() : null;
 
   useEffect(() => {
     let alive = true;
