@@ -44,7 +44,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
       .eq("subject_id", id)
       .is("trashed_at", null),
     loadTasks(supabase, { subjectId: id }),
-    user ? loadProjectSummaries(supabase, user.id, { archived: false }) : [],
+    user ? loadProjectSummaries(supabase, user.id, { archived: false, subjectId: id }) : [],
   ]);
 
   // Only small previews travel to the client; the page list itself comes from the workspace.
@@ -57,5 +57,5 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
     };
   }
 
-  return <SubjectView key={subject.id} subject={subject} previews={previews} initialTasks={tasks} projects={projects.filter((p) => p.subject_id === id)} />;
+  return <SubjectView key={subject.id} subject={subject} previews={previews} initialTasks={tasks} projects={projects} />;
 }

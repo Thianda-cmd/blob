@@ -19,13 +19,17 @@ export type ProjectSummary = Project & {
 const rank = { owner: 0, editor: 1, viewer: 2 } as const;
 const sortMembers = (list: Member[]) => [...list].sort((a, b) => rank[a.role] - rank[b.role] || a.full_name.localeCompare(b.full_name));
 
-/** Your projects and the ones you are in, most recently active first. `archived`: only those (or only active ones). */
+/**
+ * Your projects and the ones you are in, most recently active first. `archived`: only those (or only
+ * active ones); `subjectId`: only that subject's.
+ */
 export async function loadProjectSummaries(
   supabase: SupabaseClient,
   userId: string,
-  opts: { archived?: boolean; limit?: number } = {},
+  opts: { archived?: boolean; limit?: number; subjectId?: string } = {},
 ): Promise<ProjectSummary[]> {
   let query = supabase.from("projects").select("*");
+  if (opts.subjectId) query = query.eq("subject_id", opts.subjectId);
   if (opts.archived === true) query = query.not("archived_at", "is", null);
   if (opts.archived === false) query = query.is("archived_at", null);
   const { data } = await query.order("updated_at", { ascending: false }).limit(200);
