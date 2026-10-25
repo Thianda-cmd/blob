@@ -114,8 +114,9 @@ Rules around the site (`src-tauri/src/lib.rs`):
   anything dropped elsewhere reaches the site's `FileDrop` (Blob files, Markdown and text are
   imported).
 - **Starting with the computer** (Settings → App, computers only, off until switched on):
-  `tauri-plugin-autostart` writes the Run key on Windows, a launch agent on macOS and an autostart
-  entry on Linux, with `--autostart`; started that way, the window waits minimized in the taskbar
+  the `auto-launch` crate writes the Run key under HKEY_CURRENT_USER on Windows (also when Blob runs
+  as administrator), a launch agent on macOS and an autostart entry on Linux, for the person logged
+  in, with `--autostart`; started that way, the window waits minimized in the taskbar
   (reminders still come). The site asks with `autostart_get` and switches with `autostart_set`.
 - **Window size and position** are remembered.
 - **Native behaviour per platform:**

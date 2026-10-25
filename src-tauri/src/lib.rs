@@ -534,22 +534,50 @@ fn take_opened_files<R: Runtime>(app: AppHandle<R>) -> Vec<OpenedFile> {
 #[cfg(desktop)]
 const AUTOSTART_ARG: &str = "--autostart";
 
+/// Starting with the computer, for the person logged in only (on Windows the Run key under
+/// HKEY_CURRENT_USER, even when Blob runs as administrator). None when the app's path is unknown.
+#[cfg(desktop)]
+struct Autostart(Option<auto_launch::AutoLaunch>);
+
+#[cfg(desktop)]
+fn autostart_entry<R: Runtime>(app: &AppHandle<R>) -> Option<auto_launch::AutoLaunch> {
+  // An AppImage starts from its own file, not from the copy it unpacks while running.
+  #[cfg(target_os = "linux")]
+  let path = app.env().appimage.map(PathBuf::from).or_else(|| std::env::current_exe().ok());
+  #[cfg(not(target_os = "linux"))]
+  let path = std::env::current_exe().ok();
+  auto_launch::AutoLaunchBuilder::new()
+    .set_app_name(&app.package_info().name)
+    .set_app_path(&path?.to_string_lossy())
+    .set_args(&[AUTOSTART_ARG])
+    .set_macos_launch_mode(auto_launch::MacOSLaunchMode::LaunchAgent)
+    .set_windows_enable_mode(auto_launch::WindowsEnableMode::CurrentUser)
+    .build()
+    .ok()
+}
+
+#[cfg(desktop)]
+fn with_autostart<R: Runtime, T>(app: &AppHandle<R>, f: impl FnOnce(&auto_launch::AutoLaunch) -> auto_launch::Result<T>) -> Result<T, String> {
+  let state = app.state::<Autostart>();
+  let entry = state.0.as_ref().ok_or("unavailable")?;
+  f(entry).map_err(|e| e.to_string())
+}
+
 /// Whether Blob starts when you log in to your computer.
 #[cfg(desktop)]
 #[tauri::command]
 fn autostart_get<R: Runtime>(app: AppHandle<R>) -> Result<bool, String> {
-  use tauri_plugin_autostart::ManagerExt;
-  app.autolaunch().is_enabled().map_err(|e| e.to_string())
+  with_autostart(&app, |a| a.is_enabled())
 }
 
 /// Starts Blob with the computer, or stops doing so; answers how it is now.
 #[cfg(desktop)]
 #[tauri::command]
 fn autostart_set<R: Runtime>(app: AppHandle<R>, enabled: bool) -> Result<bool, String> {
-  use tauri_plugin_autostart::ManagerExt;
-  let launch = app.autolaunch();
-  if enabled { launch.enable() } else { launch.disable() }.map_err(|e| e.to_string())?;
-  launch.is_enabled().map_err(|e| e.to_string())
+  with_autostart(&app, |a| {
+    if enabled { a.enable()? } else { a.disable()? }
+    a.is_enabled()
+  })
 }
 
 /// The start page asks where to go, just before it leaves: a page from an app link, else nothing
@@ -576,8 +604,7 @@ pub fn run() {
       }
       open_files(app, &blob_paths(args.into_iter().skip(1), Path::new(&cwd)));
     }))
-    .plugin(tauri_plugin_window_state::Builder::default().build())
-    .plugin(tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build());
+    .plugin(tauri_plugin_window_state::Builder::default().build());
 
   let builder = builder
     .plugin(tauri_plugin_opener::init())
@@ -613,6 +640,9 @@ pub fn run() {
   builder
     .setup(|app| {
       let handle = app.handle().clone();
+
+      #[cfg(desktop)]
+      app.manage(Autostart(autostart_entry(&handle)));
 
       // Linux and Windows dev builds: register the link scheme now (installers do it on install).
       #[cfg(all(desktop, not(target_os = "macos")))]
