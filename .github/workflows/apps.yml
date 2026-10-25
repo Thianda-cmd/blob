@@ -44,24 +44,22 @@ env:
     Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Open Blob files**: double-click a `.blob` file (or choose *Open with → Blob*) and it comes into your notes with its sub-pages, pictures and files. On Android, open it from Files or Downloads, or share it to Blob.
-    - **Notes can do much more**: text sizes in px, text and highlighter colours, alignment, lists with their own size and style, text under a list item, find and replace, moving blocks, templates, and Markdown pasted as formatting.
-    - **Two notes side by side**, and Ctrl+Shift+L (Ctrl+Tab in the app) switches to the last note; hold it for a list of recent pages.
-    - **Diagrams without code**: mind maps, processes, timelines and more from simple rows, with a large view and downloads.
-    - **Export and import**: PDF, Markdown and Blob files, and all your notes as one backup in Settings.
-    - **Drag and drop in the app**: pictures and files dragged onto a note land in it, and a Blob file, Markdown or text dropped anywhere else comes in as a new note.
-    - **A text cursor you can see**: Blob draws its own thick cursor in the app on computers.
-    - The French course has been removed.
+    - **Start with your computer**: switch it on in *Settings → App* and Blob opens quietly in the background when you sign in to your computer (Windows, macOS, Linux).
+    - **Share with a link**: a note (with its sub-pages), a presentation or a CV can get a public link that anyone can open without an account, read-only. Stop sharing whenever you like.
+    - **Cover letters**: write your cover letter right next to your CV, step by step and in the same design, and save both as one PDF.
+    - **Notes and projects together**: a note shows the project cards it is on, *Add to project* turns it into a card and shares it with your group, and every project lists its materials and can start a shared note.
+    - **Today on Home**: today's lessons and appointments from your calendar, and tomorrow's in the evening.
+    - **Subjects and projects**: a subject shows its projects, a project shows its subject, and notes can be filtered by project.
+    - **Word export**: save a note as a Word document (.docx), and import files from the *New* menu.
 
     **Neu in dieser Version**
-    - **Blob-Dateien öffnen**: Doppelklick auf eine `.blob`-Datei (oder *Öffnen mit → Blob*), und sie kommt mit Unterseiten, Bildern und Dateien in deine Notizen. Auf Android öffnest du sie aus „Dateien“ oder „Downloads“ oder teilst sie mit Blob.
-    - **Notizen können viel mehr**: Textgrößen in px, Text- und Markerfarben, Ausrichtung, Listen mit eigener Größe und eigenem Stil, Text unter einem Listenpunkt, Suchen und Ersetzen, Blöcke verschieben, Vorlagen und eingefügtes Markdown mit Formatierung.
-    - **Zwei Notizen nebeneinander**, und Strg+Umschalt+L (in der App Strg+Tab) wechselt zur letzten Notiz; gedrückt halten zeigt die zuletzt geöffneten Seiten.
-    - **Diagramme ohne Code**: Mindmaps, Abläufe, Zeitstrahlen und mehr aus einfachen Zeilen, mit Großansicht und Download.
-    - **Export und Import**: PDF, Markdown und Blob-Dateien, und in den Einstellungen alle Notizen als eine Sicherung.
-    - **Ziehen und Ablegen in der App**: Bilder und Dateien, die du auf eine Notiz ziehst, landen darin, und eine Blob-Datei, Markdown oder Text, die du woanders ablegst, wird eine neue Notiz.
-    - **Ein Textcursor, den man sieht**: Blob zeichnet in der App am Computer einen eigenen, kräftigen Cursor.
-    - Der Französischkurs wurde entfernt.
+    - **Mit dem Computer starten**: in *Einstellungen → App* einschalten, und Blob öffnet sich beim Anmelden am Computer leise im Hintergrund (Windows, macOS, Linux).
+    - **Per Link teilen**: Eine Notiz (mit ihren Unterseiten), eine Präsentation oder ein Lebenslauf bekommt einen öffentlichen Link, den jeder ohne Konto ansehen kann, nur zum Lesen. Das Teilen kannst du jederzeit beenden.
+    - **Anschreiben**: Schreib dein Anschreiben direkt neben dem Lebenslauf, Schritt für Schritt und im selben Design, und speichere beides als eine PDF.
+    - **Notizen und Projekte zusammen**: Eine Notiz zeigt, auf welchen Projektkarten sie liegt, *Zu Projekt hinzufügen* macht sie zur Karte und teilt sie mit deiner Gruppe, und jedes Projekt zeigt seine Unterlagen und startet eine gemeinsame Notiz.
+    - **Heute auf der Startseite**: die heutigen Stunden und Termine aus deinem Kalender, abends die von morgen.
+    - **Fächer und Projekte**: Ein Fach zeigt seine Projekte, ein Projekt sein Fach, und Notizen lassen sich nach Projekt filtern.
+    - **Word-Export**: Speichere eine Notiz als Word-Dokument (.docx), und importiere Dateien über das Menü *Neu*.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.

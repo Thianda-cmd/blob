@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Blob",
   "mainBinaryName": "blob",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "identifier": "org.bojes.blob",
   "build": {
     "frontendDist": "shell"
