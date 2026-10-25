@@ -2,21 +2,26 @@
 
 import { format } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, ChevronDown, Copy, Link2, LogOut, RefreshCw, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Globe, Link2, LogOut, RefreshCw, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { Switch } from "@/components/settings/primitives";
 import { Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
+import { publicText } from "@/i18n/messages/public";
 import { shareText } from "@/i18n/messages/share";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Invite, Member, MemberRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar, personName, type Person } from "./Avatar";
 import { loadMembers, type ShareTarget } from "./useMembers";
+import type { usePublicLink } from "./usePublicLink";
+
+type PublicLinkHandle = ReturnType<typeof usePublicLink>;
 
 type Row = Member & {
   /** Pages: the member was added on a page above this one (title), so they are managed there. */
@@ -30,7 +35,9 @@ type Data = { role: AccessRole | null; members: Row[]; invite: Invite | null; pe
 /**
  * Share a page or project: who has access (owners change roles and remove people, members can leave),
  * an invite link (create with a role, copy, see when it expires, renew, delete) and adding people you
- * already work with. `onChanged` runs after every change (refresh the route there); `onLeft` after you left.
+ * already work with. Pages also get a public link (`publicLink`: anyone with it can view, no account);
+ * CVs (`publicOnly`) only that. `onChanged` runs after every change (refresh the route there);
+ * `onLeft` after you left.
  */
 export function ShareDialog({
   open,
@@ -38,6 +45,8 @@ export function ShareDialog({
   target,
   name,
   ancestors = [],
+  publicLink,
+  publicOnly = false,
   onChanged,
   onLeft,
 }: {
@@ -48,12 +57,27 @@ export function ShareDialog({
   name: string;
   /** Pages: the pages above this one, nearest first, so members added there show where they come from. */
   ancestors?: { id: string; title: string }[];
+  /** Pages: the page's public link (the top bar shows a badge while there is one). */
+  publicLink?: PublicLinkHandle;
+  /** CVs: only the public link, nobody joins. */
+  publicOnly?: boolean;
   onChanged?: () => void;
   onLeft?: () => void;
 }) {
   return (
     <Dialog open={open} onClose={onClose} labelledBy="share-title" className="max-w-[520px]">
-      {open && <SharePanel target={target} name={name} ancestors={ancestors} onClose={onClose} onChanged={onChanged} onLeft={onLeft} />}
+      {open && (
+        <SharePanel
+          target={target}
+          name={name}
+          ancestors={ancestors}
+          publicLink={publicLink}
+          publicOnly={publicOnly}
+          onClose={onClose}
+          onChanged={onChanged}
+          onLeft={onLeft}
+        />
+      )}
     </Dialog>
   );
 }
@@ -62,6 +86,8 @@ function SharePanel({
   target,
   name,
   ancestors,
+  publicLink,
+  publicOnly,
   onClose,
   onChanged,
   onLeft,
@@ -69,11 +95,14 @@ function SharePanel({
   target: ShareTarget;
   name: string;
   ancestors: { id: string; title: string }[];
+  publicLink?: PublicLinkHandle;
+  publicOnly: boolean;
   onClose: () => void;
   onChanged?: () => void;
   onLeft?: () => void;
 }) {
   const t = useMessages(shareText);
+  const tp = useMessages(publicText).section;
   const { userId } = useWorkspace();
   const [data, setData] = useState<Data | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -207,7 +236,7 @@ function SharePanel({
           <h2 id="share-title" className="line-clamp-2 break-words font-display text-[18px] font-bold leading-snug tracking-[-0.015em]" title={t.title(name)}>
             {t.title(name)}
           </h2>
-          <p className="mt-0.5 text-[13px] leading-snug text-ink-2">{target.type === "page" ? t.explainPage : t.explainProject}</p>
+          <p className="mt-0.5 text-[13px] leading-snug text-ink-2">{publicOnly ? tp.hintCv : target.type === "page" ? t.explainPage : t.explainProject}</p>
         </div>
         <IconButton label={t.close} onClick={onClose} className="-mr-1.5 -mt-1">
           <X className="size-4" />
@@ -217,6 +246,8 @@ function SharePanel({
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5">
         {!data ? (
           <LoadingRows />
+        ) : publicOnly ? (
+          publicLink && <PublicLinkSection handle={publicLink} owner={owner} subPages={false} onChanged={onChanged} />
         ) : (
           <>
             {manager && (
@@ -230,6 +261,8 @@ function SharePanel({
                 onRole={setInviteRole}
               />
             )}
+
+            {manager && target.type === "page" && publicLink && <PublicLinkSection handle={publicLink} owner={owner} subPages onChanged={onChanged} />}
 
             <section aria-labelledby="share-members">
               <SectionTitle id="share-members" count={data.members.length}>
@@ -302,6 +335,120 @@ function LoadingRows() {
         </div>
       ))}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Public link
+   --------------------------------------------------------------------------- */
+
+/**
+ * Anyone with the link can view the page, no account needed. The owner turns it on and off and
+ * decides whether the pages inside come along; editors see and copy it.
+ */
+function PublicLinkSection({ handle, owner, subPages, onChanged }: { handle: PublicLinkHandle; owner: boolean; subPages: boolean; onChanged?: () => void }) {
+  const t = useMessages(publicText).section;
+  const ts = useMessages(shareText);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const link = handle.link;
+  const url = link && typeof window !== "undefined" ? `${window.location.origin}/s/${link.token}` : "";
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 1800);
+    return () => clearTimeout(id);
+  }, [copied]);
+
+  async function run(key: string, fn: () => Promise<boolean>, success?: string) {
+    setBusy(key);
+    const ok = await fn().catch(() => false);
+    setBusy(null);
+    if (!ok) blob.say(ts.error, { mood: "worried" });
+    else {
+      if (success) blob.say(success, { mood: "happy" });
+      onChanged?.();
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      blob.say(t.linkCopied, { mood: "happy" });
+    } catch {
+      input.current?.select();
+    }
+  }
+
+  return (
+    <section aria-labelledby="share-public" className="rounded-2xl border border-line bg-surface p-3.5">
+      <div className="flex items-center gap-2">
+        <Globe className="size-4 text-blob-ink" />
+        <h3 id="share-public" className="text-[13.5px] font-semibold text-ink">
+          {t.title}
+        </h3>
+      </div>
+      {link === undefined ? (
+        <div className="mt-2.5 h-9 rounded-lg bg-hover/70" aria-hidden />
+      ) : link ? (
+        <>
+          <div className="mt-2.5 flex gap-1.5">
+            <input
+              ref={input}
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label={t.label}
+              className="h-9 min-w-0 flex-1 truncate rounded-lg border border-line bg-raised px-2.5 font-mono text-[12px] text-ink-2 outline-none focus:border-blob"
+            />
+            <Button variant="blob" size="md" onClick={copy} className="h-9 shrink-0 px-3" aria-live="polite">
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? t.copied : t.copy}
+            </Button>
+            <a href={url} target="_blank" rel="noopener" className="grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-raised text-ink-2 hover:bg-hover" aria-label={t.open} title={t.open}>
+              <ExternalLink className="size-4" />
+            </a>
+          </div>
+          {subPages && (
+            <label className="mt-2.5 flex items-center justify-between gap-3 text-[12.5px]">
+              <span className="min-w-0">
+                <span className="block font-medium text-ink">{t.subPages}</span>
+                <span className="block text-ink-3">{t.subPagesHint}</span>
+              </span>
+              <Switch checked={link.sub_pages} onChange={(v) => void run("sub", () => handle.setSubPages(v))} label={t.subPages} disabled={!owner || busy === "sub"} />
+            </label>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[12px] text-ink-3">
+            <span>{t.views(link.views)}</span>
+            {owner && (
+              <button
+                onClick={() => void run("stop", handle.remove, t.stopped)}
+                disabled={busy === "stop"}
+                className="ml-auto flex h-7 items-center gap-1 rounded-md px-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger disabled:opacity-50 [@media(hover:none)]:h-8"
+              >
+                <Trash2 className="size-3.5" /> {t.stop}
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{subPages ? t.hint : t.hintCv}</p>
+          {owner ? (
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Button onClick={() => void run("create", handle.create)} loading={busy === "create"}>
+                <Globe className="size-4" /> {t.create}
+              </Button>
+              <span className="text-[12px] text-ink-3">{t.careful}</span>
+            </div>
+          ) : (
+            <p className="mt-2 text-[12px] text-ink-3">{t.ownerOnly}</p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

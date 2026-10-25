@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeftRight, FolderInput, FileUser, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
+import { ArrowLeftRight, FolderInput, FileUser, Globe, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { AvatarStack, personName } from "@/components/share/Avatar";
 import { ShareDialog } from "@/components/share/ShareDialog";
 import { useMembers } from "@/components/share/useMembers";
+import { usePublicLink } from "@/components/share/usePublicLink";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { TopBar, type Crumb } from "@/components/shell/TopBar";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
@@ -15,6 +16,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { panesText } from "@/i18n/messages/panes";
 import { pageText } from "@/i18n/messages/page";
+import { publicText } from "@/i18n/messages/public";
 import { shareText } from "@/i18n/messages/share";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
@@ -52,17 +54,20 @@ export function PageTopBar({
 }) {
   const t = useMessages(pageText);
   const s = useMessages(shareText);
+  const pub = useMessages(publicText);
   const tp = useMessages(panesText).split;
   const cvs = useMessages(cvHomeText).title;
   const locale = useLocale();
   const router = useRouter();
   const { pages, subjects, updatePage, trashPage, userId, removePages } = useWorkspace();
   const page = pages.find((p) => p.id === pageId);
-  // CVs are never shared: no need to ask who is on them.
+  // CVs are never shared with people (only through a public link): no need to ask who is on them.
   const access = useMembers(
     page && page.kind !== "cv" ? { type: "page", id: pageId } : null,
     initialRole && initialMembers ? { role: initialRole, members: initialMembers } : undefined,
   );
+  // Owners and editors see the page's public link (a badge while there is one).
+  const publicLink = usePublicLink(page && (page.user_id === userId || access.role === "owner" || access.role === "editor") ? pageId : null);
   const [sharing, setSharing] = useState(false);
   if (!page) return <TopBar crumbs={[]} />;
 
@@ -156,7 +161,18 @@ export function PageTopBar({
                 {role === "viewer" ? s.viewOnly : s.sharedBadge}
               </button>
             )}
-            {!cv && canShare && (
+            {publicLink.link && (
+              <button
+                type="button"
+                onClick={() => setSharing(true)}
+                title={pub.badgeTitle}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-blob-soft px-2 text-[12px] font-medium text-blob-ink transition-colors hover:bg-blob-soft/70 max-md:hidden [@media(hover:none)]:h-8"
+              >
+                <Globe className="size-3.5" />
+                {pub.badge}
+              </button>
+            )}
+            {(cv ? mine : canShare) && (
               <button
                 type="button"
                 onClick={() => setSharing(true)}
@@ -248,7 +264,7 @@ export function PageTopBar({
                       <MenuSeparator />
                     </>
                   )}
-                  {!cv && role && (
+                  {(cv ? mine : role) && (
                     <MenuItem
                       icon={<UserPlus />}
                       onSelect={() => {
@@ -312,17 +328,17 @@ export function PageTopBar({
           </>
         }
       />
-      {!cv && (
-        <ShareDialog
-          open={sharing}
-          onClose={() => setSharing(false)}
-          target={{ type: "page", id: page.id }}
-          name={pageTitle(page.title, page.kind, locale)}
-          ancestors={[...chain].reverse().map((p) => ({ id: p.id, title: pageTitle(p.title, p.kind, locale) }))}
-          onChanged={changed}
-          onLeft={leftPage}
-        />
-      )}
+      <ShareDialog
+        open={sharing}
+        onClose={() => setSharing(false)}
+        target={{ type: "page", id: page.id }}
+        name={pageTitle(page.title, page.kind, locale)}
+        ancestors={[...chain].reverse().map((p) => ({ id: p.id, title: pageTitle(p.title, p.kind, locale) }))}
+        publicLink={publicLink}
+        publicOnly={cv}
+        onChanged={cv ? undefined : changed}
+        onLeft={leftPage}
+      />
     </>
   );
 }

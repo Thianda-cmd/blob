@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { fileKind, fileUrl, formatSize } from "@/lib/files";
+import { useNoteBlocks } from "./context";
 import { cn } from "@/lib/utils";
 import { FileSpec } from "./schema";
 
@@ -58,6 +59,7 @@ const LINK_LIFETIME = 50 * 60 * 1000;
 
 function FileView({ node, selected }: ReactNodeViewProps) {
   const t = useMessages(noteBlocksText).file;
+  const urlFor = useNoteBlocks().fileUrl ?? fileUrl;
   const locale = useLocale();
   const path = (node.attrs.path as string) ?? "";
   const name = (node.attrs.name as string) || "file";
@@ -81,7 +83,7 @@ function FileView({ node, selected }: ReactNodeViewProps) {
   useEffect(() => {
     if (!open || !path || link) return;
     let alive = true;
-    void fileUrl(path).then((href) => {
+    void urlFor(path).then((href) => {
       if (!alive) return;
       if (href) setLink({ href, at: Date.now() });
       else setMissing(true);
@@ -89,12 +91,12 @@ function FileView({ node, selected }: ReactNodeViewProps) {
     return () => {
       alive = false;
     };
-  }, [open, path, link]);
+  }, [open, path, link, urlFor]);
 
   const openInTab = async () => {
     // Opened before the link arrives, so the browser doesn't treat it as a popup.
     const win = window.open("about:blank", "_blank");
-    const href = fresh ?? (await fileUrl(path));
+    const href = fresh ?? (await urlFor(path));
     if (!href) {
       win?.close();
       setMissing(true);
@@ -107,7 +109,7 @@ function FileView({ node, selected }: ReactNodeViewProps) {
   };
 
   const download = async () => {
-    const href = await fileUrl(path, { download: name });
+    const href = await urlFor(path, { download: name });
     if (!href) {
       setMissing(true);
       return;

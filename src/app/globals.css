@@ -557,7 +557,7 @@
 .prose-blob .blob-pagelink-wrap {
   margin-inline: -0.4em;
 }
-.prose-blob a.blob-pagelink {
+.prose-blob .blob-pagelink {
   display: flex;
   align-items: center;
   gap: 0.5em;
@@ -593,8 +593,16 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
-.prose-blob a.blob-pagelink.is-missing {
+.prose-blob .blob-pagelink.is-missing {
   color: var(--ink-3);
+}
+/* A page a public link doesn't open (public/blocks.tsx): a quiet line, nothing to click. */
+.prose-blob span.blob-pagelink.is-missing {
+  cursor: default;
+}
+.prose-blob span.blob-pagelink.is-missing .blob-pagelink-title {
+  font-weight: 450;
+  text-decoration: none;
 }
 .prose-blob .blob-pagelink-note {
   font-size: 0.8em;
