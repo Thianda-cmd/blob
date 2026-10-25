@@ -1,18 +1,21 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, Eye, FileDown, Palette, PencilLine, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, FileDown, FileText, Mail, Palette, PencilLine, TriangleAlert } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { blob } from "@/components/blob/bus";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { useAutosave } from "@/components/page/useAutosave";
 import { Button } from "@/components/ui/Button";
+import { MenuItem, Popover } from "@/components/ui/Menu";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { CvPrint, type CvLayoutInfo } from "@/cv/CvDocument";
-import { cvFileName, cvPlainText, cvProgress, cvTitle, normalizeCv, type CvCheck } from "@/cv/model";
+import { letterTemplate } from "@/cv/letter";
+import { cvFileName, cvPlainText, cvProgress, cvTitle, letterHasContent, normalizeCv, type CvCheck, type CvPdfParts } from "@/cv/model";
 import type { Cv } from "@/cv/types";
 import { useLocale, useMessages } from "@/i18n/client";
 import { cvEditorText } from "@/i18n/messages/cvEditor";
+import { cvLetterText } from "@/i18n/messages/cvLetter";
 import { createClient } from "@/lib/supabase/client";
 import type { Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -27,10 +30,14 @@ import { PreviewPane, type Zoom } from "./editor/PreviewPane";
 import { ProgressRing } from "./editor/ProgressRing";
 import { Segmented } from "./editor/Segmented";
 import { useIsMac, useMediaQuery } from "./editor/useMedia";
+import { LetterForm } from "./letter/LetterForm";
 import type { CvChange } from "./types";
 
 type CvPatch = { content: Cv; title: string; plain_text: string };
 type Mode = "edit" | "design" | "preview";
+/** The CV or the cover letter that goes with it. */
+type Doc = "cv" | "letter";
+const PDF_PARTS: CvPdfParts[] = ["both", "cv", "letter"];
 
 /** Remembers whether the design panel was open (this browser only). */
 const PANEL_KEY = "blob-cv-panel";
@@ -41,7 +48,8 @@ const never = () => () => {};
 
 /**
  * The CV editor. Wide screens: the form on the left, the live A4 pages on the right with a slim
- * toolbar, and the design panel beside them. Tablets and phones: Edit · Design · Preview.
+ * toolbar, and the design panel beside them. Tablets and phones: Edit · Design · Preview. Above
+ * them the switch between the CV and its cover letter, which shares the CV's details and design.
  *
  * Drawn in the browser only: a CV stored without ids (a fresh, empty one) gets new random ids each
  * time it is read, so the server's ids would not match the browser's.
@@ -60,6 +68,7 @@ export function CvEditor({ page }: { page: Page }) {
 
 function Editor({ page }: { page: Page }) {
   const t = useMessages(cvEditorText);
+  const tl = useMessages(cvLetterText);
   const locale = useLocale();
   const { updatePage } = useWorkspace();
   const [cv, setCv] = useState<Cv>(() => normalizeCv(page.content, locale));
@@ -97,17 +106,25 @@ function Editor({ page }: { page: Page }) {
   const wide = useMediaQuery("(min-width: 1024px)");
   const mac = useIsMac();
   const [mode, setMode] = useState<Mode>("edit");
+  const [doc, setDoc] = useState<Doc>("cv");
   const [panelOpen, setPanelOpen] = useState(false);
   const [tab, setTab] = useState<PanelTab>("design");
   const [zoom, setZoom] = useState<Zoom>("fit");
   const [layout, setLayout] = useState<CvLayoutInfo | null>(null);
+  const [letterLayout, setLetterLayout] = useState<CvLayoutInfo | null>(null);
   const [pdf, setPdf] = useState<"idle" | "explain" | "print">("idle");
+  const [parts, setParts] = useState<CvPdfParts>("cv");
+  const hasLetter = letterHasContent(cv.letter);
   const progress = cvProgress(cv);
   const paneRef = useRef<HTMLElement>(null);
 
   // The engine reports after every re-measure: only a different page count or overflow is news.
   const onLayout = useCallback(
     (info: CvLayoutInfo) => setLayout((l) => (l && l.pages === info.pages && l.overflow === info.overflow ? l : info)),
+    [],
+  );
+  const onLetterLayout = useCallback(
+    (info: CvLayoutInfo) => setLetterLayout((l) => (l && l.pages === info.pages && l.overflow === info.overflow ? l : info)),
     [],
   );
 
@@ -155,10 +172,11 @@ function Editor({ page }: { page: Page }) {
     lastProgress.current = progress;
   }, [progress, overflow, t.cheer]);
 
-  // From the checklist (or the "too long" notice) to the right card of the form.
+  // From the checklist (or the "too long" notice) to the right card of the CV's form.
   const reveal = useCallback(
     (part: string, focus?: string[], entry?: { id: string; heading: string }) => {
       if (!wide) setMode("edit");
+      setDoc("cv");
       revealPart(part, focus, entry);
     },
     [wide],
@@ -185,8 +203,18 @@ function Editor({ page }: { page: Page }) {
     culpritRef.current = culprit;
   });
   // Straight to printing only for those who know the way and when nothing is cut off: otherwise the
-  // dialog, with its warning, every time.
-  const startPdf = useCallback(() => setPdf((p) => (p !== "idle" ? p : pdfExplained() && !culpritRef.current ? "print" : "explain")), []);
+  // dialog, with its warning, every time. Without a choice, a started letter goes in with the CV.
+  const pdfBusy = useRef(false);
+  useEffect(() => {
+    pdfBusy.current = pdf !== "idle";
+  }, [pdf]);
+  const startPdf = useCallback((choice?: CvPdfParts) => {
+    if (pdfBusy.current) return;
+    const next = choice ?? (letterHasContent(cvRef.current.letter) ? "both" : "cv");
+    pdfBusy.current = true;
+    setParts(next);
+    setPdf(pdfExplained() && !(next !== "letter" && culpritRef.current) ? "print" : "explain");
+  }, []);
 
   // Ctrl/Cmd+P prints the CV, not the editor around it.
   useEffect(() => {
@@ -218,18 +246,54 @@ function Editor({ page }: { page: Page }) {
       ? { text: t.tooManyPages(layout.pages) }
       : null;
 
-  const pdfButton = (big?: boolean) => (
-    <Button
-      variant="primary"
-      size={big ? "lg" : "sm"}
-      onClick={startPdf}
-      loading={pdf === "print"}
-      title={t.pdfTitle(pdfKeys)}
-      className={cn("shrink-0", big && "max-[400px]:px-3.5")}
-    >
-      <FileDown className={big ? "size-4" : "size-3.5"} /> {t.pdf}
-    </Button>
-  );
+  // With a cover letter started, the button asks what goes into the PDF.
+  const pdfButton = (big?: boolean) => {
+    const props = {
+      variant: "primary" as const,
+      size: big ? ("lg" as const) : ("sm" as const),
+      loading: pdf === "print",
+      title: t.pdfTitle(pdfKeys),
+      className: cn("shrink-0", big && "max-[400px]:px-3.5"),
+    };
+    const icon = <FileDown className={big ? "size-4" : "size-3.5"} />;
+    if (!hasLetter)
+      return (
+        <Button {...props} onClick={() => startPdf("cv")}>
+          {icon} {t.pdf}
+        </Button>
+      );
+    return (
+      <Popover
+        align="end"
+        label={tl.pdfMenu}
+        className="w-[250px]"
+        trigger={(p) => (
+          <Button {...props} {...p} aria-haspopup="menu">
+            {icon} {t.pdf}
+            <ChevronDown className={cn("-mr-0.5 opacity-70", big ? "size-4" : "size-3.5")} />
+          </Button>
+        )}
+      >
+        {(close) => (
+          <>
+            <div className="px-2 pb-1.5 pt-1 text-[12px] text-ink-3">{tl.pdfMenu}</div>
+            {PDF_PARTS.map((choice) => (
+              <MenuItem
+                key={choice}
+                icon={choice === "cv" ? <FileText /> : choice === "letter" ? <Mail /> : <FileDown />}
+                onSelect={() => {
+                  close();
+                  startPdf(choice);
+                }}
+              >
+                <span className="min-w-0 truncate">{tl.pdfParts[choice]}</span>
+              </MenuItem>
+            ))}
+          </>
+        )}
+      </Popover>
+    );
+  };
 
   const tooLong = culprit && (
     <div role="status" className="sticky left-0 top-0 z-10 flex items-start gap-2.5 border-b border-danger/20 bg-[color-mix(in_oklab,var(--danger)_9%,var(--surface))] px-4 py-2.5">
@@ -245,6 +309,43 @@ function Editor({ page }: { page: Page }) {
     </div>
   );
 
+  const letterPages = letterLayout?.pages ?? null;
+  const letterLong = letterPages !== null && letterPages > 1 && (
+    <div role="status" className="sticky left-0 top-0 z-10 flex items-start gap-2.5 border-b border-danger/20 bg-[color-mix(in_oklab,var(--danger)_9%,var(--surface))] px-4 py-2.5">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+      <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink">{tl.text.tooLong(letterPages)}</p>
+    </div>
+  );
+  const letter = doc === "letter";
+  // What the preview shows: the CV, or the cover letter with its own page count and warning.
+  const shown = letter
+    ? { template: letterTemplate, label: tl.previewLabel, maxPages: 1, pagesTip: tl.pagesTip, pages: letterPages, onLayout: onLetterLayout, notice: letterLong }
+    : { template: undefined, label: undefined, maxPages: 2, pagesTip: undefined, pages: layout?.pages ?? null, onLayout, notice: tooLong };
+
+  const docTabs = (
+    <div role="tablist" aria-label={tl.docSwitch} className="flex shrink-0 items-end gap-1 border-t border-line bg-surface px-2 pt-1 lg:px-3">
+      {(["cv", "letter"] as const).map((d) => (
+        <button
+          key={d}
+          type="button"
+          role="tab"
+          aria-selected={doc === d}
+          onClick={() => setDoc(d)}
+          className={cn(
+            "relative flex h-9.5 items-center gap-1.5 rounded-t-lg px-3 text-[13.5px] transition-colors max-lg:h-10.5 [&_svg]:size-4",
+            doc === d ? "font-medium text-ink" : "text-ink-3 hover:bg-hover/60 hover:text-ink-2",
+          )}
+        >
+          {d === "cv" ? <FileText aria-hidden /> : <Mail aria-hidden />}
+          {tl.docs[d]}
+          {doc === d && (
+            <motion.span layoutId="cv-doc-tab" aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blob" transition={{ type: "spring", stiffness: 600, damping: 40 }} />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
   const panel = (className: string, onClose?: () => void) => (
     <DesignPanel cv={cv} change={change} tab={tab} onTab={setTab} onJump={jump} onClose={onClose} issue={issue} className={className} />
   );
@@ -252,6 +353,7 @@ function Editor({ page }: { page: Page }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageTopBar pageId={page.id} saveState={state} />
+      {docTabs}
 
       {/* Tablets and phones: one view at a time, the PDF always in reach. */}
       <div className="flex shrink-0 items-center gap-2 border-y border-line bg-surface px-3 py-2 lg:hidden">
@@ -276,31 +378,38 @@ function Editor({ page }: { page: Page }) {
 
       <div className="flex min-h-0 flex-1 flex-col border-line lg:grid lg:grid-cols-[clamp(330px,42%,440px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:border-t">
         <div
-          aria-label={t.form}
+          key={doc}
+          aria-label={letter ? tl.formLabel : t.form}
           role="region"
           className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface lg:border-r lg:border-line", mode !== "edit" && "max-lg:hidden")}
         >
-          <button
-            type="button"
-            onClick={() => {
-              setTab("check");
-              setMode("design");
-            }}
-            className="flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left transition-colors hover:bg-hover/60 lg:hidden"
-          >
-            <ProgressRing value={progress} size={30} stroke={3.5}>
-              <span className="text-[9.5px] font-semibold tabular-nums text-ink">{progress}</span>
-            </ProgressRing>
-            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[14px] text-ink">
-              {issue && <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden />}
-              <span className="min-w-0">{progress < 100 ? t.progressStrip(progress) : issue ? t.progressStripLong : t.progressStripDone}</span>
-            </span>
-            <span className="flex shrink-0 items-center text-[13.5px] font-medium text-blob-ink">
-              {t.checklist}
-              <ChevronRight className="size-4" />
-            </span>
-          </button>
-          <CvForm cv={cv} change={change} />
+          {letter ? (
+            <LetterForm cv={cv} change={change} pages={letterPages} onShowCv={() => reveal("person")} />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("check");
+                  setMode("design");
+                }}
+                className="flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left transition-colors hover:bg-hover/60 lg:hidden"
+              >
+                <ProgressRing value={progress} size={30} stroke={3.5}>
+                  <span className="text-[9.5px] font-semibold tabular-nums text-ink">{progress}</span>
+                </ProgressRing>
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[14px] text-ink">
+                  {issue && <TriangleAlert className="size-4 shrink-0 text-danger" aria-hidden />}
+                  <span className="min-w-0">{progress < 100 ? t.progressStrip(progress) : issue ? t.progressStripLong : t.progressStripDone}</span>
+                </span>
+                <span className="flex shrink-0 items-center text-[13.5px] font-medium text-blob-ink">
+                  {t.checklist}
+                  <ChevronRight className="size-4" />
+                </span>
+              </button>
+              <CvForm cv={cv} change={change} />
+            </>
+          )}
         </div>
 
         {wide ? (
@@ -308,11 +417,9 @@ function Editor({ page }: { page: Page }) {
             paneRef={paneRef}
             className="min-h-0 flex-1 max-lg:hidden"
             cv={preview}
+            {...shown}
             zoom={zoom}
             onZoom={setZoom}
-            pages={layout?.pages ?? null}
-            onLayout={onLayout}
-            notice={tooLong}
             actions={
               <>
                 <button
@@ -372,19 +479,20 @@ function Editor({ page }: { page: Page }) {
             }
           />
         ) : mode === "preview" ? (
-          <PreviewPane className="min-h-0 flex-1" cv={preview} zoom={zoom} onZoom={setZoom} pages={layout?.pages ?? null} onLayout={onLayout} notice={tooLong} />
+          <PreviewPane className="min-h-0 flex-1" cv={preview} {...shown} zoom={zoom} onZoom={setZoom} />
         ) : mode === "design" ? (
           panel("min-h-0 flex-1")
         ) : null}
       </div>
-      {!wide && mode !== "preview" && <LayoutProbe cv={preview} onLayout={onLayout} />}
+      {!wide && mode !== "preview" && <LayoutProbe key={doc} cv={preview} template={shown.template} onLayout={shown.onLayout} />}
 
       <PdfDialog
         open={pdf === "explain"}
         onClose={() => setPdf("idle")}
         onPrint={() => setPdf("print")}
         warning={
-          culprit && (
+          culprit &&
+          parts !== "letter" && (
             <p className="mt-3 flex gap-2 rounded-lg bg-danger/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
               <TriangleAlert className="mt-px size-4 shrink-0 text-danger" />
               <span>
@@ -395,7 +503,7 @@ function Editor({ page }: { page: Page }) {
         }
       />
       {pdf === "print" ? (
-        <CvPrint cv={cv} fileName={cvFileName(cv)} onDone={() => setPdf("idle")} />
+        <CvPrint cv={cv} fileName={cvFileName(cv, parts)} parts={parts} onDone={() => setPdf("idle")} />
       ) : (
         <style>{`@media print { html, body { height: auto !important; min-height: 0 !important; } body > * { display: none !important; } body::before { content: ${JSON.stringify(t.printNote)}; display: block; margin: 25mm 20mm; font: 14pt/1.5 system-ui, sans-serif; color: #000; } }`}</style>
       )}

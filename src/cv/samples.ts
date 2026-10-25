@@ -31,6 +31,22 @@ const TEXT = {
     skills: [["Microsoft Word und PowerPoint", 4], ["Canva", 5], ["Adobe Photoshop (Grundlagen)", 3], ["Zehnfingersystem", 4]],
     languages: [["Deutsch", "native", ""], ["Englisch", "good", "B1"], ["Französisch", "school", "A2"]],
     interests: "Handball, Fotografie, Zeichnen, Lesen",
+    letter: {
+      company: "Nordlicht Werbeagentur GmbH",
+      department: "Personalabteilung",
+      contact: "Anna Berger",
+      street: "Hafenstraße 8",
+      postalCode: "20457",
+      city: "Hamburg",
+      subject: "Bewerbung um einen Ausbildungsplatz als Mediengestalterin Digital und Print",
+      reference: "Ihre Anzeige auf ausbildung.de",
+      opening:
+        "in meinem Schülerpraktikum im Januar durfte ich zwei Wochen lang in Ihrer Grafikabteilung mitarbeiten. Seitdem weiß ich, dass ich Mediengestalterin werden möchte. Deshalb bewerbe ich mich bei Ihnen um einen Ausbildungsplatz ab August 2026.",
+      body:
+        "Zurzeit besuche ich die 10. Klasse der Realschule am Stadtpark, die ich im Sommer mit dem Mittleren Schulabschluss beende. Meine Lieblingsfächer sind Kunst, Deutsch und Informatik. Seit zwei Jahren gestalte ich das Layout unserer Schülerzeitung „Pausenhof“, mit Canva und inzwischen auch mit Photoshop.\nIn Ihrer Agentur hat mir besonders gefallen, wie eng Grafik, Text und Druck zusammenarbeiten. Ich habe eigene Entwürfe für Flyer und Social-Media-Beiträge gemacht und war bei Kundengesprächen dabei. Als Co-Trainerin einer Handballmannschaft habe ich gelernt, zuverlässig zu sein und Verantwortung zu übernehmen.",
+      ending: "Über eine Einladung zu einem Vorstellungsgespräch freue ich mich sehr.",
+      enclosures: "Lebenslauf\nZeugnisse\nPraktikumsbescheinigung",
+    },
   },
   en: {
     headline: "Year 10 student · aiming for an apprenticeship in media design",
@@ -50,6 +66,22 @@ const TEXT = {
     skills: [["Microsoft Word and PowerPoint", 4], ["Canva", 5], ["Adobe Photoshop (basics)", 3], ["Touch typing", 4]],
     languages: [["German", "native", ""], ["English", "good", "B1"], ["French", "school", "A2"]],
     interests: "Handball, photography, drawing, reading",
+    letter: {
+      company: "Nordlicht Werbeagentur GmbH",
+      department: "Human Resources",
+      contact: "Anna Berger",
+      street: "Hafenstraße 8",
+      postalCode: "20457",
+      city: "Hamburg",
+      subject: "Application for an apprenticeship as a media designer",
+      reference: "Your advertisement on ausbildung.de",
+      opening:
+        "During my work experience in January I spent two weeks in your graphics department. Since then I have known that I want to become a media designer, which is why I am applying for an apprenticeship with you starting in August 2026.",
+      body:
+        "I am currently in Year 10 at Realschule am Stadtpark and will finish with my secondary school certificate this summer. My favourite subjects are art, German and computer science. For two years I have done the layout of our school newspaper “Pausenhof”, first with Canva and now with Photoshop too.\nWhat I liked most about your agency was how closely design, copy and print work together. I created my own drafts for flyers and social media posts and sat in on client meetings. As an assistant coach of a handball team I have learned to be reliable and to take responsibility.",
+      ending: "I would be delighted to be invited to an interview.",
+      enclosures: "CV\nSchool reports\nWork experience certificate",
+    },
   },
 } as const;
 
@@ -88,6 +120,7 @@ export function sampleCv(lang: Locale, template: CvTemplateId = "classic"): Cv {
         { id: cvId(), kind: "interests", text: t.interests },
       ],
       closing: { show: true, place: "Hamburg", date: "", signature: SIGNATURE },
+      letter: { ...t.letter, salutation: "ms" },
     },
     lang,
   );

@@ -11,6 +11,7 @@ import type {
   CvEntryKind,
   CvLanguage,
   CvLanguageLevel,
+  CvLetter,
   CvPerson,
   CvSection,
   CvSectionKind,
@@ -129,6 +130,28 @@ function signature(raw: unknown): CvSignature | null {
   return { d, w: num(o.w, 1, 4000, 400), h: num(o.h, 1, 2000, 120) };
 }
 
+function letter(raw: unknown): CvLetter {
+  const o = obj(raw);
+  return {
+    company: str(o.company, 120),
+    department: str(o.department, 120),
+    contact: str(o.contact, 120),
+    // Neither Frau nor Herr until the student picks one: "Guten Tag Anna Berger" is never wrong.
+    salutation: pick(o.salutation, ["ms", "mr", "neutral"] as const, "neutral"),
+    street: str(o.street, 120),
+    postalCode: str(o.postalCode, 20),
+    city: str(o.city, 80),
+    subject: str(o.subject, 200),
+    reference: str(o.reference, 200),
+    opening: str(o.opening, 2000),
+    body: str(o.body, 4000),
+    ending: str(o.ending, 1500),
+    regards: str(o.regards, 80),
+    enclosures: str(o.enclosures, 400),
+    date: day(o.date),
+  };
+}
+
 /** A CV as stored (possibly old, partial or hand-edited) with every field present and valid. */
 export function normalizeCv(raw: unknown, fallbackLang: Locale = "de"): Cv {
   const o = obj(raw);
@@ -142,6 +165,7 @@ export function normalizeCv(raw: unknown, fallbackLang: Locale = "de"): Cv {
     summary: str(o.summary, 1500),
     sections: Object.keys(o).length ? sections : defaultSections(),
     closing: { show: bool(closing.show, true), place: str(closing.place, 80), date: day(closing.date), signature: signature(closing.signature) },
+    letter: letter(o.letter),
   };
 }
 
@@ -301,6 +325,8 @@ export function cvPlainText(cv: Cv) {
     else if (s.kind === "interests") parts.push(s.text);
     else for (const e of s.entries) parts.push(e.title, e.org, e.place, e.text);
   }
+  const l = cv.letter;
+  parts.push(l.company, l.subject, l.opening, l.body, l.ending);
   return parts
     .filter(Boolean)
     .join(" ")
@@ -314,12 +340,114 @@ export function cvTitle(cv: Pick<Cv, "lang" | "person">) {
   return name ? `${CV_LABELS[cv.lang].document} – ${name}` : CV_LABELS[cv.lang].document;
 }
 
-/** A file name for the PDF: "Lebenslauf_Lena_Schneider". */
-export function cvFileName(cv: Pick<Cv, "lang" | "person">) {
-  return cvTitle(cv)
+/** What goes into one PDF: the CV, the cover letter, or both (the letter first). */
+export type CvPdfParts = "cv" | "letter" | "both";
+
+/** A file name for the PDF: "Lebenslauf_Lena_Schneider", "Anschreiben_…", "Bewerbung_…". */
+export function cvFileName(cv: Pick<Cv, "lang" | "person">, parts: CvPdfParts = "cv") {
+  const l = CV_LABELS[cv.lang];
+  const name = fullName(cv.person);
+  const what = parts === "cv" ? l.document : parts === "letter" ? l.letter : l.application;
+  return (name ? `${what} – ${name}` : what)
     .replace(/\s*–\s*/g, "_")
     .replace(/[^\p{L}\p{N}_-]+/gu, "_")
     .replace(/_+/g, "_");
+}
+
+// --- The cover letter -------------------------------------------------------------------------
+
+/** The letter's text parts, in order. */
+export const LETTER_PARTS = ["opening", "body", "ending"] as const;
+export type LetterPart = (typeof LETTER_PARTS)[number];
+
+/** A letter text as paragraphs: every line with something on it. */
+export const paragraphs = (text: string) =>
+  text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const HONORIFIC = /^(frau|herrn?|mrs?\.?|ms\.?|miss)$/i;
+/** Lower-case words that belong to the last name: "Frau von der Heide", "Herr van Dijk". */
+const PARTICLE = /^(von|vom|van|der|den|de|ter|ten|zu|zum|zur)$/;
+
+/**
+ * The person to write to, in the two forms a letter needs: "Dr. Berger" for "Sehr geehrte Frau
+ * Dr. Berger" (titles and the last name) and "Dr. Anna Berger" for the address. A "Frau" or
+ * "Herr" typed in front is dropped: the salutation says it.
+ */
+export function contactName(contact: string) {
+  const words = contact.trim().split(/\s+/).filter(Boolean);
+  while (words.length && HONORIFIC.test(words[0])) words.shift();
+  let first = words.length - 1;
+  while (first > 0 && PARTICLE.test(words[first - 1])) first--;
+  const titles = words.slice(0, Math.max(0, first)).filter((w) => /\.$/.test(w));
+  return { short: [...titles, ...words.slice(Math.max(0, first))].join(" "), full: words.join(" ") };
+}
+
+/** "Sehr geehrte Frau Berger," / "Guten Tag Anna Berger," / "Sehr geehrte Damen und Herren,". */
+export function letterGreeting(cv: Pick<Cv, "lang" | "letter">) {
+  const l = CV_LABELS[cv.lang];
+  const name = contactName(cv.letter.contact);
+  if (!name.full) return l.greeting("none", "");
+  const s = cv.letter.salutation;
+  return l.greeting(s, s === "neutral" ? name.full : name.short);
+}
+
+/** The address lines: company, department, person, street, postcode and town (empty ones left out). */
+export function letterAddress(cv: Pick<Cv, "lang" | "letter">) {
+  const t = cv.letter;
+  const name = contactName(t.contact).full;
+  // "Frau Dr. Anna Berger", but "Dr. Anna Berger" in English, where the title takes the place of Ms or Mr.
+  const titled = cv.lang === "en" && /^\S+\.\s/.test(name);
+  const person = name && t.salutation !== "neutral" && !titled ? `${CV_LABELS[cv.lang].addressee[t.salutation]} ${name}` : name;
+  return [t.company, t.department, person, t.street, [t.postalCode, t.city].filter((x) => x.trim()).join(" ")].map((x) => x.trim()).filter(Boolean);
+}
+
+/** "Hamburg, 25.10.2026": the CV's place (else the town) and the letter's date (else today). */
+export function letterPlaceDate(cv: Pick<Cv, "lang" | "letter" | "closing" | "person" | "design">) {
+  const place = cv.closing.place.trim() || cv.person.city.trim();
+  const value = cv.letter.date || today();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date =
+    m && cv.design.dates === "long"
+      ? cv.lang === "de"
+        ? `${Number(m[3])}. ${CV_LABELS.de.months[Number(m[2]) - 1]} ${m[1]}`
+        : formatDay(value, "en")
+      : formatDay(value, cv.lang);
+  return [place, date].filter(Boolean).join(", ");
+}
+
+/** The enclosures, one per line or separated by commas. */
+export const enclosureList = (text: string) =>
+  text
+    .split(/\n|,|;/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+/** Whether the student has started the letter (a new CV's letter is empty and stays out of the PDF). */
+export function letterHasContent(l: CvLetter) {
+  return [l.company, l.contact, l.subject, l.opening, l.body, l.ending].some((s) => s.trim());
+}
+
+/** Words in the letter's three parts. */
+export const letterWords = (l: CvLetter) =>
+  LETTER_PARTS.map((p) => l[p])
+    .join(" ")
+    .split(/\s+/)
+    .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+
+export type LetterCheck = "recipient" | "subject" | "text" | "signature";
+
+/** What a finished cover letter has: the editor marks its cards done with these. */
+export function letterChecklist(cv: Cv): Record<LetterCheck, boolean> {
+  const l = cv.letter;
+  return {
+    recipient: Boolean(l.company.trim() && l.city.trim()),
+    subject: Boolean(l.subject.trim() && !l.subject.includes(GAP)),
+    text: LETTER_PARTS.every((p) => l[p].trim() && !l[p].includes(GAP)),
+    signature: Boolean(cv.closing.signature),
+  };
 }
 
 // --- How complete is it? ------------------------------------------------------------------------

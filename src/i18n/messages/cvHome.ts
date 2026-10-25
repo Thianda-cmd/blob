@@ -17,6 +17,7 @@ export const cvHomeText = defineMessages({
     // A CV started from the example that still has Lena's email, phone or address.
     sample: "Still Lena's details",
     sampleHint: "This is still the example. Swap Lena's details for your own.",
+    withLetter: "with cover letter",
     options: (title: string) => `Options for “${title}”`,
     open: "Open",
     rename: "Rename",
@@ -79,6 +80,7 @@ export const cvHomeText = defineMessages({
     complete: "Bereit zum Verschicken",
     sample: "Noch Lenas Angaben",
     sampleHint: "Das ist noch das Beispiel. Ersetze Lenas Angaben durch deine eigenen.",
+    withLetter: "mit Anschreiben",
     options: (title) => `Optionen für „${title}“`,
     open: "Öffnen",
     rename: "Umbenennen",

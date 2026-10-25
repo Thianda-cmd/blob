@@ -9,7 +9,7 @@ import { memo, useMemo } from "react";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/Menu";
 import { templateMeta } from "@/cv/catalog";
 import { CvThumbnail } from "@/cv/CvDocument";
-import { cvProgress, normalizeCv } from "@/cv/model";
+import { cvProgress, letterHasContent, normalizeCv } from "@/cv/model";
 import type { Cv } from "@/cv/types";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
@@ -93,7 +93,9 @@ export function CvCard({
         <div className="flex min-w-0 flex-1 flex-col px-3 pb-3 pt-2.5">
           <span className="line-clamp-2 text-[14px] font-medium leading-snug text-ink [overflow-wrap:anywhere]">{title}</span>
           {/* Two lines, so neither gets cut off on a phone. */}
-          <span className="mt-0.5 block truncate text-[12px] text-ink-3">{loaded ? tt(templateMeta(cv.design.template).name) : " "}</span>
+          <span className="mt-0.5 block truncate text-[12px] text-ink-3">
+            {loaded ? [tt(templateMeta(cv.design.template).name), letterHasContent(cv.letter) ? t.withLetter : ""].filter(Boolean).join(" · ") : " "}
+          </span>
           <span className="block truncate text-[12px] text-ink-3" suppressHydrationWarning>
             {edited(item.updated_at, now, locale)}
           </span>

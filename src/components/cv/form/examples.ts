@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/config";
+import type { LetterPart } from "@/cv/model";
 import type { CvLanguageLevel } from "@/cv/types";
 
 // Text the form puts ON the CV (headline ideas, starter profiles, skill / language / hobby chips).
@@ -13,6 +14,14 @@ type Examples = {
   skills: string[];
   languages: { name: string; level: CvLanguageLevel }[];
   interests: string[];
+  /** The cover letter: subject lines, reference lines, the three parts per goal, regards, enclosures. */
+  letter: {
+    subjects: string[];
+    references: string[];
+    parts: Record<SummaryGoal, Record<LetterPart, string>>;
+    regards: string[];
+    enclosures: string[];
+  };
 };
 
 export const CV_EXAMPLES: Record<Locale, Examples> = {
@@ -58,6 +67,32 @@ export const CV_EXAMPLES: Record<Locale, Examples> = {
       { name: "Ukrainisch", level: "native" },
     ],
     interests: ["Fußball", "Handball", "Schwimmen", "Tanzen", "Lesen", "Zeichnen", "Fotografie", "Musik machen", "Kochen und Backen", "Programmieren", "Gaming", "Reiten"],
+    letter: {
+      subjects: ["Bewerbung um ein Schülerpraktikum als …", "Bewerbung um einen Ausbildungsplatz als … ab …", "Bewerbung um einen Minijob als …"],
+      references: ["Ihre Anzeige auf … vom …", "Unser Telefonat am … mit Frau …", "Ihr Stand auf der Ausbildungsmesse in …"],
+      // After "Sehr geehrte Frau Berger," a German letter goes on in lower case.
+      parts: {
+        internship: {
+          opening:
+            "mit großem Interesse habe ich gesehen, dass Sie Schülerpraktika anbieten. Weil mich der Beruf … sehr interessiert, bewerbe ich mich bei Ihnen um ein Praktikum vom … bis zum ….",
+          body: "Zurzeit gehe ich in die … Klasse der …. Meine Lieblingsfächer sind … und …, weil ich dort …. In meiner Freizeit …, dabei habe ich gelernt, ….\nIn einem Praktikum bei Ihnen möchte ich herausfinden, ob der Beruf … zu mir passt. Besonders gespannt bin ich auf ….",
+          ending: "Über eine Zusage oder eine Einladung zu einem persönlichen Gespräch freue ich mich sehr.",
+        },
+        apprenticeship: {
+          opening:
+            "auf der Suche nach einem Ausbildungsplatz bin ich auf Ihre Anzeige auf … gestoßen. Weil mich der Beruf … schon lange begeistert, bewerbe ich mich bei Ihnen um einen Ausbildungsplatz ab ….",
+          body: "Im Sommer … beende ich die … mit dem …. In der Schule mag ich besonders …, und in meinem Praktikum bei … habe ich gemerkt, wie viel Spaß mir … macht.\nIch bin zuverlässig, arbeite gern im Team und lerne schnell dazu. Das konnte ich zum Beispiel als … zeigen. Ihr Betrieb gefällt mir besonders, weil ….",
+          ending: "Über eine Einladung zu einem Vorstellungsgespräch freue ich mich sehr.",
+        },
+        job: {
+          opening: "ich habe gelesen, dass Sie eine Aushilfe für … suchen. Ich bin … Jahre alt, gehe in die … Klasse und habe nachmittags und am Wochenende Zeit.",
+          body: "Ich bin pünktlich, freundlich und packe gern mit an. Erste Erfahrungen habe ich schon bei … gesammelt, wo ich …. Mit Menschen zu arbeiten macht mir Spaß.",
+          ending: "Gern komme ich zum Probearbeiten vorbei. Über eine Rückmeldung freue ich mich.",
+        },
+      },
+      regards: ["Mit freundlichen Grüßen", "Freundliche Grüße", "Viele Grüße"],
+      enclosures: ["Lebenslauf", "Zeugnisse", "Praktikumsbescheinigung", "Zertifikate", "Empfehlungsschreiben"],
+    },
   },
   en: {
     headlines: [
@@ -101,6 +136,30 @@ export const CV_EXAMPLES: Record<Locale, Examples> = {
       { name: "Ukrainian", level: "native" },
     ],
     interests: ["Football", "Handball", "Swimming", "Dancing", "Reading", "Drawing", "Photography", "Making music", "Cooking and baking", "Coding", "Gaming", "Horse riding"],
+    letter: {
+      subjects: ["Application for work experience as a …", "Application for an apprenticeship as a … starting …", "Application for a part-time job as a …"],
+      references: ["Your advertisement on … of …", "Our phone call on … with Ms …", "Your stand at the careers fair in …"],
+      parts: {
+        internship: {
+          opening: "I was very pleased to see that you offer work experience for school students. As I am very interested in becoming a …, I would like to apply for a placement from … to ….",
+          body: "I am currently in Year … at …. My favourite subjects are … and … because …. In my free time I …, which has taught me ….\nA placement with you would help me find out whether a career as a … is right for me. I am especially looking forward to ….",
+          ending: "I would be very happy to hear from you or to be invited for an interview.",
+        },
+        apprenticeship: {
+          opening:
+            "While looking for an apprenticeship I came across your advertisement on …. I have been fascinated by … for a long time, so I would like to apply for an apprenticeship with you starting in ….",
+          body: "This summer I will finish … with my …. At school I particularly enjoy …, and during my work experience at … I realised how much I enjoy ….\nI am reliable, enjoy working in a team and learn quickly, as I showed for example as a …. I would particularly like to work for your company because ….",
+          ending: "I would be delighted to be invited to an interview.",
+        },
+        job: {
+          opening: "I read that you are looking for a part-time helper for …. I am … years old, in Year … at school, and I am free in the afternoons and at weekends.",
+          body: "I am punctual, friendly and happy to help out. I have already gained some experience at …, where I …. I enjoy working with people.",
+          ending: "I would be glad to come in for a trial shift. I look forward to hearing from you.",
+        },
+      },
+      regards: ["Kind regards", "Yours sincerely", "Best regards"],
+      enclosures: ["CV", "School reports", "Work experience certificate", "Certificates", "Reference letter"],
+    },
   },
 };
 

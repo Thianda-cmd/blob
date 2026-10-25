@@ -1,5 +1,5 @@
 import type { Locale } from "@/i18n/config";
-import type { CvLanguageLevel, CvSectionKind } from "./types";
+import type { CvLanguageLevel, CvSalutation, CvSectionKind } from "./types";
 
 // Words that appear on the CV itself, in the CV's own language (cv.lang). The editor's own
 // buttons and hints live in src/i18n/messages/cv*.ts and follow the app's language.
@@ -29,6 +29,16 @@ type CvLabels = {
   bornOn: (date: string, place: string) => string;
   placeDate: string;
   signature: string;
+  /** The cover letter, for its file name. */
+  letter: string;
+  /** Cover letter and CV in one file. */
+  application: string;
+  /** The greeting: by name ("Berger", "Dr. Berger"), by the whole name (neutral), or to no one in particular. */
+  greeting: (salutation: CvSalutation | "none", name: string) => string;
+  /** Before the name in the address: "Frau Anna Berger", "Herrn Jonas Berger". */
+  addressee: Record<"ms" | "mr", string>;
+  regards: string;
+  enclosures: string;
 };
 
 export const CV_LABELS: Record<Locale, CvLabels> = {
@@ -70,6 +80,13 @@ export const CV_LABELS: Record<Locale, CvLabels> = {
     bornOn: (d, p) => (d && p ? `${d} in ${p}` : d || p),
     placeDate: "Ort, Datum",
     signature: "Unterschrift",
+    letter: "Anschreiben",
+    application: "Bewerbung",
+    greeting: (s, name) =>
+      s === "ms" ? `Sehr geehrte Frau ${name},` : s === "mr" ? `Sehr geehrter Herr ${name},` : s === "neutral" ? `Guten Tag ${name},` : "Sehr geehrte Damen und Herren,",
+    addressee: { ms: "Frau", mr: "Herrn" },
+    regards: "Mit freundlichen Grüßen",
+    enclosures: "Anlagen",
   },
   en: {
     document: "Curriculum Vitae",
@@ -109,5 +126,13 @@ export const CV_LABELS: Record<Locale, CvLabels> = {
     bornOn: (d, p) => (d && p ? `${d} in ${p}` : d || p),
     placeDate: "Place, date",
     signature: "Signature",
+    letter: "Cover letter",
+    application: "Application",
+    // "Dear Dr. Berger": a title takes the place of Ms or Mr.
+    greeting: (s, name) =>
+      s === "none" ? "Dear Sir or Madam," : s === "neutral" || /^\S+\.\s/.test(name) ? `Dear ${name},` : `Dear ${s === "ms" ? "Ms" : "Mr"} ${name},`,
+    addressee: { ms: "Ms", mr: "Mr" },
+    regards: "Kind regards",
+    enclosures: "Enclosures",
   },
 };

@@ -3,6 +3,7 @@
 import { FileText, Maximize2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { CvDocument, PAGE_W, type CvLayoutInfo } from "@/cv/CvDocument";
+import type { CvTemplate } from "@/cv/templates/types";
 import type { Cv } from "@/cv/types";
 import { useMessages } from "@/i18n/client";
 import { cvEditorText } from "@/i18n/messages/cvEditor";
@@ -17,9 +18,14 @@ const PAGE_PX = PAGE_W * MM;
 /**
  * The live A4 pages with a slim toolbar: zoom (fit or real size), the page count and whatever the
  * editor puts on the right (design, checklist, PDF). `side` sits next to the pages (the design panel).
+ * `template` shows the cover letter instead of the CV; the page count turns red above `maxPages`.
  */
 export function PreviewPane({
   cv,
+  template,
+  label,
+  maxPages = 2,
+  pagesTip,
   zoom,
   onZoom,
   pages,
@@ -31,6 +37,10 @@ export function PreviewPane({
   paneRef,
 }: {
   cv: Cv;
+  template?: CvTemplate;
+  label?: string;
+  maxPages?: number;
+  pagesTip?: string;
   zoom: Zoom;
   onZoom: (zoom: Zoom) => void;
   /** Page count from the last layout (null before the first). */
@@ -68,10 +78,10 @@ export function PreviewPane({
   }, [zoom]);
 
   const scale = zoom === "full" ? 1 : (fit?.scale ?? 0.5);
-  const many = (pages ?? 0) > 2;
+  const many = (pages ?? 0) > maxPages;
 
   return (
-    <section ref={paneRef} aria-label={t.previewLabel} className={cn("@container/preview flex min-h-0 min-w-0 flex-col bg-paper", className)}>
+    <section ref={paneRef} aria-label={label ?? t.previewLabel} className={cn("@container/preview flex min-h-0 min-w-0 flex-col bg-paper", className)}>
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface px-2.5">
         <Segmented
           label={t.zoom}
@@ -96,7 +106,7 @@ export function PreviewPane({
         {pages !== null && (
           <span
             className={cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] tabular-nums", many ? "text-danger" : "text-ink-3")}
-            title={many ? t.pagesTip : undefined}
+            title={many ? (pagesTip ?? t.pagesTip) : undefined}
             aria-live="polite"
           >
             <FileText className="size-3.5" aria-hidden />
@@ -113,7 +123,9 @@ export function PreviewPane({
           {notice}
           <div className="mx-auto w-max" style={{ padding: `${fit && fit.pad > 20 ? 28 : 16}px ${fit?.pad ?? 16}px 40px` }}>
             <CvDocument
+              key={template?.id ?? "cv"}
               cv={cv}
+              template={template}
               scale={scale}
               gap={fit && fit.pad > 20 ? 24 : 14}
               onLayout={onLayout}

@@ -8,6 +8,8 @@ export const setPerson = (patch: Partial<CvPerson>) => (cv: Cv): Cv => ({ ...cv,
 
 export const setClosing = (patch: Partial<Cv["closing"]>) => (cv: Cv): Cv => ({ ...cv, closing: { ...cv.closing, ...patch } });
 
+export const setLetter = (patch: Partial<Cv["letter"]>) => (cv: Cv): Cv => ({ ...cv, letter: { ...cv.letter, ...patch } });
+
 /** Change one section (by id); the function gets and returns the section. */
 export function updateSection<S extends CvSection>(id: string, fn: (s: S) => S) {
   return (cv: Cv): Cv => ({ ...cv, sections: cv.sections.map((s) => (s.id === id ? fn(s as S) : s)) });

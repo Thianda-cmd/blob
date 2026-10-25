@@ -104,6 +104,42 @@ export type CvClosing = {
   signature: CvSignature | null;
 };
 
+/**
+ * How the letter greets its reader: as Frau/Herr with the name, with the whole name (no Frau or
+ * Herr), or "Sehr geehrte Damen und Herren" when no person is named.
+ */
+export type CvSalutation = "ms" | "mr" | "neutral";
+
+/**
+ * The cover letter (Anschreiben) that goes with the CV: the same person and the same design, so the
+ * two look like one application. Empty fields are left off the letter.
+ */
+export type CvLetter = {
+  company: string;
+  /** Second address line: "Personalabteilung". */
+  department: string;
+  /** The person to write to ("Anna Berger"); empty: the letter greets "Sehr geehrte Damen und Herren". */
+  contact: string;
+  salutation: CvSalutation;
+  street: string;
+  postalCode: string;
+  city: string;
+  /** The subject line, without "Betreff": "Bewerbung um einen Ausbildungsplatz als Mediengestalterin". */
+  subject: string;
+  /** A line under the subject: "Ihre Anzeige auf ausbildung.de vom 12.10.2026". */
+  reference: string;
+  /** The letter in three parts: why you write, why you, and the way forward. A line is a paragraph. */
+  opening: string;
+  body: string;
+  ending: string;
+  /** "" for the usual "Mit freundlichen Grüßen" / "Kind regards" in the letter's language. */
+  regards: string;
+  /** What comes with the letter, one per line or separated by commas. */
+  enclosures: string;
+  /** "YYYY-MM-DD", or "" for the day it is printed. The place is the CV's (closing place, else the town). */
+  date: string;
+};
+
 export type Cv = {
   version: 1;
   /** The language the CV itself is written in (headings, dates). The app's language can differ. */
@@ -114,4 +150,5 @@ export type Cv = {
   summary: string;
   sections: CvSection[];
   closing: CvClosing;
+  letter: CvLetter;
 };

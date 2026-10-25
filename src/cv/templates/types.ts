@@ -56,7 +56,8 @@ export type CvBackgroundProps = {
 };
 
 export type CvTemplate = {
-  id: CvTemplateId;
+  /** A CV design, or the cover letter (src/cv/letter.tsx), which follows the CV's design. */
+  id: CvTemplateId | "letter";
   geometry: (cv: Cv) => CvGeometry;
   blocks: (cv: Cv) => CvBlock[];
   Background?: ComponentType<CvBackgroundProps>;

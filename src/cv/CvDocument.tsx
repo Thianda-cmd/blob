@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 import { deckFontVars } from "@/components/deck/fonts";
 import { cn } from "@/lib/utils";
 import { CV_FONTS } from "./fonts";
+import { letterTemplate } from "./letter";
+import type { CvPdfParts } from "./model";
 import { templateFor } from "./templates";
-import type { CvBlock, CvGeometry } from "./templates/types";
+import type { CvBlock, CvGeometry, CvTemplate } from "./templates/types";
 import type { Cv } from "./types";
 
 // The CV engine: cuts a CV into blocks (the design decides how), measures each block at its real
@@ -187,10 +189,12 @@ export type CvLayoutInfo = { pages: number; overflow: boolean };
 
 /**
  * Draws a CV as A4 pages. `scale` shrinks the pages for screens (1 = real size, for printing);
- * `maxPages` draws only the first pages (thumbnails).
+ * `maxPages` draws only the first pages (thumbnails). `template` draws something else with the
+ * CV's content and design: the cover letter (src/cv/letter.tsx).
  */
 export function CvDocument({
   cv,
+  template: other,
   scale = 1,
   maxPages,
   gap = 16,
@@ -199,6 +203,7 @@ export function CvDocument({
   pageClassName,
 }: {
   cv: Cv;
+  template?: CvTemplate;
   scale?: number;
   maxPages?: number;
   /** Space between pages on screen, in px. */
@@ -207,7 +212,7 @@ export function CvDocument({
   className?: string;
   pageClassName?: string;
 }) {
-  const template = templateFor(cv.design.template);
+  const template = other ?? templateFor(cv.design.template);
   const geometry = useMemo(() => template.geometry(cv), [template, cv]);
   const blocks = useMemo(() => template.blocks(cv), [template, cv]);
   const fonts = useFontsVersion();
@@ -311,11 +316,14 @@ export function CvThumbnail({ cv, width, className }: { cv: Cv; width: number; c
 
 /**
  * Prints the CV (the browser's print dialog, where "Save as PDF" makes the file). While it is
- * mounted, printing shows only the CV pages at real size on A4 without margins. `onDone` runs
- * after the dialog closes.
+ * mounted, printing shows only the CV pages at real size on A4 without margins. `parts` adds the
+ * cover letter, before the CV, or prints only the letter. `onDone` runs after the dialog closes.
  */
-export function CvPrint({ cv, fileName, onDone }: { cv: Cv; fileName: string; onDone: () => void }) {
-  const [ready, setReady] = useState(false);
+export function CvPrint({ cv, fileName, parts = "cv", onDone }: { cv: Cv; fileName: string; parts?: CvPdfParts; onDone: () => void }) {
+  const docs = parts === "both" ? (["letter", "cv"] as const) : [parts];
+  // Printed once every document has been laid out.
+  const [laidOut, setLaidOut] = useState<string[]>([]);
+  const ready = docs.every((d) => laidOut.includes(d));
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
@@ -353,7 +361,16 @@ export function CvPrint({ cv, fileName, onDone }: { cv: Cv; fileName: string; on
     // Off screen but laid out (the pages are measured); in print it is the only thing on the paper.
     <div className="cv-print" style={{ position: "fixed", left: -100000, top: 0, visibility: "hidden" }} aria-hidden>
       <style>{PRINT_CSS}</style>
-      <CvDocument cv={cv} scale={1} gap={0} onLayout={() => setReady(true)} />
+      {docs.map((d) => (
+        <CvDocument
+          key={d}
+          cv={cv}
+          template={d === "letter" ? letterTemplate : undefined}
+          scale={1}
+          gap={0}
+          onLayout={() => setLaidOut((l) => (l.includes(d) ? l : [...l, d]))}
+        />
+      ))}
     </div>,
     document.body,
   );
@@ -368,5 +385,6 @@ const PRINT_CSS = `
   .cv-print .cv-measure { display: none !important; }
   .cv-print .cv-page-slot { height: 296.6mm !important; overflow: hidden; break-after: page; }
   .cv-print .cv-page-slot:last-child { break-after: auto; }
+  .cv-print .cv-document + .cv-document { break-before: page; }
   .cv-print .cv-page { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }`;
