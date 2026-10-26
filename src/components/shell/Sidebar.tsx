@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
+  BadgeQuestionMark,
   BookMarked,
   ChevronRight,
   Ellipsis,
@@ -354,6 +355,9 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         </NavLink>
         <NavLink href="/cv" icon={<FileUser />} active={pathname === "/cv" || openPage?.kind === "cv"}>
           {t.cv}
+        </NavLink>
+        <NavLink href="/quiz" icon={<BadgeQuestionMark />} active={pathname === "/quiz" || pathname.startsWith("/quiz/")}>
+          {t.quiz}
         </NavLink>
         <NavLink href="/blob" icon={<BlobMark />} active={pathname === "/blob"}>
           {t.blob}

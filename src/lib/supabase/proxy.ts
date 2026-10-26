@@ -4,7 +4,7 @@ import { isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { PATH_HEADER } from "@/lib/path-header";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
-const APP_PREFIXES = ["/home", "/p", "/tasks", "/calendar", "/projects", "/join", "/notes", "/cv", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study", "/admin", "/oauth/consent"];
+const APP_PREFIXES = ["/home", "/p", "/tasks", "/calendar", "/projects", "/join", "/notes", "/cv", "/subjects", "/settings", "/trash", "/present", "/onboarding", "/learn", "/study", "/admin", "/oauth/consent", "/quiz", "/live"];
 const GUEST_ONLY = ["/login", "/signup", "/forgot-password"];
 
 function matches(pathname: string, prefixes: string[]) {

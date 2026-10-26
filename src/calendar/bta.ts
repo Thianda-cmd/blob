@@ -171,7 +171,7 @@ type SerovalNode = { t: number; i?: number; s?: unknown; a?: (SerovalNode | null
 /** seroval keeps a few characters escaped inside strings (so the text could sit in a script tag). */
 function unescapeString(s: string): string {
   return s.replace(/\\(\\|"|n|r|b|t|f|u2028|u2029|x3C)/g, (_, c: string) =>
-    c === "n" ? "\n" : c === "r" ? "\r" : c === "b" ? "\b" : c === "t" ? "\t" : c === "f" ? "\f" : c === "u2028" ? " " : c === "u2029" ? " " : c === "x3C" ? "<" : c,
+    c === "n" ? "\n" : c === "r" ? "\r" : c === "b" ? "\b" : c === "t" ? "\t" : c === "f" ? "\f" : c === "u2028" ? "\u2028" : c === "u2029" ? "\u2029" : c === "x3C" ? "<" : c,
   );
 }
 
