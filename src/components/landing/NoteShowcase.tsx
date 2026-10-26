@@ -1,39 +1,6 @@
 "use client";
 
-import {
-  ALargeSmall,
-  ArrowLeft,
-  BookOpen,
-  BookOpenCheck,
-  ChartSpline,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  FileDown,
-  FilePlus2,
-  FileText,
-  Folder,
-  GraduationCap,
-  Layers,
-  Leaf,
-  Lightbulb,
-  Link2,
-  ListChecks,
-  Network,
-  Paperclip,
-  PenTool,
-  Pin,
-  Play,
-  Presentation,
-  Printer,
-  RotateCw,
-  Sigma,
-  Table2,
-  Undo2,
-  Workflow,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { ALargeSmall, ArrowLeft, BadgeQuestionMark, BookOpen, BookOpenCheck, ChartSpline, Check, ChevronDown, ChevronRight, FileDown, FilePlus2, FileText, Folder, GraduationCap, Layers, Leaf, Lightbulb, Link2, ListChecks, Network, Paperclip, PenTool, Pin, Play, Presentation, Printer, RotateCw, Sigma, Table2, Undo2, Workflow, X, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
@@ -233,6 +200,7 @@ function LearnMenu() {
     { key: "cards", Icon: Layers, title: t.modes.cards, hint: t.hints.cards },
     { key: "quiz", Icon: ListChecks, title: t.modes.quiz, hint: t.hints.quiz },
     { key: "summary", Icon: BookOpenCheck, title: t.modes.summary, hint: t.hints.summary },
+    { key: "live", Icon: BadgeQuestionMark, title: t.live.title, hint: t.live.hint },
   ];
   return (
     <motion.div

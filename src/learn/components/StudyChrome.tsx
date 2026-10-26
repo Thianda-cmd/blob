@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, AnimatePresence, motion } from "motion/react";
-import { Flame, X, Zap } from "lucide-react";
+import { Flame, Target, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Blob, type BlobAccessory, type BlobHandle } from "@/components/blob/Blob";
@@ -93,7 +93,7 @@ export function StudyTopBar({
           )}
         </AnimatePresence>
         <span className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-ink" title={t.sessionXp}>
-          <Zap className="size-4 text-blob" />
+          <Trophy className="size-4 text-blob" />
           <CountUp value={xp} />
         </span>
       </div>
@@ -225,7 +225,7 @@ export function SessionEnd({
           </div>
           <div className="flex items-center gap-3">
             <Ring value={today.to / today.goal} from={today.from / today.goal} size={48} stroke={5} delay={0.8}>
-              <Zap className="size-4 text-blob" />
+              <Target className="size-4 text-blob" />
             </Ring>
             <div className="text-[13px] leading-tight">
               <div className="font-medium text-ink">{reachedGoal ? m.chrome.goalReached : m.dailyGoal}</div>

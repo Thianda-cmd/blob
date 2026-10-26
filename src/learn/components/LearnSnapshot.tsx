@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Flame, Zap } from "lucide-react";
+import { ArrowRight, Flame, Target } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
@@ -33,7 +33,7 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
     >
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
         <Ring value={today.xp / DAILY_GOAL} size={34} stroke={4}>
-          <Zap className="size-3.5 text-blob" />
+          <Target className="size-3.5 text-blob" />
         </Ring>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[13.5px] font-semibold tabular-nums">

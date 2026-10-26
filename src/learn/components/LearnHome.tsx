@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, BookOpen, Check, Clock, Dumbbell, Flame, GraduationCap, Trophy, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Dumbbell, Flame, GraduationCap, Target, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
@@ -68,7 +68,7 @@ export function LearnHome({
               <StatChip icon={<Flame className="size-4" />} label={t.dayStreak} value={today.streak} hot={today.streak > 0} />
               <div className={cn(CHIP, "sm:pl-2")}>
                 <Ring value={today.xp / DAILY_GOAL} size={34} stroke={4} className="max-sm:-m-0.5">
-                  <Zap className="size-3.5 text-blob" />
+                  <Target className="size-3.5 text-blob" />
                 </Ring>
                 <div className="min-w-0 leading-tight">
                   <div className="text-[14px] font-semibold tabular-nums">
