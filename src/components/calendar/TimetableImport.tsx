@@ -50,7 +50,7 @@ export function TimetableImport({ open, onClose, store, onDone }: { open: boolea
     );
   }
   return (
-    <Dialog open={open} onClose={onClose} className="max-w-[780px]" labelledBy="timetable-title">
+    <Dialog open={open} onClose={onClose} className="max-w-[780px]!" labelledBy="timetable-title">
       {body}
     </Dialog>
   );
@@ -253,13 +253,13 @@ function Ready({ tt, store, onClose, onDone, t }: { tt: Timetable; store: Calend
       </div>
 
       <footer className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3.5">
-        <div className="min-w-0 flex-1">
+        {earlier > 0 && <p className="basis-full text-[12px] text-ink-3">{t.replaces(earlier, dateLabel)}</p>}
+        <div className="min-w-[200px] flex-1">
           {preview.lessons ? (
             <p className="text-[13px] font-medium text-ink">{t.summary(preview.lessons, preview.breaks, preview.exams)}</p>
           ) : (
             <p className="text-[13px] text-ink-2">{t.nothing}</p>
           )}
-          {earlier > 0 && <p className="text-[11.5px] text-ink-3">{t.replaces(earlier, dateLabel)}</p>}
         </div>
         {earlier > 0 &&
           (confirmRemove ? (
@@ -291,8 +291,8 @@ function suggestColor(code: string, picks: Pick_[]): SubjectColor {
 function SubjectSelect({ value, name, subjects, onChange, t }: { value: string; name: string; subjects: Subject[]; onChange: (v: string) => void; t: T }) {
   const own = subjects.filter((s) => s.kind !== "notebook");
   return (
-    <span className="relative shrink-0">
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={cn(inputClass, "h-8 w-[150px] appearance-none truncate py-0 pl-2.5 pr-7 text-[12.5px] max-sm:w-[120px]", !value && "text-ink-3")} aria-label={name}>
+    <span className="relative w-[150px] shrink-0 max-sm:w-[120px]">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={cn(inputClass, "h-8 appearance-none truncate py-0 pl-2.5 pr-7 text-[12.5px]", !value && "text-ink-3")} aria-label={name}>
         <option value="">{t.noSubject}</option>
         {own.map((s) => (
           <option key={s.id} value={s.id}>

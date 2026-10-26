@@ -87,7 +87,9 @@ export function CalendarView({
   if (phone && view === "week") view = "three";
   const [anchorState, setAnchor] = useState<Date | null>(() => fromYmd(initialDate ?? null));
   const today = now === null ? null : startOfDay(now);
-  const anchor = anchorState ?? today;
+  // Times are drawn in the device's time zone, which the server doesn't know: the grid waits for
+  // the browser (`now`), also when the address names a day (else a reload showed UTC times).
+  const anchor = now === null ? null : (anchorState ?? today);
   const [move, setMove] = useState<Move>(null);
   const [agendaDays, setAgendaDays] = useState(42);
 
@@ -195,7 +197,7 @@ export function CalendarView({
   const [selected, setSelected] = useState<string | null>(null);
   const [held, setHeld] = useState<Held>(null);
   const [ask, setAsk] = useState<Ask>(null);
-  const [importing, setImporting] = useState(!!openImport);
+  const [importing, setImporting] = useState(false);
   const closePanel = useCallback(() => setPanel(null), []);
 
   const open = useCallback((item: CalItem, rect: DOMRect | null) => {
@@ -222,6 +224,10 @@ export function CalendarView({
   useEffect(() => {
     if (opened.current || !anchor) return;
     opened.current = true;
+    if (openImport) {
+      queueMicrotask(() => setImporting(true));
+      return;
+    }
     if (openNew) {
       queueMicrotask(newAtNextHour);
       return;
@@ -230,7 +236,7 @@ export function CalendarView({
       const item = items.find((i) => i.id === openEvent || i.occurrence?.series.id === openEvent || i.task?.id === openEvent);
       if (item) queueMicrotask(() => open(item, null));
     }
-  }, [anchor, openNew, openEvent, items, newAtNextHour, open]);
+  }, [anchor, openNew, openEvent, openImport, items, newAtNextHour, open]);
 
   const askScope = (kind: "edit" | "delete", scopes: Scope[], run: (s: Scope) => void, cancel: () => void = () => {}) => setAsk({ kind, scopes, run, cancel });
 
