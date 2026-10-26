@@ -23,7 +23,9 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 4, Motion, Tiptap 3 a
 - **CV builder** (`/cv`): six designs (Klassisch, Modern, Kreativ, Kompakt, Minimal, Elegant), a guided form with tips and examples for school students, photo with cropping, drawn signature, a checklist, CVs in German or English, and a PDF through the print dialog. The engine (`src/cv/CvDocument.tsx`) measures the CV and fills A4 pages, so preview and PDF are the same pages.
   - A **cover letter** (Anschreiben) next to each CV: recipient with an automatic greeting, subject, the text in three parts with starter texts, regards and enclosures, drawn by the same engine (`src/cv/letter.tsx`) with a letterhead in the CV's design. The PDF can hold the letter, the CV or both.
 - **Projects** (`/projects`): boards with columns, cards (assignees, labels, checklists, files, links and attached pages), members with live presence, and templates. A note's bar shows the cards it is on and adds it to a project (sharing it with the group); a project lists its materials and starts a shared note; subjects list their projects (`src/components/projects/links.ts`).
-- **Calendar** (`/calendar`): events, lessons and repeating series next to tasks and the project cards assigned to you. Home shows today's events (tomorrow's once today's are over).
+- **Calendar** (`/calendar`): events, lessons and repeating series (also in even or odd calendar weeks) next to tasks and the project cards assigned to you. Home shows today's events (tomorrow's once today's are over).
+  - **Timetable import**: the BTA926A timetable from [bta.bojes.org](https://bta.bojes.org) (button "Timetable", or link to `/calendar?import=bta`). Every lesson becomes one weekly series until the summer, without holidays, public holidays and bridge days; fortnightly lessons keep to even weeks, quarter lessons end with their quarter. Exams become exam tasks, holidays all-day events. Importing again replaces the earlier import from the chosen day on. `api/timetable/bta` reads the site (its TanStack Start server function and the school year in its scripts, `src/calendar/bta.ts`); `src/calendar/timetable.ts` plans the changes (one undo).
+- **Live quiz** (`/quiz`, `/live/[game]`, `/play`): Kahoot-style quizzes. Six question types (quiz with one or several right answers, true/false, type answer with typo tolerance, poll, puzzle, slider), pictures, time limits, double points and explanations. The host's big screen shows the PIN and a QR code, everyone's Blob, each question, the answers with how the class voted, a scoreboard and a podium, with music made in the browser. Players join at `/play` without an account, pick a name and a Blob, and see right/wrong, points, streaks and their place. The server decides everything (`src/quiz/server.ts`, service role only, migration 0021): speed points from when it got the answer, the right answers stay hidden until the question is over, live updates on a channel only the server may send on. Results per game with a CSV download.
 - **Presentations**: 17 layouts (incl. stats, timeline, compare, formula), 10 themes plus a custom theme editor, slide transitions (incl. morph), click-by-click builds, drag-to-reorder, and a presenter (`/present/[id]`) with speaker view, second window, overview, laser and black/white screen.
 - **Tasks**: quick add with natural dates (`Bio test fri #biology`), groups by due date, two-week heatmap, jelly check-off animation.
 - **Subjects**, **favorites**, **trash** with restore, **⌘K** search across titles and note contents, light/dark/system themes.
@@ -41,7 +43,7 @@ npm run dev                  # http://localhost:3000
 
 `npm run build` first runs `scripts/migrate.mjs`, which applies any new files in `supabase/migrations/` to the database in `POSTGRES_URL_NON_POOLING` and records them in `blob_meta.migrations`. Set `SKIP_MIGRATIONS=1` to build without touching the database. On Vercel, the Supabase integration provides the variable, so every deploy keeps the schema up to date.
 
-Other scripts: `npm run lint`, `npm run typecheck`, `npm run migrate`, `npm run check:learn` (checks every lesson, cheat sheet and task generator in both languages; run it before committing learning content) and `npm run show-manifest` (the list of public pictures; also runs before every build).
+Other scripts: `npm run lint`, `npm run typecheck`, `npm run migrate`, `npm run check:learn` (checks every lesson, cheat sheet and task generator in both languages; run it before committing learning content), `npm run check:calendar` (repeating events and the timetable import), `npm run check:quiz` (the live quiz's grading and points) and `npm run show-manifest` (the list of public pictures; also runs before every build).
 
 ## Auth emails (blob.bojes.org)
 
@@ -91,6 +93,7 @@ src/learn/biology     biology visuals and topics
 src/app/show, embed   public picture pages and embeds
 src/cv                CV builder: CV format, page engine, designs (templates/), sample CV
 src/components/cv     CV editor, form, design panel and the /cv home
+src/quiz              live quiz: questions, grading, names, the game server; src/components/quiz: editor, big screen, phones, results
 src/app/onboarding    first-run flow
 src/app/auth          PKCE callback and sign out route
 src/components/blob   the mascot, intro animation, loaders, helper and event bus

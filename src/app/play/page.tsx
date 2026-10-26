@@ -5,7 +5,7 @@ import { getMessages } from "@/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages(quizText);
-  return { title: { absolute: t.metaPlay }, description: t.home.intro };
+  return { title: { absolute: t.metaPlay }, description: t.home.intro, other: { "blob-no-offline": "1" } };
 }
 
 /** Playing along in a live quiz, without an account: blob.bojes.org/play (or ?pin= from the QR code). */

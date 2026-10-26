@@ -14,6 +14,7 @@
     "check:learn": "tsx --tsconfig tsconfig.json scripts/check-learn.ts",
     "check:calendar": "TZ=Europe/Berlin tsx --tsconfig tsconfig.json scripts/check-calendar.ts",
     "check:notify": "TZ=Europe/Berlin tsx --tsconfig tsconfig.json scripts/check-notify.ts",
+    "check:quiz": "tsx --tsconfig tsconfig.json scripts/check-quiz.ts",
     "app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "app:build": "tauri build",
     "tauri": "tauri"

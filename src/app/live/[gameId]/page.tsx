@@ -20,7 +20,7 @@ async function load(gameId: string) {
 
 export async function generateMetadata({ params }: PageProps<"/live/[gameId]">): Promise<Metadata> {
   const t = await getMessages(quizText);
-  return { title: { absolute: t.metaHost(t.title) }, robots: { index: false } };
+  return { title: { absolute: t.metaHost(t.title) }, robots: { index: false }, other: { "blob-no-offline": "1" } };
 }
 
 /** The big screen of a live game, for its host. Players join on their phones at /play. */

@@ -1,0 +1,29 @@
+// Checks the live quiz's grading, points, question rules and player names:
+//   npx tsx --tsconfig tsconfig.json scripts/check-quiz.ts
+import { grade, parseAnswer, speedPoints, textMatches } from "../src/quiz/score";
+import { newQuestion, issuesOf, normalizeQuestion, convertQuestion } from "../src/quiz/model";
+import { cleanNickname, isRude, isBlobName, blobName } from "../src/quiz/names";
+let failed = 0;
+const eq = (name: string, got: unknown, want: unknown) => { if (JSON.stringify(got) !== JSON.stringify(want)) { failed++; console.error("✗", name, { got, want }); } };
+const q = newQuestion("quiz"); q.text = "x"; q.choices = q.choices.map((c, i) => ({ ...c, text: `a${i}`, correct: i === 1 || i === 2 }));
+eq("single: any right one counts", grade(q, { kind: "choice", ids: [q.choices[2].id] }), 1);
+eq("single: wrong", grade(q, { kind: "choice", ids: [q.choices[0].id] }), 0);
+q.multi = true;
+eq("multi: all right", grade(q, { kind: "choice", ids: [q.choices[1].id, q.choices[2].id] }), 1);
+eq("multi: half", grade(q, { kind: "choice", ids: [q.choices[1].id] }), 0.5);
+eq("multi: one right one wrong", grade(q, { kind: "choice", ids: [q.choices[1].id, q.choices[0].id] }), 0);
+eq("parse rejects unknown ids", parseAnswer(q, { kind: "choice", ids: ["nope"] }), null);
+eq("parse rejects a second id on single", parseAnswer({ ...q, multi: false }, { kind: "choice", ids: [q.choices[1].id, q.choices[2].id] }), null);
+eq("typo", [textMatches("Canbera", ["Canberra"]), textMatches("CANBERRA!", ["Canberra"]), textMatches("Sydney", ["Canberra"]), textMatches("Größe", ["Groesse", "grösse"]), textMatches("206", ["207"])], [true, true, false, true, false]);
+const s = newQuestion("slider"); s.slider = { min: 0, max: 100, step: 1, value: 50, margin: "medium", unit: "" };
+eq("slider", [grade(s, { kind: "value", value: 50 }), grade(s, { kind: "value", value: 55 }), grade(s, { kind: "value", value: 61 })], [1, 0.75, 0]);
+const p = newQuestion("puzzle"); p.choices = p.choices.map((c, i) => ({ ...c, text: `s${i}` }));
+eq("puzzle", [grade(p, { kind: "order", ids: p.choices.map((c) => c.id) }), grade(p, { kind: "order", ids: [...p.choices].reverse().map((c) => c.id) })], [1, 0]);
+eq("speed points", [speedPoints({ points: "standard", type: "quiz", time: 20 }, 1, 0), speedPoints({ points: "standard", type: "quiz", time: 20 }, 1, 20000), speedPoints({ points: "double", type: "quiz", time: 20 }, 1, 10000), speedPoints({ points: "none", type: "quiz", time: 20 }, 1, 0)], [1000, 500, 1500, 0]);
+eq("poll ungraded", grade(newQuestion("poll"), { kind: "choice", ids: [] }), null);
+eq("issues", issuesOf(newQuestion("quiz")), ["text", "choices", "correct"]);
+eq("normalize junk", normalizeQuestion({ type: "slider", text: 5, slider: { min: 10, max: 1 } })?.slider?.max! > 10, true);
+eq("convert quiz→type keeps right answers", convertQuestion({ ...q, multi: false }, "type").accepted, ["a1", "a2"]);
+eq("names", [cleanNickname("  Mia   K "), cleanNickname("\u202e"), isRude("F1ck"), isRude("Mia"), isBlobName(blobName("de")), isBlobName(blobName("en")), isBlobName("Lena")], ["Mia K", null, true, false, true, true, false]);
+console.log(failed ? `${failed} failed` : "all quiz checks passed");
+process.exit(failed ? 1 : 0);

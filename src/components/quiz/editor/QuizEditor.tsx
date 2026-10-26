@@ -410,7 +410,7 @@ function OptionsDialog({
         {subjects.length > 0 && (
           <label className="mt-2 flex items-center gap-3 px-2">
             <span className="flex-1 text-[13.5px] font-medium text-ink">{t.editor.subject}</span>
-            <select value={subjectId ?? ""} onChange={(e) => onSubject(e.target.value || null)} className={cn(inputClass, "h-9 w-[180px] px-2 text-[13px]")}>
+            <select value={subjectId ?? ""} onChange={(e) => onSubject(e.target.value || null)} className={cn(inputClass, "h-9 max-w-[200px] px-2 text-[13px]")}>
               <option value="">{t.editor.noSubject}</option>
               {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
