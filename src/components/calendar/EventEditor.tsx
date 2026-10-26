@@ -446,7 +446,7 @@ type RepeatChoice = "never" | "daily" | "weekdays" | "weekly" | "monthly" | "yea
 
 function choiceOf(r: Recurrence | null, start: Date): RepeatChoice {
   if (!r) return "never";
-  if (r.until || r.count || (r.interval ?? 1) !== 1) return "custom";
+  if (r.until || r.count || (r.interval ?? 1) !== 1 || r.weeks) return "custom";
   if (r.freq === "daily") return "daily";
   if (r.freq === "weekly") {
     const days = weekdaysOf(r, start);
@@ -499,7 +499,7 @@ function RepeatField({ value, start, onChange, t, locale }: { value: Recurrence 
               value={r.freq}
               onChange={(e) => {
                 const freq = e.target.value as RepeatFreq;
-                onChange({ ...r, freq, byDay: freq === "weekly" ? (r.byDay?.length ? r.byDay : [start.getDay()]) : undefined });
+                onChange({ ...r, freq, byDay: freq === "weekly" ? (r.byDay?.length ? r.byDay : [start.getDay()]) : undefined, weeks: freq === "weekly" ? r.weeks : undefined });
               }}
               className={cn(inputClass, "h-8 px-2 text-[13px]")}
               style={{ width: "auto" }}
@@ -531,6 +531,27 @@ function RepeatField({ value, start, onChange, t, locale }: { value: Recurrence 
                   </button>
                 );
               })}
+            </div>
+          )}
+          {r.freq === "weekly" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-ink-2">{t.repeat.weeks}</span>
+              <select
+                value={r.weeks === "even" || r.weeks === "odd" ? r.weeks : "all"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange({ ...r, weeks: v === "even" || v === "odd" ? v : undefined });
+                }}
+                className={cn(inputClass, "h-8 px-2 text-[13px]")}
+                style={{ width: "auto" }}
+                aria-label={t.repeat.weeks}
+              >
+                {(["all", "even", "odd"] as const).map((w) => (
+                  <option key={w} value={w}>
+                    {t.repeat.weeksChoice[w]}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">

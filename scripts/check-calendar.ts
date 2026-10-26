@@ -6,6 +6,9 @@ import { fitLane, itemDays, layoutDay, monthWeeks, packLane } from "../src/calen
 import { countBefore, hasOccurrenceBefore, occurrenceOn, occurrences, untilBefore } from "../src/calendar/recurrence";
 import { allDayIso, atMinutes, eventSpan, minutesInto, spanToStored, weekStart, ymd } from "../src/calendar/time";
 import { planDelete, planEdit, scopesFor } from "../src/calendar/ops";
+import { publicHolidays, rhythmOf, type Timetable } from "../src/calendar/bta";
+import { importedAfter, planImport, planRemoveImport, schoolEnd } from "../src/calendar/timetable";
+import { isoWeek } from "../src/calendar/time";
 import type { Change } from "../src/lib/offline/sync";
 import type { CalEvent, Task } from "../src/lib/types";
 
@@ -372,6 +375,163 @@ function item(key: string, start: Date, end: Date, allDay = false): CalItem {
     [["2026-10-14", "2026-10-16"], ["2026-10-28", "2026-10-30"]],
   );
   eq("scopes", [scopesFor(itemAt(fresh(), 2026, 10, 12)), scopesFor(itemAt(fresh(), 2026, 10, 12), { recurrence: null })], [["this", "following", "all"], ["following", "all"]]);
+}
+
+// Even and odd calendar weeks ------------------------------------------------------------------------
+
+{
+  eq("iso weeks", [isoWeek(at(2026, 12, 28)), isoWeek(at(2027, 1, 3)), isoWeek(at(2027, 1, 4)), isoWeek(at(2027, 1, 11)), isoWeek(at(2026, 10, 26))], [53, 53, 1, 2, 44]);
+  // 2026 has 53 weeks: "every 2 weeks" would slip into the odd weeks after New Year, even weeks don't.
+  const even = event({ id: "ev", start: at(2026, 12, 7, 8), end: at(2026, 12, 7, 9), recurrence: { freq: "weekly", byDay: [1], weeks: "even" } });
+  eq(
+    "even weeks across a 53-week year",
+    occurrences(even, at(2026, 12, 1), at(2027, 2, 1)).map((o) => ymd(o.start)),
+    ["2026-12-07", "2026-12-21", "2027-01-11", "2027-01-25"],
+  );
+  const odd = event({ id: "od", start: at(2026, 12, 1, 8), end: at(2026, 12, 1, 9), recurrence: { freq: "weekly", byDay: [2], weeks: "odd" } });
+  // Week 49 is odd; weeks 53 and 1 are both odd, so it happens two weeks running there.
+  eq("odd weeks", occurrences(odd, at(2026, 12, 1), at(2027, 1, 13)).map((o) => ymd(o.start)), ["2026-12-01", "2026-12-15", "2026-12-29", "2027-01-05"]);
+  const late = event({ id: "l", start: at(2026, 12, 7, 8), end: at(2026, 12, 7, 9), recurrence: { freq: "weekly", byDay: [1], weeks: "odd" } });
+  eq("odd weeks: a start in an even week waits for the next odd one", occurrences(late, at(2026, 12, 1), at(2026, 12, 22)).map((o) => ymd(o.start)), ["2026-12-14"]);
+  eq("even weeks with a count", occurrences(event({ id: "c", start: at(2026, 10, 26, 8), end: at(2026, 10, 26, 9), recurrence: { freq: "weekly", weeks: "even", count: 3 } }), at(2026, 10, 1), at(2027, 1, 1)).length, 3);
+
+  // Moving a fortnightly series from Friday to the next Monday puts it into the other weeks.
+  const fri = event({ id: "f", start: at(2026, 10, 30, 8), end: at(2026, 10, 30, 9), recurrence: { freq: "weekly", byDay: [5], weeks: "even" } });
+  const map = new Map([["f", fri]]);
+  const item = buildItems({ events: [fri], tasks: [], cards: [], subjects: [], from: at(2026, 10, 30), to: at(2026, 10, 31) })[0];
+  const plan = planEdit(item, { span: { start: at(2026, 11, 2, 8), end: at(2026, 11, 2, 9), allDay: false } }, "all", map, () => "x");
+  const r = (plan.changes[0] as { values: Partial<CalEvent> }).values.recurrence!;
+  eq("moved across a week: other weeks", [r.weeks, r.byDay], ["odd", [1]]);
+}
+
+// Importing a school timetable --------------------------------------------------------------------
+
+{
+  eq("rhythms", [rhythmOf("14-tg..", []).kind, rhythmOf("1. Quart.", [{ nr: 1, from: "2026-08-01", to: "2026-12-18" }]).kind, rhythmOf(null, []).kind], ["fortnightly", "quarter", "weekly"]);
+  eq("holidays 2027", [publicHolidays(2027)["2027-03-26"], publicHolidays(2027)["2027-05-06"], publicHolidays(2027)["2027-05-17"]], ["Karfreitag", "Christi Himmelfahrt", "Pfingstmontag"]);
+
+  const lesson = (p: Partial<Timetable["lessons"][number]>): Timetable["lessons"][number] => ({
+    id: "x",
+    day: 0,
+    start: 480,
+    end: 570,
+    code: "B5T",
+    name: "Mikroorganismen untersuchen",
+    part: "Theorie",
+    field: "LF 5",
+    teachers: ["A. Teacher"],
+    room: "P03",
+    note: null,
+    correction: null,
+    rhythm: { kind: "weekly" },
+    hue: 345,
+    ...p,
+  });
+  const tt: Timetable = {
+    source: "bta",
+    className: "T1",
+    updated: null,
+    blocks: [],
+    lessons: [
+      lesson({ id: "mon" }),
+      lesson({ id: "fri", day: 4, start: 480, end: 675, code: "B4T", name: "Pflanzen untersuchen", rhythm: { kind: "fortnightly", weeks: "even" } }),
+      lesson({ id: "wed", day: 2, start: 810, end: 900, code: "EDV", name: "EDV", part: null, field: null, rhythm: { kind: "quarter", nr: 1, from: "2026-08-01", to: "2026-12-18" } }),
+    ],
+    quarters: [
+      { nr: 1, from: "2026-08-01", to: "2026-12-18" },
+      { nr: 2, from: "2026-12-19", to: "2027-07-31" },
+    ],
+    breaks: [
+      { name: "Weihnachtsferien", from: "2026-12-21", to: "2027-01-08" },
+      { name: "Sommerferien", from: "2027-07-05", to: "2027-08-06" },
+    ],
+    daysOff: { "2026-11-18": "Studientag" },
+    exams: [
+      { code: "B5T", name: "Mikroorganismen untersuchen", date: "2026-11-02", title: "Klausur Nr. 1" },
+      { code: "EDV", name: "EDV", date: "2026-11-11", title: "Klausur Nr. 1" },
+      { code: "B5T", name: "Mikroorganismen untersuchen", date: "2026-10-01", title: "Klausur Nr. 0" },
+    ],
+    year: { from: "2026-08-01", to: "2027-07-31" },
+    live: true,
+  };
+  eq("school ends before the summer holidays", ymd(schoolEnd(tt)), "2027-07-04");
+
+  type Map_ = Map<string, CalEvent>;
+  const apply = (map: Map_, tasks: Task[], changes: Change[]) => {
+    for (const c of changes) {
+      if (c.table === "tasks") {
+        if (c.op === "insert") tasks.push(c.row as unknown as Task);
+        else if (c.op === "delete") tasks.splice(tasks.findIndex((x) => x.id === c.id), 1);
+        continue;
+      }
+      if (c.op === "insert") map.set(c.id, { ...(c.row as unknown as CalEvent), deleted_at: null });
+      else if (c.op === "update") map.set(c.id, { ...map.get(c.id)!, ...(c.values as Partial<CalEvent>) });
+      else map.set(c.id, { ...map.get(c.id)!, deleted_at: "deleted" });
+    }
+  };
+  let n = 0;
+  const ctx = (map: Map_, tasks: Task[]) => ({ userId: "u", timeZone: "Europe/Berlin", events: [...map.values()], tasks, newId: () => `i${++n}` });
+  const opts = { from: at(2026, 10, 26), titles: "name" as const, subjects: { B5T: { subjectId: null, color: "rose" as const } }, breaks: true, exams: true, reminder: null };
+  const days = (map: Map_, title: string, from: Date, to: Date) =>
+    buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from, to })
+      .filter((i) => i.title === title)
+      .map((i) => hm(i.start));
+
+  const map: Map_ = new Map();
+  const tasks: Task[] = [];
+  const first = planImport(tt, opts, ctx(map, tasks));
+  apply(map, tasks, first.plan.changes);
+  eq("import counts", [first.lessons, first.breaks, first.exams, first.replaced], [3, 3, 2, 0]);
+  eq(
+    "weekly lesson skips the holidays",
+    days(map, "Mikroorganismen untersuchen · Theorie", at(2026, 12, 7), at(2027, 1, 19)),
+    ["2026-12-07 08:00", "2026-12-14 08:00", "2027-01-11 08:00", "2027-01-18 08:00"],
+  );
+  eq(
+    "fortnightly lesson in even weeks",
+    days(map, "Pflanzen untersuchen · Theorie", at(2026, 10, 26), at(2027, 2, 1)),
+    ["2026-10-30 08:00", "2026-11-13 08:00", "2026-11-27 08:00", "2026-12-11 08:00", "2027-01-15 08:00", "2027-01-29 08:00"],
+  );
+  const edv = days(map, "EDV", at(2026, 10, 26), at(2027, 7, 1));
+  eq("quarter lesson: until its quarter ends, not on a day off", [edv[0], edv[edv.length - 1], edv.includes("2026-11-18 13:30")], ["2026-10-28 13:30", "2026-12-16 13:30", false]);
+  const mon = days(map, "Mikroorganismen untersuchen · Theorie", at(2026, 10, 26), at(2027, 8, 1));
+  eq("last lesson before the summer", mon[mon.length - 1], "2027-06-28 08:00");
+  eq("exams: future ones, at the lesson's time", tasks.map((x) => [x.title, hm(new Date(x.due_at!))]), [
+    ["Mikroorganismen untersuchen: Klausur Nr. 1", "2026-11-02 08:00"],
+    ["EDV: Klausur Nr. 1", "2026-11-11 13:30"],
+  ]);
+  check("colour chosen", [...map.values()].some((e) => e.title.startsWith("Mikro") && e.color === "rose"));
+
+  // Changing an imported lesson "this and following" changes the weeks ahead.
+  const nov9 = buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from: at(2026, 11, 9), to: at(2026, 11, 10) }).find((i) => i.title.startsWith("Mikro"))!;
+  apply(map, tasks, planEdit(nov9, { location: "P12" }, "following", new Map(map), () => `e${++n}`).changes);
+  const rooms = buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from: at(2026, 11, 2), to: at(2026, 11, 24) })
+    .filter((i) => i.title.startsWith("Mikro"))
+    .map((i) => i.event!.location);
+  eq("following edit reaches the weeks ahead", rooms, ["P03", "P12", "P12", "P12"]);
+
+  // Importing again from 16 November keeps the weeks before and replaces the rest (no doubles).
+  // The split Monday series, Friday, Wednesday, the day off and both holidays (the cut series ends before).
+  eq("imported after", importedAfter([...map.values()], tt, at(2026, 11, 16)), 6);
+  const again = planImport(tt, { ...opts, from: at(2026, 11, 16) }, ctx(map, tasks));
+  apply(map, tasks, again.plan.changes);
+  eq("import again: exams not doubled", [again.exams, tasks.length], [0, 2]);
+  eq(
+    "import again: no doubles, weeks before kept",
+    days(map, "Mikroorganismen untersuchen · Theorie", at(2026, 11, 2), at(2026, 11, 24)),
+    ["2026-11-02 08:00", "2026-11-09 08:00", "2026-11-16 08:00", "2026-11-23 08:00"],
+  );
+  const rooms2 = buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from: at(2026, 11, 2), to: at(2026, 11, 24) })
+    .filter((i) => i.title.startsWith("Mikro"))
+    .map((i) => i.event!.location);
+  eq("import again: your change before stays, after is the school's", rooms2, ["P03", "P12", "P03", "P03"]);
+  eq("one Christmas holiday", buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from: at(2026, 12, 1), to: at(2027, 1, 31) }).filter((i) => i.title === "Weihnachtsferien").length, 1);
+
+  // Undo takes it all back; removing takes out what's left from a day on.
+  apply(map, tasks, again.plan.undo);
+  eq("undo the second import", importedAfter([...map.values()], tt, at(2026, 11, 16)), 6);
+  apply(map, tasks, planRemoveImport(tt, [...map.values()], at(2026, 10, 26)).changes);
+  eq("removed", buildItems({ events: [...map.values()], tasks: [], cards: [], subjects: [], from: at(2026, 10, 1), to: at(2027, 8, 1) }).length, 0);
 }
 
 console.log(`${passed} passed, ${failed} failed`);

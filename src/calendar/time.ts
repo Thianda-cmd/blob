@@ -67,6 +67,14 @@ export function weekStart(d: Date, weekStartsOn: number): Date {
   return addDays(s, -diff);
 }
 
+/** The ISO 8601 calendar week number of `d` (weeks start on Monday; week 1 holds the first Thursday). */
+export function isoWeek(d: Date): number {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const jan1 = Date.UTC(t.getUTCFullYear(), 0, 1);
+  return Math.ceil(((t.getTime() - jan1) / 864e5 + 1) / 7);
+}
+
 /** Whole local days between two dates. */
 export const dayDiff = (a: Date, b: Date) => differenceInCalendarDays(a, b);
 

@@ -3,7 +3,7 @@ import type { Change, Row } from "@/lib/offline/sync";
 import type { CalEvent, Recurrence } from "@/lib/types";
 import type { CalItem } from "./items";
 import { countBefore, hasOccurrenceBefore, untilBefore } from "./recurrence";
-import { MINUTES_PER_DAY, atMinutes, dateFromAllDay, dayDiff, eventSpan, spanToStored } from "./time";
+import { MINUTES_PER_DAY, atMinutes, dateFromAllDay, dayDiff, eventSpan, spanToStored, weekStart } from "./time";
 
 // Changing and deleting events, as lists of row changes for the sync outbox, each with the changes
 // that undo it. A repeating event can be changed for one occurrence ("this"), from an occurrence on
@@ -25,7 +25,8 @@ const FIELDS = ["title", "details", "location", "kind", "color", "subject_id", "
 const asRow = (e: CalEvent) => e as unknown as Row;
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-class Builder {
+/** Collects row changes and the changes that undo them. */
+export class Builder {
   plan: Plan = { changes: [], undo: [] };
 
   update(e: CalEvent, values: Partial<CalEvent>) {
@@ -63,6 +64,7 @@ export function newEvent(values: Partial<CalEvent> & Pick<CalEvent, "id" | "user
     series_id: null,
     series_start: null,
     reminders: [],
+    source: null,
     deleted_at: null,
     created_at: now,
     updated_at: now,
@@ -91,12 +93,18 @@ function shiftStored(stored: string, allDay: boolean, s: Shift): string {
   return shifted(new Date(stored), s).toISOString();
 }
 
-/** Weekdays of a weekly series moved by whole days. */
+/** Weekdays (and even/odd weeks) of a weekly series moved by whole days. */
 function shiftRecurrence(r: Recurrence | null, startBefore: Date, startAfter: Date): Recurrence | null {
-  if (!r || r.freq !== "weekly" || !r.byDay?.length) return r;
+  if (!r || r.freq !== "weekly") return r;
+  let out = r;
+  // Moved into a week of the other kind (Friday to the next Monday): it keeps to that kind now.
+  if (r.weeks === "even" || r.weeks === "odd") {
+    const weeks = Math.round(dayDiff(weekStart(startAfter, 1), weekStart(startBefore, 1)) / 7);
+    if (weeks % 2) out = { ...out, weeks: r.weeks === "even" ? "odd" : "even" };
+  }
   const days = (((startAfter.getDay() - startBefore.getDay()) % 7) + 7) % 7;
-  if (!days) return r;
-  return { ...r, byDay: [...new Set(r.byDay.map((d) => (d + days) % 7))].sort((a, b) => a - b) };
+  if (!days || !r.byDay?.length) return out;
+  return { ...out, byDay: [...new Set(r.byDay.map((d) => (d + days) % 7))].sort((a, b) => a - b) };
 }
 
 /** The stored times of a span whose start is `start` and length that of `like`. */
@@ -261,6 +269,7 @@ function copyOf(e: CalEvent): Partial<CalEvent> {
     reminders: e.reminders,
     time_zone: e.time_zone,
     all_day: e.all_day,
+    source: e.source ?? null,
   };
 }
 
@@ -268,7 +277,8 @@ function copyOf(e: CalEvent): Partial<CalEvent> {
 export function planDuplicate(item: CalItem, span: Span, newId: () => string): Plan {
   const b = new Builder();
   const e = item.event!;
-  b.insert(newEvent({ ...copyOf(e), id: newId(), user_id: e.user_id, ...spanToStored(span.allDay, span.start, span.end), all_day: span.allDay }));
+  // A copy is your own event: importing again leaves it alone.
+  b.insert(newEvent({ ...copyOf(e), source: null, id: newId(), user_id: e.user_id, ...spanToStored(span.allDay, span.start, span.end), all_day: span.allDay }));
   return b.plan;
 }
 

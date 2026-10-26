@@ -36,18 +36,20 @@ export function describeRepeat(r: Recurrence | null, start: Date, t: T, locale: 
   const n = intervalOf(r);
   const days = r.freq === "weekly" ? weekdaysOf(r, start) : [];
   const simpleEnd = !r.until && !r.count;
-  if (simpleEnd && n === 1) {
+  const parity = r.freq === "weekly" && (r.weeks === "even" || r.weeks === "odd") ? r.weeks : null;
+  if (simpleEnd && n === 1 && !parity) {
     if (r.freq === "daily") return t.repeat.daily;
     if (r.freq === "weekly" && days.join() === "1,2,3,4,5") return t.repeat.weekdays;
     if (r.freq === "weekly" && days.length === 1 && days[0] === start.getDay()) return t.repeat.weekly(weekdayName(start.getDay(), locale));
     if (r.freq === "monthly") return t.repeat.monthly(start.getDate());
     if (r.freq === "yearly") return t.repeat.yearly(fmt(start, t.format.monthDay, locale));
   }
-  const every = t.repeat.everyN(n, r.freq);
+  const every = parity && n === 1 ? t.repeat.everyOther : t.repeat.everyN(n, r.freq);
   const on = r.freq === "weekly" ? orderWeek(days).map((d) => weekdayName(d, locale, "short")).join(", ") : null;
   const until = fromYmd(r.until ?? null);
   const end = until ? t.repeat.until(fmt(until, t.format.dateYear, locale)) : r.count ? t.repeat.count(r.count) : null;
-  return t.repeat.summary(every, on, end);
+  const text = t.repeat.summary(every, on, end);
+  return parity ? `${text} (${t.repeat.parity[parity]})` : text;
 }
 
 /** Weekdays in week order (Monday first). */

@@ -2,7 +2,7 @@
 
 import { addDays, addMonths, isSameDay, isSameMonth, startOfDay } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, PanelRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, PanelRight, Plus, School } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildItems, DEFAULT_FILTERS, taskSpan, type CalItem, type Filters } from "@/calendar/items";
 import { itemDays, monthWeeks } from "@/calendar/layout";
@@ -18,6 +18,7 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { calendarText } from "@/i18n/messages/calendar";
 import { tasksText } from "@/i18n/messages/tasks";
+import { timetableText } from "@/i18n/messages/timetable";
 import type { Row } from "@/lib/offline/sync";
 import type { AssignedCard } from "@/lib/tasks";
 import type { CalEvent, Task } from "@/lib/types";
@@ -29,6 +30,7 @@ import { MiniMonth } from "./MiniMonth";
 import { MonthGrid } from "./MonthGrid";
 import { ticker, ZOOM, type Move } from "./move";
 import { TimeGrid, type CommitMode, type Held } from "./TimeGrid";
+import { TimetableImport } from "./TimetableImport";
 import { useCalendarStore } from "./useCalendarStore";
 import { useStored } from "./useStored";
 
@@ -53,6 +55,7 @@ export function CalendarView({
   initialView,
   openNew,
   openEvent,
+  openImport,
 }: {
   initialEvents: CalEvent[];
   initialTasks: Task[];
@@ -61,8 +64,11 @@ export function CalendarView({
   initialView?: string;
   openNew?: boolean;
   openEvent?: string;
+  /** ?import=bta: the timetable import (a link from the school's site). */
+  openImport?: boolean;
 }) {
   const t = useMessages(calendarText);
+  const tImport = useMessages(timetableText);
   const tt = useMessages(tasksText);
   const locale = useLocale();
   const { subjects, profile } = useWorkspace();
@@ -179,6 +185,7 @@ export function CalendarView({
     url.searchParams.set("view", view);
     url.searchParams.delete("new");
     url.searchParams.delete("event");
+    url.searchParams.delete("import");
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [anchor, view]);
 
@@ -188,6 +195,7 @@ export function CalendarView({
   const [selected, setSelected] = useState<string | null>(null);
   const [held, setHeld] = useState<Held>(null);
   const [ask, setAsk] = useState<Ask>(null);
+  const [importing, setImporting] = useState(!!openImport);
   const closePanel = useCallback(() => setPanel(null), []);
 
   const open = useCallback((item: CalItem, rect: DOMRect | null) => {
@@ -389,6 +397,16 @@ export function CalendarView({
               </div>
             )}
             {!phone && <Segmented value={view} options={viewOptions} onChange={chooseView} label={t.title} className="max-md:hidden" />}
+            <button
+              type="button"
+              onClick={() => setImporting(true)}
+              className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink [@media(hover:none)]:h-9"
+              title={tImport.buttonTitle}
+              aria-label={tImport.buttonTitle}
+            >
+              <School className="size-4" />
+              <span className="max-xl:hidden">{tImport.button}</span>
+            </button>
             <button
               type="button"
               onClick={newAtNextHour}
@@ -631,6 +649,16 @@ export function CalendarView({
         onCancel={() => {
           ask?.cancel();
           setAsk(null);
+        }}
+      />
+
+      <TimetableImport
+        open={importing}
+        onClose={() => setImporting(false)}
+        store={store}
+        onDone={(from) => {
+          go(from);
+          if (view === "month" || view === "agenda") chooseView(phone ? "three" : "week");
         }}
       />
 

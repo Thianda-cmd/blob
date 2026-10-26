@@ -86,6 +86,10 @@ export const calendarText = defineMessages({
         n === 1 ? `Every ${{ daily: "day", weekly: "week", monthly: "month", yearly: "year" }[freq]}` : `Every ${n} ${{ daily: "days", weekly: "weeks", monthly: "months", yearly: "years" }[freq]}`,
       until: (date: string) => `until ${date}`,
       count: (n: number) => `${n} ${plural(n, "time", "times")}`,
+      everyOther: "Every other week",
+      parity: { even: "even weeks", odd: "odd weeks" },
+      weeks: "Weeks",
+      weeksChoice: { all: "Every week", even: "Even calendar weeks", odd: "Odd calendar weeks" },
     },
     reminder: {
       atStart: "At the start",
@@ -236,6 +240,10 @@ export const calendarText = defineMessages({
         n === 1 ? { daily: "Jeden Tag", weekly: "Jede Woche", monthly: "Jeden Monat", yearly: "Jedes Jahr" }[freq] : `Alle ${n} ${{ daily: "Tage", weekly: "Wochen", monthly: "Monate", yearly: "Jahre" }[freq]}`,
       until: (date) => `bis ${date}`,
       count: (n) => `${n}-mal`,
+      everyOther: "Alle 14 Tage",
+      parity: { even: "gerade KW", odd: "ungerade KW" },
+      weeks: "Wochen",
+      weeksChoice: { all: "Jede Woche", even: "Gerade Kalenderwochen", odd: "Ungerade Kalenderwochen" },
     },
     reminder: {
       atStart: "Zu Beginn",

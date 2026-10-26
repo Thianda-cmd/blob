@@ -180,6 +180,8 @@ export type Recurrence = {
   until?: string | null;
   /** How many times it happens in all. */
   count?: number | null;
+  /** Weekly: only in even or odd calendar weeks (ISO 8601 numbers), like fortnightly lessons or A/B weeks. */
+  weeks?: "even" | "odd" | null;
 };
 
 export type CalEvent = {
@@ -205,6 +207,8 @@ export type CalEvent = {
   series_start: string | null;
   /** Minutes before the start (all-day: before local midnight, so -540 is 9:00 on the day). */
   reminders: number[];
+  /** Where an imported event came from ("bta:BTA926A:lesson:0-0-2"), so importing again can replace it. */
+  source?: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

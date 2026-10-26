@@ -24,6 +24,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
       initialView={one(params.view)}
       openNew={one(params.new) === "1"}
       openEvent={one(params.event)}
+      openImport={one(params.import) === "bta"}
     />
   );
 }

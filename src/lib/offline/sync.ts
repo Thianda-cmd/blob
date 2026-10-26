@@ -47,7 +47,7 @@ type Spec = {
 
 const SPECS: Record<SyncTable, Spec> = {
   events: {
-    insert: ["id", "title", "details", "location", "kind", "color", "subject_id", "all_day", "starts_at", "ends_at", "time_zone", "recurrence", "exdates", "series_id", "series_start", "reminders"],
+    insert: ["id", "title", "details", "location", "kind", "color", "subject_id", "all_day", "starts_at", "ends_at", "time_zone", "recurrence", "exdates", "series_id", "series_start", "reminders", "source"],
     soft: true,
     load: (db) => db.from("events").select("*").is("deleted_at", null).order("starts_at").limit(5000),
     since: (db, since) => db.from("events").select("*").gt("updated_at", since).order("updated_at").limit(2000),

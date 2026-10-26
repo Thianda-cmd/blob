@@ -1,11 +1,13 @@
 import { addDays, addMonths, addYears, startOfDay } from "date-fns";
 import type { CalEvent, Recurrence } from "@/lib/types";
-import { allDayIso, dateFromAllDay, eventSpan, fromYmd, weekStart } from "./time";
+import { allDayIso, dateFromAllDay, eventSpan, fromYmd, isoWeek, weekStart } from "./time";
 
 // Repeating events, worked out in local wall-clock time (a lesson at 8:00 stays at 8:00 after the
 // clocks change). Months without the start's day (the 31st, 29 February) are skipped, as in
-// iCalendar. A series' changed occurrences are their own rows (series_id + series_start); its
-// removed ones are listed in `exdates`. Both are matched by the occurrence's original start.
+// iCalendar. A weekly series can keep to even or odd calendar weeks (`weeks`): fortnightly lessons
+// stay in their weeks across a year with 53 weeks, which "every 2 weeks" can't. A series' changed
+// occurrences are their own rows (series_id + series_start); its removed ones are listed in
+// `exdates`. Both are matched by the occurrence's original start.
 
 export type Occurrence = {
   /** The series row (or the plain event). */
@@ -22,6 +24,12 @@ export type Occurrence = {
 const MAX_STEPS = 20000;
 
 export const intervalOf = (r: Recurrence) => Math.min(99, Math.max(1, Math.floor(r.interval ?? 1)));
+
+/** Whether a weekly series happens in the week starting `monday` (its even/odd calendar weeks). */
+export function inWeeks(r: Recurrence, monday: Date): boolean {
+  if (r.freq !== "weekly" || (r.weeks !== "even" && r.weeks !== "odd")) return true;
+  return (isoWeek(monday) % 2 === 0) === (r.weeks === "even");
+}
 
 /** The weekdays a weekly series falls on (sorted), defaulting to the start's weekday. */
 export function weekdaysOf(r: Recurrence, start: Date): number[] {
@@ -64,6 +72,11 @@ function walk(event: CalEvent, stopAt: Date, visit: (start: Date, index: number)
     // Weeks counted from the week of the start (weeks begin on Monday, as in iCalendar).
     let week = weekStart(start, 1);
     for (let step = 0; step < MAX_STEPS; step++) {
+      if (!inWeeks(r, week)) {
+        if (ended(week)) return;
+        week = addDays(week, 7 * interval);
+        continue;
+      }
       for (const wd of days) {
         const day = addDays(week, (wd - 1 + 7) % 7);
         const at = sameTime(day, start);
