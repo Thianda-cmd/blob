@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeQuestionMark, Copy, Ellipsis, Pencil, Play, Plus, Search, Smartphone, Trash2, Tv, Users } from "lucide-react";
+import { BadgeQuestionMark, Copy, Ellipsis, NotebookText, Pencil, Play, Plus, Search, Smartphone, Trash2, Tv, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -10,16 +10,19 @@ import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { TopBar } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { MenuItem, Popover } from "@/components/ui/Menu";
+import { PageIcon } from "@/components/shell/Sidebar";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { quizText } from "@/i18n/messages/quiz";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn, pageTitle } from "@/lib/utils";
 import { DEFAULT_SETTINGS, issuesOf, newQuestion, type Quiz } from "@/quiz/model";
 import { sampleQuiz } from "@/quiz/samples";
 import { api } from "../api";
+import { makeQuizFromNote } from "../fromNote";
 import { Shape, styleAt } from "../Shape";
 
 const rise = {
@@ -36,6 +39,7 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
   const [quizzes, setQuizzes] = useState(initial);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,6 +62,19 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
     }
     if (example) blob.react("celebrate", "excited");
     router.push(`/quiz/${data.id}`);
+  };
+
+  const fromNote = async (pageId: string) => {
+    setBusy(`note:${pageId}`);
+    const made = await makeQuizFromNote(pageId, userId);
+    if (made === "empty" || made === "failed") {
+      setBusy(null);
+      blob.say(made === "empty" ? t.fromNote.empty : t.errors.failed, { mood: made === "empty" ? "thinking" : "worried" });
+      return;
+    }
+    blob.react("celebrate", "excited");
+    blob.say(t.fromNote.made(made.count), { mood: "happy" });
+    router.push(`/quiz/${made.id}`);
   };
 
   const host = async (quiz: Quiz) => {
@@ -110,6 +127,9 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
               <a href="/play" target="_blank" rel="noopener" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-raised px-4 text-[14px] font-medium text-ink shadow-card hover:bg-hover/60">
                 <Smartphone className="size-4" /> {t.home.join}
               </a>
+              <Button variant="secondary" size="lg" onClick={() => setPicking(true)}>
+                <NotebookText className="size-4" /> {t.fromNote.button}
+              </Button>
               <Button variant="blob" size="lg" onClick={() => void create()} loading={busy === "new"}>
                 <Plus className="size-4" /> {t.home.create}
               </Button>
@@ -149,7 +169,61 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
           )}
         </div>
       </div>
+      <NotePicker open={picking} onClose={() => setPicking(false)} busy={busy} onPick={(id) => void fromNote(id)} />
     </>
+  );
+}
+
+/** Choosing the note a new quiz is made from. */
+function NotePicker({ open, onClose, busy, onPick }: { open: boolean; onClose: () => void; busy: string | null; onPick: (pageId: string) => void }) {
+  const t = useMessages(quizText);
+  const locale = useLocale();
+  const { pages } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const notes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return pages.filter((p) => p.kind === "note" && !p.trashed_at && (!q || pageTitle(p.title, p.kind, locale).toLowerCase().includes(q))).slice(0, 60);
+  }, [pages, query, locale]);
+  return (
+    <Dialog open={open} onClose={onClose} className="max-w-[480px]!" labelledBy="quiz-from-note">
+      <div className="flex items-start gap-3 px-5 pb-3 pt-5">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blob-soft text-blob-ink">
+          <NotebookText className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 id="quiz-from-note" className="font-display text-[18px] font-semibold tracking-[-0.01em] text-ink">
+            {t.fromNote.title}
+          </h2>
+          <p className="mt-1 text-[13px] leading-snug text-ink-2">{t.fromNote.hint}</p>
+        </div>
+      </div>
+      <div className="px-5">
+        <label className="flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-3 focus-within:border-blob">
+          <Search className="size-4 text-ink-3" />
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.fromNote.search} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-3" />
+        </label>
+      </div>
+      <ul className="mt-2 max-h-[min(380px,50vh)] overflow-y-auto px-2 pb-3">
+        {notes.length === 0 && <li className="px-3 py-6 text-center text-[13.5px] text-ink-3">{t.fromNote.none}</li>}
+        {notes.map((p) => {
+          const loading = busy === `note:${p.id}`;
+          return (
+            <li key={p.id}>
+              <button
+                type="button"
+                disabled={!!busy}
+                onClick={() => onPick(p.id)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[14px] text-ink transition-colors hover:bg-hover disabled:opacity-60"
+              >
+                <PageIcon page={p} className="size-4 shrink-0 text-ink-3" />
+                <span className="min-w-0 flex-1 truncate">{pageTitle(p.title, p.kind, locale)}</span>
+                {loading && <Blob size={22} mood="thinking" interactive={false} />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Dialog>
   );
 }
 

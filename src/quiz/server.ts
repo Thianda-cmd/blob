@@ -296,6 +296,7 @@ async function playerView(game: Game, player: PlayerRow): Promise<PlayerView> {
       look: cleanLook(player.look),
       score: settled ? player.score : (me?.before ?? player.score),
       rank: settled ? (me?.rank ?? board.length + 1) : (me?.beforeRank ?? board.length + 1),
+      moved: settled && me ? Math.max(0, me.beforeRank - me.rank) : 0,
       players: board.length,
       streak: player.streak,
       correct: player.correct,

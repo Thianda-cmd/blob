@@ -58,7 +58,7 @@ function ChoicePad({ question, onAnswer }: { question: ShownQuestion; onAnswer: 
               aria-label={c.text ?? style.shape}
             >
               <Shape shape={style.shape} className={withText ? "size-8" : "size-16"} />
-              {c.text && <span className="min-w-0 flex-1 text-[17px] font-bold leading-tight [overflow-wrap:anywhere]">{c.text}</span>}
+              {c.text && <span className={cn("min-w-0 flex-1 font-bold leading-tight hyphens-auto [overflow-wrap:break-word]", c.text.length > 36 ? "text-[14.5px]" : c.text.length > 18 ? "text-[16px]" : "text-[18px]")}>{c.text}</span>}
               {question.multi && (
                 <span className={cn("absolute right-3 top-3 grid size-7 place-items-center rounded-full border-2 border-white/90 transition-colors", on ? "bg-white text-ink" : "bg-transparent")}>
                   {on && <Check className="size-4" strokeWidth={3} style={{ color: style.deep }} />}
@@ -148,7 +148,7 @@ function PuzzlePad({ question, onAnswer }: { question: ShownQuestion; onAnswer: 
                 {c && (
                   <motion.span key={c.id} layoutId={`pz-${c.id}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold text-ink">
                     <Shape shape={styleAt(c.style).shape} fill={styleAt(c.style).color} className="size-4" />
-                    <span className="[overflow-wrap:anywhere]">{c.text}</span>
+                    <span className="hyphens-auto [overflow-wrap:break-word]">{c.text}</span>
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -162,7 +162,7 @@ function PuzzlePad({ question, onAnswer }: { question: ShownQuestion; onAnswer: 
           return (
             <motion.button key={c.id} layoutId={`pz-${c.id}`} type="button" onClick={() => add(c.id)} className="quiz-press flex min-h-14 items-center gap-2 rounded-2xl px-3 py-2 text-left text-[15px] font-bold text-white" style={{ background: style.color, ["--quiz-deep" as string]: style.deep }}>
               <Shape shape={style.shape} className="size-5" />
-              <span className="min-w-0 [overflow-wrap:anywhere]">{c.text}</span>
+              <span className="min-w-0 hyphens-auto [overflow-wrap:break-word]">{c.text}</span>
             </motion.button>
           );
         })}

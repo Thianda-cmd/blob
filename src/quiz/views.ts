@@ -71,7 +71,8 @@ export type PlayerView = {
   game: GameInfo;
   question: ShownQuestion | null;
   reveal: Reveal | null;
-  me: { id: string; nickname: string; look: Look; score: number; rank: number; players: number; streak: number; correct: number; kicked: boolean };
+  /** `moved`: places gained with the last question (once it's over). */
+  me: { id: string; nickname: string; look: Look; score: number; rank: number; moved: number; players: number; streak: number; correct: number; kicked: boolean };
   mine: Mine | null;
   /** The player just ahead, and how many points behind them you are. */
   ahead: { nickname: string; gap: number } | null;

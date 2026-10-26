@@ -3,6 +3,7 @@
 import { grade, parseAnswer, speedPoints, textMatches } from "../src/quiz/score";
 import { newQuestion, issuesOf, normalizeQuestion, convertQuestion } from "../src/quiz/model";
 import { cleanNickname, isRude, isBlobName, blobName } from "../src/quiz/names";
+import { quizFromNote } from "../src/quiz/fromNote";
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => { if (JSON.stringify(got) !== JSON.stringify(want)) { failed++; console.error("✗", name, { got, want }); } };
 const q = newQuestion("quiz"); q.text = "x"; q.choices = q.choices.map((c, i) => ({ ...c, text: `a${i}`, correct: i === 1 || i === 2 }));
@@ -22,8 +23,13 @@ eq("puzzle", [grade(p, { kind: "order", ids: p.choices.map((c) => c.id) }), grad
 eq("speed points", [speedPoints({ points: "standard", type: "quiz", time: 20 }, 1, 0), speedPoints({ points: "standard", type: "quiz", time: 20 }, 1, 20000), speedPoints({ points: "double", type: "quiz", time: 20 }, 1, 10000), speedPoints({ points: "none", type: "quiz", time: 20 }, 1, 0)], [1000, 500, 1500, 0]);
 eq("poll ungraded", grade(newQuestion("poll"), { kind: "choice", ids: [] }), null);
 eq("issues", issuesOf(newQuestion("quiz")), ["text", "choices", "correct"]);
-eq("normalize junk", normalizeQuestion({ type: "slider", text: 5, slider: { min: 10, max: 1 } })?.slider?.max! > 10, true);
+eq("normalize junk", (normalizeQuestion({ type: "slider", text: 5, slider: { min: 10, max: 1 } })?.slider?.max ?? 0) > 10, true);
 eq("convert quiz→type keeps right answers", convertQuestion({ ...q, multi: false }, "type").accepted, ["a1", "a2"]);
 eq("names", [cleanNickname("  Mia   K "), cleanNickname("\u202e"), isRude("F1ck"), isRude("Mia"), isBlobName(blobName("de")), isBlobName(blobName("en")), isBlobName("Lena")], ["Mia K", null, true, false, true, true, false]);
+const para = (text: string) => ({ type: "paragraph", content: [{ type: "text", text }] });
+const note = { type: "doc", content: [para("Osmose: Diffusion von Wasser durch eine Membran"), para("Ribosom: Ort der Proteinbiosynthese"), para("Zellkern: enthält die DNA"), para("Mitochondrium: Kraftwerk der Zelle")] };
+const made = quizFromNote(note, "Zelle", 3);
+eq("from a note: German, all playable", [made.lang, made.questions.length >= 3, made.questions.every((x) => !issuesOf(x).length)], ["de", true, true]);
+eq("from a note: nothing to ask", quizFromNote({ type: "doc", content: [para("Hallo")] }, "x").questions.length, 0);
 console.log(failed ? `${failed} failed` : "all quiz checks passed");
 process.exit(failed ? 1 : 0);

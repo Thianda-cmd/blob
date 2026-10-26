@@ -1,27 +1,47 @@
 "use client";
 
-import { BookOpenCheck, ChevronDown, GraduationCap, Layers, ListChecks } from "lucide-react";
+import { BadgeQuestionMark, BookOpenCheck, ChevronDown, GraduationCap, Layers, ListChecks } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { blob } from "@/components/blob/bus";
+import { makeQuizFromNote } from "@/components/quiz/fromNote";
 import { Popover } from "@/components/ui/Menu";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
+import { quizText } from "@/i18n/messages/quiz";
 import { cn } from "@/lib/utils";
 
-type Mode = "cards" | "quiz" | "summary";
+type Mode = "cards" | "quiz" | "summary" | "live";
 
 /**
- * "Lernen" in the note's top bar: turn the note into flashcards, a quiz or a summary. `due`: flashcards
- * of this note due for review today (shown as a badge).
+ * "Lernen" in the note's top bar: turn the note into flashcards, a quiz or a summary, or into a live
+ * quiz to play with the class. `due`: flashcards of this note due for review today (shown as a badge).
  */
 export function StudyMenu({ pageId, beforeOpen, due = 0 }: { pageId: string; beforeOpen: () => Promise<void>; due?: number }) {
   const t = useMessages(editorText).study;
   const router = useRouter();
+  const quiz = useMessages(quizText);
+  const { userId } = useWorkspace();
+  const [making, setMaking] = useState(false);
   const items: { mode: Mode; icon: ReactNode; title: string; hint: string; badge?: number }[] = [
     { mode: "cards", icon: <Layers />, title: t.cards, hint: due > 0 ? t.due(due) : t.cardsHint, badge: due },
     { mode: "quiz", icon: <ListChecks />, title: t.quiz, hint: t.quizHint },
     { mode: "summary", icon: <BookOpenCheck />, title: t.summary, hint: t.summaryHint },
+    { mode: "live", icon: <BadgeQuestionMark />, title: t.live, hint: t.liveHint },
   ];
+
+  const live = async () => {
+    setMaking(true);
+    const made = await makeQuizFromNote(pageId, userId);
+    setMaking(false);
+    if (made === "empty" || made === "failed") {
+      blob.say(made === "empty" ? quiz.fromNote.empty : quiz.errors.failed, { mood: made === "empty" ? "thinking" : "worried" });
+      return;
+    }
+    blob.say(quiz.fromNote.made(made.count), { mood: "happy" });
+    router.push(`/quiz/${made.id}`);
+  };
 
   return (
     <Popover
@@ -67,10 +87,12 @@ export function StudyMenu({ pageId, beforeOpen, due = 0 }: { pageId: string; bef
               key={item.mode}
               type="button"
               role="menuitem"
+              disabled={item.mode === "live" && making}
               onClick={async () => {
                 close();
                 await beforeOpen();
-                router.push(`/study/note/${pageId}?mode=${item.mode}`);
+                if (item.mode === "live") await live();
+                else router.push(`/study/note/${pageId}?mode=${item.mode}`);
               }}
               className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-hover"
             >

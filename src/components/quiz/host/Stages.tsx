@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { Check, Flame, Keyboard, ListOrdered, Medal, SlidersHorizontal, Trophy, Users } from "lucide-react";
+import { ArrowUp, Check, Flame, Keyboard, ListOrdered, Medal, SlidersHorizontal, Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { useLocale } from "@/i18n/client";
@@ -29,7 +29,7 @@ export function Intro({ view, left, total, t }: { view: HostView; left: number; 
       <motion.span initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="rounded-full bg-blob-soft px-4 py-1.5 text-[clamp(13px,1.4vw,20px)] font-bold uppercase tracking-wide text-blob-ink">
         {t.host.question(view.game.q + 1, view.game.total)} · {t.types[q.type]}
       </motion.span>
-      <motion.h1 initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }} className="max-w-[80vw] font-display text-[clamp(28px,4.6vw,76px)] font-bold leading-[1.1] tracking-[-0.02em] text-ink [overflow-wrap:anywhere]">
+      <motion.h1 initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }} className="max-w-[80vw] font-display text-[clamp(28px,4.6vw,76px)] font-bold leading-[1.1] tracking-[-0.02em] text-ink hyphens-auto [overflow-wrap:break-word]">
         {q.text}
       </motion.h1>
       {q.points === "double" && (
@@ -51,7 +51,7 @@ export function Asking({ view, left, t }: { view: HostView; left: number; t: T }
   const live = view.players.length;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-[2vh] px-[3vw] pb-[2vh]">
-      <h1 className="mx-auto max-w-[86vw] rounded-3xl bg-raised px-[3vw] py-[2vh] text-center font-display text-[clamp(22px,3.1vw,52px)] font-bold leading-[1.15] tracking-[-0.015em] text-ink shadow-card [overflow-wrap:anywhere]">{q.text}</h1>
+      <h1 className="mx-auto max-w-[86vw] rounded-3xl bg-raised px-[3vw] py-[2vh] text-center font-display text-[clamp(22px,3.1vw,52px)] font-bold leading-[1.15] tracking-[-0.015em] text-ink shadow-card hyphens-auto [overflow-wrap:break-word]">{q.text}</h1>
       <div className="flex min-h-0 flex-1 items-center justify-between gap-[3vw]">
         <Countdown left={left} total={q.time} size={128} />
         <div className="flex min-h-0 flex-1 items-center justify-center self-stretch">
@@ -61,14 +61,7 @@ export function Asking({ view, left, t }: { view: HostView; left: number; t: T }
             <TypeHint view={view} t={t} />
           )}
         </div>
-        <div className="flex flex-col items-center gap-1 text-center">
-          <motion.span key={view.answered} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="font-display text-[clamp(40px,5vw,84px)] font-bold tabular-nums leading-none text-ink">
-            {view.answered}
-          </motion.span>
-          <span className="text-[clamp(13px,1.3vw,20px)] font-semibold text-ink-3">
-            {t.host.answersLabel} · {live}
-          </span>
-        </div>
+        <Answered view={view} live={live} t={t} />
       </div>
       {(q.type === "quiz" || q.type === "truefalse" || q.type === "poll") && <Tiles view={view} />}
       {q.type === "puzzle" && (
@@ -76,11 +69,38 @@ export function Asking({ view, left, t }: { view: HostView; left: number; t: T }
           {shown.choices.map((c, i) => (
             <motion.div key={c.id} initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: i * 0.06, type: "spring", stiffness: 380, damping: 24 }} className="flex min-h-[9vh] items-center gap-3 rounded-2xl px-4 text-[clamp(16px,1.8vw,30px)] font-bold text-white shadow-card" style={{ background: styleAt(c.style).color }}>
               <Shape shape={styleAt(c.style).shape} className="size-[clamp(20px,2.2vw,36px)]" />
-              <span className="min-w-0 [overflow-wrap:anywhere]">{c.text}</span>
+              <span className="min-w-0 hyphens-auto [overflow-wrap:break-word]">{c.text}</span>
             </motion.div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** How many have answered, with the Blobs of those who did popping in (never what they picked). */
+function Answered({ view, live, t }: { view: HostView; live: number; t: T }) {
+  const done = view.players.filter((p) => p.answered);
+  const shown = done.slice(-9);
+  return (
+    <div className="flex w-[clamp(128px,15vw,240px)] flex-col items-center gap-1.5 text-center">
+      <motion.span key={view.answered} initial={{ scale: 1.5 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} className="font-display text-[clamp(40px,5vw,84px)] font-bold tabular-nums leading-none text-ink">
+        {view.answered}
+      </motion.span>
+      <span className="text-[clamp(12px,1.2vw,18px)] font-semibold leading-tight text-ink-3">{t.host.answeredOf(live)}</span>
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-line">
+        <motion.div className="h-full rounded-full bg-blob" animate={{ width: `${live ? (view.answered / live) * 100 : 0}%` }} transition={{ type: "spring", stiffness: 200, damping: 26 }} />
+      </div>
+      <ul className="mt-2 flex min-h-[44px] flex-wrap justify-center gap-0.5">
+        <AnimatePresence initial={false}>
+          {shown.map((p) => (
+            <motion.li key={p.id} initial={{ scale: 0, y: 14 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0 }} transition={{ type: "spring", stiffness: 600, damping: 15 }} title={p.nickname}>
+              <MiniBlob look={p.look} size={40} bounce={false} />
+            </motion.li>
+          ))}
+        </AnimatePresence>
+        {done.length > shown.length && <li className="grid h-10 place-items-center px-1 text-[13px] font-bold text-ink-3">+{done.length - shown.length}</li>}
+      </ul>
     </div>
   );
 }
@@ -129,7 +149,7 @@ function Tiles({ view, revealed = false }: { view: HostView; revealed?: boolean 
             style={{ background: style.color, boxShadow: `0 6px 0 ${style.deep}` }}
           >
             <Shape shape={style.shape} className="size-[clamp(24px,2.6vw,44px)]" />
-            <span className="min-w-0 flex-1 text-[clamp(16px,2vw,34px)] font-bold leading-tight [overflow-wrap:anywhere]">{c.text}</span>
+            <span className="min-w-0 flex-1 text-[clamp(16px,2vw,34px)] font-bold leading-tight hyphens-auto [overflow-wrap:break-word]">{c.text}</span>
             {revealed && ok && !poll && (
               <motion.span initial={{ scale: 0, rotate: -40 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 500, damping: 14 }} className="grid size-[clamp(28px,3vw,50px)] place-items-center rounded-full bg-white">
                 <Check className="size-[65%]" strokeWidth={3.4} style={{ color: style.deep }} />
@@ -151,7 +171,7 @@ export function Revealed({ view, t }: { view: HostView; t: T }) {
   const max = Math.max(1, ...Object.values(r.counts));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-[2vh] px-[3vw] pb-[2vh]">
-      <h1 className="mx-auto max-w-[86vw] rounded-3xl bg-raised px-[3vw] py-[1.6vh] text-center font-display text-[clamp(20px,2.6vw,44px)] font-bold leading-[1.15] tracking-[-0.015em] text-ink shadow-card [overflow-wrap:anywhere]">{q.text}</h1>
+      <h1 className="mx-auto max-w-[86vw] rounded-3xl bg-raised px-[3vw] py-[1.6vh] text-center font-display text-[clamp(20px,2.6vw,44px)] font-bold leading-[1.15] tracking-[-0.015em] text-ink shadow-card hyphens-auto [overflow-wrap:break-word]">{q.text}</h1>
       <div className="flex min-h-0 flex-1 items-end justify-center gap-[3vw]">
         {choiceType && (
           <div className="flex h-full max-h-[34vh] items-end gap-[2vw]">
@@ -192,7 +212,7 @@ export function Revealed({ view, t }: { view: HostView; t: T }) {
             {q.choices.map((c, i) => (
               <motion.li key={c.id} initial={{ x: -30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.12, type: "spring", stiffness: 300, damping: 22 }} className="flex items-center gap-4 rounded-2xl px-5 py-[1.2vh] text-[clamp(16px,1.9vw,32px)] font-bold text-white" style={{ background: styleAt(i).color }}>
                 <span className="grid size-[1.6em] place-items-center rounded-full bg-white/25 tabular-nums">{i + 1}</span>
-                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{c.text}</span>
+                <span className="min-w-0 flex-1 hyphens-auto [overflow-wrap:break-word]">{c.text}</span>
               </motion.li>
             ))}
           </ol>
@@ -238,30 +258,61 @@ export function Scoreboard({ view, t }: { view: HostView; t: T }) {
   const board = view.board ?? [];
   const [moved, setMoved] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => setMoved(true), 900);
+    const timer = setTimeout(() => setMoved(true), 1100);
     return () => clearTimeout(timer);
   }, []);
   const rows = moved ? board : [...board].sort((a, b) => a.beforeRank - b.beforeRank || b.before - a.before);
+  const left = view.game.total - view.game.q - 1;
   return (
     <div className="flex flex-1 flex-col items-center gap-[2.4vh] px-[6vw] pb-[3vh]">
-      <h1 className="font-display text-[clamp(28px,4vw,64px)] font-bold tracking-[-0.02em] text-ink">{t.host.scoreboard}</h1>
+      <div className="flex flex-col items-center gap-2">
+        <h1 className="font-display text-[clamp(28px,4vw,64px)] font-bold tracking-[-0.02em] text-ink">{t.host.scoreboard}</h1>
+        {left > 0 && (
+          <motion.span initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={cn("rounded-full px-4 py-1 text-[clamp(13px,1.3vw,20px)] font-bold", left === 1 ? "bg-[#fff1e6] text-[#c2410c]" : "bg-blob-soft text-blob-ink")}>
+            {left === 1 ? t.host.lastNext : t.host.toGo(left)}
+          </motion.span>
+        )}
+      </div>
       <LayoutGroup>
         <ol className="flex w-full max-w-[min(1000px,82vw)] flex-col gap-[1.4vh]">
-          {rows.map((s) => (
-            <motion.li layout key={s.id} transition={{ type: "spring", stiffness: 300, damping: 30 }} className={cn("flex items-center gap-[1.4vw] rounded-2xl px-[1.6vw] py-[1.2vh] shadow-card", s.rank === 1 && moved ? "bg-blob text-white" : "bg-raised text-ink")}>
-              <span className="w-[2ch] text-center font-display text-[clamp(18px,2.2vw,36px)] font-bold tabular-nums">{moved ? s.rank : s.beforeRank}</span>
-              <MiniBlob look={s.look} size={52} />
-              <span className="min-w-0 flex-1 truncate text-[clamp(18px,2.2vw,36px)] font-bold">{s.nickname}</span>
-              {view.game.streaks && s.streak >= 2 && (
-                <span className="flex items-center gap-1 rounded-full bg-[#fff1e6] px-2.5 py-1 text-[clamp(12px,1.2vw,18px)] font-bold text-[#c2410c]">
-                  <Flame className="size-[1.1em]" /> {s.streak}
+          {rows.map((s, i) => {
+            const up = s.beforeRank - s.rank;
+            const first = s.rank === 1 && moved;
+            return (
+              <motion.li
+                layout
+                key={s.id}
+                initial={{ opacity: 0, x: -40 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ layout: { type: "spring", stiffness: 260, damping: 28 }, delay: moved ? 0 : i * 0.07, type: "spring", stiffness: 380, damping: 30 }}
+                className={cn("flex items-center gap-[1.4vw] rounded-2xl px-[1.6vw] py-[1vh] shadow-card transition-colors duration-500", first ? "bg-blob text-white" : "bg-raised text-ink")}
+              >
+                <span className="w-[2ch] text-center font-display text-[clamp(18px,2.2vw,36px)] font-bold tabular-nums">{moved ? s.rank : s.beforeRank}</span>
+                <MiniBlob look={s.look} size={60} bounce={first} />
+                <span className="min-w-0 flex-1 truncate text-[clamp(18px,2.2vw,36px)] font-bold">{s.nickname}</span>
+                <AnimatePresence>
+                  {moved && up > 0 && (
+                    <motion.span initial={{ scale: 0, y: 10 }} animate={{ scale: 1, y: 0 }} transition={{ type: "spring", stiffness: 500, damping: 14, delay: 0.25 }} className={cn("flex items-center gap-0.5 rounded-full px-2.5 py-1 text-[clamp(12px,1.2vw,18px)] font-bold", first ? "bg-white/20 text-white" : "bg-ok/15 text-ok")} title={t.host.moved(up)}>
+                      <ArrowUp className="size-[1.1em]" strokeWidth={3} /> {up}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                {view.game.streaks && s.streak >= 2 && (
+                  <span className="flex items-center gap-1 rounded-full bg-[#fff1e6] px-2.5 py-1 text-[clamp(12px,1.2vw,18px)] font-bold text-[#c2410c]" title={t.host.streak(s.streak)}>
+                    <Flame className="size-[1.1em]" /> {s.streak}
+                  </span>
+                )}
+                {s.gained > 0 && (
+                  <motion.span initial={{ opacity: 0, x: 10 }} animate={{ opacity: moved ? 0.75 : 1, x: 0 }} className="text-[clamp(13px,1.4vw,22px)] font-bold tabular-nums">
+                    +{s.gained}
+                  </motion.span>
+                )}
+                <span className="min-w-[4ch] text-right font-display text-[clamp(18px,2.2vw,36px)] font-bold tabular-nums">
+                  <Rolling from={s.before} to={s.score} go={moved} />
                 </span>
-              )}
-              <span className="font-display text-[clamp(18px,2.2vw,36px)] font-bold tabular-nums">
-                <Rolling from={s.before} to={s.score} go={moved} />
-              </span>
-            </motion.li>
-          ))}
+              </motion.li>
+            );
+          })}
         </ol>
       </LayoutGroup>
     </div>
@@ -314,6 +365,7 @@ export function Podium({ view, t, sound }: { view: HostView; t: T; sound: boolea
     { s: top[2], place: 3, at: 1, height: "18vh" },
   ];
   const colors = ["#f0bf2e", "#c9ced8", "#d48a4a"];
+  const rest = (view.podium ?? []).slice(3, 5);
   return (
     <div className="relative flex flex-1 flex-col items-center justify-end gap-[2vh] overflow-hidden px-[4vw]">
       {step >= 3 && <Confetti ms={9000} count={220} />}
@@ -322,6 +374,18 @@ export function Podium({ view, t, sound }: { view: HostView; t: T; sound: boolea
           {step >= 3 && top[0] ? `${top[0].nickname}: ${t.host.winner}` : t.host.drumroll}
         </motion.h1>
       </AnimatePresence>
+      {rest.length > 0 && (
+        <motion.ol initial={{ opacity: 0 }} animate={{ opacity: step >= 1 ? 1 : 0 }} className="flex flex-wrap justify-center gap-2">
+          {rest.map((s) => (
+            <li key={s.id} className="flex items-center gap-2 rounded-full bg-raised py-1 pl-1.5 pr-4 text-[clamp(13px,1.3vw,20px)] font-bold text-ink shadow-card">
+              <MiniBlob look={s.look} size={30} bounce={false} />
+              <span className="tabular-nums text-ink-3">{s.rank}.</span>
+              <span className="max-w-[16ch] truncate">{s.nickname}</span>
+              <span className="tabular-nums text-ink-2">{s.score.toLocaleString(intlLocale(locale))}</span>
+            </li>
+          ))}
+        </motion.ol>
+      )}
       <div className="flex w-full max-w-[min(1100px,90vw)] items-end justify-center gap-[2vw]">
         {slots.map(({ s, place, at, height }) => (
           <div key={place} className="flex w-[30%] flex-col items-center gap-[1vh]">

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, BarChart3, ChevronRight, Copy, Lock, LockOpen, Maximize, Play, RotateCcw, SkipForward, Square, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronRight, Copy, Lock, LockOpen, Maximize, Play, RotateCcw, SkipForward, Square, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -17,6 +17,7 @@ import { MiniBlob } from "../MiniBlob";
 import { QR } from "../QR";
 import { quizSound } from "../sound";
 import { useQuizLive } from "../useQuizLive";
+import { useWakeLock } from "../useWakeLock";
 import { Asking, Intro, Podium, Revealed, Scoreboard } from "./Stages";
 
 type T = QuizText;
@@ -42,6 +43,7 @@ export function HostScreen({ initial, origin }: { initial: HostView; origin: str
   const muted = useSyncExternalStore(sound.subscribe, () => sound.muted, () => false);
   const [unlocked, setUnlocked] = useState(false);
   const soundOn = unlocked && !muted && view.game.phase !== "ended";
+  useWakeLock(view.game.phase !== "ended");
 
   const act = useCallback(
     async (action: string, playerId?: string) => {
@@ -165,6 +167,13 @@ export function HostScreen({ initial, origin }: { initial: HostView; origin: str
           <ArrowLeft className="size-5" />
         </Link>
         <span className="min-w-0 flex-1 truncate font-display text-[clamp(14px,1.4vw,20px)] font-semibold text-ink-2">{game.title || t.untitled}</span>
+        <AnimatePresence>
+          {live.error && (
+            <motion.span initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 rounded-full bg-[#fff1e6] px-3 py-1 text-[clamp(12px,1.1vw,16px)] font-bold text-[#c2410c]" role="status">
+              <WifiOff className="size-4" /> {t.host.reconnecting}
+            </motion.span>
+          )}
+        </AnimatePresence>
         {game.phase !== "lobby" && game.phase !== "ended" && (
           <span className="rounded-full bg-raised px-3 py-1 text-[clamp(12px,1.1vw,16px)] font-bold tabular-nums text-ink shadow-card">
             {t.host.pin} {game.pin}
@@ -187,7 +196,8 @@ export function HostScreen({ initial, origin }: { initial: HostView; origin: str
         </AnimatePresence>
       </main>
 
-      <footer className="relative z-10 flex flex-wrap items-center gap-3 px-[2vw] pb-[max(14px,env(safe-area-inset-bottom))] pt-2">
+      {/* On the podium the buttons float over the pedestals, which reach the bottom edge. */}
+      <footer className={cn("z-10 flex flex-wrap items-center gap-3 px-[2vw] pb-[max(14px,env(safe-area-inset-bottom))] pt-2", game.phase === "podium" || game.phase === "ended" ? "absolute inset-x-0 bottom-0" : "relative")}>
         {game.phase === "lobby" ? (
           <>
             <span className="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-[clamp(13px,1.2vw,18px)] font-bold text-ink shadow-card">

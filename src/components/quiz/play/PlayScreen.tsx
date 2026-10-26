@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, Dices, Flame, LogOut, Medal, Trophy, Vote, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Dices, Flame, LogOut, Medal, Trophy, Users, Vote, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -21,6 +21,7 @@ import { MiniBlob } from "../MiniBlob";
 import { Shape, styleAt } from "../Shape";
 import { quizSound } from "../sound";
 import { useQuizLive } from "../useQuizLive";
+import { useWakeLock } from "../useWakeLock";
 import { AnswerPad, formatValue } from "./AnswerPad";
 
 type PT = QuizText["play"];
@@ -293,6 +294,7 @@ function InGame({ seat, first, onLeave }: { seat: Seat; first: PlayerView | null
   const view = live.view;
   const [sent, setSent] = useState<{ q: number; answer: PlayerAnswer } | null>(null);
   const [failed, setFailed] = useState(false);
+  useWakeLock(view?.game.phase !== "ended");
 
   // The seat is gone (game deleted, or this phone's token is unknown).
   useEffect(() => {
@@ -385,7 +387,7 @@ function InGame({ seat, first, onLeave }: { seat: Seat; first: PlayerView | null
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <TimeBar left={toClose ?? q.time} total={q.time} />
           {q.text ? (
-            <h2 className="text-center text-[19px] font-bold leading-snug text-ink [overflow-wrap:anywhere]">{q.text}</h2>
+            <h2 className="text-center text-[19px] font-bold leading-snug text-ink hyphens-auto [overflow-wrap:break-word]">{q.text}</h2>
           ) : (
             <p className="text-center text-[14px] font-semibold text-ink-3">{t.lookUp}</p>
           )}
@@ -397,7 +399,8 @@ function InGame({ seat, first, onLeave }: { seat: Seat; first: PlayerView | null
       );
     }
   } else if ((phase === "reveal" || phase === "board") && q) {
-    key = `result-${game.q}-${phase}`;
+    // The same screen through the answer and the scoreboard (only the place moves).
+    key = `result-${game.q}`;
     const r = resultTone(view);
     tone = r;
     stage = <Result view={view} t={t} tone={r} />;
@@ -420,6 +423,13 @@ function InGame({ seat, first, onLeave }: { seat: Seat; first: PlayerView | null
           {view.me.score.toLocaleString(intlLocale(locale))}
         </motion.span>
       </header>
+      <AnimatePresence>
+        {live.error && live.error !== "not_found" && (
+          <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} role="status" className="mx-4 mb-2 flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-black/25 px-3 py-2 text-[13px] font-semibold text-white">
+            <WifiOff className="size-4 shrink-0" /> {t.offline}
+          </motion.p>
+        )}
+      </AnimatePresence>
       <AnimatePresence mode="wait">
         <motion.section
           key={key}
@@ -483,14 +493,34 @@ function Message({ text, mood, look }: { text: string; mood: "thinking" | "surpr
 }
 
 function Lobby({ view, t }: { view: PlayerView; t: PT }) {
+  const [pokes, setPokes] = useState(0);
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-white">
-      <motion.div initial={{ scale: 0.4, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 300, damping: 12 }}>
-        <Blob size={170} mood="excited" plain wear={{ skin: view.me.look.skin, hat: view.me.look.hat, eyes: null, neck: null }} />
+      {/* Something to do while waiting: poke your Blob. */}
+      <motion.div
+        aria-hidden
+        initial={{ scale: 0.4, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        whileTap={{ scale: 0.86, rotate: pokes % 2 ? 8 : -8 }}
+        transition={{ type: "spring", stiffness: 300, damping: 12 }}
+        onPointerDown={() => {
+          setPokes((n) => n + 1);
+          quizSound().unlock();
+          quizSound().plop();
+          try {
+            navigator.vibrate?.(12);
+          } catch {}
+        }}
+        className="cursor-pointer select-none"
+      >
+        <Blob size={170} mood={pokes % 5 === 4 ? "surprised" : "excited"} plain wear={{ skin: view.me.look.skin, hat: view.me.look.hat, eyes: null, neck: null }} />
       </motion.div>
       <h1 className="font-display text-[34px] font-bold tracking-[-0.02em]">{t.youreIn}</h1>
       <p className="max-w-[300px] text-center text-[16px] text-white/85">{t.seeName}</p>
-      <div className="mt-2 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-[14px] font-semibold">
+      <motion.span key={view.me.players} initial={{ scale: 1.15 }} animate={{ scale: 1 }} className="flex items-center gap-1.5 text-[13.5px] font-semibold text-white/80">
+        <Users className="size-4" /> {t.here(view.me.players)}
+      </motion.span>
+      <div className="mt-1 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-[14px] font-semibold">
         <span className="flex gap-1">
           {[0, 1, 2].map((i) => (
             <span key={i} className="size-1.5 animate-bounce rounded-full bg-white" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -511,7 +541,7 @@ function GetReady({ view, seconds, t, tt }: { view: PlayerView; seconds: number;
         {Math.max(1, Math.ceil(seconds))}
       </motion.span>
       <p className="font-display text-[26px] font-bold">{t.getReady}</p>
-      {q.text && <p className="max-w-[340px] text-center text-[17px] font-semibold text-white/90 [overflow-wrap:anywhere]">{q.text}</p>}
+      {q.text && <p className="max-w-[340px] text-center text-[17px] font-semibold text-white/90 hyphens-auto [overflow-wrap:break-word]">{q.text}</p>}
       {q.points === "double" && <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-blob-ink">{tt.points.double}</span>}
     </div>
   );
@@ -637,10 +667,19 @@ function Result({ view, t, tone }: { view: PlayerView; t: PT; tone: Tone }) {
       )}
       {r?.explain && <p className="max-w-[340px] rounded-2xl bg-black/10 px-4 py-2.5 text-center text-[14px] leading-snug text-white/95">{r.explain}</p>}
       {tone !== "poll" && (
-        <div className="mt-2 flex flex-col items-center gap-1 rounded-2xl bg-black/15 px-5 py-3">
-          <span className="font-display text-[20px] font-bold">{t.place(view.me.rank)}</span>
+        <motion.div layout className="mt-2 flex flex-col items-center gap-1 rounded-2xl bg-black/15 px-5 py-3">
+          <AnimatePresence>
+            {view.game.phase === "board" && view.me.moved > 0 && (
+              <motion.span initial={{ scale: 0, height: 0 }} animate={{ scale: 1, height: "auto" }} transition={{ type: "spring", stiffness: 500, damping: 15 }} className="mb-1 flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[13px] font-bold text-ok">
+                <ArrowUp className="size-4" strokeWidth={3} /> {t.moved(view.me.moved)}
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <motion.span key={view.me.rank} initial={{ scale: 1.2 }} animate={{ scale: 1 }} className="font-display text-[20px] font-bold">
+            {t.place(view.me.rank)}
+          </motion.span>
           <span className="text-[14px] text-white/85">{view.ahead ? t.behind(view.ahead.gap, view.ahead.nickname) : t.leading}</span>
-        </div>
+        </motion.div>
       )}
     </div>
   );

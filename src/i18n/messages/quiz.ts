@@ -51,7 +51,24 @@ export const quizText = defineMessages({
       updated: (when: string) => `Edited ${when}`,
       howTitle: "How it works",
       how: ["Make your quiz: questions, pictures, time and points.", "Host it: Blob shows a PIN and a QR code on the big screen.", "Everyone joins at blob.bojes.org/play and plays along."],
-      fromCards: "From flashcards",
+    },
+
+    fromNote: {
+      ask: {
+        term: (p: string) => `Which term is meant: ${p}`,
+        meaning: (p: string) => `What does “${p}” mean?`,
+        column: (column: string, p: string) => `${p}: ${column}?`,
+        date: (p: string) => `When was this: ${p}?`,
+        truefalse: (p: string, s: string) => `${p} → ${s}`,
+      },
+      description: (title: string) => `From the note “${title}”`,
+      button: "From a note",
+      title: "A quiz from a note",
+      hint: "Blob turns the note's flashcards, definitions and key terms into questions. You can change all of it afterwards.",
+      search: "Search notes",
+      none: "No notes found.",
+      empty: "Blob found nothing to ask in this note. Flashcards, definitions or bold terms work best.",
+      made: (n: number) => `${n} ${plural(n, "question", "questions")} from your note`,
     },
 
     editor: {
@@ -135,7 +152,6 @@ export const quizText = defineMessages({
       skip: "Skip",
       next: "Next",
       answers: (n: number, of: number) => `${n} of ${of}`,
-      answersLabel: "Answers",
       question: (n: number, of: number) => `Question ${n} of ${of}`,
       getReady: "Get ready…",
       timeUp: "Time's up!",
@@ -164,6 +180,11 @@ export const quizText = defineMessages({
       drumroll: "And the winner is…",
       copyLink: "Copy link",
       copied: "Copied",
+      answeredOf: (of: number) => `of ${of} answered`,
+      toGo: (n: number) => (n === 1 ? "One question left" : `${n} questions to go`),
+      lastNext: "Last question next",
+      reconnecting: "Reconnecting…",
+      moved: (n: number) => `Up ${n}`,
     },
 
     play: {
@@ -223,6 +244,9 @@ export const quizText = defineMessages({
       rightAnswer: "Right answer",
       selected: (n: number) => `${n} picked`,
       makeYourOwn: "Make your own quiz with Blob",
+      here: (n: number) => (n <= 1 ? "Just you so far" : `${n} players are in`),
+      moved: (n: number) => `Up ${n} ${plural(n, "place", "places")}!`,
+      offline: "No connection. Blob keeps trying…",
     },
 
     report: {
@@ -288,7 +312,24 @@ export const quizText = defineMessages({
       updated: (when) => `Bearbeitet ${when}`,
       howTitle: "So geht's",
       how: ["Bau dein Quiz: Fragen, Bilder, Zeit und Punkte.", "Starte es: Blob zeigt eine PIN und einen QR-Code auf dem großen Bildschirm.", "Alle treten unter blob.bojes.org/play bei und spielen mit."],
-      fromCards: "Aus Karteikarten",
+    },
+
+    fromNote: {
+      ask: {
+        term: (p) => `Welcher Begriff ist gemeint: ${p}`,
+        meaning: (p) => `Was bedeutet „${p}“?`,
+        column: (column, p) => `${p}: ${column}?`,
+        date: (p) => `Wann war das: ${p}?`,
+        truefalse: (p, s) => `${p} → ${s}`,
+      },
+      description: (title) => `Aus der Notiz „${title}“`,
+      button: "Aus einer Notiz",
+      title: "Quiz aus einer Notiz",
+      hint: "Blob macht aus den Karteikarten, Definitionen und Fachbegriffen der Notiz Fragen. Danach kannst du alles ändern.",
+      search: "Notizen durchsuchen",
+      none: "Keine Notizen gefunden.",
+      empty: "In dieser Notiz hat Blob nichts zum Abfragen gefunden. Am besten klappt es mit Karteikarten, Definitionen oder fett markierten Begriffen.",
+      made: (n) => `${n} ${plural(n, "Frage", "Fragen")} aus deiner Notiz`,
     },
 
     editor: {
@@ -372,7 +413,6 @@ export const quizText = defineMessages({
       skip: "Überspringen",
       next: "Weiter",
       answers: (n, of) => `${n} von ${of}`,
-      answersLabel: "Antworten",
       question: (n, of) => `Frage ${n} von ${of}`,
       getReady: "Mach dich bereit…",
       timeUp: "Die Zeit ist um!",
@@ -401,6 +441,11 @@ export const quizText = defineMessages({
       drumroll: "Und gewonnen hat…",
       copyLink: "Link kopieren",
       copied: "Kopiert",
+      answeredOf: (of) => `von ${of} haben geantwortet`,
+      toGo: (n) => (n === 1 ? "Noch eine Frage" : `Noch ${n} Fragen`),
+      lastNext: "Gleich kommt die letzte Frage",
+      reconnecting: "Verbinde neu…",
+      moved: (n) => `${n} hoch`,
     },
 
     play: {
@@ -460,6 +505,9 @@ export const quizText = defineMessages({
       rightAnswer: "Richtige Antwort",
       selected: (n) => `${n} gewählt`,
       makeYourOwn: "Bau dein eigenes Quiz mit Blob",
+      here: (n) => (n <= 1 ? "Bisher nur du" : `${n} sind schon dabei`),
+      moved: (n) => `${n} ${plural(n, "Platz", "Plätze")} hoch!`,
+      offline: "Keine Verbindung. Blob versucht es weiter…",
     },
 
     report: {
