@@ -44,22 +44,18 @@ env:
     Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Start with your computer**: switch it on in *Settings → App* and Blob opens quietly in the background when you sign in to your computer (Windows, macOS, Linux).
-    - **Share with a link**: a note (with its sub-pages), a presentation or a CV can get a public link that anyone can open without an account, read-only. Stop sharing whenever you like.
-    - **Cover letters**: write your cover letter right next to your CV, step by step and in the same design, and save both as one PDF.
-    - **Notes and projects together**: a note shows the project cards it is on, *Add to project* turns it into a card and shares it with your group, and every project lists its materials and can start a shared note.
-    - **Today on Home**: today's lessons and appointments from your calendar, and tomorrow's in the evening.
-    - **Subjects and projects**: a subject shows its projects, a project shows its subject, and notes can be filtered by project.
-    - **Word export**: save a note as a Word document (.docx), and import files from the *New* menu.
+    - **Live quiz**: make a quiz, put it on the big screen and the whole class plays along on their phones at *blob.bojes.org/play*, with a PIN or the QR code and no account. Six kinds of questions (multiple choice, true or false, type the answer, poll, put in order, slider), pictures, points for being right and quick, streaks, a scoreboard after every question and a podium with confetti at the end. Results per game, as a spreadsheet too.
+    - **A quiz from your notes**: *Learn → Live quiz* in a note, or *From a note* in Live quiz, and Blob writes the questions from what's in it. You change what you like and press play.
+    - **Your BTA timetable in one click**: *Timetable* in the calendar brings in the whole plan of class BTA926A from bta.bojes.org for the school year, with every-other-week lessons, holidays and exams. Change one lesson, or all the ones after it.
+    - **Every other week**: lessons and events can repeat in even or odd weeks only.
+    - **Calendar fix**: after a reload, times showed an hour or two early on some days. They don't any more.
 
     **Neu in dieser Version**
-    - **Mit dem Computer starten**: in *Einstellungen → App* einschalten, und Blob öffnet sich beim Anmelden am Computer leise im Hintergrund (Windows, macOS, Linux).
-    - **Per Link teilen**: Eine Notiz (mit ihren Unterseiten), eine Präsentation oder ein Lebenslauf bekommt einen öffentlichen Link, den jeder ohne Konto ansehen kann, nur zum Lesen. Das Teilen kannst du jederzeit beenden.
-    - **Anschreiben**: Schreib dein Anschreiben direkt neben dem Lebenslauf, Schritt für Schritt und im selben Design, und speichere beides als eine PDF.
-    - **Notizen und Projekte zusammen**: Eine Notiz zeigt, auf welchen Projektkarten sie liegt, *Zu Projekt hinzufügen* macht sie zur Karte und teilt sie mit deiner Gruppe, und jedes Projekt zeigt seine Unterlagen und startet eine gemeinsame Notiz.
-    - **Heute auf der Startseite**: die heutigen Stunden und Termine aus deinem Kalender, abends die von morgen.
-    - **Fächer und Projekte**: Ein Fach zeigt seine Projekte, ein Projekt sein Fach, und Notizen lassen sich nach Projekt filtern.
-    - **Word-Export**: Speichere eine Notiz als Word-Dokument (.docx), und importiere Dateien über das Menü *Neu*.
+    - **Live-Quiz**: Bau ein Quiz, zeig es auf dem großen Bildschirm, und die ganze Klasse spielt am Handy mit, unter *blob.bojes.org/play*, mit PIN oder QR-Code und ohne Konto. Sechs Arten von Fragen (Quiz, Richtig oder falsch, Antwort tippen, Umfrage, Reihenfolge, Schieberegler), Bilder, Punkte fürs Richtige und fürs Schnellsein, Serien, eine Rangliste nach jeder Frage und am Ende ein Siegertreppchen mit Konfetti. Ergebnisse für jedes Spiel, auch als Tabelle.
+    - **Ein Quiz aus deinen Notizen**: *Lernen → Live-Quiz* in einer Notiz oder *Aus einer Notiz* im Live-Quiz, und Blob macht aus ihrem Inhalt die Fragen. Du änderst, was du willst, und startest.
+    - **Dein BTA-Stundenplan mit einem Klick**: *Stundenplan* im Kalender holt den ganzen Plan der Klasse BTA926A von bta.bojes.org für das Schuljahr, mit 14-täglichen Stunden, Ferien und Klausuren. Ändere eine Stunde oder alle folgenden.
+    - **Alle zwei Wochen**: Stunden und Termine können sich nur in geraden oder ungeraden Wochen wiederholen.
+    - **Kalender-Fix**: Nach dem Neuladen standen Termine an manchen Tagen ein bis zwei Stunden zu früh. Das ist behoben.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
