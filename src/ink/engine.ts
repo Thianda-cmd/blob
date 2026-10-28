@@ -227,6 +227,10 @@ export class InkEngine {
     on("pointermove", (e) => this.move(e));
     on("pointerup", (e) => this.up(e, false));
     on("pointercancel", (e) => this.up(e, true));
+    // Capture lost without an up (the element went away, the system took the pointer): ended.
+    on("lostpointercapture", (e) => {
+      if (this.pointers.has(e.pointerId)) this.up(e, true);
+    });
     on("pointerleave", (e) => {
       if (e.pointerType === "pen" && !this.pointers.has(e.pointerId)) this.setHover(null);
     });
@@ -991,6 +995,14 @@ export class InkEngine {
         this.action = null;
         this.settled();
       }
+    }
+    // The first finger (or pen) of a new touch: whatever of that kind is still listed lost its up,
+    // and what it was doing ends here (else nothing could be written any more).
+    if (e.isPrimary) {
+      for (const [id, p] of this.pointers) if (p.kind === kind && id !== e.pointerId) this.pointers.delete(id);
+      const a = this.action;
+      const lost = a ? (a.kind === "pinch" ? [a.a, a.b] : [a.id]).find((id) => !this.pointers.has(id)) : undefined;
+      if (lost !== undefined) this.up({ pointerId: lost, pointerType: "" } as PointerEvent, true);
     }
     if (this.palm(e)) return;
     if (this.fling) {
