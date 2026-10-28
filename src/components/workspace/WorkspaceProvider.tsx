@@ -215,7 +215,7 @@ export function WorkspaceProvider({
           parent_id: input.parent_id ?? null,
           position,
           // A folder only holds pages: it has no content of its own.
-          content: input.content ?? (kind === "deck" ? newDeckContent(input.title, locale) : kind === "cv" ? newCv(locale) : {}),
+          content: input.content ?? (kind === "deck" ? newDeckContent(input.title, locale) : kind === "cv" ? newCv(locale) : kind === "ink" ? { v: 1 } : {}),
           ...(input.plain_text !== undefined && { plain_text: input.plain_text }),
           ...(input.tags?.length && { tags: input.tags.slice(0, 20) }),
           ...(input.topics?.length && { topics: input.topics.slice(0, 20) }),

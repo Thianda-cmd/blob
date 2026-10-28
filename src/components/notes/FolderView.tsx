@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion } from "motion/react";
-import { ArrowUpFromLine, Ellipsis, Eye, FilePlus2, Folder, FolderInput, FolderPlus, GripVertical, Presentation, Trash2 } from "lucide-react";
+import { ArrowUpFromLine, Ellipsis, Eye, FilePlus2, Folder, FolderInput, FolderPlus, GripVertical, Presentation, Signature, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState, type KeyboardEventHandler, type MouseEventHandler, type ReactNode, type TouchEventHandler } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -22,7 +22,7 @@ import { blob } from "@/components/blob/bus";
 import { SCHOOL_EMOJIS } from "@/components/editor/IconPicker";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { PageIcon } from "@/components/shell/Sidebar";
-import { DeckCard, NoteCard, type PagePreview } from "@/components/subjects/PageCards";
+import { DeckCard, InkCard, NoteCard, type PagePreview } from "@/components/subjects/PageCards";
 import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
@@ -33,7 +33,7 @@ import { notesText } from "@/i18n/messages/notes";
 import type { AccessRole, Member, Page, PageKind, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
-type NewKind = Extract<PageKind, "note" | "deck" | "folder">;
+type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink">;
 
 /** A folder: the pages inside it as cards, new pages inside, and drag (or a menu) to move them. */
 export function FolderView({ page: initial, role, members, previews }: { page: Page; role: AccessRole; members: Member[]; previews: Record<string, PagePreview> }) {
@@ -62,6 +62,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
   const folders = children.filter((p) => p.kind === "folder");
   const notes = children.filter((p) => p.kind === "note");
   const decks = children.filter((p) => p.kind === "deck");
+  const inks = children.filter((p) => p.kind === "ink");
   const parent = page.parent_id ? pages.find((p) => p.id === page.parent_id) : undefined;
 
   useEffect(() => {
@@ -124,6 +125,8 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
         <FolderCard page={p} count={pages.filter((c) => c.parent_id === p.id).length} titles={pages.filter((c) => c.parent_id === p.id).slice(0, 2).map((c) => pageTitle(c.title, c.kind, locale))} />
       ) : p.kind === "deck" ? (
         <DeckCard page={p} preview={previews[p.id]} now={now} />
+      ) : p.kind === "ink" ? (
+        <InkCard page={p} preview={previews[p.id]} now={now} />
       ) : (
         <NoteCard page={p} preview={previews[p.id]} now={now} />
       )}
@@ -177,6 +180,9 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
                 <Button variant="primary" onClick={() => create("note")} loading={busy === "note"}>
                   <FilePlus2 className="size-4" /> {t.newNote}
                 </Button>
+                <Button variant="secondary" onClick={() => create("ink")} loading={busy === "ink"}>
+                  <Signature className="size-4" /> <span className="max-sm:sr-only">{t.newInk}</span>
+                </Button>
                 <Button variant="secondary" onClick={() => create("deck")} loading={busy === "deck"}>
                   <Presentation className="size-4" /> <span className="max-sm:sr-only">{t.newDeck}</span>
                 </Button>
@@ -218,6 +224,11 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
                 {notes.length > 0 && (
                   <Section title={t.notes} count={notes.length}>
                     <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">{notes.map(card)}</div>
+                  </Section>
+                )}
+                {inks.length > 0 && (
+                  <Section title={t.inks} count={inks.length}>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">{inks.map(card)}</div>
                   </Section>
                 )}
                 {decks.length > 0 && (

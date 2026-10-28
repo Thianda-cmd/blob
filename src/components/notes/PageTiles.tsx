@@ -3,6 +3,7 @@
 import { formatDistanceStrict } from "date-fns";
 import { CornerDownRight, Folder, Layers, TextSearch } from "lucide-react";
 import Link from "next/link";
+import { InkThumb } from "@/components/ink/InkThumb";
 import { Avatar, type Person } from "@/components/share/Avatar";
 import { PageIcon, SubjectIcon } from "@/components/shell/Sidebar";
 import { SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
@@ -108,6 +109,25 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
       <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
         <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
         <SlideThumb title={preview?.slideTitle?.trim() || title} theme={preview?.theme ?? null} className="pointer-events-none transition-transform duration-300 group-hover:scale-[1.012]" />
+        <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
+          <PageIcon page={page} className="size-3.5" />
+          <span className="truncate text-[13.5px] font-medium text-ink" title={title}>
+            {title}
+          </span>
+        </div>
+        <div className="mt-1.5 space-y-1.5 px-1.5 pb-0.5">
+          <Tags tags={page.tags} onTag={onTag} />
+          <Meta {...props} />
+        </div>
+      </div>
+    );
+  }
+
+  if (page.kind === "ink") {
+    return (
+      <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
+        <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
+        <InkThumb preview={preview?.ink} crop={0.5} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012]" />
         <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
           <PageIcon page={page} className="size-3.5" />
           <span className="truncate text-[13.5px] font-medium text-ink" title={title}>

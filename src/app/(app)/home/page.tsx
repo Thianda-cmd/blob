@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { loadEvents } from "@/calendar/load";
 import { themeSpecOf } from "@/components/deck/deck";
+import { readPreview } from "@/ink/preview";
 import { HomeView } from "@/components/home/HomeView";
 import { homeText } from "@/i18n/messages/home";
 import { getMessages } from "@/i18n/server";
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getMessages(homeText)).title };
 }
 
-type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
+type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown; ink_preview: unknown };
 
 function snippet(text: string | null) {
   const flat = (text ?? "").replace(/\s+/g, " ").trim();
@@ -28,7 +29,7 @@ export default async function HomePage() {
     loadUpcomingTasks(supabase, 7),
     supabase
       .from("pages")
-      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
+      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview")
       .is("trashed_at", null)
       .order("updated_at", { ascending: false })
       .limit(8),
@@ -49,6 +50,7 @@ export default async function HomePage() {
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
+      ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
     };
   }
 

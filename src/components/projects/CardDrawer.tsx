@@ -1031,7 +1031,7 @@ function PagePicker({ exclude, onPick }: { exclude: Set<string>; onPick: (page: 
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const list = pages
-    .filter((p) => (p.kind === "note" || p.kind === "deck" || p.kind === "folder") && !exclude.has(p.id))
+    .filter((p) => (p.kind === "note" || p.kind === "ink" || p.kind === "deck" || p.kind === "folder") && !exclude.has(p.id))
     .filter((p) => !q || pageTitle(p.title, p.kind, locale).toLowerCase().includes(q))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 30);

@@ -8,7 +8,8 @@ import type { PageKind } from "@/lib/types";
 //   { "format": "blob", "version": 1, "exportedAt": "…", "app": "Blob", "pages": [ … ], "assets": { … } }
 //
 // Each page: kind, title, icon, tags, topics, its content as stored (Tiptap JSON for notes, the deck
-// for presentations) and its sub-pages in `children`. Pictures and files point to an asset of the
+// for presentations; for handwritten notes { v, preview, items } with everything on their sheets,
+// see src/ink/model.ts) and its sub-pages in `children`. Pictures and files point to an asset of the
 // file ("blob-asset:<id>") instead of a web address; links between pages of the file keep the page's
 // `ref`, so they still point to each other after importing.
 
@@ -22,7 +23,7 @@ const ASSET = "blob-asset:";
 export type BlobFilePage = {
   /** The page's id where it came from: links between pages of the file use it. */
   ref: string;
-  kind: Extract<PageKind, "note" | "deck" | "folder">;
+  kind: Extract<PageKind, "note" | "deck" | "folder" | "ink">;
   title: string;
   icon: string | null;
   tags: string[];
@@ -91,8 +92,21 @@ export function assetsOf(page: Pick<BlobFilePage, "kind" | "content">) {
     eachDeckImage(page.content, (src) => {
       if (isCarried(src)) images.add(src);
     });
+  } else if (page.kind === "ink") {
+    // Pictures on handwritten notes are files of the page.
+    for (const item of inkItemsOf(page.content)) {
+      const path = item.kind === "image" ? (item.data as { path?: unknown }).path : null;
+      if (typeof path === "string" && path) files.set(path, { name: path.split("/").pop() || "picture", mime: "" });
+    }
   }
   return { images: [...images], files };
+}
+
+/** What is on a handwritten note in a Blob file (its items as stored). */
+export function inkItemsOf(content: unknown): { id: string; kind: string; sheet: string | null; seq: number; data: Record<string, unknown> }[] {
+  const items = (content as { items?: unknown } | null)?.items;
+  if (!Array.isArray(items)) return [];
+  return items.filter((i): i is { id: string; kind: string; sheet: string | null; seq: number; data: Record<string, unknown> } => !!i && typeof i === "object" && typeof (i as { id?: unknown }).id === "string" && !!(i as { data?: unknown }).data && typeof (i as { data?: unknown }).data === "object");
 }
 
 /**
@@ -117,6 +131,12 @@ export function swapAssets(page: Pick<BlobFilePage, "kind" | "content">, swap: (
       const next = swap(src, "image");
       if (next !== undefined) set(next);
     });
+  } else if (page.kind === "ink") {
+    for (const item of inkItemsOf(content)) {
+      if (item.kind !== "image" || typeof item.data.path !== "string") continue;
+      const next = swap(item.data.path, "file");
+      if (next !== undefined) item.data.path = next;
+    }
   }
   return content;
 }
@@ -160,7 +180,7 @@ export function parseBlobFile(text: string): { file: BlobFile } | { error: ReadE
   const page = (p: unknown, depth: number): BlobFilePage | null => {
     if (!p || typeof p !== "object" || depth > 12) return null;
     const x = p as Partial<BlobFilePage>;
-    const kind = x.kind === "deck" || x.kind === "folder" ? x.kind : x.kind === "note" ? "note" : null;
+    const kind = x.kind === "deck" || x.kind === "folder" || x.kind === "ink" ? x.kind : x.kind === "note" ? "note" : null;
     if (!kind) return null;
     if (kind === "note" && x.content !== undefined && x.content !== null && !isDoc(x.content) && typeof x.content !== "string") return null;
     return {

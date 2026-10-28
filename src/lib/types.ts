@@ -36,8 +36,8 @@ export type Subject = {
   created_at: string;
 };
 
-/** A folder only holds pages (no text of its own). */
-export type PageKind = "note" | "deck" | "cv" | "folder";
+/** A folder only holds pages (no text of its own). "ink": a handwritten note (src/ink). */
+export type PageKind = "note" | "deck" | "cv" | "folder" | "ink";
 
 /** Page metadata used by the sidebar and lists (no content). */
 export type PageMeta = {

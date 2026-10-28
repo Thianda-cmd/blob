@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, FileUser, Folder, Presentation } from "lucide-react";
+import { FileText, FileUser, Folder, Presentation, Signature } from "lucide-react";
 import { createContext, useContext } from "react";
 import type { PublicPageRef } from "@/lib/publicLink";
 import type { PageKind } from "@/lib/types";
@@ -20,6 +20,6 @@ export function usePublicPages() {
 /** A page's emoji, else an icon for its kind. */
 export function PageGlyph({ page, className }: { page: { icon: string | null; kind: PageKind }; className?: string }) {
   if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
-  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? Folder : FileText;
+  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? Folder : page.kind === "ink" ? Signature : FileText;
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }

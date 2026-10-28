@@ -11,10 +11,13 @@ import { useMessages } from "@/i18n/client";
 import { offlineText } from "@/i18n/messages/offline";
 import { flushWaitingNotes, settleOwed, syncNoteCopies } from "./notes";
 import { flushReviews } from "./reviews";
+import { flushInkPending, keepInkCopy } from "@/ink/sync";
 
 /** Pages the app keeps for offline use besides the notes themselves. */
 const MAIN_PAGES = ["/home", "/notes", "/calendar", "/tasks", "/projects", "/learn", "/cv", "/settings", "/notes/offline"];
 const RECENT_PAGES = 25;
+/** Handwritten notes kept on the device (what is on them, besides the page). */
+const RECENT_INK = 12;
 
 /**
  * Keeps this device ready to work without a connection. Everywhere: unsaved note text stays on
@@ -42,11 +45,20 @@ export function useOfflineDevice() {
         void latest.current.reloadPages();
       };
       await Promise.all([settleOwed(userId, latest.current.words, onConflict), flushReviews(userId)]);
-      // Notes written offline whose editor was closed before they were saved.
-      await flushWaitingNotes(userId, latest.current.words, onConflict);
+      // Notes written offline whose editor was closed before they were saved (and handwriting).
+      await Promise.all([flushWaitingNotes(userId, latest.current.words, onConflict), flushInkPending(userId)]);
       if (!app) return;
       await syncNoteCopies(userId, latest.current.pages);
       await noteCache.loadCopies(userId);
+      // The recent handwritten notes, there to open without a connection.
+      const inks = latest.current.pages
+        .filter((p) => p.kind === "ink" && !p.trashed_at)
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .slice(0, RECENT_INK);
+      for (const p of inks) {
+        if (!alive || !isOnline()) break;
+        await keepInkCopy(userId, p.id).catch(() => {});
+      }
     };
 
     void noteCache.load(userId).then(async () => {
@@ -59,7 +71,7 @@ export function useOfflineDevice() {
     const idle = setTimeout(() => {
       if (!alive || !app) return;
       const recent = latest.current.pages
-        .filter((p) => (p.kind === "note" || p.kind === "deck") && !p.trashed_at)
+        .filter((p) => (p.kind === "note" || p.kind === "deck" || p.kind === "ink") && !p.trashed_at)
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .slice(0, RECENT_PAGES)
         .map((p) => `/p/${p.id}`);

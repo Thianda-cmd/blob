@@ -100,7 +100,7 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
 
   const deleting = phase === "deleting";
   const mood: BlobMood = deleting ? "sleepy" : startled ? "surprised" : "worried";
-  const notes = pages.filter((p) => p.kind === "note").length;
+  const notes = pages.filter((p) => p.kind === "note" || p.kind === "ink").length;
   const decks = pages.filter((p) => p.kind === "deck").length;
   const cvs = pages.filter((p) => p.kind === "cv").length;
   const summary = [t.notes(notes), decks ? t.decks(decks) : null, cvs ? cvCount(cvs) : null, t.subjects(subjects.length)]

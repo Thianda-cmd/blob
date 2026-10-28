@@ -25,7 +25,7 @@ import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import type { PageKind, Subject, Task } from "@/lib/types";
 import { pageTitle } from "@/lib/utils";
-import { DeckCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
+import { DeckCard, InkCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
 
 /** Everything for one subject: notes, presentations, its projects and its tasks. */
 export function SubjectView({
@@ -51,10 +51,11 @@ export function SubjectView({
   const now = useNow();
   const [creating, setCreating] = useState<PageKind | null>(null);
 
-  const { notes, decks, folders, byId } = useMemo(() => {
+  const { notes, inks, decks, folders, byId } = useMemo(() => {
     const mine = pages.filter((p) => p.subject_id === subject.id).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     return {
       notes: mine.filter((p) => p.kind === "note"),
+      inks: mine.filter((p) => p.kind === "ink"),
       decks: mine.filter((p) => p.kind === "deck"),
       folders: mine.filter((p) => p.kind === "folder"),
       byId: new Map(pages.map((p) => [p.id, p])),
@@ -177,6 +178,15 @@ export function SubjectView({
                     <NoteCard key={p.id} page={p} preview={previews[p.id]} parent={p.parent_id ? byId.get(p.parent_id) : undefined} now={now} />
                   ))}
                   <NewCard kind="note" onClick={() => create("note")} busy={creating === "note"} alone={notes.length === 0} />
+                </div>
+              </Section>
+
+              <Section title={t.inks} count={inks.length}>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+                  {inks.map((p) => (
+                    <InkCard key={p.id} page={p} preview={previews[p.id]} now={now} />
+                  ))}
+                  <NewCard kind="ink" onClick={() => create("ink")} busy={creating === "ink"} alone={inks.length === 0} />
                 </div>
               </Section>
 

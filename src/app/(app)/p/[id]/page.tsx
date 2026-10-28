@@ -5,8 +5,10 @@ import { DeckEditor } from "@/components/deck/DeckEditor";
 import { NoteEditor } from "@/components/editor/NoteEditor";
 import { FileSweep } from "@/components/files/FileSweep";
 import { themeSpecOf } from "@/components/deck/deck";
+import { InkEditor } from "@/components/ink/InkEditor";
 import { FolderView } from "@/components/notes/FolderView";
 import type { PagePreview } from "@/components/subjects/PageCards";
+import { readPreview } from "@/ink/preview";
 import { snippet } from "@/notes/snippet";
 import { TrashedNotice } from "@/components/page/TrashedNotice";
 import { pageText } from "@/i18n/messages/page";
@@ -40,14 +42,14 @@ async function loadAccess(id: string): Promise<{ role: AccessRole; members: Memb
   return { role: (role.data as AccessRole | null) ?? "owner", members: list };
 }
 
-type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
+type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown; ink_preview: unknown };
 
 /** Small previews of a folder's pages (the pages themselves come from the workspace). */
 async function loadFolderPreviews(id: string): Promise<Record<string, PagePreview>> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("pages")
-    .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
+    .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview")
     .eq("parent_id", id)
     .is("trashed_at", null);
   const previews: Record<string, PagePreview> = {};
@@ -56,6 +58,7 @@ async function loadFolderPreviews(id: string): Promise<Record<string, PagePrevie
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
+      ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
     };
   }
   return previews;
@@ -73,6 +76,14 @@ export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
   }
   const { role, members } = await loadAccess(page.id);
   if (page.kind === "deck") return <DeckEditor key={page.id} page={page} role={role} members={members} />;
+  if (page.kind === "ink") {
+    return (
+      <>
+        <InkEditor key={page.id} page={page} role={role} members={members} />
+        {(role === "owner" || role === "editor") && <FileSweep key={`files-${page.id}`} kind="page" id={page.id} />}
+      </>
+    );
+  }
   return (
     <>
       <NoteEditor key={page.id} page={page} role={role} members={members} />

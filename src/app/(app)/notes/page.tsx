@@ -5,6 +5,7 @@ import type { PagePreview } from "@/components/subjects/PageCards";
 import { notesText } from "@/i18n/messages/notes";
 import { getMessages } from "@/i18n/server";
 import { loadDue } from "@/notes/server";
+import { readPreview } from "@/ink/preview";
 import { snippet } from "@/notes/snippet";
 import { createClient } from "@/lib/supabase/server";
 import type { Attachment, PageKind, Project } from "@/lib/types";
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getMessages(notesText)).metaTitle };
 }
 
-type Row = { id: string; kind: PageKind; plain_text: string | null; links: string[] | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
+type Row = { id: string; kind: PageKind; plain_text: string | null; links: string[] | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown; ink_preview: unknown };
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -24,7 +25,7 @@ export default async function NotesPage({ searchParams }: PageProps<"/notes">) {
   const [rowsRes, due, cardsRes] = await Promise.all([
     supabase
       .from("pages")
-      .select("id, kind, plain_text, links, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
+      .select("id, kind, plain_text, links, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview")
       .is("trashed_at", null)
       .neq("kind", "cv"),
     loadDue(supabase),
@@ -40,6 +41,7 @@ export default async function NotesPage({ searchParams }: PageProps<"/notes">) {
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
+      ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
     };
     if (row.links?.length) links[row.id] = row.links;
   }

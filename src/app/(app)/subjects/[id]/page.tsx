@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { themeSpecOf } from "@/components/deck/deck";
+import { readPreview } from "@/ink/preview";
 import { loadProjectSummaries } from "@/components/projects/load";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { SubjectView } from "@/components/subjects/SubjectView";
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/subjects/[id]">):
   return { title: subject ? subject.name : (await getMessages(subjectsText)).notFound };
 }
 
-type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown };
+type PreviewRow = { id: string; kind: PageKind; plain_text: string | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown; ink_preview: unknown };
 
 function snippet(text: string | null) {
   const flat = (text ?? "").replace(/\s+/g, " ").trim();
@@ -40,7 +41,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
   const [pagesRes, tasks, projects] = await Promise.all([
     supabase
       .from("pages")
-      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom")
+      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview")
       .eq("subject_id", id)
       .is("trashed_at", null),
     loadTasks(supabase, { subjectId: id }),
@@ -54,6 +55,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
+      ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
     };
   }
 

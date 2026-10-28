@@ -21,6 +21,7 @@ import {
   Monitor,
   Moon,
   NotebookPen,
+  Signature,
   PanelLeftClose,
   Plus,
   Presentation,
@@ -88,7 +89,7 @@ function useStoredSet(key: string) {
 
 export function PageIcon({ page, className, open }: { page: Pick<PageMeta, "icon" | "kind">; className?: string; open?: boolean }) {
   if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
-  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? (open ? FolderOpen : Folder) : FileText;
+  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? (open ? FolderOpen : Folder) : page.kind === "ink" ? Signature : FileText;
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }
 
@@ -99,7 +100,7 @@ export function SubjectIcon({ subject, className }: { subject: Pick<Subject, "em
   return <span className={cn("size-2 rounded-full", className)} style={{ background: subjectColor(subject.color) }} />;
 }
 
-type NewKind = Extract<PageKind, "note" | "deck" | "folder">;
+type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink">;
 
 export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse: () => void; onSearch: () => void; isAdmin?: boolean }) {
   const router = useRouter();
@@ -419,19 +420,27 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-line px-2 py-2">
-        <div className="mb-1 grid grid-cols-2 gap-1">
+        <div className="mb-1 grid grid-cols-[1fr_1fr_auto] gap-1">
           <button
             onClick={() => newPage("note")}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97]"
+            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97] [@media(hover:none)]:h-9"
           >
-            <FilePlus2 className="size-3.5" /> {t.newNote}
+            <FilePlus2 className="size-3.5 shrink-0" /> <span className="truncate">{t.newNote}</span>
+          </button>
+          <button
+            onClick={() => newPage("ink")}
+            title={t.newInkTitle}
+            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
+          >
+            <Signature className="size-3.5 shrink-0" /> <span className="truncate">{t.newInk}</span>
           </button>
           <button
             onClick={() => newPage("deck")}
             title={t.newDeckTitle}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97]"
+            aria-label={t.newDeckTitle}
+            className="grid size-8 place-items-center rounded-lg border border-line bg-surface text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:size-9"
           >
-            <Presentation className="size-3.5" /> {t.newDeck}
+            <Presentation className="size-3.5" />
           </button>
         </div>
         {isAdmin && (
@@ -465,6 +474,9 @@ function AddMenu({ label, onPick, onImport, className }: { label: string; onPick
         <>
           <MenuItem icon={<FileText />} onSelect={() => (close(), onPick("note"))}>
             {t.note}
+          </MenuItem>
+          <MenuItem icon={<Signature />} onSelect={() => (close(), onPick("ink"))}>
+            {t.ink}
           </MenuItem>
           <MenuItem icon={<Presentation />} onSelect={() => (close(), onPick("deck"))}>
             {t.presentation}

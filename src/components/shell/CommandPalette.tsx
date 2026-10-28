@@ -18,6 +18,7 @@ import {
   ListPlus,
   Moon,
   NotebookPen,
+  Signature,
   Presentation,
   Search,
   Settings,
@@ -64,6 +65,7 @@ const MAX_TOPICS = 6;
 
 const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
 const FOLDER_WORDS = "ordner folder";
+const INK_WORDS = "handschrift handwriting stift pen zeichnen draw drawing skizze sketch tablet s pen";
 const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
 const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
 const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
@@ -142,6 +144,18 @@ function Palette({ onClose }: { onClose: () => void }) {
         run: async () => {
           onClose();
           const p = await createPage({ kind: "note", title: q });
+          if (p) router.push(`/p/${p.id}`);
+        },
+      },
+      {
+        id: "new-ink",
+        group: "actions",
+        label: q ? t.newInkNamed(q) : t.newInk,
+        keywords: INK_WORDS,
+        icon: <Signature />,
+        run: async () => {
+          onClose();
+          const p = await createPage({ kind: "ink", title: q });
           if (p) router.push(`/p/${p.id}`);
         },
       },

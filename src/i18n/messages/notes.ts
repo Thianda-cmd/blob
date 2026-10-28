@@ -8,12 +8,13 @@ export const notesText = defineMessages({
   en: {
     title: "Notes",
     metaTitle: "Notes",
-    counts: (notes: number, decks: number, folders: number) =>
-      [`${notes} ${notes === 1 ? "note" : "notes"}`, decks ? `${decks} ${decks === 1 ? "presentation" : "presentations"}` : "", folders ? `${folders} ${folders === 1 ? "folder" : "folders"}` : ""]
+    counts: (notes: number, decks: number, folders: number, inks?: number) =>
+      [`${notes} ${notes === 1 ? "note" : "notes"}`, inks ? `${inks} handwritten` : "", decks ? `${decks} ${decks === 1 ? "presentation" : "presentations"}` : "", folders ? `${folders} ${folders === 1 ? "folder" : "folders"}` : ""]
         .filter(Boolean)
         .join(" · "),
     new: "New",
     newNote: "Note",
+    newInk: "Handwritten note",
     newDeck: "Presentation",
     newFolder: "Folder",
     tabs: { all: "All pages", graph: "Knowledge graph" },
@@ -31,6 +32,7 @@ export const notesText = defineMessages({
       kind: "Type",
       allKinds: "Everything",
       notes: "Notes",
+      inks: "Handwritten notes",
       decks: "Presentations",
       folders: "Folders",
       owner: "Shared",
@@ -99,6 +101,7 @@ export const notesText = defineMessages({
       emptyTitle: "This folder is empty",
       emptyText: "Add a note, a presentation or another folder.",
       newNote: "New note",
+      newInk: "Handwriting",
       newDeck: "New presentation",
       newFolder: "New folder",
       readOnly: "You can look, but not change this folder.",
@@ -114,6 +117,7 @@ export const notesText = defineMessages({
       moveFailed: "I couldn't move that. Try again?",
       folders: "Folders",
       notes: "Notes",
+      inks: "Handwritten",
       decks: "Presentations",
     },
     topic: {
@@ -149,12 +153,13 @@ export const notesText = defineMessages({
   de: {
     title: "Notizen",
     metaTitle: "Notizen",
-    counts: (notes, decks, folders) =>
-      [notes === 1 ? "1 Notiz" : `${notes} Notizen`, decks ? (decks === 1 ? "1 Präsentation" : `${decks} Präsentationen`) : "", folders ? (folders === 1 ? "1 Ordner" : `${folders} Ordner`) : ""]
+    counts: (notes, decks, folders, inks) =>
+      [notes === 1 ? "1 Notiz" : `${notes} Notizen`, inks ? `${inks} handschriftlich` : "", decks ? (decks === 1 ? "1 Präsentation" : `${decks} Präsentationen`) : "", folders ? (folders === 1 ? "1 Ordner" : `${folders} Ordner`) : ""]
         .filter(Boolean)
         .join(" · "),
     new: "Neu",
     newNote: "Notiz",
+    newInk: "Handschriftliche Notiz",
     newDeck: "Präsentation",
     newFolder: "Ordner",
     tabs: { all: "Alle Seiten", graph: "Wissensnetz" },
@@ -172,6 +177,7 @@ export const notesText = defineMessages({
       kind: "Art",
       allKinds: "Alles",
       notes: "Notizen",
+      inks: "Handschriftliche Notizen",
       decks: "Präsentationen",
       folders: "Ordner",
       owner: "Geteilt",
@@ -240,6 +246,7 @@ export const notesText = defineMessages({
       emptyTitle: "Dieser Ordner ist noch leer",
       emptyText: "Leg eine Notiz, eine Präsentation oder einen Unterordner an.",
       newNote: "Neue Notiz",
+      newInk: "Handschrift",
       newDeck: "Neue Präsentation",
       newFolder: "Neuer Ordner",
       readOnly: "Du kannst diesen Ordner ansehen, aber nicht ändern.",
@@ -255,6 +262,7 @@ export const notesText = defineMessages({
       moveFailed: "Das konnte ich nicht verschieben. Nochmal versuchen?",
       folders: "Ordner",
       notes: "Notizen",
+      inks: "Handschrift",
       decks: "Präsentationen",
     },
     topic: {

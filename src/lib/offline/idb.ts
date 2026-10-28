@@ -4,10 +4,14 @@
 // Every function here quietly does nothing where IndexedDB isn't available (server rendering, some
 // private windows): the app then simply works online only.
 
-const VERSION = 1;
+const VERSION = 2;
 
-/** The stores. Rows are keyed by `id`; the outbox by `key` (sortable: the order writes were made). */
-export const STORES = ["events", "tasks", "pages", "subjects", "notes", "outbox", "meta"] as const;
+/**
+ * The stores. Rows are keyed by `id`; the outbox by `key` (sortable: the order writes were made).
+ * Handwritten notes (src/ink/sync.ts) keep what is on them ("inkItems", in the app) and what this
+ * device wrote and hasn't sent yet ("inkPending") under "<page id>:<item id>".
+ */
+export const STORES = ["events", "tasks", "pages", "subjects", "notes", "outbox", "meta", "inkItems", "inkPending"] as const;
 export type StoreName = (typeof STORES)[number];
 
 const KEY_PATH: Record<StoreName, string> = {
@@ -18,6 +22,8 @@ const KEY_PATH: Record<StoreName, string> = {
   notes: "id",
   outbox: "key",
   meta: "key",
+  inkItems: "key",
+  inkPending: "key",
 };
 
 const opened = new Map<string, Promise<IDBDatabase | null>>();
@@ -92,6 +98,31 @@ export async function getOne<T>(userId: string, store: StoreName, key: string): 
     return (await promise(db.transaction(store).objectStore(store).get(key))) as T | undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Rows whose key starts with `prefix` (keys like "<page id>:<item id>"). */
+export async function getPrefix<T>(userId: string, store: StoreName, prefix: string): Promise<T[]> {
+  const db = await openDb(userId);
+  if (!db) return [];
+  try {
+    return (await promise(db.transaction(store).objectStore(store).getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`)))) as T[];
+  } catch {
+    return [];
+  }
+}
+
+/** Removes the rows whose key starts with `prefix`. */
+export async function deletePrefix(userId: string, store: StoreName, prefix: string): Promise<boolean> {
+  const db = await openDb(userId);
+  if (!db) return false;
+  try {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).delete(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+    await done(tx);
+    return true;
+  } catch {
+    return false;
   }
 }
 

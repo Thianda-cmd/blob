@@ -18,6 +18,7 @@ import {
   Network,
   Plus,
   Presentation,
+  Signature,
   Search,
   Shapes,
   Users,
@@ -58,7 +59,7 @@ export type NotesQuery = { q: string; subject: string; tag: string; kind: string
 type Sort = "recent" | "created" | "alpha";
 type View = "grid" | "list" | "graph";
 
-const KINDS: PageKind[] = ["note", "deck", "folder"];
+const KINDS: PageKind[] = ["note", "ink", "deck", "folder"];
 
 function writeUrl(query: NotesQuery) {
   const params = new URLSearchParams();
@@ -212,7 +213,7 @@ export function NotesHome({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  async function create(kind: Extract<PageKind, "note" | "deck" | "folder">) {
+  async function create(kind: Extract<PageKind, "note" | "deck" | "folder" | "ink">) {
     if (busy) return;
     setBusy(kind);
     // A new page lands where you're looking: in the filtered subject, with the filtered tag and topic.
@@ -241,7 +242,7 @@ export function NotesHome({
           <header className="flex flex-wrap items-end gap-x-4 gap-y-3">
             <div className="min-w-0 flex-1">
               <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.025em] sm:text-[32px]">{t.title}</h1>
-              <p className="mt-0.5 text-[13px] text-ink-3">{t.counts(counts.note ?? 0, counts.deck ?? 0, counts.folder ?? 0)}</p>
+              <p className="mt-0.5 text-[13px] text-ink-3">{t.counts(counts.note ?? 0, counts.deck ?? 0, counts.folder ?? 0, counts.ink ?? 0)}</p>
             </div>
             <div className="flex items-center gap-2">
               <Segmented
@@ -404,7 +405,7 @@ export function NotesHome({
               </FilterChip>
               <FilterChip
                 icon={<Shapes />}
-                label={query.kind === "deck" ? t.filters.decks : query.kind === "folder" ? t.filters.folders : query.kind === "note" ? t.filters.notes : t.filters.kind}
+                label={query.kind === "deck" ? t.filters.decks : query.kind === "folder" ? t.filters.folders : query.kind === "note" ? t.filters.notes : query.kind === "ink" ? t.filters.inks : t.filters.kind}
                 active={Boolean(query.kind)}
                 onClear={() => set({ kind: "" })}
               >
@@ -415,7 +416,7 @@ export function NotesHome({
                     </MenuItem>
                     {KINDS.map((k) => (
                       <MenuItem key={k} active={query.kind === k} shortcut={counts[k] ?? 0} onSelect={() => (set({ kind: k }), close())}>
-                        {k === "deck" ? t.filters.decks : k === "folder" ? t.filters.folders : t.filters.notes}
+                        {k === "deck" ? t.filters.decks : k === "folder" ? t.filters.folders : k === "ink" ? t.filters.inks : t.filters.notes}
                       </MenuItem>
                     ))}
                   </>
@@ -687,7 +688,7 @@ function Segmented<T extends string>({
   );
 }
 
-function NewMenu({ onPick, busy }: { onPick: (kind: "note" | "deck" | "folder") => void; busy: PageKind | null }) {
+function NewMenu({ onPick, busy }: { onPick: (kind: "note" | "deck" | "folder" | "ink") => void; busy: PageKind | null }) {
   const t = useMessages(notesText);
   const ti = useMessages(transferText).import;
   const { pick } = useImporter();
@@ -705,6 +706,9 @@ function NewMenu({ onPick, busy }: { onPick: (kind: "note" | "deck" | "folder") 
         <>
           <MenuItem icon={<FilePlus2 />} onSelect={() => (close(), onPick("note"))}>
             {t.newNote}
+          </MenuItem>
+          <MenuItem icon={<Signature />} onSelect={() => (close(), onPick("ink"))}>
+            {t.newInk}
           </MenuItem>
           <MenuItem icon={<Presentation />} onSelect={() => (close(), onPick("deck"))}>
             {t.newDeck}

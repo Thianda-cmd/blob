@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { motion } from "motion/react";
-import { ArrowUpRight, FilePlus2, FileUser, ListPlus, Plus, Presentation, Search } from "lucide-react";
+import { ArrowUpRight, FilePlus2, FileUser, ListPlus, Plus, Presentation, Search, Signature } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
@@ -11,7 +11,7 @@ import { RecentCvCard } from "@/components/cv/home/RecentCvCard";
 import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
 import { useShell } from "@/components/shell/AppShell";
 import { TopBar } from "@/components/shell/TopBar";
-import { NoteCard, SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
+import { InkCard, NoteCard, SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
 import { PageIcon } from "@/components/shell/Sidebar";
 import type { ProjectSummary } from "@/components/projects/load";
 import { UpcomingTasks } from "@/components/tasks/UpcomingTasks";
@@ -67,14 +67,14 @@ export function HomeView({
   const locale = useLocale();
   const t = useMessages(homeText);
   const blobRef = useRef<BlobHandle>(null);
-  const [busy, setBusy] = useState<"note" | "deck" | null>(null);
+  const [busy, setBusy] = useState<"note" | "deck" | "ink" | null>(null);
   // Back from a page you just edited: fetch the previews (and CV thumbnails) again instead of Next's old copy.
   useRefreshOnBack();
 
   const recent = [...pages].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 6);
   const name = firstName(profile.full_name);
 
-  async function create(kind: "note" | "deck") {
+  async function create(kind: "note" | "deck" | "ink") {
     setBusy(kind);
     const page = await createPage({ kind });
     setBusy(null);
@@ -112,6 +112,9 @@ export function HomeView({
               <QuickAction icon={<FilePlus2 />} onClick={() => create("note")} busy={busy === "note"} primary>
                 {t.newNote}
               </QuickAction>
+              <QuickAction icon={<Signature />} onClick={() => create("ink")} busy={busy === "ink"}>
+                {t.newInk}
+              </QuickAction>
               <QuickAction icon={<Presentation />} onClick={() => create("deck")} busy={busy === "deck"}>
                 {t.newDeck}
               </QuickAction>
@@ -147,6 +150,8 @@ export function HomeView({
                         <RecentDeck page={page} preview={previews[page.id]} now={now} />
                       ) : page.kind === "cv" ? (
                         <RecentCvCard page={page} content={cvs[page.id]} now={now} />
+                      ) : page.kind === "ink" ? (
+                        <InkCard page={page} preview={previews[page.id]} now={now} />
                       ) : (
                         <NoteCard page={page} preview={previews[page.id]} parent={pages.find((p) => p.id === page.parent_id)} now={now} fixed />
                       )}

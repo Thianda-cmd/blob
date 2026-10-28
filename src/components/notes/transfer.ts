@@ -13,6 +13,7 @@ import {
   assetIdOf,
   assetRef,
   assetsOf,
+  inkItemsOf,
   isDoc,
   remapPageIds,
   swapAssets,
@@ -25,7 +26,7 @@ import {
 // text as a download.
 
 type Row = { id: string; kind: PageKind; title: string; icon: string | null; tags: string[] | null; topics: string[] | null; content: unknown; parent_id: string | null };
-const KINDS = new Set<PageKind>(["note", "deck", "folder"]);
+const KINDS = new Set<PageKind>(["note", "deck", "folder", "ink"]);
 
 /** Saves text as a file in the Downloads folder (browsers and the apps alike). */
 export function download(name: string, data: string | Blob, mime: string) {
@@ -73,6 +74,24 @@ async function loadTree(rootIds: string[]): Promise<Row[] | null> {
   return rows.filter((r) => KINDS.has(r.kind));
 }
 
+/** Everything on a handwritten note, as stored (without what was deleted). */
+async function inkItems(pageId: string) {
+  const db = createClient();
+  const out: { id: string; kind: string; sheet: string | null; seq: number; data: Record<string, unknown> }[] = [];
+  let at: string | null = null;
+  let id: string | null = null;
+  for (let round = 0; round < 100; round++) {
+    const { data, error } = await db.rpc("ink_pull", { p_page: pageId, p_at: at, p_id: id, p_full: true, p_limit: 5000 });
+    const res = data as { items: { id: string; kind: string; sheet: string | null; seq: number; data: Record<string, unknown>; updated_at: string }[]; more: boolean } | null;
+    if (error || !res) break;
+    for (const i of res.items) out.push({ id: i.id, kind: i.kind, sheet: i.sheet, seq: i.seq, data: i.data });
+    if (!res.more || !res.items.length) break;
+    at = res.items[res.items.length - 1].updated_at;
+    id = res.items[res.items.length - 1].id;
+  }
+  return out;
+}
+
 export type ExportResult = { file: BlobFile; pages: number; /** Pictures and files that couldn't come along (too big, or unreachable). */ missing: number };
 
 /**
@@ -110,7 +129,9 @@ export async function exportPages(rootIds: string[], current?: { id: string; con
   };
 
   const build = async (r: Row): Promise<BlobFilePage> => {
-    const content = current && r.id === current.id ? current.content : r.content;
+    let content: unknown = current && r.id === current.id ? current.content : r.content;
+    // Handwritten notes: what is on their sheets comes along.
+    if (r.kind === "ink") content = { v: 1, preview: (r.content as { preview?: unknown } | null)?.preview ?? null, items: await inkItems(r.id) };
     const page = { kind: r.kind as BlobFilePage["kind"], content };
     const { images, files } = assetsOf(page);
     const found = new Map<string, string>();
@@ -208,7 +229,7 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
       subject_id: opts.subjectId,
       parent_id: parentId,
       // The real content follows once its pictures are uploaded.
-      content: page.kind === "deck" ? page.content : {},
+      content: page.kind === "deck" ? page.content : page.kind === "ink" ? { v: 1, preview: (page.content as { preview?: unknown } | null)?.preview ?? null } : {},
     });
     if (!meta) {
       failed++;
@@ -253,6 +274,20 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
         const url = await picture(assetId);
         if (url) uploaded.set(ref, url);
       }
+    }
+    if (page.kind === "ink") {
+      // What is on the sheets goes in as it was (pictures moved to this page's files; one that
+      // couldn't come along is left out).
+      const content = swapAssets(page, (ref) => uploaded.get(ref) ?? (assetIdOf(ref) ? "" : undefined));
+      const items = inkItemsOf(content).filter((i) => i.kind !== "image" || i.data.path);
+      for (let k = 0; k < items.length; k += 300) {
+        const { data, error } = await db.rpc("ink_push", { p_page: id, p_items: items.slice(k, k + 300) });
+        if (error || !(data as { ok?: boolean } | null)?.ok) {
+          failed++;
+          break;
+        }
+      }
+      continue;
     }
     // A picture that couldn't come along: "" (notes drop it, presentations show no picture).
     const content = remapPageIds(swapAssets(page, (ref) => uploaded.get(ref) ?? (assetIdOf(ref) ? "" : undefined)), ids);
