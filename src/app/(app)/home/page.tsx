@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { loadEvents } from "@/calendar/load";
 import { themeSpecOf } from "@/components/deck/deck";
-import { readPreview } from "@/ink/preview";
+import { readPreview } from "@/ink/model";
 import { HomeView } from "@/components/home/HomeView";
 import { homeText } from "@/i18n/messages/home";
 import { getMessages } from "@/i18n/server";

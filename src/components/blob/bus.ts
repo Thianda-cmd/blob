@@ -13,7 +13,8 @@ type Extras = { mood?: BlobMood; ms?: number; accessory?: BlobAccessory };
 export type BlobEvent =
   | ({ type: "say"; text: string } & Extras)
   | ({ type: "react"; reaction: BlobReaction } & Extras)
-  | { type: "mood"; mood: BlobMood | null };
+  | { type: "mood"; mood: BlobMood | null }
+  | { type: "away"; away: boolean };
 
 type Listener = (event: BlobEvent) => void;
 const listeners = new Set<Listener>();
@@ -32,6 +33,10 @@ export const blob = {
   /** Hold a mood until cleared with `blob.mood(null)`. */
   mood(mood: BlobMood | null) {
     emit({ type: "mood", mood });
+  },
+  /** Out of the way (a page written on with a pen, where a corner is page too): shows only to talk. */
+  away(away: boolean) {
+    emit({ type: "away", away });
   },
   subscribe(fn: Listener) {
     listeners.add(fn);

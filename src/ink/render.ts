@@ -79,15 +79,17 @@ export function hsl(h: number, s: number, l: number): string {
 
 // Templates -----------------------------------------------------------------------------------
 
-/** A template's lines (x0, y0, x1, y1 …) in two strengths, and dots (x, y …). */
-export type TemplateLines = { fine: number[]; strong: number[]; dots: number[]; dot: number };
+/** A template's lines (x0, y0, x1, y1 …) in two strengths, and dots (x, y …); `pitch`: how far apart the fine ones are. */
+export type TemplateLines = { fine: number[]; strong: number[]; dots: number[]; dot: number; pitch: number };
+
+const PITCH: Record<Template, number> = { blank: 0, lined: 8 * MM, narrow: 6 * MM, grid: 5 * MM, dots: 5 * MM, mm: MM, cornell: 8 * MM, music: 2.1 * MM };
 
 const cache = new Map<Template, TemplateLines>();
 
 export function templateLines(tpl: Template): TemplateLines {
   let t = cache.get(tpl);
   if (t) return t;
-  t = { fine: [], strong: [], dots: [], dot: 0 };
+  t = { fine: [], strong: [], dots: [], dot: 0, pitch: PITCH[tpl] };
   const hline = (to: number[], y: number, x0 = 0, x1 = SHEET_W) => to.push(x0, y, x1, y);
   const vline = (to: number[], x: number, y0 = 0, y1 = SHEET_H) => to.push(x, y0, x, y1);
   switch (tpl) {
@@ -172,9 +174,17 @@ export function drawPaper(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderi
     ctx.lineWidth = width;
     ctx.stroke();
   };
-  lines(t.fine, look.line, Math.max(0.62, px));
+  // Fine lines fade as they crowd together (zoomed far out, small pictures) instead of turning the
+  // page grey: gone at 2 device pixels apart, full from 6.
+  const fade = t.pitch ? Math.min(1, Math.max(0, (t.pitch / px - 2) / 4)) : 1;
+  if (fade > 0) {
+    ctx.globalAlpha = fade;
+    lines(t.fine, look.line, Math.max(0.62, px));
+    ctx.globalAlpha = 1;
+  }
   lines(t.strong, look.strong, Math.max(0.9, px * 1.2));
-  if (t.dots.length) {
+  if (t.dots.length && fade > 0) {
+    ctx.globalAlpha = fade;
     ctx.fillStyle = look.strong;
     const r = Math.max(t.dot, px * 0.8);
     ctx.beginPath();
@@ -186,6 +196,7 @@ export function drawPaper(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderi
       ctx.arc(x, y, r, 0, Math.PI * 2);
     }
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }
 

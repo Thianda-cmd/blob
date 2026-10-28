@@ -313,8 +313,25 @@ export class InkEngine {
     };
   }
 
-  /** Space above the first sheet for the title (CSS pixels). */
-  head = 0;
+  /** Space above the first sheet (the title, a toolbar on top) and under the last (a toolbar at the bottom), CSS pixels. */
+  private head = 0;
+  private tail = 0;
+  /** The screen's edges under floating bars (nothing being typed should hide there). */
+  private cover = { top: 0, bottom: 0 };
+
+  /** Bars floating over the top and bottom of the surface, and room for a title above the first sheet. */
+  setInsets(top: number, bottom: number, title: number) {
+    this.cover = { top, bottom };
+    const head = title + top;
+    if (head === this.head && bottom === this.tail) return;
+    const atTop = this.view.ty >= this.clamp(this.view).ty - 1 && this.view.ty >= this.head - 1;
+    this.head = head;
+    this.tail = bottom;
+    // At the top it stays at the top (the title shows); elsewhere the view stays where it is.
+    this.view = atTop ? this.clamp({ ...this.view, ty: 1e9 }) : this.clamp(this.view);
+    this.request();
+    this.publish();
+  }
 
   private frameInfo(): Frame {
     const { scale, tx, ty } = this.view;
@@ -385,6 +402,8 @@ export class InkEngine {
     const cx = (this.width / 2 - this.view.tx) / this.view.scale;
     const cy = (this.height / 2 - this.view.ty) / this.view.scale;
     const zoom = this.view.scale / this.fit;
+    const oldWidth = this.width;
+    const oldDpr = this.dpr;
     this.width = w;
     this.height = h;
     this.dpr = dpr;
@@ -398,12 +417,18 @@ export class InkEngine {
     // About 2.5 screens of tiles.
     this.tiles.max = Math.max(24, Math.min(80, Math.ceil(((w * dpr) / TILE + 1) * ((h * dpr) / TILE + 1) * 2.5)));
     if (firstTime || !this.placed) {
-      this.view = this.clamp({ scale: this.fit, tx: 0, ty: 0 });
+      this.view = this.clamp({ scale: this.fit, tx: 0, ty: 1e9 });
+    } else if (w === oldWidth) {
+      // Only the height changed (a keyboard came or went): the top stays where it is.
+      this.view = this.clamp(this.view);
+      if (this.text) this.revealText();
     } else {
       const scale = this.fit * zoom;
       this.view = this.clamp({ scale, tx: w / 2 - cx * scale, ty: h / 2 - cy * scale });
     }
-    this.tiles.invalidateAll();
+    // Tiles are drawn for the sheets at zoom levels, not for the screen: only a new pixel density
+    // needs them again.
+    if (dpr !== oldDpr) this.tiles.invalidateAll();
     this.request();
     this.publish();
   }
@@ -413,21 +438,24 @@ export class InkEngine {
     this.placed = true;
     const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pos?.zoom ?? 1)) * this.fit;
     const page = Math.min(Math.max(0, pos?.page ?? 0), Math.max(0, this.doc.sheets.length - 1));
-    const ty = pos ? -(sheetTop(page) + pos.offset) * scale : 0;
-    this.view = this.clamp({ scale, tx: 0, ty: pos ? ty : 0 });
+    // Above the first sheet's top means at the top, with the title (whatever room it has now).
+    const top = !pos || (page === 0 && pos.offset < 0);
+    const ty = top ? 1e9 : -(sheetTop(page) + pos.offset) * scale;
+    this.view = this.clamp({ scale, tx: 0, ty });
     this.request();
     this.publish();
   }
 
   /** Where the view is (to come back to it): the sheet at the top, how far into it, the zoom. */
   position() {
+    if (!this.placed) return null;
     const top = -this.view.ty / this.view.scale;
     const page = sheetAt(top, this.doc.sheets.length);
     return { page: Math.max(0, page), offset: top - sheetTop(Math.max(0, page)), zoom: this.view.scale / this.fit };
   }
 
   private clamp(v: View, give = 0): View {
-    return clampView(v, { width: this.width, height: this.height }, this.doc.sheets.length, give, this.head);
+    return clampView(v, { width: this.width, height: this.height }, this.doc.sheets.length, give, this.head, this.tail);
   }
 
   private currentPage() {
@@ -610,7 +638,8 @@ export class InkEngine {
   /** Scrolls so the sheet's top shows. */
   goToSheet(index: number, smooth = true) {
     const scale = this.view.scale;
-    const target = this.clamp({ scale, tx: this.view.tx, ty: -(sheetTop(index) * scale) + 24 + (index === 0 ? this.head : 0) });
+    // The first sheet with the title above it; the others just under the toolbar.
+    const target = this.clamp({ scale, tx: this.view.tx, ty: index === 0 ? 1e9 : -(sheetTop(index) * scale) + 16 + this.cover.top });
     if (!smooth) {
       this.view = target;
       this.request();
@@ -851,23 +880,49 @@ export class InkEngine {
       this.text = { item: hit, isNew: false };
     } else {
       const fs = this.settings.text.size;
-      const w = Math.min(560, SHEET_W - x - 20);
+      // As wide as fits on the sheet, and on the screen (zoomed in, it scrolls into sight below).
+      const w = Math.min(560, SHEET_W - x - 20, (this.width - 24) / this.view.scale);
       if (w < 60) return;
       const item: TextBox = { kind: "text", id: newId(), sheet: sheet.id, seq: nextSeq(), text: "", x, y: y - fs * 0.6, w, fs, color: this.settings.text.color, box: { x0: x, y0: y, x1: x + w, y1: y + fs * 1.35 } };
       this.text = { item, isNew: true };
     }
+    this.caret = 1;
     this.tiles.hidden = new Set([this.text.item.id]);
     this.tiles.invalidate(sheet.id, this.text.item.box);
+    this.revealText();
     this.request();
     this.publish();
   }
 
+  /** How far into the text being typed the caret is (0–1, by characters: about where its line is). */
+  private caret = 1;
+
   /** The text being typed (shown by the editor's text field until it is done). */
-  updateText(text: string, heightPx?: number) {
+  updateText(text: string, heightPx?: number, caret = 1) {
     const t = this.text;
     if (!t) return;
     const h = heightPx ? heightPx / this.view.scale : textBoxHeight(text, t.item.w, t.item.fs);
     t.item = { ...t.item, text, box: { x0: t.item.x, y0: t.item.y, x1: t.item.x + t.item.w, y1: t.item.y + h } };
+    this.caret = caret;
+    this.revealText();
+    this.publish();
+  }
+
+  /** Scrolls the caret's line into sight (the box grows a line at a time; a keyboard may cover the bottom). */
+  private revealText() {
+    const st = this.textState();
+    if (!st || this.action) return;
+    const r = st.rect;
+    const line = st.fontPx * 1.35;
+    const top = this.cover.top + 12;
+    const bottom = this.height - this.cover.bottom - 12;
+    const y = r.y + Math.max(line, r.h * this.caret);
+    const dy = y > bottom ? y - bottom : y - line < top ? y - line - top : 0;
+    // The box's right edge too, when it fits; never its left edge out of sight.
+    const dx = Math.max(0, Math.min(r.x + r.w - (this.width - 12), r.x - 12));
+    if (Math.abs(dy) <= 0.5 && dx <= 0.5) return;
+    this.view = this.clamp({ ...this.view, tx: this.view.tx - dx, ty: this.view.ty - dy });
+    this.request();
     this.publish();
   }
 

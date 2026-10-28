@@ -312,6 +312,10 @@ fn site_window<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str, url: WebviewU
     // Keeps track of whether the site is up; a link that came while the start page was already
     // leaving goes there once it is.
     .on_page_load(move |webview, payload| {
+      // A note left open by a reload or a link out of the app doesn't keep the swipe away.
+      if matches!(payload.event(), PageLoadEvent::Started) {
+        allow_swipe(&webview, true);
+      }
       if webview.label() != "main" {
         return;
       }
@@ -447,6 +451,26 @@ fn swipe_navigation<R: Runtime>(window: &WebviewWindow<R>) {
   });
   #[cfg(any(windows, target_os = "android"))]
   let _ = window;
+}
+
+/// A handwritten note is open (`on`), or closed again: a pen or finger starting at the edge of the
+/// screen writes instead of swiping back a page (iPad and iPhone; on a Mac two fingers pan the note).
+/// Every page load gives the swipe back (see `site_window`). Android keeps its edges itself
+/// (gen/android MainActivity.kt, window.BlobInk).
+#[tauri::command]
+fn set_pen_mode<R: Runtime>(window: WebviewWindow<R>, on: bool) {
+  allow_swipe(&window, !on);
+}
+
+fn allow_swipe<R: Runtime>(window: &WebviewWindow<R>, allow: bool) {
+  #[cfg(any(target_os = "macos", target_os = "ios"))]
+  let _ = window.with_webview(move |webview| unsafe {
+    if let Some(web) = (webview.inner() as *mut objc2::runtime::AnyObject).as_ref() {
+      let _: () = objc2::msg_send![web, setAllowsBackForwardNavigationGestures: allow];
+    }
+  });
+  #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+  let _ = (window, allow);
 }
 
 #[derive(Serialize)]
@@ -632,10 +656,11 @@ pub fn run() {
     update::update_check,
     update::update_download,
     update::update_progress,
-    update::update_apply
+    update::update_apply,
+    set_pen_mode
   ]);
   #[cfg(mobile)]
-  let builder = builder.invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget, take_opened_files]);
+  let builder = builder.invoke_handler(tauri::generate_handler![open_external, print_page, app_info, start_target, set_offline_ready, offline_ready, set_widget, take_opened_files, set_pen_mode]);
 
   builder
     .setup(|app| {

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "site",
-  "description": "What blob.bojes.org may ask the app for: open a link outside, print, say which app it is, note that it can start offline, show and schedule its notifications, fill the home screen widgets, take the Blob files opened with the app, and on computers start with the computer and update itself. Nothing else (no other files, no shell).",
+  "description": "What blob.bojes.org may ask the app for: open a link outside, print, say which app it is, note that it can start offline, show and schedule its notifications, fill the home screen widgets, take the Blob files opened with the app, keep the swipe back out of a handwritten note, and on computers start with the computer and update itself. Nothing else (no other files, no shell).",
   "windows": [
     "main",
     "popup-*"
@@ -24,6 +24,7 @@
     "allow-update-download",
     "allow-update-progress",
     "allow-update-apply",
+    "allow-set-pen-mode",
     "notification:default"
   ]
 }

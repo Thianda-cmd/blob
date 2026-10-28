@@ -35,12 +35,13 @@ export const MAX_ZOOM = 6;
 
 /**
  * The view moved inside the column's limits: the sheets centred when narrower than the screen,
- * never scrolled past the first sheet's top (and `head` pixels of title above it) or the foot.
+ * never scrolled past the first sheet's top (and `head` pixels above it: the title, the toolbar) or
+ * the foot (and `tail` pixels under it: a toolbar at the bottom).
  * `give` lets it stretch past them a little (while a finger drags), like a rubber band.
  */
-export function clampView(v: View, b: Bounds, sheets: number, give = 0, head = 0): View {
+export function clampView(v: View, b: Bounds, sheets: number, give = 0, head = 0, tail = 0): View {
   const w = SHEET_W * v.scale;
-  const h = (columnHeight(sheets) + FOOT) * v.scale;
+  const h = (columnHeight(sheets) + FOOT) * v.scale + tail;
   const pad = Math.min(28, b.width * 0.04);
   let { tx, ty } = v;
   if (w + 2 * pad <= b.width) tx = (b.width - w) / 2;

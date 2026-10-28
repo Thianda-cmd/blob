@@ -8,7 +8,7 @@ import { themeSpecOf } from "@/components/deck/deck";
 import { InkEditor } from "@/components/ink/InkEditor";
 import { FolderView } from "@/components/notes/FolderView";
 import type { PagePreview } from "@/components/subjects/PageCards";
-import { readPreview } from "@/ink/preview";
+import { readPreview } from "@/ink/model";
 import { snippet } from "@/notes/snippet";
 import { TrashedNotice } from "@/components/page/TrashedNotice";
 import { pageText } from "@/i18n/messages/page";

@@ -34,12 +34,19 @@ export function BlobHelper() {
   const [flashAccessory, setFlashAccessory] = useState<BlobAccessory | null>(null);
   // On phones Blob slides out of the way while you scroll down, and comes back when you scroll up.
   const [tucked, setTucked] = useState(false);
+  // Out of the way altogether while a page wants the whole screen (handwritten notes).
+  const [away, setAway] = useState(false);
   const accessoryTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const speechTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     return blob.subscribe((e: BlobEvent) => {
+      if (e.type === "away") {
+        setAway(e.away);
+        if (e.away) setOpen(false);
+        return;
+      }
       setSleepy(false);
       if (e.type === "mood") {
         setHeldMood(e.mood);
@@ -215,6 +222,8 @@ export function BlobHelper() {
       className={cn(
         "pointer-events-none fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-2 z-40 flex flex-col items-end transition-transform duration-300 ease-out sm:bottom-[calc(12px+env(safe-area-inset-bottom))] sm:right-4",
         tucked && !open && !speech && "max-sm:translate-y-[calc(100%+12px)]",
+        // Below the screen's edge (on phones, below the tab bar too).
+        away && !open && !speech && "translate-y-[calc(100%+160px)]",
       )}
     >
       <AnimatePresence>

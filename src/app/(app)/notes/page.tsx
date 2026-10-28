@@ -5,7 +5,7 @@ import type { PagePreview } from "@/components/subjects/PageCards";
 import { notesText } from "@/i18n/messages/notes";
 import { getMessages } from "@/i18n/server";
 import { loadDue } from "@/notes/server";
-import { readPreview } from "@/ink/preview";
+import { readPreview } from "@/ink/model";
 import { snippet } from "@/notes/snippet";
 import { createClient } from "@/lib/supabase/server";
 import type { Attachment, PageKind, Project } from "@/lib/types";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { themeSpecOf } from "@/components/deck/deck";
-import { readPreview } from "@/ink/preview";
+import { readPreview } from "@/ink/model";
 import { loadProjectSummaries } from "@/components/projects/load";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { SubjectView } from "@/components/subjects/SubjectView";

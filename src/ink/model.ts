@@ -110,15 +110,29 @@ export type WireItem = {
 /** What pages.content holds for a handwritten note: a small preview for lists (src/ink/preview.ts). */
 export type InkContent = { v: 1; preview?: InkPreview | null };
 
-/** The first sheet, small: its paper and its strokes as SVG paths (a quarter of sheet units: 250 × 353.5). */
+/** The first sheet, small: its paper and what is on it, in preview units (PREVIEW_K of sheet units: 250 × 353.5). */
 export type InkPreview = {
   tpl: Template;
   paper: Paper;
   /** How many sheets the note has. */
   sheets: number;
-  /** [colour, width (preview units), SVG path data, opacity][] in drawing order (highlighters first). */
+  /** Strokes: [colour, width, SVG path data, opacity][] in drawing order (highlighters first). */
   lines: [string, number, string, number][];
+  /** Text boxes: [colour, font size, x, y, the lines as wrapped, joined by "\n"][]. */
+  texts?: [string, number, number, number, string][];
+  /** Pictures, as where they are: [x, y, w, h, turn (radians)][]. */
+  pics?: [number, number, number, number, number][];
 };
+
+/** Preview units: a quarter of a sheet unit, whole numbers. */
+export const PREVIEW_K = 0.25;
+
+/** Whether a stored preview is one this app can show. */
+export function readPreview(content: unknown): InkPreview | null {
+  const p = (content as { preview?: unknown } | null)?.preview as InkPreview | undefined;
+  if (!p || typeof p !== "object" || !Array.isArray(p.lines)) return null;
+  return { ...p, texts: Array.isArray(p.texts) ? p.texts : undefined, pics: Array.isArray(p.pics) ? p.pics : undefined };
+}
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HEX = /^#[0-9a-f]{6}$/i;

@@ -17,6 +17,8 @@ declare global {
     BlobWidget?: { postMessage(data: string): void };
     /** Android app only, on the site's own pages: "take" answers with the Blob files opened with the app. */
     BlobFiles?: { postMessage(data: string): void; onmessage: ((event: MessageEvent<string>) => void) | null };
+    /** Android app only, on the site's own pages: edge areas kept from the back swipe ([[x, y, w, h]], device px). */
+    BlobInk?: { postMessage(data: string): void };
   }
 }
 
@@ -41,7 +43,8 @@ type Command =
   | "update_check"
   | "update_download"
   | "update_progress"
-  | "update_apply";
+  | "update_apply"
+  | "set_pen_mode";
 
 async function call<T>(command: Command, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -141,6 +144,41 @@ export async function setOfflineReady(ready: boolean): Promise<void> {
     await call("set_offline_ready", { ready });
   } catch {
     // An older app without the command: it just won't start offline.
+  }
+}
+
+/**
+ * A handwritten note is open (or closed again): a stroke may start at the screen's edge, where the
+ * swipe of iPad, iPhone and the Mac would otherwise go back a page. (Android: see guardEdges.)
+ */
+export async function setPenMode(on: boolean): Promise<void> {
+  const app = blobApp();
+  if (app?.platform !== "ios" && app?.platform !== "macos") return;
+  try {
+    await call("set_pen_mode", { on });
+  } catch {
+    // An older app without the command: the swipe stays.
+  }
+}
+
+/**
+ * Android app: keeps the screen's edges around height `y` (CSS pixels) from Android's back swipe,
+ * so a stroke can start there (Android allows 200dp per edge; the pen hovers before it touches, so
+ * the guard follows it). Null gives the edges back.
+ */
+export function guardEdges(y: number | null) {
+  const bridge = typeof window === "undefined" ? undefined : window.BlobInk;
+  if (!bridge) return;
+  try {
+    if (y === null) return bridge.postMessage("[]");
+    const band = 200;
+    const edge = 48;
+    const dpr = window.devicePixelRatio || 1;
+    const top = Math.max(0, Math.min(window.innerHeight - band, y - band / 2));
+    const right = window.innerWidth - edge;
+    bridge.postMessage(JSON.stringify([[0, top, edge, band], [right, top, edge, band]].map((r) => r.map((v) => Math.round(v * dpr)))));
+  } catch {
+    // The app went away meanwhile.
   }
 }
 

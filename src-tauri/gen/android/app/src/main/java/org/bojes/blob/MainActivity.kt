@@ -4,7 +4,9 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.print.PrintAttributes
@@ -122,6 +124,20 @@ class MainActivity : TauriActivity() {
     if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
       WebViewCompat.addWebMessageListener(webView, "BlobWidget", setOf(SITE)) { _, message, _, isMainFrame, _ ->
         if (isMainFrame) TodayWidget.save(applicationContext, message.data ?: "")
+      }
+      // window.BlobInk.postMessage("[[x, y, w, h], …]"): while a handwritten note is open, the parts
+      // of the screen's edges near the pen (device pixels of the web view) don't start Android's back
+      // swipe, so a stroke can start there. "[]" gives them back. Android keeps at most 200dp per edge.
+      WebViewCompat.addWebMessageListener(webView, "BlobInk", setOf(SITE)) { _, message, _, isMainFrame, _ ->
+        if (isMainFrame && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          val list = try { JSONArray(message.data ?: "[]") } catch (e: Exception) { JSONArray() }
+          webView.systemGestureExclusionRects = (0 until minOf(list.length(), 4)).mapNotNull { i ->
+            val r = list.optJSONArray(i) ?: return@mapNotNull null
+            val x = r.optInt(0)
+            val y = r.optInt(1)
+            Rect(x, y, x + r.optInt(2), y + r.optInt(3))
+          }
+        }
       }
       // window.BlobFiles.postMessage("take"): the Blob files opened with the app, as JSON
       // ([{ name, text }]), for the site's own pages only.

@@ -19,12 +19,12 @@ import { ImageCache } from "@/ink/images";
 import { isPenTool, type InkColor, type InkContent } from "@/ink/model";
 import { PEN_COLORS } from "@/ink/pens";
 import { exportPdf, exportPng } from "@/ink/pdf";
-import { buildPreview } from "@/ink/preview";
+import { buildPreview, wordsOf } from "@/ink/preview";
 import { inkColor, setTextFont } from "@/ink/render";
 import { InkSync, markOpen, type SyncStatus } from "@/ink/sync";
 import { fileUrl, MAX_FILE_BYTES, uploadFile } from "@/lib/files";
 import { useLive } from "@/lib/live";
-import { blobApp } from "@/lib/native";
+import { blobApp, guardEdges, setPenMode } from "@/lib/native";
 import { createClient } from "@/lib/supabase/client";
 import type { AccessRole, Member, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -34,8 +34,8 @@ import { Toolbar } from "./Toolbar";
 import { useInkSettings } from "./useInkSettings";
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-/** Room above the first sheet for the title (CSS pixels). */
-const HEAD = 62;
+/** Room above the first sheet for the title (CSS pixels); the toolbar's room comes on top of it. */
+const TITLE = 58;
 
 const IDLE: EngineState = { page: 0, pages: 0, zoomed: false, canUndo: false, canRedo: false, selection: null, moving: false, fingersDraw: true, penSeen: false, text: null, snapped: 0 };
 const noop = () => () => {};
@@ -83,8 +83,9 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
     let eng: InkEngine | null = null;
     const images = new ImageCache((path) => fileUrl(path), (path) => eng?.imageLoaded(path));
     eng = new InkEngine(root, { doc, sync, readOnly: role === "viewer", dark: document.documentElement.dataset.theme === "dark", images });
-    eng.head = HEAD;
     setParts({ engine: eng, sync, images, doc });
+    // Development: the engine on window, to look into from the console (and browser tests).
+    if (process.env.NODE_ENV === "development") (window as unknown as { __ink: unknown }).__ink = eng;
     const unmark = markOpen(page.id);
     const offStatus = sync.subscribe(() => setStatus(sync.status));
     let alive = true;
@@ -97,7 +98,8 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
     });
     const keepPosition = () => {
       try {
-        if (eng) sessionStorage.setItem(posKey(page.id), JSON.stringify(eng.position()));
+        const pos = eng?.position();
+        if (pos) sessionStorage.setItem(posKey(page.id), JSON.stringify(pos));
       } catch {
         // Not kept.
       }
@@ -116,7 +118,51 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page.id, userId]);
 
+  // Blob leaves the corner to the page (he comes back to say something).
+  useEffect(() => {
+    blob.away(true);
+    return () => blob.away(false);
+  }, []);
+
+  // In the app, a stroke may start at the screen's edge: the swipe back stays out of the way (iPad
+  // and Mac while the note is open; Android around the pen, which hovers before it touches).
+  useEffect(() => {
+    const root = surfaceRef.current;
+    if (readOnly || !root) return;
+    void setPenMode(true);
+    let last = -1e9;
+    const follow = (e: PointerEvent) => {
+      if (e.pointerType === "mouse" || Math.abs(e.clientY - last) < 32) return;
+      last = e.clientY;
+      guardEdges(e.clientY);
+    };
+    guardEdges(window.innerHeight / 2);
+    root.addEventListener("pointermove", follow, { passive: true });
+    root.addEventListener("pointerdown", follow, { passive: true });
+    return () => {
+      void setPenMode(false);
+      guardEdges(null);
+      root.removeEventListener("pointermove", follow);
+      root.removeEventListener("pointerdown", follow);
+    };
+  }, [readOnly]);
+
   useEffect(() => engine?.setDark(dark), [engine, dark]);
+  // Room for the title above the first page, and for the toolbar (on top, or at the bottom on phones).
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!engine) return;
+    const bar = barRef.current;
+    const place = () => {
+      const h = bar ? bar.offsetHeight + 12 + 6 : 0;
+      engine.setInsets(phone ? 0 : h, phone ? h : 0, TITLE);
+    };
+    place();
+    if (!bar) return;
+    const ro = new ResizeObserver(place);
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, [engine, phone, readOnly]);
   useEffect(() => {
     engine?.setReadOnly(readOnly);
     parts?.sync.setCanEdit(!readOnly);
@@ -168,16 +214,19 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
     const save = () => {
       if (!parts.sync.loaded) return;
       const preview = buildPreview(parts.doc);
-      const words = parts.doc
-        .all()
-        .flatMap((i) => (i.kind === "text" ? [i.text] : []))
-        .join("\n")
-        .slice(0, 20000);
+      const words = wordsOf(parts.doc);
       const key = JSON.stringify([preview, words]);
       if (key === savedPreview.current) return;
       savedPreview.current = key;
       const content: InkContent = { v: 1, preview };
-      void createClient().from("pages").update({ content, plain_text: words }).eq("id", page.id);
+      void createClient()
+        .from("pages")
+        .update({ content, plain_text: words })
+        .eq("id", page.id)
+        .then(({ error }) => {
+          // Not saved (offline, say): tried again with the next change, or on the way out.
+          if (error && savedPreview.current === key) savedPreview.current = null;
+        });
     };
     const off = parts.doc.subscribe(() => {
       clearTimeout(timer);
@@ -222,7 +271,7 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
       frameRef.current = f;
       const title = titleBox.current;
       if (title) {
-        title.style.transform = `translate(${f.head.x}px, ${f.head.y - HEAD + 6}px)`;
+        title.style.transform = `translate(${f.head.x}px, ${f.head.y - TITLE}px)`;
         title.style.width = `${f.head.w}px`;
       }
       const foot = footBox.current;
@@ -235,12 +284,18 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
       }
       const sel = selBox.current;
       if (sel && f.selection) {
+        // Over the selection (clear of its turning knob), else under it, never under the toolbar.
         const r = f.selection;
         const w = sel.offsetWidth;
-        const parent = sel.parentElement?.clientWidth ?? 0;
-        const x = Math.max(8, Math.min(parent - w - 8, r.x + r.w / 2 - w / 2));
-        const above = r.y - sel.offsetHeight - 40;
-        const y = above > 60 ? above : r.y + r.h + 16;
+        const h = sel.offsetHeight;
+        const area = sel.parentElement;
+        const bar = barRef.current;
+        const top = (bar && !phone ? bar.offsetTop + bar.offsetHeight : 0) + 8;
+        const bottom = (area?.clientHeight ?? 0) - (bar && phone ? bar.offsetHeight + 18 : 0) - 8;
+        const x = Math.max(8, Math.min((area?.clientWidth ?? 0) - w - 8, r.x + r.w / 2 - w / 2));
+        const above = r.y - h - 46;
+        const below = r.y + r.h + 16;
+        const y = above >= top ? above : below + h <= bottom ? below : Math.max(top, Math.min(bottom - h, above));
         sel.style.transform = `translate(${x}px, ${y}px)`;
       }
       const text = textBox.current;
@@ -252,7 +307,7 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
       }
       if (zoomLabel.current) zoomLabel.current.textContent = t.zoom(Math.round(f.zoom * 100));
     });
-  }, [engine, t, state.selection, state.text]);
+  }, [engine, t, phone, state.selection, state.text]);
 
   // The text box being typed: focused when it opens.
   useEffect(() => {
@@ -460,7 +515,8 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
           <span className="min-w-0">{notice}</span>
         </p>
       )}
-      <div className="relative min-h-0 flex-1 overflow-hidden border-t border-line" data-ink-surface>
+      {/* Clipped, not scrollable: a field typed off the edge must not scroll the surface away. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden border-t border-line supports-[overflow:clip]:overflow-clip" data-ink-surface>
         <div
           ref={surfaceRef}
           role="application"
@@ -471,7 +527,7 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
         />
 
         {/* The title, above the first sheet (it scrolls with the pages). */}
-        <div ref={titleBox} className="pointer-events-none absolute left-0 top-0 flex h-[50px] items-end will-change-transform">
+        <div ref={titleBox} className="pointer-events-none absolute left-0 top-0 flex h-[50px] items-end px-1 will-change-transform">
           <input
             value={title}
             readOnly={readOnly}
@@ -510,7 +566,7 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
               const el = e.currentTarget;
               el.style.height = "auto";
               el.style.height = `${el.scrollHeight}px`;
-              engine?.updateText(el.value, el.scrollHeight);
+              engine?.updateText(el.value, el.scrollHeight, el.value.length ? el.selectionEnd / el.value.length : 1);
             }}
             onBlur={() => engine?.finishText()}
             onKeyDown={(e) => {
@@ -521,64 +577,65 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
           />
         )}
 
-        {/* What to do with the selection. */}
-        <AnimatePresence>
-          {state.selection && !state.moving && !readOnly && (
-            <motion.div
-              ref={selBox}
-              key="sel"
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.1 } }}
-              transition={{ type: "spring", stiffness: 600, damping: 34 }}
-              className="absolute left-0 top-0 z-20 flex items-center gap-0.5 rounded-xl border border-line bg-raised p-1 shadow-pop"
-              onPointerDown={(e) => e.stopPropagation()}
-              role="toolbar"
-              aria-label={t.selected(state.selection.count)}
-            >
-              <SelButton label={t.copy} onClick={() => engine?.copySelection()} touch={touch}>
-                <Copy />
-              </SelButton>
-              <SelButton label={t.cut} onClick={() => engine?.cutSelection()} touch={touch}>
-                <Scissors />
-              </SelButton>
-              <SelButton label={t.duplicate} onClick={() => engine?.duplicateSelection()} touch={touch}>
-                <CopyPlus />
-              </SelButton>
-              {state.selection.strokes > 0 && (
-                <Popover
-                  side="top"
-                  align="start"
-                  role="dialog"
-                  label={t.colour}
-                  className="w-[268px] p-2"
-                  trigger={({ ref, onClick }) => (
-                    <SelButton buttonRef={ref} label={t.colour} onClick={() => onClick({ stopPropagation() {}, preventDefault() {} } as React.MouseEvent)} touch={touch}>
-                      <Palette />
-                    </SelButton>
-                  )}
-                >
-                  {(close) => (
-                    <div className="grid grid-cols-6 gap-1">
-                      {PEN_COLORS.map((c) => (
-                        <button key={c} type="button" aria-label={c} onClick={() => (engine?.recolorSelection(c), close())} className="grid size-10 place-items-center rounded-full">
-                          <span className="block size-6 rounded-full border border-black/10 dark:border-white/15" style={{ background: inkColor(c, dark) }} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </Popover>
-              )}
-              <SelButton label={t.delete} onClick={() => engine?.deleteSelection()} touch={touch} danger>
-                <Trash2 />
-              </SelButton>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* What to do with the selection (placed by the frame above; the bar inside animates). */}
+        <div ref={selBox} className="pointer-events-none absolute left-0 top-0 z-20 will-change-transform">
+          <AnimatePresence>
+            {state.selection && !state.moving && !readOnly && (
+              <motion.div
+                key="sel"
+                initial={{ opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.1 } }}
+                transition={{ type: "spring", stiffness: 600, damping: 34 }}
+                className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-line bg-raised p-1 shadow-pop"
+                onPointerDown={(e) => e.stopPropagation()}
+                role="toolbar"
+                aria-label={t.selected(state.selection.count)}
+              >
+                <SelButton label={t.copy} onClick={() => engine?.copySelection()} touch={touch}>
+                  <Copy />
+                </SelButton>
+                <SelButton label={t.cut} onClick={() => engine?.cutSelection()} touch={touch}>
+                  <Scissors />
+                </SelButton>
+                <SelButton label={t.duplicate} onClick={() => engine?.duplicateSelection()} touch={touch}>
+                  <CopyPlus />
+                </SelButton>
+                {state.selection.strokes > 0 && (
+                  <Popover
+                    side="top"
+                    align="start"
+                    role="dialog"
+                    label={t.colour}
+                    className="w-[268px] p-2"
+                    trigger={({ ref, onClick }) => (
+                      <SelButton buttonRef={ref} label={t.colour} onClick={() => onClick({ stopPropagation() {}, preventDefault() {} } as React.MouseEvent)} touch={touch}>
+                        <Palette />
+                      </SelButton>
+                    )}
+                  >
+                    {(close) => (
+                      <div className="grid grid-cols-6 gap-1">
+                        {PEN_COLORS.map((c) => (
+                          <button key={c} type="button" aria-label={c} onClick={() => (engine?.recolorSelection(c), close())} className="grid size-10 place-items-center rounded-full">
+                            <span className="block size-6 rounded-full border border-black/10 dark:border-white/15" style={{ background: inkColor(c, dark) }} />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </Popover>
+                )}
+                <SelButton label={t.delete} onClick={() => engine?.deleteSelection()} touch={touch} danger>
+                  <Trash2 />
+                </SelButton>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* The tools: a floating bar on top (at the bottom on phones, near the thumb). */}
         {!readOnly && (
-          <div className={cn("pointer-events-none absolute inset-x-0 z-30 flex justify-center px-2", phone ? "bottom-[max(10px,env(safe-area-inset-bottom))]" : "top-3")}>
+          <div ref={barRef} className={cn("pointer-events-none absolute inset-x-0 z-30 flex justify-center px-2", phone ? "bottom-[max(10px,env(safe-area-inset-bottom))]" : "top-3")}>
             <Toolbar
               settings={settings}
               update={update}
@@ -612,6 +669,7 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
                 exit={{ opacity: 0, y: 4 }}
                 onClick={() => engine?.resetZoom()}
                 title={t.fitWidth}
+                aria-label={t.fitWidth}
                 className="pointer-events-auto flex h-8 items-center rounded-full border border-line bg-raised/90 px-3 text-[12.5px] font-medium tabular-nums text-ink-2 shadow-card backdrop-blur-md hover:text-ink"
               >
                 <span ref={zoomLabel} />

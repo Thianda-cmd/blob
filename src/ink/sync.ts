@@ -14,8 +14,9 @@ import { tabId } from "@/lib/live";
 import { deletePrefix, getAll, getMeta, getPrefix, setMeta, write } from "@/lib/offline/idb";
 import { isNetworkError, isOnline, onConnectivity, reportNetworkError, reportOk } from "@/lib/offline/net";
 import { createClient } from "@/lib/supabase/client";
-import type { InkDoc } from "./doc";
-import { decodeItem, type Item, type WireItem } from "./model";
+import { InkDoc } from "./doc";
+import { decodeItem, type InkContent, type Item, type WireItem } from "./model";
+import { buildPreview, wordsOf } from "./preview";
 
 export type SyncStatus = "loading" | "saved" | "saving" | "waiting" | "error" | "denied";
 
@@ -69,7 +70,6 @@ export class InkSync {
   private batchMax = PUSH_ITEMS;
   private pulling: Promise<boolean> | null = null;
   private channel: RealtimeChannel | null = null;
-  private subscribedOnce = false;
   private stops: (() => void)[] = [];
   private stopped = false;
   private hiddenAt = 0;
@@ -163,6 +163,11 @@ export class InkSync {
       };
       document.addEventListener("visibilitychange", vis);
       this.stops.push(() => document.removeEventListener("visibilitychange", vis));
+      // Now and then, in case Realtime dropped something (it doesn't promise every message).
+      const every = setInterval(() => {
+        if (document.visibilityState === "visible" && isOnline() && this.loaded) void this.pull();
+      }, 60_000);
+      this.stops.push(() => clearInterval(every));
     }
     const ok = await this.pull();
     if (this.stopped) return;
@@ -313,9 +318,9 @@ export class InkSync {
           })
           .subscribe((status: string) => {
             if (status !== "SUBSCRIBED") return;
-            // Joined again after losing the connection: catch up on what was missed meanwhile.
-            if (this.subscribedOnce) void this.pull();
-            this.subscribedOnce = true;
+            // Joined (again): catch up on what was written before the subscription was in place, or
+            // while the connection was lost.
+            void this.pull();
           });
       });
   }
@@ -471,6 +476,7 @@ export async function flushInkPending(userId: string): Promise<void> {
   }
   const db = createClient();
   for (const [page, list] of byPage) {
+    let sent = true;
     for (let i = 0; i < list.length; ) {
       const batch: Pending[] = [];
       let bytes = 0;
@@ -484,18 +490,38 @@ export async function flushInkPending(userId: string): Promise<void> {
           reportNetworkError();
           return;
         }
+        sent = false;
         break;
       }
       const res = data as { ok: boolean; reason?: string } | null;
       if (res?.reason === "denied") {
         // The note is gone (or no longer ours to edit): nothing of it can be saved any more.
         await deletePrefix(userId, "inkPending", `${page}:`);
+        sent = false;
         break;
       }
-      if (!res?.ok) break;
+      if (!res?.ok) {
+        sent = false;
+        break;
+      }
       await write(userId, "inkPending", [], batch.map((p) => p.key));
     }
+    if (sent) await afterFlush(userId, page, list);
   }
+}
+
+/**
+ * A note changed on this device while it was closed has reached the server: the device's copy (the
+ * app keeps one) takes the changes, and the note's preview in lists is drawn again from it.
+ */
+async function afterFlush(userId: string, page: string, sent: Pending[]) {
+  if (!(await getMeta(userId, metaKey(page)))) return;
+  await write(userId, "inkItems", sent.map((p) => ({ key: p.key, page, item: p.item })));
+  const items = new Map((await getPrefix<Stored>(userId, "inkItems", `${page}:`)).map((s) => [s.item.id, s.item]));
+  const doc = new InkDoc();
+  doc.reset([...items.values()].map(decodeItem).filter((i): i is Item => !!i));
+  const content: InkContent = { v: 1, preview: buildPreview(doc) };
+  await createClient().from("pages").update({ content, plain_text: wordsOf(doc) }).eq("id", page);
 }
 
 /** Whether notes have changes on this device that the server doesn't have yet. */

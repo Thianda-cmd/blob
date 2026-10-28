@@ -76,7 +76,7 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
       blob.subscribe((e) => {
         if (e.type === "say") say(e.text, 4200);
         if (e.type === "react" && e.reaction !== "poke" && e.reaction !== "squish" && e.reaction !== "shake") trick(e.reaction);
-        if (e.type !== "mood" && e.mood) face(e.mood, e.ms ?? 2600);
+        if ((e.type === "say" || e.type === "react") && e.mood) face(e.mood, e.ms ?? 2600);
       }),
     [],
   );

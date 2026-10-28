@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { useDark } from "@/components/editor/blocks/useDark";
-import type { InkPreview, Template } from "@/ink/model";
-import { PREVIEW_K } from "@/ink/preview";
+import { PREVIEW_K, type InkPreview, type Template } from "@/ink/model";
 import { inkColor, lookOf, templateLines } from "@/ink/render";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +24,8 @@ function templatePath(tpl: Template) {
   };
   let dots = "";
   for (let i = 0; i < t.dots.length; i += 2) dots += `M${f(t.dots[i])} ${f(t.dots[i + 1])}h0`;
-  p = { fine: lines(t.fine), strong: lines(t.strong), dots };
+  // Millimetres are too close together for a card: the centimetre lines say "graph paper".
+  p = { fine: tpl === "mm" ? "" : lines(t.fine), strong: lines(t.strong), dots };
   templatePaths.set(tpl, p);
   return p;
 }
@@ -45,8 +45,21 @@ export function InkThumb({ preview, crop = 0.62, className }: { preview: InkPrev
       {tpl.fine && <path d={tpl.fine} stroke={look.line} strokeWidth={0.6} fill="none" />}
       {tpl.strong && <path d={tpl.strong} stroke={look.strong} strokeWidth={0.8} fill="none" />}
       {tpl.dots && <path d={tpl.dots} stroke={look.strong} strokeWidth={1.1} strokeLinecap="round" fill="none" />}
+      {/* Pictures show as where they are (the files themselves stay out of lists). */}
+      {preview?.pics?.map(([x, y, w, ph, rot], i) => (
+        <rect key={i} x={x} y={y} width={w} height={ph} rx={2} fill={look.dark ? "rgba(255,255,255,0.09)" : "rgba(28,27,24,0.07)"} transform={rot ? `rotate(${(rot * 180) / Math.PI} ${x + w / 2} ${y + ph / 2})` : undefined} />
+      ))}
       {lines.map(([color, width, d, alpha], i) => (
         <path key={i} d={d} fill="none" stroke={inkColor(color, look.dark)} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" opacity={alpha < 1 ? alpha : undefined} />
+      ))}
+      {preview?.texts?.map(([color, size, x, y, text], i) => (
+        <text key={i} fill={inkColor(color, look.dark)} fontSize={size} style={{ fontFamily: "inherit" }}>
+          {text.split("\n").map((line, k) => (
+            <tspan key={k} x={x} y={y + k * size * 1.35 + size * 0.95}>
+              {line}
+            </tspan>
+          ))}
+        </text>
       ))}
     </svg>
   );
