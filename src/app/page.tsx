@@ -5,6 +5,7 @@ import { BlobMark } from "@/components/blob/BlobMark";
 import { BoardShowcase, TogetherPoints } from "@/components/landing/BoardShowcase";
 import { CalendarPoints, CalendarShowcase } from "@/components/landing/CalendarShowcase";
 import { CvShowcase } from "@/components/landing/CvShowcase";
+import { InkPoints, InkShowcase } from "@/components/landing/InkShowcase";
 import { HeroBlob, KnowledgeDemo, QuickAddDemo, Reveal } from "@/components/landing/Interactive";
 import { LearnDemo } from "@/components/landing/LearnDemo";
 import { LearnStages, TopicGrid } from "@/components/landing/LearnFeatures";
@@ -31,6 +32,7 @@ export default async function LandingPage() {
   const nav = [
     { href: "#learn", label: t.nav.learn },
     { href: "#notes", label: t.nav.notes },
+    { href: "#handwriting", label: t.nav.handwriting },
     { href: "#quiz", label: t.nav.quiz },
     { href: "#together", label: t.nav.together },
     { href: "#homework", label: t.nav.homework },
@@ -75,7 +77,7 @@ export default async function LandingPage() {
           <div className="relative mx-auto grid max-w-[1240px] items-center gap-4 px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-12 lg:grid-cols-[1.05fr_1fr] lg:gap-6 lg:pb-20 lg:pt-16">
             <div>
               <a
-                href="#quiz"
+                href="#handwriting"
                 className="group mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-raised py-1.5 pl-3 pr-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:text-ink"
               >
                 <span className="size-1.5 rounded-full bg-blob" /> {t.hero.badge}
@@ -138,8 +140,21 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* Handwriting: a note written by itself on a tablet's page */}
+        <section id="handwriting" className="scroll-mt-14 border-t border-line bg-surface">
+          <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+            <SectionHead kicker={t.handwriting.kicker} title={t.handwriting.title} body={t.handwriting.body} />
+            <div className="mt-8 grid gap-10 lg:mt-12 lg:grid-cols-12 lg:gap-10">
+              <Reveal className="lg:order-2 lg:col-span-7">
+                <InkShowcase />
+              </Reveal>
+              <InkPoints className="content-center sm:grid-cols-2 lg:order-1 lg:col-span-5 lg:grid-cols-1" />
+            </div>
+          </div>
+        </section>
+
         {/* Live quiz: the big screen and a phone playing one question */}
-        <section id="quiz" className="scroll-mt-14 border-t border-line bg-surface">
+        <section id="quiz" className="scroll-mt-14 border-t border-line">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.quiz.kicker} title={t.quiz.title} body={t.quiz.body} />
             <div className="mt-8 grid gap-10 lg:mt-12 lg:grid-cols-12 lg:gap-10">
@@ -152,7 +167,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Working together: sharing, presence, writing at once, project boards */}
-        <section id="together" className="scroll-mt-14 border-t border-line">
+        <section id="together" className="scroll-mt-14 border-t border-line bg-surface">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.together.kicker} title={t.together.title} body={t.together.body} />
             <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-12 lg:gap-10">
@@ -165,7 +180,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Notes home and homework */}
-        <section className="border-t border-line bg-surface">
+        <section className="border-t border-line">
           <div className="mx-auto grid max-w-[1240px] gap-10 px-4 py-12 sm:px-6 sm:py-16 md:grid-cols-2 lg:gap-8 lg:py-20">
             <Feature id="organize" kicker={t.organize.kicker} title={t.organize.title} body={t.organize.body}>
               <KnowledgeDemo />
@@ -177,7 +192,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Calendar: a school week that plans itself, with a reminder and the "Next up" widget */}
-        <section id="calendar" className="scroll-mt-14 border-t border-line">
+        <section id="calendar" className="scroll-mt-14 border-t border-line bg-surface">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.calendar.kicker} title={t.calendar.title} body={t.calendar.body} />
             <div className="mt-8 grid gap-10 lg:mt-12 lg:grid-cols-12 lg:gap-10">
@@ -190,7 +205,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Presentations */}
-        <section id="presentations" className="scroll-mt-14 border-t border-line bg-surface">
+        <section id="presentations" className="scroll-mt-14 border-t border-line">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.slides.kicker} title={t.slides.title} body={t.slides.body} />
             <Reveal className="mt-8 lg:mt-10">
@@ -200,7 +215,7 @@ export default async function LandingPage() {
         </section>
 
         {/* CV builder */}
-        <section id="cv" className="scroll-mt-14 border-t border-line">
+        <section id="cv" className="scroll-mt-14 border-t border-line bg-surface">
           <div className="mx-auto max-w-[1240px] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
             <SectionHead kicker={t.cv.kicker} title={t.cv.title} body={t.cv.body} />
             <Reveal className="mt-8 lg:mt-10">
@@ -209,7 +224,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="border-t border-line bg-surface">
+        <section className="border-t border-line">
           <Reveal className="mx-auto max-w-[1240px] px-4 py-14 text-center sm:px-6 sm:py-20">
             <h2 className="font-display text-[clamp(30px,4vw,46px)] font-bold tracking-[-0.035em] text-balance">{t.cta.title}</h2>
             <p className="mx-auto mt-3 max-w-[480px] text-[15px] text-ink-2 text-balance">{t.cta.body}</p>

@@ -7,7 +7,7 @@ export const landingText = defineMessages({
     meta: {
       title: "Blob — notes, live quizzes, group projects, presentations, homework, lessons and your CV for school",
       description:
-        "One calm place for school: notes that turn into flashcards, live quizzes the whole class plays on their phones, group projects on a shared board, presentations, homework, a CV builder and step-by-step lessons in maths, chemistry and biology with Blob, your jelly tutor. Free and without ads.",
+        "One calm place for school: notes that turn into flashcards, handwritten notes for your tablet, live quizzes the whole class plays on their phones, group projects on a shared board, presentations, homework, a CV builder and step-by-step lessons in maths, chemistry and biology with Blob, your jelly tutor. Free and without ads.",
     },
     header: {
       home: "Blob, home",
@@ -16,12 +16,12 @@ export const landingText = defineMessages({
       start: "Get started",
       open: "Open Blob",
     },
-    nav: { learn: "Learn", notes: "Notes", quiz: "Live quiz", together: "Together", homework: "Homework", calendar: "Calendar", presentations: "Presentations", cv: "CV" },
+    nav: { learn: "Learn", notes: "Notes", handwriting: "Handwriting", quiz: "Live quiz", together: "Together", homework: "Homework", calendar: "Calendar", presentations: "Presentations", cv: "CV" },
     hero: {
-      badge: "New: live quizzes for the whole class",
+      badge: "New: handwritten notes for your tablet",
       titleA: "Your school,",
       titleB: "sorted.",
-      body: "Notes that turn into flashcards, live quizzes for the whole class, group projects, presentations, homework, your CV and lessons for maths, chemistry and biology in one calm place. Blob, your jelly helper, saves everything as you go and explains every step.",
+      body: "Notes that turn into flashcards, handwriting on your tablet, live quizzes for the whole class, group projects, presentations, homework, your CV and lessons for maths, chemistry and biology in one calm place. Blob, your jelly helper, saves everything as you go and explains every step.",
       cta: "Create your free space",
       haveAccount: "I have an account",
       fine: "Free. No ads. Your notes stay private until you share them.",
@@ -303,6 +303,28 @@ export const landingText = defineMessages({
         ],
       },
     },
+    handwriting: {
+      kicker: "Handwriting",
+      title: "Write by hand, like on paper.",
+      body: "A notebook for your tablet: write and draw with your pen or a finger on lined, squared or dotted pages. Your hand can rest on the screen, and everything is saved as you write.",
+      demo: {
+        label: "A handwritten note on photosynthesis is written: the title, the formula in blue with glucose highlighted, the word light circled and straightened into a clean circle, then a sun and a leaf",
+        title: "Photosynthesis",
+        a: "6 CO2 + 6 H2O →",
+        b: "C6H12O6",
+        c: "+ 6 O2",
+        d: "happens in the leaves, needs",
+        e: "light",
+        tools: { pen: "Pen", highlighter: "Highlighter", eraser: "Eraser", lasso: "Lasso", text: "Text" },
+      },
+      points: {
+        pens: { title: "Pens that feel like pens", body: "Ballpoint, fountain pen, pencil and calligraphy pen follow your pressure. The highlighter stays under the ink." },
+        paper: { title: "Paper like in your notebook", body: "Lined, squared, dotted, graph paper, Cornell notes or music, on white, cream, grey or dark paper." },
+        shapes: { title: "Lasso, shapes, text, pictures", body: "Circle what you wrote to move, resize, turn or recolour it. Hold the pen still and a wobbly line becomes a clean shape." },
+        tablet: { title: "Made for your tablet", body: "Your palm can rest on the screen, the S Pen's button erases, two fingers tap to undo. Pinch to zoom, scroll with a finger." },
+        together: { title: "Saved, shared, exported", body: "Saved as you write, offline too. Shared notes change live while others write. Export as PDF or picture." },
+      },
+    },
     calendar: {
       kicker: "Calendar",
       title: "Your whole week, at a glance.",
@@ -357,7 +379,7 @@ export const landingText = defineMessages({
     meta: {
       title: "Blob – Notizen, Live-Quiz, Gruppenprojekte, Präsentationen, Hausaufgaben, Lernen und Lebenslauf für die Schule",
       description:
-        "Ein ruhiger Ort für die Schule: Notizen, aus denen Karteikarten werden, Live-Quizze, bei denen die ganze Klasse am Handy mitspielt, Gruppenprojekte auf einem gemeinsamen Board, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen in Mathe, Chemie und Bio, Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
+        "Ein ruhiger Ort für die Schule: Notizen, aus denen Karteikarten werden, Handschrift-Notizen fürs Tablet, Live-Quizze, bei denen die ganze Klasse am Handy mitspielt, Gruppenprojekte auf einem gemeinsamen Board, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen in Mathe, Chemie und Bio, Schritt für Schritt mit Blob. Kostenlos und ohne Werbung.",
     },
     header: {
       home: "Blob, Startseite",
@@ -366,12 +388,12 @@ export const landingText = defineMessages({
       start: "Loslegen",
       open: "Blob öffnen",
     },
-    nav: { learn: "Lernen", notes: "Notizen", quiz: "Live-Quiz", together: "Gemeinsam", homework: "Hausaufgaben", calendar: "Kalender", presentations: "Präsentationen", cv: "Lebenslauf" },
+    nav: { learn: "Lernen", notes: "Notizen", handwriting: "Handschrift", quiz: "Live-Quiz", together: "Gemeinsam", homework: "Hausaufgaben", calendar: "Kalender", presentations: "Präsentationen", cv: "Lebenslauf" },
     hero: {
-      badge: "Neu: Live-Quiz für die ganze Klasse",
+      badge: "Neu: Handschrift-Notizen für dein Tablet",
       titleA: "Deine Schule",
       titleB: "im Griff.",
-      body: "Notizen, aus denen Karteikarten werden, Live-Quizze für die ganze Klasse, Gruppenprojekte, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen für Mathe, Chemie und Bio an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir jeden Schritt.",
+      body: "Notizen, aus denen Karteikarten werden, Handschrift auf dem Tablet, Live-Quizze für die ganze Klasse, Gruppenprojekte, Präsentationen, Hausaufgaben, dein Lebenslauf und Lektionen für Mathe, Chemie und Bio an einem ruhigen Ort. Blob, dein lila Helfer, speichert alles automatisch und erklärt dir jeden Schritt.",
       cta: "Kostenlos loslegen",
       haveAccount: "Ich habe schon ein Konto",
       fine: "Kostenlos. Ohne Werbung. Deine Notizen siehst nur du, bis du sie teilst.",
@@ -651,6 +673,28 @@ export const landingText = defineMessages({
           { title: "Englisch: Vokabeln Unit 3", due: "Morgen" },
           { title: "Mathe: S. 42, Nr. 3", due: "Do" },
         ],
+      },
+    },
+    handwriting: {
+      kicker: "Handschrift",
+      title: "Schreib mit der Hand, wie auf Papier.",
+      body: "Ein Heft für dein Tablet: Schreib und zeichne mit dem Stift oder dem Finger auf linierten, karierten oder gepunkteten Seiten. Deine Hand darf auf dem Bildschirm liegen, und alles wird gespeichert, während du schreibst.",
+      demo: {
+        label: "Eine handschriftliche Notiz zur Fotosynthese entsteht: der Titel, die Formel in Blau mit markierter Glucose, das Wort Licht eingekreist und zu einem sauberen Kreis geglättet, dann eine Sonne und ein Blatt",
+        title: "Fotosynthese",
+        a: "6 CO2 + 6 H2O →",
+        b: "C6H12O6",
+        c: "+ 6 O2",
+        d: "passiert im Blatt, braucht",
+        e: "Licht",
+        tools: { pen: "Stift", highlighter: "Textmarker", eraser: "Radierer", lasso: "Lasso", text: "Text" },
+      },
+      points: {
+        pens: { title: "Stifte wie echte Stifte", body: "Kugelschreiber, Füller, Bleistift und Kalligrafiestift folgen deinem Druck. Der Textmarker bleibt unter der Schrift." },
+        paper: { title: "Papier wie in deinem Heft", body: "Liniert, kariert, gepunktet, Millimeterpapier, Cornell-Notizen oder Noten, auf weißem, cremefarbenem, grauem oder dunklem Papier." },
+        shapes: { title: "Lasso, Formen, Text, Bilder", body: "Kreise Geschriebenes ein und verschiebe, vergrößere, drehe oder färbe es um. Halt den Stift still, und aus einer wackligen Linie wird eine saubere Form." },
+        tablet: { title: "Gemacht für dein Tablet", body: "Deine Hand darf auf dem Bildschirm liegen, die Taste des S Pen radiert, zwei Finger tippen rückgängig. Zoomen mit zwei Fingern, scrollen mit einem." },
+        together: { title: "Gespeichert, geteilt, exportiert", body: "Gespeichert, während du schreibst, auch offline. Geteilte Notizen ändern sich live, während andere schreiben. Export als PDF oder Bild." },
       },
     },
     calendar: {
