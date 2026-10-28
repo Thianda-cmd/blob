@@ -44,18 +44,18 @@ env:
     Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Live quiz**: make a quiz, put it on the big screen and the whole class plays along on their phones at *blob.bojes.org/play*, with a PIN or the QR code and no account. Six kinds of questions (multiple choice, true or false, type the answer, poll, put in order, slider), pictures, points for being right and quick, streaks, a scoreboard after every question and a podium with confetti at the end. Results per game, as a spreadsheet too.
-    - **A quiz from your notes**: *Learn → Live quiz* in a note, or *From a note* in Live quiz, and Blob writes the questions from what's in it. You change what you like and press play.
-    - **Your BTA timetable in one click**: *Timetable* in the calendar brings in the whole plan of class BTA926A from bta.bojes.org for the school year, with every-other-week lessons, holidays and exams. Change one lesson, or all the ones after it.
-    - **Every other week**: lessons and events can repeat in even or odd weeks only.
-    - **Calendar fix**: after a reload, times showed an hour or two early on some days. They don't any more.
+    - **Handwritten notes**: a new kind of note to write and draw on with a pen (the S Pen, an Apple Pencil, any stylus), a finger or the mouse, like a paper notebook. Pens that follow your pressure (ballpoint, fountain pen, pencil, calligraphy pen), a highlighter that stays under the ink, an eraser for whole strokes or just a part, quick colours and your own.
+    - **Paper as in a notebook**: lined, narrow lines, squared, dotted, graph paper, Cornell notes and music staves, on white, cream, grey or dark paper, for one page or all of them. As many pages as you like, to reorder, duplicate or remove in the page overview.
+    - **Lasso, shapes, text and pictures**: circle what you wrote to move it, make it bigger, turn it, change its colour, copy or delete it. Hold the pen still at the end of a line, circle or box and it becomes a clean shape. Type text boxes and add pictures anywhere.
+    - **Feels like paper**: your hand can rest on the screen while you write, the S Pen's button erases while you hold it, two fingers tap to undo and three to redo, pinch to zoom and scroll with a finger. In the app, a stroke can start right at the edge of the screen without swiping back a page.
+    - **Everywhere you are**: saved as you write (on the device while you're offline), shared notes change live while others write, previews in your lists, and export as PDF or as a picture.
 
     **Neu in dieser Version**
-    - **Live-Quiz**: Bau ein Quiz, zeig es auf dem großen Bildschirm, und die ganze Klasse spielt am Handy mit, unter *blob.bojes.org/play*, mit PIN oder QR-Code und ohne Konto. Sechs Arten von Fragen (Quiz, Richtig oder falsch, Antwort tippen, Umfrage, Reihenfolge, Schieberegler), Bilder, Punkte fürs Richtige und fürs Schnellsein, Serien, eine Rangliste nach jeder Frage und am Ende ein Siegertreppchen mit Konfetti. Ergebnisse für jedes Spiel, auch als Tabelle.
-    - **Ein Quiz aus deinen Notizen**: *Lernen → Live-Quiz* in einer Notiz oder *Aus einer Notiz* im Live-Quiz, und Blob macht aus ihrem Inhalt die Fragen. Du änderst, was du willst, und startest.
-    - **Dein BTA-Stundenplan mit einem Klick**: *Stundenplan* im Kalender holt den ganzen Plan der Klasse BTA926A von bta.bojes.org für das Schuljahr, mit 14-täglichen Stunden, Ferien und Klausuren. Ändere eine Stunde oder alle folgenden.
-    - **Alle zwei Wochen**: Stunden und Termine können sich nur in geraden oder ungeraden Wochen wiederholen.
-    - **Kalender-Fix**: Nach dem Neuladen standen Termine an manchen Tagen ein bis zwei Stunden zu früh. Das ist behoben.
+    - **Handschriftliche Notizen**: eine neue Art Notiz zum Schreiben und Zeichnen mit dem Stift (S Pen, Apple Pencil, jeder Eingabestift), dem Finger oder der Maus, wie in einem Heft. Stifte, die deinem Druck folgen (Kugelschreiber, Füller, Bleistift, Kalligrafiestift), ein Textmarker, der unter der Schrift bleibt, ein Radierer für ganze Striche oder nur ein Stück, schnelle Farben und deine eigenen.
+    - **Papier wie im Heft**: liniert, eng liniert, kariert, gepunktet, Millimeterpapier, Cornell-Notizen und Notenpapier, auf weißem, cremefarbenem, grauem oder dunklem Papier, für eine Seite oder alle. So viele Seiten, wie du willst, in der Seitenübersicht zum Umsortieren, Duplizieren oder Löschen.
+    - **Lasso, Formen, Text und Bilder**: Kreise ein, was du geschrieben hast, und verschiebe es, mach es größer, dreh es, ändere die Farbe, kopiere oder lösche es. Halt den Stift am Ende einer Linie, eines Kreises oder Rechtecks still, und es wird eine saubere Form. Tippe Textfelder und füge Bilder ein, wo du willst.
+    - **Fühlt sich an wie Papier**: Deine Hand darf beim Schreiben auf dem Bildschirm liegen, die Taste des S Pen radiert, solange du sie drückst, zwei Finger tippen rückgängig und drei wiederholen, zwei Finger zoomen und ein Finger scrollt. In der App kann ein Strich direkt am Bildschirmrand beginnen, ohne eine Seite zurückzuwischen.
+    - **Überall, wo du bist**: gespeichert, während du schreibst (offline auf dem Gerät), geteilte Notizen ändern sich live, während andere schreiben, Vorschauen in deinen Listen, und Export als PDF oder als Bild.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.

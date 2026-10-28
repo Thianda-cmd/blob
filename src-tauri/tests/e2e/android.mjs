@@ -4,9 +4,10 @@
 //   node src-tauri/tests/e2e/android.mjs --apk app-debug.apk --out shots/
 //
 // What it looks at: the page sits between the status bar, the navigation bar and the keyboard; no
-// pinch zoom; the back button and the edge back swipe walk the page history, then Back leaves the
-// app; swipes scroll; app links open their page; links to other sites never open inside the app;
-// rotation, dark mode, the print dialog; no crash. Exits 1 if a check fails. Screenshots and results.json go to --out.
+// pinch zoom; the back button and the edge back swipe walk the page history (a handwritten note
+// keeps the edge near the pen), then Back leaves the app; swipes scroll; app links open their page;
+// links to other sites never open inside the app; rotation, dark mode, the print dialog; no crash.
+// Exits 1 if a check fails. Screenshots and results.json go to --out.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -259,9 +260,37 @@ try {
   }
   check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
   // Back on the first page for the next check, whatever happened above.
-  for (let i = 0; i < 3 && (await path(dt).catch(() => first)) !== first; i++) {
-    adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  const backToFirst = async () => {
+    for (let i = 0; i < 3 && (await path(dt).catch(() => first)) !== first; i++) {
+      adb("shell", "input", "keyevent", "KEYCODE_BACK");
+      await sleep(2000);
+    }
+  };
+  await backToFirst();
+
+  // A handwritten note keeps the screen's edge near the pen from the back swipe (window.BlobInk,
+  // device pixels of the web view): the same swipe then stays on the page, and goes back again once
+  // the edge is given back.
+  if (bounds && swiped === first) {
+    await tapLink("/developers");
     await sleep(2000);
+    const y = Number(mid) - bounds[1];
+    const kept = await dt.js(`(() => { if (!window.BlobInk) return "no bridge"; window.BlobInk.postMessage(JSON.stringify([[0, ${y} - 100 * devicePixelRatio, 48 * devicePixelRatio, 200 * devicePixelRatio]])); return "kept"; })()`);
+    await sleep(500);
+    edgeSwipe();
+    await sleep(4000);
+    const stayed = await path(dt).catch(() => "?");
+    check("a handwritten note keeps the back swipe off the edge near the pen", kept === "kept" && stayed === "/developers", { kept, stayed });
+    await dt.js(`window.BlobInk && window.BlobInk.postMessage("[]")`);
+    await sleep(500);
+    edgeSwipe();
+    let freed = await until(() => path(dt), (p) => p === first, 8000);
+    if (freed !== first) {
+      edgeSwipe();
+      freed = await until(() => path(dt), (p) => p === first, 12000);
+    }
+    check("given back, the edge swipes back again", freed === first, freed);
+    await backToFirst();
   }
 
   // Back on the first page puts the app in the background (the home screen shows), like any
