@@ -57,7 +57,8 @@ export function Pages(p: Props) {
             <div className="mt-1 flex items-center justify-between gap-1">
               <span className="text-[12px] tabular-nums text-ink-3">{i + 1}</span>
               {!p.readOnly && (
-                <span className="flex gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                // Shown on hover where there is one (a mouse); always on touch screens.
+                <span className="flex gap-0.5 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
                   <IconButton label={t.moveUp} disabled={i === 0} onClick={() => p.onMove(s.id, i - 1)}>
                     <ArrowUp />
                   </IconButton>
