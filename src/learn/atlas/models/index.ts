@@ -20,8 +20,14 @@ export function loadAtlasModel(slug: string): Promise<AtlasModel> {
   let p = cache.get(slug);
   if (!p) {
     const load = LOADERS[slug];
-    p = load ? load().then((m) => m.default) : Promise.reject(new Error(`Unknown model: ${slug}`));
-    cache.set(slug, p);
+    const loading = load ? load().then((m) => m.default) : Promise.reject(new Error(`Unknown model: ${slug}`));
+    cache.set(slug, loading);
+    // A failed load (a flaky connection) is forgotten, so "Try again" or the next visit loads it afresh.
+    // The rejection itself still reaches use(), which shows the error page.
+    loading.catch(() => {
+      if (cache.get(slug) === loading) cache.delete(slug);
+    });
+    p = loading;
   }
   return p;
 }

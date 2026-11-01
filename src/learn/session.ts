@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { DAILY_GOAL, nextMastery, record, streak, today, type LearnDay } from "./progress";
+import { DAILY_GOAL, awardOnce, nextMastery, record, streak, today, type LearnDay } from "./progress";
 
 /**
  * Live state for one study session: XP, mastery, combo. Every answer is saved
@@ -74,6 +74,16 @@ export function useStudySession({
     [supabase, topic, level],
   );
 
+  /** A one-time reward (the Atlas's "explored everything"): the server pays it at most once per topic. */
+  const award = useCallback(
+    async (amount: number) => {
+      const paid = await awardOnce(supabase, { topic, xp: amount });
+      if (paid) setXp((x) => x + amount);
+      return paid;
+    },
+    [supabase, topic],
+  );
+
   return {
     xp,
     mastery,
@@ -89,6 +99,7 @@ export function useStudySession({
     goal: DAILY_GOAL,
     answer,
     bonus,
+    award,
   };
 }
 

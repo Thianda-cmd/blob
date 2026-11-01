@@ -7,8 +7,8 @@ export const STRUCTURE = {
   kind: "parts",
   title: tx("Structure", "Aufbau"),
   intro: tx(
-    "A rod-shaped bacterium such as E. coli (about 2 µm long), cut lengthwise. Prokaryotes have no nucleus and no organelles wrapped in membranes. The tour goes from the outside in.",
-    "Ein stäbchenförmiges Bakterium wie E. coli (etwa 2 µm lang) im Längsschnitt. Prokaryoten haben keinen Zellkern und keine membranumhüllten Organellen. Der Rundgang geht von außen nach innen.",
+    "A model of a rod-shaped bacterium (about 2 µm long), cut lengthwise. Real species differ: E. coli, for example, has flagella all over its surface and an outer membrane over a thin murein layer. Prokaryotes have no nucleus and no organelles wrapped in membranes. The tour goes from the outside in.",
+    "Modell eines stäbchenförmigen Bakteriums (etwa 2 µm lang) im Längsschnitt. Echte Arten weichen davon ab: E. coli zum Beispiel ist peritrich begeißelt und hat über einer dünnen Mureinschicht eine äußere Membran. Prokaryoten haben keinen Zellkern und keine membranumhüllten Organellen. Der Rundgang geht von außen nach innen.",
   ),
   parts: {
     flagellum: {
@@ -22,7 +22,7 @@ export const STRUCTURE = {
       facts: [
         tx("Built from filament (the protein flagellin), hook and basal body (the motor with its rings).", "Aufbau: Filament (aus dem Protein Flagellin), Haken und Basalkörper (der Motor mit seinen Ringen)."),
         tx("Powered by the flow of protons into the cell (proton motive force), not directly by ATP.", "Angetrieben vom Einstrom von Protonen (protonenmotorische Kraft), nicht direkt durch ATP."),
-        tx("Counter-clockwise: the cell swims straight (run). Clockwise: it tumbles and turns. That is how chemotaxis steers.", "Gegen den Uhrzeigersinn: Die Zelle schwimmt geradeaus (Run). Im Uhrzeigersinn: Sie taumelt und wendet (Tumble). So steuert die Chemotaxis."),
+        tx("In E. coli: counter-clockwise, the cell swims straight (run); clockwise, it tumbles and turns. That is how chemotaxis steers.", "Bei E. coli: Gegen den Uhrzeigersinn schwimmt die Zelle geradeaus (Run), im Uhrzeigersinn taumelt sie und wendet (Tumble). So steuert die Chemotaxis."),
         tx("Flagellin is the H antigen used to type strains, as in E. coli O157:H7.", "Flagellin ist das H-Antigen zur Typisierung von Stämmen, z. B. E. coli O157:H7."),
       ],
       tip: tx(
@@ -252,12 +252,12 @@ export const SHAPES = {
   ),
   parts: {
     coccus: {
-      name: tx("Cocci", "Kokken"),
-      aka: tx("spherical bacteria; singular coccus", "Kugelbakterien; Einzahl: Kokkus"),
+      name: tx("Single cocci", "Monokokken"),
+      aka: tx("monococci; cocci are spherical bacteria, singular coccus", "einzeln liegende Kokken; Kokken = Kugelbakterien, Einzahl: Kokkus"),
       tag: tx("sphere", "Kugel"),
       role: tx(
-        "Round bacteria, about 0.5 to 1 µm across. Lying alone they are called monococci; how they stick together after dividing often gives away the genus.",
-        "Runde Bakterien, etwa 0,5 bis 1 µm groß. Einzeln liegend heißen sie Monokokken; wie sie nach der Teilung zusammenhängen, verrät oft die Gattung.",
+        "Round bacteria (cocci), about 0.5 to 1 µm across, here lying alone. How cocci stick together after dividing often gives away the genus.",
+        "Runde Bakterien (Kokken), etwa 0,5 bis 1 µm groß, hier einzeln liegend. Wie Kokken nach der Teilung zusammenhängen, verrät oft die Gattung.",
       ),
       facts: [
         tx("Arrangement = planes of division + whether the daughter cells stay together.", "Lagerung = Teilungsebene(n) + ob die Tochterzellen zusammenbleiben."),
@@ -318,7 +318,7 @@ export const SHAPES = {
       clue: tx("form cube-shaped packets of eight", "würfelförmige Pakete aus acht Zellen bilden"),
     },
     rod: {
-      name: tx("Rods", "Stäbchen"),
+      name: tx("Straight rods", "Gerade Stäbchen"),
       aka: tx("bacilli", "Bazillen"),
       tag: tx("cylinder", "Zylinder"),
       role: tx("Elongated, cylinder-shaped bacteria, usually 1 to 5 µm long. Many well-known pathogens are rods.", "Längliche, zylinderförmige Bakterien, meist 1 bis 5 µm lang. Viele bekannte Krankheitserreger sind Stäbchen."),
@@ -549,7 +549,7 @@ export const MOTOR = {
       aka: tx("rod", "Welle"),
       role: tx("The drive shaft: runs through the rings and the envelope and turns the hook.", "Die Antriebswelle: läuft durch die Ringe und die Zellhülle und dreht den Haken."),
       facts: [tx("Turns together with the MS ring and the C ring.", "Dreht sich zusammen mit MS-Ring und C-Ring.")],
-      clue: tx("is the drive shaft through the cell envelope", "die Antriebswelle durch die Zellhülle ist"),
+      clue: tx("runs through the L and P rings and turns the hook", "durch L- und P-Ring läuft und den Haken dreht"),
     },
     lring: {
       name: tx("L ring", "L-Ring"),

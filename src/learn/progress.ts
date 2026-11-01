@@ -106,3 +106,13 @@ export async function record(
   });
   return !error;
 }
+
+/**
+ * The Atlas's one-time "explored everything" bonus. The server pays it at most once per topic (it
+ * sets lesson_done and adds the XP only if the topic was not done yet) and leaves mastery alone, so
+ * an old copy of the page or a second tab cannot pay it twice. Returns whether it was paid.
+ */
+export async function awardOnce(supabase: SupabaseClient, input: { topic: string; xp: number }) {
+  const { data, error } = await supabase.rpc("learn_award_explore", { p_topic: input.topic, p_day: today(), p_xp: input.xp });
+  return !error && data === true;
+}

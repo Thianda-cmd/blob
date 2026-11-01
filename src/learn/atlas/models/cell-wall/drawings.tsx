@@ -327,7 +327,7 @@ export function Murein() {
           )),
         )}
         <Layer x={210} y={(STRANDS[0] + STRANDS[1]) / 2 + 4} anchor="middle">{tt(tx("Gram−: direct", "Gram−: direkt"))}</Layer>
-        <Layer x={150} y={(STRANDS[1] + STRANDS[2]) / 2 + 4} anchor="middle">{tt(tx("Gram+: pentaglycine", "Gram+: Pentaglycin"))}</Layer>
+        <Layer x={150} y={(STRANDS[1] + STRANDS[2]) / 2 + 4} anchor="middle">{tt(tx("Gram+ (S. aureus): pentaglycine", "Gram+ (S. aureus): Pentaglycin"))}</Layer>
         {(
           [
             ["L-Ala", 0, 0],

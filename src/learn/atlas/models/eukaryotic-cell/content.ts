@@ -6,11 +6,11 @@ import type { ModelContent, PartInfo, PartsContent } from "../../types";
 const membrane: PartInfo = {
   name: tx("Cell membrane", "Zellmembran"),
   aka: tx("plasma membrane", "Plasmamembran"),
-  role: tx("A phospholipid bilayer with proteins and cholesterol: it bounds the cell and controls what goes in and out.", "Eine Phospholipid-Doppelschicht mit Proteinen und Cholesterin: Sie grenzt die Zelle ab und kontrolliert, was hinein- und hinausgeht."),
+  role: tx("A phospholipid bilayer with proteins and sterols (cholesterol in animal cells): it bounds the cell and controls what goes in and out.", "Eine Phospholipid-Doppelschicht mit Proteinen und Sterolen (bei Tierzellen Cholesterin): Sie grenzt die Zelle ab und kontrolliert, was hinein- und hinausgeht."),
   facts: [
     tx("Fluid mosaic model (Singer and Nicolson, 1972).", "Flüssig-Mosaik-Modell (Singer und Nicolson, 1972)."),
     tx("Sugar chains on the outside (glycocalyx) let cells recognise each other, as with blood groups.", "Zuckerketten auf der Außenseite (Glykokalyx) dienen der Zellerkennung, etwa bei den Blutgruppen."),
-    tx("Cholesterol keeps it from getting too stiff or too fluid.", "Cholesterin verhindert, dass sie zu starr oder zu flüssig wird."),
+    tx("Cholesterol keeps it from getting too stiff or too fluid. Plant cells use phytosterols such as sitosterol instead.", "Cholesterin verhindert, dass sie zu starr oder zu flüssig wird. Pflanzenzellen nutzen stattdessen Phytosterole wie Sitosterol."),
   ],
   clue: tx("bounds the cell and controls what gets in and out", "die Zelle abgrenzt und den Stoffaustausch kontrolliert"),
 };
@@ -57,7 +57,7 @@ const nucleolus: PartInfo = {
 const roughER: PartInfo = {
   name: tx("Rough ER", "Raues ER"),
   aka: tx("rough endoplasmic reticulum", "raues endoplasmatisches Retikulum"),
-  role: tx("Membrane sacs with ribosomes on the outside: makes and folds proteins for membranes, lysosomes and export.", "Membransäckchen mit Ribosomen auf der Außenseite: bildet und faltet Proteine für Membranen, Lysosomen und den Export."),
+  role: tx("Membrane sacs with ribosomes on the outside: makes and folds proteins for membranes, lysosomes (in plants: the vacuole) and export.", "Membransäckchen mit Ribosomen auf der Außenseite: bildet und faltet Proteine für Membranen, Lysosomen (bei Pflanzen: die Vakuole) und den Export."),
   facts: [
     tx("A signal sequence leads the growing protein into the ER lumen.", "Eine Signalsequenz führt das wachsende Protein ins ER-Lumen."),
     tx("The first sugar chains are added here (glycosylation).", "Hier werden die ersten Zuckerketten angehängt (Glykosylierung)."),
@@ -83,7 +83,7 @@ const golgi: PartInfo = {
   role: tx("Stacks of flat membrane sacs: they modify, sort and pack proteins from the ER into vesicles.", "Stapel flacher Membransäckchen: Sie verändern, sortieren und verpacken Proteine aus dem ER in Vesikel."),
   facts: [
     tx("cis side (in, facing the ER) and trans side (out, facing the cell membrane).", "cis-Seite (Eingang, zum ER) und trans-Seite (Ausgang, zur Zellmembran)."),
-    tx("Finishes the sugar chains and makes lysosomes.", "Vollendet die Zuckerketten und bildet Lysosomen."),
+    tx("Finishes the sugar chains and makes lysosomes (in plants it sends the digestive enzymes to the vacuole).", "Vollendet die Zuckerketten und bildet Lysosomen (bei Pflanzen schickt er die Verdauungsenzyme in die Vakuole)."),
   ],
   tip: tx("Secretion route: rough ER → vesicle → Golgi → vesicle → cell membrane (exocytosis).", "Sekretionsweg: raues ER → Vesikel → Golgi → Vesikel → Zellmembran (Exocytose)."),
   clue: tx("sorts and packs proteins into vesicles", "Proteine sortiert und in Vesikel verpackt"),
@@ -120,7 +120,7 @@ const lysosome: PartInfo = {
     tx("Autophagy: the cell digests its own parts.", "Autophagie: Die Zelle verdaut eigene Bestandteile."),
     tx("Faulty lysosomal enzymes cause storage diseases.", "Defekte lysosomale Enzyme verursachen Speicherkrankheiten."),
   ],
-  clue: tx("digests old cell parts with acidic enzymes", "alte Zellbestandteile mit sauren Enzymen verdaut"),
+  clue: tx("digests old cell parts with acid hydrolases", "alte Zellbestandteile mit sauren Hydrolasen verdaut"),
 };
 
 const peroxisome: PartInfo = {
@@ -200,14 +200,14 @@ export const PLANT = {
   kind: "parts",
   title: tx("Plant cell", "Pflanzenzelle"),
   intro: tx(
-    "A plant cell from a leaf. It has what an animal cell has (except centrosomes), and three things more: a cellulose wall, chloroplasts and a large central vacuole.",
-    "Eine Pflanzenzelle aus einem Blatt. Sie hat, was eine Tierzelle hat (außer Zentrosomen), und drei Dinge mehr: eine Zellwand aus Cellulose, Chloroplasten und eine große Zentralvakuole.",
+    "A plant cell from a leaf. It has what an animal cell has, except centrosomes and lysosomes (its vacuole does the digesting), and three things more: a cellulose wall, chloroplasts and a large central vacuole.",
+    "Eine Pflanzenzelle aus einem Blatt. Sie hat, was eine Tierzelle hat, außer Zentrosomen und Lysosomen (das Verdauen übernimmt ihre Vakuole), und drei Dinge mehr: eine Zellwand aus Cellulose, Chloroplasten und eine große Zentralvakuole.",
   ),
   parts: {
     wall: {
       name: tx("Cell wall", "Zellwand"),
       aka: tx("cellulose", "aus Cellulose"),
-      tag: tx("only plants", "nur Pflanzen"),
+      tag: tx("not in animal cells", "nicht in Tierzellen"),
       role: tx("A firm wall of cellulose fibres outside the membrane: gives shape, protects and withstands the pressure of the vacuole (turgor).", "Eine feste Wand aus Cellulosefasern außerhalb der Membran: gibt Form, schützt und hält dem Druck der Vakuole (Turgor) stand."),
       facts: [
         tx("Primary wall: stretchy, grows along. Secondary wall: later, thicker, often lignified (wood).", "Primärwand: dehnbar, wächst mit. Sekundärwand: später, dicker, oft verholzt (Lignin)."),
@@ -228,11 +228,11 @@ export const PLANT = {
     vacuole: {
       name: tx("Central vacuole", "Zentralvakuole"),
       aka: tx("with its membrane, the tonoplast", "mit ihrer Membran, dem Tonoplasten"),
-      tag: tx("only plants", "nur Pflanzen"),
+      tag: tx("not in animal cells", "nicht in Tierzellen"),
       role: tx("A large space full of cell sap, up to 90 % of the cell. It stores water, ions, pigments and waste and builds up the turgor.", "Ein großer Raum voll Zellsaft, bis zu 90 % der Zelle. Er speichert Wasser, Ionen, Farb- und Abfallstoffe und baut den Turgor auf."),
       facts: [
         tx("Turgor: water flows in by osmosis and the vacuole presses the cytoplasm against the wall, so the plant stands upright.", "Turgor: Wasser strömt osmotisch ein und die Vakuole drückt das Cytoplasma gegen die Wand, so steht die Pflanze aufrecht."),
-        tx("In a salty solution it loses water and the cytoplasm pulls away from the wall: plasmolysis.", "In einer salzigen Lösung verliert sie Wasser und das Cytoplasma löst sich von der Wand: Plasmolyse."),
+        tx("In a hypertonic solution (e.g. a strong salt solution) it loses water and the cytoplasm pulls away from the wall: plasmolysis.", "In einer hypertonischen Lösung (z. B. einer konzentrierten Salzlösung) verliert sie Wasser und das Cytoplasma löst sich von der Wand: Plasmolyse."),
         tx("Holds pigments such as anthocyanins (red and blue flowers).", "Enthält Farbstoffe wie Anthocyane (rote und blaue Blüten)."),
       ],
       clue: tx("fills up to 90 % of the cell and builds up the turgor", "bis zu 90 % der Zelle füllt und den Turgor aufbaut"),

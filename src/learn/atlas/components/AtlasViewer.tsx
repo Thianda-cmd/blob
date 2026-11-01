@@ -2,7 +2,9 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { BookOpenCheck, Check, Clock, GraduationCap, Layers, ListOrdered, Map as MapIcon, PartyPopper, Route, Tags, User } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
 import { TopBar } from "@/components/shell/TopBar";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { Segmented } from "@/components/ui/Segmented";
@@ -33,19 +35,38 @@ export const itemKeys = (v: AtlasView) =>
 /** The first item of a view, for views that always show one (steps, timeline). */
 const firstItem = (v: AtlasView) => (v.kind === "steps" ? "0" : v.kind === "timeline" ? v.events[0].id : null);
 
-export function AtlasViewer({
-  slug,
-  initialView,
-  initialItem,
-  progress,
-  days,
-}: {
+/** The item from the address if the view has it, written the way the "seen" keys are ("2", never "02" or "2.0"). */
+const itemFrom = (v: AtlasView, item: string | undefined | null): string | null => {
+  if (item == null) return null;
+  if (v.kind === "parts") return v.parts.some((p) => p.id === item) ? item : null;
+  if (v.kind === "steps") return /^\d+$/.test(item) && Number(item) < v.steps.length ? String(Number(item)) : null;
+  return v.events.some((e) => e.id === item) ? item : null;
+};
+
+type ViewerProps = {
   slug: string;
-  initialView?: string;
-  initialItem?: string;
   progress: TopicProgress;
   days: LearnDay[];
-}) {
+};
+
+/**
+ * A model page. Which view and item it shows lives in the address (?view=…&item=…): taps write it
+ * there and the page reads it from there, so every navigation (a link, the command palette,
+ * Back/Forward) shows the right place, even one Next answers from its client cache.
+ * `nav` is new for every server render. Back/Forward first shows the copy Next kept from the last
+ * visit, whose progress can be old; the page is fetched again then, and the fresh render (a new `nav`)
+ * starts the viewer over with current numbers. This part stays mounted meanwhile, so that happens once.
+ */
+export function AtlasViewer({ nav, ...props }: ViewerProps & { nav: string }) {
+  const fresh = useRefreshOnBack(props.progress);
+  return <Viewer key={nav} {...props} fresh={fresh} />;
+}
+
+type Mode = "explore" | "quiz";
+/** Shows an item: an id, or a function of the item shown right now (for "the next one"). */
+type SetItem = (next: string | null | ((now: string | null) => string | null)) => void;
+
+function Viewer({ slug, progress, days, fresh }: ViewerProps & { fresh: boolean }) {
   const model = useAtlasModel(slug);
   const meta = findAtlas(slug)!;
   const t = useMessages(atlasText);
@@ -55,15 +76,24 @@ export function AtlasViewer({
   const today = useTodayXp(days);
   const session = useStudySession({ topic: atlasKey(slug), mastery: progress.mastery, todayXp: today.xp });
 
-  const [viewId, setViewId] = useState(() => (model.views.some((v) => v.id === initialView) ? initialView! : model.views[0].id));
-  const view = model.views.find((v) => v.id === viewId) ?? model.views[0];
-  const validItem = (v: AtlasView, item: string | undefined | null) =>
-    item != null && (v.kind === "parts" ? v.parts.some((p) => p.id === item) : v.kind === "steps" ? Number(item) >= 0 && Number(item) < v.steps.length : v.events.some((e) => e.id === item));
-  const [item, setItem] = useState<string | null>(() => {
-    const v = model.views.find((x) => x.id === viewId)!;
-    return validItem(v, initialItem) ? initialItem! : firstItem(v);
-  });
-  const [mode, setMode] = useState<"explore" | "quiz">("explore");
+  const params = useSearchParams();
+  const view = model.views.find((v) => v.id === params.get("view")) ?? model.views[0];
+  const item = itemFrom(view, params.get("item")) ?? firstItem(view);
+  const hrefOf = useCallback((viewId: string, it: string | null) => atlasHref(slug, viewId === model.views[0].id ? undefined : viewId, it ?? undefined), [slug, model.views]);
+  /** Shows a view and item by writing them into the address (Next passes it on to useSearchParams). */
+  const show = useCallback((viewId: string, it: string | null) => window.history.replaceState(null, "", hrefOf(viewId, it)), [hrefOf]);
+  const viewId = view.id;
+  // Relative moves (arrow keys, prev/next) start from the item in the address right now: Next updates
+  // useSearchParams in a transition, so during fast key presses the last render can be a step behind.
+  const setItem: SetItem = useCallback(
+    (next) => show(viewId, typeof next === "function" ? next(itemFrom(view, new URLSearchParams(window.location.search).get("item")) ?? firstItem(view)) : next),
+    [show, viewId, view],
+  );
+  // The quiz belongs to the place it was started at: moving anywhere else (a tap, the palette, Back) is exploring again.
+  const here = `${view.id}/${item ?? ""}`;
+  const [modeAt, setModeAt] = useState<{ at: string; mode: Mode }>({ at: here, mode: "explore" });
+  const mode: Mode = modeAt.at === here ? modeAt.mode : "explore";
+  const setMode = (m: Mode) => setModeAt({ at: here, mode: m });
   const [labels, setLabels] = useState(true);
   const seenList = useSeen(slug);
   const seen = useMemo(() => new Set(seenList), [seenList]);
@@ -72,35 +102,35 @@ export function AtlasViewer({
   const [celebrate, setCelebrate] = useState(false);
   const awarded = useRef(progress.lesson_done);
 
-  // The address follows the view and item, so a link or reload opens the same place.
+  // The address in its canonical form (the first step or milestone filled in, "01" written as "1").
   useEffect(() => {
-    window.history.replaceState(null, "", atlasHref(slug, viewId === model.views[0].id ? undefined : viewId, item ?? undefined));
-  }, [slug, viewId, item, model.views]);
+    const href = hrefOf(viewId, item);
+    if (window.location.pathname + window.location.search !== href) window.history.replaceState(null, "", href);
+  }, [hrefOf, viewId, item]);
 
   // Opening an item ticks it off; the last one of the model earns the explorer bonus once.
   useEffect(() => {
     if (mode !== "explore" || item == null) return;
     markSeen(userId, slug, `${view.id}/${item}`);
   }, [mode, item, view.id, slug, userId]);
-  const { bonus } = session;
+  const { award } = session;
   useEffect(() => {
-    if (awarded.current || seenCount < total.length || total.length === 0) return;
+    // Not from an old copy of the page (Back/Forward) whose progress may be out of date. The server
+    // pays the bonus at most once anyway; the toast only shows when it really did.
+    if (!fresh || awarded.current || seenCount < total.length || total.length === 0) return;
     awarded.current = true;
-    bonus(EXPLORE_XP, { lesson: true });
-    setCelebrate(true);
-  }, [seenCount, total.length, bonus]);
+    void award(EXPLORE_XP).then((paid) => {
+      if (paid) setCelebrate(true);
+    });
+  }, [fresh, seenCount, total.length, award]);
   useEffect(() => {
     if (!celebrate) return;
     const id = setTimeout(() => setCelebrate(false), 5200);
     return () => clearTimeout(id);
   }, [celebrate]);
 
-  const chooseView = (id: string) => {
-    const v = model.views.find((x) => x.id === id)!;
-    setViewId(id);
-    setItem(firstItem(v));
-    if (v.kind === "timeline" || mode === "quiz") setMode("explore");
-  };
+  // Another view starts at its first step or milestone, in explore mode (the address changes).
+  const chooseView = (id: string) => show(id, firstItem(model.views.find((x) => x.id === id)!));
 
   const kindIcon = (v: AtlasView) => (v.kind === "parts" ? <Tags className="size-3.5" /> : v.kind === "steps" ? <ListOrdered className="size-3.5" /> : <Route className="size-3.5" />);
   const viewSeen = (v: AtlasView) => {
@@ -299,7 +329,7 @@ function ExploreParts({
 }: {
   view: PartsView;
   item: string | null;
-  setItem: (id: string | null) => void;
+  setItem: SetItem;
   labels: boolean;
   seen: Set<string>;
   onQuiz: () => void;
@@ -309,7 +339,14 @@ function ExploreParts({
   const index = item ? view.parts.findIndex((p) => p.id === item) : -1;
   const part = index >= 0 ? view.parts[index] : null;
   const n = view.parts.length;
-  const move = useCallback((d: 1 | -1) => setItem(view.parts[(((index < 0 ? (d === 1 ? -1 : 0) : index) + d) % n + n) % n].id), [index, n, setItem, view.parts]);
+  const move = useCallback(
+    (d: 1 | -1) =>
+      setItem((now) => {
+        const i = view.parts.findIndex((p) => p.id === now);
+        return view.parts[(((i < 0 ? (d === 1 ? -1 : 0) : i) + d) % n + n) % n].id;
+      }),
+    [n, setItem, view.parts],
+  );
   useArrowKeys(move, () => setItem(null));
   const card = useRevealBelow(item);
   const seenHere = useMemo(() => new Set(view.parts.filter((p) => seen.has(`${view.id}/${p.id}`)).map((p) => p.id)), [seen, view]);
@@ -403,14 +440,15 @@ function IntroCard({ view, count, hint, onStart, onQuiz }: { view: AtlasView; co
   );
 }
 
-function ExploreSteps({ view, item, setItem, seen }: { view: StepsView; item: string | null; setItem: (id: string | null) => void; seen: Set<string> }) {
+function ExploreSteps({ view, item, setItem, seen }: { view: StepsView; item: string | null; setItem: SetItem; seen: Set<string> }) {
   const t = useMessages(atlasText);
   const tt = useText();
-  const step = Math.max(0, Math.min(view.steps.length - 1, Number(item ?? 0)));
+  const step = Math.max(0, Math.min(view.steps.length - 1, Math.trunc(Number(item ?? 0)) || 0));
   const s = view.steps[step];
   const n = view.steps.length;
   const go = useCallback((i: number) => setItem(String(Math.max(0, Math.min(n - 1, i)))), [n, setItem]);
-  useArrowKeys(useCallback((d: 1 | -1) => go(step + d), [go, step]));
+  const by = useCallback((d: 1 | -1) => setItem((now) => String(Math.max(0, Math.min(n - 1, (Number(now) || 0) + d)))), [n, setItem]);
+  useArrowKeys(by);
   const seenHere = useMemo(() => new Set(view.steps.map((_, i) => String(i)).filter((i) => seen.has(`${view.id}/${i}`))), [seen, view]);
   const content: InfoContent = {
     key: String(step),
@@ -427,7 +465,7 @@ function ExploreSteps({ view, item, setItem, seen }: { view: StepsView; item: st
       stage={<StepsStage view={view} step={step} onStep={go} seen={seenHere} />}
       panel={
         <div className="space-y-4">
-          <InfoCard content={content} onPrev={step > 0 ? () => go(step - 1) : undefined} onNext={step < n - 1 ? () => go(step + 1) : undefined} />
+          <InfoCard content={content} onPrev={step > 0 ? () => by(-1) : undefined} onNext={step < n - 1 ? () => by(1) : undefined} />
           <p className="px-1 text-[12.5px] leading-relaxed text-ink-3">{tt(view.intro)}</p>
         </div>
       }
@@ -435,15 +473,18 @@ function ExploreSteps({ view, item, setItem, seen }: { view: StepsView; item: st
   );
 }
 
-function ExploreTimeline({ view, item, setItem, seen }: { view: TimelineView; item: string | null; setItem: (id: string | null) => void; seen: Set<string> }) {
+function ExploreTimeline({ view, item, setItem, seen }: { view: TimelineView; item: string | null; setItem: SetItem; seen: Set<string> }) {
   const t = useMessages(atlasText);
   const tt = useText();
   const wide = useWide();
   const index = Math.max(0, view.events.findIndex((e) => e.id === item));
   const e = view.events[index];
   const n = view.events.length;
-  const go = useCallback((i: number) => setItem(view.events[Math.max(0, Math.min(n - 1, i))].id), [n, setItem, view.events]);
-  useArrowKeys(useCallback((d: 1 | -1) => go(index + d), [go, index]));
+  const by = useCallback(
+    (d: 1 | -1) => setItem((now) => view.events[Math.max(0, Math.min(n - 1, Math.max(0, view.events.findIndex((x) => x.id === now)) + d))].id),
+    [n, setItem, view.events],
+  );
+  useArrowKeys(by);
   const seenHere = useMemo(() => new Set(view.events.map((x) => x.id).filter((id) => seen.has(`${view.id}/${id}`))), [seen, view]);
   const content: InfoContent = {
     key: e.id,
@@ -464,12 +505,12 @@ function ExploreTimeline({ view, item, setItem, seen }: { view: TimelineView; it
           selected={e.id}
           onPick={(id) => setItem(id)}
           seen={seenHere}
-          detail={wide ? undefined : <InfoCard content={{ ...content, eyebrow: t.of(index + 1, n) }} onPrev={index > 0 ? () => go(index - 1) : undefined} onNext={index < n - 1 ? () => go(index + 1) : undefined} />}
+          detail={wide ? undefined : <InfoCard content={{ ...content, eyebrow: t.of(index + 1, n) }} onPrev={index > 0 ? () => by(-1) : undefined} onNext={index < n - 1 ? () => by(1) : undefined} />}
         />
       </div>
       {wide && (
         <div className="sticky top-3">
-          <InfoCard content={content} onPrev={index > 0 ? () => go(index - 1) : undefined} onNext={index < n - 1 ? () => go(index + 1) : undefined} />
+          <InfoCard content={content} onPrev={index > 0 ? () => by(-1) : undefined} onNext={index < n - 1 ? () => by(1) : undefined} />
         </div>
       )}
     </div>

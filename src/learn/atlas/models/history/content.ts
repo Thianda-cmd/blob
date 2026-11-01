@@ -46,7 +46,7 @@ export const TIMELINE = {
         tx("His famous letter about the creatures in pepper water is dated 9 October 1676.", "Sein berühmter Brief über die Tierchen im Pfefferwasser stammt vom 9. Oktober 1676."),
         tx("In 1683 he drew cocci, rods and spirals from his own teeth.", "1683 zeichnete er Kokken, Stäbchen und Spiralen aus seinem eigenen Zahnbelag."),
       ],
-      tip: tx("Hooke saw cells (in cork); Leeuwenhoek was the first to see living microorganisms.", "Hooke sah Zellen (im Kork); Leeuwenhoek sah als Erster lebende Mikroorganismen."),
+      tip: tx("Hooke saw cells (in cork) and described a mould; Leeuwenhoek was the first to see bacteria and protozoa.", "Hooke sah Zellen (im Kork) und beschrieb einen Schimmelpilz; Leeuwenhoek sah als Erster Bakterien und Protozoen."),
       icon: "lens",
     },
     spallanzani: {
@@ -198,8 +198,8 @@ export const TIMELINE = {
       who: tx("Louis Pasteur", "Louis Pasteur"),
       title: tx("Vaccine against rabies", "Impfung gegen Tollwut"),
       body: tx(
-        "Pasteur develops weakened (attenuated) vaccines, first against chicken cholera and anthrax (1881), then against rabies. In 1885 he saves the bitten boy Joseph Meister with it.",
-        "Pasteur entwickelt abgeschwächte Impfstoffe, zuerst gegen Hühnercholera und Milzbrand (1881), dann gegen Tollwut. 1885 rettet er damit den gebissenen Jungen Joseph Meister.",
+        "Pasteur develops weakened (attenuated) vaccines, first against chicken cholera (1880) and anthrax (1881), then against rabies. In 1885 he saves the bitten boy Joseph Meister with it.",
+        "Pasteur entwickelt abgeschwächte (attenuierte) Impfstoffe, zuerst gegen Hühnercholera (1880) und Milzbrand (1881), dann gegen Tollwut. 1885 rettet er damit den gebissenen Jungen Joseph Meister.",
       ),
       icon: "vaccine",
     },
@@ -252,8 +252,8 @@ export const TIMELINE = {
       who: tx("Frederick Twort, Félix d'Hérelle", "Frederick Twort, Félix d'Hérelle"),
       title: tx("Bacteriophages", "Bakteriophagen"),
       body: tx(
-        "Viruses that attack and dissolve bacteria: Twort sees them in 1915, d'Hérelle names them bacteriophages (bacteria eaters) in 1917.",
-        "Viren, die Bakterien befallen und auflösen: Twort sieht sie 1915, d'Hérelle nennt sie 1917 Bakteriophagen (Bakterienfresser).",
+        "Viruses that attack and dissolve bacteria: Twort notices their effect in 1915 (colonies turn glassy and dissolve), d'Hérelle names them bacteriophages (bacteria eaters) in 1917.",
+        "Viren, die Bakterien befallen und auflösen: Twort bemerkt 1915 ihre Wirkung (Kolonien werden glasig und lösen sich auf), d'Hérelle nennt sie 1917 Bakteriophagen (Bakterienfresser).",
       ),
       facts: [tx("Phage therapy is making a comeback against resistant bacteria.", "Die Phagentherapie erlebt ein Comeback gegen resistente Keime.")],
       icon: "phage",
@@ -423,6 +423,10 @@ export const PASTEUR = {
       short: tx("Boil", "Kochen"),
       title: tx("Boil", "Abkochen"),
       body: tx("He boils the broth: all microorganisms in it die. The steam also drives air and germs out of the neck.", "Er kocht die Brühe: Alle Mikroorganismen darin sterben. Der Dampf treibt auch Luft und Keime aus dem Hals."),
+      tip: tx(
+        "Boiling is not sterilising: endospores survive 100 °C (see Cohn, 1876). In the lab you sterilise, e.g. in the autoclave at 121 °C.",
+        "Abkochen ist keine Sterilisation: Endosporen überleben 100 °C (siehe Cohn, 1876). Im Labor wird sterilisiert, z. B. im Autoklaven bei 121 °C.",
+      ),
     },
     {
       short: tx("Wait", "Warten"),
@@ -449,7 +453,7 @@ export const PASTEUR = {
       ),
       facts: [
         tx("It also settled the argument about a \"vital force\" in the air: the air got in all along.", "Damit war auch das Argument einer „Lebenskraft“ der Luft erledigt: Die Luft kam ja die ganze Zeit hinein."),
-        tx("The basis of sterile working: boil, then keep germs out.", "Die Grundlage sterilen Arbeitens: abkochen, dann Keime fernhalten."),
+        tx("The basis of sterile working: sterilise, then keep germs out.", "Die Grundlage sterilen Arbeitens: sterilisieren, dann Keime fernhalten."),
       ],
       tip: tx("Germs come from germs (omne vivum ex vivo).", "Keime kommen von Keimen (omne vivum ex vivo)."),
     },
@@ -516,7 +520,7 @@ export const KOCH = {
         "Nicht jede Krankheit passt: Manche Erreger lassen sich nicht in Reinkultur züchten, manche Menschen tragen einen Erreger, ohne krank zu werden, und manche Krankheiten haben mehrere Ursachen.",
       ),
       facts: [
-        tx("Not culturable: Treponema pallidum (syphilis), Mycobacterium leprae (leprosy), viruses without cells.", "Nicht anzüchtbar: Treponema pallidum (Syphilis), Mycobacterium leprae (Lepra), Viren ohne Zellen."),
+        tx("Not culturable on cell-free media: Treponema pallidum (syphilis; grows only together with host cells), Mycobacterium leprae (leprosy), viruses (they need host cells).", "Nicht auf zellfreien Nährböden anzüchtbar: Treponema pallidum (Syphilis; wächst nur zusammen mit Wirtszellen), Mycobacterium leprae (Lepra), Viren (sie brauchen Wirtszellen)."),
         tx("Healthy carriers, such as with Salmonella Typhi (\"Typhoid Mary\") or cholera, break postulate 1.", "Gesunde Träger, etwa bei Salmonella Typhi („Typhoid Mary“) oder Cholera, verletzen Postulat 1."),
         tx("Today there are molecular postulates for virulence genes (Falkow, 1988).", "Heute gibt es molekulare Postulate für Virulenzgene (Falkow, 1988)."),
       ],

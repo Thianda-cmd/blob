@@ -13,7 +13,7 @@ import { Inline } from "@/learn/components/Rich";
 import { Ring } from "@/learn/components/Ring";
 import type { StudySession } from "@/learn/session";
 import { cn } from "@/lib/utils";
-import { itemOf, makeRound, QUIZ_XP, type QuizQuestion } from "../quiz";
+import { itemOf, makeRound, QUIZ_XP, stepLabel, type QuizQuestion } from "../quiz";
 import type { AtlasView, PartsView, StepsView, TimelineView } from "../types";
 import { EventIcon } from "./EventIcon";
 import { Layout } from "./Layout";
@@ -74,8 +74,8 @@ export function Quiz({
     setIndex((i) => i + 1);
   }, []);
 
-  const restart = (focus?: { items: string[]; mc: number[] }) => {
-    setRound(makeRound(view, focus ? { focus: focus.items, missedMc: focus.mc } : {}));
+  const restart = (focus?: { items: string[]; mc: number[]; order: boolean }) => {
+    setRound(makeRound(view, focus ? { focus: focus.items, missedMc: focus.mc, order: focus.order } : {}));
     setIndex(0);
     setAnswer(null);
     setResults([]);
@@ -117,7 +117,17 @@ export function Quiz({
             missed={missed}
             view={view}
             onAgain={() => restart()}
-            onMistakes={missed.length ? () => restart({ items: missed.map((m) => itemOf(m.q)).filter((x): x is string => !!x), mc: missed.flatMap((m) => (m.q.kind === "mc" ? [m.q.index] : [])) }) : undefined}
+            onMistakes={
+              missed.length
+                ? () =>
+                    restart({
+                      items: missed.map((m) => itemOf(m.q)).filter((x): x is string => !!x),
+                      mc: missed.flatMap((m) => (m.q.kind === "mc" ? [m.q.index] : [])),
+                      // A slip in the ordering question asks a fresh one.
+                      order: missed.some((m) => m.q.kind === "order" || m.q.kind === "chrono"),
+                    })
+                : undefined
+            }
             onExit={onExit}
             onLook={onLook}
           />
@@ -280,7 +290,7 @@ function Prompt({
       );
     case "which": {
       const steps = (view as StepsView).steps;
-      return <Options title={t.whichStep} options={q.options.map((s) => ({ value: s, label: steps[s].title, correct: s === q.step }))} answer={answer} onOption={onOption} />;
+      return <Options title={t.whichStep} options={q.options.map((s) => ({ value: s, label: stepLabel(steps[s].title), correct: s === q.step }))} answer={answer} onOption={onOption} />;
     }
     case "who": {
       const e = event(q.event);
@@ -313,7 +323,7 @@ function Prompt({
       return (
         <Ordered
           title={t.orderSteps}
-          items={q.items.map((s) => ({ value: s, label: steps[s].title }))}
+          items={q.items.map((s) => ({ value: s, label: stepLabel(steps[s].title) }))}
           expected={expected}
           sequence={sequence}
           shake={shake}

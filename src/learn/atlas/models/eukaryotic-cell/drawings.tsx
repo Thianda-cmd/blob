@@ -350,8 +350,11 @@ export function PlantCell() {
       <g data-part="wall">
         <rect x={WALL.x} y={WALL.y} width={WALL.w} height={WALL.h} rx={22} fill={`url(#${id.wall})`} stroke="var(--bio-wall-deep)" strokeWidth={2} />
       </g>
+      {/* The cytoplasm: background only (not a part in this view), so it is neither tapped nor dimmed. */}
+      <rect x={WALL.x + 12} y={WALL.y + 12} width={WALL.w - 24} height={WALL.h - 24} rx={14} fill={`url(#${id.cyto})`} />
+      {/* The membrane is just the line at the edge of the protoplast, pressed against the wall. */}
       <g data-part="membrane">
-        <rect x={WALL.x + 12} y={WALL.y + 12} width={WALL.w - 24} height={WALL.h - 24} rx={14} fill={`url(#${id.cyto})`} stroke="var(--bio-membrane)" strokeWidth={4} />
+        <rect x={WALL.x + 12} y={WALL.y + 12} width={WALL.w - 24} height={WALL.h - 24} rx={14} fill="none" stroke="var(--bio-membrane)" strokeWidth={4} />
       </g>
       <g data-part="plasmodesmata">
         {[140, 260, 400].map((y) => (

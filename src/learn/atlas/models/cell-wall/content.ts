@@ -28,7 +28,7 @@ export const GRAM_POSITIVE = {
       clue: tx("makes the Gram-positive wall thick and keeps the dye in the Gram stain", "die grampositive Wand dick macht und bei der Gramfärbung den Farbstoff festhält"),
     },
     teichoic: {
-      name: tx("Wall teichoic acids", "Teichonsäuren"),
+      name: tx("Teichoic acids", "Teichonsäuren"),
       aka: tx("wall teichoic acids", "Wandteichonsäuren"),
       tag: tx("only Gram-positive", "nur grampositiv"),
       role: tx(
@@ -82,7 +82,7 @@ export const GRAM_POSITIVE = {
         tx("MRSA has an altered PBP (PBP2a) that methicillin hardly binds to.", "MRSA hat ein verändertes PBP (PBP2a), an das Methicillin kaum bindet."),
       ],
       tip: tx("Penicillin only kills bacteria that grow: resting cells build no new murein.", "Penicillin tötet nur wachsende Bakterien: Ruhende Zellen bauen kein neues Murein ein."),
-      clue: tx("links new murein and is the target of penicillin", "neues Murein vernetzt und das Ziel von Penicillin ist"),
+      clue: tx("builds new murein on the outer face of the membrane and links its peptides", "an der Außenseite der Membran neues Murein einbaut und seine Peptide verknüpft"),
     },
     membrane: {
       name: tx("Cytoplasmic membrane", "Cytoplasmamembran"),
@@ -92,7 +92,7 @@ export const GRAM_POSITIVE = {
         tx("Gram-positives have only this one membrane.", "Grampositive haben nur diese eine Membran."),
         tx("Between membrane and murein there is only a narrow gap, not a real periplasm as in Gram-negatives.", "Zwischen Membran und Murein liegt nur ein schmaler Spalt, kein echtes Periplasma wie bei Gramnegativen."),
       ],
-      clue: tx("is the only membrane of a Gram-positive cell", "die einzige Membran einer grampositiven Zelle ist"),
+      clue: tx("is the real barrier of the cell and carries the respiratory chain", "die eigentliche Grenze der Zelle ist und die Atmungskette trägt"),
     },
   },
   questions: [
@@ -197,7 +197,7 @@ export const GRAM_NEGATIVE = {
         tx("The reason why penicillin G and lysozyme work poorly on Gram-negatives.", "Der Grund, warum Penicillin G und Lysozym bei Gramnegativen schlecht wirken."),
         tx("In the Gram stain, the alcohol dissolves its lipids.", "Bei der Gramfärbung löst der Alkohol ihre Lipide heraus."),
       ],
-      clue: tx("is the second membrane with LPS on its outer face", "die zweite Membran mit LPS auf der Außenseite ist"),
+      clue: tx("carries LPS and keeps out bile salts and many antibiotics", "LPS trägt und Gallensalze und viele Antibiotika abhält"),
     },
     porin: {
       name: tx("Porins", "Porine"),
@@ -236,14 +236,14 @@ export const GRAM_NEGATIVE = {
         tx("Peptides linked directly (diaminopimelic acid to D-alanine), with no bridge.", "Peptide direkt verknüpft (Diaminopimelinsäure mit D-Alanin), ohne Brücke."),
         tx("Too thin to hold the dye in the Gram stain.", "Zu dünn, um bei der Gramfärbung den Farbstoff festzuhalten."),
       ],
-      clue: tx("is only a few nanometres thick in Gram-negatives", "bei Gramnegativen nur wenige Nanometer dick ist"),
+      clue: tx("is the net of sugar chains and peptides that keeps the cell from bursting", "das Netz aus Zuckerketten und Peptiden ist, das die Zelle vor dem Platzen schützt"),
     },
     inner: {
       name: tx("Cytoplasmic membrane", "Cytoplasmamembran"),
       aka: tx("inner membrane", "innere Membran"),
       role: tx("The inner membrane: a phospholipid bilayer with the respiratory chain, transporters and the enzymes that build murein.", "Die innere Membran: eine Phospholipid-Doppelschicht mit Atmungskette, Transportern und den Enzymen für den Mureinaufbau."),
       facts: [tx("The real barrier for everything that gets past the outer membrane.", "Die eigentliche Barriere für alles, was durch die äußere Membran kommt.")],
-      clue: tx("is the inner of the two membranes", "die innere der beiden Membranen ist"),
+      clue: tx("carries the respiratory chain and the enzymes that build murein", "die Atmungskette und die Enzyme für den Mureinaufbau trägt"),
     },
   },
   questions: [

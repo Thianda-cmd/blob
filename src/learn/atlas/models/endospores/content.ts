@@ -44,14 +44,14 @@ export const STRUCTURE = {
       tag: tx("keeps the core dry", "hält den Kern trocken"),
       role: tx("A thick layer of loosely cross-linked, special murein. It keeps the core dehydrated, and that is the key to heat resistance.", "Eine dicke Schicht aus locker vernetztem, besonderem Murein. Sie hält den Kern entwässert, und das ist der Schlüssel zur Hitzeresistenz."),
       facts: [
-        tx("Many NAM residues carry muramic δ-lactam instead of a peptide, so there are few cross-links.", "Viele NAM tragen Muramyl-δ-lactam statt eines Peptids, darum gibt es wenige Quervernetzungen."),
+        tx("Many NAM residues are turned into muramic δ-lactam and carry no peptide, so there are few cross-links.", "Viele NAM-Reste sind zu Muraminsäure-δ-Lactam umgewandelt und tragen kein Peptid, darum gibt es wenige Quervernetzungen."),
         tx("The first thing broken down when the spore germinates.", "Wird als Erstes abgebaut, wenn die Spore keimt."),
       ],
-      clue: tx("keeps the spore core dry", "den Sporenkern trocken hält"),
+      clue: tx("is a thick layer of loosely cross-linked murein that keeps the core dry", "eine dicke Schicht aus locker vernetztem Murein ist und den Kern trocken hält"),
     },
     germwall: {
       name: tx("Germ cell wall", "Keimzellwand"),
-      aka: tx("primordial cell wall", "Primordialzellwand"),
+      aka: tx("primordial cell wall", "engl. germ cell wall, core wall"),
       role: tx("A thin layer of ordinary murein right on the inner membrane: after germination it becomes the wall of the new cell.", "Eine dünne Schicht aus normalem Murein direkt auf der inneren Membran: Nach der Keimung wird sie zur Zellwand der neuen Zelle."),
       facts: [tx("Unlike the cortex, it survives germination.", "Anders als der Cortex übersteht sie die Keimung.")],
       clue: tx("becomes the cell wall of the new cell after germination", "nach der Keimung zur Zellwand der neuen Zelle wird"),
@@ -74,7 +74,7 @@ export const STRUCTURE = {
       facts: [
         tx("Only about 10 to 25 % of the water of a vegetative cell.", "Nur etwa 10 bis 25 % des Wassers einer vegetativen Zelle."),
         tx("Its pH is about one unit lower than in a growing cell.", "Sein pH-Wert liegt etwa eine Einheit tiefer als in einer wachsenden Zelle."),
-        tx("Survives boiling. Only autoclaving (121 °C, 2 bar, at least 15 min) or dry heat (e.g. 180 °C for 30 min) kills spores for sure.", "Übersteht Kochen. Sicher töten nur Autoklavieren (121 °C, 2 bar, mindestens 15 min) oder trockene Hitze (z. B. 180 °C für 30 min)."),
+        tx("Survives boiling. Only sterilisation kills spores for sure, for example autoclaving (121 °C, 2 bar, at least 15 min) or dry heat (180 °C for 30 min).", "Übersteht Kochen. Sicher töten nur Sterilisationsverfahren, zum Beispiel Autoklavieren (121 °C, 2 bar, mindestens 15 min) oder trockene Hitze (180 °C für 30 min)."),
       ],
       tip: tx("70 % ethanol doesn't kill spores: it can even be contaminated with them.", "70-prozentiger Alkohol tötet keine Sporen: Er kann sogar selbst Sporen enthalten."),
       clue: tx("holds DNA and ribosomes but hardly any water", "DNA und Ribosomen enthält, aber kaum Wasser"),
@@ -260,8 +260,8 @@ export const GERMINATION = {
   ],
   questions: [
     {
-      q: tx("What activates dormant spores?", "Wodurch werden ruhende Sporen aktiviert?"),
-      options: [tx("A short heat shock", "Einen kurzen Hitzeschock"), tx("Freezing", "Einfrieren"), tx("UV light", "UV-Licht"), tx("Penicillin", "Penicillin")],
+      q: tx("What activates dormant spores?", "Was aktiviert ruhende Sporen?"),
+      options: [tx("A short heat shock", "Ein kurzer Hitzeschock"), tx("Freezing", "Einfrieren"), tx("UV light", "UV-Licht"), tx("Penicillin", "Penicillin")],
       correct: 0,
     },
     {

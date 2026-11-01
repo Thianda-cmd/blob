@@ -89,7 +89,7 @@ export const PROCEDURE = {
         tx("Gram-negative: E. coli, Salmonella, Pseudomonas, Neisseria, Helicobacter.", "Gramnegativ: E. coli, Salmonella, Pseudomonas, Neisseria, Helicobacter."),
         tx("Not Gram-stainable: mycobacteria (waxy wall, use Ziehl-Neelsen) and mycoplasmas (no wall).", "Nicht nach Gram färbbar: Mykobakterien (wachsartige Wand, Ziehl-Neelsen-Färbung) und Mykoplasmen (keine Zellwand)."),
       ],
-      tip: tx("Gram-Positive = Purple: both start with P.", "Negativ = rot, wie die roten Zahlen auf dem Konto."),
+      tip: tx("Negative = red, like a bank account in the red.", "Negativ = rot, wie die roten Zahlen auf dem Konto."),
     },
   ],
   questions: [

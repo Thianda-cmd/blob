@@ -16,19 +16,18 @@ export async function generateMetadata({ params }: PageProps<"/learn/atlas/[mode
   return { title: meta ? atlasText[locale].meta.model(resolveText(meta.title, locale)) : learnText[locale].meta.notFound };
 }
 
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+/** New for every render of the page: a fresh render (after Back/Forward) starts the viewer over (see AtlasViewer). */
+const renderId = () => crypto.randomUUID();
 
-export default async function AtlasModelPage({ params, searchParams }: PageProps<"/learn/atlas/[model]">) {
-  const [{ model }, query] = await Promise.all([params, searchParams]);
+// The view and item (?view=…&item=…) are read by the viewer itself, from the address.
+export default async function AtlasModelPage({ params }: PageProps<"/learn/atlas/[model]">) {
+  const { model } = await params;
   if (!findAtlas(model)) notFound();
   const { atlas, days } = await loadLearnState();
   return (
     <AtlasViewer
-      // A link to another view or structure of the same model starts the page fresh there.
-      key={`${model}:${one(query.view) ?? ""}:${one(query.item) ?? ""}`}
+      nav={renderId()}
       slug={model}
-      initialView={one(query.view)}
-      initialItem={one(query.item)}
       progress={atlas[model] ?? EMPTY_PROGRESS(atlasKey(model))}
       days={days}
     />

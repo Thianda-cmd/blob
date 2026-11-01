@@ -53,7 +53,13 @@ export function StepsStage({
   return (
     <div className={cn("w-full", className)}>
       <div className="relative w-full select-none" style={{ aspectRatio: `${view.width} / ${view.height}` }}>
-        <svg viewBox={`0 0 ${view.width} ${view.height}`} className="absolute inset-0 size-full overflow-visible" role="img" aria-label={`${tt(view.title)}: ${tt(view.steps[step]?.title)}`}>
+        <svg
+          viewBox={`0 0 ${view.width} ${view.height}`}
+          className="absolute inset-0 size-full overflow-visible"
+          role="img"
+          // In the quiz (no controls) the step's title would say the answer out loud.
+          aria-label={controls ? `${tt(view.title)}: ${tt(view.steps[step]?.title)}` : tt(view.title)}
+        >
           <Drawing step={step} />
         </svg>
       </div>

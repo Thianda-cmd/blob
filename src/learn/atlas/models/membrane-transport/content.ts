@@ -21,7 +21,7 @@ export const PASSIVE = {
     bilayer: {
       name: tx("Lipid bilayer", "Lipid-Doppelschicht"),
       aka: tx("phospholipids", "Phospholipide"),
-      role: tx("The barrier: water-loving heads outside, water-repelling fatty tails inside. That is why ions and polar molecules only get through proteins.", "Die Barriere: wasserliebende Köpfe außen, wasserabweisende Fettsäureschwänze innen. Darum kommen Ionen und polare Moleküle nur über Proteine hindurch."),
+      role: tx("The barrier: water-loving heads outside, water-repelling fatty tails inside. That is why ions and larger polar molecules such as glucose only get through proteins. Small uncharged polar molecules such as water and urea also get through without a protein, but slowly.", "Die Barriere: wasserliebende Köpfe außen, wasserabweisende Fettsäureschwänze innen. Darum kommen Ionen und größere polare Moleküle wie Glucose nur über Proteine hindurch. Kleine ungeladene polare Moleküle wie Wasser und Harnstoff kommen auch ohne Protein durch, aber langsam."),
       facts: [tx("Selectively permeable: lets some substances through, others not.", "Selektiv permeabel: lässt manche Stoffe durch, andere nicht.")],
       clue: tx("stops ions because its inside repels water", "Ionen aufhält, weil ihr Inneres wasserabweisend ist"),
     },
@@ -125,7 +125,7 @@ export const ACTIVE = {
         tx("Blocked by ouabain and digitalis (a heart drug).", "Gehemmt durch Ouabain und Digitalis (ein Herzmedikament)."),
       ],
       tip: tx("3 out, 2 in: three Na⁺ out, two K⁺ in.", "3 raus, 2 rein: drei Na⁺ hinaus, zwei K⁺ hinein."),
-      clue: tx("uses ATP to pump 3 Na⁺ out and 2 K⁺ in", "mit ATP 3 Na⁺ hinaus- und 2 K⁺ hineinpumpt"),
+      clue: tx("uses ATP to move three positive ions out and two in", "mit ATP drei positive Ionen hinaus- und zwei hineinbefördert"),
     },
     abc: {
       name: tx("ABC transporter", "ABC-Transporter"),
@@ -147,7 +147,7 @@ export const ACTIVE = {
       facts: [
         tx("SGLT1 in the small intestine takes up glucose together with Na⁺.", "SGLT1 im Dünndarm nimmt Glucose zusammen mit Na⁺ auf."),
         tx("E. coli takes up lactose with H⁺ (lactose permease, LacY).", "E. coli nimmt Lactose mit H⁺ auf (Lactose-Permease, LacY)."),
-        tx("No ATP at the carrier, but the ion gradient was built with ATP before (Na⁺/K⁺ pump).", "Kein ATP am Carrier, aber der Ionengradient wurde vorher mit ATP aufgebaut (Na⁺/K⁺-Pumpe)."),
+        tx("No ATP at the carrier: the ion gradient was built before, in animal cells by the Na⁺/K⁺ pump with ATP, in bacteria mostly by the respiratory chain (proton motive force).", "Kein ATP am Carrier: Der Ionengradient wurde vorher aufgebaut, in Tierzellen von der Na⁺/K⁺-Pumpe mit ATP, bei Bakterien meist von der Atmungskette (protonenmotorische Kraft)."),
       ],
       clue: tx("takes two substances in the same direction", "zwei Stoffe in dieselbe Richtung mitnimmt"),
     },
@@ -160,7 +160,7 @@ export const ACTIVE = {
         tx("Na⁺/Ca²⁺ exchanger in heart muscle: 3 Na⁺ in, 1 Ca²⁺ out.", "Na⁺/Ca²⁺-Austauscher im Herzmuskel: 3 Na⁺ hinein, 1 Ca²⁺ hinaus."),
         tx("The Na⁺/H⁺ exchanger keeps the pH of the cell right.", "Der Na⁺/H⁺-Austauscher hält den pH-Wert der Zelle im Lot."),
       ],
-      clue: tx("swaps two substances in opposite directions", "zwei Stoffe in entgegengesetzte Richtungen tauscht"),
+      clue: tx("swaps two substances in opposite directions without splitting ATP itself", "zwei Stoffe in entgegengesetzte Richtungen tauscht, ohne selbst ATP zu spalten"),
     },
     pts: {
       name: tx("Group translocation", "Gruppentranslokation"),
@@ -264,7 +264,7 @@ export const VESICLES = {
     lysosome: {
       name: tx("Lysosome", "Lysosom"),
       aka: tx("digestion", "Verdauung"),
-      role: tx("Fuses with vesicles that came in and digests their content with acidic enzymes.", "Verschmilzt mit aufgenommenen Vesikeln und verdaut deren Inhalt mit sauren Enzymen."),
+      role: tx("Fuses with vesicles that came in and digests their content with acid hydrolases: enzymes that work best at low pH.", "Verschmilzt mit aufgenommenen Vesikeln und verdaut deren Inhalt mit sauren Hydrolasen: Enzymen, die bei niedrigem pH am besten arbeiten."),
       facts: [tx("pH about 5 inside.", "Innen etwa pH 5.")],
       clue: tx("digests what the cell has taken up", "verdaut, was die Zelle aufgenommen hat"),
     },

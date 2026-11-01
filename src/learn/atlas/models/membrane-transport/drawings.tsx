@@ -211,14 +211,14 @@ export function Passive() {
           [-20, 150],
           [44, 166],
         ].map(([dx, y], i) => (
-          <Ion key={i} x={PX.channel + dx} y={y} label="K⁺" color="var(--bio-nucleus-deep)" />
+          <Ion key={i} x={PX.channel + dx} y={y} label="Na⁺" color="var(--bio-mito-deep)" />
         ))}
         {[0, 1].map((i) => (
           <Move key={i} x={PX.channel} y0={150} y1={340} delay={i * 1.4} dur={2.6}>
-            <Ion x={0} y={0} label="K⁺" color="var(--bio-nucleus-deep)" />
+            <Ion x={0} y={0} label="Na⁺" color="var(--bio-mito-deep)" />
           </Move>
         ))}
-        <Ion x={PX.channel - 30} y={410} label="K⁺" color="var(--bio-nucleus-deep)" />
+        <Ion x={PX.channel - 30} y={410} label="Na⁺" color="var(--bio-mito-deep)" />
         <Label x={PX.channel} y={460}>{tt(tx("ions", "Ionen"))}</Label>
       </g>
 
@@ -410,6 +410,8 @@ export function Vesicles() {
         {/* The phagosome inside, already holding a bacterium. */}
         <circle cx={150} cy={360} r={40} fill="color-mix(in oklab, var(--bio-capsule) 50%, var(--bio-cell))" stroke="var(--bio-head)" strokeWidth={6} />
         <rect x={-20} y={-9} width={40} height={18} rx={9} fill="var(--bio-gneg)" opacity={0.75} transform="translate(146 360) rotate(20)" />
+        {/* Not fused with the lysosome yet: only after fusing is it a phagolysosome. */}
+        <Label x={150} y={430}>{tt(tx("phagosome", "Phagosom"))}</Label>
       </g>
 
       <g data-part="lysosome">
@@ -422,7 +424,6 @@ export function Vesicles() {
         ].map(([dx, dy], i) => (
           <circle key={i} cx={236 + dx} cy={344 + dy} r={2.2} fill="var(--bio-blood)" />
         ))}
-        <Label x={190} y={430}>{tt(tx("phagolysosome", "Phagolysosom"))}</Label>
       </g>
 
       <g data-part="pinocytosis">
