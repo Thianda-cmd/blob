@@ -17,11 +17,12 @@ function bestStreak(days: string[]) {
 
 /** What unlocks things in Blob's wardrobe: XP, lessons, streaks and days. */
 export async function loadBlobStats(): Promise<BlobStats> {
-  const { progress, days } = await loadLearnState();
+  const { progress, atlas, days } = await loadLearnState();
   const rows = Object.values(progress);
   const active = days.filter((d) => d.xp > 0).map((d) => d.day);
   return {
-    xp: rows.reduce((n, p) => n + (p.xp ?? 0), 0),
+    // XP from the Atlas counts too; "lessons" stay the topics' lessons.
+    xp: [...rows, ...Object.values(atlas)].reduce((n, p) => n + (p.xp ?? 0), 0),
     lessons: rows.filter((p) => p.lesson_done).length,
     bestStreak: bestStreak(active),
     activeDays: active.length,

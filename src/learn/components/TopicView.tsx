@@ -1,17 +1,20 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, ImageIcon, MousePointerClick, Printer, Timer } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Dumbbell, GraduationCap, Hourglass, ImageIcon, Map as MapIcon, MousePointerClick, Printer, Timer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { SaveCheatSheet, TopicNotes } from "@/components/notes/TopicNotes";
 import { TopBar } from "@/components/shell/TopBar";
 import { useLocale, useMessages } from "@/i18n/client";
+import { atlasText } from "@/i18n/messages/atlas";
 import { learnText } from "@/i18n/messages/learn";
 import { showText } from "@/i18n/messages/show";
 import { useText } from "@/i18n/useText";
 import { type LearnDay, masteryLabel, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
+import { atlasForTopic, atlasHref } from "@/learn/atlas/catalog";
+import { AtlasArt } from "@/learn/atlas/components/AtlasArt";
 import { studyHref, SUBJECTS, topicHref } from "@/learn/catalog";
 import { levelProgress, type LevelRows, suggestedLevel } from "@/learn/levels";
 import { showHref, showItems, showTopicHref } from "@/learn/showcase";
@@ -58,6 +61,8 @@ export function TopicView({
   const tip = summary.find((b) => b.tone === "tip") ?? summary[0];
   const s = useMessages(showText);
   const shareable = meta.minutes ? showItems(topic).filter((i) => i.level === level) : [];
+  const a = useMessages(atlasText);
+  const atlasModels = atlasForTopic(slug);
 
   function choose(l: Level) {
     setLevel(l);
@@ -202,6 +207,39 @@ export function TopicView({
           </div>
 
           <TopicNotes topic={topic} level={level} summary={summary} />
+
+          {atlasModels.length > 0 && (
+            <section className="mt-8 print:hidden" aria-labelledby="topic-atlas">
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+                <div className="min-w-0">
+                  <h2 id="topic-atlas" className="flex items-center gap-2 font-display text-[19px] font-semibold tracking-[-0.01em]">
+                    <MapIcon className="size-4 text-blob-ink" /> {a.related}
+                  </h2>
+                  <p className="max-w-[640px] text-[13px] text-ink-3">{a.relatedText}</p>
+                </div>
+                <Link href="/learn/atlas" className="-my-1.5 flex items-center gap-1 py-1.5 text-[13px] font-medium text-blob-ink hover:underline">
+                  {a.openAtlas} <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {atlasModels.map((m) => (
+                  <Link
+                    key={m.slug}
+                    href={atlasHref(m.slug)}
+                    className="group flex min-w-0 items-center gap-3 rounded-xl border border-line bg-raised p-2 pr-3 shadow-card transition-[border-color,transform] hover:-translate-y-0.5 hover:border-blob/40"
+                  >
+                    <span className="w-[84px] shrink-0 rounded-lg bg-surface p-1">
+                      <AtlasArt slug={m.slug} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[14px] font-semibold group-hover:text-blob-ink">{tt(m.title)}</span>
+                      <span className="line-clamp-2 text-[12.5px] leading-snug text-ink-3">{tt(m.subtitle)}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           {shareable.length > 0 && (
             <section className="mt-8 print:hidden" aria-labelledby="topic-show">

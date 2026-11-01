@@ -12,6 +12,7 @@ import {
   Hash,
   House,
   Keyboard,
+  Map as MapIcon,
   ListChecks,
   CalendarDays,
   CalendarPlus,
@@ -39,6 +40,8 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { shellText } from "@/i18n/messages/shell";
 import { resolveText } from "@/i18n/text";
 import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
+import { atlasHref } from "@/learn/atlas/catalog";
+import type { AtlasHit } from "@/learn/atlas/content";
 import type { PageKind } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { panesText } from "@/i18n/messages/panes";
@@ -74,6 +77,10 @@ const CALENDAR_WORDS = "kalender calendar termin event stundenplan timetable sch
 /** Tags shown for a search. */
 const MAX_TAGS = 5;
 
+/** Atlas models and structures shown for a search. */
+const MAX_ATLAS = 5;
+const ATLAS_WORDS = "atlas modell model modelle models zelle cell bakterien bacteria mikrobiologie microbiology struktur structure";
+
 function snippet(text: string, q: string) {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
   if (i < 0) return text.slice(0, 80);
@@ -100,6 +107,18 @@ function Palette({ onClose }: { onClose: () => void }) {
   const [found, setFound] = useState<{ id: string; title: string; kind: PageKind; icon: string | null; text: string }[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const q = query.trim();
+  // The Atlas's names (structures, steps, milestones), loaded the first time someone searches.
+  const [atlas, setAtlas] = useState<{ index: AtlasHit[]; matches: (hit: AtlasHit, q: string) => boolean } | null>(null);
+  useEffect(() => {
+    if (q.length < 2 || atlas) return;
+    let cancelled = false;
+    void import("@/learn/atlas/content").then((m) => {
+      if (!cancelled) setAtlas({ index: m.atlasSearchIndex(), matches: m.atlasHitMatches });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [q, atlas]);
 
   // Full-text-ish search inside note contents (titles are matched locally).
   useEffect(() => {
@@ -207,6 +226,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       { id: "calendar", group: "actions", label: t.goCalendar, keywords: CALENDAR_WORDS, icon: <CalendarDays />, run: () => go("/calendar") },
       { id: "cv", group: "actions", label: t.goCv, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv") },
       { id: "learn", group: "actions", label: t.goLearn, hint: t.goLearnHint, icon: <GraduationCap />, run: () => go("/learn") },
+      { id: "atlas", group: "actions", label: t.goAtlas, hint: t.goAtlasHint, keywords: ATLAS_WORDS, icon: <MapIcon />, run: () => go("/learn/atlas") },
       {
         id: "blob",
         group: "actions",
@@ -338,15 +358,30 @@ function Palette({ onClose }: { onClose: () => void }) {
         };
       });
 
+    // Structures, steps and milestones of the Atlas: "Lipid A" opens the cell wall right at lipid A.
+    const atlasItems: Item[] = q && atlas
+      ? atlas.index
+          .filter((hit) => atlas.matches(hit, q))
+          .slice(0, MAX_ATLAS)
+          .map((hit) => ({
+            id: `atlas-${hit.slug}-${hit.view ?? ""}-${hit.item ?? ""}`,
+            group: "learn" as const,
+            label: resolveText(hit.label, locale),
+            hint: hit.view ? `${t.atlas} · ${resolveText(hit.model, locale)}` : t.atlas,
+            icon: <MapIcon />,
+            run: () => go(atlasHref(hit.slug, hit.view, hit.item)),
+          }))
+      : [];
+
     // Actions that match what was typed ("cv" → „Neuer Lebenslauf“) come before the "new note named …"
     // fallbacks, so Enter opens the CV builder instead of making a note called "cv".
     const hit = (a: Item) => match(a.label) || (lower.length > 1 && Boolean(a.keywords?.split(" ").some((w) => w.startsWith(lower))));
     const filteredActions = q
       ? [...actions.filter((a) => !a.id.startsWith("new") && hit(a)), ...actions.filter((a) => a.id.startsWith("new"))]
       : actions.slice(0, 3);
-    return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...filteredActions] : [...filteredActions, ...pageItems];
+    return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer]);
+  }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer, atlas]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing
