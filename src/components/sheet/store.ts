@@ -61,6 +61,8 @@ export type SheetState = {
   canRedo: boolean;
   /** Counts document changes (local and remote); saving watches it. */
   version: number;
+  /** Grid zoom, 0.75–2 (pinch, Ctrl+wheel, the status bar). */
+  zoom: number;
 };
 
 export interface SheetStore {
@@ -93,6 +95,7 @@ export interface SheetStore {
 
   setClip(clip: SheetState["clip"]): void;
   setFocus(focus: SheetState["focus"]): void;
+  setZoom(zoom: number): void;
 
   undo(): void;
   redo(): void;
