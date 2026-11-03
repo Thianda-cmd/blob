@@ -5,8 +5,20 @@
 import type { Locale } from "@/i18n/config";
 import type { NumberFormat } from "../types";
 import { daysInMonth, fullYear, monthFromName, serialFromYMD } from "./dates";
+import type { DurationFormat } from "./format";
 
-export type ParsedValue = { kind: "number"; value: number; fmt?: NumberFormat } | { kind: "bool"; value: boolean };
+export type ParsedValue =
+  | {
+      kind: "number";
+      value: number;
+      fmt?: NumberFormat;
+      /**
+       * German typing, "1.234" (one group of three digits after a dot, no comma): read as 1234 like
+       * Excel does, but 1,234 may have been meant; this is that other reading (see `thousandsHint`).
+       */
+      orDecimal?: { value: number; fmt?: NumberFormat };
+    }
+  | { kind: "bool"; value: boolean };
 
 export type ParseValueOptions = {
   /** Accept WAHR/FALSCH (TRUE/FALSE in English): typing yes, arithmetic no ("TRUE" + 1 is #VALUE! in Excel). */
@@ -21,6 +33,14 @@ export type ParseValueOptions = {
    * arithmetic keep reading "0.123" as 123.
    */
   zeroDecimal?: boolean;
+  /**
+   * Typing only, German: "1.234", "2.345 g" or "1.000 µL" stay 1234, 2345 and 1000 (the thousands
+   * dot of German lab notation: "10.000 rpm"), but aren't shown with a thousands dot, so the cell
+   * reads "1234", visibly not what was typed when 1,234 was meant, and the result carries
+   * `orDecimal` for a one-click correction. A balance or photometer gives 1.234 with three decimals,
+   * so silently showing it unchanged as 1234 would hide a factor of 1000.
+   */
+  thousandsHint?: boolean;
 };
 
 /** "0.123" in German typing: a 0 (or 00…) before the dot can't be a thousands group. */
@@ -28,29 +48,74 @@ const zeroBeforeDot = (body: string, locale: Locale, opts?: ParseValueOptions) =
 
 /**
  * Units typed after a number that make it a number shown with that unit (instead of dead text,
- * as in Excel). Only these, so "3 Proben" stays text.
+ * as in Excel). Only these, so "3 Proben" or "2 Kolben" stay text. "%" isn't one: "50 %" is a
+ * percentage. A 2 or 3 typed right after a unit is its power ("g/cm3" → g/cm³).
  */
 const LAB_UNITS = new Set([
   // concentration
   "mg/L", "mg/l", "g/L", "g/l", "µg/L", "µg/l", "ug/L", "µg/mL", "µg/ml", "ug/ml", "ng/mL", "ng/ml", "mg/mL", "mg/ml", "g/mL", "g/ml",
+  "ng/µL", "ng/µl", "ng/uL", "ng/ul", "µg/µL", "µg/µl", "pg/µL", "pg/µl", "kg/L", "kg/l",
   "mol/L", "mol/l", "mmol/L", "mmol/l", "µmol/L", "µmol/l", "umol/l", "nmol/L", "nmol/l", "M", "mM", "µM", "uM", "nM", "pM",
-  "mg/dL", "mg/dl", "g/dL", "g/dl", "U/L", "U/l", "U/mL", "U/ml", "IU/mL", "IU/ml", "Zellen/mL", "Zellen/ml", "cells/mL", "cells/ml", "KBE/mL", "KBE/ml", "CFU/mL", "CFU/ml",
-  // mass, amount, volume, length
+  "mg/dL", "mg/dl", "g/dL", "g/dl", "U/L", "U/l", "U/mL", "U/ml", "U/µL", "U/µl", "U/uL", "U/ul", "U/mg", "IU/mL", "IU/ml",
+  "Zellen/mL", "Zellen/ml", "cells/mL", "cells/ml", "KBE/mL", "KBE/ml", "CFU/mL", "CFU/ml",
+  "ppm", "ppb", "ppt", "mg/kg", "µg/kg", "ug/kg", "g/kg", "mg/g", "µg/g",
+  // molar mass, density, conductivity, molar energy, extinction coefficient
+  "g/mol", "kg/mol", "g/cm³", "kg/m³", "kg/dm³", "µS/cm", "uS/cm", "mS/cm", "kJ/mol", "J/mol", "kcal/mol", "L/(mol·cm)", "l/(mol·cm)",
+  // rates: flow, enzyme activity, growth
+  "mL/min", "ml/min", "L/min", "l/min", "µL/min", "µl/min", "mL/h", "ml/h", "L/h", "l/h", "µmol/min", "nmol/min", "h⁻¹", "min⁻¹", "s⁻¹",
+  // mass, amount, volume, length, area
   "kg", "g", "mg", "µg", "ug", "ng", "pg", "mol", "mmol", "µmol", "umol", "nmol", "pmol", "Da", "kDa",
-  "L", "l", "mL", "ml", "µL", "µl", "uL", "ul", "dL", "dl", "nL", "nl",
-  "m", "cm", "mm", "µm", "um", "nm", "bp", "kb",
-  // time, temperature, pressure, speed, energy
-  "s", "sec", "min", "h", "d", "ms", "°C", "°F", "K", "Pa", "hPa", "kPa", "bar", "mbar", "atm", "rpm", "U/min", "xg", "×g", "x g", "× g", "J", "kJ", "cal", "kcal", "V", "mV", "A", "mA",
+  "L", "l", "mL", "ml", "µL", "µl", "uL", "ul", "dL", "dl", "nL", "nl", "m³", "dm³", "cm³", "mm³",
+  "m", "cm", "mm", "µm", "um", "nm", "bp", "kb", "m²", "cm²", "mm²", "µm²",
+  // time, temperature, pressure, speed, energy, electricity, angle, optical density
+  "s", "sec", "min", "h", "d", "ms", "°C", "°F", "K", "Pa", "hPa", "kPa", "bar", "mbar", "atm", "rpm", "rcf", "U/min", "xg", "×g", "x g", "× g", "J", "kJ", "cal", "kcal", "V", "mV", "A", "mA", "°", "OD",
 ]);
 
-const SPACE = "[ \\u00A0\\u202F]";
-const CURRENCIES: { re: RegExp; symbol: "€" | "$" | "£" | "CHF" }[] = [
-  { re: /^(?:€|EUR)$/i, symbol: "€" },
-  { re: /^\$$/, symbol: "$" },
-  { re: /^£$/, symbol: "£" },
-  { re: /^CHF$/i, symbol: "CHF" },
+const SPACES = "   ";
+
+/**
+ * The text without spaces (no-break ones too) at its end. By hand on purpose: a RegExp such as
+ * ^(.*?) *%$ takes quadratic time on a long run of spaces (a pasted or imported cell can be
+ * 32,767 characters long).
+ */
+function trimSpacesEnd(s: string): string {
+  let end = s.length;
+  while (end > 0 && SPACES.includes(s[end - 1])) end--;
+  return s.slice(0, end);
+}
+
+function trimSpacesStart(s: string): string {
+  let start = 0;
+  while (start < s.length && SPACES.includes(s[start])) start++;
+  return s.slice(start);
+}
+
+type Currency = "€" | "$" | "£" | "CHF";
+/** How a currency may be written before or after the number (any case): "12,50 €", "12,50 EUR", "$12.50", "CHF 12.50". */
+const CURRENCIES: { text: string; symbol: Currency }[] = [
+  { text: "EUR", symbol: "€" },
+  { text: "CHF", symbol: "CHF" },
+  { text: "€", symbol: "€" },
+  { text: "$", symbol: "$" },
+  { text: "£", symbol: "£" },
 ];
-const currencySymbol = (s: string) => CURRENCIES.find((c) => c.re.test(s))?.symbol ?? null;
+
+/** A currency at the end ("12,50 €") or the start ("€ 12,50") of a text with a digit beside it: the symbol and the rest. */
+function currencyIn(s: string): { symbol: Currency; rest: string; before: boolean } | null {
+  for (const c of CURRENCIES) {
+    if (s.slice(-c.text.length).toUpperCase() === c.text) {
+      const rest = trimSpacesEnd(s.slice(0, s.length - c.text.length));
+      if (/\d/.test(rest)) return { symbol: c.symbol, rest, before: false };
+    }
+  }
+  for (const c of CURRENCIES) {
+    if (s.slice(0, c.text.length).toUpperCase() === c.text) {
+      const rest = trimSpacesStart(s.slice(c.text.length));
+      if (/\d/.test(rest)) return { symbol: c.symbol, rest, before: true };
+    }
+  }
+  return null;
+}
 
 /** Parse a plain number body (no sign) in the locale's style; null when it isn't one. */
 function parseNumberBody(body: string, locale: Locale, opts?: ParseValueOptions): { value: number; decimals: number; group: boolean; exp: boolean } | null {
@@ -94,13 +159,19 @@ const fractionDigits = (body: string) => {
 };
 
 function validDate(y: number, m: number, d: number): number | null {
+  // The serial numbers start at 30.12.1899 (0) and 31.12.1899 (1): those two read back too, so a
+  // date cell holding 0 or 1 can be edited without turning into text.
+  if (y === 1899 && m === 12 && d >= 30) return serialFromYMD(y, m, d);
   if (m < 1 || m > 12 || d < 1 || y < 1900 || y > 9999) return null;
   if (d > daysInMonth(y, m)) return null;
   return serialFromYMD(y, m, d);
 }
 
+/** The most hours a typed time may have ("9999:59"); longer durations are edited as plain numbers. */
+export const MAX_TYPED_HOURS = 9999;
+
 /** "14:30", "14:30:15", "2:30 PM" → fraction of a day (hours may exceed 24: "36:00" = 1,5). */
-function parseTime(text: string): { value: number; seconds: boolean } | null {
+function parseTime(text: string): { value: number; seconds: boolean; hours: number } | null {
   const m = /^(\d{1,4}):(\d{1,2})(?::(\d{1,2})(?:[.,](\d+))?)?(?:\s*([AaPp])\.?[Mm]\.?)?$/.exec(text);
   if (!m) return null;
   let h = Number(m[1]);
@@ -112,7 +183,7 @@ function parseTime(text: string): { value: number; seconds: boolean } | null {
     const pm = m[5].toLowerCase() === "p";
     h = (h % 12) + (pm ? 12 : 0);
   }
-  return { value: (h * 3600 + mi * 60 + s) / 86400, seconds: m[3] !== undefined };
+  return { value: (h * 3600 + mi * 60 + s) / 86400, seconds: m[3] !== undefined, hours: h };
 }
 
 function thisYear(opts?: ParseValueOptions): number {
@@ -197,38 +268,43 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
   }
 
   let percent = false;
-  let currency: "€" | "$" | "£" | "CHF" | null = null;
-  let m = new RegExp(`^(.*?)${SPACE}*%$`).exec(rest);
-  if (m) {
+  let currency: Currency | null = null;
+  if (rest.endsWith("%")) {
     percent = true;
-    rest = m[1];
-  } else if ((m = new RegExp(`^(.*?)${SPACE}*(€|EUR|\\$|£|CHF)$`, "i").exec(rest)) && /\d/.test(m[1])) {
-    currency = currencySymbol(m[2]);
-    rest = m[1];
-  } else if ((m = new RegExp(`^(€|EUR|\\$|£|CHF)${SPACE}*(.*)$`, "i").exec(rest)) && /\d/.test(m[2])) {
-    currency = currencySymbol(m[1]);
-    rest = m[2];
-    if (/^[-−]/.test(rest) && sign === 1) {
-      sign = -1;
-      rest = rest.slice(1);
+    rest = trimSpacesEnd(rest.slice(0, -1));
+  } else {
+    const c = currencyIn(rest);
+    if (c) {
+      currency = c.symbol;
+      rest = c.rest;
+      if (c.before && /^[-−]/.test(rest) && sign === 1) {
+        sign = -1;
+        rest = rest.slice(1);
+      }
     }
   }
 
-  // A lab unit after the number: "12,5 mg/L", "37 °C", "100µl".
+  // A lab unit after the number: "12,5 mg/L", "37 °C", "100µl", "1,02 g/cm3" (g/cm³).
   let unit: string | null = null;
   if (opts?.units && !percent && !currency) {
-    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)\s*([^\s0-9.,+\-][^0-9]*)$/.exec(rest);
-    if (um && LAB_UNITS.has(um[2].trim())) {
-      unit = um[2].trim();
+    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)\s*([^\s0-9.,+\-][^0-9]*)([23]?)$/.exec(rest);
+    const name = um ? um[2].trim() + (um[3] === "2" ? "²" : um[3] === "3" ? "³" : "") : "";
+    if (um && LAB_UNITS.has(name)) {
+      unit = name;
       rest = um[1];
     }
   }
 
   const num = parseNumberBody(rest, locale, opts);
+  // German "1.234": one group of three digits after a dot and nothing else (see thousandsHint).
+  // Money keeps its thousands dot: "1.234 €" never means 1,234 €.
+  const ambiguous = !!num?.group && !!opts?.thousandsHint && locale === "de" && !currency && /^\d{1,3}\.\d{3}$/.test(rest);
+  const decimal = sign * Number(rest);
   if (num && unit) {
     const value = sign * num.value;
     if (!Number.isFinite(value)) return null;
     if (num.exp) return { kind: "number", value, fmt: { kind: "scientific", decimals: Math.max(2, num.decimals), unit } };
+    if (ambiguous) return { kind: "number", value, fmt: { kind: "number", decimals: 0, unit }, orDecimal: { value: decimal, fmt: { kind: "number", decimals: 3, unit } } };
     return { kind: "number", value, fmt: { kind: "number", decimals: num.decimals, group: num.group || undefined, unit } };
   }
   if (unit) {
@@ -239,9 +315,14 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
   if (num) {
     const value = sign * num.value;
     if (!Number.isFinite(value)) return null;
-    if (percent) return { kind: "number", value: value / 100, fmt: { kind: "percent", decimals: num.decimals } };
+    if (percent) {
+      const fmt: NumberFormat = { kind: "percent", decimals: num.decimals };
+      if (ambiguous) return { kind: "number", value: value / 100, fmt, orDecimal: { value: decimal / 100, fmt: { kind: "percent", decimals: 3 } } };
+      return { kind: "number", value: value / 100, fmt };
+    }
     if (currency) return { kind: "number", value, fmt: { kind: "currency", decimals: num.decimals > 0 ? Math.max(2, num.decimals) : 0, symbol: currency } };
     if (num.exp) return { kind: "number", value, fmt: { kind: "scientific", decimals: Math.max(2, num.decimals) } };
+    if (ambiguous) return { kind: "number", value, orDecimal: { value: decimal } };
     if (num.group) return { kind: "number", value, fmt: { kind: "number", decimals: num.decimals, group: true } };
     return { kind: "number", value };
   }
@@ -259,7 +340,15 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
 
   // Times and dates (no sign, no symbols).
   const time = parseTime(text);
-  if (time) return { kind: "number", value: time.value, fmt: { kind: "time", seconds: time.seconds } };
+  if (time) {
+    // 24 hours or more is a duration (an incubation, a growth curve over days): it shows as 36:00
+    // and edits as 36:00, like Excel's [h]:mm, instead of the clock time 12:00.
+    if (time.hours >= 24) {
+      const fmt: DurationFormat = { kind: "time", seconds: time.seconds, duration: true };
+      return { kind: "number", value: time.value, fmt };
+    }
+    return { kind: "number", value: time.value, fmt: { kind: "time", seconds: time.seconds } };
+  }
   const date = parseDate(text, locale, opts);
   if (date) return { kind: "number", value: date.value, fmt: date.fmt };
 

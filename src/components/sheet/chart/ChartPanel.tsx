@@ -37,7 +37,7 @@ import { sheetChartText, type SheetChartText } from "@/i18n/messages/sheetChart"
 import { cn } from "@/lib/utils";
 import { ChartView } from "@/sheet/chart/ChartView";
 import { newSeries } from "@/sheet/chart/create";
-import { chartData, seriesColor, type ChartData } from "@/sheet/chart/data";
+import { chartData, seriesColor, type ChartData, type ChartSeriesData } from "@/sheet/chart/data";
 import type { Calc } from "@/sheet/engine";
 import type { AxisSpec, ChartKind, ChartSpec, ErrorBarSpec, RangeRef, SeriesSpec, Workbook } from "@/sheet/types";
 import { AddToNoteDialog } from "../embed/AddToNote";
@@ -46,7 +46,7 @@ import { deleteChart, saveChartFile, updateChart } from "./actions";
 import { Chips, Field, Note, NumberField, RangeField, Section, SeriesPicker, Swatches, TextField, Toggle } from "./PanelParts";
 import { selectionRef } from "./ranges";
 import { setChartUi, useChartUi, type ChartSection } from "./selection";
-import { TrendSection } from "./TrendSection";
+import { TrendSection, XTextNote } from "./TrendSection";
 
 const KIND_ICONS: Record<ChartKind, ReactNode> = {
   scatter: <ChartScatter className="size-5" />,
@@ -236,6 +236,8 @@ function PanelBody({
   const fromSelection = (): RangeRef => selectionRef(store.get());
   const scatter = spec.kind === "scatter";
   const lineKind = spec.kind === "scatter" || spec.kind === "line";
+  // Text among the chart's x values (of a series that has no x values of its own).
+  const sharedXText = scatter ? data.series.find((d, i) => d.xText && !spec.series[i]?.x)?.xText : undefined;
 
   const changeKind = (kind: ChartKind) =>
     change(t.undo.kind, (c) => ({
@@ -304,6 +306,7 @@ function PanelBody({
               s={s}
               index={i}
               name={data.series[i]?.name ?? s.name}
+              xText={s.x ? data.series[i]?.xText : undefined}
               spec={spec}
               wb={wb}
               t={t}
@@ -334,11 +337,12 @@ function PanelBody({
             onCommit={(r) => change(t.undo.x, (c) => ({ ...c, x: r }))}
             onUseSelection={readOnly ? undefined : () => change(t.undo.x, (c) => ({ ...c, x: fromSelection() }))}
           />
+          {sharedXText && <XTextNote xText={sharedXText} t={t} />}
         </Section>
 
         {spec.kind !== "pie" && current && (
           <Section id="trend" title={t.sections.trend} icon={<TrendingUp />} open={isOpen("trend")} onToggle={() => toggle("trend")}>
-            <TrendSection store={store} spec={spec} series={current} data={currentData} locale={locale} t={t} readOnly={readOnly} picker={picker} />
+            <TrendSection store={store} spec={spec} series={current} data={currentData} xFormat={data.xFormat} locale={locale} t={t} readOnly={readOnly} picker={picker} />
           </Section>
         )}
 
@@ -500,6 +504,7 @@ function SeriesCard({
   s,
   index,
   name,
+  xText,
   spec,
   wb,
   t,
@@ -511,6 +516,8 @@ function SeriesCard({
   s: SeriesSpec;
   index: number;
   name: string;
+  /** Text among this series' own x values. */
+  xText?: ChartSeriesData["xText"];
   spec: ChartSpec;
   wb: Workbook;
   t: SheetChartText;
@@ -589,6 +596,7 @@ function SeriesCard({
           onUseSelection={readOnly ? undefined : () => onChange((x) => ({ ...x, x: fromSelection() }))}
         />
       )}
+      {xText && <XTextNote xText={xText} t={t} />}
     </div>
   );
 }

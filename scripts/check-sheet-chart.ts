@@ -6,22 +6,27 @@
 // expected numbers here are computed independently: closed-form sums for straight lines,
 // Cramer's rule for parabolas, exact curves for the other models, plus textbook examples.
 // Also: R² semantics of every model (fixed intercepts, logarithms), domain errors, the equation
-// and R² text in German and English, solving for x, axis ticks, reading chart data from cells
-// (with a small fake Calc, so this doesn't need the formula engine), the chart a selection
-// makes, and the drawing itself (no NaN, the equation in the SVG).
+// and R² text in German and English (4 significant digits per coefficient, the same rule as the
+// .xlsx label format), solving for x and "Probe berechnen" (a worked line that adds up, advice
+// above and below the standards), axis ticks, reading chart data from cells (with a small fake
+// Calc, so this doesn't need the formula engine: hidden points, text among x values), the chart
+// a selection makes, and the drawing itself (no NaN, the equation in the SVG, wrapped when long,
+// forecasts on category charts, log axes with values ≤ 0, notes under the plot).
 // Problems make the script exit with 1.
 
 import { placeInView } from "@/components/sheet/chart/actions";
 import type { ChartViewport } from "@/components/sheet/chart/selection";
 import { cellKey } from "@/sheet/a1";
-import { linearAxis, logAxis, logTickLabel, niceStep } from "@/sheet/chart/axis";
+import { linearAxis, logAxis, logTickLabel, logTicksScientific, niceStep } from "@/sheet/chart/axis";
 import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
 import { chartData } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
-import { formatGeneral, formatR2, formatSignificant, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
+import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
+import { probeRange, probeResultText, workedLine } from "@/sheet/chart/probe";
 import { equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
-import { buildChartScene } from "@/sheet/chart/scene";
-import { formatValue, type Calc, type CellValue } from "@/sheet/engine";
+import { buildChartScene, textWidth, wrapEquation, type SvgNode } from "@/sheet/chart/scene";
+import { formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
+import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
 import type { Cell, ChartSpec, RangeRef, SeriesSpec, TrendlineSpec, Workbook } from "@/sheet/types";
 
 let passed = 0;
@@ -83,16 +88,29 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   close("calibration R²", f.r2, want.r2, 1e-12);
   close("calibration slope by hand", f.coefficients[1], 21.786 / 420, 1e-12);
   close("calibration R² ≈ 0.99997", f.r2, 0.999969863735797, 1e-9);
-  eq("calibration equation de", equationText(f, "de"), "y = 0,0519x + 0,0015");
-  eq("calibration equation en", equationText(f, "en"), "y = 0.0519x + 0.0015");
+  // Every coefficient with 4 significant digits (Excel's narrow label would say 0,0519 and 0,0015).
+  eq("calibration equation de", equationText(f, "de"), "y = 0,05187x + 0,001476");
+  eq("calibration equation en", equationText(f, "en"), "y = 0.05187x + 0.001476");
   // Excel's label says "R² = 1" here; students judge calibration lines by R² ≥ 0,999, so Blob
   // shows the decimals that keep it below 1.
   eq("calibration R² text (not 1 like Excel)", r2Text(f.r2!, "de"), "R² = 0,99997");
   eq("calibration R² text en", r2Text(f.r2!, "en"), "R² = 0.99997");
   eq("calibration n", f.n, 6);
-  // Excel keeps 4 decimals after "0,": more significant digits on request.
+  // "More digits" in the panel: 6 significant digits.
   eq("calibration equation 6 digits", equationText(f, "de", 6), "y = 0,0518714x + 0,00147619");
   close("solve 0,42", solveForX(f, 0.42), (0.42 - want.b) / want.m, 1e-12);
+
+  // Small and huge slopes keep their digits, so a student who works back from the label gets the
+  // right concentration (Excel's narrow label: "0,0009x + 0,0254", 5 % off; "9E-10x", 5 % off).
+  const brad = fit("bradford µg/mL", [0, 125, 250, 500, 750, 1000], [0.0247, 0.1472, 0.2587, 0.5007, 0.7317, 0.9737], spec("linear"));
+  eq("bradford µg/mL label", equationText(brad, "de"), "y = 0,0009463x + 0,02544");
+  const byHand = (0.5 - 0.02544) / 0.0009463;
+  check("bradford: the label's numbers give the concentration within 0,05 %", Math.abs(byHand / solveForX(brad, 0.5)! - 1) < 5e-4, { byHand, exact: solveForX(brad, 0.5) });
+  const cells = fit("cell counts", [1e8, 2e8, 5e8, 1e9, 2e9], [0.1, 0.21, 0.48, 0.95, 1.9], spec("linear"));
+  eq("cell counts label", equationText(cells, "de"), "y = 9,434E-10x + 0,01098");
+  check("cells: the label's numbers give the count within 0,05 %", Math.abs((0.5 - 0.01098) / 9.434e-10 / solveForX(cells, 0.5)! - 1) < 5e-4);
+  // The chart label, its aria label and "Formel kopieren" all use equationText: 4 digits, 6 with "more digits".
+  eq("bradford 6 digits", equationText(brad, "en", 6), "y = 0.000946316x + 0.0254368");
 
   // The textbook example x 1…5, y 2 4 5 4 5: y = 0,6x + 2,2 with R² = 0,6.
   const t = fit("textbook", [1, 2, 3, 4, 5], [2, 4, 5, 4, 5], spec("linear"));
@@ -120,7 +138,7 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   eq("origin intercept exactly 0", f0.coefficients[0], 0);
   const sse0 = sse(x, y, (v) => m0 * v);
   close("origin R² uncentred", f0.r2, 1 - sse0 / sum(y.map((v) => v * v)), 1e-12);
-  eq("origin equation", equationText(f0, "de"), "y = 0,0521x");
+  eq("origin equation", equationText(f0, "de"), "y = 0,05207x");
   // The uncentred R² of a poor line through 0 is still high, as in Excel.
   const poor = fit("poor origin", [1, 2, 3, 4], [5, 4, 6, 5], spec("linear", { intercept: 0 }));
   const mp = (5 + 8 + 18 + 20) / 30;
@@ -277,7 +295,8 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   const yMean = sum(gy) / gy.length;
   const rawR2 = 1 - sse(gx, gy, g.predict) / sum(gy.map((v) => (v - yMean) ** 2));
   check("growth R² is not the raw one", Math.abs(rawR2 - (g.r2 ?? 0)) > 1e-4, { rawR2, r2: g.r2 });
-  eq("growth equation", equationText(g, "de"), `y = ${formatGeneral(Math.exp(ln.b), "de")}e^(${formatGeneral(ln.m, "de")}x)`);
+  eq("growth equation", equationText(g, "de"), `y = ${formatCoefficient(Math.exp(ln.b), "de")}e^(${formatCoefficient(ln.m, "de")}x)`);
+  eq("growth equation text", equationText(g, "de"), "y = 0,04832e^(0,699x)");
 
   // Fixed intercept a₀ = 0,05: ln y − ln a₀ = b·x through the origin, R² on that.
   const a0 = 0.05;
@@ -289,7 +308,17 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   close("growth fixed R²", gf.r2, 1 - sse(gx, lyy, (v) => b0 * v) / sum(lyy.map((v) => v * v)), 1e-12);
   fitError("exp with y = 0", [1, 2, 3], [1, 0, 2], spec("exponential"), "non-positive-y");
   fitError("exp with y < 0", [1, 2, 3], [1, -1, 2], spec("exponential"), "non-positive-y");
-  fitError("exp intercept 0", [1, 2, 3], [1, 2, 3], spec("exponential", { intercept: 0 }), "bad-intercept");
+  fitError("exp intercept NaN", [1, 2, 3], [1, 2, 3], spec("exponential", { intercept: NaN }), "bad-intercept");
+  // A fixed a of 0 or less (left over from a line through the origin) can't be: a is fitted, not
+  // replaced by 1 (which drew a falling curve through growth data, R² 0,28).
+  const ox = [1.5, 2, 2.5, 3, 3.5];
+  const oy = [0.088, 0.172, 0.351, 0.694, 1.36];
+  const free = fit("growth free", ox, oy, spec("exponential"));
+  for (const a0 of [0, -1]) {
+    const ig = fit(`growth with a ${a0}`, ox, oy, spec("exponential", { intercept: a0 }));
+    check(`exp intercept ${a0} ignored: fitted a`, ig.intercept === null && near(ig.coefficients[0], free.coefficients[0], 1e-12) && near(ig.coefficients[1], free.coefficients[1], 1e-12) && ig.r2! > 0.999, ig);
+  }
+  eq("exp intercept 0 equation", equationText(fit("growth with 0", ox, oy, spec("exponential", { intercept: 0 })), "de"), "y = 0,01117e^(1,374x)");
   const decay = fit("decay", [0, 1, 2], [2, 2 * Math.exp(-0.5), 2 * Math.exp(-1)], spec("exponential"));
   eq("negative exponent", equationText(decay, "de"), "y = 2e^(-0,5x)");
   eq("negative exponent en", equationText(decay, "en"), "y = 2e^(-0.5x)");
@@ -347,19 +376,168 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
 }
 
 // ----------------------------------------------------------------------------------------------
+// Dates as x: a of exponential and power fits is far below what a number holds (e^(−28 610)),
+// yet the curve and the way back work (Excel's label says "0e^…" and Blob drew nothing).
+
+{
+  const d0 = 46325;
+  const days = [0, 1, 2, 3, 4, 5, 6];
+  const noise = [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.01];
+  const counts = days.map((t) => Math.round(2e5 * Math.exp(0.62 * t) * (1 + noise[t])));
+  const dx = days.map((t) => d0 + t);
+  const fromStart = fit("cells from the start", days, counts, spec("exponential"));
+  const dated = fit("cells by date", dx, counts, spec("exponential"));
+  eq("dates: a is 0 as a number", dated.coefficients[0], 0);
+  close("dates: same growth rate as from the start", dated.coefficients[1], fromStart.coefficients[1], 1e-9);
+  close("dates: same R²", dated.r2, fromStart.r2, 1e-9);
+  close("dates: the curve has values", dated.predict(d0 + 3), fromStart.predict(3), 1e-6);
+  close("dates: solve for 1 000 000 cells", solveForX(dated, 1e6), d0 + solveForX(fromStart, 1e6)!, 1e-9);
+  eq("dates: the label shows a, not 0", equationText(dated, "de"), "y = 5,884E-12426e^(0,6179x)");
+  const power = fit("cells by date, power", dx, counts, spec("power"));
+  check("dates: power curve has values", Number.isFinite(power.predict(d0 + 3)) && power.predict(d0 + 3) > 1e6, power.predict(d0 + 3));
+  check("dates: power solves", near(power.predict(solveForX(power, 1e6)!), 1e6, 1e-6), solveForX(power, 1e6));
+  check("dates: power label has no 0x", !equationText(power, "de").startsWith("y = 0x"), equationText(power, "de"));
+}
+
+// ----------------------------------------------------------------------------------------------
+// "Probe berechnen": the worked line gives the result shown when you type it into a calculator,
+// and the advice depends on where the sample lies (dilute only when it is above the standards).
+
+{
+  const brad = fit("bradford probe", [0, 125, 250, 500, 750, 1000], [0.0247, 0.1472, 0.2587, 0.5007, 0.7317, 0.9737], spec("linear"));
+  const xb = solveForX(brad, 0.5)!;
+  eq("probe result", probeResultText(xb, "de"), "501,48");
+  eq("probe worked line", workedLine(brad, 0.5, xb, "de"), "x = (0,5 − 0,0254368) / 0,000946316 = 501,48");
+  eq("probe worked line en", workedLine(brad, 0.5, xb, "en"), "x = (0.5 − 0.0254368) / 0.000946316 = 501.48");
+  const cells = fit("cells probe", [1e8, 2e8, 5e8, 1e9, 2e9], [0.1, 0.21, 0.48, 0.95, 1.9], spec("linear"));
+  const xc = solveForX(cells, 0.5)!;
+  eq("probe: a cell count in scientific notation", probeResultText(xc, "de"), "5,1833E+08");
+  eq("probe worked line, cells", workedLine(cells, 0.5, xc, "de"), "x = (0,5 − 0,0109784) / 9,43449E-10 = 5,1833E+08");
+  const lab = fit("lab probe", [0, 2, 4, 6, 8, 10], [0.002, 0.105, 0.209, 0.311, 0.418, 0.52], spec("linear"));
+  eq("probe worked line, minus intercept", workedLine(lab, -0.01, solveForX(lab, -0.01)!, "de"), "x = (-0,01 − 0,00147619) / 0,0518714 = -0,22124");
+  // Every worked line, typed into a calculator, gives its own result (all models with a formula).
+  const models: [string, Fit][] = [
+    ["bradford", brad],
+    ["cells", cells],
+    ["lab", lab],
+    ["exponential", fit("growth probe", [0, 1, 2, 3, 4, 5, 6], [0.05, 0.09, 0.21, 0.38, 0.81, 1.52, 3.3], spec("exponential"))],
+    ["logarithmic", fit("log probe", [0.5, 1, 2, 4, 8, 16], [0.2, 1.1, 2.3, 3.1, 4.4, 5.2], spec("logarithmic"))],
+    ["power", fit("power probe", [1, 2, 3, 5, 8, 13], [3.1, 5.6, 7.1, 10.9, 15.2, 21.8], spec("power"))],
+    ["dates", fit("dates probe", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("exponential"))],
+    ["dates power", fit("dates power probe", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("power"))],
+  ];
+  const calculator = (line: string, locale: "de" | "en") => {
+    // The line as a calculator reads it: numbers in the user's format, ln, e^, ^, −.
+    const expr = line
+      .replace(/^x = /, "")
+      .replace(/ = [^=]*$/, "")
+      .replace(/−/g, "-")
+      .replace(/-?\d[\d.,]*(E[-+]\d+)?/g, (m) => `(${parseChartNumber(m, locale)})`)
+      .replace(/ln\(/g, "Math.log(")
+      .replace(/e\^\(/g, "Math.exp(")
+      .replace(/\^/g, "**");
+    return Function(`"use strict"; return (${expr});`)() as number;
+  };
+  for (const [name, f] of models) {
+    for (const locale of ["de", "en"] as const) {
+      for (const y of [0.05, 0.42, 1, 3, 12, 1e6]) {
+        const x = solveForX(f, y);
+        if (x === null) continue;
+        const line = workedLine(f, y, x, locale)!;
+        const shown = line.split(" = ").pop();
+        check(`worked line adds up: ${name} ${y} ${locale}`, shown === probeResultText(x, locale) && probeResultText(calculator(line, locale), locale) === shown, line);
+      }
+    }
+  }
+  // Where the sample lies, decided on x (so falling curves work too).
+  eq("probe inside", probeRange(lab, solveForX(lab, 0.3)!), null);
+  eq("probe above the highest standard", probeRange(lab, solveForX(lab, 0.6)!), "above");
+  eq("probe below the blank", probeRange(lab, solveForX(lab, 0.001)!), "negative");
+  const noBlank = fit("no blank", [2, 4, 6, 8, 10], [0.105, 0.209, 0.311, 0.418, 0.52], spec("linear"));
+  eq("probe below the lowest standard", probeRange(noBlank, solveForX(noBlank, 0.05)!), "below");
+  const falling = fit("falling", [0, 2, 4, 6], [1, 0.8, 0.6, 0.4], spec("linear"));
+  eq("probe on a falling line: high y is below", probeRange(falling, solveForX(falling, 1.2)!), "negative");
+  eq("probe on a falling line: low y is above", probeRange(falling, solveForX(falling, 0.2)!), "above");
+}
+
+// ----------------------------------------------------------------------------------------------
+// The .xlsx export's label format follows the same rule: Excel shows every coefficient with at
+// least 4 significant digits, the same equation as Blob's chart to those digits.
+
+{
+  const fits: [string, Fit][] = [
+    ["bradford", fit("x bradford", [0, 125, 250, 500, 750, 1000], [0.0247, 0.1472, 0.2587, 0.5007, 0.7317, 0.9737], spec("linear"))],
+    ["cells", fit("x cells", [1e8, 2e8, 5e8, 1e9, 2e9], [0.1, 0.21, 0.48, 0.95, 1.9], spec("linear"))],
+    ["lab", fit("x lab", [0, 2, 4, 6, 8, 10], [0.002, 0.105, 0.209, 0.311, 0.418, 0.52], spec("linear"))],
+    ["quadratic", fit("x quad", [0, 125, 250, 500, 750, 1000], [0, 0.1347, 0.2633, 0.5027, 0.7113, 0.8993], spec("polynomial"))],
+    ["growth", fit("x growth", [0, 1, 2, 3, 4, 5, 6], [0.05, 0.09, 0.21, 0.38, 0.81, 1.52, 3.3], spec("exponential"))],
+    ["small", fit("x small", [0, 1, 2, 3], [0.00002, 0.00007, 0.00012, 0.00018], spec("linear"))],
+  ];
+  for (const [name, f] of fits) {
+    const code = trendLabelFormat(f);
+    for (const c of f.coefficients.filter((v) => v !== 0)) {
+      const excel = parseChartNumber(formatWithCode(c, code, "de"), "de");
+      const chart = parseChartNumber(formatCoefficient(c, "de"), "de");
+      check(`xlsx label ${name}: ${c} keeps 4 digits in Excel`, excel !== null && Math.abs(excel - c) <= 5.000001e-4 * Math.abs(c), { code, excel });
+      check(`xlsx label ${name}: ${c} agrees with the chart`, excel !== null && chart !== null && Math.abs(excel - chart) <= 1e-3 * Math.abs(c), { excel, chart });
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------------------------
 // Numbers in labels
 
 {
   const line = (m: number, b: number): Fit => ({ type: "linear", coefficients: [b, m], r2: 1, n: 2, predict: (x) => m * x + b });
   eq("sign: y = -1,2x + 3", equationText(line(-1.2, 3), "de"), "y = -1,2x + 3");
   eq("sign: minus intercept", equationText(line(2, -0.5), "de"), "y = 2x - 0,5");
-  eq("tiny slope like Excel", equationText(line(0.00006, 0.0012), "de"), "y = 6E-05x + 0,0012");
+  eq("tiny slope", equationText(line(0.00006, 0.0012), "de"), "y = 6E-05x + 0,0012");
   eq("tiny slope en", equationText(line(0.00006, 0.0012), "en"), "y = 6E-05x + 0.0012");
+  eq("tiny slope keeps its digits", equationText(line(0.0000523456, 0.0012), "de"), "y = 5,235E-05x + 0,0012");
   eq("slope 1 dropped", equationText(line(1, 2), "de"), "y = x + 2");
   eq("slope -1", equationText(line(-1, 0), "de"), "y = -x");
-  eq("huge numbers", equationText(line(25012.3, -4123456), "de"), "y = 25012x - 4E+06");
-  eq("4 decimals", equationText(line(0.052345, 0.00123), "de"), "y = 0,0523x + 0,0012");
+  eq("huge numbers", equationText(line(25012.3, -4123456), "de"), "y = 25012x - 4123456");
+  eq("from 10 million on scientific", equationText(line(12345678, -5.6e10), "de"), "y = 1,235E+07x - 5,6E+10");
+  eq("4 significant digits", equationText(line(0.052345, 0.00123), "de"), "y = 0,05235x + 0,00123");
   eq("zero line", equationText(line(0, 0), "de"), "y = 0");
+  // Every coefficient formatCoefficient writes reads back within 4 significant digits, at any size.
+  {
+    const bad: string[] = [];
+    for (let e = -12; e <= 12; e++) {
+      for (const m of [1, 1.23456, 4.99995, 9.87654, 9.99996]) {
+        for (const v of [m * 10 ** e, -m * 10 ** e]) {
+          for (const locale of ["de", "en"] as const) {
+            const s = formatCoefficient(v, locale);
+            const back = parseChartNumber(s, locale);
+            if (back === null || Math.abs(back - v) > 5.000001e-4 * Math.abs(v)) bad.push(`${v} → ${s}`);
+          }
+        }
+      }
+    }
+    eq("coefficients keep 4 significant digits", bad, []);
+  }
+  const coefCases: [number, string][] = [
+    [0.0518714, "0,05187"],
+    [0.000946289, "0,0009463"],
+    [0.00147619, "0,001476"],
+    [9.43396e-10, "9,434E-10"],
+    [7.85714, "7,857"],
+    [25012.3, "25012"],
+    [1234567.89, "1234568"],
+    [12345678, "1,235E+07"],
+    [0.000098, "9,8E-05"],
+    [0.0012, "0,0012"],
+    [-0.5, "-0,5"],
+    [0, "0"],
+  ];
+  for (const [v, s] of coefCases) eq(`coefficient ${v}`, formatCoefficient(v, "de"), s);
+  eq("coefficient 6 digits", formatCoefficient(0.0518714, "de", 6), "0,0518714");
+  eq("coefficient en", formatCoefficient(0.000946289, "en"), "0.0009463");
+  // A number known only by its logarithm (a of a fit with dates as x).
+  eq("from ln: tiny", formatFromLn(-28411.9, "de"), "7,389E-12340");
+  eq("from ln: huge", formatFromLn(23000, "en"), "5.93E+9988");
+  eq("from ln: ordinary", formatFromLn(Math.log(0.0521), "de"), "0,0521");
+  eq("from ln: rounds up a decade", formatFromLn(Math.LN10 * -1000 + Math.log(9.99996), "de"), "1E-999");
   const cases: [number, string][] = [
     [0.052345, "0,0523"],
     [7.85714, "7,8571"],
@@ -553,9 +731,29 @@ const calc = fakeCalc(lab);
   const g = chartData(chart("scatter", ref(1, 0, 6, 0), [series("m2", ref(1, 4, 6, 4), { nameRef: ref(0, 4, 0, 4) })]), calc, "de");
   eq("non-numbers skipped", g.series[0].points.map((p) => p.x), [0, 4, 6, 8, 10]);
   eq("name from cell", g.series[0].name, "M2");
-  // Text among x values: plotted against 1, 2, 3 … like Excel.
+  // Text among x values: plotted against 1, 2, 3 … like Excel, and the first such cell is named.
   const tx = chartData(chart("scatter", ref(1, 2, 6, 2), [series("m1", ref(1, 3, 6, 3))]), calc, "de");
   eq("text x → 1, 2, 3", tx.series[0].points.map((p) => p.x), [1, 2, 3, 4, 5, 6]);
+  eq("text x → which cell", tx.series[0].xText, { cell: "C2", text: "A", sheetId: "s1", row: 1, col: 2 });
+  eq("numbers as x → no text cell", d.series[0].xText, undefined);
+  {
+    // "Blank" typed for the blank's concentration: the whole calibration silently became 1…6.
+    const blank = workbook([["c", "E"], ["Blank", 0.003], [2, 0.104], [4, 0.207], [6, 0.318], [8, 0.423], [10, 0.522]]);
+    const bd = chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { trendline: linearTl })]), fakeCalc(blank), "de");
+    eq("blank as text → A2 named", [bd.series[0].xText?.cell, bd.series[0].xText?.text], ["A2", "Blank"]);
+    // A hidden row's text doesn't count (the chart leaves the row out anyway).
+    const hiddenBlank: Workbook = { ...blank, sheets: [{ ...blank.sheets[0], rows: { "1": { hidden: true } } }] };
+    const hb = chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), fakeCalc(hiddenBlank), "de");
+    check("hidden text x cell → real x values", hb.series[0].xText === undefined && hb.series[0].points[0].x === 2, hb.series[0]);
+    eq("hidden row counted", hb.series[0].hiddenPoints, 1);
+    // x values on another sheet: the cell with its sheet's name.
+    const other: Workbook = { ...blank, sheets: [blank.sheets[0], { ...blank.sheets[0], id: "s2", name: "Blatt 2" }] };
+    const od = chartData(chart("scatter", { ...ref(1, 0, 6, 0), sheetId: "s2" }, [series("e", ref(1, 1, 6, 1))]), fakeCalc(other), "de");
+    eq("text x on another sheet", od.series[0].xText?.cell, "'Blatt 2'!A2");
+    // A series' own x values.
+    const own = chartData(chart("scatter", null, [series("e", ref(1, 1, 6, 1), { x: ref(1, 0, 6, 0) })]), fakeCalc(blank), "de");
+    eq("own x with text", own.series[0].xText?.cell, "A2");
+  }
   eq("default name", tx.series[0].name, "Reihe 1");
   eq("default name en", chartData(chart("scatter", null, [series("m1", ref(1, 3, 6, 3))]), calc, "en").series[0].name, "Series 1");
 
@@ -604,6 +802,9 @@ const calc = fakeCalc(lab);
   const hiddenWb: Workbook = { ...lab, sheets: [{ ...lab.sheets[0], rows: { "2": { hidden: true } } }] };
   const hd = chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), fakeCalc(hiddenWb), "de");
   eq("hidden row skipped", hd.series[0].points.map((p) => p.x), [0, 4, 6, 8, 10]);
+  // …and counted, so the panel can say that formulas like STEIGUNG still use it.
+  eq("hidden points counted", hd.series[0].hiddenPoints, 1);
+  eq("nothing hidden → no count", d.series[0].hiddenPoints, undefined);
   // No series, missing sheet.
   eq("no series", chartData(chart("scatter", null, []), calc, "de").series, []);
   eq("missing sheet", chartData(chart("scatter", null, [series("x", { ...ref(1, 1, 6, 1), sheetId: "gone" })]), calc, "de").series[0].points, []);
@@ -750,6 +951,134 @@ if (engineReady) {
   check("empty chart says so", JSON.stringify(empty.nodes).includes("Noch keine Zahlen") && empty.plot === null);
   const poly = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 3, 6, 3), { trendline: { ...tl, type: "polynomial" } })]);
   check("polynomial exponent drawn raised", JSON.stringify(buildChartScene(poly, chartData(poly, calc, "de"), { width: 480, height: 300, locale: "de" }).nodes).includes('"dy":-'));
+}
+
+// ----------------------------------------------------------------------------------------------
+// The drawing: forecasts on category charts, log axes with values ≤ 0, notes under the plot,
+// long equations, trendlines with dates as x.
+
+/** Every <text> of a scene as it reads (its tspans joined). */
+function sceneTexts(nodes: (SvgNode | string)[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (typeof n === "string") continue;
+    if (n.tag === "text") out.push((n.children ?? []).map((c) => (typeof c === "string" ? c : (c.children ?? []).join(""))).join(""));
+    else if (n.children) sceneTexts(n.children, out);
+  }
+  return out;
+}
+/** Paths of a scene with a given attribute (and the attributes). */
+function scenePaths(nodes: (SvgNode | string)[], pick: (attrs: NonNullable<SvgNode["attrs"]>) => boolean, out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (typeof n === "string") continue;
+    if (n.tag === "path" && n.attrs && pick(n.attrs)) out.push(String(n.attrs.d ?? ""));
+    if (n.children) scenePaths(n.children, pick, out);
+  }
+  return out;
+}
+/** The x (or y) coordinates of a path's points. */
+const pathCoords = (d: string) => [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
+const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDasharray !== undefined && String(a.clipPath ?? "").includes("-tight"));
+
+{
+  // Forecasts on column, line, area and bar charts get categories of their own, like Excel: the
+  // dashed line isn't cut off half a category after the last point any more.
+  // (Values in the hundreds, so no value tick reads "5" or "6" like an extra category would.)
+  const week = workbook([["Tag", "Wert"], ["Mo", 200], ["Di", 310], ["Mi", 390], ["Do", 520]]);
+  const wc = fakeCalc(week);
+  for (const kind of ["column", "line", "area", "bar"] as const) {
+    const c = chart(kind, ref(1, 0, 4, 0), [series("w", ref(1, 1, 4, 1), { line: "straight", trendline: { ...linearTl, forward: 2, backward: 1 } })]);
+    const scene = buildChartScene(c, chartData(c, wc, "de"), { width: 480, height: 300, locale: "de" });
+    const P = scene.plot!;
+    const pts = pathCoords(trendPaths(scene.nodes)[0] ?? "");
+    const along = pts.map((p) => (kind === "bar" ? p.y : p.x));
+    const [a0, a1] = kind === "bar" ? [P.y, P.y + P.h] : [P.x, P.x + P.w];
+    const band = (a1 - a0) / 7;
+    check(`${kind}: forecast drawn inside the plot`, along.length === 2 && near(Math.min(...along), a0 + 0.5 * band, 1e-3) && near(Math.max(...along), a1 - 0.5 * band, 1e-3), { along, a0, a1 });
+    const texts = sceneTexts(scene.nodes);
+    check(`${kind}: the extra categories have no labels`, ["Mo", "Di", "Mi", "Do"].every((s) => texts.includes(s)) && !texts.includes("5") && !texts.includes("6"), texts);
+    eq(`${kind}: tooltips only for the data's categories`, scene.hits.map((h) => h.title), ["Mo", "Di", "Mi", "Do"]);
+  }
+  // "Rückwärts 0,5" (Excel's trick to start a column chart's trendline at the axis) adds nothing.
+  const half = chart("column", ref(1, 0, 4, 0), [series("w", ref(1, 1, 4, 1), { trendline: { ...linearTl, backward: 0.5 } })]);
+  const hs = buildChartScene(half, chartData(half, wc, "de"), { width: 480, height: 300, locale: "de" });
+  const hp = pathCoords(trendPaths(hs.nodes)[0] ?? "");
+  check("backward 0,5 reaches the axis", near(hp[0]?.x, hs.plot!.x, 1e-3), { first: hp[0], plot: hs.plot });
+  // The value axis is stretched only for a forecast that is drawn: here it is.
+  const lineFc = chart("line", ref(1, 0, 4, 0), [series("w", ref(1, 1, 4, 1), { trendline: { ...linearTl, forward: 3 } })]);
+  const lf = buildChartScene(lineFc, chartData(lineFc, wc, "de"), { width: 480, height: 300, locale: "de" });
+  check("line: forecast end inside the plot", Math.max(...pathCoords(trendPaths(lf.nodes)[0] ?? "").map((p) => p.x)) <= lf.plot!.x + lf.plot!.w + 0.01, lf.plot);
+
+  // A log axis: the 0 at the start of a growth curve isn't drawn (a note says so), the noisy
+  // point's error bar that reaches below 0 runs off the bottom without a lower cap, and the
+  // skipped point's error bar doesn't stretch the axis.
+  const growth = workbook([["t", "OD", "SD"], [0, 0, 0.004], [1, 0.012, 0.015], [2, 0.05, 0.01], [3, 0.2, 0.03], [4, 0.8, 0.06], [5, 1.6, 0.1]]);
+  const gc = fakeCalc(growth);
+  const logChart = chart("scatter", ref(1, 0, 6, 0), [series("g", ref(1, 1, 6, 1), { errorBars: { kind: "custom", value: 0, plus: ref(1, 2, 6, 2), minus: null, direction: "both" } })], { yAxis: { title: "OD", min: null, max: null, log: true, grid: true, decimals: null } });
+  for (const locale of ["de", "en"] as const) {
+    const ls = buildChartScene(logChart, chartData(logChart, gc, locale), { width: 480, height: 300, locale });
+    const texts = sceneTexts(ls.nodes);
+    check(`log axis: note about the value ≤ 0 (${locale})`, texts.includes(locale === "de" ? "1 Wert ≤ 0 nicht gezeigt (Log-Achse)" : "1 value ≤ 0 not shown (log axis)"), texts);
+    check(`log axis: the 0's error bar doesn't stretch the axis (${locale})`, texts.includes(locale === "de" ? "0,01" : "0.01") && !texts.includes(locale === "de" ? "0,001" : "0.001"), texts);
+    const bars = scenePaths(ls.nodes, (a) => a.strokeWidth === 1.3).join("");
+    const stems = [...bars.matchAll(/M[\d.]+ [\d.]+V[\d.]+/g)].length;
+    const caps = [...bars.matchAll(/h[\d.]+/g)].length;
+    check(`log axis: 5 error bars, one without its lower cap (${locale})`, stems === 5 && caps === 9, { stems, caps });
+    check(`log axis: the bar below 0 runs to the plot's bottom (${locale})`, bars.includes(`${Math.round((ls.plot!.y + ls.plot!.h) * 100) / 100}V`), bars.slice(0, 80));
+  }
+  // Nothing above 0 at all: the message in the middle, no note under it.
+  const zeros = workbook([["x", "y"], [1, 0], [2, -1]]);
+  const zs = buildChartScene(chart("scatter", ref(1, 0, 2, 0), [series("z", ref(1, 1, 2, 1))], { yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } }), chartData(chart("scatter", ref(1, 0, 2, 0), [series("z", ref(1, 1, 2, 1))]), fakeCalc(zeros), "de"), { width: 480, height: 300, locale: "de" });
+  check("log axis with nothing above 0 says so once", sceneTexts(zs.nodes).filter((s) => s.includes("Log-Achse") || s.includes("logarithmische")).length === 1, sceneTexts(zs.nodes));
+  // A log x axis counts its values ≤ 0 too.
+  const logX = chart("scatter", ref(1, 0, 6, 0), [series("g", ref(1, 3, 6, 3))], { xAxis: { title: "", min: null, max: null, log: true, grid: false, decimals: null } });
+  check("log x axis: note about x ≤ 0", sceneTexts(buildChartScene(logX, chartData(logX, calc, "de"), { width: 480, height: 300, locale: "de" }).nodes).includes("1 Wert ≤ 0 nicht gezeigt (Log-Achse)"));
+
+  // One notation per log axis.
+  check("log ticks 1E-07…1E-03 all scientific", logTicksScientific([1e-7, 1e-6, 1e-5, 1e-4, 1e-3]) && [1e-7, 1e-5, 1e-3].map((v) => logTickLabel(v, "de", true)).join(" ") === "1E-07 1E-05 1E-03");
+  check("log ticks 1000…1E+07 all scientific", logTicksScientific([1e3, 1e4, 1e5, 1e6, 1e7]) && logTickLabel(1e3, "de", true) === "1E+03" && logTickLabel(2e6, "de", true) === "2E+06");
+  check("log ticks 0,01…100 written out", !logTicksScientific([0.01, 0.1, 1, 10, 100]) && logTickLabel(0.01, "de") === "0,01");
+  const cfu = workbook([["t", "KBE/mL"], [0, 2e3], [1, 3e4], [2, 4e5], [3, 5e6], [4, 2e7]]);
+  const cfuChart = chart("scatter", ref(1, 0, 5, 0), [series("k", ref(1, 1, 5, 1))], { yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } });
+  const cfuTicks = sceneTexts(buildChartScene(cfuChart, chartData(cfuChart, fakeCalc(cfu), "de"), { width: 480, height: 300, locale: "de" }).nodes).filter((s) => /E\+|^1000/.test(s));
+  eq("CFU axis in one notation", cfuTicks, ["1E+03", "1E+04", "1E+05", "1E+06", "1E+07", "1E+08"]);
+
+  // Text among the x values: the chart itself says so (in the grid, in notes and in files).
+  const blank = workbook([["c", "E"], ["Blank", 0.003], [2, 0.104], [4, 0.207], [6, 0.318], [8, 0.423], [10, 0.522]]);
+  const textChart = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { trendline: linearTl })]);
+  check("text x: note in the SVG", chartSvg(textChart, chartData(textChart, fakeCalc(blank), "de"), "de").includes("Text in A2 statt Zahl – x ist hier 1, 2, 3 …"));
+  check("text x: note in English", chartSvg(textChart, chartData(textChart, fakeCalc(blank), "en"), "en").includes("Text in A2 instead of a number – x is 1, 2, 3 … here"));
+  check("numbers as x: no note", !sceneTexts(buildChartScene(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), calc, "de"), { width: 480, height: 300, locale: "de" }).nodes).some((s) => s.includes("statt Zahl")));
+
+  // A long equation is broken between its terms, not run past the plot.
+  const sixth = fit("6th order", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [1.3, 1.9, 2.5, 3.1, 3.5, 4, 4.3, 4.8, 5.1, 5.6, 5.9, 6.4], spec("polynomial", { order: 6 }));
+  const parts = equationParts(sixth, "de");
+  const wrapped = wrapEquation(parts, 260, 12);
+  const lineText = (ps: typeof parts) => ps.map((p) => (p.sup ? (p.plain ?? p.text) : p.text)).join("");
+  check("long equation wraps", wrapped.length >= 2 && wrapped.every((l) => l.indent + l.parts.reduce((w, p) => w + textWidth(p.text, p.sup ? 12 * 0.72 : 12), 0) <= 260), wrapped.map((l) => lineText(l.parts)));
+  eq("wrapped lines read as the equation", wrapped.map((l) => lineText(l.parts)).join(" "), equationText(sixth, "de"));
+  check("continuation lines start with their sign, after y =", wrapped.slice(1).every((l) => /^[+-] /.test(lineText(l.parts)) && l.indent > 0), wrapped.map((l) => lineText(l.parts)));
+  eq("short equation stays one line", wrapEquation(equationParts(fit("short", [0, 1, 2], [1, 3, 5], spec("linear")), "de"), 260, 12).length, 1);
+
+  // Dates as x: the exponential curve is drawn (it was missing), and has its legend entry.
+  const datesWb = workbook(
+    [["Datum", "Zellen"], ...[0, 1, 2, 3, 4, 5, 6].map((t) => [46325 + t, Math.round(2e5 * Math.exp(0.62 * t) * (1 + [0, 0.03, -0.02, 0.04, -0.03, 0.02, -0.01][t]))])],
+    Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((r) => [cellKey(r, 0), { fmt: { kind: "date" as const, style: "short" as const } }])),
+  );
+  for (const type of ["exponential", "power"] as const) {
+    const dc = chart("scatter", ref(1, 0, 7, 0), [series("c", ref(1, 1, 7, 1), { trendline: { ...linearTl, type } })], { legend: "bottom" });
+    const ds = buildChartScene(dc, chartData(dc, fakeCalc(datesWb), "de"), { width: 480, height: 300, locale: "de" });
+    check(`dates ${type}: the trendline is drawn`, pathCoords(trendPaths(ds.nodes)[0] ?? "").length > 100, trendPaths(ds.nodes)[0]?.slice(0, 60));
+    check(`dates ${type}: legend entry`, sceneTexts(ds.nodes).some((s) => s.includes("(Reihe 1)")), sceneTexts(ds.nodes));
+  }
+  // A trendline with nothing to draw on the axes has no legend entry.
+  const negWb = workbook([["x", "y"], [1, 5], [2, 4], [3, 3.2], [4, 2.1]]);
+  const negLine = chart("scatter", ref(1, 0, 4, 0), [series("n", ref(1, 1, 4, 1), { trendline: { ...linearTl, forward: 0 } })], { legend: "bottom", yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } });
+  check("drawn trendline has its legend entry", sceneTexts(buildChartScene(negLine, chartData(negLine, fakeCalc(negWb), "de"), { width: 480, height: 300, locale: "de" }).nodes).includes("Linear (Reihe 1)"));
+  // (The line through these is below 0 from x = 1 to 5; only the last point shows.)
+  const allNeg = workbook([["x", "y"], [1, -5], [2, -4], [3, -3], [4, -2], [5, 0.01]]);
+  const negChart = chart("scatter", ref(1, 0, 5, 0), [series("n", ref(1, 1, 5, 1), { trendline: linearTl })], { legend: "bottom", yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } });
+  const negScene = buildChartScene(negChart, chartData(negChart, fakeCalc(allNeg), "de"), { width: 480, height: 300, locale: "de" });
+  check("trendline below 0 on a log axis: no legend entry", trendPaths(negScene.nodes).every((d) => !d) && !sceneTexts(negScene.nodes).includes("Linear (Reihe 1)"), sceneTexts(negScene.nodes));
 }
 
 const failed = problems.length;

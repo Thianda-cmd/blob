@@ -6,7 +6,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey, inArea, parseKey } from "./a1";
-import { adjustArea, adjustFormula, adjustMovedFormula, editText, formatValue, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type StructuralChange, type TableRows } from "./engine";
+import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globFind, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
 import { seriesOf } from "./engine/series";
 // Smart-table helpers that import nothing from this file (table/model.ts does, so it can't be used here).
 import { columnPattern, headerGaps, insertedRowCells } from "./table/columns";
@@ -896,21 +896,14 @@ export function sortArea(wb: Workbook, calc: Calc, sheetId: string, area: Area, 
 
 export type FindOptions = { sheetId?: string; matchCase?: boolean; wholeCell?: boolean; inFormulas?: boolean };
 
-const escapeRe = (s: string) => s.replace(/[\\^$.|+()[\]{}*?]/g, "\\$&");
-
-/** The query as a test: * and ? are wildcards (like Excel's find), ~ escapes them. */
-function finder(query: string, opts: FindOptions): RegExp {
-  let src = "";
-  for (let i = 0; i < query.length; i++) {
-    const ch = query[i];
-    if (ch === "~" && i + 1 < query.length && "*?~".includes(query[i + 1])) {
-      src += escapeRe(query[i + 1]);
-      i++;
-    } else if (ch === "*") src += "[\\s\\S]*";
-    else if (ch === "?") src += "[\\s\\S]";
-    else src += escapeRe(ch);
-  }
-  return new RegExp(opts.wholeCell ? `^${src}$` : src, opts.matchCase ? "g" : "gi");
+/**
+ * The query as a test: * and ? are wildcards (like Excel's find), ~ escapes them. Matched without
+ * a RegExp (src/sheet/engine/glob.ts), so no query can freeze the page.
+ */
+function finder(query: string, opts: FindOptions): { found: (text: string) => boolean; replace: (text: string, by: string) => string } {
+  const glob: Glob = compileGlob(query, { matchCase: opts.matchCase });
+  if (opts.wholeCell) return { found: (text) => globTest(glob, text), replace: (text, by) => (globTest(glob, text) ? by : text) };
+  return { found: (text) => globFind(glob, text) !== null, replace: (text, by) => globReplace(glob, text, by) };
 }
 
 function sortedKeys(sheet: Sheet): { key: string; row: number; col: number }[] {
@@ -922,7 +915,7 @@ function sortedKeys(sheet: Sheet): { key: string; row: number; col: number }[] {
 /** Cells whose shown text (or formula, with inFormulas) contains the query, sheet by sheet, row by row. */
 export function findCells(wb: Workbook, calc: Calc, query: string, opts: FindOptions, locale: Locale): { sheetId: string; row: number; col: number }[] {
   if (!query) return [];
-  const re = finder(query, opts);
+  const match = finder(query, opts);
   const out: { sheetId: string; row: number; col: number }[] = [];
   for (const sheet of wb.sheets) {
     if (opts.sheetId && sheet.id !== opts.sheetId) continue;
@@ -930,8 +923,7 @@ export function findCells(wb: Workbook, calc: Calc, query: string, opts: FindOpt
       const cell = sheet.cells[key];
       if (cell.v === undefined && cell.f === undefined) continue;
       const text = opts.inFormulas ? editText(cell, locale).replace(/^'/, "") : formatValue(calc.value(sheet.id, row, col), cell.s?.fmt, locale);
-      re.lastIndex = 0;
-      if (re.test(text)) out.push({ sheetId: sheet.id, row, col });
+      if (match.found(text)) out.push({ sheetId: sheet.id, row, col });
     }
   }
   return out;
@@ -941,7 +933,7 @@ export function findCells(wb: Workbook, calc: Calc, query: string, opts: FindOpt
 export function replaceCells(wb: Workbook, calc: Calc, query: string, replacement: string, opts: FindOptions, locale: Locale): { wb: Workbook; count: number } {
   void calc;
   if (!query) return { wb, count: 0 };
-  const re = finder(query, opts);
+  const match = finder(query, opts);
   let next = wb;
   let count = 0;
   for (const sheet of wb.sheets) {
@@ -952,9 +944,8 @@ export function replaceCells(wb: Workbook, calc: Calc, query: string, replacemen
       if (cell.f !== undefined) {
         if (!opts.inFormulas) continue;
         const local = toLocalFormula(cell.f, locale);
-        re.lastIndex = 0;
-        if (!re.test(local)) continue;
-        const replaced = local.replace(re, () => replacement);
+        if (!match.found(local)) continue;
+        const replaced = match.replace(local, replacement);
         const r = toCanonicalFormula(replaced, locale);
         if ("error" in r || r.formula === cell.f) continue;
         updates.push({ row, col, cell: { ...cell, f: r.formula } });
@@ -963,9 +954,8 @@ export function replaceCells(wb: Workbook, calc: Calc, query: string, replacemen
       }
       if (cell.v === undefined) continue;
       const text = typeof cell.v === "string" ? cell.v : editText({ v: cell.v, s: cell.s }, locale);
-      re.lastIndex = 0;
-      if (!re.test(text)) continue;
-      const replaced = text.replace(re, () => replacement);
+      if (!match.found(text)) continue;
+      const replaced = match.replace(text, replacement);
       if (replaced === text) continue;
       const p = typeof cell.v === "string" && cell.s?.fmt?.kind === "text" ? { cell: { v: replaced } } : parseInput(replaced, locale, cell);
       const content: Pick<Cell, "v" | "f"> = "error" in p && p.error ? { v: replaced } : p.cell;

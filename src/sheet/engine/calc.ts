@@ -115,6 +115,7 @@ export class CalcImpl implements Calc {
   private readonly nowFn: () => Date;
   private nowValue: Date | null = null;
   private readonly hiddenFn?: (sheetId: string, row: number) => boolean;
+  private readonly filteredFn?: (sheetId: string, row: number) => boolean;
   private extent: { rows: number; cols: number } | null = null;
   /**
    * Values that read a cell still being calculated (re-entrant reads, e.g. a smart table's filter
@@ -131,6 +132,7 @@ export class CalcImpl implements Calc {
     this.locale = opts.locale ?? DEFAULT_LOCALE;
     this.nowFn = opts.now ?? (() => new Date());
     this.hiddenFn = opts.isRowHidden;
+    this.filteredFn = opts.isRowFiltered;
     wb.sheets.forEach((sheet, idx) => {
       const rec: SheetRec = { idx, id: sheet.id, name: sheet.name, sheet };
       this.recs.push(rec);
@@ -253,6 +255,8 @@ export class CalcImpl implements Calc {
     const rec = this.recs[sheet];
     if (!rec) return { filtered: false, manual: false };
     const manual = !!rec.sheet.rows[String(row)]?.hidden;
+    // A filtered row never counts, hidden by hand as well or not (Excel's SUBTOTAL 1–11 too).
+    if (this.filteredFn) return { filtered: this.filteredFn(rec.id, row), manual };
     const any = this.hiddenFn ? this.hiddenFn(rec.id, row) : manual;
     return { filtered: any && !manual, manual };
   }
@@ -691,7 +695,7 @@ function call(node: Extract<Node, { t: "call" }>, ctx: EvalCtx): Value {
   let lift = false;
   for (let i = 0; i < n; i++) {
     const kind = argKind(def.args, i);
-    let v = ev(node.args[i], ctx);
+    let v = i === 0 && def.lookupValue && node.args[0].t === "miss" ? 0 : ev(node.args[i], ctx);
     if (kind !== "r") {
       if (isRef(v)) v = ctx.deref(v);
       if (kind === "s" && isMatrix(v)) {

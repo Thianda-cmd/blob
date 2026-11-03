@@ -110,6 +110,20 @@ export const sheetGridText = defineMessages({
     pasteHint: "Press Ctrl+V (⌘V on a Mac) to paste from the clipboard.",
     pasteNothing: "There is nothing to paste.",
 
+    // Text that looks like a number (a mark in the cell's corner, its tip and what screen readers hear)
+    numberText: {
+      title: "Number stored as text",
+      text: "This looks like a number, but it's text, for example because of a second comma or a space. Formulas and charts leave this cell out. Type the value again.",
+    },
+
+    // Filling on a touch screen: the menu entry, and how it works
+    fillTouch: "Fill…",
+    fillByTouch: "Drag the square at the bottom right down or to the side: series like 2, 4, 6 continue, formulas adjust.",
+
+    // The keyboard on phones and tablets while typing in a cell (a switch in the formula bar)
+    numberPad: "Number keyboard",
+    letterPad: "Letter keyboard",
+
     // Undo steps
     labels: {
       input: "Typing",
@@ -230,6 +244,17 @@ export const sheetGridText = defineMessages({
 
     pasteHint: "Drück Strg+V (⌘V am Mac), um aus der Zwischenablage einzufügen.",
     pasteNothing: "Es gibt nichts zum Einfügen.",
+
+    numberText: {
+      title: "Zahl als Text",
+      text: "Das sieht aus wie eine Zahl, ist aber Text, zum Beispiel wegen eines zweiten Kommas oder eines Leerzeichens. Formeln und Diagramme lassen diese Zelle aus. Tipp den Wert neu ein.",
+    },
+
+    fillTouch: "Ausfüllen …",
+    fillByTouch: "Zieh das Quadrat unten rechts nach unten oder zur Seite: Reihen wie 2, 4, 6 gehen weiter, Formeln passen sich an.",
+
+    numberPad: "Zahlentastatur",
+    letterPad: "Buchstabentastatur",
 
     labels: {
       input: "Eingabe",

@@ -4,17 +4,18 @@
 // its options, the fitted equation and R² read out live, and "Probe berechnen": type a measured
 // value and get x back (the concentration of a sample from its absorbance).
 
-import { Calculator, Check, ClipboardCopy, Info, TriangleAlert } from "lucide-react";
+import { Calculator, Check, ClipboardCopy, Info, Lightbulb, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
 import type { Locale } from "@/i18n/config";
 import type { SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import type { ChartSeriesData } from "@/sheet/chart/data";
-import { formatGeneral, formatSignificant, parseChartNumber } from "@/sheet/chart/format";
-import { equationParts, equationText, isFitError, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
+import { formatCoefficient, isDateFormat, parseChartNumber } from "@/sheet/chart/format";
+import { probeRange, probeResultText, workedLine } from "@/sheet/chart/probe";
+import { aOutOfRange, equationParts, equationText, isFitError, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
 import { trendlineName } from "@/sheet/chart/scene";
-import type { ChartSpec, SeriesSpec, TrendlineSpec } from "@/sheet/types";
+import type { ChartSpec, NumberFormat, SeriesSpec, TrendlineSpec } from "@/sheet/types";
 import type { SheetStore } from "../store";
 import { LINEAR_TRENDLINE, updateChart } from "./actions";
 import { Chips, Field, Note, NumberField, TextField, Toggle } from "./PanelParts";
@@ -85,11 +86,21 @@ function CopyButton({ text, label, t }: { text: string; label: string; t: SheetC
   );
 }
 
+/** Why the points stand at x = 1, 2, 3 …: a cell among the x values holds text (its text shortened for the sentence). */
+export function XTextNote({ xText, t }: { xText: NonNullable<ChartSeriesData["xText"]>; t: SheetChartText }) {
+  return (
+    <Note tone="warn" icon={<TriangleAlert />}>
+      {t.xTextPanel(xText.cell, xText.text.length > 24 ? `${xText.text.slice(0, 23)}…` : xText.text)}
+    </Note>
+  );
+}
+
 export function TrendSection({
   store,
   spec,
   series,
   data,
+  xFormat,
   locale,
   t,
   readOnly,
@@ -99,6 +110,8 @@ export function TrendSection({
   spec: ChartSpec;
   series: SeriesSpec;
   data: ChartSeriesData | undefined;
+  /** The number format of the chart's x values (dates get a tip for exponential and power fits). */
+  xFormat?: NumberFormat | null;
   locale: Locale;
   t: SheetChartText;
   readOnly: boolean;
@@ -114,16 +127,19 @@ export function TrendSection({
       ...c,
       series: c.series.map((s) => (s.id === series.id ? { ...s, trendline: patch === null ? null : { ...(s.trendline ?? LINEAR_TRENDLINE), ...patch } } : s)),
     }));
-  const choose = (type: TrendType | "none") => {
-    if (type === "none") return set(null);
-    // A fixed intercept doesn't exist for logarithmic and power fits; exponential needs one above 0.
-    const intercept = tl?.intercept ?? null;
-    const fixed = type === "logarithmic" || type === "power" || type === "movingAverage" ? null : type === "exponential" && intercept !== null && intercept <= 0 ? 1 : intercept;
-    set({ type, intercept: fixed });
-  };
+  // The fixed intercept stays as it is when the type changes: logarithmic, power and moving
+  // averages don't use one, and exponential ignores one at or below 0 (the panel says so), so a
+  // line through the origin is still one after trying other types.
+  const choose = (type: TrendType | "none") => (type === "none" ? set(null) : set({ type }));
   const seriesName = data?.name ?? series.name;
   const canIntercept = tl && (tl.type === "linear" || tl.type === "polynomial" || tl.type === "exponential");
   const n = data?.points.length ?? 0;
+  const fitted = fit && !isFitError(fit) ? fit : null;
+  // Exponential: an intercept switched on starts at the fitted a (so the curve stays put until
+  // the student types the value she knows); a line starts through the origin.
+  const fittedA = fitted?.type === "exponential" && fitted.coefficients[0] >= 1e-300 && fitted.coefficients[0] <= 1e300 ? Number(fitted.coefficients[0].toPrecision(4)) : 1;
+  const interceptIgnored = tl?.type === "exponential" && tl.intercept !== null && tl.intercept <= 0;
+  const datesTip = spec.kind === "scatter" && !!fitted && (fitted.type === "exponential" || fitted.type === "power") && (isDateFormat(xFormat) || aOutOfRange(fitted));
 
   return (
     <div className="space-y-3.5">
@@ -184,9 +200,13 @@ export function TrendSection({
               </>
             ) : null}
           </div>
+          {data?.xText && <XTextNote xText={data.xText} t={t} />}
+          {!!data?.hiddenPoints && <Note icon={<Info />}>{t.hiddenPoints(data.hiddenPoints)}</Note>}
+          {interceptIgnored && <Note icon={<Info />}>{t.interceptIgnored(formatCoefficient(tl.intercept!, locale, 6))}</Note>}
+          {datesTip && <Note icon={<Lightbulb />}>{t.datesTip}</Note>}
           {spec.kind !== "scatter" && <Note icon={<Info />}>{t.categoryX}</Note>}
 
-          {fit && !isFitError(fit) && <Probe fit={fit} spec={spec} locale={locale} t={t} seriesName={seriesName} />}
+          {fitted && <Probe fit={fitted} spec={spec} locale={locale} t={t} seriesName={seriesName} />}
 
           {tl.type !== "movingAverage" && (
             <div className="space-y-1">
@@ -201,10 +221,10 @@ export function TrendSection({
                 label={t.setIntercept}
                 checked={tl.intercept !== null}
                 disabled={readOnly}
-                onChange={(v) => set({ intercept: v ? (tl.type === "exponential" ? 1 : 0) : null })}
+                onChange={(v) => set({ intercept: v ? (tl.type === "exponential" ? fittedA : 0) : null })}
               />
               {tl.intercept !== null && (
-                <Field label={t.setIntercept} hint={t.interceptHint}>
+                <Field label={t.setIntercept} hint={tl.type === "exponential" ? t.interceptHintExp : t.interceptHint}>
                   <NumberField locale={locale} value={tl.intercept} onCommit={(v) => v !== null && set({ intercept: v })} label={t.setIntercept} className="w-32" />
                 </Field>
               )}
@@ -237,26 +257,6 @@ export function TrendSection({
   );
 }
 
-/** The solution with the numbers put in: "x = (0,42 − 0,0015) / 0,0519 = 8,0685" (the models with a formula). */
-function worked(fit: Fit, y: number, x: number, locale: Locale): string | null {
-  const g = (v: number) => formatGeneral(v, locale);
-  const c = fit.coefficients;
-  const result = `= ${formatSignificant(x, locale, 5)}`;
-  const minus = (a: string, v: number) => (v < 0 ? `${a} + ${g(-v)}` : `${a} − ${g(v)}`);
-  switch (fit.type) {
-    case "linear":
-      return `x = (${minus(g(y), c[0])}) / ${g(c[1])} ${result}`;
-    case "exponential":
-      return `x = ln(${g(y)} / ${g(c[0])}) / ${g(c[1])} ${result}`;
-    case "logarithmic":
-      return `x = e^((${minus(g(y), c[0])}) / ${g(c[1])}) ${result}`;
-    case "power":
-      return `x = (${g(y)} / ${g(c[0])})^(1 / ${g(c[1])}) ${result}`;
-    default:
-      return null;
-  }
-}
-
 /** "Probe berechnen": a measured y → x along the trendline, with how it is worked out. */
 function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec; locale: Locale; t: SheetChartText; seriesName: string }) {
   const [text, setText] = useState("");
@@ -264,8 +264,9 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
   const x = y === null ? null : solveForX(fit, y);
   const yName = spec.yAxis.title.trim() || seriesName || "y";
   const xName = spec.kind === "scatter" ? spec.xAxis.title.trim() || "x" : "x";
-  const outside = x !== null && fit.xMin !== undefined && fit.xMax !== undefined && (x < fit.xMin - 1e-9 * Math.abs(fit.xMin) || x > fit.xMax + 1e-9 * Math.abs(fit.xMax));
-  const xText = x === null ? "" : formatSignificant(x, locale, 5);
+  const outside = x === null ? null : probeRange(fit, x);
+  const xText = x === null ? "" : probeResultText(x, locale);
+  const line = x === null || y === null ? null : workedLine(fit, y, x, locale);
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-1 flex items-center gap-2 text-[13px] font-medium text-ink">
@@ -295,14 +296,14 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
                 <div className="truncate text-[11.5px] text-blob-ink/80">{xName}</div>
                 <div className={cn("truncate text-[18px] font-semibold tabular-nums leading-tight text-blob-ink")}>{xText}</div>
               </div>
-              <CopyButton text={formatSignificant(x, locale, 6)} label={t.copy} t={t} />
+              <CopyButton text={formatCoefficient(x, locale, 6)} label={t.copy} t={t} />
             </div>
           )}
           <p className="font-mono text-[11.5px] leading-relaxed text-ink-3">{t.solveHow[fit.type]}</p>
-          {x !== null && worked(fit, y, x, locale) && <p className="font-mono text-[11.5px] leading-relaxed text-ink-3">{worked(fit, y, x, locale)}</p>}
+          {line && <p className="break-words font-mono text-[11.5px] leading-relaxed text-ink-3">{line}</p>}
           {outside && (
             <Note tone="warn" icon={<TriangleAlert />}>
-              {t.probeOutside(formatSignificant(fit.xMin!, locale, 4), formatSignificant(fit.xMax!, locale, 4))}
+              {outside === "above" ? t.probeAbove(formatCoefficient(fit.xMax!, locale)) : outside === "below" ? t.probeBelow(formatCoefficient(fit.xMin!, locale)) : t.probeNegative}
             </Note>
           )}
         </div>

@@ -1,8 +1,8 @@
 // Text: TEXTKETTE, VERKETTEN, TEXTVERKETTEN, LINKS, RECHTS, TEIL, LÄNGE, GROSS, KLEIN, GROSS2,
 // GLÄTTEN, TEXT, WERT, FINDEN, SUCHEN, WECHSELN, ERSETZEN, WIEDERHOLEN, IDENTISCH, FEST, ZEICHEN, CODE.
 
-import { wildcardRegex } from "../criteria";
 import { formatFixed, formatWithCode } from "../format";
+import { compileGlob, globFind } from "../glob";
 import { textToNumber } from "../parse";
 import { ERR, isErr, mkErr, type CellError, type Scalar, type Value } from "../values";
 import { roundExcel } from "./math";
@@ -152,12 +152,9 @@ export const TEXT_FNS: FnDef[] = [
     if (start < 1 || start > w.length + 1) return ERR.value;
     const f = find as string;
     if (f === "") return start;
-    // Wildcards: the shortest match starting at each position, first position wins.
-    const re = wildcardRegex(f);
-    const src = re.source.slice(1, -1);
-    const lazy = new RegExp(src.replace(/\[\\s\\S\]\*/g, "[\\s\\S]*?"), "i");
-    const m = lazy.exec(w.slice(start - 1));
-    return m ? m.index + start : mkErr("#VALUE!", "not-found");
+    // Wildcards (* ? ~), any case: the first position where the pattern matches.
+    const m = globFind(compileGlob(f), w, start - 1);
+    return m ? m.start + 1 : mkErr("#VALUE!", "not-found");
   }),
   textFn("SUBSTITUTE", 3, 4, "tttn", ([text, old, rep, inst]) => {
     const s = text as string;

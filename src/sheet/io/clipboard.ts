@@ -11,7 +11,17 @@
 // - Google Sheets: TSV without the last line break; HTML inside <google-sheets-html-origin>.
 // - LibreOffice, Numbers, Word tables and web pages: an HTML table, and text with tabs (or not).
 // Both carry the values as the cells show them ("1,5" in German), which is what pasting wants:
-// every value is read like typing in the user's language.
+// every value is read like typing in the user's language. A spreadsheet's HTML also carries each
+// number's full value (Excel x:num, LibreOffice sdval, Google Sheets data-sheets-value): pasting
+// keeps those (clipboardNumbers, pasteExactNumbers), so 0,12 shown is 0,123456789 pasted, as
+// between two spreadsheet programs.
+
+import type { Locale } from "@/i18n/config";
+import { cellKey } from "../a1";
+import { formatValue, parseInput } from "../engine";
+import { setCells } from "../ops";
+import type { Cell, NumberFormat, Pos, Workbook } from "../types";
+import { lookup } from "./xml";
 
 /** Rows of cell texts from clipboard data; null when it isn't table-like (then paste as one value). */
 export function parseClipboard(data: { text?: string; html?: string }): string[][] | null {
@@ -52,8 +62,21 @@ export function toTsv(rows: string[][]): string {
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/**
+ * How a copied cell goes into the HTML. `num`: its full value, for Excel (x:num), which then
+ * calculates with it rather than with the rounded text. `fmt`: its number format as an Excel
+ * format code, so Excel shows it the same (a unit too, which the text leaves out).
+ */
+export type HtmlCellLook = { bold?: boolean; align?: "left" | "center" | "right"; num?: number; fmt?: string };
+
+/** A number as Excel writes x:num ("1E-7", never "-0"). */
+const excelNum = (n: number) => (Object.is(n, -0) ? "0" : String(n).replace("e", "E"));
+
+/** An Excel format code as a CSS string (Excel reads mso-number-format with CSS escapes). */
+const cssString = (code: string) => `"${code.replace(/[\\"]/g, "\\$&")}"`;
+
 /** An HTML table (escaped), optionally with bold/colour per cell, for pasting into rich editors. */
-export function toHtmlTable(rows: string[][], styles?: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[][]): string {
+export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]): string {
   // Light borders so a table pasted into Word or an e-mail is visibly a table; spreadsheets and
   // Blob notes keep only the cells and their text.
   const cell = "border:1px solid #d4d2cb;padding:2px 6px;vertical-align:middle";
@@ -64,13 +87,16 @@ export function toHtmlTable(rows: string[][], styles?: ({ bold?: boolean; align?
         let css = cell;
         if (look?.align) css += `;text-align:${look.align}`;
         if (look?.bold) css += ";font-weight:bold";
+        if (look?.fmt) css += `;mso-number-format:${cssString(look.fmt)}`;
+        const num = look?.num !== undefined && Number.isFinite(look.num) ? ` x:num="${excelNum(look.num)}"` : "";
         const inner = escHtml(text).replace(/\r\n|\r|\n/g, "<br>");
-        return `<td style="${css}">${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
+        // In single quotes like Excel's own, so the format's double quotes need no entities.
+        return `<td${num} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
       });
       return `<tr>${cells.join("")}</tr>`;
     })
     .join("");
-  return `<meta charset="utf-8"><table data-blob-sheet="1" style="border-collapse:collapse"><tbody>${body}</tbody></table>`;
+  return `<meta charset="utf-8"><table data-blob-sheet="1" xmlns:x="urn:schemas-microsoft-com:office:excel" style="border-collapse:collapse"><tbody>${body}</tbody></table>`;
 }
 
 // Delimited text ----------------------------------------------------------------------------------
@@ -290,7 +316,7 @@ export function decodeHtmlEntities(s: string): string {
       if (code === 160) return " ";
       return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
-    const v = ENTITIES[e];
+    const v = lookup(ENTITIES, e);
     // A name we don't know stays as it was written ("&foo" in a sentence is just text).
     return v !== undefined && (m.endsWith(";") || v.length) ? v : m;
   });
@@ -306,7 +332,9 @@ const SKIP = new Set(["style", "script", "head", "title", "template", "noscript"
 /** Elements that end a line of text inside a cell. */
 const BLOCK = new Set(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "blockquote", "dt", "dd", "tr", "ul", "ol"]);
 
-type Cell = { text: string; colspan: number; rowspan: number };
+type HtmlCell = { text: string; colspan: number; rowspan: number; num: number | null };
+/** A cell of the laid-out table: its text, and the exact number a spreadsheet gave it (or null). */
+type GridCell = { text: string; num: number | null };
 
 /**
  * The rows of the HTML tables in a clipboard fragment, as the cells read: line breaks from <br>
@@ -316,13 +344,39 @@ type Cell = { text: string; colspan: number; rowspan: number };
  * as that cell's text.
  */
 export function parseHtmlTable(html: string): string[][] | null {
+  return htmlGrid(html)?.map((row) => row.map((c) => c.text)) ?? null;
+}
+
+/**
+ * The exact number a spreadsheet put on a cell of its HTML: Excel's x:num="…" (a bare x:num means
+ * the text is exact), LibreOffice's sdval="…", Google Sheets' data-sheets-value {"1":3,"3":…}
+ * (type 3 is a number). null for anything else.
+ */
+function exactOf(attrs: string): number | null {
+  const m = /(?:^|\s)(?:x:num|sdval)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+  if (m) {
+    const raw = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    const n = Number(raw);
+    return raw && Number.isFinite(n) ? n : null;
+  }
+  const g = /(?:^|\s)data-sheets-value\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
+  if (!g) return null;
+  try {
+    const v = JSON.parse(decodeHtmlEntities(g[1] ?? g[2] ?? "")) as Record<string, unknown> | null;
+    return v && v["1"] === 3 && typeof v["3"] === "number" && Number.isFinite(v["3"]) ? v["3"] : null;
+  } catch {
+    return null;
+  }
+}
+
+function htmlGrid(html: string): GridCell[][] | null {
   // Comments and Office's conditional comments (<!--[if …]> … <![endif]-->) carry no cell text.
   const src = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<!\[(?:if|endif)[^\]]*\]>/gi, "");
   const tagRe = /<\/?([A-Za-z][A-Za-z0-9:-]*)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*\/?>/g;
-  const out: Cell[][] = [];
+  const out: HtmlCell[][] = [];
   let depth = 0;
-  let row: Cell[] | null = null;
-  let cell: { parts: string[]; colspan: number; rowspan: number; depth: number } | null = null;
+  let row: HtmlCell[] | null = null;
+  let cell: { parts: string[]; colspan: number; rowspan: number; num: number | null; depth: number } | null = null;
   let skip: string | null = null;
   let at = 0;
   let m: RegExpExecArray | null;
@@ -380,7 +434,7 @@ export function parseHtmlTable(html: string): string[][] | null {
       if (!closing) {
         row ??= [];
         const attrs = m[2] ?? "";
-        cell = { parts: [], colspan: spanAttr(attrs, "colspan"), rowspan: spanAttr(attrs, "rowspan"), depth };
+        cell = { parts: [], colspan: spanAttr(attrs, "colspan"), rowspan: spanAttr(attrs, "rowspan"), num: exactOf(attrs), depth };
       }
       continue;
     }
@@ -403,7 +457,7 @@ export function parseHtmlTable(html: string): string[][] | null {
       .join("\n")
       .replace(/^\n+|\n+$/g, "")
       .replace(/\n{2,}/g, "\n");
-    row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan });
+    row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan, num: cell.num });
     cell = null;
   }
   function closeRow() {
@@ -413,7 +467,8 @@ export function parseHtmlTable(html: string): string[][] | null {
 
   if (!out.length) return null;
   // Lay the cells out on a grid: spans leave empty cells to the right and below.
-  const grid: string[][] = [];
+  const EMPTY: GridCell = { text: "", num: null };
+  const grid: GridCell[][] = [];
   const taken: boolean[][] = [];
   out.forEach((cells, r) => {
     grid[r] ??= [];
@@ -427,17 +482,75 @@ export function parseHtmlTable(html: string): string[][] | null {
         taken[rr] ??= [];
         for (let dc = 0; dc < cellAt.colspan; dc++) {
           taken[rr][c + dc] = true;
-          grid[rr][c + dc] = dr === 0 && dc === 0 ? cellAt.text : "";
+          grid[rr][c + dc] = dr === 0 && dc === 0 ? { text: cellAt.text, num: cellAt.num } : EMPTY;
         }
       }
       c += cellAt.colspan;
     }
   });
   const width = Math.max(1, ...grid.map((r) => r.length));
-  const rows = grid.slice(0, Math.max(out.length, 1)).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ""));
+  const rows = grid.slice(0, Math.max(out.length, 1)).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? EMPTY));
   // A trailing empty row (Excel's HTML sometimes ends with one) is nothing to paste.
-  while (rows.length > 1 && rows[rows.length - 1].every((t) => t === "")) rows.pop();
+  while (rows.length > 1 && rows[rows.length - 1].every((t) => t.text === "")) rows.pop();
   return rows;
+}
+
+// Exact numbers ------------------------------------------------------------------------------------
+
+/** The same text, whatever the spaces (HTML collapses them; Blob puts a thin one before a unit). */
+const sameText = (a: string, b: string) => a.replace(/\s+/g, "") === b.replace(/\s+/g, "");
+
+/**
+ * The exact numbers behind a spreadsheet's copy, cell by cell as `rows` (the text that is pasted)
+ * has them. Only where the spreadsheet's HTML table lines up with that text: the same number of
+ * rows and, for each cell, the same text (a filtered or merged copy that differs leaves those
+ * cells to their text). null when there is nothing to use.
+ */
+export function clipboardNumbers(html: string | undefined, rows: string[][]): (number | null)[][] | null {
+  if (!html || !SPREADSHEET_HTML.test(html) || !/<table[\s>]/i.test(html)) return null;
+  const grid = htmlGrid(html);
+  if (!grid || grid.length !== rows.length) return null;
+  let found = false;
+  const out = rows.map((row, r) =>
+    row.map((text, c) => {
+      const cell = grid[r][c];
+      if (!cell || cell.num === null || !sameText(cell.text, text)) return null;
+      found = true;
+      return cell.num;
+    }),
+  );
+  return found ? out : null;
+}
+
+/** "0,12" → two decimals (a plain number in the locale's style; undefined for anything else). */
+function decimalsShown(text: string, locale: Locale): NumberFormat | undefined {
+  const m = (locale === "de" ? /^[-+−]?\d+(?:,(\d+))?$/ : /^[-+−]?\d+(?:\.(\d+))?$/).exec(text.trim());
+  return m ? { kind: "number", decimals: m[1]?.length ?? 0 } : undefined;
+}
+
+/**
+ * Cells pasted as text (pasteText's result) with the exact numbers of the copy: a cell whose text
+ * was read as a number gets the full value when that value, shown the way its text is written
+ * (decimals, percent, date, unit…), reads the same text, so a number can't land in the wrong cell.
+ * A cell without a number format of its own gets the decimals the text showed, so it still looks
+ * as it did where it came from. `locale`: the one the text was read in.
+ */
+export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: string[][], exact: (number | null)[][], locale: Locale): Workbook {
+  const sheet = wb.sheets.find((s) => s.id === sheetId);
+  if (!sheet) return wb;
+  const updates: { row: number; col: number; cell: Cell }[] = [];
+  exact.forEach((line, i) =>
+    line.forEach((x, j) => {
+      const text = rows[i]?.[j];
+      const cell = sheet.cells[cellKey(at.row + i, at.col + j)];
+      if (x === null || text === undefined || !cell || cell.f !== undefined || typeof cell.v !== "number" || cell.v === x) return;
+      const shown = parseInput(text, locale).fmt ?? decimalsShown(text, locale);
+      if (!shown || !sameText(formatValue(x, shown, locale), text)) return;
+      const fmt = cell.s?.fmt ?? (sameText(formatValue(x, undefined, locale), text) ? undefined : shown);
+      updates.push({ row: at.row + i, col: at.col + j, cell: { ...cell, v: x, ...(fmt && !cell.s?.fmt ? { s: { ...cell.s, fmt } } : {}) } });
+    }),
+  );
+  return setCells(wb, sheetId, updates);
 }
 
 function spanAttr(attrs: string, name: string): number {

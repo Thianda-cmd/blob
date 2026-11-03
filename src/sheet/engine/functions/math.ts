@@ -31,11 +31,23 @@ export function roundExcel(x: number, digits: number, mode: "half" | "up" | "dow
   return out === 0 ? 0 : out;
 }
 
-/** n / step rounded to a whole number when it is one within binary noise (0.6 / 0.2 = 2.9999999999999996 → 3). */
+/**
+ * Is q a whole number but for binary noise (0,6 / 0,2 = 2.9999999999999996)? Only a few units in
+ * the last place count as noise: a looser tolerance turns a real fraction of a big quotient into a
+ * whole number (1E15 / 7 = 142857142857142.86 would become …143, and REST(1E15; 7) −1).
+ */
+const nearWhole = (q: number) => Math.abs(q - Math.round(q)) <= 3 * Number.EPSILON * Math.abs(q);
+
+/** n / step, rounded to a whole number when it is one within binary noise (for VRUNDEN, OBERGRENZE, UNTERGRENZE, QUOTIENT). */
 function quotient(n: number, step: number): number {
   const q = n / step;
-  const r = Math.round(q);
-  return Math.abs(q - r) <= 1e-12 * Math.max(1, Math.abs(q)) ? r : q;
+  return nearWhole(q) ? Math.round(q) : q;
+}
+
+/** k steps of `step`: binary noise dropped (3 × 0,1 = 0,3), whole numbers kept exactly (UNTERGRENZE(1E15+3; 7) = 1000000000000001). */
+function steps(k: number, step: number): number {
+  const x = k * step;
+  return Number.isInteger(x) ? x : clean15(x);
 }
 
 function gcd2(a: number, b: number): number {
@@ -111,20 +123,20 @@ export const MATH: FnDef[] = [
     if (m === 0 || n === 0) return 0;
     if (Math.sign(n) !== Math.sign(m)) return ERR.num;
     const q = quotient(n, m);
-    return clean15(Math.sign(q) * Math.floor(Math.abs(clean15(q)) + 0.5) * m);
+    return steps(Math.sign(q) * Math.floor(Math.abs(clean15(q)) + 0.5), m);
   }),
   numFn("CEILING", 2, 2, ([n, s]) => {
     if (n === 0 || s === 0) return 0;
     if (n > 0 && s < 0) return ERR.num;
-    if (s < 0) return clean15(-Math.ceil(quotient(-n, -s)) * -s);
-    return clean15(Math.ceil(quotient(n, s)) * s);
+    if (s < 0) return steps(-Math.ceil(quotient(-n, -s)), -s);
+    return steps(Math.ceil(quotient(n, s)), s);
   }),
   numFn("FLOOR", 2, 2, ([n, s]) => {
     if (n === 0) return 0;
     if (s === 0) return ERR.div0;
     if (n > 0 && s < 0) return ERR.num;
-    if (s < 0) return clean15(-Math.floor(quotient(-n, -s)) * -s);
-    return clean15(Math.floor(quotient(n, s)) * s);
+    if (s < 0) return steps(-Math.floor(quotient(-n, -s)), -s);
+    return steps(Math.floor(quotient(n, s)), s);
   }),
   numFn("EVEN", 1, 1, ([x]) => {
     const v = Math.ceil(clean15(Math.abs(x)) / 2) * 2;
@@ -151,11 +163,17 @@ export const MATH: FnDef[] = [
   numFn("PI", 0, 0, () => Math.PI),
   numFn("MOD", 2, 2, ([n, d]) => {
     if (d === 0) return ERR.div0;
-    const q = quotient(n, d);
-    const r = n - d * Math.floor(clean15(q));
-    // Within rounding noise of 0 (or of d) is 0: MOD(0,3; 0,1) = 0.
-    if (Math.abs(r) <= 1e-12 * Math.abs(d) || Math.abs(r - d) <= 1e-12 * Math.abs(d)) return 0;
-    return clean15(r);
+    const q = n / d;
+    // Beyond 2^53 a double has no fraction left, so there is no remainder to give.
+    if (!(Math.abs(q) < 2 ** 53)) return ERR.num;
+    // A quotient that is whole but for binary noise leaves nothing: REST(0,3; 0,1) = 0, and a time
+    // built as 18:00 + 6 × 1/24 is midnight, REST(…; 1) = 0 (not −0,0000000000146).
+    if (nearWhole(q)) return 0;
+    // Otherwise the exact remainder of the two doubles, with the divisor's sign like Excel:
+    // REST(1E15; 7) = 6, REST(46329,99999999; 1) = 0,99999999, REST(−1; 3) = 2.
+    let r = n % d;
+    if (r !== 0 && r < 0 !== d < 0) r += d;
+    return Math.abs(r) < Math.abs(d) ? clean15(r) : 0;
   }),
   numFn("QUOTIENT", 2, 2, ([n, d]) => (d === 0 ? ERR.div0 : Math.trunc(quotient(n, d)))),
   {

@@ -75,7 +75,8 @@ type Props = {
   active: Pos;
   /** Hide the selection (while typing into a cell its references are what matters). */
   quiet: boolean;
-  handles: "fill" | "touch" | null;
+  /** The mouse's small fill handle, a finger's two round handles, or (filling by touch) one big fill handle. */
+  handles: "fill" | "touch" | "touchFill" | null;
   clip: { area: Area; cut: boolean } | null;
   frames: RefFrame[];
   fillPreview: Area | null;
@@ -136,6 +137,21 @@ export const SelectionLayer = memo(function SelectionLayer(p: Props) {
       );
       if (start) out.push(handle("tl", l.colLeft[m.c0], l.rowTop[m.r0]));
       if (corner) out.push(handle("br", l.colLeft[m.c1 + 1], l.rowTop[m.r1 + 1]));
+    }
+    if (p.handles === "touchFill" && corner) {
+      // Filling by touch: the corner's handle is a square like the mouse's fill handle, finger-sized.
+      out.push(
+        <div
+          key="fill"
+          data-handle="fill"
+          role="presentation"
+          title={p.fillLabel}
+          className="absolute z-[2] grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
+          style={{ left: l.colLeft[m.c1 + 1], top: l.rowTop[m.r1 + 1], touchAction: "none" }}
+        >
+          <span className="size-4 rounded-[4px] border-2 border-raised bg-blob shadow-card" />
+        </div>,
+      );
     }
   }
 

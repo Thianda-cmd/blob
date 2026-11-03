@@ -49,6 +49,23 @@ export function suggestFunction(typed: string, locale: Locale): string | null {
 
 const q = (locale: Locale, s: string) => (locale === "de" ? `„${s}“` : `"${s}"`);
 
+/** A typed formula longer than a cell takes. */
+export function formulaTooLongMessage(locale: Locale): string {
+  return locale === "de"
+    ? "Die Formel ist zu lang: höchstens 8.192 Zeichen, wie in Excel. Verteil die Rechnung auf mehrere Zellen."
+    : "The formula is too long: 8,192 characters at most, as in Excel. Spread the calculation over several cells.";
+}
+
+/**
+ * German "1.234" read as 1234 (the dot separates thousands): the note after typing it, and the
+ * label of the button that stores 1,234 instead. `read` and `decimal` are the typed text written
+ * both ways ("1234 mg/L", "1,234 mg/L").
+ */
+export function thousandsNotice(typed: string, read: string, decimal: string, locale: Locale): { message: string; action: string } {
+  if (locale === "de") return { message: `${q(locale, typed)} ist ${read}: Der Punkt trennt Tausender. Für ${decimal} tipp ein Komma.`, action: `Als ${decimal} lesen` };
+  return { message: `${q(locale, typed)} is ${read}: the point separates thousands. For ${decimal}, type a comma.`, action: `Read as ${decimal}` };
+}
+
 /** A parse error in plain words of the user's language. */
 export function parseErrorMessage(e: ParseError, locale: Locale): string {
   const de = locale === "de";

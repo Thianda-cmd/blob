@@ -37,9 +37,13 @@ function vecOf(v: Value, ctx: Ctx, take?: "row0" | "col0"): Vec | CellError {
 
 const sameKind = (a: Scalar, b: Scalar) => typeof a === typeof b && a !== null && !isErr(a);
 
-/** Exact match (case-insensitive, wildcards in text): first index or -1. */
-function exactIndex(vec: Vec, target: Scalar, ctx: Ctx, reverse = false): number {
-  const t = target === null ? 0 : target;
+/**
+ * Exact match (case-insensitive, wildcards in text): first index or -1. An empty lookup cell
+ * (null) finds nothing, like Excel: a SVERWEIS filled down into rows without a sample ID shows #NV
+ * there, not the row whose key is 0.
+ */
+function exactIndex(vec: Vec, t: Scalar, ctx: Ctx, reverse = false): number {
+  if (t === null) return -1;
   if (typeof t === "string" && hasWildcards(t)) {
     const n = vec.values.length;
     for (let k = 0; k < n; k++) {
@@ -81,10 +85,10 @@ function hashKey(v: Scalar): string | null {
 /**
  * Binary search like Excel's: the last position whose value is ≤ target (ascending data), or
  * with `descending` the last position whose value is ≥ target. Values of another kind (text
- * among numbers, empty cells) are stepped over.
+ * among numbers, empty cells) are stepped over; an empty lookup cell finds nothing.
  */
-function approxIndex(values: Scalar[], target: Scalar, descending = false): number {
-  const t = target === null ? 0 : target;
+function approxIndex(values: Scalar[], t: Scalar, descending = false): number {
+  if (t === null) return -1;
   let lo = 0;
   let hi = values.length - 1;
   let found = -1;
@@ -106,9 +110,9 @@ function approxIndex(values: Scalar[], target: Scalar, descending = false): numb
   return found;
 }
 
-/** XLOOKUP's "exact or next smaller / larger" without assuming sorted data. */
-function nearestIndex(values: Scalar[], target: Scalar, larger: boolean, reverse: boolean): number {
-  const t = target === null ? 0 : target;
+/** XLOOKUP's "exact or next smaller / larger" without assuming sorted data (an empty lookup cell finds nothing). */
+function nearestIndex(values: Scalar[], t: Scalar, larger: boolean, reverse: boolean): number {
+  if (t === null) return -1;
   let best = -1;
   const n = values.length;
   for (let k = 0; k < n; k++) {
@@ -273,10 +277,10 @@ function choose(nodes: Node[], ctx: Ctx): Value {
 }
 
 export const LOOKUP: FnDef[] = [
-  { name: "VLOOKUP", min: 3, max: 4, args: "srss", impl: (args, ctx) => lookupTable(args, ctx, false) },
-  { name: "HLOOKUP", min: 3, max: 4, args: "srss", impl: (args, ctx) => lookupTable(args, ctx, true) },
-  { name: "XLOOKUP", min: 3, max: 6, args: "srrvss", impl: (args, ctx) => xlookup(args, ctx) },
-  { name: "MATCH", min: 2, max: 3, args: "srs", impl: (args, ctx) => match(args, ctx) },
+  { name: "VLOOKUP", min: 3, max: 4, args: "srss", lookupValue: true, impl: (args, ctx) => lookupTable(args, ctx, false) },
+  { name: "HLOOKUP", min: 3, max: 4, args: "srss", lookupValue: true, impl: (args, ctx) => lookupTable(args, ctx, true) },
+  { name: "XLOOKUP", min: 3, max: 6, args: "srrvss", lookupValue: true, impl: (args, ctx) => xlookup(args, ctx) },
+  { name: "MATCH", min: 2, max: 3, args: "srs", lookupValue: true, impl: (args, ctx) => match(args, ctx) },
   { name: "INDEX", min: 2, max: 4, args: "rsss", impl: (args, ctx) => indexOf(args, ctx) },
   { name: "CHOOSE", min: 2, max: 255, args: "s", lazy: choose },
   {

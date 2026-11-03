@@ -12,7 +12,7 @@ import type { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { cellKey } from "@/sheet/a1";
 import type { Calc, CellValue, ErrorCode } from "@/sheet/engine";
 import type { Area, BorderLine, Cell, Pos, Sheet } from "@/sheet/types";
-import { borderCss, CELL_PAD, fitNumber, lookOf, type CellLook } from "./cellLook";
+import { borderCss, CELL_PAD, fitNumber, lookOf, numberAsText, type CellLook } from "./cellLook";
 import { colWidth, type Layout } from "./geometry";
 import type { CellDecor } from "./Grid";
 import { LINE_HEIGHT, textWidth } from "./measure";
@@ -45,13 +45,13 @@ export function cellSource(sheet: Sheet, calc: Calc, decorate: Decorate | undefi
 /** The id of a cell's element (for aria-activedescendant). */
 export const cellId = (gridId: string, row: number, col: number) => `${gridId}-c${row}-${col}`;
 
-/** What a screen reader hears about a cell besides its text: its error in words, its note. */
-export type Describe = (error: ErrorCode | null, note: string) => string | undefined;
+/** What a screen reader hears about a cell besides its text: its error in words, that it is a number stored as text, its note. */
+export type Describe = (error: ErrorCode | null, note: string, numberText?: boolean) => string | undefined;
 
 export function describer(t: GridText): Describe {
-  return (error, note) => {
+  return (error, note, numberText) => {
     const help = error ? t.errors[error] : null;
-    return [help && `${help.title}. ${help.text}`, note && `${t.note}: ${note}`].filter(Boolean).join(" ") || undefined;
+    return [help && `${help.title}. ${help.text}`, numberText && `${t.numberText.title}. ${t.numberText.text}`, note && `${t.note}: ${note}`].filter(Boolean).join(" ") || undefined;
   };
 }
 
@@ -149,6 +149,7 @@ const GridRow = memo(function GridRow(p: RowProps) {
     if (!cell && !decor && !isActive) return;
     const value = cell && (cell.v !== undefined || cell.f !== undefined) ? src.value(row, c) : null;
     const look = lookOf(cell, value, decor, locale);
+    const numberText = look.kind === "text" && numberAsText(value, (d) => (row + d < 0 ? null : src.value(row + d, c)));
     const size = look.size * zoom;
     const buttonW = decor?.button ? Math.round(20 * zoom) : 0;
     const avail = Math.max(0, w - 2 * pad - buttonW);
@@ -191,7 +192,8 @@ const GridRow = memo(function GridRow(p: RowProps) {
         size={size}
         spill={spill}
         note={!!cell?.note}
-        description={p.describe(look.error, cell?.note ?? "")}
+        numberText={numberText}
+        description={p.describe(look.error, cell?.note ?? "", numberText)}
         selected={inSpans(p.selected, c)}
         decorButton={decor?.button ? `${decor.button.state}|${decor.button.label}` : ""}
         lineBelow={decor?.lineBelow === "strong"}
@@ -240,6 +242,8 @@ type CellProps = {
   spill: boolean;
   /** Has a note (the corner mark). */
   note: boolean;
+  /** Text that looks like a number (a mark in the other corner, see numberAsText). */
+  numberText: boolean;
   /** The error in words and the note, for screen readers. */
   description: string | undefined;
   selected: boolean;
@@ -351,6 +355,13 @@ const GridCell = memo(function GridCell(p: CellProps) {
           aria-hidden
           className="pointer-events-none absolute left-0 top-0 size-0"
           style={{ borderTop: `${mark}px solid var(--sheet-red)`, borderRight: `${mark}px solid transparent` }}
+        />
+      )}
+      {p.numberText && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-0 size-0"
+          style={{ borderTop: `${mark + 1}px solid var(--sheet-orange)`, borderRight: `${mark + 1}px solid transparent` }}
         />
       )}
       {p.note && (

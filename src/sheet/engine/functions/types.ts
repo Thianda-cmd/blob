@@ -50,6 +50,12 @@ export type FnDef = {
   lazy?: (args: Node[], ctx: Ctx) => Value;
   /** Errors in "s" arguments are passed to the function instead of being its result right away (ISERROR…). */
   takesErrors?: boolean;
+  /**
+   * The first argument is a value to look up (SVERWEIS, VERGLEICH…): a reference to an empty cell
+   * there finds nothing (#NV), like Excel, while a left-out one (VERGLEICH(;A2:A8;0)) looks up 0.
+   * The function gets null only for the empty cell.
+   */
+  lookupValue?: boolean;
   /** Changes on every calculation (TODAY, NOW, RAND). */
   volatile?: boolean;
 };

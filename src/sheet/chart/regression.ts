@@ -21,16 +21,22 @@
 //   the free fit's R² would suggest); for other b₀ the same regression gives the same formula
 //   (LibreOffice computes Σ(ŷ − b₀)² / (Σ(ŷ − b₀)² + SSE), which equals it because the residuals of
 //   a least-squares fit through the origin are orthogonal to the fitted values). For exponential
-//   fits the fixed a₀ is ln a₀ on the log scale, and R² is computed on ln y − ln a₀.
+//   fits the fixed a₀ is ln a₀ on the log scale, and R² is computed on ln y − ln a₀. a₀ has to be
+//   above 0 (a·e^(bx) never reaches 0): a 0 or less, typically left over from a line through the
+//   origin when the type was switched, is ignored and a fitted instead (Fit.intercept says which,
+//   so the panel can tell), rather than drawing a falling curve through rising data.
 // - Logarithmic and power fits have no fixed intercept in Excel (the option is greyed out); a
 //   given intercept is ignored for them.
+// - Exponential and power curves are computed from ln a (Fit.lnA): with dates as x (46 000 days)
+//   a itself is far below what a number holds (Excel's label says "0e^…"), yet the curve and the
+//   way back from a measured value work.
 // - Data that a model can't take (x ≤ 0 for logarithmic and power, y ≤ 0 for exponential and
 //   power) is an error, like Excel, which refuses those trendlines rather than skipping points.
 // - When all y are equal the total sum of squares is 0 and R² is undefined: NaN, shown as #NV.
 
 import type { Locale } from "@/i18n/config";
 import type { TrendlineSpec } from "../types";
-import { formatGeneral, formatR2, formatSignificant } from "./format";
+import { EQUATION_DIGITS, formatCoefficient, formatFromLn, formatR2 } from "./format";
 
 export type Fit = {
   type: TrendlineSpec["type"];
@@ -55,6 +61,11 @@ export type Fit = {
   xMax?: number;
   /** The fixed intercept that was used (null: fitted). */
   intercept?: number | null;
+  /**
+   * Exponential and power: ln a, which the curve and solveForX are computed from, so they work
+   * where a itself is 0 or ∞ as a number (dates as x).
+   */
+  lnA?: number;
   /**
    * Polynomial: the same curve as d₀ + d₁t + … with t = (x − center) / scale, which predicts and
    * solves accurately even where the coefficients of x are huge or tiny.
@@ -243,15 +254,18 @@ function polynomialFit(px: number[], py: number[], orderIn: number, c0: number |
   };
 }
 
-function exponentialFit(px: number[], py: number[], a0: number | null): Fit | FitError {
+function exponentialFit(px: number[], py: number[], given: number | null): Fit | FitError {
   if (px.length < 2) return { error: "too-few-points" };
   if (py.some((y) => y <= 0)) return { error: "non-positive-y" };
-  if (a0 !== null && !(Number.isFinite(a0) && a0 > 0)) return { error: "bad-intercept" };
+  if (given !== null && !Number.isFinite(given)) return { error: "bad-intercept" };
+  // A fixed a of 0 or less can't be (see the top of this file): a is fitted.
+  const a0 = given !== null && given > 0 ? given : null;
   const line = lineCore(px, py.map(Math.log), a0 === null ? null : Math.log(a0));
   if ("error" in line) return line;
-  const a = a0 ?? Math.exp(line.b);
+  const lnA = line.b;
+  const a = a0 ?? Math.exp(lnA);
   const b = line.m;
-  return { type: "exponential", coefficients: [a, b], r2: line.r2, n: px.length, predict: (x) => a * Math.exp(b * x), xs: px, ys: py, ...range(px), intercept: a0 };
+  return { type: "exponential", coefficients: [a, b], r2: line.r2, n: px.length, predict: (x) => Math.exp(lnA + b * x), xs: px, ys: py, ...range(px), intercept: a0, lnA };
 }
 
 function logarithmicFit(px: number[], py: number[]): Fit | FitError {
@@ -270,9 +284,9 @@ function powerFit(px: number[], py: number[]): Fit | FitError {
   if (py.some((y) => y <= 0)) return { error: "non-positive-y" };
   const line = lineCore(px.map(Math.log), py.map(Math.log), null);
   if ("error" in line) return line;
-  const a = Math.exp(line.b);
+  const lnA = line.b;
   const b = line.m;
-  return { type: "power", coefficients: [a, b], r2: line.r2, n: px.length, predict: (x) => (x > 0 ? a * x ** b : NaN), xs: px, ys: py, ...range(px), intercept: null };
+  return { type: "power", coefficients: [Math.exp(lnA), b], r2: line.r2, n: px.length, predict: (x) => (x > 0 ? Math.exp(lnA + b * Math.log(x)) : NaN), xs: px, ys: py, ...range(px), intercept: null, lnA };
 }
 
 /**
@@ -472,6 +486,15 @@ function solvePolynomial(fit: Fit, y: number): number | null {
   );
 }
 
+/** ln a of an exponential or power fit (from the fit itself where a is 0 or ∞ as a number). */
+export const lnOfA = (fit: Fit) => fit.lnA ?? Math.log(fit.coefficients[0]);
+
+/**
+ * Whether a of an exponential or power fit is beyond what a number holds (0 or ∞), so it is only
+ * known as ln a: dates as x (46 000 days) do that.
+ */
+export const aOutOfRange = (fit: Fit) => (fit.type === "exponential" || fit.type === "power") && fit.lnA !== undefined && !(fit.coefficients[0] >= 1e-300 && fit.coefficients[0] <= 1e300);
+
 /**
  * Solve a fitted line for x: the concentration of a sample from its measured value (y), the
  * everyday use of a calibration curve. null when there is no (unique) answer.
@@ -488,13 +511,13 @@ export function solveForX(fit: Fit, y: number): number | null {
       x = solvePolynomial(fit, y);
       break;
     case "exponential":
-      x = c[1] === 0 || !(y / c[0] > 0) ? null : Math.log(y / c[0]) / c[1];
+      x = c[1] === 0 || !(y > 0) ? null : (Math.log(y) - lnOfA(fit)) / c[1];
       break;
     case "logarithmic":
       x = c[1] === 0 ? null : Math.exp((y - c[0]) / c[1]);
       break;
     case "power":
-      x = c[1] === 0 || !(y / c[0] > 0) ? null : (y / c[0]) ** (1 / c[1]);
+      x = c[1] === 0 || !(y > 0) ? null : Math.exp((Math.log(y) - lnOfA(fit)) / c[1]);
       break;
     case "movingAverage": {
       const pts = fit.points ?? [];
@@ -529,7 +552,10 @@ const SUPERSCRIPT_DIGITS: Record<string, string> = { "0": "⁰", "1": "¹", "2":
  * Same numbers and conventions as equationText. Moving averages have no equation ([]).
  */
 export function equationParts(fit: Fit, locale: Locale, digits?: number): EqPart[] {
-  const num = (v: number) => (digits ? formatSignificant(v, locale, digits) : formatGeneral(v, locale));
+  const d = digits ?? EQUATION_DIGITS;
+  const num = (v: number) => formatCoefficient(v, locale, d);
+  // a of an exponential or power curve with dates as x is only known as ln a (it is 0 as a number).
+  const aNum = (a: number) => (aOutOfRange(fit) ? formatFromLn(fit.lnA!, locale, d) : num(a));
   const c = fit.coefficients;
   const parts: EqPart[] = [{ text: "y = " }];
   // Each term: its coefficient and what it multiplies. Exactly-zero terms are left out, like
@@ -575,7 +601,7 @@ export function equationParts(fit: Fit, locale: Locale, digits?: number): EqPart
         terms([[a, []]]);
         break;
       }
-      const aText = num(a);
+      const aText = aNum(a);
       const bText = num(b);
       const exp = `${bText === "1" ? "" : bText === "-1" ? "-" : bText}x`;
       parts.push({ text: `${aText === "1" ? "" : aText === "-1" ? "-" : aText}e` }, { text: exp, sup: true, plain: `^(${exp})` });
@@ -587,7 +613,7 @@ export function equationParts(fit: Fit, locale: Locale, digits?: number): EqPart
         terms([[a, []]]);
         break;
       }
-      const aText = num(a);
+      const aText = aNum(a);
       const bText = num(b);
       parts.push({ text: `${aText === "1" ? "" : aText === "-1" ? "-" : aText}x` });
       if (bText !== "1") parts.push({ text: bText, sup: true, plain: `^${bText}` });
@@ -607,9 +633,11 @@ export function equationParts(fit: Fit, locale: Locale, digits?: number): EqPart
 }
 
 /**
- * The equation as Excel shows it on the chart, in the user's number format:
- * "y = 0,0523x + 0,0012", "y = 1,2e^(0,35x)" (rendered with a superscript by the chart),
- * "y = 2,1ln(x) - 0,5", "y = 0,3x² - 1,2x + 4". `digits`: significant digits (Excel: 4–5).
+ * The equation as Excel writes it on the chart, in the user's number format, with every
+ * coefficient to `digits` significant digits (EQUATION_DIGITS, 4, unless "more digits" asks for
+ * more; see formatCoefficient): "y = 0,05187x + 0,001476", "y = 0,0009463x + 0,02544",
+ * "y = 1,2e^(0,35x)" (rendered with a superscript by the chart), "y = 2,1ln(x) - 0,5",
+ * "y = 0,3x² - 1,2x + 4".
  */
 export function equationText(fit: Fit, locale: Locale, digits?: number): string {
   return equationParts(fit, locale, digits)
@@ -619,8 +647,8 @@ export function equationText(fit: Fit, locale: Locale, digits?: number): string 
 
 /**
  * "R² = 0,9987" in the user's number format: 4 decimals, and never "1" for a fit that isn't
- * perfect ("R² = 0,99997" where Excel's label says 1; see formatR2). The equation keeps Excel's
- * label format. `digits`: the decimals for "more digits" in the panel (up to 3 more if needed).
+ * perfect ("R² = 0,99997" where Excel's label says 1; see formatR2). `digits`: the decimals for
+ * "more digits" in the panel (up to 3 more if needed).
  */
 export function r2Text(r2: number, locale: Locale, digits?: number): string {
   return `R² = ${digits ? formatR2(r2, locale, Math.max(4, digits), Math.max(6, digits + 3)) : formatR2(r2, locale)}`;

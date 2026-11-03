@@ -23,8 +23,9 @@ import {
   sheetById,
 } from "@/sheet/ops";
 import { DEFAULT_COL_W, type Area, type Cell, type Pos, type Sheet } from "@/sheet/types";
-import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, tablesAfterPaste, typedCell, type SheetStore } from "../store";
+import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, tablesAfterPaste, typedCell, type Selection, type SheetStore } from "../store";
 import { BASE_FONT, CELL_PAD, shownText } from "./cellLook";
+import type { MenuKind } from "./ContextMenu";
 import { textWidth } from "./measure";
 import { currentRegion } from "./navigation";
 
@@ -37,6 +38,18 @@ const sheetOf = (store: SheetStore): Sheet => {
 /** Does the area cover whole rows (every column) or whole columns (every row)? */
 export function wholeness(area: Area, sheet: Sheet): { rows: boolean; cols: boolean } {
   return { rows: area.c0 === 0 && area.c1 >= sheet.size.cols - 1, cols: area.r0 === 0 && area.r1 >= sheet.size.rows - 1 };
+}
+
+/**
+ * Which menu the selection gets (right-click, long press, the menu key), wherever it was opened:
+ * whole columns the column menu, whole rows the row menu, anything else the cells' menu. So a
+ * long press on a cell inside a selected column never offers "Delete 200 rows".
+ */
+export function menuKindFor(selection: Selection, sheet: Sheet): MenuKind {
+  const whole = selectionAreas(selection).map((a) => wholeness(a, sheet));
+  if (whole.every((w) => w.cols && !w.rows)) return "cols";
+  if (whole.every((w) => w.rows && !w.cols)) return "rows";
+  return "cells";
 }
 
 /** Rows (or columns) of the selection, each once, in order. */

@@ -99,8 +99,11 @@ export function csvNumberLocale(rows: string[][], fallback: Locale): Locale {
   return fallback;
 }
 
-/** The format without a unit: a number with "mg/L" after it would reach Excel as text. */
-function csvFormat(fmt: NumberFormat | undefined): NumberFormat | undefined {
+/**
+ * The format without a unit: a number with "mg/L" after it would reach Excel as text. For CSV and
+ * for the text a copy puts on the clipboard.
+ */
+export function withoutUnit(fmt: NumberFormat | undefined): NumberFormat | undefined {
   if (!fmt) return fmt;
   if ((fmt.kind === "number" || fmt.kind === "scientific" || fmt.kind === "significant") && fmt.unit) return { ...fmt, unit: undefined };
   return fmt;

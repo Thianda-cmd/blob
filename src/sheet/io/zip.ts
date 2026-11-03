@@ -4,6 +4,11 @@
 // every current browser and in Node 18+, so the check script runs the same code).
 //
 // Only what Office files need: no zip64 (parts stay far below 4 GB), no encryption, no spanning.
+//
+// Reading stays bounded whatever the file says: deflate packs repeated text about 1000:1, so a
+// file of a few hundred kilobytes can unpack to gigabytes. A part is unpacked only when the sizes
+// the file declares are within the limits below, and unpacking stops as soon as the bytes that
+// come out pass the declared size.
 
 const LOCAL = 0x04034b50;
 const CENTRAL = 0x02014b50;
@@ -49,20 +54,51 @@ export async function deflateRaw(data: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
-export async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+/**
+ * Raw inflate, piece by piece: more than `limit` bytes coming out stops it at once (ZipError
+ * "tooBig") instead of filling the memory first.
+ */
+export async function inflateRaw(data: Uint8Array, limit = Infinity): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") throw new ZipError("unsupported");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
   try {
-    return await through(data, new DecompressionStream("deflate-raw" as CompressionFormat));
-  } catch {
-    throw new ZipError("broken");
+    const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw" as CompressionFormat) as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
+    const reader = stream.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > limit) {
+        reader.cancel().catch(() => {});
+        throw new ZipError("tooBig");
+      }
+      chunks.push(value);
+    }
+  } catch (e) {
+    throw e instanceof ZipError ? e : new ZipError("broken");
   }
+  if (chunks.length === 1) return chunks[0];
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
 }
 
 export class ZipError extends Error {
-  constructor(public code: "not-zip" | "broken" | "encrypted" | "unsupported") {
+  /** "tooBig": a part (or all parts together) would unpack to more than the limits allow. */
+  constructor(public code: "not-zip" | "broken" | "encrypted" | "unsupported" | "tooBig") {
     super(`zip: ${code}`);
   }
 }
+
+/** The most one part may unpack to; real sheets stay far below (Blob saves at most 5 MB a page). */
+export const MAX_PART_BYTES = 64 * 1024 * 1024;
+/** The most all parts read from one file may unpack to together. */
+export const MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
 
 export type ZipEntry = { name: string; data: Uint8Array };
 
@@ -160,7 +196,10 @@ export async function makeZip(entries: ZipEntry[], opts: { compress?: boolean; d
 
 type Located = { name: string; method: number; flags: number; crc: number; size: number; packed: number; offset: number };
 
-/** The files of a zip, read on demand. Names are matched without case (Office part names ignore case). */
+/**
+ * The files of a zip, read on demand. Names are matched without case (Office part names ignore
+ * case). Reading a part bigger than the limits throws ZipError "tooBig".
+ */
 export type ZipReader = {
   names: string[];
   has: (name: string) => boolean;
@@ -170,7 +209,11 @@ export type ZipReader = {
   text: (name: string) => Promise<string | null>;
 };
 
-export function readZip(input: Uint8Array): ZipReader {
+export function readZip(input: Uint8Array, limits: { part?: number; total?: number } = {}): ZipReader {
+  const maxPart = limits.part ?? MAX_PART_BYTES;
+  const maxTotal = limits.total ?? MAX_UNPACKED_BYTES;
+  /** Bytes unpacked so far, all parts together. */
+  let unpacked = 0;
   const data = input;
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (data.length < 22 || view.getUint32(0, true) !== LOCAL) throw new ZipError("not-zip");
@@ -212,12 +255,21 @@ export function readZip(input: Uint8Array): ZipReader {
     if (e.offset + 30 > data.length || view.getUint32(e.offset, true) !== LOCAL) throw new ZipError("broken");
     const start = e.offset + 30 + view.getUint16(e.offset + 26, true) + view.getUint16(e.offset + 28, true);
     if (start + e.packed > data.length) throw new ZipError("broken");
+    // Refused before unpacking: bigger than a part may be, or than what is left for the file.
+    if (e.size > maxPart || unpacked + e.size > maxTotal) throw new ZipError("tooBig");
     const raw = data.subarray(start, start + e.packed);
     let out: Uint8Array;
     if (e.method === 0) out = raw.slice();
-    else if (e.method === 8) out = await inflateRaw(raw);
-    else throw new ZipError("unsupported");
+    else if (e.method === 8) {
+      try {
+        out = await inflateRaw(raw, e.size);
+      } catch (err) {
+        // More bytes than the file declared: it is damaged, or made to fill the memory.
+        throw err instanceof ZipError && err.code === "tooBig" ? new ZipError("broken") : err;
+      }
+    } else throw new ZipError("unsupported");
     if (out.length !== e.size || crc32(out) !== e.crc) throw new ZipError("broken");
+    unpacked += out.length;
     return out;
   };
   return {

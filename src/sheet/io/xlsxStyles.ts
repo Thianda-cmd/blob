@@ -4,6 +4,7 @@
 import type { Locale } from "@/i18n/config";
 import { COLOR_HEX } from "../colors";
 import type { BorderLine, NumberFormat, SheetColor, TableStyle } from "../types";
+import { lookup } from "./xml";
 
 // Number formats ----------------------------------------------------------------------------------
 
@@ -104,6 +105,26 @@ export function toExcelFormat(fmt: NumberFormat | undefined, locale: Locale, val
     case "datetime":
       return { id: 22 };
   }
+}
+
+/**
+ * Significant figures ride along as a named cell style ("Blob sig 3"): Excel and LibreOffice keep
+ * a cell's named style, show the decimals written for the value as usual, and an import into Blob
+ * turns the cell back into significant figures. (Never a made-up format code: Excel repairs or
+ * refuses files with codes it doesn't know.)
+ */
+export const sigStyleName = (fmt: NumberFormat | undefined): string | undefined =>
+  fmt?.kind === "significant" ? `Blob sig ${Math.max(1, Math.min(15, Math.round(fmt.digits)))}` : undefined;
+
+/**
+ * The significant figures a named style of the file stands for, kept when the cell still shows a
+ * plain number (someone who gave it a date or percent format in Excel meant that).
+ */
+export function fromSigStyle(name: string | undefined, fmt: NumberFormat | undefined): NumberFormat | undefined {
+  const m = /^Blob sig (\d{1,2})$/.exec(name ?? "");
+  const digits = m ? Number(m[1]) : 0;
+  if (digits < 1 || digits > 15 || (fmt && fmt.kind !== "number" && fmt.kind !== "scientific")) return fmt;
+  return fmt?.unit ? { kind: "significant", digits, unit: fmt.unit } : { kind: "significant", digits };
 }
 
 /** The first section of a format code (positive numbers), split outside quotes and brackets. */
@@ -226,7 +247,7 @@ export function fromExcelFormat(code: string, locale: Locale): NumberFormat | un
     const unit = cleanUnit(text);
     return unit ? { kind: "scientific", decimals, unit } : { kind: "scientific", decimals };
   }
-  const sym = currency ? (SYMBOLS[currency] ?? SYMBOLS[currency.toUpperCase()]) : undefined;
+  const sym = currency ? (lookup(SYMBOLS, currency) ?? lookup(SYMBOLS, currency.toUpperCase())) : undefined;
   const textSym = Object.keys(SYMBOLS).find((s) => text.includes(s));
   if (sym || textSym) return { kind: "currency", decimals, symbol: sym ?? SYMBOLS[textSym!] };
   const group = /[0#?],[0#?]/.test(intPart);

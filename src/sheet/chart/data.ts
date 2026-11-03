@@ -6,8 +6,10 @@
 // Like Excel:
 // - Cells that aren't numbers (text, empty, errors, TRUE/FALSE) are skipped: a gap in a line.
 // - Rows and columns hidden by hand or by a smart table's filter are left out (Excel's default
-//   "show data in hidden rows and columns" is off), so filtering a table filters its chart.
-// - A scatter series whose x cells contain text is plotted against 1, 2, 3 … instead.
+//   "show data in hidden rows and columns" is off), so filtering a table filters its chart. How
+//   many numbers that leaves out is counted: formulas like STEIGUNG still use them.
+// - A scatter series whose x cells contain text is plotted against 1, 2, 3 … instead; the first
+//   such cell is reported, so the chart and the panel can say why.
 // - Trendlines of line, column, bar and area charts are fitted against the category number
 //   1, 2, 3 … (Excel's x for category charts), so their equations match Excel's. ChartPoint.x of
 //   those charts is the 0-based category index, so the view draws the trendline at x − 1.
@@ -17,7 +19,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
-import { cellKey } from "../a1";
+import { cellKey, posName, quoteSheetName } from "../a1";
 import { SERIES_COLORS } from "../colors";
 import { formatValue, isError, type Calc, type CellValue } from "../engine";
 import { sheetById } from "../ops";
@@ -45,6 +47,17 @@ export type ChartSeriesData = {
   points: ChartPoint[];
   /** The fitted trendline, or why it can't be fitted. */
   fit: Fit | FitError | null;
+  /**
+   * Numbers of the series left out because their row or column is hidden or filtered out (like
+   * Excel's charts). Formulas like STEIGUNG still count them, so the panel says so.
+   */
+  hiddenPoints?: number;
+  /**
+   * Scatter: the first shown x cell that holds text, why the series is plotted against 1, 2, 3 …
+   * (Excel does that without a word). `cell` names it as the chart's sheet writes it: "A7", or
+   * "'Blatt 2'!A7" on another sheet.
+   */
+  xText?: { cell: string; text: string; sheetId: string; row: number; col: number };
 };
 
 export type ChartData = {
@@ -180,13 +193,23 @@ export function chartData(spec: ChartSpec, calc: Calc, locale: Locale): ChartDat
   let yFormat: NumberFormat | null = null;
 
   const series: ChartSeriesData[] = spec.series.map((s, si) => {
-    const ys = readRange(calc, s.y, hidden).filter((c) => c.visible);
+    const yCells = readRange(calc, s.y, hidden);
+    const ys = yCells.filter((c) => c.visible);
+    let hiddenPoints = 0;
+    for (const c of yCells) if (!c.visible && Number.isFinite(num(c.value))) hiddenPoints++;
     let xs: CellRead[] | null = null;
+    let xText: ChartSeriesData["xText"];
     if (scatter) {
       const own = s.x ? readRange(calc, s.x, hidden).filter((c) => c.visible) : null;
       xs = own ?? shared;
-      // Excel: text among the x values → the series is plotted against 1, 2, 3 ….
-      if (xs && xs.some((c) => typeof c.value === "string" && c.value.trim() !== "")) xs = null;
+      // Excel: text among the x values → the series is plotted against 1, 2, 3 …. The first such
+      // cell is kept, so the chart and its panel can say which one it is.
+      const textCell = xs?.find((c) => typeof c.value === "string" && c.value.trim() !== "");
+      const xRef = s.x ?? spec.x;
+      if (textCell && xRef) {
+        xText = { cell: cellName(wb, spec.sheetId, xRef.sheetId, textCell.row, textCell.col), text: String(textCell.value).trim(), sheetId: xRef.sheetId, row: textCell.row, col: textCell.col };
+        xs = null;
+      }
     }
     const points: ChartPoint[] = [];
     const pos: number[] = [];
@@ -229,6 +252,8 @@ export function chartData(spec: ChartSpec, calc: Calc, locale: Locale): ChartDat
       color: seriesColor(s, si),
       points,
       fit,
+      ...(hiddenPoints ? { hiddenPoints } : {}),
+      ...(xText ? { xText } : {}),
     };
   });
 
@@ -249,6 +274,14 @@ export function chartData(spec: ChartSpec, calc: Calc, locale: Locale): ChartDat
     for (let i = categories.length; i < used; i++) categories.push(String(i + 1));
   }
   return { categories, series, xDecimals, yDecimals, xFormat, yFormat };
+}
+
+/** A cell as the chart's sheet writes it: "A7", or "'Blatt 2'!A7" on another sheet. */
+function cellName(wb: Workbook, hostSheetId: string, sheetId: string, row: number, col: number): string {
+  const name = posName({ row, col });
+  if (sheetId === hostSheetId) return name;
+  const sheet = sheetById(wb, sheetId);
+  return sheet ? `${quoteSheetName(sheet.name)}!${name}` : name;
 }
 
 function seriesName(s: SeriesSpec, i: number, calc: Calc, locale: Locale, fallback: (n: number) => string): string {

@@ -7,8 +7,17 @@
 
 import type { Locale } from "@/i18n/config";
 import type { NumberFormat } from "../types";
-import { clockTime, isoDate, longDate, MAX_SERIAL, MONTHS, MONTHS_SHORT, shortDate, timeOfSerial, WEEKDAYS, WEEKDAYS_SHORT, weekdayOf, ymdFromSerial } from "./dates";
+import { clockTime, durationText, isoDate, longDate, MAX_SERIAL, MONTHS, MONTHS_SHORT, shortDate, timeOfSerial, WEEKDAYS, WEEKDAYS_SHORT, weekdayOf, ymdFromSerial } from "./dates";
 import { boolText, errorText, isError, type CellValue, type CellError, ERR } from "./values";
+
+/**
+ * A time format for durations ("Dauer"): the hours go on past 24, like Excel's [h]:mm, so 1,5 days
+ * shows 36:00 instead of the clock time 12:00. Typing "36:00" gives it.
+ */
+export type DurationFormat = { kind: "time"; seconds: boolean; duration: true };
+
+/** Is this a duration format (36:00) rather than a clock time (12:00)? */
+export const isDuration = (fmt: NumberFormat | undefined): boolean => fmt?.kind === "time" && "duration" in fmt && fmt.duration === true;
 
 /** Narrow no-break space between a number and its unit ("12,5 mg/L"). */
 export const UNIT_SPACE = " ";
@@ -193,7 +202,7 @@ export function formatNumber(n: number, fmt: NumberFormat | undefined, locale: L
       return fmt.style === "long" ? longDate(n, locale) : fmt.style === "iso" ? isoDate(n) : shortDate(n, locale);
     case "time":
       if (n < 0) return formatGeneral(n, locale);
-      return clockTime(n, fmt.seconds);
+      return isDuration(fmt) ? durationText(n, fmt.seconds) : clockTime(n, fmt.seconds);
     case "datetime": {
       if (n < 0 || n >= MAX_SERIAL + 1) return formatGeneral(n, locale);
       const t = timeOfSerial(n);

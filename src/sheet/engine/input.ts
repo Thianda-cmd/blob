@@ -4,15 +4,34 @@
 
 import type { Locale } from "@/i18n/config";
 import type { Cell, NumberFormat } from "../types";
-import { clockTime, isoDate, shortDate, timeOfSerial } from "./dates";
-import { digitsOf } from "./format";
+import { clockTime, durationText, isoDate, shortDate, timeOfSerial } from "./dates";
+import { digitsOf, isDuration } from "./format";
 import type { ParsedInput } from "./index";
 import { lex } from "./lexer";
-import { parseValueText } from "./parse";
+import { formulaTooLongMessage, thousandsNotice } from "./messages";
+import { MAX_TYPED_HOURS, parseValueText } from "./parse";
 import { toCanonicalFormula, toLocalFormula } from "./translate";
 import { boolText, isError, type CellValue } from "./values";
 
 type InputOptions = { now?: () => Date };
+
+/**
+ * The longest formula a cell takes, as in Excel: 8,192 characters (stored, without "="). Longer
+ * ones are refused when typed: the saved sheet would drop them.
+ */
+export const MAX_FORMULA_LENGTH = 8192;
+
+type TypedFormula = { formula: string } | { error: { message: string; at: number }; tooLong?: boolean };
+
+/** A formula as typed (without "=") → canonical, or why not, with the caret position for the editor (`shift`: where the formula starts in the typed text). */
+function typedFormula(local: string, locale: Locale, shift: number): TypedFormula {
+  if (local.length > MAX_FORMULA_LENGTH) return { error: { message: formulaTooLongMessage(locale), at: shift + MAX_FORMULA_LENGTH }, tooLong: true };
+  const r = toCanonicalFormula(local, locale);
+  if ("error" in r) return { error: { message: r.error, at: r.at + shift } };
+  // German names can be longer than the stored English ones: what counts is what is stored.
+  if (r.formula.length > MAX_FORMULA_LENGTH) return { error: { message: formulaTooLongMessage(locale), at: shift + local.length }, tooLong: true };
+  return r;
+}
 
 /** Formulas whose result is a date or time get that format when typed (=HEUTE() shows 03.11.2026, not 46329). */
 function impliedFormulaFormat(canonical: string): NumberFormat | undefined {
@@ -43,25 +62,34 @@ export function parseInput(text: string, locale: Locale, current?: Cell, opts?: 
   if (text.trim() === "") return { cell: {} };
   if (text.startsWith("'")) return { cell: { v: text.slice(1) } };
   if (text.startsWith("=")) {
-    const r = toCanonicalFormula(text.slice(1), locale);
-    if ("error" in r) return { cell: {}, error: { message: r.error, at: r.at + 1 } };
+    const r = typedFormula(text.slice(1), locale, 1);
+    if ("error" in r) return { cell: {}, error: r.error };
     const fmt = impliedFormulaFormat(r.formula);
     return fmt ? { cell: { f: r.formula }, fmt } : { cell: { f: r.formula } };
   }
-  const parsed = parseValueText(text, locale, { bools: true, units: true, zeroDecimal: true, now: opts?.now });
+  const parsed = parseValueText(text, locale, { bools: true, units: true, zeroDecimal: true, thousandsHint: true, now: opts?.now });
   if (parsed) {
     if (parsed.kind === "bool") return { cell: { v: parsed.value } };
-    let value = parsed.value;
     // Excel: a number typed into a percent cell means percent (50 → 50 %).
-    if (!parsed.fmt && current?.s?.fmt?.kind === "percent") value = value / 100;
-    return parsed.fmt ? { cell: { v: value }, fmt: parsed.fmt } : { cell: { v: value } };
+    const inPercentCell = (fmt: NumberFormat | undefined, v: number) => (!fmt && current?.s?.fmt?.kind === "percent" ? v / 100 : v);
+    const value = inPercentCell(parsed.fmt, parsed.value);
+    const out: ParsedInput = parsed.fmt ? { cell: { v: value }, fmt: parsed.fmt } : { cell: { v: value } };
+    if (parsed.orDecimal) {
+      // "1.234" stays 1234 (Excel's reading), but the person may have meant 1,234: say so, and offer it.
+      const typed = text.trim();
+      const { message, action } = thousandsNotice(typed, typed.replace(/(\d+)\.(\d+)/, "$1$2"), typed.replace(/(\d+)\.(\d+)/, "$1,$2"), locale);
+      const alt = parsed.orDecimal;
+      out.notice = { message, action, other: alt.fmt ? { cell: { v: alt.value }, fmt: alt.fmt } : { cell: { v: inPercentCell(undefined, alt.value) } } };
+    }
+    return out;
   }
   // "+A1*2" or "-A1": a formula without "=" (an old habit from other programs), when it is clearly one.
   if (/^[+-]/.test(text)) {
     const toks = lex(text, locale);
     if (toks.some((t) => t.k === "ref" || t.k === "fn")) {
-      const r = toCanonicalFormula(text, locale);
+      const r = typedFormula(text, locale, 0);
       if ("formula" in r) return { cell: { f: r.formula } };
+      if (r.tooLong) return { cell: {}, error: r.error };
     }
   }
   return { cell: { v: text } };
@@ -119,13 +147,18 @@ export function editText(cell: Cell | undefined, locale: Locale): string {
     }
     case "time": {
       if (v < 0) break;
-      if (v >= 1) {
-        const t = timeOfSerial(v);
-        const day = Math.floor(v) + t.carry;
-        return `${shortDate(day, locale)} ${clockTime(v, t.s !== 0)}`;
-      }
       const t = timeOfSerial(v);
-      return clockTime(v, t.s !== 0 || fmt.seconds);
+      const seconds = t.s !== 0 || fmt.seconds;
+      // A duration edits as one ("36:00"), and so does a time of a day or more with hours typing
+      // takes back (a 36:00 typed before durations had their own format): never an 1899 date,
+      // which wouldn't read back as a number. Too long for that: a duration as a plain number, a
+      // date with its time (a timestamp shown as a clock time) as the date and the time.
+      if (isDuration(fmt) || v >= 1) {
+        if (Math.round(v * 86400) < (MAX_TYPED_HOURS + 1) * 3600) return durationText(v, seconds);
+        if (isDuration(fmt)) return editNumber(v, locale);
+        return `${shortDate(Math.floor(v) + t.carry, locale)} ${clockTime(v, t.s !== 0)}`;
+      }
+      return clockTime(v, seconds);
     }
   }
   return editNumber(v, locale);

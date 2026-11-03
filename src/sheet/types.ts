@@ -34,7 +34,28 @@ export type Sheet = {
   freeze: { rows: number; cols: number };
   /** How many rows and columns the grid shows; it grows when you type, paste or fill beyond it. */
   size: { rows: number; cols: number };
+  /**
+   * The sheet's latest changes of rows and columns (inserted, deleted, sorted, moved), oldest
+   * first. Merging lines two people's versions up with it before comparing cells, so an edit made
+   * in row 7 lands in row 8 when the other person inserted a row above it (src/sheet/sheetLog.ts,
+   * src/sheet/collab.ts). Missing in older content: nothing recorded.
+   */
+  log?: SheetOp[];
 };
+
+/**
+ * One change of a sheet's rows or columns, as kept in Sheet.log. `id` is random; `inv` is set on
+ * an undo or redo and names the entry it takes back.
+ */
+export type SheetOp = { id: string; inv?: string } & (
+  | { kind: "insertRows" | "deleteRows" | "insertCols" | "deleteCols"; at: number; count: number }
+  /** Rows r0… of columns c0…c1 in a new order: row r0 + i holds what was in row r0 + order[i]. */
+  | { kind: "sort"; r0: number; c0: number; c1: number; order: number[] }
+  /** Cut and paste: the block `from` of sheet `src` moved to `to` on sheet `dst` (the same sheet or another; kept in both logs). */
+  | { kind: "move"; src: string; from: Area; dst: string; to: Pos }
+  /** A change that can't be repeated on another version: the entries before it were dropped, or a sort too long to keep. */
+  | { kind: "barrier" }
+);
 
 export const DEFAULT_COL_W = 100;
 export const DEFAULT_ROW_H = 28;

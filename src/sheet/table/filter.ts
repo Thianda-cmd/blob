@@ -7,7 +7,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey } from "../a1";
-import { errorText, formatValue, isError, type Calc, type CellValue } from "../engine";
+import { compileGlob, errorText, formatValue, globTest, isError, type Calc, type CellValue } from "../engine";
 import type { FilterSpec, NumberFormat, Sheet, TableSpec } from "../types";
 import { dataRows } from "./totals";
 
@@ -20,23 +20,6 @@ export function shownText(value: CellValue, fmt: NumberFormat | undefined, local
 
 /** Values are compared without case ("Probe" and "probe" are one entry, like Excel). */
 export const valueKey = (text: string, locale: Locale) => text.toLocaleLowerCase(locale);
-
-const escapeRe = (s: string) => s.replace(/[\\^$.|+()[\]{}*?]/g, "\\$&");
-
-/** Excel's wildcards as a regular expression source: ? one character, * any number, ~ escapes them. */
-export function wildcardSource(pattern: string): string {
-  let src = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-    if (ch === "~" && i + 1 < pattern.length && "*?~".includes(pattern[i + 1])) {
-      src += escapeRe(pattern[i + 1]);
-      i++;
-    } else if (ch === "*") src += "[\\s\\S]*";
-    else if (ch === "?") src += "[\\s\\S]";
-    else src += escapeRe(ch);
-  }
-  return src;
-}
 
 /** Reads one column of a table lazily: values and shown texts, each worked out once. */
 class ColumnReader {
@@ -88,16 +71,15 @@ function rowTest(read: ColumnReader, r0: number, r1: number, spec: FilterSpec, l
     }
     case "text": {
       const text = spec.text ?? "";
-      if (spec.op === "equals") {
-        const re = new RegExp(`^${wildcardSource(text)}$`, "iu");
-        return (row) => re.test(read.text(row));
-      }
+      // Wildcards without a RegExp, so no pattern can freeze the table (src/sheet/engine/glob.ts);
+      // ? stands for one character, an emoji included.
+      const glob = compileGlob(text, { unicode: true });
+      if (spec.op === "equals") return (row) => globTest(glob, read.text(row));
       // An empty pattern asks nothing (rather than hiding every row).
       if (!text) return () => true;
-      const src = wildcardSource(text);
-      const re = new RegExp(spec.op === "begins" ? `^${src}` : spec.op === "ends" ? `${src}$` : src, "iu");
-      if (spec.op === "notContains") return (row) => !re.test(read.text(row));
-      return (row) => re.test(read.text(row));
+      if (spec.op === "notContains") return (row) => !globTest(glob, read.text(row), "contains");
+      const within = spec.op === "begins" ? "begins" : spec.op === "ends" ? "ends" : "contains";
+      return (row) => globTest(glob, read.text(row), within);
     }
     case "number": {
       const num = (row: number) => {

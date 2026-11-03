@@ -1,6 +1,6 @@
-// Numbers in charts: trendline equations and R² the way Excel labels them, tick labels, data
-// labels and tooltips. Plain functions without the formula engine, so the regression, the chart
-// and their tests work on their own.
+// Numbers in charts: trendline equations (with enough significant digits to calculate with) and
+// R² the way Excel labels them, tick labels, data labels and tooltips. Plain functions without the
+// formula engine, so the regression, the chart and their tests work on their own.
 
 import type { Locale } from "@/i18n/config";
 import type { NumberFormat } from "../types";
@@ -22,12 +22,13 @@ function excelExponent(s: string): string {
 }
 
 /**
- * Excel's "General" format squeezed into `width` characters (without the sign), which is what
- * Excel's trendline labels show by default: as many decimals as fit, trailing zeros dropped, and
- * scientific notation when the first digit would fall past the last decimal or the number has
- * too many digits: 0.052345 → "0,0523", 0.00051 → "0,0005", 7.85714 → "7,8571",
- * 13.4592 → "13,459", 124.113 → "124,11", 25012.3 → "25012", 0.00006 → "6E-05",
- * 0.000098 → "1E-04", 1234567 → "1E+06".
+ * Excel's "General" format squeezed into `width` characters (without the sign): as many decimals
+ * as fit, trailing zeros dropped, and scientific notation when the first digit would fall past
+ * the last decimal or the number has too many digits: 0.052345 → "0,0523", 0.00051 → "0,0005",
+ * 7.85714 → "7,8571", 13.4592 → "13,459", 124.113 → "124,11", 25012.3 → "25012",
+ * 0.00006 → "6E-05", 0.000098 → "1E-04", 1234567 → "1E+06". Values without a number format in
+ * tooltips and data labels use it, roomy. (Excel's trendline labels use the narrow one, which is
+ * too coarse to calculate with; Blob's equations use formatCoefficient.)
  */
 export function formatGeneral(v: number, locale: Locale, width = 6): string {
   if (Number.isNaN(v)) return locale === "de" ? "#NV" : "#N/A";
@@ -79,12 +80,14 @@ function scientificInWidth(a: number, width: number): string {
   return excelExponent(a.toExponential(0));
 }
 
-/**
- * A number with `digits` significant digits, trailing zeros dropped ("more digits" for the
- * equation, the sample calculator): 0.0523456 → "0,052346" (5), 1234.5678 → "1234,6" (5).
- * Very small or large numbers in scientific notation (1,2346E-05).
- */
-export function formatSignificant(v: number, locale: Locale, digits: number): string {
+/** A positive number in scientific notation with `d` significant digits, trailing zeros dropped: "1,2346E-05". */
+function scientificText(a: number, d: number, locale: Locale): string {
+  const [m, e] = excelExponent(a.toExponential(d - 1)).split("E");
+  return localize(`${trimZeros(m)}E${e}`, locale);
+}
+
+/** `digits` significant digits; scientific below 0,0001 and above 10^maxFixedExp. */
+function significant(v: number, locale: Locale, digits: number, maxFixedExp: number): string {
   if (Number.isNaN(v)) return locale === "de" ? "#NV" : "#N/A";
   if (!Number.isFinite(v)) return v > 0 ? "∞" : "-∞";
   if (v === 0) return "0";
@@ -92,14 +95,71 @@ export function formatSignificant(v: number, locale: Locale, digits: number): st
   const sign = v < 0 ? "-" : "";
   const a = Math.abs(v);
   const exp = Number(a.toExponential(d - 1).split("e")[1]);
-  if (exp < -4 || exp >= 10) {
-    const s = excelExponent(a.toExponential(d - 1));
-    const [m, e] = s.split("E");
-    return sign + localize(`${trimZeros(m)}E${e}`, locale);
-  }
+  if (exp < -4 || exp > maxFixedExp) return sign + scientificText(a, d, locale);
   const s = trimZeros(toFixedDecimal(a, Math.max(0, d - 1 - exp)));
   return s === "0" ? "0" : sign + localize(s, locale);
 }
+
+/**
+ * A number with `digits` significant digits, trailing zeros dropped (axis settings, cell values
+ * in the panel): 0.0523456 → "0,052346" (5), 1234.5678 → "1234,6" (5). Very small or large
+ * numbers in scientific notation (1,2346E-05).
+ */
+export function formatSignificant(v: number, locale: Locale, digits: number): string {
+  return significant(v, locale, digits, 9);
+}
+
+/**
+ * Significant digits every coefficient of a trendline equation keeps: on the chart, in its aria
+ * label, in the panel and on the clipboard, and (as one format for the whole label) in an .xlsx
+ * export. Four are enough to work a sample's concentration back by hand to about 0,05 %.
+ */
+export const EQUATION_DIGITS = 4;
+
+/**
+ * A coefficient of a trendline equation, and the numbers worked out with it ("Probe berechnen"):
+ * `digits` significant digits with trailing zeros dropped, the whole-number part never rounded
+ * away, scientific below 0,0001 and from 10 million on. 0.000946289 → "0,0009463",
+ * 0.0518714 → "0,05187", 25012.3 → "25012", 9.43396e-10 → "9,434E-10", 518333626 → "5,183E+08".
+ * Excel's narrow "General" label keeps 1 significant digit of such numbers (0,0009 or 9E-10), and
+ * a student who works back from that gets concentrations 5 % off.
+ */
+export function formatCoefficient(v: number, locale: Locale, digits = EQUATION_DIGITS): string {
+  return significant(v, locale, digits, 6);
+}
+
+/**
+ * A positive number given by its natural logarithm, with `digits` significant digits, also where
+ * the number is beyond what a JS number holds: exponential and power trendlines with dates as x
+ * (46 000 days) have an a like e^(−28412) = 1,234E-12339, which is 0 as a number.
+ */
+export function formatFromLn(lnV: number, locale: Locale, digits = EQUATION_DIGITS): string {
+  if (Number.isNaN(lnV)) return locale === "de" ? "#NV" : "#N/A";
+  const direct = Math.exp(lnV);
+  if (direct >= 1e-300 && direct <= 1e300) return formatCoefficient(direct, locale, digits);
+  if (!Number.isFinite(lnV)) return lnV > 0 ? "∞" : "0";
+  const d = Math.max(1, Math.min(15, Math.round(digits)));
+  const log10 = lnV / Math.LN10;
+  let e = Math.floor(log10);
+  let m = (10 ** (log10 - e)).toFixed(d - 1);
+  // 9,99996 rounds up to 10,000: one more power of ten instead.
+  if (Number(m) >= 10) {
+    e += 1;
+    m = (Number(m) / 10).toFixed(d - 1);
+  }
+  return localize(`${trimZeros(m)}E${e < 0 ? "-" : "+"}${String(Math.abs(e)).padStart(2, "0")}`, locale);
+}
+
+/** Scientific notation with `digits` significant digits, trailing zeros dropped: 1500000 → "1,5E+06". */
+export function formatScientific(v: number, locale: Locale, digits: number): string {
+  if (Number.isNaN(v)) return locale === "de" ? "#NV" : "#N/A";
+  if (!Number.isFinite(v)) return v > 0 ? "∞" : "-∞";
+  if (v === 0) return "0";
+  return (v < 0 ? "-" : "") + scientificText(Math.abs(v), Math.max(1, Math.min(15, Math.round(digits))), locale);
+}
+
+/** Dates, times and both: the kinds of format whose numbers are serial dates. */
+export const isDateFormat = (fmt: NumberFormat | null | undefined) => fmt?.kind === "date" || fmt?.kind === "datetime" || fmt?.kind === "time";
 
 /** R² counts as exactly 1 within this distance: a perfect line's 1 − SSE/SST lands a few ulps off. */
 export const R2_ONE_TOLERANCE = 5e-13;

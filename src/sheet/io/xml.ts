@@ -3,9 +3,18 @@
 // attributes and children; comments, processing instructions and the DOCTYPE are skipped. Names
 // keep their prefix ("r:id", "x:Row"); `local` drops it, so files in the "strict" OOXML namespace
 // read the same.
+//
+// Files come from anywhere, so reading stays bounded: a budget caps the elements of one file (a
+// few kilobytes of zip can hold millions of "<c/>"), an end tag of an element that isn't open is
+// skipped at once, and attribute names from the file never reach an object's prototype.
 
 export type XmlEl = { name: string; local: string; attrs: Record<string, string>; kids: XmlNode[] };
 export type XmlNode = XmlEl | string;
+
+/** A value of a lookup table for a key from a file: never one of Object's own ("constructor", "__proto__"). */
+export function lookup<T>(table: Readonly<Record<string, T>>, key: string | null | undefined): T | undefined {
+  return key != null && Object.hasOwn(table, key) ? table[key] : undefined;
+}
 
 const NAMED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
@@ -17,7 +26,7 @@ export function decodeEntities(s: string): string {
       const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
       return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
-    return NAMED[e] ?? m;
+    return lookup(NAMED, e) ?? m;
   });
 }
 
@@ -32,17 +41,45 @@ export const localName = (name: string) => {
  */
 const KEEPS_SPACE = new Set(["t"]);
 
-export class XmlError extends Error {}
+export class XmlError extends Error {
+  /** `tooBig`: the file has more elements than its budget allows (not broken, just too much). */
+  constructor(
+    message: string,
+    public tooBig = false,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * How many more elements one file may have, shared by all its parts. A full sheet of 20,000 rows
+ * and 200 columns stays below the default, and Blob can't save anything near that big anyway.
+ */
+export type XmlBudget = { elements: number };
+export const MAX_XML_ELEMENTS = 8_000_000;
+export const xmlBudget = (elements = MAX_XML_ELEMENTS): XmlBudget => ({ elements });
 
 /** Space, tab, line feed, carriage return. */
 const space = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
 /** Where a tag or attribute name ends: whitespace, "/" or ">". */
 const nameEnd = (c: number) => space(c) || c === 47 || c === 62;
 
-/** The document's root element. Throws XmlError when the text isn't XML. */
-export function parseXml(src: string): XmlEl {
-  const doc: XmlEl = { name: "#document", local: "#document", attrs: {}, kids: [] };
+/** What elements without attributes or children share (never changed after reading), so big parts stay small. */
+const NO_ATTRS: Record<string, string> = Object.freeze(Object.create(null) as Record<string, string>);
+const NO_KIDS: XmlNode[] = Object.freeze([] as XmlNode[]) as XmlNode[];
+
+/**
+ * The document's root element. Throws XmlError when the text isn't XML, or (with `tooBig` set)
+ * when it has more elements than `budget` has left; the budget is shared by the parts of a file.
+ */
+export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
+  const doc: XmlEl = { name: "#document", local: "#document", attrs: NO_ATTRS, kids: [] };
   const stack: XmlEl[] = [doc];
+  // How many elements of each name are open: an end tag of one that isn't is skipped at once
+  // (looking for it through the whole stack each time made such files take minutes).
+  const open = new Map<string, number>();
+  // One string per tag name (a sheet repeats "c", "v" and "row" millions of times).
+  const names = new Map<string, string>();
   let i = 0;
   const n = src.length;
   while (i < n) {
@@ -94,10 +131,11 @@ export function parseXml(src: string): XmlEl {
       if (close < 0) throw new XmlError("xml: unclosed end tag");
       const name = src.slice(lt + 2, close).trim();
       // Close up to the matching element (forgiving about a missing end tag in between).
-      for (let k = stack.length - 1; k > 0; k--) {
-        if (stack[k].name === name) {
-          stack.length = k;
-          break;
+      if (open.get(name)) {
+        for (;;) {
+          const el = stack.pop()!;
+          open.set(el.name, open.get(el.name)! - 1);
+          if (el.name === name) break;
         }
       }
       i = close + 1;
@@ -106,9 +144,15 @@ export function parseXml(src: string): XmlEl {
     // A start tag: its name, then attributes up to ">" or "/>" (">" may appear inside quotes).
     let j = lt + 1;
     while (j < n && !nameEnd(src.charCodeAt(j))) j++;
-    const name = src.slice(lt + 1, j);
-    if (!name) throw new XmlError("xml: empty tag name");
-    const attrs: Record<string, string> = {};
+    const raw = src.slice(lt + 1, j);
+    if (!raw) throw new XmlError("xml: empty tag name");
+    if (--budget.elements < 0) throw new XmlError("xml: too many elements", true);
+    let name = names.get(raw);
+    if (name === undefined) {
+      name = raw;
+      if (names.size < 10_000) names.set(raw, raw);
+    }
+    let attrs = NO_ATTRS;
     let selfClosing = false;
     for (;;) {
       while (j < n && space(src.charCodeAt(j))) j++;
@@ -139,12 +183,17 @@ export function parseXml(src: string): XmlEl {
       const close = src.indexOf(q, j + 1);
       if (close < 0) throw new XmlError("xml: unclosed attribute");
       const value = src.slice(j + 1, close);
+      // Without a prototype, a file's attribute named "constructor" or "__proto__" is just a name.
+      if (attrs === NO_ATTRS) attrs = Object.create(null) as Record<string, string>;
       attrs[attr] = decodeEntities(/[\t\n\r]/.test(value) ? value.replace(/[\t\n\r]/g, " ") : value);
       j = close + 1;
     }
-    const el: XmlEl = { name, local: localName(name), attrs, kids: [] };
+    const el: XmlEl = { name, local: localName(name), attrs, kids: selfClosing ? NO_KIDS : [] };
     stack[stack.length - 1].kids.push(el);
-    if (!selfClosing) stack.push(el);
+    if (!selfClosing) {
+      stack.push(el);
+      open.set(name, (open.get(name) ?? 0) + 1);
+    }
     i = j;
   }
   const root = doc.kids.find((k): k is XmlEl => typeof k !== "string");

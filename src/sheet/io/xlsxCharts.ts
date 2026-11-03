@@ -9,13 +9,13 @@
 import type { Locale } from "@/i18n/config";
 import { quoteSheetName } from "../a1";
 import { chartData } from "../chart/data";
-import { r2Decimals } from "../chart/format";
+import { EQUATION_DIGITS, r2Decimals } from "../chart/format";
 import { isFitError, type Fit, type FitError } from "../chart/regression";
 import { COLOR_HEX } from "../colors";
 import { isError, type Calc } from "../engine";
 import { newId } from "../ops";
 import type { AxisSpec, ChartKind, ChartSpec, ErrorBarSpec, RangeRef, SeriesSpec, SheetColor, TrendlineSpec } from "../types";
-import { attr, boolAttr, child, children, descendants, escAttr, escText, numAttr, textOf, XML_HEAD, type XmlEl } from "./xml";
+import { attr, boolAttr, child, children, descendants, escAttr, escText, lookup, numAttr, textOf, XML_HEAD, type XmlEl } from "./xml";
 import { nearestSheetColor } from "./xlsxStyles";
 
 const NS_C = "http://schemas.openxmlformats.org/drawingml/2006/chart";
@@ -83,18 +83,22 @@ function dataRef(tag: "xVal" | "yVal" | "cat" | "val" | "plus" | "minus", ref: R
 const TREND_TYPE: Record<TrendlineSpec["type"], string> = { linear: "linear", polynomial: "poly", exponential: "exp", logarithmic: "log", power: "power", movingAverage: "movingAvg" };
 
 /**
- * The number format of a trendline's label (equation and R²): about four significant digits of the
- * smallest coefficient, trailing zeros left out ("y = 0,0524x + 0,0022", "R² = 0,999786"), or
- * scientific for very small and very large coefficients. Excel has one format for the whole label,
- * so when R² is shown it also gets the decimals it needs not to round up to 1 (0,99997 would
- * read "R² = 1,0" with four), as Blob's own chart label does.
+ * The number format of a trendline's label (equation and R²), by the rule of Blob's own chart
+ * label: every coefficient keeps at least EQUATION_DIGITS (4) significant digits, so Excel shows
+ * the same equation as Blob, to those digits. Excel has one format for the whole label: decimals
+ * for 4 significant digits of the smallest coefficient, trailing zeros left out
+ * ("y = 0,0009463x + 0,0254368", "R² = 0,999786"), or scientific with 4 significant digits when a
+ * coefficient is below 0,00001 or from 10 million on (Blob's label writes single coefficients
+ * from 0,0001 down scientific; a whole Excel label in scientific notation reads worse than one
+ * small number with decimals). When R² is shown it also gets the decimals it needs not to round
+ * up to 1 (0,99997 would read "R² = 1,0" with four), as Blob's own chart label does.
  */
 export function trendLabelFormat(fit: Fit | FitError | null | undefined, showR2 = true): string {
   if (!fit || isFitError(fit)) return "General";
   const cs = fit.coefficients.filter((c) => Number.isFinite(c) && c !== 0).map(Math.abs);
   const r2 = showR2 && fit.r2 !== null && Number.isFinite(fit.r2) ? r2Decimals(fit.r2, 4, 8) : 4;
-  if (cs.some((c) => c < 1e-5 || c >= 1e7)) return `0.${"0".repeat(Math.max(3, r2 - 1))}E+00`;
-  const needed = cs.length ? Math.max(...cs.map((c) => 3 - Math.floor(Math.log10(c)))) : 4;
+  if (cs.some((c) => c < 1e-5 || c >= 1e7)) return `0.${"0".repeat(Math.max(EQUATION_DIGITS - 1, r2 - 1))}E+00`;
+  const needed = cs.length ? Math.max(...cs.map((c) => EQUATION_DIGITS - 1 - Math.floor(Math.log10(c)))) : 4;
   const decimals = Math.max(4, r2, Math.min(8, needed));
   return `0.0${"#".repeat(decimals - 1)}`;
 }
@@ -372,7 +376,7 @@ export function chartFromXml(
     let trendline: TrendlineSpec | null = null;
     const tl = child(ser, "trendline");
     if (tl) {
-      const type = TREND_FROM[attr(child(tl, "trendlineType"), "val") ?? "linear"] ?? "linear";
+      const type = lookup(TREND_FROM, attr(child(tl, "trendlineType"), "val") ?? "linear") ?? "linear";
       trendline = {
         type,
         order: numAttr(child(tl, "order"), "val") ?? 2,
@@ -388,7 +392,7 @@ export function chartFromXml(
     let errorBars: ErrorBarSpec | null = null;
     const eb = children(ser, "errBars").find((e) => (attr(child(e, "errDir"), "val") ?? "y") === "y");
     if (eb) {
-      const k = ERR_FROM[attr(child(eb, "errValType"), "val") ?? "fixedVal"] ?? "fixed";
+      const k = lookup(ERR_FROM, attr(child(eb, "errValType"), "val") ?? "fixedVal") ?? "fixed";
       const dir = attr(child(eb, "errBarType"), "val");
       errorBars = {
         kind: k,

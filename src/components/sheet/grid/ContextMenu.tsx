@@ -26,6 +26,7 @@ import {
   RemoveFormatting,
   Scissors,
   Snowflake,
+  SquareArrowDownRight,
   Trash2,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -37,8 +38,8 @@ import { posName } from "@/sheet/a1";
 import { sheetById } from "@/sheet/ops";
 import type { Pos } from "@/sheet/types";
 import { sortSelection } from "../chrome/actions";
-import { activeArea, type SheetStore } from "../store";
-import { clearSelection, deleteAtSelection, fillFrom, fitColumns, fitRows, freeze, hiddenNear, hideSelection, insertAtSelection, selectedIndexes, setNote, unhideNear } from "./actions";
+import { activeArea, selectionAreas, type SheetStore } from "../store";
+import { clearSelection, deleteAtSelection, fillFrom, fitColumns, fitRows, freeze, hiddenNear, hideSelection, insertAtSelection, selectedIndexes, setNote, unhideNear, wholeness } from "./actions";
 import { copySelection, hasOwnCopy, pasteData, readSystemClipboard, writeSystemClipboard, type PasteMode } from "./clipboard";
 import type { GridText } from "./GridCells";
 
@@ -69,6 +70,7 @@ export function GridMenu({
   onClose,
   extra,
   onNote,
+  onFill,
   notify,
   t,
   keys,
@@ -79,6 +81,8 @@ export function GridMenu({
   onClose: () => void;
   extra?: (close: () => void) => ReactNode;
   onNote: (at: Pos) => void;
+  /** Touch screens: fill by dragging (the bottom-right handle becomes the fill handle). */
+  onFill?: () => void;
   notify: (text: string) => void;
   t: GridText;
   keys: Keys;
@@ -98,6 +102,11 @@ export function GridMenu({
     const anchor = s.selection.anchor;
     const note = sheet.cells[`${anchor.row},${anchor.col}`]?.note;
     const frozen = sheet.freeze.rows > 0 || sheet.freeze.cols > 0;
+    // A selection that spans whole columns (or rows) never offers to insert, delete or hide every
+    // row (or column) of the sheet from the cells' menu.
+    const whole = selectionAreas(s.selection).map((x) => wholeness(x, sheet));
+    const rowItems = kind === "rows" || (kind === "cells" && !whole.some((w) => w.cols));
+    const colItems = kind === "cols" || (kind === "cells" && !whole.some((w) => w.rows));
     const hiddenRows = kind !== "cols" ? hiddenNear(store, "rows") : [];
     const hiddenCols = kind !== "rows" ? hiddenNear(store, "cols") : [];
     const extraItems = !readOnly && extra ? extra(onClose) : null;
@@ -124,8 +133,14 @@ export function GridMenu({
             <MenuItem icon={<ArrowRightLeft />} onSelect={run(() => void pasteFromMenu(store, "transpose", notify, t))}>
               {t.pasteTransposed}
             </MenuItem>
+            {/* A finger has no fill handle: this turns the bottom-right handle into one (near the top, so it is found). */}
+            {onFill && kind === "cells" && (
+              <MenuItem icon={<SquareArrowDownRight />} onSelect={run(onFill)}>
+                {t.fillTouch}
+              </MenuItem>
+            )}
             <MenuSeparator />
-            {kind !== "cols" && (
+            {rowItems && (
               <>
                 <MenuItem icon={<BetweenHorizontalStart />} onSelect={run(() => insertAtSelection(store, "rows"))}>
                   {t.insertRowsAbove(nRows)}
@@ -140,7 +155,7 @@ export function GridMenu({
                 </MenuItem>
               </>
             )}
-            {kind !== "rows" && (
+            {colItems && (
               <>
                 <MenuItem icon={<BetweenVerticalStart />} onSelect={run(() => insertAtSelection(store, "cols"))}>
                   {t.insertColsLeft(nCols)}
@@ -155,12 +170,12 @@ export function GridMenu({
                 </MenuItem>
               </>
             )}
-            {kind !== "cols" && (
+            {rowItems && (
               <MenuItem icon={<EyeOff />} onSelect={run(() => hideSelection(store, "rows"))}>
                 {t.hideRows(selectedIndexes(store, "rows").length)}
               </MenuItem>
             )}
-            {kind !== "rows" && (
+            {colItems && (
               <MenuItem icon={<EyeOff />} onSelect={run(() => hideSelection(store, "cols"))}>
                 {t.hideCols(selectedIndexes(store, "cols").length)}
               </MenuItem>

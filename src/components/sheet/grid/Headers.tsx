@@ -32,13 +32,17 @@ function rowHighlight(areas: Area[], cols: number, r: number): Highlight {
   return h;
 }
 
+// The letters and numbers are how students read "B2:B7": dark enough to read on the header's grey.
 const tone = (h: Highlight) =>
-  h === "full" ? "bg-blob-soft font-semibold text-blob-ink" : h === "on" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-3";
+  h === "full" ? "bg-blob-soft font-semibold text-blob-ink" : h === "on" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2";
 
-/** The letters of columns c0…c1, positioned for a layer whose left edge is the grid's left edge. */
-export const ColumnHeaders = memo(function ColumnHeaders({ layout, c0, c1, areas, t }: { layout: Layout; c0: number; c1: number; areas: Area[]; t: GridText }) {
+/** The headers' text size: smaller with the zoom, but on touch screens never below 12 px (the header row keeps its height). */
+const headerFont = (zoom: number, touch: boolean) => (touch ? Math.max(12, 12 * zoom) : Math.max(9, 11.5 * zoom));
+
+/** The letters of columns c0…c1, positioned for a layer whose left edge is the grid's left edge. `touch`: a touch screen. */
+export const ColumnHeaders = memo(function ColumnHeaders({ layout, c0, c1, areas, t, touch = false }: { layout: Layout; c0: number; c1: number; areas: Area[]; t: GridText; touch?: boolean }) {
   const out: ReactNode[] = [];
-  const fontSize = Math.max(9, 11.5 * layout.zoom);
+  const fontSize = headerFont(layout.zoom, touch);
   const line = Math.max(2, Math.round(2 * layout.zoom));
   for (let c = c0; c <= c1; c++) {
     const w = colWidth(layout, c);
@@ -75,9 +79,9 @@ export const ColumnHeaders = memo(function ColumnHeaders({ layout, c0, c1, areas
 });
 
 /** The numbers of rows r0…r1, positioned for a layer whose top edge is the grid's top edge. */
-export const RowHeaders = memo(function RowHeaders({ layout, r0, r1, areas, t }: { layout: Layout; r0: number; r1: number; areas: Area[]; t: GridText }) {
+export const RowHeaders = memo(function RowHeaders({ layout, r0, r1, areas, t, touch = false }: { layout: Layout; r0: number; r1: number; areas: Area[]; t: GridText; touch?: boolean }) {
   const out: ReactNode[] = [];
-  const fontSize = Math.max(9, 11.5 * layout.zoom);
+  const fontSize = headerFont(layout.zoom, touch);
   const line = Math.max(2, Math.round(2 * layout.zoom));
   for (let r = r0; r <= r1; r++) {
     const hgt = rowHeight(layout, r);

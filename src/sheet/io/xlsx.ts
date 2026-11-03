@@ -21,6 +21,7 @@ import { areaName, cellKey, colIndex, colName } from "../a1";
 import { COLOR_HEX } from "../colors";
 import { adjustFormula, formatValue, getFunction, shiftFormula, toCanonicalFormula, type Calc, type CellValue } from "../engine";
 import { newId } from "../ops";
+import { totalOfCell } from "../table/totals";
 import {
   DEFAULT_COL_W,
   DEFAULT_ROW_H,
@@ -41,7 +42,7 @@ import {
   type TotalFn,
   type Workbook,
 } from "../types";
-import { attr, boolAttr, child, children, descendants, escAttr, escText, numAttr, parseXml, textOf, XML_HEAD, type XmlEl } from "./xml";
+import { attr, boolAttr, child, children, descendants, escAttr, escText, lookup, numAttr, parseXml, textOf, XML_HEAD, XmlError, xmlBudget, type XmlBudget, type XmlEl } from "./xml";
 import { chartFromXml, chartXml, drawingXml, EMU } from "./xlsxCharts";
 import { calledFunctions, importFormula, stripPrefixes, toFileFormula, type FileTable, type FormulaContext } from "./xlsxFormulas";
 import {
@@ -53,6 +54,7 @@ import {
   EXCEL_FONT_PT,
   fillArgb,
   fromExcelFormat,
+  fromSigStyle,
   heightToPx,
   INDEXED_COLORS,
   mixWhite,
@@ -62,6 +64,7 @@ import {
   pxToHeight,
   pxToPt,
   pxToWidth,
+  sigStyleName,
   TABLE_STYLE_NAME,
   tableStyleFromExcel,
   textArgb,
@@ -77,6 +80,10 @@ const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships
 const CT = "application/vnd.openxmlformats-officedocument.spreadsheetml";
 /** Excel's limit for the text of one cell. */
 const MAX_TEXT = 32767;
+/** Characters of a formula (Excel's limit; Blob can't store longer ones, src/sheet/doc.ts). */
+const MAX_FORMULA = 8192;
+/** Sheets of one spreadsheet (Blob keeps at most this many, src/sheet/doc.ts). */
+const MAX_SHEETS = 250;
 
 /** Why an Excel file can't be read; `message` says it in the user's language. */
 export class XlsxError extends Error {
@@ -139,7 +146,8 @@ function excelTableName(name: string, used: Set<string>): string {
   return candidate;
 }
 
-type StyleKey = { fmt: { id: number } | { code: string }; style: CellStyle | undefined };
+/** `named`: a named cell style the cell's format belongs to (significant figures, see sigStyleName). */
+type StyleKey = { fmt: { id: number } | { code: string }; style: CellStyle | undefined; named?: string };
 
 /** styles.xml, built up while the sheets are written: every distinct look gets one cell format (xf). */
 class StyleSheet {
@@ -155,6 +163,8 @@ class StyleSheet {
   private xfIds = new Map<string, number>([[this.xfs[0], 0]]);
   private dxfs: string[] = [];
   private tableStyles = new Map<TableStyle, string>();
+  /** Named cell styles after "Normal": the name at index i is cell style xf i + 1. */
+  private named: string[] = [];
 
   private intern(list: string[], ids: Map<string, number>, xml: string): number {
     let id = ids.get(xml);
@@ -177,9 +187,14 @@ class StyleSheet {
   }
 
   /** The cell format for a look and number format. */
-  xf({ fmt, style }: StyleKey): number {
+  xf({ fmt, style, named }: StyleKey): number {
     const s = style ?? {};
     const numFmtId = this.numFmtId(fmt);
+    let xfId = 0;
+    if (named) {
+      xfId = this.named.indexOf(named) + 1;
+      if (!xfId) xfId = this.named.push(named);
+    }
     let font = "<font>";
     if (s.bold) font += "<b/>";
     if (s.italic) font += "<i/>";
@@ -200,7 +215,7 @@ class StyleSheet {
     const vertical = ` vertical="${s.valign === "top" ? "top" : s.valign === "bottom" ? "bottom" : "center"}"`;
     const wrap = s.wrap ? ' wrapText="1"' : "";
     const xml =
-      `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0"` +
+      `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="${xfId}"` +
       (numFmtId ? ' applyNumberFormat="1"' : "") +
       (fontId ? ' applyFont="1"' : "") +
       (fillId ? ' applyFill="1"' : "") +
@@ -238,9 +253,10 @@ class StyleSheet {
       `<fonts count="${this.fonts.length}">${this.fonts.join("")}</fonts>` +
       `<fills count="${this.fills.length}">${this.fills.join("")}</fills>` +
       `<borders count="${this.borders.length}">${this.borders.join("")}</borders>` +
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      // Named styles look like "Normal": the cells that use one carry their own look.
+      `<cellStyleXfs count="${this.named.length + 1}">${'<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'.repeat(this.named.length + 1)}</cellStyleXfs>` +
       `<cellXfs count="${this.xfs.length}">${this.xfs.join("")}</cellXfs>` +
-      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      `<cellStyles count="${this.named.length + 1}"><cellStyle name="Normal" xfId="0" builtinId="0"/>${this.named.map((name, i) => `<cellStyle name="${escAttr(name)}" xfId="${i + 1}"/>`).join("")}</cellStyles>` +
       `<dxfs count="${this.dxfs.length}">${this.dxfs.join("")}</dxfs>` +
       `<tableStyles count="${styles.length}" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16">${styles.join("")}</tableStyles>` +
       "</styleSheet>"
@@ -463,7 +479,7 @@ export async function exportXlsx(wb: Workbook, calc: Calc, locale: Locale): Prom
         const cell: Cell = sheet.cells[key] ?? {};
         const formula = cell.f ? fileFormula(cell.f, sheet.name) : undefined;
         const value = cell.f ? safeValue(calc, sheet.id, r, col) : null;
-        const xf = cell.s ? styles.xf({ fmt: toExcelFormat(cell.s.fmt, locale, typeof value === "number" ? value : cell.v), style: cell.s }) : 0;
+        const xf = cell.s ? styles.xf({ fmt: toExcelFormat(cell.s.fmt, locale, typeof value === "number" ? value : cell.v), style: cell.s, named: sigStyleName(cell.s.fmt) }) : 0;
         const xml = cellXml(`${colName(col)}${r + 1}`, xf, formula !== undefined ? { ...cell, f: formula } : cell, value, strings, headerText.get(key));
         if (xml) {
           parts.push(xml);
@@ -652,10 +668,10 @@ function resolvePart(base: string, target: string): string {
   return out.join("/");
 }
 
-async function readRels(zip: ZipReader, part: string): Promise<Rel[]> {
+async function readRels(zip: ZipReader, part: string, budget: XmlBudget): Promise<Rel[]> {
   const text = await zip.text(relsOf(part));
   if (!text) return [];
-  const root = parseXml(text);
+  const root = parseXml(text, budget);
   return children(root, "Relationship").map((r) => ({
     id: attr(r, "Id") ?? "",
     type: attr(r, "Type") ?? "",
@@ -675,7 +691,9 @@ class FileStyles {
   private fonts: { b: boolean; i: boolean; u: boolean; strike: boolean; sz: number | null; color: string | null }[] = [];
   private fills: (string | null)[] = [];
   private borders: { left?: BorderLine; right?: BorderLine; top?: BorderLine; bottom?: BorderLine }[] = [];
-  private xfs: { numFmtId: number; fontId: number; fillId: number; borderId: number; h?: string; v?: string; wrap: boolean }[] = [];
+  private xfs: { numFmtId: number; fontId: number; fillId: number; borderId: number; xfId: number; h?: string; v?: string; wrap: boolean }[] = [];
+  /** Names of the file's named cell styles, by their cell style xf. */
+  private styleNames = new Map<number, string>();
   private baseSize = EXCEL_FONT_PT;
 
   constructor(
@@ -733,6 +751,10 @@ class FileStyles {
       };
       return { left: side("left"), right: side("right"), top: side("top"), bottom: side("bottom") };
     });
+    for (const s of children(child(root, "cellStyles"), "cellStyle")) {
+      const xfId = numAttr(s, "xfId");
+      if (xfId !== undefined) this.styleNames.set(xfId, attr(s, "name") ?? "");
+    }
     this.xfs = children(child(root, "cellXfs"), "xf").map((x) => {
       const al = child(x, "alignment");
       return {
@@ -740,6 +762,7 @@ class FileStyles {
         fontId: numAttr(x, "fontId") ?? 0,
         fillId: numAttr(x, "fillId") ?? 0,
         borderId: numAttr(x, "borderId") ?? 0,
+        xfId: numAttr(x, "xfId") ?? 0,
         h: attr(al, "horizontal"),
         v: attr(al, "vertical"),
         wrap: boolAttr(al, "wrapText"),
@@ -796,7 +819,8 @@ class FileStyles {
     // writes "bottom" on cells nobody aligned).
     if (xf.v === "top") s.valign = "top";
     if (xf.wrap) s.wrap = true;
-    const fmt = this.format(xf.numFmtId);
+    // Significant figures come back through the named style Blob gave the cell.
+    const fmt = fromSigStyle(this.styleNames.get(xf.xfId), this.format(xf.numFmtId));
     if (fmt) s.fmt = fmt;
     look = { style: Object.keys(s).length ? s : undefined, fmt };
     this.looks.set(index, look);
@@ -879,7 +903,7 @@ function filterFromExcel(fc: XmlEl): FilterSpec | null {
   if (custom) {
     const list = children(custom, "customFilter");
     const ops: Record<string, "gt" | "gte" | "lt" | "lte" | "eq" | "neq"> = { greaterThan: "gt", greaterThanOrEqual: "gte", lessThan: "lt", lessThanOrEqual: "lte", equal: "eq", notEqual: "neq" };
-    const read = (el: XmlEl) => ({ op: ops[attr(el, "operator") ?? "equal"], val: attr(el, "val") ?? "" });
+    const read = (el: XmlEl) => ({ op: lookup(ops, attr(el, "operator") ?? "equal"), val: attr(el, "val") ?? "" });
     if (list.length === 1) {
       const { op, val } = read(list[0]);
       const n = Number(val);
@@ -987,6 +1011,9 @@ type Counts = {
   outline: number;
   tooBig: number;
   longText: number;
+  /** Sheets past Blob's limit, not read. */
+  sheets: number;
+  longFormulas: number;
 };
 
 /** What couldn't come along, as short lines in the user's language. */
@@ -1019,6 +1046,8 @@ function skippedLines(c: Counts, locale: Locale): string[] {
   if (c.outline) out.push(t.outline);
   if (c.tooBig) out.push(t.tooBig(c.tooBig, MAX_ROWS.toLocaleString(locale === "de" ? "de-DE" : "en-US"), MAX_COLS));
   if (c.longText) out.push(t.longText(c.longText));
+  if (c.sheets) out.push(t.sheets(c.sheets, MAX_SHEETS));
+  if (c.longFormulas) out.push(t.longFormulas(c.longFormulas, MAX_FORMULA.toLocaleString(locale === "de" ? "de-DE" : "en-US")));
   return out;
 }
 
@@ -1053,7 +1082,8 @@ export async function importXlsx(data: ArrayBuffer, locale: Locale): Promise<{ w
     return await readWorkbook(zip, locale);
   } catch (e) {
     if (e instanceof XlsxError) throw e;
-    if (e instanceof ZipError) throw new XlsxError(e.code === "encrypted" ? "encrypted" : e.code === "unsupported" ? "unsupported" : "broken", locale);
+    if (e instanceof ZipError) throw new XlsxError(e.code === "encrypted" ? "encrypted" : e.code === "unsupported" ? "unsupported" : e.code === "tooBig" ? "tooBig" : "broken", locale);
+    if (e instanceof XmlError && e.tooBig) throw new XlsxError("tooBig", locale);
     throw new XlsxError("broken", locale);
   }
 }
@@ -1064,14 +1094,17 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
   if (mimetype?.includes("opendocument")) throw new XlsxError("ods", locale);
   if (zip.names.some((n) => /^Index\/.*\.iwa$/i.test(n))) throw new XlsxError("numbers", locale);
 
-  const rootRels = await readRels(zip, "");
+  // Every part of the file shares one budget of elements (see xml.ts).
+  const budget = xmlBudget();
+  const xml = (text: string) => parseXml(text, budget);
+  const rootRels = await readRels(zip, "", budget);
   const office = rootRels.find((r) => relIs(r, "officeDocument") && !r.external);
   const wbPath = office ? resolvePart("", office.target) : "xl/workbook.xml";
   const wbText = await zip.text(wbPath);
   if (!wbText) throw new XlsxError(zip.has("word/document.xml") || zip.has("ppt/presentation.xml") ? "notXlsx" : "broken", locale);
-  const wbRoot = parseXml(wbText);
+  const wbRoot = xml(wbText);
   if (wbRoot.local !== "workbook") throw new XlsxError("notXlsx", locale);
-  const wbRels = await readRels(zip, wbPath);
+  const wbRels = await readRels(zip, wbPath, budget);
   const relById = new Map(wbRels.map((r) => [r.id, r]));
   const date1904 = boolAttr(child(wbRoot, "workbookPr"), "date1904");
 
@@ -1100,20 +1133,22 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
     outline: 0,
     tooBig: 0,
     longText: 0,
+    sheets: 0,
+    longFormulas: 0,
   };
   if (zip.names.some((n) => /vbaProject\.bin$/i.test(n))) counts.macros = 1;
 
   const themeRel = wbRels.find((r) => relIs(r, "theme"));
   const themeText = themeRel ? await zip.text(resolvePart(wbPath, themeRel.target)) : null;
-  const theme = themeColors(themeText ? parseXml(themeText) : null);
+  const theme = themeColors(themeText ? xml(themeText) : null);
   const stylesRel = wbRels.find((r) => relIs(r, "styles"));
   const stylesText = stylesRel ? await zip.text(resolvePart(wbPath, stylesRel.target)) : null;
-  const styles = new FileStyles(stylesText ? parseXml(stylesText) : null, theme, locale);
+  const styles = new FileStyles(stylesText ? xml(stylesText) : null, theme, locale);
   const sstRel = wbRels.find((r) => relIs(r, "sharedStrings"));
   const sstText = sstRel ? await zip.text(resolvePart(wbPath, sstRel.target)) : null;
-  const sst = sstText ? children(parseXml(sstText), "si").map(stringItem) : [];
+  const sst = sstText ? children(xml(sstText), "si").map(stringItem) : [];
 
-  // The sheets, in tab order.
+  // The sheets, in tab order (those past Blob's limit aren't read at all).
   const sheetParts: SheetPart[] = [];
   const sheetEls = children(child(wbRoot, "sheets"), "sheet");
   for (let i = 0; i < sheetEls.length; i++) {
@@ -1125,10 +1160,14 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
       continue;
     }
     if (!relIs(rel, "worksheet")) continue;
+    if (sheetParts.length >= MAX_SHEETS) {
+      counts.sheets++;
+      continue;
+    }
     const path = resolvePart(wbPath, rel.target);
     const text = await zip.text(path);
     if (!text) continue;
-    sheetParts.push({ name: (attr(el, "name") ?? "").trim(), path, root: parseXml(text), rels: await readRels(zip, path), index: i });
+    sheetParts.push({ name: (attr(el, "name") ?? "").trim(), path, root: xml(text), rels: await readRels(zip, path, budget), index: i });
   }
   if (!sheetParts.length) throw new XlsxError("noSheets", locale);
 
@@ -1153,7 +1192,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
       if (!rel) continue;
       const text = await zip.text(resolvePart(part.path, rel.target));
       if (!text) continue;
-      const tr = parseXml(text);
+      const tr = xml(text);
       const area = parseRange(attr(tr, "ref"));
       if (!area) continue;
       const name = attr(tr, "displayName") ?? attr(tr, "name") ?? "";
@@ -1168,7 +1207,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
       }
       if (area.r1 >= MAX_ROWS || area.c1 >= MAX_COLS || area.r1 <= area.r0) continue;
       const width = area.c1 - area.c0 + 1;
-      const columns: TableColumn[] = Array.from({ length: width }, (_, i) => ({ id: newId(), total: TOTALS_FROM_EXCEL[attr(cols[i], "totalsRowFunction") ?? ""] ?? "none" }));
+      const columns: TableColumn[] = Array.from({ length: width }, (_, i) => ({ id: newId(), total: lookup(TOTALS_FROM_EXCEL, attr(cols[i], "totalsRowFunction")) ?? "none" }));
       const filters: Record<string, FilterSpec> = {};
       let lost = false;
       const af = child(tr, "autoFilter");
@@ -1286,13 +1325,13 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
     for (const rel of part.rels) {
       if (relIs(rel, "comments")) {
         const text = await zip.text(resolvePart(part.path, rel.target));
-        if (text) for (const [k, v] of readComments(parseXml(text))) if (!notes.has(k)) notes.set(k, v);
+        if (text) for (const [k, v] of readComments(xml(text))) if (!notes.has(k)) notes.set(k, v);
       }
     }
     for (const rel of part.rels) {
       if (relIs(rel, "threadedComment")) {
         const text = await zip.text(resolvePart(part.path, rel.target));
-        if (text) for (const [k, v] of readThreaded(parseXml(text))) notes.set(k, v);
+        if (text) for (const [k, v] of readThreaded(xml(text))) notes.set(k, v);
       }
     }
 
@@ -1311,8 +1350,8 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
         const path = resolvePart(part.path, rel.target);
         const text = await zip.text(path);
         if (!text) continue;
-        const drawing = parseXml(text);
-        const drawingRels = await readRels(zip, path);
+        const drawing = xml(text);
+        const drawingRels = await readRels(zip, path, budget);
         const layout = sheetLayout(root);
         for (const anchor of children(drawing).filter((a) => /Anchor$/.test(a.local))) {
           const chartEl = descendants(anchor, "chart")[0];
@@ -1323,8 +1362,10 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
             const place = anchorPlace(anchor, layout);
             let spec: ChartSpec | null = null;
             try {
-              spec = chartText && place ? chartFromXml(parseXml(chartText), sheetIdOf, sheet.id, place.at, place.size, theme) : null;
-            } catch {
+              spec = chartText && place ? chartFromXml(xml(chartText), sheetIdOf, sheet.id, place.at, place.size, theme) : null;
+            } catch (e) {
+              // A chart Blob can't read is left out (and listed); a file over its budget isn't read at all.
+              if (e instanceof XmlError && e.tooBig) throw e;
               spec = null;
             }
             if (spec) blobCharts.push(spec);
@@ -1424,6 +1465,11 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
           value = /^TRUE/i.test(formula.trim());
           formula = null;
         }
+        // Longer than a formula may be (LibreOffice writes such): its last result stays, as a value.
+        if (formula !== null && formula.length > MAX_FORMULA) {
+          counts.longFormulas++;
+          formula = null;
+        }
         if (formula !== null) {
           const checked = checkFormula(formula);
           if ("formula" in checked) out.f = checked.formula;
@@ -1471,6 +1517,14 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
     for (const x of tables) {
       maxRow = Math.max(maxRow, x.table.area.r1);
       maxCol = Math.max(maxCol, x.table.area.c1);
+      // A totals row's function as its cell has it (Excel files say "custom" for Blob's own and for
+      // SUBTOTALs typed by hand), so switching the totals row off and on brings the same ones back.
+      if (!x.table.totals) continue;
+      const { area, columns } = x.table;
+      columns.forEach((c, i) => {
+        const fn = totalOfCell(sheet.cells[cellKey(area.r1, area.c0 + i)], area.c0 + i);
+        if (fn !== "custom" && fn !== "none") columns[i] = { ...c, total: fn };
+      });
     }
     sheet.size = {
       rows: Math.min(MAX_ROWS, Math.max(DEFAULT_SIZE.rows, maxRow + 1 + 50, sheet.freeze.rows + 1)),

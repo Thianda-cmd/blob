@@ -150,6 +150,15 @@ export function clockTime(serial: number, seconds: boolean): string {
   return seconds ? `${pad2(t.h)}:${pad2(t.mi)}:${pad2(t.s)}` : `${pad2(t.h)}:${pad2(t.mi)}`;
 }
 
+/** A duration in hours and minutes, Excel's [h]:mm: 1,5 days → 36:00 (36:00:00 with seconds), rounded to the second. */
+export function durationText(serial: number, seconds: boolean): string {
+  const total = Math.round(serial * 86400);
+  const h = Math.floor(total / 3600);
+  const mi = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return seconds ? `${pad2(h)}:${pad2(mi)}:${pad2(s)}` : `${pad2(h)}:${pad2(mi)}`;
+}
+
 /** ISO 8601 week number (weeks start on Monday; week 1 holds the year's first Thursday). */
 export function isoWeekNum(serial: number): number {
   const day = Math.floor(serial);

@@ -65,44 +65,69 @@ export function usedArea(sheet: Sheet): Area | null {
   return r1 < 0 ? null : { r0, c0, r1, c1 };
 }
 
+/** Does a sorted list hold a number between lo and hi (binary search)? */
+function anyIn(sorted: number[] | undefined, lo: number, hi: number): boolean {
+  if (!sorted || lo > hi) return false;
+  let a = 0;
+  let b = sorted.length;
+  while (a < b) {
+    const m = (a + b) >> 1;
+    if (sorted[m] < lo) a = m + 1;
+    else b = m;
+  }
+  return a < sorted.length && sorted[a] <= hi;
+}
+
 /**
  * Excel's current region: the rectangle of data around `p`, grown while any cell touching it
  * (sideways or diagonally) has something in it. A lone empty cell gives just itself.
+ *
+ * The filled cells are listed once (their columns per row and rows per column, sorted), so asking
+ * "is anything in this stretch?" takes a binary search instead of a scan: a block of 20,000 rows
+ * (the most a sheet has) is found whole in milliseconds, which Ctrl+A and sorting rely on.
  */
 export function currentRegion(sheet: Sheet, p: Pos): Area {
   const R = sheet.size.rows - 1;
   const C = sheet.size.cols - 1;
+  const byRow = new Map<number, number[]>();
+  const byCol = new Map<number, number[]>();
+  const add = (map: Map<number, number[]>, k: number, v: number) => {
+    const list = map.get(k);
+    if (list) list.push(v);
+    else map.set(k, [v]);
+  };
+  for (const key in sheet.cells) {
+    if (!filled(sheet.cells[key])) continue;
+    const i = key.indexOf(",");
+    const r = Number(key.slice(0, i));
+    const c = Number(key.slice(i + 1));
+    if (r > R || c > C) continue;
+    add(byRow, r, c);
+    add(byCol, c, r);
+  }
+  for (const list of byRow.values()) list.sort((x, y) => x - y);
+  for (const list of byCol.values()) list.sort((x, y) => x - y);
   const a: Area = { r0: p.row, c0: p.col, r1: p.row, c1: p.col };
-  const rowHas = (r: number, c0: number, c1: number) => {
-    if (r < 0 || r > R) return false;
-    for (let c = Math.max(0, c0); c <= Math.min(C, c1); c++) if (isFilled(sheet, r, c)) return true;
-    return false;
-  };
-  const colHas = (c: number, r0: number, r1: number) => {
-    if (c < 0 || c > C) return false;
-    for (let r = Math.max(0, r0); r <= Math.min(R, r1); r++) if (isFilled(sheet, r, c)) return true;
-    return false;
-  };
-  for (let grown = true, guard = 0; grown && guard < 10000; guard++) {
-    grown = false;
-    if (rowHas(a.r0 - 1, a.c0 - 1, a.c1 + 1)) {
+  for (;;) {
+    let grown = false;
+    while (a.r0 > 0 && anyIn(byRow.get(a.r0 - 1), a.c0 - 1, a.c1 + 1)) {
       a.r0--;
       grown = true;
     }
-    if (rowHas(a.r1 + 1, a.c0 - 1, a.c1 + 1)) {
+    while (a.r1 < R && anyIn(byRow.get(a.r1 + 1), a.c0 - 1, a.c1 + 1)) {
       a.r1++;
       grown = true;
     }
-    if (colHas(a.c0 - 1, a.r0 - 1, a.r1 + 1)) {
+    while (a.c0 > 0 && anyIn(byCol.get(a.c0 - 1), a.r0 - 1, a.r1 + 1)) {
       a.c0--;
       grown = true;
     }
-    if (colHas(a.c1 + 1, a.r0 - 1, a.r1 + 1)) {
+    while (a.c1 < C && anyIn(byCol.get(a.c1 + 1), a.r0 - 1, a.r1 + 1)) {
       a.c1++;
       grown = true;
     }
+    if (!grown) return a;
   }
-  return a;
 }
 
 /**

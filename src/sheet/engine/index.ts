@@ -64,6 +64,12 @@ export type CalcOptions = {
   /** Rows hidden by a smart table's filter or by hand: SUBTOTAL(1xx, …) skips them, 1–11 skip filtered rows. */
   isRowHidden?: (sheetId: string, row: number) => boolean;
   /**
+   * Rows a smart table's filter leaves out, whether or not they are also hidden by hand: SUBTOTAL
+   * 1–11 skip these (rows hidden only by hand still count, like Excel). Without it, a row hidden by
+   * hand can't be told apart from a filtered one and counts for 1–11 even when its filter leaves it out.
+   */
+  isRowFiltered?: (sheetId: string, row: number) => boolean;
+  /**
    * The calculation before this change and the cells that changed, so unchanged results can be kept.
    * Only a hint: ignoring it must still give correct results.
    */
@@ -109,7 +115,18 @@ export type ParsedInput = {
   fmt?: NumberFormat;
   /** The formula didn't parse: where and why (the editor stays open and shows it). */
   error?: { message: string; at: number };
+  /**
+   * Read one way though another may have been meant (German "1.234" is 1234: the dot separates
+   * thousands, as in Excel; 1,234 needs a comma). Doesn't stop the input: a short note to show
+   * after it, a label for a button, and what to store instead when it is pressed.
+   */
+  notice?: { message: string; action: string; other: { cell: Pick<Cell, "v">; fmt?: NumberFormat } };
 };
+
+/** The longest formula a cell takes, as in Excel: 8,192 characters (stored, without "="). */
+export { MAX_FORMULA_LENGTH } from "./input";
+/** Durations ("36:00", Excel's [h]:mm): a time format whose hours go on past 24. */
+export { isDuration, type DurationFormat } from "./format";
 
 /**
  * Text typed into a cell → what to store. "=…" is a formula (canonicalised); "'…" is always text;
@@ -250,3 +267,5 @@ export { normalizeRef, refText, adjustArea, transposeFormula } from "./refs";
 export { growTableRefs, tableRowsArea, type TableRows } from "./refs";
 export { getFunction, missingFunctions } from "./functions";
 export { serialFromYMD, ymdFromSerial } from "./dates";
+/** Excel's wildcards (* ? ~) in linear time, for everything that matches text: filters, find & replace. */
+export { compileGlob, globFind, globReplace, globTest, type Glob, type GlobOptions } from "./glob";

@@ -2,50 +2,32 @@
 // "Probe*", "A?", "~*" (a literal star), TRUE, a number or a date.
 
 import type { Locale } from "@/i18n/config";
+import { compileGlob, globTest } from "./glob";
 import { textToNumber } from "./parse";
 import { compareText, compareValues, errorFromText, isError, numbersEqual, type Scalar } from "./values";
 
 export type Criterion = (v: Scalar) => boolean;
 
-const regexCache = new Map<string, RegExp>();
-
-/** Excel wildcards → a RegExp (whole text, any case): * any text, ? one character, ~ escapes. */
-export function wildcardRegex(pattern: string): RegExp {
-  let re = regexCache.get(pattern);
-  if (re) return re;
-  let src = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-    if (ch === "~" && i + 1 < pattern.length && "*?~".includes(pattern[i + 1])) {
-      src += "\\" + pattern[i + 1];
-      i++;
-    } else if (ch === "*") src += "[\\s\\S]*";
-    else if (ch === "?") src += "[\\s\\S]";
-    else src += ch.replace(/[\\^$.|+()[\]{}*?]/g, "\\$&");
-  }
-  re = new RegExp(`^${src}$`, "i");
-  if (regexCache.size > 2000) regexCache.clear();
-  regexCache.set(pattern, re);
-  return re;
-}
-
 export const hasWildcards = (s: string) => /[*?~]/.test(s);
 
-/** Text equal to a pattern (with wildcards), without regard to case. */
+/** Text equal to a pattern (with wildcards: * any text, ? one character, ~ escapes), without regard to case. */
 export function textMatches(text: string, pattern: string): boolean {
   if (!hasWildcards(pattern)) return compareText(text, pattern) === 0;
-  return wildcardRegex(pattern).test(text);
+  return globTest(compileGlob(pattern), text);
 }
 
 const criteriaCache = new Map<string, Criterion>();
 
 /** A criterion as a test for each cell value. */
 export function makeCriterion(crit: Scalar, locale: Locale): Criterion {
+  // An empty criteria cell means 0, as Microsoft documents for ZÄHLENWENNS and MITTELWERTWENN: a
+  // summary row whose condition isn't filled in yet counts the zeros, not every empty row.
+  if (crit === null) crit = 0;
   if (typeof crit === "number") {
-    return (v) => (typeof v === "number" ? numbersEqual(v, crit) : typeof v === "string" ? numericTextEquals(v, crit, locale) : false);
+    const n = crit;
+    return (v) => (typeof v === "number" ? numbersEqual(v, n) : typeof v === "string" ? numericTextEquals(v, n, locale) : false);
   }
   if (typeof crit === "boolean") return (v) => v === crit;
-  if (crit === null) return (v) => v === null || v === "";
   if (isError(crit)) return (v) => isError(v) && v.error === crit.error;
   const key = `${locale}\u0000${crit}`;
   let c = criteriaCache.get(key);
@@ -67,10 +49,11 @@ function parseCriterion(text: string, locale: Locale): Criterion {
   const operand = m[2];
 
   if (operand === "") {
-    // "" matches empty cells and empty text; "=" only cells with nothing in them.
+    // "" matches empty cells and empty text; "=" only cells with nothing in them, and "<>" is its
+    // opposite: a formula that gives "" counts as filled, as in Excel (and like ANZAHL2).
     if (op === "") return (v) => v === null || v === "";
     if (op === "=") return (v) => v === null;
-    if (op === "<>") return (v) => v !== null && v !== "";
+    if (op === "<>") return (v) => v !== null;
     return () => false;
   }
 

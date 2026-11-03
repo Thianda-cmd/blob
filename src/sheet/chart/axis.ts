@@ -6,7 +6,7 @@
 // room beyond the data (x from 0 to 10 → axis to 12), so the last point isn't cut by the frame.
 
 import type { Locale } from "@/i18n/config";
-import { formatFixed } from "./format";
+import { formatFixed, formatScientific } from "./format";
 
 export type AxisScale = {
   log: boolean;
@@ -198,14 +198,27 @@ export function axisValue(scale: AxisScale, f: number): number {
   return scale.min + f * (scale.max - scale.min);
 }
 
-/** A tick label of a log axis: 0,01 / 0,1 / 1 / 10 … 100000, beyond that 1E+06. */
-export function logTickLabel(v: number, locale: Locale): string {
+/** Ticks of a log axis are written out (0,00001 … 100000) inside this range, else as 1E-06, 1E+06. */
+const needsScientific = (v: number) => v > 0 && (Math.log10(v) < -5 - EPS || Math.log10(v) >= 6 - EPS);
+
+/**
+ * Whether a log axis writes all its ticks in scientific notation: as soon as one of them needs it,
+ * so an axis reads 1E-07 … 1E-03 or 1E+03 … 1E+07, never 1E-06 next to 0,00001.
+ */
+export const logTicksScientific = (ticks: number[]) => ticks.some(needsScientific);
+
+/**
+ * A tick label of a log axis: 0,01 / 0,1 / 1 / 10 … 100000, beyond that 1E+06; with `scientific`
+ * (see logTicksScientific) every tick like 1E+03.
+ */
+export function logTickLabel(v: number, locale: Locale, scientific = false): string {
   const e = Math.round(Math.log10(v));
-  if (Math.abs(v - pow10(e)) > 1e-9 * v) {
-    // Not a decade (a fixed end): enough decimals to show it.
+  const decade = Math.abs(v - pow10(e)) <= 1e-9 * v;
+  if (scientific || needsScientific(v)) return decade ? `1E${e < 0 ? "-" : "+"}${String(Math.abs(e)).padStart(2, "0")}` : formatScientific(v, locale, 4);
+  // Not a decade (2, 5 or a fixed end): enough decimals to show it.
+  if (!decade) {
     const dec = Math.max(0, Math.min(10, 2 - Math.floor(Math.log10(v))));
     return formatFixed(v, dec, locale).replace(/([.,]\d*?)0+$/, "$1").replace(/[.,]$/, "");
   }
-  if (e >= -5 && e <= 5) return formatFixed(v, Math.max(0, -e), locale);
-  return `1E${e < 0 ? "-" : "+"}${String(Math.abs(e)).padStart(2, "0")}`;
+  return formatFixed(v, Math.max(0, -e), locale);
 }

@@ -43,6 +43,9 @@ export const sheetChartText = defineMessages({
     emptyTitle: "No numbers to show yet",
     emptyHint: "Pick cells with numbers in the chart settings.",
     noPositive: "A log axis needs values above 0",
+    /** Notes under the plot (short: one line on a small chart). */
+    logSkipped: (n: number) => (n === 1 ? "1 value ≤ 0 not shown (log axis)" : `${n} values ≤ 0 not shown (log axis)`),
+    xTextNote: (cell: string) => `Text in ${cell} instead of a number – x is 1, 2, 3 … here`,
 
     // The card on the sheet
     chartLabel: (kind: string, title: string) => (title ? `${kind}: ${title}` : kind),
@@ -109,6 +112,8 @@ export const sheetChartText = defineMessages({
     period: "Period",
     setIntercept: "Set intercept",
     interceptHint: "e.g. 0 for a calibration line through the origin",
+    interceptHintExp: "The value at x = 0 (a in y = a·e^(bx)), e.g. the starting OD. It must be above 0.",
+    interceptIgnored: (v: string) => `An exponential trendline needs a fixed intercept above 0 (a in y = a·e^(bx)), so ${v} doesn't apply here: the curve is fitted freely. For linear and polynomial trendlines it applies again.`,
     interceptNotHere: "Logarithmic and power trendlines can't have a fixed intercept (as in Excel).",
     showEquation: "Display equation on chart",
     showR2: "Display R-squared value on chart",
@@ -123,8 +128,15 @@ export const sheetChartText = defineMessages({
       "non-positive-x": "This trendline needs x values above 0.",
       "non-positive-y": "This trendline needs y values above 0.",
       singular: "The x values are all the same (or too few different ones for this order).",
-      "bad-intercept": "This intercept doesn't work here (exponential needs one above 0).",
+      "bad-intercept": "This intercept isn't a valid number.",
     } as Record<FitProblem, string>,
+    hiddenPoints: (n: number) =>
+      n === 1
+        ? "1 point is hidden or filtered out and doesn't count here. Formulas like SLOPE or RSQ still count it: to leave it out everywhere, delete the value instead of hiding its row."
+        : `${n} points are hidden or filtered out and don't count here. Formulas like SLOPE or RSQ still count them: to leave them out everywhere, delete the values instead of hiding their rows.`,
+    xTextPanel: (cell: string, text: string) =>
+      `${cell} holds text (“${text}”) instead of a number, so the points are placed at x = 1, 2, 3 …, as in Excel. The trendline and the sample results are wrong this way: type a number in ${cell} (0 for the blank, for example).`,
+    datesTip: "Tip: use the time since the start as x (0, 1, 2 … days) instead of the date. Then a is your starting value and the equation is easy to read.",
     categoryX: "In line, column and area charts x is the number of the category (1, 2, 3 …), as in Excel. For real x values use a scatter chart.",
     noTrendPie: "Pie charts have no trendlines.",
     moreDigits: "More digits",
@@ -136,7 +148,9 @@ export const sheetChartText = defineMessages({
     probeIntro: "Type a measured value, e.g. a sample's absorbance. Blob works back along the trendline.",
     measured: "Measured",
     probeNone: "No result for this value on this trendline.",
-    probeOutside: (lo: string, hi: string) => `Outside the measured range (${lo} to ${hi}). Better dilute the sample and measure again.`,
+    probeAbove: (hi: string) => `Above the highest standard (${hi}): the trendline isn't backed by measurements there. Dilute the sample and measure it again.`,
+    probeBelow: (lo: string) => `Below the lowest standard (${lo}). Measure the sample more concentrated (dilute it less or use more of it), or report it as “< ${lo}”.`,
+    probeNegative: "Below the blank: nothing can be detected in the sample this way. Measure it more concentrated (dilute it less or use more of it).",
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x is where the curve reaches y (inside the measured range).",
@@ -231,6 +245,8 @@ export const sheetChartText = defineMessages({
     emptyTitle: "Noch keine Zahlen",
     emptyHint: "Wähle in den Einstellungen Zellen mit Zahlen.",
     noPositive: "Eine logarithmische Achse braucht Werte über 0",
+    logSkipped: (n) => (n === 1 ? "1 Wert ≤ 0 nicht gezeigt (Log-Achse)" : `${n} Werte ≤ 0 nicht gezeigt (Log-Achse)`),
+    xTextNote: (cell) => `Text in ${cell} statt Zahl – x ist hier 1, 2, 3 …`,
 
     chartLabel: (kind, title) => (title ? `${kind}: ${title}` : kind),
     settings: "Einstellungen",
@@ -294,6 +310,8 @@ export const sheetChartText = defineMessages({
     period: "Periode",
     setIntercept: "Schnittpunkt festlegen",
     interceptHint: "z. B. 0 für eine Kalibriergerade durch den Ursprung",
+    interceptHintExp: "Der Wert bei x = 0 (a in y = a·e^(bx)), z. B. die Start-OD. Er muss über 0 liegen.",
+    interceptIgnored: (v) => `Bei Exponentiell muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). ${v} gilt hier also nicht: Die Kurve ist frei angepasst. Bei Linear und Polynom gilt der Wert wieder.`,
     interceptNotHere: "Logarithmische und Potenz-Trendlinien haben keinen festen Schnittpunkt (wie in Excel).",
     showEquation: "Formel im Diagramm anzeigen",
     showR2: "Bestimmtheitsmaß (R²) im Diagramm anzeigen",
@@ -308,8 +326,15 @@ export const sheetChartText = defineMessages({
       "non-positive-x": "Diese Trendlinie braucht x-Werte über 0.",
       "non-positive-y": "Diese Trendlinie braucht y-Werte über 0.",
       singular: "Die x-Werte sind alle gleich (oder es gibt zu wenige verschiedene für diesen Grad).",
-      "bad-intercept": "Dieser Schnittpunkt geht hier nicht (bei Exponentiell muss er über 0 liegen).",
+      "bad-intercept": "Dieser Schnittpunkt ist keine gültige Zahl.",
     },
+    hiddenPoints: (n) =>
+      n === 1
+        ? "1 Punkt ist ausgeblendet oder weggefiltert und zählt hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen ihn weiter mit: Soll er überall wegfallen, lösch den Wert, statt die Zeile auszublenden."
+        : `${n} Punkte sind ausgeblendet oder weggefiltert und zählen hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen sie weiter mit: Sollen sie überall wegfallen, lösch die Werte, statt die Zeilen auszublenden.`,
+    xTextPanel: (cell, text) =>
+      `In ${cell} steht Text („${text}“) statt einer Zahl. Darum stehen die Punkte wie in Excel bei x = 1, 2, 3 … – Trendlinie und Probe stimmen so nicht. Trag in ${cell} eine Zahl ein (für den Blindwert z. B. 0).`,
+    datesTip: "Tipp: Nimm als x die Zeit seit dem Start (0, 1, 2 … Tage) statt des Datums. Dann ist a dein Startwert und die Formel gut lesbar.",
     categoryX: "In Linien-, Säulen- und Flächendiagrammen ist x die Nummer der Kategorie (1, 2, 3 …), wie in Excel. Für echte x-Werte nimm ein Punktdiagramm.",
     noTrendPie: "Kreisdiagramme haben keine Trendlinie.",
     moreDigits: "Mehr Stellen",
@@ -321,7 +346,9 @@ export const sheetChartText = defineMessages({
     probeIntro: "Gib einen gemessenen Wert ein, z. B. die Extinktion einer Probe. Blob rechnet mit der Trendlinie zurück.",
     measured: "Gemessen",
     probeNone: "Für diesen Wert gibt es auf der Trendlinie kein Ergebnis.",
-    probeOutside: (lo, hi) => `Liegt außerhalb des Messbereichs (${lo} bis ${hi}). Verdünne die Probe besser und miss neu.`,
+    probeAbove: (hi) => `Über dem höchsten Standard (${hi}): Dort ist die Trendlinie nicht durch Messungen gestützt. Verdünne die Probe und miss sie neu.`,
+    probeBelow: (lo) => `Unter dem kleinsten Standard (${lo}). Miss die Probe konzentrierter (weniger verdünnen oder mehr Probe einsetzen) oder gib sie als „< ${lo}“ an.`,
+    probeNegative: "Unter dem Blindwert: In der Probe ist so nichts nachweisbar. Miss sie konzentrierter (weniger verdünnen oder mehr Probe einsetzen).",
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x ist die Stelle, an der die Kurve y erreicht (im Messbereich).",

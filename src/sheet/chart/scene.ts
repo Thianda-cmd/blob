@@ -10,10 +10,10 @@ import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
 import { COLOR_HEX } from "../colors";
 import { formatValue } from "../engine";
-import type { AxisSpec, ChartSpec, NumberFormat, SeriesSpec, SheetColor } from "../types";
-import { axisFraction, linearAxis, logAxis, logTickLabel, type AxisScale } from "./axis";
+import type { AxisSpec, ChartSpec, NumberFormat, SeriesSpec, SheetColor, TrendlineSpec } from "../types";
+import { axisFraction, linearAxis, logAxis, logTickLabel, logTicksScientific, type AxisScale } from "./axis";
 import type { ChartData, ChartPoint, ChartSeriesData } from "./data";
-import { formatChartNumber, formatFixed } from "./format";
+import { formatChartNumber, formatFixed, isDateFormat } from "./format";
 import { equationParts, equationText, isFitError, r2Text, type EqPart, type Fit } from "./regression";
 import { linePath, smoothPath, type Pt } from "./smooth";
 
@@ -236,12 +236,15 @@ function barPath(x0: number, y0: number, x1: number, y1: number, end: "top" | "b
 // ----------------------------------------------------------------------------------------------
 // Numbers on axes and in tooltips
 
-const isDateFormat = (fmt: NumberFormat | null | undefined) => fmt?.kind === "date" || fmt?.kind === "datetime" || fmt?.kind === "time";
-
 /** How a value axis writes its ticks. */
 function tickFormatter(scale: AxisScale, axis: AxisSpec, fmt: NumberFormat | null | undefined, locale: Locale): (v: number) => string {
   if (isDateFormat(fmt)) return (v) => formatValue(v, fmt ?? undefined, locale);
-  if (scale.log) return axis.decimals !== null ? (v) => formatFixed(v, axis.decimals!, locale) : (v) => logTickLabel(v, locale);
+  if (scale.log) {
+    if (axis.decimals !== null) return (v) => formatFixed(v, axis.decimals!, locale);
+    // One notation per axis: 1E-07 … 1E-03, never 1E-06 next to 0,00001.
+    const scientific = logTicksScientific(scale.ticks);
+    return (v) => logTickLabel(v, locale, scientific);
+  }
   const decimals = axis.decimals ?? scale.decimals;
   if (fmt && fmt.kind !== "general" && fmt.kind !== "text" && fmt.kind !== "significant") return (v) => formatChartNumber(v, fmt, locale, { decimals });
   return (v) => formatFixed(v, decimals, locale);
@@ -420,9 +423,36 @@ function legendEntries(ctx: Ctx): LegendEntry[] {
       swatch: !lineKind,
       seriesId: s.id,
     });
-    if (ss.trendline && s.fit && !isFitError(s.fit)) trends.push({ kind: "trend", label: trendlineName(ss.trendline, s.name, locale), color: pal.trend(s.color), seriesId: s.id });
+    if (ss.trendline && s.fit && !isFitError(s.fit) && trendDrawable(spec, s.fit, ss.trendline, s)) trends.push({ kind: "trend", label: trendlineName(ss.trendline, s.name, locale), color: pal.trend(s.color), seriesId: s.id });
   });
   return [...out, ...trends];
+}
+
+/**
+ * The x a trendline is drawn from and to (in the fit's x: category charts count 1, 2, 3 …): the
+ * fitted points plus the forecast (moving averages have none, like in Excel).
+ */
+function trendSpan(fit: Fit, tl: TrendlineSpec, s: ChartSeriesData, scatter: boolean): { x0: number; x1: number } {
+  const lo = fit.xMin ?? Math.min(...s.points.map((p) => (scatter ? p.x : p.x + 1)));
+  const hi = fit.xMax ?? Math.max(...s.points.map((p) => (scatter ? p.x : p.x + 1)));
+  if (fit.type === "movingAverage") return { x0: lo, x1: hi };
+  return { x0: lo - Math.max(0, tl.backward || 0), x1: hi + Math.max(0, tl.forward || 0) };
+}
+
+/**
+ * Whether a trendline shows anything on the chart's axes (a legend entry for a line that isn't
+ * drawn would be confusing): somewhere along it the curve has a value, above 0 on a log axis.
+ */
+function trendDrawable(spec: ChartSpec, fit: Fit, tl: TrendlineSpec, s: ChartSeriesData): boolean {
+  const scatter = spec.kind === "scatter";
+  const shows = (x: number, y: number) => Number.isFinite(y) && !(spec.yAxis.log && !(y > 0)) && !(scatter && spec.xAxis.log && !(x > 0));
+  if (fit.type === "movingAverage") return (fit.points ?? []).some((p) => shows(p.x, p.y));
+  const { x0, x1 } = trendSpan(fit, tl, s, scatter);
+  for (let k = 0; k <= 32; k++) {
+    const x = x0 + ((x1 - x0) * k) / 32;
+    if (shows(x, fit.predict(x))) return true;
+  }
+  return false;
 }
 
 function legendSymbol(ctx: Ctx, e: LegendEntry, x: number, y: number): SvgNode[] {
@@ -517,42 +547,58 @@ type Mapper = (v: number) => number;
 
 type TrendDraw = { s: ChartSeriesData; fit: Fit; tl: NonNullable<SeriesSpec["trendline"]>; samples: Pt[] };
 
-function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hits: ChartHit[] } {
-  const { spec, data, fs, pal, locale } = ctx;
+function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hits: ChartHit[] } {
+  const { spec, data, fs, pal, locale, t } = ctx;
   const kind = spec.kind;
   const horizontal = kind === "bar";
   const scatter = kind === "scatter";
-  const nCat = Math.max(1, data.categories.length, ...data.series.map((s) => (s.points.length ? s.points[s.points.length - 1].x + 1 : 0)));
+  // Categories with data or labels (category charts; trendline forecasts may add more, below).
+  const nData = Math.max(1, data.categories.length, ...data.series.map((s) => (s.points.length ? s.points[s.points.length - 1].x + 1 : 0)));
   const tickSize = Math.round(fs * 0.88 * 10) / 10;
   const titleSize = Math.round(fs * 0.94 * 10) / 10;
   const tickLen = Math.max(3, fs * 0.32);
 
-  // The value domain (y; x of bars): points, error bar ends, forecast parts of trendlines.
+  // The value domain (y; x of bars): points, error bar ends, forecast parts of trendlines. A log
+  // axis has no place for values at or below 0: such points aren't drawn (a note under the plot
+  // says how many, like Excel warns), and neither they nor their error bars stretch the axes.
   const valueAxis = spec.yAxis;
   const catAxis = spec.xAxis;
   const vals: number[] = [];
   const xs: number[] = [];
+  let logSkipped = 0;
+  let drawable = 0;
   for (const s of data.series) {
     for (const p of s.points) {
+      if ((valueAxis.log && !(p.y > 0)) || (scatter && catAxis.log && !(p.x > 0))) {
+        logSkipped++;
+        continue;
+      }
+      drawable++;
       vals.push(p.y);
       if (p.lo !== undefined) vals.push(p.lo);
       if (p.hi !== undefined) vals.push(p.hi);
       if (scatter) xs.push(p.x);
     }
   }
-  // Trendline extents (forecast forward/backward widen the x axis, like Excel).
+  // Trendline extents: a forecast forward or backward widens the x axis, like Excel. Category
+  // charts count x 1, 2, 3 … and give a forecast categories of its own, without labels, after the
+  // data (`after`) and before it (`before`). Category centres sit half a band in from the plot's
+  // edges, so the first half period needs no room ("Rückwärts 0,5", Excel's trick to start a
+  // column chart's trendline at the axis, leaves the axis as it is).
   const trendExt: { s: ChartSeriesData; fit: Fit; tl: NonNullable<SeriesSpec["trendline"]>; x0: number; x1: number }[] = [];
+  let before = 0;
+  let after = 0;
   data.series.forEach((s, i) => {
     const tl = spec.series[i]?.trendline;
     if (!tl || !s.fit || isFitError(s.fit)) return;
     const fit = s.fit;
-    const lo = fit.xMin ?? Math.min(...s.points.map((p) => (scatter ? p.x : p.x + 1)));
-    const hi = fit.xMax ?? Math.max(...s.points.map((p) => (scatter ? p.x : p.x + 1)));
-    const x0 = lo - Math.max(0, tl.backward || 0);
-    const x1 = hi + Math.max(0, tl.forward || 0);
+    const { x0, x1 } = trendSpan(fit, tl, s, scatter);
     trendExt.push({ s, fit, tl, x0, x1 });
-    if (scatter) {
-      xs.push(x0, x1);
+    if (scatter) xs.push(x0, x1);
+    else {
+      // Category i (0-based) is fit x i + 1; its band reaches from i to i + 1.
+      before = Math.max(before, Math.ceil(0.5 - x0 - 1e-9));
+      after = Math.max(after, Math.ceil(x1 - 0.5 - nData - 1e-9));
     }
     if (fit.type !== "movingAverage" && (tl.forward > 0 || tl.backward > 0)) {
       for (const x of [x0, x1]) {
@@ -561,6 +607,22 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
       }
     }
   });
+  // A forecast of thousands of periods would leave the data a sliver: at most 1000 more.
+  before = Math.min(before, 500);
+  after = Math.min(after, 500);
+  const nCat = nData + before + after;
+
+  // One-line notes under the plot, about what the chart shows differently from the cells.
+  const notes: { text: string; warn: boolean }[] = [];
+  const xText = scatter ? data.series.find((s) => s.xText)?.xText : undefined;
+  if (xText) notes.push({ text: t.xTextNote(xText.cell), warn: true });
+  if (logSkipped && drawable) notes.push({ text: t.logSkipped(logSkipped), warn: false });
+  const noteSize = Math.round(fs * 0.8 * 10) / 10;
+  const noteLine = noteSize * 1.5;
+  // Tiny charts keep their room for the data.
+  const shownNotes = area.h - notes.length * noteLine >= fs * 9 ? notes : [];
+  const frame: Box = { ...area, h: area.h - shownNotes.length * noteLine };
+
   const yLogVals = vals.filter((v) => v > 0);
   const range = (v: number[]) => (v.length ? [Math.min(...v), Math.max(...v)] : [NaN, NaN]);
   const [vMin, vMax] = range(valueAxis.log ? yLogVals : vals);
@@ -611,7 +673,7 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
     if (horizontal) {
       // Bars: categories on the left, values along the bottom.
       const band = plot.h / nCat;
-      catLayout = categoryLayout(data.categories, nCat, band, tickSize, false, frame.w * 0.32);
+      catLayout = categoryLayout(data.categories, nData, band, tickSize, false, frame.w * 0.32);
       const left = (catTitle ? titleSize * 1.5 : 0) + catLayout.width + tickLen + fs * 0.4;
       const lastW = textWidth(vLabels[vLabels.length - 1] ?? "", tickSize);
       plot.x += left;
@@ -632,7 +694,7 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
         plot.w -= Math.max(fs * 0.4, lastW / 2);
         bottom = (catTitle ? titleSize * 1.6 : 0) + tickSize * 1.3 + tickLen + fs * 0.25;
       } else {
-        catLayout = categoryLayout(data.categories, nCat, (plot.w - fs * 0.4) / nCat, tickSize, true, frame.h * 0.3);
+        catLayout = categoryLayout(data.categories, nData, (plot.w - fs * 0.4) / nCat, tickSize, true, frame.h * 0.3);
         plot.w -= fs * 0.4;
         bottom = (catTitle ? titleSize * 1.6 : 0) + catLayout.height + tickLen + fs * 0.25;
       }
@@ -647,7 +709,8 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
   // Screen position of a value on the value axis.
   const vPos: Mapper = horizontal ? (v) => P.x + vFrac(v) * P.w : (v) => P.y + P.h - vFrac(v) * P.h;
   const band = (horizontal ? P.h : P.w) / nCat;
-  const catPos: Mapper = horizontal ? (i) => P.y + (i + 0.5) * band : (i) => P.x + (i + 0.5) * band;
+  // The centre of category i (0-based, of the data), after the forecast's own categories.
+  const catPos: Mapper = horizontal ? (i) => P.y + (i + before + 0.5) * band : (i) => P.x + (i + before + 0.5) * band;
   const xPos: Mapper = scatter && xScale ? (x) => P.x + axisFraction(xScale!, x) * P.w : catPos;
 
   const nodes: SvgNode[] = [];
@@ -831,14 +894,15 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
       }
     }
 
-    // Error bars.
+    // Error bars. On a log axis a lower end at or below 0 has no place: the bar runs off the bottom
+    // of the plot, like Excel's, without a cap there (a cap would read as a real lower end).
     for (const { x, y, p } of scr) {
-      if (p.lo === undefined || p.hi === undefined) continue;
-      if (!onAxis(p.lo) || !onAxis(p.hi)) continue;
-      const a = vPos(p.lo);
+      if (p.lo === undefined || p.hi === undefined || !onAxis(p.hi)) continue;
+      const low = onAxis(p.lo);
+      const a = low ? vPos(p.lo) : horizontal ? P.x : P.y + P.h;
       const b = vPos(p.hi);
-      if (horizontal) errors.push(`M${rnd(a)} ${rnd(y)}H${rnd(b)}M${rnd(a)} ${rnd(y - cap)}v${rnd(2 * cap)}M${rnd(b)} ${rnd(y - cap)}v${rnd(2 * cap)}`);
-      else errors.push(`M${rnd(x)} ${rnd(a)}V${rnd(b)}M${rnd(x - cap)} ${rnd(a)}h${rnd(2 * cap)}M${rnd(x - cap)} ${rnd(b)}h${rnd(2 * cap)}`);
+      if (horizontal) errors.push(`M${rnd(a)} ${rnd(y)}H${rnd(b)}${low ? `M${rnd(a)} ${rnd(y - cap)}v${rnd(2 * cap)}` : ""}M${rnd(b)} ${rnd(y - cap)}v${rnd(2 * cap)}`);
+      else errors.push(`M${rnd(x)} ${rnd(a)}V${rnd(b)}${low ? `M${rnd(x - cap)} ${rnd(a)}h${rnd(2 * cap)}` : ""}M${rnd(x - cap)} ${rnd(b)}h${rnd(2 * cap)}`);
     }
     if (errors.length) g.push({ tag: "path", attrs: { d: errors.join(""), stroke: shade, strokeWidth: 1.3, fill: "none", strokeLinecap: "round" } });
 
@@ -879,9 +943,9 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
     }
   });
 
-  // Category tooltips: one per band, with every series' value there.
+  // Category tooltips: one per band of the data, with every series' value there.
   if (!scatter) {
-    for (let i = 0; i < nCat; i++) {
+    for (let i = 0; i < nData; i++) {
       const rows: ChartHit["rows"] = [];
       const rings: ChartHit["rings"] = [];
       let anchor = horizontal ? -Infinity : Infinity;
@@ -961,10 +1025,35 @@ function cartesianScene(ctx: Ctx, frame: Box): { nodes: SvgNode[]; plot: Box; hi
   nodes.push(...trendNodes.filter((n) => n.attrs?.d), ...seriesNodes, ...labelNodes);
   nodes.push(...equationBoxes(ctx, P, trends, pointsOnScreen));
   // A log axis with nothing above 0 to show says why the chart is empty (Excel warns too).
-  if ((valueAxis.log && vals.length && !yLogVals.length) || (scatter && catAxis.log && xs.length && !xLogVals.length)) {
+  if (logSkipped && !drawable) {
     nodes.push(text(P.x + P.w / 2, P.y + P.h / 2, fitText(ctx.t.noPositive, P.w - fs, fs * 0.9), { fontSize: fs * 0.9, fill: pal.ink3, textAnchor: "middle" }));
   }
+  // The notes, centred under the plot, in the room kept for them below the axis title.
+  shownNotes.forEach((note, k) => {
+    const icon = note.warn ? noteSize * 1.05 : 0;
+    const gap = note.warn ? noteSize * 0.4 : 0;
+    const s = fitText(note.text, area.w - icon - gap, noteSize);
+    const w = icon + gap + textWidth(s, noteSize);
+    const cx = Math.min(Math.max(P.x + P.w / 2, area.x + w / 2), area.x + area.w - w / 2);
+    const baseline = frame.y + frame.h + (k + 0.8) * noteLine;
+    const x0 = cx - w / 2;
+    if (note.warn) nodes.push(warnIcon(x0, baseline, icon, pal.series("orange"), pal.bg));
+    nodes.push(text(x0 + icon + gap, baseline, s, { fontSize: noteSize, fill: note.warn ? pal.ink2 : pal.ink3 }));
+  });
   return { nodes, plot: P, hits };
+}
+
+/** A small warning triangle with "!" (size × size), its bottom on the text's baseline. */
+function warnIcon(x: number, baseline: number, size: number, color: string, bg: string): SvgNode {
+  const top = baseline - size * 0.9;
+  const mid = x + size / 2;
+  return {
+    tag: "g",
+    children: [
+      { tag: "path", attrs: { d: `M${rnd(mid)} ${rnd(top)}L${rnd(x + size)} ${rnd(top + size * 0.9)}H${rnd(x)}Z`, fill: color, strokeLinejoin: "round", stroke: color, strokeWidth: 1 } },
+      { tag: "path", attrs: { d: `M${rnd(mid)} ${rnd(top + size * 0.32)}V${rnd(top + size * 0.58)}M${rnd(mid)} ${rnd(top + size * 0.76)}v0.01`, stroke: bg, strokeWidth: rnd(Math.max(1.1, size * 0.13)), strokeLinecap: "round", fill: "none" } },
+    ],
+  };
 }
 
 /** Category labels: all of them when they fit, else every n-th; rotated when long. */
@@ -985,30 +1074,62 @@ function categoryLayout(cats: string[], n: number, band: number, size: number, b
   return { labels: short, rotate: true, every, height: longest * Math.sin((40 * Math.PI) / 180) + size * 1.2, width: longest };
 }
 
+/**
+ * An equation in lines no wider than `maxW`, broken between its terms (before " + " and " - "),
+ * the lines after the first lined up after "y = ": a 6th-order polynomial with 4 significant
+ * digits per coefficient doesn't fit across a small chart.
+ */
+export function wrapEquation(parts: EqPart[], maxW: number, size: number): { parts: EqPart[]; indent: number }[] {
+  if (partsWidth(parts, size) <= maxW) return [{ parts, indent: 0 }];
+  const terms: EqPart[][] = [[]];
+  for (const p of parts) {
+    if (p.sup) {
+      terms[terms.length - 1].push(p);
+      continue;
+    }
+    p.text.split(/(?= [+-] )/).forEach((chunk, i) => {
+      if ((i > 0 || /^ [+-] /.test(chunk)) && terms[terms.length - 1].length) terms.push([]);
+      terms[terms.length - 1].push({ ...p, text: chunk });
+    });
+  }
+  const indent = textWidth("y = ", size);
+  const lines: { parts: EqPart[]; indent: number }[] = [];
+  let line: EqPart[] = [];
+  for (const term of terms) {
+    const room = lines.length ? maxW - indent : maxW;
+    if (line.length && partsWidth([...line, ...term], size) > room) {
+      lines.push({ parts: line, indent: lines.length ? indent : 0 });
+      line = [{ ...term[0], text: term[0].text.replace(/^ /, "") }, ...term.slice(1)];
+    } else line.push(...term);
+  }
+  lines.push({ parts: line, indent: lines.length ? indent : 0 });
+  return lines;
+}
+
 /** Equation and R² labels, stacked in the corner of the plot with the least data under it. */
 function equationBoxes(ctx: Ctx, P: Box, trends: TrendDraw[], points: Pt[]): SvgNode[] {
   const { fs, pal, locale } = ctx;
   const size = Math.round(fs * 0.92 * 10) / 10;
   const lh = size * 1.42;
-  type Line = { parts: EqPart[]; color: string };
+  const padX = size * 0.6;
+  const padY = size * 0.42;
+  const blockGap = size * 0.35;
+  const inset = Math.max(4, fs * 0.5);
+  type Line = { parts: EqPart[]; color: string; indent: number };
   const blocks: Line[][] = [];
   for (const { s, fit, tl } of trends) {
     if (fit.type === "movingAverage") continue;
     const lines: Line[] = [];
     const color = pal.trend(s.color);
-    if (tl.showEquation) lines.push({ parts: equationParts(fit, locale), color });
-    if (tl.showR2 && fit.r2 !== null) lines.push({ parts: [{ text: r2Text(fit.r2, locale) }], color });
+    if (tl.showEquation) for (const l of wrapEquation(equationParts(fit, locale), P.w - 2 * (inset + padX), size)) lines.push({ ...l, color });
+    if (tl.showR2 && fit.r2 !== null) lines.push({ parts: [{ text: r2Text(fit.r2, locale) }], color, indent: 0 });
     if (lines.length) blocks.push(lines);
   }
   if (!blocks.length) return [];
-  const padX = size * 0.6;
-  const padY = size * 0.42;
-  const blockGap = size * 0.35;
   const lines = blocks.flat();
-  const w = Math.min(P.w, Math.max(...lines.map((l) => partsWidth(l.parts, size))) + 2 * padX);
+  const w = Math.min(P.w, Math.max(...lines.map((l) => l.indent + partsWidth(l.parts, size))) + 2 * padX);
   const h = lines.length * lh + (blocks.length - 1) * blockGap + 2 * padY;
   if (h > P.h + 4) return [];
-  const inset = Math.max(4, fs * 0.5);
   const corners = {
     tl: { x: P.x + inset, y: P.y + inset },
     tr: { x: P.x + P.w - inset - w, y: P.y + inset },
@@ -1038,7 +1159,7 @@ function equationBoxes(ctx: Ctx, P: Box, trends: TrendDraw[], points: Pt[]): Svg
     for (const line of block) {
       y += lh;
       // xml:space keeps the spaces around " + " between the pieces in other SVG programs too.
-      out.push({ tag: "text", attrs: { x: rnd(at.x + padX), y: rnd(y - lh * 0.3), fontSize: size, fill: line.color, fontWeight: 500, xmlSpace: "preserve" }, children: partsSpans(line.parts, size) });
+      out.push({ tag: "text", attrs: { x: rnd(at.x + padX + line.indent), y: rnd(y - lh * 0.3), fontSize: size, fill: line.color, fontWeight: 500, xmlSpace: "preserve" }, children: partsSpans(line.parts, size) });
     }
   });
   return [{ tag: "g", children: out }];
