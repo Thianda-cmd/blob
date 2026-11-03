@@ -101,9 +101,10 @@ function DeleteAccountBody({ onClose, onBusy }: { onClose: () => void; onBusy: (
   const deleting = phase === "deleting";
   const mood: BlobMood = deleting ? "sleepy" : startled ? "surprised" : "worried";
   const notes = pages.filter((p) => p.kind === "note" || p.kind === "ink").length;
+  const sheets = pages.filter((p) => p.kind === "sheet").length;
   const decks = pages.filter((p) => p.kind === "deck").length;
   const cvs = pages.filter((p) => p.kind === "cv").length;
-  const summary = [t.notes(notes), decks ? t.decks(decks) : null, cvs ? cvCount(cvs) : null, t.subjects(subjects.length)]
+  const summary = [t.notes(notes), sheets ? t.sheets(sheets) : null, decks ? t.decks(decks) : null, cvs ? cvCount(cvs) : null, t.subjects(subjects.length)]
     .filter(Boolean)
     .join(", ");
 

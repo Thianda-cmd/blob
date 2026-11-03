@@ -8,6 +8,7 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { Callout } from "./blocks/Callout";
 import { Flashcard, FlashcardBack, FlashcardFront } from "./blocks/Flashcard";
 import { DeckEmbed } from "./blocks/DeckEmbed";
+import { SheetEmbed } from "./blocks/SheetEmbed";
 import { Diagram } from "./blocks/Diagram";
 import { FileBlock } from "./blocks/File";
 import { FileUploadPlaceholder } from "./blocks/fileUpload";
@@ -121,6 +122,7 @@ export function buildExtensions({
         plot: Plot,
         file: FileBlock,
         deckEmbed: DeckEmbed,
+        sheetEmbed: SheetEmbed,
         lessonLink: LessonLink,
         pageLink: PageLink.configure({ untitled: () => text().untitled }),
       },

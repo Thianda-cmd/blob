@@ -7,11 +7,12 @@ import { blobApp } from "@/lib/native";
 import { registerOffline, warmOffline } from "./device";
 import { isOnline, onConnectivity } from "./net";
 import { blob } from "@/components/blob/bus";
-import { useMessages } from "@/i18n/client";
+import { useLocale, useMessages } from "@/i18n/client";
 import { offlineText } from "@/i18n/messages/offline";
 import { flushWaitingNotes, settleOwed, syncNoteCopies } from "./notes";
 import { flushReviews } from "./reviews";
 import { flushInkPending, keepInkCopy } from "@/ink/sync";
+import { draftPages } from "@/components/sheet/drafts";
 
 /** Pages the app keeps for offline use besides the notes themselves. */
 const MAIN_PAGES = ["/home", "/notes", "/calendar", "/tasks", "/projects", "/learn", "/cv", "/settings", "/notes/offline"];
@@ -28,9 +29,10 @@ const RECENT_INK = 12;
 export function useOfflineDevice() {
   const { userId, pages, reloadPages } = useWorkspace();
   const words = useMessages(offlineText).notes;
-  const latest = useRef({ pages, words, reloadPages });
+  const locale = useLocale();
+  const latest = useRef({ pages, words, reloadPages, locale });
   useEffect(() => {
-    latest.current = { pages, words, reloadPages };
+    latest.current = { pages, words, reloadPages, locale };
   });
 
   useEffect(() => {
@@ -45,8 +47,19 @@ export function useOfflineDevice() {
         void latest.current.reloadPages();
       };
       await Promise.all([settleOwed(userId, latest.current.words, onConflict), flushReviews(userId)]);
-      // Notes written offline whose editor was closed before they were saved (and handwriting).
-      await Promise.all([flushWaitingNotes(userId, latest.current.words, onConflict), flushInkPending(userId)]);
+      // Notes written offline whose editor was closed before they were saved (and handwriting, and
+      // spreadsheets: their saving code loads only when one is waiting).
+      await Promise.all([
+        flushWaitingNotes(userId, latest.current.words, onConflict),
+        flushInkPending(userId),
+        draftPages(userId)
+          .then(async (ids) => {
+            if (!ids.length || !alive) return;
+            const { flushSheetDrafts } = await import("@/components/sheet/flushDrafts");
+            await flushSheetDrafts(userId, latest.current.locale);
+          })
+          .catch(() => {}),
+      ]);
       if (!app) return;
       await syncNoteCopies(userId, latest.current.pages);
       await noteCache.loadCopies(userId);
@@ -71,7 +84,7 @@ export function useOfflineDevice() {
     const idle = setTimeout(() => {
       if (!alive || !app) return;
       const recent = latest.current.pages
-        .filter((p) => (p.kind === "note" || p.kind === "deck" || p.kind === "ink") && !p.trashed_at)
+        .filter((p) => (p.kind === "note" || p.kind === "deck" || p.kind === "ink" || p.kind === "sheet") && !p.trashed_at)
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .slice(0, RECENT_PAGES)
         .map((p) => `/p/${p.id}`);

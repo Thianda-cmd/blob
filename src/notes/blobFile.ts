@@ -1,15 +1,16 @@
 import type { JSONContent } from "@tiptap/core";
 import type { PageKind } from "@/lib/types";
 
-// The Blob file (.blob): notes (with their sub-pages), presentations and folders as one file that
-// holds everything Blob knows about them, pictures and attached files included, so it opens again
-// in any Blob account exactly as it was. It is JSON:
+// The Blob file (.blob): notes (with their sub-pages), handwritten notes, spreadsheets,
+// presentations and folders as one file that holds everything Blob knows about them, pictures and
+// attached files included, so it opens again in any Blob account exactly as it was. It is JSON:
 //
 //   { "format": "blob", "version": 1, "exportedAt": "…", "app": "Blob", "pages": [ … ], "assets": { … } }
 //
 // Each page: kind, title, icon, tags, topics, its content as stored (Tiptap JSON for notes, the deck
-// for presentations; for handwritten notes { v, preview, items } with everything on their sheets,
-// see src/ink/model.ts) and its sub-pages in `children`. Pictures and files point to an asset of the
+// for presentations, the workbook for spreadsheets (src/sheet/types.ts); for handwritten notes
+// { v, preview, items } with everything on their sheets, see src/ink/model.ts) and its sub-pages in
+// `children`. Pictures and files point to an asset of the
 // file ("blob-asset:<id>") instead of a web address; links between pages of the file keep the page's
 // `ref`, so they still point to each other after importing.
 
@@ -23,7 +24,7 @@ const ASSET = "blob-asset:";
 export type BlobFilePage = {
   /** The page's id where it came from: links between pages of the file use it. */
   ref: string;
-  kind: Extract<PageKind, "note" | "deck" | "folder" | "ink">;
+  kind: Extract<PageKind, "note" | "deck" | "folder" | "ink" | "sheet">;
   title: string;
   icon: string | null;
   tags: string[];
@@ -145,8 +146,8 @@ export const assetRef = (id: string) => `${ASSET}${id}`;
 export const assetIdOf = (ref: string) => (ref.startsWith(ASSET) ? ref.slice(ASSET.length) : null);
 
 /**
- * Links between pages ("[[" links, sub-page blocks, presentations shown in a note) moved to the
- * pages' new ids after an import. Links to pages outside the file stay as they were.
+ * Links between pages ("[[" links, sub-page blocks, presentations and spreadsheets shown in a note)
+ * moved to the pages' new ids after an import. Links to pages outside the file stay as they were.
  */
 export function remapPageIds(content: unknown, ids: Map<string, string>): unknown {
   if (!isDoc(content) || !ids.size) return content;
@@ -154,6 +155,8 @@ export function remapPageIds(content: unknown, ids: Map<string, string>): unknow
   const swapHref = (href: string) => href.replace(/^\/p\/([0-9a-f-]{36})/i, (whole, id: string) => (ids.has(id) ? `/p/${ids.get(id)}` : whole));
   eachNode(doc, (n) => {
     if ((n.type === "pageLink" || n.type === "deckEmbed") && typeof n.attrs?.id === "string" && ids.has(n.attrs.id)) n.attrs.id = ids.get(n.attrs.id);
+    // A chart, table or range of a spreadsheet shown in the note (src/sheet/embed.ts).
+    if (n.type === "sheetEmbed" && typeof n.attrs?.pageId === "string" && ids.has(n.attrs.pageId)) n.attrs.pageId = ids.get(n.attrs.pageId);
     for (const m of n.marks ?? []) if (m.type === "link" && typeof m.attrs?.href === "string") m.attrs.href = swapHref(m.attrs.href);
   });
   return doc;
@@ -180,7 +183,7 @@ export function parseBlobFile(text: string): { file: BlobFile } | { error: ReadE
   const page = (p: unknown, depth: number): BlobFilePage | null => {
     if (!p || typeof p !== "object" || depth > 12) return null;
     const x = p as Partial<BlobFilePage>;
-    const kind = x.kind === "deck" || x.kind === "folder" || x.kind === "ink" ? x.kind : x.kind === "note" ? "note" : null;
+    const kind = x.kind === "deck" || x.kind === "folder" || x.kind === "ink" || x.kind === "sheet" ? x.kind : x.kind === "note" ? "note" : null;
     if (!kind) return null;
     if (kind === "note" && x.content !== undefined && x.content !== null && !isDoc(x.content) && typeof x.content !== "string") return null;
     return {

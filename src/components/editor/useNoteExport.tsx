@@ -67,17 +67,37 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: "happy", ms: 6000 });
   };
 
+  /** The note as Markdown, spreadsheet embeds as their tables and links. */
+  const markdownText = async () => {
+    if (!editor || editor.isDestroyed) return null;
+    const content = contentToSave(editor);
+    const [{ noteToMarkdown }, { withSheetEmbeds }] = await Promise.all([import("@/notes/markdown"), import("./sheetEmbedExport")]);
+    const { doc } = await withSheetEmbeds(content, "markdown", locale);
+    return noteToMarkdown(doc, { locale, title: title || untitled, pageHref: (id) => `${location.origin}/p/${id}` });
+  };
+
   const markdown = async () => {
-    if (!editor || editor.isDestroyed) return;
-    const { noteToMarkdown } = await import("@/notes/markdown");
-    download(name(".md"), noteToMarkdown(contentToSave(editor), { locale, title: title || untitled, pageHref: (id) => `${location.origin}/p/${id}` }), "text/markdown;charset=utf-8");
+    const md = await markdownText();
+    if (md !== null) download(name(".md"), md, "text/markdown;charset=utf-8");
   };
 
   const copyMarkdown = async () => {
-    if (!editor || editor.isDestroyed) return;
-    const { noteToMarkdown } = await import("@/notes/markdown");
+    const md = markdownText();
     try {
-      await navigator.clipboard.writeText(noteToMarkdown(contentToSave(editor), { locale, title: title || untitled, pageHref: (id) => `${location.origin}/p/${id}` }));
+      // Loading embedded spreadsheets takes a moment, and some browsers only let a page write to the
+      // clipboard right after the click: they get the text as a promise, the others once it's ready.
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "text/plain": md.then((x) => new Blob([x ?? ""], { type: "text/plain" })) })]);
+          blob.say(t.export.copied, { mood: "happy" });
+          return;
+        } catch {
+          // Not with a promise here: plain text below.
+        }
+      }
+      const text = await md;
+      if (text === null) return;
+      await navigator.clipboard.writeText(text);
       blob.say(t.export.copied, { mood: "happy" });
     } catch {
       blob.say(t.export.failed, { mood: "worried" });
@@ -88,26 +108,37 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     if (!editor || editor.isDestroyed) return;
     blob.say(t.export.preparing, { mood: "thinking", ms: 4000 });
     try {
-      const [{ noteToDocx }, { docxDrawings, docxImage }] = await Promise.all([import("@/notes/docx"), import("./docxAssets")]);
-      const file = await noteToDocx(editor.state.doc.toJSON(), {
-        locale,
-        title: title || untitled,
-        pageHref: (id) => `${location.origin}/p/${id}`,
-        absolute: (href) => new URL(href, location.origin).href,
-        pageTitle: (id) => pages.find((p) => p.id === id)?.title || undefined,
-        image: docxImage,
-        drawings: await docxDrawings(editor),
-      });
-      download(name(".docx"), file, DOCX_MIME);
+      const [{ noteToDocx }, { docxDrawings, docxImage }, { withSheetEmbeds }] = await Promise.all([import("@/notes/docx"), import("./docxAssets"), import("./sheetEmbedExport")]);
+      // Spreadsheet charts as pictures, their tables as Word tables.
+      const drawings = await docxDrawings(editor);
+      const { doc, done } = await withSheetEmbeds(editor.state.doc.toJSON(), "docx", locale);
+      try {
+        const file = await noteToDocx(doc, {
+          locale,
+          title: title || untitled,
+          pageHref: (id) => `${location.origin}/p/${id}`,
+          absolute: (href) => new URL(href, location.origin).href,
+          pageTitle: (id) => pages.find((p) => p.id === id)?.title || undefined,
+          image: docxImage,
+          drawings,
+        });
+        download(name(".docx"), file, DOCX_MIME);
+      } finally {
+        done();
+      }
       blob.say(t.export.wordDone, { mood: "happy", ms: 6000 });
     } catch {
       blob.say(t.export.failed, { mood: "worried" });
     }
   };
 
-  const text = () => {
+  const text = async () => {
     if (!editor || editor.isDestroyed) return;
-    download(name(".txt"), `${title || untitled}\n\n${editor.getText({ blockSeparator: "\n\n" })}\n`, "text/plain;charset=utf-8");
+    const { sheetEmbedTexts } = await import("./sheetEmbedExport");
+    const sheetEmbed = await sheetEmbedTexts(editor.state.doc, locale, (id) => `${location.origin}/p/${id}`);
+    if (editor.isDestroyed) return;
+    const body = editor.getText({ blockSeparator: "\n\n", textSerializers: { sheetEmbed: ({ node }) => sheetEmbed(node) } });
+    download(name(".txt"), `${title || untitled}\n\n${body}\n`, "text/plain;charset=utf-8");
   };
 
   const items = (close: () => void) => {

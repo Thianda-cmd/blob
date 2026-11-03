@@ -25,7 +25,7 @@ import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import type { PageKind, Subject, Task } from "@/lib/types";
 import { pageTitle } from "@/lib/utils";
-import { DeckCard, InkCard, NewCard, NoteCard, type PagePreview } from "./PageCards";
+import { DeckCard, InkCard, NewCard, NoteCard, SheetCard, type PagePreview } from "./PageCards";
 
 /** Everything for one subject: notes, presentations, its projects and its tasks. */
 export function SubjectView({
@@ -51,11 +51,12 @@ export function SubjectView({
   const now = useNow();
   const [creating, setCreating] = useState<PageKind | null>(null);
 
-  const { notes, inks, decks, folders, byId } = useMemo(() => {
+  const { notes, inks, sheets, decks, folders, byId } = useMemo(() => {
     const mine = pages.filter((p) => p.subject_id === subject.id).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     return {
       notes: mine.filter((p) => p.kind === "note"),
       inks: mine.filter((p) => p.kind === "ink"),
+      sheets: mine.filter((p) => p.kind === "sheet"),
       decks: mine.filter((p) => p.kind === "deck"),
       folders: mine.filter((p) => p.kind === "folder"),
       byId: new Map(pages.map((p) => [p.id, p])),
@@ -92,7 +93,13 @@ export function SubjectView({
     <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
   );
 
-  const stats = [t.noteCount(notes.length), t.deckCount(decks.length), ...(folders.length ? [t.folderCount(folders.length)] : []), t.openTaskCount(open.length)];
+  const stats = [
+    t.noteCount(notes.length),
+    ...(sheets.length ? [t.sheetCount(sheets.length)] : []),
+    t.deckCount(decks.length),
+    ...(folders.length ? [t.folderCount(folders.length)] : []),
+    t.openTaskCount(open.length),
+  ];
 
   return (
     <>
@@ -187,6 +194,15 @@ export function SubjectView({
                     <InkCard key={p.id} page={p} preview={previews[p.id]} now={now} />
                   ))}
                   <NewCard kind="ink" onClick={() => create("ink")} busy={creating === "ink"} alone={inks.length === 0} />
+                </div>
+              </Section>
+
+              <Section title={t.sheets} count={sheets.length}>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
+                  {sheets.map((p) => (
+                    <SheetCard key={p.id} page={p} preview={previews[p.id]} now={now} />
+                  ))}
+                  <NewCard kind="sheet" onClick={() => create("sheet")} busy={creating === "sheet"} alone={sheets.length === 0} />
                 </div>
               </Section>
 

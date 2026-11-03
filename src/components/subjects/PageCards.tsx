@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceStrict } from "date-fns";
-import { CornerDownRight, FilePlus2, Presentation, Signature } from "lucide-react";
+import { CornerDownRight, FilePlus2, Presentation, Sheet as SheetIcon, Signature } from "lucide-react";
 import Link from "next/link";
 import { FONTS, miniBackdrop, presetSpec, specPalette } from "@/components/deck/deck";
 import { deckFontVars } from "@/components/deck/fonts";
@@ -11,7 +11,9 @@ import type { Locale } from "@/i18n/config";
 import { dateLocale } from "@/i18n/format";
 import { subjectsText } from "@/i18n/messages/subjects";
 import { InkThumb } from "@/components/ink/InkThumb";
+import { SheetThumb } from "@/components/sheet/SheetThumb";
 import type { InkPreview } from "@/ink/model";
+import type { SheetPreview } from "@/sheet/doc";
 import type { DeckThemeSpec, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
@@ -24,6 +26,8 @@ export type PagePreview = {
   theme: DeckThemeSpec | null;
   /** Handwritten notes: their first sheet, small. */
   ink?: InkPreview | null;
+  /** Spreadsheets: the first rows of their first sheet and their first chart, small. */
+  sheet?: SheetPreview | null;
 };
 
 function edited(updatedAt: string, now: number | null, locale: Locale) {
@@ -140,9 +144,27 @@ export function InkCard({ page, preview, now }: { page: PageMeta; preview?: Page
   );
 }
 
-export function NewCard({ kind, onClick, busy, alone }: { kind: "note" | "deck" | "ink"; onClick: () => void; busy?: boolean; alone?: boolean }) {
+/** A spreadsheet: the top of its first sheet (and its first chart), like a little screenshot. */
+export function SheetCard({ page, preview, now }: { page: PageMeta; preview?: PagePreview; now: number | null }) {
+  const locale = useLocale();
+  const name = pageTitle(page.title, page.kind, locale);
+  return (
+    <Link href={`/p/${page.id}`} className={cn(cardBase, "p-2")}>
+      <SheetThumb preview={preview?.sheet} className="rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012] dark:ring-white/[0.08]" />
+      <div className="flex min-w-0 items-center gap-2 px-1.5 pb-1 pt-2.5">
+        <PageIcon page={page} className="size-3.5" />
+        <span className="truncate text-[13.5px] font-medium text-ink" title={name}>
+          {name}
+        </span>
+      </div>
+      <div className="truncate px-1.5 pb-0.5 text-[11.5px] text-ink-3">{edited(page.updated_at, now, locale)}</div>
+    </Link>
+  );
+}
+
+export function NewCard({ kind, onClick, busy, alone }: { kind: "note" | "deck" | "ink" | "sheet"; onClick: () => void; busy?: boolean; alone?: boolean }) {
   const t = useMessages(subjectsText);
-  const Icon = kind === "deck" ? Presentation : kind === "ink" ? Signature : FilePlus2;
+  const Icon = kind === "deck" ? Presentation : kind === "ink" ? Signature : kind === "sheet" ? SheetIcon : FilePlus2;
   return (
     <button
       onClick={onClick}
@@ -156,7 +178,7 @@ export function NewCard({ kind, onClick, busy, alone }: { kind: "note" | "deck" 
       )}
     >
       <Icon className="size-4" />
-      {kind === "deck" ? t.newDeck : kind === "ink" ? t.newInk : t.newNote}
+      {kind === "deck" ? t.newDeck : kind === "ink" ? t.newInk : kind === "sheet" ? t.newSheet : t.newNote}
     </button>
   );
 }

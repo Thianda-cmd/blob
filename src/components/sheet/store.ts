@@ -10,15 +10,24 @@
 
 import { createContext, useContext, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/config";
-import type { Calc } from "@/sheet/engine";
-import type { Area, Pos, Workbook } from "@/sheet/types";
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
+import { areaOf, inArea, parseKey, sameArea } from "@/sheet/a1";
+import { mergeWorkbooks } from "@/sheet/collab";
+import { createCalc, editText, parseInput, type Calc, type ParsedInput } from "@/sheet/engine";
+import { getCell, setCells, sheetById } from "@/sheet/ops";
+import { afterInput, filteredRows } from "@/sheet/table/model";
+import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type Pos, type Sheet, type Workbook } from "@/sheet/types";
 
 export type Selection = {
   /** Where the selection started; the active cell (the one you type into). */
   anchor: Pos;
   /** The opposite corner (Shift+arrows, dragging). anchor = focus: one cell. */
   focus: Pos;
-  /** More areas added with Ctrl/⌘ (a chart of two columns that aren't side by side). */
+  /**
+   * More areas added with Ctrl/⌘ (a chart of two columns that aren't side by side).
+   * Enter and Tab inside a selected range keep the range here as the last area while the active
+   * cell (anchor = focus) walks through it; selectionAreas() and activeArea() read that right.
+   */
   extra: Area[];
 };
 
@@ -63,6 +72,9 @@ export type SheetState = {
   version: number;
   /** Grid zoom, 0.75–2 (pinch, Ctrl+wheel, the status bar). */
   zoom: number;
+  /** What Undo and Redo would undo or redo ("Eingabe", "Einfügen"…), for the buttons' tooltips. */
+  undoLabel?: string;
+  redoLabel?: string;
 };
 
 export interface SheetStore {
@@ -107,9 +119,624 @@ export interface SheetStore {
   replaceRemote(wb: Workbook): void;
 }
 
+// ----------------------------------------------------------------------------------------------
+// Selection helpers (also for the toolbar, status bar, charts and tables)
+
+/** A selection of one cell. */
+export const singleCell = (p: Pos): Selection => ({ anchor: { row: p.row, col: p.col }, focus: { row: p.row, col: p.col }, extra: [] });
+
+/** The area between anchor and focus (the one the active cell is in, unless Enter walks through a range: see activeArea). */
+export const mainArea = (sel: Selection): Area => areaOf(sel.anchor, sel.focus);
+
+/**
+ * Every selected area, each once: the Ctrl/⌘ areas and the main one. While Enter or Tab walk
+ * through a selected range, the range is the last extra area and the active cell is inside it;
+ * then the active cell isn't listed again (sums and formats count each cell once).
+ */
+export function selectionAreas(sel: Selection): Area[] {
+  const main = mainArea(sel);
+  const one = main.r0 === main.r1 && main.c0 === main.c1;
+  if (one && sel.extra.some((a) => inArea(a, main.r0, main.c0))) return sel.extra;
+  return [...sel.extra, main];
+}
+
+/** The range the selection is about: the main area, or the range Enter and Tab are walking through. */
+export function activeArea(sel: Selection): Area {
+  return walkRange(sel) ?? mainArea(sel);
+}
+
+/** The range Enter/Tab cycle through: a main area of more than one cell, or the last extra area the active cell walks in. */
+function walkRange(sel: Selection): Area | null {
+  const main = mainArea(sel);
+  if (main.r0 !== main.r1 || main.c0 !== main.c1) return main;
+  const last = sel.extra[sel.extra.length - 1];
+  if (last && (last.r0 !== last.r1 || last.c0 !== last.c1) && inArea(last, sel.anchor.row, sel.anchor.col)) return last;
+  return null;
+}
+
+const samePos = (a: Pos, b: Pos) => a.row === b.row && a.col === b.col;
+
+export function sameSelection(a: Selection, b: Selection): boolean {
+  if (a === b) return true;
+  return samePos(a.anchor, b.anchor) && samePos(a.focus, b.focus) && a.extra.length === b.extra.length && a.extra.every((x, i) => sameArea(x, b.extra[i]));
+}
+
+function toSelection(sel: Selection | Pos | Area): Selection {
+  if ("anchor" in sel) return sel;
+  if ("r0" in sel) return { anchor: { row: sel.r0, col: sel.c0 }, focus: { row: sel.r1, col: sel.c1 }, extra: [] };
+  return singleCell(sel);
+}
+
+const clampN = (n: number, max: number) => Math.max(0, Math.min(max, Math.floor(n)));
+
+/** The selection inside the sheet; the same object when it already was. */
+function clampSelection(sel: Selection, sheet: Sheet): Selection {
+  const R = sheet.size.rows - 1;
+  const C = sheet.size.cols - 1;
+  const inside = (p: Pos) => p.row >= 0 && p.col >= 0 && p.row <= R && p.col <= C;
+  const areaInside = (a: Area) => a.r0 >= 0 && a.c0 >= 0 && a.r1 <= R && a.c1 <= C;
+  if (inside(sel.anchor) && inside(sel.focus) && sel.extra.every(areaInside)) return sel;
+  const pos = (p: Pos) => ({ row: clampN(p.row, R), col: clampN(p.col, C) });
+  const extra = sel.extra
+    .filter((a) => a.r0 <= R && a.c0 <= C)
+    .map((a) => ({ r0: clampN(a.r0, R), c0: clampN(a.c0, C), r1: clampN(a.r1, R), c1: clampN(a.c1, C) }));
+  return { anchor: pos(sel.anchor), focus: pos(sel.focus), extra };
+}
+
+// ----------------------------------------------------------------------------------------------
+// Small pure helpers on the workbook
+
+/** The sheet with room for at least `rows` × `cols` (never smaller, never beyond the limits). */
+export function growSheet(wb: Workbook, sheetId: string, rows: number, cols: number): Workbook {
+  const sheet = sheetById(wb, sheetId);
+  if (!sheet) return wb;
+  const r = Math.min(MAX_ROWS, Math.max(sheet.size.rows, rows));
+  const c = Math.min(MAX_COLS, Math.max(sheet.size.cols, cols));
+  if (r === sheet.size.rows && c === sheet.size.cols) return wb;
+  return { ...wb, sheets: wb.sheets.map((s) => (s.id === sheetId ? { ...s, size: { rows: r, cols: c } } : s)) };
+}
+
+type Changed = { sheetId: string; row: number; col: number };
+
+/**
+ * The cells whose typed value or formula differs between two versions of a workbook: the hint
+ * that lets the engine keep unchanged results. undefined when the change is more than cell
+ * contents (sheets, row visibility, tables and their filters): then everything is recalculated.
+ */
+function cellChanges(a: Workbook, b: Workbook): Changed[] | undefined {
+  if (a === b) return [];
+  if (a.tables !== b.tables || a.sheets.length !== b.sheets.length) return undefined;
+  const out: Changed[] = [];
+  for (let i = 0; i < b.sheets.length; i++) {
+    const s = a.sheets[i];
+    const t = b.sheets[i];
+    if (s === t) continue;
+    if (s.id !== t.id || s.name !== t.name || s.rows !== t.rows) return undefined;
+    if (s.cells === t.cells) continue;
+    // A filter reads values: a changed value can hide or show rows, and SUBTOTALs anywhere follow.
+    if (b.tables.some((x) => x.sheetId === t.id && Object.keys(x.filters).length > 0)) return undefined;
+    for (const k in t.cells) {
+      const x = s.cells[k];
+      const y = t.cells[k];
+      if (x !== y && (x?.v !== y.v || x?.f !== y.f)) out.push({ sheetId: t.id, ...parseKey(k) });
+    }
+    for (const k in s.cells) {
+      const x = s.cells[k];
+      if (!(k in t.cells) && (x.v !== undefined || x.f !== undefined)) out.push({ sheetId: t.id, ...parseKey(k) });
+    }
+  }
+  return out;
+}
+
+// Rows hidden by smart table filters, worked out once per calculation and sheet.
+const NONE: ReadonlySet<number> = new Set<number>();
+const filterMemo = new WeakMap<Calc, Map<string, ReadonlySet<number>>>();
+
+function filterHidden(calc: Calc, sheetId: string, locale: Locale): ReadonlySet<number> {
+  const wb = calc.workbook;
+  if (!wb.tables.some((t) => t.sheetId === sheetId && Object.keys(t.filters).length > 0)) return NONE;
+  let bySheet = filterMemo.get(calc);
+  if (!bySheet) filterMemo.set(calc, (bySheet = new Map()));
+  const known = bySheet.get(sheetId);
+  if (known) return known;
+  // The filters read values, and a value may be a SUBTOTAL that asks which rows are hidden: while
+  // this sheet's filters are being worked out, only the rows hidden by hand count.
+  bySheet.set(sheetId, NONE);
+  let rows: ReadonlySet<number> = NONE;
+  try {
+    rows = filteredRows(wb, calc, sheetId, locale);
+  } catch (e) {
+    console.error("sheet: smart table filters failed", e);
+  }
+  bySheet.set(sheetId, rows);
+  return rows;
+}
+
+function rowHidden(wb: Workbook, calc: Calc | null, sheetId: string, row: number, locale: Locale): boolean {
+  const sheet = sheetById(wb, sheetId);
+  if (!sheet) return false;
+  if (sheet.rows[row]?.hidden) return true;
+  return calc ? filterHidden(calc, sheetId, locale).has(row) : false;
+}
+
+/** Is a row hidden (by hand or by a smart table's filter) in the workbook this Calc belongs to? What the store's isRowHidden answers for its current Calc. */
+export const rowHiddenIn = (calc: Calc, sheetId: string, row: number, locale: Locale) => rowHidden(calc.workbook, calc, sheetId, row, locale);
+
+function mergeSafely(base: Workbook, mine: Workbook, theirs: Workbook): Workbook {
+  try {
+    return mergeWorkbooks(base, mine, theirs);
+  } catch (e) {
+    console.error("sheet: merging for undo failed", e);
+    return mine;
+  }
+}
+
+/** How many "(" of a formula are still open (outside "text" and 'sheet names'). */
+export function openParens(text: string): number {
+  let open = 0;
+  let quote: string | null = null;
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "(") open++;
+    else if (ch === ")") open = Math.max(0, open - 1);
+  }
+  return open;
+}
+
+/**
+ * parseInput, but forgiving like Excel: a formula whose closing parentheses are missing gets them
+ * ("=MITTELWERT(B2:B7" → "=MITTELWERT(B2:B7)"). Any other error stays.
+ */
+export function parseTyped(text: string, locale: Locale, current: Cell | undefined): ParsedInput {
+  const parsed = parseInput(text, locale, current);
+  if (!parsed.error || !text.startsWith("=")) return parsed;
+  const open = openParens(text);
+  if (open <= 0) return parsed;
+  const closed = parseInput(text + ")".repeat(open), locale, current);
+  return closed.error ? parsed : closed;
+}
+
+/** A cell after typing: the parsed value or formula, its look kept (plus an implied format, and wrapping for line breaks), its note kept. */
+export function typedCell(current: Cell | undefined, parsed: ParsedInput): Cell {
+  let s: CellStyle | undefined = current?.s;
+  if (parsed.fmt && !s?.fmt) s = { ...s, fmt: parsed.fmt };
+  const v = parsed.cell.v;
+  if (typeof v === "string" && v.includes("\n") && !s?.wrap) s = { ...s, wrap: true };
+  const cell: Cell = {};
+  if (v !== undefined && v !== "") cell.v = v;
+  if (parsed.cell.f !== undefined) cell.f = parsed.cell.f;
+  if (s && Object.keys(s).length) cell.s = s;
+  if (current?.note) cell.note = current.note;
+  return cell;
+}
+
+type Step = {
+  label: string;
+  /** The workbook before and after the change. */
+  before: Workbook;
+  after: Workbook;
+  /** Where to look after undoing it (the sheet and selection from before the change)… */
+  sheetId: string;
+  selection: Selection;
+  /** …and after redoing it (the sheet and selection from when it was undone). */
+  redoView?: { sheetId: string; selection: Selection };
+};
+
+const UNDO_LIMIT = 200;
+export const ZOOM_MIN = 0.75;
+export const ZOOM_MAX = 2;
+
+type Move = "down" | "up" | "right" | "left";
+
+// ----------------------------------------------------------------------------------------------
+
 export function createSheetStore(init: { pageId: string; workbook: Workbook; locale: Locale; readOnly: boolean }): SheetStore {
-  void init;
-  throw new Error("store: createSheetStore not implemented");
+  const locale = init.locale;
+  const labels = sheetGridText[locale].labels;
+  const listeners = new Set<() => void>();
+  const undoStack: Step[] = [];
+  const redoStack: Step[] = [];
+  /** The selection each sheet had when you left it, to come back to. */
+  const remembered = new Map<string, Selection>();
+  /** Where the running edit started: the sheet and selection to return to, and the text it began with. */
+  let editStart: { sheetId: string; selection: Selection; original: string } | null = null;
+  /** Tab moves right along a row; Enter then goes down to the column the tabbing started in (like Excel). */
+  let tabStart: Pos | null = null;
+
+  /**
+   * A Calc for `wb` whose SUBTOTALs skip hidden rows, including the rows its own values hide
+   * through smart table filters (read lazily from this very Calc, so creating it costs nothing).
+   */
+  function makeCalc(wb: Workbook, previous?: Calc, changed?: Changed[]): Calc {
+    let self: Calc | null = null;
+    const calc = createCalc(wb, {
+      locale,
+      isRowHidden: (sheetId, row) => rowHidden(wb, self, sheetId, row, locale),
+      ...(previous && changed ? { previous, changed } : {}),
+    });
+    self = calc;
+    return calc;
+  }
+
+  const first = init.workbook.sheets[0];
+  let state: SheetState = {
+    pageId: init.pageId,
+    workbook: init.workbook,
+    calc: makeCalc(init.workbook),
+    sheetId: first?.id ?? "",
+    selection: singleCell({ row: 0, col: 0 }),
+    edit: null,
+    clip: null,
+    focus: null,
+    readOnly: init.readOnly,
+    locale,
+    canUndo: false,
+    canRedo: false,
+    version: 0,
+    zoom: 1,
+  };
+
+  function emit() {
+    for (const listener of [...listeners]) listener();
+  }
+
+  const sheetOf = (s: SheetState): Sheet | undefined => sheetById(s.workbook, s.sheetId);
+
+  /** The state made consistent with its workbook: an existing sheet, a selection inside it, no edit, clip or panel of something gone. */
+  function settle(s: SheetState): SheetState {
+    const wb = s.workbook;
+    let { sheetId, selection, edit, clip, focus } = s;
+    let sheet = sheetById(wb, sheetId);
+    if (!sheet) {
+      sheet = wb.sheets[0];
+      sheetId = sheet.id;
+      selection = remembered.get(sheetId) ?? singleCell({ row: 0, col: 0 });
+    }
+    selection = clampSelection(selection, sheet);
+    if (edit) {
+      const es = sheetById(wb, edit.sheetId);
+      if (!es || edit.row >= es.size.rows || edit.col >= es.size.cols) {
+        edit = null;
+        editStart = null;
+      }
+    }
+    if (clip && !sheetById(wb, clip.sheetId)) clip = null;
+    if (focus) {
+      const id = focus.id;
+      const exists = focus.kind === "chart" ? wb.charts.some((c) => c.id === id) : wb.tables.some((t) => t.id === id);
+      if (!exists) focus = null;
+    }
+    if (sheetId === s.sheetId && selection === s.selection && edit === s.edit && clip === s.clip && focus === s.focus) return s;
+    return { ...s, sheetId, selection, edit, clip, focus };
+  }
+
+  function historyState() {
+    return {
+      canUndo: undoStack.length > 0,
+      canRedo: redoStack.length > 0,
+      undoLabel: undoStack[undoStack.length - 1]?.label,
+      redoLabel: redoStack[redoStack.length - 1]?.label,
+    };
+  }
+
+  /** Put a new document in place (with its Calc), optionally looking at another sheet and selection. */
+  function setDocument(wb: Workbook, calc: Calc, view?: { sheetId: string; selection: Selection }) {
+    if (view && view.sheetId !== state.sheetId) remembered.set(state.sheetId, state.selection);
+    state = settle({ ...state, ...view, workbook: wb, calc, version: state.version + 1, ...historyState() });
+    emit();
+  }
+
+  /** One undo step: `next` replaces the workbook. */
+  function commit(label: string, next: Workbook, calc?: Calc) {
+    const prev = state.workbook;
+    if (next === prev) return;
+    undoStack.push({ label, before: prev, after: next, sheetId: state.sheetId, selection: state.selection });
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack.length = 0;
+    setDocument(next, calc ?? makeCalc(next, state.calc, cellChanges(prev, next)));
+  }
+
+  /** Write parsed input into a cell, in one undo step with what a smart table does after it. */
+  function writeParsed(sheetId: string, pos: Pos, current: Cell | undefined, parsed: ParsedInput) {
+    const wb0 = state.workbook;
+    let wb1 = setCells(wb0, sheetId, [{ row: pos.row, col: pos.col, cell: typedCell(current, parsed) }]);
+    // Typing in the last row or column leaves one more to go on with (the sheet grows as you type).
+    wb1 = growSheet(wb1, sheetId, pos.row + 2, pos.col + 2);
+    if (wb1 === wb0) return;
+    // Only this cell changed (growing the sheet changes no values): no need to compare all cells.
+    const filtered = wb1.tables.some((x) => x.sheetId === sheetId && Object.keys(x.filters).length > 0);
+    const calc1 = makeCalc(wb1, state.calc, filtered ? undefined : [{ sheetId, row: pos.row, col: pos.col }]);
+    let wb2 = wb1;
+    try {
+      wb2 = afterInput(wb1, calc1, sheetId, pos.row, pos.col);
+    } catch (e) {
+      console.error("sheet: smart table update after typing failed", e);
+    }
+    commit(labels.input, wb2, wb2 === wb1 ? calc1 : undefined);
+  }
+
+  /** Back to the sheet and selection the edit started from (pointing at cells for a formula moves them). */
+  function restoreEditView(e: NonNullable<EditState>) {
+    const start = editStart;
+    const selection = start && start.sheetId === e.sheetId ? start.selection : singleCell({ row: e.row, col: e.col });
+    if (state.sheetId !== e.sheetId) remembered.set(state.sheetId, state.selection);
+    state = { ...state, sheetId: e.sheetId, selection, edit: null };
+    editStart = null;
+    state = settle(state);
+  }
+
+  const hiddenRow = (row: number) => rowHidden(state.workbook, state.calc, state.sheetId, row, locale);
+  const hiddenCol = (sheet: Sheet, col: number) => !!sheet.cols[col]?.hidden;
+
+  /** The next row (or column) that isn't hidden, `d` steps away; the same one when there is none. */
+  function nextVisible(from: number, d: 1 | -1, max: number, hidden: (i: number) => boolean): number {
+    let i = from + d;
+    while (i >= 0 && i <= max && hidden(i)) i += d;
+    return i < 0 || i > max ? from : i;
+  }
+
+  /** Enter, Tab and their Shift versions after a commit: one cell on, or round a selected range. */
+  function moveActive(dir: Move) {
+    const sheet = sheetOf(state);
+    if (!sheet) return;
+    const sel = state.selection;
+    const R = sheet.size.rows - 1;
+    const C = sheet.size.cols - 1;
+    const range = walkRange(sel);
+    if (range) {
+      tabStart = null;
+      const size = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+      let { row, col } = sel.anchor;
+      for (let i = 0; i < size; i++) {
+        if (dir === "down" || dir === "up") {
+          const d = dir === "down" ? 1 : -1;
+          row += d;
+          if (row > range.r1 || row < range.r0) {
+            row = d > 0 ? range.r0 : range.r1;
+            col += d;
+            if (col > range.c1 || col < range.c0) col = d > 0 ? range.c0 : range.c1;
+          }
+        } else {
+          const d = dir === "right" ? 1 : -1;
+          col += d;
+          if (col > range.c1 || col < range.c0) {
+            col = d > 0 ? range.c0 : range.c1;
+            row += d;
+            if (row > range.r1 || row < range.r0) row = d > 0 ? range.r0 : range.r1;
+          }
+        }
+        if (!hiddenRow(row) && !hiddenCol(sheet, col)) break;
+      }
+      const main = mainArea(sel);
+      const extra = sameArea(main, range) ? [...sel.extra, range] : sel.extra;
+      state = { ...state, selection: { anchor: { row, col }, focus: { row, col }, extra } };
+      return;
+    }
+    let { row, col } = sel.anchor;
+    if (dir === "right") {
+      if (!tabStart || tabStart.row !== row) tabStart = { row, col };
+      col = nextVisible(col, 1, C, (c) => hiddenCol(sheet, c));
+    } else if (dir === "left") {
+      col = nextVisible(col, -1, C, (c) => hiddenCol(sheet, c));
+    } else if (dir === "down") {
+      if (tabStart && tabStart.row === row) col = tabStart.col;
+      tabStart = null;
+      row = nextVisible(row, 1, R, hiddenRow);
+    } else {
+      tabStart = null;
+      row = nextVisible(row, -1, R, hiddenRow);
+    }
+    state = { ...state, selection: singleCell({ row, col }) };
+  }
+
+  /** Commit the running edit (if any) and move. false: the formula didn't parse; the editor stays open with the reason. */
+  function commitEditInternal(move: Move | null): boolean {
+    const e = state.edit;
+    if (e) {
+      const unchanged = editStart !== null && e.text === editStart.original;
+      if (unchanged || state.readOnly) restoreEditView(e);
+      else {
+        const pos = { row: e.row, col: e.col };
+        const current = getCell(state.workbook, e.sheetId, e.row, e.col);
+        const parsed = parseTyped(e.text, locale, current);
+        if (parsed.error) {
+          const at = Math.max(0, Math.min(e.text.length, parsed.error.at));
+          state = { ...state, edit: { ...e, error: parsed.error, caret: at } };
+          emit();
+          return false;
+        }
+        // The undo step remembers the edited cell as the selection, not the cells pointed at.
+        restoreEditView(e);
+        writeParsed(e.sheetId, pos, current, parsed);
+      }
+    }
+    if (move) moveActive(move);
+    emit();
+    return true;
+  }
+
+  function setSelection(sel: Selection) {
+    const sheet = sheetOf(state);
+    if (!sheet) return;
+    const next = clampSelection(sel, sheet);
+    if (sameSelection(next, state.selection)) return;
+    state = { ...state, selection: next };
+    emit();
+  }
+
+  const store: SheetStore = {
+    get: () => state,
+
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+
+    apply(label, change) {
+      if (state.readOnly) return;
+      const next = change(state.workbook, state.calc);
+      if (next === state.workbook) return;
+      commit(label, next);
+    },
+
+    input(at, text) {
+      if (state.readOnly) return true;
+      const sheetId = state.sheetId;
+      const current = getCell(state.workbook, sheetId, at.row, at.col);
+      const parsed = parseTyped(text, locale, current);
+      if (parsed.error) return false;
+      writeParsed(sheetId, at, current, parsed);
+      return true;
+    },
+
+    setSheet(sheetId) {
+      if (sheetId === state.sheetId || !sheetById(state.workbook, sheetId)) return;
+      // A formula being typed stays open: clicking cells on the other sheet inserts 'Blatt 2'!A1.
+      const pointing = !!state.edit && state.edit.text.startsWith("=");
+      if (state.edit && !pointing && !commitEditInternal(null)) return;
+      tabStart = null;
+      remembered.set(state.sheetId, state.selection);
+      const sheet = sheetById(state.workbook, sheetId)!;
+      const selection = clampSelection(remembered.get(sheetId) ?? singleCell({ row: 0, col: 0 }), sheet);
+      let focus = state.focus;
+      if (focus) {
+        const id = focus.id;
+        const item = focus.kind === "chart" ? state.workbook.charts.find((c) => c.id === id) : state.workbook.tables.find((t) => t.id === id);
+        if (item?.sheetId !== sheetId) focus = null;
+      }
+      state = { ...state, sheetId, selection, focus };
+      emit();
+    },
+
+    select(sel, opts) {
+      if (state.edit && !opts?.keepEdit && !commitEditInternal(null)) return;
+      if (!opts?.keepEdit) tabStart = null;
+      setSelection(toSelection(sel));
+    },
+
+    startEdit(opts) {
+      if (state.readOnly) return;
+      const running = state.edit;
+      if (running) {
+        const same = !opts.at || (running.sheetId === state.sheetId && running.row === opts.at.row && running.col === opts.at.col);
+        if (same) {
+          // The same edit, now in the cell or in the formula bar: what was typed stays.
+          const text = opts.text ?? running.text;
+          const caret = opts.text !== undefined ? text.length : running.caret;
+          state = { ...state, edit: { ...running, via: opts.via, replace: opts.replace, text, caret } };
+          emit();
+          return;
+        }
+        if (!commitEditInternal(null)) return;
+      }
+      if (opts.at && !samePos(opts.at, state.selection.anchor)) {
+        tabStart = null;
+        setSelection(singleCell(opts.at));
+      }
+      const sheet = sheetOf(state);
+      if (!sheet) return;
+      const pos = state.selection.anchor;
+      const original = editText(getCell(state.workbook, state.sheetId, pos.row, pos.col), locale);
+      const text = opts.replace ? (opts.text ?? "") : (opts.text ?? original);
+      editStart = { sheetId: state.sheetId, selection: state.selection, original };
+      // Typing ends the copy mode (the marching ants), like Excel; pasting still works from the clipboard.
+      state = {
+        ...state,
+        clip: null,
+        edit: { sheetId: state.sheetId, row: pos.row, col: pos.col, text, caret: text.length, via: opts.via, replace: opts.replace, error: null },
+      };
+      emit();
+    },
+
+    updateEdit(text, caret) {
+      const e = state.edit;
+      if (!e) return;
+      const c = Math.max(0, Math.min(text.length, caret));
+      if (text === e.text && c === e.caret) return;
+      state = { ...state, edit: { ...e, text, caret: c, error: text === e.text ? e.error : null } };
+      emit();
+    },
+
+    commitEdit(move) {
+      return commitEditInternal(move ?? null);
+    },
+
+    cancelEdit() {
+      const e = state.edit;
+      if (!e) return;
+      restoreEditView(e);
+      emit();
+    },
+
+    setClip(clip) {
+      if (clip === state.clip || (clip && state.clip && clip.sheetId === state.clip.sheetId && clip.cut === state.clip.cut && sameArea(clip.area, state.clip.area))) return;
+      state = { ...state, clip };
+      emit();
+    },
+
+    setFocus(focus) {
+      if (focus === state.focus || (focus && state.focus && focus.kind === state.focus.kind && focus.id === state.focus.id)) return;
+      state = { ...state, focus };
+      emit();
+    },
+
+    setZoom(zoom) {
+      if (!Number.isFinite(zoom)) return;
+      const z = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)) * 100) / 100;
+      if (z === state.zoom) return;
+      state = { ...state, zoom: z };
+      emit();
+    },
+
+    undo() {
+      if (state.edit) {
+        // Undo while typing drops the typing first (Excel's undo button does the same).
+        restoreEditView(state.edit);
+        emit();
+      }
+      const step = undoStack.pop();
+      if (!step) return;
+      tabStart = null;
+      const now = state.workbook;
+      // Someone else's changes since then stay: only what this step changed goes back.
+      const wb = now === step.after ? step.before : mergeSafely(step.after, step.before, now);
+      redoStack.push({ ...step, before: wb, after: now, redoView: { sheetId: state.sheetId, selection: state.selection } });
+      setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), { sheetId: step.sheetId, selection: step.selection });
+    },
+
+    redo() {
+      if (state.edit) {
+        restoreEditView(state.edit);
+        emit();
+      }
+      const step = redoStack.pop();
+      if (!step) return;
+      tabStart = null;
+      const now = state.workbook;
+      const wb = now === step.before ? step.after : mergeSafely(step.before, step.after, now);
+      undoStack.push({ label: step.label, before: now, after: wb, sheetId: state.sheetId, selection: state.selection });
+      setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), step.redoView ?? { sheetId: step.sheetId, selection: step.selection });
+    },
+
+    isRowHidden(sheetId, row) {
+      return rowHidden(state.workbook, state.calc, sheetId, row, locale);
+    },
+
+    replaceRemote(wb) {
+      if (wb === state.workbook || !wb.sheets.length) return;
+      // No undo step, and the undo history stays: undoing later puts back only what that step
+      // changed and keeps the other person's changes (a three-way merge, see undo()). A step that
+      // inserted or deleted rows can't be lined up with their edits cell by cell; then theirs in
+      // the moved cells may land a row off. Rare enough (both at once, then undo) to accept.
+      setDocument(wb, makeCalc(wb, state.calc, cellChanges(state.workbook, wb)));
+    },
+  };
+
+  return store;
 }
 
 export const SheetStoreContext = createContext<SheetStore | null>(null);

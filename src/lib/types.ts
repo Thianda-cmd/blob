@@ -36,8 +36,8 @@ export type Subject = {
   created_at: string;
 };
 
-/** A folder only holds pages (no text of its own). "ink": a handwritten note (src/ink). */
-export type PageKind = "note" | "deck" | "cv" | "folder" | "ink";
+/** A folder only holds pages (no text of its own). "ink": a handwritten note (src/ink). "sheet": a spreadsheet (src/sheet). */
+export type PageKind = "note" | "deck" | "cv" | "folder" | "ink" | "sheet";
 
 /** Page metadata used by the sidebar and lists (no content). */
 export type PageMeta = {
@@ -65,7 +65,7 @@ export type Page = PageMeta & {
   plain_text: string;
   /** Pages this one links to (page links, [[links]]), for backlinks. Saved with the content. */
   links: string[];
-  /** Presentations: revision for saving together (save_deck). */
+  /** Presentations and spreadsheets: revision for saving together (save_deck, save_sheet). */
   rev: number;
   /** Notes edited together: the step version pages.content is at (push_steps / save_note_snapshot). */
   doc_version: number;

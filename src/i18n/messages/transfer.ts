@@ -1,6 +1,6 @@
 import { defineMessages } from "../define";
 
-/** Exporting notes (PDF, Word, Blob file, Markdown, text) and bringing files in. */
+/** Exporting notes (PDF, Word, Blob file, Markdown, text) and bringing files in (Excel and CSV become spreadsheets). */
 export const transferText = defineMessages({
   en: {
     export: {
@@ -20,7 +20,7 @@ export const transferText = defineMessages({
       missing: (n: number) => (n === 1 ? "One picture or file was too big or out of reach and stayed out." : `${n} pictures or files were too big or out of reach and stayed out.`),
       failed: "That didn't work. Check your connection and try again?",
       backup: "Download all your notes",
-      backupHint: "One Blob file with all your notes, folders and presentations, pictures and files included.",
+      backupHint: "One Blob file with all your notes, spreadsheets, folders and presentations, pictures and files included.",
       backupName: (date: string) => `Blob backup ${date}`,
       backupButton: "Download backup",
     },
@@ -39,13 +39,13 @@ export const transferText = defineMessages({
     import: {
       label: "Import",
       action: "Import a file",
-      actionHint: "Blob files (.blob), Markdown or text",
+      actionHint: "Blob files (.blob), Excel or CSV, Markdown or text",
       drop: "Drop to import",
-      dropInNote: "I can import Blob files, Markdown and text here. Pictures and other files go into a note: drop them on its page.",
+      dropInNote: "I can import Blob files, Excel and CSV files, Markdown and text here. Pictures and other files go into a note: drop them on its page.",
       importing: "Bringing it in…",
       done: (n: number) => (n === 1 ? "Imported. Here it is!" : `Imported ${n} pages. Here they are!`),
       partly: (n: number) => (n === 1 ? "Imported, but one page didn't make it." : `Imported, but ${n} pages didn't make it.`),
-      notBlob: "That isn't a file Blob can open. Try a .blob, .md or .txt file.",
+      notBlob: "That isn't a file Blob can open. Try a .blob, .xlsx, .csv, .md or .txt file.",
       newer: "This file comes from a newer Blob. Reload the page (or update the app) and try again.",
       broken: "This Blob file seems damaged, so I couldn't open it.",
       tooBig: "That file is too big to import (over 100 MB).",
@@ -70,7 +70,7 @@ export const transferText = defineMessages({
       missing: (n) => (n === 1 ? "Ein Bild oder eine Datei war zu groß oder nicht erreichbar und ist nicht dabei." : `${n} Bilder oder Dateien waren zu groß oder nicht erreichbar und sind nicht dabei.`),
       failed: "Das hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal?",
       backup: "Alle Notizen herunterladen",
-      backupHint: "Eine Blob-Datei mit all deinen Notizen, Ordnern und Präsentationen, samt Bildern und Dateien.",
+      backupHint: "Eine Blob-Datei mit all deinen Notizen, Tabellen, Ordnern und Präsentationen, samt Bildern und Dateien.",
       backupName: (date) => `Blob-Sicherung ${date}`,
       backupButton: "Sicherung herunterladen",
     },
@@ -89,13 +89,13 @@ export const transferText = defineMessages({
     import: {
       label: "Importieren",
       action: "Datei importieren",
-      actionHint: "Blob-Dateien (.blob), Markdown oder Text",
+      actionHint: "Blob-Dateien (.blob), Excel oder CSV, Markdown oder Text",
       drop: "Zum Importieren loslassen",
-      dropInNote: "Hier kann ich Blob-Dateien, Markdown und Text importieren. Bilder und andere Dateien gehören in eine Notiz: Zieh sie auf ihre Seite.",
+      dropInNote: "Hier kann ich Blob-Dateien, Excel- und CSV-Dateien, Markdown und Text importieren. Bilder und andere Dateien gehören in eine Notiz: Zieh sie auf ihre Seite.",
       importing: "Wird hereingeholt…",
       done: (n) => (n === 1 ? "Importiert. Hier ist es!" : `${n} Seiten importiert. Hier sind sie!`),
       partly: (n) => (n === 1 ? "Importiert, aber eine Seite hat es nicht geschafft." : `Importiert, aber ${n} Seiten haben es nicht geschafft.`),
-      notBlob: "Diese Datei kann Blob nicht öffnen. Probier eine .blob-, .md- oder .txt-Datei.",
+      notBlob: "Diese Datei kann Blob nicht öffnen. Probier eine .blob-, .xlsx-, .csv-, .md- oder .txt-Datei.",
       newer: "Diese Datei stammt aus einem neueren Blob. Lade die Seite neu (oder aktualisiere die App) und versuch es nochmal.",
       broken: "Diese Blob-Datei scheint beschädigt zu sein, deshalb konnte ich sie nicht öffnen.",
       tooBig: "Diese Datei ist zu groß zum Importieren (über 100 MB).",

@@ -54,6 +54,7 @@ import { SlashController } from "./slash/SlashCommand";
 import { SlashMenu } from "./slash/SlashMenu";
 import { StudyMenu } from "./StudyMenu";
 import { useNoteExport } from "./useNoteExport";
+import { useSheetEmbedParam } from "./useSheetEmbedParam";
 import { useFindBar } from "./FindBar";
 import { ViewMenu } from "./ViewMenu";
 import { useViewPrefs } from "./viewPrefs";
@@ -831,6 +832,8 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
   // is saved, and sent to the others when working together.
   const followed = useRef<Editor | null>(null);
   const canFollow = !!editor && canEdit && (!collabOn || collab.status === "live");
+  // "Add to note" from a spreadsheet: the chart or table goes in once the note can take it.
+  useSheetEmbedParam({ editor, pageId: page.id, ready: canFollow, blocked: readOnly || broken, enabled: !pane });
   useEffect(() => {
     if (!canFollow || !editor || followed.current === editor) return;
     followed.current = editor;

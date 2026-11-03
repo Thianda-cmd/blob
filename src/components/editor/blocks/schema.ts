@@ -468,6 +468,69 @@ export const DeckEmbedSpec = Node.create({
   },
 });
 
+/** How big a spreadsheet embed is in the note (src/sheet/embed.ts SheetEmbedSize). */
+const SHEET_EMBED_SIZES = ["s", "m", "l", "full"];
+
+/**
+ * A chart, smart table or cells of one of your spreadsheets, shown live in the note (the block's
+ * view loads the spreadsheet). `item` is a SheetEmbedItem (src/sheet/embed.ts), checked when read.
+ */
+export const SheetEmbedSpec = Node.create({
+  name: "sheetEmbed",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      pageId: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-sheet-id"),
+        renderHTML: (attrs) => (attrs.pageId ? { "data-sheet-id": attrs.pageId } : {}),
+      },
+      item: {
+        default: null,
+        parseHTML: (el) => {
+          try {
+            const item = JSON.parse(el.getAttribute("data-item") ?? "null");
+            return item && typeof item === "object" && !Array.isArray(item) ? item : null;
+          } catch {
+            return null;
+          }
+        },
+        renderHTML: (attrs) => (attrs.item ? { "data-item": JSON.stringify(attrs.item) } : {}),
+      },
+      size: {
+        default: "m",
+        parseHTML: (el) => {
+          const size = el.getAttribute("data-size") ?? "";
+          return SHEET_EMBED_SIZES.includes(size) ? size : "m";
+        },
+        renderHTML: (attrs) => ({ "data-size": attrs.size }),
+      },
+      caption: {
+        default: "",
+        parseHTML: (el) => el.getAttribute("data-caption") ?? "",
+        renderHTML: (attrs) => (attrs.caption ? { "data-caption": attrs.caption } : {}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "div[data-sheet-embed]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-sheet-embed": "" })];
+  },
+
+  // The caption is the block's text (search finds the figure by it); the values stay in the spreadsheet.
+  renderText({ node }) {
+    return typeof node.attrs.caption === "string" ? node.attrs.caption : "";
+  },
+});
+
 /** A lesson of the learning center, with your progress, to jump into from the note. */
 export const LessonLinkSpec = Node.create({
   name: "lessonLink",

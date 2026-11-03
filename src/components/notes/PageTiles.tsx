@@ -4,6 +4,7 @@ import { formatDistanceStrict } from "date-fns";
 import { CornerDownRight, Folder, Layers, TextSearch } from "lucide-react";
 import Link from "next/link";
 import { InkThumb } from "@/components/ink/InkThumb";
+import { SheetThumb } from "@/components/sheet/SheetThumb";
 import { Avatar, type Person } from "@/components/share/Avatar";
 import { PageIcon, SubjectIcon } from "@/components/shell/Sidebar";
 import { SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
@@ -97,7 +98,10 @@ function Meta({ page, subject, parent, owner, shared, due, now }: Pick<TileProps
   );
 }
 
-/** A page in the grid: a note with its first lines, a presentation with its first slide, a folder with what's inside. */
+/**
+ * A page in the grid: a note with its first lines, a presentation with its first slide, a
+ * handwritten note or a spreadsheet with a picture of its start, a folder with what's inside.
+ */
 export function PageTile(props: TileProps & { childCount: number; childTitles: string[] }) {
   const { page, preview, inText, onTag, childCount, childTitles } = props;
   const locale = useLocale();
@@ -123,11 +127,15 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
     );
   }
 
-  if (page.kind === "ink") {
+  if (page.kind === "ink" || page.kind === "sheet") {
     return (
       <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
         <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
-        <InkThumb preview={preview?.ink} crop={0.5} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012]" />
+        {page.kind === "sheet" ? (
+          <SheetThumb preview={preview?.sheet} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012] dark:ring-white/[0.08]" />
+        ) : (
+          <InkThumb preview={preview?.ink} crop={0.5} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012]" />
+        )}
         <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
           <PageIcon page={page} className="size-3.5" />
           <span className="truncate text-[13.5px] font-medium text-ink" title={title}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Node, mergeAttributes, type Editor, type Range } from "@tiptap/core";
+import type { Editor, Range } from "@tiptap/core";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, useEditorState, type ReactNodeViewProps } from "@tiptap/react";
 import { Layers, RotateCw } from "lucide-react";

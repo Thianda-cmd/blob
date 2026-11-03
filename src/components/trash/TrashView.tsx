@@ -347,7 +347,7 @@ function TrashRow({
                 <span className="truncate">{subject.name}</span>
               </span>
             ) : (
-              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : root.kind === "folder" ? t.folder : t.note}</span>
+              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : root.kind === "folder" ? t.folder : root.kind === "sheet" ? t.sheet : t.note}</span>
             )}
             {inside > 0 && (
               <>

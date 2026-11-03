@@ -26,7 +26,7 @@ import {
 // text as a download.
 
 type Row = { id: string; kind: PageKind; title: string; icon: string | null; tags: string[] | null; topics: string[] | null; content: unknown; parent_id: string | null };
-const KINDS = new Set<PageKind>(["note", "deck", "folder", "ink"]);
+const KINDS = new Set<PageKind>(["note", "deck", "folder", "ink", "sheet"]);
 
 /** Saves text as a file in the Downloads folder (browsers and the apps alike). */
 export function download(name: string, data: string | Blob, mime: string) {
@@ -203,7 +203,17 @@ export function settleNote(content: unknown, pageId: string, locale: Locale) {
   return { content: json, plain_text: plainTextOf(doc), links: collectLinks(doc, pageId) };
 }
 
-type Create = (input: { kind: PageKind; title: string; icon: string | null; tags: string[]; topics: string[]; subject_id: string | null; parent_id: string | null; content?: unknown }) => Promise<PageMeta | null>;
+type Create = (input: {
+  kind: PageKind;
+  title: string;
+  icon: string | null;
+  tags: string[];
+  topics: string[];
+  subject_id: string | null;
+  parent_id: string | null;
+  content?: unknown;
+  plain_text?: string;
+}) => Promise<PageMeta | null>;
 
 export type ImportResult = { roots: PageMeta[]; pages: number; failed: number };
 
@@ -220,6 +230,13 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
 
   // First every page (parents before their children), so links can find their new ids.
   const make = async (page: BlobFilePage, parentId: string | null, depth: number): Promise<void> => {
+    // Spreadsheets come in complete (read safely, with a fresh preview and search text); the
+    // spreadsheet code loads only for files that have one.
+    let sheet: { content: unknown; plain_text: string } | null = null;
+    if (page.kind === "sheet") {
+      const { sheetPageContent } = await import("@/components/sheet/importFile");
+      sheet = sheetPageContent(page.content, opts.locale);
+    }
     const meta = await opts.createPage({
       kind: page.kind,
       title: page.title,
@@ -229,7 +246,8 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
       subject_id: opts.subjectId,
       parent_id: parentId,
       // The real content follows once its pictures are uploaded.
-      content: page.kind === "deck" ? page.content : page.kind === "ink" ? { v: 1, preview: (page.content as { preview?: unknown } | null)?.preview ?? null } : {},
+      content: page.kind === "deck" ? page.content : page.kind === "ink" ? { v: 1, preview: (page.content as { preview?: unknown } | null)?.preview ?? null } : sheet ? sheet.content : {},
+      ...(sheet && { plain_text: sheet.plain_text }),
     });
     if (!meta) {
       failed++;
@@ -259,7 +277,8 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
   };
 
   for (const { page, id } of created) {
-    if (page.kind === "folder") continue;
+    // Folders have no content, spreadsheets got theirs when they were made.
+    if (page.kind === "folder" || page.kind === "sheet") continue;
     const uploaded = new Map<string, string>();
     const { images, files } = assetsOf(page);
     for (const ref of [...images, ...files.keys()]) {

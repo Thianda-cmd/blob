@@ -71,6 +71,16 @@ export const editorText = defineMessages({
         lesson: { title: "Lesson", description: "Link a topic of the learning center", keywords: ["learn", "topic", "practice", "learning center", "exercise"] },
         deck: { title: "Presentation", description: "Show one of your presentations", keywords: ["slides", "deck", "present", "embed", "slideshow"] },
         plot: { title: "Function plot", description: "Graphs of f(x), with zoom", keywords: ["graph", "function", "plot", "curve", "parabola", "coordinate", "axis", "chart"] },
+        sheetChart: {
+          title: "Chart from a spreadsheet",
+          description: "A chart from one of your spreadsheets, always up to date",
+          keywords: ["spreadsheet", "chart", "excel", "graph", "scatter", "trendline", "calibration", "diagram", "table", "data"],
+        },
+        sheetCells: {
+          title: "Table from a spreadsheet",
+          description: "A smart table or cells of a spreadsheet, always up to date",
+          keywords: ["spreadsheet", "table", "excel", "cells", "range", "data", "values", "calibration", "chart"],
+        },
       } satisfies Record<string, SlashText>,
     },
 
@@ -276,6 +286,16 @@ export const editorText = defineMessages({
         lesson: { title: "Lektion", description: "Ein Thema aus dem Lernbereich verlinken", keywords: ["lernen", "thema", "üben", "lernbereich", "übung"] },
         deck: { title: "Präsentation", description: "Eine deiner Präsentationen zeigen", keywords: ["folien", "referat", "präsentieren", "einbetten", "vortrag"] },
         plot: { title: "Funktionsgraph", description: "Graphen von f(x), mit Zoom", keywords: ["graph", "funktion", "parabel", "gerade", "koordinatensystem", "schaubild", "kurve", "achse"] },
+        sheetChart: {
+          title: "Diagramm aus einer Tabelle",
+          description: "Ein Diagramm aus deinen Tabellen, immer aktuell",
+          keywords: ["tabelle", "diagramm", "excel", "chart", "spreadsheet", "kalibrierung", "kalibriergerade", "streudiagramm", "punktdiagramm", "trendlinie", "messwerte", "graph"],
+        },
+        sheetCells: {
+          title: "Tabelle aus einer Tabelle",
+          description: "Eine intelligente Tabelle oder Zellen, immer aktuell",
+          keywords: ["tabelle", "diagramm", "excel", "chart", "spreadsheet", "kalibrierung", "zellen", "bereich", "messwerte", "werte", "intelligente tabelle", "tabellenausschnitt"],
+        },
       },
     },
 

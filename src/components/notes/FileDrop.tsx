@@ -7,17 +7,17 @@ import { blob } from "@/components/blob/bus";
 import { useMessages } from "@/i18n/client";
 import { transferText } from "@/i18n/messages/transfer";
 import { BLOB_EXT } from "@/notes/blobFile";
-import { useImporter } from "./useImporter";
+import { isSheetFile, useImporter } from "./useImporter";
 
 const IMPORTABLE = new RegExp(`(\\${BLOB_EXT}|\\.md|\\.markdown|\\.txt)$`, "i");
-const importable = (f: File) => IMPORTABLE.test(f.name) || f.type === "text/markdown" || f.type === "text/plain";
+const importable = (f: File) => IMPORTABLE.test(f.name) || f.type === "text/markdown" || f.type === "text/plain" || isSheetFile(f);
 const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
 
 /**
  * Files dropped anywhere in Blob that isn't a place for them (a note takes pictures and files
- * itself, so does a card or a CV photo): Blob files, Markdown and text come in as new pages, and
- * the first one opens. Without this the browser (or the app's web view) would open the file
- * instead of Blob.
+ * itself, so does a card or a CV photo, a spreadsheet takes Excel and CSV files as new sheets):
+ * Blob files, Excel and CSV files, Markdown and text come in as new pages, and the first one
+ * opens. Without this the browser (or the app's web view) would open the file instead of Blob.
  */
 export function FileDrop() {
   const t = useMessages(transferText).import;

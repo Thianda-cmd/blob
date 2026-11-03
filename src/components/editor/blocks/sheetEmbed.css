@@ -1,0 +1,497 @@
+/* A chart, smart table or cells from a spreadsheet inside a note (SheetEmbed.tsx). Colours come
+   from the design tokens and the --sheet-* palette, so dark mode follows; paper (print, PDF) gets
+   the whole table and no buttons. */
+
+.prose-blob .blob-sheet {
+  position: relative;
+  font-family: var(--font-sans);
+  line-height: 1.45;
+}
+
+/* The card the chart or table sits in. */
+.prose-blob .blob-sheet-card {
+  position: relative;
+  margin-inline: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  transition: border-color 0.15s;
+}
+.prose-blob .blob-sheet:hover .blob-sheet-card {
+  border-color: var(--line-2);
+}
+.prose-blob .blob-sheet-chart {
+  display: flex;
+  justify-content: center;
+  padding: 0.35rem 0.75rem 0.75rem;
+}
+.prose-blob .blob-sheet-chart > svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose-blob .blob-sheet-card.is-refreshing .blob-sheet-chart,
+.prose-blob .blob-sheet-card.is-refreshing .blob-sheet-scroll {
+  opacity: 0.75;
+  transition: opacity 0.3s;
+}
+
+/* A chart's card hugs the chart. */
+.prose-blob .blob-sheet-card.is-hugging {
+  width: fit-content;
+  min-width: min(100%, 300px);
+  max-width: 100%;
+}
+
+/* The bar on top: where it comes from (a link that opens the spreadsheet), then the buttons. */
+.prose-blob .blob-sheet-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.5rem 0.1rem 0.85rem;
+}
+.prose-blob .blob-sheet-source-link {
+  display: inline-flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  padding: 0.15rem 0.3rem;
+  margin: -0.15rem -0.3rem;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.prose-blob .blob-sheet-source-link > svg {
+  align-self: center;
+}
+.prose-blob a.blob-sheet-source-link:hover,
+.prose-blob button.blob-sheet-source-link:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.prose-blob .blob-sheet-name {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.prose-blob .blob-sheet-from,
+.prose-blob .blob-sheet-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prose-blob .blob-sheet-where::before {
+  content: "· ";
+}
+
+/* The buttons (they show on hover, when selected and always on touch screens). */
+.prose-blob .blob-sheet-actions {
+  display: flex;
+  flex: none;
+  gap: 0.3rem;
+}
+.prose-blob .blob-sheet-actions .blob-block-edit {
+  position: static;
+}
+.prose-blob .blob-sheet-actions .blob-block-edit:disabled {
+  opacity: 0.5;
+}
+.prose-blob .blob-sheet-spin {
+  animation: blob-sheet-spin 0.9s linear infinite;
+}
+@keyframes blob-sheet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prose-blob .blob-sheet-spin {
+    animation: none;
+  }
+}
+
+/* A table's cells (scrolling sideways when wide). */
+.prose-blob .blob-sheet-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.35rem 0.85rem 0.75rem;
+}
+.prose-blob table.blob-sheet-table {
+  width: auto;
+  min-width: 0;
+  table-layout: auto;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  font-size: var(--blob-sheet-font, 13.5px);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.prose-blob table.blob-sheet-table.is-full {
+  width: 100%;
+}
+.prose-blob .blob-sheet-table td,
+.prose-blob .blob-sheet-table th {
+  min-width: 0;
+  padding: 0.38em 0.7em;
+  vertical-align: middle;
+  text-align: left;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-weight: 400;
+  color: var(--ink);
+  background: transparent;
+  border-right: none;
+  border-bottom: 1px solid var(--line);
+}
+.prose-blob .blob-sheet-table tr:last-child > td,
+.prose-blob .blob-sheet-table tr:last-child > th {
+  border-bottom: none;
+}
+.prose-blob .blob-sheet-table .is-wrap {
+  white-space: pre-wrap;
+  min-width: 8em;
+  max-width: 22em;
+}
+.prose-blob .blob-sheet-table .is-error {
+  color: var(--sheet-red);
+}
+/* Cells of a range: a light grid, like the spreadsheet. */
+.prose-blob .blob-sheet-table.is-range td {
+  border-right: 1px solid var(--line);
+}
+.prose-blob .blob-sheet-table.is-range tr > td:last-child {
+  border-right: none;
+}
+/* A smart table: its header in the table's colour, bands, the totals row. */
+.prose-blob .blob-sheet-table th {
+  font-weight: 640;
+  background: var(--blob-sheet-tint, color-mix(in oklab, var(--hover) 55%, var(--raised)));
+  border-bottom: 1.5px solid var(--blob-sheet-accent, var(--line-2));
+}
+.prose-blob .blob-sheet-table thead tr > th:first-child {
+  border-top-left-radius: 8px;
+}
+.prose-blob .blob-sheet-table thead tr > th:last-child {
+  border-top-right-radius: 8px;
+}
+.prose-blob .blob-sheet-table tr.is-band > td {
+  background: color-mix(in oklab, var(--blob-sheet-tint, var(--hover)) 45%, transparent);
+}
+.prose-blob .blob-sheet-table tr.is-totals > td {
+  font-weight: 640;
+  border-top: 3px double var(--blob-sheet-accent, var(--line-2));
+}
+
+/* "… 48 more rows": a quiet line under the table that opens the spreadsheet. */
+.prose-blob .blob-sheet-more {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin-top: -0.35rem;
+  padding: 0 0.85rem 0.7rem;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* Calm notices: deleted, not shared, offline… */
+.prose-blob .blob-sheet-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.prose-blob .blob-sheet-notice > svg {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--ink-3);
+}
+.prose-blob .blob-sheet-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+.prose-blob .blob-sheet-loading {
+  display: grid;
+  place-items: center;
+  gap: 0.5rem;
+  min-height: 9rem;
+  padding: 1rem;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.prose-blob .blob-sheet-shimmer {
+  width: min(70%, 320px);
+  height: 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--hover), color-mix(in oklab, var(--hover) 40%, var(--raised)), var(--hover));
+  background-size: 200% 100%;
+  animation: blob-sheet-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes blob-sheet-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prose-blob .blob-sheet-shimmer {
+    animation: none;
+  }
+}
+
+/* The caption under the block (Abb. 1: …), centred like a figure's. */
+.prose-blob .blob-sheet-caption {
+  display: block;
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.15rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--ink-2);
+  outline: none;
+}
+.prose-blob input.blob-sheet-caption:focus {
+  background: var(--hover);
+  font-style: normal;
+}
+.prose-blob .blob-sheet-caption.is-editable {
+  cursor: text;
+}
+
+/* The picker: which spreadsheet, then what of it. */
+.prose-blob .blob-sheet-pick-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.2rem 0.35rem 0.55rem;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.prose-blob .blob-sheet-pick-head > .blob-sheet-pick-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prose-blob .blob-sheet-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 28px;
+  padding: 0 0.5rem 0 0.3rem;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--ink-2);
+  transition: background-color 0.15s;
+}
+.prose-blob .blob-sheet-back:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.prose-blob .blob-sheet-tabs {
+  padding: 0 0.35rem 0.5rem;
+}
+.prose-blob .blob-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem;
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.1rem 0.35rem 0.35rem;
+}
+.prose-blob .blob-sheet-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    transform 0.15s;
+}
+.prose-blob .blob-sheet-option:hover,
+.prose-blob .blob-sheet-option:focus-visible {
+  border-color: var(--line-2);
+  background: var(--surface);
+}
+.prose-blob .blob-sheet-option:active {
+  transform: scale(0.985);
+}
+.prose-blob .blob-sheet-option.is-current {
+  border-color: color-mix(in oklab, var(--blob) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--blob) 60%, transparent);
+}
+.prose-blob .blob-sheet-option-preview {
+  display: grid;
+  place-items: center;
+  height: 132px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--raised);
+  pointer-events: none;
+}
+.prose-blob .blob-sheet-option-preview > svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose-blob .blob-sheet-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose-blob .blob-sheet-option-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.prose-blob .blob-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.1rem 0.35rem 0.35rem;
+}
+.prose-blob .blob-sheet-list .blob-sheet-option {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.7rem;
+}
+.prose-blob .blob-sheet-list .blob-sheet-option-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--blob-sheet-tint, var(--hover));
+  color: var(--blob-sheet-accent, var(--ink-2));
+}
+.prose-blob .blob-sheet-empty {
+  padding: 1.1rem 0.75rem 1.2rem;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.prose-blob .blob-sheet-range {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.1rem 0.35rem 0.4rem;
+}
+.prose-blob .blob-sheet-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.prose-blob .blob-sheet-field {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+.prose-blob .blob-sheet-input {
+  height: 36px;
+  min-width: 0;
+  padding: 0 0.65rem;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.prose-blob .blob-sheet-input:focus {
+  border-color: var(--blob);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--blob) 14%, transparent);
+}
+/* Cell references read in capitals (a1:d12 is A1:D12), without moving the caret while typing. */
+.prose-blob .blob-sheet-input.is-ref {
+  text-transform: uppercase;
+}
+.prose-blob .blob-sheet-input[aria-invalid="true"] {
+  border-color: var(--danger, var(--sheet-red));
+}
+.prose-blob select.blob-sheet-input {
+  font-family: var(--font-sans);
+  padding-right: 1.6rem;
+}
+.prose-blob .blob-sheet-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.prose-blob .blob-sheet-hint.is-error {
+  color: var(--danger, var(--sheet-red));
+}
+.prose-blob .blob-sheet-preview {
+  max-height: 210px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  padding: 0.25rem 0.4rem;
+}
+
+@media (hover: none) {
+  .prose-blob .blob-sheet-back {
+    height: 36px;
+  }
+  .prose-blob .blob-sheet-caption {
+    min-height: 32px;
+  }
+}
+
+/* On paper: the whole table, no buttons. */
+.note-print .blob-sheet-actions,
+.note-print .blob-sheet-more button {
+  display: none !important;
+}
+.note-print .blob-sheet-scroll {
+  overflow: visible !important;
+}
+.note-print .blob-sheet-card {
+  break-inside: avoid;
+}

@@ -23,6 +23,7 @@ import {
   Presentation,
   Search,
   Settings,
+  Sheet as SheetIcon,
   SquareKanban,
   SquarePlus,
   Sun,
@@ -69,6 +70,7 @@ const MAX_TOPICS = 6;
 const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
 const FOLDER_WORDS = "ordner folder";
 const INK_WORDS = "handschrift handwriting stift pen zeichnen draw drawing skizze sketch tablet s pen";
+const SHEET_WORDS = "tabelle tabellen spreadsheet sheet excel tabellenkalkulation calc rechnen formel formula diagramm chart kalibrierung kalibriergerade calibration messreihe messwerte mittelwert trendlinie";
 const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
 const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
 const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
@@ -175,6 +177,18 @@ function Palette({ onClose }: { onClose: () => void }) {
         run: async () => {
           onClose();
           const p = await createPage({ kind: "ink", title: q });
+          if (p) router.push(`/p/${p.id}`);
+        },
+      },
+      {
+        id: "new-sheet",
+        group: "actions",
+        label: q ? t.newSheetNamed(q) : t.newSheet,
+        keywords: SHEET_WORDS,
+        icon: <SheetIcon />,
+        run: async () => {
+          onClose();
+          const p = await createPage({ kind: "sheet", title: q });
           if (p) router.push(`/p/${p.id}`);
         },
       },

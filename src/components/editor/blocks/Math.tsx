@@ -1,6 +1,6 @@
 "use client";
 
-import { InputRule, Node, mergeAttributes, type Editor } from "@tiptap/core";
+import { InputRule, type Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { Sigma, Trash2 } from "lucide-react";
@@ -9,7 +9,6 @@ import { Kbd } from "@/components/ui/Kbd";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
 import { MathView } from "@/learn/components/MathView";
-import { plainMath } from "@/learn/engine/display";
 import { cn } from "@/lib/utils";
 import { useNoteBlocks } from "./context";
 import { Floating } from "./Floating";

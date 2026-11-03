@@ -1,6 +1,5 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { Maximize2, Minus, Plus, X } from "lucide-react";

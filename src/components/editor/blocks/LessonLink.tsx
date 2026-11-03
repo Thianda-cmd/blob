@@ -1,6 +1,5 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import { Check, ChevronDown, Dumbbell, FlaskConical, GraduationCap, Leaf, Play, RefreshCw, Sigma } from "lucide-react";
 import { useRouter } from "next/navigation";

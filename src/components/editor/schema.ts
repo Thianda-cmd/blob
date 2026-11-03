@@ -20,6 +20,7 @@ import {
   MathInlineSpec,
   PageLinkSpec,
   PlotSpec,
+  SheetEmbedSpec,
   SketchSpec,
   Tables,
   ToggleContent,
@@ -50,11 +51,16 @@ export const BLOCK_SPECS = {
   plot: PlotSpec,
   file: FileSpec,
   deckEmbed: DeckEmbedSpec,
+  sheetEmbed: SheetEmbedSpec,
   lessonLink: LessonLinkSpec,
   pageLink: PageLinkSpec,
 };
 
-export type NoteBlocks = Record<keyof typeof BLOCK_SPECS, AnyExtension>;
+/**
+ * The blocks an editor passes in. An editor that passes no spreadsheet embed (the public page's,
+ * until it has one) gets the bare block: still the same document, just not drawn.
+ */
+export type NoteBlocks = Omit<Record<keyof typeof BLOCK_SPECS, AnyExtension>, "sheetEmbed"> & { sheetEmbed?: AnyExtension };
 
 /**
  * "[[" links remember the title of the page they were made with (data-page-title), so their text
@@ -123,6 +129,7 @@ export function documentExtensions(blocks: NoteBlocks, readOnly = false): AnyExt
     blocks.plot,
     blocks.file,
     blocks.deckEmbed,
+    blocks.sheetEmbed ?? SheetEmbedSpec,
     blocks.lessonLink,
     blocks.pageLink,
   ];

@@ -1,0 +1,46 @@
+/* The spreadsheet grid's own styles (imported by Grid.tsx): the selection's tint and the
+   marching ants around copied cells. Colours come from the design tokens, so dark mode follows. */
+
+.sheet-sel-fill {
+  background: color-mix(in oklab, var(--blob) 11%, transparent);
+}
+
+@keyframes sheet-ants {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+
+.sheet-ants {
+  animation: sheet-ants 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-ants {
+    animation: none;
+  }
+}
+
+/* The in-cell editor: the typed text is drawn by the coloured copy underneath (formulas), the
+   textarea on top only shows the caret and the text selection. */
+.sheet-editor-text {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.sheet-editor-text::selection {
+  background: color-mix(in oklab, var(--blob) 28%, transparent);
+}
+
+/* No native text selection or tap highlight on the grid itself (dragging selects cells). */
+.sheet-grid {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.sheet-grid textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

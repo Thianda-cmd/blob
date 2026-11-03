@@ -103,7 +103,9 @@ export async function forgetDevice() {
   noteCache.reset();
   await Promise.all([ask({ type: "wipe" }, 10_000), wipeAllDbs(), setOfflineReady(false), clearNotifications(), publishWidget(null)]);
   try {
-    for (const key of Object.keys(localStorage)) if (key === WARM_KEY || key.startsWith("blob-card-reviews") || key === NOTIFY_EXTRA_KEY || key === DEVICE_USER_KEY) localStorage.removeItem(key);
+    // (Unsaved spreadsheet work too: src/components/sheet/drafts.ts.)
+    for (const key of Object.keys(localStorage))
+      if (key === WARM_KEY || key.startsWith("blob-card-reviews") || key.startsWith("blob-sheet-draft:") || key === NOTIFY_EXTRA_KEY || key === DEVICE_USER_KEY) localStorage.removeItem(key);
   } catch {}
 }
 

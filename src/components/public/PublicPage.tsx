@@ -16,15 +16,16 @@ import { PublicCv } from "./PublicCv";
 import { PublicDeck } from "./PublicDeck";
 import { PublicInk } from "./PublicInk";
 import { PublicNote } from "./PublicNote";
+import { PublicSheet } from "./PublicSheet";
 
 const never = () => () => {};
 
 // A CV's A4 page is 794px wide at full size: its column (with the side padding) fits it exactly.
-const WIDTH = { note: "max-w-[760px]", folder: "max-w-[760px]", cv: "max-w-[842px]", deck: "max-w-[1100px]", ink: "max-w-[860px]" } as const;
+const WIDTH = { note: "max-w-[760px]", folder: "max-w-[760px]", cv: "max-w-[842px]", deck: "max-w-[1100px]", ink: "max-w-[860px]", sheet: "max-w-[1100px]" } as const;
 
 /**
  * A page opened through its public link: Blob's bar with "Try Blob", where the page sits under the
- * link's page, its title and content (a note, presentation or CV, read-only), the pages inside it,
+ * link's page, its title and content (a note, presentation, handwritten note, spreadsheet or CV, read-only), the pages inside it,
  * and a word about Blob at the end. Nothing here needs an account.
  */
 export function PublicPage({ token, view }: { token: string; view: PublicView }) {
@@ -90,6 +91,8 @@ export function PublicPage({ token, view }: { token: string; view: PublicView })
                 <PublicCv content={page.content} />
               ) : page.kind === "ink" ? (
                 <PublicInk token={token} pageId={page.id} />
+              ) : page.kind === "sheet" ? (
+                <PublicSheet pageId={page.id} content={page.content} />
               ) : view.children.length === 0 ? (
                 <p className="text-[14px] text-ink-3">{t.empty}</p>
               ) : null)}

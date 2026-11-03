@@ -8,13 +8,20 @@ export const notesText = defineMessages({
   en: {
     title: "Notes",
     metaTitle: "Notes",
-    counts: (notes: number, decks: number, folders: number, inks?: number) =>
-      [`${notes} ${notes === 1 ? "note" : "notes"}`, inks ? `${inks} handwritten` : "", decks ? `${decks} ${decks === 1 ? "presentation" : "presentations"}` : "", folders ? `${folders} ${folders === 1 ? "folder" : "folders"}` : ""]
+    counts: (notes: number, decks: number, folders: number, inks?: number, sheets?: number) =>
+      [
+        `${notes} ${notes === 1 ? "note" : "notes"}`,
+        inks ? `${inks} handwritten` : "",
+        sheets ? `${sheets} ${sheets === 1 ? "spreadsheet" : "spreadsheets"}` : "",
+        decks ? `${decks} ${decks === 1 ? "presentation" : "presentations"}` : "",
+        folders ? `${folders} ${folders === 1 ? "folder" : "folders"}` : "",
+      ]
         .filter(Boolean)
         .join(" · "),
     new: "New",
     newNote: "Note",
     newInk: "Handwritten note",
+    newSheet: "Spreadsheet",
     newDeck: "Presentation",
     newFolder: "Folder",
     tabs: { all: "All pages", graph: "Knowledge graph" },
@@ -33,6 +40,7 @@ export const notesText = defineMessages({
       allKinds: "Everything",
       notes: "Notes",
       inks: "Handwritten notes",
+      sheets: "Spreadsheets",
       decks: "Presentations",
       folders: "Folders",
       owner: "Shared",
@@ -102,6 +110,7 @@ export const notesText = defineMessages({
       emptyText: "Add a note, a presentation or another folder.",
       newNote: "New note",
       newInk: "Handwriting",
+      newSheet: "New spreadsheet",
       newDeck: "New presentation",
       newFolder: "New folder",
       readOnly: "You can look, but not change this folder.",
@@ -118,6 +127,7 @@ export const notesText = defineMessages({
       folders: "Folders",
       notes: "Notes",
       inks: "Handwritten",
+      sheets: "Spreadsheets",
       decks: "Presentations",
     },
     topic: {
@@ -153,13 +163,20 @@ export const notesText = defineMessages({
   de: {
     title: "Notizen",
     metaTitle: "Notizen",
-    counts: (notes, decks, folders, inks) =>
-      [notes === 1 ? "1 Notiz" : `${notes} Notizen`, inks ? `${inks} handschriftlich` : "", decks ? (decks === 1 ? "1 Präsentation" : `${decks} Präsentationen`) : "", folders ? (folders === 1 ? "1 Ordner" : `${folders} Ordner`) : ""]
+    counts: (notes, decks, folders, inks, sheets) =>
+      [
+        notes === 1 ? "1 Notiz" : `${notes} Notizen`,
+        inks ? `${inks} handschriftlich` : "",
+        sheets ? (sheets === 1 ? "1 Tabelle" : `${sheets} Tabellen`) : "",
+        decks ? (decks === 1 ? "1 Präsentation" : `${decks} Präsentationen`) : "",
+        folders ? (folders === 1 ? "1 Ordner" : `${folders} Ordner`) : "",
+      ]
         .filter(Boolean)
         .join(" · "),
     new: "Neu",
     newNote: "Notiz",
     newInk: "Handschriftliche Notiz",
+    newSheet: "Tabelle",
     newDeck: "Präsentation",
     newFolder: "Ordner",
     tabs: { all: "Alle Seiten", graph: "Wissensnetz" },
@@ -178,6 +195,7 @@ export const notesText = defineMessages({
       allKinds: "Alles",
       notes: "Notizen",
       inks: "Handschriftliche Notizen",
+      sheets: "Tabellen",
       decks: "Präsentationen",
       folders: "Ordner",
       owner: "Geteilt",
@@ -247,6 +265,7 @@ export const notesText = defineMessages({
       emptyText: "Leg eine Notiz, eine Präsentation oder einen Unterordner an.",
       newNote: "Neue Notiz",
       newInk: "Handschrift",
+      newSheet: "Neue Tabelle",
       newDeck: "Neue Präsentation",
       newFolder: "Neuer Ordner",
       readOnly: "Du kannst diesen Ordner ansehen, aber nicht ändern.",
@@ -263,6 +282,7 @@ export const notesText = defineMessages({
       folders: "Ordner",
       notes: "Notizen",
       inks: "Handschrift",
+      sheets: "Tabellen",
       decks: "Präsentationen",
     },
     topic: {

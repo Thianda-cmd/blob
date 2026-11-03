@@ -2,10 +2,12 @@ import type { Editor, Range } from "@tiptap/core";
 import {
   BookOpen,
   CalendarDays,
+  ChartScatter,
   ChartSpline,
   ChevronRight,
   Code2,
   FilePlus2,
+  FileSpreadsheet,
   FlaskConical,
   GraduationCap,
   Layers,
@@ -231,6 +233,19 @@ const DEFS: SlashDef[] = [
     group: "media",
     icon: Table2,
     run: ({ editor, range }) => chainAt(editor, range).insertTable(newTable).run(),
+  },
+  {
+    id: "sheetChart",
+    group: "media",
+    icon: ChartScatter,
+    // The block opens its picker on the spreadsheet's charts (the kind is all it knows until you pick).
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "sheetEmbed", attrs: { pageId: null, item: { kind: "chart" } } }),
+  },
+  {
+    id: "sheetCells",
+    group: "media",
+    icon: FileSpreadsheet,
+    run: ({ editor, range }) => insertBlock(editor, range, { type: "sheetEmbed", attrs: { pageId: null, item: { kind: "table" } } }),
   },
   {
     id: "diagram",

@@ -1,0 +1,187 @@
+// Copy, cut and paste for the grid. Copying puts the shown values on the system clipboard as
+// tab-separated text and as an HTML table (so Excel, Google Sheets, Word or a Blob note can take
+// them), and keeps Blob's own copy with formulas and looks. Pasting the same text back inside
+// Blob uses that copy (formulas move like in Excel, a cut moves the cells); anything else is
+// parsed like typing.
+
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
+import { sameArea } from "@/sheet/a1";
+import { defaultAlign } from "@/sheet/engine";
+import { parseClipboard, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
+import { copyArea, pasteClip, pasteText, type ClipData } from "@/sheet/ops";
+import type { Area } from "@/sheet/types";
+import { activeArea, type SheetStore } from "../store";
+import { shownText } from "./cellLook";
+
+type OwnCopy = { pageId: string; text: string; clip: ClipData; cut: boolean };
+
+/** Blob's own clipboard: the cells last copied or cut (with formulas and looks) and the text that went to the system clipboard with them. */
+let ownCopy: OwnCopy | null = null;
+
+const normalize = (text: string) => text.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+
+// The clipboard formats come from src/sheet/io/clipboard.ts. Should one of them fail, these plain
+// versions keep copy and paste working (tabs and line breaks, a bare table).
+function tsv(rows: string[][]): string {
+  try {
+    return toTsv(rows);
+  } catch (e) {
+    console.error("sheet: toTsv failed", e);
+    const quote = (t: string) => (/[\t\n"]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
+    return rows.map((r) => r.map(quote).join("\t")).join("\n");
+  }
+}
+
+function htmlTable(rows: string[][], styles: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[][]): string {
+  try {
+    return toHtmlTable(rows, styles);
+  } catch (e) {
+    console.error("sheet: toHtmlTable failed", e);
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<table>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+  }
+}
+
+function parse(data: { text?: string; html?: string }): string[][] | null {
+  try {
+    return parseClipboard(data);
+  } catch (e) {
+    console.error("sheet: parseClipboard failed", e);
+    const text = data.text ? normalize(data.text) : "";
+    return text.includes("\t") || text.includes("\n") ? text.split("\n").map((line) => line.split("\t")) : null;
+  }
+}
+
+export type CopyPayload = { text: string; html: string; area: Area; sheetId: string };
+
+/** What copying the selection gives: TSV and HTML of the shown values; Blob's own copy is remembered and the marching ants start. */
+export function copySelection(store: SheetStore, cut: boolean): CopyPayload {
+  const s = store.get();
+  const area = activeArea(s.selection);
+  const sheet = s.workbook.sheets.find((x) => x.id === s.sheetId)!;
+  const rows: string[][] = [];
+  const styles: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[][] = [];
+  for (let r = area.r0; r <= area.r1; r++) {
+    const line: string[] = [];
+    const look: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[] = [];
+    for (let c = area.c0; c <= area.c1; c++) {
+      const cell = sheet.cells[`${r},${c}`];
+      const value = cell ? s.calc.value(s.sheetId, r, c) : null;
+      line.push(shownText(value, cell?.s?.fmt, s.locale));
+      look.push(cell ? { bold: cell.s?.bold, align: cell.s?.align ?? (value === null ? undefined : defaultAlign(value)) } : null);
+    }
+    rows.push(line);
+    styles.push(look);
+  }
+  const text = tsv(rows);
+  const html = htmlTable(rows, styles);
+  ownCopy = { pageId: s.pageId, text, clip: copyArea(s.workbook, s.sheetId, area), cut: cut && !s.readOnly };
+  store.setClip({ sheetId: s.sheetId, area, cut: cut && !s.readOnly });
+  return { text, html, area, sheetId: s.sheetId };
+}
+
+export type PasteMode = "all" | "values" | "transpose";
+
+/**
+ * Paste clipboard data at the selection. Blob's own copy when the text is what Blob copied (or
+ * when `own` asks for it because the system clipboard can't be read), else the text or HTML table
+ * parsed like typing. The pasted cells end up selected. false: there was nothing to paste.
+ */
+export function pasteData(store: SheetStore, data: { text?: string; html?: string } | null, mode: PasteMode): boolean {
+  const s = store.get();
+  if (s.readOnly) return false;
+  const labels = sheetGridText[s.locale].labels;
+  const target = activeArea(s.selection);
+  const text = data?.text !== undefined ? normalize(data.text) : null;
+  const own = ownCopy && ownCopy.pageId === s.pageId && (text === null ? !data?.html : text !== "" && normalize(ownCopy.text) === text) ? ownCopy : null;
+
+  if (own) {
+    // A cut moves its cells, once; after Escape (no marching ants any more) it pastes like a copy.
+    const cut = own.cut && !!s.clip?.cut && s.clip.sheetId === own.clip.sheetId && sameArea(s.clip.area, own.clip.area);
+    const transpose = mode === "transpose";
+    store.apply(cut ? labels.move : labels.paste, (wb, calc) =>
+      pasteClip(wb, calc, s.sheetId, target, own.clip, { mode: mode === "values" ? "values" : "all", transpose, cut }),
+    );
+    const ch = own.clip.cells.length;
+    const cw = own.clip.cells[0]?.length ?? 1;
+    const [h, w] = transpose ? [cw, ch] : [ch, cw];
+    const th = target.r1 - target.r0 + 1;
+    const tw = target.c1 - target.c0 + 1;
+    const repeats = th % h === 0 && tw % w === 0;
+    store.select({ r0: target.r0, c0: target.c0, r1: target.r0 + (repeats ? th : h) - 1, c1: target.c0 + (repeats ? tw : w) - 1 });
+    if (cut) {
+      ownCopy = null;
+      store.setClip(null);
+    }
+    return true;
+  }
+
+  if (!data || (!data.text && !data.html)) return false;
+  let rows = parse({ text: data.text, html: data.html }) ?? (text ? [[text]] : null);
+  if (!rows || !rows.length) return false;
+  if (mode === "transpose") rows = transposeRows(rows);
+  const height = rows.length;
+  const width = Math.max(1, ...rows.map((r) => r.length));
+  const at = { row: target.r0, col: target.c0 };
+  store.apply(labels.paste, (wb) => pasteText(wb, s.sheetId, at, rows, s.locale));
+  store.select({ r0: at.row, c0: at.col, r1: at.row + height - 1, c1: at.col + width - 1 });
+  return true;
+}
+
+function transposeRows(rows: string[][]): string[][] {
+  const width = Math.max(0, ...rows.map((r) => r.length));
+  return Array.from({ length: width }, (_, c) => rows.map((r) => r[c] ?? ""));
+}
+
+/** Is there a copy of Blob's own for this page (so the menu can paste even when the system clipboard can't be read)? */
+export const hasOwnCopy = (pageId: string) => ownCopy?.pageId === pageId;
+
+/** Forget the cut after Escape: pasting then copies (the ants are gone, like Excel's copy mode). */
+export function endCut() {
+  if (ownCopy?.cut) ownCopy = { ...ownCopy, cut: false };
+}
+
+/** Write to the system clipboard without a keyboard event (menu actions). false when the browser refused. */
+export async function writeSystemClipboard(text: string, html: string): Promise<boolean> {
+  const clip = typeof navigator === "undefined" ? undefined : navigator.clipboard;
+  if (!clip) return false;
+  try {
+    if (typeof clip.write === "function" && typeof ClipboardItem !== "undefined") {
+      await clip.write([new ClipboardItem({ "text/plain": new Blob([text], { type: "text/plain" }), "text/html": new Blob([html], { type: "text/html" }) })]);
+      return true;
+    }
+  } catch {
+    // Some browsers only take plain text: try that below.
+  }
+  try {
+    await clip.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read the system clipboard without a keyboard event (menu actions); null when the browser won't let the page. */
+export async function readSystemClipboard(): Promise<{ text?: string; html?: string } | null> {
+  const clip = typeof navigator === "undefined" ? undefined : navigator.clipboard;
+  if (!clip) return null;
+  try {
+    if (typeof clip.read === "function") {
+      const items = await clip.read();
+      let text: string | undefined;
+      let html: string | undefined;
+      for (const item of items) {
+        if (html === undefined && item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
+        if (text === undefined && item.types.includes("text/plain")) text = await (await item.getType("text/plain")).text();
+      }
+      return { text, html };
+    }
+  } catch {
+    // Reading rich data was refused; plain text may still work.
+  }
+  try {
+    return { text: await clip.readText() };
+  } catch {
+    return null;
+  }
+}

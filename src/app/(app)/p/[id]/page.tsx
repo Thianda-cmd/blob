@@ -7,9 +7,11 @@ import { FileSweep } from "@/components/files/FileSweep";
 import { themeSpecOf } from "@/components/deck/deck";
 import { InkEditor } from "@/components/ink/InkEditor";
 import { FolderView } from "@/components/notes/FolderView";
+import { SheetEditor } from "@/components/sheet/SheetEditor";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { readPreview } from "@/ink/model";
 import { snippet } from "@/notes/snippet";
+import { readSheetPreview } from "@/sheet/doc";
 import { TrashedNotice } from "@/components/page/TrashedNotice";
 import { pageText } from "@/i18n/messages/page";
 import { getLocale } from "@/i18n/server";
@@ -59,6 +61,8 @@ async function loadFolderPreviews(id: string): Promise<Record<string, PagePrevie
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
       ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
+      // Spreadsheets keep their preview at the same place (content->preview).
+      sheet: row.kind === "sheet" ? readSheetPreview(row.ink_preview) : null,
     };
   }
   return previews;
@@ -76,6 +80,7 @@ export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
   }
   const { role, members } = await loadAccess(page.id);
   if (page.kind === "deck") return <DeckEditor key={page.id} page={page} role={role} members={members} />;
+  if (page.kind === "sheet") return <SheetEditor key={page.id} page={page} role={role} members={members} />;
   if (page.kind === "ink") {
     return (
       <>

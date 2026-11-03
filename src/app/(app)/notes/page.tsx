@@ -6,6 +6,7 @@ import { notesText } from "@/i18n/messages/notes";
 import { getMessages } from "@/i18n/server";
 import { loadDue } from "@/notes/server";
 import { readPreview } from "@/ink/model";
+import { readSheetPreview } from "@/sheet/doc";
 import { snippet } from "@/notes/snippet";
 import { createClient } from "@/lib/supabase/server";
 import type { Attachment, PageKind, Project } from "@/lib/types";
@@ -42,6 +43,7 @@ export default async function NotesPage({ searchParams }: PageProps<"/notes">) {
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
       ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
+      sheet: row.kind === "sheet" ? readSheetPreview(row.ink_preview) : null,
     };
     if (row.links?.length) links[row.id] = row.links;
   }

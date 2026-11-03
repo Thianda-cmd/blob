@@ -27,6 +27,7 @@ import {
   Presentation,
   Search,
   Settings,
+  Sheet as SheetIcon,
   ShieldCheck,
   SquareKanban,
   Star,
@@ -89,7 +90,20 @@ function useStoredSet(key: string) {
 
 export function PageIcon({ page, className, open }: { page: Pick<PageMeta, "icon" | "kind">; className?: string; open?: boolean }) {
   if (page.icon) return <span className={cn("grid size-4 shrink-0 place-items-center text-[13px] leading-none", className)}>{page.icon}</span>;
-  const Icon = page.kind === "deck" ? Presentation : page.kind === "cv" ? FileUser : page.kind === "folder" ? (open ? FolderOpen : Folder) : page.kind === "ink" ? Signature : FileText;
+  const Icon =
+    page.kind === "deck"
+      ? Presentation
+      : page.kind === "cv"
+        ? FileUser
+        : page.kind === "folder"
+          ? open
+            ? FolderOpen
+            : Folder
+          : page.kind === "ink"
+            ? Signature
+            : page.kind === "sheet"
+              ? SheetIcon
+              : FileText;
   return <Icon className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.8} />;
 }
 
@@ -100,7 +114,7 @@ export function SubjectIcon({ subject, className }: { subject: Pick<Subject, "em
   return <span className={cn("size-2 rounded-full", className)} style={{ background: subjectColor(subject.color) }} />;
 }
 
-type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink">;
+type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink" | "sheet">;
 
 export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse: () => void; onSearch: () => void; isAdmin?: boolean }) {
   const router = useRouter();
@@ -420,7 +434,8 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-line px-2 py-2">
-        <div className="mb-1 grid grid-cols-[1fr_1fr_auto] gap-1">
+        {/* New pages: a note first (the most used), then handwriting, a spreadsheet and a presentation. */}
+        <div className="mb-1 grid grid-cols-2 gap-1">
           <button
             onClick={() => newPage("note")}
             className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97] [@media(hover:none)]:h-9"
@@ -435,12 +450,18 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             <Signature className="size-3.5 shrink-0" /> <span className="truncate">{t.newInk}</span>
           </button>
           <button
+            onClick={() => newPage("sheet")}
+            title={t.newSheetTitle}
+            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
+          >
+            <SheetIcon className="size-3.5 shrink-0" /> <span className="truncate">{t.newSheet}</span>
+          </button>
+          <button
             onClick={() => newPage("deck")}
             title={t.newDeckTitle}
-            aria-label={t.newDeckTitle}
-            className="grid size-8 place-items-center rounded-lg border border-line bg-surface text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:size-9"
+            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
           >
-            <Presentation className="size-3.5" />
+            <Presentation className="size-3.5 shrink-0" /> <span className="truncate">{t.newDeck}</span>
           </button>
         </div>
         {isAdmin && (
@@ -457,7 +478,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   );
 }
 
-/** "+" with a small menu: new note, presentation or folder. */
+/** "+" with a small menu: new note, handwritten note, spreadsheet, presentation or folder. */
 function AddMenu({ label, onPick, onImport, className }: { label: string; onPick: (kind: NewKind) => void; onImport?: () => void; className?: string }) {
   const t = useMessages(shellText).sidebar;
   const ti = useMessages(transferText).import;
@@ -477,6 +498,9 @@ function AddMenu({ label, onPick, onImport, className }: { label: string; onPick
           </MenuItem>
           <MenuItem icon={<Signature />} onSelect={() => (close(), onPick("ink"))}>
             {t.ink}
+          </MenuItem>
+          <MenuItem icon={<SheetIcon />} onSelect={() => (close(), onPick("sheet"))}>
+            {t.sheet}
           </MenuItem>
           <MenuItem icon={<Presentation />} onSelect={() => (close(), onPick("deck"))}>
             {t.presentation}

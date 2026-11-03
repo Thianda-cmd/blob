@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { blob } from "@/components/blob/bus";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
+import { sheetText } from "@/i18n/messages/sheet";
 import { transferText } from "@/i18n/messages/transfer";
 import { createClient } from "@/lib/supabase/client";
 import type { PageMeta } from "@/lib/types";
@@ -13,16 +14,22 @@ import { importBlobFile, settleNote } from "./transfer";
 
 const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
 /** What the file picker offers. */
-export const IMPORT_ACCEPT = `${BLOB_EXT},.md,.markdown,.txt,text/markdown,text/plain`;
+export const IMPORT_ACCEPT = `${BLOB_EXT},.md,.markdown,.txt,text/markdown,text/plain,.xlsx,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
+
+/** Excel and CSV files become spreadsheets ("Tabellen"). */
+export const isSheetFile = (f: File) =>
+  /\.(xlsx|xls|csv|tsv)$/i.test(f.name) || f.type === "text/csv" || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || f.type === "application/vnd.ms-excel";
 
 export type ImportTarget = { subjectId?: string | null; parentId?: string | null; /** Open the first imported page afterwards (default true). */ open?: boolean };
 
 /**
- * Bringing files into Blob: Blob files (.blob) with all their pages, Markdown and plain text as a
- * new note each. `pick` opens the file picker; `importFiles` takes files dropped somewhere.
+ * Bringing files into Blob: Blob files (.blob) with all their pages, Excel (.xlsx) and CSV files as
+ * a new spreadsheet each, Markdown and plain text as a new note each. `pick` opens the file picker;
+ * `importFiles` takes files dropped somewhere.
  */
 export function useImporter() {
   const t = useMessages(transferText).import;
+  const ts = useMessages(sheetText);
   const locale = useLocale();
   const router = useRouter();
   const { userId, createPage, updatePage } = useWorkspace();
@@ -39,8 +46,28 @@ export function useImporter() {
           continue;
         }
         const name = file.name.toLowerCase();
-        const text = await file.text();
         try {
+          if (isSheetFile(file)) {
+            // A spreadsheet: read in the browser (the spreadsheet code loads only now).
+            const { readSheetFile, sheetPageContent } = await import("@/components/sheet/importFile");
+            const read = await readSheetFile(file, locale);
+            if ("error" in read) {
+              const p = read.error;
+              blob.say(p === "tooBig" ? ts.importTooBig : p === "oldXls" ? ts.importOldXls : p === "empty" ? ts.importEmpty : ts.importFailed, { mood: "worried", ms: 7000 });
+              continue;
+            }
+            const { content, plain_text } = sheetPageContent(read.workbook, locale);
+            const meta = await createPage({ kind: "sheet", title: read.name.slice(0, 200), subject_id: target.parentId ? null : (target.subjectId ?? null), parent_id: target.parentId ?? null, content, plain_text });
+            if (!meta) {
+              failed++;
+              continue;
+            }
+            if (read.skipped.length) blob.say(ts.importSkipped(read.skipped.join(", ")), { mood: "thinking", ms: 9000 });
+            roots.push(meta);
+            pages++;
+            continue;
+          }
+          const text = await file.text();
           if (name.endsWith(BLOB_EXT) || text.trimStart().startsWith("{")) {
             const read = parseBlobFile(text);
             if ("error" in read) {
@@ -87,7 +114,7 @@ export function useImporter() {
       if (target.open !== false) router.push(`/p/${roots[0].id}`);
       return roots;
     },
-    [t, userId, locale, createPage, updatePage, router],
+    [t, ts, userId, locale, createPage, updatePage, router],
   );
 
   const pick = useCallback(

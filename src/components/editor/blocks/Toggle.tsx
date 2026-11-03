@@ -1,6 +1,6 @@
 "use client";
 
-import { Extension, InputRule, Node, mergeAttributes, type Editor, type JSONContent, type Range } from "@tiptap/core";
+import { Extension, InputRule, type Editor, type JSONContent, type Range } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection, type EditorState } from "@tiptap/pm/state";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";

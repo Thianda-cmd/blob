@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { themeSpecOf } from "@/components/deck/deck";
 import { readPreview } from "@/ink/model";
+import { readSheetPreview } from "@/sheet/doc";
 import { loadProjectSummaries } from "@/components/projects/load";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { SubjectView } from "@/components/subjects/SubjectView";
@@ -56,6 +57,7 @@ export default async function SubjectPage({ params }: PageProps<"/subjects/[id]"
       slideTitle: row.kind === "deck" ? row.slide_title : null,
       theme: row.kind === "deck" ? themeSpecOf(row.deck_theme, row.deck_custom) : null,
       ink: row.kind === "ink" ? readPreview({ preview: row.ink_preview }) : null,
+      sheet: row.kind === "sheet" ? readSheetPreview(row.ink_preview) : null,
     };
   }
 
