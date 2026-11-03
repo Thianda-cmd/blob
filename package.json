@@ -17,6 +17,11 @@
     "check:quiz": "tsx --tsconfig tsconfig.json scripts/check-quiz.ts",
     "check:ink": "tsx --tsconfig tsconfig.json scripts/check-ink.ts",
     "check:atlas": "tsx --tsconfig tsconfig.json scripts/check-atlas.ts",
+    "check:sheet": "TZ=Europe/Berlin tsx --tsconfig tsconfig.json scripts/check-sheet.ts",
+    "check:sheet-chart": "tsx --tsconfig tsconfig.json scripts/check-sheet-chart.ts",
+    "check:sheet-table": "tsx --tsconfig tsconfig.json scripts/check-sheet-table.ts",
+    "check:sheet-doc": "tsx --tsconfig tsconfig.json scripts/check-sheet-doc.ts",
+    "check:sheet-io": "tsx --tsconfig tsconfig.json scripts/check-sheet-io.ts",
     "app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "app:build": "tauri build",
     "tauri": "tauri"

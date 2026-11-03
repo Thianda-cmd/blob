@@ -99,6 +99,27 @@
   /* Colours with a fixed meaning that must not flip in dark mode (a penguin's back stays dark). */
   --bio-plumage: #2f2d36;
   --bio-plumage-light: #f7f4ec;
+  /* Spreadsheet colours (src/sheet/colors.ts): text and lines, and cell fills. */
+  --sheet-gray: #5f6368;
+  --sheet-gray-fill: #ececec;
+  --sheet-red: #d93025;
+  --sheet-red-fill: #fde2df;
+  --sheet-orange: #e8710a;
+  --sheet-orange-fill: #fde9d4;
+  --sheet-yellow: #b58b00;
+  --sheet-yellow-fill: #fff3c4;
+  --sheet-green: #188038;
+  --sheet-green-fill: #dcf1e1;
+  --sheet-teal: #0f8a83;
+  --sheet-teal-fill: #d5f0ee;
+  --sheet-blue: #1a73e8;
+  --sheet-blue-fill: #dde9fc;
+  --sheet-purple: #7c4dff;
+  --sheet-purple-fill: #ebe3ff;
+  --sheet-pink: #d01884;
+  --sheet-pink-fill: #fbe0ef;
+  --sheet-brown: #8d5a2b;
+  --sheet-brown-fill: #f1e5d8;
   color-scheme: light;
 }
 
@@ -180,6 +201,26 @@
   --bio-shine: 0.16;
   --bio-plumage: #3b3944;
   --bio-plumage-light: #ece8dd;
+  --sheet-gray: #b5b8bd;
+  --sheet-gray-fill: #3a3a3c;
+  --sheet-red: #f28b82;
+  --sheet-red-fill: #4d2422;
+  --sheet-orange: #fcad70;
+  --sheet-orange-fill: #4d3220;
+  --sheet-yellow: #fdd663;
+  --sheet-yellow-fill: #4a4019;
+  --sheet-green: #81c995;
+  --sheet-green-fill: #1f3b28;
+  --sheet-teal: #6fd3c9;
+  --sheet-teal-fill: #173b38;
+  --sheet-blue: #8ab4f8;
+  --sheet-blue-fill: #1f3352;
+  --sheet-purple: #b39dff;
+  --sheet-purple-fill: #33294f;
+  --sheet-pink: #ff8bcb;
+  --sheet-pink-fill: #4a1f37;
+  --sheet-brown: #d6a77a;
+  --sheet-brown-fill: #3d2e21;
   color-scheme: dark;
 }
 
