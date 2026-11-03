@@ -1,6 +1,7 @@
 // Smart tables ("intelligente Tabellen", Excel's "Als Tabelle formatieren"): a range with a header
-// row that sorts, filters, adds a totals row, grows when you type right below or beside it, and
-// fills a formula typed into one of its columns down the whole column.
+// row that sorts, filters, adds a totals row, grows when you type right below or beside it (and
+// the formulas and charts over its data rows grow with it, like Excel's structured references),
+// and fills a formula typed into one of its columns down the whole column.
 //
 // CONTRACT: pure functions on a Workbook; keep names and signatures, add more if needed.
 //
@@ -12,12 +13,14 @@
 import { isLocale, type Locale } from "@/i18n/config";
 import { cellKey, inArea, normArea, overlaps, parseKey } from "../a1";
 import { shiftFormula, type Calc } from "../engine";
-import { clearAreas, copyArea, insertRows, newId, pasteClip, putTable, removeTable, setCells, setStyle, sheetById, sortArea } from "../ops";
+import { clearAreas, copyArea, growTableReferences, insertRows, newId, pasteClip, putTable, removeTable, setCells, setStyle, sheetById, sortArea } from "../ops";
 import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type FilterSpec, type Sheet, type TableColumn, type TableSpec, type TableStyle, type TotalFn, type Workbook } from "../types";
+import { columnPattern, genericColumnName, headerGaps } from "./columns";
 import { hiddenByFilters, shownText } from "./filter";
 import { dataRows, isCountTotal, refreshTotals, totalFormula } from "./totals";
 
 export { dataRows, refreshTotals, totalFormula, TOTAL_FNS, TOTAL_CODES, totalOfCell, parseTotalFormula } from "./totals";
+export { genericColumnName, columnPattern } from "./columns";
 export { columnKind, columnValues, columnAverage, shownText, valueKey, type ColumnKind, type ColumnValue } from "./filter";
 
 /** The colours a table can have, in the order the panel shows them. */
@@ -34,9 +37,6 @@ export const tableById = (wb: Workbook, id: string): TableSpec | undefined => wb
 export function tableAt(wb: Workbook, sheetId: string, row: number, col: number): TableSpec | undefined {
   return wb.tables.find((t) => t.sheetId === sheetId && inArea(t.area, row, col));
 }
-
-/** "Spalte3" / "Column3": the name of a column without a header, like Excel's. */
-export const genericColumnName = (locale: Locale, n: number) => `${locale === "de" ? "Spalte" : "Column"}${n}`;
 
 /** The language a Calc was made for (the store passes it); German when it can't tell. */
 function calcLocale(calc: Calc): Locale {
@@ -251,26 +251,6 @@ function makeRoom(wb: Workbook, calc: Calc, sheetId: string, row: number, c0: nu
   if (last + 1 >= MAX_ROWS) return null;
   const clip = copyArea(wb, sheetId, { r0: row, c0, r1: last, c1 });
   return pasteClip(wb, calc, sheetId, { r0: row + 1, c0, r1: last + 1, c1 }, clip, { mode: "all", cut: true });
-}
-
-/** Names for the empty header cells of a table area ("Spalte2"), unique among the header's names. */
-function headerGaps(sheet: Sheet, a: Area, locale: Locale): Update[] {
-  const taken = new Set<string>();
-  for (let c = a.c0; c <= a.c1; c++) {
-    const v = sheet.cells[cellKey(a.r0, c)]?.v;
-    if (v !== undefined) taken.add(String(v).toLowerCase());
-  }
-  const out: Update[] = [];
-  for (let c = a.c0; c <= a.c1; c++) {
-    const cell = sheet.cells[cellKey(a.r0, c)];
-    if (hasContent(cell)) continue;
-    let n = c - a.c0 + 1;
-    while (taken.has(genericColumnName(locale, n).toLowerCase())) n++;
-    const name = genericColumnName(locale, n);
-    taken.add(name.toLowerCase());
-    out.push({ row: a.r0, col: c, cell: { ...cell, v: name } });
-  }
-  return out;
 }
 
 export type MakeTableOptions = {
@@ -607,21 +587,6 @@ export function deleteTable(wb: Workbook, tableId: string): Workbook {
 // ----------------------------------------------------------------------------------------------
 // Typing next to and into a table
 
-/**
- * A calculated column: every row r0…r1 of the column holds the same formula, moved along with its
- * row (=A2*B2, =A3*B3…). That formula and the row it was read in; null otherwise.
- */
-function columnPattern(sheet: Sheet, col: number, r0: number, r1: number): { f: string; row: number } | null {
-  let ref: { f: string; row: number } | null = null;
-  for (let r = r0; r <= r1; r++) {
-    const c = sheet.cells[cellKey(r, col)];
-    if (!c || c.f === undefined) return null;
-    if (!ref) ref = { f: c.f, row: r };
-    else if (shiftFormula(ref.f, r - ref.row, 0) !== c.f) return null;
-  }
-  return ref;
-}
-
 /** A table that grows to include a cell typed right below it (no totals row) or right beside it. */
 function growInto(wb: Workbook, sheetId: string, row: number, col: number): { table: TableSpec; dir: "row" | "col" } | null {
   const tables = wb.tables.filter((t) => t.sheetId === sheetId);
@@ -704,7 +669,8 @@ function fillColumn(sheet: Sheet, t: TableSpec, row: number, col: number): Updat
 }
 
 /**
- * After typing into (row, col): a table directly above or to the left grows to include it; a
+ * After typing into (row, col): a table directly above or to the left grows to include it (and
+ * formulas and charts over its data rows grow with it, see ops.ts growTableReferences); a
  * formula typed into a table's data cell is filled down the column (Excel's calculated column).
  * Return wb unchanged when nothing applies. Called by the store's input().
  * (`locale`, optional: for the name of a new column; else the Calc's language.)
@@ -722,8 +688,12 @@ export function afterInput(wb: Workbook, calc: Calc, sheetId: string, row: numbe
     if (grown) {
       t = grown.table;
       next = putTable(ensureSize(next, sheetId, t.area), t);
-      if (grown.dir === "row") next = writeCells(next, sheetId, continueRows(sheet, t, row, row, (r, c) => r === row && c === col));
-      else next = writeCells(next, sheetId, headerGaps(sheet, t.area, lang).filter((u) => u.col === col));
+      if (grown.dir === "row") {
+        // Formulas and charts over the data rows (=STEIGUNG(C6:C11;…)) take the new row in, like
+        // Excel's structured references; then calculated columns continue into it.
+        next = growTableReferences(next, t, { r0: t.area.r0 + 1, r1: row - 1 }, { r0: t.area.r0 + 1, r1: row });
+        next = writeCells(next, sheetId, continueRows(sheetById(next, sheetId)!, t, row, row, (r, c) => r === row && c === col));
+      } else next = writeCells(next, sheetId, headerGaps(sheet, t.area, lang).filter((u) => u.col === col));
     }
   }
   if (!t) return wb;
@@ -742,8 +712,9 @@ export function afterInput(wb: Workbook, calc: Calc, sheetId: string, row: numbe
 /**
  * After pasting or filling into `area`: a table the pasted rows continue below (it has no totals
  * row) grows down over them, a table they continue to the right of grows over the new columns,
- * like typing there (calculated columns and number formats continue into the new rows; new
- * columns get a header name). Only rows and columns with something in them count. The same
+ * like typing there (formulas and charts over the data rows take the new rows in, calculated
+ * columns and number formats continue into them; new columns get a header name). Only rows and
+ * columns with something in them count. The same
  * workbook when nothing applies. For the grid's paste and fill handle.
  */
 export function afterPaste(wb: Workbook, calc: Calc, sheetId: string, area: Area, locale?: Locale): Workbook {
@@ -761,6 +732,7 @@ export function afterPaste(wb: Workbook, calc: Calc, sheetId: string, area: Area
       if (used && !blocked({ r0: t.area.r1 + 1, r1: used.r1, c0: t.area.c0, c1: t.area.c1 })) {
         const grown: TableSpec = { ...t, area: { ...t.area, r1: used.r1 } };
         next = putTable(ensureSize(next, sheetId, grown.area), grown);
+        next = growTableReferences(next, grown, { r0: t.area.r0 + 1, r1: t.area.r1 }, { r0: t.area.r0 + 1, r1: used.r1 });
         next = writeCells(next, sheetId, continueRows(sheetById(next, sheetId)!, grown, t.area.r1 + 1, used.r1, pasted));
         t = grown;
       }

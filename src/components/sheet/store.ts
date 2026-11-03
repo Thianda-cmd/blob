@@ -15,7 +15,7 @@ import { areaOf, inArea, parseKey, sameArea } from "@/sheet/a1";
 import { mergeWorkbooks } from "@/sheet/collab";
 import { createCalc, editText, parseInput, type Calc, type ParsedInput } from "@/sheet/engine";
 import { getCell, setCells, sheetById } from "@/sheet/ops";
-import { afterInput, filteredRows } from "@/sheet/table/model";
+import { afterInput, afterPaste, filteredRows } from "@/sheet/table/model";
 import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type Pos, type Sheet, type Workbook } from "@/sheet/types";
 
 export type Selection = {
@@ -104,6 +104,11 @@ export interface SheetStore {
   /** Commit the running edit and move the selection (Enter: down, Tab: right, Shift: back). false: the formula didn't parse. */
   commitEdit(move?: "down" | "up" | "right" | "left" | null): boolean;
   cancelEdit(): void;
+  /**
+   * The selection the running edit started from (what Ctrl+Enter fills): pointing at cells for a
+   * formula moves the selection, not this. null when nothing is being edited.
+   */
+  editSelection(): Selection | null;
 
   setClip(clip: SheetState["clip"]): void;
   setFocus(focus: SheetState["focus"]): void;
@@ -228,6 +233,15 @@ function cellChanges(a: Workbook, b: Workbook): Changed[] | undefined {
   return out;
 }
 
+// What smart tables and merging do is wrapped: a bug there must never cost what was just typed
+// or pasted. It is reported once per kind (filters are worked out for every row on screen).
+const reported = new Set<string>();
+function reportOnce(what: string, err: unknown) {
+  if (reported.has(what)) return;
+  reported.add(what);
+  console.error(`sheet: ${what} failed`, err);
+}
+
 // Rows hidden by smart table filters, worked out once per calculation and sheet.
 const NONE: ReadonlySet<number> = new Set<number>();
 const filterMemo = new WeakMap<Calc, Map<string, ReadonlySet<number>>>();
@@ -246,7 +260,7 @@ function filterHidden(calc: Calc, sheetId: string, locale: Locale): ReadonlySet<
   try {
     rows = filteredRows(wb, calc, sheetId, locale);
   } catch (e) {
-    console.error("sheet: smart table filters failed", e);
+    reportOnce("smart table filters", e);
   }
   bySheet.set(sheetId, rows);
   return rows;
@@ -262,11 +276,45 @@ function rowHidden(wb: Workbook, calc: Calc | null, sheetId: string, row: number
 /** Is a row hidden (by hand or by a smart table's filter) in the workbook this Calc belongs to? What the store's isRowHidden answers for its current Calc. */
 export const rowHiddenIn = (calc: Calc, sheetId: string, row: number, locale: Locale) => rowHidden(calc.workbook, calc, sheetId, row, locale);
 
+/**
+ * A Calc for `wb` whose SUBTOTALs skip hidden rows, including the rows its own values hide
+ * through smart table filters (read lazily from this very Calc, so creating it costs nothing).
+ */
+export function calcFor(wb: Workbook, locale: Locale, previous?: Calc, changed?: Changed[]): Calc {
+  let self: Calc | null = null;
+  const calc = createCalc(wb, {
+    locale,
+    isRowHidden: (sheetId, row) => rowHidden(wb, self, sheetId, row, locale),
+    ...(previous && changed ? { previous, changed } : {}),
+  });
+  self = calc;
+  return calc;
+}
+
+/**
+ * After pasting or filling into `areas` (Blob's own copy, text from other programs, the fill
+ * handle, Ctrl+D/R, Ctrl+Enter): a smart table right above or left of the new cells grows over
+ * them like typing there does (src/sheet/table/model.ts afterPaste), worked out on a Calc of the
+ * pasted workbook. Call it inside the same apply() so it is one undo step. The same workbook when
+ * no table is concerned (or when that goes wrong: what was pasted stays either way).
+ */
+export function tablesAfterPaste(wb: Workbook, sheetId: string, areas: Area | Area[], locale: Locale): Workbook {
+  if (!wb.tables.some((t) => t.sheetId === sheetId)) return wb;
+  let next = wb;
+  try {
+    for (const area of Array.isArray(areas) ? areas : [areas]) next = afterPaste(next, calcFor(next, locale), sheetId, area, locale);
+  } catch (e) {
+    reportOnce("smart table update after pasting", e);
+    return wb;
+  }
+  return next;
+}
+
 function mergeSafely(base: Workbook, mine: Workbook, theirs: Workbook): Workbook {
   try {
     return mergeWorkbooks(base, mine, theirs);
   } catch (e) {
-    console.error("sheet: merging for undo failed", e);
+    reportOnce("merging for undo", e);
     return mine;
   }
 }
@@ -345,20 +393,7 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   /** Tab moves right along a row; Enter then goes down to the column the tabbing started in (like Excel). */
   let tabStart: Pos | null = null;
 
-  /**
-   * A Calc for `wb` whose SUBTOTALs skip hidden rows, including the rows its own values hide
-   * through smart table filters (read lazily from this very Calc, so creating it costs nothing).
-   */
-  function makeCalc(wb: Workbook, previous?: Calc, changed?: Changed[]): Calc {
-    let self: Calc | null = null;
-    const calc = createCalc(wb, {
-      locale,
-      isRowHidden: (sheetId, row) => rowHidden(wb, self, sheetId, row, locale),
-      ...(previous && changed ? { previous, changed } : {}),
-    });
-    self = calc;
-    return calc;
-  }
+  const makeCalc = (wb: Workbook, previous?: Calc, changed?: Changed[]): Calc => calcFor(wb, locale, previous, changed);
 
   const first = init.workbook.sheets[0];
   let state: SheetState = {
@@ -450,9 +485,9 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     const calc1 = makeCalc(wb1, state.calc, filtered ? undefined : [{ sheetId, row: pos.row, col: pos.col }]);
     let wb2 = wb1;
     try {
-      wb2 = afterInput(wb1, calc1, sheetId, pos.row, pos.col);
+      wb2 = afterInput(wb1, calc1, sheetId, pos.row, pos.col, locale);
     } catch (e) {
-      console.error("sheet: smart table update after typing failed", e);
+      reportOnce("smart table update after typing", e);
     }
     commit(labels.input, wb2, wb2 === wb1 ? calc1 : undefined);
   }
@@ -670,6 +705,12 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       if (!e) return;
       restoreEditView(e);
       emit();
+    },
+
+    editSelection() {
+      const e = state.edit;
+      if (!e) return null;
+      return editStart && editStart.sheetId === e.sheetId ? editStart.selection : singleCell({ row: e.row, col: e.col });
     },
 
     setClip(clip) {

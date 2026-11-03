@@ -8,16 +8,19 @@
 //
 // Viewers (and a spreadsheet that couldn't be read) see everything but can't change it.
 
-import { ChartScatter, Eye, FileDown, FileSpreadsheet, FileUp, NotebookPen, Printer, TriangleAlert } from "lucide-react";
+import { ChartScatter, Eye, FileDown, FileSpreadsheet, FileUp, Keyboard, NotebookPen, Printer, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { download } from "@/components/notes/transfer";
 import { isSheetFile } from "@/components/notes/useImporter";
 import { PageTopBar } from "@/components/page/PageTopBar";
+import { usePanes } from "@/components/shell/Panes";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
+import { useIsMac, usePhone } from "@/components/ui/useMediaQuery";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
+import { panesText } from "@/i18n/messages/panes";
 import { sheetText } from "@/i18n/messages/sheet";
 import type { AccessRole, Member, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -43,12 +46,21 @@ import { activeArea, createSheetStore, SheetStoreContext, useSheet, type SheetSt
 import { TableMenuItems } from "./table/TableMenuItems";
 import { TablePanel } from "./table/TablePanel";
 import { useTableDecor } from "./table/useTableDecor";
+import { PANEL_MIN_WIDTH, PANEL_WIDTH } from "./panelLayout";
 import { TemplatePicker } from "./TemplatePicker";
 import { useSheetSave } from "./useSheetSave";
 
-/** Editor width (px) from which a chart's or table's settings sit beside the grid instead of in a bottom sheet. */
-const PANEL_MIN_WIDTH = 900;
+/** The docked panel's two heights: part of the editor (at most DOCK_LOW_MAX px) or nearly all of it (keep in step with the classes below). */
+const DOCK_LOW = 0.58;
+const DOCK_LOW_MAX = 600;
+const DOCK_TALL = 0.88;
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/** While a file is dragged, only its type is known: could it be an Excel or CSV file (no type: maybe)? */
+const mightBeSheet = (data: DataTransfer) => {
+  const files = Array.from(data.items).filter((item) => item.kind === "file");
+  return files.length === 0 || files.some((item) => !item.type || /csv|tab-separated|excel|spreadsheet/.test(item.type));
+};
 
 /** A file name from the title: no characters file systems refuse. */
 const fileNameOf = (title: string) =>
@@ -61,7 +73,11 @@ const fileNameOf = (title: string) =>
 export function SheetEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const locale = useLocale();
   const t = useMessages(sheetText);
+  const shortcutsLabel = useMessages(panesText).shortcuts.open;
   const { pages, updatePage, userId, profile } = useWorkspace();
+  const { showShortcuts } = usePanes();
+  const mac = useIsMac();
+  const modKey = mac ? "⌘" : locale === "de" ? "Strg+" : "Ctrl+";
 
   // The stored content, read once (normalizing never throws; a bug while reading opens it read-only).
   const [start] = useState(() => {
@@ -127,12 +143,64 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     return () => ro.disconnect();
   }, []);
 
+  // The height of the row with the sheet tabs and the status bar, as --sheet-foot on the editor: the
+  // docked settings end above it (not on phones, where every row of the panel counts).
+  const footRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const foot = footRef.current;
+    const editor = bodyRef.current;
+    if (!foot || !editor) return;
+    const ro = new ResizeObserver(() => editor.style.setProperty("--sheet-foot", `${foot.offsetHeight}px`));
+    ro.observe(foot);
+    return () => ro.disconnect();
+  }, []);
+
   // The chart or smart table whose settings are open.
   const focus = useSheet(store, (s) => s.focus);
   const closePanel = useCallback(() => {
     store.setFocus(null);
     focusSheetGrid();
   }, [store]);
+  // The docked panel (narrow screens): about half the editor, or nearly all of it. Its handle
+  // switches between the two with a tap, or is dragged (down to the bottom closes the panel). On
+  // phones a chart's settings start tall: they show the chart themselves.
+  const phone = usePhone();
+  const [dockTall, setDockTall] = useState<boolean | null>(null);
+  const tall = dockTall ?? (focus?.kind === "chart" && phone);
+  const [dragH, setDragH] = useState<number | null>(null);
+  const dockDrag = useRef<{ id: number; startY: number; startH: number; max: number; room: number; moved: boolean } | null>(null);
+  const justDragged = useRef(false);
+  const startDockDrag = (e: React.PointerEvent<HTMLElement>) => {
+    justDragged.current = false;
+    const dock = e.currentTarget.parentElement;
+    const max = bodyRef.current?.clientHeight ?? 0;
+    if (!dock || !max || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    // Where the panel ends (above the tabs row, or the editor's bottom): its top may come up to 40 px below the editor's top.
+    const room = dock.offsetTop + dock.offsetHeight;
+    dockDrag.current = { id: e.pointerId, startY: e.clientY, startH: dock.getBoundingClientRect().height, max, room, moved: false };
+  };
+  const moveDockDrag = (e: React.PointerEvent<HTMLElement>) => {
+    const d = dockDrag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.abs(dy) < 6) return;
+    d.moved = true;
+    setDragH(Math.max(80, Math.min(d.room - 40, d.startH - dy)));
+  };
+  const endDockDrag = (e: React.PointerEvent<HTMLElement>) => {
+    const d = dockDrag.current;
+    if (!d || d.id !== e.pointerId) return;
+    dockDrag.current = null;
+    setDragH(null);
+    if (!d.moved || e.type === "pointercancel") return;
+    // The click that follows a drag doesn't toggle.
+    justDragged.current = true;
+    const h = d.startH - (e.clientY - d.startY);
+    if (h < d.max * 0.22) return closePanel();
+    setDockTall(Math.abs(h - d.max * DOCK_TALL) < Math.abs(h - Math.min(d.max * DOCK_LOW, DOCK_LOW_MAX)));
+  };
+
   const panel: ReactNode = focus ? (
     focus.kind === "chart" ? (
       <ChartPanel key={`chart:${focus.id}`} store={store} chartId={focus.id} onClose={closePanel} />
@@ -175,15 +243,22 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     return () => cancelAnimationFrame(frame);
   }, [typeOnOpen]);
 
+  // Saving, printing, a file or a note: what is still being typed in a cell counts, as in Excel (a
+  // formula with a mistake stays open with its message and is left out).
+  const commitTyping = useCallback(() => {
+    if (store.get().edit) store.commitEdit(null);
+  }, [store]);
+
   // "In Notiz einfügen": the selected cells (one cell: the block of data around it).
   const [embed, setEmbed] = useState<SheetEmbedItem | null>(null);
   const addRangeToNote = useCallback(() => {
+    commitTyping();
     const s = store.get();
     let area = activeArea(s.selection);
     const sheet = sheetById(s.workbook, s.sheetId);
     if (sheet && area.r0 === area.r1 && area.c0 === area.c1) area = currentRegion(sheet, area.r0, area.c0);
     setEmbed({ kind: "range", sheetId: s.sheetId, area });
-  }, [store]);
+  }, [store, commitTyping]);
 
   // The grid's parts from charts and smart tables.
   const { decorate, menu } = useTableDecor(store);
@@ -194,6 +269,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
 
   const fileName = fileNameOf(title) || fileNameOf(t.untitled);
   const exportXlsxFile = async () => {
+    commitTyping();
     blob.say(t.exporting, { mood: "idle", ms: 2500 });
     try {
       const { exportXlsx } = await import("@/sheet/io/xlsx");
@@ -206,6 +282,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     }
   };
   const exportCsvFile = () => {
+    commitTyping();
     try {
       const s = store.get();
       const sheet = sheetById(s.workbook, s.sheetId);
@@ -219,6 +296,10 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   };
 
   const fileRef = useRef<HTMLInputElement>(null);
+  // A file dragged over the editor: a hint says what dropping it does (dragover keeps coming while
+  // it is over the editor; the hint goes when it stops: the file left, or the drag was cancelled).
+  const [dropping, setDropping] = useState(false);
+  const dropTimer = useRef(0);
   const problemText = (p: ReadProblem) => (p === "tooBig" ? t.importTooBig : p === "oldXls" ? t.importOldXls : p === "empty" ? t.importEmpty : t.importFailed);
   const importFile = async (file: File) => {
     if (readOnly) return;
@@ -255,6 +336,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   };
 
   const printNow = async () => {
+    commitTyping();
     const s = store.get();
     const sheet = sheetById(s.workbook, s.sheetId);
     const ok = await printSheet({
@@ -280,8 +362,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
       const k = e.key.toLowerCase();
       if (k === "s") {
         e.preventDefault();
-        // Like Excel, what is being typed in a cell counts.
-        if (store.get().edit) store.commitEdit(null);
+        commitTyping();
         void keys.current.flush();
       } else if (k === "p") {
         e.preventDefault();
@@ -290,7 +371,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [store]);
+  }, [commitTyping]);
 
   const pageMenu = (close: () => void) => (
     <>
@@ -305,11 +386,15 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
           {t.importFile}
         </MenuItem>
       )}
-      <MenuItem icon={<Printer />} onSelect={() => (close(), void printNow())}>
+      <MenuItem icon={<Printer />} shortcut={`${modKey}P`} onSelect={() => (close(), void printNow())}>
         {t.print}
       </MenuItem>
       <MenuItem icon={<NotebookPen />} onSelect={() => (close(), addRangeToNote())}>
         {t.addToNote}
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem icon={<Keyboard />} shortcut={`${modKey}/`} onSelect={() => (close(), showShortcuts())}>
+        {shortcutsLabel}
       </MenuItem>
       <MenuSeparator />
     </>
@@ -337,15 +422,20 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
         ref={bodyRef}
         className="relative flex min-h-0 flex-1 border-t border-line bg-paper"
         data-sheet-editor=""
-        // An Excel or CSV file dropped on the spreadsheet comes in as new sheets (anything else is
-        // left to Blob's own drop handling, src/components/notes/FileDrop.tsx).
+        // An Excel or CSV file dropped on the spreadsheet comes in as new sheets (anything else, a
+        // picture say, is left to Blob's own drop handling and its hint, src/components/notes/FileDrop.tsx).
         onDragOver={(e) => {
-          if (!readOnly && e.dataTransfer.types.includes("Files")) {
+          if (!readOnly && e.dataTransfer.types.includes("Files") && mightBeSheet(e.dataTransfer)) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "copy";
+            setDropping(true);
+            window.clearTimeout(dropTimer.current);
+            dropTimer.current = window.setTimeout(() => setDropping(false), 250);
           }
         }}
         onDrop={(e) => {
+          window.clearTimeout(dropTimer.current);
+          setDropping(false);
           const file = Array.from(e.dataTransfer.files).find(isSheetFile);
           if (readOnly || !file) return;
           e.preventDefault();
@@ -388,21 +478,29 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
           </div>
 
           <div className="relative flex min-h-0 flex-1 flex-col">
-            {/* Viewers keep it too: finding, the function list (the toolbar leaves out what changes cells). */}
-            <Toolbar store={store} />
-            <FormulaBar store={store} />
+            {/* Two cards with a little room around them, like the rest of Blob; the grid below runs edge
+                to edge. Only a little at the sides: from about 1440 px the toolbar fits "Tabelle" and
+                "Diagramm" with their words, and every pixel counts there.
+                Viewers keep the toolbar too: finding, the function list (it leaves out what changes cells). */}
+            <div className="flex shrink-0 flex-col gap-1.5 px-1.5 pb-2 max-sm:gap-1 max-sm:px-2 max-sm:pb-1.5">
+              <Toolbar store={store} />
+              <FormulaBar store={store} />
+            </div>
             {/* Its own stacking context: the grid's sticky headers stay under the templates and panels. */}
-            <div className="relative isolate min-h-0 flex-1">
+            <div className="relative isolate min-h-0 flex-1 border-t border-line">
               <div className="absolute inset-0">
                 <Grid store={store} decorate={decorate} overlay={overlay} contextMenu={contextMenu} />
               </div>
             </div>
-            {/* One row, also on phones: the tabs take what the status bar (its numbers scroll) leaves. */}
-            <div className="flex shrink-0 items-stretch border-t border-line bg-surface">
-              <div className="min-w-0 flex-1">
+            {/* One row, also on phones: the tabs keep room for their list button, + and one tab; the
+                status bar gets what its figures need of the rest. Settings docked at the bottom end
+                above this row (--sheet-foot), so Summe and Mittelwert stay in sight. */}
+            <div ref={footRef} className="flex shrink-0 items-stretch border-t border-line bg-surface">
+              <div className="min-w-[9rem] flex-1">
                 <SheetTabs store={store} />
               </div>
-              <div className="flex min-w-0 max-w-[62%] shrink-0 justify-end">
+              {/* The status bar measures its room and drops whole figures that don't fit. */}
+              <div className="flex min-w-0 justify-end">
                 <StatusBar store={store} />
               </div>
             </div>
@@ -416,10 +514,32 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
         </section>
 
         {wide && panel && (
-          <aside className="flex w-[352px] shrink-0 flex-col border-l border-line bg-surface" aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}>
+          <aside style={{ width: PANEL_WIDTH }} className="flex shrink-0 flex-col border-l border-line bg-surface" aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}>
             {panel}
           </aside>
         )}
+
+        <AnimatePresence>
+          {dropping && (
+            <motion.div
+              key="drop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              role="status"
+              className="pointer-events-none absolute inset-0 z-50 grid place-items-center bg-paper/55 p-6 backdrop-blur-[2px]"
+            >
+              <div className="flex max-w-[340px] flex-col items-center rounded-2xl border-2 border-dashed border-blob/60 bg-raised px-8 py-7 text-center shadow-pop">
+                <span className="grid size-11 place-items-center rounded-xl bg-blob-soft text-blob-ink">
+                  <FileSpreadsheet className="size-5" />
+                </span>
+                <span className="mt-3 font-display text-[17px] font-semibold tracking-[-0.01em] text-ink">{t.dropHere}</span>
+                <span className="mt-1 text-[13px] text-ink-3">{t.dropHint}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Phones and tablets held upright: the settings over the lower part of the editor, not
             modal, so the chart above changes as you go and cells can still be picked for its data. */}
@@ -432,6 +552,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
               exit={{ y: "100%", transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
               transition={{ type: "spring", stiffness: 420, damping: 40 }}
               role="region"
+              data-sheet-dock=""
               aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -439,9 +560,32 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
                   closePanel();
                 }
               }}
-              className="absolute inset-x-0 bottom-0 z-40 flex h-[min(58%,600px)] flex-col overflow-hidden rounded-t-2xl border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_-12px_rgb(28_27_24/0.28)]"
+              style={dragH !== null ? { height: dragH } : undefined}
+              className={cn(
+                "absolute inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t border-line bg-surface shadow-[0_-10px_30px_-12px_rgb(28_27_24/0.28)]",
+                // Phones: over the tabs and status bar, to the screen's bottom edge. Larger: above them.
+                phone ? "bottom-0 pb-[env(safe-area-inset-bottom)]" : "bottom-[var(--sheet-foot,0px)] max-h-[calc(100%_-_var(--sheet-foot,0px))]",
+                dragH === null && "transition-[height] duration-200 ease-out",
+                dragH === null && (tall ? "h-[88%]" : "h-[min(58%,600px)]"),
+              )}
             >
-              <span aria-hidden className="mx-auto mt-1.5 h-1 w-10 shrink-0 rounded-full bg-line-2" />
+              <button
+                type="button"
+                aria-label={tall ? t.dockSmaller : t.dockBigger}
+                aria-expanded={tall}
+                title={tall ? t.dockSmaller : t.dockBigger}
+                onClick={() => {
+                  if (justDragged.current) justDragged.current = false;
+                  else setDockTall(!tall);
+                }}
+                onPointerDown={startDockDrag}
+                onPointerMove={moveDockDrag}
+                onPointerUp={endDockDrag}
+                onPointerCancel={endDockDrag}
+                className="mx-auto flex h-5 w-16 shrink-0 cursor-ns-resize touch-none items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blob [@media(hover:none)]:h-7 [@media(hover:none)]:w-20"
+              >
+                <span aria-hidden className="h-1 w-10 rounded-full bg-line-2" />
+              </button>
               <div className="flex min-h-0 flex-1 flex-col">{panel}</div>
             </motion.div>
           )}

@@ -10,6 +10,7 @@ import {
   copyArea,
   deleteCols,
   deleteRows,
+  fillArea,
   getCell,
   insertCols,
   insertRows,
@@ -22,7 +23,7 @@ import {
   sheetById,
 } from "@/sheet/ops";
 import { DEFAULT_COL_W, type Area, type Cell, type Pos, type Sheet } from "@/sheet/types";
-import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, typedCell, type SheetStore } from "../store";
+import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, tablesAfterPaste, typedCell, type SheetStore } from "../store";
 import { BASE_FONT, CELL_PAD, shownText } from "./cellLook";
 import { textWidth } from "./measure";
 import { currentRegion } from "./navigation";
@@ -72,7 +73,25 @@ export function fillFrom(store: SheetStore, dir: "down" | "right") {
     to = { ...a, c0: a.c0 + 1 };
   }
   const labels = labelsOf(store);
-  store.apply(dir === "down" ? labels.fillDown : labels.fillRight, (wb, calc) => pasteClip(wb, calc, s.sheetId, to, copyArea(wb, s.sheetId, from), { mode: "all" }));
+  store.apply(dir === "down" ? labels.fillDown : labels.fillRight, (wb, calc) => {
+    const next = pasteClip(wb, calc, s.sheetId, to, copyArea(wb, s.sheetId, from), { mode: "all" });
+    // Filled right under (or beside) a smart table: it grows over the new cells, like typing there.
+    return next === wb ? wb : tablesAfterPaste(next, s.sheetId, to, s.locale);
+  });
+}
+
+/**
+ * The fill handle (dragged, or double-clicked to fill down beside the data): `from` continued over
+ * `to` (series, formulas, looks), which ends up selected. A smart table right above or beside
+ * grows over the new cells, in the same undo step.
+ */
+export function fillTo(store: SheetStore, from: Area, to: Area) {
+  const s = store.get();
+  store.apply(labelsOf(store).fill, (wb, calc) => {
+    const next = fillArea(wb, calc, s.sheetId, from, to, s.locale);
+    return next === wb ? wb : tablesAfterPaste(next, s.sheetId, to, s.locale);
+  });
+  store.select({ anchor: { row: to.r0, col: to.c0 }, focus: { row: to.r1, col: to.c1 }, extra: [] });
 }
 
 /** Delete/Backspace: clear what is in the selected cells (their look stays). */
@@ -93,11 +112,15 @@ export function fillSelectionWith(store: SheetStore, text: string): boolean {
   const at: Pos = { row: e.row, col: e.col };
   const parsed = parseTyped(text, s.locale, getCell(s.workbook, e.sheetId, at.row, at.col));
   if (parsed.error) return store.commitEdit(null);
-  const sel = s.sheetId === e.sheetId ? s.selection : singleCell(at);
+  // The cells selected when typing began (pointing at cells for a formula moved the selection since).
+  const sel = store.editSelection() ?? singleCell(at);
+  const areas = selectionAreas(sel);
+  // One cell: that's typing without moving on (a smart table continues its formula column, grows…).
+  if (areas.length === 1 && areas[0].r0 === areas[0].r1 && areas[0].c0 === areas[0].c1) return store.commitEdit(null);
   store.cancelEdit();
   store.apply(labelsOf(store).fillSelection, (wb) => {
     const updates: { row: number; col: number; cell: Cell | null }[] = [];
-    for (const a of selectionAreas(sel)) {
+    for (const a of areas) {
       for (let r = a.r0; r <= a.r1; r++) {
         for (let c = a.c0; c <= a.c1; c++) {
           const f = parsed.cell.f;
@@ -106,7 +129,8 @@ export function fillSelectionWith(store: SheetStore, text: string): boolean {
         }
       }
     }
-    return setCells(wb, e.sheetId, updates);
+    const next = setCells(wb, e.sheetId, updates);
+    return next === wb ? wb : tablesAfterPaste(next, e.sheetId, areas, s.locale);
   });
   store.select(sel);
   return true;
@@ -122,7 +146,7 @@ export function insertAtSelection(store: SheetStore, kind: "rows" | "cols", afte
     store.apply(labels.insertRows, (wb) => insertRows(wb, s.sheetId, after ? a.r1 + 1 : a.r0, count));
   } else {
     const count = a.c1 - a.c0 + 1;
-    store.apply(labels.insertCols, (wb) => insertCols(wb, s.sheetId, after ? a.c1 + 1 : a.c0, count));
+    store.apply(labels.insertCols, (wb) => insertCols(wb, s.sheetId, after ? a.c1 + 1 : a.c0, count, s.locale));
   }
 }
 

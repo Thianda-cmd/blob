@@ -309,7 +309,7 @@ export function SplitButton({
   );
 }
 
-export const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line" />;
+export const Divider = () => <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-line" />;
 
 /** The title row of a panel opened from "Mehr", with a way back. */
 export function PanelHeader({ title, onBack, backLabel }: { title: string; onBack?: () => void; backLabel: string }) {

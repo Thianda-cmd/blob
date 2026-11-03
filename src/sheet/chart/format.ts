@@ -101,6 +101,36 @@ export function formatSignificant(v: number, locale: Locale, digits: number): st
   return s === "0" ? "0" : sign + localize(s, locale);
 }
 
+/** R² counts as exactly 1 within this distance: a perfect line's 1 − SSE/SST lands a few ulps off. */
+export const R2_ONE_TOLERANCE = 5e-13;
+
+/**
+ * The decimals R² needs so that a value below 1 doesn't round up to 1: `min` normally, more for
+ * 0,99997 (5) or 0,999996 (6), at most `max`. A value that is 1 up to rounding noise needs `min`.
+ */
+export function r2Decimals(r2: number, min = 4, max = 6): number {
+  if (!(r2 < 1 - R2_ONE_TOLERANCE)) return min;
+  for (let d = min; d < max; d++) if (Number(toFixedDecimal(r2, d)) < 1) return d;
+  return max;
+}
+
+/**
+ * R² as the chart label, the chart panel and notes show it. Excel's label rounds 0,99997 to
+ * "R² = 1", but students judge a calibration line by R² ≥ 0,999, so "1" appears only when R² is 1
+ * up to rounding noise. Otherwise `min` decimals with trailing zeros dropped like Excel's label
+ * ("0,9987", "0,6"), more when those would round up to 1 ("0,99997", "0,999996"), and when even
+ * `max` decimals would, the last one is cut instead of rounded ("0,999999"): never a false 1.
+ */
+export function formatR2(r2: number, locale: Locale, min = 4, max = 6): string {
+  if (Number.isNaN(r2)) return locale === "de" ? "#NV" : "#N/A";
+  if (!Number.isFinite(r2)) return r2 > 0 ? "∞" : "-∞";
+  if (Math.abs(r2 - 1) <= R2_ONE_TOLERANCE) return "1";
+  const d = r2Decimals(r2, min, max);
+  let s = toFixedDecimal(r2, d);
+  if (r2 < 1 && Number(s) >= 1) s = (Math.floor(r2 * 10 ** d) / 10 ** d).toFixed(d);
+  return localize(trimZeros(s), locale);
+}
+
 /** Thousands with "." (German) or "," (English) in the integer part of a plain number string. */
 function group(s: string, locale: Locale): string {
   const [int, frac] = s.split(".");

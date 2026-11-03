@@ -33,9 +33,24 @@ import { previewValue, resolveName, selectionName } from "@/components/sheet/chr
 import { browseFunctions } from "@/components/sheet/chrome/FunctionBrowser";
 import { formatFor, formatId } from "@/components/sheet/chrome/NumberFormatMenu";
 import { sheetHasContent, sheetNameProblem } from "@/components/sheet/chrome/SheetTabs";
-import { selectionStats } from "@/components/sheet/chrome/StatusBar";
-import { toolbarLayout } from "@/components/sheet/chrome/Toolbar";
+import { fitFigures, selectionStats, type FigureKey } from "@/components/sheet/chrome/StatusBar";
+import { labelRoom, toolbarLayout } from "@/components/sheet/chrome/Toolbar";
+import { SHEET_EVENT, type SheetEventDetail } from "@/components/sheet/events";
+import { fillFrom, fillSelectionWith, fillTo } from "@/components/sheet/grid/actions";
+import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
+import { formulaArgument, formulaSuggestions } from "@/components/sheet/grid/FormulaHints";
+import { handleGridKey, type GridKeyContext } from "@/components/sheet/grid/keys";
+import { cycleReference, formulaTokens, insertSelectionRef, pointAt, pointing, refFrames } from "@/components/sheet/grid/point";
 import { createSheetStore, type SheetStore } from "@/components/sheet/store";
+import { makeTable, setTableFilter } from "@/sheet/table/model";
+
+// Helpers that wrap other modules report a failure on the console; in normal use nothing may be
+// reported. Every console.error from here on is collected and checked at the end.
+const reported: string[] = [];
+const consoleError = console.error;
+console.error = (...args: unknown[]) => {
+  reported.push(args.map((a) => (a instanceof Error ? a.message : String(a))).join(" "));
+};
 
 // ----------------------------------------------------------------------------------------------
 // Tiny test kit
@@ -674,12 +689,39 @@ section("sheet names");
 // ==============================================================================================
 section("toolbar layout");
 {
-  const all = toolbarLayout(1600, false);
-  eq("wide: everything, with words on Tabelle and Diagramm", [all.shown.size, all.labels, all.compact], [16, true, false]);
-  const laptop = toolbarLayout(1264, false);
-  eq("1280 px laptop: everything", laptop.shown.size, 16);
-  const tablet = toolbarLayout(1264, true);
-  eq("Galaxy Tab landscape (touch): everything", tablet.shown.size, 16);
+  // Widths are the bar's inside, what the toolbar measures (1440 px with Blob's sidebar: 1148,
+  // after the 6 px inset of the toolbar card on each side).
+  // The words "Tabelle" + "Diagramm" are about 106 px in the app's font, "Table" + "Chart" 67.
+  const de = labelRoom(106);
+  const en = labelRoom(67);
+  const GROUPS = 15;
+  const all = toolbarLayout(1600, false, de);
+  eq("wide: everything, with words on Tabelle and Diagramm", [all.shown.size, all.labels, all.compact], [GROUPS, true, false]);
+  const desk = toolbarLayout(1148, false, de);
+  eq("1440 px with the sidebar, no side panel: everything, with words", [desk.shown.size, desk.labels], [GROUPS, true]);
+  eq("…in English too", toolbarLayout(1148, false, en).labels, true);
+  const panel = toolbarLayout(796, false, de);
+  eq("1440 px with a side panel: icons only, some in Mehr", [panel.labels, panel.shown.size < GROUPS], [false, true]);
+  check("the function library isn't on the bar (the formula bar's fx is right below)", !all.shown.has("fx" as never));
+  const laptop = toolbarLayout(1252, false, de);
+  eq("1280 px laptop: everything", laptop.shown.size, GROUPS);
+  const tablet = toolbarLayout(1252, true, de);
+  eq("Galaxy Tab landscape (touch): everything", tablet.shown.size, GROUPS);
+  // Narrowing the bar: the words go first, then groups move into "Mehr".
+  let wordsOnlyWithAll = true;
+  let lastWords = Infinity;
+  let firstAll = Infinity;
+  for (let w = 300; w <= 1700; w += 2) {
+    const l = toolbarLayout(w, false, de);
+    if (l.labels && l.shown.size < GROUPS) wordsOnlyWithAll = false;
+    if (l.labels) lastWords = Math.min(lastWords, w);
+    if (l.shown.size === GROUPS) firstAll = Math.min(firstAll, w);
+  }
+  check("words only when every group is on the bar", wordsOnlyWithAll);
+  check("narrowing: words go before any group moves into Mehr", lastWords > firstAll, `words from ${lastWords}, all groups from ${firstAll}`);
+  // (Until the last group fits, the bar keeps room for the "Mehr" button: 7 px of slack.)
+  check("…by about the room the words take", lastWords - firstAll >= de - 8 && lastWords - firstAll <= de, `${lastWords - firstAll} for ${de}`);
+  check("unmeasured words: a safe guess", labelRoom(16 * 8) >= de);
   const narrow = toolbarLayout(784, false);
   check("narrow: the most needed stay", ["history", "sum", "table", "chart", "format", "bold"].every((g) => narrow.shown.has(g as never)));
   check("narrow: some go into Mehr", narrow.shown.size < 16);
@@ -719,6 +761,323 @@ section("format previews");
   eq("unit", formatValue(12.5, { kind: "number", decimals: 1, unit: "mg/L" }, "de"), "12,5\u202Fmg/L");
   check("an error stays an error", isError(createCalc(book({ A1: "=1/0" })).value("s1", 0, 0)));
 }
+
+// ==============================================================================================
+section("status bar: which figures fit");
+{
+  const W = (key: FigureKey, full: number, short: number) => ({ key, full, short });
+  // Widths like the real bar's at 12 px (Summe 31,565 · Mittelwert 2,630416667 · …).
+  const six = [W("sum", 99, 62), W("average", 149, 100), W("count", 70, 40), W("min", 46, 46), W("max", 56, 56), W("stdev", 138, 100)];
+  const fit = (room: number, widths = six) => {
+    const f = fitFigures(widths, room);
+    return { keys: [...f.keys].sort(), short: f.short };
+  };
+  const sorted = (...k: FigureKey[]) => [...k].sort();
+  eq("room for all: all six, with words", fit(568), { keys: sorted("sum", "average", "count", "min", "max", "stdev"), short: false });
+  eq("a pixel less: Min and Max step aside together", fit(567), { keys: sorted("sum", "average", "count", "stdev"), short: false });
+  eq("no room for Stdabw.: Min and Max still fit", fit(461), { keys: sorted("sum", "average", "count", "min", "max"), short: false });
+  eq("the main three with words", fit(330), { keys: sorted("sum", "average", "count"), short: false });
+  eq("short of room: Σ Ø n keep all three", fit(300), { keys: sorted("sum", "average", "count"), short: true });
+  eq("a phone: signs when they show more of the three", fit(170), { keys: sorted("sum", "average"), short: true });
+  eq("words when signs show no more", fit(120), { keys: sorted("sum"), short: false });
+  eq("no room at all: nothing (never a cut figure)", fit(40), { keys: [], short: false });
+  eq("only a count (cells without numbers)", fit(50, [W("count", 70, 40)]), { keys: ["count"], short: true });
+  eq("half a pixel of rounding still fits", fit(567.6), { keys: sorted("sum", "average", "count", "min", "max", "stdev"), short: false });
+  // Over many rooms: never wider than the room, Anzahl never without Summe and Mittelwert, Min and Max together.
+  let fits = true;
+  let order = true;
+  let pairs = true;
+  for (let room = 0; room <= 700; room += 3) {
+    const f = fitFigures(six, room);
+    const used = [...f.keys].reduce((sum, k, i) => sum + (f.short ? six.find((x) => x.key === k)!.short : six.find((x) => x.key === k)!.full) + (i ? 2 : 0), 0);
+    if (used > room + 0.5) fits = false;
+    if ((f.keys.has("count") && !(f.keys.has("sum") && f.keys.has("average"))) || (f.keys.has("average") && !f.keys.has("sum"))) order = false;
+    if (f.keys.has("min") !== f.keys.has("max")) pairs = false;
+  }
+  check("never wider than the room", fits);
+  check("Summe, Mittelwert, Anzahl stay longest, in that order", order);
+  check("Min and Max come and go together", pairs);
+}
+
+// ==============================================================================================
+// A spreadsheet with a smart table over A1:B4: header "Konz" | "E", three rows of numbers.
+function tableStore(locale: Locale = "de") {
+  const store = storeOf({ A1: locale === "de" ? "Konz" : "Conc", B1: "E", A2: 0, B2: 0.002, A3: 2, B3: 0.105, A4: 4, B4: 0.209 }, locale);
+  store.apply("table", (wb, calc) => {
+    const made = makeTable(wb, calc, "s1", { r0: 0, c0: 0, r1: 3, c1: 1 }, locale);
+    return "error" in made ? wb : made.wb;
+  });
+  return store;
+}
+const tableArea = (store: SheetStore) => {
+  const a = store.get().workbook.tables[0]?.area;
+  return a ? `${a.r0},${a.c0}:${a.r1},${a.c1}` : null;
+};
+
+section("pasting text: numbers in the language they are written in");
+{
+  const de = storeOf({}, "de");
+  selectA1(de, "A1");
+  pasteData(de, { text: "Zeit\tOD600\r\n0\t0.052\r\n30\t0.123\r\n" }, "all");
+  eq("English lab values pasted by a German user keep their value", [valueOf(de, "A1"), valueOf(de, "B2"), valueOf(de, "A3"), valueOf(de, "B3")], ["Zeit", 0.052, 30, 0.123]);
+  const one = storeOf({}, "de");
+  selectA1(one, "C3");
+  pasteData(one, { text: "0.123" }, "all");
+  eq("…also a single value", valueOf(one, "C3"), 0.123);
+  const own = storeOf({}, "de");
+  selectA1(own, "A1");
+  pasteData(own, { text: "1,5\t2,25\n3\t0,5" }, "all");
+  eq("German numbers stay German", [valueOf(own, "A1"), valueOf(own, "B1"), valueOf(own, "A2"), valueOf(own, "B2")], [1.5, 2.25, 3, 0.5]);
+  const thousands = storeOf({}, "de");
+  selectA1(thousands, "A1");
+  pasteData(thousands, { text: "1.234\t5" }, "all");
+  eq("data that doesn't tell is read like typing (1.234 is a thousand in German)", valueOf(thousands, "A1"), 1234);
+  const en = storeOf({}, "en");
+  selectA1(en, "A1");
+  pasteData(en, { text: "0,5\t1,25\n2,75\t3" }, "all");
+  eq("German values pasted by an English user keep their value", [valueOf(en, "A1"), valueOf(en, "B1"), valueOf(en, "A2")], [0.5, 1.25, 2.75]);
+  const html = storeOf({}, "de");
+  selectA1(html, "A1");
+  pasteData(html, { text: "", html: "<table><tr><td>Probe</td><td>Wert</td></tr><tr><td>1</td><td>0.25</td></tr><tr><td>2</td><td>0.75</td></tr></table>" }, "all");
+  eq("an HTML table (Word, a web page) too", [valueOf(html, "A1"), valueOf(html, "B2"), valueOf(html, "B3")], ["Probe", 0.25, 0.75]);
+}
+
+section("smart tables grow when pasting and filling below them");
+{
+  const typed = tableStore();
+  typed.input(pos("A5"), "6");
+  eq("typing right below grows the table (as before)", tableArea(typed), "0,0:4,1");
+
+  const text = tableStore();
+  selectA1(text, "A5");
+  pasteData(text, { text: "6\t0.311\n8\t0.418" }, "all");
+  eq("text from another program pasted below: the table grows", tableArea(text), "0,0:5,1");
+  eq("…with the values read right", [valueOf(text, "B5"), valueOf(text, "B6")], [0.311, 0.418]);
+  eq("…in one undo step called Einfügen", text.get().undoLabel, "Einfügen");
+  text.undo();
+  eq("undo takes back the paste and the growing together", [tableArea(text), valueOf(text, "A5")], ["0,0:3,1", null]);
+
+  const clip = tableStore();
+  selectA1(clip, "A3:B4");
+  const copied = copySelection(clip, false);
+  selectA1(clip, "A5");
+  pasteData(clip, { text: copied.text, html: copied.html }, "all");
+  eq("Blob's own copy pasted below: the table grows", tableArea(clip), "0,0:5,1");
+  eq("…with the copied values", [valueOf(clip, "A5"), valueOf(clip, "B6")], [2, 0.209]);
+
+  const values = tableStore();
+  selectA1(values, "A3:B4");
+  const copiedValues = copySelection(values, false);
+  selectA1(values, "A5");
+  pasteData(values, { text: copiedValues.text }, "values");
+  eq("…also pasting values only", tableArea(values), "0,0:5,1");
+
+  const handle = tableStore();
+  fillTo(handle, { r0: 2, c0: 0, r1: 3, c1: 0 }, { r0: 2, c0: 0, r1: 5, c1: 0 });
+  eq("the fill handle continues the series below the table", [valueOf(handle, "A5"), valueOf(handle, "A6")], [6, 8]);
+  eq("…and the table grows over it", tableArea(handle), "0,0:5,1");
+  eq("…in one undo step", handle.get().undoLabel, "Ausfüllen");
+  handle.undo();
+  eq("…which undo takes back as one", [tableArea(handle), valueOf(handle, "A5")], ["0,0:3,1", null]);
+
+  const down = tableStore();
+  selectA1(down, "A4:B6");
+  fillFrom(down, "down");
+  eq("Ctrl+D below the table: it grows", [tableArea(down), valueOf(down, "B6")], ["0,0:5,1", 0.209]);
+
+  const right = tableStore();
+  right.input(pos("C2"), "1");
+  eq("typing beside the table grows it by a column (German name)", [tableArea(right), valueOf(right, "C1")], ["0,0:3,2", "Spalte3"]);
+  const rightEn = tableStore("en");
+  rightEn.input(pos("C2"), "1");
+  eq("…named in the user's language (English)", [tableArea(rightEn), valueOf(rightEn, "C1")], ["0,0:3,2", "Column3"]);
+
+  const enter = tableStore();
+  selectA1(enter, "A5:A6");
+  enter.startEdit({ via: "cell", replace: true, text: "10" });
+  fillSelectionWith(enter, "10");
+  eq("Ctrl+Enter into cells below the table: it grows", [tableArea(enter), valueOf(enter, "A5"), valueOf(enter, "A6")], ["0,0:5,1", 10, 10]);
+
+  const single = tableStore();
+  selectA1(single, "A5");
+  single.startEdit({ via: "cell", replace: true, text: "6" });
+  fillSelectionWith(single, "6");
+  eq("Ctrl+Enter in one cell is typing without moving on", [tableArea(single), valueOf(single, "A5"), single.get().selection.anchor], ["0,0:4,1", 6, { row: 4, col: 0 }]);
+
+  const far = tableStore();
+  selectA1(far, "A9");
+  pasteData(far, { text: "6\t0.311" }, "all");
+  eq("pasting far below leaves the table alone", tableArea(far), "0,0:3,1");
+  const plain = storeOf({ A1: 1 });
+  selectA1(plain, "A2");
+  pasteData(plain, { text: "2\n3" }, "all");
+  eq("no table: pasting is just pasting", [valueOf(plain, "A2"), valueOf(plain, "A3"), plain.get().workbook.tables.length], [2, 3, 0]);
+}
+
+section("Blob's own copy between two spreadsheets");
+{
+  const x = createSheetStore({ pageId: "page-x", workbook: book({ A1: { v: "Probe", s: { bold: true } }, A2: 2, B2: "=A2*10" }), locale: "de", readOnly: false });
+  const y = createSheetStore({ pageId: "page-y", workbook: book({ A1: 7 }), locale: "de", readOnly: false });
+  selectA1(x, "A1:B2");
+  const copied = copySelection(x, false);
+  selectA1(y, "C5");
+  pasteData(y, { text: copied.text, html: copied.html }, "all");
+  eq("formulas come along and move like within a sheet", [cellOf(y, "D6")?.f, valueOf(y, "D6")], ["C6*10", 20]);
+  eq("looks come along", cellOf(y, "C5")?.s, { bold: true });
+  const z = createSheetStore({ pageId: "page-z", workbook: book(), locale: "de", readOnly: false });
+  selectA1(z, "A1");
+  pasteData(z, { text: copied.text, html: copied.html }, "values");
+  eq("as values: the shown values", [valueOf(z, "A2"), cellOf(z, "B2")], [2, { v: 20 }]);
+  const cut = createSheetStore({ pageId: "page-c", workbook: book({ A1: 5 }), locale: "de", readOnly: false });
+  selectA1(cut, "A1");
+  const moved = copySelection(cut, true);
+  const other = createSheetStore({ pageId: "page-o", workbook: book(), locale: "de", readOnly: false });
+  selectA1(other, "B2");
+  pasteData(other, { text: moved.text }, "all");
+  eq("a cut pasted into another spreadsheet copies (the first one keeps its cells)", [valueOf(other, "B2"), valueOf(cut, "A1")], [5, 5]);
+}
+
+section("Ctrl+Enter fills the cells selected when typing began");
+{
+  const s = storeOf({ A2: 1, A3: 2, A4: 3 });
+  selectA1(s, "B2:B4");
+  s.startEdit({ via: "cell", replace: true, text: "=" });
+  check("pointing", pointing(s));
+  pointAt(s, pos("A2"), pos("A2"));
+  eq("pointing put the reference in and moved the selection", [editOf(s), s.get().selection.anchor], ["=A2|", { row: 1, col: 0 }]);
+  s.updateEdit("=A2*2", 5);
+  eq("editSelection is still where typing began", s.editSelection(), { anchor: { row: 1, col: 1 }, focus: { row: 3, col: 1 }, extra: [] });
+  fillSelectionWith(s, "=A2*2");
+  eq("the selected cells get the formula, shifted per cell", [valueOf(s, "B2"), valueOf(s, "B3"), valueOf(s, "B4")], [2, 4, 6]);
+  eq("the cell pointed at keeps its value (no formula pointing at itself)", cellOf(s, "A2"), { v: 1 });
+  eq("not editing: no edit selection", s.editSelection(), null);
+}
+
+section("Ctrl+H opens find with the replace row");
+{
+  const g = globalThis as unknown as { window?: EventTarget };
+  if (!g.window) g.window = new EventTarget();
+  const seen: string[] = [];
+  g.window.addEventListener(SHEET_EVENT, (e) => seen.push((e as CustomEvent<SheetEventDetail>).detail.open));
+  const store = storeOf({ A1: 1 });
+  const ctx = { store, layout: null, view: { w: 800, h: 600 }, typeInto() {}, prepareClipboard() {}, openMenu() {}, openChooser() {}, openDecor() {}, reveal() {} } as unknown as GridKeyContext;
+  const press = (key: string, mods: { ctrl?: boolean; meta?: boolean; alt?: boolean; shift?: boolean; code?: string } = {}) => {
+    let stopped = false;
+    handleGridKey(
+      {
+        key,
+        code: mods.code ?? `Key${key.toUpperCase()}`,
+        keyCode: 0,
+        ctrlKey: !!mods.ctrl,
+        metaKey: !!mods.meta,
+        altKey: !!mods.alt,
+        shiftKey: !!mods.shift,
+        preventDefault() {
+          stopped = true;
+        },
+        stopPropagation() {},
+      } as never,
+      ctx,
+    );
+    return stopped;
+  };
+  check("Ctrl+F is used", press("f", { ctrl: true }));
+  check("Ctrl+H is used", press("h", { ctrl: true }));
+  check("⌘⌥F is used (⌥ makes the key ƒ)", press("ƒ", { meta: true, alt: true, code: "KeyF" }));
+  eq("Ctrl+F finds, Ctrl+H and ⌘⌥F replace", seen, ["find", "replace", "replace"]);
+}
+
+section("formula helpers: nothing breaks or is reported while typing");
+{
+  const formulas = [
+    "=MITTELWERT(B2:B7)",
+    "=SUMME(A1;A2;$B$3)*2",
+    "=WENN(A1>0;\"ja\";\"nein\")",
+    "=STEIGUNG(B2:B7;A2:A7)",
+    "=SVERWEIS(A1;'Blatt 2'!A:B;2;FALSCH)",
+    "=(A1+B1)/C1^2%",
+    "={1;2;3}",
+    "=RUNDEN(MITTELWERT(B2:B4);3)&\" mg/L\"",
+    "=A1:A3 B2",
+    "=#BEZUG!+1",
+    "=\"offen",
+    "=SUMME((",
+    "=))",
+  ];
+  const en = ["=AVERAGE(B2:B7)", "=SUM(A1,A2,$B$3)*2", "=IF(A1>0,\"yes\",\"no\")", "=VLOOKUP(A1,'Sheet 2'!A:B,2,FALSE)"];
+  const wb = book({ A1: 1, B2: 2 });
+  let thrown = 0;
+  const tryIt = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch {
+      thrown++;
+    }
+  };
+  let calls = 0;
+  for (const [list, locale] of [
+    [formulas, "de"],
+    [en, "en"],
+  ] as const) {
+    for (const full of list) {
+      for (let n = 1; n <= full.length; n++) {
+        const text = full.slice(0, n);
+        for (let caret = 0; caret <= text.length; caret++) {
+          calls++;
+          tryIt(() => {
+            const tok = formulaTokens(text, locale);
+            refFrames(wb, "s1", "s1", tok);
+            formulaSuggestions(text, caret, locale);
+            formulaArgument(text, caret, locale);
+            cycleReference(text, caret, locale);
+            wantsRef(text, caret, locale);
+            insertRef(text, caret, "B2", locale);
+            if (tok) refColors(tokenizeFormula(text.slice(1), locale));
+          });
+        }
+      }
+    }
+  }
+  eq(`${calls} half-typed formulas and carets: nothing throws`, thrown, 0);
+  // Pointing at cells on every prefix, through the store.
+  const s = storeOf({ A1: 1, A2: 2, B1: 3 });
+  let pointErrors = 0;
+  for (const full of formulas) {
+    for (let n = 1; n <= full.length; n++) {
+      s.select(pos("C5"));
+      s.startEdit({ via: "cell", replace: true, text: full.slice(0, n) });
+      try {
+        if (pointing(s)) pointAt(s, pos("A1"), pos("A2"));
+        insertSelectionRef(s);
+      } catch {
+        pointErrors++;
+      }
+      s.cancelEdit();
+    }
+  }
+  eq("pointing on every half-typed formula: nothing throws", pointErrors, 0);
+}
+
+section("smart table filters, undo after someone else's change, copying: nothing reported");
+{
+  const store = tableStore();
+  const t = store.get().workbook.tables[0];
+  store.apply("filter", (wb) => setTableFilter(wb, t.id, t.columns[0].id, { kind: "number", op: "gt", a: 1, b: null }));
+  eq("a filter hides its rows in the grid's eyes", [store.isRowHidden("s1", 1), store.isRowHidden("s1", 2)], [true, false]);
+  selectA1(store, "A1:B4");
+  copySelection(store, false);
+  // Someone else changes another cell; undoing mine keeps theirs.
+  store.input(pos("D1"), "mine");
+  const theirs = store.get().workbook;
+  const sheet = theirs.sheets[0];
+  store.replaceRemote({ ...theirs, sheets: [{ ...sheet, cells: { ...sheet.cells, "9,5": { v: "theirs" } } }] });
+  store.undo();
+  eq("undo after a remote change: mine goes, theirs stays", [valueOf(store, "D1"), valueOf(store, "F10")], [null, "theirs"]);
+}
+
+console.error = consoleError;
+section("nothing reported");
+eq("no helper reported a failure in normal use", reported, []);
 
 // ----------------------------------------------------------------------------------------------
 

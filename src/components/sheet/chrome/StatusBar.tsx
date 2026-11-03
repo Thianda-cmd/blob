@@ -3,12 +3,14 @@
 // The status bar under the sheet: for several selected cells the sum, mean, count, minimum,
 // maximum and standard deviation of their numbers (a click copies one), for a single cell its
 // note or what its error means; what typing is doing right now (Eingeben, Bearbeiten, Zeigen);
-// and the zoom.
+// and the zoom. When the figures don't all fit (a side panel is open, a phone), the less needed
+// ones step aside whole, never cut: Summe, Mittelwert and Anzahl stay longest, with short signs
+// (Σ, Ø, n) before one of them has to go.
 //
 // CONTRACT: <StatusBar store={store} /> is placed by SheetEditor. Implemented by the editor chrome.
 
 import { Check, Lock, Minus, Plus, StickyNote, TriangleAlert } from "lucide-react";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
 import { Popover } from "@/components/ui/Menu";
 import { useMessages } from "@/i18n/client";
@@ -95,15 +97,76 @@ function statFormat(fmt: NumberFormat | undefined): NumberFormat | undefined {
 
 const ZOOMS = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
-function Figure({ label, tip, value, onCopy, copied }: { label: string; tip: string; value: string; onCopy: () => void; copied: boolean }) {
+export type FigureKey = "sum" | "average" | "count" | "min" | "max" | "stdev";
+
+/** Which figures stay longest when room is short: the first three one by one, then Stdabw., then Min and Max together. */
+const FIGURE_PRIORITY: FigureKey[][] = [["sum"], ["average"], ["count"], ["stdev"], ["min", "max"]];
+/** Of those, the ones that never give way to a later one (Anzahl is never shown without Summe). */
+const CORE = 3;
+/** The space between two figures (gap-0.5). */
+export const FIGURE_GAP = 2;
+
+/**
+ * Which of the figures fit into `room` px, each whole or not at all, and whether with their short
+ * signs (Σ, Ø, n, s): words when that shows as many, signs when they let more of the main three
+ * stay. `widths` are the figures' widths with words (`full`) and signs (`short`).
+ */
+export function fitFigures(widths: { key: FigureKey; full: number; short: number }[], room: number): { keys: Set<FigureKey>; short: boolean } {
+  const byKey = new Map(widths.map((w) => [w.key, w]));
+  const pick = (short: boolean) => {
+    const keys = new Set<FigureKey>();
+    let used = 0;
+    for (let i = 0; i < FIGURE_PRIORITY.length; i++) {
+      const group = FIGURE_PRIORITY[i].filter((k) => byKey.has(k));
+      if (!group.length) continue;
+      let need = 0;
+      for (const k of group) need += (short ? byKey.get(k)!.short : byKey.get(k)!.full) + (used + need > 0 ? FIGURE_GAP : 0);
+      // (Widths are fractions of a pixel: half a pixel either way is still a fit.)
+      if (used + need <= room + 0.5) {
+        for (const k of group) keys.add(k);
+        used += need;
+      } else if (i < CORE) break;
+    }
+    return keys;
+  };
+  const isCore = (k: FigureKey) => FIGURE_PRIORITY.slice(0, CORE).some((g) => g.includes(k));
+  const coreOf = (keys: Iterable<FigureKey>) => [...keys].filter(isCore).length;
+  const words = pick(false);
+  if (coreOf(words) >= coreOf(byKey.keys())) return { keys: words, short: false };
+  const signs = pick(true);
+  return coreOf(signs) > coreOf(words) ? { keys: signs, short: true } : { keys: words, short: false };
+}
+
+function Figure({
+  label,
+  name,
+  tip,
+  value,
+  onCopy,
+  copied,
+  measure,
+}: {
+  /** What the figure shows (a word or a short sign). */
+  label: string;
+  /** Its full name, for screen readers. */
+  name: string;
+  tip: string;
+  value: string;
+  onCopy?: () => void;
+  copied?: boolean;
+  /** Only measured, never seen (the hidden copy that tells what fits). */
+  measure?: string;
+}) {
   return (
     <button
       type="button"
       onMouseDown={keepFocus}
       onClick={onCopy}
-      data-tip={tip}
-      aria-label={`${label}: ${value}. ${tip}`}
-      className="inline-flex h-7 shrink-0 items-baseline gap-1.5 rounded-md px-1.5 pt-[5px] text-[12px] transition-colors hover:bg-hover [@media(hover:none)]:h-9 [@media(hover:none)]:pt-[9px]"
+      data-tip={measure ? undefined : tip}
+      data-fig={measure}
+      tabIndex={measure ? -1 : undefined}
+      aria-label={`${name}: ${value}. ${tip}`}
+      className="inline-flex h-7 shrink-0 items-baseline gap-1.5 whitespace-nowrap rounded-md px-1.5 pt-[5px] text-[12px] transition-colors hover:bg-hover [@media(hover:none)]:h-9 [@media(hover:none)]:pt-[9px]"
     >
       <span className="text-ink-3">{label}</span>
       {copied ? (
@@ -174,17 +237,46 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
     mode = pointing ? "point" : edit.replace ? "enter" : "edit";
   }
 
-  const figures: { key: string; label: string; tip: string; value: string }[] = [];
+  const figures: { key: FigureKey; tip: string; value: string }[] = [];
   if (stats && stats.count > 0) {
-    figures.push({ key: "sum", label: t.stats.sum, tip: t.statTips.sum, value: fmtNumber(stats.sum) });
-    figures.push({ key: "average", label: t.stats.average, tip: t.statTips.average, value: fmtNumber(stats.mean) });
-    figures.push({ key: "count", label: t.stats.count, tip: t.statTips.count, value: fmtNumber(stats.count, true) });
-    figures.push({ key: "min", label: t.stats.min, tip: t.statTips.min, value: fmtNumber(stats.min) });
-    figures.push({ key: "max", label: t.stats.max, tip: t.statTips.max, value: fmtNumber(stats.max) });
-    if (stats.stdev !== null) figures.push({ key: "stdev", label: t.stats.stdev, tip: t.statTips.stdev, value: fmtNumber(stats.stdev) });
+    figures.push({ key: "sum", tip: t.statTips.sum, value: fmtNumber(stats.sum) });
+    figures.push({ key: "average", tip: t.statTips.average, value: fmtNumber(stats.mean) });
+    figures.push({ key: "count", tip: t.statTips.count, value: fmtNumber(stats.count, true) });
+    figures.push({ key: "min", tip: t.statTips.min, value: fmtNumber(stats.min) });
+    figures.push({ key: "max", tip: t.statTips.max, value: fmtNumber(stats.max) });
+    if (stats.stdev !== null) figures.push({ key: "stdev", tip: t.statTips.stdev, value: fmtNumber(stats.stdev) });
   } else if (stats && stats.filled > 0) {
-    figures.push({ key: "count", label: t.stats.count, tip: t.stats.count, value: fmtNumber(stats.filled, true) });
+    figures.push({ key: "count", tip: t.statTips.filled, value: fmtNumber(stats.filled, true) });
   }
+
+  // Which figures fit: a hidden copy of all of them (with words and with signs) is measured, and
+  // the room is what the bar may take (the hidden copy asks for all of it, see below).
+  const figBox = useRef<HTMLDivElement>(null);
+  const ghost = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<{ width: number; widths: Record<string, number> } | null>(null);
+  const figureKeys = figures.map((f) => f.key).join(",");
+  useEffect(() => {
+    const box = figBox.current;
+    const copies = ghost.current;
+    if (!box || !copies || typeof ResizeObserver === "undefined") return;
+    const read = () => {
+      const widths: Record<string, number> = {};
+      for (const el of copies.querySelectorAll<HTMLElement>("[data-fig]")) widths[el.dataset.fig!] = el.getBoundingClientRect().width;
+      const width = box.getBoundingClientRect().width;
+      setRoom((old) => (old && old.width === width && Object.keys(widths).every((k) => old.widths[k] === widths[k]) && Object.keys(old.widths).length === Object.keys(widths).length ? old : { width, widths }));
+    };
+    const ro = new ResizeObserver(read);
+    ro.observe(box);
+    for (const el of copies.querySelectorAll("[data-fig]")) ro.observe(el);
+    return () => ro.disconnect();
+  }, [figureKeys, locale]);
+  const fit = room
+    ? fitFigures(
+        figures.filter((f) => room.widths[`full:${f.key}`] && room.widths[`short:${f.key}`]).map((f) => ({ key: f.key, full: room.widths[`full:${f.key}`], short: room.widths[`short:${f.key}`] })),
+        room.width,
+      )
+    : null;
+  const shown = fit ? figures.filter((f) => fit.keys.has(f.key)) : [];
 
   const note = single ? activeCell?.note : undefined;
   const problem = single && isError(activeValue) ? explainError(activeValue, locale) : null;
@@ -198,7 +290,8 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
   };
   // German puts a (narrow) space before %, English doesn't.
   const pct = (z: number) => (locale === "de" ? `${Math.round(z * 100)}\u202F%` : `${Math.round(z * 100)}%`);
-  const zoomBtn = "grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-35 [@media(hover:none)]:size-9";
+  // On a phone the steps give their room to the figures: the percentage still opens the zoom levels, and fingers pinch.
+  const zoomBtn = "grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-35 max-sm:hidden [@media(hover:none)]:size-9";
 
   return (
     <div role="group" aria-label={t.statusBar} className="flex h-9 min-w-0 items-center gap-1 px-1.5 text-[12px] text-ink-3 [@media(hover:none)]:h-11">
@@ -216,23 +309,47 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
           {t.modes[mode]}
         </span>
       )}
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {figures.map((f) => (
-          <Figure key={f.key} label={f.label} tip={`${f.tip} · ${t.copyHint}`} value={f.value} copied={copied?.key === f.key} onCopy={() => copy(f.key, f.label, f.value)} />
-        ))}
-        {!figures.length && problem && (
-          <span className="inline-flex min-w-0 items-center gap-1.5 px-1.5 text-ink-2">
-            <TriangleAlert className="size-3.5 shrink-0 text-danger" />
-            <span className="truncate">{problem}</span>
-          </span>
-        )}
-        {!figures.length && !problem && note && (
-          <span className="inline-flex min-w-0 items-center gap-1.5 px-1.5 text-ink-2" title={note}>
-            <StickyNote className="size-3.5 shrink-0 text-[var(--sheet-yellow)]" />
-            <span className="sr-only">{t.note}: </span>
-            <span className="truncate">{note.replace(/\s+/g, " ")}</span>
-          </span>
-        )}
+      <div ref={figBox} className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 items-center justify-end gap-0.5 overflow-hidden">
+          {shown.map((f) => (
+            <Figure
+              key={f.key}
+              label={fit?.short ? t.statsShort[f.key] : t.stats[f.key]}
+              name={t.stats[f.key]}
+              tip={`${fit?.short ? `${t.stats[f.key]}: ` : ""}${f.tip} · ${t.copyHint}`}
+              value={f.value}
+              copied={copied?.key === f.key}
+              onCopy={() => copy(f.key, t.stats[f.key], f.value)}
+            />
+          ))}
+          {!figures.length && problem && (
+            <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 px-1.5 text-ink-2" title={problem}>
+              <TriangleAlert className="size-3.5 shrink-0 text-danger" />
+              <span className="truncate">{problem}</span>
+            </span>
+          )}
+          {!figures.length && !problem && note && (
+            <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 px-1.5 text-ink-2" title={note}>
+              <StickyNote className="size-3.5 shrink-0 text-[var(--sheet-yellow)]" />
+              <span className="sr-only">{t.note}: </span>
+              <span className="truncate">{note.replace(/\s+/g, " ")}</span>
+            </span>
+          )}
+        </div>
+        {/* Every figure once more, unseen: with words in the flow (so the bar asks for the room
+            they all need, up to what the editor gives it) and with signs out of it; measured above. */}
+        <div ref={ghost} aria-hidden inert className="invisible h-0 overflow-hidden">
+          <div className="flex w-max gap-0.5">
+            {figures.map((f) => (
+              <Figure key={f.key} label={t.stats[f.key]} name={t.stats[f.key]} tip="" value={f.value} measure={`full:${f.key}`} />
+            ))}
+          </div>
+          <div className="absolute left-0 top-0 flex w-max gap-0.5">
+            {figures.map((f) => (
+              <Figure key={f.key} label={t.statsShort[f.key]} name={t.stats[f.key]} tip="" value={f.value} measure={`short:${f.key}`} />
+            ))}
+          </div>
+        </div>
       </div>
       <span className="sr-only" aria-live="polite">
         {copied ? t.copied(copied.label) : ""}

@@ -15,7 +15,16 @@ export type ParseValueOptions = {
   now?: () => Date;
   /** Accept a lab unit after the number ("12,5 mg/L" → 12,5 shown with its unit): typing only. */
   units?: boolean;
+  /**
+   * Typing only, German: no number starts with a lone 0 before a thousands group, so "0.123"
+   * (or "-0.123", "0.123 mg/L") is the decimal 0,123, the way "1.5" is 1,5. VALUE() and
+   * arithmetic keep reading "0.123" as 123.
+   */
+  zeroDecimal?: boolean;
 };
+
+/** "0.123" in German typing: a 0 (or 00…) before the dot can't be a thousands group. */
+const zeroBeforeDot = (body: string, locale: Locale, opts?: ParseValueOptions) => !!opts?.zeroDecimal && locale === "de" && /^0+\.\d/.test(body);
 
 /**
  * Units typed after a number that make it a number shown with that unit (instead of dead text,
@@ -44,7 +53,7 @@ const CURRENCIES: { re: RegExp; symbol: "€" | "$" | "£" | "CHF" }[] = [
 const currencySymbol = (s: string) => CURRENCIES.find((c) => c.re.test(s))?.symbol ?? null;
 
 /** Parse a plain number body (no sign) in the locale's style; null when it isn't one. */
-function parseNumberBody(body: string, locale: Locale): { value: number; decimals: number; group: boolean; exp: boolean } | null {
+function parseNumberBody(body: string, locale: Locale, opts?: ParseValueOptions): { value: number; decimals: number; group: boolean; exp: boolean } | null {
   // Exponent: 1,5E-3 / 1.5e3 (no thousands separators then).
   const expMatch = locale === "de" ? /^(\d+(?:,\d*)?|,\d+)[eE]([+-]?\d+)$/.exec(body) : /^(\d+(?:\.\d*)?|\.\d+)[eE]([+-]?\d+)$/.exec(body);
   if (expMatch) {
@@ -62,7 +71,7 @@ function parseNumberBody(body: string, locale: Locale): { value: number; decimal
     return { value: Number(`${int}.${frac || "0"}`), decimals: frac.length, group: false, exp: false };
   }
   const grouped = new RegExp(`^(\\d{1,3}(?:${esc(grp)}\\d{3})+)(?:${esc(dec)}(\\d*))?$`).exec(body);
-  if (grouped) {
+  if (grouped && !zeroBeforeDot(body, locale, opts)) {
     const int = grouped[1].split(grp).join("");
     const frac = grouped[2] ?? "";
     return { value: Number(`${int}.${frac || "0"}`), decimals: frac.length, group: true, exp: false };
@@ -71,12 +80,18 @@ function parseNumberBody(body: string, locale: Locale): { value: number; decimal
 }
 
 /** A forgiving second try: the other language's decimal point ("1.5" in German, "1,5" in English) when it can't be thousands. */
-function parseForeignDecimal(body: string, locale: Locale): number | null {
+function parseForeignDecimal(body: string, locale: Locale, opts?: ParseValueOptions): number | null {
   const re = locale === "de" ? /^(\d+)\.(\d+)$/ : /^(\d+),(\d+)$/;
   const m = re.exec(body);
-  if (!m || m[2].length === 3) return null;
+  if (!m || (m[2].length === 3 && !zeroBeforeDot(body, locale, opts))) return null;
   return Number(`${m[1]}.${m[2]}`);
 }
+
+/** Digits after the decimal separator of a plain "1.25" / "1,25". */
+const fractionDigits = (body: string) => {
+  const i = body.search(/[.,]/);
+  return i < 0 ? 0 : body.length - i - 1;
+};
 
 function validDate(y: number, m: number, d: number): number | null {
   if (m < 1 || m > 12 || d < 1 || y < 1900 || y > 9999) return null;
@@ -209,12 +224,17 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
     }
   }
 
-  const num = parseNumberBody(rest, locale);
+  const num = parseNumberBody(rest, locale, opts);
   if (num && unit) {
     const value = sign * num.value;
     if (!Number.isFinite(value)) return null;
     if (num.exp) return { kind: "number", value, fmt: { kind: "scientific", decimals: Math.max(2, num.decimals), unit } };
     return { kind: "number", value, fmt: { kind: "number", decimals: num.decimals, group: num.group || undefined, unit } };
+  }
+  if (unit) {
+    // "1.5 mg/L" in German: the forgiving decimal point works with a unit too, as it does without one.
+    const foreign = parseForeignDecimal(rest, locale, opts);
+    if (foreign !== null) return { kind: "number", value: sign * foreign, fmt: { kind: "number", decimals: fractionDigits(rest), unit } };
   }
   if (num) {
     const value = sign * num.value;
@@ -227,10 +247,10 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
   }
   if (percent || currency || sign === -1 || text.startsWith("+")) {
     // "-1.5" in German is a number too (dates have no sign).
-    const foreign = parseForeignDecimal(rest, locale);
+    const foreign = parseForeignDecimal(rest, locale, opts);
     if (foreign !== null) {
       const value = sign * foreign;
-      if (percent) return { kind: "number", value: value / 100, fmt: { kind: "percent", decimals: rest.length - rest.search(/[.,]/) - 1 } };
+      if (percent) return { kind: "number", value: value / 100, fmt: { kind: "percent", decimals: fractionDigits(rest) } };
       if (currency) return { kind: "number", value, fmt: { kind: "currency", decimals: 2, symbol: currency } };
       return { kind: "number", value };
     }
@@ -243,7 +263,7 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
   const date = parseDate(text, locale, opts);
   if (date) return { kind: "number", value: date.value, fmt: date.fmt };
 
-  const foreign = parseForeignDecimal(text, locale);
+  const foreign = parseForeignDecimal(text, locale, opts);
   if (foreign !== null) return { kind: "number", value: foreign };
   return null;
 }

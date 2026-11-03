@@ -17,8 +17,9 @@
 //   background save of drafts whose editor was closed.
 // Problems make the script exit with 1.
 
-import { clearDraft, draftPages, markSheetOpen, readLocalDraft, writeDraft } from "@/components/sheet/drafts";
+import { clearDraft, draftPages, flushedRev, markSheetOpen, readLocalDraft, writeDraft } from "@/components/sheet/drafts";
 import { flushSheetDrafts } from "@/components/sheet/flushDrafts";
+import { newPageFor } from "@/components/shell/paletteNew";
 import { SheetSaver, type SaverApi } from "@/components/sheet/saver";
 import { createSheetStore } from "@/components/sheet/store";
 import { reportOk } from "@/lib/offline/net";
@@ -608,6 +609,25 @@ section("readSheetPreview", () => {
 // ----------------------------------------------------------------------------------------------
 // Merging
 
+section("command palette: new pages from the query", () => {
+  const sheet = (q: string) => newPageFor("sheet", q, "Neue Tabelle", "kalibrierung diagramm chart");
+  const same = (a: { rank: number; title: string }, rank: number, title: string) => a.rank === rank && a.title === title;
+  check("palette: 'Tabelle' makes a spreadsheet without a name, first", same(sheet("Tabelle"), 2, ""), sheet("Tabelle"));
+  check("palette: 'neue Tabelle' too", same(sheet("neue Tabelle"), 2, ""), sheet("neue Tabelle"));
+  check("palette: 'excel' and 'Tabellen' too", same(sheet("excel"), 2, "") && same(sheet("Tabellen"), 2, ""));
+  check("palette: 'Tabelle Titration' names it Titration", same(sheet("Tabelle Titration"), 2, "Titration"), sheet("Tabelle Titration"));
+  check("palette: 'neue Tabelle Titration' too", same(sheet("neue Tabelle Titration"), 2, "Titration"), sheet("neue Tabelle Titration"));
+  check("palette: 'tab' on its way: no name, first among new pages", same(sheet("tab"), 1, ""), sheet("tab"));
+  check("palette: a related word keeps the name", same(sheet("Kalibrierung"), 1, "Kalibrierung"), sheet("Kalibrierung"));
+  check("palette: anything else is the plain fallback", same(sheet("Mitochondrien"), 0, "Mitochondrien") && same(sheet("Tabellenbuch"), 0, "Tabellenbuch"));
+  check("palette: one letter is no kind", same(sheet("t"), 0, "t"));
+  check("palette: empty query", same(sheet(""), 0, ""));
+  check("palette: notes", same(newPageFor("note", "Notiz", "Neue Notiz"), 2, "") && same(newPageFor("note", "Mitochondrien", "Neue Notiz"), 0, "Mitochondrien"));
+  check("palette: presentations", same(newPageFor("deck", "Präsentation Zellbiologie", "Neue Präsentation"), 2, "Zellbiologie"));
+  check("palette: English", same(newPageFor("sheet", "New spreadsheet", "New spreadsheet"), 2, "") && same(newPageFor("sheet", "spreadsheet Lab 3", "New spreadsheet"), 2, "Lab 3"));
+  check("palette: 'Tabelle' doesn't make a note", newPageFor("note", "Tabelle", "Neue Notiz").rank === 0);
+});
+
 const setCell = (wb: Workbook, sheetId: string, key: string, cell: Cell | undefined): Workbook => ({
   ...wb,
   sheets: wb.sheets.map((s) => {
@@ -1009,8 +1029,10 @@ class FakeServer implements SaverApi {
 type Log = { states: string[]; notices: (string | null)[]; titles: string[]; saved: number[]; restored: number; trouble: string[] };
 
 let pageCounter = 0;
-function openEditor(server: FakeServer, pageId: string, opts: { userId?: string; readOnly?: boolean } = {}) {
-  const wb = normalizeWorkbook(clone(server.content), "de");
+function openEditor(server: FakeServer, pageId: string, opts: { userId?: string; readOnly?: boolean; opened?: { rev: number; content: unknown; title: string } } = {}) {
+  // `opened`: what the page came with, when that isn't what the server has by now.
+  const opened = opts.opened ?? { rev: server.rev, content: server.content, title: server.title };
+  const wb = normalizeWorkbook(clone(opened.content), "de");
   const store = createSheetStore({ pageId, workbook: wb, locale: "de", readOnly: !!opts.readOnly });
   const log: Log = { states: [], notices: [], titles: [], saved: [], restored: 0, trouble: [] };
   const saver = new SheetSaver({
@@ -1018,9 +1040,9 @@ function openEditor(server: FakeServer, pageId: string, opts: { userId?: string;
     pageId,
     userId: opts.userId ?? "u1",
     locale: "de",
-    rev: server.rev,
+    rev: opened.rev,
     base: wb,
-    title: server.title,
+    title: opened.title,
     readOnly: !!opts.readOnly,
     api: server,
     on: {
@@ -1248,6 +1270,55 @@ async function savingTests() {
     const n = await flushSheetDrafts("u1", "de", server);
     check("background: saved and merged", n === 1 && server.cell("0,0")?.v === "offline" && server.cell("2,2")?.v === "online" && server.title === "Messung 2", server.content);
     check("background: draft gone", readLocalDraft("u1", id) === null && (await draftPages("u1")).length === 0);
+  }
+
+  // Another tab's draft (or one of a tab that was closed offline): restored here, and gone once saved.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server.content, "de");
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "1,1", { v: 2.5 }), baseTitle: "Messung", title: "Messung", at: Date.now(), tab: "closed-tab" });
+    const e = openEditor(server, id);
+    await e.saver.restore();
+    await e.saver.flush();
+    check("other tab's draft: restored and saved", e.log.restored === 1 && server.cell("1,1")?.v === 2.5 && server.rev === 1, server.content);
+    check("other tab's draft: gone once saved", readLocalDraft("u1", id) === null, readLocalDraft("u1", id)?.tab);
+    await e.close();
+  }
+
+  // 7. Blob opened right at a spreadsheet with a draft waiting (back online, or the app reopened there).
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server.content, "de");
+    const sheetId = base.sheets[0].id;
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, sheetId, "2,0", { v: "offline" }), baseTitle: "Messung", title: "Messung", at: Date.now(), tab: "t" });
+    // Its address shows while the editor is on its way: the background save leaves the draft to it.
+    const g = globalThis as { location?: unknown };
+    const before = g.location;
+    g.location = { pathname: `/p/${id}` };
+    const skipped = await flushSheetDrafts("u1", "de", server);
+    g.location = { pathname: "/home" };
+    check("background: leaves the spreadsheet being opened to its editor", skipped === 0 && readLocalDraft("u1", id) !== null && server.calls === 0);
+    // Elsewhere: saved in the background, while the spreadsheet's page was already on its way with
+    // the version before (rev 0). Its editor catches up instead of showing the old copy.
+    const opened = { rev: server.rev, content: clone(server.content), title: server.title };
+    const n = await flushSheetDrafts("u1", "de", server);
+    g.location = before;
+    check("background: saved while the page was on its way", n === 1 && server.rev === 1 && server.cell("2,0")?.v === "offline" && flushedRev(id) === 1);
+    const late = openEditor(server, id, { opened });
+    check("background: the late editor opened with the old copy", late.cell("2,0") === undefined);
+    await late.saver.restore();
+    await new Promise((r) => setTimeout(r, 0));
+    await late.saver.flush();
+    check("background: …and catches up with the saved draft", late.cell("2,0")?.v === "offline" && server.loads >= 1 && !late.saver.dirty() && server.rev === 1, late.store.get().workbook.sheets[0].cells);
+    await late.close();
+    // An editor that opened with that version already doesn't fetch it again.
+    const loads = server.loads;
+    const fresh = openEditor(server, id);
+    await fresh.saver.restore();
+    check("background: an up-to-date editor doesn't fetch again", server.loads === loads && fresh.cell("2,0")?.v === "offline");
+    await fresh.close();
   }
 }
 

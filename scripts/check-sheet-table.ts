@@ -12,7 +12,8 @@ import * as E from "@/sheet/engine";
 import * as O from "@/sheet/ops";
 import * as T from "@/sheet/table/model";
 import { buildDecorate } from "@/components/sheet/table/decor";
-import type { Area, Cell, FilterSpec, Sheet, TableSpec, Workbook } from "@/sheet/types";
+import { createSheetStore } from "@/components/sheet/store";
+import type { Area, Cell, ChartSpec, FilterSpec, RangeRef, Sheet, TableSpec, Workbook } from "@/sheet/types";
 
 // ----------------------------------------------------------------------------------------------
 // Tiny test kit
@@ -773,19 +774,301 @@ run("afterInput: totals follow inserted rows", () => {
   let wb = make(book(LAB), "A1:C7").wb;
   const t = only(wb);
   wb = T.setTotals(wb, calcOf(wb), t.id, true, "de");
-  // A row inserted right above the totals row: the range ends one short until the totals refresh
+  // A row inserted right above the totals row: ops.insertRows puts the range right at once
   const ins = O.insertRows(wb, "s1", 7, 1);
   eq("table grew", areaText(only(ins).area), "A1:C9");
+  eq("range covers the new row right after inserting", cell(ins, "B9")?.f, "SUBTOTAL(109,B2:B8)");
+  eq("…also when it is pasted into, before anything is typed", cell(T.afterPaste(O.pasteText(ins, "s1", at("B8"), [["10"]], "de"), calcOf(ins), "s1", A("B8")), "B9")?.f, "SUBTOTAL(109,B2:B8)");
   const typed = O.setCells(ins, "s1", [{ row: 7, col: 1, cell: { v: 10 } }]);
   const fixed = T.afterInput(typed, calcOf(typed), "s1", 7, 1);
   eq("range covers the new row", cell(fixed, "B9")?.f, "SUBTOTAL(109,B2:B8)");
   near("total includes it", val(fixed, "B9"), 12.943);
   // A row inserted right under the header
   const top = O.insertRows(wb, "s1", 1, 1);
+  eq("under the header: right after inserting", cell(top, "B9")?.f, "SUBTOTAL(109,B2:B8)");
   eq("refresh alone", cell(T.refreshTotals(top, "s1"), "B9")?.f, "SUBTOTAL(109,B2:B8)");
+  near("the total includes a value typed there", val(O.setCells(top, "s1", [{ row: 1, col: 1, cell: { v: 1 } }]), "B9"), 3.943);
+  // Deleting rows keeps them right too
+  const delTop = O.deleteRows(top, "s1", 1, 1);
+  eq("deleting the row again", cell(delTop, "B8")?.f, "SUBTOTAL(109,B2:B7)");
   // Formulas typed by hand into the totals row are left alone
   const own = O.setCells(wb, "s1", [{ row: 7, col: 2, cell: { f: "COUNTA(C2:C5)" } }]);
   check("own formula kept", T.refreshTotals(own, "s1") === own);
+});
+
+// ==============================================================================================
+// A calibration as in the templates: a title, the table B5:D11 (header row 5, six standards with
+// their standard deviations), slope, intercept, R² and more below it, a second sheet that uses
+// them, and a scatter chart with custom error bars.
+const CAL: Record<string, CellInput> = {
+  B2: "Kalibriergerade",
+  B5: "Konzentration (mg/L)",
+  C5: "Extinktion",
+  D5: "SD",
+  ...Object.fromEntries([0, 2, 4, 6, 8, 10].map((x, i) => [`B${6 + i}`, x])),
+  ...Object.fromEntries([0.002, 0.105, 0.208, 0.312, 0.418, 0.521].map((y, i) => [`C${6 + i}`, y])),
+  ...Object.fromEntries([0.001, 0.003, 0.002, 0.004, 0.003, 0.005].map((y, i) => [`D${6 + i}`, y])),
+  B14: "Steigung",
+  C14: "=SLOPE(C6:C11,B6:B11)",
+  B15: "Achsenabschnitt",
+  C15: "=INTERCEPT($C$6:$C$11,$B$6:$B$11)",
+  B16: "R²",
+  C16: "=RSQ(C6:C11,B6:B11)",
+  B17: "Messwerte",
+  C17: "=COUNT(C5:C11)",
+  B18: "Ohne Blank",
+  C18: "=AVERAGE(C7:C11)",
+};
+const rr = (a1: string, sheetId = "s1"): RangeRef => ({ sheetId, ...A(a1) });
+function calChart(): ChartSpec {
+  return {
+    id: "ch1",
+    sheetId: "s1",
+    at: { row: 1, col: 6, dx: 0, dy: 0 },
+    size: { w: 480, h: 320 },
+    kind: "scatter",
+    title: "",
+    x: rr("B6:B11"),
+    series: [
+      {
+        id: "se1",
+        name: "",
+        nameRef: rr("C5"),
+        y: rr("C6:C11"),
+        x: null,
+        color: null,
+        marker: "circle",
+        line: "none",
+        labels: false,
+        errorBars: { kind: "custom", value: 0, plus: rr("D6:D11"), minus: rr("D6:D11"), direction: "both" },
+        trendline: { type: "linear", order: 2, period: 2, intercept: null, showEquation: true, showR2: true, forward: 0, backward: 0, name: "" },
+      },
+    ],
+    xAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "none",
+  };
+}
+function calibration(extra: Record<string, CellInput> = {}, area = "B5:D11"): Workbook {
+  const other = mkSheet({ A1: "=SLOPE('Blatt 1'!C6:C11,'Blatt 1'!B6:B11)", A2: "=SUM('Blatt 1'!C6:D11)", A3: "=SUM(C6:C11)", A4: "='Blatt 1'!C14" }, "s2", "Auswertung");
+  return O.putChart(make(book({ ...CAL, ...extra }, [other]), area).wb, calChart());
+}
+/** Typed like the store does it: parsed, then the table's afterInput. */
+function typeIn(wb: Workbook, a1: string, input: string, locale: Locale = "de"): Workbook {
+  const p = at(a1);
+  const cur = O.getCell(wb, "s1", p.row, p.col);
+  const parsed = E.parseInput(input, locale, cur);
+  const s = parsed.fmt && !cur?.s?.fmt ? { ...cur?.s, fmt: parsed.fmt } : cur?.s;
+  const w1 = O.setCells(wb, "s1", [{ row: p.row, col: p.col, cell: { ...cur, v: parsed.cell.v, f: parsed.cell.f, s } }]);
+  return T.afterInput(w1, calcOf(w1, locale), "s1", p.row, p.col, locale);
+}
+function pasteIn(wb: Workbook, a1: string, rows: string[][]): Workbook {
+  const p = at(a1);
+  const w1 = O.pasteText(wb, "s1", p, rows, "de");
+  return T.afterPaste(w1, calcOf(w1), "s1", { r0: p.row, c0: p.col, r1: p.row + rows.length - 1, c1: p.col + Math.max(...rows.map((r) => r.length)) - 1 }, "de");
+}
+const fOf = (wb: Workbook, a1: string, sheetId = "s1") => cell(wb, a1, sheetId)?.f;
+/** Least squares by hand, to check the engine's SLOPE and RSQ independently. */
+function fit(xs: number[], ys: number[]) {
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) ** 2;
+    syy += (ys[i] - my) ** 2;
+  }
+  return { slope: sxy / sxx, rsq: (sxy * sxy) / (sxx * syy) };
+}
+const XS = [0, 2, 4, 6, 8, 10];
+const YS = [0.002, 0.105, 0.208, 0.312, 0.418, 0.521];
+
+section("growing: formulas and charts follow the table");
+run(current, () => {
+  const wb = calibration();
+  // A seventh standard typed right below the table
+  let w = typeIn(wb, "B12", "12");
+  eq("the table grew", areaText(only(w).area), "B5:D12");
+  eq("slope", fOf(w, "C14"), "SLOPE(C6:C12,B6:B12)");
+  eq("intercept ($ ranges)", fOf(w, "C15"), "INTERCEPT($C$6:$C$12,$B$6:$B$12)");
+  eq("R²", fOf(w, "C16"), "RSQ(C6:C12,B6:B12)");
+  eq("header row plus data", fOf(w, "C17"), "COUNT(C5:C12)");
+  eq("part of the data stays", fOf(w, "C18"), "AVERAGE(C7:C11)");
+  eq("the other sheet", [fOf(w, "A1", "s2"), fOf(w, "A2", "s2"), fOf(w, "A3", "s2"), fOf(w, "A4", "s2")], ["SLOPE('Blatt 1'!C6:C12,'Blatt 1'!B6:B12)", "SUM('Blatt 1'!C6:D12)", "SUM(C6:C11)", "'Blatt 1'!C14"]);
+  const ch = w.charts[0];
+  eq("chart x and y", [ch.x, ch.series[0].y], [rr("B6:B12"), rr("C6:C12")]);
+  eq("chart error bars", [ch.series[0].errorBars?.plus, ch.series[0].errorBars?.minus], [rr("D6:D12"), rr("D6:D12")]);
+  eq("chart legend name stays the header cell", ch.series[0].nameRef, rr("C5"));
+  w = typeIn(w, "C12", "0,623");
+  w = typeIn(w, "D12", "0,004");
+  eq("typing the rest of the row changes nothing more", [areaText(only(w).area), fOf(w, "C14")], ["B5:D12", "SLOPE(C6:C12,B6:B12)"]);
+  const f7 = fit([...XS, 12], [...YS, 0.623]);
+  near("slope with seven standards", val(w, "C14"), f7.slope, 1e-12);
+  near("R² with seven standards", val(w, "C16"), f7.rsq, 1e-12);
+  near("…on the other sheet too", calcOf(w).value("s2", 0, 0), f7.slope, 1e-12);
+  eq("count", val(w, "C17"), 7);
+  // The chart now reads seven points
+  const ys = calcOf(w).values(w.charts[0].series[0].y).map((r) => r[0]);
+  eq("the chart's values", ys, [...YS, 0.623]);
+
+  // Several standards pasted at once
+  const pasted = pasteIn(wb, "B12", [
+    ["12", "0,623", "0,004"],
+    ["14", "0,727", "0,002"],
+  ]);
+  eq("paste: table grew by two", areaText(only(pasted).area), "B5:D13");
+  eq("paste: slope and chart", [fOf(pasted, "C14"), pasted.charts[0].series[0].y], ["SLOPE(C6:C13,B6:B13)", rr("C6:C13")]);
+  near("paste: slope value", val(pasted, "C14"), fit([...XS, 12, 14], [...YS, 0.623, 0.727]).slope, 1e-12);
+
+  // A mean typed right below a column: the table takes the row (as in Excel), but the formula
+  // never comes to include itself
+  const mean = typeIn(wb, "C12", "=MITTELWERT(C6:C11)");
+  eq("mean: kept as typed", fOf(mean, "C12"), "AVERAGE(C6:C11)");
+  near("mean: no circle", val(mean, "C12"), YS.reduce((a, b) => a + b, 0) / 6, 1e-12);
+  // A formula in the new row that uses other columns follows the table
+  const sample = typeIn(wb, "D12", "=C12/STEIGUNG(C6:C11;B6:B11)");
+  eq("new-row formula on other columns grows", fOf(sample, "D12"), "C12/SLOPE(C6:C12,B6:B12)");
+
+  // A table on another sheet with the same addresses doesn't touch this one
+  const twoTables = O.putTable(wb, { ...only(wb), id: "t2", name: "Andere", sheetId: "s2", columns: only(wb).columns.map((c, i) => ({ ...c, id: `o${i}` })) });
+  const otherGrows = O.growTableReferences(twoTables, twoTables.tables[1], { r0: 5, r1: 10 }, { r0: 5, r1: 11 });
+  eq("a table on another sheet: only references to that sheet", [fOf(otherGrows, "C14"), fOf(otherGrows, "A3", "s2"), fOf(otherGrows, "A1", "s2")], ["SLOPE(C6:C11,B6:B11)", "SUM(C6:C12)", "SLOPE('Blatt 1'!C6:C11,'Blatt 1'!B6:B11)"]);
+
+  // With a totals row the table doesn't grow by typing below, so nothing follows
+  const tot = T.setTotals(wb, calcOf(wb), only(wb).id, true, "de");
+  const belowTot = typeIn(tot, "B13", "12");
+  eq("totals row: nothing grows", [areaText(only(belowTot).area), fOf(belowTot, "C15")], ["B5:D12", fOf(tot, "C15")]);
+
+  // Typed below a column that isn't the table's (diagonal): nothing
+  eq("diagonal: nothing", fOf(typeIn(wb, "E12", "1"), "C14"), "SLOPE(C6:C11,B6:B11)");
+});
+
+run("growing: calculated columns stay one formula", () => {
+  section("growing: calculated columns");
+  // E: each standard's share of all absorbances, a calculated column over the whole column
+  const extra: Record<string, CellInput> = { E5: "Anteil" };
+  for (let r = 6; r <= 11; r++) extra[`E${r}`] = `=C${r}/SUM(C$6:C$11)`;
+  const wb = calibration(extra, "B5:E11");
+  const w = typeIn(wb, "B12", "12");
+  eq("every row grows its range", [fOf(w, "E6"), fOf(w, "E11")], ["C6/SUM(C$6:C$12)", "C11/SUM(C$6:C$12)"]);
+  eq("the new row continues the same formula", fOf(w, "E12"), "C12/SUM(C$6:C$12)");
+  const p = pasteIn(wb, "B12", [["12", "0,623"], ["14", "0,727"]]);
+  eq("pasted rows too", [fOf(p, "E6"), fOf(p, "E12"), fOf(p, "E13")], ["C6/SUM(C$6:C$13)", "C12/SUM(C$6:C$13)", "C13/SUM(C$6:C$13)"]);
+  near("shares add up to 1", [6, 7, 8, 9, 10, 11, 12, 13].reduce((s, r) => s + (val(p, `E${r}`) as number), 0), 1, 1e-12);
+  // 5000 standards, a calculated column over all of them: typing below stays quick
+  const big: Record<string, CellInput> = { A1: "x", B1: "y", C1: "Anteil", F2: "=SLOPE(B2:B5001,A2:A5001)" };
+  for (let r = 2; r <= 5001; r++) {
+    big[`A${r}`] = r;
+    big[`B${r}`] = r * 2;
+    big[`C${r}`] = `=B${r}/SUM($B$2:$B$5001)`;
+  }
+  const bigWb = make(book(big), "A1:C5001").wb;
+  const typed = O.setCells(bigWb, "s1", [{ row: 5001, col: 0, cell: { v: 5002 } }]);
+  const calcBig = calcOf(typed);
+  const t0 = performance.now();
+  const grownBig = T.afterInput(typed, calcBig, "s1", 5001, 0, "de");
+  const ms = performance.now() - t0;
+  eq("5000 rows: slope and calculated column follow", [fOf(grownBig, "F2"), fOf(grownBig, "C2"), fOf(grownBig, "C5002")], ["SLOPE(B2:B5002,A2:A5002)", "B2/SUM($B$2:$B$5002)", "B5002/SUM($B$2:$B$5002)"]);
+  check("5000 rows: typing below quickly", ms < 1500, `${ms.toFixed(0)} ms`);
+});
+
+run("growing: undo is one step (store)", () => {
+  section("growing: undo");
+  const store = createSheetStore({ pageId: "p1", workbook: calibration(), locale: "de", readOnly: false });
+  store.input(at("B12"), "12");
+  const s1 = store.get();
+  eq("typed through the store: slope grows", [fOf(s1.workbook, "C14"), areaText(only(s1.workbook).area), s1.workbook.charts[0].series[0].y], ["SLOPE(C6:C12,B6:B12)", "B5:D12", rr("C6:C12")]);
+  store.undo();
+  const s2 = store.get();
+  eq("one undo puts it all back", [fOf(s2.workbook, "C14"), cell(s2.workbook, "B12"), areaText(only(s2.workbook).area), s2.workbook.charts[0].series[0].y], ["SLOPE(C6:C11,B6:B11)", undefined, "B5:D11", rr("C6:C11")]);
+  store.redo();
+  eq("redo", fOf(store.get().workbook, "C14"), "SLOPE(C6:C12,B6:B12)");
+});
+
+run("rows inserted into a table (ops.ts)", () => {
+  section("insertRows: calculated columns, formats, references");
+  const extra: Record<string, CellInput> = { E5: "Berechnet" };
+  for (let r = 6; r <= 11; r++) extra[`E${r}`] = `=(C${r}-$C$15)/$C$14`;
+  let wb = calibration(extra, "B5:E11");
+  wb = O.setStyle(wb, "s1", [A("C6:C11")], { fmt: { kind: "number", decimals: 3 } });
+  // Between two standards
+  const mid = O.insertRows(wb, "s1", 7, 1);
+  eq("calculated column continues", fOf(mid, "E8"), "(C8-$C$16)/$C$15");
+  eq("format continues", cell(mid, "C8")?.s?.fmt, { kind: "number", decimals: 3 });
+  eq("ranges grow by themselves", [fOf(mid, "C15"), mid.charts[0].series[0].y], ["SLOPE(C6:C12,B6:B12)", rr("C6:C12")]);
+  // Right under the header (the standards' formulas sit below the table and move down)
+  const top = O.insertRows(wb, "s1", 5, 2);
+  eq("under the header: table", areaText(only(top).area), "B5:E13");
+  eq("…calculated column", [fOf(top, "E6"), fOf(top, "E7")], ["(C6-$C$17)/$C$16", "(C7-$C$17)/$C$16"]);
+  eq("…format from the row below", cell(top, "C6")?.s?.fmt, { kind: "number", decimals: 3 });
+  eq("…slope, chart and other sheet take the rows in", [fOf(top, "C16"), top.charts[0].x, top.charts[0].series[0].errorBars?.plus, fOf(top, "A1", "s2")], ["SLOPE(C6:C13,B6:B13)", rr("B6:B13"), rr("D6:D13"), "SLOPE('Blatt 1'!C6:C13,'Blatt 1'!B6:B13)"]);
+  eq("…the header row plus data", fOf(top, "C19"), "COUNT(C5:C13)");
+  const typed = typeIn(typeIn(top, "B6", "1"), "C6", "0,05");
+  near("…values typed there count", val(typed, "C16"), fit([1, ...XS], [0.05, ...YS]).slope, 1e-12);
+  // Right above the totals row
+  const tot = T.setTotals(wb, calcOf(wb), only(wb).id, true, "de");
+  const totArea = areaText(only(tot).area);
+  const above = O.insertRows(tot, "s1", 11, 1);
+  eq("above the totals row: table", [totArea, areaText(only(above).area)], ["B5:E12", "B5:E13"]);
+  eq("…slope takes it in", fOf(above, "C15"), "SLOPE(C6:C12,B6:B12)");
+  eq("…totals take it in", fOf(above, "E13"), "SUBTOTAL(109,E6:E12)");
+  eq("…calculated column (the slope cells below moved down a row)", fOf(above, "E12"), "(C12-$C$16)/$C$15");
+});
+
+run("every data row deleted (ops.ts)", () => {
+  section("deleteRows: one empty row stays");
+  const extra: Record<string, CellInput> = { E5: "Anteil" };
+  for (let r = 6; r <= 11; r++) extra[`E${r}`] = `=C${r}/SUM(C$6:C$11)`;
+  let wb = calibration(extra, "B5:E11");
+  wb = O.setStyle(wb, "s1", [A("C6:C11")], { fmt: { kind: "number", decimals: 3 } });
+  wb = T.setTableFilter(wb, only(wb).id, only(wb).columns[0].id, { kind: "number", op: "gt", a: 3, b: null });
+  const del = O.deleteRows(wb, "s1", 5, 6);
+  eq("header and one row", areaText(only(del).area), "B5:E6");
+  eq("the row is empty, keeping the calculated column and formats", [cell(del, "B6"), cell(del, "C6"), cell(del, "D6"), fOf(del, "E6")], [undefined, { s: { fmt: { kind: "number", decimals: 3 } } }, undefined, "C6/SUM(C$6:C$6)"]);
+  eq("filters cleared", only(del).filters, {});
+  eq("formulas below moved up and point at the row", [fOf(del, "C9"), fOf(del, "C10"), fOf(del, "C11")], ["SLOPE(C6:C6,B6:B6)", "INTERCEPT($C$6:$C$6,$B$6:$B$6)", "RSQ(C6:C6,B6:B6)"]);
+  eq("the chart stays", [del.charts.length, del.charts[0].series[0].y], [1, rr("C6:C6")]);
+  eq("other sheet", fOf(del, "A1", "s2"), "SLOPE('Blatt 1'!C6:C6,'Blatt 1'!B6:B6)");
+  // New standards typed in: the table, the formulas and the chart grow again
+  let w = typeIn(del, "B6", "0");
+  w = typeIn(w, "C6", "0,002");
+  w = typeIn(w, "B7", "2");
+  w = typeIn(w, "C7", "0,105");
+  w = typeIn(w, "B8", "4");
+  w = typeIn(w, "C8", "0,208");
+  eq("grew again", areaText(only(w).area), "B5:E8");
+  eq("formulas follow again", [fOf(w, "C9"), fOf(w, "C11"), fOf(w, "E8")], ["SLOPE(C6:C8,B6:B8)", "RSQ(C6:C8,B6:B8)", "C8/SUM(C$6:C$8)"]);
+  near("slope of the new standards", val(w, "C9"), fit([0, 2, 4], [0.002, 0.105, 0.208]).slope, 1e-12);
+  eq("chart follows", [w.charts[0].x, w.charts[0].series[0].y], [rr("B6:B8"), rr("C6:C8")]);
+  eq("format carried into the new rows", cell(w, "C8")?.s?.fmt, { kind: "number", decimals: 3 });
+  // With a totals row: header, one row, totals; the total still works
+  const tot0 = T.setTotals(wb, calcOf(wb), only(wb).id, true, "de");
+  const tot = T.setColumnTotal(tot0, only(tot0).id, only(tot0).columns[1].id, "sum", "de");
+  const delTot = O.deleteRows(tot, "s1", 5, 6);
+  eq("with totals", [areaText(only(delTot).area), only(delTot).totals, fOf(delTot, "C7"), fOf(delTot, "E7")], ["B5:E7", true, "SUBTOTAL(109,C6:C6)", "SUBTOTAL(109,E6:E6)"]);
+  eq("…a sum of the empty row is 0", val(delTot, "C7"), 0);
+  // Undo through the store
+  const store = createSheetStore({ pageId: "p1", workbook: wb, locale: "de", readOnly: false });
+  store.apply("Zeilen löschen", (x) => O.deleteRows(x, "s1", 5, 6));
+  eq("store: deleted", areaText(only(store.get().workbook).area), "B5:E6");
+  store.undo();
+  eq("store: undo brings the rows back", [areaText(only(store.get().workbook).area), fOf(store.get().workbook, "C14")], ["B5:E11", "SLOPE(C6:C11,B6:B11)"]);
+});
+
+run("columns inserted into a table (ops.ts)", () => {
+  section("insertCols: header names");
+  const wb = calibration();
+  const de = O.insertCols(wb, "s1", 3, 1, "de");
+  eq("German name", [cell(de, "D5")?.v, cell(de, "E5")?.v], ["Spalte3", "SD"]);
+  eq("column names", T.columnNames(de, calcOf(de), only(de), "de"), ["Konzentration (mg/L)", "Extinktion", "Spalte3", "SD"]);
+  eq("English name", cell(O.insertCols(wb, "s1", 3, 1, "en"), "D5")?.v, "Column3");
+  eq("default German", cell(O.insertCols(wb, "s1", 3, 1), "D5")?.v, "Spalte3");
+  const twice = O.insertCols(de, "s1", 3, 1, "de");
+  eq("unique in the table", [cell(twice, "D5")?.v, cell(twice, "E5")?.v], ["Spalte4", "Spalte3"]);
+  eq("left of the table: no name", cell(O.insertCols(wb, "s1", 1, 1, "de"), "B5"), undefined);
 });
 
 // ==============================================================================================
@@ -860,8 +1143,14 @@ run(current, () => {
   // Filters still work after inserting rows
   eq("filter after insert", hidden(O.insertRows(wb, "s1", 1, 1)), [2, 3, 4, 5, 7]);
 
-  // Every data row deleted: a header without rows still behaves
-  const bare = O.deleteRows(wb, "s1", 1, 6);
+  // Every data row deleted: one empty data row stays (Excel), and the filters go with the data
+  const emptied = O.deleteRows(wb, "s1", 1, 6);
+  eq("one empty data row stays", [areaText(only(emptied).area), cell(emptied, "A2"), cell(emptied, "B2"), cell(emptied, "C2")], ["A1:C2", undefined, undefined, undefined]);
+  eq("its filter goes (it would hide the row)", [only(emptied).filters, hidden(emptied)], [{}, []]);
+  const typedIn = O.setCells(emptied, "s1", [{ row: 1, col: 1, cell: { v: 3 } }]);
+  check("typing into it needs no growing", T.afterInput(typedIn, calcOf(typedIn), "s1", 1, 1) === typedIn);
+  // A table with only its header (from older files, or totals switched off on an empty table) still behaves
+  const bare = O.putTable(O.clearAreas(wb, "s1", [A("A2:C7")], "all"), { ...only(wb), area: A("A1:C1") });
   const tb = only(bare);
   eq("header only", areaText(tb.area), "A1:C1");
   eq("no rows hidden", hidden(bare), []);

@@ -1247,6 +1247,28 @@ section("typing into cells");
   eq("unit en", P("0.25 mM", "en"), { cell: { v: 0.25 }, fmt: { kind: "number", decimals: 2, unit: "mM" } });
   eq("other words stay text", P("3 Proben"), { cell: { v: "3 Proben" } });
   err("units only when typing (VALUE stays strict)", ev('VALUE("12,5 mg/L")'), "#VALUE!");
+  // A lone 0 before the dot can't be a thousands group: German "0.123" is 0,123 like "1.5" is 1,5.
+  eq("0.123 is a decimal in German", P("0.123"), { cell: { v: 0.123 } });
+  eq("0.5", P("0.5"), { cell: { v: 0.5 } });
+  eq("-0.25", P("-0.25"), { cell: { v: -0.25 } });
+  eq("-0.123", P("-0.123"), { cell: { v: -0.123 } });
+  eq("+0.123", P("+0.123"), { cell: { v: 0.123 } });
+  eq("0.000123", P("0.000123"), { cell: { v: 0.000123 } });
+  eq("00.123", P("00.123"), { cell: { v: 0.123 } });
+  eq("0.123 with a unit", P("0.123 mg/L"), { cell: { v: 0.123 }, fmt: { kind: "number", decimals: 3, unit: "mg/L" } });
+  eq("1.5 with a unit is a number like 1.5", P("1.5 mg/L"), { cell: { v: 1.5 }, fmt: { kind: "number", decimals: 1, unit: "mg/L" } });
+  eq("-1.5 with a unit", P("-1.5 °C"), { cell: { v: -1.5 }, fmt: { kind: "number", decimals: 1, unit: "°C" } });
+  eq("0.123 %", P("0.123 %"), { cell: { v: 0.00123 }, fmt: { kind: "percent", decimals: 3 } });
+  eq("0.123.456 is no number", P("0.123.456"), { cell: { v: "0.123.456" } });
+  eq("1.234 still thousands", P("1.234").cell, { v: 1234 });
+  eq("1.234,5 still thousands", P("1.234,5").cell, { v: 1234.5 });
+  eq("1.234 mg/L still thousands", P("1.234 mg/L"), { cell: { v: 1234 }, fmt: { kind: "number", decimals: 0, group: true, unit: "mg/L" } });
+  eq("en 0.123 unchanged", P("0.123", "en"), { cell: { v: 0.123 } });
+  eq("en 0,123 unchanged", P("0,123", "en"), { cell: { v: 123 }, fmt: { kind: "number", decimals: 0, group: true } });
+  eq("VALUE keeps reading 0.123 as thousands", ev('VALUE("0.123")'), 123);
+  eq("arithmetic too", ev('"0.123"+0'), 123);
+  eq("text 0.123 edits with ' (typing it makes a number)", E.editText({ v: "0.123" }, "de"), "'0.123");
+  eq("pasting 0.123 in German", O.getCell(O.pasteText(book1(), "s1", { row: 0, col: 0 }, [["0.123", "-0.5"]], "de"), "s1", 0, 0), { v: 0.123 });
   eq("shown with its unit", E.formatValue(12.5, P("12,5 mg/L").fmt, "de"), "12,5\u202Fmg/L");
 }
 
@@ -1380,6 +1402,47 @@ section("structural changes (adjust)");
   eq("move to another sheet (formula there)", cross("'Blatt 1'!A2", "Daten"), "Daten!C2");
   const moved = E.adjustMovedFormula("A1*2+B1", "Blatt 1", "Daten", { kind: "move", sheet: "Blatt 1", from: area("A1:A2"), toSheet: "Daten", to: { row: 0, col: 2 } });
   eq("a moved formula keeps pointing home", moved, "C1*2+'Blatt 1'!B1");
+}
+
+// ==============================================================================================
+section("smart tables growing: references follow (growTableRefs)");
+{
+  // A table on 'Blatt 1', columns B…D, header row 5, data rows 6…11, grows to row 12.
+  const g: E.TableRows = { sheet: "Blatt 1", c0: 1, c1: 3, header: 4, from: { r0: 5, r1: 10 }, to: { r0: 5, r1: 11 } };
+  const G = (f: string, host = "Blatt 1", at?: string, rows = g) => E.growTableRefs(f, host, rows, at ? parsePos(at)! : undefined);
+  eq("relative", G("SLOPE(C6:C11,B6:B11)"), "SLOPE(C6:C12,B6:B12)");
+  eq("absolute", G("SLOPE($C$6:$C$11,$B$6:$B$11)"), "SLOPE($C$6:$C$12,$B$6:$B$12)");
+  eq("mixed", G("SUM(C$6:C$11)+SUM($C6:$C11)"), "SUM(C$6:C$12)+SUM($C6:$C12)");
+  eq("several columns", G("INDEX(LINEST(C6:C11,B6:B11),1)+SUM(B6:D11)"), "INDEX(LINEST(C6:C12,B6:B12),1)+SUM(B6:D12)");
+  eq("header row plus data", G("COUNTA(B5:B11)+COUNT(B5:D11)"), "COUNTA(B5:B12)+COUNT(B5:D12)");
+  eq("from another sheet", G("SLOPE('Blatt 1'!C6:C11,'Blatt 1'!B6:B11)", "Auswertung"), "SLOPE('Blatt 1'!C6:C12,'Blatt 1'!B6:B12)");
+  eq("sheet named in another case", G("SUM('BLATT 1'!C6:C11)", "Auswertung"), "SUM('BLATT 1'!C6:C12)");
+  eq("own sheet named", G("SUM('Blatt 1'!$C$6:$C$11)"), "SUM('Blatt 1'!$C$6:$C$12)");
+  const stays = ["SUM(C7:C11)", "SUM(C6:C10)", "SUM(A6:C11)", "SUM(C6:E11)", "C11*2", "SUM(C:C)", "SUM(6:11)", "SUM(C6:C12)", "SUM(B4:B11)", "SUM(Daten!C6:C11)", '"C6:C11"'];
+  for (const f of stays) check(`stays: ${f}`, G(f) === f, G(f));
+  check("same cells on another sheet stay", G("SUM(C6:C11)", "Auswertung") === "SUM(C6:C11)");
+  eq("corners written backwards", G("SUM(C11:C6)"), "SUM(C6:C12)");
+  eq("spacing kept", G("SUM( C6:C11 ) + 1"), "SUM( C6:C12 ) + 1");
+  // A formula in the new row itself: never made circular
+  eq("mean typed right below: keeps its range", G("AVERAGE(C6:C11)", "Blatt 1", "C12"), "AVERAGE(C6:C11)");
+  eq("…another column of the new row grows", G("C12/SLOPE(C6:C11,B6:B11)", "Blatt 1", "D12"), "C12/SLOPE(C6:C12,B6:B12)");
+  eq("…a cell outside the table grows", G("AVERAGE(C6:C11)", "Blatt 1", "F12"), "AVERAGE(C6:C12)");
+  eq("…the same address on another sheet grows", G("AVERAGE('Blatt 1'!C6:C11)", "Auswertung", "C12"), "AVERAGE('Blatt 1'!C6:C12)");
+  // Several rows at once (a paste)
+  eq("several rows", G("SLOPE(C6:C11,B6:B11)", "Blatt 1", undefined, { ...g, to: { r0: 5, r1: 14 } }), "SLOPE(C6:C15,B6:B15)");
+  // Rows inserted right under the header: references were pushed past them and come back
+  const top: E.TableRows = { ...g, from: { r0: 6, r1: 11 }, to: { r0: 5, r1: 11 } };
+  eq("rows under the header", G("SLOPE(C7:C12,$B$7:$B$12)", "Blatt 1", undefined, top), "SLOPE(C6:C12,$B$6:$B$12)");
+  eq("…header and data already right", G("COUNTA(B5:B12)", "Blatt 1", undefined, top), "COUNTA(B5:B12)");
+  // A table without data rows has nothing to follow
+  check("no data rows", G("SUM(B5:B5)", "Blatt 1", undefined, { ...g, from: { r0: 5, r1: 4 } }) === "SUM(B5:B5)");
+  // Stored areas (charts)
+  eq("area grows", E.tableRowsArea({ r0: 5, c0: 2, r1: 10, c1: 2 }, g), { r0: 5, c0: 2, r1: 11, c1: 2 });
+  eq("area: header and data", E.tableRowsArea({ r0: 4, c0: 1, r1: 10, c1: 3 }, g), { r0: 4, c0: 1, r1: 11, c1: 3 });
+  eq("area: part of the data", E.tableRowsArea({ r0: 6, c0: 2, r1: 10, c1: 2 }, g), null);
+  eq("area: beside the table", E.tableRowsArea({ r0: 5, c0: 4, r1: 10, c1: 4 }, g), null);
+  eq("area: the header cell alone", E.tableRowsArea({ r0: 4, c0: 2, r1: 4, c1: 2 }, g), null);
+  eq("area: already there", E.tableRowsArea({ r0: 5, c0: 2, r1: 11, c1: 2 }, { ...g, from: { r0: 5, r1: 11 } }), null);
 }
 
 // ==============================================================================================
@@ -1681,9 +1744,19 @@ section("ops: inserting and deleting rows");
   eq("table shrinks", d.tables[0].area, area("A1:B5"));
   eq("chart shrinks", d.charts[0].series[0].y, rr("s1", "B2:B5"));
   eq("size never below the default", d.sheets[0].size.rows, 200);
+  // Every data row of the table: like Excel, it keeps one empty data row; ranges over the data
+  // shrink to it (instead of #REF!), so the chart and the sum stay and can grow again.
   const allData = O.deleteRows(wb, "s1", 1, 5);
-  eq("chart without data goes", allData.charts.length, 0);
-  eq("table keeps its header", allData.tables[0].area, area("A1:B1"));
+  eq("table keeps one empty data row", allData.tables[0].area, area("A1:B2"));
+  eq("…emptied in every column", [cellAt(allData, "A2"), cellAt(allData, "B2"), cellAt(allData, "C2")], [undefined, undefined, undefined]);
+  eq("…ranges over the data shrink to it", [f(allData, "D1"), f(allData, "A2", "s2")], ["SUM(B2:B2)", "SUM('Blatt 1'!B2:B2)"]);
+  eq("…a deleted cell is still #REF!", f(allData, "E1"), "#REF!");
+  eq("…the chart stays", [allData.charts.length, allData.charts[0].x, allData.charts[0].series[0].y, allData.charts[0].series[0].errorBars?.plus], [1, rr("s1", "A2:A2"), rr("s1", "B2:B2"), rr("s1", "C2:C2")]);
+  eq("…its filters go (they could hide the row)", allData.tables[0].filters, {});
+  eq("…the frozen row stays", allData.sheets[0].freeze.rows, 1);
+  const noTable = O.deleteRows({ ...wb, tables: [] }, "s1", 1, 5);
+  eq("without a table: chart without data goes", noTable.charts.length, 0);
+  eq("…and the sum is #REF!", f(noTable, "D1"), "SUM(#REF!)");
   const header = O.deleteRows(wb, "s1", 0, 1);
   eq("table without header goes", header.tables.length, 0);
   eq("chart loses its name cell", header.charts[0].series[0].nameRef, null);
@@ -1703,6 +1776,14 @@ section("ops: inserting and deleting columns");
   eq("formulas in moved cells", f(w, "D2"), "A2*2");
   eq("table grows", w.tables[0].area, area("A1:C6"));
   eq("table gets a column", w.tables[0].columns.map((c) => c.id.startsWith("col") ? c.id : "new"), ["col1", "new", "col2"]);
+  eq("…with a header name (default German)", [cellAt(w, "A1")?.v, cellAt(w, "B1")?.v, cellAt(w, "C1")?.v], ["Konz", "Spalte2", "Ext"]);
+  eq("…its data cells stay empty", cellAt(w, "B2"), undefined);
+  eq("English name", cellAt(O.insertCols(wb, "s1", 1, 1, "en"), "B1")?.v, "Column2");
+  const two = O.insertCols(wb, "s1", 1, 2, "de");
+  eq("two new columns, two names", [cellAt(two, "B1")?.v, cellAt(two, "C1")?.v, cellAt(two, "D1")?.v], ["Spalte2", "Spalte3", "Ext"]);
+  const taken = O.insertCols(O.setCells(wb, "s1", [{ row: 0, col: 1, cell: { v: "spalte2" } }]), "s1", 1, 1, "de");
+  eq("unique in the table", [cellAt(taken, "B1")?.v, cellAt(taken, "C1")?.v], ["Spalte3", "spalte2"]);
+  eq("no names outside tables", cellAt(O.insertCols(wb, "s1", 3, 1, "de"), "D1"), undefined);
   eq("chart follows", w.charts[0].series[0].y, rr("s1", "C2:C6"));
   eq("other sheet follows", f(w, "A2", "s2"), "SUM('Blatt 1'!C2:C6)");
   eq("size grows", w.sheets[0].size.cols, 27);
@@ -1717,6 +1798,85 @@ section("ops: inserting and deleting columns");
   eq("widths move", O.insertCols(O.setColWidths(wb, "s1", [1], 150), "s1", 0, 2).sheets[0].cols, { "3": { w: 150 } });
   const gone = O.deleteCols(wb, "s1", 0, 2);
   eq("table wholly deleted goes", gone.tables.length, 0);
+}
+
+section("ops: smart tables keep their formulas, totals and references");
+{
+  // The lab table widened to A1:C6 so the doubled column C (=A2*2…) is a calculated column; B has 3 decimals.
+  const fmt3 = { kind: "number" as const, decimals: 3 };
+  const base = lab();
+  const wb0: Workbook = { ...base, tables: [{ ...tableOn("s1", "A1:C6"), filters: {}, sort: null }] };
+  const wb = O.setStyle(wb0, "s1", [area("B2:B6")], { fmt: fmt3 });
+  const withTotals: Workbook = O.setCells({ ...wb, tables: [{ ...wb.tables[0], totals: true, area: area("A1:C7") }] }, "s1", [
+    { row: 1, col: 0, cell: { v: 0 } },
+    { row: 6, col: 0, cell: { v: "Ergebnis" } },
+    { row: 6, col: 1, cell: { f: "SUBTOTAL(109,B2:B6)" } },
+  ]);
+  // (In withTotals the data rows are 2…6 and row 7 is the totals row; the old row 7 had nothing.)
+
+  // Rows inserted between the data rows: calculated column and formats continue
+  const mid = O.insertRows(wb, "s1", 3, 2);
+  eq("calculated column continues", [f(mid, "C4"), f(mid, "C5"), f(mid, "C6")], ["A4*2", "A5*2", "A6*2"]);
+  eq("number format continues", [cellAt(mid, "B4")?.s?.fmt, cellAt(mid, "B5")?.s?.fmt], [fmt3, fmt3]);
+  eq("…no values", [cellAt(mid, "A4"), cellAt(mid, "B4")?.v], [undefined, undefined]);
+  eq("ranges grow by themselves", [f(mid, "D1"), mid.charts[0].series[0].y], ["SUM(B2:B8)", rr("s1", "B2:B8")]);
+  // Right under the header: ranges over the data take the new row in (Excel's structured references)
+  const top = O.insertRows(wb, "s1", 1, 1);
+  eq("under the header: table grows", top.tables[0].area, area("A1:C7"));
+  eq("…calculated column (from the row below)", f(top, "C2"), "A2*2");
+  eq("…format from the row below", cellAt(top, "B2")?.s?.fmt, fmt3);
+  eq("…sum takes it in", f(top, "D1"), "SUM(B2:B7)");
+  eq("…other sheet too", f(top, "A2", "s2"), "SUM('Blatt 1'!B2:B7)");
+  eq("…chart x, y and error bars", [top.charts[0].x, top.charts[0].series[0].y, top.charts[0].series[0].errorBars?.plus], [rr("s1", "A2:A7"), rr("s1", "B2:B7"), rr("s1", "C2:C7")]);
+  eq("…the legend name cell stays", top.charts[0].series[0].nameRef, rr("s1", "B1"));
+  eq("…a single cell still moves", f(top, "E1"), "B5");
+  // Right above the totals row
+  const above = O.insertRows(withTotals, "s1", 6, 2);
+  eq("above the totals row: table grows", above.tables[0].area, area("A1:C9"));
+  eq("…totals cover every data row", f(above, "B9"), "SUBTOTAL(109,B2:B8)");
+  eq("…sum and chart take them in", [f(above, "D1"), above.charts[0].series[0].y], ["SUM(B2:B8)", rr("s1", "B2:B8")]);
+  eq("…calculated column", [f(above, "C7"), f(above, "C8")], ["A7*2", "A8*2"]);
+  eq("…its value", val(O.setCells(above, "s1", [{ row: 6, col: 0, cell: { v: 7 } }]), "C7"), 14);
+  const under = O.insertRows(withTotals, "s1", 1, 1);
+  eq("under the header with totals", f(under, "B8"), "SUBTOTAL(109,B2:B7)");
+  // Not the table's rows: nothing is filled
+  const before = O.insertRows(wb, "s1", 0, 1);
+  eq("above the table: no new row in it", [before.tables[0].area, cellAt(before, "C1")], [area("A2:C7"), undefined]);
+  const after = O.insertRows(wb, "s1", 6, 1);
+  eq("right below (no totals): not the table's", [after.tables[0].area, cellAt(after, "C7"), f(after, "D1")], [area("A1:C6"), undefined, "SUM(B2:B6)"]);
+  // Two tables next to each other each fill their own columns
+  const pair: Workbook = { ...wb, tables: [...wb.tables, { ...tableOn("s1", "E3:E5", "t2", "T2"), filters: {}, sort: null }] };
+  const pairIns = O.insertRows(O.setCells(pair, "s1", [{ row: 2, col: 4, cell: { f: "A3+1" } }, { row: 3, col: 4, cell: { f: "A4+1" } }, { row: 4, col: 4, cell: { f: "A5+1" } }]), "s1", 4, 1);
+  eq("two tables", [f(pairIns, "C5"), f(pairIns, "E5")], ["A5*2", "A5+1"]);
+
+  // Deleting every data row: one empty row stays, with the calculated column's formula and the formats
+  const all = O.deleteRows(wb, "s1", 1, 5);
+  eq("one row stays", all.tables[0].area, area("A1:C2"));
+  eq("…with the calculated column and the format", [cellAt(all, "A2"), cellAt(all, "B2"), cellAt(all, "C2")], [undefined, { s: { fmt: fmt3 } }, { f: "A2*2" }]);
+  eq("…the kept row's height goes with what was in it", O.deleteRows(O.setRowHeights(wb, "s1", [1, 7], 50), "s1", 1, 5).sheets[0].rows, { "3": { h: 50 } });
+  const allTot = O.deleteRows(withTotals, "s1", 1, 5);
+  eq("with totals: header, one row, totals", [allTot.tables[0].area, allTot.tables[0].totals], [area("A1:C3"), true]);
+  eq("…the totals still add up the data row", [f(allTot, "B3"), val(allTot, "B3"), cellAt(allTot, "A3")?.v], ["SUBTOTAL(109,B2:B2)", 0, "Ergebnis"]);
+  const allAndTotals = O.deleteRows(withTotals, "s1", 1, 6);
+  eq("data and totals rows deleted: one row, no totals", [allAndTotals.tables[0].area, allAndTotals.tables[0].totals], [area("A1:C2"), false]);
+  const last = O.deleteRows(O.deleteRows(wb, "s1", 2, 4), "s1", 1, 1);
+  eq("the last data row deleted: emptied instead", [last.tables[0].area, cellAt(last, "A2"), f(last, "C2")], [area("A1:C2"), undefined, "A2*2"]);
+  const further = O.setCells(wb, "s1", [{ row: 9, col: 0, cell: { v: "unten" } }, { row: 7, col: 5, cell: { v: "daneben" } }]);
+  const past = O.deleteRows(further, "s1", 1, 7);
+  eq("deleting past the table: the rest moves up by one less", [cellAt(past, "A4")?.v, past.tables[0].area], ["unten", area("A1:C2")]);
+  eq("…deleted cells beside the table are gone", Object.keys(past.sheets[0].cells).filter((k) => k.endsWith(",5")), []);
+  const besideHeader: Workbook = { ...wb, tables: [...wb.tables, { ...tableOn("s1", "E2:E4", "t2", "T2"), filters: {}, sort: null }] };
+  eq("a table whose header was deleted goes", O.deleteRows(besideHeader, "s1", 1, 5).tables.map((t) => t.id), ["t1"]);
+  const anchored = O.deleteRows({ ...wb, charts: [{ ...chartOn("s1"), at: { row: 3, col: 3, dx: 4, dy: 6 } }] }, "s1", 1, 5);
+  eq("a chart anchored in the deleted rows moves to the first", anchored.charts[0].at, { row: 1, col: 3, dx: 4, dy: 0 });
+
+  // growTableReferences directly: formulas everywhere and chart ranges
+  const t = wb.tables[0];
+  const grown = O.growTableReferences(wb, t, { r0: 1, r1: 5 }, { r0: 1, r1: 6 });
+  eq("formulas on both sheets", [f(grown, "D1"), f(grown, "A2", "s2"), f(grown, "E1")], ["SUM(B2:B7)", "SUM('Blatt 1'!B2:B7)", "B4"]);
+  eq("chart ranges", [grown.charts[0].x, grown.charts[0].series[0].y, grown.charts[0].series[0].errorBars?.plus, grown.charts[0].series[0].nameRef], [rr("s1", "A2:A7"), rr("s1", "B2:B7"), rr("s1", "C2:C7"), rr("s1", "B1")]);
+  check("unchanged workbook when nothing points there", O.growTableReferences(wb, t, { r0: 2, r1: 5 }, { r0: 2, r1: 6 }) === wb);
+  check("…or nothing changes", O.growTableReferences(wb, t, { r0: 1, r1: 5 }, { r0: 1, r1: 5 }) === wb);
 }
 
 section("ops: speed on a big sheet");
@@ -2029,6 +2189,12 @@ section("ops: sheets");
   eq("references become #REF!", [f(d, "A1", "s2"), f(d, "A2", "s2")], ["#REF!", "SUM(#REF!)"]);
   eq("its charts and tables go", [d.charts.length, d.tables.length], [0, 0]);
   eq("the last sheet stays", O.deleteSheet(d, "s2"), d);
+  // A ' in a sheet name is written twice in formulas ('Paul''s Daten'!A5): they still follow
+  const apos = book(mkSheet("s1", "Paul's Daten", { A5: 5 }), mkSheet("s2", "Blatt 2", { A1: "='Paul''s Daten'!A5*2" }));
+  eq("name with ': rows inserted", [f(O.insertRows(apos, "s1", 0, 1), "A1", "s2"), val(O.insertRows(apos, "s1", 0, 1), "A1", "s2")], ["'Paul''s Daten'!A6*2", 10]);
+  eq("name with ': columns deleted", f(O.deleteCols(apos, "s1", 0, 1), "A1", "s2"), "#REF!*2");
+  eq("name with ': renamed", f(O.renameSheet(apos, "s1", "Neu"), "A1", "s2"), "Neu!A5*2");
+  eq("name with ': deleted", f(O.deleteSheet(apos, "s1"), "A1", "s2"), "#REF!*2");
   const other: Workbook = { ...wb, charts: [{ ...chartOn("s1"), sheetId: "s2" }] };
   eq("a chart elsewhere loses series from the deleted sheet", O.deleteSheet(other, "s1").charts.length, 0);
   eq("move sheet", O.moveSheet(wb, "s2", 0).sheets.map((s) => s.id), ["s2", "s1"]);

@@ -8,19 +8,20 @@ import { areaName, colName, quoteSheetName } from "@/sheet/a1";
 import { tokenizeFormula, type FormulaToken } from "@/sheet/engine";
 import { sheetById } from "@/sheet/ops";
 import type { Area, Pos, SheetColor, Workbook } from "@/sheet/types";
-import { insertRef, refColors, wantsRef } from "../chrome/formulaInput";
+import { insertRef, REF_COLORS, refColors, wantsRef } from "../chrome/formulaInput";
 import { mainArea, type SheetStore } from "../store";
 import { dataEdge } from "./navigation";
 import type { RefFrame } from "./Selection";
 
+// The formula bar's helpers (chrome/formulaInput.ts) decide colours and pointing, so cell and bar
+// behave the same. They are wrapped: half-typed formulas are their daily bread, but should one
+// ever throw, simple rules below keep typing and pointing working, and it is reported once.
 const warned = new Set<string>();
 function warnOnce(what: string, err: unknown) {
   if (warned.has(what)) return;
   warned.add(what);
   console.error(`sheet: ${what} failed`, err);
 }
-
-const REF_PALETTE: SheetColor[] = ["blue", "red", "purple", "green", "orange", "teal", "pink", "brown"];
 
 /** Tokens of a formula being typed (text with "="), positions in that text, with each reference's colour. null for plain text. */
 export function formulaTokens(text: string, locale: Locale): { tokens: FormulaToken[]; colors: Map<FormulaToken, SheetColor> } | null {
@@ -32,7 +33,7 @@ export function formulaTokens(text: string, locale: Locale): { tokens: FormulaTo
     return null;
   }
   // The formula bar colours references the same way (refColors); should that fail, each distinct
-  // reference still gets the next colour of a fixed palette.
+  // reference still gets the next of the same colours.
   let colors: Map<FormulaToken, SheetColor>;
   try {
     colors = refColors(raw);
@@ -43,7 +44,7 @@ export function formulaTokens(text: string, locale: Locale): { tokens: FormulaTo
     for (const t of raw) {
       if (t.kind !== "ref") continue;
       const key = t.text.replace(/\$/g, "").toUpperCase();
-      if (!byText.has(key)) byText.set(key, REF_PALETTE[byText.size % REF_PALETTE.length]);
+      if (!byText.has(key)) byText.set(key, REF_COLORS[byText.size % REF_COLORS.length]);
       colors.set(t, byText.get(key)!);
     }
   }
@@ -84,8 +85,7 @@ function refEndsAtCaret(text: string, caret: number, locale: Locale): boolean {
   return !!tok?.tokens.some((t) => t.kind === "ref" && t.end === caret);
 }
 
-// The formula bar's helpers decide pointing (chrome/formulaInput.ts, shared so both behave the
-// same). Should one of them fail, these simple rules keep pointing at cells working.
+// Should the formula bar's pointing helpers ever fail, these simple rules keep pointing working.
 
 function wantsRefFallback(text: string, caret: number, locale: Locale): boolean {
   if (!text.startsWith("=")) return false;

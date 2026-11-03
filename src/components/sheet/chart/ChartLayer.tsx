@@ -12,7 +12,7 @@
 // Ctrl/⌘ + D duplicates it, Ctrl/⌘ + Z / Y undo and redo, Escape lets go of it.
 
 import { Copy, ImageDown, Settings2, Trash2, TrendingUp } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useTouch } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
@@ -20,11 +20,13 @@ import { cn } from "@/lib/utils";
 import { ChartView } from "@/sheet/chart/ChartView";
 import { chartData, type ChartData } from "@/sheet/chart/data";
 import type { Calc } from "@/sheet/engine";
-import { DEFAULT_COL_W, type ChartSpec, type Sheet } from "@/sheet/types";
+import { DEFAULT_COL_W, type ChartSpec, type RangeRef, type Sheet } from "@/sheet/types";
+import { useOpenEmbedItem } from "../embed/openItem";
 import type { GridGeometry } from "../grid/Grid";
+import { PANEL_MIN_WIDTH, PANEL_WIDTH } from "../panelLayout";
 import { useSheet, type SheetStore } from "../store";
 import { deleteChart, duplicateChart, openChartPanel, quickTrendline, saveChartFile, updateChart } from "./actions";
-import { selectChart, useChartUi } from "./selection";
+import { chartUi, selectChart, setChartUi, setChartViewport, useChartUi, type ChartViewport } from "./selection";
 
 /** The smallest a chart gets by resizing (logical px). */
 export const CHART_MIN = { w: 240, h: 160 } as const;
@@ -95,6 +97,90 @@ function dragged(base: Box, kind: "move" | Handle, dx: number, dy: number, scale
   return { x, y, w: Math.max(minW, w), h: Math.max(minH, h) };
 }
 
+/** Room kept between a chart scrolled into view and the edges of what you see (px). */
+const REVEAL_MARGIN = 12;
+/** The action bar of a selected chart, with its gap (px): above the chart, or below it at the top of the sheet. */
+const BAR_SPACE = 52;
+
+/** The leftmost column of the cells a chart shows (on its own sheet), or null. */
+function dataLeftCol(spec: ChartSpec): number | null {
+  const refs = [spec.x, ...spec.series.flatMap((s) => [s.y, s.x])].filter((r): r is RangeRef => !!r && r.sheetId === spec.sheetId);
+  return refs.length ? Math.min(...refs.map((r) => Math.min(r.c0, r.c1))) : null;
+}
+
+/**
+ * Scroll the grid so a chart is in view (just inserted or duplicated, its settings just opened, or
+ * opened from a note), with its action bar: below the headers and frozen panes, and above the
+ * settings SheetEditor docks over the lower part of the editor on narrow screens (a region in
+ * [data-sheet-editor]). Sideways it moves only as far as it must, and when most of the chart
+ * shows already it doesn't push the cells the chart is made from out on the left: a chart
+ * inserted beside a calibration table with the side panel open used to cut column A off.
+ * `frozen` and `dataLeft` are in the grid's content px (GridGeometry).
+ */
+function revealChart(card: HTMLElement, opts: { frozen: { w: number; h: number }; dataLeft: number | null; bar: "above" | "below" }) {
+  const grid = card.closest<HTMLElement>("[data-sheet-grid]");
+  const overlay = card.closest<HTMLElement>("[data-grid-overlay]");
+  if (!grid || !overlay) {
+    card.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    return;
+  }
+  // The overlay covers the scrolling cells, which start after the row numbers and column letters.
+  const cells = overlay.offsetParent instanceof HTMLElement ? overlay.offsetParent : null;
+  const g = grid.getBoundingClientRect();
+  const origin = overlay.getBoundingClientRect();
+  const left = g.left + grid.clientLeft + (cells?.offsetLeft ?? 0) + opts.frozen.w;
+  const top = g.top + grid.clientTop + (cells?.offsetTop ?? 0) + opts.frozen.h;
+  const right = g.left + grid.clientLeft + grid.clientWidth;
+  let bottom = g.top + grid.clientTop + grid.clientHeight;
+  // Settings docked at the bottom cover the grid from their top edge down (measured without the
+  // slide-in animation's transform, so it is right while the sheet still moves up).
+  const editor = card.closest<HTMLElement>("[data-sheet-editor]");
+  const docked = editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]");
+  if (editor && docked) bottom = Math.min(bottom, editor.getBoundingClientRect().top + editor.clientTop + docked.offsetTop);
+  if (right - left < 40 || bottom - top < 40) return;
+
+  const c = card.getBoundingClientRect();
+  const M = REVEAL_MARGIN;
+  const top0 = c.top - (opts.bar === "above" ? BAR_SPACE : 0);
+  const bottom0 = c.bottom + (opts.bar === "below" ? BAR_SPACE : 0);
+  let dy = 0;
+  // Taller than the room: its top (title, the upper part of the plot) shows.
+  if (bottom0 - top0 > bottom - top - 2 * M || top0 < top + M) dy = top0 - (top + M);
+  else if (bottom0 > bottom - M) dy = bottom0 - (bottom - M);
+
+  let dx = 0;
+  if (c.left < left + M) dx = c.left - (left + M);
+  else if (c.right > right - M) {
+    dx = Math.max(0, Math.min(c.right - (right - M), c.left - (left + M)));
+    const shown = (Math.min(c.right, right) - Math.max(c.left, left)) / Math.max(1, c.width);
+    const dataLeft = opts.dataLeft === null ? null : origin.left + opts.dataLeft;
+    if (dataLeft !== null && dataLeft >= left - 1 && dataLeft < c.left && shown >= 0.5) dx = Math.min(dx, Math.max(0, dataLeft - left));
+  }
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+  grid.scrollBy({ left: Math.abs(dx) < 1 ? 0 : dx, top: Math.abs(dy) < 1 ? 0 : dy, behavior: "smooth" });
+}
+
+
+/** The grid's visible cells now, in content px (see ChartViewport). */
+function measureViewport(store: SheetStore, geom: GridGeometry): ChartViewport | null {
+  const grid = document.querySelector<HTMLElement>("[data-sheet-grid]");
+  const overlay = grid?.querySelector<HTMLElement>("[data-grid-overlay]");
+  if (!grid || !overlay || !grid.clientWidth) return null;
+  const cells = overlay.offsetParent instanceof HTMLElement ? overlay.offsetParent : null;
+  const state = store.get();
+  const fc = state.workbook.sheets.find((x) => x.id === geom.sheetId)?.freeze.cols ?? 0;
+  const editor = grid.closest<HTMLElement>("[data-sheet-editor]");
+  // No settings open yet: on a wide editor they will open beside the grid and take its room.
+  const opens = !state.focus && !!editor && !editor.querySelector(":scope > aside") && editor.clientWidth >= PANEL_MIN_WIDTH;
+  return {
+    left: grid.scrollLeft + (fc > 0 ? geom.rect(0, fc).x : 0),
+    right: grid.scrollLeft + grid.clientWidth - (cells?.offsetLeft ?? 0),
+    colX: (col) => geom.rect(0, col).x,
+    zoom: geom.zoom > 0 ? geom.zoom : 1,
+    sidePanel: opens ? PANEL_WIDTH : 0,
+  };
+}
+
 const EMPTY_DATA: ChartData = { categories: [], series: [], xDecimals: null, yDecimals: null };
 
 /** A chart's data; a broken reference or an engine problem shows an empty chart, never a broken sheet. */
@@ -120,6 +206,18 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
     sheets.find((s) => s.id === geom.sheetId),
   );
   const panelChart = focus?.kind === "chart" ? focus.id : null;
+  // Opened from a note's block: what it shows is selected (the layer is on screen whenever the grid is).
+  useOpenEmbedItem(store);
+
+  // What the grid shows, for placing a new chart where it can be seen (insertChart).
+  const geomRef = useRef(geom);
+  useEffect(() => {
+    geomRef.current = geom;
+  });
+  useEffect(() => {
+    setChartViewport(store, () => measureViewport(store, geomRef.current));
+    return () => setChartViewport(store, null);
+  }, [store]);
 
   // A press anywhere else (a cell, the toolbar) lets go of the selected chart; its panel and the
   // menus and dialogs it opens don't.
@@ -151,7 +249,7 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
             selected={ui.selected === spec.id}
             panelOpen={panelChart === spec.id}
             highlight={panelChart === spec.id ? ui.series : null}
-            reveal={ui.selected === spec.id ? ui.reveal : 0}
+            reveal={ui.revealId === spec.id ? ui.reveal : 0}
           />
         ))}
     </>
@@ -197,10 +295,36 @@ function ChartCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const box = preview ?? base;
 
-  // A chart just inserted or duplicated scrolls into view.
+  // A chart just inserted, duplicated or opened from a note scrolls into view, and so does a
+  // chart whose settings open (docked at the bottom on narrow screens, they would cover it).
+  // Measured a frame later, when the panel that opens with it has taken its place.
+  const revealNow = useEffectEvent(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const sheet = store.get().workbook.sheets.find((x) => x.id === spec.sheetId);
+    const fc = sheet?.freeze.cols ?? 0;
+    const fr = sheet?.freeze.rows ?? 0;
+    const col = dataLeftCol(spec);
+    revealChart(el, {
+      frozen: { w: fc > 0 ? geom.rect(0, fc).x : 0, h: fr > 0 ? geom.rect(fr, 0).y : 0 },
+      dataLeft: col !== null ? geom.rect(spec.at.row, col).x : null,
+      bar: box.y >= 52 ? "above" : "below",
+    });
+  });
+  const revealed = useRef({ reveal: 0, panel: false });
   useEffect(() => {
-    if (reveal) cardRef.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-  }, [reveal]);
+    const done = revealed.current;
+    if (!panelOpen) done.panel = false;
+    if (!((reveal !== 0 && reveal !== done.reveal) || (panelOpen && !done.panel))) return;
+    const frame = requestAnimationFrame(() => {
+      done.reveal = reveal;
+      done.panel = panelOpen;
+      revealNow();
+      // Done: coming back to this sheet later doesn't scroll to the chart again.
+      if (reveal !== 0 && chartUi(store).revealId === spec.id) setChartUi(store, { revealId: null });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [reveal, panelOpen, store, spec.id]);
 
   /** Write the box as the chart's anchor cell + offset and size (logical px). */
   const commit = (next: Box, kind: "move" | Handle) => {

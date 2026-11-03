@@ -11,6 +11,7 @@ import { Flashcard, FlashcardBack, FlashcardFront } from "@/components/editor/bl
 import { LessonLink } from "@/components/editor/blocks/LessonLink";
 import { MathBlock, MathInline } from "@/components/editor/blocks/Math";
 import { Plot } from "@/components/editor/blocks/Plot";
+import { PublicSheetEmbed } from "@/components/editor/blocks/SheetEmbed";
 import { Sketch } from "@/components/editor/blocks/Sketch";
 import { Toggle, ToggleContent, ToggleReveal, ToggleSummary } from "@/components/editor/blocks/Toggle";
 import { documentExtensions } from "@/components/editor/schema";
@@ -26,8 +27,8 @@ function asDoc(content: unknown): JSONContent {
 
 /**
  * A note as anyone with its public link sees it: the editor's own blocks (formulas, diagrams,
- * flashcards, toggles…), read-only. Files come through the link, links to pages lead to the pages
- * the link also opens.
+ * flashcards, toggles, charts and tables from spreadsheets…), read-only. Files come through the
+ * link, links to pages lead to the pages the link also opens.
  */
 export function PublicNote({ pageId, content }: { pageId: string; content: unknown }) {
   const { token } = usePublicPages();
@@ -58,6 +59,7 @@ export function PublicNote({ pageId, content }: { pageId: string; content: unkno
             plot: Plot,
             file: FileBlock,
             deckEmbed: PublicDeckEmbed,
+            sheetEmbed: PublicSheetEmbed,
             lessonLink: LessonLink,
             pageLink: PublicPageLink,
           },

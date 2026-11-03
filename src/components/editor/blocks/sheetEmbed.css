@@ -8,6 +8,14 @@
   line-height: 1.45;
 }
 
+/* A click on a button's icon or label belongs to the button. The note's editor (a Tiptap node
+   view) leaves clicks on the block's buttons, links and fields alone, but not clicks on what is
+   inside them: it would select the block and focus the note in the middle of the click, and throw
+   when the note changes right then ("Öffnen" in a note that has just opened). */
+.prose-blob .blob-sheet-embed :is(button, a, label) * {
+  pointer-events: none;
+}
+
 /* The card the chart or table sits in. */
 .prose-blob .blob-sheet-card {
   position: relative;

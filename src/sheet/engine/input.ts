@@ -48,7 +48,7 @@ export function parseInput(text: string, locale: Locale, current?: Cell, opts?: 
     const fmt = impliedFormulaFormat(r.formula);
     return fmt ? { cell: { f: r.formula }, fmt } : { cell: { f: r.formula } };
   }
-  const parsed = parseValueText(text, locale, { bools: true, units: true, now: opts?.now });
+  const parsed = parseValueText(text, locale, { bools: true, units: true, zeroDecimal: true, now: opts?.now });
   if (parsed) {
     if (parsed.kind === "bool") return { cell: { v: parsed.value } };
     let value = parsed.value;

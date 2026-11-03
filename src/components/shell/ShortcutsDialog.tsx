@@ -1,15 +1,22 @@
 "use client";
 
 import { Keyboard, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
 import { useIsMac } from "@/components/ui/useMediaQuery";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import type { Locale } from "@/i18n/config";
 import { useLocale, useMessages } from "@/i18n/client";
 import { panesText } from "@/i18n/messages/panes";
+import { sheetText } from "@/i18n/messages/sheet";
+import { pageIdOfPath } from "./recent";
 
 type Item = keyof (typeof panesText)["en"]["shortcuts"]["items"];
 type Group = keyof (typeof panesText)["en"]["shortcuts"]["groups"];
+type SheetItem = keyof (typeof sheetText)["en"]["shortcuts"]["items"];
+type SheetGroup = keyof (typeof sheetText)["en"]["shortcuts"]["groups"];
 
 /** Keys as written in the list: "mod" and "shift" become ⌘ ⇧ on a Mac, Ctrl and Shift elsewhere. */
 const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
@@ -73,13 +80,61 @@ const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
   },
 ];
 
-/** Every keyboard shortcut, in one list (Ctrl/Cmd+/). */
+/**
+ * A spreadsheet's keys, as the grid (src/components/sheet/grid/keys.ts), the cell editor (CellEditor.tsx)
+ * and the editor (SheetEditor.tsx) handle them. The date is Strg+. on German keyboards, as in German
+ * Excel (";" needs Shift there); Ctrl+; on English ones. ⌘H hides the app on a Mac, so ⌘⌥F replaces.
+ */
+function sheetGroups(mac: boolean, locale: Locale): { group: SheetGroup; items: [SheetItem, string[][]][] }[] {
+  const date = locale === "de" ? "." : ";";
+  return [
+    {
+      group: "cells",
+      items: [
+        ["edit", [["F2"]]],
+        ["absolute", [["F4"]]],
+        ["newLine", [["alt", "↵"]]],
+        ["fillTyped", [["mod", "↵"]]],
+        ["fill", [["mod", "D"], ["mod", "R"]]],
+        ["date", [["mod", date], ["mod", "shift", date]]],
+        ["undo", [["mod", "Z"], mac ? ["mod", "shift", "Z"] : ["mod", "Y"]]],
+      ],
+    },
+    {
+      group: "tools",
+      items: [
+        ["table", [["mod", "T"]]],
+        ["formats", [["mod", "1"]]],
+        ["autoSum", [["alt", "="]]],
+        ["chart", [["alt", "F1"]]],
+        ["functions", [["shift", "F3"]]],
+        ["find", [["mod", "F"]]],
+        ["replace", [mac ? ["mod", "alt", "F"] : ["mod", "H"]]],
+        ["save", [["mod", "S"]]],
+        ["print", [["mod", "P"]]],
+      ],
+    },
+  ];
+}
+
+/** Every keyboard shortcut, in one list (Ctrl/Cmd+/). In a spreadsheet its keys come first. */
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useMessages(panesText).shortcuts;
+  const ts = useMessages(sheetText).shortcuts;
   const mac = useIsMac();
   const locale = useLocale();
+  const { pages } = useWorkspace();
+  const here = pageIdOfPath(usePathname());
+  const inSheet = !!here && pages.some((p) => p.id === here && p.kind === "sheet");
   const name = (k: string) =>
     k === "mod" ? (mac ? "⌘" : locale === "de" ? "Strg" : "Ctrl") : k === "shift" ? (mac ? "⇧" : locale === "de" ? "Umschalt" : "Shift") : k === "alt" ? (mac ? "⌥" : "Alt") : k;
+  const app = GROUPS.map(({ group, items }) => ({ id: group, title: t.groups[group], items: items.map(([item, combos]) => ({ id: item, label: t.items[item], combos })) }));
+  const sheet = sheetGroups(mac, locale).map(({ group, items }) => ({
+    id: `sheet-${group}`,
+    title: ts.groups[group],
+    items: items.map(([item, combos]) => ({ id: item, label: ts.items[item], combos })),
+  }));
+  const sections = inSheet ? [...sheet, ...app] : [...app, ...sheet];
 
   return (
     <Dialog open={open} onClose={onClose} labelledBy="shortcuts-title" className="max-w-[720px]!">
@@ -93,13 +148,13 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
         </button>
       </div>
       <div className="grid max-h-[70vh] gap-x-8 gap-y-5 overflow-y-auto px-5 py-4 sm:grid-cols-2">
-        {GROUPS.map(({ group, items }) => (
-          <section key={group}>
-            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{t.groups[group]}</h3>
+        {sections.map(({ id, title, items }) => (
+          <section key={id}>
+            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{title}</h3>
             <dl className="space-y-1">
-              {items.map(([item, combos]) => (
+              {items.map(({ id: item, label, combos }) => (
                 <div key={item} className="flex items-center justify-between gap-3 py-0.5 text-[13px]">
-                  <dt className="min-w-0 text-ink-2">{t.items[item]}</dt>
+                  <dt className="min-w-0 text-ink-2">{label}</dt>
                   <dd className="flex shrink-0 items-center gap-1">
                     {combos.map((keys, i) => (
                       <Fragment key={i}>

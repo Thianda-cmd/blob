@@ -242,5 +242,11 @@ export { toFileFormula, fromFileFormula } from "./translate";
 export { parseErrorMessage };
 export { formatWithCode } from "./format";
 export { normalizeRef, refText, adjustArea, transposeFormula } from "./refs";
+/**
+ * Smart tables growing (Excel's structured references without the syntax): ranges that cover
+ * exactly a table's data rows follow when rows are typed, pasted or inserted at its edges.
+ * growTableRefs rewrites a formula; tableRowsArea does the same for a stored area (charts).
+ */
+export { growTableRefs, tableRowsArea, type TableRows } from "./refs";
 export { getFunction, missingFunctions } from "./functions";
 export { serialFromYMD, ymdFromSerial } from "./dates";

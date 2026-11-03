@@ -210,6 +210,8 @@ export const sheetChromeText = defineMessages({
     // Status bar
     statusBar: "Status bar",
     stats: { sum: "Sum", average: "Average", count: "Count", min: "Min", max: "Max", stdev: "Std. dev." },
+    /** The same as signs, when the status bar is narrow (a phone, a side panel open). */
+    statsShort: { sum: "Σ", average: "Avg", count: "n", min: "Min", max: "Max", stdev: "SD" },
     statTips: {
       sum: "The sum of the numbers (SUM)",
       average: "The mean of the numbers (AVERAGE)",
@@ -217,6 +219,7 @@ export const sheetChromeText = defineMessages({
       min: "The smallest number (MIN)",
       max: "The largest number (MAX)",
       stdev: "Sample standard deviation (STDEV.S)",
+      filled: "How many cells aren't empty",
     },
     copyHint: "Click to copy",
     copied: (what: string) => `${what} copied`,
@@ -494,6 +497,7 @@ export const sheetChromeText = defineMessages({
 
     statusBar: "Statusleiste",
     stats: { sum: "Summe", average: "Mittelwert", count: "Anzahl", min: "Min", max: "Max", stdev: "Stdabw." },
+    statsShort: { sum: "Σ", average: "Ø", count: "n", min: "Min", max: "Max", stdev: "s" },
     statTips: {
       sum: "Die Summe der Zahlen (SUMME)",
       average: "Der Mittelwert der Zahlen (MITTELWERT)",
@@ -501,6 +505,7 @@ export const sheetChromeText = defineMessages({
       min: "Die kleinste Zahl (MIN)",
       max: "Die größte Zahl (MAX)",
       stdev: "Standardabweichung der Stichprobe (STABW.S)",
+      filled: "Wie viele Zellen nicht leer sind",
     },
     copyHint: "Klicken zum Kopieren",
     copied: (what) => `${what} kopiert`,

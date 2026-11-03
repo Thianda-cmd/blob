@@ -165,7 +165,10 @@ export function PanesProvider({ children }: { children: ReactNode }) {
     const isMod = (e: KeyboardEvent) => (mac ? e.metaKey : e.ctrlKey);
     const onKeyDown = (e: KeyboardEvent) => {
       const s = switcherRef.current;
-      const switchKey = (isMod(e) && e.shiftKey && !e.altKey && e.code === "KeyL") || (e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Tab");
+      // In a spreadsheet's grid Ctrl+Shift+L is Excel's filter key (the grid makes a smart table with
+      // filter buttons): it stays there instead of also leaving the page. A switcher already open keeps it.
+      const inGrid = !s && e.target instanceof Element && e.target.closest("[data-sheet-grid]") !== null;
+      const switchKey = (isMod(e) && e.shiftKey && !e.altKey && e.code === "KeyL" && !inGrid) || (e.ctrlKey && !e.metaKey && !e.altKey && e.key === "Tab");
       if (switchKey) {
         e.preventDefault();
         const back = e.key === "Tab" && e.shiftKey;

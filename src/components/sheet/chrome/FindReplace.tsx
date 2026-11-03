@@ -1,10 +1,11 @@
 "use client";
 
 // Find and replace in the spreadsheet: a small panel under the toolbar that leaves the sheet in
-// view. Matches are the cells whose shown text (or formula, with "In Formeln") contains what you
-// type (* and ? work like in Excel); Enter and the arrows go from match to match (onto other
-// sheets with "Alle Blätter"), selecting each. Replacing changes typed values, and formulas with
-// "In Formeln"; each replace is one undo step.
+// view. Ctrl+F opens it for finding, Ctrl+H (⌘⌥F on a Mac) with the replace row. Matches are the
+// cells whose shown text (or formula, with "In Formeln") contains what you type (* and ? work
+// like in Excel); Enter and the arrows go from match to match (onto other sheets with "Alle
+// Blätter"), selecting each. Replacing changes typed values, and formulas with "In Formeln"; each
+// replace is one undo step.
 
 import { ArrowDown, ArrowUp, CaseSensitive, ChevronRight, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -59,6 +60,7 @@ export function FindReplace({
   store,
   open,
   focusNonce,
+  withReplace = false,
   onClose,
   anchor,
 }: {
@@ -66,6 +68,8 @@ export function FindReplace({
   open: boolean;
   /** Changes when Ctrl+F is pressed again: the search field takes the keyboard again. */
   focusNonce: number;
+  /** Whether the replace row shows when it is opened (Ctrl+H) or not (Ctrl+F); the user can still fold it either way. */
+  withReplace?: boolean;
   onClose: () => void;
   /** The toolbar: the panel opens under its right end. */
   anchor: RefObject<HTMLElement | null>;
@@ -80,11 +84,18 @@ export function FindReplace({
   const readOnly = useSheet(store, (s) => s.readOnly);
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
-  const [withReplace, setWithReplace] = useState(false);
+  const [replaceRow, setReplaceRow] = useState(withReplace);
+  // Each Ctrl+F / Ctrl+H (a new focusNonce) shows the panel the way it was asked for.
+  const [askedAt, setAskedAt] = useState(focusNonce);
+  if (askedAt !== focusNonce) {
+    setAskedAt(focusNonce);
+    setReplaceRow(withReplace);
+  }
   const [opts, setOpts] = useState<Options>(NO_OPTIONS);
   const [notice, setNotice] = useState<{ text: string; query: string } | null>(null);
   const [pos, setPos] = useState<{ top: number; right: number; width: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
 
   const findOpts: FindOptions = useMemo(
     () => ({ sheetId: opts.allSheets ? undefined : sheetId, matchCase: opts.matchCase, wholeCell: opts.wholeCell, inFormulas: opts.inFormulas }),
@@ -176,8 +187,27 @@ export function FindReplace({
     setNotice({ text: t.replaced(result.count), query });
   };
 
+  /** Ctrl+F and Ctrl+H (⌘⌥F) in the panel switch between finding and replacing, instead of the browser's own find bar or history. */
+  const switchKeys = (e: KeyboardEvent<HTMLInputElement>): boolean => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return false;
+    const k = e.key.toLowerCase();
+    if ((k === "h" && !e.altKey) || (e.metaKey && e.altKey && e.code === "KeyF")) {
+      e.preventDefault();
+      if (!readOnly) setReplaceRow(true);
+      return true;
+    }
+    if (k === "f" && !e.altKey) {
+      e.preventDefault();
+      setReplaceRow(false);
+      input.current?.focus();
+      input.current?.select();
+      return true;
+    }
+    return false;
+  };
+
   const onFindKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing) return;
+    if (e.nativeEvent.isComposing || switchKeys(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       close();
@@ -187,10 +217,14 @@ export function FindReplace({
     } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && (e.altKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       go(e.key === "ArrowDown" ? 1 : -1);
+    } else if (e.key === "Tab" && !e.shiftKey && replaceRow && !readOnly) {
+      // From "find" straight to "replace with", like Excel's dialog.
+      e.preventDefault();
+      replaceInput.current?.focus();
     }
   };
   const onReplaceKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing) return;
+    if (e.nativeEvent.isComposing || switchKeys(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       close();
@@ -198,6 +232,9 @@ export function FindReplace({
       e.preventDefault();
       if (e.metaKey || e.ctrlKey) replaceAll();
       else replaceOne();
+    } else if (e.key === "Tab" && e.shiftKey) {
+      e.preventDefault();
+      input.current?.focus();
     }
   };
 
@@ -222,8 +259,8 @@ export function FindReplace({
         >
           <div className="flex items-center gap-1">
             {!readOnly ? (
-              <button type="button" onClick={() => setWithReplace((r) => !r)} className={iconBtn} aria-expanded={withReplace} aria-label={withReplace ? t.hideReplace : t.showReplace} data-tip={withReplace ? t.hideReplace : t.showReplace}>
-                <ChevronRight className={cn("transition-transform duration-200", withReplace && "rotate-90")} />
+              <button type="button" onClick={() => setReplaceRow((r) => !r)} className={iconBtn} aria-expanded={replaceRow} aria-label={replaceRow ? t.hideReplace : t.showReplace} data-tip={replaceRow ? t.hideReplace : t.showReplace}>
+                <ChevronRight className={cn("transition-transform duration-200", replaceRow && "rotate-90")} />
               </button>
             ) : (
               <span className="w-1" />
@@ -255,9 +292,10 @@ export function FindReplace({
               <X />
             </button>
           </div>
-          {withReplace && !readOnly && (
+          {replaceRow && !readOnly && (
             <div className="mt-1 flex items-center gap-1 pl-9 [@media(hover:none)]:pl-10">
               <input
+                ref={replaceInput}
                 value={replacement}
                 onChange={(e) => setReplacement(e.target.value)}
                 onKeyDown={onReplaceKey}

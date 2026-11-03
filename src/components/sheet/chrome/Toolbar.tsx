@@ -1,9 +1,11 @@
 "use client";
 
 // The spreadsheet's toolbar: undo, number formats and units, text style and colours, alignment,
-// borders, AutoSum, smart tables, charts, sorting, freezing, find and the function library.
-// Buttons show what the active cell has (bold pressed, its format's name); every one has a
-// tooltip with its shortcut. When the bar is too narrow, the least used groups move into "Mehr".
+// borders, AutoSum, smart tables, charts, sorting, freezing and find (the function library is the
+// formula bar's fx right below, and in Σ's menu). Buttons show what the active cell has (bold
+// pressed, its format's name); every one has a tooltip with its shortcut. "Tabelle" and
+// "Diagramm", what students come for, carry their words when there is room; when the bar gets
+// narrower they turn into icons first, then the least used groups move into "Mehr".
 // Clicking a tool keeps the keyboard where it was (in the grid or the cell being typed in).
 //
 // CONTRACT: <Toolbar store={store} /> is placed by SheetEditor. Implemented by the editor chrome.
@@ -32,7 +34,6 @@ import {
   Search,
   Sigma,
   Snowflake,
-  SquareFunction,
   Strikethrough,
   Table2,
   Underline,
@@ -60,14 +61,21 @@ import { BorderPanel, ChartPanel, ColorPanel, FreezePanel, SizePanel, SumPanel, 
 // ----------------------------------------------------------------------------------------------
 // Which groups fit
 
-export type GroupId = "history" | "format" | "decimals" | "bold" | "styles" | "colors" | "align" | "borders" | "size" | "sum" | "table" | "chart" | "sort" | "freeze" | "find" | "fx";
+export type GroupId = "history" | "format" | "decimals" | "bold" | "styles" | "colors" | "align" | "borders" | "size" | "sum" | "table" | "chart" | "sort" | "freeze" | "find";
 
 /** Left to right. */
-const ORDER: GroupId[] = ["history", "format", "decimals", "bold", "styles", "colors", "align", "borders", "size", "sum", "table", "chart", "sort", "freeze", "find", "fx"];
+const ORDER: GroupId[] = ["history", "format", "decimals", "bold", "styles", "colors", "align", "borders", "size", "sum", "table", "chart", "sort", "freeze", "find"];
 /** Most needed first: what a narrow screen keeps on the bar. */
-const PRIORITY: GroupId[] = ["history", "sum", "table", "chart", "format", "bold", "colors", "decimals", "styles", "align", "borders", "sort", "find", "size", "freeze", "fx"];
+const PRIORITY: GroupId[] = ["history", "sum", "table", "chart", "format", "bold", "colors", "decimals", "styles", "align", "borders", "sort", "find", "size", "freeze"];
 /** Groups in the same section sit together; sections have a divider between them. */
-const SECTION: Record<GroupId, number> = { history: 0, format: 1, decimals: 1, bold: 2, styles: 2, colors: 2, align: 3, borders: 3, size: 3, sum: 4, table: 4, chart: 4, sort: 5, freeze: 5, find: 6, fx: 6 };
+const SECTION: Record<GroupId, number> = { history: 0, format: 1, decimals: 1, bold: 2, styles: 2, colors: 2, align: 3, borders: 3, size: 3, sum: 4, table: 4, chart: 4, sort: 5, freeze: 5, find: 6 };
+
+/**
+ * How much wider "Tabelle" and "Diagramm" get with their words, from the words' own widths (13 px
+ * text): the words plus the gap between icon and word in each button. Measured in the app: 1030 px
+ * of content with icons, 1144 px with the words (106 px), and the estimate above is 2 px generous.
+ */
+export const labelRoom = (words: number) => Math.ceil(words) + 8;
 
 function groupWidth(g: GroupId, u: number, split: number, fmt: number): number {
   switch (g) {
@@ -93,18 +101,19 @@ function groupWidth(g: GroupId, u: number, split: number, fmt: number): number {
 }
 
 /**
- * Which groups fit into `width` px (the most needed first), whether "Tabelle" and "Diagramm" get
- * their words too, and whether the number format button is just an icon (narrow bars).
+ * Which groups fit into `width` px (the bar's inside), the most needed first; whether "Tabelle"
+ * and "Diagramm" get their words too (`labelExtra` px more: only when everything else fits, so
+ * they turn into icons before any group has to move into "Mehr"); and whether the number format
+ * button is just an icon (narrow bars).
  */
-export function toolbarLayout(width: number, touch: boolean): { shown: Set<GroupId>; labels: boolean; compact: boolean } {
+export function toolbarLayout(width: number, touch: boolean, labelExtra = labelRoom(16 * 8)): { shown: Set<GroupId>; labels: boolean; compact: boolean } {
   const u = touch ? 38 : 34;
   const split = u + (touch ? 20 : 16);
   const compact = width < 560;
   const fmt = compact ? u : touch ? 120 : 110;
-  const divider = 11;
-  const pad = 12;
+  const divider = 7;
   const total = (set: Set<GroupId>) => {
-    let w = pad;
+    let w = 0;
     const sections = new Set<number>();
     for (const g of set) {
       w += groupWidth(g, u, split, fmt);
@@ -121,23 +130,45 @@ export function toolbarLayout(width: number, touch: boolean): { shown: Set<Group
       break;
     }
   }
-  const labels = shown.size === PRIORITY.length && total(shown) + 136 <= width;
+  const labels = shown.size === PRIORITY.length && total(shown) + labelExtra <= width;
   return { shown, labels, compact };
 }
 
-function useWidth(ref: RefObject<HTMLElement | null>): number {
-  const [width, setWidth] = useState(0);
+let measureCanvas: HTMLCanvasElement | null = null;
+
+/** The width of the toolbar's words for "Tabelle" and "Diagramm", in its own font. */
+function wordsWidth(el: HTMLElement, words: string[]): number {
+  measureCanvas ??= document.createElement("canvas");
+  const ctx = measureCanvas.getContext("2d");
+  if (!ctx) return words.join("").length * 8;
+  ctx.font = `500 13px ${getComputedStyle(el).fontFamily}`;
+  return words.reduce((sum, w) => sum + ctx.measureText(w).width, 0);
+}
+
+/** The bar's inside width, and how much room the words of "Tabelle" and "Diagramm" need (0 until measured). */
+function useRoom(ref: RefObject<HTMLElement | null>, words: string[]): { width: number; words: number } {
+  const [room, setRoom] = useState({ width: 0, words: 0 });
+  const key = words.join("\n");
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
+    const list = key.split("\n");
     const ro = new ResizeObserver((entries) => {
-      const w = Math.round(entries[0]?.contentRect.width ?? 0);
-      setWidth((old) => (old === w ? old : w));
+      const width = Math.round(entries[0]?.contentRect.width ?? 0);
+      const w = Math.ceil(wordsWidth(el, list));
+      setRoom((old) => (old.width === width && old.words === w ? old : { width, words: w }));
     });
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
-  return width;
+    // Web fonts arriving later change the words' width.
+    const fonts = document.fonts;
+    const again = () => setRoom((old) => ({ ...old, words: Math.ceil(wordsWidth(el, list)) }));
+    fonts?.addEventListener("loadingdone", again);
+    return () => {
+      ro.disconnect();
+      fonts?.removeEventListener("loadingdone", again);
+    };
+  }, [ref, key]);
+  return room;
 }
 
 /** An action of another part of the editor (smart tables); a failure there is logged, never breaks the toolbar. */
@@ -196,11 +227,13 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
   const [panel, setPanel] = useState<{ anchor: Anchor; stack: View[] }>({ anchor: "more", stack: [] });
   const [lastColor, setLastColor] = useState<SheetColor>("red");
   const [lastFill, setLastFill] = useState<SheetColor>("yellow");
-  const [find, setFind] = useState({ open: false, nonce: 0 });
+  // The find panel: open, a counter that gives its field the keyboard again (Ctrl+F twice), and
+  // whether it opens with the replace row (Ctrl+H) or without (Ctrl+F, the button).
+  const [find, setFind] = useState({ open: false, nonce: 0, replace: false });
   const [functionsOpen, setFunctionsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const width = useWidth(root);
-  const { shown, labels, compact } = toolbarLayout(width || 1280, touch);
+  const room = useRoom(root, [t.tableShort, t.chart]);
+  const { shown, labels, compact } = toolbarLayout(room.width || 1280, touch, room.words ? labelRoom(room.words) : undefined);
   const overflow = ORDER.filter((g) => !shown.has(g));
 
   /**
@@ -243,7 +276,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
   useEffect(() => {
     const onEvent = (e: Event) => {
       const detail = (e as CustomEvent<SheetEventDetail>).detail;
-      if (detail?.open === "find") setFind((f) => ({ open: true, nonce: f.nonce + 1 }));
+      if (detail?.open === "find" || detail?.open === "replace") setFind((f) => ({ open: true, nonce: f.nonce + 1, replace: detail.open === "replace" }));
       else if (detail?.open === "format" && !store.get().readOnly) {
         const anchor: Anchor = formatOnBar.current ? "format" : "more";
         // Opened from the grid (Ctrl+1): the keyboard goes back to the grid afterwards.
@@ -552,16 +585,10 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
             pressed={find.open}
             onClick={() => {
               if (find.open) focusGrid();
-              setFind((f) => ({ open: !f.open, nonce: f.nonce + 1 }));
+              setFind((f) => ({ open: !f.open, nonce: f.nonce + 1, replace: false }));
             }}
           >
             <Search />
-          </ToolButton>
-        );
-      case "fx":
-        return (
-          <ToolButton label={t.functions} keys={keys("Shift+F3")} shortcut="Shift+F3" onClick={() => setFunctionsOpen(true)}>
-            <SquareFunction />
           </ToolButton>
         );
     }
@@ -635,9 +662,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
       case "freeze":
         return drill(<Snowflake />, t.freeze, "freeze");
       case "find":
-        return run(<Search />, t.find, () => setFind((f) => ({ open: true, nonce: f.nonce + 1 })), false);
-      case "fx":
-        return run(<SquareFunction />, t.functions, () => setFunctionsOpen(true), false);
+        return run(<Search />, t.find, () => setFind((f) => ({ open: true, nonce: f.nonce + 1, replace: false })), false);
       case "bold":
         // B I and U S share one row when both are tucked away.
         return iconRow(
@@ -722,7 +747,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
         )}
       </div>
       <HoverTips />
-      <FindReplace store={store} open={find.open} focusNonce={find.nonce} onClose={() => setFind((f) => ({ ...f, open: false }))} anchor={root} />
+      <FindReplace store={store} open={find.open} focusNonce={find.nonce} withReplace={find.replace} onClose={() => setFind((f) => ({ ...f, open: false }))} anchor={root} />
       <FunctionBrowser
         open={functionsOpen}
         onClose={() => setFunctionsOpen(false)}

@@ -6,9 +6,12 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey, inArea, parseKey } from "./a1";
-import { adjustArea, adjustFormula, adjustMovedFormula, editText, formatValue, isError, parseInput, shiftFormula, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type StructuralChange } from "./engine";
+import { adjustArea, adjustFormula, adjustMovedFormula, editText, formatValue, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type StructuralChange, type TableRows } from "./engine";
 import { seriesOf } from "./engine/series";
-import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type ChartSpec, type Pos, type RangeRef, type Sheet, type TableSpec, type Workbook } from "./types";
+// Smart-table helpers that import nothing from this file (table/model.ts does, so it can't be used here).
+import { columnPattern, headerGaps, insertedRowCells } from "./table/columns";
+import { dataRows, refreshTotals } from "./table/totals";
+import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type ChartSpec, type NumberFormat, type Pos, type RangeRef, type Sheet, type TableSpec, type Workbook } from "./types";
 
 // ----------------------------------------------------------------------------------------------
 // Reading (implemented)
@@ -227,6 +230,16 @@ export function clearAreas(wb: Workbook, sheetId: string, areas: Area[], what: C
 
 type RowColChange = { kind: "insertRows" | "deleteRows" | "insertCols" | "deleteCols"; at: number; count: number };
 
+/**
+ * Could this formula name the sheet? A quick test before rewriting it. Formulas write a ' in a
+ * sheet name twice ('Paul''s Daten'!A1), so that spelling counts too.
+ */
+function mayName(f: string, sheetName: string): boolean {
+  const text = f.toLowerCase();
+  const name = sheetName.toLowerCase();
+  return text.includes(name) || (name.includes("'") && text.includes(name.replace(/'/g, "''")));
+}
+
 /** Every formula of the workbook rewritten through `f` (host sheet name, formula) → new formula. Sheets without changes are kept as they are. */
 function mapFormulas(wb: Workbook, f: (host: Sheet, formula: string, key: string) => string): Workbook {
   let changed = false;
@@ -289,6 +302,50 @@ function adjustCharts(charts: ChartSpec[], f: <T extends RangeRef>(ref: T) => T 
   return out;
 }
 
+/**
+ * A smart table's data rows changed from `from` to `to`: it grew by rows typed or pasted right
+ * below it (table/model.ts afterInput, afterPaste) or inserted at its edges. Like Excel's
+ * structured references (Tabelle1[Extinktion]), every reference that covered exactly its data rows
+ * in one or more of its columns follows: formulas on any sheet (=STEIGUNG(C6:C11;B6:B11) →
+ * C6:C12, B6:B12; $C$6:$C$11; 'Blatt 1'!C6:C11) and chart ranges (x and y values, error bar cells),
+ * and so do ranges over its header row plus all data rows. Parts of the data, the totals row and
+ * single cells stay. A formula never grows to include its own cell. The same workbook when nothing
+ * points there. (`table`: its sheet, columns and header row; its area may already be the new one.)
+ */
+export function growTableReferences(wb: Workbook, table: TableSpec, from: { r0: number; r1: number }, to: { r0: number; r1: number }): Workbook {
+  const sheet = sheetById(wb, table.sheetId);
+  if (!sheet || from.r1 < from.r0 || to.r1 < to.r0 || (from.r0 === to.r0 && from.r1 === to.r1)) return wb;
+  const rows: TableRows = { sheet: sheet.name, c0: table.area.c0, c1: table.area.c1, header: table.area.r0, from, to };
+  // Every range that ends on the last data row names that row's number: a cheap first test.
+  const mark = String(from.r1 + 1);
+  const next = mapFormulas(wb, (host, f, key) => (f.includes(mark) ? growTableRefs(f, host.name, rows, parseKey(key)) : f));
+  const fix = <T extends RangeRef>(ref: T): T => {
+    if (ref.sheetId !== table.sheetId) return ref;
+    const a = tableRowsArea(ref, rows);
+    return a ? { ...ref, r0: a.r0, r1: a.r1 } : ref;
+  };
+  let chartsChanged = false;
+  const charts = next.charts.map((chart) => {
+    const x = chart.x ? fix(chart.x) : null;
+    let changed = x !== chart.x;
+    // The legend name (nameRef) is the header cell: it stays.
+    const series = chart.series.map((s) => {
+      const y = fix(s.y);
+      const sx = s.x ? fix(s.x) : null;
+      const eb = s.errorBars;
+      const plus = eb?.plus ? fix(eb.plus) : null;
+      const minus = eb?.minus ? fix(eb.minus) : null;
+      if (y === s.y && sx === s.x && plus === (eb?.plus ?? null) && minus === (eb?.minus ?? null)) return s;
+      changed = true;
+      return { ...s, y, x: sx, errorBars: eb ? { ...eb, plus, minus } : eb };
+    });
+    if (!changed) return chart;
+    chartsChanged = true;
+    return { ...chart, x, series };
+  });
+  return chartsChanged ? { ...next, charts } : next;
+}
+
 /** Shift a record keyed by index ("0", "1"…) for inserted or deleted rows/columns. */
 function shiftIndexRecord<T>(rec: Record<string, T>, at: number, count: number, insert: boolean): Record<string, T> {
   const out: Record<string, T> = {};
@@ -344,10 +401,9 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
   }
 
   // Formulas on the other sheets follow when they name this one.
-  const lower = sheet.name.toLowerCase();
   let next = mapFormulas(
     { ...wb, sheets: wb.sheets.map((s) => (s.id === sheetId ? { ...s, cells } : s)) },
-    (host, f) => (host.id === sheetId || !f.toLowerCase().includes(lower) ? f : adjustFormula(f, host.name, sc)),
+    (host, f) => (host.id === sheetId || !mayName(f, sheet.name) ? f : adjustFormula(f, host.name, sc)),
   );
 
   // Row heights / column widths and hidden flags, frozen panes, size.
@@ -387,6 +443,7 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
 
   // Smart tables on this sheet.
   const tables: TableSpec[] = [];
+  const grown: { before: TableSpec; after: TableSpec }[] = [];
   for (const t of next.tables) {
     if (t.sheetId !== sheetId) {
       tables.push(t);
@@ -413,25 +470,135 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
         nt = { ...nt, columns, filters, sort: t.sort && gone.has(t.sort.column) ? null : t.sort };
       }
     }
+    if (change.kind === "insertRows" && nt.area.r0 === t.area.r0 && nt.area.r1 > t.area.r1) grown.push({ before: t, after: nt });
     tables.push(nt);
   }
-  return { ...next, charts, tables };
+  let out: Workbook = { ...next, charts, tables };
+  for (const g of grown) out = continueTableRows(out, g.before, g.after, at, count);
+  return out;
+}
+
+/**
+ * Rows inserted among a table's data rows (the table went from `before` to `after`), like Excel:
+ * calculated columns and number formats continue into them, and when they came right under the
+ * header or right above the totals row, ranges over the data rows take them in too (rows inserted
+ * in between are inside those ranges already).
+ */
+function continueTableRows(wb: Workbook, before: TableSpec, after: TableSpec, at: number, count: number): Workbook {
+  const d = dataRows(before);
+  let next = wb;
+  if (d.r1 >= d.r0) {
+    if (at === d.r0) next = growTableReferences(next, after, { r0: d.r0 + count, r1: d.r1 + count }, { r0: d.r0, r1: d.r1 + count });
+    else if (before.totals && at === before.area.r1) next = growTableReferences(next, after, d, { r0: d.r0, r1: d.r1 + count });
+  }
+  const sheet = sheetById(next, after.sheetId);
+  return sheet ? setCells(next, after.sheetId, insertedRowCells(sheet, after, at, at + count - 1)) : next;
 }
 
 // ----------------------------------------------------------------------------------------------
 // Rows and columns: everything at and after `at` moves; formulas, charts and tables follow.
 
+//
+// Smart tables: rows inserted among a table's data rows get its calculated columns and number
+// formats; a totals row keeps adding up every data row; a table never loses its last data row;
+// columns inserted into a table get a header name.
+
 export function insertRows(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
-  return rowColChange(wb, sheetId, { kind: "insertRows", at, count });
+  const next = rowColChange(wb, sheetId, { kind: "insertRows", at, count });
+  // Rows right under the header or right above the totals row lie outside the totals' SUBTOTAL ranges.
+  return next === wb ? wb : refreshTotals(next, sheetId);
 }
 export function deleteRows(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
-  return rowColChange(wb, sheetId, { kind: "deleteRows", at, count });
+  const next = deleteRowsKeepingTables(wb, sheetId, at, count);
+  return next === wb ? wb : refreshTotals(next, sheetId);
 }
-export function insertCols(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
-  return rowColChange(wb, sheetId, { kind: "insertCols", at, count });
+/** `locale`: for the header names of columns inserted into a smart table ("Spalte3" / "Column3"). */
+export function insertCols(wb: Workbook, sheetId: string, at: number, count: number, locale: Locale = "de"): Workbook {
+  const next = rowColChange(wb, sheetId, { kind: "insertCols", at, count });
+  if (next === wb) return wb;
+  // A table's columns need names (menus, charts, the totals label): new ones get "Spalte3", unique in the table, as in Excel.
+  const sheet = sheetById(next, sheetId);
+  if (!sheet) return next;
+  const names: { row: number; col: number; cell: Cell | null }[] = [];
+  for (const t of wb.tables) {
+    if (t.sheetId !== sheetId || !(at > t.area.c0 && at <= t.area.c1)) continue;
+    const grown = next.tables.find((x) => x.id === t.id);
+    if (grown) names.push(...headerGaps(sheet, grown.area, locale).filter((u) => u.col >= at && u.col < at + count));
+  }
+  return names.length ? setCells(next, sheetId, names) : next;
 }
 export function deleteCols(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
   return rowColChange(wb, sheetId, { kind: "deleteCols", at, count });
+}
+
+/**
+ * Deleting rows, except that a smart table losing every data row keeps one, empty, as in Excel (a
+ * table of only a header can't take rows where its data was). One row less is deleted and the
+ * row that stays (the table's first data row) is emptied in every column, except for what the
+ * table keeps there: its calculated columns' formulas and its columns' number formats. Ranges over
+ * the table's data rows shrink to that row instead of becoming #BEZUG!, so the totals row,
+ * formulas like =STEIGUNG(…) and charts keep working and grow again with the next rows typed
+ * below the table. Everything else ends up as after the full deletion.
+ */
+function deleteRowsKeepingTables(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
+  const sheet = sheetById(wb, sheetId);
+  if (!sheet || count <= 0 || at < 0) return wb;
+  const end = at + count - 1;
+  const emptied = wb.tables.filter((t) => {
+    if (t.sheetId !== sheetId || t.area.r0 !== at - 1) return false;
+    const d = dataRows(t);
+    return d.r1 >= d.r0 && d.r1 <= end;
+  });
+  if (!emptied.length) return rowColChange(wb, sheetId, { kind: "deleteRows", at, count });
+
+  // What the kept row holds afterwards, read before anything moves.
+  const keepFormula = new Set<number>();
+  const keepFmt = new Map<number, NumberFormat>();
+  for (const t of emptied) {
+    const d = dataRows(t);
+    for (let col = t.area.c0; col <= t.area.c1; col++) {
+      if (columnPattern(sheet, col, d.r0, d.r1)) keepFormula.add(col);
+      const fmt = sheet.cells[cellKey(d.r0, col)]?.s?.fmt ?? sheet.cells[cellKey(d.r1, col)]?.s?.fmt;
+      if (fmt) keepFmt.set(col, fmt);
+    }
+  }
+  let next = count > 1 ? rowColChange(wb, sheetId, { kind: "deleteRows", at: at + 1, count: count - 1 }) : wb;
+
+  // The kept row, emptied (its own formulas already follow the deletion).
+  const after = sheetById(next, sheetId)!;
+  const prefix = `${at},`;
+  const updates: { row: number; col: number; cell: Cell | null }[] = [];
+  const cols = new Set<number>([...keepFormula, ...keepFmt.keys()]);
+  for (const key in after.cells) if (key.startsWith(prefix)) cols.add(parseKey(key).col);
+  for (const col of cols) {
+    const f = keepFormula.has(col) ? after.cells[cellKey(at, col)]?.f : undefined;
+    const fmt = keepFmt.get(col);
+    updates.push({ row: at, col, cell: f !== undefined || fmt ? { f, s: fmt ? { fmt } : undefined } : null });
+  }
+  next = setCells(next, sheetId, updates);
+  next = updateSheet(next, sheetId, (s) => {
+    if (!s.rows[String(at)]) return s;
+    const rows = { ...s.rows };
+    delete rows[String(at)];
+    return { ...s, rows };
+  });
+
+  // Tables and charts as the full deletion leaves them: a table whose header row was the kept row
+  // goes, one whose totals row it was loses it, charts anchored in the deleted rows move to the
+  // first of them. An emptied table's filters go too: they could hide its one row.
+  const gone = new Set(wb.tables.filter((t) => t.sheetId === sheetId && t.area.r0 === at).map((t) => t.id));
+  const lostTotals = new Set(wb.tables.filter((t) => t.sheetId === sheetId && t.totals && t.area.r0 < at && t.area.r1 === at).map((t) => t.id));
+  const emptiedIds = new Set(emptied.map((t) => t.id));
+  const tables = next.tables
+    .filter((t) => !gone.has(t.id))
+    .map((t) => {
+      if (lostTotals.has(t.id)) return { ...t, totals: false, area: { ...t.area, r1: at - 1 } };
+      if (emptiedIds.has(t.id) && Object.keys(t.filters).length) return { ...t, filters: {} };
+      return t;
+    });
+  const anchored = new Set(wb.charts.filter((c) => c.sheetId === sheetId && c.at.row >= at && c.at.row <= end).map((c) => c.id));
+  const charts = next.charts.map((c) => (anchored.has(c.id) && (c.at.row !== at || c.at.dy !== 0) ? { ...c, at: { ...c.at, row: at, dy: 0 } } : c));
+  return { ...next, tables, charts };
 }
 
 function setIndexProps<T extends { w?: number; h?: number; hidden?: boolean }>(rec: Record<string, T>, indexes: number[], patch: Partial<T>): Record<string, T> {
@@ -838,9 +1005,8 @@ export function renameSheet(wb: Workbook, sheetId: string, name: string): Workbo
   const to = name.trim();
   if (!sheet || !validSheetName(to) || to === sheet.name || nameTaken(wb, to, sheetId)) return wb;
   const change: StructuralChange = { kind: "renameSheet", from: sheet.name, to };
-  const lower = sheet.name.toLowerCase();
   const renamed = updateSheet(wb, sheetId, (s) => ({ ...s, name: to }));
-  return mapFormulas(renamed, (host, f) => (f.toLowerCase().includes(lower) ? adjustFormula(f, host.name, change) : f));
+  return mapFormulas(renamed, (host, f) => (mayName(f, sheet.name) ? adjustFormula(f, host.name, change) : f));
 }
 
 /** Never the last sheet. Its charts and tables go too; references to it become #REF!. */
@@ -848,9 +1014,8 @@ export function deleteSheet(wb: Workbook, sheetId: string): Workbook {
   const sheet = sheetById(wb, sheetId);
   if (!sheet || wb.sheets.length <= 1) return wb;
   const change: StructuralChange = { kind: "deleteSheet", sheet: sheet.name };
-  const lower = sheet.name.toLowerCase();
   const rest: Workbook = { ...wb, sheets: wb.sheets.filter((s) => s.id !== sheetId), charts: wb.charts.filter((c) => c.sheetId !== sheetId), tables: wb.tables.filter((t) => t.sheetId !== sheetId) };
-  const next = mapFormulas(rest, (host, f) => (f.toLowerCase().includes(lower) ? adjustFormula(f, host.name, change) : f));
+  const next = mapFormulas(rest, (host, f) => (mayName(f, sheet.name) ? adjustFormula(f, host.name, change) : f));
   const charts = adjustCharts(next.charts, (ref) => (ref.sheetId === sheetId ? null : ref));
   return { ...next, charts };
 }

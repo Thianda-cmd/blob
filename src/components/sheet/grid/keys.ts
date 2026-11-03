@@ -184,6 +184,12 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
   }
 
   if (!mod) return;
+  // ⌘⌥F on a Mac (⌘H hides the app there): find and replace. By the key's place, since ⌥ changes the character.
+  if (e.altKey && e.code === "KeyF") {
+    done();
+    openSheetPanel("replace");
+    return;
+  }
   const k = key.toLowerCase();
   switch (k) {
     case "c":
@@ -240,9 +246,13 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
       return;
     }
     case "f":
-    case "h":
       done();
       openSheetPanel("find");
+      return;
+    case "h":
+      // Ctrl+H: find with the replace row open, like Excel's "Ersetzen".
+      done();
+      openSheetPanel("replace");
       return;
     case "1":
       done();

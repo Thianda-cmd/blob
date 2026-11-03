@@ -16,13 +16,15 @@ export type ChartUi = {
   series: string | null;
   /** A section the panel should open and scroll to (the action bar's "Trendlinie"). */
   section: ChartSection | null;
-  /** Counts requests to scroll the selected chart into view (a chart just inserted). */
+  /** Counts requests to scroll a chart into view (a chart just inserted, duplicated or opened from a note). */
   reveal: number;
+  /** The chart the latest of those requests was for (selecting another chart later doesn't scroll). */
+  revealId: string | null;
 };
 
 type Entry = { value: ChartUi; listeners: Set<() => void> };
 
-const EMPTY: ChartUi = { selected: null, series: null, section: null, reveal: 0 };
+const EMPTY: ChartUi = { selected: null, series: null, section: null, reveal: 0, revealId: null };
 const entries = new WeakMap<SheetStore, Entry>();
 
 function entry(store: SheetStore): Entry {
@@ -56,8 +58,44 @@ export function useChartUi(store: SheetStore): ChartUi {
   );
 }
 
+/**
+ * What the grid shows, for putting a new chart where it can be seen (insertChart). Registered by
+ * ChartLayer while the grid is on screen; px are the grid's content px (GridGeometry, zoomed).
+ */
+export type ChartViewport = {
+  /** The visible part of the scrolling cells, left to right. */
+  left: number;
+  right: number;
+  /** A column's left edge. */
+  colX: (col: number) => number;
+  zoom: number;
+  /** How much narrower the grid gets when the chart's settings open beside it (0 when they are open already or dock below). */
+  sidePanel: number;
+};
+
+const viewports = new WeakMap<SheetStore, () => ChartViewport | null>();
+
+export function setChartViewport(store: SheetStore, measure: (() => ChartViewport | null) | null) {
+  if (measure) viewports.set(store, measure);
+  else viewports.delete(store);
+}
+
+/** The grid's visible part now (null when no grid is on screen). */
+export function chartViewport(store: SheetStore): ChartViewport | null {
+  try {
+    return viewports.get(store)?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Select a chart on the sheet; `reveal` scrolls it into view. */
 export function selectChart(store: SheetStore, id: string | null, opts: { reveal?: boolean } = {}) {
   const cur = chartUi(store);
-  setChartUi(store, { selected: id, reveal: opts.reveal ? cur.reveal + 1 : cur.reveal, series: id === cur.selected ? cur.series : null });
+  setChartUi(store, {
+    selected: id,
+    reveal: opts.reveal ? cur.reveal + 1 : cur.reveal,
+    revealId: opts.reveal ? id : cur.revealId,
+    series: id === cur.selected ? cur.series : null,
+  });
 }

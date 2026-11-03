@@ -10,7 +10,7 @@
 import type { Locale } from "@/i18n/config";
 import { normalizeWorkbook } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
-import { parseCsv } from "@/sheet/io/csv";
+import { csvNumberLocale, parseCsv } from "@/sheet/io/csv";
 import { newId, pasteText, renameSheet, uniqueSheetName } from "@/sheet/ops";
 import { uniqueTableName } from "@/sheet/table/model";
 import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type ChartSpec, type RangeRef, type Sheet, type TableSpec, type Workbook } from "@/sheet/types";
@@ -83,7 +83,9 @@ export async function readSheetFile(file: File, locale: Locale): Promise<ReadShe
     rows = rows.slice(0, MAX_ROWS).map((r) => r.slice(0, MAX_COLS));
     const id = newId();
     const sheetName = name.replace(/[[\]:*?/\\]/g, " ").replace(/^'+|'+$/g, "").trim().slice(0, 31) || (locale === "de" ? "Blatt 1" : "Sheet 1");
-    const wb = pasteText({ v: 1, sheets: [blankSheet(id, sheetName)], charts: [], tables: [] }, id, { row: 0, col: 0 }, rows, locale);
+    // Numbers are read in the language the file writes them in: an English lab CSV opened in
+    // German keeps 0.123 as 0,123 (not 123).
+    const wb = pasteText({ v: 1, sheets: [blankSheet(id, sheetName)], charts: [], tables: [] }, id, { row: 0, col: 0 }, rows, csvNumberLocale(rows, locale));
     return { workbook: wb, skipped: [], cutRows, kind: "csv", name };
   } catch (e) {
     console.error("sheet: reading the file failed", e);

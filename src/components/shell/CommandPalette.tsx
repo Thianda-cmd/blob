@@ -48,6 +48,7 @@ import { cn, pageTitle } from "@/lib/utils";
 import { panesText } from "@/i18n/messages/panes";
 import { transferText } from "@/i18n/messages/transfer";
 import { useImporter } from "@/components/notes/useImporter";
+import { newPageFor, type NewKind } from "./paletteNew";
 import { usePanes } from "./Panes";
 import { PageIcon, SubjectIcon } from "./Sidebar";
 
@@ -62,6 +63,11 @@ type Item = {
   run: () => void;
   /** Shift+Enter: a note opens beside the page you're on. */
   beside?: () => void;
+  /**
+   * New pages: 2 when the query is the kind of page itself ("Tabelle", "neue Tabelle", "Tabelle Titration"),
+   * 1 when it is on its way to one of its words ("tab", "kalib"), else 0 (the "… named <query>" fallback).
+   */
+  rank?: number;
 };
 
 /** Learning topics shown for a search (the rest are one click away on /learn). */
@@ -156,53 +162,30 @@ function Palette({ onClose }: { onClose: () => void }) {
     const lower = q.toLowerCase();
     const match = (s: string) => !lower || s.toLowerCase().includes(lower);
 
+    // A new page is called what was typed ("Neue Notiz „Mitochondrien“"), unless the query names the
+    // kind of page: "Tabelle" makes a spreadsheet without a name, first in the list (paletteNew.ts).
+    const newPage = (kind: NewKind, bare: string, named: (q: string) => string, icon: ReactNode, keywords?: string): Item => {
+      const { rank, title } = newPageFor(kind, q, bare, keywords);
+      return {
+        id: `new-${kind}`,
+        group: "actions",
+        label: title ? named(title) : bare,
+        keywords,
+        icon,
+        rank,
+        run: async () => {
+          onClose();
+          const p = await createPage({ kind, title });
+          if (p) router.push(`/p/${p.id}`);
+        },
+      };
+    };
+
     const actions: Item[] = [
-      {
-        id: "new-note",
-        group: "actions",
-        label: q ? t.newNoteNamed(q) : t.newNote,
-        icon: <FilePlus2 />,
-        run: async () => {
-          onClose();
-          const p = await createPage({ kind: "note", title: q });
-          if (p) router.push(`/p/${p.id}`);
-        },
-      },
-      {
-        id: "new-ink",
-        group: "actions",
-        label: q ? t.newInkNamed(q) : t.newInk,
-        keywords: INK_WORDS,
-        icon: <Signature />,
-        run: async () => {
-          onClose();
-          const p = await createPage({ kind: "ink", title: q });
-          if (p) router.push(`/p/${p.id}`);
-        },
-      },
-      {
-        id: "new-sheet",
-        group: "actions",
-        label: q ? t.newSheetNamed(q) : t.newSheet,
-        keywords: SHEET_WORDS,
-        icon: <SheetIcon />,
-        run: async () => {
-          onClose();
-          const p = await createPage({ kind: "sheet", title: q });
-          if (p) router.push(`/p/${p.id}`);
-        },
-      },
-      {
-        id: "new-deck",
-        group: "actions",
-        label: q ? t.newDeckNamed(q) : t.newDeck,
-        icon: <Presentation />,
-        run: async () => {
-          onClose();
-          const p = await createPage({ kind: "deck", title: q });
-          if (p) router.push(`/p/${p.id}`);
-        },
-      },
+      newPage("note", t.newNote, t.newNoteNamed, <FilePlus2 />),
+      newPage("ink", t.newInk, t.newInkNamed, <Signature />, INK_WORDS),
+      newPage("sheet", t.newSheet, t.newSheetNamed, <SheetIcon />, SHEET_WORDS),
+      newPage("deck", t.newDeck, t.newDeckNamed, <Presentation />),
       { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
       { id: "new-event", group: "actions", label: t.newEvent, hint: t.newEventHint, keywords: CALENDAR_WORDS, icon: <CalendarPlus />, run: () => go("/calendar?new=1") },
       // Not "new-…": these only show when they match what was typed.
@@ -390,10 +373,15 @@ function Palette({ onClose }: { onClose: () => void }) {
     // Actions that match what was typed ("cv" → „Neuer Lebenslauf“) come before the "new note named …"
     // fallbacks, so Enter opens the CV builder instead of making a note called "cv".
     const hit = (a: Item) => match(a.label) || (lower.length > 1 && Boolean(a.keywords?.split(" ").some((w) => w.startsWith(lower))));
-    const filteredActions = q
-      ? [...actions.filter((a) => !a.id.startsWith("new") && hit(a)), ...actions.filter((a) => a.id.startsWith("new"))]
-      : actions.slice(0, 3);
-    return q ? [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems, ...filteredActions] : [...filteredActions, ...pageItems];
+    const isNew = (a: Item) => a.id.startsWith("new");
+    // New pages whose kind the query is on its way to ("tab") before the other ones (a stable sort).
+    const newItems = actions.filter(isNew).sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
+    const results = [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems];
+    // The query is the kind of page ("Tabelle"): making one comes first, and nobody wants a note called "Tabelle".
+    const asked = newItems.filter((a) => a.rank === 2);
+    if (q && asked.length) return [...asked, ...actions.filter((a) => !isNew(a) && hit(a)), ...results];
+    const filteredActions = q ? [...actions.filter((a) => !isNew(a) && hit(a)), ...newItems] : actions.slice(0, 3);
+    return q ? [...results, ...filteredActions] : [...filteredActions, ...pageItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer, atlas]);
 

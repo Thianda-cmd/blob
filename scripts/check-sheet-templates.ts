@@ -28,7 +28,8 @@ import { cellKey, parseKey, parsePos } from "@/sheet/a1";
 import { FUNCTION_DOCS, type FnDoc } from "@/sheet/engine/docs";
 import { FUNCTION_BY_DE, FUNCTION_BY_EN, FUNCTION_NAMES } from "@/sheet/engine/names";
 import { SHEET_TEMPLATES } from "@/sheet/templates";
-import { MAX_COLS, MAX_ROWS, type Area, type RangeRef, type Sheet, type Workbook } from "@/sheet/types";
+import { textWidth } from "@/sheet/chart/scene";
+import { DEFAULT_COL_W, MAX_COLS, MAX_ROWS, type Area, type RangeRef, type Sheet, type Workbook } from "@/sheet/types";
 import * as engine from "@/sheet/engine";
 
 const LOCALES = ["en", "de"] as const;
@@ -527,6 +528,54 @@ function checkWorkbook(where: string, wb: Workbook) {
 }
 
 // ----------------------------------------------------------------------------------------------
+// Templates: what fits at 100 % zoom
+
+/**
+ * Rough widths from the chart module's character table (within a few per cent of the app's font,
+ * Geist at 14 px), so a template whose number shows "###" or whose header is cut by the filter
+ * button is caught here and not first on screen: Bradford's slope "0,000900 mL/µg" once did, and
+ * its "Messwert 1" headers were cut. (Checked against the real editor at 100 %: what passes here
+ * fits there.)
+ */
+const TEXT_SLACK = 1;
+/** A smart table's header cell: its text, padding and the filter button. */
+const HEADER_EXTRA = 18;
+/** Any other cell: its padding. */
+const CELL_EXTRA = 10;
+
+function checkFits(where: string, wb: Workbook, lang: Lang) {
+  const calc = engine.createCalc(wb, { now: () => new Date(2026, 10, 3, 12), locale: lang });
+  for (const sheet of wb.sheets) {
+    const width = (c: number) => sheet.cols[String(c)]?.w ?? DEFAULT_COL_W;
+    const filled = (r: number, c: number) => {
+      const cell = sheet.cells[cellKey(r, c)];
+      return !!cell && ((cell.v !== undefined && cell.v !== "") || cell.f !== undefined);
+    };
+    const headers = new Set(wb.tables.filter((t) => t.sheetId === sheet.id).flatMap((t) => Array.from({ length: t.area.c1 - t.area.c0 + 1 }, (_, i) => cellKey(t.area.r0, t.area.c0 + i))));
+    for (const [key, cell] of Object.entries(sheet.cells)) {
+      const { row, col } = parseKey(key);
+      const value = cell.f !== undefined ? calc.value(sheet.id, row, col) : (cell.v ?? null);
+      if (value === null || value === "") continue;
+      const st = cell.s ?? {};
+      const text = engine.formatValue(value, st.fmt, lang);
+      const needed = (bold: boolean, extra: number) => Math.ceil(textWidth(text, st.size ?? 14, bold ? 700 : 400) * TEXT_SLACK) + extra;
+      if (headers.has(key)) {
+        const w = needed(true, HEADER_EXTRA);
+        if (w > width(col)) fail(`${where} ${key}`, `header "${text}" needs about ${w} px with its filter button, the column has ${width(col)}`);
+      } else if (typeof value === "number" && st.fmt) {
+        // A number in a format of its own shows "###" when it doesn't fit (General shortens it).
+        const w = needed(!!st.bold, CELL_EXTRA);
+        if (w > width(col)) fail(`${where} ${key}`, `"${text}" needs about ${w} px, the column has ${width(col)}: it would show ###`);
+      } else if (typeof value === "string" && !st.wrap && filled(row, col + 1)) {
+        // Text spills into an empty neighbour; one with something in it cuts the text off.
+        const w = needed(!!st.bold, CELL_EXTRA);
+        if (w > width(col)) fail(`${where} ${key}`, `"${text}" needs about ${w} px, the column has ${width(col)}: it is cut off`);
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------------------------
 // Templates: values (with the engine)
 
 function engineReady(): boolean {
@@ -734,6 +783,7 @@ function main() {
         if (ready) {
           try {
             checkValues(`${tpl.id} (${lang})`, wb, tpl.id, lang);
+            checkFits(`${tpl.id} (${lang})`, wb, lang);
           } catch (e) {
             fail(`${tpl.id} (${lang})`, `calculating: ${e instanceof Error ? e.message : String(e)}`);
           }

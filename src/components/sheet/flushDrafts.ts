@@ -9,14 +9,20 @@ import type { Locale } from "@/i18n/config";
 import { mergeWorkbooks, sameJson } from "@/sheet/collab";
 import { normalizeWorkbook } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
-import { clearDraft, draftPages, isSheetOpen, readDraft } from "./drafts";
+import { clearDraft, draftPages, isSheetOpen, markFlushed, readDraft } from "./drafts";
 import { mergeTitle, saveOnce, supabaseApi, type SaverApi } from "./saver";
+
+/**
+ * Its editor takes the draft: open in this tab, or being opened (Blob was opened right at it, or
+ * came back online there: its address shows while the editor is still on its way).
+ */
+const leftToEditor = (pageId: string) => isSheetOpen(pageId) || (typeof location !== "undefined" && location.pathname.startsWith(`/p/${pageId}`));
 
 /** Send every waiting draft of spreadsheets that aren't open here. Returns how many were saved. */
 export async function flushSheetDrafts(userId: string, locale: Locale, api: SaverApi = supabaseApi): Promise<number> {
   let saved = 0;
   for (const pageId of await draftPages(userId)) {
-    if (isSheetOpen(pageId)) continue;
+    if (leftToEditor(pageId)) continue;
     const d = await readDraft(userId, pageId);
     if (!d) continue;
     let base = normalizeWorkbook(d.base, locale);
@@ -30,10 +36,11 @@ export async function flushSheetDrafts(userId: string, locale: Locale, api: Save
     }
     for (let attempt = 0; attempt < 6; attempt++) {
       // Opened in the meantime: its editor takes the draft from here.
-      if (isSheetOpen(pageId)) break;
+      if (leftToEditor(pageId)) break;
       const r = await saveOnce(pageId, rev, mine, createCalc(mine, { locale }), title, locale, api);
       if (r.ok) {
         clearDraft(userId, pageId);
+        markFlushed(pageId, r.rev);
         saved++;
         break;
       }

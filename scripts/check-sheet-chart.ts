@@ -11,12 +11,14 @@
 // makes, and the drawing itself (no NaN, the equation in the SVG).
 // Problems make the script exit with 1.
 
+import { placeInView } from "@/components/sheet/chart/actions";
+import type { ChartViewport } from "@/components/sheet/chart/selection";
 import { cellKey } from "@/sheet/a1";
 import { linearAxis, logAxis, logTickLabel, niceStep } from "@/sheet/chart/axis";
 import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
 import { chartData } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
-import { formatGeneral, formatSignificant, parseChartNumber } from "@/sheet/chart/format";
+import { formatGeneral, formatR2, formatSignificant, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
 import { equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
 import { buildChartScene } from "@/sheet/chart/scene";
 import { formatValue, type Calc, type CellValue } from "@/sheet/engine";
@@ -83,7 +85,10 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   close("calibration R² ≈ 0.99997", f.r2, 0.999969863735797, 1e-9);
   eq("calibration equation de", equationText(f, "de"), "y = 0,0519x + 0,0015");
   eq("calibration equation en", equationText(f, "en"), "y = 0.0519x + 0.0015");
-  eq("calibration R² text (Excel shows 1)", r2Text(f.r2!, "de"), "R² = 1");
+  // Excel's label says "R² = 1" here; students judge calibration lines by R² ≥ 0,999, so Blob
+  // shows the decimals that keep it below 1.
+  eq("calibration R² text (not 1 like Excel)", r2Text(f.r2!, "de"), "R² = 0,99997");
+  eq("calibration R² text en", r2Text(f.r2!, "en"), "R² = 0.99997");
   eq("calibration n", f.n, 6);
   // Excel keeps 4 decimals after "0,": more significant digits on request.
   eq("calibration equation 6 digits", equationText(f, "de", 6), "y = 0,0518714x + 0,00147619");
@@ -379,6 +384,46 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   eq("R² 0,99874", r2Text(0.99874, "de"), "R² = 0,9987");
   eq("R² 0,95", r2Text(0.95, "en"), "R² = 0.95");
   eq("R² digits", r2Text(0.998741234, "de", 6), "R² = 0,998741");
+  // R² never reads 1 unless it is 1 up to rounding noise: 4 decimals, more (up to 6) when those
+  // would round up to 1, and past that the last decimal is cut, not rounded.
+  const r2Cases: [number, string][] = [
+    [1, "1"],
+    [1 - 1e-15, "1"],
+    [1 - 4e-13, "1"],
+    [1 + 2e-16, "1"],
+    [1 - 1e-12, "0,999999"],
+    [0.99997, "0,99997"],
+    [0.99996, "0,99996"],
+    [0.99995, "0,99995"],
+    [0.999949, "0,9999"],
+    [0.99994, "0,9999"],
+    [0.999996, "0,999996"],
+    [0.9999996, "0,999999"],
+    [0.99999999, "0,999999"],
+    [0.9987, "0,9987"],
+    [0.99874, "0,9987"],
+    [0.99875, "0,9988"],
+    [0.999, "0,999"],
+    [0.6, "0,6"],
+    [0.12345, "0,1235"],
+    [0.00001, "0"],
+    [0, "0"],
+    [-0.25, "-0,25"],
+  ];
+  for (const [v, s] of r2Cases) eq(`R² ${v}`, formatR2(v, "de"), s);
+  eq("R² NaN de", formatR2(NaN, "de"), "#NV");
+  eq("R² en", formatR2(0.999969863735797, "en"), "0.99997");
+  eq("R² text 0,99997", r2Text(0.99997, "de"), "R² = 0,99997");
+  eq("R² text perfect", r2Text(1 - 2e-16, "de"), "R² = 1");
+  eq("R² more digits near 1", r2Text(0.99999996, "de", 6), "R² = 0,99999996");
+  eq("R² more digits cut", r2Text(1 - 1e-12, "de", 6), "R² = 0,999999999");
+  eq("R² decimals", [r2Decimals(0.9987), r2Decimals(0.99997), r2Decimals(0.999996), r2Decimals(0.9999996), r2Decimals(1), r2Decimals(0.99997, 4, 8)], [4, 5, 6, 6, 4, 5]);
+  // A noisy-but-excellent calibration (R² ≈ 0,99998) keeps its 5th decimal on every surface.
+  {
+    const near1 = fit("near 1", [0, 1, 2, 3, 4, 5], [0.001, 0.1, 0.202, 0.299, 0.401, 0.5], spec("linear"));
+    check("near-1 fit is below 1", near1.r2! < 1 - 1e-6 && near1.r2! > 0.9999, near1.r2);
+    check("near-1 fit label is not 1", r2Text(near1.r2!, "de") !== "R² = 1" && /^R² = 0,9999\d{1,2}$/.test(r2Text(near1.r2!, "de")), r2Text(near1.r2!, "de"));
+  }
   eq("significant 5", formatSignificant(0.0523456, "de", 5), "0,052346");
   eq("significant big", formatSignificant(1234.5678, "en", 5), "1234.6");
   eq("significant tiny", formatSignificant(0.0000123456, "de", 4), "1,235E-05");
@@ -597,6 +642,22 @@ if (engineReady) {
   eq("axis titles from headers", [sc?.xAxis.title, sc?.yAxis.title], ["Konzentration", "Extinktion"]);
   eq("title = the one series", sc?.title, "Extinktion");
   eq("placed right of the data", sc?.at, { row: 0, col: 3, dx: 0, dy: 0 });
+  // Where it fits on screen: one empty column between data and chart when there is room, else
+  // right beside the data (a laptop at 1440 px with the sidebar open and the settings beside the grid).
+  if (sc) {
+    const widths = [170, 100, 100, 100, 100, 100, 100, 100, 100, 100];
+    const colX = (c: number) => widths.slice(0, c).reduce((a, b) => a + b, 0);
+    const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, colX, zoom: 1, sidePanel: 0, ...extra });
+    eq("room for the gap column", placeInView(sc, view(1200)).at, sc.at);
+    eq("no room: beside the data", placeInView(sc, view(782)).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("settings about to open beside the grid", placeInView(sc, view(1134, { sidePanel: 352 })).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("not even beside the data: beside it, more of it shows", placeInView(sc, view(622)).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("gap column narrower than the gap: as made", placeInView({ ...sc, at: { ...sc.at, col: 3 } }, view(622, { colX: (c) => (c <= 2 ? colX(c) : colX(c) - 90) })).at, sc.at);
+    eq("the column beside the data isn't empty", placeInView(sc, view(782), (c) => c !== 2).at, sc.at);
+    eq("zoomed 150 %: beside the data", placeInView(sc, view(1200, { colX: (c) => colX(c) * 1.5, zoom: 1.5 })).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("scrolled past the data: as made", placeInView(sc, view(782, { left: 300 })).at, sc.at);
+    eq("no grid on screen", placeInView(sc, null), sc);
+  }
   eq("default size", sc?.size, { w: 480, h: 300 });
   eq("one series: no legend", sc?.legend, "none");
   eq("scatter: markers, no line", [sc?.series[0].marker, sc?.series[0].line], ["circle", "none"]);
@@ -678,8 +739,8 @@ if (engineReady) {
   const cal = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { name: "Extinktion", trendline: tl })], { title: "Kalibrierung" });
   const svg = chartSvg(cal, chartData(cal, calc, "de"), "de");
   check("equation in the SVG", svg.includes("y = 0,0519x + 0,0015"), svg.length);
-  check("R² in the SVG", svg.includes("R² = 1"));
-  check("aria summary", svg.includes('aria-label="Punktdiagramm Kalibrierung, 1 Reihe, Trendlinie y = 0,0519x + 0,0015, R² = 1"'), svg.match(/aria-label="[^"]*"/)?.[0]);
+  check("R² in the SVG (0,99997, not 1)", svg.includes("R² = 0,99997") && !svg.includes("R² = 1<"), svg.match(/R² = [^<]*/)?.[0]);
+  check("aria summary", svg.includes('aria-label="Punktdiagramm Kalibrierung, 1 Reihe, Trendlinie y = 0,0519x + 0,0015, R² = 0,99997"'), svg.match(/aria-label="[^"]*"/)?.[0]);
   check("light colours in files", svg.includes("#1a73e8") && !svg.includes("var(--"));
   const scene = buildChartScene(cal, chartData(cal, calc, "de"), { width: 480, height: 300, locale: "de" });
   check("screen colours are CSS variables", JSON.stringify(scene.nodes).includes("var(--sheet-blue)"));

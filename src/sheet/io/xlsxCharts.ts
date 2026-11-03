@@ -9,6 +9,7 @@
 import type { Locale } from "@/i18n/config";
 import { quoteSheetName } from "../a1";
 import { chartData } from "../chart/data";
+import { r2Decimals } from "../chart/format";
 import { isFitError, type Fit, type FitError } from "../chart/regression";
 import { COLOR_HEX } from "../colors";
 import { isError, type Calc } from "../engine";
@@ -84,14 +85,17 @@ const TREND_TYPE: Record<TrendlineSpec["type"], string> = { linear: "linear", po
 /**
  * The number format of a trendline's label (equation and R²): about four significant digits of the
  * smallest coefficient, trailing zeros left out ("y = 0,0524x + 0,0022", "R² = 0,999786"), or
- * scientific for very small and very large coefficients. Excel has one format for the whole label.
+ * scientific for very small and very large coefficients. Excel has one format for the whole label,
+ * so when R² is shown it also gets the decimals it needs not to round up to 1 (0,99997 would
+ * read "R² = 1,0" with four), as Blob's own chart label does.
  */
-export function trendLabelFormat(fit: Fit | FitError | null | undefined): string {
+export function trendLabelFormat(fit: Fit | FitError | null | undefined, showR2 = true): string {
   if (!fit || isFitError(fit)) return "General";
   const cs = fit.coefficients.filter((c) => Number.isFinite(c) && c !== 0).map(Math.abs);
-  if (cs.some((c) => c < 1e-5 || c >= 1e7)) return "0.000E+00";
+  const r2 = showR2 && fit.r2 !== null && Number.isFinite(fit.r2) ? r2Decimals(fit.r2, 4, 8) : 4;
+  if (cs.some((c) => c < 1e-5 || c >= 1e7)) return `0.${"0".repeat(Math.max(3, r2 - 1))}E+00`;
   const needed = cs.length ? Math.max(...cs.map((c) => 3 - Math.floor(Math.log10(c)))) : 4;
-  const decimals = Math.max(4, Math.min(8, needed));
+  const decimals = Math.max(4, r2, Math.min(8, needed));
   return `0.0${"#".repeat(decimals - 1)}`;
 }
 
@@ -192,7 +196,7 @@ export function chartXml(spec: ChartSpec, calc: Calc, sheetName: (id: string) =>
       for (let p = 0; p < Math.min(n, 64); p++) x += `<c:dPt><c:idx val="${p}"/><c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="${hex(SERIES_PALETTE[p % SERIES_PALETTE.length])}"/></a:solidFill><a:ln w="12700"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr></c:dPt>`;
     }
     if (s.labels) x += '<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>';
-    if (s.trendline && !pie) x += trendlineXml(s.trendline, hex(s.color ?? SERIES_PALETTE[i % SERIES_PALETTE.length]), trendLabelFormat(fits[i]));
+    if (s.trendline && !pie) x += trendlineXml(s.trendline, hex(s.color ?? SERIES_PALETTE[i % SERIES_PALETTE.length]), trendLabelFormat(fits[i], s.trendline.showR2));
     if (s.errorBars && !pie) x += errBarsXml(s.errorBars, scatter, color, calc, sheetName);
     if (scatter) {
       const xs = s.x ?? spec.x;

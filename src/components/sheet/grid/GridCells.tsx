@@ -269,6 +269,18 @@ function sameCell(a: CellProps, b: CellProps): boolean {
 
 const BUTTON_ICONS = { plain: ChevronDown, filtered: Filter, sortedAsc: ArrowUp, sortedDesc: ArrowDown } as const;
 
+/** The finger-sized box (at least 36 px) around a smart table's header button, relative to the button. */
+function touchTarget(row: number, cellH: number, zoom: number) {
+  const size = Math.round(18 * zoom);
+  const inset = Math.round(3 * zoom);
+  const w = Math.max(36, size + inset);
+  const h = Math.max(36, size);
+  const centred = (h - size) / 2;
+  // How far the cell reaches above the button: in row 1 nothing above it can take the touch.
+  const above = row === 0 ? Math.min(centred, Math.floor((cellH - size) / 2)) : centred;
+  return { right: -inset, top: -above, width: w, height: h };
+}
+
 const GridCell = memo(function GridCell(p: CellProps) {
   const { look, zoom } = p;
   const justify = look.align === "left" ? "flex-start" : look.align === "center" ? "center" : "flex-end";
@@ -359,12 +371,16 @@ const GridCell = memo(function GridCell(p: CellProps) {
           onClick={(e) => p.onDecor(p.row, p.col, e.currentTarget)}
           className={
             buttonState === "plain"
-              ? "absolute top-1/2 grid -translate-y-1/2 place-items-center rounded-md border border-line bg-raised text-ink-3 shadow-card transition-colors hover:bg-hover hover:text-ink"
-              : "absolute top-1/2 grid -translate-y-1/2 place-items-center rounded-md border border-blob/40 bg-blob-soft text-blob-ink shadow-card transition-colors hover:bg-blob/20"
+              ? "absolute top-1/2 z-[1] grid -translate-y-1/2 place-items-center rounded-md border border-line bg-raised text-ink-3 shadow-card transition-colors hover:bg-hover hover:text-ink"
+              : "absolute top-1/2 z-[1] grid -translate-y-1/2 place-items-center rounded-md border border-blob/40 bg-blob-soft text-blob-ink shadow-card transition-colors hover:bg-blob/20"
           }
           style={{ right: Math.round(3 * zoom), width: Math.round(18 * zoom), height: Math.round(18 * zoom) }}
         >
           <Icon style={{ width: Math.round(12 * zoom), height: Math.round(12 * zoom) }} strokeWidth={2.25} />
+          {/* A finger needs more than the small button: on touch screens an invisible 36 px target
+              around it (reaching left over the header text, not into the next column; in the
+              sheet's first row, where the column letters sit right above, reaching down instead). */}
+          <span aria-hidden className="absolute hidden [@media(hover:none)]:block" style={touchTarget(p.row, p.h, zoom)} />
         </button>
       )}
     </div>

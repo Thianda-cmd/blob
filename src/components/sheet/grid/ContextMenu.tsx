@@ -44,6 +44,9 @@ import type { GridText } from "./GridCells";
 
 export type MenuKind = "cells" | "rows" | "cols";
 
+/** Fingers get taller menu entries (40 px) than the shared menu's 32 px, without changing the shared menu item. */
+const TOUCH_ITEMS = "[@media(hover:none)]:[&_[role=menuitem]]:h-10";
+
 type Keys = { mod: string; shift: string };
 
 /** Paste from a menu: the system clipboard when the browser lets us read it, else Blob's own copy, else a hint to use the keyboard. */
@@ -237,7 +240,7 @@ export function GridMenu({
     );
   }
   return (
-    <ContextMenu at={at} onClose={onClose} label={t.menu}>
+    <ContextMenu at={at} onClose={onClose} label={t.menu} className={TOUCH_ITEMS}>
       {body}
     </ContextMenu>
   );
@@ -254,7 +257,7 @@ export function Chooser({ store, at, kind, onClose, t }: { store: SheetStore; at
     fn();
   };
   return (
-    <ContextMenu at={at} onClose={onClose} label={kind === "insert" ? t.insertWhat : t.deleteWhat}>
+    <ContextMenu at={at} onClose={onClose} label={kind === "insert" ? t.insertWhat : t.deleteWhat} className={TOUCH_ITEMS}>
       <MenuLabel>{kind === "insert" ? t.insertWhat : t.deleteWhat}</MenuLabel>
       {kind === "insert" ? (
         <>

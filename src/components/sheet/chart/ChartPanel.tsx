@@ -29,7 +29,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Segmented } from "@/components/ui/Segmented";
 import { usePhone } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
@@ -57,6 +57,46 @@ const KIND_ICONS: Record<ChartKind, ReactNode> = {
   pie: <ChartPie className="size-5" />,
 };
 const KINDS: ChartKind[] = ["scatter", "line", "column", "bar", "area", "pie"];
+
+/** The live preview at the top of a docked panel is at most this tall (px), so the settings keep room. */
+const PREVIEW_MAX_H = 230;
+/** Room a chart on the sheet needs besides its own height: its action bar and a margin (px, see ChartLayer). */
+const CHART_EXTRA_H = 52 + 2 * 12;
+
+/**
+ * Whether the docked panel would cover the chart: SheetEditor docks the settings over the lower
+ * part of the editor when it is narrow (phones, tablets held upright, small windows) instead of
+ * beside the grid (an <aside>), and the chart, `chartHeight` px with its action bar, doesn't fit
+ * in the room left above them. Then the panel shows the chart itself. (When it fits, ChartLayer
+ * scrolls it into that room.) Measured again when the editor or the panel changes size.
+ */
+function useCoveredChart(ref: RefObject<HTMLElement | null>, chartHeight: number): boolean {
+  const [covered, setCovered] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || el.closest("aside")) return;
+    const editor = el.closest<HTMLElement>("[data-sheet-editor]");
+    const measure = () => {
+      const dock = editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]");
+      const grid = editor?.querySelector<HTMLElement>("[data-sheet-grid]");
+      const cells = grid?.querySelector<HTMLElement>("[data-grid-overlay]")?.offsetParent;
+      if (!editor || !dock || !grid) {
+        setCovered(true);
+        return;
+      }
+      // Without the slide-in animation's transform: where the docked panel ends up.
+      const dockTop = editor.getBoundingClientRect().top + editor.clientTop + dock.offsetTop;
+      const cellsTop = grid.getBoundingClientRect().top + grid.clientTop + (cells instanceof HTMLElement ? cells.offsetTop : 0);
+      setCovered(chartHeight + CHART_EXTRA_H > dockTop - cellsTop);
+    };
+    // A ResizeObserver reports once as soon as it observes, and again on every change of size.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (editor) ro.observe(editor);
+    return () => ro.disconnect();
+  }, [ref, chartHeight]);
+  return covered;
+}
 
 function safeData(spec: ChartSpec, calc: Calc, locale: Locale): ChartData {
   try {
@@ -87,6 +127,32 @@ export function ChartPanel({ store, chartId, onClose }: { store: SheetStore; cha
     );
   }
   return <PanelBody key={spec.id} store={store} spec={spec} wb={wb} calc={calc} locale={locale} readOnly={readOnly} pageId={pageId} t={t} onClose={onClose} />;
+}
+
+/**
+ * The chart at the top of a docked panel, drawn for the size it gets (at most PREVIEW_MAX_H tall),
+ * like a chart in a note: its text stays readable instead of shrinking with the picture.
+ */
+function PreviewChart({ spec, data, locale, selectedSeries }: { spec: ChartSpec; data: ChartData; locale: Locale; selectedSeries: string | null }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const ratio = Math.max(1, spec.size.h) / Math.max(1, spec.size.w);
+  return (
+    <div ref={box} className="mx-auto overflow-hidden rounded-xl bg-raised shadow-card ring-1 ring-line" style={{ maxWidth: Math.round(PREVIEW_MAX_H / ratio) }}>
+      {width > 0 ? (
+        <ChartView spec={spec} data={data} width={width} height={Math.round(width * ratio)} locale={locale} selectedSeries={selectedSeries} />
+      ) : (
+        <div style={{ aspectRatio: `${spec.size.w} / ${spec.size.h}` }} />
+      )}
+    </div>
+  );
 }
 
 function PanelHeader({ title, t, onClose, icon }: { title: string; t: SheetChartText; onClose: () => void; icon?: ReactNode }) {
@@ -130,6 +196,9 @@ function PanelBody({
 }) {
   const ui = useChartUi(store);
   const phone = usePhone();
+  const zoom = useSheet(store, (s) => s.zoom);
+  const root = useRef<HTMLDivElement>(null);
+  const covered = useCoveredChart(root, spec.size.h * zoom);
   const data = useMemo(() => safeData(spec, calc, locale), [spec, calc, locale]);
   const [open, setOpen] = useState<Set<ChartSection>>(() => new Set<ChartSection>(spec.kind === "scatter" ? ["chart", "trend"] : ["chart", "data"]));
   const [noteOpen, setNoteOpen] = useState(false);
@@ -201,14 +270,13 @@ function PanelBody({
   };
 
   return (
-    <div data-chart-panel={spec.id} className="flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
+    <div ref={root} data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
       <PanelHeader title={spec.title.trim() || t.kindNames[spec.kind]} icon={KIND_ICONS[spec.kind]} t={t} onClose={onClose} />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {phone && (
-          <div className="border-b border-line bg-paper/60 p-3">
-            <div className="overflow-hidden rounded-xl bg-raised shadow-card ring-1 ring-line">
-              <ChartView spec={spec} data={data} width={spec.size.w} height={spec.size.h} locale={locale} selectedSeries={ui.series} className="h-auto w-full" />
-            </div>
+        {/* Docked at the bottom, the panel can cover the chart on the sheet: the chart, live, on top. */}
+        {(phone || covered) && (
+          <div className="border-b border-line bg-paper/60 p-3" data-chart-preview="">
+            <PreviewChart spec={spec} data={data} locale={locale} selectedSeries={ui.series} />
           </div>
         )}
 
@@ -350,7 +418,8 @@ function PanelBody({
             {t.saveFailed}
           </p>
         )}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Docked across a tablet's width: one row, so the settings above keep their room. */}
+        <div className="grid grid-cols-2 gap-2 @[540px]/chartpanel:flex @[540px]/chartpanel:items-center">
           <FooterButton onClick={() => save("png")} busy={saving === "png"} icon={<ImageDown />} label={t.exportPng}>
             {t.exportPngShort}
           </FooterButton>
@@ -370,7 +439,7 @@ function PanelBody({
               }}
               icon={<Trash2 />}
               danger
-              className="col-span-2"
+              className="col-span-2 @[540px]/chartpanel:ml-auto"
             >
               {t.deleteChart}
             </FooterButton>

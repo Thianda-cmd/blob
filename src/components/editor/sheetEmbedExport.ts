@@ -129,6 +129,13 @@ function tableJson(model: EmbedTableModel): JSONContent {
 const captionJson = (caption: string): JSONContent => ({ type: "paragraph", attrs: { align: "center" }, content: [text(caption, [{ type: "italic" }])] });
 
 /**
+ * The line above an exported table, as the block in the note names it: a smart table by its name,
+ * cells by the spreadsheet they come from ("Kalibrierung · Blatt 1 · A1:B7", "Messung · Blatt 1 ·
+ * A9:B10"; a range's own title is only its sheet's name, which `where` already says).
+ */
+const tableTitle = (s: Extract<Shown, { kind: "table" }>) => (s.model.kind === "table" ? s.model.title : s.sheetTitle);
+
+/**
  * The document with every spreadsheet embed replaced by blocks the exporters know. For Word, charts
  * become pictures whose files live at blob: addresses until `done()` is called.
  */
@@ -165,7 +172,7 @@ export async function withSheetEmbeds(doc: JSONContent, target: "docx" | "markdo
       else out.push({ type: "paragraph", content: [text(t.exportChart(s.title), [{ type: "link", attrs: { href: link } }])] });
     } else if (s?.kind === "table") {
       const m = s.model;
-      out.push({ type: "paragraph", content: [text(m.title, [{ type: "bold" }]), text(` · ${m.where}`)] });
+      out.push({ type: "paragraph", content: [text(tableTitle(s), [{ type: "bold" }]), text(` · ${m.where}`)] });
       out.push(tableJson(m));
       if (m.moreRows > 0 || m.moreCols > 0) {
         const more = [m.moreRows > 0 ? t.more(m.moreRows) : null, m.moreCols > 0 ? t.moreCols(m.moreCols) : null].filter(Boolean).join(" ");
@@ -202,7 +209,7 @@ export async function sheetEmbedTexts(doc: PMNode, locale: Locale, pageHref: (id
     const s = resolved.get(keyOf(node.attrs.pageId, node.attrs.item));
     const caption = typeof node.attrs.caption === "string" && node.attrs.caption.trim() ? `\n${node.attrs.caption.trim()}` : "";
     if (s?.kind === "chart") return `[${t.exportChart(s.title)}] ${pageHref(s.pageId)}${caption}`;
-    if (s?.kind === "table") return `${s.model.title} · ${s.model.where}\n\n${embedTableMarkdown(s.model)}${caption}`;
+    if (s?.kind === "table") return `${tableTitle(s)} · ${s.model.where}\n\n${embedTableMarkdown(s.model)}${caption}`;
     return typeof node.attrs.caption === "string" ? node.attrs.caption : "";
   };
 }

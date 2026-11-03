@@ -207,3 +207,60 @@ export function adjustFormula(canonical: string, host: string, change: Structura
 export function adjustMovedFormula(canonical: string, host: string, newHost: string, change: StructuralChange): string {
   return rewriteRefs(canonical, (ref) => adjustRef(ref, host, change, newHost));
 }
+
+// ----------------------------------------------------------------------------------------------
+// Smart tables growing: Excel's structured references, without the syntax
+
+/**
+ * A smart table whose data rows changed from `from` to `to`: it grew by rows typed or pasted right
+ * below it, or by rows inserted right under its header or right above its totals row (rows
+ * inserted between its data rows need nothing: ranges grow by Excel's rules then).
+ */
+export type TableRows = {
+  /** The table's sheet, by name (compared without case, as formulas name sheets). */
+  sheet: string;
+  /** The table's columns. */
+  c0: number;
+  c1: number;
+  /** Its header row. */
+  header: number;
+  /** Its data rows as references write them now, and the rows they should cover. */
+  from: { r0: number; r1: number };
+  to: { r0: number; r1: number };
+};
+
+/**
+ * Where a range on the table's sheet goes when the table's rows change: a range that covers
+ * exactly the data rows of one or more of the table's columns covers the new data rows, one that
+ * covers the header row plus all data rows grows with them. Anything else (part of the data, the
+ * totals row, columns beside the table) gives null.
+ */
+export function tableRowsArea(a: Area, rows: Omit<TableRows, "sheet">): Area | null {
+  const { from, to } = rows;
+  if (from.r1 < from.r0 || to.r1 < to.r0) return null;
+  const n = { r0: Math.min(a.r0, a.r1), c0: Math.min(a.c0, a.c1), r1: Math.max(a.r0, a.r1), c1: Math.max(a.c0, a.c1) };
+  if (n.c0 < rows.c0 || n.c1 > rows.c1 || n.r1 !== from.r1) return null;
+  if (n.r0 === from.r0) return n.r0 === to.r0 && n.r1 === to.r1 ? null : { ...n, r0: to.r0, r1: to.r1 };
+  if (n.r0 === rows.header && rows.header < from.r0) return n.r1 === to.r1 ? null : { ...n, r1: to.r1 };
+  return null;
+}
+
+/**
+ * A formula on sheet `host` after a smart table's rows changed: =STEIGUNG(C6:C11;B6:B11) →
+ * C6:C12, B6:B12 when the table's data rows 6…11 became 6…12, also as $C$6:$C$11 or
+ * 'Blatt 1'!C6:C11 from another sheet, the way Excel's Tabelle1[Extinktion] would follow. Only
+ * ranges (A1:A5), never single cells. `at`: the formula's own cell; a range that would come to
+ * include it (=MITTELWERT(C6:C11) typed right below the table, into C12) stays as it is, so the
+ * table growing never makes a formula circular.
+ */
+export function growTableRefs(canonical: string, host: string, rows: TableRows, at?: { row: number; col: number }): string {
+  const own = same(host, rows.sheet);
+  return rewriteRefs(canonical, (ref) => {
+    if (ref.kind !== "range" || !same(ref.sheet ?? host, rows.sheet)) return undefined;
+    const n = normalizeRef(ref);
+    const a = tableRowsArea(n, rows);
+    if (!a) return undefined;
+    if (at && own && at.row >= a.r0 && at.row <= a.r1 && at.col >= a.c0 && at.col <= a.c1) return undefined;
+    return { ...n, r0: a.r0, r1: a.r1 };
+  });
+}

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import type { SaveState } from "@/components/page/useAutosave";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { pageText } from "@/i18n/messages/page";
 import { sheetText } from "@/i18n/messages/sheet";
@@ -65,11 +66,12 @@ export function useSheetSave({
   const [writer, setWriter] = useState<string | null>(null);
   const saverRef = useRef<SheetSaver | null>(null);
   const live = useLive(shared ? `page:${pageId}` : null, me);
+  const { updatePage } = useWorkspace();
 
   // Kept current for the long-lived saver.
-  const latest = useRef({ live, onTitle, t, words });
+  const latest = useRef({ live, onTitle, t, words, updatePage });
   useEffect(() => {
-    latest.current = { live, onTitle, t, words };
+    latest.current = { live, onTitle, t, words, updatePage };
   });
   const initial = useRef({ rev, title, readOnly, locale, userId });
 
@@ -88,7 +90,12 @@ export function useSheetSave({
         state: setState,
         notice: setNotice,
         title: (next) => latest.current.onTitle(next),
-        saved: (next) => latest.current.live.send("sheet-saved", { rev: next }),
+        saved: (next) => {
+          latest.current.live.send("sheet-saved", { rev: next });
+          // Moves the spreadsheet's updated_at in this tab's page list (no request): a note
+          // showing it here, say in a side pane, checks for the new values at once.
+          void latest.current.updatePage(pageId, {}, { local: true });
+        },
         restored: () => blob.say(latest.current.t.restored, { mood: "happy", ms: 5000 }),
         trouble: (kind) =>
           kind === "failed" ? blob.say(latest.current.words.cantReach, { mood: "worried" }) : blob.say(latest.current.words.backOnline, { mood: "happy" }),

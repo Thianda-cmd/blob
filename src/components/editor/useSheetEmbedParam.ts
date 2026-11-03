@@ -54,20 +54,28 @@ export function useSheetEmbedParam({ editor, pageId, ready, blocked, enabled }: 
       return;
     }
     if (!ready) return;
-    handled.add(key);
-    const at = insertAtEnd(editor, attrs);
-    clean();
-    if (at === null) return;
-    blob.say(t.added, { mood: "happy" });
-    // The spreadsheet may still have been saving when its page closed: look again in a moment.
-    const pageOfSheet = attrs.pageId;
-    if (pageOfSheet) setTimeout(() => void privateSheets.ensure(pageOfSheet, 0), 2500);
-    // Once the block has drawn: bring it into view.
-    requestAnimationFrame(() => {
-      if (editor.isDestroyed) return;
-      const dom = editor.view.nodeDOM(at);
-      if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+    // A moment later, not inside the effect: Tiptap draws the new block with React right away
+    // (flushSync), which React refuses while it is still committing ("flushSync was called from
+    // inside a lifecycle method"). Marked as done only when it happens, so React running the
+    // effect twice still inserts it once.
+    const timer = setTimeout(() => {
+      if (editor.isDestroyed || handled.has(key)) return;
+      handled.add(key);
+      const at = insertAtEnd(editor, attrs);
+      clean();
+      if (at === null) return;
+      blob.say(t.added, { mood: "happy" });
+      // The spreadsheet may still have been saving when its page closed: look again in a moment.
+      const pageOfSheet = attrs.pageId;
+      if (pageOfSheet) setTimeout(() => void privateSheets.ensure(pageOfSheet, 0), 2500);
+      // Once the block has drawn: bring it into view.
+      requestAnimationFrame(() => {
+        if (editor.isDestroyed) return;
+        const dom = editor.view.nodeDOM(at);
+        if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [raw, editor, ready, blocked, pageId, params, t]);
 }
 

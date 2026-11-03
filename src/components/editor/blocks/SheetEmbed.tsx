@@ -46,6 +46,7 @@ import {
   embedTarget,
   readEmbedItem,
   sameItem,
+  sheetItemHref,
   usedArea,
   type EmbedCell,
   type EmbedTableModel,
@@ -99,7 +100,7 @@ function PrivateView({ node, updateAttributes, selected }: ReactNodeViewProps) {
   if (!pageId || !item || picking) {
     if (!canEdit) {
       return (
-        <NodeViewWrapper className="blob-embed blob-object" contentEditable={false}>
+        <NodeViewWrapper className="blob-embed blob-object blob-sheet-embed" contentEditable={false}>
           <div className="blob-sheet-card">
             <Notice icon={FileSpreadsheet} text={t.nothing} />
           </div>
@@ -107,7 +108,7 @@ function PrivateView({ node, updateAttributes, selected }: ReactNodeViewProps) {
       );
     }
     return (
-      <NodeViewWrapper className="blob-embed blob-object" contentEditable={false}>
+      <NodeViewWrapper className="blob-embed blob-object blob-sheet-embed" contentEditable={false}>
         <SheetPicker
           t={t}
           locale={locale}
@@ -125,7 +126,7 @@ function PrivateView({ node, updateAttributes, selected }: ReactNodeViewProps) {
 
   const title = meta?.title?.trim() || "";
   return (
-    <NodeViewWrapper className={cn("blob-embed blob-object", selected && "blob-node-selected")} contentEditable={false}>
+    <NodeViewWrapper className={cn("blob-embed blob-object blob-sheet-embed", selected && "blob-node-selected")} contentEditable={false}>
       <EmbedBody
         t={t}
         locale={locale}
@@ -137,7 +138,7 @@ function PrivateView({ node, updateAttributes, selected }: ReactNodeViewProps) {
         canEdit={canEdit}
         knownTitle={title}
         changedAt={meta?.updated_at ?? null}
-        open={() => router.push(`/p/${pageId}`)}
+        open={() => router.push(sheetItemHref(pageId, item))}
         onChange={() => setPicking(true)}
         onSize={(s) => updateAttributes({ size: s })}
         onCaption={(c) => updateAttributes({ caption: c })}
@@ -154,10 +155,10 @@ function PublicView({ node }: ReactNodeViewProps) {
   const { token, root, pages } = usePublicPages();
   const pageId = embedPageId(node.attrs.pageId);
   const item = readEmbedItem(node.attrs.item);
-  if (!pageId || !item) return <NodeViewWrapper className="blob-embed" contentEditable={false} />;
+  if (!pageId || !item) return <NodeViewWrapper className="blob-embed blob-sheet-embed" contentEditable={false} />;
   const page = pages.get(pageId);
   return (
-    <NodeViewWrapper className="blob-embed blob-object" contentEditable={false}>
+    <NodeViewWrapper className="blob-embed blob-object blob-sheet-embed" contentEditable={false}>
       <EmbedBody
         t={t}
         locale={locale}

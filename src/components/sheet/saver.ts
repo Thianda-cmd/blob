@@ -17,7 +17,7 @@ import { normalizeWorkbook, workbookPlainText, workbookPreview, type SheetPrevie
 import { editText, type Calc } from "@/sheet/engine";
 import { getCell, setCells } from "@/sheet/ops";
 import type { Workbook } from "@/sheet/types";
-import { clearDraft, draftTab, readDraft, writeDraft } from "./drafts";
+import { clearDraft, draftTab, flushedRev, readDraft, writeDraft } from "./drafts";
 import { parseTyped, typedCell, type SheetStore } from "./store";
 
 /** Quiet time after the last change before saving. */
@@ -397,6 +397,10 @@ export class SheetSaver {
   async restore() {
     const { store, userId, pageId, locale } = this.o;
     if (this.o.readOnly || !userId) return;
+    // The background save (flushDrafts.ts) sent this device's draft while this page was on its
+    // way with the version before: that newer version comes in now, as if someone had saved it.
+    const flushed = flushedRev(pageId);
+    if (flushed > this.rev) void this.remote(flushed);
     const d = await readDraft(userId, pageId);
     if (!d || this.stopped) return;
     const base = normalizeWorkbook(d.base, locale);
@@ -420,6 +424,9 @@ export class SheetSaver {
       this.o.on.title(title);
     }
     this.o.on.restored();
+    // The draft (maybe another tab's, or a closed one's) is this tab's work now: kept as this tab's
+    // draft, it goes away once that is saved.
+    this.keepDraft();
     this.changed();
   }
 

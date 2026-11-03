@@ -19,9 +19,9 @@ export const sheetText = defineMessages({
     restored: "Your unsaved changes from this device are back.",
     someoneChanged: (name: string) => `${name} changed something`,
 
-    exportXlsx: "Export as Excel file (.xlsx)",
-    exportCsv: "Export this sheet as CSV",
-    importFile: "Import an Excel or CSV file",
+    exportXlsx: "Save as Excel file",
+    exportCsv: "Save sheet as CSV",
+    importFile: "Import Excel or CSV",
     print: "Print",
     exporting: "Getting your file ready…",
     exported: "Saved to your downloads.",
@@ -35,6 +35,8 @@ export const sheetText = defineMessages({
     importEmpty: "There's nothing in that file.",
     importCut: (rows: string) => `Only the first ${rows} rows fit.`,
     importLabel: "Import",
+    dropHere: "Drop to add it as a new sheet",
+    dropHint: "An Excel (.xlsx) or CSV file",
     templateLabel: "Template",
     printEmpty: "There's nothing on this sheet to print yet.",
 
@@ -44,9 +46,34 @@ export const sheetText = defineMessages({
 
     chartSettings: "Chart settings",
     tableSettings: "Smart table settings",
+    dockBigger: "Make the settings taller",
+    dockSmaller: "Make the settings smaller",
 
     sheets: "Sheets",
     empty: "This spreadsheet is empty.",
+
+    // The keyboard shortcuts list (Ctrl/⌘+/, src/components/shell/ShortcutsDialog.tsx).
+    shortcuts: {
+      groups: { cells: "Spreadsheets: cells", tools: "Spreadsheets: tools" },
+      items: {
+        edit: "Edit the cell",
+        absolute: "Switch $ in a reference (A1 → $A$1)",
+        newLine: "New line in the cell",
+        fillTyped: "Type into every selected cell",
+        fill: "Fill down / right",
+        date: "Today's date / the time",
+        undo: "Undo / redo",
+        table: "Smart table",
+        formats: "Number formats",
+        autoSum: "AutoSum",
+        chart: "Insert chart",
+        functions: "All functions",
+        find: "Find",
+        replace: "Find and replace",
+        save: "Save now",
+        print: "Print",
+      },
+    },
   },
   de: {
     kind: "Tabelle",
@@ -60,9 +87,9 @@ export const sheetText = defineMessages({
     restored: "Deine ungespeicherten Änderungen von diesem Gerät sind wieder da.",
     someoneChanged: (name) => `${name} hat etwas geändert`,
 
-    exportXlsx: "Als Excel-Datei (.xlsx) exportieren",
-    exportCsv: "Aktuelles Blatt als CSV exportieren",
-    importFile: "Excel- oder CSV-Datei importieren",
+    exportXlsx: "Als Excel-Datei speichern",
+    exportCsv: "Blatt als CSV speichern",
+    importFile: "Excel/CSV importieren",
     print: "Drucken",
     exporting: "Deine Datei wird vorbereitet…",
     exported: "In deinen Downloads gespeichert.",
@@ -76,6 +103,8 @@ export const sheetText = defineMessages({
     importEmpty: "In dieser Datei steht nichts.",
     importCut: (rows) => `Nur die ersten ${rows} Zeilen passen hinein.`,
     importLabel: "Importieren",
+    dropHere: "Loslassen für ein neues Blatt",
+    dropHint: "Eine Excel- (.xlsx) oder CSV-Datei",
     templateLabel: "Vorlage",
     printEmpty: "Auf diesem Blatt gibt es noch nichts zu drucken.",
 
@@ -85,8 +114,32 @@ export const sheetText = defineMessages({
 
     chartSettings: "Diagramm-Einstellungen",
     tableSettings: "Tabellen-Einstellungen",
+    dockBigger: "Einstellungen größer",
+    dockSmaller: "Einstellungen kleiner",
 
     sheets: "Blätter",
     empty: "Diese Tabelle ist leer.",
+
+    shortcuts: {
+      groups: { cells: "Tabellen: Zellen", tools: "Tabellen: Werkzeuge" },
+      items: {
+        edit: "Zelle bearbeiten",
+        absolute: "$ im Bezug umschalten (A1 → $A$1)",
+        newLine: "Neue Zeile in der Zelle",
+        fillTyped: "In alle markierten Zellen schreiben",
+        fill: "Nach unten / rechts ausfüllen",
+        date: "Heutiges Datum / Uhrzeit",
+        undo: "Rückgängig / Wiederholen",
+        table: "Als intelligente Tabelle",
+        formats: "Zahlenformate",
+        autoSum: "AutoSumme",
+        chart: "Diagramm einfügen",
+        functions: "Alle Funktionen",
+        find: "Suchen",
+        replace: "Suchen und ersetzen",
+        save: "Jetzt speichern",
+        print: "Drucken",
+      },
+    },
   },
 });

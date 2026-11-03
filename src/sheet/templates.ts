@@ -178,7 +178,8 @@ const workbook = (sheets: Draft[], charts: ChartSpec[], tables: TableSpec[]): Wo
 function calibration(locale: Locale): Workbook {
   const t = sayer(locale);
   const d = new Draft(t("Calibration", "Kalibrierung"));
-  d.widths([190, 120, 120, 140, 180, 170]);
+  // Header cells need their text plus about 24 px for the smart table's filter button.
+  d.widths([190, 120, 120, 160, 190, 170]);
   d.intro(
     t("Calibration curve – photometry (Beer–Lambert law)", "Kalibriergerade – Photometrie nach Lambert-Beer"),
     t(
@@ -196,8 +197,8 @@ function calibration(locale: Locale): Workbook {
   d.set(3, 0, t("1. Standards", "1. Standards"), {
     style: section("blue"),
     note: t(
-      "More standards? Insert a row above the last one (cell menu: “Insert row above”): slope, R² and the chart then include it.",
-      "Mehr Standards? Über dem letzten Standard eine Zeile einfügen (Zellmenü: „Zeile oberhalb einfügen“): Steigung, R² und Diagramm rechnen sie dann mit.",
+      "More standards? Type the next one into the empty row right below the table, or insert rows above the last standard (cell menu: “Insert row above”). Slope, R² and the chart include them by themselves.",
+      "Mehr Standards? Tipp den nächsten einfach in die leere Zeile direkt unter der Tabelle oder füg über dem letzten Standard Zeilen ein (Zellmenü: „Zeile oberhalb einfügen“). Steigung, R² und Diagramm rechnen sie von selbst mit.",
     ),
   });
   d.head(HEAD_ROW, 0, [t("Standard", "Standard"), t("Concentration", "Konzentration"), t("Absorbance", "Extinktion")], {
@@ -310,7 +311,10 @@ function calibration(locale: Locale): Workbook {
 function bradford(locale: Locale): Workbook {
   const t = sayer(locale);
   const d = new Draft(t("Bradford", "Bradford"));
-  d.widths([170, 90, 90, 90, 100, 90, 110]);
+  // Just wide enough for "Messwert 1", "Verdünnung" and "Blindwert (Mittelwert)" (headers need
+  // their text plus about 24 px for the filter button), so the chart beside the table still fits
+  // on a 1440 px laptop with the sidebar open.
+  d.widths([152, 102, 102, 102, 96, 108, 100]);
   d.intro(
     t("Bradford protein assay", "Bradford-Proteinbestimmung"),
     t(
@@ -336,8 +340,8 @@ function bradford(locale: Locale): Workbook {
   d.set(3, 0, t("1. BSA standards", "1. BSA-Standards"), {
     style: section("purple"),
     note: t(
-      "More standards? Insert a row above the last one (cell menu: “Insert row above”): the line and the chart then include it.",
-      "Mehr Standards? Über dem letzten Standard eine Zeile einfügen (Zellmenü: „Zeile oberhalb einfügen“): Gerade und Diagramm rechnen sie dann mit.",
+      "More standards? Type the next one into the empty row right below the table, or insert rows above the last standard (cell menu: “Insert row above”). The line and the chart include them by themselves.",
+      "Mehr Standards? Tipp den nächsten einfach in die leere Zeile direkt unter der Tabelle oder füg über dem letzten Standard Zeilen ein (Zellmenü: „Zeile oberhalb einfügen“). Gerade und Diagramm rechnen sie von selbst mit.",
     ),
   });
   d.head(HEAD_ROW, 0, ["BSA", ...readings, t("Mean", "Mittelwert"), t("SD", "Stabw."), t("Net", "Netto")], {
@@ -367,10 +371,11 @@ function bradford(locale: Locale): Workbook {
   const INTERCEPT = K + 2;
   const BLANK = K + 4;
   d.set(K, 0, t("2. The line's numbers", "2. Kennwerte der Geraden"), { style: section("purple") });
-  d.set(SLOPE, 0, t("Slope m", "Steigung m"), {
+  // The unit in the label: "0,000900 mL/µg" is too wide for the column (it showed ###).
+  d.set(SLOPE, 0, t("Slope m (mL/µg)", "Steigung m (mL/µg)"), {
     note: t("=SLOPE(net absorbances, BSA concentrations): the absorbance per µg/mL protein.", "=STEIGUNG(Netto-Extinktionen; BSA-Konzentrationen): die Extinktion pro µg/mL Protein."),
   });
-  d.set(SLOPE, 1, `=SLOPE(${net},${xs})`, { fmt: dec(6, "mL/µg"), style: RESULT });
+  d.set(SLOPE, 1, `=SLOPE(${net},${xs})`, { fmt: dec(6), style: RESULT });
   d.set(INTERCEPT, 0, t("Intercept b", "Achsenabschnitt b"));
   d.set(INTERCEPT, 1, `=INTERCEPT(${net},${xs})`, { fmt: dec(4), style: RESULT });
   d.set(K + 3, 0, t("R² (goodness of fit)", "Bestimmtheitsmaß R²"), {
@@ -417,8 +422,8 @@ function bradford(locale: Locale): Workbook {
     [d],
     [
       chart(s, {
-        at: { row: 3, col: 7, dx: 16, dy: 4 },
-        size: { w: 420, h: 300 },
+        at: { row: 3, col: 7, dx: 12, dy: 4 },
+        size: { w: 350, h: 270 },
         kind: "scatter",
         title: t("BSA calibration", "BSA-Kalibriergerade"),
         x: d.range(FIRST, 0, LAST, 0),
@@ -438,7 +443,8 @@ function bradford(locale: Locale): Workbook {
 function replicates(locale: Locale): Workbook {
   const t = sayer(locale);
   const d = new Draft(t("Measurements", "Messreihe"));
-  d.widths([120, 95, 95, 95, 115, 115, 80]);
+  // "Replicate 1" with the filter button needs 100 px; the chart beside the table fits at 1440 px.
+  d.widths([120, 100, 100, 100, 104, 100, 64]);
   d.intro(
     t("Replicate measurements", "Messreihe mit Replikaten"),
     t(
@@ -485,8 +491,9 @@ function replicates(locale: Locale): Workbook {
     [d],
     [
       chart(s, {
-        at: { row: 2, col: 7, dx: 16, dy: 4 },
-        size: { w: 440, h: 300 },
+        // Below the frozen header row (a chart there would slide under it and lose its title).
+        at: { row: FIRST, col: 7, dx: 12, dy: 4 },
+        size: { w: 420, h: 300 },
         kind: "column",
         title: t("Mean ± standard deviation", "Mittelwert ± Standardabweichung"),
         x: d.range(FIRST, 0, LAST, 0),

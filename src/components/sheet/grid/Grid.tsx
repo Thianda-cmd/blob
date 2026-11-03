@@ -37,11 +37,11 @@ import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { areaName, cellKey, inArea, parseKey } from "@/sheet/a1";
 import { explainError, isError, type Calc, type CellError } from "@/sheet/engine";
-import { fillArea, setColWidths, setRowHeights, sheetById } from "@/sheet/ops";
+import { setColWidths, setRowHeights, sheetById } from "@/sheet/ops";
 import { DEFAULT_COL_W, DEFAULT_ROW_H, MAX_ROWS, type Area, type Pos, type Sheet } from "@/sheet/types";
 import { cn } from "@/lib/utils";
 import { activeArea, mainArea, rowHiddenIn, selectionAreas, useSheet, type SheetStore } from "../store";
-import { fitColumns, fitRows, isSelected, selectedIndexes, addRoom, unhideNear } from "./actions";
+import { fillTo, fitColumns, fitRows, isSelected, selectedIndexes, addRoom, unhideNear } from "./actions";
 import { BASE_FONT, CELL_PAD, shownText } from "./cellLook";
 import { CellEditor } from "./CellEditor";
 import { copySelection, pasteData, type PasteMode } from "./clipboard";
@@ -304,24 +304,34 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     if (over > 0) el.scrollTop += over;
   }, [keyboard.open, keyboard.height, view.h, editRow, editCol]);
 
-  // Each sheet keeps its own scroll position, like Excel (before the selection is brought into view below).
-  const scrolls = useRef(new Map<string, { left: number; top: number }>());
+  // Each sheet keeps its own scroll position, like Excel (before the selection is brought into view
+  // below). With it goes where the selection's moving end was: back on a sheet with that same
+  // selection, the sheet stays as it was left instead of jumping to the selection (a different one,
+  // say a cell picked on that sheet through the name box, is still brought into view).
+  const focusRow = selection.focus.row;
+  const focusCol = selection.focus.col;
+  const scrolls = useRef(new Map<string, { left: number; top: number; row: number; col: number }>());
   const shownSheet = useRef(sheetId);
+  const shownFocus = useRef({ row: focusRow, col: focusCol });
+  const restored = useRef<{ row: number; col: number } | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el || shownSheet.current === sheetId) return;
-    scrolls.current.set(shownSheet.current, { left: el.scrollLeft, top: el.scrollTop });
+    scrolls.current.set(shownSheet.current, { left: el.scrollLeft, top: el.scrollTop, ...shownFocus.current });
     shownSheet.current = sheetId;
-    const back = scrolls.current.get(sheetId) ?? { left: 0, top: 0 };
-    el.scrollTo({ left: back.left, top: back.top });
+    const back = scrolls.current.get(sheetId);
+    el.scrollTo({ left: back?.left ?? 0, top: back?.top ?? 0 });
+    restored.current = back ? { row: back.row, col: back.col } : null;
   }, [sheetId]);
 
   // The moving end of the selection stays in view (keys, Enter, pointing at cells for a formula).
   // Whole columns only scroll sideways and whole rows only up and down: clicking a column's
   // letter doesn't jump to its last row.
-  const focusRow = selection.focus.row;
-  const focusCol = selection.focus.col;
   useLayoutEffect(() => {
+    const back = restored.current;
+    restored.current = null;
+    shownFocus.current = { row: focusRow, col: focusCol };
+    if (back && back.row === focusRow && back.col === focusCol) return;
     const el = scroller.current;
     if (!el || !el.clientWidth) return;
     const l = latest.current.layout;
@@ -555,10 +565,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const s = store.get();
     const l = latest.current.layout;
     if (d.kind === "fill" && d.to) {
-      const from = d.from;
-      const to = d.to;
-      store.apply(t.labels.fill, (wb, c) => fillArea(wb, c, s.sheetId, from, to, s.locale));
-      store.select({ anchor: { row: to.r0, col: to.c0 }, focus: { row: to.r1, col: to.c1 }, extra: [] });
+      fillTo(store, d.from, d.to);
     } else if (d.kind === "colSize") {
       const w = Math.round(d.size / l.zoom);
       if (w !== Math.round(d.was / l.zoom)) store.apply(t.labels.colWidth, (wb) => setColWidths(wb, s.sheetId, d.all, w));
@@ -817,9 +824,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       const from = activeArea(s.selection);
       const end = fillDownEnd(sh, from);
       if (end === null || end <= from.r1) return;
-      const to = { ...from, r1: end };
-      store.apply(t.labels.fill, (wb, c) => fillArea(wb, c, s.sheetId, from, to, s.locale));
-      store.select({ anchor: { row: to.r0, col: to.c0 }, focus: { row: to.r1, col: to.c1 }, extra: [] });
+      fillTo(store, from, { ...from, r1: end });
       return;
     }
     const hit = hitAt(e.clientX, e.clientY, 4);

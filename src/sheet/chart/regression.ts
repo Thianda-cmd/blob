@@ -30,7 +30,7 @@
 
 import type { Locale } from "@/i18n/config";
 import type { TrendlineSpec } from "../types";
-import { formatGeneral, formatSignificant } from "./format";
+import { formatGeneral, formatR2, formatSignificant } from "./format";
 
 export type Fit = {
   type: TrendlineSpec["type"];
@@ -617,7 +617,11 @@ export function equationText(fit: Fit, locale: Locale, digits?: number): string 
     .join("");
 }
 
-/** "R² = 0,9987" in the user's number format. */
+/**
+ * "R² = 0,9987" in the user's number format: 4 decimals, and never "1" for a fit that isn't
+ * perfect ("R² = 0,99997" where Excel's label says 1; see formatR2). The equation keeps Excel's
+ * label format. `digits`: the decimals for "more digits" in the panel (up to 3 more if needed).
+ */
 export function r2Text(r2: number, locale: Locale, digits?: number): string {
-  return `R² = ${digits ? formatSignificant(r2, locale, digits) : formatGeneral(r2, locale)}`;
+  return `R² = ${digits ? formatR2(r2, locale, Math.max(4, digits), Math.max(6, digits + 3)) : formatR2(r2, locale)}`;
 }

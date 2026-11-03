@@ -527,8 +527,14 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
 
   const showMirror = isFormula;
   const lines = text.split("\n").length;
-  const canExpand = expanded || lines > 1 || text.length > 60;
-  const textStyle = "px-2.5 py-1.5 text-[13.5px] leading-[20px] whitespace-pre-wrap break-words [overflow-wrap:anywhere]";
+  // (A phone's bar has room for only about 20 characters on a line.)
+  const canExpand = expanded || lines > 1 || text.length > (phone ? 20 : 60);
+  // One line high, a long formula wraps out of sight: its lines are then as tall as the bar, so the
+  // next one never peeks in under the first (the caret's line scrolls in whole). Expanded, normal lines.
+  const textStyle = cn(
+    "px-2.5 text-[13.5px] whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+    expanded ? "py-1.5 leading-[20px]" : "py-0 leading-[32px]",
+  );
 
   const help: ReactNode = !helpOpen ? null : error ? (
     <div className="px-3 py-2">

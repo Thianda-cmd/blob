@@ -113,10 +113,15 @@ export function CellEditor({ store, layout, scroll, view, sheetId, locale, t, gr
     }
   }, [isFormula, text, locale, calc, sheetId, pos.row, pos.col, fmt]);
 
-  // The help below the editor (above it near the bottom of the screen, right-aligned near the right edge).
+  // The help goes below the editor. Near the bottom of the screen it goes beside it on the right
+  // rather than above: a formula is mostly typed under its data, and those cells must stay in
+  // view to be pointed at. Only without room there either, above. Right-aligned near the right edge.
   const viewY = layout.headerH + rect.y - (frozenRow ? 0 : scroll.top);
-  const above = viewY + h + 260 > view.h && viewY > 220;
-  const toLeft = viewX + 360 > view.w && viewX + w > 360;
+  const helpH = edit?.error ? 90 : listOpen ? 300 : 150;
+  const roomBelow = view.h - (viewY + h) - 6;
+  const roomAbove = viewY - layout.headerH - 6;
+  const place = roomBelow >= helpH ? "below" : viewX + w + 6 + 360 <= view.w ? "beside" : roomAbove >= helpH ? "above" : "below";
+  const toLeft = place !== "beside" && viewX + 360 > view.w && viewX + w > 360;
 
   // Keep the caret where the store says when the text changed elsewhere (a reference was inserted,
   // a suggestion taken, the formula bar typed); leave it alone while the user moves it.
@@ -368,8 +373,13 @@ export function CellEditor({ store, layout, scroll, view, sheetId, locale, t, gr
       </div>
       {help && (
         <div
-          className="absolute left-0 z-50 w-max min-w-[220px] max-w-[min(360px,80vw)] overflow-hidden rounded-xl border border-line bg-raised text-left shadow-pop"
-          style={{ ...(above ? { bottom: h + 6 } : { top: h + 6 }), ...(toLeft ? { right: 0, left: "auto" } : null) }}
+          // Only the list of functions takes clicks; the hints let them through to the cells under
+          // them, so pointing at cells always works.
+          className={`absolute left-0 z-50 w-max min-w-[220px] max-w-[min(360px,80vw)] overflow-hidden rounded-xl border border-line bg-raised text-left shadow-pop ${listOpen ? "" : "pointer-events-none"}`}
+          style={{
+            ...(place === "above" ? { bottom: h + 6 } : place === "beside" ? { bottom: 0, left: w + 6 } : { top: h + 6 }),
+            ...(toLeft ? { right: 0, left: "auto" } : null),
+          }}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.preventDefault()}
         >

@@ -151,3 +151,14 @@ export function markSheetOpen(pageId: string): () => void {
 }
 
 export const isSheetOpen = (pageId: string) => open.has(pageId);
+
+// Revisions the background save wrote in this tab. A spreadsheet opened at that very moment may have
+// come with the version before (its page was already on its way): its editor catches up with them.
+const flushed = new Map<string, number>();
+
+export function markFlushed(pageId: string, rev: number) {
+  flushed.set(pageId, Math.max(rev, flushed.get(pageId) ?? 0));
+}
+
+/** The newest revision the background save wrote for a page in this tab (0: none). */
+export const flushedRev = (pageId: string) => flushed.get(pageId) ?? 0;

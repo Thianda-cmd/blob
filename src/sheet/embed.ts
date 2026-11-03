@@ -83,6 +83,24 @@ export function embedFromParam(param: string | null): SheetEmbedAttrs | null {
   }
 }
 
+/** The address parameter that opens a spreadsheet with an embed's chart, table or cells selected. */
+export const SHEET_ITEM_PARAM = "sheetItem";
+
+/** The spreadsheet's address with what a block shows selected (the block's "Öffnen"). */
+export function sheetItemHref(pageId: string, item: SheetEmbedItem): string {
+  return `/p/${pageId}?${SHEET_ITEM_PARAM}=${encodeURIComponent(JSON.stringify(item))}`;
+}
+
+/** The ?sheetItem= value of a spreadsheet's address → the item (null when it isn't valid). */
+export function itemFromParam(param: string | null): SheetEmbedItem | null {
+  if (!param) return null;
+  try {
+    return readEmbedItem(JSON.parse(param));
+  } catch {
+    return null;
+  }
+}
+
 /** Two items show the same thing. */
 export function sameItem(a: SheetEmbedItem | null, b: SheetEmbedItem | null): boolean {
   if (!a || !b || a.kind !== b.kind) return false;

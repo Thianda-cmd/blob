@@ -21,7 +21,9 @@ import { sheetEmbedTexts, withSheetEmbeds } from "@/components/editor/sheetEmbed
 import { noteSchema, plainTextOf } from "@/components/editor/schema";
 import { noteToDocx } from "@/notes/docx";
 import { noteToMarkdown } from "@/notes/markdown";
-import { addToNoteHref, embedFromParam, embedTableMarkdown, embedTableModel, embedTarget, readEmbedAttrs, readEmbedItem, sameItem, usedArea } from "@/sheet/embed";
+import { calcOf } from "@/components/editor/blocks/sheetEmbedData";
+import { readSheetFile } from "@/components/sheet/importFile";
+import { addToNoteHref, embedFromParam, embedTableMarkdown, embedTableModel, embedTarget, itemFromParam, readEmbedAttrs, readEmbedItem, sameItem, sheetItemHref, usedArea } from "@/sheet/embed";
 import { createCalc } from "@/sheet/engine";
 import { parseClipboard, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
 import { csvNumberLocale, detectSeparator, parseCsv, sheetToCsv } from "@/sheet/io/csv";
@@ -758,6 +760,9 @@ async function xlsxImport() {
     },
   );
   eq("trendline label format", [trendLabelFormat({ type: "linear", coefficients: [0.0022, 0.0524], r2: 0.9998, n: 5, predict: () => 0 }), trendLabelFormat({ type: "linear", coefficients: [12.5, 340], r2: 1, n: 3, predict: () => 0 }), trendLabelFormat({ type: "exponential", coefficients: [3e-7, 0.7], r2: 1, n: 3, predict: () => 0 })], ["0.0#####", "0.0###", "0.000E+00"]);
+  // Excel uses one format for equation and R²: with R² shown it gets the decimals that keep 0,99997
+  // from reading "1,0" (Blob's own label never shows a false 1 either).
+  eq("trendline label format keeps R² below 1", [trendLabelFormat({ type: "linear", coefficients: [12.5, 340], r2: 0.99997, n: 3, predict: () => 0 }), trendLabelFormat({ type: "linear", coefficients: [12.5, 340], r2: 0.99997, n: 3, predict: () => 0 }, false), trendLabelFormat({ type: "linear", coefficients: [12.5, 340], r2: 0.9999996, n: 3, predict: () => 0 }), trendLabelFormat({ type: "exponential", coefficients: [3e-7, 0.7], r2: 0.99997, n: 3, predict: () => 0 })], ["0.0####", "0.0###", "0.0######", "0.0000E+00"]);
 
   eq("skipped", skipped, [
     "2 verbundene Zellbereiche (der Text steht jeweils in der ersten Zelle)",
@@ -822,6 +827,20 @@ async function embed() {
   const href = addToNoteHref("11111111-2222-4333-8444-555555555555", attrs);
   ok("href", href.startsWith("/p/11111111-2222-4333-8444-555555555555?sheetEmbed=%7B"), href);
   eq("param round trip", embedFromParam(new URL(href, "https://blob.test").searchParams.get("sheetEmbed")), attrs);
+  // "Öffnen" on a block: the spreadsheet's address with the item to select.
+  for (const item of [attrs.item, { kind: "chart" as const, chartId: "chart1" }, { kind: "table" as const, tableId: "table1" }]) {
+    const open = sheetItemHref(page, item);
+    ok(`open href ${item.kind}`, open.startsWith(`/p/${page}?sheetItem=`), open);
+    eq(`open param round trip ${item.kind}`, itemFromParam(new URL(open, "https://blob.test").searchParams.get("sheetItem")), item);
+  }
+  eq("open param junk", [itemFromParam("{nope"), itemFromParam(null), itemFromParam('{"kind":"chart","chartId":"<x>"}')], [null, null, null]);
+  // Notes calculate in the reader's language: TEXT and VALUE read text the way the reader writes numbers.
+  {
+    const lw: Workbook = { v: 1, sheets: [sheet("l1", "Blatt 1", { "0,0": { f: 'VALUE("0.523")' }, "0,1": { f: 'VALUE("0,523")' } })], charts: [], tables: [] };
+    eq("calcOf German", [calcOf(lw, "de").value("l1", 0, 0), calcOf(lw, "de").value("l1", 0, 1)], [523, 0.523]);
+    eq("calcOf English", calcOf(lw, "en").value("l1", 0, 0), 0.523);
+    ok("calcOf one per language", calcOf(lw, "de") !== calcOf(lw, "en") && calcOf(lw, "de") === calcOf(lw, "de"));
+  }
   eq("param junk", embedFromParam("{not json"), null);
   ok("same item", sameItem({ kind: "table", tableId: "a" }, { kind: "table", tableId: "a" }) && !sameItem({ kind: "table", tableId: "a" }, { kind: "chart", chartId: "a" }));
 
@@ -912,6 +931,7 @@ async function embed() {
       { type: "sheetEmbed", attrs: { pageId: page, item: { kind: "table", tableId: "t1" }, size: "m", caption: "Tab. 1: Messwerte" } },
       { type: "sheetEmbed", attrs: { pageId: page, item: { kind: "chart", chartId: "c1" }, size: "l", caption: "" } },
       { type: "sheetEmbed", attrs: { pageId: gone, item: { kind: "chart", chartId: "x" }, size: "m", caption: "" } },
+      { type: "sheetEmbed", attrs: { pageId: page, item: { kind: "range", sheetId: "s1", area: { r0: 0, c0: 0, r1: 1, c1: 1 } }, size: "m", caption: "" } },
     ],
   };
   const forMd = await withSheetEmbeds(note, "markdown", "de", source);
@@ -921,6 +941,8 @@ async function embed() {
   ok("markdown caption", mdOut.includes("*Tab. 1: Messwerte*"), mdOut);
   ok("markdown chart link", mdOut.includes(`[Diagramm: Kalibriergerade](https://blob.test/p/${page})`), mdOut);
   ok("markdown unreadable link", mdOut.includes(`[Tabelle](https://blob.test/p/${gone})`), mdOut);
+  // Cells are named after the spreadsheet they come from (their own title is only the sheet's name).
+  ok("markdown range title", mdOut.includes("**Photometrie** · Messung · A1:B2") && !mdOut.includes("**Messung** · Messung"), mdOut);
   const forWord = await withSheetEmbeds({ ...note, content: note.content.slice(0, 2) }, "docx", "de", source);
   const word = await noteToDocx(forWord.doc, { locale: "de", title: "Notiz", pageHref: (id) => `/p/${id}`, absolute: (h) => h, image: async () => null, drawings: [] });
   forWord.done();
@@ -931,6 +953,103 @@ async function embed() {
   ok("text table", texts[0].startsWith("Messwerte · Messung · A1:C6\n\n| Probe |") && texts[0].endsWith("\nTab. 1: Messwerte"), texts[0]);
   eq("text chart", texts[1], `[Diagramm: Kalibriergerade] https://blob.test/p/${page}`);
   eq("text unreadable", texts[2], "");
+  ok("text range title", texts[3].startsWith("Photometrie · Messung · A1:B2\n\n| Probe |"), texts[3]);
+}
+
+/**
+ * Smart tables in .xlsx: Excel "repairs" a file whose table column names repeat or are empty, so
+ * they are the header texts as shown, made unique with numbers ("Wert", "Wert2"), and the header
+ * cells say the same. Every formula is written through toFileFormula (cells, a totals row) and
+ * read back through importFormula, so _xlfn prefixes come and go.
+ */
+async function xlsxTableNames() {
+  const cells: Record<string, Cell> = {
+    "0,0": { v: "Wert" },
+    "0,1": { v: "Wert" },
+    "0,3": { v: "wert" },
+    "0,4": { v: 2020 },
+    "0,5": { v: "Zeile 1\nZeile 2", s: { wrap: true } },
+    "0,6": { v: "  Wert  " },
+    "0,7": { v: "Stabw" },
+    "0,8": { f: 'CONCAT("Mit","tel")' },
+  };
+  for (let r = 1; r <= 3; r++) {
+    for (let c = 0; c <= 6; c++) cells[`${r},${c}`] = { v: r * 10 + c };
+    cells[`${r},7`] = { f: `STDEV.S(A${r + 1}:G${r + 1})` };
+    cells[`${r},8`] = { f: `AVERAGE(A${r + 1}:G${r + 1})` };
+  }
+  cells["4,0"] = { v: "Ergebnis" };
+  cells["4,1"] = { f: "SUBTOTAL(109,B2:B4)" };
+  cells["4,7"] = { f: "STDEV.S(H2:H4)" };
+  const wb: Workbook = {
+    v: 1,
+    sheets: [sheet("t1", "Daten", cells)],
+    charts: [],
+    tables: [
+      {
+        id: "tb1",
+        sheetId: "t1",
+        name: "Werte",
+        area: { r0: 0, c0: 0, r1: 4, c1: 8 },
+        totals: true,
+        style: "blue",
+        banded: true,
+        columns: Array.from({ length: 9 }, (_, i) => ({ id: `c${i}`, total: i === 1 ? "sum" : "none" })),
+        filters: {},
+        sort: null,
+      },
+    ],
+  };
+  const calc = createCalc(wb, { locale: "de" });
+  const bytes = new Uint8Array(await (await exportXlsx(wb, calc, "de")).arrayBuffer());
+  const z = readZip(bytes);
+  const table = (await z.text("xl/tables/table1.xml")) ?? "";
+  const names = [...table.matchAll(/<tableColumn [^>]*name="([^"]*)"/g)].map((m) => m[1]);
+  const wanted = ["Wert", "Wert2", "Spalte3", "wert3", "2020", "Zeile 1_x000A_Zeile 2", "Wert4", "Stabw", "Mittel"];
+  eq("table column names: shown texts, unique, none empty", names, wanted);
+  ok("table column names unique (any case)", new Set(names.map((n) => n.toLowerCase())).size === names.length);
+  ok("no empty column name", names.every((n) => n.trim() !== ""));
+  ok("totals formula with prefix", table.includes("<totalsRowFormula>_xlfn.STDEV.S(H2:H4)</totalsRowFormula>"), table);
+  const sheetXml = (await z.text("xl/worksheets/sheet1.xml")) ?? "";
+  const formulas = [...sheetXml.matchAll(/<f>([^<]*)<\/f>/g)].map((m) => m[1]);
+  ok("every STDEV.S written with its _xlfn prefix", formulas.filter((f) => f.includes("STDEV.S")).every((f) => /(^|[^.\w])_xlfn\.STDEV\.S\(/.test(f) && !/(^|[^.\w])STDEV\.S\(/.test(f)), formulas.join(" | "));
+  ok("a header formula becomes its text", !formulas.some((f) => f.includes("CONCAT")), formulas.join(" | "));
+  // Back in: the same header texts in the cells, the table's columns, the formulas without prefixes.
+  const { workbook: back } = await importXlsx(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "de");
+  const b = back.sheets[0];
+  eq(
+    "header cells say the column names",
+    Array.from({ length: 9 }, (_, c) => b.cells[`0,${c}`]?.v),
+    ["Wert", "Wert2", "Spalte3", "wert3", "2020", "Zeile 1\nZeile 2", "Wert4", "Stabw", "Mittel"],
+  );
+  eq("table back", back.tables.map((t) => ({ name: t.name, area: t.area, totals: t.totals, columns: t.columns.length })), [{ name: "Werte", area: { r0: 0, c0: 0, r1: 4, c1: 8 }, totals: true, columns: 9 }]);
+  eq("formulas back without prefixes", [b.cells["1,7"]?.f, b.cells["3,8"]?.f, b.cells["4,7"]?.f, b.cells["4,1"]?.f], ["STDEV.S(A2:G2)", "AVERAGE(A4:G4)", "STDEV.S(H2:H4)", "SUBTOTAL(109,B2:B4)"]);
+  const calc2 = createCalc(back, { locale: "de" });
+  eq("values back", [calc2.value(b.id, 1, 7), calc2.value(b.id, 4, 1)], [calc.value("t1", 1, 7), calc.value("t1", 4, 1)]);
+  // Numbers in the header row (a table made from rows 2–4): their shown text, still unique.
+  const numbers: Workbook = { ...wb, tables: [{ ...wb.tables[0], area: { r0: 1, c0: 0, r1: 3, c1: 1 }, totals: false, columns: wb.tables[0].columns.slice(0, 2) }] };
+  numbers.sheets = [{ ...wb.sheets[0], cells: { ...wb.sheets[0].cells, "1,0": { v: 1.5, s: { fmt: { kind: "number", decimals: 1 } } }, "1,1": { v: 1.5 } } }];
+  const t2 = (await readZip(new Uint8Array(await (await exportXlsx(numbers, createCalc(numbers, { locale: "de" }), "de")).arrayBuffer())).text("xl/tables/table1.xml")) ?? "";
+  const names2 = [...t2.matchAll(/<tableColumn [^>]*name="([^"]*)"/g)].map((m) => m[1]);
+  eq("numbers as header: shown text, unique", names2, ["1,5", "1,52"]);
+}
+
+/** Importing a CSV file reads its numbers in the language the file writes them in. */
+async function csvImport() {
+  const file = (text: string, name = "messung.csv") => new File([text], name, { type: "text/csv" });
+  const en = await readSheetFile(file("Konzentration,Extinktion\r\n0.5,0.123\r\n1,1.234\r\n2,2.5\r\n"), "de");
+  if ("error" in en) fail("English CSV read in German", en.error);
+  else {
+    const c = en.workbook.sheets[0].cells;
+    eq("English CSV in German: decimals stay decimals", [c["1,0"]?.v, c["1,1"]?.v, c["2,1"]?.v, c["3,1"]?.v], [0.5, 0.123, 1.234, 2.5]);
+    eq("sheet named after the file", en.workbook.sheets[0].name, "messung");
+  }
+  const de = await readSheetFile(file("Konzentration;Extinktion\r\n0,5;0,123\r\n1;1.234,5\r\n"), "en");
+  if ("error" in de) fail("German CSV read in English", de.error);
+  else eq("German CSV in English", [de.workbook.sheets[0].cells["1,1"]?.v, de.workbook.sheets[0].cells["2,1"]?.v], [0.123, 1234.5]);
+  const plain = await readSheetFile(file("a;b\r\n1;2\r\n1.234;5\r\n"), "de");
+  if ("error" in plain) fail("whole numbers CSV", plain.error);
+  else eq("no decimals shown: the reader's language", plain.workbook.sheets[0].cells["2,0"]?.v, 1234);
 }
 
 async function main() {
@@ -940,6 +1059,8 @@ async function main() {
   xml();
   formats();
   await xlsxRoundTrip();
+  await xlsxTableNames();
+  await csvImport();
   await xlsxImport();
   await embed();
   if (problems.length) {
