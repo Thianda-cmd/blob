@@ -5,8 +5,10 @@
 //
 // CONTRACT: keep the props.
 //
-// Picking a note opens it at /p/<note>?sheetEmbed=<what to show>; the note itself adds the block
-// (src/components/editor/useSheetEmbedParam.ts), so it is saved and shared like any edit there.
+// Picking a note opens it (in this tab) at /p/<note>?sheetEmbed=<one-time token>, which this tab's
+// sessionStorage resolves to what to show (src/sheet/embedAttrs.ts); the note itself adds the
+// block (src/components/editor/useSheetEmbedParam.ts), so it is saved and shared like any edit
+// there. Only such a token adds a block without asking.
 
 import { FileText, NotebookPen, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";

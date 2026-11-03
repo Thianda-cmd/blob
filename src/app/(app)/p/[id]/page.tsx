@@ -7,7 +7,6 @@ import { FileSweep } from "@/components/files/FileSweep";
 import { themeSpecOf } from "@/components/deck/deck";
 import { InkEditor } from "@/components/ink/InkEditor";
 import { FolderView } from "@/components/notes/FolderView";
-import { SheetEditor } from "@/components/sheet/SheetEditor";
 import type { PagePreview } from "@/components/subjects/PageCards";
 import { readPreview } from "@/ink/model";
 import { snippet } from "@/notes/snippet";
@@ -18,6 +17,7 @@ import { getLocale } from "@/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import type { AccessRole, Member, Page, PageKind } from "@/lib/types";
 import { pageTitle } from "@/lib/utils";
+import { SheetPage } from "./SheetPage";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -80,7 +80,7 @@ export default async function PageRoute({ params }: PageProps<"/p/[id]">) {
   }
   const { role, members } = await loadAccess(page.id);
   if (page.kind === "deck") return <DeckEditor key={page.id} page={page} role={role} members={members} />;
-  if (page.kind === "sheet") return <SheetEditor key={page.id} page={page} role={role} members={members} />;
+  if (page.kind === "sheet") return <SheetPage key={page.id} page={page} role={role} members={members} />;
   if (page.kind === "ink") {
     return (
       <>

@@ -5,9 +5,11 @@
 //   npx tsx --tsconfig tsconfig.json scripts/check-sheet-chrome.ts
 //
 // Problems make the script exit with 1.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Locale } from "@/i18n/config";
 import { cellKey, parsePos } from "@/sheet/a1";
-import { createCalc, formatValue, isError, tokenizeFormula, type FormulaToken } from "@/sheet/engine";
+import { createCalc, formatValue, FUNCTION_NAMES, isError, tokenizeFormula, type FormulaToken } from "@/sheet/engine";
 import { getCell } from "@/sheet/ops";
 import type { Cell, Sheet, Workbook } from "@/sheet/types";
 import {
@@ -30,19 +32,29 @@ import {
 import { applySuggestion, argumentAt, insertFunctionCall, insertRef, matchFunctions, matchingParens, refColors, suggestFunctions, wantsRef } from "@/components/sheet/chrome/formulaInput";
 import { nextMatch } from "@/components/sheet/chrome/FindReplace";
 import { previewValue, resolveName, selectionName } from "@/components/sheet/chrome/FormulaBar";
+import { errorHelp } from "@/components/sheet/chrome/errorHelp";
 import { browseFunctions } from "@/components/sheet/chrome/FunctionBrowser";
-import { formatFor, formatId } from "@/components/sheet/chrome/NumberFormatMenu";
+import { functionsForWords, squeeze } from "@/components/sheet/chrome/functionWords";
+import { formatFor, formatId, shownDecimals } from "@/components/sheet/chrome/NumberFormatMenu";
 import { sheetHasContent, sheetNameProblem } from "@/components/sheet/chrome/SheetTabs";
 import { fitFigures, selectionStats, type FigureKey } from "@/components/sheet/chrome/StatusBar";
-import { labelRoom, toolbarLayout } from "@/components/sheet/chrome/Toolbar";
+import { barWidth, labelRoom, toolbarLayout, type GroupId } from "@/components/sheet/chrome/Toolbar";
+import { makeChart } from "@/components/sheet/chrome/ToolbarPanels";
+import { currentSheetNotice, hideSheetNotice, holdSheetNotice, noticeDuration, sheetNoticeCountsDown, showSheetNotice } from "@/components/sheet/notice";
+import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { SHEET_EVENT, type SheetEventDetail } from "@/components/sheet/events";
-import { fillFrom, fillSelectionWith, fillTo } from "@/components/sheet/grid/actions";
+import { fillFrom, fillSelectionWith, fillTo, menuKindFor, selectRegionOrAll } from "@/components/sheet/grid/actions";
 import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
 import { formulaArgument, formulaSuggestions } from "@/components/sheet/grid/FormulaHints";
 import { handleGridKey, type GridKeyContext } from "@/components/sheet/grid/keys";
 import { cycleReference, formulaTokens, insertSelectionRef, pointAt, pointing, refFrames } from "@/components/sheet/grid/point";
 import { createSheetStore, type SheetStore } from "@/components/sheet/store";
 import { makeTable, setTableFilter } from "@/sheet/table/model";
+import { placeHelp } from "@/components/sheet/grid/CellEditor";
+import { numberAsText, numberLike } from "@/components/sheet/grid/cellLook";
+import { keypadContext, keypadFor } from "@/components/sheet/grid/keypad";
+import { currentRegion } from "@/components/sheet/grid/navigation";
+import { placeMenu } from "@/components/ui/ContextMenu";
 
 // Helpers that wrap other modules report a failure on the console; in normal use nothing may be
 // reported. Every console.error from here on is collected and checked at the end.
@@ -689,53 +701,86 @@ section("sheet names");
 // ==============================================================================================
 section("toolbar layout");
 {
-  // Widths are the bar's inside, what the toolbar measures (1440 px with Blob's sidebar: 1148,
-  // after the 6 px inset of the toolbar card on each side).
-  // The words "Tabelle" + "Diagramm" are about 106 px in the app's font, "Table" + "Chart" 67.
-  const de = labelRoom(106);
+  // Widths are the bar's inside, what the toolbar measures, with Blob's sidebar open: a 1280 px
+  // window 988, 1366 px 1074, 1440 px 1148 (after the 6 px inset of the toolbar card on each side);
+  // 1252 is a 1280 px window without the sidebar. The words "Als Tabelle" + "Diagramm" are about
+  // 128 px in the app's font, "Table" + "Chart" 67.
+  const de = labelRoom(128);
   const en = labelRoom(67);
   const GROUPS = 15;
+  /** What students come for and use most: these stay before the words. */
+  const MAIN: GroupId[] = ["history", "sum", "table", "chart", "format", "bold", "colors", "decimals", "align", "borders"];
+  /** Seldom used: they move into "Mehr" before the words go. */
+  const RARE: GroupId[] = ["sort", "find", "styles", "size", "freeze"];
   const all = toolbarLayout(1600, false, de);
-  eq("wide: everything, with words on Tabelle and Diagramm", [all.shown.size, all.labels, all.compact], [GROUPS, true, false]);
-  const desk = toolbarLayout(1148, false, de);
-  eq("1440 px with the sidebar, no side panel: everything, with words", [desk.shown.size, desk.labels], [GROUPS, true]);
-  eq("…in English too", toolbarLayout(1148, false, en).labels, true);
+  eq("wide: everything, with words on Als Tabelle and Diagramm", [all.shown.size, all.labels, all.compact], [GROUPS, true, false]);
+  for (const [w, screen] of [
+    [988, "1280"],
+    [1074, "1366"],
+    [1148, "1440"],
+  ] as const) {
+    const l = toolbarLayout(w, false, de);
+    eq(`${screen} px laptop with the sidebar: the words and every main tool`, [l.labels, MAIN.filter((g) => !l.shown.has(g))], [true, []]);
+  }
+  eq("1440 px: only seldom used tools give way to the words", RARE.filter((g) => !toolbarLayout(1148, false, de).shown.has(g)), ["styles", "freeze"]);
+  eq("…in English everything fits, with words", [toolbarLayout(1148, false, en).shown.size, toolbarLayout(1148, false, en).labels], [GROUPS, true]);
   const panel = toolbarLayout(796, false, de);
   eq("1440 px with a side panel: icons only, some in Mehr", [panel.labels, panel.shown.size < GROUPS], [false, true]);
+  // 1600 px with the sidebar and a side panel open: no room for the words, but the seldom used tools
+  // that fit stay on the bar (they once went into Mehr with the words, leaving 120 px empty).
+  const wide = toolbarLayout(948, false, de);
+  eq("1600 px with a side panel: no words, the seldom used tools that fit stay", [wide.labels, RARE.filter((g) => wide.shown.has(g))], [false, ["sort", "size"]]);
   check("the function library isn't on the bar (the formula bar's fx is right below)", !all.shown.has("fx" as never));
   const laptop = toolbarLayout(1252, false, de);
-  eq("1280 px laptop: everything", laptop.shown.size, GROUPS);
+  eq("1280 px laptop without the sidebar: everything, with words", [laptop.shown.size, laptop.labels], [GROUPS, true]);
   const tablet = toolbarLayout(1252, true, de);
-  eq("Galaxy Tab landscape (touch): everything", tablet.shown.size, GROUPS);
-  // Narrowing the bar: the words go first, then groups move into "Mehr".
-  let wordsOnlyWithAll = true;
-  let lastWords = Infinity;
-  let firstAll = Infinity;
-  for (let w = 300; w <= 1700; w += 2) {
-    const l = toolbarLayout(w, false, de);
-    if (l.labels && l.shown.size < GROUPS) wordsOnlyWithAll = false;
-    if (l.labels) lastWords = Math.min(lastWords, w);
-    if (l.shown.size === GROUPS) firstAll = Math.min(firstAll, w);
+  eq("Galaxy Tab landscape (touch): the words and every main tool", [tablet.labels, MAIN.filter((g) => !tablet.shown.has(g))], [true, []]);
+  // Every width, mouse and touch, German and English words: the bar is never too wide; nothing waits
+  // in "Mehr" that would still fit; the words only next to every main tool, and before the seldom
+  // used tools (they'd fit next to the main tools: they're on the bar).
+  const ALL = [...MAIN, ...RARE];
+  const layoutProblems: string[] = [];
+  for (const touch of [false, true]) {
+    for (const words of [de, en]) {
+      for (let w = 300; w <= 1700; w++) {
+        const l = toolbarLayout(w, touch, words);
+        const at = `${w} px${touch ? " touch" : ""}`;
+        const hidden = ALL.filter((g) => !l.shown.has(g));
+        const extra = l.labels ? words : 0;
+        if (barWidth(l.shown, touch, l.compact, extra, hidden.length > 0) > w) layoutProblems.push(`${at}: too wide`);
+        for (const g of hidden) if (barWidth([...l.shown, g], touch, l.compact, extra, hidden.length > 1) <= w) layoutProblems.push(`${at}: ${g} would fit`);
+        const main = MAIN.every((g) => l.shown.has(g));
+        if (l.labels && !main) layoutProblems.push(`${at}: words without every main tool`);
+        if (!l.compact && !l.labels && main && barWidth(MAIN, touch, false, words, true) <= w) layoutProblems.push(`${at}: the words gave way to seldom used tools`);
+      }
+    }
   }
-  check("words only when every group is on the bar", wordsOnlyWithAll);
-  check("narrowing: words go before any group moves into Mehr", lastWords > firstAll, `words from ${lastWords}, all groups from ${firstAll}`);
-  // (Until the last group fits, the bar keeps room for the "Mehr" button: 7 px of slack.)
-  check("…by about the room the words take", lastWords - firstAll >= de - 8 && lastWords - firstAll <= de, `${lastWords - firstAll} for ${de}`);
-  check("unmeasured words: a safe guess", labelRoom(16 * 8) >= de);
+  eq("no room left empty while tools wait in Mehr; the words only next to every main tool, before the seldom used ones", layoutProblems.slice(0, 6), []);
+  check("unmeasured words: a safe guess", labelRoom(18 * 8) >= de);
+  check("split buttons: a whole arrow (24 px) still leaves the main tools room at 1280 px", toolbarLayout(988, false, de).shown.has("chart"));
   const narrow = toolbarLayout(784, false);
   check("narrow: the most needed stay", ["history", "sum", "table", "chart", "format", "bold"].every((g) => narrow.shown.has(g as never)));
   check("narrow: some go into Mehr", narrow.shown.size < 16);
   const phone = toolbarLayout(374, true);
   eq("phone: undo, Σ, table, chart and the format icon", [...phone.shown].sort(), ["chart", "format", "history", "sum", "table"]);
   eq("phone: compact format button", phone.compact, true);
-  let previous = 0;
-  let grows = true;
-  for (let w = 300; w <= 1700; w += 40) {
-    const n = toolbarLayout(w, false).shown.size;
-    if (n < previous) grows = false;
-    previous = n;
+  eq("phone: no words (the icons need the room)", phone.labels, false);
+  // A 390 px phone: 360 px inside (its 32 px split arrows for fingers included).
+  eq("390 px phone: the same five", [...toolbarLayout(360, true).shown].sort(), ["chart", "format", "history", "sum", "table"]);
+  // A wider bar never gives the main tools less room, nor loses the words once they're on (the
+  // seldom used tools may give their place to the words). Not across the switch to the compact bar
+  // with its small format button.
+  const mainRoom = (l: ReturnType<typeof toolbarLayout>, touch: boolean) => barWidth(MAIN.filter((g) => l.shown.has(g)), touch, l.compact);
+  let steady = true;
+  for (const touch of [false, true]) {
+    let before = toolbarLayout(300, touch, de);
+    for (let w = 301; w <= 1700; w++) {
+      const l = toolbarLayout(w, touch, de);
+      if (l.compact === before.compact && ((before.labels && !l.labels) || mainRoom(l, touch) < mainRoom(before, touch))) steady = false;
+      before = l;
+    }
   }
-  check("never fewer tools on a wider bar", grows);
+  check("a wider bar never gives the main tools less room, nor loses the words", steady);
 }
 
 // ==============================================================================================
@@ -749,7 +794,33 @@ section("function browser search");
   eq("German names in English", names("steigung", "en")[0], "SLOPE");
   check("words of the help find functions (Standardabweichung)", names("standardabweichung").includes("STABW.S"));
   eq("a category", browseFunctions("", "regression", "de").length, 10);
-  eq("all", browseFunctions("", "all", "de").length, 175);
+  eq("all", browseFunctions("", "all", "de").length, FUNCTION_NAMES.length);
+  // What students type (FT-9): everyday words, lab words, R² without the ² key.
+  eq("Durchschnitt → MITTELWERT first", names("Durchschnitt")[0], "MITTELWERT");
+  eq("Schnitt too", names("Schnitt")[0], "MITTELWERT");
+  eq("Ø too", names("Ø")[0], "MITTELWERT");
+  for (const q of ["R2", "R^2", "R²", "r 2", "R-Quadrat", "Bestimmtheitsmass"]) eq(`${q} → BESTIMMTHEITSMASS first`, names(q)[0], "BESTIMMTHEITSMASS");
+  check("R2 no longer finds WENNS through the argument Wert_wenn_wahr2", !names("R2").includes("WENNS"));
+  check("argument names don't count at all", names("wahr2").length === 0);
+  eq("Standardabweichung → STABW.S first, before MITTELWERT (whose tip mentions it)", names("Standardabweichung").slice(0, 2), ["STABW.S", "STABW.N"]);
+  eq("Kalibrier → STEIGUNG first (MAX only mentions a Kalibrierbereich)", names("Kalibrier")[0], "STEIGUNG");
+  eq("Kalibriergerade: slope, intercept, R²", names("Kalibriergerade").slice(0, 3), ["STEIGUNG", "ACHSENABSCHNITT", "BESTIMMTHEITSMASS"]);
+  eq("y-Achsenabschnitt", names("y-Achsenabschnitt")[0], "ACHSENABSCHNITT");
+  eq("a word with an ending (Durchschnitte)", names("Durchschnitte")[0], "MITTELWERT");
+  eq("…and a compound in the list (Durchschnittswert)", names("Durchschnittswert")[0], "MITTELWERT");
+  // A word followed by another word is something else: error bars aren't IFERROR, extrapolating
+  // isn't POWER, an intercept (Schnittpunkt) isn't an average (Schnitt).
+  check("Fehlerbalken: no WENNFEHLER", !names("Fehlerbalken").includes("WENNFEHLER"));
+  check("hochrechnen: no POTENZ", !names("hochrechnen").includes("POTENZ"));
+  eq("Schnittpunkt: ACHSENABSCHNITT first, no MITTELWERT", [names("Schnittpunkt")[0], names("Schnittpunkt").includes("MITTELWERT")], ["ACHSENABSCHNITT", false]);
+  eq("a name still beats a word (Steigung)", names("Steigung")[0], "STEIGUNG");
+  eq("English: R2 → RSQ first", names("R2", "en")[0], "RSQ");
+  check("English: R2 doesn't list SUM through number2", !names("R2", "en").includes("SUM"));
+  eq("English: mean → AVERAGE first", names("mean", "en")[0], "AVERAGE");
+  eq("English: standard deviation → STDEV.S first", names("standard deviation", "en")[0], "STDEV.S");
+  eq("German words in the English app too", names("Durchschnitt", "en")[0], "AVERAGE");
+  eq("one or two letters only find their own word", [...functionsForWords("sd").keys()], ["STDEV.S", "STDEV.P"]);
+  eq("R² typed any way is one word", [squeeze("R²"), squeeze("R^2"), squeeze("r 2"), squeeze("R-2")], ["r2", "r2", "r2", "r2"]);
   eq("nothing", names("qqqqq"), []);
 }
 
@@ -760,6 +831,132 @@ section("format previews");
   eq("number", formatValue(1234.5678, { kind: "number", decimals: 2 }, "de"), "1234,57");
   eq("unit", formatValue(12.5, { kind: "number", decimals: 1, unit: "mg/L" }, "de"), "12,5\u202Fmg/L");
   check("an error stays an error", isError(createCalc(book({ A1: "=1/0" })).value("s1", 0, 0)));
+}
+
+// ==============================================================================================
+// Lane F (fix round): messages that show whether or not Blob's tips are on, error help, the
+// format menu's decimals, names.
+section("sheet notices: answers to the student's own actions");
+{
+  const de = sheetChromeText.de;
+  const notice = (store: SheetStore) => {
+    const n = currentSheetNotice(store);
+    return n && [n.tone, n.text];
+  };
+  const chart = storeOf({ A1: "x" });
+  selectA1(chart, "D6");
+  makeChart(chart);
+  eq("Diagramm with nothing to chart says how to pick the data", notice(chart), ["info", de.chartNeedsData]);
+  const sort = storeOf({ C5: 1 });
+  selectA1(sort, "C5");
+  sortSelection(sort, "asc");
+  eq("nothing to sort", notice(sort), ["info", de.nothingToSort]);
+  const wide = storeOf({ A1: "x", B1: "y", A2: 3, B2: 30, A3: 1, B3: 10 });
+  selectA1(wide, "B2:B3");
+  sortSelection(wide, "asc");
+  eq("sorted together with the next column", notice(wide), ["info", de.sortedWithNeighbours]);
+  const freeze = storeOf({});
+  selectA1(freeze, "A1");
+  freezePanes(freeze, "here");
+  eq("freezing at A1", notice(freeze), ["info", de.freezeNothing]);
+  const sum = storeOf({ A1: "a", B1: "b" });
+  selectA1(sum, "A1:B1");
+  autoSum(sum);
+  eq("AutoSum without numbers", notice(sum), ["info", de.noNumbers]);
+  const readOnly = storeOf({}, "de", true);
+  makeChart(readOnly);
+  eq("read-only: no hint about picking data", currentSheetNotice(readOnly), null);
+
+  const store = storeOf({});
+  const first = showSheetNotice(store, "eins");
+  const second = showSheetNotice(store, "zwei", "error");
+  check("one at a time: a new notice replaces the old one", currentSheetNotice(store)?.text === "zwei" && first !== second);
+  hideSheetNotice(store, first);
+  eq("hiding an old one leaves the newer one", currentSheetNotice(store)?.text, "zwei");
+  hideSheetNotice(store, second);
+  eq("…hidden by its own id", currentSheetNotice(store), null);
+  check("each editor has its own notices", currentSheetNotice(storeOf({})) === null);
+  check("problems stay longer than hints, hints longer than good news", noticeDuration("x", "error") > noticeDuration("x", "info") && noticeDuration("x", "info") > noticeDuration("x", "done"));
+  check("long texts stay long enough to read slowly (about 14 characters a second)", noticeDuration("x".repeat(140), "info") >= 140 * 70);
+  check("work in progress waits for its result", noticeDuration("…", "busy") >= 30_000);
+  // The pointer resting on a notice holds that notice, not the place: a newer one shown meanwhile
+  // (the card under the pointer goes without a pointerleave) still goes by itself.
+  const held = storeOf({});
+  const old = showSheetNotice(held, "Deine Datei wird gelesen …", "busy");
+  holdSheetNotice(held, old, true);
+  check("held: it doesn't count down", !sheetNoticeCountsDown(held));
+  const fresh = showSheetNotice(held, "In der Auswahl stehen keine Zahlen.");
+  check("a newer notice under the resting pointer counts down", sheetNoticeCountsDown(held));
+  holdSheetNotice(held, old, false);
+  check("…and the old card letting go on its way out changes nothing", sheetNoticeCountsDown(held) && currentSheetNotice(held)?.id === fresh);
+  holdSheetNotice(held, fresh, true);
+  check("the pointer on the new one holds it", !sheetNoticeCountsDown(held));
+  holdSheetNotice(held, fresh, false);
+  check("…until it leaves", sheetNoticeCountsDown(held));
+  hideSheetNotice(held);
+  check("hidden: nothing counts down", !sheetNoticeCountsDown(held) && currentSheetNotice(held) === null);
+  // Blob's speech bubble shows nothing when a student switched its tips off: messages of the
+  // spreadsheet editor go through its notices (src/components/sheet/notice.ts), never Blob alone.
+  // (flushDrafts.ts sends drafts in the background while no editor is open: no notice to use.)
+  const root = join(process.cwd(), "src/components/sheet");
+  const said: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(entry.name) && /\bblob\.say\(/.test(readFileSync(path, "utf8"))) said.push(path.slice(root.length + 1));
+    }
+  };
+  walk(root);
+  eq("no editor message goes only through Blob's speech bubble", said.filter((f) => f !== "flushDrafts.ts"), []);
+}
+
+// ==============================================================================================
+section("error help: the same words for tooltip, status bar and screen readers");
+{
+  // A6 can't be read (two ranges side by side, Excel's intersection, isn't supported): #NAME?
+  // with nothing unknown in it, as a pasted or imported formula can be.
+  const wb = book({ A1: 4, A2: "=A1/0", A3: "=SUMM(A1)", A4: "=Blatt9!A1", A5: '="a"+1', A6: "=A1:A3 C1:C3" });
+  const calc = createCalc(wb);
+  const help = (a1: string, locale: Locale = "de", withFormula = false) => {
+    const p = pos(a1);
+    const v = calc.value("s1", p.row, p.col);
+    return isError(v) ? errorHelp(v, locale, withFormula ? getCell(wb, "s1", p.row, p.col)?.f : undefined) : null;
+  };
+  eq("#DIV/0!: its name and the advice what to do", help("A2"), { title: "Division durch null", text: "Hier wird durch 0 oder durch eine leere Zelle geteilt. Prüf den Nenner – oder fang den Fall mit WENNFEHLER ab." });
+  eq("an unknown function: which one, and a suggestion", help("A3")?.text, "Die Funktion „SUMM“ gibt es nicht. Meintest du SUMME?");
+  check("a missing sheet: which one", !!help("A4")?.text.includes("Blatt9"));
+  check("English keeps the advice too", !!help("A2", "en")?.text.includes("IFERROR"));
+  eq("…and suggests in English", help("A3", "en")?.text, 'There is no function called "SUMM". Did you mean SUM?');
+  eq("a formula that can't be read: not an unknown name, and where it goes wrong", help("A6", "de", true), { title: "Fehler in der Formel", text: "Vor „C1:C3“ fehlt ein Rechenzeichen (+ - * /) oder ein „;“." });
+  eq("…without the formula at hand: the engine's sentence", help("A6"), { title: "Fehler in der Formel", text: "Die Formel enthält einen Fehler." });
+  eq("…in English", help("A6", "en", true)?.title, "Mistake in the formula");
+}
+
+// ==============================================================================================
+section("format menu: the decimals a cell shows");
+{
+  eq("Standard 0,0523: 4, like the toolbar counts them", shownDecimals(undefined, 0.0523, "de"), 4);
+  eq("Standard 12: 0", shownDecimals(undefined, 12, "de"), 0);
+  eq("Standard in scientific notation: the mantissa's", shownDecimals(undefined, 1.25e-7, "de"), 2);
+  eq("an empty or text cell: 0", shownDecimals(undefined, null, "de"), 0);
+  eq("Zahl with 3 decimals: 3", shownDecimals({ kind: "number", decimals: 3 }, 1, "de"), 3);
+  eq("a date: 0", shownDecimals({ kind: "date", style: "short" }, 46000, "de"), 0);
+  // The menu's minus works on Standard like the toolbar's button.
+  const store = storeOf({ A1: 0.0523 });
+  selectA1(store, "A1");
+  changeDecimals(store, -1);
+  eq("…one fewer: 0,052", formatValue(0.0523, cellOf(store, "A1")?.s?.fmt, "de"), "0,052");
+}
+
+// ==============================================================================================
+section("names: Tabelle is the spreadsheet, the smart table says what it is");
+{
+  const { de, en } = sheetChromeText;
+  eq("the toolbar's word", [de.tableShort, en.tableShort], ["Als Tabelle", "Table"]);
+  check("the word is part of the button's name (voice control, screen readers)", de.table.toLowerCase().includes(de.tableShort.toLowerCase()) && en.table.toLowerCase().includes(en.tableShort.toLowerCase()));
+  eq("the name box's list", [de.nameBoxTables, en.nameBoxTables], ["Intelligente Tabellen", "Smart tables"]);
+  check("British English throughout (Grey, not Gray)", !Object.values(en.colors).includes("Gray"));
 }
 
 // ==============================================================================================
@@ -1075,6 +1272,200 @@ section("smart table filters, undo after someone else's change, copying: nothing
   eq("undo after a remote change: mine goes, theirs stays", [valueOf(store, "D1"), valueOf(store, "F10")], [null, "theirs"]);
 }
 
+// ==============================================================================================
+// The grid on touch screens and the keyboard, the cell editor and the menus.
+
+/** "A1:C3" → an area. */
+const areaOf = (range: string) => {
+  const [a, b] = range.split(":");
+  const p = pos(a);
+  const q = pos(b ?? a);
+  return { r0: Math.min(p.row, q.row), c0: Math.min(p.col, q.col), r1: Math.max(p.row, q.row), c1: Math.max(p.col, q.col) };
+};
+
+section("the block of data around a cell (Ctrl+A, sorting)");
+{
+  eq("a block", currentRegion(mkSheet("s1", "B", { A1: 1, B1: 2, A2: 3, B2: 4 }), pos("A1")), areaOf("A1:B2"));
+  eq("touching corners join", currentRegion(mkSheet("s1", "B", { A1: 1, B2: 2, C3: 3 }), pos("A1")), areaOf("A1:C3"));
+  eq("an empty cell next to data takes it in", currentRegion(mkSheet("s1", "B", { A1: 1, B2: 2 }), pos("C3")), areaOf("A1:C3"));
+  eq("a lone empty cell is just itself", currentRegion(mkSheet("s1", "B", { A1: 1 }), pos("E9")), areaOf("E9"));
+  // What counts as data is navigation's own: a value or a formula; "" and formatting alone don't.
+  const gap = mkSheet("s1", "B", { A1: 1, A2: 2, A4: 4, B4: 5 });
+  gap.cells[cellKey(2, 0)] = { v: "" };
+  eq("an emptied cell (v: \"\") ends the block", currentRegion(gap, pos("A1")), areaOf("A1:A2"));
+  gap.cells[cellKey(2, 0)] = { s: { bold: true } };
+  eq("so does a cell with only formatting", currentRegion(gap, pos("A1")), areaOf("A1:A2"));
+  gap.cells[cellKey(2, 0)] = { f: "A2*2" };
+  eq("a formula joins the parts", currentRegion(gap, pos("A1")), areaOf("A1:B4"));
+  const edge = mkSheet("s1", "B", { Y199: 1, Z200: 2 });
+  eq("data at the sheet's last row and column", currentRegion(edge, pos("Z200")), areaOf("Y199:Z200"));
+
+  // A data logger's export: 20,000 rows (as many as a sheet has) of time, OD600 and ln(OD).
+  const rows = 20000;
+  const big: Sheet = { id: "s1", name: "Blatt 1", cells: {}, cols: {}, rows: {}, freeze: { rows: 0, cols: 0 }, size: { rows, cols: 26 } };
+  big.cells[cellKey(0, 0)] = { v: "Zeit" };
+  big.cells[cellKey(0, 1)] = { v: "OD600" };
+  big.cells[cellKey(0, 2)] = { v: "ln(OD)" };
+  for (let r = 1; r < rows; r++) {
+    // Not in order, so sorting has something to do.
+    const od = 0.05 + ((r * 7919) % 20011) / 10000;
+    big.cells[cellKey(r, 0)] = { v: r };
+    big.cells[cellKey(r, 1)] = { v: od };
+    big.cells[cellKey(r, 2)] = { v: Math.log(od) };
+  }
+  let t0 = performance.now();
+  const region = currentRegion(big, pos("A6"));
+  const regionMs = performance.now() - t0;
+  eq("20,000 rows: the whole block", region, { r0: 0, c0: 0, r1: rows - 1, c1: 2 });
+  check("…found in well under a second", regionMs < 500, `${Math.round(regionMs)} ms`);
+  const store = createSheetStore({ pageId: "p1", workbook: { v: 1, sheets: [big], charts: [], tables: [] }, locale: "de", readOnly: false });
+  selectA1(store, "A6");
+  t0 = performance.now();
+  selectRegionOrAll(store);
+  const selectMs = performance.now() - t0;
+  eq("Ctrl+A in A6 selects all 20,000 rows", store.get().selection, { anchor: { row: 0, col: 0 }, focus: { row: rows - 1, col: 2 }, extra: [] });
+  check("…in well under a second", selectMs < 500, `${Math.round(selectMs)} ms`);
+  t0 = performance.now();
+  const plan = sortPlan(big, store.get().calc, "s1", { anchor: pos("B2"), focus: pos("B2"), extra: [] });
+  const planMs = performance.now() - t0;
+  eq("sorting from B2 takes every row under the header", plan && plan.area, { r0: 1, c0: 0, r1: rows - 1, c1: 2 });
+  check("…found in well under a second", planMs < 500, `${Math.round(planMs)} ms`);
+  selectA1(store, "B2");
+  sortSelection(store, "desc");
+  const sorted = store.get().workbook.sheets[0];
+  let falls = true;
+  let together = true;
+  for (let r = 2; r < rows; r++) {
+    const b = sorted.cells[cellKey(r, 1)]?.v as number;
+    if (b > (sorted.cells[cellKey(r - 1, 1)]?.v as number)) falls = false;
+    if (Math.abs(Math.log(b) - (sorted.cells[cellKey(r, 2)]?.v as number)) > 1e-12) together = false;
+  }
+  check("Z → A sorts all 20,000 rows, the last ones too", falls);
+  check("…and each row stays whole", together);
+  eq("…under its header", valueOf(store, "B1"), "OD600");
+}
+
+section("the menu follows the selection (right-click, long press, the menu key)");
+{
+  const sheet = mkSheet("s1", "Blatt 1");
+  const sel = (a: string, b: string, extra: string[] = []) => ({ anchor: pos(a), focus: pos(b), extra: extra.map(areaOf) });
+  eq("a cell: the cells' menu", menuKindFor(sel("B3", "B3"), sheet), "cells");
+  eq("a range", menuKindFor(sel("B3", "D9"), sheet), "cells");
+  eq("a whole column (opened on any of its cells): the column menu", menuKindFor(sel("E1", "E200"), sheet), "cols");
+  eq("whole columns B:D", menuKindFor(sel("B1", "D200"), sheet), "cols");
+  eq("two whole columns apart", menuKindFor(sel("E1", "E200", ["B1:B200"]), sheet), "cols");
+  eq("whole rows: the row menu", menuKindFor(sel("A3", "Z5"), sheet), "rows");
+  eq("everything: the cells' menu, which then offers no rows or columns to delete", menuKindFor(sel("A1", "Z200"), sheet), "cells");
+  eq("a column and a cell", menuKindFor(sel("E1", "E200", ["B3"]), sheet), "cells");
+}
+
+section("a long press opens the menu beside the finger, never under it");
+{
+  // The grid's menu: 267 px wide, 973 px of items, at most 520 px (or 70 % of the window) shown.
+  const w = 267;
+  const full = 973;
+  let tries = 0;
+  let under = 0;
+  let out = 0;
+  for (const [vw, vh] of [[390, 844], [360, 640], [820, 1180], [1180, 820], [1280, 800]]) {
+    const cap = Math.min(vh * 0.7, 520);
+    for (let x = 2; x < vw; x += 11) {
+      for (let y = 2; y < vh; y += 13) {
+        tries++;
+        const p = placeMenu({ x, y, keyboard: false, finger: true }, w, Math.min(full, cap), full, cap, vw, vh);
+        const h = p.maxHeight ?? Math.min(full, cap);
+        // The finger's point and 16 px around it stay clear of the menu.
+        if (x > p.left - 16 && x < p.left + w + 16 && y > p.top - 16 && y < p.top + h + 16) under++;
+        if (p.left < 7.5 || p.left + w > vw - 7.5 || p.top < 7.5 || p.top + h > vh - 7.5 || h < 120) out++;
+      }
+    }
+  }
+  eq(`${tries} places for a finger on phones and tablets: none under the menu`, under, 0);
+  eq("…the menu always inside the window, and at least 120 px tall (it scrolls)", out, 0);
+  const tablet = placeMenu({ x: 300, y: 400, keyboard: false, finger: true }, w, 520, full, 520, 1280, 800);
+  eq("a tablet: right beside the finger, as tall as it may be", [tablet.left, tablet.maxHeight], [328, 520]);
+  const mouse = placeMenu({ x: 100, y: 100, keyboard: false }, 220, 300, 300, 520, 1280, 800);
+  eq("a mouse: at the pointer, as before", [mouse.left, mouse.top, mouse.maxHeight], [100, 100, null]);
+  const corner = placeMenu({ x: 1200, y: 700, keyboard: false }, 220, 300, 300, 520, 1280, 800);
+  eq("…flipped near the window's edges", [corner.left, corner.top], [980, 400]);
+}
+
+section("formula help next to the cell editor stays where it can be seen");
+{
+  const box = (top: number, left: number, w = 100, h = 28) => ({ top, bottom: top + h, left, right: left + w });
+  // A tablet with the keyboard up (it covers 360 px): what can be seen ends at 432.
+  const tablet = { top: 8, bottom: 432, left: 8, right: 1272 };
+  eq("room below: below", placeHelp(box(100, 100), 300, 120, tablet), { top: 134, left: 100, maxHeight: null });
+  eq("just above the keyboard: beside, ending with the cell", placeHelp(box(400, 100), 300, 120, tablet), { top: 308, left: 206, maxHeight: null });
+  const phone = { top: 8, bottom: 536, left: 8, right: 382 };
+  eq("a phone near the keyboard: above, inside the screen", placeHelp(box(480, 150), 300, 120, phone), { top: 354, left: 82, maxHeight: null });
+  eq("no room anywhere: the roomier side, scrolling", placeHelp(box(200, 150), 300, 400, { top: 8, bottom: 400, left: 8, right: 382 }), { top: 8, left: 82, maxHeight: 186 });
+  let bad = 0;
+  let tries = 0;
+  for (const frame of [tablet, phone, { top: 8, bottom: 792, left: 8, right: 1272 }]) {
+    for (let top = frame.top; top < frame.bottom - 28; top += 23) {
+      for (let left = frame.left; left < frame.right - 60; left += 37) {
+        for (const [w, h] of [[220, 60], [360, 150], [300, 290]]) {
+          tries++;
+          const cell = box(top, left, 90);
+          const p = placeHelp(cell, w, h, frame);
+          const shownH = Math.min(h, p.maxHeight ?? h);
+          const overlaps = p.left < cell.right && p.left + w > cell.left && p.top < cell.bottom && p.top + shownH > cell.top;
+          const outside = p.left < frame.left - 0.5 || p.left + w > frame.right + 0.5 || p.top < frame.top - 0.5 || p.top + shownH > frame.bottom + 0.5;
+          if (overlaps || outside) bad++;
+        }
+      }
+    }
+  }
+  eq(`${tries} cells and help sizes: never over the cell, never outside what can be seen`, bad, 0);
+}
+
+section("text that looks like a number gets a mark");
+{
+  const near = (above: number | string | null, below: number | string | null) => (d: -1 | 1) => (d < 0 ? above : below);
+  eq("'0,1040,110' (typed after the old value) under 0,209", numberAsText({ v: "0,1040,110" }, near(0.209, null)), true);
+  eq("'0, 5' above a number", numberAsText({ v: "0, 5" }, near(null, 0.5)), true);
+  eq("'O,104' with the letter O", numberAsText({ v: "O,104" }, near(0.1, 0.2)), true);
+  eq("'1,2,3' among words: no mark", numberAsText({ v: "1,2,3" }, near("Probe", "Name")), false);
+  eq("a word: no mark", numberAsText({ v: "Probe" }, near(1, 2)), false);
+  eq("a number: no mark", numberAsText({ v: 0.104 }, near(1, 2)), false);
+  eq("a formula's text: no mark", numberAsText({ v: "1,5", f: "TEXT(A1;\"0,0\")" }, near(1, 2)), false);
+  eq("a cell formatted as text on purpose: no mark", numberAsText({ v: "0,104", s: { fmt: { kind: "text" } } }, near(1, 2)), false);
+  // A tap that opens such text (or a number) for editing selects it, so the new value replaces it.
+  eq("number-like text: '12', '0,1040,110', '-0,003', '12 %'", ["12", "0,1040,110", "-0,003", "12 %"].map(numberLike), [true, true, true, true]);
+  eq("…words are not: 'Probe 1', 'R²', 'Steigung'", ["Probe 1", "R²", "Steigung"].map(numberLike), [false, false, false]);
+}
+
+section("phones and tablets: digits where numbers are typed, letters elsewhere");
+{
+  const sheet = mkSheet("s1", "Blatt 1", {
+    A1: "Konzentration",
+    A2: 0,
+    A3: 2,
+    B1: "Probe",
+    B2: "Wasser",
+    C1: "Doppelt",
+    C2: "=A2*2",
+    D1: "Datum",
+    D2: { v: 46143, s: { fmt: { kind: "date", style: "short" } } },
+    E1: "Extinktion",
+    F4: 7,
+  });
+  eq("under a typed number: digits", keypadContext(sheet, pos("A4")), "number");
+  eq("on a number", keypadContext(sheet, pos("A3")), "number");
+  eq("above a number (filling a gap)", keypadContext(sheet, pos("F3")), "number");
+  eq("the first value under a heading: letters", keypadContext(sheet, pos("E2")), "other");
+  eq("on a heading", keypadContext(sheet, pos("A1")), "other");
+  eq("under text", keypadContext(sheet, pos("B3")), "other");
+  eq("under a formula (a column of formulas)", keypadContext(sheet, pos("C3")), "other");
+  eq("on a formula", keypadContext(sheet, pos("C2")), "other");
+  eq("under a date (it needs the dots)", keypadContext(sheet, pos("D3")), "other");
+  const none = { number: null, other: null } as const;
+  eq("numbers get the digits keyboard", keypadFor("number", none), "decimal");
+  eq("the rest the letters", keypadFor("other", none), "text");
+  eq("a choice by hand sticks for that kind of cell", [keypadFor("number", { number: "text", other: null }), keypadFor("other", { number: "text", other: null })], ["text", "text"]);
+}
+
 console.error = consoleError;
 section("nothing reported");
 eq("no helper reported a failure in normal use", reported, []);
@@ -1087,3 +1478,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`check-sheet-chrome: all ${count} checks passed.`);
+// Done: the notices the checks showed would otherwise keep Node waiting for their timers.
+process.exit(0);

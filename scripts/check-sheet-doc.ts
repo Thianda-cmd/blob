@@ -13,20 +13,40 @@
 //   merges, and random edits on both sides (valid result; one side's changes survive).
 // - Saving (src/components/sheet/saver.ts) against a stand-in for save_sheet: one editor, two at
 //   once (different cells, the same cell, the title, typing during a save), offline with the draft
-//   kept and put back, refused saves (no access, server error, too big), viewers, and the
-//   background save of drafts whose editor was closed.
+//   kept and put back, refused saves (no access, server error, too big) and their save states,
+//   viewers, and the background save of drafts whose editor was closed.
+// - Data safety: a save whose answer was lost (it landed, or it didn't) and a partner's correction
+//   afterwards, through the open editor, a reopened one and the background save; two editors (tabs)
+//   offline at once, an open editor's draft left alone (here and, through Web Locks, in another
+//   tab), one taker at a time; what signing out counts, flushes and stops; a pull that misses a
+//   save announced meanwhile; the longest waits for a save and a draft while typing goes on; a
+//   rename made elsewhere; the size limit as save_sheet measures it, the warning near it and the
+//   import check; and the notice when rows were moved on both sides at once.
 // Problems make the script exit with 1.
 
-import { clearDraft, draftPages, flushedRev, markSheetOpen, readLocalDraft, writeDraft } from "@/components/sheet/drafts";
+import {
+  clearDraft,
+  discardOpenSheets,
+  draftPages,
+  flushOpenSheets,
+  flushedRev,
+  forgetOtherAccounts,
+  readDrafts,
+  unsavedSheets,
+  waitingDrafts,
+  writeDraft,
+  type SheetDraft,
+} from "@/components/sheet/drafts";
 import { flushSheetDrafts } from "@/components/sheet/flushDrafts";
+import { appendWorkbook, freshIds, importedBytes, MAX_SHEET_BYTES, sheetPageContent } from "@/components/sheet/importFile";
 import { newPageFor } from "@/components/shell/paletteNew";
-import { SheetSaver, type SaverApi } from "@/components/sheet/saver";
+import { jsonBytes, LARGE_BYTES, MAX_BYTES, SheetSaver, storedContent, type SaveArgs, type SaverApi, type SheetConflict } from "@/components/sheet/saver";
 import { createSheetStore } from "@/components/sheet/store";
 import { reportOk } from "@/lib/offline/net";
 import { mergeWorkbooks, sameJson } from "@/sheet/collab";
 import { isBlankWorkbook, isUnreadableWorkbook, newWorkbook, normalizeWorkbook, previewLook, readSheetPreview, workbookPlainText, workbookPreview } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
-import { setCells } from "@/sheet/ops";
+import { insertRows, setCells } from "@/sheet/ops";
 import { MAX_COLS, MAX_ROWS, type Cell, type ChartSpec, type SeriesSpec, type Sheet, type TableSpec, type Workbook } from "@/sheet/types";
 
 let passed = 0;
@@ -985,6 +1005,39 @@ const memory = new Map<string, string>();
   clear: () => memory.clear(),
 };
 
+/**
+ * Web Locks for Node, as browsers have them (navigator.locks): exclusive locks by name, held
+ * while their callback runs, and query() listing them. A lock held here stands for an editor open
+ * in another tab.
+ */
+class FakeLocks {
+  held = new Set<string>();
+  private waiting = new Map<string, (() => void)[]>();
+  async request(name: string, a: unknown, b?: unknown): Promise<unknown> {
+    const fn = (typeof a === "function" ? a : b) as (lock: unknown) => unknown;
+    while (this.held.has(name)) await new Promise<void>((r) => this.waiting.set(name, [...(this.waiting.get(name) ?? []), r]));
+    this.held.add(name);
+    try {
+      return await fn({ name, mode: "exclusive" });
+    } finally {
+      this.held.delete(name);
+      const next = this.waiting.get(name)?.shift();
+      next?.();
+    }
+  }
+  async query() {
+    return { held: [...this.held].map((name) => ({ name, mode: "exclusive", clientId: "tab" })), pending: [] };
+  }
+  /** Another tab's editor `writer` is open until the returned function is called. */
+  holdFor(writer: string): () => void {
+    let release = () => {};
+    void this.request(`blob-sheet-editor:${writer}`, () => new Promise<void>((r) => (release = r)));
+    return () => release();
+  }
+}
+const fakeLocks = new FakeLocks();
+Object.defineProperty(globalThis.navigator, "locks", { value: fakeLocks, configurable: true });
+
 /** One page on the "server", saved like save_sheet (migration 0024) does. */
 class FakeServer implements SaverApi {
   rev = 0;
@@ -994,39 +1047,72 @@ class FakeServer implements SaverApi {
   saves = 0;
   calls = 0;
   loads = 0;
-  mode: "ok" | "offline" | "error" | "denied" = "ok";
+  /** save_sheet's pages.save_ids: each editor's newest save. */
+  saveIds: string[] = [];
+  /**
+   * offline: nothing gets through. lost: the save lands but its answer doesn't come back (the
+   * connection dropped on the way, the tab closed), once. error, denied: what the server says.
+   */
+  mode: "ok" | "offline" | "lost" | "error" | "denied" = "ok";
   /** Make each save take this long (ms), to type while one is on its way. */
   delay = 0;
+  /** Make loading the page take this long (ms): the row is read after `loadAt` ms. */
+  loadDelay = 0;
+  loadAt = 0;
   constructor(wb: Workbook, title = "") {
     this.content = clone(wb);
     this.title = title;
   }
-  async saveSheet(a: { p_page: string; p_rev: number; p_content: unknown; p_title: string; p_plain: string }) {
+  async saveSheet(a: SaveArgs) {
     this.calls++;
     if (this.delay) await new Promise((r) => setTimeout(r, this.delay));
     if (this.mode === "offline") throw new TypeError("Failed to fetch");
     if (this.mode === "error") return { data: null, error: { message: "boom" }, status: 400 };
     if (this.mode === "denied") return { data: { ok: false, reason: "denied" }, error: null, status: 200 };
+    // Measured as sent, UTF-8 (save_sheet's p_content is json).
     const json = JSON.stringify(a.p_content);
-    if (json.length > 5_000_000) return { data: { ok: false, reason: "too_big" }, error: null, status: 200 };
+    if (new TextEncoder().encode(json).length > 5_000_000) return { data: { ok: false, reason: "too_big" }, error: null, status: 200 };
     if (a.p_rev !== this.rev) return { data: { ok: false, reason: "behind", rev: this.rev, content: clone(this.content), title: this.title }, error: null, status: 200 };
     this.content = JSON.parse(json);
-    this.title = a.p_title;
+    // The title only when this editor renamed it (p_base_title).
+    if (a.p_title !== a.p_base_title) this.title = a.p_title.slice(0, 200);
     this.plain = a.p_plain;
     this.rev++;
     this.saves++;
-    return { data: { ok: true, rev: this.rev }, error: null, status: 200 };
+    this.saveIds = [...this.saveIds.filter((x) => x !== a.p_last_save && x !== a.p_save_id), a.p_save_id].slice(-50);
+    if (this.mode === "lost") {
+      this.mode = "ok";
+      throw new TypeError("Failed to fetch");
+    }
+    return { data: { ok: true, rev: this.rev, title: this.title }, error: null, status: 200 };
   }
   async loadRow() {
     this.loads++;
-    return { rev: this.rev, content: clone(this.content), title: this.title };
+    if (this.mode === "offline") return null;
+    if (!this.loadDelay) return { rev: this.rev, content: clone(this.content), title: this.title };
+    await new Promise((r) => setTimeout(r, this.loadAt));
+    const row = { rev: this.rev, content: clone(this.content), title: this.title };
+    await new Promise((r) => setTimeout(r, this.loadDelay - this.loadAt));
+    return row;
+  }
+  async landed(_pageId: string, saveId: string) {
+    return this.mode === "offline" ? null : this.saveIds.includes(saveId);
   }
   cell(key: string, sheet = 0) {
     return (this.content as Workbook).sheets[sheet]?.cells[key];
   }
 }
 
-type Log = { states: string[]; notices: (string | null)[]; titles: string[]; saved: number[]; restored: number; trouble: string[] };
+/** Every draft of a page in localStorage (the IndexedDB copies don't exist in Node). */
+const localDrafts = (userId: string, pageId: string): SheetDraft[] =>
+  [...memory.keys()]
+    .filter((k) => k.startsWith(`blob-sheet-draft:${userId}:${pageId}:`))
+    .map((k) => JSON.parse(memory.get(k)!) as SheetDraft)
+    .sort((a, b) => a.at - b.at);
+const draftOf = (userId: string, pageId: string) => localDrafts(userId, pageId).at(-1) ?? null;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type Log = { states: string[]; notices: (string | null)[]; titles: string[]; saved: number[]; restored: number; trouble: string[]; sizes: number[]; conflicts: SheetConflict[][] };
 
 let pageCounter = 0;
 function openEditor(server: FakeServer, pageId: string, opts: { userId?: string; readOnly?: boolean; opened?: { rev: number; content: unknown; title: string } } = {}) {
@@ -1034,7 +1120,7 @@ function openEditor(server: FakeServer, pageId: string, opts: { userId?: string;
   const opened = opts.opened ?? { rev: server.rev, content: server.content, title: server.title };
   const wb = normalizeWorkbook(clone(opened.content), "de");
   const store = createSheetStore({ pageId, workbook: wb, locale: "de", readOnly: !!opts.readOnly });
-  const log: Log = { states: [], notices: [], titles: [], saved: [], restored: 0, trouble: [] };
+  const log: Log = { states: [], notices: [], titles: [], saved: [], restored: 0, trouble: [], sizes: [], conflicts: [] };
   const saver = new SheetSaver({
     store,
     pageId,
@@ -1048,10 +1134,12 @@ function openEditor(server: FakeServer, pageId: string, opts: { userId?: string;
     on: {
       state: (x) => log.states.push(x),
       notice: (x) => log.notices.push(x),
+      size: (x) => log.sizes.push(x),
       title: (x) => log.titles.push(x),
       saved: (x) => log.saved.push(x),
       restored: () => log.restored++,
       trouble: (x) => log.trouble.push(x),
+      conflict: (x) => log.conflicts.push(x),
     },
   });
   let version = store.get().version;
@@ -1061,17 +1149,21 @@ function openEditor(server: FakeServer, pageId: string, opts: { userId?: string;
     version = v;
     saver.changed();
   });
-  const unmark = markSheetOpen(pageId);
   return {
     store,
     saver,
     log,
+    sheetId: store.get().sheetId,
     type: (row: number, col: number, text: string) => store.input({ row, col }, text),
     cell: (key: string) => store.get().workbook.sheets[0].cells[key],
     close: async () => {
       off();
-      unmark();
       await saver.close();
+    },
+    /** The tab is gone at once (closed, crashed): no more saving, what is on the device stays. */
+    kill: () => {
+      off();
+      saver.discard();
     },
   };
 }
@@ -1094,7 +1186,7 @@ async function savingTests() {
     check("save: preview dropped when read again", !("preview" in normalizeWorkbook(server.content, "de")));
     check("save: search text", server.plain.includes("Konzentration"), server.plain);
     check("save: saved and clean", a.saver.state === "saved" && !a.saver.dirty() && a.log.saved.join() === "1", a.log);
-    check("save: no draft left behind", readLocalDraft("u1", id) === null);
+    check("save: no draft left behind", draftOf("u1", id) === null);
     // Two saves asked for at once: one request.
     a.type(2, 0, "2");
     const calls = server.calls;
@@ -1160,15 +1252,15 @@ async function savingTests() {
     a.type(0, 0, "offline getippt");
     await a.saver.flush();
     check("offline: state 'device'", a.saver.state === "device", a.log.states);
-    const draft = readLocalDraft("u1", id);
+    const draft = draftOf("u1", id);
     check("offline: draft on the device", !!draft && draft.mine.sheets[0].cells["0,0"]?.v === "offline getippt" && draft.rev === 0, draft);
     // Typing in a cell when the app goes away: the draft has it, though it isn't entered yet.
     a.store.startEdit({ via: "cell", replace: true, text: "noch nicht bestätigt", at: { row: 6, col: 0 } });
     a.saver.keepDraft();
-    check("offline: a cell being typed is in the draft", readLocalDraft("u1", id)?.mine.sheets[0].cells["6,0"]?.v === "noch nicht bestätigt", readLocalDraft("u1", id)?.mine.sheets[0].cells);
+    check("offline: a cell being typed is in the draft", draftOf("u1", id)?.mine.sheets[0].cells["6,0"]?.v === "noch nicht bestätigt", draftOf("u1", id)?.mine.sheets[0].cells);
     a.store.cancelEdit();
     await a.close();
-    check("offline: closing keeps the draft", readLocalDraft("u1", id) !== null);
+    check("offline: closing keeps the draft", draftOf("u1", id) !== null);
     reportOk();
     server.mode = "ok";
     // Someone else saved in the meantime.
@@ -1183,13 +1275,13 @@ async function savingTests() {
     // (The cancelled edit is gone from the draft written when the editor closed.)
     check("offline: a cancelled edit isn't restored", a2.cell("6,0") === undefined, a2.cell("6,0"));
     await a2.saver.flush();
-    check("offline: saved after restoring", server.cell("0,0")?.v === "offline getippt" && server.cell("4,4")?.v === "von B" && readLocalDraft("u1", id) === null, server.content);
+    check("offline: saved after restoring", server.cell("0,0")?.v === "offline getippt" && server.cell("4,4")?.v === "von B" && draftOf("u1", id) === null, server.content);
     // A draft that was saved already (it outlived its save) changes nothing.
     await a2.close();
-    writeDraft("u1", { v: 1, pageId: id, rev: 0, base: newWorkbook("de"), mine: normalizeWorkbook(server.content, "de"), baseTitle: "", title: "", at: Date.now(), tab: "x" });
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base: newWorkbook("de"), mine: normalizeWorkbook(server.content, "de"), baseTitle: "", title: "", at: Date.now(), writer: "x" });
     const a3 = openEditor(server, id);
     await a3.saver.restore();
-    check("offline: a stale draft is just cleared", a3.log.restored === 0 && readLocalDraft("u1", id) === null && !a3.saver.dirty());
+    check("offline: a stale draft is just cleared", a3.log.restored === 0 && draftOf("u1", id) === null && !a3.saver.dirty());
     await a3.close();
   }
 
@@ -1201,14 +1293,16 @@ async function savingTests() {
     server.mode = "denied";
     a.type(0, 0, "x");
     await a.saver.flush();
-    check("denied: notice and error", a.log.notices.includes("denied") && a.saver.state === "error", a.log);
-    check("denied: draft kept", readLocalDraft("u1", id) !== null);
+    // (Its own state: "Nicht gespeichert", not "Offline, versuche erneut".)
+    check("denied: notice and the state 'refused'", a.log.notices.includes("denied") && a.saver.state === "refused", a.log);
+    check("denied: draft kept", draftOf("u1", id) !== null);
     const calls = server.calls;
     a.type(0, 1, "y");
     await a.saver.flush();
     check("denied: no more tries", server.calls === calls);
     await a.close();
-    clearDraft("u1", id);
+    check("denied: closing keeps what was typed since", draftOf("u1", id)?.mine.sheets[0].cells["0,1"]?.v === "y");
+    for (const d of localDrafts("u1", id)) clearDraft("u1", id, d.writer);
 
     const id2 = page();
     const server2 = new FakeServer(newWorkbook("de"));
@@ -1220,7 +1314,7 @@ async function savingTests() {
     console.error = () => {};
     await e.saver.flush();
     console.error = logError;
-    check("error: state error, said once", e.saver.state === "error" && e.log.trouble.join() === "failed", e.log);
+    check("error: the state 'failed' (not offline), said once", e.saver.state === "failed" && e.log.trouble.join() === "failed", e.log);
     server2.mode = "ok";
     await e.saver.flush();
     check("error: works again", e.saver.state === "saved" && e.log.trouble.join() === "failed,recovered" && server2.cell("0,0")?.v === "x", e.log);
@@ -1232,7 +1326,7 @@ async function savingTests() {
     const sheetId = big.store.get().sheetId;
     big.store.apply("big", (wb) => setCells(wb, sheetId, Array.from({ length: 170 }, (_, i) => ({ row: i, col: 0, cell: { v: "x".repeat(32000) } }))));
     await big.saver.flush();
-    check("too big: refused before sending", big.log.notices.includes("tooBig") && server3.calls === 0 && big.saver.state === "error", big.log);
+    check("too big: refused before sending, the state 'tooBig'", big.log.notices.includes("tooBig") && server3.calls === 0 && big.saver.state === "tooBig", big.log);
     big.store.apply("smaller", (wb) => setCells(wb, sheetId, Array.from({ length: 160 }, (_, i) => ({ row: i, col: 0, cell: null }))));
     await big.saver.flush();
     check("too big: saves again once it fits", server3.rev === 1 && big.log.notices[big.log.notices.length - 1] === null && big.saver.state === "saved", big.log);
@@ -1257,19 +1351,29 @@ async function savingTests() {
     const base = normalizeWorkbook(server.content, "de");
     const sheetId = base.sheets[0].id;
     // Typed offline in an editor that has closed since…
-    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, sheetId, "0,0", { v: "offline" }), baseTitle: "Messung", title: "Messung 2", at: Date.now(), tab: "t" });
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, sheetId, "0,0", { v: "offline" }), baseTitle: "Messung", title: "Messung 2", at: Date.now(), writer: "closed" });
     // …while someone else saved.
     const other = openEditor(server, id, { userId: "u2" });
     other.type(2, 2, "online");
     await other.saver.flush();
     await other.close();
-    // Open here: left alone.
-    const unmark = markSheetOpen(id);
-    check("background: skips open spreadsheets", (await flushSheetDrafts("u1", "de", server)) === 0 && readLocalDraft("u1", id) !== null);
-    unmark();
+    // An editor open here, with a draft of its own (typed offline): that draft is left to it.
+    const open = openEditor(server, id);
+    server.mode = "offline";
+    open.type(4, 4, "offen");
+    await open.saver.flush();
+    server.mode = "ok";
+    const waiting = await waitingDrafts("u1", id);
+    check("background: an open editor's draft isn't waiting to be taken", localDrafts("u1", id).length === 2 && waiting.length === 1 && waiting[0].writer === "closed", waiting.map((d) => d.writer));
     const n = await flushSheetDrafts("u1", "de", server);
     check("background: saved and merged", n === 1 && server.cell("0,0")?.v === "offline" && server.cell("2,2")?.v === "online" && server.title === "Messung 2", server.content);
-    check("background: draft gone", readLocalDraft("u1", id) === null && (await draftPages("u1")).length === 0);
+    // Back online (the background save's answer said so), the open editor saves its own and catches up.
+    reportOk();
+    await sleep(10);
+    await open.saver.flush();
+    check("background: the open editor caught up and saved its own", open.cell("0,0")?.v === "offline" && server.cell("4,4")?.v === "offen" && server.cell("0,0")?.v === "offline" && !open.saver.dirty(), open.store.get().workbook.sheets[0].cells);
+    await open.close();
+    check("background: drafts gone", draftOf("u1", id) === null && (await draftPages("u1")).length === 0);
   }
 
   // Another tab's draft (or one of a tab that was closed offline): restored here, and gone once saved.
@@ -1277,12 +1381,12 @@ async function savingTests() {
     const id = page();
     const server = new FakeServer(newWorkbook("de"), "Messung");
     const base = normalizeWorkbook(server.content, "de");
-    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "1,1", { v: 2.5 }), baseTitle: "Messung", title: "Messung", at: Date.now(), tab: "closed-tab" });
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "1,1", { v: 2.5 }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "closed-tab" });
     const e = openEditor(server, id);
     await e.saver.restore();
     await e.saver.flush();
     check("other tab's draft: restored and saved", e.log.restored === 1 && server.cell("1,1")?.v === 2.5 && server.rev === 1, server.content);
-    check("other tab's draft: gone once saved", readLocalDraft("u1", id) === null, readLocalDraft("u1", id)?.tab);
+    check("other tab's draft: gone once saved", draftOf("u1", id) === null, draftOf("u1", id)?.writer);
     await e.close();
   }
 
@@ -1292,19 +1396,11 @@ async function savingTests() {
     const server = new FakeServer(newWorkbook("de"), "Messung");
     const base = normalizeWorkbook(server.content, "de");
     const sheetId = base.sheets[0].id;
-    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, sheetId, "2,0", { v: "offline" }), baseTitle: "Messung", title: "Messung", at: Date.now(), tab: "t" });
-    // Its address shows while the editor is on its way: the background save leaves the draft to it.
-    const g = globalThis as { location?: unknown };
-    const before = g.location;
-    g.location = { pathname: `/p/${id}` };
-    const skipped = await flushSheetDrafts("u1", "de", server);
-    g.location = { pathname: "/home" };
-    check("background: leaves the spreadsheet being opened to its editor", skipped === 0 && readLocalDraft("u1", id) !== null && server.calls === 0);
-    // Elsewhere: saved in the background, while the spreadsheet's page was already on its way with
-    // the version before (rev 0). Its editor catches up instead of showing the old copy.
+    writeDraft("u1", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, sheetId, "2,0", { v: "offline" }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "t" });
+    // Saved in the background, while the spreadsheet's page was already on its way with the version
+    // before (rev 0). Its editor catches up instead of showing the old copy.
     const opened = { rev: server.rev, content: clone(server.content), title: server.title };
     const n = await flushSheetDrafts("u1", "de", server);
-    g.location = before;
     check("background: saved while the page was on its way", n === 1 && server.rev === 1 && server.cell("2,0")?.v === "offline" && flushedRev(id) === 1);
     const late = openEditor(server, id, { opened });
     check("background: the late editor opened with the old copy", late.cell("2,0") === undefined);
@@ -1319,6 +1415,382 @@ async function savingTests() {
     await fresh.saver.restore();
     check("background: an up-to-date editor doesn't fetch again", server.loads === loads && fresh.cell("2,0")?.v === "offline");
     await fresh.close();
+  }
+
+  // 8. DS-3: a save that landed but whose answer was lost (the tab closed on the way), then the value
+  //    corrected on another device. Opened again, the draft's own changes start where that save left
+  //    off: the correction stays, and what was typed after the save is put back.
+  const lostSave = async (user: string, typeAfter: boolean) => {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const laptop = openEditor(server, id, { userId: user });
+    laptop.type(3, 1, "0,333");
+    server.mode = "lost";
+    server.delay = 30;
+    void laptop.saver.flush();
+    await sleep(5);
+    if (typeAfter) laptop.type(4, 2, "später getippt");
+    // The tab closes while the save is on its way: pagehide writes the draft, then the tab is gone.
+    laptop.saver.keepDraft();
+    laptop.kill();
+    await sleep(60);
+    server.delay = 0;
+    reportOk();
+    const sending = draftOf(user, id)?.sending;
+    check(`lost answer${typeAfter ? " (typed after)" : ""}: the draft knows the save on its way, which landed`, !!sending && server.saveIds.includes(sending.id) && server.rev === 1 && server.cell("3,1")?.v === 0.333, { sending, rev: server.rev });
+    // The phone corrects the value.
+    const phone = openEditor(server, id, { userId: "u2" });
+    phone.type(3, 1, "0,209");
+    await phone.saver.flush();
+    await phone.close();
+    return { id, server };
+  };
+  {
+    const { id, server } = await lostSave("ds3", false);
+    const again = openEditor(server, id, { userId: "ds3" });
+    await again.saver.restore();
+    await again.saver.flush();
+    check("lost answer: the correction made elsewhere stays", server.cell("3,1")?.v === 0.209 && again.cell("3,1")?.v === 0.209 && server.rev === 2, { server: server.cell("3,1"), rev: server.rev });
+    check("lost answer: nothing put back, no draft left", again.log.restored === 0 && localDrafts("ds3", id).length === 0);
+    await again.close();
+  }
+  {
+    const { id, server } = await lostSave("ds3", true);
+    const again = openEditor(server, id, { userId: "ds3" });
+    await again.saver.restore();
+    await again.saver.flush();
+    check("lost answer (typed after): the correction stays, the later typing is back", server.cell("3,1")?.v === 0.209 && server.cell("4,2")?.v === "später getippt" && again.log.restored === 1, server.content);
+    check("lost answer (typed after): no draft left", localDrafts("ds3", id).length === 0);
+    await again.close();
+  }
+  // …and through the background save (the laptop only opens the start page).
+  {
+    const { id, server } = await lostSave("ds3bg", false);
+    const n = await flushSheetDrafts("ds3bg", "de", server);
+    check("lost answer, background: the correction stays", n === 1 && server.cell("3,1")?.v === 0.209 && server.rev === 2 && localDrafts("ds3bg", id).length === 0, { n, v: server.cell("3,1"), rev: server.rev });
+  }
+  // An editor closed while its last save is on its way (navigating away; the tab may be closed
+  // next, and the page's own "leaving" events no longer reach it): the draft is there at once,
+  // naming that save, and gone once the save went through.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const e = openEditor(server, id, { userId: "closing" });
+    e.type(0, 0, "zuletzt");
+    server.delay = 30;
+    const closed = e.close();
+    await sleep(5);
+    const d = draftOf("closing", id);
+    check("closing: a draft while the last save is on its way, naming it", !!d?.sending && d.mine.sheets[0].cells["0,0"]?.v === "zuletzt", d?.sending);
+    await closed;
+    server.delay = 0;
+    check("closing: saved, and no draft left", server.cell("0,0")?.v === "zuletzt" && localDrafts("closing", id).length === 0);
+  }
+  // A save that didn't get through at all: its changes are put back (nothing typed is lost).
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const laptop = openEditor(server, id, { userId: "ds3no" });
+    laptop.type(3, 1, "0,333");
+    server.mode = "offline";
+    await laptop.saver.flush();
+    laptop.kill();
+    server.mode = "ok";
+    reportOk();
+    const phone = openEditor(server, id, { userId: "u2" });
+    phone.type(0, 4, "Phone");
+    await phone.saver.flush();
+    await phone.close();
+    const again = openEditor(server, id, { userId: "ds3no" });
+    await again.saver.restore();
+    await again.saver.flush();
+    check("didn't land: put back and saved with the other change", server.cell("3,1")?.v === 0.333 && server.cell("0,4")?.v === "Phone" && again.log.restored === 1, server.content);
+    await again.close();
+  }
+  // In the open editor: the answer is lost (the connection dropped), the value is corrected elsewhere,
+  // and the next try starts from what that save sent.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const a = openEditor(server, id, { userId: "ds3open" });
+    a.type(3, 1, "0,333");
+    server.mode = "lost";
+    await a.saver.flush();
+    check("lost answer, open: kept on the device for now", a.saver.state === "device" && server.rev === 1);
+    // (The phone's save gets through: the connection is back, and the open editor tries again then.)
+    const phone = openEditor(server, id, { userId: "u2" });
+    phone.type(3, 1, "0,209");
+    await phone.saver.flush();
+    await phone.close();
+    a.type(5, 0, "weiter");
+    await a.saver.flush();
+    check("lost answer, open: the correction stays, later typing saved", server.cell("3,1")?.v === 0.209 && server.cell("5,0")?.v === "weiter" && a.cell("3,1")?.v === 0.209 && !a.saver.dirty(), server.content);
+    await a.close();
+  }
+  // The background save's own answer lost: the draft says so, and the next try finds it landed.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server.content, "de");
+    writeDraft("bglost", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "3,1", { v: 0.333 }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "gone" });
+    server.mode = "lost";
+    const first = await flushSheetDrafts("bglost", "de", server);
+    reportOk();
+    check("background, lost answer: the draft says the save may have landed", first === 0 && server.cell("3,1")?.v === 0.333 && !!draftOf("bglost", id)?.sending);
+    const phone = openEditor(server, id, { userId: "u2" });
+    phone.type(3, 1, "0,209");
+    await phone.saver.flush();
+    await phone.close();
+    const n = await flushSheetDrafts("bglost", "de", server);
+    check("background, lost answer: the correction stays", n === 1 && server.cell("3,1")?.v === 0.209 && server.rev === 2 && localDrafts("bglost", id).length === 0, { n, rev: server.rev });
+  }
+
+  // 9. DS-5: two tabs of the same spreadsheet offline at once: neither overwrites the other's work.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const tabA = openEditor(server, id, { userId: "ds5" });
+    const tabB = openEditor(server, id, { userId: "ds5" });
+    server.mode = "offline";
+    tabA.type(1, 3, "Wert aus Tab A");
+    await tabA.saver.flush();
+    tabB.type(1, 4, "Wert aus Tab B");
+    await tabB.saver.flush();
+    const both = localDrafts("ds5", id);
+    check("two tabs: each keeps a draft of its own", both.length === 2 && both.some((d) => d.mine.sheets[0].cells["1,3"]?.v === "Wert aus Tab A") && both.some((d) => d.mine.sheets[0].cells["1,4"]?.v === "Wert aus Tab B"), both.length);
+    // Another editor opening now leaves them alone: their editors are still open.
+    const peek = openEditor(server, id, { userId: "ds5" });
+    await peek.saver.restore();
+    check("two tabs: an open editor's draft isn't taken", peek.log.restored === 0 && localDrafts("ds5", id).length === 2);
+    await peek.close();
+    await tabB.close();
+    await tabA.close();
+    server.mode = "ok";
+    reportOk();
+    const later = openEditor(server, id, { userId: "ds5" });
+    await later.saver.restore();
+    await later.saver.flush();
+    check("two tabs: both values saved", server.cell("1,3")?.v === "Wert aus Tab A" && server.cell("1,4")?.v === "Wert aus Tab B" && later.log.restored === 1, server.content);
+    check("two tabs: the drafts were taken over and are gone", localDrafts("ds5", id).length === 0);
+    await later.close();
+  }
+  // An editor open in another tab (its Web Lock is held): its draft stays its own, until that tab is gone.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server.content, "de");
+    writeDraft("ds5x", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "0,0", { v: "dort" }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "tab-elsewhere" });
+    const release = fakeLocks.holdFor("tab-elsewhere");
+    await sleep(0);
+    const e = openEditor(server, id, { userId: "ds5x" });
+    await e.saver.restore();
+    check("other tab open: its draft stays its own", e.log.restored === 0 && localDrafts("ds5x", id).length === 1);
+    check("other tab open: the background save leaves it too", (await flushSheetDrafts("ds5x", "de", server)) === 0 && server.rev === 0);
+    await e.close();
+    release();
+    await sleep(0);
+    const f = openEditor(server, id, { userId: "ds5x" });
+    await f.saver.restore();
+    await f.saver.flush();
+    check("other tab closed: its draft is taken over", f.log.restored === 1 && server.cell("0,0")?.v === "dort" && localDrafts("ds5x", id).length === 0);
+    await f.close();
+  }
+  // One taker at a time: an editor opening and the background save at once put a draft back once.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server.content, "de");
+    writeDraft("take", { v: 1, pageId: id, rev: 0, base, mine: setCell(base, base.sheets[0].id, "0,0", { v: "einmal" }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "gone" });
+    const e = openEditor(server, id, { userId: "take" });
+    await Promise.all([e.saver.restore(), flushSheetDrafts("take", "de", server)]);
+    await sleep(0);
+    await e.saver.flush();
+    check("one taker: the draft is saved once", server.saves === 1 && server.cell("0,0")?.v === "einmal" && e.cell("0,0")?.v === "einmal" && localDrafts("take", id).length === 0, { saves: server.saves });
+    await e.close();
+  }
+
+  // 10. DS-4: signing out. Open editors save what they hold; what can't be saved is counted (a
+  //     draft that changes nothing isn't); then the editors stop without writing a draft again.
+  {
+    const user = "signout";
+    const [id, id2, id3] = [page(), page(), page()];
+    const server = new FakeServer(newWorkbook("de"));
+    const base = normalizeWorkbook(newWorkbook("de"), "de");
+    writeDraft(user, { v: 1, pageId: id2, rev: 0, base, mine: setCell(base, base.sheets[0].id, "0,0", { v: "offline" }), baseTitle: "", title: "", at: Date.now(), writer: "closed" });
+    writeDraft(user, { v: 1, pageId: id3, rev: 0, base, mine: clone(base), baseTitle: "", title: "", at: Date.now(), writer: "stale" });
+    const open = openEditor(server, id, { userId: user });
+    open.type(0, 0, "noch nicht gespeichert");
+    check("sign-out: counts the open editor and a closed one's draft, not a draft that changes nothing", (await unsavedSheets(user)) === 2, await unsavedSheets(user));
+    await flushOpenSheets();
+    check("sign-out: the open editor saved what it held", server.cell("0,0")?.v === "noch nicht gespeichert" && !open.saver.dirty() && (await unsavedSheets(user)) === 1);
+    server.mode = "offline";
+    open.type(1, 0, "offline");
+    await flushOpenSheets();
+    check("sign-out: work that can't be sent is counted", (await unsavedSheets(user)) === 2);
+    // "Trotzdem abmelden": the editors stop, the device is wiped; nothing is written again.
+    discardOpenSheets();
+    for (const k of [...memory.keys()]) if (k.startsWith(`blob-sheet-draft:${user}:`)) memory.delete(k);
+    open.type(2, 0, "nach dem Abmelden");
+    await open.close();
+    await sleep(10);
+    check("sign-out: no draft written after the wipe", (await draftPages(user)).length === 0 && (await unsavedSheets(user)) === 0, await draftPages(user));
+    server.mode = "ok";
+    reportOk();
+  }
+
+  // 11. DS-11: a save announced while a pull is on its way (which read the page just before it):
+  //     the viewer looks again and shows the newest values.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"));
+    const partner = openEditor(server, id, { userId: "u2" });
+    const viewer = openEditor(server, id, { userId: "pull" });
+    partner.type(2, 1, "0,2");
+    await partner.saver.flush();
+    server.loadDelay = 60;
+    server.loadAt = 10;
+    const pulled = viewer.saver.remote(1);
+    await sleep(25);
+    partner.type(2, 1, "2");
+    await partner.saver.flush();
+    await viewer.saver.remote(2);
+    await pulled;
+    await sleep(150);
+    check("pull race: the viewer catches up with the save announced meanwhile", viewer.cell("2,1")?.v === 2 && !viewer.saver.dirty(), viewer.cell("2,1"));
+    // A revision announced that the page doesn't have (a wrong message): fetched once, not after every save.
+    server.loadDelay = 0;
+    const loads = server.loads;
+    await viewer.saver.remote(999999);
+    viewer.type(7, 0, "x");
+    await viewer.saver.flush();
+    viewer.type(8, 0, "y");
+    await viewer.saver.flush();
+    await sleep(0);
+    check("pull race: no pulling in circles for a revision that isn't there", server.loads === loads + 1, server.loads - loads);
+    await viewer.close();
+    await partner.close();
+  }
+
+  // 12. DS-12: steady typing (a value every 400 ms) puts the save off by about 3 s at most, and the
+  //     draft on the device by about 5 s (here the saves hang, so only the draft keeps the work).
+  {
+    const server = new FakeServer(newWorkbook("de"));
+    const typing = openEditor(server, page(), { userId: "wait" });
+    const slow = new FakeServer(newWorkbook("de"));
+    slow.delay = 8000;
+    const slowPage = page();
+    const stuck = openEditor(slow, slowPage, { userId: "wait" });
+    const start = Date.now();
+    let savedAt = 0;
+    let draftAt = 0;
+    for (let i = 0; i < 15; i++) {
+      typing.type(i, 0, String(i));
+      stuck.type(i, 0, String(i));
+      await sleep(400);
+      if (!savedAt && server.saves > 0) savedAt = Date.now() - start;
+      if (!draftAt && localDrafts("wait", slowPage).length) draftAt = Date.now() - start;
+    }
+    check("max wait: saved while the typing goes on (after about 3 s)", savedAt > 0 && savedAt <= 3600, savedAt);
+    check("max wait: the draft written while the typing goes on (after about 5 s)", draftAt > 0 && draftAt <= 5600, draftAt);
+    await typing.close();
+    stuck.kill();
+    for (const d of localDrafts("wait", slowPage)) clearDraft("wait", slowPage, d.writer);
+  }
+
+  // 13. DS-13: renamed elsewhere (a rename alone leaves the revision as it is): the open editor's
+  //     next save keeps that title and shows it; a rename here still wins.
+  {
+    const server = new FakeServer(newWorkbook("de"), "Messung 1");
+    const e = openEditor(server, page(), { userId: "title" });
+    server.title = "Kalibrierung Nitrat 03.11.";
+    e.type(5, 5, "5");
+    await e.saver.flush();
+    check("rename elsewhere: kept by the next save, and shown", server.title === "Kalibrierung Nitrat 03.11." && e.log.titles.at(-1) === "Kalibrierung Nitrat 03.11.", { server: server.title, titles: e.log.titles });
+    // Realtime brings the row of a rename (the same revision): shown at once.
+    server.title = "Nitrat";
+    await e.saver.remoteRow(server.rev, "Nitrat");
+    check("rename elsewhere: shown at once from the row", e.log.titles.at(-1) === "Nitrat" && !e.saver.dirty());
+    // Renamed here and elsewhere at once: here wins (like a cell).
+    e.saver.setTitle("Meine Messung");
+    server.title = "Deren";
+    await e.saver.remoteRow(server.rev, "Deren");
+    await e.saver.flush();
+    check("rename here and elsewhere: here wins", server.title === "Meine Messung", server.title);
+    await e.close();
+  }
+
+  // 14. DS-10/SEC-5: the size as save_sheet measures it (UTF-8 bytes of the JSON as sent, preview
+  //     included): exactly the limit is saved, one byte more is refused before sending; a warning
+  //     from LARGE_BYTES on; the import checks measure the same way.
+  {
+    const server = new FakeServer(newWorkbook("de"));
+    const e = openEditor(server, page(), { userId: "size" });
+    const sid = e.sheetId;
+    e.type(0, 0, "Messwerte");
+    const start = e.store.get().workbook;
+    const padded = (k: number, rest: string) =>
+      setCells(start, sid, [...Array.from({ length: k }, (_, i) => ({ row: 100 + i, col: 0, cell: { v: "y".repeat(30_000) } })), { row: 100 + k, col: 0, cell: { v: rest } }]);
+    const bytesOf = (wb: Workbook) => jsonBytes(storedContent(wb, createCalc(wb, { locale: "de" }), "de").content);
+    let k = Math.floor((MAX_BYTES - bytesOf(start)) / 30_100);
+    let r = 1 + MAX_BYTES - bytesOf(padded(k, "y"));
+    while (r > 30_000) r = 1 + MAX_BYTES - bytesOf(padded(++k, "y"));
+    check("size: (a rest cell fits)", r > 1 && r <= 30_000, r);
+    e.store.apply("pad", () => padded(k, "y".repeat(r)));
+    await e.saver.flush();
+    check("size: exactly 5,000,000 bytes is saved (the server measures the same)", server.rev === 1 && e.saver.state === "saved" && e.log.sizes.at(-1) === MAX_BYTES, e.log.sizes.at(-1));
+    check("size: close to the limit, the editor says so", e.log.notices.at(-1) === "large" && MAX_BYTES > LARGE_BYTES);
+    const calls = server.calls;
+    e.store.apply("pad", () => padded(k, "y".repeat(r + 1)));
+    await e.saver.flush();
+    check("size: one byte more is refused before sending", server.calls === calls && e.saver.state === "tooBig" && e.log.sizes.at(-1) === MAX_BYTES + 1, e.log.sizes.at(-1));
+    // Characters beyond ASCII count the bytes they take: "µ" is two.
+    e.store.apply("pad", () => padded(k, "µ".repeat(Math.ceil(r / 2) + 1)));
+    await e.saver.flush();
+    check("size: counted in UTF-8 bytes", server.calls === calls && e.saver.state === "tooBig");
+    e.store.apply("smaller", () => start);
+    await e.saver.flush();
+    check("size: small again, saved, no warning", e.saver.state === "saved" && e.log.notices.at(-1) === null && server.rev === 2);
+    await e.close();
+
+    const lab = labWorkbook();
+    const page1 = sheetPageContent(lab, "de");
+    check("import: a new page's size, measured as saving does", page1.bytes === jsonBytes(page1.content) && MAX_SHEET_BYTES === MAX_BYTES);
+    const next = appendWorkbook(lab, freshIds(labWorkbook()), "de");
+    const calc = createCalc(lab, { locale: "de" });
+    check("import: the open spreadsheet's size with a file added, without recalculating", importedBytes(next, calc, "de") === jsonBytes(storedContent(next, createCalc(next, { locale: "de" }), "de").content));
+  }
+
+  // 15. Rows inserted on both sides at once: the merge keeps theirs and mine as a copy sheet
+  //     (src/sheet/collab.ts), and the editor is told (useSheetSave shows it).
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const a = openEditor(server, id, { userId: "conflict" });
+    const b = openEditor(server, id, { userId: "u2" });
+    a.store.apply("insert", (wb) => insertRows(wb, a.sheetId, 1, 1));
+    a.type(0, 0, "von A");
+    b.store.apply("insert", (wb) => insertRows(wb, b.sheetId, 3, 1));
+    b.type(0, 1, "von B");
+    await b.saver.flush();
+    await a.saver.flush();
+    const c = a.log.conflicts.at(-1)?.[0];
+    check("conflict: reported with the copy's name", !!c && c.name === "Blatt 1" && c.copyName.includes("Konflikt"), a.log.conflicts);
+    check("conflict: the copy is saved too", !!c && (server.content as Workbook).sheets.some((s) => s.name === c.copyName));
+    await a.close();
+    await b.close();
+  }
+
+  // 16. SEC-7: another account signing in on this device removes every other account's drafts.
+  {
+    const base = newWorkbook("de");
+    const draft = (pageId: string, writer: string): SheetDraft => ({ v: 1, pageId, writer, rev: 0, base, mine: setCell(base, base.sheets[0].id, "0,0", { v: "Patientin 4711: 0,523" }), baseTitle: "", title: "", at: Date.now() });
+    writeDraft("old-account", draft("p-old", "w1"));
+    writeDraft("new-account", draft("p-new", "w2"));
+    forgetOtherAccounts("new-account");
+    check("sign-in: another account's drafts removed, this one's kept", (await draftPages("old-account")).length === 0 && (await draftPages("new-account")).length === 1);
+    const kept = await readDrafts("new-account", "p-new");
+    check("sign-in: this account's draft still readable", kept.length === 1 && kept[0].writer === "w2");
+    clearDraft("new-account", "p-new", "w2");
   }
 }
 

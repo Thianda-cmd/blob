@@ -4,23 +4,41 @@ import type { JSONContent } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { Locale } from "@/i18n/config";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
-import { chartData } from "@/sheet/chart/data";
-import { chartPng } from "@/sheet/chart/export";
-import { CHART_WIDTH, embedPageId, embedTableMarkdown, embedTableModel, embedTarget, readEmbedItem, type EmbedCell, type EmbedTableModel, type SheetEmbedItem } from "@/sheet/embed";
+import type { ChartData } from "@/sheet/chart/data";
+import type { EmbedCell, EmbedTableModel } from "@/sheet/embed";
+import { CHART_WIDTH, embedPageId, readEmbedItem, type SheetEmbedItem } from "@/sheet/embedAttrs";
 import type { Workbook } from "@/sheet/types";
-import { calcOf, privateSheets, setSheetLocale } from "./blocks/sheetEmbedData";
+import { privateSheets, setSheetLocale } from "./blocks/sheetEmbedData";
 
 // Spreadsheet embeds in the note's exports. The exporters (src/notes/docx.ts and markdown.ts)
 // know a note's ordinary blocks; an embed becomes those before it gets there:
 //   Word      a chart → its picture (PNG); a table or cells → a real Word table
 //   Markdown  a chart → "[Diagramm: Titel](link)"; a table or cells → a Markdown table
 //   text      the same as Markdown
-// with the caption under it. PDF needs nothing: it prints the note as it is on screen.
+// A chart with a trendline also gets a line per series with its equation and R², as the chart
+// shows them ("Standards: y = 0,0519x + 0,0015 · R² = 0,99997"), so the result of a calibration
+// can be copied from any export. The caption comes under it all. PDF needs nothing: it prints
+// the note as it is on screen.
+//
+// Charts, tables and the calculation load only with an export that has such a block.
 
 type Shown =
-  | { kind: "chart"; title: string; pageId: string; png: () => Promise<Blob | null>; width: number }
+  | { kind: "chart"; title: string; pageId: string; png: () => Promise<Blob | null>; width: number; trends: string[] }
   | { kind: "table"; model: EmbedTableModel; pageId: string; sheetTitle: string }
   | null;
+
+/** What reading an embed needs: the chart's data and picture, its fits, the table, the calculation. */
+const loadKit = async () => {
+  const [data, picture, regression, embed, calc] = await Promise.all([
+    import("@/sheet/chart/data"),
+    import("@/sheet/chart/export"),
+    import("@/sheet/chart/regression"),
+    import("@/sheet/embed"),
+    import("./blocks/sheetEmbedCalc"),
+  ]);
+  return { chartData: data.chartData, chartPng: picture.chartPng, ...regression, ...embed, calcOf: calc.calcOf };
+};
+type Kit = Awaited<ReturnType<typeof loadKit>>;
 
 const keyOf = (pageId: unknown, item: unknown) => `${String(pageId)}\n${JSON.stringify(item ?? null)}`;
 
@@ -42,7 +60,7 @@ async function resolveAll(embeds: { pageId: unknown; item: unknown; size: unknow
   setSheetLocale(locale);
   const out = new Map<string, Shown>();
   const pages = [...new Set(embeds.map((e) => embedPageId(e.pageId)).filter((x): x is string => !!x))];
-  const loaded = new Map(await Promise.all(pages.map(async (id) => [id, await source(id).catch(() => null)] as const)));
+  const [kit, loaded] = await Promise.all([loadKit(), Promise.all(pages.map(async (id) => [id, await source(id).catch(() => null)] as const)).then((list) => new Map(list))]);
   for (const e of embeds) {
     const key = keyOf(e.pageId, e.item);
     if (out.has(key)) continue;
@@ -53,28 +71,44 @@ async function resolveAll(embeds: { pageId: unknown; item: unknown; size: unknow
       out.set(key, null);
       continue;
     }
-    out.set(key, shown(pageId, item, sheet.wb, sheet.title, locale, PAPER[String(e.size)] ?? PAPER.m));
+    out.set(key, shown(kit, pageId, item, sheet.wb, sheet.title, locale, PAPER[String(e.size)] ?? PAPER.m));
   }
   return out;
 }
 
-function shown(pageId: string, item: SheetEmbedItem, wb: Workbook, sheetTitle: string, locale: Locale, width: number): Shown {
+function shown(kit: Kit, pageId: string, item: SheetEmbedItem, wb: Workbook, sheetTitle: string, locale: Locale, width: number): Shown {
   const t = noteBlocksText[locale].sheet;
   try {
-    const target = embedTarget(wb, item);
-    const calc = calcOf(wb, locale);
+    const target = kit.embedTarget(wb, item);
+    const calc = kit.calcOf(wb, locale);
     if (target.kind === "chart") {
       const spec = target.chart;
       const aspect = Math.min(0.95, Math.max(0.42, spec.size.h / Math.max(1, spec.size.w)));
       const size = { w: width, h: Math.round(width * aspect) };
+      let data: ChartData | null = null;
+      try {
+        data = kit.chartData(spec, calc, locale);
+      } catch {
+        // Exported as a link only (the picture can't be drawn either).
+      }
+      // Each trendline's equation and R², as the chart's label writes them (the same formatter).
+      const trends: string[] = [];
+      for (const s of data?.series ?? []) {
+        const tl = spec.series.find((x) => x.id === s.id)?.trendline;
+        if (!tl || !s.fit || kit.isFitError(s.fit) || s.fit.type === "movingAverage") continue;
+        const parts = [tl.showEquation ? kit.equationText(s.fit, locale) : null, tl.showR2 && s.fit.r2 !== null ? kit.r2Text(s.fit.r2, locale) : null].filter(Boolean);
+        if (parts.length) trends.push(`${s.name}: ${parts.join(" · ")}`);
+      }
       return {
         kind: "chart",
         title: spec.title.trim() || t.untitledChart,
         pageId,
         width,
+        trends,
         png: async () => {
+          if (!data) return null;
           try {
-            return await chartPng(spec, chartData(spec, calc, locale), locale, size);
+            return await kit.chartPng(spec, data, locale, size);
           } catch {
             return null;
           }
@@ -82,7 +116,7 @@ function shown(pageId: string, item: SheetEmbedItem, wb: Workbook, sheetTitle: s
       };
     }
     if (target.kind === "gone") return null;
-    const model = embedTableModel(wb, calc, item, locale);
+    const model = kit.embedTableModel(wb, calc, item, locale);
     return model ? { kind: "table", model, pageId, sheetTitle: sheetTitle.trim() || t.untitled } : null;
   } catch {
     return null;
@@ -170,6 +204,7 @@ export async function withSheetEmbeds(doc: JSONContent, target: "docx" | "markdo
       const picture = pictures.get(keyOf(node.attrs?.pageId, node.attrs?.item));
       if (target === "docx" && picture) out.push({ type: "image", attrs: { src: picture, alt: t.exportChart(s.title), title: s.title, width: s.width } });
       else out.push({ type: "paragraph", content: [text(t.exportChart(s.title), [{ type: "link", attrs: { href: link } }])] });
+      for (const line of s.trends) out.push({ type: "paragraph", content: [text(line)] });
     } else if (s?.kind === "table") {
       const m = s.model;
       out.push({ type: "paragraph", content: [text(tableTitle(s), [{ type: "bold" }]), text(` · ${m.where}`)] });
@@ -204,11 +239,12 @@ export async function sheetEmbedTexts(doc: PMNode, locale: Locale, pageHref: (id
     return true;
   });
   const t = noteBlocksText[locale].sheet;
-  const resolved = embeds.length ? await resolveAll(embeds, locale, source) : new Map<string, Shown>();
+  if (!embeds.length) return (node) => (typeof node.attrs.caption === "string" ? node.attrs.caption : "");
+  const [resolved, { embedTableMarkdown }] = await Promise.all([resolveAll(embeds, locale, source), import("@/sheet/embed")]);
   return (node) => {
     const s = resolved.get(keyOf(node.attrs.pageId, node.attrs.item));
     const caption = typeof node.attrs.caption === "string" && node.attrs.caption.trim() ? `\n${node.attrs.caption.trim()}` : "";
-    if (s?.kind === "chart") return `[${t.exportChart(s.title)}] ${pageHref(s.pageId)}${caption}`;
+    if (s?.kind === "chart") return `[${t.exportChart(s.title)}] ${pageHref(s.pageId)}${s.trends.map((line) => `\n${line}`).join("")}${caption}`;
     if (s?.kind === "table") return `${tableTitle(s)} · ${s.model.where}\n\n${embedTableMarkdown(s.model)}${caption}`;
     return typeof node.attrs.caption === "string" ? node.attrs.caption : "";
   };

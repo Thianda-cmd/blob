@@ -63,6 +63,16 @@ function Tags({ tags, onTag, max = 3 }: { tags: string[]; onTag: (tag: string) =
   );
 }
 
+/** Says why a tile is among the results: the search found its words, not its title. */
+function InText() {
+  const t = useMessages(notesText);
+  return (
+    <span className="pointer-events-none flex items-center gap-1 text-[11px] font-medium text-blob-ink">
+      <TextSearch className="size-3" /> {t.inText}
+    </span>
+  );
+}
+
 function Meta({ page, subject, parent, owner, shared, due, now }: Pick<TileProps, "page" | "subject" | "parent" | "owner" | "shared" | "due" | "now">) {
   const locale = useLocale();
   const t = useMessages(notesText);
@@ -120,6 +130,7 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
           </span>
         </div>
         <div className="mt-1.5 space-y-1.5 px-1.5 pb-0.5">
+          {inText && <InText />}
           <Tags tags={page.tags} onTag={onTag} />
           <Meta {...props} />
         </div>
@@ -143,6 +154,7 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
           </span>
         </div>
         <div className="mt-1.5 space-y-1.5 px-1.5 pb-0.5">
+          {inText && <InText />}
           <Tags tags={page.tags} onTag={onTag} />
           <Meta {...props} />
         </div>
@@ -179,11 +191,7 @@ export function PageTile(props: TileProps & { childCount: number; childTitles: s
         <p className={cn("pointer-events-none mt-2 line-clamp-3 text-[12.5px] leading-[1.55]", snippet ? "text-ink-3" : "italic text-ink-3/70")}>{snippet || t.emptyNote}</p>
       )}
       <div className="mt-auto space-y-2 pt-2.5">
-        {inText && (
-          <span className="pointer-events-none flex items-center gap-1 text-[11px] font-medium text-blob-ink">
-            <TextSearch className="size-3" /> {t.inText}
-          </span>
-        )}
+        {inText && <InText />}
         <Tags tags={page.tags} onTag={onTag} />
         <Meta {...props} />
       </div>

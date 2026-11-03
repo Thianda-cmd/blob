@@ -194,8 +194,21 @@ export function HomeView({
             <SectionTitle>{t.subjects}</SectionTitle>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3">
               {subjects.map((s, i) => {
-                const notes = pages.filter((p) => p.subject_id === s.id && p.kind === "note").length;
-                const decks = pages.filter((p) => p.subject_id === s.id && p.kind === "deck").length;
+                const inside = pages.filter((p) => p.subject_id === s.id);
+                const counts = [
+                  // Handwritten notes are notes too.
+                  { n: inside.filter((p) => p.kind === "note" || p.kind === "ink").length, text: t.notes },
+                  { n: inside.filter((p) => p.kind === "sheet").length, text: t.sheets },
+                  { n: inside.filter((p) => p.kind === "deck").length, text: t.decks },
+                ];
+                // What the subject holds, most first and kinds it has none of left out, on one line that
+                // a narrow card (two per row on a phone) cuts at the end: the main thing stays readable.
+                const holds =
+                  counts
+                    .filter((c) => c.n > 0)
+                    .sort((a, b) => b.n - a.n)
+                    .map((c) => c.text(c.n))
+                    .join(" · ") || t.notes(0);
                 const open = openTasks[s.id] ?? 0;
                 return (
                   <motion.div key={s.id} variants={rise} custom={7 + i} initial="hidden" animate="shown">
@@ -212,12 +225,9 @@ export function HomeView({
                         <ArrowUpRight className="ml-auto size-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                       <div className="mt-auto flex gap-3 text-[12px] text-ink-3">
-                        <span className="shrink-0">{t.notes(notes)}</span>
-                        {decks > 0 && (
-                          <span className="min-w-0 truncate" title={t.decks(decks)}>
-                            {t.decks(decks)}
-                          </span>
-                        )}
+                        <span className="min-w-0 truncate" title={holds}>
+                          {holds}
+                        </span>
                         <span className={cn("shrink-0", open > 0 && "font-medium text-blob-ink")}>{t.open(open)}</span>
                       </div>
                     </Link>

@@ -8,7 +8,7 @@
 //
 // Viewers (and a spreadsheet that couldn't be read) see everything but can't change it.
 
-import { ChartScatter, Eye, FileDown, FileSpreadsheet, FileUp, Keyboard, NotebookPen, Printer, TriangleAlert } from "lucide-react";
+import { ChartScatter, Eye, FileDown, FileSpreadsheet, FileUp, Gauge, Keyboard, NotebookPen, Printer, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
@@ -40,8 +40,10 @@ import { Toolbar } from "./chrome/Toolbar";
 import { AddToNoteDialog } from "./embed/AddToNote";
 import { contentWidth } from "./grid/actions";
 import { focusSheetGrid, Grid, type GridGeometry } from "./grid/Grid";
-import { appendWorkbook, readSheetFile, SHEET_FILE_ACCEPT, type ReadProblem } from "./importFile";
+import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, type ReadProblem } from "./importFile";
+import { hideSheetNotice, showSheetNotice } from "./notice";
 import { printSheet } from "./print";
+import { SheetNotices } from "./SheetNotice";
 import { activeArea, createSheetStore, SheetStoreContext, useSheet, type SheetStore } from "./store";
 import { TableMenuItems } from "./table/TableMenuItems";
 import { TablePanel } from "./table/TablePanel";
@@ -69,6 +71,19 @@ const fileNameOf = (title: string) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80);
+
+/**
+ * Where F6 lands in the open settings: their first field or control, past the title row with its
+ * close button (and the docked panel's handle); the close button when there is nothing else.
+ */
+function firstSetting(panel: HTMLElement): HTMLElement | null {
+  const body = panel.querySelector<HTMLElement>("[data-table-panel], [data-chart-panel]") ?? panel;
+  const header = body.querySelector("h2")?.parentElement ?? null;
+  const controls = [...body.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]")].filter(
+    (el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0 && el.getClientRects().length > 0,
+  );
+  return controls.find((el) => !header?.contains(el)) ?? controls[0] ?? null;
+}
 
 export function SheetEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
   const locale = useLocale();
@@ -154,6 +169,19 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     ro.observe(foot);
     return () => ro.disconnect();
   }, []);
+  // How high the docked settings reach (from the editor's bottom to their top), as --sheet-dock:
+  // the notices (SheetNotice.tsx) sit above them instead of over their buttons.
+  const dockTop = useCallback((dock: HTMLDivElement | null) => {
+    const editor = bodyRef.current;
+    if (!dock || !editor) return;
+    const ro = new ResizeObserver(() => editor.style.setProperty("--sheet-dock", `${editor.clientHeight - dock.offsetTop}px`));
+    ro.observe(dock);
+    ro.observe(editor);
+    return () => {
+      ro.disconnect();
+      editor.style.removeProperty("--sheet-dock");
+    };
+  }, []);
 
   // The chart or smart table whose settings are open.
   const focus = useSheet(store, (s) => s.focus);
@@ -201,6 +229,34 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     setDockTall(Math.abs(h - d.max * DOCK_TALL) < Math.abs(h - Math.min(d.max * DOCK_LOW, DOCK_LOW_MAX)));
   };
 
+  // The settings beside the grid or docked below it: Escape closes them and the keyboard goes back
+  // to the cells. A field holding a draft takes its Escape first (it stops it); menus that open out
+  // of the panel (elsewhere on the page, in the same React tree) keep theirs.
+  const onPanelKey = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Escape" || e.defaultPrevented || !e.currentTarget.contains(e.target as Node)) return;
+    e.stopPropagation();
+    closePanel();
+  };
+
+  // F6 moves the keyboard between the parts of the editor, as in Excel: the cells, the open
+  // settings, the toolbar (Shift+F6 the other way round). Ctrl+F6 does the same, for browsers that
+  // keep F6 for their address bar (Office on the web uses it too).
+  const cycleParts = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "F6" || e.altKey || !e.currentTarget.contains(e.target as Node)) return;
+    const editor = e.currentTarget;
+    const toolbar = editor.querySelector<HTMLElement>("[data-sheet-toolbar]");
+    const settings = editor.querySelector<HTMLElement>("[data-sheet-panel]");
+    const at = document.activeElement;
+    const parts = ["grid", ...(settings ? ["panel"] : []), ...(toolbar ? ["toolbar"] : [])];
+    const here = settings?.contains(at) ? "panel" : toolbar?.contains(at) ? "toolbar" : "grid";
+    const next = parts[(parts.indexOf(here) + (e.shiftKey ? parts.length - 1 : 1)) % parts.length];
+    e.preventDefault();
+    e.stopPropagation();
+    if (next === "toolbar") toolbar?.querySelector<HTMLElement>('button[tabindex="0"]')?.focus();
+    else if (next === "panel" && settings) firstSetting(settings)?.focus();
+    else focusSheetGrid();
+  };
+
   const panel: ReactNode = focus ? (
     focus.kind === "chart" ? (
       <ChartPanel key={`chart:${focus.id}`} store={store} chartId={focus.id} onClose={closePanel} />
@@ -220,18 +276,26 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   const pickTemplate = useCallback(
     (wb: Workbook, template?: { id: string; title: string }) => {
       setDismissed(true);
-      store.apply(t.templateLabel, () => wb);
+      // The template is where the spreadsheet starts (like a new file from a template in Excel),
+      // not an undo step: Ctrl+Z right after picking it doesn't empty the sheet again.
+      store.reset(wb);
       if (template && !titleRef.current.trim()) {
         showTitle(template.title);
         saveTitle(template.title);
       }
       requestAnimationFrame(() => focusSheetGrid());
     },
-    [store, t.templateLabel, showTitle, saveTitle],
+    [store, showTitle, saveTitle],
   );
   const dismissPicker = useCallback(() => {
     setDismissed(true);
     requestAnimationFrame(() => focusSheetGrid());
+  }, []);
+  // Typing while the templates show starts blank with what was typed, in A1: the keyboard moves
+  // into the cell's editor during the key press, so the letter (and the next ones) land there.
+  const typeIntoBlank = useCallback(() => {
+    setDismissed(true);
+    document.querySelector<HTMLTextAreaElement>("[data-sheet-grid] textarea:not([aria-hidden])")?.focus({ preventScroll: true });
   }, []);
 
   // With a keyboard at hand, typing starts right away when the spreadsheet opens (the templates
@@ -270,15 +334,15 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   const fileName = fileNameOf(title) || fileNameOf(t.untitled);
   const exportXlsxFile = async () => {
     commitTyping();
-    blob.say(t.exporting, { mood: "idle", ms: 2500 });
+    showSheetNotice(store, t.exporting, "busy");
     try {
       const { exportXlsx } = await import("@/sheet/io/xlsx");
       const s = store.get();
       download(`${fileName}.xlsx`, await exportXlsx(s.workbook, s.calc, s.locale), XLSX_MIME);
-      blob.say(t.exported, { mood: "happy" });
+      showSheetNotice(store, t.exported, "done");
     } catch (e) {
       console.error("sheet: xlsx export failed", e);
-      blob.say(t.exportFailed, { mood: "worried" });
+      showSheetNotice(store, t.exportFailed, "error");
     }
   };
   const exportCsvFile = () => {
@@ -288,10 +352,10 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
       const sheet = sheetById(s.workbook, s.sheetId);
       const name = s.workbook.sheets.length > 1 && sheet ? fileNameOf(`${fileName} – ${sheet.name}`) : fileName;
       download(`${name}.csv`, sheetToCsv(s.workbook, s.calc, s.sheetId, s.locale), "text/csv;charset=utf-8");
-      blob.say(t.exported, { mood: "happy" });
+      showSheetNotice(store, t.exported, "done");
     } catch (e) {
       console.error("sheet: csv export failed", e);
-      blob.say(t.exportFailed, { mood: "worried" });
+      showSheetNotice(store, t.exportFailed, "error");
     }
   };
 
@@ -303,36 +367,54 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   const problemText = (p: ReadProblem) => (p === "tooBig" ? t.importTooBig : p === "oldXls" ? t.importOldXls : p === "empty" ? t.importEmpty : t.importFailed);
   const importFile = async (file: File) => {
     if (readOnly) return;
-    blob.say(t.reading, { mood: "idle", ms: 3000 });
-    const r = await readSheetFile(file, locale);
-    if ("error" in r) {
-      blob.say(problemText(r.error), { mood: "worried" });
-      return;
-    }
-    const ids = r.workbook.sheets.map((s) => s.id);
-    setDismissed(true);
-    store.apply(t.importLabel, (wb) => appendWorkbook(wb, r.workbook, locale));
-    if (!ids.some((id) => sheetById(store.get().workbook, id))) return;
-    store.setSheet(ids[0]);
-    // A CSV comes without column widths: columns with longer content get the room they need.
-    if (r.kind === "csv") {
-      const s = store.get();
-      const sheet = sheetById(s.workbook, ids[0]);
-      const cols = sheet ? Array.from({ length: Math.min(sheet.size.cols, 60) }, (_, i) => i) : [];
-      const widths = cols.map((c) => [c, contentWidth(store, c)] as const).filter(([, w]) => w !== null && w > DEFAULT_COL_W);
-      if (widths.length) {
-        store.apply(t.importLabel, (wb) => {
-          let out = wb;
-          for (const [c, w] of widths) out = setColWidths(out, ids[0], [c], Math.min(w!, 360));
-          return out;
-        });
+    const busy = showSheetNotice(store, t.reading, "busy");
+    try {
+      const r = await readSheetFile(file, locale);
+      if ("error" in r) {
+        showSheetNotice(store, problemText(r.error), "error");
+        return;
       }
+      const ids = r.workbook.sheets.map((s) => s.id);
+      // Too big to save with the file in it: nothing changes (it can go into a spreadsheet of its own).
+      const before = store.get();
+      const next = appendWorkbook(before.workbook, r.workbook, locale);
+      const bytes = importedBytes(next, before.calc, locale);
+      if (bytes > MAX_SHEET_BYTES) {
+        showSheetNotice(store, t.importNoRoom(bytes), "error");
+        return;
+      }
+      setDismissed(true);
+      store.apply(t.importLabel, (wb) => (wb === before.workbook ? next : appendWorkbook(wb, r.workbook, locale)));
+      if (!ids.some((id) => sheetById(store.get().workbook, id))) return;
+      store.setSheet(ids[0]);
+      // A CSV comes without column widths: columns with longer content get the room they need.
+      if (r.kind === "csv") {
+        const s = store.get();
+        const sheet = sheetById(s.workbook, ids[0]);
+        const cols = sheet ? Array.from({ length: Math.min(sheet.size.cols, 60) }, (_, i) => i) : [];
+        const widths = cols.map((c) => [c, contentWidth(store, c)] as const).filter(([, w]) => w !== null && w > DEFAULT_COL_W);
+        if (widths.length) {
+          store.apply(t.importLabel, (wb) => {
+            let out = wb;
+            for (const [c, w] of widths) out = setColWidths(out, ids[0], [c], Math.min(w!, 360));
+            return out;
+          });
+        }
+      }
+      const parts = [t.imported(ids.length)];
+      if (r.cutRows) parts.push(t.importCut(r.cutRows.toLocaleString(locale === "de" ? "de-DE" : "en-US")));
+      if (r.skipped.length) parts.push(t.importSkipped(r.skipped.join(", ")));
+      // Something left behind is worth a closer look than a plain "done".
+      showSheetNotice(store, parts.join(" "), parts.length > 1 ? "info" : "done");
+      requestAnimationFrame(() => focusSheetGrid());
+    } catch (e) {
+      console.error("sheet: import failed", e);
+      showSheetNotice(store, t.importFailed, "error");
+    } finally {
+      // "Deine Datei wird gelesen…" never stays behind: the result has replaced it, or nothing came
+      // of the file (the spreadsheet turned read-only meanwhile).
+      hideSheetNotice(store, busy);
     }
-    const parts = [t.imported(ids.length)];
-    if (r.cutRows) parts.push(t.importCut(r.cutRows.toLocaleString(locale === "de" ? "de-DE" : "en-US")));
-    if (r.skipped.length) parts.push(t.importSkipped(r.skipped.join(", ")));
-    blob.say(parts.join(" "), { mood: "happy", ms: r.skipped.length ? 9000 : 4000 });
-    requestAnimationFrame(() => focusSheetGrid());
   };
 
   const printNow = async () => {
@@ -348,7 +430,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
       locale,
       isRowHidden: (row) => store.isRowHidden(s.sheetId, row),
     });
-    if (!ok) blob.say(t.printEmpty, { mood: "thinking" });
+    if (!ok) showSheetNotice(store, t.printEmpty);
   };
 
   // Ctrl/⌘+S saves now (a habit from Excel; the browser's "save page" isn't wanted here), Ctrl/⌘+P prints the sheet.
@@ -400,8 +482,19 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     </>
   );
 
-  const notice = start.unreadable ? t.unreadable : role === "viewer" ? t.viewOnly : save.notice === "denied" ? t.denied : save.notice === "tooBig" ? t.tooBig : null;
-  const noticeIsProblem = start.unreadable || save.notice !== null;
+  const notice = start.unreadable
+    ? t.unreadable
+    : role === "viewer"
+      ? t.viewOnly
+      : save.notice === "denied"
+        ? t.denied
+        : save.notice === "tooBig"
+          ? t.tooBig
+          : save.notice === "large"
+            ? t.nearlyFull(save.bytes)
+            : null;
+  // (Close to the size limit is a heads-up, not yet a problem.)
+  const noticeIsProblem = start.unreadable || save.notice === "denied" || save.notice === "tooBig";
 
   return (
     <SheetStoreContext.Provider value={store}>
@@ -414,7 +507,13 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
             noticeIsProblem ? "bg-danger/8 text-ink" : "bg-blob-soft/60 text-blob-ink",
           )}
         >
-          {noticeIsProblem ? <TriangleAlert className="size-3.5 shrink-0 text-danger" /> : <Eye className="size-3.5 shrink-0" />}
+          {noticeIsProblem ? (
+            <TriangleAlert className="size-3.5 shrink-0 text-danger" />
+          ) : save.notice === "large" && role !== "viewer" ? (
+            <Gauge className="size-3.5 shrink-0" />
+          ) : (
+            <Eye className="size-3.5 shrink-0" />
+          )}
           <span className="min-w-0">{notice}</span>
         </p>
       )}
@@ -422,6 +521,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
         ref={bodyRef}
         className="relative flex min-h-0 flex-1 border-t border-line bg-paper"
         data-sheet-editor=""
+        onKeyDown={showPicker ? undefined : cycleParts}
         // An Excel or CSV file dropped on the spreadsheet comes in as new sheets (anything else, a
         // picture say, is left to Blob's own drop handling and its hint, src/components/notes/FileDrop.tsx).
         onDragOver={(e) => {
@@ -459,7 +559,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
               aria-label={t.titleLabel}
               title={title || undefined}
               spellCheck
-              className="min-w-0 flex-1 truncate bg-transparent font-display text-[20px] font-semibold tracking-[-0.02em] text-ink outline-none placeholder:text-ink-3/55 max-sm:text-[18px]"
+              // The placeholder (the name it gets) readable at 4.5:1 and more, even at a phone's 18 px.
+              className="min-w-0 flex-1 truncate bg-transparent font-display text-[20px] font-semibold tracking-[-0.02em] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] max-sm:text-[18px]"
             />
             <AnimatePresence>
               {save.writer && (
@@ -479,8 +580,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
 
           <div className="relative flex min-h-0 flex-1 flex-col">
             {/* Two cards with a little room around them, like the rest of Blob; the grid below runs edge
-                to edge. Only a little at the sides: from about 1440 px the toolbar fits "Tabelle" and
-                "Diagramm" with their words, and every pixel counts there.
+                to edge. Only a little at the sides: on laptops every pixel of the toolbar counts
+                (the words on "Als Tabelle" and "Diagramm", the tools beside them).
                 Viewers keep the toolbar too: finding, the function list (it leaves out what changes cells). */}
             <div className="flex shrink-0 flex-col gap-1.5 px-1.5 pb-2 max-sm:gap-1 max-sm:px-2 max-sm:pb-1.5">
               <Toolbar store={store} />
@@ -507,14 +608,21 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
 
             {showPicker && (
               <div className="absolute inset-0 z-30 bg-paper">
-                <TemplatePicker onPick={pickTemplate} onDismiss={dismissPicker} autoFocus />
+                <TemplatePicker onPick={pickTemplate} onDismiss={dismissPicker} onType={typeIntoBlank} autoFocus />
               </div>
             )}
+            <SheetNotices store={store} />
           </div>
         </section>
 
         {wide && panel && (
-          <aside style={{ width: PANEL_WIDTH }} className="flex shrink-0 flex-col border-l border-line bg-surface" aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}>
+          <aside
+            data-sheet-panel=""
+            style={{ width: PANEL_WIDTH }}
+            className="flex shrink-0 flex-col border-l border-line bg-surface"
+            aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}
+            onKeyDown={onPanelKey}
+          >
             {panel}
           </aside>
         )}
@@ -553,13 +661,10 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
               transition={{ type: "spring", stiffness: 420, damping: 40 }}
               role="region"
               data-sheet-dock=""
+              data-sheet-panel=""
               aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.stopPropagation();
-                  closePanel();
-                }
-              }}
+              onKeyDown={onPanelKey}
+              ref={dockTop}
               style={dragH !== null ? { height: dragH } : undefined}
               className={cn(
                 "absolute inset-x-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t border-line bg-surface shadow-[0_-10px_30px_-12px_rgb(28_27_24/0.28)]",
@@ -582,7 +687,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
                 onPointerMove={moveDockDrag}
                 onPointerUp={endDockDrag}
                 onPointerCancel={endDockDrag}
-                className="mx-auto flex h-5 w-16 shrink-0 cursor-ns-resize touch-none items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blob [@media(hover:none)]:h-7 [@media(hover:none)]:w-20"
+                // A finger gets 40 × 96 px to tap or drag; the bar it shows stays small.
+                className="mx-auto flex h-5 w-16 shrink-0 cursor-ns-resize touch-none items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-blob [@media(hover:none)]:h-10 [@media(hover:none)]:w-24"
               >
                 <span aria-hidden className="h-1 w-10 rounded-full bg-line-2" />
               </button>
@@ -627,7 +733,7 @@ function CellMenuItems({ store, close, onAddToNote }: { store: SheetStore; close
           icon={<ChartScatter />}
           onSelect={() => {
             close();
-            if (!insertChart(store)) blob.say(t.noChart, { mood: "thinking" });
+            if (!insertChart(store)) showSheetNotice(store, t.noChart);
           }}
         >
           {t.insertChart}

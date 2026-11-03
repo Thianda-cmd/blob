@@ -43,6 +43,7 @@ export type ParseErrorCode =
   | "too-few-args"
   | "too-many-args"
   | "thousands"
+  | "ambiguous-comma"
   | "too-deep";
 
 export type ParseError = { code: ParseErrorCode; at: number; end: number; text?: string; fn?: string; count?: number };
@@ -90,6 +91,8 @@ class Parser {
     private readonly toks: Tok[],
     private readonly textEnd: number,
     private readonly mode: LexMode,
+    /** All tokens, spaces included: to write the formula out again in a message. */
+    private readonly all: Tok[],
   ) {}
 
   fail(code: ParseErrorCode, tok: Tok | undefined, extra?: Partial<ParseError>): never {
@@ -203,6 +206,7 @@ class Parser {
 
   parseCall(): Node {
     const t = this.toks[this.p];
+    const open = this.p + 1;
     this.p += 2; // name and "("
     const canonical = t.fn ?? functionFromName(t.upper ?? "", this.mode);
     const def = canonical ? getFunction(canonical) : null;
@@ -239,11 +243,41 @@ class Parser {
         this.fail("missing-operator", d, { text: d.text });
       }
     }
+    if (this.mode === "de") this.commaOrSemicolon(open, this.p - 1, def, args.length);
     if (def) {
       if (args.length < def.min) this.warnings.push({ code: "too-few-args", at: t.start, end: t.end, fn: def.name, count: def.min });
       else if (args.length > def.max) this.warnings.push({ code: "too-many-args", at: t.start, end: t.end, fn: def.name, count: def.max });
     }
     return { t: "call", name: canonical ?? (t.upper ?? t.text.toUpperCase()), fn: def, args, at: t.start };
+  }
+
+  /**
+   * German formulas take "," as the separator too (from English habits), and "," is also the decimal
+   * comma. When one argument list has both, the reading is a guess: =SVERWEIS(E2,B2:C6,2,0) would
+   * look up approximately with column 2,0, and =MITTELWERT(1,2,3) would average 1,2 and 3. German
+   * Excel refuses these; refuse them too, with the ";" version to take. Only this call's own list
+   * counts (not nested calls or { }), so =RUNDEN(A1,2) and =MAX(1,2) stay fine. `args` is how many
+   * arguments the list has as read now (2,0 one number).
+   */
+  commaOrSemicolon(open: number, close: number, def: FnDef | null, args: number): void {
+    const seps: Tok[] = [];
+    const nums: Tok[] = [];
+    let depth = 0;
+    for (let i = open + 1; i < close; i++) {
+      const k = this.toks[i];
+      if (k.k === "lp" || k.k === "lb") depth++;
+      else if (k.k === "rp" || k.k === "rb") depth--;
+      else if (depth === 0 && !k.inBrace) {
+        if (k.k === "sep" && k.text === ",") seps.push(k);
+        else if (k.k === "num" && k.text.includes(",")) nums.push(k);
+      }
+    }
+    if (!seps.length || !nums.length) return;
+    // Every comma a ";" is the guess only when the function takes that many arguments: in
+    // =WENN(A1>0,5,1,0) one of the commas is a decimal comma, and only the person knows which.
+    const count = args + nums.reduce((n, k) => n + k.text.split(",").length - 1, 0);
+    const meant = def && count >= def.min && count <= def.max ? this.all.map((k) => (seps.includes(k) ? ";" : nums.includes(k) ? k.text.replace(/,/g, ";") : k.text)).join("") : null;
+    this.fail("ambiguous-comma", nums[0], { text: meant === null ? undefined : `=${meant}`, fn: def?.name });
   }
 
   parseArray(): Node {
@@ -295,7 +329,7 @@ export function parseTokens(all: Tok[], mode: LexMode): { ok: true; parsed: Pars
   for (const t of all) if (t.k !== "ws") toks.push(t);
   const textEnd = all.length ? all[all.length - 1].end : 0;
   if (!toks.length) return { ok: false, error: { code: "empty", at: 0, end: 0 } };
-  const ps = new Parser(toks, textEnd, mode);
+  const ps = new Parser(toks, textEnd, mode, all);
   try {
     const ast = ps.parseExpr(0);
     if (!ps.done) {

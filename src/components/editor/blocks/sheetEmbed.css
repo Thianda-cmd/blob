@@ -1,4 +1,4 @@
-/* A chart, smart table or cells from a spreadsheet inside a note (SheetEmbed.tsx). Colours come
+/* A chart, smart table or cells from a spreadsheet inside a note (SheetEmbedView.tsx). Colours come
    from the design tokens and the --sheet-* palette, so dark mode follows; paper (print, PDF) gets
    the whole table and no buttons. */
 
@@ -50,17 +50,21 @@
   max-width: 100%;
 }
 
-/* The bar on top: where it comes from (a link that opens the spreadsheet), then the buttons. */
+/* The bar on top: where it comes from (a link that opens the spreadsheet), then the buttons. In a
+   narrow note (a phone) the source gets a line of its own and the buttons go under it, so the
+   spreadsheet's name isn't cut off for them. */
 .prose-blob .blob-sheet-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0.2rem;
   min-height: 2.6rem;
   padding: 0.45rem 0.5rem 0.1rem 0.85rem;
 }
 .prose-blob .blob-sheet-source-link {
   display: inline-flex;
-  flex: 1;
+  flex: 1 1 13rem;
   align-items: baseline;
   gap: 0.4rem;
   min-width: 0;
@@ -106,6 +110,7 @@
   display: flex;
   flex: none;
   gap: 0.3rem;
+  margin-left: auto;
 }
 .prose-blob .blob-sheet-actions .blob-block-edit {
   position: static;
@@ -127,13 +132,51 @@
   }
 }
 
-/* A table's cells (scrolling sideways when wide). */
+/* A table's cells, scrolling sideways when wider than the note; a soft edge on each side that has
+   more columns (SideScroll in SheetEmbedView.tsx) shows that nothing is cut off. */
+.prose-blob .blob-sheet-scroll-box {
+  position: relative;
+}
+.prose-blob .blob-sheet-scroll-box::before,
+.prose-blob .blob-sheet-scroll-box::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 2.5rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.prose-blob .blob-sheet-scroll-box::before {
+  left: 0;
+  border-bottom-left-radius: 13px;
+  background: linear-gradient(to right, var(--raised) 15%, transparent);
+  box-shadow: inset 6px 0 6px -6px color-mix(in oklab, var(--ink) 28%, transparent);
+}
+.prose-blob .blob-sheet-scroll-box::after {
+  right: 0;
+  border-bottom-right-radius: 13px;
+  background: linear-gradient(to left, var(--raised) 15%, transparent);
+  box-shadow: inset -6px 0 6px -6px color-mix(in oklab, var(--ink) 28%, transparent);
+}
+.prose-blob .blob-sheet-scroll-box.has-more-left::before,
+.prose-blob .blob-sheet-scroll-box.has-more-right::after {
+  opacity: 1;
+}
 .prose-blob .blob-sheet-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   padding: 0.35rem 0.85rem 0.75rem;
+}
+.prose-blob .blob-sheet-scroll:focus-visible {
+  outline: 2px solid var(--blob);
+  outline-offset: -2px;
+  border-radius: 10px;
 }
 .prose-blob table.blob-sheet-table {
   width: auto;
@@ -492,14 +535,29 @@
   }
 }
 
-/* On paper: the whole table, no buttons. */
+/* On paper: the whole table, no buttons. A chart stays in one piece; a long table goes on over
+   the next pages (its rows whole, the header row repeated) instead of leaving a page nearly
+   empty, and its bar stays with it. */
 .note-print .blob-sheet-actions,
-.note-print .blob-sheet-more button {
+.note-print .blob-sheet-more button,
+.note-print .blob-sheet-scroll-box::before,
+.note-print .blob-sheet-scroll-box::after {
   display: none !important;
 }
 .note-print .blob-sheet-scroll {
   overflow: visible !important;
 }
 .note-print .blob-sheet-card {
+  break-inside: avoid;
+}
+.note-print .blob-sheet-embed.blob-object,
+.note-print .blob-sheet-card:has(table.blob-sheet-table),
+.note-print table.blob-sheet-table {
+  break-inside: auto;
+}
+.note-print .blob-sheet-bar {
+  break-after: avoid;
+}
+.note-print table.blob-sheet-table tr {
   break-inside: avoid;
 }

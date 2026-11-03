@@ -49,14 +49,19 @@ export function useImporter() {
         try {
           if (isSheetFile(file)) {
             // A spreadsheet: read in the browser (the spreadsheet code loads only now).
-            const { readSheetFile, sheetPageContent } = await import("@/components/sheet/importFile");
+            const { readSheetFile, sheetPageContent, MAX_SHEET_BYTES } = await import("@/components/sheet/importFile");
             const read = await readSheetFile(file, locale);
             if ("error" in read) {
               const p = read.error;
               blob.say(p === "tooBig" ? ts.importTooBig : p === "oldXls" ? ts.importOldXls : p === "empty" ? ts.importEmpty : ts.importFailed, { mood: "worried", ms: 7000 });
               continue;
             }
-            const { content, plain_text } = sheetPageContent(read.workbook, locale);
+            const { content, plain_text, bytes } = sheetPageContent(read.workbook, locale);
+            // A page too big to save could never be changed again: not made at all.
+            if (bytes > MAX_SHEET_BYTES) {
+              blob.say(ts.importTooBigSheet(bytes), { mood: "worried", ms: 9000 });
+              continue;
+            }
             const meta = await createPage({ kind: "sheet", title: read.name.slice(0, 200), subject_id: target.parentId ? null : (target.subjectId ?? null), parent_id: target.parentId ?? null, content, plain_text });
             if (!meta) {
               failed++;

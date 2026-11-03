@@ -7,7 +7,8 @@
 // it on every save, so lists (home, notes, subjects, folders) can draw a tile from
 // content->preview without loading the engine, like handwritten notes do. normalizeWorkbook drops
 // the preview when reading: the editor works on the workbook alone and the next save writes a
-// fresh preview.
+// fresh preview. Each sheet may also hold `log`, its latest changes of rows and columns
+// (src/sheet/sheetLog.ts): merging needs it, so it is checked and kept.
 //
 // This module stays light on purpose (no formula engine, no ops): the workspace makes new
 // spreadsheets with newWorkbook and lists read previews with readSheetPreview, and neither should
@@ -23,6 +24,7 @@ import { SHEET_COLORS } from "./colors";
 import type { Calc } from "./engine";
 import { formatValue } from "./engine/format";
 import { isError, type CellValue } from "./engine/values";
+import { readLog } from "./sheetLog";
 import {
   DEFAULT_COL_W,
   DEFAULT_SIZE,
@@ -207,9 +209,9 @@ function normalize(raw: unknown, locale: Locale): Workbook {
   const sheetIds = new Map<string, string>();
   const takenIds = new Set<string>();
   const takenNames = new Set<string>();
-  const sheets: Sheet[] = [];
+  const found: { s: Obj; id: string; name: string }[] = [];
   let sameSheets = src.sheets.length <= MAX_SHEETS;
-  for (let i = 0; i < src.sheets.length && sheets.length < MAX_SHEETS; i++) {
+  for (let i = 0; i < src.sheets.length && found.length < MAX_SHEETS; i++) {
     const s = src.sheets[i];
     if (!isObj(s)) {
       sameSheets = false;
@@ -217,8 +219,12 @@ function normalize(raw: unknown, locale: Locale): Workbook {
     }
     const id = claimId(s.id, `s${i + 1}`, takenIds);
     if (typeof s.id === "string" && !sheetIds.has(s.id)) sheetIds.set(s.id, id);
-    const name = sheetName(s.name, locale, i, takenNames);
-    const sheet = normSheet(s, id, name);
+    found.push({ s, id, name: sheetName(s.name, locale, i, takenNames) });
+  }
+  // (Once every id is known: a sheet's log may name other sheets, src/sheet/sheetLog.ts.)
+  const sheets: Sheet[] = [];
+  for (const { s, id, name } of found) {
+    const sheet = normSheet(s, id, name, sheetIds);
     if (sheet !== s) sameSheets = false;
     sheets.push(sheet);
   }
@@ -297,7 +303,7 @@ function sheetName(x: unknown, locale: Locale, i: number, taken: Set<string>): s
   return name;
 }
 
-function normSheet(s: Obj, id: string, name: string): Sheet {
+function normSheet(s: Obj, id: string, name: string, sheetIds: ReadonlyMap<string, string>): Sheet {
   const cells = normCells(s.cells);
   const size0 = isObj(s.size) ? s.size : {};
   const rows = Math.min(MAX_ROWS, Math.max(int(size0.rows, 1, MAX_ROWS, DEFAULT_SIZE.rows), cells.rows));
@@ -311,10 +317,22 @@ function normSheet(s: Obj, id: string, name: string): Sheet {
   const fc = int(f.cols, 0, Math.max(0, colsN - 1), 0);
   const freezeSame = isObj(s.freeze) && onlyKeys(s.freeze, ["rows", "cols"]) && s.freeze.rows === fr && s.freeze.cols === fc;
   const freeze = freezeSame ? (s.freeze as Sheet["freeze"]) : { rows: fr, cols: fc };
+  // The log of inserted, deleted, sorted and moved rows and columns that merging lines versions up with.
+  const log = readLog(s.log, id, sheetIds);
   const same =
-    id === s.id && name === s.name && cells.same && sizeSame && cols.same && rowsMap.same && freezeSame && onlyKeys(s, ["id", "name", "cells", "cols", "rows", "freeze", "size"]);
+    id === s.id &&
+    name === s.name &&
+    cells.same &&
+    sizeSame &&
+    cols.same &&
+    rowsMap.same &&
+    freezeSame &&
+    log.same &&
+    onlyKeys(s, ["id", "name", "cells", "cols", "rows", "freeze", "size", "log"]);
   if (same) return s as Sheet;
-  return { id, name, cells: cells.map, cols: cols.map, rows: rowsMap.map, freeze, size };
+  const out: Sheet = { id, name, cells: cells.map, cols: cols.map, rows: rowsMap.map, freeze, size };
+  if (log.log) out.log = log.log;
+  return out;
 }
 
 const KEY = /^(\d{1,5}),(\d{1,3})$/;

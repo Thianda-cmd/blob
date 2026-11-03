@@ -410,7 +410,7 @@ export function SheetTabs({ store }: { store: SheetStore }): ReactNode {
                   autoComplete="off"
                   maxLength={31}
                   style={{ width: `${Math.max(6, renaming.draft.length + 2)}ch` }}
-                  className="h-8 max-w-[220px] rounded-lg border border-blob bg-raised px-2.5 text-[13px] font-medium text-ink shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] outline-none aria-[invalid=true]:border-danger [@media(hover:none)]:h-9"
+                  className="h-8 max-w-[220px] rounded-lg border border-blob bg-raised px-2.5 text-[13px] font-medium text-ink shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] outline-none aria-[invalid=true]:border-danger [@media(hover:none)]:h-9 [@media(hover:none)]:text-[16px]"
                 />
               </div>
             );
@@ -498,7 +498,7 @@ export function SheetTabs({ store }: { store: SheetStore }): ReactNode {
         )}
       </ContextMenu>
 
-      <Dialog open={!!confirmSheet} onClose={() => setConfirm(null)} labelledBy="sheet-delete-title">
+      <Dialog open={!!confirmSheet} onClose={() => setConfirm(null)} labelledBy="sheet-delete-title" returnFocus={focusGrid}>
         {confirmSheet && (
           <div className="p-5">
             <h2 id="sheet-delete-title" className="font-display text-[17px] font-semibold text-ink">

@@ -6,23 +6,23 @@
 // live channel when it is shared) and says who is here.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { blob } from "@/components/blob/bus";
 import type { SaveState } from "@/components/page/useAutosave";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
-import { pageText } from "@/i18n/messages/page";
 import { sheetText } from "@/i18n/messages/sheet";
 import { useLive, useTableChanges, type Peer } from "@/lib/live";
-import { markSheetOpen } from "./drafts";
-import { SheetSaver } from "./saver";
+import { showSheetNotice } from "./notice";
+import { SheetSaver, type SaveNotice } from "./saver";
 import { useSheet, type SheetStore } from "./store";
 
 type Me = { user_id: string; name: string; avatar_url: string | null };
 
 export type SheetSave = {
   state: SaveState;
-  /** A problem that stays until it is solved (no access any more, too big to save). */
-  notice: "denied" | "tooBig" | null;
+  /** A problem that stays until it is solved (no access any more, too big to save), or "large": close to the limit. */
+  notice: SaveNotice | null;
+  /** The spreadsheet's size when it was last saved (bytes, as the limit counts them; 0: not measured yet). */
+  bytes: number;
   /** Who else has the spreadsheet open (shared spreadsheets). */
   peers: Peer[];
   /** First name of whoever just changed something (shared spreadsheets), for a moment. */
@@ -60,18 +60,18 @@ export function useSheetSave({
 }): SheetSave {
   const locale = useLocale();
   const t = useMessages(sheetText);
-  const words = useMessages(pageText);
   const [state, setState] = useState<SaveState>("saved");
   const [notice, setNotice] = useState<SheetSave["notice"]>(null);
+  const [bytes, setBytes] = useState(0);
   const [writer, setWriter] = useState<string | null>(null);
   const saverRef = useRef<SheetSaver | null>(null);
   const live = useLive(shared ? `page:${pageId}` : null, me);
   const { updatePage } = useWorkspace();
 
   // Kept current for the long-lived saver.
-  const latest = useRef({ live, onTitle, t, words, updatePage });
+  const latest = useRef({ live, onTitle, t, updatePage });
   useEffect(() => {
-    latest.current = { live, onTitle, t, words, updatePage };
+    latest.current = { live, onTitle, t, updatePage };
   });
   const initial = useRef({ rev, title, readOnly, locale, userId });
 
@@ -86,9 +86,13 @@ export function useSheetSave({
       base: store.get().workbook,
       title: init.title,
       readOnly: init.readOnly,
+      // What the person should hear about goes to the editor's notices (notice.ts): Blob's speech
+      // bubble stays away on spreadsheets.
       on: {
         state: setState,
         notice: setNotice,
+        size: setBytes,
+        conflict: (found) => showSheetNotice(store, latest.current.t.conflict(found), "info", { ms: 20_000 }),
         title: (next) => latest.current.onTitle(next),
         saved: (next) => {
           latest.current.live.send("sheet-saved", { rev: next });
@@ -96,13 +100,11 @@ export function useSheetSave({
           // showing it here, say in a side pane, checks for the new values at once.
           void latest.current.updatePage(pageId, {}, { local: true });
         },
-        restored: () => blob.say(latest.current.t.restored, { mood: "happy", ms: 5000 }),
-        trouble: (kind) =>
-          kind === "failed" ? blob.say(latest.current.words.cantReach, { mood: "worried" }) : blob.say(latest.current.words.backOnline, { mood: "happy" }),
+        restored: () => showSheetNotice(store, latest.current.t.restored, "done"),
+        trouble: (kind) => showSheetNotice(store, kind === "failed" ? latest.current.t.saveTrouble : latest.current.t.saveBack, kind === "failed" ? "error" : "done"),
       },
     });
     saverRef.current = saver;
-    const unmark = markSheetOpen(pageId);
 
     // Document changes (not the selection or the zoom): save in a moment.
     let version = store.get().version;
@@ -130,7 +132,6 @@ export function useSheetSave({
 
     return () => {
       off();
-      unmark();
       window.removeEventListener("pagehide", hide);
       window.removeEventListener("beforeunload", hide);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -140,11 +141,12 @@ export function useSheetSave({
     };
   }, [store, pageId]);
 
-  // Someone else saved (any device): fetch it and merge.
-  useTableChanges<{ rev: number }>("pages", `id=eq.${pageId}`, (payload) => {
+  // Someone else saved (any device): fetch it and merge. A rename elsewhere (the revision stays)
+  // comes with the row.
+  useTableChanges<{ rev: number; title: string }>("pages", `id=eq.${pageId}`, (payload) => {
     if (payload.eventType !== "UPDATE") return;
-    const next = (payload.new as { rev?: unknown }).rev;
-    if (typeof next === "number") void saverRef.current?.remote(next);
+    const row = payload.new as { rev?: unknown; title?: unknown };
+    if (typeof row.rev === "number") void saverRef.current?.remoteRow(row.rev, row.title);
   });
 
   // …and said so on the live channel (quicker than the database's message, and names who it was).
@@ -176,5 +178,5 @@ export function useSheetSave({
     await saverRef.current?.flush();
   }, []);
 
-  return { state, notice, peers: live.peers, writer, setTitle, flush };
+  return { state, notice, bytes, peers: live.peers, writer, setTitle, flush };
 }

@@ -48,39 +48,35 @@ import { cn, pageTitle } from "@/lib/utils";
 import { panesText } from "@/i18n/messages/panes";
 import { transferText } from "@/i18n/messages/transfer";
 import { useImporter } from "@/components/notes/useImporter";
-import { newPageFor, type NewKind } from "./paletteNew";
+import {
+  CALENDAR_WORDS,
+  CV_WORDS,
+  FOLDER_WORDS,
+  INK_WORDS,
+  NOTEBOOK_WORDS,
+  NOTES_WORDS,
+  PROJECT_WORDS,
+  SHEET_WORDS,
+  newPageFor,
+  paletteOrder,
+  type NewKind,
+  type PaletteEntry,
+} from "./paletteNew";
 import { usePanes } from "./Panes";
 import { PageIcon, SubjectIcon } from "./Sidebar";
 
-type Item = {
-  id: string;
+/** The id, label, keywords and (new pages) rank and title decide the item's place (paletteOrder). */
+type Item = PaletteEntry & {
   group: "actions" | "pages" | "found" | "subjects" | "tags" | "learn";
-  label: string;
   hint?: string;
-  /** Extra words that find an action (in both languages), e.g. "cv" for „Neuer Lebenslauf“. */
-  keywords?: string;
   icon: ReactNode;
   run: () => void;
   /** Shift+Enter: a note opens beside the page you're on. */
   beside?: () => void;
-  /**
-   * New pages: 2 when the query is the kind of page itself ("Tabelle", "neue Tabelle", "Tabelle Titration"),
-   * 1 when it is on its way to one of its words ("tab", "kalib"), else 0 (the "… named <query>" fallback).
-   */
-  rank?: number;
 };
 
 /** Learning topics shown for a search (the rest are one click away on /learn). */
 const MAX_TOPICS = 6;
-
-const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
-const FOLDER_WORDS = "ordner folder";
-const INK_WORDS = "handschrift handwriting stift pen zeichnen draw drawing skizze sketch tablet s pen";
-const SHEET_WORDS = "tabelle tabellen spreadsheet sheet excel tabellenkalkulation calc rechnen formel formula diagramm chart kalibrierung kalibriergerade calibration messreihe messwerte mittelwert trendlinie";
-const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
-const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
-const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
-const CALENDAR_WORDS = "kalender calendar termin event stundenplan timetable schedule geburtstag birthday woche week monat month";
 
 /** Tags shown for a search. */
 const MAX_TAGS = 5;
@@ -173,6 +169,7 @@ function Palette({ onClose }: { onClose: () => void }) {
         keywords,
         icon,
         rank,
+        title,
         run: async () => {
           onClose();
           const p = await createPage({ kind, title });
@@ -370,18 +367,9 @@ function Palette({ onClose }: { onClose: () => void }) {
           }))
       : [];
 
-    // Actions that match what was typed ("cv" → „Neuer Lebenslauf“) come before the "new note named …"
-    // fallbacks, so Enter opens the CV builder instead of making a note called "cv".
-    const hit = (a: Item) => match(a.label) || (lower.length > 1 && Boolean(a.keywords?.split(" ").some((w) => w.startsWith(lower))));
-    const isNew = (a: Item) => a.id.startsWith("new");
-    // New pages whose kind the query is on its way to ("tab") before the other ones (a stable sort).
-    const newItems = actions.filter(isNew).sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
-    const results = [...pageItems, ...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems];
-    // The query is the kind of page ("Tabelle"): making one comes first, and nobody wants a note called "Tabelle".
-    const asked = newItems.filter((a) => a.rank === 2);
-    if (q && asked.length) return [...asked, ...actions.filter((a) => !isNew(a) && hit(a)), ...results];
-    const filteredActions = q ? [...actions.filter((a) => !isNew(a) && hit(a)), ...newItems] : actions.slice(0, 3);
-    return q ? [...results, ...filteredActions] : [...filteredActions, ...pageItems];
+    // Pages found first, the actions that match, then new pages named after the query; a query that
+    // names a kind of page ("Tabelle", "Notiz zur Zellatmung") moves making one up (paletteNew.ts).
+    return paletteOrder(q, { actions, pages: pageItems, results: [...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer, atlas]);
 
@@ -410,8 +398,6 @@ function Palette({ onClose }: { onClose: () => void }) {
       onClose();
     }
   }
-
-  let lastGroup = "";
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-center px-4 pt-[14vh]">
@@ -454,8 +440,8 @@ function Palette({ onClose }: { onClose: () => void }) {
         <div ref={listRef} id="palette-list" role="listbox" className="overflow-y-auto p-1.5">
           {items.length === 0 && <div className="px-3 py-8 text-center text-[13px] text-ink-3">{t.nothing(q)}</div>}
           {items.map((item, i) => {
-            const header = item.group !== lastGroup ? item.group : null;
-            lastGroup = item.group;
+            // A heading above the first item of each group (paletteOrder keeps a group together).
+            const header = item.group !== items[i - 1]?.group ? item.group : null;
             return (
               <div key={item.id}>
                 {header && <div className="px-2.5 pb-1 pt-2.5 text-[11.5px] font-medium text-ink-3">{t.groups[header]}</div>}

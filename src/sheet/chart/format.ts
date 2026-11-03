@@ -161,6 +161,12 @@ export function formatScientific(v: number, locale: Locale, digits: number): str
 /** Dates, times and both: the kinds of format whose numbers are serial dates. */
 export const isDateFormat = (fmt: NumberFormat | null | undefined) => fmt?.kind === "date" || fmt?.kind === "datetime" || fmt?.kind === "time";
 
+/**
+ * Calendar dates, with or without the time of day: numbers that count days since 1900. A time
+ * alone (0:00, 0:30, 1:00 …) is often already the time since the start of a measurement.
+ */
+export const isCalendarFormat = (fmt: NumberFormat | null | undefined) => fmt?.kind === "date" || fmt?.kind === "datetime";
+
 /** R² counts as exactly 1 within this distance: a perfect line's 1 − SSE/SST lands a few ulps off. */
 export const R2_ONE_TOLERANCE = 5e-13;
 

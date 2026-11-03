@@ -5,8 +5,8 @@
 //
 // A dialog on wide screens (categories, list, details side by side) and a bottom sheet on phones
 // (list, then the details of the one tapped). Search finds names in both languages, also without
-// umlauts, and words of the descriptions ("Mittelwert", "Kalibrier…"). Works without help texts
-// too: then a function shows its name and category.
+// umlauts, the words students use for them ("Durchschnitt", "R2", "Kalibrier…") and words of the
+// descriptions. Works without help texts too: then a function shows its name and category.
 
 import { ArrowLeft, Lightbulb, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { FUNCTION_BY_EN, FUNCTION_NAMES, type FunctionCategory, type FunctionName } from "@/sheet/engine";
 import { fnDoc, localName, Syntax } from "./FormulaHelp";
 import { POPULAR_FUNCTIONS } from "./formulaInput";
+import { foldSearch, functionsForWords } from "./functionWords";
+import { focusGrid } from "./parts";
 
 type Category = "popular" | "all" | FunctionCategory;
 
@@ -29,35 +31,38 @@ const POPULAR = POPULAR_FUNCTIONS.slice(0, 16)
   .map((en) => FUNCTION_BY_EN.get(en))
   .filter((f): f is FunctionName => !!f);
 
-const fold = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/ä/g, "a")
-    .replace(/ö/g, "o")
-    .replace(/ü/g, "u")
-    .replace(/ß/g, "ss");
-
-/** Functions for a search (names first: starts with, then contains; then descriptions), or a category. */
+/**
+ * Functions for a search, or a category. A search finds, best first: the name (either language,
+ * also without umlauts), names that start with it, the words students use for a function
+ * ("Durchschnitt", "R2", "Kalibriergerade": functionWords.ts), names that contain it, then the
+ * words of the summary and of the tip. Argument names don't count ("Zahl2" would make "R2" find
+ * WENNS). Equal hits go by how common the function is.
+ */
 export function browseFunctions(query: string, category: Category, locale: Locale): FunctionName[] {
-  const q = fold(query.trim());
+  const q = foldSearch(query.trim());
   if (!q) {
     if (category === "popular") return POPULAR;
     const list = category === "all" ? FUNCTION_NAMES : FUNCTION_NAMES.filter((f) => f.category === category);
     return [...list].sort((a, b) => localName(a, locale).localeCompare(localName(b, locale), locale));
   }
+  const words = functionsForWords(q);
   const scored: { fn: FunctionName; score: number }[] = [];
   for (const fn of FUNCTION_NAMES) {
-    const names = [fold(fn.de), fold(fn.en)];
-    const own = fold(localName(fn, locale));
+    const names = [foldSearch(fn.de), foldSearch(fn.en)];
+    const own = foldSearch(localName(fn, locale));
+    const word = words.get(fn.en);
     let score = -1;
     if (own === q || names.includes(q)) score = 0;
     else if (own.startsWith(q)) score = 1;
     else if (names.some((n) => n.startsWith(q))) score = 2;
-    else if (names.some((n) => n.includes(q))) score = 3;
-    else {
+    else if (word?.exact) score = 3 + word.rank / 100;
+    else if (names.some((n) => n.includes(q))) score = 4;
+    else if (word) score = 5 + word.rank / 100;
+    else if (q.length >= 3) {
+      // A single letter or two would be in almost every description.
       const doc = fnDoc(fn.en, locale);
-      const text = doc ? fold(`${doc.summary} ${doc.tip ?? ""} ${doc.args.map((a) => a.name).join(" ")}`) : "";
-      if (text.includes(q)) score = 4;
+      if (doc && foldSearch(doc.summary).includes(q)) score = 6;
+      else if (doc?.tip && foldSearch(doc.tip).includes(q)) score = 7;
     }
     if (score >= 0) scored.push({ fn, score });
   }
@@ -85,28 +90,28 @@ function Details({ fn, locale, t, canInsert, onInsert }: { fn: FunctionName; loc
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h3 className="font-mono text-[19px] font-semibold tracking-tight text-ink">{name}</h3>
-          <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-medium text-ink-3">{t.categories[fn.category]}</span>
+          <span className="rounded-full bg-hover px-2 py-0.5 text-[12px] font-medium text-ink-2">{t.categories[fn.category]}</span>
         </div>
-        {other !== name && <div className="mt-0.5 text-[12px] text-ink-3">{t.otherName(other)}</div>}
+        {other !== name && <div className="mt-0.5 text-[12px] text-ink-2">{t.otherName(other)}</div>}
         {doc ? (
           <>
             <p className="mt-3 text-[14px] leading-relaxed text-ink">{doc.summary}</p>
             <section className="mt-4">
-              <h4 className="text-[11px] font-medium uppercase tracking-wide text-ink-3">{t.syntax}</h4>
+              <h4 className="text-[12px] font-medium uppercase tracking-wide text-ink-2">{t.syntax}</h4>
               <div className="mt-1.5 rounded-lg bg-paper px-3 py-2 text-[13px] leading-relaxed">
                 <Syntax name={name} args={doc.args} locale={locale} />
               </div>
             </section>
             <section className="mt-4">
-              <h4 className="text-[11px] font-medium uppercase tracking-wide text-ink-3">{t.arguments}</h4>
+              <h4 className="text-[12px] font-medium uppercase tracking-wide text-ink-2">{t.arguments}</h4>
               {doc.args.length ? (
                 <dl className="mt-1.5 space-y-2">
                   {doc.args.map((a) => (
                     <div key={a.name}>
                       <dt className="flex flex-wrap items-baseline gap-1.5">
                         <span className="font-mono text-[13px] font-medium text-ink">{a.name}</span>
-                        {a.optional && <span className="text-[11px] text-ink-3">{t.optional}</span>}
-                        {a.repeat && <span className="text-[11px] text-ink-3">· {t.repeats}</span>}
+                        {a.optional && <span className="text-[12px] text-ink-2">{t.optional}</span>}
+                        {a.repeat && <span className="text-[12px] text-ink-2">· {t.repeats}</span>}
                       </dt>
                       <dd className="text-[13px] leading-snug text-ink-2">{a.desc}</dd>
                     </div>
@@ -117,7 +122,7 @@ function Details({ fn, locale, t, canInsert, onInsert }: { fn: FunctionName; loc
               )}
             </section>
             <section className="mt-4">
-              <h4 className="text-[11px] font-medium uppercase tracking-wide text-ink-3">{t.example}</h4>
+              <h4 className="text-[12px] font-medium uppercase tracking-wide text-ink-2">{t.example}</h4>
               <div className="mt-1.5 rounded-lg border border-line bg-paper px-3 py-2">
                 <code className="block break-all font-mono text-[13px] text-ink">{doc.example}</code>
                 <div className="mt-1 text-[12.5px] leading-snug text-ink-2">= {doc.exampleResult}</div>
@@ -127,7 +132,7 @@ function Details({ fn, locale, t, canInsert, onInsert }: { fn: FunctionName; loc
               <section className="mt-4 flex gap-2.5 rounded-lg bg-blob-soft/60 px-3 py-2.5">
                 <Lightbulb className="mt-0.5 size-4 shrink-0 text-blob-ink" aria-hidden />
                 <div>
-                  <h4 className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{t.tip}</h4>
+                  <h4 className="text-[12px] font-medium uppercase tracking-wide text-blob-ink">{t.tip}</h4>
                   <p className="mt-0.5 text-[13px] leading-snug text-ink">{doc.tip}</p>
                 </div>
               </section>
@@ -153,13 +158,13 @@ export function FunctionBrowser({ open, onClose, onPick, canInsert = true }: { o
   const t = useMessages(sheetChromeText);
   if (phone) {
     return (
-      <Sheet open={open} onClose={onClose} full label={t.browserTitle}>
+      <Sheet open={open} onClose={onClose} full label={t.browserTitle} returnFocus={focusGrid}>
         {open && <Browser phone onClose={onClose} onPick={onPick} canInsert={canInsert} />}
       </Sheet>
     );
   }
   return (
-    <Dialog open={open} onClose={onClose} className="max-w-[920px]!" labelledBy="sheet-fx-title">
+    <Dialog open={open} onClose={onClose} className="max-w-[920px]!" labelledBy="sheet-fx-title" returnFocus={focusGrid}>
       {open && <Browser phone={false} onClose={onClose} onPick={onPick} canInsert={canInsert} />}
     </Dialog>
   );
@@ -231,11 +236,12 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
               "shrink-0 text-left text-[13px] transition-colors",
               row
                 ? cn("h-8 rounded-full border px-3 [@media(hover:none)]:h-9", on ? "border-blob bg-blob-soft text-blob-ink" : "border-line text-ink-2 hover:bg-hover")
-                : cn("flex h-8 items-center justify-between gap-2 rounded-lg px-2.5", on ? "bg-blob-soft font-medium text-blob-ink" : "text-ink-2 hover:bg-hover hover:text-ink"),
+                : cn("flex min-h-8 items-center justify-between gap-2 rounded-lg px-2.5 py-1", on ? "bg-blob-soft font-medium text-blob-ink" : "text-ink-2 hover:bg-hover hover:text-ink"),
             )}
           >
-            <span className="truncate">{label}</span>
-            {!row && <span className="text-[11px] tabular-nums text-ink-3">{countIn(c)}</span>}
+            {/* In the column a long name ("Nachschlagen & Verweisen") takes a second line rather than being cut. */}
+            <span className={row ? "whitespace-nowrap" : "leading-tight"}>{label}</span>
+            {!row && <span className="text-[12px] tabular-nums text-ink-2">{countIn(c)}</span>}
           </button>
         );
       })}
@@ -260,7 +266,7 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
         spellCheck={false}
         autoComplete="off"
         enterKeyHint="search"
-        className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3"
+        className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3 [@media(hover:none)]:text-[16px]"
       />
       {query && (
         <button type="button" onClick={() => setQuery("")} aria-label={t.close} className="grid size-6 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink">
@@ -291,13 +297,13 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
           >
             <div className="flex items-baseline gap-2">
               <span className={cn("font-mono text-[13px] font-medium", on && !phone ? "text-blob-ink" : "text-ink")}>{localName(fn, locale)}</span>
-              {(query || category === "popular" || category === "all") && <span className="ml-auto shrink-0 text-[11px] text-ink-3">{t.categories[fn.category]}</span>}
+              {(query || category === "popular" || category === "all") && <span className="ml-auto shrink-0 text-[12px] text-ink-2">{t.categories[fn.category]}</span>}
             </div>
-            <div className="line-clamp-2 text-[12.5px] leading-snug text-ink-3">{doc?.summary ?? t.categories[fn.category]}</div>
+            <div className="line-clamp-2 text-[12.5px] leading-snug text-ink-2">{doc?.summary ?? t.categories[fn.category]}</div>
           </li>
         );
       })}
-      {!items.length && <li className="px-3 py-8 text-center text-[13px] text-ink-3">{t.noResults(query)}</li>}
+      {!items.length && <li className="px-3 py-8 text-center text-[13px] text-ink-2">{t.noResults(query)}</li>}
     </ul>
   );
 
@@ -320,7 +326,7 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
           <>
             <div className="flex items-center gap-2 px-4 pb-2">
               <h2 className="font-display text-[18px] font-semibold text-ink">{t.browserTitle}</h2>
-              <span className="ml-auto text-[12px] text-ink-3">{t.functionCount(items.length)}</span>
+              <span className="ml-auto text-[12px] text-ink-2">{t.functionCount(items.length)}</span>
             </div>
             <div className="px-4 pb-2">{search}</div>
             {chips(true)}
@@ -343,14 +349,14 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
         </button>
       </div>
       <div className="flex min-h-0 flex-1">
-        <nav className="hidden w-[196px] shrink-0 overflow-y-auto border-r border-line lg:block">{chips(false)}</nav>
+        <nav className="hidden w-[228px] shrink-0 overflow-y-auto border-r border-line lg:block">{chips(false)}</nav>
         <div className="flex w-[300px] shrink-0 flex-col border-r border-line">
           <div className="lg:hidden">{chips(true)}</div>
-          <div className="px-4 pt-2 text-[11.5px] text-ink-3">{t.functionCount(items.length)}</div>
+          <div className="px-4 pt-2 text-[12px] text-ink-2">{t.functionCount(items.length)}</div>
           {listView}
         </div>
         <div className="min-w-0 flex-1">
-          {current ? <Details fn={current} locale={locale} t={t} canInsert={canInsert} onInsert={() => insert(current)} /> : <p className="p-6 text-[13px] text-ink-3">{t.pickOne}</p>}
+          {current ? <Details fn={current} locale={locale} t={t} canInsert={canInsert} onInsert={() => insert(current)} /> : <p className="p-6 text-[13px] text-ink-2">{t.pickOne}</p>}
         </div>
       </div>
     </div>

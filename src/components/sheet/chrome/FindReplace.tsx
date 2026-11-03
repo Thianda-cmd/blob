@@ -276,9 +276,9 @@ export function FindReplace({
                 spellCheck={false}
                 autoComplete="off"
                 enterKeyHint="search"
-                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3 [@media(hover:none)]:text-[16px]"
               />
-              <span role="status" aria-live="polite" className="shrink-0 text-[11.5px] tabular-nums text-ink-3">
+              <span role="status" aria-live="polite" className="shrink-0 text-[12px] tabular-nums text-ink-2">
                 {status}
               </span>
             </label>
@@ -303,7 +303,7 @@ export function FindReplace({
                 aria-label={t.replaceField}
                 spellCheck={false}
                 autoComplete="off"
-                className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-blob [@media(hover:none)]:h-9"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-blob [@media(hover:none)]:h-9 [@media(hover:none)]:text-[16px]"
               />
               <button
                 type="button"
@@ -341,7 +341,7 @@ export function FindReplace({
               {null}
             </Toggle>
           </div>
-          <div className="px-1 pb-0.5 pt-1 text-[11px] text-ink-3">{t.wildcards}</div>
+          <div className="px-1 pb-0.5 pt-1 text-[12px] text-ink-2">{t.wildcards}</div>
         </motion.div>
       )}
     </AnimatePresence>,

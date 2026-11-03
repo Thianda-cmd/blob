@@ -3,10 +3,11 @@
 // The spreadsheet's toolbar: undo, number formats and units, text style and colours, alignment,
 // borders, AutoSum, smart tables, charts, sorting, freezing and find (the function library is the
 // formula bar's fx right below, and in Σ's menu). Buttons show what the active cell has (bold
-// pressed, its format's name); every one has a tooltip with its shortcut. "Tabelle" and
-// "Diagramm", what students come for, carry their words when there is room; when the bar gets
-// narrower they turn into icons first, then the least used groups move into "Mehr".
-// Clicking a tool keeps the keyboard where it was (in the grid or the cell being typed in).
+// pressed, its format's name); every one has a tooltip with its shortcut (on hover and on keyboard
+// focus). "Als Tabelle" and "Diagramm", what students come for, carry their words when there is
+// room: as the bar gets narrower the least used groups move into "Mehr" first, then the words go,
+// then more groups. Clicking a tool keeps the keyboard where it was (in the grid or the cell being
+// typed in); for the keyboard the bar is one Tab stop, with the arrow keys along it.
 //
 // CONTRACT: <Toolbar store={store} /> is placed by SheetEditor. Implemented by the editor chrome.
 // Keep it mounted in read-only mode too: it answers the grid's Ctrl+F (find) and Ctrl+1 (formats).
@@ -35,12 +36,12 @@ import {
   Sigma,
   Snowflake,
   Strikethrough,
-  Table2,
+  TableProperties,
   Underline,
   Undo2,
   WrapText,
 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
 import { Popover } from "@/components/ui/Menu";
 import { useIsMac, useTouch } from "@/components/ui/useMediaQuery";
 import { useMessages } from "@/i18n/client";
@@ -65,15 +66,21 @@ export type GroupId = "history" | "format" | "decimals" | "bold" | "styles" | "c
 
 /** Left to right. */
 const ORDER: GroupId[] = ["history", "format", "decimals", "bold", "styles", "colors", "align", "borders", "size", "sum", "table", "chart", "sort", "freeze", "find"];
-/** Most needed first: what a narrow screen keeps on the bar. */
-const PRIORITY: GroupId[] = ["history", "sum", "table", "chart", "format", "bold", "colors", "decimals", "styles", "align", "borders", "sort", "find", "size", "freeze"];
+/**
+ * Most needed first: what a narrow screen keeps on the bar. "words" are the words on "Als Tabelle"
+ * and "Diagramm", what students come for: once every main tool before them is on the bar, they
+ * stay before the least used tools keep their place (sorting, find, underline and strikethrough,
+ * font size and freezing move into "Mehr" first). Never on a compact bar (phones), where the icons
+ * need the room.
+ */
+const PRIORITY: (GroupId | "words")[] = ["history", "sum", "table", "chart", "format", "bold", "colors", "decimals", "align", "borders", "words", "sort", "find", "styles", "size", "freeze"];
 /** Groups in the same section sit together; sections have a divider between them. */
 const SECTION: Record<GroupId, number> = { history: 0, format: 1, decimals: 1, bold: 2, styles: 2, colors: 2, align: 3, borders: 3, size: 3, sum: 4, table: 4, chart: 4, sort: 5, freeze: 5, find: 6 };
 
 /**
- * How much wider "Tabelle" and "Diagramm" get with their words, from the words' own widths (13 px
- * text): the words plus the gap between icon and word in each button. Measured in the app: 1030 px
- * of content with icons, 1144 px with the words (106 px), and the estimate above is 2 px generous.
+ * How much wider "Als Tabelle" and "Diagramm" get with their words, from the words' own widths (13
+ * px text): the words plus the gap between icon and word in each button. (Measured in the app:
+ * "Als Tabelle" + "Diagramm" are 128 px, "Table" + "Chart" 67 px.)
  */
 export const labelRoom = (words: number) => Math.ceil(words) + 8;
 
@@ -100,38 +107,62 @@ function groupWidth(g: GroupId, u: number, split: number, fmt: number): number {
   }
 }
 
+/** The bar narrower than this is compact (phones): the number format button is just an icon, and no words. */
+const COMPACT_BELOW = 560;
+
 /**
- * Which groups fit into `width` px (the bar's inside), the most needed first; whether "Tabelle"
- * and "Diagramm" get their words too (`labelExtra` px more: only when everything else fits, so
- * they turn into icons before any group has to move into "Mehr"); and whether the number format
- * button is just an icon (narrow bars).
+ * The room these tools take on the bar, px: their buttons with the gaps after them, the dividers
+ * between their sections, `words` px more for the words on "Als Tabelle" and "Diagramm", and the
+ * "Mehr" button with its divider when `more`.
  */
-export function toolbarLayout(width: number, touch: boolean, labelExtra = labelRoom(16 * 8)): { shown: Set<GroupId>; labels: boolean; compact: boolean } {
+export function barWidth(groups: Iterable<GroupId>, touch: boolean, compact: boolean, words = 0, more = false): number {
+  // A tool with the gap after it. A split button: its main part (4 px narrower with a mouse) and
+  // an arrow big enough to hit, 24 px (32 px for fingers).
   const u = touch ? 38 : 34;
-  const split = u + (touch ? 20 : 16);
-  const compact = width < 560;
+  const split = touch ? u + 32 : u - 4 + 24;
   const fmt = compact ? u : touch ? 120 : 110;
   const divider = 7;
-  const total = (set: Set<GroupId>) => {
-    let w = 0;
-    const sections = new Set<number>();
-    for (const g of set) {
-      w += groupWidth(g, u, split, fmt);
-      sections.add(SECTION[g]);
-    }
-    return w + Math.max(0, sections.size - 1) * divider;
-  };
-  const shown = new Set<GroupId>();
-  for (const g of PRIORITY) {
-    shown.add(g);
-    const more = shown.size < PRIORITY.length ? u + divider : 0;
-    if (shown.size > 1 && total(shown) + more > width) {
-      shown.delete(g);
-      break;
+  let w = words;
+  const sections = new Set<number>();
+  for (const g of groups) {
+    w += groupWidth(g, u, split, fmt);
+    sections.add(SECTION[g]);
+  }
+  return w + Math.max(0, sections.size - 1) * divider + (more ? u + divider : 0);
+}
+
+/**
+ * Which groups fit into `width` px (the bar's inside), the most needed first; whether "Als Tabelle"
+ * and "Diagramm" get their words too (`labelExtra` px more, in their place in PRIORITY); and
+ * whether the number format button is just an icon (narrow bars).
+ */
+export function toolbarLayout(width: number, touch: boolean, labelExtra = labelRoom(18 * 8)): { shown: Set<GroupId>; labels: boolean; compact: boolean } {
+  const compact = width < COMPACT_BELOW;
+  const items = PRIORITY.filter((g) => g !== "words" || !compact);
+  const groups = items.filter((g) => g !== "words").length;
+  const fits = (set: Set<GroupId | "words">, more: boolean) =>
+    barWidth([...set].filter((g): g is GroupId => g !== "words"), touch, compact, set.has("words") ? labelExtra : 0, more) <= width;
+  // Everything at once (no room needed for "Mehr" then). Else one by one, the most needed first:
+  // one that doesn't fit stays out, and the next ones may still fill its room (no gap is left on
+  // the bar while tools wait in "Mehr"). The words only next to every main tool, before the
+  // seldom used ones. Room for "Mehr" is kept while a tool is still to come or stayed out.
+  let shown = new Set(items);
+  if (!fits(shown, false)) {
+    shown = new Set();
+    let placed = 0;
+    for (const [i, g] of items.entries()) {
+      if (g === "words" && placed < i) continue;
+      shown.add(g);
+      const tools = placed + (g === "words" ? 0 : 1);
+      if (shown.size > 1 && !fits(shown, tools < groups)) {
+        shown.delete(g);
+        continue;
+      }
+      placed = tools;
     }
   }
-  const labels = shown.size === PRIORITY.length && total(shown) + labelExtra <= width;
-  return { shown, labels, compact };
+  const labels = shown.delete("words");
+  return { shown: shown as Set<GroupId>, labels, compact };
 }
 
 let measureCanvas: HTMLCanvasElement | null = null;
@@ -537,7 +568,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
       case "table":
         return (
           <ToolButton label={t.table} tip={t.tableTip} keys={keys("Mod+T")} shortcut="Mod+T" disabled={off} onClick={() => safely("making a smart table", () => makeTableFromSelection(store))} className={labels ? "px-2" : undefined}>
-            <Table2 />
+            <TableProperties />
             {labels && <span>{t.tableShort}</span>}
           </ToolButton>
         );
@@ -649,7 +680,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
       case "sum":
         return drill(<Sigma />, t.autoSum, "sum");
       case "table":
-        return run(<Table2 />, t.table, () => safely("making a smart table", () => makeTableFromSelection(store)));
+        return run(<TableProperties />, t.table, () => safely("making a smart table", () => makeTableFromSelection(store)));
       case "chart":
         return drill(<ChartScatter />, t.chart, "chart");
       case "sort":
@@ -719,15 +750,54 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
     buttons[next]?.focus();
   };
 
+  /**
+   * The whole bar is one stop for Tab (from the title to the formula bar takes two presses, not
+   * thirty): the tool used last, or the first one that works (Undo starts out disabled). The others
+   * are reached with the arrow keys. The buttons come and go with the room and their state, so the
+   * tab stop is set on them directly after every change, and when the keyboard moves along.
+   */
+  const tabStop = useRef<HTMLButtonElement | null>(null);
+  /** Whether the keyboard is on the bar (still so when the tool it is on turns off under it). */
+  const keyboardIn = useRef(false);
+  const syncTabStop = () => {
+    const buttons = [...(root.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+    const usable = buttons.filter((b) => !b.disabled);
+    const last = tabStop.current;
+    const stop = last && usable.includes(last) ? last : (usable[0] ?? null);
+    for (const b of buttons) b.tabIndex = b === stop ? 0 : -1;
+    // The tool the keyboard is on turned off or went away under it (Enter on Undo for the last
+    // step, a narrower window moving it into "Mehr"): the keyboard goes to the bar's new stop
+    // instead of falling out to the top of the page.
+    const at = document.activeElement;
+    if (keyboardIn.current && stop && last && stop !== last && (!at || at === document.body || at === last)) stop.focus();
+  };
+  useEffect(syncTabStop);
+  const onFocus = (e: FocusEvent<HTMLDivElement>) => {
+    // Focus from the bar's own buttons only (its panels open elsewhere on the page, in the same React tree).
+    if (!(e.target instanceof HTMLButtonElement) || !root.current?.contains(e.target)) return;
+    tabStop.current = e.target;
+    keyboardIn.current = true;
+    syncTabStop();
+  };
+  const onBlur = (e: FocusEvent<HTMLDivElement>) => {
+    // A button turning off or going away takes the focus with it: that isn't the student leaving.
+    const from = e.target;
+    if (from instanceof HTMLButtonElement && (from.disabled || !from.isConnected)) return;
+    if (!root.current?.contains(e.relatedTarget as Node | null)) keyboardIn.current = false;
+  };
+
   return (
     <>
       <div
         ref={root}
         role="toolbar"
+        data-sheet-toolbar=""
         aria-label={t.toolbar}
         aria-orientation="horizontal"
         onMouseDown={keepFocus}
         onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        onBlur={onBlur}
         className="flex min-w-0 items-center gap-0.5 overflow-hidden rounded-xl border border-line bg-raised px-1.5 py-1 shadow-card"
       >
         {items}

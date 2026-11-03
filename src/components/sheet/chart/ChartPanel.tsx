@@ -29,9 +29,8 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
-import { usePhone } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
 import { sheetChartText, type SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
@@ -43,8 +42,9 @@ import type { AxisSpec, ChartKind, ChartSpec, ErrorBarSpec, RangeRef, SeriesSpec
 import { AddToNoteDialog } from "../embed/AddToNote";
 import { useSheet, type SheetStore } from "../store";
 import { deleteChart, saveChartFile, updateChart } from "./actions";
-import { Chips, Field, Note, NumberField, RangeField, Section, SeriesPicker, Swatches, TextField, Toggle } from "./PanelParts";
+import { Chips, Field, HINT_TEXT, Note, NumberField, RangeField, Section, SeriesPicker, Swatches, TextField, Toggle } from "./PanelParts";
 import { selectionRef } from "./ranges";
+import { scrollBehavior } from "./reveal";
 import { setChartUi, useChartUi, type ChartSection } from "./selection";
 import { TrendSection, XTextNote } from "./TrendSection";
 
@@ -58,45 +58,8 @@ const KIND_ICONS: Record<ChartKind, ReactNode> = {
 };
 const KINDS: ChartKind[] = ["scatter", "line", "column", "bar", "area", "pie"];
 
-/** The live preview at the top of a docked panel is at most this tall (px), so the settings keep room. */
+/** The live copy of the chart at the top of the panel is at most this tall (px), so the settings keep room. */
 const PREVIEW_MAX_H = 230;
-/** Room a chart on the sheet needs besides its own height: its action bar and a margin (px, see ChartLayer). */
-const CHART_EXTRA_H = 52 + 2 * 12;
-
-/**
- * Whether the docked panel would cover the chart: SheetEditor docks the settings over the lower
- * part of the editor when it is narrow (phones, tablets held upright, small windows) instead of
- * beside the grid (an <aside>), and the chart, `chartHeight` px with its action bar, doesn't fit
- * in the room left above them. Then the panel shows the chart itself. (When it fits, ChartLayer
- * scrolls it into that room.) Measured again when the editor or the panel changes size.
- */
-function useCoveredChart(ref: RefObject<HTMLElement | null>, chartHeight: number): boolean {
-  const [covered, setCovered] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || el.closest("aside")) return;
-    const editor = el.closest<HTMLElement>("[data-sheet-editor]");
-    const measure = () => {
-      const dock = editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]");
-      const grid = editor?.querySelector<HTMLElement>("[data-sheet-grid]");
-      const cells = grid?.querySelector<HTMLElement>("[data-grid-overlay]")?.offsetParent;
-      if (!editor || !dock || !grid) {
-        setCovered(true);
-        return;
-      }
-      // Without the slide-in animation's transform: where the docked panel ends up.
-      const dockTop = editor.getBoundingClientRect().top + editor.clientTop + dock.offsetTop;
-      const cellsTop = grid.getBoundingClientRect().top + grid.clientTop + (cells instanceof HTMLElement ? cells.offsetTop : 0);
-      setCovered(chartHeight + CHART_EXTRA_H > dockTop - cellsTop);
-    };
-    // A ResizeObserver reports once as soon as it observes, and again on every change of size.
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    if (editor) ro.observe(editor);
-    return () => ro.disconnect();
-  }, [ref, chartHeight]);
-  return covered;
-}
 
 function safeData(spec: ChartSpec, calc: Calc, locale: Locale): ChartData {
   try {
@@ -130,8 +93,9 @@ export function ChartPanel({ store, chartId, onClose }: { store: SheetStore; cha
 }
 
 /**
- * The chart at the top of a docked panel, drawn for the size it gets (at most PREVIEW_MAX_H tall),
- * like a chart in a note: its text stays readable instead of shrinking with the picture.
+ * The chart at the top of the panel while it can't be seen on the sheet, drawn for the size it
+ * gets (at most PREVIEW_MAX_H tall), like a chart in a note: its text stays readable instead of
+ * shrinking with the picture.
  */
 function PreviewChart({ spec, data, locale, selectedSeries }: { spec: ChartSpec; data: ChartData; locale: Locale; selectedSeries: string | null }) {
   const box = useRef<HTMLDivElement>(null);
@@ -159,7 +123,14 @@ function PanelHeader({ title, t, onClose, icon }: { title: string; t: SheetChart
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
       {icon && <span className="text-ink-3 [&_svg]:size-4">{icon}</span>}
-      <h2 className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-ink">{title}</h2>
+      {/* Where the keyboard lands when the settings open from the chart (Enter): a screen reader reads the chart's name, Tab goes on through the settings. */}
+      <h2
+        tabIndex={-1}
+        data-chart-panel-title=""
+        className="-mx-1 min-w-0 flex-1 truncate rounded-md px-1 font-display text-[15px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-blob"
+      >
+        {title}
+      </h2>
       <button
         type="button"
         onClick={onClose}
@@ -195,10 +166,9 @@ function PanelBody({
   onClose: () => void;
 }) {
   const ui = useChartUi(store);
-  const phone = usePhone();
-  const zoom = useSheet(store, (s) => s.zoom);
-  const root = useRef<HTMLDivElement>(null);
-  const covered = useCoveredChart(root, spec.size.h * zoom);
+  // The chart can't be seen on the sheet (docked settings cover it, or showing it would push its
+  // data out of view): the panel shows it at its top. ChartLayer measures where it is.
+  const covered = ui.inView !== spec.id;
   const data = useMemo(() => safeData(spec, calc, locale), [spec, calc, locale]);
   const [open, setOpen] = useState<Set<ChartSection>>(() => new Set<ChartSection>(spec.kind === "scatter" ? ["chart", "trend"] : ["chart", "data"]));
   const [noteOpen, setNoteOpen] = useState(false);
@@ -210,7 +180,7 @@ function PanelBody({
   const isOpen = (id: ChartSection) => open.has(id) || ui.section === id;
   useEffect(() => {
     if (!ui.section) return;
-    scroller.current?.querySelector(`[data-chart-section="${ui.section}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    scroller.current?.querySelector(`[data-chart-section="${ui.section}"]`)?.scrollIntoView({ block: "start", behavior: scrollBehavior() });
   }, [ui.section]);
   const toggle = (id: ChartSection) => {
     // The section asked for from outside stays open as an ordinary open section.
@@ -236,8 +206,10 @@ function PanelBody({
   const fromSelection = (): RangeRef => selectionRef(store.get());
   const scatter = spec.kind === "scatter";
   const lineKind = spec.kind === "scatter" || spec.kind === "line";
-  // Text among the chart's x values (of a series that has no x values of its own).
+  // Text among the chart's x values (of a series that has no x values of its own), and whether a
+  // trendline is fitted to them.
   const sharedXText = scatter ? data.series.find((d, i) => d.xText && !spec.series[i]?.x)?.xText : undefined;
+  const sharedXTrend = spec.series.some((s) => !s.x && !!s.trendline);
 
   const changeKind = (kind: ChartKind) =>
     change(t.undo.kind, (c) => ({
@@ -272,11 +244,11 @@ function PanelBody({
   };
 
   return (
-    <div ref={root} data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
+    <div data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
       <PanelHeader title={spec.title.trim() || t.kindNames[spec.kind]} icon={KIND_ICONS[spec.kind]} t={t} onClose={onClose} />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {/* Docked at the bottom, the panel can cover the chart on the sheet: the chart, live, on top. */}
-        {(phone || covered) && (
+        {/* The chart, live, while it can't be seen on the sheet. */}
+        {covered && (
           <div className="border-b border-line bg-paper/60 p-3" data-chart-preview="">
             <PreviewChart spec={spec} data={data} locale={locale} selectedSeries={ui.series} />
           </div>
@@ -337,7 +309,7 @@ function PanelBody({
             onCommit={(r) => change(t.undo.x, (c) => ({ ...c, x: r }))}
             onUseSelection={readOnly ? undefined : () => change(t.undo.x, (c) => ({ ...c, x: fromSelection() }))}
           />
-          {sharedXText && <XTextNote xText={sharedXText} t={t} />}
+          {sharedXText && <XTextNote xText={sharedXText} trend={sharedXTrend} t={t} />}
         </Section>
 
         {spec.kind !== "pie" && current && (
@@ -362,10 +334,11 @@ function PanelBody({
           </Section>
         )}
 
+        {/* Named by where they run on the chart: a bar chart has its categories up the side. */}
         {spec.kind !== "pie" && (
           <Section id="axes" title={t.sections.axes} icon={<Axis3d />} open={isOpen("axes")} onToggle={() => toggle("axes")}>
             <AxisFields
-              title={spec.kind === "bar" ? t.axisCategories : scatter ? t.axisX : t.axisCategories}
+              title={scatter ? t.axisX : t.axisCategories(spec.kind === "bar")}
               axis={spec.xAxis}
               numeric={scatter}
               locale={locale}
@@ -373,7 +346,14 @@ function PanelBody({
               onChange={(a) => change(t.undo.axis, (c) => ({ ...c, xAxis: a }))}
             />
             <div className="h-px bg-line" />
-            <AxisFields title={spec.kind === "bar" ? t.axisValues : t.axisY} axis={spec.yAxis} numeric locale={locale} t={t} onChange={(a) => change(t.undo.axis, (c) => ({ ...c, yAxis: a }))} />
+            <AxisFields
+              title={scatter ? t.axisY : t.axisValues(spec.kind !== "bar")}
+              axis={spec.yAxis}
+              numeric
+              locale={locale}
+              t={t}
+              onChange={(a) => change(t.undo.axis, (c) => ({ ...c, yAxis: a }))}
+            />
           </Section>
         )}
 
@@ -596,7 +576,7 @@ function SeriesCard({
           onUseSelection={readOnly ? undefined : () => onChange((x) => ({ ...x, x: fromSelection() }))}
         />
       )}
-      {xText && <XTextNote xText={xText} t={t} />}
+      {xText && <XTextNote xText={xText} trend={!!s.trendline} t={t} />}
     </div>
   );
 }
@@ -642,7 +622,7 @@ function ErrorBars({
           <NumberField locale={locale} value={eb.value} min={0} onCommit={(v) => v !== null && onChange({ ...eb, value: v })} label={t.errorAmount} className="w-32" />
         </Field>
       )}
-      {eb?.kind === "stderr" && <p className="text-[11.5px] leading-snug text-ink-3">{t.stderrHint}</p>}
+      {eb?.kind === "stderr" && <p className={HINT_TEXT}>{t.stderrHint}</p>}
       {eb?.kind === "custom" && (
         <>
           <RangeField label={t.errorPlus} value={eb.plus} wb={wb} hostSheetId={spec.sheetId} allowEmpty t={t} onCommit={(r) => onChange({ ...eb, plus: r })} onUseSelection={readOnly ? undefined : () => onChange({ ...eb, plus: fromSelection() })} />
@@ -673,7 +653,7 @@ function AxisFields({ title, axis, numeric, locale, t, onChange }: { title: stri
   const decimals = axis.decimals === null ? "auto" : String(axis.decimals);
   return (
     <div className="space-y-3">
-      <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">{title}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-2">{title}</div>
       <Field label={t.axisTitle}>
         <TextField value={axis.title} label={`${title}: ${t.axisTitle}`} onCommit={(v) => onChange({ ...axis, title: v.trim() })} />
       </Field>

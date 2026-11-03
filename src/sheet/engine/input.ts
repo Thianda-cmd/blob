@@ -5,7 +5,7 @@
 import type { Locale } from "@/i18n/config";
 import type { Cell, NumberFormat } from "../types";
 import { clockTime, durationText, isoDate, shortDate, timeOfSerial } from "./dates";
-import { digitsOf, isDuration } from "./format";
+import { digitsOf, formatValue, isDuration } from "./format";
 import type { ParsedInput } from "./index";
 import { lex } from "./lexer";
 import { formulaTooLongMessage, thousandsNotice } from "./messages";
@@ -25,11 +25,13 @@ type TypedFormula = { formula: string } | { error: { message: string; at: number
 
 /** A formula as typed (without "=") → canonical, or why not, with the caret position for the editor (`shift`: where the formula starts in the typed text). */
 function typedFormula(local: string, locale: Locale, shift: number): TypedFormula {
-  if (local.length > MAX_FORMULA_LENGTH) return { error: { message: formulaTooLongMessage(locale), at: shift + MAX_FORMULA_LENGTH }, tooLong: true };
+  const tooLong = (at: number): TypedFormula => ({ error: { message: formulaTooLongMessage(locale), at: shift + at }, tooLong: true });
+  // What counts is the stored formula (German names can be longer or shorter than the English
+  // ones); text far beyond that can't fit and isn't worth reading.
+  if (local.length > 4 * MAX_FORMULA_LENGTH) return tooLong(MAX_FORMULA_LENGTH);
   const r = toCanonicalFormula(local, locale);
   if ("error" in r) return { error: { message: r.error, at: r.at + shift } };
-  // German names can be longer than the stored English ones: what counts is what is stored.
-  if (r.formula.length > MAX_FORMULA_LENGTH) return { error: { message: formulaTooLongMessage(locale), at: shift + local.length }, tooLong: true };
+  if (r.formula.length > MAX_FORMULA_LENGTH) return tooLong(local.length);
   return r;
 }
 
@@ -75,10 +77,11 @@ export function parseInput(text: string, locale: Locale, current?: Cell, opts?: 
     const value = inPercentCell(parsed.fmt, parsed.value);
     const out: ParsedInput = parsed.fmt ? { cell: { v: value }, fmt: parsed.fmt } : { cell: { v: value } };
     if (parsed.orDecimal) {
-      // "1.234" stays 1234 (Excel's reading), but the person may have meant 1,234: say so, and offer it.
-      const typed = text.trim();
-      const { message, action } = thousandsNotice(typed, typed.replace(/(\d+)\.(\d+)/, "$1$2"), typed.replace(/(\d+)\.(\d+)/, "$1,$2"), locale);
+      // "1.234" stays 1234 (Excel's reading), but the person may have meant 1,234: say so, and
+      // offer it. Both readings written plainly: "„001.234“ ist 1234", "Als 1,234 lesen".
       const alt = parsed.orDecimal;
+      const read = formatValue(parsed.value, parsed.fmt, locale);
+      const { message, action } = thousandsNotice(text.trim(), read, formatValue(alt.value, alt.fmt, locale), locale);
       out.notice = { message, action, other: alt.fmt ? { cell: { v: alt.value }, fmt: alt.fmt } : { cell: { v: inPercentCell(undefined, alt.value) } } };
     }
     return out;

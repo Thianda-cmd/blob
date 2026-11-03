@@ -33,6 +33,18 @@ export function formatId(fmt: NumberFormat | undefined): FormatId {
   }
 }
 
+/**
+ * The decimals the format menu's stepper shows: the format's own, or for Standard as many as the
+ * number shows (0,0523: 4; in scientific notation the mantissa's), like the toolbar's buttons
+ * count them. An empty or text cell: 0.
+ */
+export function shownDecimals(fmt: NumberFormat | undefined, value: number | null, locale: Locale): number {
+  if (fmt && "decimals" in fmt) return fmt.decimals;
+  if (fmt && fmt.kind !== "general") return 0;
+  const shown = value === null ? null : stepDecimals(undefined, value, 0, locale);
+  return shown && "decimals" in shown ? shown.decimals : 0;
+}
+
 /** Decimals that show `sig` significant digits of `value` (0,0000123 with 3 → 7). */
 function decimalsFor(value: number | null, sig: number): number {
   if (value === null || value === 0 || !Number.isFinite(value)) return 2;
@@ -194,7 +206,7 @@ export function FormatPanel({ store, onDone, onUnit }: { store: SheetStore; onDo
         (decimals !== null || currentId === "general") && (
           <Stepper
             label={t.decimals}
-            value={decimals ?? 0}
+            value={shownDecimals(fmt, value, locale)}
             onLess={() => changeDecimals(store, -1)}
             onMore={() => changeDecimals(store, 1)}
             lessLabel={t.fewerDecimals}
@@ -243,7 +255,7 @@ export function UnitPanel({ store, onDone }: { store: SheetStore; onDone: () => 
   return (
     <div className="w-[min(300px,calc(100vw-24px))] p-1.5" onMouseDown={keepFocus}>
       <div className="px-0.5 text-[13px] font-medium text-ink">{t.unitTitle}</div>
-      <p className="mt-0.5 px-0.5 text-[12px] leading-snug text-ink-3">{allowed ? t.unitHint : t.unitNotHere}</p>
+      <p className="mt-0.5 px-0.5 text-[12px] leading-snug text-ink-2">{allowed ? t.unitHint : t.unitNotHere}</p>
       <form
         className="mt-2 flex items-center gap-1.5"
         onSubmit={(e) => {
@@ -260,7 +272,7 @@ export function UnitPanel({ store, onDone }: { store: SheetStore; onDone: () => 
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none transition-[border,box-shadow] placeholder:text-ink-3 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-50 [@media(hover:none)]:h-10"
+          className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none transition-[border,box-shadow] placeholder:text-ink-3 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-50 [@media(hover:none)]:h-10 [@media(hover:none)]:text-[16px]"
         />
         <button
           type="submit"
@@ -270,7 +282,7 @@ export function UnitPanel({ store, onDone }: { store: SheetStore; onDone: () => 
           {t.unitApply}
         </button>
       </form>
-      {allowed && draft && <div className="mt-1.5 px-0.5 text-[12px] tabular-nums text-ink-3">{sample}</div>}
+      {allowed && draft && <div className="mt-1.5 px-0.5 text-[12px] tabular-nums text-ink-2">{sample}</div>}
       <div className="mt-2 flex flex-wrap gap-1">
         {UNIT_SUGGESTIONS.map((u) => (
           <button

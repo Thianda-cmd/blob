@@ -43,6 +43,14 @@ export function Section({ id, title, icon, open, onToggle, children }: { id: str
   );
 }
 
+/**
+ * Small text of the panel that says more (hints, why something can't be done, how a result is
+ * worked out): readable on every background of the panel (4.5:1 and more) and not too small on a
+ * phone, like the smart table's panel.
+ */
+export const HINT_TEXT = "text-[12px] leading-snug text-ink-2";
+const ERROR_TEXT = "text-[12px] leading-snug text-danger";
+
 /** A label above a control (or a group of them). */
 export function Field({ label, htmlFor, hint, error, action, children }: { label: string; htmlFor?: string; hint?: ReactNode; error?: string | null; action?: ReactNode; children: ReactNode }) {
   return (
@@ -55,11 +63,11 @@ export function Field({ label, htmlFor, hint, error, action, children }: { label
       </div>
       {children}
       {error ? (
-        <p className="text-[11.5px] leading-snug text-danger" role="alert">
+        <p className={ERROR_TEXT} role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[11.5px] leading-snug text-ink-3">{hint}</p>
+        <p className={HINT_TEXT}>{hint}</p>
       ) : null}
     </div>
   );
@@ -84,7 +92,9 @@ export function Toggle({ label, checked, onChange, disabled }: { label: string; 
   );
 }
 
-const fieldClass = cn(inputClass, "h-9 text-[13px] [@media(hover:none)]:h-10");
+// 16 px text on touch screens: an iPhone zooms into any field with smaller text when it gets the
+// keyboard (the smart table's panel does the same).
+export const fieldClass = cn(inputClass, "h-9 [@media(hover:none)]:h-10 [@media(hover:none)]:text-[16px]");
 
 /** Text that is saved when you leave the field or press Enter (Escape goes back). */
 export function TextField({ id, value, onCommit, placeholder, label, className, invalid, mono }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; label?: string; className?: string; invalid?: boolean; mono?: boolean }) {
@@ -295,11 +305,11 @@ export function RangeField({
     <div className="space-y-1.5">
       {field}
       {error ? (
-        <p className="text-[11.5px] leading-snug text-danger" role="alert">
+        <p className={ERROR_TEXT} role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[11.5px] leading-snug text-ink-3">{hint}</p>
+        <p className={HINT_TEXT}>{hint}</p>
       ) : null}
     </div>
   );
@@ -336,7 +346,7 @@ export function Chips<T extends string>({
             onClick={() => onChange(o.value)}
             className={cn(
               "inline-flex items-center justify-center rounded-lg border text-[12.5px] transition-[background,border,color] disabled:opacity-40",
-              size === "tile" ? "min-h-[58px] flex-col gap-1 px-1 py-2 text-[11.5px] leading-tight" : "h-8 gap-1.5 px-2.5 [@media(hover:none)]:h-9",
+              size === "tile" ? "min-h-[58px] flex-col gap-1 px-1 py-2 text-[12px] leading-tight" : "h-8 gap-1.5 px-2.5 [@media(hover:none)]:h-9",
               on ? "border-blob bg-blob-soft font-medium text-blob-ink" : "border-line bg-raised text-ink-2 hover:border-line-2 hover:text-ink",
               "[&_svg]:shrink-0",
             )}

@@ -5,110 +5,19 @@
 // "Add to note" dialog (src/components/sheet/embed/AddToNote.tsx).
 //
 // Besides the types, this module holds the block's pure parts, so the note, its exports and the
-// check script read embeds the same way: checking attributes that come from a document or a URL,
-// finding what an embed points at, and the table a note shows (values as the cells show them,
-// with their looks), as a model and as Markdown.
+// check script read embeds the same way: checking attributes that come from a document or a URL
+// (src/sheet/embedAttrs.ts, re-exported here, which notes load without the rest), finding what an
+// embed points at, and the table a note shows (values as the cells show them, with their looks),
+// as a model and as Markdown.
 
 import type { Locale } from "@/i18n/config";
 import { areaName, cellKey } from "./a1";
 import { defaultAlign, formatValue, isError, type Calc, type CellValue } from "./engine";
 import { filteredRows } from "./table/model";
 import { DEFAULT_COL_W, MAX_COLS, MAX_ROWS, type Area, type CellStyle, type ChartSpec, type Sheet, type SheetColor, type TableSpec, type TableStyle, type Workbook } from "./types";
+import { EMBED_MAX_COLS, EMBED_MAX_ROWS, type SheetEmbedItem } from "./embedAttrs";
 
-export type SheetEmbedItem =
-  | { kind: "chart"; chartId: string }
-  | { kind: "table"; tableId: string }
-  | { kind: "range"; sheetId: string; area: Area };
-
-/** The note block's attributes. */
-export type SheetEmbedAttrs = { pageId: string | null; item: SheetEmbedItem | null };
-
-/** How wide the block is in the note: small, medium, large or the text's full width. */
-export type SheetEmbedSize = "s" | "m" | "l" | "full";
-export const EMBED_SIZES: SheetEmbedSize[] = ["s", "m", "l", "full"];
-
-/** Width of a chart at each size, in px (full: the text column's width). */
-export const CHART_WIDTH: Record<Exclude<SheetEmbedSize, "full">, number> = { s: 360, m: 520, l: 680 };
-
-/** Rows a note shows of a table or range; the rest is in the spreadsheet. */
-export const EMBED_MAX_ROWS = 200;
-export const EMBED_MAX_COLS = 50;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ID = /^[\w.:-]{1,64}$/;
-
-/** A page id that is a uuid (pages.id), or null. */
-export const embedPageId = (x: unknown): string | null => (typeof x === "string" && UUID.test(x) ? x.toLowerCase() : null);
-
-/** An item from stored or sent JSON, checked (null when it isn't one). */
-export function readEmbedItem(x: unknown): SheetEmbedItem | null {
-  if (!x || typeof x !== "object") return null;
-  const o = x as Record<string, unknown>;
-  if (o.kind === "chart" && typeof o.chartId === "string" && ID.test(o.chartId)) return { kind: "chart", chartId: o.chartId };
-  if (o.kind === "table" && typeof o.tableId === "string" && ID.test(o.tableId)) return { kind: "table", tableId: o.tableId };
-  if (o.kind === "range" && typeof o.sheetId === "string" && ID.test(o.sheetId) && o.area && typeof o.area === "object") {
-    const a = o.area as Record<string, unknown>;
-    const n = (v: unknown, max: number) => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < max ? v : null);
-    const r0 = n(a.r0, MAX_ROWS);
-    const r1 = n(a.r1, MAX_ROWS);
-    const c0 = n(a.c0, MAX_COLS);
-    const c1 = n(a.c1, MAX_COLS);
-    if (r0 === null || r1 === null || c0 === null || c1 === null) return null;
-    return { kind: "range", sheetId: o.sheetId, area: { r0: Math.min(r0, r1), c0: Math.min(c0, c1), r1: Math.max(r0, r1), c1: Math.max(c0, c1) } };
-  }
-  return null;
-}
-
-/** Attributes from stored or sent JSON, checked; null when there is no page or item to show. */
-export function readEmbedAttrs(x: unknown): SheetEmbedAttrs | null {
-  if (!x || typeof x !== "object") return null;
-  const o = x as Record<string, unknown>;
-  const pageId = embedPageId(o.pageId);
-  const item = readEmbedItem(o.item);
-  return pageId && item ? { pageId, item } : null;
-}
-
-/** The note's address that inserts an embed when the note opens (the "Add to note" dialog's way there). */
-export function addToNoteHref(noteId: string, attrs: SheetEmbedAttrs): string {
-  return `/p/${noteId}?sheetEmbed=${encodeURIComponent(JSON.stringify({ pageId: attrs.pageId, item: attrs.item }))}`;
-}
-
-/** The ?sheetEmbed= value of a note's address → the attributes (null when it isn't valid). */
-export function embedFromParam(param: string | null): SheetEmbedAttrs | null {
-  if (!param) return null;
-  try {
-    return readEmbedAttrs(JSON.parse(param));
-  } catch {
-    return null;
-  }
-}
-
-/** The address parameter that opens a spreadsheet with an embed's chart, table or cells selected. */
-export const SHEET_ITEM_PARAM = "sheetItem";
-
-/** The spreadsheet's address with what a block shows selected (the block's "Öffnen"). */
-export function sheetItemHref(pageId: string, item: SheetEmbedItem): string {
-  return `/p/${pageId}?${SHEET_ITEM_PARAM}=${encodeURIComponent(JSON.stringify(item))}`;
-}
-
-/** The ?sheetItem= value of a spreadsheet's address → the item (null when it isn't valid). */
-export function itemFromParam(param: string | null): SheetEmbedItem | null {
-  if (!param) return null;
-  try {
-    return readEmbedItem(JSON.parse(param));
-  } catch {
-    return null;
-  }
-}
-
-/** Two items show the same thing. */
-export function sameItem(a: SheetEmbedItem | null, b: SheetEmbedItem | null): boolean {
-  if (!a || !b || a.kind !== b.kind) return false;
-  if (a.kind === "chart") return a.chartId === (b as typeof a).chartId;
-  if (a.kind === "table") return a.tableId === (b as typeof a).tableId;
-  const r = b as typeof a;
-  return a.sheetId === r.sheetId && a.area.r0 === r.area.r0 && a.area.c0 === r.area.c0 && a.area.r1 === r.area.r1 && a.area.c1 === r.area.c1;
-}
+export * from "./embedAttrs";
 
 // What an embed points at -------------------------------------------------------------------------
 

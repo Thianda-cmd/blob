@@ -5,8 +5,12 @@
 
 import type { Locale } from "@/i18n/config";
 import { formatValue, isError, type Calc } from "../engine";
-import type { NumberFormat, Workbook } from "../types";
+import type { Workbook } from "../types";
 import { parseDelimited } from "./clipboard";
+import { withoutUnit } from "./formatCodes";
+import { FILE_LIMIT, type ReadLimit } from "./limits";
+
+export { withoutUnit };
 
 export type CsvSeparator = ";" | "," | "\t";
 
@@ -61,12 +65,13 @@ export function detectSeparator(text: string): CsvSeparator {
   return ([";", "\t", ","] as const).find((sep) => !text.includes(sep)) ?? ";";
 }
 
-export function parseCsv(text: string): string[][] {
+/** A CSV file's rows; `limit`: how much is read (a sheet's worth, and a row to tell there was more). */
+export function parseCsv(text: string, limit: ReadLimit = FILE_LIMIT): string[][] {
   let src = text.replace(/^\uFEFF/, "");
   const sep = detectSeparator(src);
   // Excel's hint line isn't data.
   src = src.replace(/^sep=.\r?\n/i, "");
-  const rows = parseDelimited(src, sep);
+  const rows = parseDelimited(src, sep, limit);
   // Lines that are empty at the end of the file are no rows.
   while (rows.length && rows[rows.length - 1].every((c) => c === "")) rows.pop();
   return rows;
@@ -82,7 +87,9 @@ export function csvNumberLocale(rows: string[][], fallback: Locale): Locale {
   let en = 0;
   for (const row of rows.slice(0, 500)) {
     for (const raw of row) {
-      const s = raw.trim().replace(/^[-+]/, "").replace(/\s*%$/, "");
+      // (endsWith, not /\s*%$/: a regex ending in \s* retries every space of a long field.)
+      let s = raw.trim().replace(/^[-+]/, "");
+      if (s.endsWith("%")) s = s.slice(0, -1).trimEnd();
       const m = /^(\d+)([.,])(\d+)$/.exec(s);
       if (m) {
         // "1.234" and "1,234" could be either (a thousand, or one point two three four): no vote.
@@ -97,16 +104,6 @@ export function csvNumberLocale(rows: string[][], fallback: Locale): Locale {
   if (de > en * 2 && de > 0) return "de";
   if (en > de * 2 && en > 0) return "en";
   return fallback;
-}
-
-/**
- * The format without a unit: a number with "mg/L" after it would reach Excel as text. For CSV and
- * for the text a copy puts on the clipboard.
- */
-export function withoutUnit(fmt: NumberFormat | undefined): NumberFormat | undefined {
-  if (!fmt) return fmt;
-  if ((fmt.kind === "number" || fmt.kind === "scientific" || fmt.kind === "significant") && fmt.unit) return { ...fmt, unit: undefined };
-  return fmt;
 }
 
 /**
@@ -145,7 +142,7 @@ export function sheetToCsv(wb: Workbook, calc: Calc, sheetId: string, locale: Lo
         continue;
       }
       const value = calc.value(sheetId, r, c);
-      let text = formatValue(value, csvFormat(cell.s?.fmt), locale);
+      let text = formatValue(value, withoutUnit(cell.s?.fmt), locale);
       if (typeof value === "string") text = guard(text);
       else if (value !== null && isError(value)) text = formatValue(value, undefined, locale);
       fields.push(text.includes(sep) || text.includes('"') || text.includes("\n") || text.includes("\r") ? `"${text.replace(/"/g, '""')}"` : text);

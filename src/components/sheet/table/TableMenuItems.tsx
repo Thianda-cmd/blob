@@ -1,12 +1,12 @@
 "use client";
 
 // Smart table entries for the cells' context menu (the Grid's `contextMenu` prop): outside a
-// table "Als intelligente Tabelle" (Strg+T); inside one its settings, a chart of it, the totals
+// table "Als Tabelle formatieren" (Strg+T); inside one its settings, a chart of it, the totals
 // row and clearing its filters.
 //
 //   <Grid contextMenu={(close) => <TableMenuItems store={store} close={close} />} … />
 
-import { ChartScatter, FunnelX, Sigma, Table2, TableProperties } from "lucide-react";
+import { ChartScatter, FunnelX, Settings2, Sigma, TableProperties } from "lucide-react";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useIsMac } from "@/components/ui/useMediaQuery";
 import { sheetTableText } from "@/i18n/messages/sheetTable";
@@ -28,12 +28,12 @@ export function TableMenuItems({ store, close, separator = true }: { store: Shee
   return (
     <>
       {!table ? (
-        <MenuItem icon={<Table2 />} shortcut={mac ? "⌘T" : locale === "de" ? "Strg+T" : "Ctrl+T"} onSelect={run(() => makeTableFromSelection(store))}>
+        <MenuItem icon={<TableProperties />} shortcut={mac ? "⌘T" : locale === "de" ? "Strg+T" : "Ctrl+T"} onSelect={run(() => makeTableFromSelection(store))}>
           {t.makeTable}
         </MenuItem>
       ) : (
         <>
-          <MenuItem icon={<TableProperties />} onSelect={run(() => openTablePanel(store, table.id))}>
+          <MenuItem icon={<Settings2 />} onSelect={run(() => openTablePanel(store, table.id))}>
             {t.openTable}
           </MenuItem>
           <MenuItem icon={<ChartScatter />} onSelect={run(() => chartFromTable(store, table.id))}>

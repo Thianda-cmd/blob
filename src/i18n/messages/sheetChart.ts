@@ -111,9 +111,11 @@ export const sheetChartText = defineMessages({
     order: "Order",
     period: "Period",
     setIntercept: "Set intercept",
+    /** The field for the fixed intercept (b of a line, a of an exponential curve, c₀ of a polynomial: always y at x = 0). */
+    interceptValue: "Intercept (y at x = 0)",
     interceptHint: "e.g. 0 for a calibration line through the origin",
     interceptHintExp: "The value at x = 0 (a in y = a·e^(bx)), e.g. the starting OD. It must be above 0.",
-    interceptIgnored: (v: string) => `An exponential trendline needs a fixed intercept above 0 (a in y = a·e^(bx)), so ${v} doesn't apply here: the curve is fitted freely. For linear and polynomial trendlines it applies again.`,
+    interceptIgnored: (v: string) => `An exponential trendline needs a fixed intercept above 0 (a in y = a·e^(bx)), so your ${v} doesn't apply here: Blob fits the curve to the points freely. For linear and polynomial trendlines it applies again.`,
     interceptNotHere: "Logarithmic and power trendlines can't have a fixed intercept (as in Excel).",
     showEquation: "Display equation on chart",
     showR2: "Display R-squared value on chart",
@@ -132,10 +134,11 @@ export const sheetChartText = defineMessages({
     } as Record<FitProblem, string>,
     hiddenPoints: (n: number) =>
       n === 1
-        ? "1 point is hidden or filtered out and doesn't count here. Formulas like SLOPE or RSQ still count it: to leave it out everywhere, delete the value instead of hiding its row."
-        : `${n} points are hidden or filtered out and don't count here. Formulas like SLOPE or RSQ still count them: to leave them out everywhere, delete the values instead of hiding their rows.`,
-    xTextPanel: (cell: string, text: string) =>
-      `${cell} holds text (“${text}”) instead of a number, so the points are placed at x = 1, 2, 3 …, as in Excel. The trendline and the sample results are wrong this way: type a number in ${cell} (0 for the blank, for example).`,
+        ? "1 point is hidden or filtered out and doesn't count here. Formulas like SLOPE or RSQ still count it, though. To leave it out everywhere, delete its row or its value."
+        : `${n} points are hidden or filtered out and don't count here. Formulas like SLOPE or RSQ still count them, though. To leave them out everywhere, delete their rows or their values.`,
+    /** `trend`: a trendline uses these x values (it and "Calculate a sample" are wrong too). */
+    xTextPanel: (cell: string, text: string, trend: boolean) =>
+      `${cell} holds text (“${text}”) instead of a number, so the chart just numbers the points (x = 1, 2, 3 …), as Excel does.${trend ? " The trendline and the sample results are wrong this way." : ""} Type a number in ${cell}, e.g. 0 for a blank.`,
     datesTip: "Tip: use the time since the start as x (0, 1, 2 … days) instead of the date. Then a is your starting value and the equation is easy to read.",
     categoryX: "In line, column and area charts x is the number of the category (1, 2, 3 …), as in Excel. For real x values use a scatter chart.",
     noTrendPie: "Pie charts have no trendlines.",
@@ -148,9 +151,13 @@ export const sheetChartText = defineMessages({
     probeIntro: "Type a measured value, e.g. a sample's absorbance. Blob works back along the trendline.",
     measured: "Measured",
     probeNone: "No result for this value on this trendline.",
+    /** What was typed can't be read as a number. */
+    probeNotNumber: "Type the measured value as a number, e.g. 0.42.",
+    /** A number with the unit of the result (the x axis) was typed: it goes the other way round. */
+    probeXUnit: (unit: string, measured: string) => `${unit} is the unit of the result. Type what you measured here (${measured}), as a number.`,
     probeAbove: (hi: string) => `Above the highest standard (${hi}): the trendline isn't backed by measurements there. Dilute the sample and measure it again.`,
-    probeBelow: (lo: string) => `Below the lowest standard (${lo}). Measure the sample more concentrated (dilute it less or use more of it), or report it as “< ${lo}”.`,
-    probeNegative: "Below the blank: nothing can be detected in the sample this way. Measure it more concentrated (dilute it less or use more of it).",
+    probeBelow: (lo: string) => `Below the lowest standard (${lo}). Measure a more concentrated sample (dilute it less or use more of it), or report it as “< ${lo}”.`,
+    probeNegative: "Below the blank: nothing can be detected in the sample this way. Measure a more concentrated sample (dilute it less or use more of it).",
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x is where the curve reaches y (inside the measured range).",
@@ -159,6 +166,13 @@ export const sheetChartText = defineMessages({
       power: "x = (y / a)^(1 / b)",
       movingAverage: "x is read off the curve.",
     } as Record<Trend, string>,
+    /** A line through the origin (intercept 0). */
+    solveOrigin: "x = y / m",
+    /** An a too small or too big to write out (dates as x): the formula with ln a, and ln a itself. */
+    solveViaLn: {
+      exponential: (lnA: string) => `x = (ln y − ln a) / b, with ln a = ${lnA}`,
+      power: (lnA: string) => `x = e^((ln y − ln a) / b), with ln a = ${lnA}`,
+    },
     errorKinds: { none: "None", fixed: "Fixed value", percent: "Percentage", stdev: "Standard deviation", stderr: "Standard error", custom: "Custom" },
     errorAmount: "Amount",
     errorPercent: "Percent",
@@ -172,8 +186,9 @@ export const sheetChartText = defineMessages({
     stderrHint: "The standard error of the series (SD / √n), the same for every point.",
     axisX: "Horizontal axis (x)",
     axisY: "Vertical axis (y)",
-    axisCategories: "Category axis",
-    axisValues: "Value axis",
+    /** The axes of line, column, area and bar charts, by where they run (a bar chart has its categories up the side). */
+    axisCategories: (vertical: boolean): string => (vertical ? "Vertical axis (categories)" : "Horizontal axis (categories)"),
+    axisValues: (vertical: boolean): string => (vertical ? "Vertical axis (values)" : "Horizontal axis (values)"),
     axisTitle: "Axis title",
     auto: "Auto",
     min: "Minimum",
@@ -272,7 +287,7 @@ export const sheetChartText = defineMessages({
       removeSeries: "Datenreihe entfernen",
       x: "X-Werte ändern",
       trend: "Trendlinie ändern",
-      errors: "Fehlerindikatoren ändern",
+      errors: "Fehlerbalken ändern",
       axis: "Achse ändern",
       look: "Darstellung ändern",
     },
@@ -280,7 +295,7 @@ export const sheetChartText = defineMessages({
     panel: "Diagramm-Einstellungen",
     close: "Schließen",
     gone: "Dieses Diagramm gibt es nicht mehr.",
-    sections: { chart: "Diagramm", data: "Daten", trend: "Trendlinie", errors: "Fehlerindikatoren", axes: "Achsen", look: "Darstellung" },
+    sections: { chart: "Diagramm", data: "Daten", trend: "Trendlinie", errors: "Fehlerbalken", axes: "Achsen", look: "Darstellung" },
     chartType: "Diagrammtyp",
     title: "Titel",
     titlePlaceholder: "Diagrammtitel",
@@ -309,9 +324,10 @@ export const sheetChartText = defineMessages({
     order: "Grad",
     period: "Periode",
     setIntercept: "Schnittpunkt festlegen",
+    interceptValue: "y-Achsenabschnitt (y bei x = 0)",
     interceptHint: "z. B. 0 für eine Kalibriergerade durch den Ursprung",
     interceptHintExp: "Der Wert bei x = 0 (a in y = a·e^(bx)), z. B. die Start-OD. Er muss über 0 liegen.",
-    interceptIgnored: (v) => `Bei Exponentiell muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). ${v} gilt hier also nicht: Die Kurve ist frei angepasst. Bei Linear und Polynom gilt der Wert wieder.`,
+    interceptIgnored: (v) => `Bei Exponentiell muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). Dein Wert ${v} gilt hier also nicht: Blob passt die Kurve frei an die Punkte an. Bei Linear und Polynom gilt er wieder.`,
     interceptNotHere: "Logarithmische und Potenz-Trendlinien haben keinen festen Schnittpunkt (wie in Excel).",
     showEquation: "Formel im Diagramm anzeigen",
     showR2: "Bestimmtheitsmaß (R²) im Diagramm anzeigen",
@@ -330,10 +346,10 @@ export const sheetChartText = defineMessages({
     },
     hiddenPoints: (n) =>
       n === 1
-        ? "1 Punkt ist ausgeblendet oder weggefiltert und zählt hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen ihn weiter mit: Soll er überall wegfallen, lösch den Wert, statt die Zeile auszublenden."
-        : `${n} Punkte sind ausgeblendet oder weggefiltert und zählen hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen sie weiter mit: Sollen sie überall wegfallen, lösch die Werte, statt die Zeilen auszublenden.`,
-    xTextPanel: (cell, text) =>
-      `In ${cell} steht Text („${text}“) statt einer Zahl. Darum stehen die Punkte wie in Excel bei x = 1, 2, 3 … – Trendlinie und Probe stimmen so nicht. Trag in ${cell} eine Zahl ein (für den Blindwert z. B. 0).`,
+        ? "1 Punkt ist ausgeblendet oder weggefiltert und zählt hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen ihn aber weiter mit. Soll er überall wegfallen, lösch seine Zeile oder seinen Wert."
+        : `${n} Punkte sind ausgeblendet oder weggefiltert und zählen hier nicht mit. Formeln wie STEIGUNG oder BESTIMMTHEITSMASS rechnen sie aber weiter mit. Sollen sie überall wegfallen, lösch ihre Zeilen oder ihre Werte.`,
+    xTextPanel: (cell, text, trend) =>
+      `In ${cell} steht Text („${text}“) statt einer Zahl. Darum zählt das Diagramm die Punkte wie Excel einfach durch (x = 1, 2, 3 …).${trend ? " Trendlinie und Probe stimmen so nicht." : ""} Trag in ${cell} eine Zahl ein, z. B. 0 für einen Blindwert.`,
     datesTip: "Tipp: Nimm als x die Zeit seit dem Start (0, 1, 2 … Tage) statt des Datums. Dann ist a dein Startwert und die Formel gut lesbar.",
     categoryX: "In Linien-, Säulen- und Flächendiagrammen ist x die Nummer der Kategorie (1, 2, 3 …), wie in Excel. Für echte x-Werte nimm ein Punktdiagramm.",
     noTrendPie: "Kreisdiagramme haben keine Trendlinie.",
@@ -346,6 +362,8 @@ export const sheetChartText = defineMessages({
     probeIntro: "Gib einen gemessenen Wert ein, z. B. die Extinktion einer Probe. Blob rechnet mit der Trendlinie zurück.",
     measured: "Gemessen",
     probeNone: "Für diesen Wert gibt es auf der Trendlinie kein Ergebnis.",
+    probeNotNumber: "Gib den Messwert als Zahl ein, z. B. 0,42.",
+    probeXUnit: (unit, measured) => `${unit} ist die Einheit des Ergebnisses. Gib hier ein, was du gemessen hast (${measured}), als Zahl.`,
     probeAbove: (hi) => `Über dem höchsten Standard (${hi}): Dort ist die Trendlinie nicht durch Messungen gestützt. Verdünne die Probe und miss sie neu.`,
     probeBelow: (lo) => `Unter dem kleinsten Standard (${lo}). Miss die Probe konzentrierter (weniger verdünnen oder mehr Probe einsetzen) oder gib sie als „< ${lo}“ an.`,
     probeNegative: "Unter dem Blindwert: In der Probe ist so nichts nachweisbar. Miss sie konzentrierter (weniger verdünnen oder mehr Probe einsetzen).",
@@ -357,6 +375,11 @@ export const sheetChartText = defineMessages({
       power: "x = (y / a)^(1 / b)",
       movingAverage: "x ist an der Kurve abgelesen.",
     },
+    solveOrigin: "x = y / m",
+    solveViaLn: {
+      exponential: (lnA) => `x = (ln y − ln a) / b, mit ln a = ${lnA}`,
+      power: (lnA) => `x = e^((ln y − ln a) / b), mit ln a = ${lnA}`,
+    },
     errorKinds: { none: "Keine", fixed: "Fester Wert", percent: "Prozentsatz", stdev: "Standardabweichung", stderr: "Standardfehler", custom: "Benutzerdefiniert" },
     errorAmount: "Wert",
     errorPercent: "Prozent",
@@ -366,12 +389,12 @@ export const sheetChartText = defineMessages({
     errorPlus: "Plus-Werte (+)",
     errorMinus: "Minus-Werte (−)",
     errorMinusSame: "Leer: wie Plus",
-    errorHint: "Mittelwerte mit eigener Standardabweichung je Probe: Benutzerdefiniert wählen und die Spalte mit den Standardabweichungen nehmen.",
+    errorHint: "Mittelwerte mit eigener Standardabweichung je Probe: Benutzerdefiniert wählen und die Spalte mit den Standardabweichungen nehmen. (In Excel heißen Fehlerbalken „Fehlerindikatoren“.)",
     stderrHint: "Der Standardfehler der Reihe (Stabw / √n), für jeden Punkt gleich.",
     axisX: "Horizontale Achse (x)",
     axisY: "Vertikale Achse (y)",
-    axisCategories: "Rubrikenachse",
-    axisValues: "Größenachse",
+    axisCategories: (vertical) => (vertical ? "Vertikale Achse (Kategorien)" : "Horizontale Achse (Kategorien)"),
+    axisValues: (vertical) => (vertical ? "Vertikale Achse (Werte)" : "Horizontale Achse (Werte)"),
     axisTitle: "Achsentitel",
     auto: "Auto",
     min: "Minimum",

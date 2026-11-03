@@ -3356,7 +3356,11 @@ html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [ro
 .note-print [data-flashcard-back] {
   margin-top: 0.4em;
 }
-.note-print :is(img, pre, table, blockquote, li, .blob-object, .blob-callout) {
+.note-print :is(img, pre, blockquote, li, .blob-object, .blob-callout) {
+  break-inside: avoid;
+}
+/* A table goes on over the next page instead of leaving a page nearly empty; its rows stay whole. */
+.note-print tr {
   break-inside: avoid;
 }
 .note-print :is(h1, h2, h3) {

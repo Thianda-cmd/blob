@@ -2,7 +2,8 @@ import { defineMessages } from "../define";
 
 type Style = "purple" | "blue" | "green" | "orange" | "teal" | "gray";
 type Total = "none" | "sum" | "average" | "count" | "countNumbers" | "min" | "max" | "stdev" | "var";
-type NumberOp = "gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "between" | "top" | "bottom" | "aboveAverage" | "belowAverage";
+/** The conditions of the number and date filter menu ("top" stands for both ends: Größte or Kleinste is picked beside it). */
+type NumberOp = "gt" | "gte" | "lt" | "lte" | "eq" | "neq" | "between" | "top" | "aboveAverage" | "belowAverage";
 type TextOp = "contains" | "notContains" | "begins" | "ends" | "equals";
 type ColumnKind = "number" | "date" | "text";
 type ButtonState = "plain" | "filtered" | "sortedAsc" | "sortedDesc";
@@ -10,7 +11,7 @@ type ButtonState = "plain" | "filtered" | "sortedAsc" | "sortedDesc";
 /** Smart tables ("intelligente Tabellen"): the header buttons, the column menu (sort, filter, total) and the table panel. */
 export const sheetTableText = defineMessages({
   en: {
-    table: "Table",
+    table: "Smart table",
 
     // Undo steps
     undo: {
@@ -26,16 +27,16 @@ export const sheetTableText = defineMessages({
       style: "Table colour",
       banded: "Banded rows",
       unmake: "Convert to range",
-      remove: "Delete table",
+      remove: "Delete smart table",
     },
 
     // Making a table
     errors: {
-      overlap: "These cells already belong to a table. Pick cells outside it.",
+      overlap: "These cells already belong to a smart table. Pick cells outside it.",
       empty: "There's nothing here yet. Type a few values first, or select cells with data.",
     },
     made: (name: string) => `Smart table “${name}” created`,
-    headerFound: (names: string) => `The first row is the header: ${names}.`,
+    headerFound: (names: string[], more: number) => `The first row is the header: ${names.join(", ")}${more === 1 ? " and 1 more" : more > 1 ? ` and ${more} more` : ""}.`,
     headerAdded: "The first row looked like data, so there's a new header row above it. Type into it to name the columns.",
     headerIsData: "First row isn't a header",
     headerIsHeader: "First row is the header",
@@ -72,7 +73,6 @@ export const sheetTableText = defineMessages({
       neq: "does not equal",
       between: "is between",
       top: "Top 10 …",
-      bottom: "Bottom 10 …",
       aboveAverage: "is above average",
       belowAverage: "is below average",
     } as Record<NumberOp, string>,
@@ -84,8 +84,7 @@ export const sheetTableText = defineMessages({
       eq: "is on",
       neq: "is not on",
       between: "is between",
-      top: "latest …",
-      bottom: "earliest …",
+      top: "latest or earliest …",
       aboveAverage: "is after the average",
       belowAverage: "is before the average",
     } as Record<NumberOp, string>,
@@ -103,22 +102,26 @@ export const sheetTableText = defineMessages({
     items: "items",
     average: (avg: string) => `The average is ${avg}.`,
     notANumber: "That isn't a number.",
-    notADate: "That isn't a date. Write it like 11/1/2026.",
+    notADate: "That isn't a date. Write it like 1 Nov 2026 or 2026-11-01.",
     needValue: "Type a value first.",
     wildcards: "? stands for one character, * for any number of them.",
     total: "Total",
     custom: "Own formula",
-    tableSettings: "Table settings",
+    tableSettings: "Smart table settings",
     readOnly: "You can look at this table but not change it.",
 
     // How a filter reads (panel)
     filterValues: (n: number) => (n === 1 ? "1 value" : `${n} values`),
     filterBlank: "blanks",
+    /** A "Top 10" filter in the panel: the n largest / smallest numbers, the n latest / earliest dates. */
+    ranked: {
+      number: { top: (n: number) => `the ${n} largest`, bottom: (n: number) => `the ${n} smallest` },
+      date: { top: (n: number) => `the ${n} latest`, bottom: (n: number) => `the ${n} earliest` },
+    },
 
     // The table panel
-    panel: "Table settings",
     close: "Close",
-    gone: "This table doesn't exist any more.",
+    gone: "This smart table doesn't exist any more.",
     name: "Name",
     nameHint: "Letters, digits and _ – no spaces.",
     nameErrors: {
@@ -151,22 +154,22 @@ export const sheetTableText = defineMessages({
     sortedBy: (name: string, dir: "asc" | "desc") => `Sorted by ${name} (${dir === "asc" ? "ascending" : "descending"})`,
     clearAll: "Clear all filters",
     chart: "Chart from table",
-    chartHint: "A chart of the table's columns; with numbers in the first column a scatter chart, ready for a trendline.",
+    chartHint: "Makes a chart of the table's columns. With numbers in the first column it's a scatter chart, ready for a trendline.",
     noChart: "The table needs numbers for a chart.",
     addToNote: "Add to note",
     actions: "Actions",
     unmake: "Convert to range",
-    unmakeHint: "The cells keep their values, formulas and look; sorting, filters and the total row's menu go.",
-    remove: "Delete table",
-    removeConfirm: "Delete the table with all its cells?",
+    unmakeHint: "The cells keep their values, formulas and look; sorting, filters and the total row's menus go away.",
+    remove: "Delete smart table",
+    removeConfirm: "Delete the smart table and all the values in it? The rest of the sheet stays.",
     removeYes: "Delete",
 
     // Context menu and toolbar
     makeTable: "Format as table",
-    openTable: "Table settings",
+    openTable: "Smart table settings",
   },
   de: {
-    table: "Tabelle",
+    table: "Intelligente Tabelle",
 
     undo: {
       make: "Als Tabelle formatieren",
@@ -181,15 +184,15 @@ export const sheetTableText = defineMessages({
       style: "Tabellenfarbe",
       banded: "Gebänderte Zeilen",
       unmake: "In Bereich umwandeln",
-      remove: "Tabelle löschen",
+      remove: "Intelligente Tabelle löschen",
     },
 
     errors: {
-      overlap: "Diese Zellen gehören schon zu einer Tabelle. Wähle Zellen außerhalb davon aus.",
+      overlap: "Diese Zellen gehören schon zu einer intelligenten Tabelle. Wähl Zellen außerhalb davon aus.",
       empty: "Hier steht noch nichts. Tippe zuerst ein paar Werte ein oder wähle Zellen mit Daten aus.",
     },
     made: (name) => `Intelligente Tabelle „${name}“ erstellt`,
-    headerFound: (names) => `Die erste Zeile ist die Überschrift: ${names}.`,
+    headerFound: (names, more) => `Die erste Zeile ist die Überschrift: ${names.join(", ")}${more === 1 ? " und eine weitere" : more > 1 ? ` und ${more} weitere` : ""}.`,
     headerAdded: "Die erste Zeile sah nach Daten aus, deshalb gibt es darüber jetzt eine Überschriftenzeile. Tippe hinein, um die Spalten zu benennen.",
     headerIsData: "Erste Zeile ist keine Überschrift",
     headerIsHeader: "Erste Zeile ist die Überschrift",
@@ -224,7 +227,6 @@ export const sheetTableText = defineMessages({
       neq: "ungleich",
       between: "zwischen",
       top: "Top 10 …",
-      bottom: "Untersten 10 …",
       aboveAverage: "über dem Durchschnitt",
       belowAverage: "unter dem Durchschnitt",
     },
@@ -236,8 +238,7 @@ export const sheetTableText = defineMessages({
       eq: "am",
       neq: "nicht am",
       between: "zwischen",
-      top: "neueste …",
-      bottom: "älteste …",
+      top: "neueste oder älteste …",
       aboveAverage: "nach dem Durchschnitt",
       belowAverage: "vor dem Durchschnitt",
     },
@@ -265,10 +266,13 @@ export const sheetTableText = defineMessages({
 
     filterValues: (n) => (n === 1 ? "1 Wert" : `${n} Werte`),
     filterBlank: "leer",
+    ranked: {
+      number: { top: (n) => `die ${n} größten`, bottom: (n) => `die ${n} kleinsten` },
+      date: { top: (n) => `die ${n} neuesten`, bottom: (n) => `die ${n} ältesten` },
+    },
 
-    panel: "Tabelleneinstellungen",
     close: "Schließen",
-    gone: "Diese Tabelle gibt es nicht mehr.",
+    gone: "Diese intelligente Tabelle gibt es nicht mehr.",
     name: "Name",
     nameHint: "Buchstaben, Ziffern und _ – ohne Leerzeichen.",
     nameErrors: {
@@ -301,17 +305,17 @@ export const sheetTableText = defineMessages({
     sortedBy: (name, dir) => `Sortiert nach ${name} (${dir === "asc" ? "aufsteigend" : "absteigend"})`,
     clearAll: "Alle Filter löschen",
     chart: "Diagramm aus Tabelle",
-    chartHint: "Ein Diagramm aus den Spalten der Tabelle; stehen links Zahlen, ein Punktdiagramm – bereit für eine Trendlinie.",
+    chartHint: "Macht ein Diagramm aus den Spalten der Tabelle. Stehen in der ersten Spalte Zahlen, wird es ein Punktdiagramm – bereit für eine Trendlinie.",
     noChart: "Für ein Diagramm braucht die Tabelle Zahlen.",
     addToNote: "In Notiz einfügen",
     actions: "Aktionen",
-    unmake: "In normalen Bereich umwandeln",
-    unmakeHint: "Werte, Formeln und Aussehen der Zellen bleiben; Sortieren, Filter und das Menü der Ergebniszeile gehen.",
-    remove: "Tabelle löschen",
-    removeConfirm: "Die Tabelle mit allen ihren Zellen löschen?",
+    unmake: "In Bereich umwandeln",
+    unmakeHint: "Werte, Formeln und Aussehen der Zellen bleiben; Sortieren, Filter und die Menüs der Ergebniszeile fallen weg.",
+    remove: "Intelligente Tabelle löschen",
+    removeConfirm: "Die intelligente Tabelle und alle Werte darin löschen? Der Rest des Blatts bleibt.",
     removeYes: "Löschen",
 
-    makeTable: "Als intelligente Tabelle",
+    makeTable: "Als Tabelle formatieren",
     openTable: "Tabelleneinstellungen",
   },
 });

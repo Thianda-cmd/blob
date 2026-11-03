@@ -126,9 +126,11 @@ export function ContextMenu({
       const el = panel.current;
       const w = el?.offsetWidth ?? 220;
       const h = el?.offsetHeight ?? 240;
+      // Everything in it, with its borders (max-height counts them too; scrollHeight doesn't).
+      const full = el ? el.scrollHeight + el.offsetHeight - el.clientHeight : h;
       // The cap is the panel's max-h class below (keep the two in step).
       const cap = Math.min(window.innerHeight * 0.7, 520);
-      setPos(placeMenu(at, w, h, el?.scrollHeight ?? h, cap, window.innerWidth, window.innerHeight));
+      setPos(placeMenu(at, w, h, full, cap, window.innerWidth, window.innerHeight));
     };
     place();
     const grows = typeof ResizeObserver === "undefined" || !panel.current ? null : new ResizeObserver(place);

@@ -4,9 +4,19 @@
 
 export type FunctionCategory = "math" | "stats" | "regression" | "logic" | "lookup" | "text" | "date" | "info" | "science";
 
-export type FunctionName = { en: string; de: string; category: FunctionCategory };
+export type FunctionName = {
+  en: string;
+  de: string;
+  category: FunctionCategory;
+  /**
+   * An older Excel name (Excel 2007 and before; Excel lists them under "Kompatibilität") that old
+   * workbooks and textbooks still use: the newer function that calculates the same. Two for TVERT:
+   * T.VERT.RE does what it does with Seiten 1, T.VERT.2S what it does with Seiten 2.
+   */
+  newer?: string[];
+};
 
-const f = (en: string, de: string, category: FunctionCategory): FunctionName => ({ en, de, category });
+const f = (en: string, de: string, category: FunctionCategory, ...newer: string[]): FunctionName => (newer.length ? { en, de, category, newer } : { en, de, category });
 
 export const FUNCTION_NAMES: FunctionName[] = [
   // Mathematik
@@ -25,6 +35,8 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("TRUNC", "KÜRZEN", "math"),
   f("CEILING", "OBERGRENZE", "math"),
   f("FLOOR", "UNTERGRENZE", "math"),
+  f("CEILING.MATH", "OBERGRENZE.MATHEMATIK", "math"),
+  f("FLOOR.MATH", "UNTERGRENZE.MATHEMATIK", "math"),
   f("EVEN", "GERADE", "math"),
   f("ODD", "UNGERADE", "math"),
   f("ABS", "ABS", "math"),
@@ -61,6 +73,7 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("AVERAGEIFS", "MITTELWERTWENNS", "stats"),
   f("MEDIAN", "MEDIAN", "stats"),
   f("MODE.SNGL", "MODUS.EINF", "stats"),
+  f("MODE", "MODALWERT", "stats", "MODE.SNGL"),
   f("MIN", "MIN", "stats"),
   f("MAX", "MAX", "stats"),
   f("MINIFS", "MINWENNS", "stats"),
@@ -70,14 +83,19 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("COUNTBLANK", "ANZAHLLEEREZELLEN", "stats"),
   f("COUNTIF", "ZÄHLENWENN", "stats"),
   f("COUNTIFS", "ZÄHLENWENNS", "stats"),
+  f("FREQUENCY", "HÄUFIGKEIT", "stats"),
   f("STDEV.S", "STABW.S", "stats"),
   f("STDEV.P", "STABW.N", "stats"),
-  f("STDEV", "STABW", "stats"),
-  f("STDEVP", "STABWN", "stats"),
+  f("STDEV", "STABW", "stats", "STDEV.S"),
+  f("STDEVP", "STABWN", "stats", "STDEV.P"),
+  f("STDEVA", "STABWA", "stats"),
+  f("STDEVPA", "STABWNA", "stats"),
   f("VAR.S", "VAR.S", "stats"),
   f("VAR.P", "VAR.P", "stats"),
-  f("VAR", "VARIANZ", "stats"),
-  f("VARP", "VARIANZEN", "stats"),
+  f("VAR", "VARIANZ", "stats", "VAR.S"),
+  f("VARP", "VARIANZEN", "stats", "VAR.P"),
+  f("VARA", "VARIANZA", "stats"),
+  f("VARPA", "VARIANZENA", "stats"),
   f("AVEDEV", "MITTELABW", "stats"),
   f("DEVSQ", "SUMQUADABW", "stats"),
   f("GEOMEAN", "GEOMITTEL", "stats"),
@@ -85,20 +103,51 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("LARGE", "KGRÖSSTE", "stats"),
   f("SMALL", "KKLEINSTE", "stats"),
   f("RANK.EQ", "RANG.GLEICH", "stats"),
+  f("RANK.AVG", "RANG.MITTELW", "stats"),
+  f("RANK", "RANG", "stats", "RANK.EQ"),
   f("PERCENTILE.INC", "QUANTIL.INKL", "stats"),
+  f("PERCENTILE.EXC", "QUANTIL.EXKL", "stats"),
+  f("PERCENTILE", "QUANTIL", "stats", "PERCENTILE.INC"),
   f("QUARTILE.INC", "QUARTILE.INKL", "stats"),
+  f("QUARTILE.EXC", "QUARTILE.EXKL", "stats"),
+  f("QUARTILE", "QUARTILE", "stats", "QUARTILE.INC"),
   f("STANDARDIZE", "STANDARDISIERUNG", "stats"),
   f("NORM.DIST", "NORM.VERT", "stats"),
   f("NORM.INV", "NORM.INV", "stats"),
   f("NORM.S.DIST", "NORM.S.VERT", "stats"),
   f("NORM.S.INV", "NORM.S.INV", "stats"),
+  f("NORMDIST", "NORMVERT", "stats", "NORM.DIST"),
+  f("NORMINV", "NORMINV", "stats", "NORM.INV"),
+  f("NORMSDIST", "STANDNORMVERT", "stats", "NORM.S.DIST"),
+  f("NORMSINV", "STANDNORMINV", "stats", "NORM.S.INV"),
   f("T.DIST", "T.VERT", "stats"),
   f("T.DIST.2T", "T.VERT.2S", "stats"),
+  f("T.DIST.RT", "T.VERT.RE", "stats"),
   f("T.INV", "T.INV", "stats"),
   f("T.INV.2T", "T.INV.2S", "stats"),
   f("T.TEST", "T.TEST", "stats"),
+  f("TDIST", "TVERT", "stats", "T.DIST.RT", "T.DIST.2T"),
+  f("TINV", "TINV", "stats", "T.INV.2T"),
+  f("TTEST", "TTEST", "stats", "T.TEST"),
+  f("F.TEST", "F.TEST", "stats"),
+  f("F.DIST", "F.VERT", "stats"),
+  f("F.DIST.RT", "F.VERT.RE", "stats"),
+  f("F.INV", "F.INV", "stats"),
+  f("F.INV.RT", "F.INV.RE", "stats"),
+  f("FTEST", "FTEST", "stats", "F.TEST"),
+  f("FDIST", "FVERT", "stats", "F.DIST.RT"),
+  f("FINV", "FINV", "stats", "F.INV.RT"),
+  f("CHISQ.TEST", "CHIQU.TEST", "stats"),
+  f("CHISQ.DIST", "CHIQU.VERT", "stats"),
+  f("CHISQ.DIST.RT", "CHIQU.VERT.RE", "stats"),
+  f("CHISQ.INV", "CHIQU.INV", "stats"),
+  f("CHISQ.INV.RT", "CHIQU.INV.RE", "stats"),
+  f("CHITEST", "CHITEST", "stats", "CHISQ.TEST"),
+  f("CHIDIST", "CHIVERT", "stats", "CHISQ.DIST.RT"),
+  f("CHIINV", "CHIINV", "stats", "CHISQ.INV.RT"),
   f("CONFIDENCE.T", "KONFIDENZ.T", "stats"),
   f("CONFIDENCE.NORM", "KONFIDENZ.NORM", "stats"),
+  f("CONFIDENCE", "KONFIDENZ", "stats", "CONFIDENCE.NORM"),
   f("CORREL", "KORREL", "stats"),
   f("PEARSON", "PEARSON", "stats"),
   f("COVARIANCE.S", "KOVARIANZ.S", "stats"),
@@ -111,7 +160,7 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("INTERCEPT", "ACHSENABSCHNITT", "regression"),
   f("RSQ", "BESTIMMTHEITSMASS", "regression"),
   f("STEYX", "STFEHLERYX", "regression"),
-  f("FORECAST", "PROGNOSE", "regression"),
+  f("FORECAST", "PROGNOSE", "regression", "FORECAST.LINEAR"),
   f("FORECAST.LINEAR", "PROGNOSE.LINEAR", "regression"),
   f("TREND", "TREND", "regression"),
   f("GROWTH", "VARIATION", "regression"),
@@ -137,6 +186,8 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("XLOOKUP", "XVERWEIS", "lookup"),
   f("INDEX", "INDEX", "lookup"),
   f("MATCH", "VERGLEICH", "lookup"),
+  f("XMATCH", "XVERGLEICH", "lookup"),
+  f("LOOKUP", "VERWEIS", "lookup"),
   f("CHOOSE", "WAHL", "lookup"),
   f("ROW", "ZEILE", "lookup"),
   f("COLUMN", "SPALTE", "lookup"),

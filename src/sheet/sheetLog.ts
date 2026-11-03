@@ -2,13 +2,15 @@
 // delete of rows or columns, every sort and every cut-and-paste move, each with a random id. Two
 // versions of a workbook can then be lined up before they are merged (collab.ts): what one person
 // did to the rows is done to the other person's version too, so everyone's edits stay on the rows
-// they were made on. Undo uses it to take a change back on a version others have edited since.
+// they were made on. Undo uses it to take a change back on a version others have edited since,
+// and the editor to keep the selection and the cell being typed into on their cells when someone
+// else's change of rows arrives.
 //
 // The log only grows (an undo is a new entry that takes an older one back), and only its newest
 // entries are kept. A version whose log doesn't hold the newest entry of the version it was made
 // from can't be lined up with it: merging then keeps both versions instead of guessing.
 //
-// Imports nothing but types: doc.ts, which stays light, checks stored logs with it.
+// Imports only from types.ts: doc.ts, which stays light, checks stored logs with it.
 
 import { MAX_COLS, MAX_ROWS, type Area, type Pos, type Sheet, type SheetOp } from "./types";
 
@@ -105,6 +107,117 @@ export function inverseOp(op: SheetOp, id: string): SheetOp | null {
     case "barrier":
       return null;
   }
+}
+
+// ----------------------------------------------------------------------------------------------
+// Following cells through changes (the editor's selection, the cell being typed into, what was cut)
+
+/**
+ * Where a cell of sheet `sheetId` is after `ops` (entries of that sheet's log, oldest first): its
+ * new address, or null when it isn't on the sheet any more (its row or column deleted, or cut and
+ * pasted to another sheet).
+ */
+export function followCell(ops: readonly SheetOp[], sheetId: string, pos: Pos): Pos | null {
+  let { row, col } = pos;
+  for (const op of ops) {
+    switch (op.kind) {
+      case "insertRows":
+        if (row >= op.at) row += op.count;
+        break;
+      case "deleteRows":
+        if (row >= op.at + op.count) row -= op.count;
+        else if (row >= op.at) return null;
+        break;
+      case "insertCols":
+        if (col >= op.at) col += op.count;
+        break;
+      case "deleteCols":
+        if (col >= op.at + op.count) col -= op.count;
+        else if (col >= op.at) return null;
+        break;
+      case "sort":
+        if (col >= op.c0 && col <= op.c1 && row >= op.r0 && row < op.r0 + op.order.length) row = op.r0 + op.order.indexOf(row - op.r0);
+        break;
+      case "move":
+        // (Cells pasted over this one replace its content; the cell itself stays where it is.)
+        if (op.src === sheetId && row >= op.from.r0 && row <= op.from.r1 && col >= op.from.c0 && col <= op.from.c1) {
+          if (op.dst !== sheetId) return null;
+          row += op.to.row - op.from.r0;
+          col += op.to.col - op.from.c0;
+        }
+        break;
+      case "barrier":
+        return null;
+    }
+  }
+  return { row, col };
+}
+
+/** Rows (or columns) i0…i1 after `count` of them were deleted at `at`: the part left, or null. */
+function shrink(i0: number, i1: number, at: number, count: number): [number, number] | null {
+  const end = at + count - 1;
+  if (i1 < at) return [i0, i1];
+  if (i0 > end) return [i0 - count, i1 - count];
+  const left = Math.max(0, at - i0) + Math.max(0, i1 - end);
+  return left ? [Math.min(i0, at), Math.min(i0, at) + left - 1] : null;
+}
+
+/**
+ * An area of sheet `sheetId` after `ops`: moved along with its cells, smaller where rows or
+ * columns of it were deleted, bigger where some were inserted inside it. null when it is gone or
+ * its cells don't stay together (a sort or a cut and paste through part of it).
+ */
+export function followArea(ops: readonly SheetOp[], sheetId: string, area: Area): Area | null {
+  let { r0, c0, r1, c1 } = area;
+  for (const op of ops) {
+    switch (op.kind) {
+      case "insertRows":
+        if (r0 >= op.at) r0 += op.count;
+        if (r1 >= op.at) r1 += op.count;
+        break;
+      case "insertCols":
+        if (c0 >= op.at) c0 += op.count;
+        if (c1 >= op.at) c1 += op.count;
+        break;
+      case "deleteRows": {
+        const left = shrink(r0, r1, op.at, op.count);
+        if (!left) return null;
+        [r0, r1] = left;
+        break;
+      }
+      case "deleteCols": {
+        const left = shrink(c0, c1, op.at, op.count);
+        if (!left) return null;
+        [c0, c1] = left;
+        break;
+      }
+      case "sort": {
+        const b1 = op.r0 + op.order.length - 1;
+        if (c1 < op.c0 || c0 > op.c1 || r1 < op.r0 || r0 > b1) break;
+        // All rows of the sorted block: the same cells, in another order.
+        if (r0 <= op.r0 && r1 >= b1) break;
+        // One row inside the sorted columns goes where its cells went.
+        if (r0 !== r1 || c0 < op.c0 || c1 > op.c1) return null;
+        r0 = r1 = op.r0 + op.order.indexOf(r0 - op.r0);
+        break;
+      }
+      case "move": {
+        const f = op.from;
+        if (op.src !== sheetId || r1 < f.r0 || r0 > f.r1 || c1 < f.c0 || c0 > f.c1) break;
+        if (r0 < f.r0 || r1 > f.r1 || c0 < f.c0 || c1 > f.c1 || op.dst !== sheetId) return null;
+        const dr = op.to.row - f.r0;
+        const dc = op.to.col - f.c0;
+        r0 += dr;
+        r1 += dr;
+        c0 += dc;
+        c1 += dc;
+        break;
+      }
+      case "barrier":
+        return null;
+    }
+  }
+  return { r0, c0, r1, c1 };
 }
 
 // ----------------------------------------------------------------------------------------------

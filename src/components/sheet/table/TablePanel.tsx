@@ -1,7 +1,8 @@
 "use client";
 
-// A smart table's settings: name, colour, banded rows, totals row and each column's total,
-// "Diagramm erstellen", convert back to plain cells, remove.
+// A smart table's settings: name, colour, banded rows, totals row and each column's total, its
+// filters; "Diagramm aus Tabelle" and "In Notiz einfügen" at the bottom; at the end of the list,
+// with what they do spelled out, convert back to plain cells and delete.
 //
 // CONTRACT: <TablePanel store tableId onClose /> is placed by SheetEditor.
 //
@@ -9,7 +10,7 @@
 // both. Each change is one undo step. Right after a table is made, a card at the top says what
 // became the header and offers the other choice with one tap.
 
-import { ChartScatter, CircleCheck, Filter, Info, NotebookPen, Table2, Trash2, Undo2, Ungroup, X } from "lucide-react";
+import { ChartScatter, CircleCheck, Filter, Info, NotebookPen, TableProperties, Trash2, Undo2, Ungroup, X } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
 import { sheetTableText, type SheetTableText } from "@/i18n/messages/sheetTable";
@@ -43,7 +44,7 @@ export function TablePanel({ store, tableId, onClose }: { store: SheetStore; tab
   const t = sheetTableText[locale];
   if (!table) {
     return (
-      <div data-table-panel="" className="flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
+      <div data-table-panel="" className="flex h-full min-h-0 flex-col bg-surface">
         <PanelHeader title={t.table} t={t} onClose={onClose} />
         <div className="p-4">
           <Note icon={<Info />}>{t.gone}</Note>
@@ -57,7 +58,7 @@ export function TablePanel({ store, tableId, onClose }: { store: SheetStore; tab
 function PanelHeader({ title, t, onClose }: { title: string; t: SheetTableText; onClose: () => void }) {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
-      <Table2 aria-hidden className="size-4 shrink-0 text-ink-3" />
+      <TableProperties aria-hidden className="size-4 shrink-0 text-ink-3" />
       <h2 className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-ink">{title}</h2>
       <button
         type="button"
@@ -79,8 +80,12 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
   const pageId = useSheet(store, (s) => s.pageId);
   const fresh = useFreshTable(store, table.id);
   const nameId = useId();
+  const unmakeHintId = useId();
+  const removeConfirmId = useId();
   const [noteOpen, setNoteOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Deleting asks first. The question takes the keyboard on its safe choice ("Abbrechen"), so a
+  // screen reader reads it out; cancelling (or Escape) gives the keyboard back to the delete button.
+  const [confirmDelete, setConfirmDelete] = useState<"no" | "ask" | "cancelled">("no");
 
   const sheet = sheetById(wb, table.sheetId);
   const names = useMemo(() => columnNames(wb, calc, table, locale), [wb, calc, table, locale]);
@@ -99,7 +104,8 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
   const sortIndex = table.sort ? table.columns.findIndex((c) => c.id === table.sort!.column) : -1;
 
   return (
-    <div data-table-panel={table.id} className="flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
+    // The panel sits in the editor's side panel or dock, which carry its name ("Tabelleneinstellungen").
+    <div data-table-panel={table.id} className="flex h-full min-h-0 flex-col bg-surface">
       <PanelHeader title={table.name} t={t} onClose={onClose} />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {fresh && !readOnly && (
@@ -109,7 +115,7 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-[13px] font-medium text-ink">{t.made(table.name)}</p>
                 <p className="text-[12px] leading-snug text-ink-2">
-                  {fresh.header === "found" ? t.headerFound(names.length > 4 ? `${names.slice(0, 4).join(", ")} …` : names.join(", ")) : t.headerAdded}
+                  {fresh.header === "found" ? t.headerFound(names.slice(0, 4), Math.max(0, names.length - 4)) : t.headerAdded}
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1.5">
                   <SmallButton onClick={() => switchTableHeader(store, table.id)}>{fresh.header === "found" ? t.headerIsData : t.headerIsHeader}</SmallButton>
@@ -150,7 +156,7 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
               onCommit={(v) => changeTableLook(store, table.id, { name: v })}
             />
           </Field>
-          <p className="text-[12px] tabular-nums text-ink-3">{t.size(areaName(table.area), table.columns.length, dataCount)}</p>
+          <p className="text-[12px] tabular-nums text-ink-2">{t.size(areaName(table.area), table.columns.length, dataCount)}</p>
         </Group>
 
         <Group title={t.look}>
@@ -215,7 +221,7 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
           }
         >
           {filters.length === 0 ? (
-            <p className="text-[12.5px] leading-snug text-ink-3">{t.noFilters}</p>
+            <p className="text-[12.5px] leading-snug text-ink-2">{t.noFilters}</p>
           ) : (
             <ul className="space-y-1.5">
               {filters.map(([columnId, spec]) => {
@@ -243,45 +249,18 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
               })}
             </ul>
           )}
-          {(filters.length > 0 || shown < dataCount) && <p className="text-[12px] text-ink-3">{t.shownRows(shown, dataCount)}</p>}
-          {table.sort && sortIndex >= 0 && <p className="text-[12px] text-ink-3">{t.sortedBy(names[sortIndex], table.sort.dir)}</p>}
+          {(filters.length > 0 || shown < dataCount) && <p className="text-[12px] text-ink-2">{t.shownRows(shown, dataCount)}</p>}
+          {table.sort && sortIndex >= 0 && <p className="text-[12px] text-ink-2">{t.sortedBy(names[sortIndex], table.sort.dir)}</p>}
         </Group>
-      </div>
 
-      {!readOnly && (
-        <div className="shrink-0 space-y-2 border-t border-line bg-surface px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <ActionButton tone="primary" icon={<ChartScatter />} label={t.chartHint} onClick={() => chartFromTable(store, table.id)}>
-            {t.chart}
-          </ActionButton>
-          {pageId && (
-            <ActionButton icon={<NotebookPen />} onClick={() => setNoteOpen(true)}>
-              {t.addToNote}
-            </ActionButton>
-          )}
-          {confirmDelete ? (
-            <div className="space-y-2 rounded-lg border border-danger/30 bg-danger/5 p-2.5" role="alertdialog" aria-label={t.removeConfirm}>
-              <p className="text-[12.5px] leading-snug text-ink">{t.removeConfirm}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <ActionButton icon={<X />} onClick={() => setConfirmDelete(false)}>
-                  {t.cancel}
-                </ActionButton>
-                <ActionButton
-                  icon={<Trash2 />}
-                  className="border-transparent bg-danger text-white shadow-none hover:bg-danger/90 hover:text-white"
-                  onClick={() => {
-                    deleteTableWithCells(store, table.id);
-                    onClose();
-                  }}
-                >
-                  {t.removeYes}
-                </ActionButton>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
+        {/* Seldom needed, so at the end of the list, each on its own row with its whole name and
+            (converting) what it keeps and what goes. */}
+        {!readOnly && (
+          <Group title={t.actions}>
+            <div className="space-y-1.5">
               <ActionButton
                 icon={<Ungroup />}
-                label={t.unmakeHint}
+                describedBy={unmakeHintId}
                 onClick={() => {
                   convertTableToRange(store, table.id);
                   onClose();
@@ -289,10 +268,61 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
               >
                 {t.unmake}
               </ActionButton>
-              <ActionButton tone="danger" icon={<Trash2 />} onClick={() => setConfirmDelete(true)}>
+              <p id={unmakeHintId} className="text-[12px] leading-snug text-ink-2">
+                {t.unmakeHint}
+              </p>
+            </div>
+            {confirmDelete === "ask" ? (
+              <div
+                className="space-y-2 rounded-lg border border-danger/30 bg-danger/5 p-2.5"
+                role="alertdialog"
+                aria-label={t.remove}
+                aria-describedby={removeConfirmId}
+                onKeyDown={(e) => {
+                  if (e.key !== "Escape") return;
+                  // Escape answers the question (no), it doesn't close the whole panel.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setConfirmDelete("cancelled");
+                }}
+              >
+                <p id={removeConfirmId} className="text-[12.5px] leading-snug text-ink">
+                  {t.removeConfirm}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionButton icon={<X />} autoFocus onClick={() => setConfirmDelete("cancelled")}>
+                    {t.cancel}
+                  </ActionButton>
+                  <ActionButton
+                    icon={<Trash2 />}
+                    className="border-transparent bg-danger text-white shadow-none hover:bg-danger/90 hover:text-white"
+                    onClick={() => {
+                      deleteTableWithCells(store, table.id);
+                      onClose();
+                    }}
+                  >
+                    {t.removeYes}
+                  </ActionButton>
+                </div>
+              </div>
+            ) : (
+              <ActionButton tone="danger" icon={<Trash2 />} autoFocus={confirmDelete === "cancelled"} onClick={() => setConfirmDelete("ask")}>
                 {t.remove}
               </ActionButton>
-            </div>
+            )}
+          </Group>
+        )}
+      </div>
+
+      {!readOnly && (
+        <div className="shrink-0 space-y-2 border-t border-line bg-surface px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <ActionButton tone="primary" icon={<ChartScatter />} hint={t.chartHint} onClick={() => chartFromTable(store, table.id)}>
+            {t.chart}
+          </ActionButton>
+          {pageId && (
+            <ActionButton icon={<NotebookPen />} onClick={() => setNoteOpen(true)}>
+              {t.addToNote}
+            </ActionButton>
           )}
         </div>
       )}

@@ -50,6 +50,21 @@ function steps(k: number, step: number): number {
   return Number.isInteger(x) ? x : clean15(x);
 }
 
+/**
+ * OBERGRENZE.MATHEMATIK (`up`) and UNTERGRENZE.MATHEMATIK: to a multiple of the step (1 when left
+ * out), whatever its sign. Negative numbers go toward 0 (OBERGRENZE) or away from it
+ * (UNTERGRENZE); a Modus other than 0 turns that around.
+ */
+function roundMath(up: boolean) {
+  return ([n, step = 1, mode = 0]: number[]): number => {
+    const s = Math.abs(step);
+    if (n === 0 || s === 0) return 0;
+    const q = quotient(n, s);
+    const ceil = n >= 0 || mode === 0 ? up : !up;
+    return steps(ceil ? Math.ceil(q) : Math.floor(q), s);
+  };
+}
+
 function gcd2(a: number, b: number): number {
   while (b) [a, b] = [b, a % b];
   return a;
@@ -138,6 +153,8 @@ export const MATH: FnDef[] = [
     if (s < 0) return steps(-Math.floor(quotient(-n, -s)), -s);
     return steps(Math.floor(quotient(n, s)), s);
   }),
+  numFn("CEILING.MATH", 1, 3, roundMath(true)),
+  numFn("FLOOR.MATH", 1, 3, roundMath(false)),
   numFn("EVEN", 1, 1, ([x]) => {
     const v = Math.ceil(clean15(Math.abs(x)) / 2) * 2;
     return x < 0 ? -v : v;

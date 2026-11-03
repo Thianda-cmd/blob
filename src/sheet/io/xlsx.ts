@@ -19,7 +19,7 @@ import type { Locale } from "@/i18n/config";
 import { sheetIoText, type SheetIoText } from "@/i18n/messages/sheetIo";
 import { areaName, cellKey, colIndex, colName } from "../a1";
 import { COLOR_HEX } from "../colors";
-import { adjustFormula, formatValue, getFunction, shiftFormula, toCanonicalFormula, type Calc, type CellValue } from "../engine";
+import { adjustFormula, formatValue, getFunction, MAX_FORMULA_LENGTH, shiftFormula, toCanonicalFormula, type Calc, type CellValue } from "../engine";
 import { newId } from "../ops";
 import { totalOfCell } from "../table/totals";
 import {
@@ -44,7 +44,8 @@ import {
 } from "../types";
 import { attr, boolAttr, child, children, descendants, escAttr, escText, lookup, numAttr, parseXml, textOf, XML_HEAD, XmlError, xmlBudget, type XmlBudget, type XmlEl } from "./xml";
 import { chartFromXml, chartXml, drawingXml, EMU } from "./xlsxCharts";
-import { calledFunctions, importFormula, stripPrefixes, toFileFormula, type FileTable, type FormulaContext } from "./xlsxFormulas";
+import { calledFunctions, importFormula, MAX_FORMULA_WORK, stripPrefixes, toFileFormula, type FileTable, type FormulaContext, type FormulaProblem, type ImportedFormula } from "./xlsxFormulas";
+import { MAX_IMPORT_TEXT, MAX_SHEETS } from "./limits";
 import {
   applyTint,
   argb,
@@ -80,10 +81,6 @@ const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships
 const CT = "application/vnd.openxmlformats-officedocument.spreadsheetml";
 /** Excel's limit for the text of one cell. */
 const MAX_TEXT = 32767;
-/** Characters of a formula (Excel's limit; Blob can't store longer ones, src/sheet/doc.ts). */
-const MAX_FORMULA = 8192;
-/** Sheets of one spreadsheet (Blob keeps at most this many, src/sheet/doc.ts). */
-const MAX_SHEETS = 250;
 
 /** Why an Excel file can't be read; `message` says it in the user's language. */
 export class XlsxError extends Error {
@@ -1016,8 +1013,8 @@ type Counts = {
   longFormulas: number;
 };
 
-/** What couldn't come along, as short lines in the user's language. */
-function skippedLines(c: Counts, locale: Locale): string[] {
+/** What couldn't come along, as short lines in the user's language (`maxSheets`: how many could come in). */
+function skippedLines(c: Counts, locale: Locale, maxSheets: number): string[] {
   const t = sheetIoText[locale].skipped;
   const out: string[] = [];
   if (c.merged) out.push(t.merged(c.merged));
@@ -1046,8 +1043,8 @@ function skippedLines(c: Counts, locale: Locale): string[] {
   if (c.outline) out.push(t.outline);
   if (c.tooBig) out.push(t.tooBig(c.tooBig, MAX_ROWS.toLocaleString(locale === "de" ? "de-DE" : "en-US"), MAX_COLS));
   if (c.longText) out.push(t.longText(c.longText));
-  if (c.sheets) out.push(t.sheets(c.sheets, MAX_SHEETS));
-  if (c.longFormulas) out.push(t.longFormulas(c.longFormulas, MAX_FORMULA.toLocaleString(locale === "de" ? "de-DE" : "en-US")));
+  if (c.sheets) out.push(t.sheetLimit(c.sheets, maxSheets));
+  if (c.longFormulas) out.push(t.longFormulas(c.longFormulas, MAX_FORMULA_LENGTH.toLocaleString(locale === "de" ? "de-DE" : "en-US")));
   return out;
 }
 
@@ -1067,9 +1064,13 @@ function oleKind(bytes: Uint8Array): "encrypted" | "oldXls" | null {
   return "oldXls";
 }
 
-/** What couldn't be brought over is listed in `skipped` ("3 merged cells", "1 chart"). */
-export async function importXlsx(data: ArrayBuffer, locale: Locale): Promise<{ workbook: Workbook; skipped: string[] }> {
-  const bytes = new Uint8Array(data);
+/**
+ * What couldn't be brought over is listed in `skipped` ("3 merged cells", "1 chart").
+ * `maxSheets`: how many sheets may come in (fewer than Blob's 250 when they are added to a
+ * spreadsheet that has sheets already); the rest aren't read and are listed.
+ */
+export async function importXlsx(data: ArrayBuffer | Uint8Array, locale: Locale, opts: { maxSheets?: number } = {}): Promise<{ workbook: Workbook; skipped: string[] }> {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   const ole = oleKind(bytes);
   if (ole) throw new XlsxError(ole, locale);
   let zip: ZipReader;
@@ -1079,7 +1080,7 @@ export async function importXlsx(data: ArrayBuffer, locale: Locale): Promise<{ w
     throw new XlsxError(e instanceof ZipError && e.code === "not-zip" ? "notXlsx" : "broken", locale);
   }
   try {
-    return await readWorkbook(zip, locale);
+    return await readWorkbook(zip, locale, Math.max(1, Math.min(MAX_SHEETS, opts.maxSheets ?? MAX_SHEETS)));
   } catch (e) {
     if (e instanceof XlsxError) throw e;
     if (e instanceof ZipError) throw new XlsxError(e.code === "encrypted" ? "encrypted" : e.code === "unsupported" ? "unsupported" : e.code === "tooBig" ? "tooBig" : "broken", locale);
@@ -1088,14 +1089,21 @@ export async function importXlsx(data: ArrayBuffer, locale: Locale): Promise<{ w
   }
 }
 
-async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook: Workbook; skipped: string[] }> {
+async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): Promise<{ workbook: Workbook; skipped: string[] }> {
   const t = sheetIoText[locale];
   const mimetype = await zip.text("mimetype").catch(() => null);
   if (mimetype?.includes("opendocument")) throw new XlsxError("ods", locale);
   if (zip.names.some((n) => /^Index\/.*\.iwa$/i.test(n))) throw new XlsxError("numbers", locale);
 
-  // Every part of the file shares one budget of elements (see xml.ts).
+  // Every part of the file shares one budget of elements and attributes (see xml.ts).
   const budget = xmlBudget();
+  // And one for the text the cells get (MAX_IMPORT_TEXT): a shared string or a shared formula is
+  // repeated for every cell that points at it, so a small file could otherwise make gigabytes.
+  let textLeft = MAX_IMPORT_TEXT;
+  const spend = (chars: number) => {
+    textLeft -= chars;
+    if (textLeft < 0) throw new XlsxError("tooBig", locale);
+  };
   const xml = (text: string) => parseXml(text, budget);
   const rootRels = await readRels(zip, "", budget);
   const office = rootRels.find((r) => relIs(r, "officeDocument") && !r.external);
@@ -1160,7 +1168,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
       continue;
     }
     if (!relIs(rel, "worksheet")) continue;
-    if (sheetParts.length >= MAX_SHEETS) {
+    if (sheetParts.length >= maxSheets) {
       counts.sheets++;
       continue;
     }
@@ -1377,8 +1385,12 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
     }
 
     // The cells.
-    const shared = new Map<string, { row: number; col: number; formula: string | null; problem?: "external" | "table-ref" }>();
+    const shared = new Map<string, { row: number; col: number; formula: string | null; problem?: FormulaProblem }>();
     const ctxBase = { tables: fileTables, names: definedNames, sheet: part.name, tableAt };
+    // A formula's text far too long to be one Blob keeps isn't read at all (renaming sheets in it
+    // would already take long).
+    const readFormula = (text: string, row: number, col: number): ImportedFormula =>
+      text.length > MAX_FORMULA_WORK ? { problem: "long" } : importFormula(renameSheets(text, renames), { ...ctxBase, row, col });
     let maxRow = -1;
     let maxCol = -1;
     let nextRow = 0;
@@ -1445,8 +1457,10 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
             const si2 = attr(fEl, "si") ?? "";
             let master = shared.get(si2);
             if (text && (!master || master.row !== pos.row || master.col !== col)) {
-              const imported = importFormula(renameSheets(text, renames), { ...ctxBase, row: pos.row, col });
+              const imported = readFormula(text, pos.row, col);
               master = "formula" in imported ? { row: pos.row, col, formula: imported.formula } : { row: pos.row, col, formula: null, problem: imported.problem };
+              // Too long to keep: so is every copy of it (not shifted for each cell that shares it).
+              if (master.formula !== null && master.formula.length > MAX_FORMULA_LENGTH) master = { ...master, formula: null, problem: "long" };
               shared.set(si2, master);
               if (master.problem) noteProblem(master.problem, counts);
               else formula = master.formula;
@@ -1455,24 +1469,28 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
               else if (master.formula !== null) formula = safeShift(master.formula, pos.row - master.row, col - master.col);
             }
           } else if (text) {
-            const imported = importFormula(renameSheets(text, renames), { ...ctxBase, row: pos.row, col });
+            const imported = readFormula(text, pos.row, col);
             if ("formula" in imported) formula = imported.formula;
             else noteProblem(imported.problem, counts);
           }
         }
+        // Each formula read counts against the text budget, kept or not (checking one takes time too).
+        if (formula !== null) spend(formula.length);
         // LibreOffice writes TRUE and FALSE typed into a cell as the formulas TRUE() and FALSE().
         if (formula !== null && /^(TRUE|FALSE)\(\)$/i.test(formula.trim())) {
           value = /^TRUE/i.test(formula.trim());
           formula = null;
         }
         // Longer than a formula may be (LibreOffice writes such): its last result stays, as a value.
-        if (formula !== null && formula.length > MAX_FORMULA) {
+        if (formula !== null && formula.length > MAX_FORMULA_LENGTH) {
           counts.longFormulas++;
           formula = null;
         }
         if (formula !== null) {
           const checked = checkFormula(formula);
-          if ("formula" in checked) out.f = checked.formula;
+          // The stored form counts (it can be a little longer than the file's).
+          if ("formula" in checked && checked.formula.length > MAX_FORMULA_LENGTH) counts.longFormulas++;
+          else if ("formula" in checked) out.f = checked.formula;
           else {
             const unknown = calledFunctions(formula).filter((fn) => !getFunction(fn));
             if (unknown.length) {
@@ -1483,20 +1501,25 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
         }
         if (out.f === undefined && value !== null) {
           if (typeof value === "object") {
-            // An error as a value (#N/A typed into a cell) stays an error.
-            const code = value.error.toUpperCase();
-            if ("formula" in checkFormula(code)) out.f = code;
-            else out.v = value.error;
+            // An error as a value (#N/A typed into a cell) stays an error (their names are short).
+            const code = value.error.length <= 16 ? value.error.toUpperCase() : null;
+            if (code !== null && "formula" in checkFormula(code)) out.f = code;
+            else out.v = value.error.slice(0, MAX_TEXT);
+            spend(Math.min(value.error.length, MAX_TEXT));
           } else if (typeof value === "string") {
             if (value.length > MAX_TEXT) counts.longText++;
             if (value !== "") out.v = value.slice(0, MAX_TEXT);
+            spend(Math.min(value.length, MAX_TEXT));
           } else if (typeof value === "number") {
             const fmt = out.s?.fmt;
             out.v = date1904 && fmt && (fmt.kind === "date" || fmt.kind === "datetime") ? value + DAYS_1904 : value;
           } else out.v = value;
         }
         const note = notes.get(`${colName(col)}${pos.row + 1}`);
-        if (note) out.note = note;
+        if (note) {
+          out.note = note;
+          spend(note.length);
+        }
         if (out.v === undefined && out.f === undefined && !out.s && !out.note) continue;
         sheet.cells[cellKey(pos.row, col)] = out;
         if (out.v !== undefined || out.f !== undefined || out.note) {
@@ -1510,7 +1533,10 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
       const pos = parseRef(ref);
       if (!pos || pos.row >= MAX_ROWS || pos.col >= MAX_COLS) continue;
       const key = cellKey(pos.row, pos.col);
-      if (!sheet.cells[key]) sheet.cells[key] = { note: text };
+      if (!sheet.cells[key]) {
+        sheet.cells[key] = { note: text };
+        spend(text.length);
+      }
       if (pos.row > maxRow) maxRow = pos.row;
       if (pos.col > maxCol) maxCol = pos.col;
     }
@@ -1533,7 +1559,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale): Promise<{ workbook:
   }
 
   const workbook: Workbook = { v: 1, sheets: blobSheets, charts: blobCharts, tables: blobTables };
-  return { workbook, skipped: skippedLines(counts, locale) };
+  return { workbook, skipped: skippedLines(counts, locale, maxSheets) };
 }
 
 /** Excel's column widths and row heights of a sheet in px, for placing drawings. */
@@ -1591,8 +1617,9 @@ function anchorPlace(anchor: XmlEl, layout: Layout): { at: ChartSpec["at"]; size
   return { at, size: clampSize(w, h) };
 }
 
-function noteProblem(problem: "external" | "table-ref", counts: Counts) {
+function noteProblem(problem: FormulaProblem, counts: Counts) {
   if (problem === "external") counts.external++;
+  else if (problem === "long") counts.longFormulas++;
   else counts.tableRefs++;
 }
 

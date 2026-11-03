@@ -1,10 +1,11 @@
 "use client";
 
-// Small pieces the spreadsheet chrome shares: tool buttons (plain, pressed, split), hover tooltips
-// that name a button and its keyboard shortcut, and shortcut text for Mac and everything else.
+// Small pieces the spreadsheet chrome shares: tool buttons (plain, pressed, split), tooltips that
+// name a button and its keyboard shortcut (on hover and on keyboard focus), and shortcut text for
+// Mac and everything else.
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { Kbd } from "@/components/ui/Kbd";
 import { useIsMac } from "@/components/ui/useMediaQuery";
@@ -46,7 +47,7 @@ export function ariaKeys(spec: string | undefined): string | undefined {
 }
 
 // ----------------------------------------------------------------------------------------------
-// Hover tooltips: one for the whole page, for every element with data-tip (and data-keys)
+// Tooltips: one for the whole page, for every element with data-tip (and data-keys)
 
 type Tip = { label: string; keys: string[]; x: number; top: number; bottom: number };
 
@@ -61,6 +62,10 @@ function setTip(next: Tip | null) {
   tip = next;
   for (const l of [...tipListeners]) l();
 }
+
+/** A field the keyboard types into (text, numbers; not a checkbox or a slider). */
+const takesTyping = (el: Element) =>
+  el.matches("textarea, input:not([type=checkbox], [type=radio], [type=range], [type=button], [type=color], [type=file])") || (el instanceof HTMLElement && el.isContentEditable);
 
 function install() {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -106,9 +111,28 @@ function install() {
     target = null;
     setTip(null);
   };
+  // The keyboard reaching a tool shows its name too (icon buttons have no words). Only for keyboard
+  // focus (:focus-visible): a tap or click that focuses a button leaves tips to hovering. Fields
+  // that take typing (the name box) match :focus-visible however they got the keyboard, a tap too,
+  // and their tip would cover what is typed: theirs shows on hover only. Any key first hides the
+  // old tip (press), then the newly focused tool shows its own.
+  const focusIn = (e: FocusEvent) => {
+    const at = e.target as Element | null;
+    const el = at?.closest?.<HTMLElement>("[data-tip]") ?? null;
+    if (!el || !at?.matches(":focus-visible") || takesTyping(at)) return;
+    stop();
+    target = el;
+    if (warm) show(el);
+    else timer = setTimeout(() => show(el), 450);
+  };
+  const focusOut = (e: FocusEvent) => {
+    if (target && target.contains(e.target as Node)) hide();
+  };
   document.addEventListener("pointerover", over, true);
   document.addEventListener("pointerdown", press, true);
   document.addEventListener("keydown", press, true);
+  document.addEventListener("focusin", focusIn);
+  document.addEventListener("focusout", focusOut);
   window.addEventListener("scroll", press, true);
   window.addEventListener("blur", press);
   uninstall = () => {
@@ -117,6 +141,8 @@ function install() {
     document.removeEventListener("pointerover", over, true);
     document.removeEventListener("pointerdown", press, true);
     document.removeEventListener("keydown", press, true);
+    document.removeEventListener("focusin", focusIn);
+    document.removeEventListener("focusout", focusOut);
     window.removeEventListener("scroll", press, true);
     window.removeEventListener("blur", press);
     setTip(null);
@@ -163,15 +189,24 @@ export function HoverTips() {
   }, [id]);
   const current = useSyncExternalStore(subscribeTip, () => tip, () => null);
   const shows = useSyncExternalStore(subscribeOwners, () => owners[0] === id, () => false);
+  // Centred on its button, but inside the window: a tool at the window's edge (Undo, the name box
+  // on a phone) has its tip beside the edge, not cut off by it. Measured before it is painted.
+  const box = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !current) return;
+    const w = el.offsetWidth;
+    el.style.left = `${Math.max(8, Math.min(window.innerWidth - 8 - w, current.x - w / 2))}px`;
+  }, [current, shows]);
   if (!shows || !current || typeof document === "undefined") return null;
-  // Below the button, or above it near the bottom of the screen; kept inside the window.
+  // Below the button, or above it near the bottom of the screen.
   const below = current.bottom + 44 < window.innerHeight;
-  const left = Math.max(8, Math.min(window.innerWidth - 8, current.x));
   return createPortal(
     <div
+      ref={box}
       role="tooltip"
-      className="pointer-events-none fixed z-[95] flex max-w-[280px] -translate-x-1/2 items-center gap-2 rounded-lg border border-line bg-raised px-2 py-1 text-[12px] leading-snug text-ink shadow-pop"
-      style={{ left, ...(below ? { top: current.bottom + 6 } : { bottom: window.innerHeight - current.top + 6 }) }}
+      className="pointer-events-none fixed z-[95] flex w-max max-w-[min(280px,calc(100vw-16px))] items-center gap-2 rounded-lg border border-line bg-raised px-2 py-1 text-[12px] leading-snug text-ink shadow-pop"
+      style={{ left: current.x, ...(below ? { top: current.bottom + 6 } : { bottom: window.innerHeight - current.top + 6 }) }}
     >
       <span>{current.label}</span>
       {current.keys.length > 0 && (
@@ -206,7 +241,7 @@ export const keepFocus = (e: ReactMouseEvent) => {
 };
 
 const toolClass =
-  "relative inline-flex h-8 min-w-8 shrink-0 select-none items-center justify-center gap-1.5 rounded-lg px-1.5 text-[13px] font-medium text-ink-2 outline-none transition-[background,color,transform] duration-150 hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-blob/50 active:scale-[0.94] disabled:pointer-events-none disabled:opacity-35 [@media(hover:none)]:h-9 [@media(hover:none)]:min-w-9 [&_svg]:size-[17px] [&_svg]:shrink-0";
+  "relative inline-flex h-8 shrink-0 select-none items-center justify-center gap-1.5 rounded-lg px-1.5 text-[13px] font-medium text-ink-2 outline-none transition-[background,color,transform] duration-150 hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-blob active:scale-[0.94] disabled:pointer-events-none disabled:opacity-35 [@media(hover:none)]:h-9 [@media(hover:none)]:min-w-9 [&_svg]:size-[17px] [&_svg]:shrink-0";
 
 export function ToolButton({
   label,
@@ -221,6 +256,7 @@ export function ToolButton({
   className,
   buttonRef,
   tip,
+  narrow,
 }: {
   label: string;
   /** Key caps for the tooltip (from useKeys). */
@@ -237,6 +273,8 @@ export function ToolButton({
   buttonRef?: Ref<HTMLButtonElement>;
   /** Tooltip text when it should say more than the label. */
   tip?: string;
+  /** The main part of a split button: 28 px with a mouse, so its arrow can be 24 px. */
+  narrow?: boolean;
 }) {
   return (
     <button
@@ -251,7 +289,7 @@ export function ToolButton({
       data-keys={keys?.length ? keys.join("|") : undefined}
       disabled={disabled}
       onClick={onClick}
-      className={cn(toolClass, pressed && "bg-blob-soft text-blob-ink hover:bg-blob-soft hover:text-blob-ink", expanded && !pressed && "bg-hover text-ink", className)}
+      className={cn(toolClass, narrow ? "min-w-7" : "min-w-8", pressed && "bg-blob-soft text-blob-ink hover:bg-blob-soft hover:text-blob-ink", expanded && !pressed && "bg-hover text-ink", className)}
     >
       {children}
     </button>
@@ -259,8 +297,9 @@ export function ToolButton({
 }
 
 /**
- * A button that does its thing (Σ: sum), with a narrow arrow next to it for the choices
- * (Mittelwert, Anzahl…). The arrow is the popover's trigger.
+ * A button that does its thing (Σ: sum), with an arrow next to it for the choices (Mittelwert,
+ * Anzahl…), big enough to hit on its own: 24 px wide, 32 px for fingers (a miss would run the main
+ * button instead). The arrow is the popover's trigger.
  */
 export function SplitButton({
   label,
@@ -289,7 +328,7 @@ export function SplitButton({
 }) {
   return (
     <div className={cn("flex shrink-0 items-center rounded-lg transition-colors", expanded && "bg-hover")}>
-      <ToolButton label={label} keys={keys} shortcut={shortcut} onClick={onClick} disabled={disabled} className="rounded-r-none pr-1" tip={tip}>
+      <ToolButton label={label} keys={keys} shortcut={shortcut} onClick={onClick} disabled={disabled} className="rounded-r-none pr-1" tip={tip} narrow>
         {children}
       </ToolButton>
       <button
@@ -301,7 +340,7 @@ export function SplitButton({
         data-tip={menuLabel}
         disabled={disabled}
         onClick={onMenu}
-        className="grid h-8 w-4 shrink-0 place-items-center rounded-r-lg text-ink-3 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-blob/50 disabled:pointer-events-none disabled:opacity-35 [@media(hover:none)]:h-9 [@media(hover:none)]:w-5"
+        className="grid h-8 w-6 shrink-0 place-items-center rounded-r-lg text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-blob disabled:pointer-events-none disabled:opacity-35 [@media(hover:none)]:h-9 [@media(hover:none)]:w-8"
       >
         <ChevronDown className="size-3" />
       </button>
@@ -325,7 +364,7 @@ export function PanelHeader({ title, onBack, backLabel }: { title: string; onBac
           <ChevronDown className="size-4 rotate-90" />
         </button>
       )}
-      <span className={cn("text-[12px] font-medium uppercase tracking-wide text-ink-3", !onBack && "px-1")}>{title}</span>
+      <span className={cn("text-[12px] font-medium uppercase tracking-wide text-ink-2", !onBack && "px-1")}>{title}</span>
     </div>
   );
 }
@@ -365,9 +404,9 @@ export function Choice({
       {icon && <span className={checked ? "text-blob-ink" : "text-ink-3"}>{icon}</span>}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{label}</span>
-        {hint && <span className="block truncate text-[11.5px] text-ink-3">{hint}</span>}
+        {hint && <span className="line-clamp-2 text-[12px] leading-snug text-ink-2">{hint}</span>}
       </span>
-      {right !== undefined && <span className={cn("max-w-[45%] shrink-0 truncate text-[12px] tabular-nums", checked ? "text-blob-ink/80" : "text-ink-3")}>{right}</span>}
+      {right !== undefined && <span className={cn("max-w-[45%] shrink-0 truncate text-[12px] tabular-nums", checked ? "text-blob-ink/80" : "text-ink-2")}>{right}</span>}
     </button>
   );
 }

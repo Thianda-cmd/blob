@@ -8,22 +8,27 @@
 // Also: R² semantics of every model (fixed intercepts, logarithms), domain errors, the equation
 // and R² text in German and English (4 significant digits per coefficient, the same rule as the
 // .xlsx label format), solving for x and "Probe berechnen" (a worked line that adds up, advice
-// above and below the standards), axis ticks, reading chart data from cells (with a small fake
-// Calc, so this doesn't need the formula engine: hidden points, text among x values), the chart
-// a selection makes, and the drawing itself (no NaN, the equation in the SVG, wrapped when long,
-// forecasts on category charts, log axes with values ≤ 0, notes under the plot).
+// above and below the standards, what it makes of what the student types), axis ticks, reading
+// chart data from cells (with a small fake Calc, so this doesn't need the formula engine: hidden
+// points, text among x values), the chart a selection makes and where it lands (beside the data,
+// below it on a phone), the drawing itself (no NaN, the equation in the SVG, wrapped when long,
+// forecasts on category charts, log axes with values ≤ 0, notes under the plot and in the aria
+// label), and the chart on the screen (how far opening its settings scrolls, when the panel
+// shows a copy of it, its action bar on a phone, reduced motion) with the panel's words.
 // Problems make the script exit with 1.
 
-import { placeInView } from "@/components/sheet/chart/actions";
+import { chartDataBlock, placeInView } from "@/components/sheet/chart/actions";
+import { barShift, inViewNext, revealScroll, scrollBehavior, shownShare, type Rect } from "@/components/sheet/chart/reveal";
 import type { ChartViewport } from "@/components/sheet/chart/selection";
+import { sheetChartText } from "@/i18n/messages/sheetChart";
 import { cellKey } from "@/sheet/a1";
 import { linearAxis, logAxis, logTickLabel, logTicksScientific, niceStep } from "@/sheet/chart/axis";
 import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
 import { chartData } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
-import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
-import { probeRange, probeResultText, workedLine } from "@/sheet/chart/probe";
-import { equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
+import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, isCalendarFormat, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
+import { probeRange, probeResultText, probeSteps, readProbe, titleUnit } from "@/sheet/chart/probe";
+import { aOutOfRange, equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
 import { buildChartScene, textWidth, wrapEquation, type SvgNode } from "@/sheet/chart/scene";
 import { formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
 import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
@@ -389,7 +394,7 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   const dated = fit("cells by date", dx, counts, spec("exponential"));
   eq("dates: a is 0 as a number", dated.coefficients[0], 0);
   close("dates: same growth rate as from the start", dated.coefficients[1], fromStart.coefficients[1], 1e-9);
-  close("dates: same R²", dated.r2, fromStart.r2, 1e-9);
+  close("dates: same R²", dated.r2, fromStart.r2!, 1e-9);
   close("dates: the curve has values", dated.predict(d0 + 3), fromStart.predict(3), 1e-6);
   close("dates: solve for 1 000 000 cells", solveForX(dated, 1e6), d0 + solveForX(fromStart, 1e6)!, 1e-9);
   eq("dates: the label shows a, not 0", equationText(dated, "de"), "y = 5,884E-12426e^(0,6179x)");
@@ -397,6 +402,12 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   check("dates: power curve has values", Number.isFinite(power.predict(d0 + 3)) && power.predict(d0 + 3) > 1e6, power.predict(d0 + 3));
   check("dates: power solves", near(power.predict(solveForX(power, 1e6)!), 1e6, 1e-6), solveForX(power, 1e6));
   check("dates: power label has no 0x", !equationText(power, "de").startsWith("y = 0x"), equationText(power, "de"));
+  // The panel's tip "use the time since the start as x" is for calendar dates (or an a beyond a
+  // number), not for elapsed time typed as 0:00, 0:30, 1:00 …, which already is that.
+  check("dates tip: dates and date-times are calendar dates", isCalendarFormat({ kind: "date", style: "short" }) && isCalendarFormat({ kind: "datetime" }));
+  check("dates tip: a time is not", !isCalendarFormat({ kind: "time", seconds: false }) && !isCalendarFormat(null));
+  const elapsed = fit("elapsed time as h:mm", [0, 1, 2, 3, 4, 5].map((k) => k / 48), [0.05, 0.07, 0.1, 0.14, 0.2, 0.28], spec("exponential"));
+  check("dates tip: elapsed time keeps a in range", !aOutOfRange(elapsed) && aOutOfRange(dated), { elapsed: elapsed.coefficients, dated: dated.coefficients });
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -404,27 +415,53 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
 // and the advice depends on where the sample lies (dilute only when it is above the standards).
 
 {
+  const steps = (f: Fit, y: number, locale: "de" | "en" = "de") => probeSteps(f, y, solveForX(f, y), locale);
   const brad = fit("bradford probe", [0, 125, 250, 500, 750, 1000], [0.0247, 0.1472, 0.2587, 0.5007, 0.7317, 0.9737], spec("linear"));
   const xb = solveForX(brad, 0.5)!;
   eq("probe result", probeResultText(xb, "de"), "501,48");
-  eq("probe worked line", workedLine(brad, 0.5, xb, "de"), "x = (0,5 − 0,0254368) / 0,000946316 = 501,48");
-  eq("probe worked line en", workedLine(brad, 0.5, xb, "en"), "x = (0.5 − 0.0254368) / 0.000946316 = 501.48");
+  eq("probe worked line", steps(brad, 0.5), { formula: "x = (y − b) / m", line: "x = (0,5 − 0,0254368) / 0,000946316 = 501,48" });
+  eq("probe worked line en", steps(brad, 0.5, "en").line, "x = (0.5 − 0.0254368) / 0.000946316 = 501.48");
   const cells = fit("cells probe", [1e8, 2e8, 5e8, 1e9, 2e9], [0.1, 0.21, 0.48, 0.95, 1.9], spec("linear"));
   const xc = solveForX(cells, 0.5)!;
   eq("probe: a cell count in scientific notation", probeResultText(xc, "de"), "5,1833E+08");
-  eq("probe worked line, cells", workedLine(cells, 0.5, xc, "de"), "x = (0,5 − 0,0109784) / 9,43449E-10 = 5,1833E+08");
+  eq("probe worked line, cells", steps(cells, 0.5).line, "x = (0,5 − 0,0109784) / 9,43449E-10 = 5,1833E+08");
   const lab = fit("lab probe", [0, 2, 4, 6, 8, 10], [0.002, 0.105, 0.209, 0.311, 0.418, 0.52], spec("linear"));
-  eq("probe worked line, minus intercept", workedLine(lab, -0.01, solveForX(lab, -0.01)!, "de"), "x = (-0,01 − 0,00147619) / 0,0518714 = -0,22124");
+  eq("probe worked line, minus intercept", steps(lab, -0.01).line, "x = (-0,01 − 0,00147619) / 0,0518714 = -0,22124");
+  // A calibration line through the origin only divides (no "(0,5 − 0)" in the lab report).
+  const origin = fit("probe through the origin", [0, 100, 200, 400, 600, 800], [0, 0.098, 0.181, 0.349, 0.517, 0.664], spec("linear", { intercept: 0 }));
+  eq("probe through the origin", steps(origin, 0.5), { formula: "x = y / m", line: "x = 0,5 / 0,00084876 = 589,09" });
+  eq("probe through the origin en", steps(origin, -0.01, "en"), { formula: "x = y / m", line: "x = -0.01 / 0.00084876 = -11.782" });
+  // Dates as x: a is beyond what a number holds, so the line works with ln a, and the formula
+  // above it says what ln a is, rounded as in the line (growth: ln a < 0, decay: ln a > 0).
+  const datesUp = fit("dates steps", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("exponential"));
+  const datesDown = fit("dates decay steps", [46329, 46330, 46331, 46332, 46333, 46334], [5e6, 3.2e6, 2e6, 1.3e6, 8.3e5, 5.3e5], spec("exponential"));
+  const datesPower = fit("dates power steps", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("power"));
+  for (const [name, f, start] of [
+    ["growth", datesUp, "x = (ln y − ln a) / b, mit ln a = "],
+    ["decay", datesDown, "x = (ln y − ln a) / b, mit ln a = "],
+    ["power", datesPower, "x = e^((ln y − ln a) / b), mit ln a = "],
+  ] as const) {
+    const s = steps(f, 1e6);
+    const lnA = s.formula.startsWith(start) ? s.formula.slice(start.length) : "";
+    const term = lnA.startsWith("-") ? `+ ${lnA.slice(1)})` : `− ${lnA})`;
+    check(`probe with dates, ${name}: the formula names ln a`, /^-?\d+(,\d+)?$/.test(lnA), s.formula);
+    check(`probe with dates, ${name}: the line uses that ln a`, !!s.line && s.line.includes(term), { formula: s.formula, line: s.line });
+  }
+  eq("probe with dates en", steps(datesUp, 1e6, "en").formula.startsWith("x = (ln y − ln a) / b, with ln a = -"), true);
+  eq("probe without a result: the formula alone", steps(datesUp, -1), { formula: `x = (ln y − ln a) / b, mit ln a = ${formatCoefficient(datesUp.lnA!, "de", 6)}`, line: null });
+  eq("probe on a polynomial: the description, no line", steps(fit("poly probe", [0, 1, 2, 3, 4], [0, 1.1, 3.9, 9.2, 15.8], spec("polynomial")), 5).line, null);
   // Every worked line, typed into a calculator, gives its own result (all models with a formula).
   const models: [string, Fit][] = [
     ["bradford", brad],
     ["cells", cells],
     ["lab", lab],
+    ["origin", origin],
     ["exponential", fit("growth probe", [0, 1, 2, 3, 4, 5, 6], [0.05, 0.09, 0.21, 0.38, 0.81, 1.52, 3.3], spec("exponential"))],
     ["logarithmic", fit("log probe", [0.5, 1, 2, 4, 8, 16], [0.2, 1.1, 2.3, 3.1, 4.4, 5.2], spec("logarithmic"))],
     ["power", fit("power probe", [1, 2, 3, 5, 8, 13], [3.1, 5.6, 7.1, 10.9, 15.2, 21.8], spec("power"))],
-    ["dates", fit("dates probe", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("exponential"))],
-    ["dates power", fit("dates power probe", [46325, 46326, 46327, 46328, 46329], [2e5, 3.7e5, 6.8e5, 1.3e6, 2.4e6], spec("power"))],
+    ["dates", datesUp],
+    ["dates decay", datesDown],
+    ["dates power", datesPower],
   ];
   const calculator = (line: string, locale: "de" | "en") => {
     // The line as a calculator reads it: numbers in the user's format, ln, e^, ^, −.
@@ -443,7 +480,7 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
       for (const y of [0.05, 0.42, 1, 3, 12, 1e6]) {
         const x = solveForX(f, y);
         if (x === null) continue;
-        const line = workedLine(f, y, x, locale)!;
+        const line = probeSteps(f, y, x, locale).line!;
         const shown = line.split(" = ").pop();
         check(`worked line adds up: ${name} ${y} ${locale}`, shown === probeResultText(x, locale) && probeResultText(calculator(line, locale), locale) === shown, line);
       }
@@ -458,6 +495,23 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   const falling = fit("falling", [0, 2, 4, 6], [1, 0.8, 0.6, 0.4], spec("linear"));
   eq("probe on a falling line: high y is below", probeRange(falling, solveForX(falling, 1.2)!), "negative");
   eq("probe on a falling line: low y is above", probeRange(falling, solveForX(falling, 0.2)!), "above");
+
+  // What the student types: a number, also with the y axis's own unit; a reason when it isn't one.
+  // The start of a number says nothing yet; a concentration typed where the absorbance goes gets
+  // its own reason (worked back, it would give a wrong result that looks right).
+  const read = (text: string, yTitle = "Extinktion", xTitle = "Konzentration (mg/L)", locale: "de" | "en" = "de") => readProbe(text, locale, yTitle, xTitle);
+  eq("probe input: a number", read("0,42"), { y: 0.42, problem: null });
+  eq("probe input: a point works in German too", read("0.42").y, 0.42);
+  eq("probe input: empty", read("  "), { y: null, problem: null });
+  eq("probe input: letters", read("abc").problem, "notNumber");
+  eq("probe input: the result's unit", read("0,42 mg/L").problem, { xUnit: "mg/L" });
+  eq("probe input: a unit no axis has", read("0,42 mg/L", "Extinktion", "Konzentration").problem, "notNumber");
+  eq("probe input: the y axis's unit is fine", read("1200 rfu", "Fluoreszenz (RFU)", "Konzentration (µg/mL)").y, 1200);
+  eq("probe input: µ and μ are the same", read("12 μmol/L", "c [µmol/L]").y, 12);
+  for (const partial of ["-", "+", ",", "1e", "1e-", "1,2E+", "0,42 E", "0,42 E-"]) eq(`probe input: still typing ${JSON.stringify(partial)}`, read(partial), { y: null, problem: "typing" });
+  for (const bad of ["e5", "4 %", "12 x", "1..2a", "O,42"]) eq(`probe input: never a number ${JSON.stringify(bad)}`, read(bad).problem, "notNumber");
+  eq("probe input en", read("1,200.5", "Absorbance", "Concentration (mg/L)", "en").y, 1200.5);
+  eq("axis title units", ["Konzentration (mg/L)", "Extinktion", "c [µmol/L]", "OD (600 nm)", "Zeit (min) "].map(titleUnit), ["mg/L", null, "µmol/L", "600 nm", "min"]);
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -476,7 +530,8 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   for (const [name, f] of fits) {
     const code = trendLabelFormat(f);
     for (const c of f.coefficients.filter((v) => v !== 0)) {
-      const excel = parseChartNumber(formatWithCode(c, code, "de"), "de");
+      const shown = formatWithCode(c, code, "de");
+      const excel = typeof shown === "string" ? parseChartNumber(shown, "de") : null;
       const chart = parseChartNumber(formatCoefficient(c, "de"), "de");
       check(`xlsx label ${name}: ${c} keeps 4 digits in Excel`, excel !== null && Math.abs(excel - c) <= 5.000001e-4 * Math.abs(c), { code, excel });
       check(`xlsx label ${name}: ${c} agrees with the chart`, excel !== null && chart !== null && Math.abs(excel - chart) <= 1e-3 * Math.abs(c), { excel, chart });
@@ -805,6 +860,13 @@ const calc = fakeCalc(lab);
   // …and counted, so the panel can say that formulas like STEIGUNG still use it.
   eq("hidden points counted", hd.series[0].hiddenPoints, 1);
   eq("nothing hidden → no count", d.series[0].hiddenPoints, undefined);
+  // A smart table's filter (here: Extinktion < 0,4) leaves rows out the same way, and they count too.
+  const filteredWb: Workbook = {
+    ...lab,
+    tables: [{ id: "t1", sheetId: "s1", name: "Standards", area: { r0: 0, c0: 0, r1: 6, c1: 1 }, columns: [{ id: "tc1", total: "none" }, { id: "tc2", total: "none" }], totals: false, style: "blue", banded: true, filters: { tc2: { kind: "number", op: "lt", a: 0.4, b: null } }, sort: null }],
+  };
+  const fd = chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), fakeCalc(filteredWb), "de");
+  eq("filtered rows skipped and counted", [fd.series[0].points.map((p) => p.x), fd.series[0].hiddenPoints], [[0, 2, 4, 6], 2]);
   // No series, missing sheet.
   eq("no series", chartData(chart("scatter", null, []), calc, "de").series, []);
   eq("missing sheet", chartData(chart("scatter", null, [series("x", { ...ref(1, 1, 6, 1), sheetId: "gone" })]), calc, "de").series[0].points, []);
@@ -848,7 +910,8 @@ if (engineReady) {
   if (sc) {
     const widths = [170, 100, 100, 100, 100, 100, 100, 100, 100, 100];
     const colX = (c: number) => widths.slice(0, c).reduce((a, b) => a + b, 0);
-    const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, colX, zoom: 1, sidePanel: 0, ...extra });
+    const rowY = (r: number) => r * 26;
+    const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, top: 0, bottom: 520, colX, rowY, zoom: 1, sidePanel: 0, ...extra });
     eq("room for the gap column", placeInView(sc, view(1200)).at, sc.at);
     eq("no room: beside the data", placeInView(sc, view(782)).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("settings about to open beside the grid", placeInView(sc, view(1134, { sidePanel: 352 })).at, { row: 0, col: 2, dx: 16, dy: 0 });
@@ -858,6 +921,26 @@ if (engineReady) {
     eq("zoomed 150 %: beside the data", placeInView(sc, view(1200, { colX: (c) => colX(c) * 1.5, zoom: 1.5 })).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("scrolled past the data: as made", placeInView(sc, view(782, { left: 300 })).at, sc.at);
     eq("no grid on screen", placeInView(sc, null), sc);
+
+    // A phone (350 px of cells): beside the data only a sliver of the chart would show, so it goes
+    // below the data, one empty row between, from the data's first column; past the slope and R²
+    // under the data (a calibration sheet), never over them. With room enough beside the data
+    // (a tablet held upright, a laptop with the settings open) it stays beside it.
+    const block = chartDataBlock(wbc, sc);
+    eq("data block of a chart: the filled cells around its ranges", block, { r0: 0, c0: 0, r1: 6, c1: 7 });
+    const data = { r0: 0, c0: 0, r1: 6, c1: 1 };
+    const empty = () => false;
+    const below = (filled: (r: number, c: number) => boolean = empty) => ({ data, filled });
+    eq("phone: below the data", placeInView(sc, view(350), undefined, below()).at, { row: 8, col: 0, dx: 0, dy: 0 });
+    const results = (r: number, c: number) => (r === 8 || r === 9) && c <= 1;
+    eq("phone: below the results under the data", placeInView(sc, view(350), undefined, below(results)).at, { row: 11, col: 0, dx: 0, dy: 0 });
+    eq("phone: nothing free below: beside the data", placeInView(sc, view(350), undefined, below(() => true)).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("phone at 150 %: below the data", placeInView(sc, view(350, { colX: (c) => colX(c) * 1.5, rowY: (r) => rowY(r) * 1.5, zoom: 1.5 }), undefined, below()).at, { row: 8, col: 0, dx: 0, dy: 0 });
+    eq("tablet: beside the data", placeInView(sc, view(740), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("laptop with the settings beside the grid: beside the data", placeInView(sc, view(622), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("room for the gap column: as made, also with below", placeInView(sc, view(1200), undefined, below()).at, sc.at);
+    const wide = (r: number, c: number) => r >= 8 && r <= 20 && c === 4;
+    eq("phone: the chart's width counts (a filled cell under its right part)", placeInView(sc, view(350), undefined, below(wide)).at, { row: 22, col: 0, dx: 0, dy: 0 });
   }
   eq("default size", sc?.size, { w: 480, h: 300 });
   eq("one series: no legend", sc?.legend, "none");
@@ -939,9 +1022,10 @@ if (engineReady) {
   }
   const cal = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { name: "Extinktion", trendline: tl })], { title: "Kalibrierung" });
   const svg = chartSvg(cal, chartData(cal, calc, "de"), "de");
-  check("equation in the SVG", svg.includes("y = 0,0519x + 0,0015"), svg.length);
+  // The chart label and the aria label carry the same 4 significant digits as the panel.
+  check("equation in the SVG", svg.includes("y = 0,05187x + 0,001476"), svg.match(/y = [^<]*/)?.[0]);
   check("R² in the SVG (0,99997, not 1)", svg.includes("R² = 0,99997") && !svg.includes("R² = 1<"), svg.match(/R² = [^<]*/)?.[0]);
-  check("aria summary", svg.includes('aria-label="Punktdiagramm Kalibrierung, 1 Reihe, Trendlinie y = 0,0519x + 0,0015, R² = 0,99997"'), svg.match(/aria-label="[^"]*"/)?.[0]);
+  check("aria summary", svg.includes('aria-label="Punktdiagramm Kalibrierung, 1 Reihe, Trendlinie y = 0,05187x + 0,001476, R² = 0,99997"'), svg.match(/aria-label="[^"]*"/)?.[0]);
   check("light colours in files", svg.includes("#1a73e8") && !svg.includes("var(--"));
   const scene = buildChartScene(cal, chartData(cal, calc, "de"), { width: 480, height: 300, locale: "de" });
   check("screen colours are CSS variables", JSON.stringify(scene.nodes).includes("var(--sheet-blue)"));
@@ -1007,6 +1091,12 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   const lineFc = chart("line", ref(1, 0, 4, 0), [series("w", ref(1, 1, 4, 1), { trendline: { ...linearTl, forward: 3 } })]);
   const lf = buildChartScene(lineFc, chartData(lineFc, wc, "de"), { width: 480, height: 300, locale: "de" });
   check("line: forecast end inside the plot", Math.max(...pathCoords(trendPaths(lf.nodes)[0] ?? "").map((p) => p.x)) <= lf.plot!.x + lf.plot!.w + 0.01, lf.plot);
+  // A forecast beyond the 500 extra categories is drawn as far as they reach, and the value axis
+  // isn't stretched for the rest: the line ends near the top of the plot, not at a fifth of it.
+  const far = chart("column", ref(1, 0, 4, 0), [series("w", ref(1, 1, 4, 1), { trendline: { ...linearTl, forward: 2000 } })]);
+  const fs2 = buildChartScene(far, chartData(far, wc, "de"), { width: 480, height: 300, locale: "de" });
+  const farEnd = pathCoords(trendPaths(fs2.nodes)[0] ?? "").pop();
+  check("huge forecast: drawn to the last extra category, axis not stretched past it", !!farEnd && near(farEnd.x, fs2.plot!.x + fs2.plot!.w, 1e-3) && farEnd.y <= fs2.plot!.y + 0.25 * fs2.plot!.h, { farEnd, plot: fs2.plot });
 
   // A log axis: the 0 at the start of a growth curve isn't drawn (a note says so), the noisy
   // point's error bar that reaches below 0 runs off the bottom without a lower cap, and the
@@ -1024,11 +1114,17 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
     const caps = [...bars.matchAll(/h[\d.]+/g)].length;
     check(`log axis: 5 error bars, one without its lower cap (${locale})`, stems === 5 && caps === 9, { stems, caps });
     check(`log axis: the bar below 0 runs to the plot's bottom (${locale})`, bars.includes(`${Math.round((ls.plot!.y + ls.plot!.h) * 100) / 100}V`), bars.slice(0, 80));
+    // A screen reader gets the chart as its aria label only: the note is in it too.
+    check(`log axis: the note in the aria label (${locale})`, ls.label.endsWith(locale === "de" ? ", 1 Reihe. 1 Wert ≤ 0 nicht gezeigt (Log-Achse)" : ", 1 series. 1 value ≤ 0 not shown (log axis)"), ls.label);
   }
+  // A chart too small for the note still says it to a screen reader.
+  const tinyLog = buildChartScene(logChart, chartData(logChart, gc, "de"), { width: 140, height: 100, locale: "de" });
+  check("log axis, tiny chart: no room for the note, the aria label has it", !sceneTexts(tinyLog.nodes).some((s) => s.includes("Log-Achse")) && tinyLog.label.includes("1 Wert ≤ 0 nicht gezeigt"), { texts: sceneTexts(tinyLog.nodes), label: tinyLog.label });
   // Nothing above 0 at all: the message in the middle, no note under it.
   const zeros = workbook([["x", "y"], [1, 0], [2, -1]]);
   const zs = buildChartScene(chart("scatter", ref(1, 0, 2, 0), [series("z", ref(1, 1, 2, 1))], { yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } }), chartData(chart("scatter", ref(1, 0, 2, 0), [series("z", ref(1, 1, 2, 1))]), fakeCalc(zeros), "de"), { width: 480, height: 300, locale: "de" });
   check("log axis with nothing above 0 says so once", sceneTexts(zs.nodes).filter((s) => s.includes("Log-Achse") || s.includes("logarithmische")).length === 1, sceneTexts(zs.nodes));
+  check("log axis with nothing above 0: the aria label says so", zs.label.endsWith(". Eine logarithmische Achse braucht Werte über 0"), zs.label);
   // A log x axis counts its values ≤ 0 too.
   const logX = chart("scatter", ref(1, 0, 6, 0), [series("g", ref(1, 3, 6, 3))], { xAxis: { title: "", min: null, max: null, log: true, grid: false, decimals: null } });
   check("log x axis: note about x ≤ 0", sceneTexts(buildChartScene(logX, chartData(logX, calc, "de"), { width: 480, height: 300, locale: "de" }).nodes).includes("1 Wert ≤ 0 nicht gezeigt (Log-Achse)"));
@@ -1047,7 +1143,13 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   const textChart = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { trendline: linearTl })]);
   check("text x: note in the SVG", chartSvg(textChart, chartData(textChart, fakeCalc(blank), "de"), "de").includes("Text in A2 statt Zahl – x ist hier 1, 2, 3 …"));
   check("text x: note in English", chartSvg(textChart, chartData(textChart, fakeCalc(blank), "en"), "en").includes("Text in A2 instead of a number – x is 1, 2, 3 … here"));
-  check("numbers as x: no note", !sceneTexts(buildChartScene(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), chartData(chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]), calc, "de"), { width: 480, height: 300, locale: "de" }).nodes).some((s) => s.includes("statt Zahl")));
+  check("text x: note in the SVG's aria label", /aria-label="[^"]*R² = [\d,]+\. Text in A2 statt Zahl – x ist hier 1, 2, 3 …"/.test(chartSvg(textChart, chartData(textChart, fakeCalc(blank), "de"), "de")), chartSvg(textChart, chartData(textChart, fakeCalc(blank), "de"), "de").match(/aria-label="[^"]*"/)?.[0]);
+  const numericX = chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1))]);
+  const numericScene = buildChartScene(numericX, chartData(numericX, calc, "de"), { width: 480, height: 300, locale: "de" });
+  check("numbers as x: no note", !sceneTexts(numericScene.nodes).some((s) => s.includes("statt Zahl")) && numericScene.label === "Punktdiagramm, 1 Reihe", { label: numericScene.label });
+  // The panel's hint names the trendline only where one uses these x values.
+  check("text x panel hint: a trendline is wrong too", sheetChartText.de.xTextPanel("A2", "Blank", true).includes("Trendlinie und Probe stimmen so nicht") && sheetChartText.en.xTextPanel("A2", "Blank", true).includes("trendline"));
+  check("text x panel hint: no trendline, no word about it", !sheetChartText.de.xTextPanel("C4", "vier", false).includes("Trendlinie") && !sheetChartText.en.xTextPanel("C4", "four", false).includes("trendline"));
 
   // A long equation is broken between its terms, not run past the plot.
   const sixth = fit("6th order", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [1.3, 1.9, 2.5, 3.1, 3.5, 4, 4.3, 4.8, 5.1, 5.6, 5.9, 6.4], spec("polynomial", { order: 6 }));
@@ -1079,6 +1181,81 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   const negChart = chart("scatter", ref(1, 0, 5, 0), [series("n", ref(1, 1, 5, 1), { trendline: linearTl })], { legend: "bottom", yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } });
   const negScene = buildChartScene(negChart, chartData(negChart, fakeCalc(allNeg), "de"), { width: 480, height: 300, locale: "de" });
   check("trendline below 0 on a log axis: no legend entry", trendPaths(negScene.nodes).every((d) => !d) && !sceneTexts(negScene.nodes).includes("Linear (Reihe 1)"), sceneTexts(negScene.nodes));
+}
+
+// ----------------------------------------------------------------------------------------------
+// The chart on the screen: how far opening its settings scrolls the grid (never pushing the data
+// it is made from out of view), when the panel shows a copy of it, and where its action bar goes
+// on a phone. Screen px, measured in the browser at 1280 and 1440 px and on a tablet.
+
+{
+  const r = (left: number, top: number, right: number, bottom: number): Rect => ({ left, top, right, bottom });
+  const scroll = { left: 0, top: 0, maxLeft: 2000, maxTop: 4000 };
+  // Laptop, 1280 px with the sidebar: the calibration template's chart beside its table, the
+  // settings open beside the grid. Column A (the labels) starts at the room's left edge.
+  const room1280 = r(297, 225, 920, 750);
+  const card1280 = r(742, 320, 1203, 620);
+  const labels = r(297, 317, 727, 513);
+  const opening = revealScroll({ card: card1280, room: room1280, bar: "above", data: labels, mode: "settings", scroll });
+  eq("settings at 1280: the labels stay, nothing scrolls", opening, { left: 0, top: 0 });
+  check("settings at 1280: the chart is mostly hidden, the panel shows it", !inViewNext(null, shownShare(card1280, room1280)), shownShare(card1280, room1280));
+  eq("duplicated or from a note: the chart comes into view", revealScroll({ card: card1280, room: room1280, bar: "above", data: labels, mode: "show", scroll })?.left, 295);
+  eq("settings, data further right: up to its left edge", revealScroll({ card: card1280, room: room1280, bar: "above", data: r(497, 317, 927, 513), mode: "settings", scroll })?.left, 200);
+  eq("settings, column A partly scrolled away already: no further", revealScroll({ card: card1280, room: room1280, bar: "above", data: r(237, 317, 667, 513), mode: "settings", scroll })?.left, 0);
+  eq("settings, data out of view on the left: the chart comes in", revealScroll({ card: card1280, room: room1280, bar: "above", data: r(100, 317, 280, 513), mode: "settings", scroll })?.left, 295);
+  eq("no data on the chart's sheet: the chart comes in", revealScroll({ card: card1280, room: room1280, bar: "above", data: null, mode: "settings", scroll })?.left, 295);
+  eq("as far as the grid scrolls", revealScroll({ card: card1280, room: room1280, bar: "above", data: null, mode: "show", scroll: { ...scroll, maxLeft: 120 } })?.left, 120);
+  eq("chart left of the room: back left", revealScroll({ card: r(250, 320, 730, 620), room: room1280, bar: "above", data: labels, mode: "settings", scroll: { ...scroll, left: 400 } })?.left, 341);
+  // Tablet held upright: settings docked from y 531 down. A chart under them comes up into the
+  // room above them only as far as the data's header row stays in view.
+  const roomTablet = r(40, 224, 820, 531);
+  eq("docked, chart beside the data: up into the room, its top first", revealScroll({ card: r(300, 400, 780, 700), room: roomTablet, bar: "above", data: r(40, 400, 300, 600), mode: "settings", scroll })?.top, 112);
+  eq("docked, chart below the data: the header row stays", revealScroll({ card: r(40, 600, 520, 900), room: roomTablet, bar: "above", data: r(40, 250, 300, 450), mode: "settings", scroll })?.top, 26);
+  eq("docked over nearly all of the grid: no room", revealScroll({ card: card1280, room: r(40, 224, 820, 240), bar: "above", data: null, mode: "show", scroll }), null);
+  const fits = revealScroll({ card: r(300, 230, 780, 520), room: roomTablet, bar: "below", data: r(40, 224, 300, 400), mode: "settings", scroll });
+  eq("docked, chart in view already: nothing scrolls", fits, { left: 0, top: 0 });
+
+  // How much shows, and the copy in the panel: shown when under 90 % of the chart can be seen,
+  // gone again only from 90 %, and once gone it comes back only under 75 % (no flicker while
+  // scrolling a little).
+  eq("shown share: all", shownShare(r(100, 100, 300, 200), r(0, 0, 1000, 1000)), 1);
+  eq("shown share: the smaller of width and height", shownShare(r(100, 100, 300, 200), r(0, 0, 200, 1000)), 0.5);
+  eq("shown share: none", shownShare(r(100, 100, 300, 200), r(400, 0, 1000, 1000)), 0);
+  eq("in view: decided once", [inViewNext(null, 0.95), inViewNext(null, 0.85)], [true, false]);
+  eq("in view: slack either way", [inViewNext(true, 0.8), inViewNext(true, 0.7), inViewNext(false, 0.85), inViewNext(false, 0.9)], [true, false, false, true]);
+
+  // The action bar on a phone (cells from x 40 to 390): a chart wider than the screen keeps its
+  // buttons on screen, a bar wider than what shows of the chart starts at its left, and nothing
+  // moves for a chart scrolled out of view.
+  const phone = r(40, 200, 390, 760);
+  const bar = (left: number, top: number, w = 330) => r(left, top, left + w, top + 44);
+  eq("bar of a wide chart: pulled in from the right", barShift(bar(115, 252), r(40, 300, 520, 600), phone), { x: -63, y: 0 });
+  eq("bar wider than what shows of the chart: over the cells beside it, all on screen", barShift(bar(375, 252), r(300, 300, 780, 600), phone), { x: -323, y: 0 });
+  eq("bar wider than the screen: from its left", barShift(bar(100, 252, 400), r(40, 300, 520, 600), phone), { x: -52, y: 0 });
+  eq("laptop, chart half under the settings: the bar ends where the chart is cut", barShift(bar(808, 272), r(743, 320, 1203, 620), r(297, 225, 919, 750)), { x: -227, y: 0 });
+  eq("bar of a chart out of view: stays", barShift(bar(475, 252), r(400, 300, 880, 600), phone), { x: 0, y: 0 });
+  eq("bar above a chart scrolled up: down into view", barShift(bar(100, 166, 200), r(40, 214, 520, 514), phone), { x: 0, y: 42 });
+  eq("bar below a chart, past the bottom: up into view", barShift(bar(100, 770, 200), r(40, 460, 520, 760), phone), { x: 0, y: -62 });
+  eq("bar of a chart below the screen: stays", barShift(bar(100, 770, 200), r(40, 820, 520, 1120), phone), { x: 0, y: 0 });
+  eq("bar in place: no shift", barShift(bar(100, 252, 200), r(40, 300, 520, 600), phone), { x: 0, y: 0 });
+
+  // Less motion: the grid jumps instead of gliding.
+  const real = (globalThis as { window?: unknown }).window;
+  eq("scrolling: smooth without a window", scrollBehavior(), "smooth");
+  (globalThis as { window?: unknown }).window = { matchMedia: (q: string) => ({ matches: q.includes("reduce") }) };
+  eq("scrolling: instant with reduced motion", scrollBehavior(), "auto");
+  (globalThis as { window?: unknown }).window = real;
+
+  // Words a student knows, the same as in the rest of Blob (Fehlerbalken), the switch and the
+  // field of a fixed intercept named apart, axes named by where they run.
+  const de = sheetChartText.de;
+  const en = sheetChartText.en;
+  eq("error bars as in the templates", [de.sections.errors, de.undo.errors], ["Fehlerbalken", "Fehlerbalken ändern"]);
+  eq("axes of a column chart", [de.axisCategories(false), de.axisValues(true)], ["Horizontale Achse (Kategorien)", "Vertikale Achse (Werte)"]);
+  eq("axes of a bar chart", [de.axisCategories(true), de.axisValues(false)], ["Vertikale Achse (Kategorien)", "Horizontale Achse (Werte)"]);
+  eq("axes in English", [en.axisCategories(false), en.axisValues(true)], ["Horizontal axis (categories)", "Vertical axis (values)"]);
+  check("no Excel jargon", !/Rubrik|Größenachse/.test(JSON.stringify(de)) && !JSON.stringify(de.sections).includes("Fehlerindikator"));
+  check("intercept: switch and field named apart", de.interceptValue !== de.setIntercept && en.interceptValue !== en.setIntercept, [de.interceptValue, en.interceptValue]);
 }
 
 const failed = problems.length;

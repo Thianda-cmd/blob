@@ -1,13 +1,15 @@
 "use client";
 
 import { AnimatePresence, motion, useDragControls } from "motion/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { useModalFocus } from "./Dialog";
 
 /**
  * A sheet that slides up from the bottom (phones). Drag the handle down or tap outside to close.
- * Content scrolls inside; the bottom keeps clear of the iPhone's home indicator.
+ * Content scrolls inside; the bottom keeps clear of the iPhone's home indicator. The keyboard stays
+ * inside while it is open and goes back where it came from afterwards (see useModalFocus).
  */
 export function Sheet({
   open,
@@ -16,6 +18,7 @@ export function Sheet({
   label,
   full,
   className,
+  returnFocus,
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,8 +27,12 @@ export function Sheet({
   /** Nearly the whole screen high (editors), instead of as high as the content. */
   full?: boolean;
   className?: string;
+  /** Where the keyboard goes after closing when the element that opened the sheet is gone. */
+  returnFocus?: () => void;
 }) {
   const controls = useDragControls();
+  const panel = useRef<HTMLDivElement>(null);
+  const focus = useModalFocus(open, panel, returnFocus);
 
   useEffect(() => {
     if (!open) return;
@@ -53,11 +60,15 @@ export function Sheet({
             onClick={onClose}
           />
           <motion.div
+            ref={panel}
             role="dialog"
             aria-modal="true"
             aria-label={label}
+            tabIndex={-1}
+            onFocus={focus.onFocus}
+            onKeyDown={focus.onKeyDown}
             className={cn(
-              "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-[20px] border-t border-line bg-raised shadow-pop",
+              "absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-[20px] border-t border-line bg-raised shadow-pop outline-none",
               full ? "h-[92dvh]" : "max-h-[92dvh]",
               className,
             )}

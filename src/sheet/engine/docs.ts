@@ -307,6 +307,54 @@ const MATH: Record<string, Pair> = {
       exampleResult: "20 – das Vielfache von 5 darunter.",
     },
   },
+  "CEILING.MATH": {
+    en: {
+      summary: "Rounds up to the next multiple of a step (1 when left out). Negative numbers go toward 0, or away from it with mode.",
+      args: [
+        a("number", "The number to round."),
+        a("significance", "The step, e.g. 5 or 0.5; left out: 1. Its sign doesn't matter.", OPT),
+        a("mode", "Only for negative numbers: 0 or left out rounds toward 0, any other number away from 0.", OPT),
+      ],
+      example: "=CEILING.MATH(24.3,5)",
+      exampleResult: "25 – the next multiple of 5.",
+      tip: "Without a step it rounds up to a whole number: =CEILING.MATH(6.2) gives 7, e.g. the number of plates you need.",
+    },
+    de: {
+      summary: "Rundet auf das nächste Vielfache eines Schritts auf (ohne Angabe 1). Negative Zahlen gehen Richtung 0, mit Modus von 0 weg.",
+      args: [
+        a("Zahl", "Die Zahl, die gerundet wird."),
+        a("Schritt", "Der Schritt, z. B. 5 oder 0,5; ohne Angabe 1. Sein Vorzeichen ist egal.", OPT),
+        a("Modus", "Nur für negative Zahlen: 0 oder leer rundet Richtung 0, jede andere Zahl von 0 weg.", OPT),
+      ],
+      example: "=OBERGRENZE.MATHEMATIK(24,3;5)",
+      exampleResult: "25 – das nächste Vielfache von 5.",
+      tip: "Ohne Schritt rundet es auf eine ganze Zahl auf: =OBERGRENZE.MATHEMATIK(6,2) ergibt 7, z. B. die Anzahl Platten, die du brauchst.",
+    },
+  },
+  "FLOOR.MATH": {
+    en: {
+      summary: "Rounds down to the previous multiple of a step (1 when left out). Negative numbers go away from 0, or toward it with mode.",
+      args: [
+        a("number", "The number to round."),
+        a("significance", "The step, e.g. 5 or 0.5; left out: 1. Its sign doesn't matter.", OPT),
+        a("mode", "Only for negative numbers: 0 or left out rounds away from 0, any other number toward 0.", OPT),
+      ],
+      example: "=FLOOR.MATH(24.3,5)",
+      exampleResult: "20 – the multiple of 5 below.",
+      tip: "Without a step it rounds down to a whole number: =FLOOR.MATH(6.7) gives 6.",
+    },
+    de: {
+      summary: "Rundet auf das vorige Vielfache eines Schritts ab (ohne Angabe 1). Negative Zahlen gehen von 0 weg, mit Modus Richtung 0.",
+      args: [
+        a("Zahl", "Die Zahl, die gerundet wird."),
+        a("Schritt", "Der Schritt, z. B. 5 oder 0,5; ohne Angabe 1. Sein Vorzeichen ist egal.", OPT),
+        a("Modus", "Nur für negative Zahlen: 0 oder leer rundet von 0 weg, jede andere Zahl Richtung 0.", OPT),
+      ],
+      example: "=UNTERGRENZE.MATHEMATIK(24,3;5)",
+      exampleResult: "20 – das Vielfache von 5 darunter.",
+      tip: "Ohne Schritt rundet es auf eine ganze Zahl ab: =UNTERGRENZE.MATHEMATIK(6,7) ergibt 6.",
+    },
+  },
   EVEN: {
     en: {
       summary: "Rounds up (away from zero) to the next even whole number.",
@@ -559,6 +607,19 @@ const MATH: Record<string, Pair> = {
 
 // ----------------------------------------------------------------------------------------------
 // Statistik
+
+const RANK_ARGS = {
+  en: [a("number", "The number to rank."), a("ref", "The list of numbers."), a("order", "0 or left out: the largest is 1st; 1: the smallest is 1st.", OPT)],
+  de: [a("Zahl", "Die Zahl, deren Rang du suchst."), a("Bezug", "Die Liste der Zahlen."), a("Reihenfolge", "0 oder leer: die größte ist 1.; 1: die kleinste ist 1.", OPT)],
+};
+const F_ARGS = {
+  en: [a("x", "The F-value, 0 or more."), a("deg_freedom1", "The degrees of freedom of the numerator, n₁ − 1."), a("deg_freedom2", "The degrees of freedom of the denominator, n₂ − 1.")],
+  de: [a("x", "Der F-Wert, 0 oder mehr."), a("Freiheitsgrade1", "Die Freiheitsgrade des Zählers, n₁ − 1."), a("Freiheitsgrade2", "Die Freiheitsgrade des Nenners, n₂ − 1.")],
+};
+const CHI_ARGS = {
+  en: [a("x", "The χ² value, 0 or more."), a("deg_freedom", "The degrees of freedom, e.g. the number of classes − 1.")],
+  de: [a("x", "Der χ²-Wert, 0 oder mehr."), a("Freiheitsgrade", "Die Freiheitsgrade, z. B. die Anzahl der Klassen − 1.")],
+};
 
 const STATS: Record<string, Pair> = {
   AVERAGE: {
@@ -896,13 +957,13 @@ const STATS: Record<string, Pair> = {
   "RANK.EQ": {
     en: {
       summary: "The rank of a number in a list; equal numbers share the best rank.",
-      args: [a("number", "The number to rank."), a("ref", "The list of numbers."), a("order", "0 or left out: the largest is 1st; 1: the smallest is 1st.", OPT)],
+      args: RANK_ARGS.en,
       example: "=RANK.EQ(B2,B$2:B$20)",
       exampleResult: "The place of B2 in the list, the largest first.",
     },
     de: {
       summary: "Der Rang einer Zahl in einer Liste; gleiche Zahlen teilen sich den besten Rang.",
-      args: [a("Zahl", "Die Zahl, deren Rang du suchst."), a("Bezug", "Die Liste der Zahlen."), a("Reihenfolge", "0 oder leer: die größte ist 1.; 1: die kleinste ist 1.", OPT)],
+      args: RANK_ARGS.de,
       example: "=RANG.GLEICH(B2;B$2:B$20)",
       exampleResult: "Der Platz von B2 in der Liste, die größte Zahl zuerst.",
     },
@@ -1053,7 +1114,7 @@ const STATS: Record<string, Pair> = {
   },
   "T.TEST": {
     en: {
-      summary: "The p-value of a t-test: how likely it is that the difference between two groups' means is just chance.",
+      summary: "The p-value of a t-test: how likely a difference of the means at least this large would be if both groups really had the same mean.",
       args: [
         a("array1", "The first group's values."),
         a("array2", "The second group's values."),
@@ -1065,7 +1126,7 @@ const STATS: Record<string, Pair> = {
       tip: "p < 0.05 usually counts as significant. Type 3 (Welch) is the safe choice when you don't know whether both groups scatter equally.",
     },
     de: {
-      summary: "Der p-Wert eines t-Tests: wie wahrscheinlich der Unterschied zwischen den Mittelwerten zweier Gruppen nur Zufall ist.",
+      summary: "Der p-Wert eines t-Tests: wie wahrscheinlich ein mindestens so großer Unterschied der Mittelwerte wäre, wenn die beiden Gruppen in Wahrheit gleich wären.",
       args: [
         a("Matrix1", "Die Werte der ersten Gruppe."),
         a("Matrix2", "Die Werte der zweiten Gruppe."),
@@ -1162,6 +1223,355 @@ const STATS: Record<string, Pair> = {
       example: "=KURT(B2:B30)",
       exampleResult: "Z. B. −0,4 – etwas flacher als eine Normalverteilung.",
     },
+  },
+
+  // Text counted as 0 (the "A" forms, like MITTELWERTA)
+  STDEVA: {
+    en: {
+      summary: "Like STDEV.S, but text in ranges counts as 0 and TRUE as 1 (STDEV.S leaves them out).",
+      args: VALUES.en,
+      example: "=STDEVA(B2:B5)",
+      exampleResult: "2.582 for 2, 4, “n.d.” and 6: the text counts as 0.",
+      tip: "Rarely what you want: a value marked “n.d.” isn't 0. For replicates, use STDEV.S.",
+    },
+    de: {
+      summary: "Wie STABW.S, aber Text in Bereichen zählt als 0 und WAHR als 1 (STABW.S lässt sie weg).",
+      args: VALUES.de,
+      example: "=STABWA(B2:B5)",
+      exampleResult: "2,582 für 2, 4, „n. b.“ und 6: Der Text zählt als 0.",
+      tip: "Selten das Richtige: Ein Wert „n. b.“ ist nicht 0. Für Replikate nimmst du STABW.S.",
+    },
+  },
+  STDEVPA: {
+    en: { summary: "Like STDEV.P (divides by n), but text in ranges counts as 0 and TRUE as 1.", args: VALUES.en, example: "=STDEVPA(B2:B5)", exampleResult: "2.236 for 2, 4, “n.d.” and 6." },
+    de: { summary: "Wie STABW.N (teilt durch n), aber Text in Bereichen zählt als 0 und WAHR als 1.", args: VALUES.de, example: "=STABWNA(B2:B5)", exampleResult: "2,236 für 2, 4, „n. b.“ und 6." },
+  },
+  VARA: {
+    en: { summary: "Like VAR.S, but text in ranges counts as 0 and TRUE as 1.", args: VALUES.en, example: "=VARA(B2:B5)", exampleResult: "6.667 for 2, 4, “n.d.” and 6." },
+    de: { summary: "Wie VAR.S, aber Text in Bereichen zählt als 0 und WAHR als 1.", args: VALUES.de, example: "=VARIANZA(B2:B5)", exampleResult: "6,667 für 2, 4, „n. b.“ und 6." },
+  },
+  VARPA: {
+    en: { summary: "Like VAR.P (divides by n), but text in ranges counts as 0 and TRUE as 1.", args: VALUES.en, example: "=VARPA(B2:B5)", exampleResult: "5 for 2, 4, “n.d.” and 6." },
+    de: { summary: "Wie VAR.P (teilt durch n), aber Text in Bereichen zählt als 0 und WAHR als 1.", args: VALUES.de, example: "=VARIANZENA(B2:B5)", exampleResult: "5 für 2, 4, „n. b.“ und 6." },
+  },
+
+  // Ranks and quantiles
+  "RANK.AVG": {
+    en: {
+      summary: "The rank of a number in a list; equal numbers share the mean of their places (two at the top are both 1.5).",
+      args: RANK_ARGS.en,
+      example: "=RANK.AVG(B2,B$2:B$20)",
+      exampleResult: "The place of B2 in the list, the largest first; a tie for 3rd and 4th place gives 3.5.",
+      tip: "Rank tests such as the Mann–Whitney U test work with these mean ranks.",
+    },
+    de: {
+      summary: "Der Rang einer Zahl in einer Liste; gleiche Zahlen teilen sich den Mittelwert ihrer Plätze (zwei gleiche an der Spitze sind beide 1,5).",
+      args: RANK_ARGS.de,
+      example: "=RANG.MITTELW(B2;B$2:B$20)",
+      exampleResult: "Der Platz von B2 in der Liste, die größte Zahl zuerst; bei Gleichstand auf Platz 3 und 4 ergibt es 3,5.",
+      tip: "Rangtests wie der Mann-Whitney-U-Test rechnen mit diesen mittleren Rängen.",
+    },
+  },
+  "PERCENTILE.EXC": {
+    en: {
+      summary: "Like PERCENTILE.INC, but k must lie inside the data: from 1/(n+1) to n/(n+1) for n values. The method many statistics books use.",
+      args: [a("array", "The numbers."), a("k", "The share, e.g. 0.9 for the 90th percentile; with n values from 1/(n+1) to n/(n+1).")],
+      example: "=PERCENTILE.EXC(B2:B101,0.95)",
+      exampleResult: "The 95th percentile of the 100 values; #NUM! for a k outside 1/101 to 100/101.",
+      tip: "With few values the outer percentiles don't exist: with 9 values, k must lie between 0.1 and 0.9.",
+    },
+    de: {
+      summary: "Wie QUANTIL.INKL, aber k muss innerhalb der Daten liegen: bei n Werten von 1/(n+1) bis n/(n+1). Die Methode vieler Statistikbücher.",
+      args: [a("Matrix", "Die Zahlen."), a("k", "Der Anteil, z. B. 0,9 für das 90-%-Quantil; bei n Werten von 1/(n+1) bis n/(n+1).")],
+      example: "=QUANTIL.EXKL(B2:B101;0,95)",
+      exampleResult: "Das 95-%-Quantil der 100 Werte; #ZAHL! für ein k außerhalb von 1/101 bis 100/101.",
+      tip: "Bei wenigen Werten gibt es die äußeren Quantile nicht: Bei 9 Werten muss k zwischen 0,1 und 0,9 liegen.",
+    },
+  },
+  "QUARTILE.EXC": {
+    en: {
+      summary: "A quartile by the exclusive method (PERCENTILE.EXC): 1 first quartile, 2 median, 3 third quartile.",
+      args: [a("array", "The numbers."), a("quart", "Which quartile, 1 to 3.")],
+      example: "=QUARTILE.EXC(B2:B30,1)",
+      exampleResult: "The first quartile by the exclusive method; it lies a little further out than the one of QUARTILE.INC.",
+      tip: "The first and third quartile need at least 3 numbers.",
+    },
+    de: {
+      summary: "Ein Quartil nach der exklusiven Methode (QUANTIL.EXKL): 1 erstes Quartil, 2 Median, 3 drittes Quartil.",
+      args: [a("Matrix", "Die Zahlen."), a("Quartile", "Welches Quartil, 1 bis 3.")],
+      example: "=QUARTILE.EXKL(B2:B30;1)",
+      exampleResult: "Das erste Quartil nach der exklusiven Methode; es liegt etwas weiter außen als das von QUARTILE.INKL.",
+      tip: "Das erste und das dritte Quartil brauchen mindestens 3 Zahlen.",
+    },
+  },
+  FREQUENCY: {
+    en: {
+      summary: "Counts how many values fall into each class: up to the first limit, above it up to the second, and so on; the last count is everything above the highest limit. An array: the cell shows the first count, INDEX gives the others.",
+      args: [a("data_array", "The values to count, e.g. colony counts."), a("bins_array", "The upper limits of the classes, e.g. 50, 100 and 150.")],
+      example: "=INDEX(FREQUENCY(B2:B31,D2:D4),2)",
+      exampleResult: "How many values in B2:B31 lie above the first limit in D2, up to the second in D3.",
+      tip: "For a histogram: limits in D2:D4, in E2 =INDEX(FREQUENCY($B$2:$B$31,$D$2:$D$4),ROW()-1), filled down to E5 (one row more than limits).",
+    },
+    de: {
+      summary: "Zählt, wie viele Werte in jede Klasse fallen: bis zur ersten Grenze, darüber bis zur zweiten und so weiter; die letzte Anzahl zählt alles über der höchsten Grenze. Eine Matrix: Die Zelle zeigt die erste Anzahl, INDEX die anderen.",
+      args: [a("Daten", "Die Werte, die gezählt werden, z. B. Koloniezahlen."), a("Klassen", "Die oberen Grenzen der Klassen, z. B. 50, 100 und 150.")],
+      example: "=INDEX(HÄUFIGKEIT(B2:B31;D2:D4);2)",
+      exampleResult: "Wie viele Werte in B2:B31 über der ersten Grenze in D2 und bis zur zweiten in D3 liegen.",
+      tip: "Für ein Histogramm: Grenzen in D2:D4, in E2 =INDEX(HÄUFIGKEIT($B$2:$B$31;$D$2:$D$4);ZEILE()-1) und bis E5 nach unten ausfüllen (eine Zeile mehr als Grenzen).",
+    },
+  },
+
+  // Distributions
+  "T.DIST.RT": {
+    en: {
+      summary: "The right-tailed t-distribution: the probability of a t at least this large (the one-tailed p-value).",
+      args: [a("x", "The t-value."), a("deg_freedom", "The degrees of freedom, usually n − 1.")],
+      example: "=T.DIST.RT(2.5,10)",
+      exampleResult: "About 0.016",
+      tip: "For t ≥ 0, twice this is T.DIST.2T, the two-tailed p-value.",
+    },
+    de: {
+      summary: "Die rechtsseitige t-Verteilung: die Wahrscheinlichkeit für ein mindestens so großes t (der einseitige p-Wert).",
+      args: [a("x", "Der t-Wert."), a("Freiheitsgrade", "Die Freiheitsgrade, meist n − 1.")],
+      example: "=T.VERT.RE(2,5;10)",
+      exampleResult: "Etwa 0,016",
+      tip: "Für t ≥ 0 ist das Doppelte T.VERT.2S, der zweiseitige p-Wert.",
+    },
+  },
+  "F.TEST": {
+    en: {
+      summary: "The p-value of an F-test: how likely variances at least this different would be if both groups really scattered equally.",
+      args: [a("array1", "The first group's values."), a("array2", "The second group's values.")],
+      example: "=F.TEST(B2:B4,C2:C4)",
+      exampleResult: "E.g. 0.61 – above 0.05, so no sign that the two groups scatter differently.",
+      tip: "Before a t-test: with p ≥ 0.05, T.TEST type 2 (equal variances) fits; otherwise take type 3 (Welch).",
+    },
+    de: {
+      summary: "Der p-Wert eines F-Tests: wie wahrscheinlich mindestens so unterschiedliche Varianzen wären, wenn beide Gruppen in Wahrheit gleich stark streuen.",
+      args: [a("Matrix1", "Die Werte der ersten Gruppe."), a("Matrix2", "Die Werte der zweiten Gruppe.")],
+      example: "=F.TEST(B2:B4;C2:C4)",
+      exampleResult: "Z. B. 0,61 – über 0,05, also kein Hinweis, dass die Gruppen unterschiedlich stark streuen.",
+      tip: "Vor dem t-Test: Bei p ≥ 0,05 passt T.TEST Typ 2 (gleiche Varianzen), sonst nimm Typ 3 (Welch).",
+    },
+  },
+  "F.DIST": {
+    en: {
+      summary: "The F-distribution: with cumulative TRUE the probability of an F up to x, with FALSE the density.",
+      args: [...F_ARGS.en, a("cumulative", "TRUE: the probability up to x; FALSE: the density at x.")],
+      example: "=F.DIST(2.5,3,10,TRUE)",
+      exampleResult: "About 0.88",
+    },
+    de: {
+      summary: "Die F-Verteilung: mit Kumuliert WAHR die Wahrscheinlichkeit für ein F bis x, mit FALSCH die Dichte.",
+      args: [...F_ARGS.de, a("Kumuliert", "WAHR: die Wahrscheinlichkeit bis x; FALSCH: die Dichte bei x.")],
+      example: "=F.VERT(2,5;3;10;WAHR)",
+      exampleResult: "Etwa 0,88",
+    },
+  },
+  "F.DIST.RT": {
+    en: {
+      summary: "The right tail of the F-distribution: the probability of an F at least this large, the p-value of an F-test or an analysis of variance.",
+      args: F_ARGS.en,
+      example: "=F.DIST.RT(2.5,3,10)",
+      exampleResult: "About 0.119",
+    },
+    de: {
+      summary: "Der rechte Teil der F-Verteilung: die Wahrscheinlichkeit für ein mindestens so großes F, der p-Wert eines F-Tests oder einer Varianzanalyse.",
+      args: F_ARGS.de,
+      example: "=F.VERT.RE(2,5;3;10)",
+      exampleResult: "Etwa 0,119",
+    },
+  },
+  "F.INV": {
+    en: {
+      summary: "The F-value below which a given share of the F-distribution lies (the inverse of F.DIST).",
+      args: [a("probability", "The share, from 0 to below 1."), ...F_ARGS.en.slice(1)],
+      example: "=F.INV(0.95,3,10)",
+      exampleResult: "3.708",
+    },
+    de: {
+      summary: "Der F-Wert, unter dem ein bestimmter Anteil der F-Verteilung liegt (die Umkehrung von F.VERT).",
+      args: [a("Wahrsch", "Der Anteil, von 0 bis unter 1."), ...F_ARGS.de.slice(1)],
+      example: "=F.INV(0,95;3;10)",
+      exampleResult: "3,708",
+    },
+  },
+  "F.INV.RT": {
+    en: {
+      summary: "The critical F-value: the F that is exceeded only with a given probability, e.g. 0.05.",
+      args: [a("probability", "The error probability, e.g. 0.05."), ...F_ARGS.en.slice(1)],
+      example: "=F.INV.RT(0.05,3,10)",
+      exampleResult: "3.708 – an F above it is significant at the 5 % level.",
+    },
+    de: {
+      summary: "Der kritische F-Wert: das F, das nur mit einer bestimmten Wahrscheinlichkeit überschritten wird, z. B. 0,05.",
+      args: [a("Wahrsch", "Die Irrtumswahrscheinlichkeit, z. B. 0,05."), ...F_ARGS.de.slice(1)],
+      example: "=F.INV.RE(0,05;3;10)",
+      exampleResult: "3,708 – ein F darüber ist auf dem 5-%-Niveau signifikant.",
+    },
+  },
+  "CHISQ.TEST": {
+    en: {
+      summary: "The p-value of a chi-squared test: how likely deviations at least this large between the observed and the expected counts would be if the expected ratio were true.",
+      args: [a("actual_range", "The observed counts, e.g. the plants of each phenotype."), a("expected_range", "The expected counts for the same cells, e.g. from a 3:1 ratio.")],
+      example: "=CHISQ.TEST(B2:B3,C2:C3)",
+      exampleResult: "E.g. 0.44 for 787 : 277 plants against the expected 798 : 266 – above 0.05, so no significant deviation from 3:1.",
+      tip: "The expected counts are the total times the expected share: for 3:1, =SUM(B$2:B$3)*3/4 and =SUM(B$2:B$3)/4. In a table of rows and columns there are (rows − 1)·(columns − 1) degrees of freedom.",
+    },
+    de: {
+      summary: "Der p-Wert eines Chi-Quadrat-Tests: wie wahrscheinlich mindestens so große Abweichungen zwischen beobachteten und erwarteten Anzahlen wären, wenn das erwartete Verhältnis stimmt.",
+      args: [a("Beob_Messwerte", "Die beobachteten Anzahlen, z. B. die Pflanzen je Phänotyp."), a("Erwart_Werte", "Die erwarteten Anzahlen für dieselben Zellen, z. B. nach einem 3:1-Verhältnis.")],
+      example: "=CHIQU.TEST(B2:B3;C2:C3)",
+      exampleResult: "Z. B. 0,44 für 787 : 277 Pflanzen gegenüber erwarteten 798 : 266 – über 0,05, also keine signifikante Abweichung von 3:1.",
+      tip: "Die erwarteten Anzahlen sind die Gesamtzahl mal dem erwarteten Anteil: für 3:1 =SUMME(B$2:B$3)*3/4 und =SUMME(B$2:B$3)/4. In einer Tabelle aus Zeilen und Spalten gibt es (Zeilen − 1)·(Spalten − 1) Freiheitsgrade.",
+    },
+  },
+  "CHISQ.DIST": {
+    en: {
+      summary: "The chi-squared distribution: with cumulative TRUE the probability of a χ² up to x, with FALSE the density.",
+      args: [...CHI_ARGS.en, a("cumulative", "TRUE: the probability up to x; FALSE: the density at x.")],
+      example: "=CHISQ.DIST(3.84,1,TRUE)",
+      exampleResult: "About 0.95",
+    },
+    de: {
+      summary: "Die Chi-Quadrat-Verteilung: mit Kumuliert WAHR die Wahrscheinlichkeit für ein χ² bis x, mit FALSCH die Dichte.",
+      args: [...CHI_ARGS.de, a("Kumuliert", "WAHR: die Wahrscheinlichkeit bis x; FALSCH: die Dichte bei x.")],
+      example: "=CHIQU.VERT(3,84;1;WAHR)",
+      exampleResult: "Etwa 0,95",
+    },
+  },
+  "CHISQ.DIST.RT": {
+    en: {
+      summary: "The right tail of the chi-squared distribution: the p-value for a χ² you calculated yourself.",
+      args: CHI_ARGS.en,
+      example: "=CHISQ.DIST.RT(3.84,1)",
+      exampleResult: "About 0.05 – the 5 % limit for one degree of freedom.",
+    },
+    de: {
+      summary: "Der rechte Teil der Chi-Quadrat-Verteilung: der p-Wert zu einem χ², das du selbst ausgerechnet hast.",
+      args: CHI_ARGS.de,
+      example: "=CHIQU.VERT.RE(3,84;1)",
+      exampleResult: "Etwa 0,05 – die 5-%-Grenze bei einem Freiheitsgrad.",
+    },
+  },
+  "CHISQ.INV": {
+    en: {
+      summary: "The χ² below which a given share of the chi-squared distribution lies (the inverse of CHISQ.DIST).",
+      args: [a("probability", "The share, from 0 to below 1."), CHI_ARGS.en[1]],
+      example: "=CHISQ.INV(0.95,1)",
+      exampleResult: "3.841",
+    },
+    de: {
+      summary: "Das χ², unter dem ein bestimmter Anteil der Chi-Quadrat-Verteilung liegt (die Umkehrung von CHIQU.VERT).",
+      args: [a("Wahrsch", "Der Anteil, von 0 bis unter 1."), CHI_ARGS.de[1]],
+      example: "=CHIQU.INV(0,95;1)",
+      exampleResult: "3,841",
+    },
+  },
+  "CHISQ.INV.RT": {
+    en: {
+      summary: "The critical χ²: the value that is exceeded only with a given probability, e.g. 0.05.",
+      args: [a("probability", "The error probability, e.g. 0.05."), CHI_ARGS.en[1]],
+      example: "=CHISQ.INV.RT(0.05,3)",
+      exampleResult: "7.815 – the 5 % limit for four classes (3 degrees of freedom), e.g. a 9:3:3:1 ratio.",
+    },
+    de: {
+      summary: "Das kritische χ²: der Wert, der nur mit einer bestimmten Wahrscheinlichkeit überschritten wird, z. B. 0,05.",
+      args: [a("Wahrsch", "Die Irrtumswahrscheinlichkeit, z. B. 0,05."), CHI_ARGS.de[1]],
+      example: "=CHIQU.INV.RE(0,05;3)",
+      exampleResult: "7,815 – die 5-%-Grenze bei vier Klassen (3 Freiheitsgrade), z. B. für ein 9:3:3:1-Verhältnis.",
+    },
+  },
+};
+
+// ----------------------------------------------------------------------------------------------
+// Older names (Excel 2007 and before) that calculate like a newer function: old workbooks and
+// textbooks use them. Each says which newer one to take and has that one's arguments.
+
+const same = (now: string, lang: "en" | "de") => STATS[now][lang].args;
+
+const OLDER: Record<string, Pair> = {
+  RANK: {
+    en: { summary: "The older name of RANK.EQ: the rank of a number in a list, with the same result.", args: same("RANK.EQ", "en"), example: "=RANK(B2,B$2:B$20)", exampleResult: "The place of B2 in the list, the same as RANK.EQ." },
+    de: { summary: "Der ältere Name von RANG.GLEICH: der Rang einer Zahl in einer Liste, mit gleichem Ergebnis.", args: same("RANK.EQ", "de"), example: "=RANG(B2;B$2:B$20)", exampleResult: "Der Platz von B2 in der Liste, wie mit RANG.GLEICH." },
+  },
+  PERCENTILE: {
+    en: { summary: "The older name of PERCENTILE.INC, with the same result.", args: same("PERCENTILE.INC", "en"), example: "=PERCENTILE(B2:B101,0.95)", exampleResult: "The 95th percentile, the same as PERCENTILE.INC." },
+    de: { summary: "Der ältere Name von QUANTIL.INKL, mit gleichem Ergebnis.", args: same("PERCENTILE.INC", "de"), example: "=QUANTIL(B2:B101;0,95)", exampleResult: "Das 95-%-Quantil, wie mit QUANTIL.INKL." },
+  },
+  QUARTILE: {
+    en: { summary: "The older name of QUARTILE.INC, with the same result.", args: same("QUARTILE.INC", "en"), example: "=QUARTILE(B2:B30,1)", exampleResult: "The first quartile, the same as QUARTILE.INC." },
+    de: { summary: "Der ältere Name von QUARTILE.INKL, mit gleichem Ergebnis.", args: same("QUARTILE.INC", "de"), example: "=QUARTILE(B2:B30;1)", exampleResult: "Das erste Quartil, wie mit QUARTILE.INKL." },
+  },
+  MODE: {
+    en: { summary: "The older name of MODE.SNGL: the number that occurs most often, with the same result.", args: NUMBERS.en, example: "=MODE(2,3,3,5)", exampleResult: "3, the same as MODE.SNGL." },
+    de: { summary: "Der ältere Name von MODUS.EINF: die Zahl, die am häufigsten vorkommt, mit gleichem Ergebnis.", args: NUMBERS.de, example: "=MODALWERT(2;3;3;5)", exampleResult: "3, wie mit MODUS.EINF." },
+  },
+  NORMDIST: {
+    en: { summary: "The older name of NORM.DIST, with the same result.", args: same("NORM.DIST", "en"), example: "=NORMDIST(110,100,15,TRUE)", exampleResult: "About 0.75, the same as NORM.DIST." },
+    de: { summary: "Der ältere Name von NORM.VERT, mit gleichem Ergebnis.", args: same("NORM.DIST", "de"), example: "=NORMVERT(110;100;15;WAHR)", exampleResult: "Etwa 0,75, wie mit NORM.VERT." },
+  },
+  NORMINV: {
+    en: { summary: "The older name of NORM.INV, with the same result.", args: same("NORM.INV", "en"), example: "=NORMINV(0.975,0,1)", exampleResult: "1.96, the same as NORM.INV." },
+    de: { summary: "Der ältere Name von NORM.INV, mit gleichem Ergebnis.", args: same("NORM.INV", "de"), example: "=NORMINV(0,975;0;1)", exampleResult: "1,96, wie mit NORM.INV." },
+  },
+  NORMSDIST: {
+    en: { summary: "The older form of NORM.S.DIST with TRUE: the probability of a standard normal value up to z.", args: [a("z", "The z-value.")], example: "=NORMSDIST(1.96)", exampleResult: "0.975" },
+    de: { summary: "Die ältere Form von NORM.S.VERT mit WAHR: die Wahrscheinlichkeit für einen standardnormalverteilten Wert bis z.", args: [a("z", "Der z-Wert.")], example: "=STANDNORMVERT(1,96)", exampleResult: "0,975" },
+  },
+  NORMSINV: {
+    en: { summary: "The older name of NORM.S.INV, with the same result.", args: same("NORM.S.INV", "en"), example: "=NORMSINV(0.95)", exampleResult: "1.645, the same as NORM.S.INV." },
+    de: { summary: "Der ältere Name von NORM.S.INV, mit gleichem Ergebnis.", args: same("NORM.S.INV", "de"), example: "=STANDNORMINV(0,95)", exampleResult: "1,645, wie mit NORM.S.INV." },
+  },
+  TDIST: {
+    en: {
+      summary: "The older t-distribution: with tails 1 the one-tailed p-value of t (like T.DIST.RT), with 2 the two-tailed one (like T.DIST.2T).",
+      args: [a("x", "The t-value, 0 or more."), a("deg_freedom", "The degrees of freedom, usually n − 1."), a("tails", "1: one-tailed; 2: two-tailed.")],
+      example: "=TDIST(2.5,10,2)",
+      exampleResult: "About 0.031, the same as T.DIST.2T(2.5,10).",
+    },
+    de: {
+      summary: "Die ältere t-Verteilung: mit Seiten 1 der einseitige p-Wert von t (wie T.VERT.RE), mit 2 der zweiseitige (wie T.VERT.2S).",
+      args: [a("x", "Der t-Wert, 0 oder mehr."), a("Freiheitsgrade", "Die Freiheitsgrade, meist n − 1."), a("Seiten", "1: einseitig; 2: zweiseitig.")],
+      example: "=TVERT(2,5;10;2)",
+      exampleResult: "Etwa 0,031, wie T.VERT.2S(2,5;10).",
+    },
+  },
+  TINV: {
+    en: { summary: "The older name of T.INV.2T: the two-tailed t-value for an error probability, with the same result.", args: same("T.INV.2T", "en"), example: "=TINV(0.05,2)", exampleResult: "4.303, the same as T.INV.2T." },
+    de: { summary: "Der ältere Name von T.INV.2S: der zweiseitige t-Wert für eine Irrtumswahrscheinlichkeit, mit gleichem Ergebnis.", args: same("T.INV.2T", "de"), example: "=TINV(0,05;2)", exampleResult: "4,303, wie mit T.INV.2S." },
+  },
+  TTEST: {
+    en: { summary: "The older name of T.TEST: the p-value of a t-test, with the same result.", args: same("T.TEST", "en"), example: "=TTEST(B2:B4,C2:C4,2,3)", exampleResult: "The same p-value as T.TEST." },
+    de: { summary: "Der ältere Name von T.TEST: der p-Wert eines t-Tests, mit gleichem Ergebnis.", args: same("T.TEST", "de"), example: "=TTEST(B2:B4;C2:C4;2;3)", exampleResult: "Derselbe p-Wert wie mit T.TEST." },
+  },
+  CONFIDENCE: {
+    en: { summary: "The older name of CONFIDENCE.NORM (normal distribution, for large samples), with the same result.", args: same("CONFIDENCE.NORM", "en"), example: "=CONFIDENCE(0.05,2.5,50)", exampleResult: "About 0.69", tip: "For a few replicates, use CONFIDENCE.T." },
+    de: { summary: "Der ältere Name von KONFIDENZ.NORM (Normalverteilung, für große Stichproben), mit gleichem Ergebnis.", args: same("CONFIDENCE.NORM", "de"), example: "=KONFIDENZ(0,05;2,5;50)", exampleResult: "Etwa 0,69", tip: "Für wenige Replikate nimmst du KONFIDENZ.T." },
+  },
+  FTEST: {
+    en: { summary: "The older name of F.TEST: the p-value of an F-test, with the same result.", args: same("F.TEST", "en"), example: "=FTEST(B2:B4,C2:C4)", exampleResult: "The same p-value as F.TEST." },
+    de: { summary: "Der ältere Name von F.TEST: der p-Wert eines F-Tests, mit gleichem Ergebnis.", args: same("F.TEST", "de"), example: "=FTEST(B2:B4;C2:C4)", exampleResult: "Derselbe p-Wert wie mit F.TEST." },
+  },
+  FDIST: {
+    en: { summary: "The older name of F.DIST.RT: the right tail of the F-distribution, with the same result.", args: same("F.DIST.RT", "en"), example: "=FDIST(2.5,3,10)", exampleResult: "About 0.119, the same as F.DIST.RT." },
+    de: { summary: "Der ältere Name von F.VERT.RE: der rechte Teil der F-Verteilung, mit gleichem Ergebnis.", args: same("F.DIST.RT", "de"), example: "=FVERT(2,5;3;10)", exampleResult: "Etwa 0,119, wie mit F.VERT.RE." },
+  },
+  FINV: {
+    en: { summary: "The older name of F.INV.RT: the critical F-value, with the same result.", args: same("F.INV.RT", "en"), example: "=FINV(0.05,3,10)", exampleResult: "3.708, the same as F.INV.RT." },
+    de: { summary: "Der ältere Name von F.INV.RE: der kritische F-Wert, mit gleichem Ergebnis.", args: same("F.INV.RT", "de"), example: "=FINV(0,05;3;10)", exampleResult: "3,708, wie mit F.INV.RE." },
+  },
+  CHITEST: {
+    en: { summary: "The older name of CHISQ.TEST: the p-value of a chi-squared test, with the same result.", args: same("CHISQ.TEST", "en"), example: "=CHITEST(B2:B3,C2:C3)", exampleResult: "The same p-value as CHISQ.TEST." },
+    de: { summary: "Der ältere Name von CHIQU.TEST: der p-Wert eines Chi-Quadrat-Tests, mit gleichem Ergebnis.", args: same("CHISQ.TEST", "de"), example: "=CHITEST(B2:B3;C2:C3)", exampleResult: "Derselbe p-Wert wie mit CHIQU.TEST." },
+  },
+  CHIDIST: {
+    en: { summary: "The older name of CHISQ.DIST.RT: the p-value for a χ², with the same result.", args: same("CHISQ.DIST.RT", "en"), example: "=CHIDIST(3.84,1)", exampleResult: "About 0.05, the same as CHISQ.DIST.RT." },
+    de: { summary: "Der ältere Name von CHIQU.VERT.RE: der p-Wert zu einem χ², mit gleichem Ergebnis.", args: same("CHISQ.DIST.RT", "de"), example: "=CHIVERT(3,84;1)", exampleResult: "Etwa 0,05, wie mit CHIQU.VERT.RE." },
+  },
+  CHIINV: {
+    en: { summary: "The older name of CHISQ.INV.RT: the critical χ², with the same result.", args: same("CHISQ.INV.RT", "en"), example: "=CHIINV(0.05,3)", exampleResult: "7.815, the same as CHISQ.INV.RT." },
+    de: { summary: "Der ältere Name von CHIQU.INV.RE: das kritische χ², mit gleichem Ergebnis.", args: same("CHISQ.INV.RT", "de"), example: "=CHIINV(0,05;3)", exampleResult: "7,815, wie mit CHIQU.INV.RE." },
   },
 };
 
@@ -1659,6 +2069,56 @@ const LOOKUP: Record<string, Pair> = {
       ],
       example: '=VERGLEICH("Probe C";A2:A20;0)',
       exampleResult: "3, wenn Probe C in der dritten Zelle steht, also in A4.",
+    },
+  },
+  XMATCH: {
+    en: {
+      summary: "The position of a value in a row or column (1 for the first cell), searched like XLOOKUP: exact by default, or the next smaller or larger value, with wildcards, or from the end.",
+      args: [
+        a("lookup_value", "What to look for."),
+        a("lookup_array", "One row or column to search."),
+        a("match_mode", "0: exact (default); −1: exact or the next smaller; 1: exact or the next larger; 2: with the wildcards * and ?.", OPT),
+        a("search_mode", "1: from the first to the last (default); −1: from the last to the first; 2 or −2: binary search in sorted data.", OPT),
+      ],
+      example: '=XMATCH("Sample C",A2:A20)',
+      exampleResult: "3 when Sample C is in the third cell, A4.",
+      tip: "Easier than MATCH: exact matches by default, and the next smaller or larger value needs no sorting.",
+    },
+    de: {
+      summary: "Die Position eines Werts in einer Zeile oder Spalte (1 für die erste Zelle), gesucht wie mit XVERWEIS: standardmäßig genau, oder der nächstkleinere oder -größere Wert, mit Platzhaltern oder vom Ende her.",
+      args: [
+        a("Suchkriterium", "Wonach gesucht wird."),
+        a("Suchmatrix", "Eine Zeile oder Spalte, die durchsucht wird."),
+        a("Vergleichsmodus", "0: genau (Standard); −1: genau oder der nächstkleinere; 1: genau oder der nächstgrößere; 2: mit den Platzhaltern * und ?.", OPT),
+        a("Suchmodus", "1: vom ersten zum letzten (Standard); −1: vom letzten zum ersten; 2 oder −2: binäre Suche in sortierten Daten.", OPT),
+      ],
+      example: '=XVERGLEICH("Probe C";A2:A20)',
+      exampleResult: "3, wenn Probe C in der dritten Zelle steht, also in A4.",
+      tip: "Einfacher als VERGLEICH: standardmäßig genaue Treffer, und für den nächstkleineren oder -größeren Wert muss nichts sortiert sein.",
+    },
+  },
+  LOOKUP: {
+    en: {
+      summary: "Looks a value up in a sorted row or column (the largest value that is ≤ the one sought) and gives the value at the same place of a second row or column.",
+      args: [
+        a("lookup_value", "What to look for."),
+        a("lookup_vector", "One row or column, sorted ascending."),
+        a("result_vector", "The row or column the result comes from; left out: the lookup vector itself.", OPT),
+      ],
+      example: "=LOOKUP(D2,A2:A7,B2:B7)",
+      exampleResult: "The grade for the share of points in D2, when A2:A7 holds the lowest share of each grade (0 %, 50 %, 60 %, 70 %, 80 %, 90 %) and B2:B7 the grades 6 to 1.",
+      tip: "Only for sorted data; for exact matches, use XLOOKUP, or VLOOKUP with FALSE.",
+    },
+    de: {
+      summary: "Sucht einen Wert in einer sortierten Zeile oder Spalte (den größten Wert, der ≤ dem gesuchten ist) und gibt den Wert an derselben Stelle einer zweiten Zeile oder Spalte.",
+      args: [
+        a("Suchkriterium", "Wonach gesucht wird."),
+        a("Suchvektor", "Eine Zeile oder Spalte, aufsteigend sortiert."),
+        a("Ergebnisvektor", "Die Zeile oder Spalte, aus der das Ergebnis kommt; ohne Angabe der Suchvektor selbst.", OPT),
+      ],
+      example: "=VERWEIS(D2;A2:A7;B2:B7)",
+      exampleResult: "Die Note zum Punkteanteil in D2, wenn in A2:A7 der kleinste Anteil jeder Note steht (0 %, 50 %, 60 %, 70 %, 80 %, 90 %) und in B2:B7 die Noten 6 bis 1.",
+      tip: "Nur für sortierte Daten; für genaue Treffer nimm XVERWEIS oder SVERWEIS mit FALSCH.",
     },
   },
   CHOOSE: {
@@ -2277,4 +2737,4 @@ const SCIENCE: Record<string, Pair> = {
   },
 };
 
-export const FUNCTION_DOCS: Record<string, { en: FnDoc; de: FnDoc }> = { ...MATH, ...STATS, ...REGRESSION, ...LOGIC, ...LOOKUP, ...TEXT, ...DATE, ...INFO, ...SCIENCE };
+export const FUNCTION_DOCS: Record<string, { en: FnDoc; de: FnDoc }> = { ...MATH, ...STATS, ...OLDER, ...REGRESSION, ...LOGIC, ...LOOKUP, ...TEXT, ...DATE, ...INFO, ...SCIENCE };

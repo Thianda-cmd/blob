@@ -706,7 +706,7 @@ function call(node: Extract<Node, { t: "call" }>, ctx: EvalCtx): Value {
     }
     vals[i] = v;
   }
-  if (!lift) return def.impl!(vals, ctx);
+  if (!lift) return named(def.impl!(vals, ctx), def);
   // Excel 365: a function of one value given arrays runs once per element.
   const lifted: (Scalar | Matrix)[] = [];
   const idx: number[] = [];
@@ -723,11 +723,25 @@ function call(node: Extract<Node, { t: "call" }>, ctx: EvalCtx): Value {
       if (!def.takesErrors && isErr(x)) return x;
       args[idx[k]] = x;
     }
-    const r = def.impl!(args, ctx);
+    const r = named(def.impl!(args, ctx), def);
     if (isRef(r)) return ctx.calc.cellValue(r.sheet, r.r0, r.c0);
     if (isMatrix(r)) return r[0]?.[0] ?? null;
     return r;
   });
+}
+
+/** The details `why` writes, with "@" for the function (functions/util.ts). */
+const WHY_DETAIL = /^(few|same|nomatch|norepeat|arg):@(?=:|$)/;
+
+/**
+ * An error the function made itself says which function it was ("few:@:2:1" → "few:STDEV.S:2:1",
+ * see `why`). Only those: an error passed on from an argument keeps its detail, even when an "@"
+ * is part of it (the sheet „Messung @ 37 °C“ that is gone).
+ */
+function named(r: Value, def: FnDef): Value {
+  if (!isErr(r) || !r.detail) return r;
+  const m = WHY_DETAIL.exec(r.detail);
+  return m ? mkErr(r.error, `${m[1]}:${def.name}${r.detail.slice(m[0].length)}`) : r;
 }
 
 export function createCalcImpl(wb: Workbook, opts?: CalcOptions): Calc {

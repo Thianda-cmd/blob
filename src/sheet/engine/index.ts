@@ -268,4 +268,4 @@ export { growTableRefs, tableRowsArea, type TableRows } from "./refs";
 export { getFunction, missingFunctions } from "./functions";
 export { serialFromYMD, ymdFromSerial } from "./dates";
 /** Excel's wildcards (* ? ~) in linear time, for everything that matches text: filters, find & replace. */
-export { compileGlob, globFind, globReplace, globTest, type Glob, type GlobOptions } from "./glob";
+export { compileGlob, globFind, globIndex, globReplace, globTest, type Glob, type GlobOptions } from "./glob";

@@ -277,7 +277,8 @@ export function drawingXml(charts: { spec: ChartSpec; rel: string; id: number }[
 
 /** A chart formula ('Blatt 1'!$B$2:$B$9) → a range on a sheet (by Blob's sheet id). */
 export function parseChartRef(f: string, sheetId: (name: string) => string | undefined): RangeRef | null {
-  const m = /^\s*(?:'((?:[^']|'')+)'|([^'!]+))!\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?\s*$/.exec(f.replace(/^\(|\)$/g, ""));
+  // Trimmed first: spaces matched inside the pattern, next to the sheet name, took seconds on a long one.
+  const m = /^(?:'((?:[^']|'')+)'|([^'!]+))!\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/.exec(f.trim().replace(/^\(|\)$/g, "").trim());
   if (!m) return null;
   const name = (m[1] ?? m[2] ?? "").replace(/''/g, "'");
   const id = sheetId(name);

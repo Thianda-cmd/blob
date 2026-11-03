@@ -118,7 +118,7 @@ export function FilterValues({
       </div>
       <div role="group" aria-label={t.filterBy.values} onKeyDown={onListKey} className="max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-line bg-raised p-1 [@media(hover:none)]:max-h-72">
         {list.length === 0 ? (
-          <p className="px-2 py-3 text-center text-[12.5px] text-ink-3">{t.noMatches}</p>
+          <p className="px-2 py-3 text-center text-[12.5px] text-ink-2">{t.noMatches}</p>
         ) : (
           <>
             <label className={cn(rowClass, "font-medium")}>
@@ -137,16 +137,16 @@ export function FilterValues({
             {list.slice(0, SHOW).map((v) => (
               <label key={v.key} className={rowClass}>
                 <input type="checkbox" className={boxClass} checked={active.has(v.key)} disabled={disabled} onChange={() => toggle(v.key)} />
-                <span className={cn("min-w-0 flex-1 truncate", !v.text && "italic text-ink-3", v.num !== null && "tabular-nums")}>{label(v)}</span>
-                <span className="shrink-0 text-[11.5px] tabular-nums text-ink-3">{v.count}</span>
+                <span className={cn("min-w-0 flex-1 truncate", !v.text && "italic text-ink-2", v.num !== null && "tabular-nums")}>{label(v)}</span>
+                <span className="shrink-0 text-[12px] tabular-nums text-ink-2">{v.count}</span>
               </label>
             ))}
-            {list.length > SHOW && <p className="px-2 py-1.5 text-[11.5px] text-ink-3">{t.moreValues(list.length - SHOW)}</p>}
+            {list.length > SHOW && <p className="px-2 py-1.5 text-[12px] text-ink-2">{t.moreValues(list.length - SHOW)}</p>}
           </>
         )}
       </div>
       {!chosen.length && list.length > 0 && (
-        <p className="text-[11.5px] text-ink-3" role="status">
+        <p className="text-[12px] text-ink-2" role="status">
           {t.nothingChecked}
         </p>
       )}

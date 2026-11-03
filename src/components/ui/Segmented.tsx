@@ -35,8 +35,9 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             className={cn(
               "relative rounded-md font-medium transition-colors",
-              size === "sm" ? "h-6 px-2 text-[12px]" : "h-7 px-2.5 text-[12.5px] [@media(hover:none)]:h-8",
-              on ? "text-ink" : "text-ink-3 hover:text-ink-2",
+              // Fingers get taller segments, like every control on touch screens.
+              size === "sm" ? "h-6 px-2 text-[12px] [@media(hover:none)]:h-8" : "h-7 px-2.5 text-[12.5px] [@media(hover:none)]:h-9",
+              on ? "text-ink" : "text-ink-2 hover:text-ink",
             )}
           >
             {on && (

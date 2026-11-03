@@ -71,7 +71,7 @@ export type ChartScene = {
   nodes: SvgNode[];
   /** <title>: the chart's title or kind. */
   title: string;
-  /** aria-label: "Punktdiagramm Kalibrierung, 2 Reihen, Trendlinie y = …, R² = …". */
+  /** aria-label: "Punktdiagramm Kalibrierung, 2 Reihen, Trendlinie y = …, R² = …", then the notes under the plot ("Text in A2 statt Zahl …"). */
   label: string;
   plot: Box | null;
   hits: ChartHit[];
@@ -337,10 +337,12 @@ export function buildChartScene(spec: ChartSpec, data: ChartData, opts: SceneOpt
     if (laid) legend = laid;
   }
 
-  const result = spec.kind === "pie" ? pieScene(ctx, frame) : cartesianScene(ctx, frame);
+  const result: { nodes: SvgNode[]; plot: Box; hits: ChartHit[]; notes?: string[] } = spec.kind === "pie" ? pieScene(ctx, frame) : cartesianScene(ctx, frame);
   nodes.push(...result.nodes);
   if (legend) nodes.push(...legend.nodes);
-  return { ...base, nodes: withFont(nodes, opts.fontFamily, pal), plot: result.plot, hits: result.hits };
+  // A screen reader gets the chart as its label only: the notes under the plot go into it too.
+  const notes = result.notes ?? [];
+  return { ...base, label: notes.length ? `${label}. ${notes.join(". ")}` : label, nodes: withFont(nodes, opts.fontFamily, pal), plot: result.plot, hits: result.hits };
 }
 
 /** One group with the font, so every <text> inherits it. */
@@ -547,7 +549,8 @@ type Mapper = (v: number) => number;
 
 type TrendDraw = { s: ChartSeriesData; fit: Fit; tl: NonNullable<SeriesSpec["trendline"]>; samples: Pt[] };
 
-function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hits: ChartHit[] } {
+/** The plot with its axes, series and trendlines; `notes`: what the notes under it say (also on tiny charts, which have no room to draw them). */
+function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hits: ChartHit[]; notes: string[] } {
   const { spec, data, fs, pal, locale, t } = ctx;
   const kind = spec.kind;
   const horizontal = kind === "bar";
@@ -596,21 +599,29 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
     trendExt.push({ s, fit, tl, x0, x1 });
     if (scatter) xs.push(x0, x1);
     else {
-      // Category i (0-based) is fit x i + 1; its band reaches from i to i + 1.
+      // Fit x k (category k − 1) sits in the middle of its band, which reaches from k − ½ to k + ½.
       before = Math.max(before, Math.ceil(0.5 - x0 - 1e-9));
       after = Math.max(after, Math.ceil(x1 - 0.5 - nData - 1e-9));
-    }
-    if (fit.type !== "movingAverage" && (tl.forward > 0 || tl.backward > 0)) {
-      for (const x of [x0, x1]) {
-        const y = fit.predict(x);
-        if (Number.isFinite(y)) vals.push(y);
-      }
     }
   });
   // A forecast of thousands of periods would leave the data a sliver: at most 1000 more.
   before = Math.min(before, 500);
   after = Math.min(after, 500);
   const nCat = nData + before + after;
+  for (const tr of trendExt) {
+    // Category charts draw a forecast only as far as their categories reach (the cap above).
+    if (!scatter) {
+      tr.x0 = Math.max(tr.x0, 0.5 - before);
+      tr.x1 = Math.min(tr.x1, nData + after + 0.5);
+    }
+    // The value axis makes room for the forecast's ends (only for what is drawn).
+    if (tr.fit.type !== "movingAverage" && (tr.tl.forward > 0 || tr.tl.backward > 0)) {
+      for (const x of [tr.x0, tr.x1]) {
+        const y = tr.fit.predict(x);
+        if (Number.isFinite(y)) vals.push(y);
+      }
+    }
+  }
 
   // One-line notes under the plot, about what the chart shows differently from the cells.
   const notes: { text: string; warn: boolean }[] = [];
@@ -1025,7 +1036,8 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
   nodes.push(...trendNodes.filter((n) => n.attrs?.d), ...seriesNodes, ...labelNodes);
   nodes.push(...equationBoxes(ctx, P, trends, pointsOnScreen));
   // A log axis with nothing above 0 to show says why the chart is empty (Excel warns too).
-  if (logSkipped && !drawable) {
+  const empty = logSkipped > 0 && drawable === 0;
+  if (empty) {
     nodes.push(text(P.x + P.w / 2, P.y + P.h / 2, fitText(ctx.t.noPositive, P.w - fs, fs * 0.9), { fontSize: fs * 0.9, fill: pal.ink3, textAnchor: "middle" }));
   }
   // The notes, centred under the plot, in the room kept for them below the axis title.
@@ -1040,7 +1052,7 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
     if (note.warn) nodes.push(warnIcon(x0, baseline, icon, pal.series("orange"), pal.bg));
     nodes.push(text(x0 + icon + gap, baseline, s, { fontSize: noteSize, fill: note.warn ? pal.ink2 : pal.ink3 }));
   });
-  return { nodes, plot: P, hits };
+  return { nodes, plot: P, hits, notes: [...notes.map((n) => n.text), ...(empty ? [t.noPositive] : [])] };
 }
 
 /** A small warning triangle with "!" (size × size), its bottom on the text's baseline. */

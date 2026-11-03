@@ -27,7 +27,7 @@ export const sheetTemplatesText = defineMessages({
   de: {
     label: "Neue Tabelle beginnen",
     heading: "Womit fängst du an?",
-    intro: "Mit einem leeren Blatt oder mit einer Vorlage fürs Labor, in der Formeln, intelligente Tabelle und Diagramm schon fertig sind. Du kannst alles darin ändern.",
+    intro: "Mit einem leeren Blatt oder mit einer Vorlage fürs Labor, in der Formeln, eine intelligente Tabelle und ein Diagramm schon fertig sind. Du kannst alles darin ändern.",
     blank: "Leere Tabelle",
     blankHint: "Ein leeres Blatt – tipp einfach los.",
     templates: "Vorlagen fürs Labor",

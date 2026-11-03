@@ -2,139 +2,120 @@
 
 // Reading an Excel (.xlsx) or CSV file for the spreadsheet: as new sheets of the workbook that is
 // open ("Excel- oder CSV-Datei importieren"), or as a new spreadsheet page (the notes' import,
-// src/components/notes/transfer.ts). The .xlsx reader is loaded only when a file needs it.
+// src/components/notes/transfer.ts).
 //
-// CSV files from German Excel are often saved in Windows-1252, not UTF-8: when UTF-8 gives
-// broken characters, the file is read again that way, so "Ä", "µ" and "°C" come through.
+// The reading itself (src/sheet/io/readFile.ts) runs in a Web Worker: a file of a few hundred
+// kilobytes can unpack to gigabytes or hold millions of cells, and the editor must stay usable
+// meanwhile. A worker that takes longer than READ_LIMIT_MS is stopped. Where workers don't
+// start (an old browser, the check script), the page reads the file itself; the reader's own
+// limits keep that bounded too.
 
 import type { Locale } from "@/i18n/config";
-import { normalizeWorkbook } from "@/sheet/doc";
-import { createCalc } from "@/sheet/engine";
-import { csvNumberLocale, parseCsv } from "@/sheet/io/csv";
-import { newId, pasteText, renameSheet, uniqueSheetName } from "@/sheet/ops";
+import { sheetIoText } from "@/i18n/messages/sheetIo";
+import { normalizeWorkbook, workbookPreview } from "@/sheet/doc";
+import { createCalc, type Calc } from "@/sheet/engine";
+import { MAX_SHEETS, readSheetBytes, type ReadJob, type ReadOptions, type ReadReply, type ReadSheetFile } from "@/sheet/io/readFile";
+import { renameSheet, uniqueSheetName } from "@/sheet/ops";
 import { uniqueTableName } from "@/sheet/table/model";
-import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type ChartSpec, type RangeRef, type Sheet, type TableSpec, type Workbook } from "@/sheet/types";
-import { storedContent } from "./saver";
+import type { Workbook } from "@/sheet/types";
+import { jsonBytes, storedContent } from "./saver";
+
+export { freshIds, MAX_SHEETS, type ReadProblem, type ReadSheetFile } from "@/sheet/io/readFile";
 
 /** Bigger files aren't read (a spreadsheet page holds at most 5 MB anyway). */
 export const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 
-/** What the file picker offers. */
+/**
+ * What the file picker offers. ".xls" too: photometers and web tools save CSV text or an HTML
+ * table under that name (a real old Excel file gets a message saying how to save it).
+ */
 export const SHEET_FILE_ACCEPT = [
   ".xlsx",
+  ".xls",
   ".csv",
   ".tsv",
   ".txt",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
   "text/csv",
   "text/tab-separated-values",
 ].join(",");
 
-export type ReadProblem = "tooBig" | "oldXls" | "empty" | "failed";
+/** How long reading may take before the worker is stopped (a real file needs a few seconds at most). */
+const READ_LIMIT_MS = 30_000;
+/** How long the worker may take to start (the first time it is loaded, or compiled in development). */
+const START_LIMIT_MS = 20_000;
 
-/** A file read into a workbook of its own (fresh ids), and what couldn't come along. */
-export type ReadSheetFile = { workbook: Workbook; skipped: string[]; cutRows: number | null; kind: "xlsx" | "csv"; name: string } | { error: ReadProblem };
-
-const baseName = (name: string) => name.replace(/\.[^.]+$/, "").trim();
+/** How many more sheets fit into a workbook (pass as `sheetRoom` when adding a file's sheets to it). */
+export const sheetRoom = (wb: Workbook) => Math.max(0, MAX_SHEETS - wb.sheets.length);
 
 /**
- * What kind of file it is, by its first bytes (a zip is an .xlsx, an old Office file is an .xls),
- * else by its name: anything else is read as text (CSV). (Windows calls CSV files
- * "application/vnd.ms-excel", so the type alone says little.)
+ * Read an .xlsx, CSV or text file into a workbook of its own. `sheetRoom`: how many sheets may
+ * come in (see sheetRoom()); 250 for a new spreadsheet.
  */
-async function fileKind(file: File): Promise<"xlsx" | "xls" | "text"> {
-  const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
-  if (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) return "xlsx";
-  if (head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0) return "xls";
-  if (/\.xls$/i.test(file.name)) return "xls";
-  return "text";
-}
-
-/** The file's text: UTF-8, or Windows-1252 when UTF-8 doesn't fit. */
-async function readText(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const utf8 = new TextDecoder("utf-8").decode(bytes);
-  if (!utf8.includes("\uFFFD")) return utf8;
-  try {
-    return new TextDecoder("windows-1252").decode(bytes);
-  } catch {
-    return utf8;
-  }
-}
-
-const blankSheet = (id: string, name: string): Sheet => ({ id, name, cells: {}, cols: {}, rows: {}, freeze: { rows: 0, cols: 0 }, size: { rows: DEFAULT_SIZE.rows, cols: DEFAULT_SIZE.cols } });
-
-/** Read an .xlsx or CSV file. */
-export async function readSheetFile(file: File, locale: Locale): Promise<ReadSheetFile> {
+export async function readSheetFile(file: File, locale: Locale, opts: ReadOptions = {}): Promise<ReadSheetFile> {
   if (file.size > MAX_IMPORT_BYTES) return { error: "tooBig" };
-  const name = baseName(file.name) || "Import";
+  let bytes: ArrayBuffer;
   try {
-    const kind = await fileKind(file);
-    if (kind === "xls") return { error: "oldXls" };
-    if (kind === "xlsx") {
-      const { importXlsx } = await import("@/sheet/io/xlsx");
-      const { workbook, skipped } = await importXlsx(await file.arrayBuffer(), locale);
-      if (!workbook.sheets.length) return { error: "empty" };
-      return { workbook: freshIds(workbook), skipped, cutRows: null, kind: "xlsx", name };
-    }
-    let rows = parseCsv(await readText(file));
-    if (!rows.length || rows.every((r) => r.every((c) => !c.trim()))) return { error: "empty" };
-    const cutRows = rows.length > MAX_ROWS ? MAX_ROWS : null;
-    rows = rows.slice(0, MAX_ROWS).map((r) => r.slice(0, MAX_COLS));
-    const id = newId();
-    const sheetName = name.replace(/[[\]:*?/\\]/g, " ").replace(/^'+|'+$/g, "").trim().slice(0, 31) || (locale === "de" ? "Blatt 1" : "Sheet 1");
-    // Numbers are read in the language the file writes them in: an English lab CSV opened in
-    // German keeps 0.123 as 0,123 (not 123).
-    const wb = pasteText({ v: 1, sheets: [blankSheet(id, sheetName)], charts: [], tables: [] }, id, { row: 0, col: 0 }, rows, csvNumberLocale(rows, locale));
-    return { workbook: wb, skipped: [], cutRows, kind: "csv", name };
+    bytes = await file.arrayBuffer();
   } catch (e) {
     console.error("sheet: reading the file failed", e);
     return { error: "failed" };
   }
+  const job: ReadJob = { bytes, name: file.name, locale, opts };
+  return (await readInWorker(job)) ?? readSheetBytes(new Uint8Array(bytes), file.name, locale, opts);
 }
 
-/** The same workbook with new ids for its sheets, charts, series, tables and columns (references follow). */
-export function freshIds(wb: Workbook): Workbook {
-  const sheetIds = new Map(wb.sheets.map((s) => [s.id, newId()]));
-  const sid = (id: string) => sheetIds.get(id) ?? id;
-  const ref = <T extends RangeRef | null>(r: T): T => (r ? ({ ...r, sheetId: sid(r.sheetId) } as T) : r);
-  const sheets = wb.sheets.map((s) => ({ ...s, id: sid(s.id) }));
-  const charts: ChartSpec[] = wb.charts.map((c) => ({
-    ...c,
-    id: newId(),
-    sheetId: sid(c.sheetId),
-    x: ref(c.x),
-    series: c.series.map((s) => ({
-      ...s,
-      id: newId(),
-      y: ref(s.y),
-      x: ref(s.x),
-      nameRef: ref(s.nameRef),
-      errorBars: s.errorBars ? { ...s.errorBars, plus: ref(s.errorBars.plus), minus: ref(s.errorBars.minus) } : null,
-    })),
-  }));
-  const tables: TableSpec[] = wb.tables.map((t) => {
-    const cols = new Map(t.columns.map((c) => [c.id, newId()]));
-    return {
-      ...t,
-      id: newId(),
-      sheetId: sid(t.sheetId),
-      columns: t.columns.map((c) => ({ ...c, id: cols.get(c.id)! })),
-      filters: Object.fromEntries(Object.entries(t.filters).map(([k, f]) => [cols.get(k) ?? k, f])),
-      sort: t.sort ? { ...t.sort, column: cols.get(t.sort.column) ?? t.sort.column } : null,
+/** The file read by a worker; null when no worker could start (the caller reads it itself then). */
+function readInWorker(job: ReadJob): Promise<ReadSheetFile | null> {
+  if (typeof Worker === "undefined") return Promise.resolve(null);
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("../../sheet/io/readFile.worker.ts", import.meta.url), { type: "module" });
+  } catch {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    let started = false;
+    const finish = (result: ReadSheetFile | null) => {
+      clearTimeout(timer);
+      worker.terminate();
+      resolve(result);
     };
+    let timer = setTimeout(() => finish(null), START_LIMIT_MS);
+    worker.onmessage = (e: MessageEvent<ReadReply>) => {
+      if ("result" in e.data) return finish(e.data.result);
+      started = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => finish({ error: "slow", message: sheetIoText[job.locale].errors.slow }), READ_LIMIT_MS);
+      // A copy, not a transfer: should the worker fail after all, the bytes are still here.
+      worker.postMessage(job);
+    };
+    // Before "ready" the worker couldn't load (the page reads the file then); after it, reading
+    // itself failed (likely out of memory, which reading again on the page would only repeat).
+    worker.onerror = (e) => {
+      e.preventDefault();
+      finish(started ? { error: "failed" } : null);
+    };
+    worker.onmessageerror = () => finish({ error: "failed" });
   });
-  return { v: 1, sheets, charts, tables };
 }
 
 /**
  * Another workbook's sheets (with their charts and tables) added after the sheets of `wb`. Sheet
  * names that are taken get a number ("Blatt 1 (2)"), and the added sheets' formulas follow the
- * new names; table names stay unique. `extra` must already have ids of its own (freshIds).
+ * new names; table names stay unique. `extra` must already have ids of its own (freshIds). Only
+ * the sheets that fit come along (250 in all; a file read with sheetRoom has no more).
  */
 export function appendWorkbook(wb: Workbook, extra: Workbook, locale: Locale): Workbook {
+  const room = sheetRoom(wb);
+  if (!room) return wb;
   let incoming = extra;
-  for (const s of extra.sheets) {
+  if (extra.sheets.length > room) {
+    const fits = new Set(extra.sheets.slice(0, room).map((s) => s.id));
+    incoming = { ...extra, sheets: extra.sheets.filter((s) => fits.has(s.id)), charts: extra.charts.filter((c) => fits.has(c.sheetId)), tables: extra.tables.filter((t) => fits.has(t.sheetId)) };
+  }
+  for (const s of [...incoming.sheets]) {
     const current = incoming.sheets.find((x) => x.id === s.id);
     if (!current) continue;
     const others: Workbook = { ...wb, sheets: [...wb.sheets, ...incoming.sheets.filter((x) => x.id !== s.id)] };
@@ -152,10 +133,22 @@ export function appendWorkbook(wb: Workbook, extra: Workbook, locale: Locale): W
 
 /**
  * What a new spreadsheet page stores for a workbook (or stored JSON from a Blob file): read safely,
- * with its preview for lists and its words for search.
+ * with its preview for lists and its words for search, and its size as saving measures it. A page
+ * over MAX_SHEET_BYTES could never be saved again: the importers refuse it before making the page.
  */
-export function sheetPageContent(raw: unknown, locale: Locale): { content: unknown; plain_text: string } {
+export function sheetPageContent(raw: unknown, locale: Locale): { content: unknown; plain_text: string; bytes: number } {
   const wb = normalizeWorkbook(raw, locale);
   const { content, plain } = storedContent(wb, createCalc(wb, { locale }), locale);
-  return { content, plain_text: plain };
+  return { content, plain_text: plain, bytes: jsonBytes(content) };
 }
+
+/**
+ * The size `next` (the open workbook with a file's sheets added after its own, appendWorkbook)
+ * would be saved with, measured as saving measures it. Its preview is the first sheet's, which an
+ * import doesn't change, so the open calculation is enough (nothing is recalculated).
+ */
+export function importedBytes(next: Workbook, calc: Calc, locale: Locale): number {
+  return jsonBytes({ ...next, preview: workbookPreview(next, calc, locale) });
+}
+
+export { MAX_BYTES as MAX_SHEET_BYTES } from "./saver";

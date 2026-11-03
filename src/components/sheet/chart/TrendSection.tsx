@@ -5,20 +5,23 @@
 // value and get x back (the concentration of a sample from its absorbance).
 
 import { Calculator, Check, ClipboardCopy, Info, Lightbulb, TriangleAlert } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
 import type { Locale } from "@/i18n/config";
 import type { SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import type { ChartSeriesData } from "@/sheet/chart/data";
-import { formatCoefficient, isDateFormat, parseChartNumber } from "@/sheet/chart/format";
-import { probeRange, probeResultText, workedLine } from "@/sheet/chart/probe";
+import { formatCoefficient, isCalendarFormat } from "@/sheet/chart/format";
+import { probeRange, probeResultText, probeSteps, readProbe } from "@/sheet/chart/probe";
 import { aOutOfRange, equationParts, equationText, isFitError, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
 import { trendlineName } from "@/sheet/chart/scene";
 import type { ChartSpec, NumberFormat, SeriesSpec, TrendlineSpec } from "@/sheet/types";
 import type { SheetStore } from "../store";
 import { LINEAR_TRENDLINE, updateChart } from "./actions";
-import { Chips, Field, Note, NumberField, TextField, Toggle } from "./PanelParts";
+import { Chips, Field, fieldClass, HINT_TEXT, Note, NumberField, TextField, Toggle } from "./PanelParts";
+
+/** A pause in typing (ms) after which an unfinished number ("1e-") counts as typed: Probe berechnen then says what is wrong. */
+const PROBE_PAUSE = 1200;
 
 type TrendType = TrendlineSpec["type"];
 const TYPES: (TrendType | "none")[] = ["none", "linear", "polynomial", "exponential", "logarithmic", "power", "movingAverage"];
@@ -78,7 +81,7 @@ function CopyButton({ text, label, t }: { text: string; label: string; t: SheetC
           setDone(false);
         }
       }}
-      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] font-medium text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-8 [&_svg]:size-3.5"
+      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [&_svg]:size-3.5"
     >
       {done ? <Check className="text-ok" /> : <ClipboardCopy />}
       {done ? t.copied : t.copy}
@@ -86,11 +89,14 @@ function CopyButton({ text, label, t }: { text: string; label: string; t: SheetC
   );
 }
 
-/** Why the points stand at x = 1, 2, 3 …: a cell among the x values holds text (its text shortened for the sentence). */
-export function XTextNote({ xText, t }: { xText: NonNullable<ChartSeriesData["xText"]>; t: SheetChartText }) {
+/**
+ * Why the points stand at x = 1, 2, 3 …: a cell among the x values holds text (its text shortened
+ * for the sentence). `trend`: a trendline uses these x values, so the note says it is wrong too.
+ */
+export function XTextNote({ xText, trend, t }: { xText: NonNullable<ChartSeriesData["xText"]>; trend: boolean; t: SheetChartText }) {
   return (
     <Note tone="warn" icon={<TriangleAlert />}>
-      {t.xTextPanel(xText.cell, xText.text.length > 24 ? `${xText.text.slice(0, 23)}…` : xText.text)}
+      {t.xTextPanel(xText.cell, xText.text.length > 24 ? `${xText.text.slice(0, 23)}…` : xText.text, trend)}
     </Note>
   );
 }
@@ -110,7 +116,7 @@ export function TrendSection({
   spec: ChartSpec;
   series: SeriesSpec;
   data: ChartSeriesData | undefined;
-  /** The number format of the chart's x values (dates get a tip for exponential and power fits). */
+  /** The number format of the chart's x values (calendar dates get a tip for exponential and power fits). */
   xFormat?: NumberFormat | null;
   locale: Locale;
   t: SheetChartText;
@@ -139,7 +145,9 @@ export function TrendSection({
   // the student types the value she knows); a line starts through the origin.
   const fittedA = fitted?.type === "exponential" && fitted.coefficients[0] >= 1e-300 && fitted.coefficients[0] <= 1e300 ? Number(fitted.coefficients[0].toPrecision(4)) : 1;
   const interceptIgnored = tl?.type === "exponential" && tl.intercept !== null && tl.intercept <= 0;
-  const datesTip = spec.kind === "scatter" && !!fitted && (fitted.type === "exponential" || fitted.type === "power") && (isDateFormat(xFormat) || aOutOfRange(fitted));
+  // Dates as x (46 000 days since 1900) make a growth curve's a meaningless: the tip says to use the
+  // time since the start. Not for times (0:00, 0:30 …), which often are just that.
+  const datesTip = spec.kind === "scatter" && !!fitted && (fitted.type === "exponential" || fitted.type === "power") && (isCalendarFormat(xFormat) || aOutOfRange(fitted));
 
   return (
     <div className="space-y-3.5">
@@ -188,19 +196,24 @@ export function TrendSection({
                     )}
                     {fit.r2 !== null && <div className="tabular-nums text-[13.5px] text-ink-2">{r2Text(fit.r2, locale, more ? 6 : undefined)}</div>}
                     {fit.type === "movingAverage" && <div className="text-[13px] text-ink-2">{trendlineName(tl, seriesName, locale)}</div>}
-                    <div className="text-[11.5px] text-ink-3">{t.points(fit.n)}</div>
+                    <div className="text-[12px] text-ink-2">{t.points(fit.n)}</div>
                   </div>
                   {fit.type !== "movingAverage" && <CopyButton text={equationText(fit, locale, more ? 6 : undefined)} label={t.copyEquation} t={t} />}
                 </div>
+                {/* Big enough for a finger, its words still in line with the equation above. */}
                 {fit.type !== "movingAverage" && (
-                  <button type="button" onClick={() => setMore((m) => !m)} className="mt-1.5 text-[11.5px] font-medium text-blob-ink hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setMore((m) => !m)}
+                    className="-ml-2 mt-1 inline-flex h-7 items-center rounded-md px-2 text-[12px] font-medium text-blob-ink transition-colors hover:bg-blob-soft [@media(hover:none)]:h-9"
+                  >
                     {more ? t.fewerDigits : t.moreDigits}
                   </button>
                 )}
               </>
             ) : null}
           </div>
-          {data?.xText && <XTextNote xText={data.xText} t={t} />}
+          {data?.xText && <XTextNote xText={data.xText} trend t={t} />}
           {!!data?.hiddenPoints && <Note icon={<Info />}>{t.hiddenPoints(data.hiddenPoints)}</Note>}
           {interceptIgnored && <Note icon={<Info />}>{t.interceptIgnored(formatCoefficient(tl.intercept!, locale, 6))}</Note>}
           {datesTip && <Note icon={<Lightbulb />}>{t.datesTip}</Note>}
@@ -223,25 +236,26 @@ export function TrendSection({
                 disabled={readOnly}
                 onChange={(v) => set({ intercept: v ? (tl.type === "exponential" ? fittedA : 0) : null })}
               />
+              {/* The switch names the choice, the field the value: y at x = 0 (b of a line, a of an exponential curve). */}
               {tl.intercept !== null && (
-                <Field label={t.setIntercept} hint={tl.type === "exponential" ? t.interceptHintExp : t.interceptHint}>
-                  <NumberField locale={locale} value={tl.intercept} onCommit={(v) => v !== null && set({ intercept: v })} label={t.setIntercept} className="w-32" />
+                <Field label={t.interceptValue} hint={tl.type === "exponential" ? t.interceptHintExp : t.interceptHint}>
+                  <NumberField locale={locale} value={tl.intercept} onCommit={(v) => v !== null && set({ intercept: v })} label={t.interceptValue} className="w-32" />
                 </Field>
               )}
             </div>
           ) : tl.type !== "movingAverage" ? (
-            <p className="text-[11.5px] leading-snug text-ink-3">{t.interceptNotHere}</p>
+            <p className={HINT_TEXT}>{t.interceptNotHere}</p>
           ) : null}
 
           {tl.type !== "movingAverage" && (
             <Field label={t.forecast}>
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-1">
-                  <span className="text-[11.5px] text-ink-3">{t.forward}</span>
+                  <span className="text-[12px] text-ink-2">{t.forward}</span>
                   <NumberField locale={locale} value={tl.forward || null} placeholder="0" allowEmpty min={0} onCommit={(v) => set({ forward: v ?? 0 })} label={`${t.forecast}: ${t.forward}`} />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[11.5px] text-ink-3">{t.backward}</span>
+                  <span className="text-[12px] text-ink-2">{t.backward}</span>
                   <NumberField locale={locale} value={tl.backward || null} placeholder="0" allowEmpty min={0} onCommit={(v) => set({ backward: v ?? 0 })} label={`${t.forecast}: ${t.backward}`} />
                 </label>
               </div>
@@ -257,23 +271,35 @@ export function TrendSection({
   );
 }
 
-/** "Probe berechnen": a measured y → x along the trendline, with how it is worked out. */
+/**
+ * "Probe berechnen": a measured y → x along the trendline, with how it is worked out. What can't
+ * be read as a number gets a reason under the field (an unfinished number like "1e-" only once
+ * the student stops typing).
+ */
 function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec; locale: Locale; t: SheetChartText; seriesName: string }) {
   const [text, setText] = useState("");
-  const y = parseChartNumber(text, locale);
+  // Typed to the end: the field was left, or typing paused.
+  const [typed, setTyped] = useState(false);
+  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(pause.current), []);
+  const hintId = useId();
+  const read = readProbe(text, locale, spec.yAxis.title, spec.kind === "scatter" ? spec.xAxis.title : "");
+  const y = read.y;
   const x = y === null ? null : solveForX(fit, y);
   const yName = spec.yAxis.title.trim() || seriesName || "y";
   const xName = spec.kind === "scatter" ? spec.xAxis.title.trim() || "x" : "x";
   const outside = x === null ? null : probeRange(fit, x);
   const xText = x === null ? "" : probeResultText(x, locale);
-  const line = x === null || y === null ? null : workedLine(fit, y, x, locale);
+  const steps = y === null ? null : probeSteps(fit, y, x, locale);
+  const problem =
+    read.problem === null || (read.problem === "typing" && !typed) ? null : typeof read.problem === "object" ? t.probeXUnit(read.problem.xUnit, yName) : t.probeNotNumber;
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-1 flex items-center gap-2 text-[13px] font-medium text-ink">
         <Calculator className="size-4 text-ink-3" />
         {t.probe}
       </div>
-      <p className="mb-2.5 text-[11.5px] leading-snug text-ink-3">{t.probeIntro}</p>
+      <p className={cn(HINT_TEXT, "mb-2.5")}>{t.probeIntro}</p>
       <label className="block space-y-1">
         <span className="text-[12px] font-medium text-ink-2">
           {t.measured} ({yName})
@@ -282,10 +308,25 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
           inputMode="decimal"
           value={text}
           placeholder={locale === "de" ? "z. B. 0,42" : "e.g. 0.42"}
-          onChange={(e) => setText(e.target.value)}
-          className="h-9 w-full rounded-lg border border-line bg-raised px-3 text-[14px] tabular-nums text-ink outline-none transition-[border,box-shadow] placeholder:text-ink-3/80 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] [@media(hover:none)]:h-10"
+          autoComplete="off"
+          aria-invalid={problem ? true : undefined}
+          aria-describedby={problem ? hintId : undefined}
+          onChange={(e) => {
+            setText(e.target.value);
+            setTyped(false);
+            clearTimeout(pause.current);
+            pause.current = setTimeout(() => setTyped(true), PROBE_PAUSE);
+          }}
+          onBlur={() => setTyped(true)}
+          className={cn(fieldClass, "tabular-nums")}
         />
       </label>
+      {problem && (
+        <p id={hintId} role="status" className="mt-1.5 flex gap-1.5 text-[12px] leading-snug text-danger">
+          <TriangleAlert className="mt-px size-3.5 shrink-0" />
+          {problem}
+        </p>
+      )}
       {y !== null && (
         <div className="mt-2.5 space-y-1.5" aria-live="polite">
           {x === null ? (
@@ -293,14 +334,14 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
           ) : (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-blob-soft px-3 py-2">
               <div className="min-w-0">
-                <div className="truncate text-[11.5px] text-blob-ink/80">{xName}</div>
+                <div className="truncate text-[12px] text-blob-ink">{xName}</div>
                 <div className={cn("truncate text-[18px] font-semibold tabular-nums leading-tight text-blob-ink")}>{xText}</div>
               </div>
               <CopyButton text={formatCoefficient(x, locale, 6)} label={t.copy} t={t} />
             </div>
           )}
-          <p className="font-mono text-[11.5px] leading-relaxed text-ink-3">{t.solveHow[fit.type]}</p>
-          {line && <p className="break-words font-mono text-[11.5px] leading-relaxed text-ink-3">{line}</p>}
+          {steps && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.formula}</p>}
+          {steps?.line && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.line}</p>}
           {outside && (
             <Note tone="warn" icon={<TriangleAlert />}>
               {outside === "above" ? t.probeAbove(formatCoefficient(fit.xMax!, locale)) : outside === "below" ? t.probeBelow(formatCoefficient(fit.xMin!, locale)) : t.probeNegative}

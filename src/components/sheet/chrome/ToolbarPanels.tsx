@@ -5,7 +5,6 @@
 
 import { Ban, ChartArea, ChartBar, ChartColumn, ChartLine, ChartPie, ChartScatter, Columns3, PanelTop, Rows3, SquareFunction, Unlock } from "lucide-react";
 import type { ReactNode } from "react";
-import { blob } from "@/components/blob/bus";
 import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
@@ -15,6 +14,7 @@ import { FUNCTION_BY_EN } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { ChartKind, SheetColor } from "@/sheet/types";
 import { insertChart } from "../chart/actions";
+import { showSheetNotice } from "../notice";
 import { useSheet, type SheetStore } from "../store";
 import { autoSum, freezePanes, setBorders, setStyle, type BorderPreset, type SumFn } from "./actions";
 import { Choice, keepFocus } from "./parts";
@@ -162,7 +162,7 @@ export function SumPanel({ store, onDone, onMore }: { store: SheetStore; onDone:
             key={fn}
             role="menuitem"
             label={t.sumFns[fn]}
-            right={<span className="font-mono text-[11.5px]">{info ? (locale === "de" ? info.de : info.en) : fn}</span>}
+            right={<span className="font-mono text-[12px]">{info ? (locale === "de" ? info.de : info.en) : fn}</span>}
             onSelect={() => {
               onDone();
               autoSum(store, fn);
@@ -197,7 +197,7 @@ export function makeChart(store: SheetStore, kind?: ChartKind) {
   } catch (err) {
     console.error("sheet: inserting a chart failed", err);
   }
-  if (!made && !store.get().readOnly) blob.say(t.chartNeedsData, { mood: "thinking", ms: 6000 });
+  if (!made && !store.get().readOnly) showSheetNotice(store, t.chartNeedsData);
 }
 
 export function ChartPanel({ store, onDone }: { store: SheetStore; onDone: () => void }) {

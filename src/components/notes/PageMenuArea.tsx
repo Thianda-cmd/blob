@@ -1,9 +1,10 @@
 "use client";
 
-import { Columns2, ExternalLink, FilePlus2, Link2, Star, StarOff, SquareArrowOutUpRight, Trash2 } from "lucide-react";
+import { Columns2, Copy, ExternalLink, FilePlus2, Link2, Star, StarOff, SquareArrowOutUpRight, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { canDuplicate, useDuplicatePage } from "@/components/page/useDuplicatePage";
 import { usePanes } from "@/components/shell/Panes";
 import { ContextMenu, useContextMenu, useLastPointer, wantsOwnMenu } from "@/components/ui/ContextMenu";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
@@ -14,8 +15,8 @@ import { panesText } from "@/i18n/messages/panes";
 
 /**
  * Right-click on any page inside (an element with data-page-id) opens Blob's page menu: open, open in
- * a new tab, favourite, a new note inside, copy the link, move to the trash. Renders no box of its
- * own (display: contents), so it can wrap a list without changing its layout.
+ * a new tab, favourite, a new note inside, duplicate (spreadsheets), copy the link, move to the
+ * trash. Renders no box of its own (display: contents), so it can wrap a list without changing its layout.
  */
 export function PageMenuArea({ children }: { children: ReactNode }) {
   const t = useMessages(notesText).pageMenu;
@@ -26,6 +27,7 @@ export function PageMenuArea({ children }: { children: ReactNode }) {
   const { pages, userId, updatePage, trashPage, createPage } = useWorkspace();
   const { at, open, close } = useContextMenu();
   const last = useLastPointer();
+  const duplicate = useDuplicatePage();
   const [id, setId] = useState<string | null>(null);
   const page = id ? pages.find((p) => p.id === id) : undefined;
   const mine = page?.user_id === userId;
@@ -80,6 +82,11 @@ export function PageMenuArea({ children }: { children: ReactNode }) {
                 })}
               >
                 {t.newInside}
+              </MenuItem>
+            )}
+            {canDuplicate(page) && (
+              <MenuItem icon={<Copy />} onSelect={act(() => duplicate(page))}>
+                {t.duplicate}
               </MenuItem>
             )}
             <MenuItem

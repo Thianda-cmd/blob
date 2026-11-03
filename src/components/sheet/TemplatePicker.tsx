@@ -10,8 +10,9 @@
 // a thumbnail of its chart. Narrow screens get a plain list. The layout follows the picker's own
 // width (container queries), since the editor beside Blob's sidebar is narrower than the window.
 // Arrow keys move between the choices (up and down follow the grid as laid out), Enter opens one,
-// Escape starts blank. The root fills its box and scrolls on its own, so the editor can put it over
-// the grid (absolute inset-0) or in its place.
+// Escape starts blank, and typing a letter starts blank with it ("tipp einfach los"). The root
+// fills its box and scrolls on its own, so the editor can put it over the grid (absolute inset-0)
+// or in its place.
 
 import {
   Activity,
@@ -61,6 +62,7 @@ type Text = (typeof sheetTemplatesText)["en"];
 export function TemplatePicker({
   onPick,
   onDismiss,
+  onType,
   autoFocus = false,
   className,
 }: {
@@ -68,6 +70,11 @@ export function TemplatePicker({
   onPick: (wb: Workbook, template?: { id: string; title: string }) => void;
   /** Start blank: the "Leere Tabelle" card, the close button and Escape. */
   onDismiss: () => void;
+  /**
+   * A key that types something was pressed: start blank and take the keyboard, during the key
+   * press, to where the letter should land (so it isn't lost, nor the ones typed right after).
+   */
+  onType?: () => void;
   /** Focus "Leere Tabelle" when shown, so the keyboard can choose right away. */
   autoFocus?: boolean;
   className?: string;
@@ -92,6 +99,14 @@ export function TemplatePicker({
       onDismiss();
       return;
     }
+    // Space and Enter stay the keyboard's way to pick the focused card; AltGr (Ctrl+Alt on Windows)
+    // types characters such as @. Dead keys (^ before ê) and input methods type too.
+    const types = (e.key.length === 1 && e.key !== " ") || e.key === "Dead" || e.key === "Process" || e.keyCode === 229;
+    const altGr = e.ctrlKey && e.altKey && !e.metaKey;
+    if (onType && types && (altGr || (!e.ctrlKey && !e.metaKey))) {
+      onType();
+      return;
+    }
     if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
     const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-pick]") ?? []);
     const next = nextItem(items, items.indexOf(document.activeElement as HTMLElement), e.key);
@@ -106,7 +121,7 @@ export function TemplatePicker({
       <div className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 @xl:px-8 @xl:pt-10">
         <header className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[12.5px] font-medium text-ink-3">{t.label}</p>
+            <p className="text-[12.5px] font-medium text-ink-2">{t.label}</p>
             <h2 id={headingId} className="mt-0.5 font-display text-[24px] font-bold leading-tight tracking-[-0.02em] @xl:text-[28px]">
               {t.heading}
             </h2>
@@ -154,7 +169,7 @@ export function TemplatePicker({
           ))}
         </ul>
 
-        <p className="mt-6 hidden items-center gap-1.5 text-[12px] text-ink-3 [@media(hover:hover)]:flex">
+        <p className="mt-6 hidden items-center gap-1.5 text-[12px] text-ink-2 [@media(hover:hover)]:flex">
           <Kbd>←</Kbd>
           <Kbd>→</Kbd>
           <Kbd>↑</Kbd>
@@ -200,7 +215,7 @@ function TemplateCard({ tpl, preview, locale, onPick }: { tpl: SheetTemplate; pr
           {preview.tags.length > 0 && (
             <span aria-hidden className="mt-2 hidden flex-wrap gap-1 @xl:flex">
               {preview.tags.map((tag) => (
-                <span key={tag} className="rounded-full border border-line bg-surface px-1.5 py-px text-[11px] leading-[16px] text-ink-3">
+                <span key={tag} className="rounded-full border border-line bg-surface px-1.5 py-px text-[12px] leading-[16px] text-ink-2">
                   {tag}
                 </span>
               ))}

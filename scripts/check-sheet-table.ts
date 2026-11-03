@@ -13,6 +13,10 @@ import * as O from "@/sheet/ops";
 import * as T from "@/sheet/table/model";
 import { buildDecorate } from "@/components/sheet/table/decor";
 import { createSheetStore } from "@/components/sheet/store";
+import { currentSheetNotice } from "@/components/sheet/notice";
+import { chartFromTable, makeTableFromSelection } from "@/components/sheet/table/actions";
+import { describeFilter } from "@/components/sheet/table/describe";
+import { sheetTableText } from "@/i18n/messages/sheetTable";
 import type { Area, Cell, ChartSpec, FilterSpec, RangeRef, Sheet, TableSpec, Workbook } from "@/sheet/types";
 
 // ----------------------------------------------------------------------------------------------
@@ -1202,9 +1206,61 @@ run(current, () => {
 });
 
 // ==============================================================================================
+// Lane F (fix round): what the table UI says. Its messages are the editor's notices (they show
+// with Blob's tips switched off too), the panel's sentences end cleanly, the names don't mix up
+// the smart table with the spreadsheet.
+section("the table UI's messages and words");
+run("the table UI's messages and words", () => {
+  const { de, en } = sheetTableText;
+  const storeOf = (cells: Record<string, CellInput>) => createSheetStore({ pageId: "p1", workbook: book(cells), locale: "de", readOnly: false });
+  const notice = (store: ReturnType<typeof storeOf>) => {
+    const n = currentSheetNotice(store);
+    return n && [n.tone, n.text];
+  };
+  const empty = storeOf({ A1: "x" });
+  empty.select({ anchor: at("D6"), focus: at("D6"), extra: [] });
+  check("no table from empty cells", !makeTableFromSelection(empty));
+  eq("…a hint how, not an alarm", notice(empty), ["info", de.errors.empty]);
+  const lab = storeOf(LAB);
+  lab.select({ anchor: at("A1"), focus: at("C7"), extra: [] });
+  check("a table from the lab data", makeTableFromSelection(lab));
+  lab.select({ anchor: at("C5"), focus: at("D9"), extra: [] });
+  check("no second table over the first", !makeTableFromSelection(lab));
+  eq("…that is a clash to sort out (role=alert)", notice(lab), ["error", de.errors.overlap]);
+  const words = storeOf({ A1: "Name", B1: "Ort", A2: "Anna", B2: "Labor", A3: "Ben", B3: "Büro" });
+  words.select({ anchor: at("A1"), focus: at("B3"), extra: [] });
+  makeTableFromSelection(words);
+  check("no chart from a table without numbers", !chartFromTable(words, words.get().workbook.tables[0].id));
+  eq("…and the editor says why", notice(words), ["info", de.noChart]);
+
+  // The sentence about a header that was found: names, then how many more, one full stop.
+  eq("four names", de.headerFound(["A", "B", "C", "D"], 0), "Die erste Zeile ist die Überschrift: A, B, C, D.");
+  eq("one more", de.headerFound(["A", "B", "C", "D"], 1), "Die erste Zeile ist die Überschrift: A, B, C, D und eine weitere.");
+  eq("two more", de.headerFound(["A", "B", "C", "D"], 2), "Die erste Zeile ist die Überschrift: A, B, C, D und 2 weitere.");
+  eq("English, one more", en.headerFound(["A", "B", "C", "D"], 1), "The first row is the header: A, B, C, D and 1 more.");
+  check("never an ellipsis before the full stop", ![de, en].some((t) => t.headerFound(["A"], 3).includes("…")));
+
+  // A "Top 10" filter in the panel, in words (not "Untersten 3").
+  const top = (op: "top" | "bottom", n: number, kind: "number" | "date", t: typeof de, locale: Locale) => describeFilter({ kind: "number", op, a: n, b: null }, kind, locale, t);
+  eq("the smallest", top("bottom", 3, "number", de, "de"), "die 3 kleinsten");
+  eq("the largest", top("top", 10, "number", de, "de"), "die 10 größten");
+  eq("dates", [top("top", 2, "date", de, "de"), top("bottom", 2, "date", de, "de")], ["die 2 neuesten", "die 2 ältesten"]);
+  eq("English", top("bottom", 3, "number", en, "en"), "the 3 smallest");
+
+  // Names: "Tabelle" is the spreadsheet; the smart table's own actions say what they act on.
+  eq("convert (Excel: In Bereich konvertieren)", [de.unmake, en.unmake], ["In Bereich umwandeln", "Convert to range"]);
+  eq("delete", [de.remove, en.remove], ["Intelligente Tabelle löschen", "Delete smart table"]);
+  check("the confirm says what goes and what stays", de.removeConfirm.includes("intelligente Tabelle") && de.removeConfirm.includes("Rest des Blatts") && en.removeConfirm.includes("rest of the sheet"));
+  eq("making one: the same words as the toolbar's button and Excel", [de.makeTable, en.makeTable], ["Als Tabelle formatieren", "Format as table"]);
+  eq("the panel's group", [de.table, en.table], ["Intelligente Tabelle", "Smart table"]);
+});
+
+// ==============================================================================================
 if (failures.length) {
   console.error(`check:sheet-table — ${failures.length} of ${count} checks failed:`);
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
 console.log(`check:sheet-table — all ${count} checks passed.`);
+// Done: the notices the checks showed would otherwise keep Node waiting for their timers.
+process.exit(0);

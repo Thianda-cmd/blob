@@ -11,16 +11,17 @@
 
 import { Check, Lock, Minus, Plus, StickyNote, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { blob } from "@/components/blob/bus";
 import { Popover } from "@/components/ui/Menu";
 import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
 import { cellKey, parseKey } from "@/sheet/a1";
-import { explainError, formatValue, isError, type Calc } from "@/sheet/engine";
+import { formatValue, isError, type Calc } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { Area, NumberFormat, Sheet } from "@/sheet/types";
+import { showSheetNotice } from "../notice";
 import { selectionAreas, useSheet, ZOOM_MAX, ZOOM_MIN, type Selection, type SheetStore } from "../store";
+import { errorHelp } from "./errorHelp";
 import { HoverTips, keepFocus } from "./parts";
 import { wantsRef } from "./formulaInput";
 
@@ -168,7 +169,7 @@ function Figure({
       aria-label={`${name}: ${value}. ${tip}`}
       className="inline-flex h-7 shrink-0 items-baseline gap-1.5 whitespace-nowrap rounded-md px-1.5 pt-[5px] text-[12px] transition-colors hover:bg-hover [@media(hover:none)]:h-9 [@media(hover:none)]:pt-[9px]"
     >
-      <span className="text-ink-3">{label}</span>
+      <span className="text-ink-2">{label}</span>
       {copied ? (
         <span className="inline-flex items-center gap-0.5 font-medium text-ok">
           <Check className="size-3 self-center" />
@@ -219,8 +220,8 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(null), 1400);
     };
-    // Without clipboard access (an old browser, a denied permission) the figure is at least said out loud.
-    const fallback = () => blob.say(`${label}: ${text}`);
+    // Without clipboard access (an old browser, a denied permission) the figure at least shows, to copy by hand.
+    const fallback = () => showSheetNotice(store, `${label}: ${text}`);
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
     else fallback();
   };
@@ -279,7 +280,9 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
   const shown = fit ? figures.filter((f) => fit.keys.has(f.key)) : [];
 
   const note = single ? activeCell?.note : undefined;
-  const problem = single && isError(activeValue) ? explainError(activeValue, locale) : null;
+  // An error: its name and what to do, as the cell's tooltip says it. When the bar is narrow the line
+  // is cut: then the whole text is its tooltip, and a tap on the cell shows it on touch screens.
+  const problem = single && isError(activeValue) ? errorHelp(activeValue, locale, activeCell?.f) : null;
 
   const stepZoom = (dir: 1 | -1) => {
     const i = ZOOMS.findIndex((z) => z >= zoom - 0.001);
@@ -296,7 +299,7 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
   return (
     <div role="group" aria-label={t.statusBar} className="flex h-9 min-w-0 items-center gap-1 px-1.5 text-[12px] text-ink-3 [@media(hover:none)]:h-11">
       {readOnly && (
-        <span data-tip={t.readOnlyTip} className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-hover px-2 text-[11.5px] font-medium text-ink-2">
+        <span data-tip={t.readOnlyTip} className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-hover px-2 text-[12px] font-medium text-ink-2">
           <Lock className="size-3" />
           {t.readOnly}
         </span>
@@ -304,7 +307,7 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
       {mode && (
         <span
           data-tip={t.modeTips[mode]}
-          className={cn("inline-flex h-6 shrink-0 items-center rounded-full px-2 text-[11.5px] font-medium", mode === "point" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}
+          className={cn("inline-flex h-6 shrink-0 items-center rounded-full px-2 text-[12px] font-medium", mode === "point" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}
         >
           {t.modes[mode]}
         </span>
@@ -323,9 +326,11 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
             />
           ))}
           {!figures.length && problem && (
-            <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 px-1.5 text-ink-2" title={problem}>
+            <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 px-1.5 text-ink-2" title={`${problem.title}: ${problem.text}`}>
               <TriangleAlert className="size-3.5 shrink-0 text-danger" />
-              <span className="truncate">{problem}</span>
+              <span className="truncate">
+                <span className="font-medium text-ink">{problem.title}:</span> {problem.text}
+              </span>
             </span>
           )}
           {!figures.length && !problem && note && (

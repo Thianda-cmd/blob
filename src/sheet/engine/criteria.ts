@@ -4,11 +4,24 @@
 import type { Locale } from "@/i18n/config";
 import { compileGlob, globTest } from "./glob";
 import { textToNumber } from "./parse";
-import { compareText, compareValues, errorFromText, isError, numbersEqual, type Scalar } from "./values";
+import { compareText, compareValues, errorFromText, isError, mkErr, numbersEqual, type CellError, type Scalar } from "./values";
 
 export type Criterion = (v: Scalar) => boolean;
 
 export const hasWildcards = (s: string) => /[*?~]/.test(s);
+
+/**
+ * The longest text with wildcards that a criterion, a lookup or SUCHEN takes, as in Excel (255
+ * characters; longer gives #WERT!). Matching takes up to (length of the text) × (length of the
+ * pattern ÷ 32) steps, so a pattern of 32,767 characters from a cell, against long texts, would
+ * hold up the sheet for seconds per formula.
+ */
+export const MAX_PATTERN = 255;
+
+/** #WERT! for a text with wildcards longer than MAX_PATTERN, else null. */
+export function patternTooLong(s: Scalar): CellError | null {
+  return typeof s === "string" && s.length > MAX_PATTERN && hasWildcards(s) ? mkErr("#VALUE!", "pattern-too-long") : null;
+}
 
 /** Text equal to a pattern (with wildcards: * any text, ? one character, ~ escapes), without regard to case. */
 export function textMatches(text: string, pattern: string): boolean {
@@ -16,10 +29,10 @@ export function textMatches(text: string, pattern: string): boolean {
   return globTest(compileGlob(pattern), text);
 }
 
-const criteriaCache = new Map<string, Criterion>();
+const criteriaCache = new Map<string, Criterion | CellError>();
 
-/** A criterion as a test for each cell value. */
-export function makeCriterion(crit: Scalar, locale: Locale): Criterion {
+/** A criterion as a test for each cell value (#WERT! for a pattern too long, see MAX_PATTERN). */
+export function makeCriterion(crit: Scalar, locale: Locale): Criterion | CellError {
   // An empty criteria cell means 0, as Microsoft documents for ZÄHLENWENNS and MITTELWERTWENN: a
   // summary row whose condition isn't filled in yet counts the zeros, not every empty row.
   if (crit === null) crit = 0;
@@ -43,7 +56,7 @@ function numericTextEquals(v: string, n: number, locale: Locale): boolean {
   return x !== null && numbersEqual(x, n);
 }
 
-function parseCriterion(text: string, locale: Locale): Criterion {
+function parseCriterion(text: string, locale: Locale): Criterion | CellError {
   const m = /^(<=|>=|<>|<|>|=)?([\s\S]*)$/.exec(text)!;
   const op = (m[1] ?? "") as "" | "=" | "<>" | "<" | ">" | "<=" | ">=";
   const operand = m[2];
@@ -92,6 +105,10 @@ function parseCriterion(text: string, locale: Locale): Criterion {
     return () => false;
   }
 
+  if (op === "" || op === "=" || op === "<>") {
+    const tooLong = patternTooLong(operand);
+    if (tooLong) return tooLong;
+  }
   switch (op) {
     case "":
     case "=":

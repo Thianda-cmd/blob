@@ -2,10 +2,42 @@
 // collecting the numbers of ranges and direct arguments the way SUM, AVERAGE, COUNT… do.
 
 import { textToNumber } from "../parse";
-import { boolText, ERR, isErr, isMatrix, isRef, mkErr, numberToText, numResult, type CellError, type Matrix, type Scalar, type Value } from "../values";
+import { boolText, ERR, isErr, isMatrix, isRef, mkErr, numberToText, numResult, type CellError, type ErrorCode, type Matrix, type Scalar, type Value } from "../values";
 import type { Ctx, FnDef } from "./types";
 
 export { numResult };
+
+/**
+ * Errors that say why, for the cell's tooltip (explainError in src/sheet/engine/messages.ts). "@"
+ * in a detail stands for the function; the call fills in its name, so RANG and RANG.GLEICH each
+ * name themselves. Argument numbers count from 1.
+ */
+export const why = {
+  /**
+   * Fewer numbers than the function needs (#DIV/0!, or the code Excel gives, e.g. #NUM! for
+   * MEDIAN): STABW.S of one replicate. `counts` says what counted when it isn't just numbers:
+   * "a" for the A forms (text as 0), "pairs" for x and y in the same place (STEIGUNG, KORREL).
+   */
+  few: (need: number, have: number, code: ErrorCode = "#DIV/0!", counts?: "a" | "pairs"): CellError => mkErr(code, `few:@:${need}:${have}${counts ? `:${counts}` : ""}`),
+  /** The same for each of two groups (T.TEST, F.TEST): `have` is the smaller group's count. */
+  fewEach: (need: number, have: number): CellError => mkErr("#DIV/0!", `few:@:${need}:${have}:each`),
+  /** All values the same where they must vary (#DIV/0!): KORREL or STEIGUNG of constant data. */
+  same: (): CellError => mkErr("#DIV/0!", "same:@"),
+  /** No cell meets the condition, so there is nothing to average (#DIV/0!). */
+  noMatch: (): CellError => mkErr("#DIV/0!", "nomatch:@"),
+  /**
+   * Argument i is outside what the function allows (#NUM!, or the code Excel gives): "gt0" must
+   * be > 0, "ge0" not negative, "ge1" / "ge2" at least 1 / 2, "p" between 0 and 1, "pos" only
+   * numbers > 0, "num" only numbers (no empty cells or text), "opt" one of the options its help
+   * lists, "range" between lo and hi.
+   */
+  arg: (i: number, rule: "gt0" | "ge0" | "ge1" | "ge2" | "p" | "pos" | "num" | "opt", code: ErrorCode = "#NUM!"): CellError => mkErr(code, `arg:@:${i}:${rule}`),
+  range: (i: number, lo: number, hi: number): CellError => mkErr("#NUM!", `arg:@:${i}:range:${lo}:${hi}`),
+  /** No value occurs more than once (#N/A from MODUS.EINF). */
+  noRepeat: (): CellError => mkErr("#N/A", "norepeat:@"),
+  /** Two ranges that must be the same size aren't (#N/A). */
+  sizes: (): CellError => mkErr("#N/A", "sizes"),
+};
 
 /** A value as a number: empty 0, TRUE 1, "3" 3, "abc" #VALUE!. */
 export function toNum(v: Scalar, ctx: Ctx): number | CellError {

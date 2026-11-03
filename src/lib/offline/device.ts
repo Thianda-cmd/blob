@@ -1,6 +1,8 @@
 "use client";
 
 import { noteCache } from "@/components/editor/noteCache";
+import { DRAFT_PREFIX, discardOpenSheets, draftPages, flushOpenSheets, forgetOtherAccounts, unsavedSheets } from "@/components/sheet/drafts";
+import type { Locale } from "@/i18n/config";
 import { blobApp, setOfflineReady } from "@/lib/native";
 import { clearNotifications, NOTIFY_EXTRA_KEY } from "@/lib/notify/scheduler";
 import { publishWidget } from "@/lib/widget/publish";
@@ -18,6 +20,10 @@ const WARM_KEY = "blob-warm-at";
 /** Whose data this device keeps (the offline page lists only that account's notes). */
 export const DEVICE_USER_KEY = "blob-device-user";
 const WARM_EVERY = 6 * 3600e3;
+/** Reworded flashcards that couldn't be saved yet (src/components/notes/study/useCardEdits.ts; the key doesn't name the account). */
+const CARD_EDITS_UNSENT = "blob-card-edits-unsent:";
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Messages the worker and waits for its answer (null when there is no worker or no answer). */
 async function ask<T>(message: Record<string, unknown>, ms = 60_000): Promise<T | null> {
@@ -36,16 +42,24 @@ async function ask<T>(message: Record<string, unknown>, ms = 60_000): Promise<T 
   });
 }
 
-/** Inside the app: installs the offline helper and tells it whose pages it keeps. */
+/**
+ * Someone is signed in here (browser and app): what another account left on this device goes (it
+ * signed out elsewhere, its session ended without signing out on a shared computer, or it was
+ * deleted): its databases, its unsaved spreadsheets and reworded flashcards. Inside the app this also
+ * installs the offline helper and tells it whose pages it keeps.
+ */
 export async function registerOffline(userId: string) {
-  if (!blobApp() || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
-  // Another account's data left on this device (it signed out elsewhere, or was deleted) goes.
   let before: string | null = null;
   try {
     before = localStorage.getItem(DEVICE_USER_KEY);
     localStorage.setItem(DEVICE_USER_KEY, userId);
   } catch {}
   if (before !== userId) await wipeAllDbs(userId);
+  // (Spreadsheet drafts name their account: any other's go. Flashcard wording doesn't: only when
+  // this device was known to be someone else's.)
+  forgetOtherAccounts(userId);
+  if (before && before !== userId) removeKeys((key) => key.startsWith(CARD_EDITS_UNSENT));
+  if (!blobApp() || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
   try {
     await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     await navigator.serviceWorker.ready;
@@ -75,38 +89,69 @@ export async function warmOffline(paths: string[], opts: { force?: boolean } = {
   if (done > 0) await setOfflineReady(true);
 }
 
+function removeKeys(match: (key: string) => boolean) {
+  try {
+    for (const key of Object.keys(localStorage)) if (match(key)) localStorage.removeItem(key);
+  } catch {}
+}
+
+/** Flashcards reworded on this device whose wording couldn't be saved yet. */
+function unsentCardEdits(): number {
+  let n = 0;
+  try {
+    for (const key of Object.keys(localStorage)) if (key.startsWith(CARD_EDITS_UNSENT) && Object.keys(JSON.parse(localStorage.getItem(key) ?? "{}") ?? {}).length) n++;
+  } catch {}
+  return n;
+}
+
+/** Spreadsheets kept on this device whose editor is closed: sent now (the saving code loads only when there are some). */
+async function flushWaitingSheets(userId: string, locale: Locale) {
+  if (!(await draftPages(userId)).length) return;
+  const { flushSheetDrafts } = await import("@/components/sheet/flushDrafts");
+  await flushSheetDrafts(userId, locale);
+}
+
 /**
  * Before signing out: what's still waiting on this device goes to the server first (while it can):
- * calendar and task changes, note text (open editors and closed ones), edits to shared notes and
- * flashcard answers. How many are still waiting afterwards (signing out would delete them).
+ * calendar and task changes, note text and spreadsheets (open editors and closed ones), edits to
+ * shared notes and flashcard answers. How many are still waiting afterwards (signing out would
+ * delete them).
  */
-export async function flushDevice(words: { copyTitle: (t: string) => string; conflict: (t: string) => string }): Promise<number> {
+export async function flushDevice(words: { copyTitle: (t: string) => string; conflict: (t: string) => string }, locale: Locale): Promise<number> {
   const { data } = await createClient().auth.getSession();
   const userId = data.session?.user.id;
-  await Promise.race([noteCache.flushOpen(), new Promise((r) => setTimeout(r, 5000))]);
+  await Promise.race([Promise.all([noteCache.flushOpen(), flushOpenSheets()]), wait(5000)]);
   const outbox = await flushAllSyncs(5000);
   if (!userId) return outbox;
   if (isOnline()) {
     const rest = (async () => {
       await Promise.all([settleOwed(userId, words), flushReviews(userId)]);
-      await flushWaitingNotes(userId, words, () => {});
+      await Promise.all([flushWaitingNotes(userId, words, () => {}), flushWaitingSheets(userId, locale).catch(() => {})]);
     })();
-    await Promise.race([rest, new Promise((r) => setTimeout(r, 8000))]);
+    await Promise.race([rest, wait(8000)]);
   }
   const kept = (await getAll<{ id: string }>(userId, "notes")).filter((r) => r.id.startsWith("owed:") || r.id.startsWith("review:")).length;
-  return outbox + noteCache.unsavedCount() + kept;
+  return outbox + noteCache.unsavedCount() + kept + (await unsavedSheets(userId)) + unsentCardEdits();
 }
 
 /** Signing out: nothing of the account stays on this device (pages, data, the app's start offline). */
 export async function forgetDevice() {
   stopAllSyncs();
   noteCache.reset();
+  // Open spreadsheets stop here and in the other tabs: closing them later would write their draft
+  // again after the wipe.
+  discardOpenSheets();
   await Promise.all([ask({ type: "wipe" }, 10_000), wipeAllDbs(), setOfflineReady(false), clearNotifications(), publishWidget(null)]);
-  try {
-    // (Unsaved spreadsheet work too: src/components/sheet/drafts.ts.)
-    for (const key of Object.keys(localStorage))
-      if (key === WARM_KEY || key.startsWith("blob-card-reviews") || key.startsWith("blob-sheet-draft:") || key === NOTIFY_EXTRA_KEY || key === DEVICE_USER_KEY) localStorage.removeItem(key);
-  } catch {}
+  // (Unsaved spreadsheet work and flashcard wording too: they were counted before, useSignOutGuard.)
+  removeKeys(
+    (key) =>
+      key === WARM_KEY ||
+      key.startsWith("blob-card-reviews") ||
+      key.startsWith(CARD_EDITS_UNSENT) ||
+      key.startsWith(DRAFT_PREFIX) ||
+      key === NOTIFY_EXTRA_KEY ||
+      key === DEVICE_USER_KEY,
+  );
 }
 
 /**
@@ -120,7 +165,5 @@ export async function forgetSignedOut() {
   stopAllSyncs();
   noteCache.reset();
   await Promise.all([ask({ type: "wipe" }, 10_000), setOfflineReady(false), clearNotifications(), publishWidget(null)]);
-  try {
-    for (const key of [WARM_KEY, NOTIFY_EXTRA_KEY, DEVICE_USER_KEY]) localStorage.removeItem(key);
-  } catch {}
+  removeKeys((key) => key === WARM_KEY || key === NOTIFY_EXTRA_KEY || key === DEVICE_USER_KEY);
 }

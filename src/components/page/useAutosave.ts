@@ -6,8 +6,13 @@ import { useMessages } from "@/i18n/client";
 import { pageText } from "@/i18n/messages/page";
 import { isOnline, onConnectivity, reportNetworkError } from "@/lib/offline/net";
 
-/** "device": no connection, but what was written is kept on this device until it can be saved. */
-export type SaveState = "saved" | "pending" | "saving" | "error" | "device";
+/**
+ * "device": no connection, but what was written is kept on this device until it can be saved.
+ * "error": not saved and trying again (for the editors that can't tell why: most likely offline).
+ * Editors that know the server said no: "failed" (an error, trying again), "refused" (no access
+ * any more, no more tries) and "tooBig" (too big to save until something is deleted).
+ */
+export type SaveState = "saved" | "pending" | "saving" | "error" | "device" | "failed" | "refused" | "tooBig";
 
 /**
  * Debounced, merge-friendly autosave. Call `schedule(patch)` on every change;

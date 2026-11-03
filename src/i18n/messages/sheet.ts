@@ -1,5 +1,8 @@
 import { defineMessages } from "../define";
 
+/** A size in MB with one decimal, rounded up (so a spreadsheet just over 5 MB never reads "5.0 MB"). */
+const mb = (bytes: number, tag: string) => (Math.ceil(bytes / 1e5) / 10).toLocaleString(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 /**
  * Spreadsheets ("Tabellen", src/components/sheet): the page around the grid — title, saving,
  * import and export, printing, the side panel — and the spreadsheet on public pages.
@@ -17,6 +20,15 @@ export const sheetText = defineMessages({
     unreadable: "This spreadsheet couldn't be read. So that nothing gets lost, it opened for viewing only.",
     tooBig: "This spreadsheet is too big to save (more than 5 MB). Delete sheets or rows you don't need any more.",
     restored: "Your unsaved changes from this device are back.",
+    saveTrouble: "Saving isn't working right now. Your changes stay on this device, and I'll keep trying.",
+    saveBack: "Saved. It works again.",
+    nearlyFull: (bytes: number) => `This spreadsheet is already ${mb(bytes, "en-US")} MB. Above 5 MB it can't be saved any more, so delete sheets or rows you don't need.`,
+    conflict: (list: { name: string; copyName: string }[]) =>
+      list.length === 1
+        ? `Rows or columns of this spreadsheet were moved in two places at once. So nothing gets lost, your version of “${list[0].name}” is now on a sheet of its own: “${list[0].copyName}”.`
+        : `Rows or columns of this spreadsheet were moved in two places at once. So nothing gets lost, your versions are now on sheets of their own: ${list.map((c) => `“${c.copyName}”`).join(", ")}.`,
+    conflictElsewhere: (page: string, copies: string[]) =>
+      `Rows or columns of “${page}” were moved in two places at once. So nothing gets lost, your version is now on ${copies.length === 1 ? "a sheet" : "sheets"} of its own: ${copies.map((c) => `“${c}”`).join(", ")}.`,
     someoneChanged: (name: string) => `${name} changed something`,
 
     exportXlsx: "Save as Excel file",
@@ -32,6 +44,8 @@ export const sheetText = defineMessages({
     importFailed: "I couldn't read that file. Is it an Excel file (.xlsx) or a CSV file?",
     importOldXls: "Old .xls files can't be read. Save it as .xlsx in Excel first.",
     importTooBig: "That file is too big (20 MB at most).",
+    importTooBigSheet: (bytes: number) => `That would make a ${mb(bytes, "en-US")} MB spreadsheet, too big to save (5 MB at most). Split the file, or leave out columns you don't need.`,
+    importNoRoom: (bytes: number) => `With this file the spreadsheet would be ${mb(bytes, "en-US")} MB, too big to save (5 MB at most). Import it as a new spreadsheet instead.`,
     importEmpty: "There's nothing in that file.",
     importCut: (rows: string) => `Only the first ${rows} rows fit.`,
     importLabel: "Import",
@@ -39,6 +53,7 @@ export const sheetText = defineMessages({
     dropHint: "An Excel (.xlsx) or CSV file",
     templateLabel: "Template",
     printEmpty: "There's nothing on this sheet to print yet.",
+    noticeClose: "Close message",
 
     insertChart: "Insert chart",
     addToNote: "Add to a note",
@@ -63,7 +78,7 @@ export const sheetText = defineMessages({
         fill: "Fill down / right",
         date: "Today's date / the time",
         undo: "Undo / redo",
-        table: "Smart table",
+        table: "Format as table",
         formats: "Number formats",
         autoSum: "AutoSum",
         chart: "Insert chart",
@@ -72,6 +87,7 @@ export const sheetText = defineMessages({
         replace: "Find and replace",
         save: "Save now",
         print: "Print",
+        areas: "Move between cells, settings and toolbar",
       },
     },
   },
@@ -85,6 +101,15 @@ export const sheetText = defineMessages({
     unreadable: "Diese Tabelle konnte nicht gelesen werden. Damit nichts verloren geht, ist sie nur zum Ansehen geöffnet.",
     tooBig: "Diese Tabelle ist zu groß zum Speichern (mehr als 5 MB). Lösche Blätter oder Zeilen, die du nicht mehr brauchst.",
     restored: "Deine ungespeicherten Änderungen von diesem Gerät sind wieder da.",
+    saveTrouble: "Speichern klappt gerade nicht. Deine Änderungen bleiben auf diesem Gerät, und ich versuche es weiter.",
+    saveBack: "Gespeichert. Jetzt klappt es wieder.",
+    nearlyFull: (bytes) => `Diese Tabelle ist schon ${mb(bytes, "de-DE")} MB groß. Ab 5 MB kann sie nicht mehr gespeichert werden – lösche Blätter oder Zeilen, die du nicht brauchst.`,
+    conflict: (list) =>
+      list.length === 1
+        ? `In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, steht deine Version von „${list[0].name}“ jetzt auf einem eigenen Blatt: „${list[0].copyName}“.`
+        : `In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, stehen deine Versionen jetzt auf eigenen Blättern: ${list.map((c) => `„${c.copyName}“`).join(", ")}.`,
+    conflictElsewhere: (page, copies) =>
+      `In „${page}“ wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, steht deine Version jetzt auf ${copies.length === 1 ? "einem eigenen Blatt" : "eigenen Blättern"}: ${copies.map((c) => `„${c}“`).join(", ")}.`,
     someoneChanged: (name) => `${name} hat etwas geändert`,
 
     exportXlsx: "Als Excel-Datei speichern",
@@ -100,6 +125,8 @@ export const sheetText = defineMessages({
     importFailed: "Diese Datei konnte ich nicht lesen. Ist es eine Excel-Datei (.xlsx) oder eine CSV-Datei?",
     importOldXls: "Alte .xls-Dateien kann ich nicht lesen. Speichere sie in Excel zuerst als .xlsx.",
     importTooBig: "Die Datei ist zu groß (höchstens 20 MB).",
+    importTooBigSheet: (bytes) => `Daraus würde eine Tabelle mit ${mb(bytes, "de-DE")} MB – zu groß zum Speichern (höchstens 5 MB). Teile die Datei auf oder lass Spalten weg, die du nicht brauchst.`,
+    importNoRoom: (bytes) => `Mit dieser Datei wäre die Tabelle ${mb(bytes, "de-DE")} MB groß – zu groß zum Speichern (höchstens 5 MB). Importiere sie lieber als neue Tabelle.`,
     importEmpty: "In dieser Datei steht nichts.",
     importCut: (rows) => `Nur die ersten ${rows} Zeilen passen hinein.`,
     importLabel: "Importieren",
@@ -107,13 +134,14 @@ export const sheetText = defineMessages({
     dropHint: "Eine Excel- (.xlsx) oder CSV-Datei",
     templateLabel: "Vorlage",
     printEmpty: "Auf diesem Blatt gibt es noch nichts zu drucken.",
+    noticeClose: "Hinweis schließen",
 
     insertChart: "Diagramm einfügen",
     addToNote: "In Notiz einfügen",
     noChart: "Markiere zuerst die Zahlen, aus denen ein Diagramm werden soll.",
 
-    chartSettings: "Diagramm-Einstellungen",
-    tableSettings: "Tabellen-Einstellungen",
+    chartSettings: "Diagrammeinstellungen",
+    tableSettings: "Tabelleneinstellungen",
     dockBigger: "Einstellungen größer",
     dockSmaller: "Einstellungen kleiner",
 
@@ -130,7 +158,7 @@ export const sheetText = defineMessages({
         fill: "Nach unten / rechts ausfüllen",
         date: "Heutiges Datum / Uhrzeit",
         undo: "Rückgängig / Wiederholen",
-        table: "Als intelligente Tabelle",
+        table: "Als Tabelle formatieren",
         formats: "Zahlenformate",
         autoSum: "AutoSumme",
         chart: "Diagramm einfügen",
@@ -139,6 +167,7 @@ export const sheetText = defineMessages({
         replace: "Suchen und ersetzen",
         save: "Jetzt speichern",
         print: "Drucken",
+        areas: "Zwischen Zellen, Einstellungen und Werkzeugleiste wechseln",
       },
     },
   },

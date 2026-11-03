@@ -1,8 +1,8 @@
-// Nachschlagen und Verweisen: SVERWEIS, WVERWEIS, XVERWEIS, INDEX, VERGLEICH, WAHL, ZEILE, SPALTE,
-// ZEILEN, SPALTEN. Exact matches ignore case and understand wildcards (* ?) like Excel; approximate
+// Nachschlagen und Verweisen: SVERWEIS, WVERWEIS, XVERWEIS, VERWEIS, INDEX, VERGLEICH, XVERGLEICH,
+// WAHL, ZEILE, SPALTE, ZEILEN, SPALTEN. Exact matches ignore case and understand wildcards (* ?) like Excel; approximate
 // matches search sorted data the way Excel does (binary search, largest value ≤ the one sought).
 
-import { hasWildcards, textMatches } from "../criteria";
+import { hasWildcards, patternTooLong, textMatches } from "../criteria";
 import type { Node } from "../parser";
 import { compareValues, ERR, isErr, isMatrix, isRef, mkErr, Ref, type CellError, type Matrix, type Scalar, type Value } from "../values";
 import type { Ctx, FnDef } from "./types";
@@ -160,6 +160,8 @@ function lookupTable(args: Value[], ctx: Ctx, horizontal: boolean): Value {
   if (idx > (horizontal ? d.rows : d.cols)) return mkErr("#REF!", "index");
   const vec = vecOf(table, ctx, horizontal ? "row0" : "col0");
   if (isErr(vec)) return vec;
+  const tooLong = approx ? null : patternTooLong(target);
+  if (tooLong) return tooLong;
   const pos = approx ? approxIndex(vec.values, target) : exactIndex(vec, target, ctx);
   if (pos < 0) return ERR.notFound;
   const v = horizontal ? cellOf(table, idx - 1, pos, ctx) : cellOf(table, pos, idx - 1, ctx);
@@ -203,34 +205,48 @@ function indexOf(args: Value[], ctx: Ctx): Value {
   return m;
 }
 
+/**
+ * XVERWEIS's and XVERGLEICH's search: the position of `target` in one row or column (-1: not
+ * found), with their match mode (0 exact, −1 or 1 the next smaller or larger, 2 wildcards) and
+ * search mode (1 from the first, −1 from the last, ±2 binary).
+ */
+function xsearch(target: Scalar, lookArr: Value, modeArg: Value | undefined, searchArg: Value | undefined, ctx: Ctx): { pos: number; vertical: boolean; n: number } | CellError {
+  const mode = modeArg !== undefined && modeArg !== null ? toInt(modeArg as Scalar, ctx) : 0;
+  if (typeof mode !== "number") return mode;
+  const search = searchArg !== undefined && searchArg !== null ? toInt(searchArg as Scalar, ctx) : 1;
+  if (typeof search !== "number") return search;
+  if (![0, -1, 1, 2].includes(mode) || ![1, -1, 2, -2].includes(search)) return ERR.value;
+  const ld = dims(lookArr, ctx);
+  if (ld.rows > 1 && ld.cols > 1) return ERR.value;
+  const vertical = ld.cols === 1 && ld.rows >= 1;
+  const vec = vecOf(lookArr, ctx);
+  if (isErr(vec)) return vec;
+  // Binary search modes give the same answers as a straight search on sorted data, so search straight.
+  const reverse = search === -1 || search === -2;
+  let pos: number;
+  if (mode === 2) {
+    const tooLong = patternTooLong(target);
+    if (tooLong) return tooLong;
+    pos = exactIndex({ values: vec.values, key: null }, target, ctx, reverse);
+  } else if (mode === 0) {
+    // Exact match: * and ? are ordinary characters here.
+    const t = typeof target === "string" && hasWildcards(target) ? target.replace(/[*?~]/g, "~$&") : target;
+    pos = exactIndex(reverse ? { values: vec.values, key: null } : vec, t, ctx, reverse);
+  } else pos = nearestIndex(vec.values, target, mode === 1, reverse);
+  return { pos, vertical, n: vertical ? ld.rows : ld.cols };
+}
+
 function xlookup(args: Value[], ctx: Ctx): Value {
   const target = args[0] as Scalar;
   if (isErr(target)) return target;
   const lookArr = args[1];
   const retArr = args[2];
   const notFound = args.length > 3 && args[3] !== null ? args[3] : undefined;
-  const mode = args.length > 4 && args[4] !== null ? toInt(args[4] as Scalar, ctx) : 0;
-  if (typeof mode !== "number") return mode;
-  const search = args.length > 5 && args[5] !== null ? toInt(args[5] as Scalar, ctx) : 1;
-  if (typeof search !== "number") return search;
-  if (![0, -1, 1, 2].includes(mode) || ![1, -1, 2, -2].includes(search)) return ERR.value;
-  const ld = dims(lookArr, ctx);
-  if (ld.rows > 1 && ld.cols > 1) return ERR.value;
-  const vertical = ld.cols === 1 && ld.rows >= 1;
+  const found = xsearch(target, lookArr, args[4], args[5], ctx);
+  if (isErr(found)) return found;
+  const { pos, vertical, n } = found;
   const rd = dims(retArr, ctx);
-  const n = vertical ? ld.rows : ld.cols;
   if ((vertical ? rd.rows : rd.cols) !== n) return ERR.value;
-  const vec = vecOf(lookArr, ctx);
-  if (isErr(vec)) return vec;
-  // Binary search modes give the same answers as a straight search on sorted data, so search straight.
-  const reverse = search === -1 || search === -2;
-  let pos: number;
-  if (mode === 2) pos = exactIndex({ values: vec.values, key: null }, target, ctx, reverse);
-  else if (mode === 0) {
-    // Exact match: * and ? are ordinary characters here.
-    const t = typeof target === "string" && hasWildcards(target) ? target.replace(/[*?~]/g, "~$&") : target;
-    pos = exactIndex(reverse ? { values: vec.values, key: null } : vec, t, ctx, reverse);
-  } else pos = nearestIndex(vec.values, target, mode === 1, reverse);
   if (pos < 0) return notFound === undefined ? ERR.notFound : notFound;
   if (isRef(retArr)) {
     const r = ctx.clip(retArr);
@@ -248,9 +264,69 @@ function match(args: Value[], ctx: Ctx): Value {
   const vec = vecOf(args[1], ctx);
   if (isErr(vec)) return vec;
   let pos: number;
-  if (type === 0) pos = exactIndex(vec, target, ctx);
-  else pos = approxIndex(vec.values, target, type < 0);
+  if (type === 0) {
+    const tooLong = patternTooLong(target);
+    if (tooLong) return tooLong;
+    pos = exactIndex(vec, target, ctx);
+  } else pos = approxIndex(vec.values, target, type < 0);
   return pos < 0 ? ERR.notFound : pos + 1;
+}
+
+/** XVERGLEICH: the position (from 1) of a value, searched like XVERWEIS does. */
+function xmatch(args: Value[], ctx: Ctx): Value {
+  const target = args[0] as Scalar;
+  if (isErr(target)) return target;
+  const found = xsearch(target, args[1], args[2], args[3], ctx);
+  if (isErr(found)) return found;
+  return found.pos < 0 ? ERR.notFound : found.pos + 1;
+}
+
+/**
+ * VERWEIS: the largest value ≤ the one sought in sorted data (like VERGLEICH with 1), and the
+ * value at the same place of the result row or column. Without one, a table answers from its last
+ * column (taller than wide, searched in its first column) or its last row (searched in its first row).
+ */
+function lookup(args: Value[], ctx: Ctx): Value {
+  const target = args[0] as Scalar;
+  if (isErr(target)) return target;
+  const where = args[1];
+  const d = dims(where, ctx);
+  let vec: Vec | CellError;
+  let result: Value;
+  let resultHorizontal: boolean;
+  if (args.length > 2 && args[2] !== null) {
+    if (d.rows > 1 && d.cols > 1) return ERR.na;
+    vec = vecOf(where, ctx);
+    result = args[2];
+    const rd = dims(result, ctx);
+    if (rd.rows > 1 && rd.cols > 1) return ERR.na;
+    resultHorizontal = rd.rows === 1 && rd.cols > 1;
+  } else {
+    const wide = d.cols > d.rows;
+    vec = vecOf(where, ctx, wide ? "row0" : "col0");
+    // The last row or column of the table, as a range or array of its own.
+    if (isRef(where)) {
+      const r = ctx.clip(where);
+      result = wide ? new Ref(r.sheet, r.r1, r.c0, r.r1, r.c1) : new Ref(r.sheet, r.r0, r.c1, r.r1, r.c1);
+    } else {
+      const m = asMatrix(where as Scalar | Matrix);
+      result = wide ? [m[m.length - 1]] : m.map((row) => [row[row.length - 1]]);
+    }
+    resultHorizontal = wide;
+  }
+  if (isErr(vec)) return vec;
+  const pos = approxIndex(vec.values, target);
+  if (pos < 0) return ERR.notFound;
+  if (isRef(result)) {
+    // Like Excel, a result range shorter than the searched one goes on past its end (a single
+    // cell in the direction of the search).
+    const single = result.rows === 1 && result.cols === 1;
+    const across = single ? d.rows === 1 && d.cols > 1 : resultHorizontal;
+    return across ? ctx.cell(result.sheet, result.r0, result.c0 + pos) : ctx.cell(result.sheet, result.r0 + pos, result.c0);
+  }
+  const rd = dims(result, ctx);
+  if (pos >= (resultHorizontal ? rd.cols : rd.rows)) return ERR.notFound;
+  return resultHorizontal ? cellOf(result, 0, pos, ctx) : cellOf(result, pos, 0, ctx);
 }
 
 function choose(nodes: Node[], ctx: Ctx): Value {
@@ -281,6 +357,8 @@ export const LOOKUP: FnDef[] = [
   { name: "HLOOKUP", min: 3, max: 4, args: "srss", lookupValue: true, impl: (args, ctx) => lookupTable(args, ctx, true) },
   { name: "XLOOKUP", min: 3, max: 6, args: "srrvss", lookupValue: true, impl: (args, ctx) => xlookup(args, ctx) },
   { name: "MATCH", min: 2, max: 3, args: "srs", lookupValue: true, impl: (args, ctx) => match(args, ctx) },
+  { name: "XMATCH", min: 2, max: 4, args: "srss", lookupValue: true, impl: (args, ctx) => xmatch(args, ctx) },
+  { name: "LOOKUP", min: 2, max: 3, args: "srr", lookupValue: true, impl: (args, ctx) => lookup(args, ctx) },
   { name: "INDEX", min: 2, max: 4, args: "rsss", impl: (args, ctx) => indexOf(args, ctx) },
   { name: "CHOOSE", min: 2, max: 255, args: "s", lazy: choose },
   {

@@ -3,9 +3,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/config";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeWorkbook } from "@/sheet/doc";
-import { createCalc, type Calc } from "@/sheet/engine";
-import { filteredRows } from "@/sheet/table/model";
+import { PAGE_META_COLUMNS, type PageMeta } from "@/lib/types";
 import type { Workbook } from "@/sheet/types";
 
 // Spreadsheets shown in notes (the sheetEmbed block), loaded once per page however many blocks
@@ -13,15 +11,21 @@ import type { Workbook } from "@/sheet/types";
 // spreadsheet changed when it appears, when the window gets the focus again, when Blob saves the
 // spreadsheet in this tab (its updated_at moves), and when you press "Refresh". Asking is cheap
 // (one row's date); the content is fetched again only when it did change.
+//
+// This is the light half, which every note loads; reading and calculating a workbook
+// (sheetEmbedCalc.ts) loads with the first spreadsheet a note shows.
 
 export type SheetDoc = { id: string; title: string; wb: Workbook; updatedAt: string | null };
+
+/** A spreadsheet in the trash: its name, and what bringing it back needs (see restoreSheet). */
+export type TrashedSheet = { status: "trashed"; title: string; trashedAt: string; parentId: string | null; ownerId: string | null };
 
 export type SheetLoad =
   | { status: "loading" }
   | { status: "ready"; doc: SheetDoc; refreshing: boolean }
-  /** Deleted, or not shared with you (the database can't say which). */
+  /** Deleted, or not shared with you (the database can't say which, so there is no name either). */
   | { status: "missing" }
-  | { status: "trashed" }
+  | TrashedSheet
   | { status: "notSheet" }
   /** Public pages: the link doesn't open this spreadsheet. */
   | { status: "private" }
@@ -38,7 +42,6 @@ type Source = {
 
 const LOADING: SheetLoad = { status: "loading" };
 
-
 const offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 /** Workbooks normalised in the reader's language at the time (a damaged one gets sheet names from it). */
@@ -47,36 +50,65 @@ export const setSheetLocale = (locale: Locale) => {
   normalizeLocale = locale;
 };
 
-function readRow(id: string, row: { title?: string | null; kind?: string; trashed_at?: string | null; updated_at?: string | null; content?: unknown } | null): Final {
+type Row = { title?: string | null; kind?: string; trashed_at?: string | null; updated_at?: string | null; parent_id?: string | null; user_id?: string | null; content?: unknown };
+
+/** What a row says before its content is read: missing, in the trash (with its name), not a spreadsheet, or null when it is one. */
+function rowStatus(row: Row | null): Final | null {
   if (!row) return { status: "missing" };
-  if (row.trashed_at) return { status: "trashed" };
+  if (row.trashed_at) return { status: "trashed", title: row.title ?? "", trashedAt: row.trashed_at, parentId: row.parent_id ?? null, ownerId: row.user_id ?? null };
   // (Compared as text: the page kind "sheet" is new.)
   if (String(row.kind) !== "sheet") return { status: "notSheet" };
+  return null;
+}
+
+async function readRow(id: string, row: Row | null): Promise<Final> {
+  const status = rowStatus(row);
+  if (status || !row) return status ?? { status: "missing" };
   let wb: Workbook;
   try {
-    wb = normalizeWorkbook(row.content, normalizeLocale);
+    const { readWorkbook } = await import("./sheetEmbedCalc");
+    wb = readWorkbook(row.content, normalizeLocale);
   } catch {
     return { status: "failed" };
   }
   return { status: "ready", doc: { id, title: row.title ?? "", wb, updatedAt: row.updated_at ?? null }, refreshing: false };
 }
 
+const ROW_COLUMNS = "title, kind, trashed_at, updated_at, parent_id, user_id";
+
 const privateSource: Source = {
   stamp: async (id) => {
-    const { data, error } = await createClient().from("pages").select("updated_at, trashed_at, kind").eq("id", id).maybeSingle();
+    const { data, error } = await createClient().from("pages").select(ROW_COLUMNS).eq("id", id).maybeSingle();
     if (error) return { status: offline() ? "offline" : "failed" };
-    const row = data as { updated_at: string | null; trashed_at: string | null; kind: string } | null;
-    if (!row) return { status: "missing" };
-    if (row.trashed_at) return { status: "trashed" };
-    if (String(row.kind) !== "sheet") return { status: "notSheet" };
-    return { updatedAt: row.updated_at };
+    const row = data as Row | null;
+    return rowStatus(row) ?? { updatedAt: row?.updated_at ?? null };
   },
   full: async (id) => {
-    const { data, error } = await createClient().from("pages").select("title, kind, trashed_at, updated_at, content").eq("id", id).maybeSingle();
+    const { data, error } = await createClient().from("pages").select(`${ROW_COLUMNS}, content`).eq("id", id).maybeSingle();
     if (error) return { status: offline() ? "offline" : "failed" };
-    return readRow(id, data as Parameters<typeof readRow>[1]);
+    return readRow(id, data as Row | null);
   },
 };
+
+/**
+ * Bring a spreadsheet back from the trash, with everything that went there together with it, and
+ * to the top level when its folder stays in the trash (as its own page's notice does,
+ * src/components/page/TrashedNotice.tsx). `known`: is a page in the workspace (not in the trash)?
+ * The pages restored, or null when it didn't work.
+ */
+export async function restoreSheet(id: string, trashed: TrashedSheet, known: (pageId: string) => boolean): Promise<PageMeta[] | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("pages").update({ trashed_at: null }).eq("trashed_at", trashed.trashedAt).select(PAGE_META_COLUMNS);
+  if (error) return null;
+  const restored = (data ?? []) as PageMeta[];
+  const parentGone = trashed.parentId && !known(trashed.parentId) && !restored.some((p) => p.id === trashed.parentId);
+  if (parentGone) {
+    await supabase.from("pages").update({ parent_id: null }).eq("id", id);
+    restored.forEach((p) => p.id === id && (p.parent_id = null));
+  }
+  void privateSheets.reload(id);
+  return restored;
+}
 
 /** Through a public link: the page as public_page() hands it out (only pages the link opens). */
 function publicSource(token: string): Source {
@@ -85,7 +117,7 @@ function publicSource(token: string): Source {
     if (error) return { status: offline() ? "offline" : "failed" };
     const view = data as { page?: { title?: string; kind?: string; content?: unknown; updated_at?: string } } | null;
     if (!view?.page) return { status: "private" };
-    return readRow(id, { ...view.page, trashed_at: null });
+    return readRow(id, { title: view.page.title, kind: view.page.kind, content: view.page.content, updated_at: view.page.updated_at, trashed_at: null });
   };
   // A public link has no cheap way to ask for the date alone: the whole page it is.
   return { full, stamp: async (id) => full(id) };
@@ -208,52 +240,4 @@ export function useSheetDoc(pageId: string | null, docs: SheetDocs, changedAt?: 
     };
   }, [pageId, docs]);
   return load;
-}
-
-// Values -----------------------------------------------------------------------------------------
-
-const calcs = new WeakMap<Workbook, Map<Locale, Calc>>();
-const filterMemo = new WeakMap<Calc, Map<string, ReadonlySet<number>>>();
-const NONE: ReadonlySet<number> = new Set<number>();
-
-/** Rows a smart table's filter hides (worked out once per calculation and sheet), as the spreadsheet does. */
-function filterHidden(calc: Calc, sheetId: string, locale: Locale): ReadonlySet<number> {
-  const wb = calc.workbook;
-  if (!wb.tables.some((t) => t.sheetId === sheetId && Object.keys(t.filters).length > 0)) return NONE;
-  let bySheet = filterMemo.get(calc);
-  if (!bySheet) filterMemo.set(calc, (bySheet = new Map()));
-  const known = bySheet.get(sheetId);
-  if (known) return known;
-  // While a sheet's filters are worked out (they read values), only rows hidden by hand count.
-  bySheet.set(sheetId, NONE);
-  let rows: ReadonlySet<number> = NONE;
-  try {
-    rows = filteredRows(wb, calc, sheetId, locale);
-  } catch {
-    rows = NONE;
-  }
-  bySheet.set(sheetId, rows);
-  return rows;
-}
-
-/** The values of a workbook, calculated as the spreadsheet does (SUBTOTAL skips hidden and filtered rows). */
-export function calcOf(wb: Workbook, locale: Locale): Calc {
-  let byLocale = calcs.get(wb);
-  if (!byLocale) calcs.set(wb, (byLocale = new Map()));
-  let calc = byLocale.get(locale);
-  if (!calc) {
-    let self: Calc | null = null;
-    calc = createCalc(wb, {
-      locale,
-      isRowHidden: (sheetId, row) => {
-        const sheet = wb.sheets.find((s) => s.id === sheetId);
-        if (!sheet) return false;
-        if (sheet.rows[String(row)]?.hidden) return true;
-        return self ? filterHidden(self, sheetId, locale).has(row) : false;
-      },
-    });
-    self = calc;
-    byLocale.set(locale, calc);
-  }
-  return calc;
 }

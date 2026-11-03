@@ -134,12 +134,12 @@ export function FilterCondition({
       {kind === "text" ? (
         <>
           {input(text, setText, t.value)}
-          <p className="text-[11.5px] leading-snug text-ink-3">{t.wildcards}</p>
+          <p className="text-[12px] leading-snug text-ink-2">{t.wildcards}</p>
         </>
       ) : op === "between" ? (
         <div className="flex items-center gap-2">
           {input(a, setA, t.from, "min-w-0 flex-1")}
-          <span className="shrink-0 text-[12px] text-ink-3">{t.and}</span>
+          <span className="shrink-0 text-[12px] text-ink-2">{t.and}</span>
           {input(b, setB, t.to, "min-w-0 flex-1")}
         </div>
       ) : op === "top" ? (
@@ -170,7 +170,7 @@ export function FilterCondition({
             disabled={disabled}
             className={cn(fieldClass, "w-16 tabular-nums")}
           />
-          <span className="text-[12px] text-ink-3">{t.items}</span>
+          <span className="text-[12px] text-ink-2">{t.items}</span>
         </div>
       ) : op === "aboveAverage" || op === "belowAverage" ? (
         average !== null && <p className="text-[12px] leading-snug text-ink-2">{t.average(show(average))}</p>
@@ -179,7 +179,7 @@ export function FilterCondition({
       )}
 
       {error && (
-        <p className="text-[11.5px] leading-snug text-danger" role="alert">
+        <p className="text-[12px] leading-snug text-danger" role="alert">
           {error}
         </p>
       )}

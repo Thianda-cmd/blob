@@ -10,13 +10,16 @@
 
 import { createContext, useContext, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/config";
+import { sheetCollabText, type TakeBackRefusal } from "@/i18n/messages/sheetCollab";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { areaOf, inArea, parseKey, sameArea } from "@/sheet/a1";
-import { mergeWorkbooks } from "@/sheet/collab";
+import { takeBack, type MergeReport } from "@/sheet/collab";
 import { createCalc, editText, parseInput, type Calc, type ParsedInput } from "@/sheet/engine";
 import { getCell, setCells, sheetById } from "@/sheet/ops";
+import { followArea, followCell, opsSince } from "@/sheet/sheetLog";
 import { afterInput, afterPaste, filteredRows } from "@/sheet/table/model";
-import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type Pos, type Sheet, type Workbook } from "@/sheet/types";
+import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type Pos, type Sheet, type SheetOp, type Workbook } from "@/sheet/types";
+import { showSheetNotice } from "./notice";
 
 export type Selection = {
   /** Where the selection started; the active cell (the one you type into). */
@@ -114,14 +117,32 @@ export interface SheetStore {
   setFocus(focus: SheetState["focus"]): void;
   setZoom(zoom: number): void;
 
+  /**
+   * Undo and redo only take back what that step did: other people's changes since stay, on the
+   * rows they made them on (src/sheet/collab.ts takeBack). A step whose rows or columns others
+   * have moved since can't be taken back without guessing: it is dropped with a message instead.
+   */
   undo(): void;
   redo(): void;
 
   /** A row hidden by hand or by a smart table's filter (what the grid hides and SUBTOTAL skips). */
   isRowHidden(sheetId: string, row: number): boolean;
 
-  /** Someone else's save, already merged with ours: replaces the document without an undo step; keeps selection and a running edit. */
-  replaceRemote(wb: Workbook): void;
+  /**
+   * Someone else's save, already merged with ours: replaces the document without an undo step.
+   * The selection, a running edit and what was copied or cut stay on their cells where the other
+   * person inserted, deleted, sorted or moved rows or columns (a running edit whose cell is gone
+   * ends, with a notice; a cut whose cells moved is cancelled). `conflicts`: the merge's report
+   * (collab.ts MergeReport), when it kept a sheet as theirs and put mine on a copy: a running edit
+   * on that sheet goes on in the copy, which has my rows.
+   */
+  replaceRemote(wb: Workbook, conflicts?: MergeReport["conflicts"]): void;
+
+  /**
+   * A new start (a template picked for an empty spreadsheet): replaces the document and clears
+   * undo and redo, so undoing can't go back to the empty sheet before it.
+   */
+  reset(wb: Workbook): void;
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -186,6 +207,47 @@ function clampSelection(sel: Selection, sheet: Sheet): Selection {
     .filter((a) => a.r0 <= R && a.c0 <= C)
     .map((a) => ({ r0: clampN(a.r0, R), c0: clampN(a.c0, C), r1: clampN(a.r1, R), c1: clampN(a.c1, C) }));
   return { anchor: pos(sel.anchor), focus: pos(sel.focus), extra };
+}
+
+/** What happened to the rows and columns of each sheet from one version to a newer one (the entries its log has since), where anything did. */
+function rowChanges(was: Workbook, now: Workbook): Map<string, SheetOp[]> {
+  const out = new Map<string, SheetOp[]>();
+  for (const s of now.sheets) {
+    const old = sheetById(was, s.id);
+    if (!old || old.log === s.log) continue;
+    const ops = opsSince(old.log, s.log);
+    if (ops?.length) out.set(s.id, ops);
+  }
+  return out;
+}
+
+/**
+ * A selection of sheet `sheetId` after `ops` changed its rows or columns: on the same cells (an
+ * area with the active cell in the same corner), or where it was when they're gone.
+ */
+function followSelection(sel: Selection, ops: readonly SheetOp[], sheetId: string): Selection {
+  let { anchor, focus } = sel;
+  if (samePos(anchor, focus)) anchor = focus = followCell(ops, sheetId, anchor) ?? anchor;
+  else {
+    const a = followArea(ops, sheetId, mainArea(sel));
+    if (a) {
+      const down = anchor.row <= focus.row;
+      const right = anchor.col <= focus.col;
+      anchor = { row: down ? a.r0 : a.r1, col: right ? a.c0 : a.c1 };
+      focus = { row: down ? a.r1 : a.r0, col: right ? a.c1 : a.c0 };
+    }
+  }
+  return { anchor, focus, extra: sel.extra.map((x) => followArea(ops, sheetId, x) ?? x) };
+}
+
+/** Did a cut and paste among `ops` paste cells over part of `area` of sheet `sheetId`? */
+function pastedInto(ops: readonly SheetOp[], sheetId: string, area: Area): boolean {
+  return ops.some((op) => {
+    if (op.kind !== "move" || op.dst !== sheetId) return false;
+    const r1 = op.to.row + op.from.r1 - op.from.r0;
+    const c1 = op.to.col + op.from.c1 - op.from.c0;
+    return op.to.row <= area.r1 && r1 >= area.r0 && op.to.col <= area.c1 && c1 >= area.c0;
+  });
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -310,14 +372,21 @@ export function tablesAfterPaste(wb: Workbook, sheetId: string, areas: Area | Ar
   return next;
 }
 
-function mergeSafely(base: Workbook, mine: Workbook, theirs: Workbook): Workbook {
+/**
+ * takeBack, where a bug means the step can't be taken back (never that someone's changes are
+ * lost): the workbook, or why not and the sheet that is about.
+ */
+function takeBackSafely(from: Workbook, to: Workbook, now: Workbook, sheetId: string): { wb: Workbook } | { refused: TakeBackRefusal; sheetId: string } {
   try {
-    return mergeWorkbooks(base, mine, theirs);
+    return takeBack(from, to, now);
   } catch (e) {
     reportOnce("merging for undo", e);
-    return mine;
+    return { refused: "error", sheetId };
   }
 }
+
+/** What was typed, short enough for a notice. */
+const shortText = (text: string) => (text.length > 40 ? `${text.slice(0, 39)}…` : text);
 
 /** How many "(" of a formula are still open (outside "text" and 'sheet names'). */
 export function openParens(text: string): number {
@@ -461,6 +530,19 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     if (view && view.sheetId !== state.sheetId) remembered.set(state.sheetId, state.selection);
     state = settle({ ...state, ...view, workbook: wb, calc, version: state.version + 1, ...historyState() });
     emit();
+  }
+
+  /**
+   * A step that can't be taken back any more (for example, someone moved rows or columns of its
+   * sheet since): it is gone from the history, the document stays as it is, and a notice at the
+   * bottom of the editor says why, naming the sheet that is about (notice.ts). The next undo goes
+   * on with the step before it.
+   */
+  function refuse(step: Step, what: "undo" | "redo", why: TakeBackRefusal, sheetId: string) {
+    const sheet = sheetById(state.workbook, sheetId) ?? sheetById(step.before, sheetId) ?? sheetById(step.after, sheetId);
+    state = { ...state, ...historyState() };
+    emit();
+    showSheetNotice(store, sheetCollabText[locale].refused(what, why, sheet?.name ?? ""));
   }
 
   /** One undo step: `next` replaces the workbook. */
@@ -744,7 +826,9 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       tabStart = null;
       const now = state.workbook;
       // Someone else's changes since then stay: only what this step changed goes back.
-      const wb = now === step.after ? step.before : mergeSafely(step.after, step.before, now);
+      const back = takeBackSafely(step.after, step.before, now, step.sheetId);
+      if ("refused" in back) return refuse(step, "undo", back.refused, back.sheetId);
+      const wb = back.wb;
       redoStack.push({ ...step, before: wb, after: now, redoView: { sheetId: state.sheetId, selection: state.selection } });
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), { sheetId: step.sheetId, selection: step.selection });
     },
@@ -758,7 +842,9 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       if (!step) return;
       tabStart = null;
       const now = state.workbook;
-      const wb = now === step.before ? step.after : mergeSafely(step.before, step.after, now);
+      const again = takeBackSafely(step.before, step.after, now, step.sheetId);
+      if ("refused" in again) return refuse(step, "redo", again.refused, again.sheetId);
+      const wb = again.wb;
       undoStack.push({ label: step.label, before: now, after: wb, sheetId: state.sheetId, selection: state.selection });
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), step.redoView ?? { sheetId: step.sheetId, selection: step.selection });
     },
@@ -767,13 +853,76 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       return rowHidden(state.workbook, state.calc, sheetId, row, locale);
     },
 
-    replaceRemote(wb) {
+    replaceRemote(wb, conflicts) {
       if (wb === state.workbook || !wb.sheets.length) return;
-      // No undo step, and the undo history stays: undoing later puts back only what that step
-      // changed and keeps the other person's changes (a three-way merge, see undo()). A step that
-      // inserted or deleted rows can't be lined up with their edits cell by cell; then theirs in
-      // the moved cells may land a row off. Rare enough (both at once, then undo) to accept.
-      setDocument(wb, makeCalc(wb, state.calc, cellChanges(state.workbook, wb)));
+      // No undo step, and the undo history stays: undoing later takes back only what that step
+      // changed and keeps the other person's changes, lined up through the sheets' logs where
+      // rows or columns moved (see undo()).
+      const was = state.workbook;
+      // Where the other person moved rows or columns, what points at cells here moves along
+      // (else typing would land in another row than the one it was meant for).
+      const moved = rowChanges(was, wb);
+      const follow = (sel: Selection, id: string) => {
+        const ops = moved.get(id);
+        return ops ? followSelection(sel, ops, id) : sel;
+      };
+      for (const [id, sel] of remembered) remembered.set(id, follow(sel, id));
+      if (moved.has(state.sheetId)) tabStart = null;
+      let { sheetId, edit, clip } = state;
+      let selection = follow(state.selection, sheetId);
+      const start = editStart && { ...editStart, selection: follow(editStart.selection, editStart.sheetId) };
+      editStart = start;
+      let lost: string | null = null;
+      if (edit) {
+        const e = edit;
+        const copy = conflicts?.find((c) => c.sheetId === e.sheetId)?.copyId;
+        if (copy) {
+          // That sheet is theirs now, and my version of it (with my rows) is on the copy: typing goes on there.
+          edit = { ...e, sheetId: copy };
+          if (start?.sheetId === e.sheetId) editStart = { ...start, sheetId: copy };
+          if (sheetId === e.sheetId) {
+            remembered.set(sheetId, selection);
+            sheetId = copy;
+            selection = state.selection;
+          }
+        } else {
+          const ops = moved.get(e.sheetId);
+          // (No copy of a sheet kept as theirs: there is nowhere left to type it into.)
+          const at = copy === "" ? null : ops ? followCell(ops, e.sheetId, e) : e;
+          if (!at) {
+            // Its row or column is gone, or the cell is on another sheet now.
+            if (!start || e.text !== start.original) lost = e.text;
+            edit = null;
+            editStart = null;
+          } else if (at.row !== e.row || at.col !== e.col) edit = { ...e, row: at.row, col: at.col };
+        }
+      }
+      let cutStopped = false;
+      if (clip) {
+        const ops = moved.get(clip.sheetId);
+        const area = ops ? followArea(ops, clip.sheetId, clip.area) : clip.area;
+        if (!clip.cut) clip = area ? { ...clip, area } : null;
+        else if (ops && (!area || !sameArea(area, clip.area) || pastedInto(ops, clip.sheetId, clip.area))) {
+          // Cutting moves the cells at the cut address when pasting: other cells are there now.
+          clip = null;
+          cutStopped = true;
+        }
+      }
+      state = { ...state, sheetId, selection, edit, clip };
+      setDocument(wb, makeCalc(wb, state.calc, cellChanges(was, wb)));
+      const text = sheetCollabText[locale];
+      if (lost !== null) showSheetNotice(store, text.editGone(shortText(lost)));
+      else if (cutStopped) showSheetNotice(store, text.cutStopped);
+    },
+
+    reset(wb) {
+      if (state.readOnly || !wb.sheets.length) return;
+      undoStack.length = 0;
+      redoStack.length = 0;
+      tabStart = null;
+      editStart = null;
+      state = { ...state, edit: null };
+      setDocument(wb, makeCalc(wb));
     },
   };
 

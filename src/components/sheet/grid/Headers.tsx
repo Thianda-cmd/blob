@@ -32,9 +32,14 @@ function rowHighlight(areas: Area[], cols: number, r: number): Highlight {
   return h;
 }
 
-// The letters and numbers are how students read "B2:B7": dark enough to read on the header's grey.
+// The letters and numbers are how students read "B2:B7": dark enough to read on the header's grey
+// (4.9:1 light, 5.6:1 dark), still lighter than the cells' own text.
 const tone = (h: Highlight) =>
-  h === "full" ? "bg-blob-soft font-semibold text-blob-ink" : h === "on" ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2";
+  h === "full"
+    ? "bg-blob-soft font-semibold text-blob-ink"
+    : h === "on"
+      ? "bg-blob-soft text-blob-ink"
+      : "bg-hover text-[color-mix(in_srgb,var(--ink-2)_60%,var(--ink-3))]";
 
 /** The headers' text size: smaller with the zoom, but on touch screens never below 12 px (the header row keeps its height). */
 const headerFont = (zoom: number, touch: boolean) => (touch ? Math.max(12, 12 * zoom) : Math.max(9, 11.5 * zoom));

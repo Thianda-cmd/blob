@@ -113,7 +113,7 @@ export const sheetGridText = defineMessages({
     // Text that looks like a number (a mark in the cell's corner, its tip and what screen readers hear)
     numberText: {
       title: "Number stored as text",
-      text: "This looks like a number, but it's text, for example because of a second comma or a space. Formulas and charts leave this cell out. Type the value again.",
+      text: "This looks like a number, but it's text, for example because of an extra point or comma, or a space. Formulas and charts leave this cell out. Type the value again.",
     },
 
     // Filling on a touch screen: the menu entry, and how it works

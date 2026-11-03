@@ -6,12 +6,14 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey, inArea, parseKey } from "./a1";
-import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globFind, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
+import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
 import { seriesOf } from "./engine/series";
+import { withOp } from "./sheetLog";
 // Smart-table helpers that import nothing from this file (table/model.ts does, so it can't be used here).
 import { columnPattern, headerGaps, insertedRowCells } from "./table/columns";
+import { freeTableName } from "./table/names";
 import { dataRows, refreshTotals } from "./table/totals";
-import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type ChartSpec, type NumberFormat, type Pos, type RangeRef, type Sheet, type TableSpec, type Workbook } from "./types";
+import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type ChartSpec, type NumberFormat, type Pos, type RangeRef, type Sheet, type SheetOp, type TableSpec, type Workbook } from "./types";
 
 // ----------------------------------------------------------------------------------------------
 // Reading (implemented)
@@ -227,8 +229,24 @@ export function clearAreas(wb: Workbook, sheetId: string, areas: Area[], what: C
 
 // ----------------------------------------------------------------------------------------------
 // Structural changes: formulas everywhere, charts and tables follow
+//
+// Each one is also written into the log of the sheets it changes (Sheet.log, src/sheet/sheetLog.ts)
+// with a random id: merging lines other people's versions up with it (collab.ts), and replayOp
+// does it again on such a version.
 
 type RowColChange = { kind: "insertRows" | "deleteRows" | "insertCols" | "deleteCols"; at: number; count: number };
+
+/** What names a logged change: its id and, for an undo or redo, the entry it takes back. */
+type OpHead = { id: string; inv?: string };
+const freshHead = (): OpHead => ({ id: newId() });
+const headOf = (op: SheetOp): OpHead => (op.inv === undefined ? { id: op.id } : { id: op.id, inv: op.inv });
+
+/** `op` written into the log of each sheet it changes. */
+function logOp(wb: Workbook, sheetIds: string[], op: SheetOp): Workbook {
+  let next = wb;
+  for (const id of new Set(sheetIds)) next = updateSheet(next, id, (s) => withOp(s, op));
+  return next;
+}
 
 /**
  * Could this formula name the sheet? A quick test before rewriting it. Formulas write a ' in a
@@ -240,10 +258,15 @@ function mayName(f: string, sheetName: string): boolean {
   return text.includes(name) || (name.includes("'") && text.includes(name.replace(/'/g, "''")));
 }
 
-/** Every formula of the workbook rewritten through `f` (host sheet name, formula) → new formula. Sheets without changes are kept as they are. */
-function mapFormulas(wb: Workbook, f: (host: Sheet, formula: string, key: string) => string): Workbook {
+/**
+ * Every formula of the workbook rewritten through `f` (host sheet name, formula) → new formula.
+ * Sheets without changes are kept as they are, and so is sheet `skip` (its formulas are done
+ * already: going through a big sheet's cells again would cost as much as the change itself).
+ */
+function mapFormulas(wb: Workbook, f: (host: Sheet, formula: string, key: string) => string, skip?: string): Workbook {
   let changed = false;
   const sheets = wb.sheets.map((sheet) => {
+    if (sheet.id === skip) return sheet;
     let cells: Record<string, Cell> | null = null;
     for (const key in sheet.cells) {
       const cell = sheet.cells[key];
@@ -366,7 +389,8 @@ function shiftIndexRecord<T>(rec: Record<string, T>, at: number, count: number, 
   return changed ? out : rec;
 }
 
-function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Workbook {
+/** Rows or columns inserted or deleted (logged as `head`): the same workbook when that can't be done. */
+function rowColChange(wb: Workbook, sheetId: string, change: RowColChange, head: OpHead): Workbook {
   const sheet = sheetById(wb, sheetId);
   if (!sheet || change.count <= 0 || change.at < 0) return wb;
   const rowsOp = change.kind === "insertRows" || change.kind === "deleteRows";
@@ -403,7 +427,8 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
   // Formulas on the other sheets follow when they name this one.
   let next = mapFormulas(
     { ...wb, sheets: wb.sheets.map((s) => (s.id === sheetId ? { ...s, cells } : s)) },
-    (host, f) => (host.id === sheetId || !mayName(f, sheet.name) ? f : adjustFormula(f, host.name, sc)),
+    (host, f) => (mayName(f, sheet.name) ? adjustFormula(f, host.name, sc) : f),
+    sheetId,
   );
 
   // Row heights / column widths and hidden flags, frozen panes, size.
@@ -456,7 +481,9 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
     if (change.kind === "deleteRows" && t.totals && t.area.r1 >= at && t.area.r1 <= end) nt = { ...nt, totals: false };
     if (change.kind === "insertCols" && at > t.area.c0 && at <= t.area.c1) {
       const i = at - t.area.c0;
-      const added = Array.from({ length: count }, () => ({ id: newId(), total: "none" as const }));
+      // Ids from the change's own id: done again on another version (replayOp), the column gets
+      // the same id there, so both versions' tables still match column for column.
+      const added = Array.from({ length: count }, (_, k) => ({ id: `${head.id}-${k}`, total: "none" as const }));
       nt = { ...nt, columns: [...t.columns.slice(0, i), ...added, ...t.columns.slice(i)] };
     }
     if (change.kind === "deleteCols") {
@@ -475,7 +502,7 @@ function rowColChange(wb: Workbook, sheetId: string, change: RowColChange): Work
   }
   let out: Workbook = { ...next, charts, tables };
   for (const g of grown) out = continueTableRows(out, g.before, g.after, at, count);
-  return out;
+  return logOp(out, [sheetId], { ...head, kind: change.kind, at, count });
 }
 
 /**
@@ -504,7 +531,7 @@ function continueTableRows(wb: Workbook, before: TableSpec, after: TableSpec, at
 // columns inserted into a table get a header name.
 
 export function insertRows(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
-  const next = rowColChange(wb, sheetId, { kind: "insertRows", at, count });
+  const next = rowColChange(wb, sheetId, { kind: "insertRows", at, count }, freshHead());
   // Rows right under the header or right above the totals row lie outside the totals' SUBTOTAL ranges.
   return next === wb ? wb : refreshTotals(next, sheetId);
 }
@@ -514,7 +541,7 @@ export function deleteRows(wb: Workbook, sheetId: string, at: number, count: num
 }
 /** `locale`: for the header names of columns inserted into a smart table ("Spalte3" / "Column3"). */
 export function insertCols(wb: Workbook, sheetId: string, at: number, count: number, locale: Locale = "de"): Workbook {
-  const next = rowColChange(wb, sheetId, { kind: "insertCols", at, count });
+  const next = rowColChange(wb, sheetId, { kind: "insertCols", at, count }, freshHead());
   if (next === wb) return wb;
   // A table's columns need names (menus, charts, the totals label): new ones get "Spalte3", unique in the table, as in Excel.
   const sheet = sheetById(next, sheetId);
@@ -528,7 +555,7 @@ export function insertCols(wb: Workbook, sheetId: string, at: number, count: num
   return names.length ? setCells(next, sheetId, names) : next;
 }
 export function deleteCols(wb: Workbook, sheetId: string, at: number, count: number): Workbook {
-  return rowColChange(wb, sheetId, { kind: "deleteCols", at, count });
+  return rowColChange(wb, sheetId, { kind: "deleteCols", at, count }, freshHead());
 }
 
 /**
@@ -549,7 +576,7 @@ function deleteRowsKeepingTables(wb: Workbook, sheetId: string, at: number, coun
     const d = dataRows(t);
     return d.r1 >= d.r0 && d.r1 <= end;
   });
-  if (!emptied.length) return rowColChange(wb, sheetId, { kind: "deleteRows", at, count });
+  if (!emptied.length) return rowColChange(wb, sheetId, { kind: "deleteRows", at, count }, freshHead());
 
   // What the kept row holds afterwards, read before anything moves.
   const keepFormula = new Set<number>();
@@ -562,7 +589,8 @@ function deleteRowsKeepingTables(wb: Workbook, sheetId: string, at: number, coun
       if (fmt) keepFmt.set(col, fmt);
     }
   }
-  let next = count > 1 ? rowColChange(wb, sheetId, { kind: "deleteRows", at: at + 1, count: count - 1 }) : wb;
+  // (Only these rows are logged as deleted: the kept row just has its cells emptied.)
+  let next = count > 1 ? rowColChange(wb, sheetId, { kind: "deleteRows", at: at + 1, count: count - 1 }, freshHead()) : wb;
 
   // The kept row, emptied (its own formulas already follow the deletion).
   const after = sheetById(next, sheetId)!;
@@ -726,8 +754,8 @@ export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Are
   return setCells(wb, sheetId, updates);
 }
 
-/** Cut and paste: the cells move, and every reference to them follows (charts and tables too). */
-function moveCells(wb: Workbook, clip: ClipData, toSheetId: string, to: Pos): Workbook {
+/** Cut and paste: the cells move, and every reference to them follows (charts and tables too). Logged as `head` in both sheets. */
+function moveCells(wb: Workbook, clip: ClipData, toSheetId: string, to: Pos, head: OpHead = freshHead()): Workbook {
   const src = sheetById(wb, clip.sheetId);
   const dst = sheetById(wb, toSheetId);
   if (!src || !dst) return wb;
@@ -775,7 +803,8 @@ function moveCells(wb: Workbook, clip: ClipData, toSheetId: string, to: Pos): Wo
     const moved = follow(ref);
     return { ...t, sheetId: toSheetId, area: { r0: moved.r0, c0: moved.c0, r1: moved.r1, c1: moved.c1 } };
   });
-  return { ...next, charts, tables };
+  const op: SheetOp = { ...head, kind: "move", src: clip.sheetId, from: { r0: from.r0, c0: from.c0, r1: from.r1, c1: from.c1 }, dst: toSheetId, to: { row: to.row, col: to.col } };
+  return logOp({ ...next, charts, tables }, [clip.sheetId, toSheetId], op);
 }
 
 /** Paste text from outside Blob (Excel, Google Sheets, a web table): each piece parsed like typing. */
@@ -880,15 +909,59 @@ export function sortArea(wb: Workbook, calc: Calc, sheetId: string, area: Area, 
     return 0;
   });
   if (sorted.every((x, i) => x.row === a.r0 + i)) return wb;
+  // Logged as the new order of the rows, not as "sorted by B": another version is put in the
+  // same order (replayOp), whatever its values are.
+  return permuteRows(wb, sheetId, { id: newId(), kind: "sort", r0: a.r0, c0: a.c0, c1: a.c1, order: sorted.map((x) => x.row - a.r0) });
+}
+
+/** The rows of a block in a new order (a sort, or one done again): their formulas move along with them. */
+function permuteRows(wb: Workbook, sheetId: string, op: Extract<SheetOp, { kind: "sort" }>): Workbook {
+  const sheet = sheetById(wb, sheetId);
+  if (!sheet) return wb;
   const updates: { row: number; col: number; cell: Cell | null }[] = [];
-  sorted.forEach((x, i) => {
-    const row = a.r0 + i;
-    for (let c = a.c0; c <= a.c1; c++) {
-      const cell = sheet.cells[cellKey(x.row, c)];
-      updates.push({ row, col: c, cell: cell ? (cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, row - x.row, 0) } : cell) : null });
+  op.order.forEach((from, i) => {
+    if (from === i) return;
+    const src = op.r0 + from;
+    const row = op.r0 + i;
+    for (let c = op.c0; c <= op.c1; c++) {
+      const cell = sheet.cells[cellKey(src, c)];
+      updates.push({ row, col: c, cell: cell ? (cell.f !== undefined ? { ...cell, f: shiftFormula(cell.f, row - src, 0) } : cell) : null });
     }
   });
-  return setCells(wb, sheetId, updates);
+  return logOp(setCells(wb, sheetId, updates), [sheetId], op);
+}
+
+// ----------------------------------------------------------------------------------------------
+// Doing a logged change again
+
+/**
+ * A change from the log of sheet `sheetId` (src/sheet/sheetLog.ts) done again on another version
+ * of the workbook, logged there with the same id: merging lines two versions up with it
+ * (collab.ts), undo and redo take changes back with it. Only the rows, columns and cells move,
+ * with everything that points at them; what a smart table did on top (keeping its last data row,
+ * names for new header cells) was a change of cells and comes with the cells. null when it can't
+ * be done on this version: a sheet is missing, or data would be pushed off the grid.
+ */
+export function replayOp(wb: Workbook, sheetId: string, op: SheetOp): Workbook | null {
+  switch (op.kind) {
+    case "insertRows":
+    case "deleteRows":
+    case "insertCols":
+    case "deleteCols": {
+      const next = rowColChange(wb, sheetId, { kind: op.kind, at: op.at, count: op.count }, headOf(op));
+      if (next === wb) return null;
+      return op.kind === "insertRows" || op.kind === "deleteRows" ? refreshTotals(next, sheetId) : next;
+    }
+    case "sort":
+      return sheetById(wb, sheetId) ? permuteRows(wb, sheetId, op) : null;
+    case "move": {
+      if (!sheetById(wb, op.src) || !sheetById(wb, op.dst)) return null;
+      const next = moveCells(wb, copyArea(wb, op.src, op.from), op.dst, op.to, headOf(op));
+      return next === wb ? null : next;
+    }
+    case "barrier":
+      return null;
+  }
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -903,7 +976,7 @@ export type FindOptions = { sheetId?: string; matchCase?: boolean; wholeCell?: b
 function finder(query: string, opts: FindOptions): { found: (text: string) => boolean; replace: (text: string, by: string) => string } {
   const glob: Glob = compileGlob(query, { matchCase: opts.matchCase });
   if (opts.wholeCell) return { found: (text) => globTest(glob, text), replace: (text, by) => (globTest(glob, text) ? by : text) };
-  return { found: (text) => globFind(glob, text) !== null, replace: (text, by) => globReplace(glob, text, by) };
+  return { found: (text) => globTest(glob, text, "contains"), replace: (text, by) => globReplace(glob, text, by) };
 }
 
 function sortedKeys(sheet: Sheet): { key: string; row: number; col: number }[] {
@@ -1021,26 +1094,29 @@ export function moveSheet(wb: Workbook, sheetId: string, toIndex: number): Workb
   return { ...wb, sheets };
 }
 
-/** A table name not used yet: "Tabelle1" → "Tabelle2", "Kalibrierung" → "Kalibrierung2". */
-function uniqueTableName(wb: Workbook, name: string): string {
-  const taken = new Set(wb.tables.map((t) => t.name.toLowerCase()));
-  if (!taken.has(name.toLowerCase())) return name;
-  const m = /^(.*?)(\d+)$/.exec(name);
-  const root = m ? m[1] : name;
-  let n = m ? Number(m[2]) + 1 : 2;
-  while (taken.has(`${root}${n}`.toLowerCase())) n++;
-  return `${root}${n}`;
-}
-
 /** A copy right after it ("Blatt 1 (2)"), with its charts and tables. */
 export function duplicateSheet(wb: Workbook, sheetId: string): { wb: Workbook; sheetId: string } {
   const i = wb.sheets.findIndex((s) => s.id === sheetId);
   if (i < 0) return { wb, sheetId };
-  const sheet = wb.sheets[i];
-  const copy: Sheet = { ...sheet, id: newId(), name: uniqueSheetName(wb, sheet.name) };
-  const sheets = [...wb.sheets.slice(0, i + 1), copy, ...wb.sheets.slice(i + 1)];
+  return copySheetInto(wb, wb, sheetId, uniqueSheetName(wb, wb.sheets[i].name), i + 1);
+}
+
+/**
+ * A copy of sheet `sheetId` of workbook `from`, with its charts and tables (new ids, table names
+ * made unique: "Standards2", "BSA_2"), put into `wb` at tab position `at` and called `name`.
+ * duplicateSheet copies within one workbook; merging keeps my version of a sheet this way when
+ * both people moved its rows at once (collab.ts).
+ */
+export function copySheetInto(wb: Workbook, from: Workbook, sheetId: string, name: string, at: number): { wb: Workbook; sheetId: string } {
+  const sheet = sheetById(from, sheetId);
+  if (!sheet) return { wb, sheetId };
+  const copy: Sheet = { ...sheet, id: newId(), name };
+  // Its log of rows and columns stays with the original: the copy starts without a history.
+  delete copy.log;
+  const i = Math.max(0, Math.min(wb.sheets.length, at));
+  const sheets = [...wb.sheets.slice(0, i), copy, ...wb.sheets.slice(i)];
   const onCopy = <T extends RangeRef>(ref: T): T => (ref.sheetId === sheetId ? { ...ref, sheetId: copy.id } : ref);
-  const charts = wb.charts
+  const charts = from.charts
     .filter((c) => c.sheetId === sheetId)
     .map((c) => ({
       ...c,
@@ -1057,13 +1133,14 @@ export function duplicateSheet(wb: Workbook, sheetId: string): { wb: Workbook; s
       })),
     }));
   let next: Workbook = { ...wb, sheets, charts: [...wb.charts, ...charts] };
-  for (const t of wb.tables.filter((t) => t.sheetId === sheetId)) {
+  for (const t of from.tables.filter((t) => t.sheetId === sheetId)) {
     const ids = new Map(t.columns.map((c) => [c.id, newId()]));
     const table: TableSpec = {
       ...t,
       id: newId(),
       sheetId: copy.id,
-      name: uniqueTableName(next, t.name),
+      // (Stored names are always valid, so the language of a made-up one never matters.)
+      name: freeTableName(next.tables.map((x) => x.name), "de", t.name),
       columns: t.columns.map((c) => ({ ...c, id: ids.get(c.id)! })),
       filters: Object.fromEntries(Object.entries(t.filters).map(([id, f]) => [ids.get(id) ?? id, f])),
       sort: t.sort ? { ...t.sort, column: ids.get(t.sort.column) ?? t.sort.column } : null,

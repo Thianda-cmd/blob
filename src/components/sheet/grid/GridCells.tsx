@@ -149,7 +149,7 @@ const GridRow = memo(function GridRow(p: RowProps) {
     if (!cell && !decor && !isActive) return;
     const value = cell && (cell.v !== undefined || cell.f !== undefined) ? src.value(row, c) : null;
     const look = lookOf(cell, value, decor, locale);
-    const numberText = look.kind === "text" && numberAsText(value, (d) => (row + d < 0 ? null : src.value(row + d, c)));
+    const numberText = look.kind === "text" && numberAsText(cell, (d) => (row + d < 0 ? null : src.value(row + d, c)));
     const size = look.size * zoom;
     const buttonW = decor?.button ? Math.round(20 * zoom) : 0;
     const avail = Math.max(0, w - 2 * pad - buttonW);

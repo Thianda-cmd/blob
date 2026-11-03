@@ -233,10 +233,12 @@ function calibration(locale: Locale): Workbook {
     note: t("The line's absorbance at 0 mg/L. It should be close to 0 (the blank).", "Die Extinktion der Geraden bei 0 mg/L. Sie sollte nahe 0 liegen (Blindwert)."),
   });
   d.set(INTERCEPT, 1, `=INTERCEPT(${ys},${xs})`, { fmt: dec(4), style: RESULT });
+  // The way to leave out an outlier: a hidden or filtered row still counts in SLOPE and RSQ (as in
+  // Excel) while the chart skips it, and a deleted value would break LINEST (it takes no gaps).
   d.set(K + 3, 0, t("R² (goodness of fit)", "Bestimmtheitsmaß R²"), {
     note: t(
-      "How well the standards lie on the line (1 = perfectly). Many procedures ask for R² ≥ 0.99, some for 0.995 or 0.999.",
-      "Wie gut die Standards auf der Geraden liegen (1 = perfekt). Viele Vorschriften verlangen R² ≥ 0,99, manche 0,995 oder 0,999.",
+      "How well the standards lie on the line (1 = perfectly). Many procedures ask for R² ≥ 0.99, some for 0.995 or 0.999. An outlier? Delete its row (cell menu: “Delete row”). Hiding or filtering it out isn't enough: it only disappears from the chart, while slope and R² still count it.",
+      "Wie gut die Standards auf der Geraden liegen (1 = perfekt). Viele Vorschriften verlangen R² ≥ 0,99, manche 0,995 oder 0,999. Ein Ausreißer? Lösch seine Zeile (Zellmenü: „Zeile löschen“). Ausblenden oder Wegfiltern reicht nicht: Dann fehlt er nur im Diagramm, Steigung und R² rechnen ihn weiter mit.",
     ),
   });
   d.set(K + 3, 1, `=RSQ(${ys},${xs})`, { fmt: dec(4), style: RESULT });
@@ -265,8 +267,8 @@ function calibration(locale: Locale): Workbook {
     3: t("Diluted the sample 1:5 before measuring? Enter 5. Undiluted: 1.", "Hast du die Probe vor dem Messen 1:5 verdünnt, trag 5 ein. Unverdünnt: 1."),
     4: t("The concentration in the undiluted sample: measured concentration × dilution factor.", "Die Konzentration in der unverdünnten Probe: gemessene Konzentration × Verdünnungsfaktor."),
     5: t(
-      "The line is only reliable between the lowest and the highest standard. Above it: dilute the sample and measure again.",
-      "Die Gerade gilt nur sicher zwischen dem kleinsten und dem größten Standard. Liegt eine Probe darüber: verdünnen und neu messen.",
+      "The line is only reliable between the lowest and the highest standard. Above it: dilute the sample and measure again. Below it, or a result under 0: dilute it less.",
+      "Die Gerade gilt nur sicher zwischen dem kleinsten und dem größten Standard. Liegt eine Probe darüber: verdünnen und neu messen. Liegt sie darunter oder ergibt sie weniger als 0: weniger verdünnen.",
     ),
   });
   const yRange = fixSpan(FIRST, 2, LAST, 2);
@@ -278,7 +280,12 @@ function calibration(locale: Locale): Workbook {
     d.set(row, 2, `=IF(${E}="","",(${E}-${fix(INTERCEPT, 1)})/${fix(SLOPE, 1)})`, { fmt: dec(2, "mg/L") });
     d.set(row, 3, dilution);
     d.set(row, 4, `=IF(OR(${E}="",${at(row, 3)}=""),"",${at(row, 2)}*${at(row, 3)})`, { fmt: dec(2, "mg/L"), style: BOLD });
-    d.set(row, 5, `=IF(${E}="","",IF(${E}>MAX(${yRange}),${str(t("too high – dilute", "zu hoch – verdünnen"))},IF(${E}<MIN(${yRange}),${str(t("too low", "zu niedrig"))},${str(t("yes", "ja"))})))`);
+    // A negative result is too low as well (when the line meets 0 mg/L above the lowest standard).
+    d.set(
+      row,
+      5,
+      `=IF(${E}="","",IF(${E}>MAX(${yRange}),${str(t("too high – dilute", "zu hoch – verdünnen"))},IF(OR(${E}<MIN(${yRange}),${at(row, 2)}<0),${str(t("too low", "zu niedrig"))},${str(t("yes", "ja"))})))`,
+    );
   });
 
   const s = d.id;
@@ -311,10 +318,12 @@ function calibration(locale: Locale): Workbook {
 function bradford(locale: Locale): Workbook {
   const t = sayer(locale);
   const d = new Draft(t("Bradford", "Bradford"));
-  // Just wide enough for "Messwert 1", "Verdünnung" and "Blindwert (Mittelwert)" (headers need
-  // their text plus about 24 px for the filter button), so the chart beside the table still fits
-  // on a 1440 px laptop with the sidebar open.
-  d.widths([152, 102, 102, 102, 96, 108, 100]);
+  // Just wide enough for headers like "Messwert 2", "Concentration" and "Im Messbereich?" (their
+  // text plus the filter button), "zu hoch – verdünnen" and a five-digit protein content: the
+  // samples table (A–J) and the chart beside the standards (over H–J) end at 1047 px, so they fit
+  // on a 1366 px laptop with the sidebar open (1060 px of sheet, about 1049 beside a Windows
+  // scrollbar).
+  d.widths([100, 104, 104, 104, 94, 72, 118, 140, 105, 106]);
   d.intro(
     t("Bradford protein assay", "Bradford-Proteinbestimmung"),
     t(
@@ -353,42 +362,48 @@ function bradford(locale: Locale): Workbook {
       "Mittelwert minus Blindwert (der Standard mit 0 µg/mL): So wird die Eigenfärbung des Farbstoffs abgezogen.",
     ),
   });
+  // A standard without readings (not measured yet, or its readings deleted) stays empty and drops
+  // out of the line, as SLOPE skips it, instead of turning everything below into #DIV/0!.
   bsa.forEach((c, i) => {
     const row = FIRST + i;
     const reps = span(row, 1, row, 3);
     d.set(row, 0, c, { fmt: dec(0, "µg/mL") });
     raw[i].forEach((a, j) => d.set(row, 1 + j, a, { fmt: dec(3) }));
-    d.set(row, 4, `=AVERAGE(${reps})`, { fmt: dec(3) });
-    d.set(row, 5, `=STDEV.S(${reps})`, { fmt: dec(3) });
-    d.set(row, 6, `=${at(row, 4)}-${fix(FIRST, 4)}`, { fmt: dec(3), style: BOLD });
+    d.set(row, 4, `=IF(COUNT(${reps})=0,"",AVERAGE(${reps}))`, { fmt: dec(3) });
+    d.set(row, 5, `=IF(COUNT(${reps})<2,"",STDEV.S(${reps}))`, { fmt: dec(3) });
+    d.set(row, 6, `=IF(${at(row, 4)}="","",${at(row, 4)}-${fix(FIRST, 4)})`, { fmt: dec(3), style: BOLD });
   });
   const xs = span(FIRST, 0, LAST, 0);
   const net = span(FIRST, 6, LAST, 6);
 
-  // 2. The line's numbers
+  // 2. The line's numbers: label in A running on over the empty B, value in C. So A only needs the
+  // sample names' width, and the samples table fits beside the sidebar (see the widths).
   const K = LAST + 2;
   const SLOPE = K + 1;
   const INTERCEPT = K + 2;
   const BLANK = K + 4;
+  const V = 2;
   d.set(K, 0, t("2. The line's numbers", "2. Kennwerte der Geraden"), { style: section("purple") });
   // The unit in the label: "0,000900 mL/µg" is too wide for the column (it showed ###).
   d.set(SLOPE, 0, t("Slope m (mL/µg)", "Steigung m (mL/µg)"), {
     note: t("=SLOPE(net absorbances, BSA concentrations): the absorbance per µg/mL protein.", "=STEIGUNG(Netto-Extinktionen; BSA-Konzentrationen): die Extinktion pro µg/mL Protein."),
   });
-  d.set(SLOPE, 1, `=SLOPE(${net},${xs})`, { fmt: dec(6), style: RESULT });
+  d.set(SLOPE, V, `=SLOPE(${net},${xs})`, { fmt: dec(6), style: RESULT });
   d.set(INTERCEPT, 0, t("Intercept b", "Achsenabschnitt b"));
-  d.set(INTERCEPT, 1, `=INTERCEPT(${net},${xs})`, { fmt: dec(4), style: RESULT });
+  d.set(INTERCEPT, V, `=INTERCEPT(${net},${xs})`, { fmt: dec(4), style: RESULT });
   d.set(K + 3, 0, t("R² (goodness of fit)", "Bestimmtheitsmaß R²"), {
     note: t(
-      "The Bradford curve bends slightly over a wide range. If R² is too low, use only the standards in the straight part.",
-      "Die Bradford-Kurve ist über einen großen Bereich leicht gekrümmt. Ist R² zu klein, nimm nur die Standards im geraden Teil.",
+      "The Bradford curve bends slightly over a wide range. If R² is too low, use only the standards in the straight part: delete the rows of the others (cell menu: “Delete row”). Hiding or filtering them out isn't enough: they only disappear from the chart, while slope and R² still count them.",
+      "Die Bradford-Kurve ist über einen großen Bereich leicht gekrümmt. Ist R² zu klein, nimm nur die Standards im geraden Teil: Lösch die Zeilen der anderen (Zellmenü: „Zeile löschen“). Ausblenden oder Wegfiltern reicht nicht: Dann fehlen sie nur im Diagramm, Steigung und R² rechnen sie weiter mit.",
     ),
   });
-  d.set(K + 3, 1, `=RSQ(${net},${xs})`, { fmt: dec(4), style: RESULT });
+  d.set(K + 3, V, `=RSQ(${net},${xs})`, { fmt: dec(4), style: RESULT });
   d.set(BLANK, 0, t("Blank (mean)", "Blindwert (Mittelwert)"));
-  d.set(BLANK, 1, `=${at(FIRST, 4)}`, { fmt: dec(3) });
+  d.set(BLANK, V, `=${at(FIRST, 4)}`, { fmt: dec(3) });
 
-  // 3. Samples in triplicate
+  // 3. Samples in triplicate: mean → net → concentration measured (from the line), right beside it
+  // the check that this lies within the standards (it judges the solution measured; the warning
+  // stays in view on a narrow screen), then × dilution, step by step like the calibration template.
   const P = K + 6;
   const P_HEAD = P + 1;
   const P_FIRST = P + 2;
@@ -399,22 +414,46 @@ function bradford(locale: Locale): Workbook {
   ];
   const P_LAST = P_FIRST + samples.length - 1;
   d.set(P, 0, t("3. Samples", "3. Proben"), { style: section("teal") });
-  d.head(P_HEAD, 0, [t("Sample", "Probe"), ...readings, t("Mean", "Mittelwert"), t("Dilution", "Verdünnung"), t("Protein", "Protein")], {
-    5: t("The sample's dilution before measuring, e.g. 10 for 1:10.", "Verdünnungsfaktor der Probe vor dem Messen, z. B. 10 für 1:10."),
-    6: t(
-      "(mean − blank − b) / m × dilution: the protein content of the undiluted sample.",
-      "(Mittelwert − Blindwert − b) / m × Verdünnung: der Proteingehalt der unverdünnten Probe.",
-    ),
-  });
+  d.head(
+    P_HEAD,
+    0,
+    [t("Sample", "Probe"), ...readings, t("Mean", "Mittelwert"), t("Net", "Netto"), t("Concentration", "Konzentration"), t("In range?", "Im Messbereich?"), t("Dilution", "Verdünnung"), t("Protein", "Protein")],
+    {
+      5: t("Mean minus the blank, as for the standards.", "Mittelwert minus Blindwert, wie bei den Standards."),
+      6: t(
+        "From the line: (net − b) / m. The protein concentration in the solution you measured.",
+        "Aus der Geraden: (Netto − b) / m. So viel Protein ist in der Lösung, die du gemessen hast.",
+      ),
+      7: t(
+        "The line is only reliable between the lowest and the highest standard (their net absorbances are compared). Above it: dilute the sample more and measure again. Below it, or a result under 0: dilute it less.",
+        "Die Gerade gilt nur sicher zwischen dem kleinsten und dem größten Standard (verglichen wird das Netto). Liegt eine Probe darüber: stärker verdünnen und neu messen. Liegt sie darunter oder ergibt sie weniger als 0: weniger verdünnen.",
+      ),
+      8: t("The sample's dilution before measuring, e.g. 10 for 1:10.", "Verdünnungsfaktor der Probe vor dem Messen, z. B. 10 für 1:10."),
+      9: t("Concentration × dilution: the protein content of the undiluted sample.", "Konzentration × Verdünnung: der Proteingehalt der unverdünnten Probe."),
+    },
+  );
+  const netRange = fixSpan(FIRST, 6, LAST, 6);
   samples.forEach(([name, values, dilution], i) => {
     const row = P_FIRST + i;
     const reps = span(row, 1, row, 3);
     const mean = at(row, 4);
+    const sampleNet = at(row, 5);
+    const measured = at(row, 6);
     d.set(row, 0, name);
     values.forEach((a, j) => d.set(row, 1 + j, a, { fmt: dec(3) }));
     d.set(row, 4, `=IF(COUNT(${reps})=0,"",AVERAGE(${reps}))`, { fmt: dec(3) });
-    d.set(row, 5, dilution);
-    d.set(row, 6, `=IF(OR(${mean}="",${at(row, 5)}=""),"",(${mean}-${fix(BLANK, 1)}-${fix(INTERCEPT, 1)})/${fix(SLOPE, 1)}*${at(row, 5)})`, { fmt: dec(0, "µg/mL"), style: BOLD });
+    d.set(row, 5, `=IF(${mean}="","",${mean}-${fix(BLANK, V)})`, { fmt: dec(3) });
+    d.set(row, 6, `=IF(${sampleNet}="","",(${sampleNet}-${fix(INTERCEPT, V)})/${fix(SLOPE, V)})`, { fmt: dec(0, "µg/mL") });
+    // Before the dilution: what counts is whether the measured solution lies within the standards.
+    // Below the line's start counts as too low as well: the curve bends, so the line meets 0 µg/mL
+    // above the blank, and a sample in between would come out negative.
+    d.set(
+      row,
+      7,
+      `=IF(${sampleNet}="","",IF(${sampleNet}>MAX(${netRange}),${str(t("too high – dilute", "zu hoch – verdünnen"))},IF(OR(${sampleNet}<MIN(${netRange}),${measured}<0),${str(t("too low", "zu niedrig"))},${str(t("yes", "ja"))})))`,
+    );
+    d.set(row, 8, dilution);
+    d.set(row, 9, `=IF(OR(${measured}="",${at(row, 8)}=""),"",${measured}*${at(row, 8)})`, { fmt: dec(0, "µg/mL"), style: BOLD });
   });
 
   const s = d.id;
@@ -422,18 +461,23 @@ function bradford(locale: Locale): Workbook {
     [d],
     [
       chart(s, {
-        at: { row: 3, col: 7, dx: 12, dy: 4 },
-        size: { w: 350, h: 270 },
+        // Its right edge lines up with the samples table's (1047 px).
+        at: { row: 3, col: 7, dx: 10, dy: 4 },
+        size: { w: 341, h: 300 },
         kind: "scatter",
         title: t("BSA calibration", "BSA-Kalibriergerade"),
         x: d.range(FIRST, 0, LAST, 0),
-        series: [series(d.range(FIRST, 6, LAST, 6), { name: t("BSA standards", "BSA-Standards"), color: "purple", errorBars: customErrors(d.range(FIRST, 5, LAST, 5)), trendline: trendline("linear") })],
+        series: [
+          series(d.range(FIRST, 6, LAST, 6), { name: t("BSA standards", "BSA-Standards"), color: "purple", errorBars: customErrors(d.range(FIRST, 5, LAST, 5)), trendline: trendline("linear") }),
+          // The samples on the same chart: one beyond the top standard (the most common Bradford mistake) stands out at once.
+          series(d.range(P_FIRST, 5, P_LAST, 5), { name: t("Samples", "Proben"), x: d.range(P_FIRST, 6, P_LAST, 6), color: "teal", marker: "diamond" }),
+        ],
         xAxis: axis("BSA (µg/mL)"),
         yAxis: axis(t("A595 (net)", "A595 (netto)")),
-        legend: "none",
+        legend: "bottom",
       }),
     ],
-    [table(s, t("BSA", "BSA"), HEAD_ROW, 0, LAST, 6, "purple"), table(s, t("Samples", "Proben"), P_HEAD, 0, P_LAST, 6, "teal")],
+    [table(s, t("BSA", "BSA"), HEAD_ROW, 0, LAST, 6, "purple"), table(s, t("Samples", "Proben"), P_HEAD, 0, P_LAST, 9, "teal")],
   );
 }
 
@@ -529,7 +573,7 @@ function growth(locale: Locale): Workbook {
   const LOG0 = FIRST + 3;
   const LOG1 = FIRST + 7;
   const phase = (i: number) =>
-    i < 3 ? t("lag phase", "lag-Phase") : i < 8 ? t("log phase", "log-Phase") : i < 11 ? t("slowing down", "Verzögerung") : t("stationary phase", "stationäre Phase");
+    i < 3 ? t("lag phase", "lag-Phase") : i < 8 ? t("log phase", "log-Phase") : i < 11 ? t("deceleration phase", "Verzögerungsphase") : t("stationary phase", "stationäre Phase");
   const LAST = FIRST + hours.length - 1;
   d.head(HEAD_ROW, 0, [t("Time", "Zeit"), "OD600", "ln(OD600)", "Phase"], {
     1: t(
@@ -621,6 +665,7 @@ function dilution(locale: Locale): Workbook {
   const STOCK = 4;
   const FACTOR = 5;
   const VOLUME = 6;
+  const LEFT = 7;
   d.set(3, 0, t("1. Starting point", "1. Angaben"), { style: section("teal") });
   d.set(STOCK, 0, t("Stock concentration", "Stammlösung"));
   d.set(STOCK, 1, 1000, { fmt: dec(0, "µg/mL"), style: INPUT });
@@ -632,12 +677,22 @@ function dilution(locale: Locale): Workbook {
       "2 für eine 1:2-Reihe (jedes Röhrchen halb so konzentriert), 10 für eine 1:10-Reihe (z. B. Keimzahlbestimmung).",
     ),
   });
-  d.set(VOLUME, 0, t("Final volume per tube", "Endvolumen je Röhrchen"));
-  d.set(VOLUME, 1, 1000, { fmt: dec(0, "µL"), style: INPUT, note: t("What each tube holds after mixing.", "So viel Flüssigkeit ist nach dem Mischen in jedem Röhrchen.") });
+  d.set(VOLUME, 0, t("Total volume per tube", "Gesamtvolumen je Röhrchen"));
+  d.set(VOLUME, 1, 1000, { fmt: dec(0, "µL"), style: INPUT, note: t("Diluent + transfer: what each tube holds right after mixing.", "Verdünnungsmittel + Übertragen: So viel ist direkt nach dem Mischen in jedem Röhrchen.") });
+  // Part of it goes on to the next tube (from the last one it is discarded), so less stays than was mixed.
+  d.set(LEFT, 0, t("Left in each tube", "Bleibt je Röhrchen"));
+  d.set(LEFT, 1, `=${at(VOLUME, 1)}-${at(VOLUME, 1)}/${at(FACTOR, 1)}`, {
+    fmt: sig(3, "µL"),
+    style: RESULT,
+    note: t(
+      "What each tube keeps in the end: the total volume minus what you transfer to the next tube (from the last one you discard it). Need more? Choose a larger total volume.",
+      "Was am Ende in jedem Röhrchen bleibt: Gesamtvolumen minus die Menge, die du ins nächste überträgst (aus dem letzten verwirfst du sie). Brauchst du mehr, nimm ein größeres Gesamtvolumen.",
+    ),
+  });
 
   // 2. Pipetting plan, one row per tube
-  const HEAD_ROW = 9;
-  const FIRST = 10;
+  const HEAD_ROW = 10;
+  const FIRST = 11;
   const TUBES = 8;
   const LAST = FIRST + TUBES - 1;
   d.set(HEAD_ROW - 1, 0, t("2. Pipetting plan", "2. Pipettierschema"), { style: section("teal") });
@@ -856,7 +911,8 @@ function todaySerial(): number {
 function grades(locale: Locale): Workbook {
   const t = sayer(locale);
   const d = new Draft(t("Grades", "Noten"));
-  d.widths([100, 170, 110, 70, 80, 130, 24, 170, 90, 70]);
+  // The last column: "Grades" with its filter button.
+  d.widths([100, 170, 110, 70, 80, 130, 24, 170, 90, 72]);
   d.intro(
     t("Grades", "Notenübersicht"),
     t(
@@ -992,7 +1048,7 @@ export const SHEET_TEMPLATES: SheetTemplate[] = [
     color: "teal",
     title: tx("Dilution series", "Verdünnungsreihe"),
     description: tx("Serial dilution with volumes for every tube, plus C₁·V₁ = C₂·V₂", "Serielle Verdünnung mit Volumina für jedes Röhrchen, dazu C₁·V₁ = C₂·V₂"),
-    preview: { rows: [9, 12], cols: [0, 1, 2, 3] },
+    preview: { rows: [10, 13], cols: [0, 1, 2, 3] },
     build: dilution,
   },
   {

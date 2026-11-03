@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Check, Eye, FileText, Folder, FolderKanban, PenLine, Presentation, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, Eye, FileText, Folder, FolderKanban, PenLine, Presentation, Sheet as SheetIcon, Signature, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,7 +33,8 @@ export type InvitePreview =
     }
   | { ok: false; reason: string };
 
-const KIND_ICON: Record<string, LucideIcon> = { note: FileText, deck: Presentation, folder: Folder, cv: FileText, project: FolderKanban };
+// The same icons as the sidebar's.
+const KIND_ICON: Record<string, LucideIcon> = { note: FileText, ink: Signature, sheet: SheetIcon, deck: Presentation, folder: Folder, cv: FileText, project: FolderKanban };
 
 /** The invite page: what you're invited to, by whom and what you may do there, then "Join". */
 export function JoinView({ token, preview, me }: { token: string; preview: InvitePreview; me: string }) {

@@ -7,7 +7,6 @@
 // columns only touches the part of the sheet in use (at least the first 200 rows / 26 columns):
 // the document stores cells, not column styles, and a whole column is 20 000 cells.
 
-import { blob } from "@/components/blob/bus";
 import type { Locale } from "@/i18n/config";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { areaName, cellKey, parseKey } from "@/sheet/a1";
@@ -16,6 +15,7 @@ import { getCell, setCells, setFreeze, setStyle as styleCells, sheetById, sortAr
 import { tableAt } from "@/sheet/table/model";
 import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type BorderLine, type Cell, type CellStyle, type NumberFormat, type Pos, type Sheet, type Workbook } from "@/sheet/types";
 import { currentRegion, filled } from "../grid/navigation";
+import { showSheetNotice } from "../notice";
 import { activeArea, selectionAreas, type Selection, type SheetStore } from "../store";
 import { sortTableColumn } from "../table/actions";
 import { insertFunctionCall } from "./formulaInput";
@@ -494,7 +494,7 @@ export function autoSum(store: SheetStore, fn?: "SUM" | "AVERAGE" | "COUNT" | "M
   }
   const cells = autoSumCells(sheet, s.calc, s.sheetId, area, which);
   if (!cells.length) {
-    blob.say(t.noNumbers, { mood: "thinking" });
+    showSheetNotice(store, t.noNumbers);
     return;
   }
   const sheetId = s.sheetId;
@@ -595,13 +595,13 @@ export function sortSelection(store: SheetStore, dir: "asc" | "desc"): void {
   }
   const plan = sortPlan(sheet, s.calc, s.sheetId, s.selection);
   if (!plan) {
-    blob.say(t.nothingToSort, { mood: "thinking" });
+    showSheetNotice(store, t.nothingToSort);
     return;
   }
   const { sheetId, locale } = s;
   const before = store.get().workbook;
   store.apply(t.steps.sort, (wb, calc) => sortArea(wb, calc, sheetId, plan.area, [{ col: plan.col, dir }], locale));
-  if (plan.widened && store.get().workbook !== before) blob.say(t.sortedWithNeighbours, { mood: "happy" });
+  if (plan.widened && store.get().workbook !== before) showSheetNotice(store, t.sortedWithNeighbours);
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -625,7 +625,7 @@ export function freezePanes(store: SheetStore, how: FreezeHow): void {
     rows = wholeCols ? 0 : wholeRows ? a.r0 : s.selection.anchor.row;
     cols = wholeRows ? 0 : wholeCols ? a.c0 : s.selection.anchor.col;
     if (!rows && !cols) {
-      blob.say(t.freezeNothing, { mood: "thinking" });
+      showSheetNotice(store, t.freezeNothing);
       return;
     }
   }

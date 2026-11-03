@@ -5,14 +5,33 @@
 //
 // CONTRACT: <ChartLayer store geom /> is passed as the Grid's overlay by SheetEditor.
 //
-// Touch and pen: a tap selects (a swipe that starts on a chart still scrolls the sheet), a
-// selected chart follows the finger, a double tap opens its settings. Mouse: press and drag
-// moves right away, double-click opens the settings. Keyboard (the chart has focus): Delete
-// removes it, Enter opens its settings, arrows nudge it (Shift: 10 px), Alt + arrows resize it,
-// Ctrl/⌘ + D duplicates it, Ctrl/⌘ + Z / Y undo and redo, Escape lets go of it.
+// Touch: a tap selects, a double tap opens the settings, a swipe that starts on a chart scrolls
+// the sheet (selected or not), and a selected chart held still for a moment is picked up and
+// follows the finger. Mouse and pen: press and drag moves right away, double-click (double tap)
+// opens the settings. Keyboard (the chart has focus, also right after it is inserted or
+// duplicated): Delete removes it, Enter opens its settings and goes into them, arrows nudge it
+// (Shift: 10 px), Alt + arrows resize it, Ctrl/⌘ + D duplicates it, Ctrl/⌘ + Z / Y undo and redo,
+// Escape lets go of it and closes its settings. The selected frame always shows where the
+// keyboard is: when it goes back into the cells, the chart is let go of.
+//
+// Opening the settings scrolls the chart into view without pushing the cells it is made from out
+// of view, and closing them scrolls back; what can't be seen, the panel shows itself (inView).
 
 import { Copy, ImageDown, Settings2, Trash2, TrendingUp } from "lucide-react";
-import { useEffect, useEffectEvent, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { useTouch } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
@@ -20,12 +39,14 @@ import { cn } from "@/lib/utils";
 import { ChartView } from "@/sheet/chart/ChartView";
 import { chartData, type ChartData } from "@/sheet/chart/data";
 import type { Calc } from "@/sheet/engine";
-import { DEFAULT_COL_W, type ChartSpec, type RangeRef, type Sheet } from "@/sheet/types";
+import { DEFAULT_COL_W, type ChartSpec, type Sheet } from "@/sheet/types";
 import { useOpenEmbedItem } from "../embed/openItem";
-import type { GridGeometry } from "../grid/Grid";
+import { focusSheetGrid, type GridGeometry } from "../grid/Grid";
+import { showSheetNotice } from "../notice";
 import { PANEL_MIN_WIDTH, PANEL_WIDTH } from "../panelLayout";
 import { useSheet, type SheetStore } from "../store";
-import { deleteChart, duplicateChart, openChartPanel, quickTrendline, saveChartFile, updateChart } from "./actions";
+import { chartDataBlock, deleteChart, duplicateChart, openChartPanel, quickTrendline, saveChartFile, updateChart } from "./actions";
+import { BAR_SPACE, barShift, inViewNext, revealScroll, scrollBehavior, shownShare, type Rect } from "./reveal";
 import { chartUi, selectChart, setChartUi, setChartViewport, useChartUi, type ChartViewport } from "./selection";
 
 /** The smallest a chart gets by resizing (logical px). */
@@ -33,7 +54,25 @@ export const CHART_MIN = { w: 240, h: 160 } as const;
 
 type Box = { x: number; y: number; w: number; h: number };
 type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
-type Gesture = { pointerId: number; kind: "move" | Handle; startX: number; startY: number; base: Box; moved: boolean; touch: boolean; wasSelected: boolean; zoom: number };
+type Gesture = {
+  pointerId: number;
+  kind: "move" | Handle;
+  startX: number;
+  startY: number;
+  base: Box;
+  moved: boolean;
+  /** A finger or a pen (taps, double taps, a bigger wobble before it counts as moving). */
+  touch: boolean;
+  /** Moving drags: at once with a mouse, a pen or on a handle; a finger on the chart only after holding still. */
+  held: boolean;
+  /** A finger held the chart still until it was picked up (lifting it then is no tap). */
+  picked: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+  zoom: number;
+};
+
+/** How long a finger holds a selected chart still before it follows the finger (ms), as on the sheet tabs. */
+const HOLD_MS = 450;
 
 const HANDLES: { h: Handle; x: number; y: number; cursor: CSSProperties["cursor"] }[] = [
   { h: "nw", x: 0, y: 0, cursor: "nwse-resize" },
@@ -97,69 +136,55 @@ function dragged(base: Box, kind: "move" | Handle, dx: number, dy: number, scale
   return { x, y, w: Math.max(minW, w), h: Math.max(minH, h) };
 }
 
-/** Room kept between a chart scrolled into view and the edges of what you see (px). */
-const REVEAL_MARGIN = 12;
-/** The action bar of a selected chart, with its gap (px): above the chart, or below it at the top of the sheet. */
-const BAR_SPACE = 52;
+const rectOf = (el: Element): Rect => {
+  const r = el.getBoundingClientRect();
+  return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+};
 
-/** The leftmost column of the cells a chart shows (on its own sheet), or null. */
-function dataLeftCol(spec: ChartSpec): number | null {
-  const refs = [spec.x, ...spec.series.flatMap((s) => [s.y, s.x])].filter((r): r is RangeRef => !!r && r.sheetId === spec.sheetId);
-  return refs.length ? Math.min(...refs.map((r) => Math.min(r.c0, r.c1))) : null;
+/** The frozen columns' width and rows' height of a sheet (content px). */
+function frozenSize(sheet: Sheet | undefined, geom: GridGeometry): { w: number; h: number } {
+  const fc = sheet?.freeze.cols ?? 0;
+  const fr = sheet?.freeze.rows ?? 0;
+  return { w: fc > 0 ? geom.rect(0, fc).x : 0, h: fr > 0 ? geom.rect(fr, 0).y : 0 };
 }
 
 /**
- * Scroll the grid so a chart is in view (just inserted or duplicated, its settings just opened, or
- * opened from a note), with its action bar: below the headers and frozen panes, and above the
+ * Where the grid shows its scrolling cells on screen (the room a chart can be seen in): right of
+ * the row numbers and frozen columns, below the column letters and frozen rows, and above the
  * settings SheetEditor docks over the lower part of the editor on narrow screens (a region in
- * [data-sheet-editor]). Sideways it moves only as far as it must, and when most of the chart
- * shows already it doesn't push the cells the chart is made from out on the left: a chart
- * inserted beside a calibration table with the side panel open used to cut column A off.
- * `frozen` and `dataLeft` are in the grid's content px (GridGeometry).
+ * [data-sheet-editor], measured without its slide-in transform, so it is right while the panel
+ * still moves up). `docked: false` leaves a docked panel out: one that is sliding away.
  */
-function revealChart(card: HTMLElement, opts: { frozen: { w: number; h: number }; dataLeft: number | null; bar: "above" | "below" }) {
+function gridRoom(card: HTMLElement, frozen: { w: number; h: number }, docked = true): Rect | null {
   const grid = card.closest<HTMLElement>("[data-sheet-grid]");
   const overlay = card.closest<HTMLElement>("[data-grid-overlay]");
-  if (!grid || !overlay) {
-    card.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-    return;
-  }
+  if (!grid || !overlay) return null;
   // The overlay covers the scrolling cells, which start after the row numbers and column letters.
   const cells = overlay.offsetParent instanceof HTMLElement ? overlay.offsetParent : null;
   const g = grid.getBoundingClientRect();
-  const origin = overlay.getBoundingClientRect();
-  const left = g.left + grid.clientLeft + (cells?.offsetLeft ?? 0) + opts.frozen.w;
-  const top = g.top + grid.clientTop + (cells?.offsetTop ?? 0) + opts.frozen.h;
-  const right = g.left + grid.clientLeft + grid.clientWidth;
-  let bottom = g.top + grid.clientTop + grid.clientHeight;
-  // Settings docked at the bottom cover the grid from their top edge down (measured without the
-  // slide-in animation's transform, so it is right while the sheet still moves up).
+  const room = {
+    left: g.left + grid.clientLeft + (cells?.offsetLeft ?? 0) + frozen.w,
+    top: g.top + grid.clientTop + (cells?.offsetTop ?? 0) + frozen.h,
+    right: g.left + grid.clientLeft + grid.clientWidth,
+    bottom: g.top + grid.clientTop + grid.clientHeight,
+  };
   const editor = card.closest<HTMLElement>("[data-sheet-editor]");
-  const docked = editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]");
-  if (editor && docked) bottom = Math.min(bottom, editor.getBoundingClientRect().top + editor.clientTop + docked.offsetTop);
-  if (right - left < 40 || bottom - top < 40) return;
-
-  const c = card.getBoundingClientRect();
-  const M = REVEAL_MARGIN;
-  const top0 = c.top - (opts.bar === "above" ? BAR_SPACE : 0);
-  const bottom0 = c.bottom + (opts.bar === "below" ? BAR_SPACE : 0);
-  let dy = 0;
-  // Taller than the room: its top (title, the upper part of the plot) shows.
-  if (bottom0 - top0 > bottom - top - 2 * M || top0 < top + M) dy = top0 - (top + M);
-  else if (bottom0 > bottom - M) dy = bottom0 - (bottom - M);
-
-  let dx = 0;
-  if (c.left < left + M) dx = c.left - (left + M);
-  else if (c.right > right - M) {
-    dx = Math.max(0, Math.min(c.right - (right - M), c.left - (left + M)));
-    const shown = (Math.min(c.right, right) - Math.max(c.left, left)) / Math.max(1, c.width);
-    const dataLeft = opts.dataLeft === null ? null : origin.left + opts.dataLeft;
-    if (dataLeft !== null && dataLeft >= left - 1 && dataLeft < c.left && shown >= 0.5) dx = Math.min(dx, Math.max(0, dataLeft - left));
-  }
-  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-  grid.scrollBy({ left: Math.abs(dx) < 1 ? 0 : dx, top: Math.abs(dy) < 1 ? 0 : dy, behavior: "smooth" });
+  const dock = docked ? editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]") : null;
+  if (editor && dock) room.bottom = Math.min(room.bottom, editor.getBoundingClientRect().top + editor.clientTop + dock.offsetTop);
+  return room;
 }
 
+/**
+ * The scroll the open settings made to show their chart, per editor: closing them scrolls back to
+ * `from`, unless the student scrolled meanwhile. Switching the settings to another chart keeps
+ * the first `from`.
+ */
+const settingsScroll = new WeakMap<SheetStore, { from: { left: number; top: number }; to: { left: number; top: number } }>();
+
+/** After the settings open from the keyboard, the keyboard goes into them: to their title, from where Tab goes on. */
+function focusSettings(chartId: string) {
+  requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-chart-panel="${CSS.escape(chartId)}"] [data-chart-panel-title]`)?.focus({ preventScroll: true }));
+}
 
 /** The grid's visible cells now, in content px (see ChartViewport). */
 function measureViewport(store: SheetStore, geom: GridGeometry): ChartViewport | null {
@@ -168,14 +193,17 @@ function measureViewport(store: SheetStore, geom: GridGeometry): ChartViewport |
   if (!grid || !overlay || !grid.clientWidth) return null;
   const cells = overlay.offsetParent instanceof HTMLElement ? overlay.offsetParent : null;
   const state = store.get();
-  const fc = state.workbook.sheets.find((x) => x.id === geom.sheetId)?.freeze.cols ?? 0;
+  const frozen = frozenSize(state.workbook.sheets.find((x) => x.id === geom.sheetId), geom);
   const editor = grid.closest<HTMLElement>("[data-sheet-editor]");
   // No settings open yet: on a wide editor they will open beside the grid and take its room.
   const opens = !state.focus && !!editor && !editor.querySelector(":scope > aside") && editor.clientWidth >= PANEL_MIN_WIDTH;
   return {
-    left: grid.scrollLeft + (fc > 0 ? geom.rect(0, fc).x : 0),
+    left: grid.scrollLeft + frozen.w,
     right: grid.scrollLeft + grid.clientWidth - (cells?.offsetLeft ?? 0),
+    top: grid.scrollTop + frozen.h,
+    bottom: grid.scrollTop + grid.clientHeight - (cells?.offsetTop ?? 0),
     colX: (col) => geom.rect(0, col).x,
+    rowY: (row) => geom.rect(row, 0).y,
     zoom: geom.zoom > 0 ? geom.zoom : 1,
     sidePanel: opens ? PANEL_WIDTH : 0,
   };
@@ -220,16 +248,26 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
   }, [store]);
 
   // A press anywhere else (a cell, the toolbar) lets go of the selected chart; its panel and the
-  // menus and dialogs it opens don't.
+  // menus and dialogs it opens don't. So does the keyboard going into the cells (Escape in the
+  // settings, closing them, Shift+Tab): the frame shows where the keyboard is, so Delete never
+  // seems to be about the chart while it clears cells.
   useEffect(() => {
     if (!ui.selected) return;
     const onDown = (e: globalThis.PointerEvent) => {
       const t = e.target;
-      if (t instanceof Element && t.closest("[data-chart-card],[data-chart-panel],[role=dialog],[role=menu],[role=listbox]")) return;
+      if (t instanceof Element && t.closest("[data-chart-card],[data-chart-panel],[data-sheet-panel],[role=dialog],[role=menu],[role=listbox]")) return;
       selectChart(store, null);
     };
+    const onFocus = (e: FocusEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-sheet-grid]") && !t.closest("[data-chart-card]")) selectChart(store, null);
+    };
     document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("focusin", onFocus);
+    };
   }, [store, ui.selected]);
 
   return (
@@ -289,42 +327,220 @@ function ChartCard({
   const anchor = geom.rect(spec.at.row, spec.at.col);
   const base: Box = { x: anchor.x + spec.at.dx * scale, y: anchor.y + spec.at.dy * scale, w: spec.size.w * scale, h: spec.size.h * scale };
   const [preview, setPreview] = useState<Box | null>(null);
+  // Held still by a finger until picked up: it lifts before it follows the finger.
+  const [lifted, setLifted] = useState(false);
   const [saving, setSaving] = useState(false);
   const gesture = useRef<Gesture | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const box = preview ?? base;
+  const barAbove = box.y >= BAR_SPACE;
+  const showBar = selected && !preview && !lifted;
 
-  // A chart just inserted, duplicated or opened from a note scrolls into view, and so does a
-  // chart whose settings open (docked at the bottom on narrow screens, they would cover it).
-  // Measured a frame later, when the panel that opens with it has taken its place.
-  const revealNow = useEffectEvent(() => {
+  /** Where the grid shows cells on screen now (see gridRoom). */
+  const roomNow = (docked = true) => {
     const el = cardRef.current;
-    if (!el) return;
     const sheet = store.get().workbook.sheets.find((x) => x.id === spec.sheetId);
-    const fc = sheet?.freeze.cols ?? 0;
-    const fr = sheet?.freeze.rows ?? 0;
-    const col = dataLeftCol(spec);
-    revealChart(el, {
-      frozen: { w: fc > 0 ? geom.rect(0, fc).x : 0, h: fr > 0 ? geom.rect(fr, 0).y : 0 },
-      dataLeft: col !== null ? geom.rect(spec.at.row, col).x : null,
-      bar: box.y >= 52 ? "above" : "below",
-    });
+    return el ? gridRoom(el, frozenSize(sheet, geom), docked) : null;
+  };
+
+  /** Tell the panel whether the chart can be seen while its settings are open (it shows a copy when not). */
+  const setInView = useEffectEvent((shown: boolean) => {
+    const cur = chartUi(store).inView;
+    if (shown && cur !== spec.id) setChartUi(store, { inView: spec.id });
+    else if (!shown && cur === spec.id) setChartUi(store, { inView: null });
   });
-  const revealed = useRef({ reveal: 0, panel: false });
+
+  // Scroll the chart into view (see revealScroll), as `settings` (its settings are opening) or
+  // `show` (the chart itself is wanted). Says where the grid was and goes to, whether there was
+  // room at all (docked settings can cover nearly all of the grid) and how much of the chart
+  // shows once there; null when the chart isn't in a grid on screen.
+  const revealNow = useEffectEvent((mode: "settings" | "show") => {
+    const el = cardRef.current;
+    const grid = el?.closest<HTMLElement>("[data-sheet-grid]");
+    const overlay = el?.closest<HTMLElement>("[data-grid-overlay]");
+    if (!el || !grid || !overlay) return null;
+    const from = { left: grid.scrollLeft, top: grid.scrollTop };
+    const room = roomNow(mode === "settings");
+    const card = rectOf(el);
+    const block = chartDataBlock(store.get().workbook, spec);
+    const origin = overlay.getBoundingClientRect();
+    let data: Rect | null = null;
+    if (block) {
+      const a = geom.rect(block.r0, block.c0);
+      const b = geom.rect(block.r1, block.c1);
+      data = { left: origin.left + a.x, top: origin.top + a.y, right: origin.left + b.x + b.w, bottom: origin.top + b.y + b.h };
+    }
+    const to = room
+      ? revealScroll({
+          card,
+          room,
+          bar: selected ? (barAbove ? "above" : "below") : null,
+          data,
+          mode,
+          scroll: { ...from, maxLeft: grid.scrollWidth - grid.clientWidth, maxTop: grid.scrollHeight - grid.clientHeight },
+        })
+      : null;
+    if (!room || !to) return { from, to: from, room: false, shown: 0 };
+    const dx = to.left - from.left;
+    const dy = to.top - from.top;
+    if (dx || dy) grid.scrollTo({ ...to, behavior: scrollBehavior() });
+    return { from, to, room: true, shown: shownShare({ left: card.left - dx, right: card.right - dx, top: card.top - dy, bottom: card.bottom - dy }, room) };
+  });
+
+  // The settings opened: the panel shows a copy of the chart unless it can be seen, and the
+  // scroll they made is kept for closing them (from where the grid was before other settings
+  // scrolled it, when these took their place).
+  const settingsOpened = useEffectEvent((r: ReturnType<typeof revealNow>) => {
+    setInView(!!r && inViewNext(null, r.shown));
+    if (!r) return;
+    const prev = settingsScroll.get(store);
+    const from = prev && Math.abs(prev.to.left - r.from.left) <= 2 && Math.abs(prev.to.top - r.from.top) <= 2 ? prev.from : r.from;
+    if (from.left !== r.to.left || from.top !== r.to.top) settingsScroll.set(store, { from, to: r.to });
+    else settingsScroll.delete(store);
+  });
+
+  // The settings closed: back to where the grid was before they scrolled it, unless the student
+  // scrolled meanwhile.
+  const scrollBack = useEffectEvent(() => {
+    const memo = settingsScroll.get(store);
+    settingsScroll.delete(store);
+    const grid = cardRef.current?.closest<HTMLElement>("[data-sheet-grid]");
+    if (!memo || !grid) return;
+    // Without the panel beside it the grid is wider again and can't scroll as far.
+    const left = Math.min(memo.to.left, grid.scrollWidth - grid.clientWidth);
+    const top = Math.min(memo.to.top, grid.scrollHeight - grid.clientHeight);
+    if (Math.abs(grid.scrollLeft - left) <= 2 && Math.abs(grid.scrollTop - top) <= 2) grid.scrollTo({ ...memo.from, behavior: scrollBehavior() });
+  });
+
+  // A chart just inserted, duplicated or opened from a note scrolls into view and gets the
+  // keyboard (so Delete removes it, never the cells it was made from). A chart whose settings
+  // open scrolls into view as far as its data allows (docked at the bottom on narrow screens,
+  // they would cover it), and back when they close. A new chart the docked settings left no room
+  // for comes into view when they close. Measured a frame later, when the panel that opens with
+  // it has taken its place.
+  const revealed = useRef({ reveal: 0, panel: false, pending: false });
   useEffect(() => {
     const done = revealed.current;
-    if (!panelOpen) done.panel = false;
-    if (!((reveal !== 0 && reveal !== done.reveal) || (panelOpen && !done.panel))) return;
+    const asked = reveal !== 0 && reveal !== done.reveal;
+    const opened = panelOpen && !done.panel;
+    const closed = !panelOpen && done.panel;
+    if (!asked && !opened && !closed) return;
     const frame = requestAnimationFrame(() => {
       done.reveal = reveal;
       done.panel = panelOpen;
-      revealNow();
-      // Done: coming back to this sheet later doesn't scroll to the chart again.
-      if (reveal !== 0 && chartUi(store).revealId === spec.id) setChartUi(store, { revealId: null });
+      if (closed) {
+        setInView(false);
+        const pending = done.pending;
+        done.pending = false;
+        // Closed for good (not switched over to other settings).
+        if (!store.get().focus) {
+          if (pending) {
+            settingsScroll.delete(store);
+            revealNow("show");
+          } else scrollBack();
+        }
+      }
+      if (asked || opened) {
+        const r = revealNow(panelOpen ? "settings" : "show");
+        if (asked) done.pending = panelOpen && !!r && (!r.room || !inViewNext(null, r.shown));
+        if (opened) settingsOpened(r);
+      }
+      if (asked) {
+        // Done: coming back to this sheet later doesn't scroll to the chart again.
+        if (chartUi(store).revealId === spec.id) setChartUi(store, { revealId: null });
+        cardRef.current?.focus({ preventScroll: true });
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [reveal, panelOpen, store, spec.id]);
+
+  // While its settings are open: can the chart still be seen after the student scrolls, the
+  // docked panel grows or the window changes? Measured once things stop moving (also after the
+  // reveal's own smooth scroll), with slack either way so the copy in the panel doesn't flick in
+  // and out.
+  const measureInView = useEffectEvent(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const room = roomNow();
+    setInView(inViewNext(chartUi(store).inView === spec.id, room ? shownShare(rectOf(el), room) : 0));
+  });
+  useEffect(() => {
+    if (!panelOpen) return;
+    const el = cardRef.current;
+    const grid = el?.closest<HTMLElement>("[data-sheet-grid]");
+    if (!el || !grid) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const later = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => measureInView(), 160);
+    };
+    grid.addEventListener("scroll", later, { passive: true });
+    const ro = new ResizeObserver(later);
+    ro.observe(el);
+    ro.observe(grid);
+    const dock = el.closest("[data-sheet-editor]")?.querySelector(":scope > [data-sheet-dock]");
+    if (dock) ro.observe(dock);
+    return () => {
+      clearTimeout(timer);
+      grid.removeEventListener("scroll", later);
+      ro.disconnect();
+    };
+  }, [panelOpen]);
+
+  // Gone from the screen (deleted, another sheet shown): its open settings show the copy again,
+  // and closing them scrolls nothing back.
+  useEffect(() => {
+    const done = revealed.current;
+    return () => {
+      if (chartUi(store).inView === spec.id) setChartUi(store, { inView: null });
+      if (done.panel) settingsScroll.delete(store);
+    };
+  }, [store, spec.id]);
+
+  // The action bar stays where a finger reaches it: inside the cells on screen while the chart
+  // shows there (a chart wider than a phone, or half scrolled away). Moved directly on the
+  // element, as the grid scrolls.
+  const placeBar = useEffectEvent(() => {
+    const bar = barRef.current;
+    const el = cardRef.current;
+    if (!bar || !el) return;
+    const sx = Number(bar.dataset.sx) || 0;
+    const sy = Number(bar.dataset.sy) || 0;
+    const r = rectOf(bar);
+    const room = roomNow(!!store.get().focus);
+    const s = room ? barShift({ left: r.left - sx, right: r.right - sx, top: r.top - sy, bottom: r.bottom - sy }, rectOf(el), room) : { x: 0, y: 0 };
+    if (s.x === sx && s.y === sy) return;
+    bar.dataset.sx = String(s.x);
+    bar.dataset.sy = String(s.y);
+    bar.style.transform = s.x || s.y ? `translate(${s.x}px, ${s.y}px)` : "";
+  });
+  useLayoutEffect(() => {
+    if (!showBar) return;
+    placeBar();
+    const grid = cardRef.current?.closest<HTMLElement>("[data-sheet-grid]");
+    const onChange = () => placeBar();
+    grid?.addEventListener("scroll", onChange, { passive: true });
+    const ro = new ResizeObserver(onChange);
+    if (grid) ro.observe(grid);
+    return () => {
+      grid?.removeEventListener("scroll", onChange);
+      ro.disconnect();
+    };
+  }, [showBar, box.x, box.y, box.w, box.h, panelOpen]);
+
+  // A finger that picked the chart up drags it, and a pen drags it at once: the sheet mustn't
+  // scroll under them.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (gesture.current?.held && gesture.current.touch) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   /** Write the box as the chart's anchor cell + offset and size (logical px). */
   const commit = (next: Box, kind: "move" | Handle) => {
@@ -340,22 +556,46 @@ function ChartCard({
   const begin = (e: PointerEvent<HTMLElement>, kind: "move" | Handle) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.stopPropagation();
-    const isTouch = e.pointerType !== "mouse";
+    const finger = e.pointerType === "touch";
     // The grid may zoom with a CSS transform: screen px → content px.
     const zoom = Math.max(0.25, store.get().zoom / scale) || 1;
-    gesture.current = { pointerId: e.pointerId, kind, startX: e.clientX, startY: e.clientY, base, moved: false, touch: isTouch, wasSelected: selected, zoom };
-    // An unselected chart under a finger waits: a swipe scrolls the sheet, a tap selects.
-    if (kind !== "move" || !isTouch || selected) {
+    const g: Gesture = { pointerId: e.pointerId, kind, startX: e.clientX, startY: e.clientY, base, moved: false, touch: e.pointerType !== "mouse", held: !finger || kind !== "move", picked: false, timer: null, zoom };
+    if (gesture.current?.timer) clearTimeout(gesture.current.timer);
+    gesture.current = g;
+    const el = e.currentTarget;
+    const capture = () => {
       try {
-        e.currentTarget.setPointerCapture(e.pointerId);
+        el.setPointerCapture(g.pointerId);
       } catch {
         // Some WebViews refuse capture for pens; moving still works while over the chart.
       }
+    };
+    if (g.held) capture();
+    else if (selected && !readOnly) {
+      // A finger on the chart waits: a swipe scrolls the sheet, a tap selects, and on a selected
+      // chart holding still for a moment picks it up (it lifts), then it follows the finger.
+      g.timer = setTimeout(() => {
+        if (gesture.current !== g || g.moved) return;
+        g.held = true;
+        g.picked = true;
+        g.timer = null;
+        capture();
+        setLifted(true);
+        navigator.vibrate?.(12);
+      }, HOLD_MS);
     }
-    if (!isTouch) {
+    if (!finger) {
       selectChart(store, spec.id);
       cardRef.current?.focus({ preventScroll: true });
     }
+  };
+
+  /** The gesture is over (or turned out to be a swipe that scrolls the sheet). */
+  const forget = () => {
+    if (gesture.current?.timer) clearTimeout(gesture.current.timer);
+    gesture.current = null;
+    setPreview(null);
+    setLifted(false);
   };
 
   const move = (e: PointerEvent<HTMLElement>) => {
@@ -364,7 +604,12 @@ function ChartCard({
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
     if (!g.moved && Math.hypot(dx, dy) < (g.touch ? 8 : 4)) return;
-    if (readOnly || (g.kind === "move" && g.touch && !g.wasSelected)) return;
+    if (!g.held) {
+      // A finger moving before it held still: it scrolls the sheet.
+      forget();
+      return;
+    }
+    if (readOnly) return;
     g.moved = true;
     setPreview(dragged(g.base, g.kind, dx / g.zoom, dy / g.zoom, scale, e.shiftKey));
   };
@@ -372,13 +617,12 @@ function ChartCard({
   const end = (e: PointerEvent<HTMLElement>) => {
     const g = gesture.current;
     if (!g || g.pointerId !== e.pointerId) return;
-    gesture.current = null;
-    setPreview(null);
+    forget();
     if (g.moved) {
       commit(dragged(g.base, g.kind, (e.clientX - g.startX) / g.zoom, (e.clientY - g.startY) / g.zoom, scale, e.shiftKey), g.kind);
       return;
     }
-    if (!g.touch || g.kind !== "move") return;
+    if (!g.touch || g.kind !== "move" || g.picked) return;
     // A tap: select; a second tap soon after opens the settings.
     selectChart(store, spec.id);
     cardRef.current?.focus({ preventScroll: true });
@@ -390,9 +634,10 @@ function ChartCard({
     } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
   };
 
-  const cancel = () => {
-    gesture.current = null;
-    setPreview(null);
+  /** Gone with the chart, the keyboard goes back to the cells. */
+  const remove = () => {
+    deleteChart(store, spec.id);
+    focusSheetGrid();
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -405,6 +650,8 @@ function ChartCard({
         e.stopPropagation();
         if (k === "y" || e.shiftKey) store.redo();
         else store.undo();
+        // Undoing the chart's insertion takes the chart away: the keyboard goes back to the cells.
+        if (!store.get().workbook.charts.some((c) => c.id === spec.id)) focusSheetGrid();
       } else if (k === "d" && !readOnly) {
         e.preventDefault();
         e.stopPropagation();
@@ -416,14 +663,20 @@ function ChartCard({
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      if (!readOnly && selected) deleteChart(store, spec.id);
+      if (!readOnly && selected) remove();
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (!readOnly) openChartPanel(store, spec.id);
+      if (!readOnly) {
+        openChartPanel(store, spec.id);
+        focusSettings(spec.id);
+      }
     } else if (e.key === "Escape") {
+      // Let go of the chart and close its settings: the keyboard goes back to the cells.
       e.preventDefault();
+      const open = store.get().focus;
+      if (open?.kind === "chart" && open.id === spec.id) store.setFocus(null);
       selectChart(store, null);
-      cardRef.current?.blur();
+      focusSheetGrid();
     } else if (arrows[e.key] && !readOnly && selected) {
       e.preventDefault();
       const [ax, ay] = arrows[e.key];
@@ -438,14 +691,15 @@ function ChartCard({
 
   const savePng = async () => {
     setSaving(true);
-    await saveChartFile(store, spec.id, "png");
+    const ok = await saveChartFile(store, spec.id, "png");
     setSaving(false);
+    // Saved, the browser shows the download; when it fails, the sheet says so.
+    if (!ok) showSheetNotice(store, t.saveFailed, "error");
   };
 
   const kindName = t.kindNames[spec.kind];
   const hit = touch ? 36 : 16;
   const dot = touch ? 14 : 9;
-  const barAbove = box.y >= 52;
   const wide = box.w >= 380;
 
   return (
@@ -457,19 +711,19 @@ function ChartCard({
       aria-label={t.chartLabel(kindName, spec.title.trim())}
       aria-describedby={hintId}
       aria-keyshortcuts="Delete Enter Escape"
-      className={cn("pointer-events-auto absolute select-none outline-none", selected ? "z-[3]" : "z-[2]")}
+      // A finger may scroll the sheet over a chart (the grid lets it pan); holding it still picks the chart up.
+      className={cn("pointer-events-auto absolute select-none outline-none [-webkit-touch-callout:none]", selected ? "z-[3]" : "z-[2]")}
       style={{
         left: box.x,
         top: box.y,
         width: box.w,
         height: box.h,
-        touchAction: selected && !readOnly ? "none" : "auto",
         cursor: selected && !readOnly ? (preview ? "grabbing" : "grab") : "pointer",
       }}
       onPointerDown={(e) => begin(e, "move")}
       onPointerMove={move}
       onPointerUp={end}
-      onPointerCancel={cancel}
+      onPointerCancel={forget}
       onLostPointerCapture={(e) => gesture.current?.pointerId === e.pointerId && gesture.current.moved && end(e)}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -491,7 +745,7 @@ function ChartCard({
         className={cn(
           "h-full w-full overflow-hidden rounded-xl bg-raised shadow-card transition-shadow",
           selected ? "ring-2 ring-blob" : panelOpen ? "ring-2 ring-blob/45" : "ring-1 ring-line hover:ring-line-2",
-          preview && "shadow-pop",
+          (preview || lifted) && "shadow-pop",
         )}
       >
         <ChartView spec={spec} data={data} width={box.w} height={box.h} locale={locale} interactive={!preview} selectedSeries={highlight} />
@@ -512,8 +766,9 @@ function ChartCard({
           </div>
         ))}
 
-      {selected && !preview && (
+      {showBar && (
         <div
+          ref={barRef}
           role="toolbar"
           aria-label={t.chartLabel(kindName, spec.title.trim())}
           className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-line bg-raised p-1 shadow-pop"
@@ -522,13 +777,28 @@ function ChartCard({
           onDoubleClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.key !== "Tab" && e.stopPropagation()}
         >
+          {/* From the keyboard (a click without a pointer), the keyboard goes along into the settings. */}
           {!readOnly && (
-            <BarButton label={t.settings} showLabel={wide} onClick={() => openChartPanel(store, spec.id)}>
+            <BarButton
+              label={t.settings}
+              showLabel={wide}
+              onClick={(e) => {
+                openChartPanel(store, spec.id);
+                if (e.detail === 0) focusSettings(spec.id);
+              }}
+            >
               <Settings2 />
             </BarButton>
           )}
           {!readOnly && spec.kind !== "pie" && (
-            <BarButton label={t.trendline} title={t.addTrendline} showLabel={wide} onClick={() => quickTrendline(store, spec.id)}>
+            <BarButton
+              label={t.trendline}
+              title={t.addTrendline}
+              showLabel={wide}
+              onClick={(e) => {
+                if (quickTrendline(store, spec.id) === "opened" && e.detail === 0) focusSettings(spec.id);
+              }}
+            >
               <TrendingUp />
             </BarButton>
           )}
@@ -541,7 +811,7 @@ function ChartCard({
             <ImageDown />
           </BarButton>
           {!readOnly && (
-            <BarButton label={t.remove} danger onClick={() => deleteChart(store, spec.id)}>
+            <BarButton label={t.remove} danger onClick={remove}>
               <Trash2 />
             </BarButton>
           )}
@@ -551,7 +821,23 @@ function ChartCard({
   );
 }
 
-function BarButton({ label, title, showLabel, danger, disabled, onClick, children }: { label: string; title?: string; showLabel?: boolean; danger?: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+function BarButton({
+  label,
+  title,
+  showLabel,
+  danger,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  title?: string;
+  showLabel?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"

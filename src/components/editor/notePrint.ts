@@ -14,6 +14,16 @@ const PRINT_CSS = `
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Blocks that are still loading (a spreadsheet block's view or its data mark themselves with
+ * data-print-wait) have their content: the copy shows what the screen shows then. At most a few
+ * seconds; a block that takes longer is printed as it is.
+ */
+async function loaded(dom: HTMLElement) {
+  const until = Date.now() + 8000;
+  while (dom.querySelector("[data-print-wait]") && Date.now() < until) await wait(100);
+}
+
 /** Pictures, diagrams and fonts ready (or a few seconds passed). */
 async function settled(root: HTMLElement) {
   const images = [...root.querySelectorAll("img")].filter((img) => !img.complete);
@@ -78,6 +88,7 @@ function stillCopy(dom: HTMLElement) {
  * text; the PDF is named after the title. Resolves once the print window has closed.
  */
 export async function printNote({ dom, title, icon, untitled }: { dom: HTMLElement; title: string; icon: string | null; untitled: string }) {
+  await loaded(dom);
   const root = document.documentElement;
   const theme = root.dataset.theme;
   // Paper is white: drawings made for the dark theme are drawn again in the light one first.

@@ -20,11 +20,17 @@ export type ChartUi = {
   reveal: number;
   /** The chart the latest of those requests was for (selecting another chart later doesn't scroll). */
   revealId: string | null;
+  /**
+   * The chart whose settings are open, while it can be seen on the sheet (ChartLayer measures it);
+   * null otherwise. Its panel then leaves out the copy of the chart it shows when the chart is
+   * covered or scrolled away.
+   */
+  inView: string | null;
 };
 
 type Entry = { value: ChartUi; listeners: Set<() => void> };
 
-const EMPTY: ChartUi = { selected: null, series: null, section: null, reveal: 0, revealId: null };
+const EMPTY: ChartUi = { selected: null, series: null, section: null, reveal: 0, revealId: null, inView: null };
 const entries = new WeakMap<SheetStore, Entry>();
 
 function entry(store: SheetStore): Entry {
@@ -63,11 +69,15 @@ export function useChartUi(store: SheetStore): ChartUi {
  * ChartLayer while the grid is on screen; px are the grid's content px (GridGeometry, zoomed).
  */
 export type ChartViewport = {
-  /** The visible part of the scrolling cells, left to right. */
+  /** The visible part of the scrolling cells, left to right and top to bottom. */
   left: number;
   right: number;
+  top: number;
+  bottom: number;
   /** A column's left edge. */
   colX: (col: number) => number;
+  /** A row's top edge. */
+  rowY: (row: number) => number;
   zoom: number;
   /** How much narrower the grid gets when the chart's settings open beside it (0 when they are open already or dock below). */
   sidePanel: number;

@@ -72,13 +72,19 @@ export function lookOf(cell: Cell | undefined, value: CellValue, decor: CellDeco
  * Text that looks like a number but isn't one, beside a number in its column: "0,1040,110" (a new
  * value typed after the old one), "0, 5", "O,104" (the letter O). Formulas and charts skip such a
  * cell without a word, so the grid marks it (like Excel's "number stored as text"). It stays as
- * typed: "1,2,3" can be meant as text, and alone in a column of words it gets no mark.
+ * typed: "1,2,3" can be meant as text, and alone in a column of words it gets no mark. Only typed
+ * text counts: a formula's text and a cell formatted as text are meant to be text.
  */
-export function numberAsText(value: CellValue, near: (dRow: -1 | 1) => CellValue): boolean {
-  if (typeof value !== "string") return false;
-  const t = value.trim();
-  if (!/\d/.test(t) || !/[.,]/.test(t) || !/^[+-]?[\dOo.,' ]+%?$/.test(t)) return false;
+export function numberAsText(cell: Cell | undefined, near: (dRow: -1 | 1) => CellValue): boolean {
+  if (!cell || cell.f !== undefined || typeof cell.v !== "string" || cell.s?.fmt?.kind === "text") return false;
+  if (!/[.,]/.test(cell.v) || !numberLike(cell.v)) return false;
   return typeof near(-1) === "number" || typeof near(1) === "number";
+}
+
+/** Text of digits and number signs only, as typed for a number ("12", "0,1040,110", "O,104" with the letter O). */
+export function numberLike(text: string): boolean {
+  const t = text.trim();
+  return /\d/.test(t) && /^[+-]?[\dOo.,' ]+%?$/.test(t);
 }
 
 /** CSS for one border line (an Excel border is dark, like ink). */

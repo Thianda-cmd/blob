@@ -146,9 +146,11 @@ export function formulaRefs(canonical: string): FormulaRef[] {
 
 /** Functions Excel files name with the "_xlfn." prefix (added to Excel after 2007). */
 const XLFN = new Set([
-  "CONCAT", "CONFIDENCE.NORM", "CONFIDENCE.T", "COVARIANCE.P", "COVARIANCE.S", "DAYS", "FORECAST.LINEAR", "IFNA", "IFS", "ISFORMULA", "ISOWEEKNUM",
-  "MAXIFS", "MINIFS", "MODE.SNGL", "NORM.DIST", "NORM.INV", "NORM.S.DIST", "NORM.S.INV", "PERCENTILE.INC", "QUARTILE.INC", "RANK.EQ", "STDEV.P",
-  "STDEV.S", "SWITCH", "T.DIST", "T.DIST.2T", "T.INV", "T.INV.2T", "T.TEST", "TEXTJOIN", "VAR.P", "VAR.S", "XLOOKUP", "XOR",
+  "CEILING.MATH", "CHISQ.DIST", "CHISQ.DIST.RT", "CHISQ.INV", "CHISQ.INV.RT", "CHISQ.TEST", "CONCAT", "CONFIDENCE.NORM", "CONFIDENCE.T", "COVARIANCE.P",
+  "COVARIANCE.S", "DAYS", "F.DIST", "F.DIST.RT", "F.INV", "F.INV.RT", "F.TEST", "FLOOR.MATH", "FORECAST.LINEAR", "IFNA", "IFS", "ISFORMULA", "ISOWEEKNUM",
+  "MAXIFS", "MINIFS", "MODE.SNGL", "NORM.DIST", "NORM.INV", "NORM.S.DIST", "NORM.S.INV", "PERCENTILE.EXC", "PERCENTILE.INC", "QUARTILE.EXC", "QUARTILE.INC",
+  "RANK.AVG", "RANK.EQ", "STDEV.P", "STDEV.S", "SWITCH", "T.DIST", "T.DIST.2T", "T.DIST.RT", "T.INV", "T.INV.2T", "T.TEST", "TEXTJOIN", "VAR.P", "VAR.S",
+  "XLOOKUP", "XMATCH", "XOR",
 ]);
 
 /** A canonical formula as an .xlsx file writes it: newer functions get Excel's "_xlfn." prefix. */

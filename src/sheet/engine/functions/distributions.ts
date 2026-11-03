@@ -1,6 +1,7 @@
 // The special functions behind the statistics: the error function, log-gamma, the regularised
-// incomplete beta function, and from them the normal and Student's t distributions with their
-// inverses. Accurate to about 1e-12 or better (Excel shows 15 digits; lab work needs far fewer).
+// incomplete beta and gamma functions, and from them the normal, Student's t, chi-squared and F
+// distributions with their inverses. Accurate to about 1e-12 or better (Excel shows 15 digits;
+// lab work needs far fewer).
 
 const SQRT2 = Math.SQRT2;
 const SQRT_PI = Math.sqrt(Math.PI);
@@ -227,6 +228,148 @@ export function tInv(p: number, df: number): number {
     t = next;
   }
   return lower ? -t : t;
+}
+
+// ----------------------------------------------------------------------------------------------
+// Chi-squared and F
+
+/** The P(a, x) series, good below x = a + 1. */
+function gammaSeries(a: number, x: number): number {
+  let ap = a;
+  let del = 1 / a;
+  let sum = del;
+  for (let n = 1; n < 1_000_000; n++) {
+    ap += 1;
+    del *= x / ap;
+    sum += del;
+    if (Math.abs(del) < Math.abs(sum) * 1e-16) break;
+  }
+  return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a));
+}
+
+/** Q(a, x) by a continued fraction (modified Lentz), good from x = a + 1 on. */
+function gammaFraction(a: number, x: number): number {
+  const tiny = 1e-300;
+  let b = x + 1 - a;
+  let c = 1 / tiny;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i < 1_000_000; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < tiny) d = tiny;
+    c = b + an / c;
+    if (Math.abs(c) < tiny) c = tiny;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-16) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+}
+
+/** Regularised lower incomplete gamma P(a, x). */
+export function gammaP(a: number, x: number): number {
+  if (x <= 0) return 0;
+  return x < a + 1 ? gammaSeries(a, x) : 1 - gammaFraction(a, x);
+}
+
+/** Regularised upper incomplete gamma Q(a, x) = 1 − P(a, x), without cancellation in the tail. */
+export function gammaQ(a: number, x: number): number {
+  if (x <= 0) return 1;
+  return x < a + 1 ? 1 - gammaSeries(a, x) : gammaFraction(a, x);
+}
+
+/** P(χ² ≤ x) for k degrees of freedom. */
+export const chiSqCdf = (x: number, k: number) => gammaP(k / 2, x / 2);
+/** P(χ² > x): the p-value of a chi-squared test. */
+export const chiSqUpper = (x: number, k: number) => gammaQ(k / 2, x / 2);
+
+export function chiSqPdf(x: number, k: number): number {
+  if (x < 0) return 0;
+  if (x === 0) return k < 2 ? Infinity : k === 2 ? 0.5 : 0;
+  return Math.exp((k / 2 - 1) * Math.log(x) - x / 2 - (k / 2) * Math.LN2 - lnGamma(k / 2));
+}
+
+/** P(F ≤ x) for d1 and d2 degrees of freedom. */
+export function fCdf(x: number, d1: number, d2: number): number {
+  if (x <= 0) return 0;
+  return betaInc((d1 * x) / (d1 * x + d2), d1 / 2, d2 / 2);
+}
+
+/** P(F > x), computed from its own side so small tails keep their digits. */
+export function fUpper(x: number, d1: number, d2: number): number {
+  if (x <= 0) return 1;
+  return betaInc(d2 / (d2 + d1 * x), d2 / 2, d1 / 2);
+}
+
+export function fPdf(x: number, d1: number, d2: number): number {
+  if (x < 0) return 0;
+  if (x === 0) return d1 < 2 ? Infinity : d1 === 2 ? 1 : 0;
+  const lnB = lnGamma(d1 / 2) + lnGamma(d2 / 2) - lnGamma((d1 + d2) / 2);
+  return Math.exp((d1 / 2) * Math.log(d1 / d2) + (d1 / 2 - 1) * Math.log(x) - ((d1 + d2) / 2) * Math.log1p((d1 * x) / d2) - lnB);
+}
+
+/**
+ * The x ≥ 0 where a distribution on [0, ∞) has the lower tail p (`upper`: the upper tail p).
+ * Works on whichever tail is smaller, so tiny probabilities keep their precision: Newton steps
+ * with the density, inside a bracket that bisection falls back on.
+ */
+function invertTail(p: number, upper: boolean, cdf: (x: number) => number, sf: (x: number) => number, pdf: (x: number) => number, start: number): number {
+  const useUpper = upper ? p <= 0.5 : p > 0.5;
+  const q = upper === useUpper ? p : 1 - p;
+  const tail = useUpper ? sf : cdf;
+  // tail(x) − q falls (upper tail) or rises (lower tail) with x: f > 0 means x is too small (upper)…
+  const tooSmall = (f: number) => (useUpper ? f > 0 : f < 0);
+  let lo = 0;
+  let hi = Math.max(1, start);
+  while (tooSmall(tail(hi) - q)) {
+    lo = hi;
+    hi *= 2;
+    if (hi > 1e300) return NaN;
+  }
+  let x = start > lo && start < hi ? start : (lo + hi) / 2;
+  for (let k = 0; k < 300; k++) {
+    const f = tail(x) - q;
+    if (f === 0) return x;
+    if (tooSmall(f)) lo = x;
+    else hi = x;
+    const slope = useUpper ? -pdf(x) : pdf(x);
+    let next = x - f / slope;
+    if (!Number.isFinite(next) || next <= lo || next >= hi) next = (lo + hi) / 2;
+    if (Math.abs(next - x) <= 1e-15 * Math.abs(x) || hi - lo <= 1e-15 * hi) return next;
+    x = next;
+  }
+  return x;
+}
+
+/** The x with P(χ² ≤ x) = p (`upper`: P(χ² > x) = p). */
+export function chiSqInv(p: number, k: number, upper = false): number {
+  // A start near the answer (Wilson–Hilferty): (1 − 2/(9k) + z·√(2/(9k)))³ · k.
+  const z = normInv(upper ? 1 - p : p);
+  const w = 2 / (9 * k);
+  const start = Number.isFinite(z) ? k * Math.pow(Math.max(0.01, 1 - w + z * Math.sqrt(w)), 3) : k;
+  return invertTail(
+    p,
+    upper,
+    (x) => chiSqCdf(x, k),
+    (x) => chiSqUpper(x, k),
+    (x) => chiSqPdf(x, k),
+    start,
+  );
+}
+
+/** The x with P(F ≤ x) = p (`upper`: P(F > x) = p). */
+export function fInv(p: number, d1: number, d2: number, upper = false): number {
+  return invertTail(
+    p,
+    upper,
+    (x) => fCdf(x, d1, d2),
+    (x) => fUpper(x, d1, d2),
+    (x) => fPdf(x, d1, d2),
+    1,
+  );
 }
 
 /** Γ(n+1) = n! for whole n (exact for small n). */

@@ -51,14 +51,18 @@ export function Syntax({ name, args, locale, current = -1, className }: { name: 
   );
 }
 
-/** The hint under the formula bar: the call the caret is in, its current argument and what that is. */
-export function ArgumentHint({ fn, index, locale, t }: { fn: string; index: number; locale: Locale; t: SheetChromeText }) {
+/**
+ * The hint under the formula bar: the call the caret is in, its current argument and what that is.
+ * `compact` (phones): the call alone on one line, so the cells under it stay in view to be tapped.
+ */
+export function ArgumentHint({ fn, index, locale, t, compact = false }: { fn: string; index: number; locale: Locale; t: SheetChromeText; compact?: boolean }) {
   const info = FUNCTION_BY_EN.get(fn);
   const doc = fnDoc(fn, locale);
   const name = info ? localName(info, locale) : fn;
   const args = doc?.args ?? [];
   const current = currentArg(args, index);
   const arg = current >= 0 ? args[current] : undefined;
+  if (compact) return <Syntax name={name} args={args} locale={locale} current={current} className="block min-w-0 truncate text-[12.5px] leading-snug" />;
   return (
     <div className="px-3 py-2">
       <div className="text-[12.5px] leading-snug">
@@ -79,7 +83,10 @@ export function ArgumentHint({ fn, index, locale, t }: { fn: string; index: numb
   );
 }
 
-/** Matching functions while typing; `pick` is highlighted. Pressing an item keeps the keyboard in the formula. */
+/**
+ * Matching functions while typing; `pick` is highlighted. Pressing an item keeps the keyboard in the
+ * formula. `compact` (phones): one line per function and no keyboard hint, so it covers less.
+ */
 export function SuggestionList({
   id,
   items,
@@ -89,6 +96,7 @@ export function SuggestionList({
   typed,
   onPick,
   onHover,
+  compact = false,
 }: {
   id: string;
   items: FunctionName[];
@@ -99,11 +107,12 @@ export function SuggestionList({
   typed: string;
   onPick: (fn: FunctionName) => void;
   onHover?: (i: number) => void;
+  compact?: boolean;
 }) {
   const upper = typed.toUpperCase();
   return (
     <div>
-      <ul id={id} role="listbox" aria-label={t.suggestions} className="max-h-[min(40vh,280px)] overflow-y-auto overscroll-contain p-1">
+      <ul id={id} role="listbox" aria-label={t.suggestions} className={cn("overflow-y-auto overscroll-contain p-1", compact ? "max-h-[min(30vh,200px)]" : "max-h-[min(40vh,280px)]")}>
         {items.map((fn, i) => {
           const name = localName(fn, locale);
           const other = locale === "de" && !fn.de.startsWith(upper) && fn.en.startsWith(upper) ? fn.en : null;
@@ -127,12 +136,12 @@ export function SuggestionList({
                 {other && <span className="font-mono text-[11px] text-ink-3">{other}</span>}
                 <span className="ml-auto shrink-0 text-[10.5px] text-ink-3">{t.categories[fn.category]}</span>
               </span>
-              {doc?.summary && <span className="line-clamp-1 text-[11.5px] text-ink-3">{doc.summary}</span>}
+              {doc?.summary && !compact && <span className="line-clamp-1 text-[11.5px] text-ink-3">{doc.summary}</span>}
             </li>
           );
         })}
       </ul>
-      <div className="border-t border-line px-2.5 py-1 text-[11px] text-ink-3">{t.pickHint}</div>
+      {!compact && <div className="border-t border-line px-2.5 py-1 text-[11px] text-ink-3">{t.pickHint}</div>}
     </div>
   );
 }

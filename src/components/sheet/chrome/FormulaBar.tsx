@@ -13,7 +13,7 @@ import { Check, ChevronDown, Table2, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Popover } from "@/components/ui/Menu";
-import { usePhone } from "@/components/ui/useMediaQuery";
+import { usePhone, useTouch } from "@/components/ui/useMediaQuery";
 import { useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { sheetChromeText, type SheetChromeText } from "@/i18n/messages/sheetChrome";
@@ -26,6 +26,7 @@ import { getCell, sheetById } from "@/sheet/ops";
 import { MAX_COLS, MAX_ROWS, type Area, type NumberFormat, type Workbook } from "@/sheet/types";
 import { SHEET_EVENT, type SheetEventDetail } from "../events";
 import { fillSelectionWith } from "../grid/actions";
+import { chooseKeypad, keypadContext, keypadFor, useKeypad } from "../grid/keypad";
 import { cycleReference } from "../grid/point";
 import { activeArea, growSheet, openParens, useSheet, type SheetStore } from "../store";
 import { insertFunction } from "./actions";
@@ -89,7 +90,8 @@ export function resolveName(wb: Workbook, currentSheetId: string, text: string):
   return { sheetId, area };
 }
 
-function NameBox({ store, t, phone }: { store: SheetStore; t: SheetChromeText; phone: boolean }) {
+/** `bare`: without the tables button (a phone while editing: the formula needs the room). */
+function NameBox({ store, t, phone, bare }: { store: SheetStore; t: SheetChromeText; phone: boolean; bare: boolean }) {
   const workbook = useSheet(store, (s) => s.workbook);
   const sheetId = useSheet(store, (s) => s.sheetId);
   const selection = useSheet(store, (s) => s.selection);
@@ -177,13 +179,16 @@ function NameBox({ store, t, phone }: { store: SheetStore; t: SheetChromeText; p
         autoComplete="off"
         autoCapitalize="characters"
         enterKeyHint="go"
+        // Touch screens: 16 px text, or an iPhone zooms the page when the box is tapped (in either
+        // orientation, so not only on phone widths). Where there is room, the box grows with it, so
+        // a table's name still fits.
         className={cn(
-          "h-8 rounded-lg border border-transparent bg-paper px-2 font-mono text-[12.5px] text-ink outline-none transition-[border,box-shadow] hover:border-line focus:border-blob focus:bg-raised focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] aria-[invalid=true]:border-danger [@media(hover:none)]:h-9",
-          phone ? "w-[68px]" : "w-[104px]",
-          tables.length > 0 && "rounded-r-none",
+          "h-8 text-ellipsis rounded-lg border border-transparent bg-paper px-2 font-mono text-[12.5px] text-ink outline-none transition-[border,box-shadow] hover:border-line focus:border-blob focus:bg-raised focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] aria-[invalid=true]:border-danger [@media(hover:none)]:h-9 [@media(hover:none)]:px-1.5 [@media(hover:none)]:text-[16px]",
+          phone ? "w-[68px] [@media(hover:none)]:w-[84px]" : "w-[104px] [@media(hover:none)]:w-[132px]",
+          tables.length > 0 && !bare && "rounded-r-none",
         )}
       />
-      {tables.length > 0 && (
+      {tables.length > 0 && !bare && (
         <Popover
           open={tablesOpen}
           onOpenChange={setTablesOpen}
@@ -199,7 +204,8 @@ function NameBox({ store, t, phone }: { store: SheetStore; t: SheetChromeText; p
               data-tip={t.nameBoxTables}
               onMouseDown={keepFocus}
               onClick={() => setTablesOpen((v) => !v)}
-              className="grid h-8 w-5 place-items-center rounded-r-lg bg-paper text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [@media(hover:none)]:w-7"
+              // A finger gets 40 × 40 px (the box looks 36 px wide; the rest reaches past its edges).
+              className="relative grid h-8 w-5 place-items-center rounded-r-lg bg-paper text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-0.5 [@media(hover:none)]:after:content-['']"
             >
               <ChevronDown className="size-3" />
             </button>
@@ -312,6 +318,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
   const t = useMessages(sheetChromeText);
   const keys = useKeys();
   const phone = usePhone();
+  const touch = useTouch();
+  const keypad = useKeypad();
   const listId = useId();
   const locale = useSheet(store, (s) => s.locale);
   const readOnly = useSheet(store, (s) => s.readOnly);
@@ -361,7 +369,6 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
     }
   })() : null;
   const error = edit?.error ?? null;
-  const helpOpen = inBar && focused && (!!error || listOpen || !!argument);
 
   const fmt = cell?.s?.fmt;
   const preview = useMemo(() => {
@@ -373,6 +380,16 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
     // cellPos is rebuilt every render; its parts are what matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit, isFormula, text, locale, calc, cellPos.sheetId, cellPos.row, cellPos.col, fmt]);
+
+  // A phone's bar is narrow: while a formula is typed here the name box steps aside, the result
+  // moves into the help, and the help is one line (the cells under it stay in view to be tapped).
+  const roomy = phone && inBar;
+  const helpOpen = inBar && focused && (!!error || listOpen || !!argument || (phone && preview !== null));
+
+  // Touch screens, while the cell editor has the keyboard: "123" / "ABC" switches its keyboard.
+  const keypadSheet = touch && keypad.open && !readOnly ? sheetById(workbook, cellPos.sheetId) : undefined;
+  const padContext = keypadSheet ? keypadContext(keypadSheet, cellPos) : null;
+  const pad = padContext ? keypadFor(padContext, keypad.choice) : null;
 
   // ---- keeping the textarea and the store in step
 
@@ -419,13 +436,13 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
     return () => window.removeEventListener(SHEET_EVENT, onEvent);
   }, []);
 
-  // The help box sits under the formula, inside the window.
+  // The help box sits under the formula, inside the window (on a phone as wide as the window).
   useLayoutEffect(() => {
     if (!helpOpen) return;
     const place = () => {
       const r = box.current?.getBoundingClientRect();
       if (!r) return;
-      const width = Math.min(420, Math.max(260, r.width), window.innerWidth - 16);
+      const width = phone ? window.innerWidth - 16 : Math.min(420, Math.max(260, r.width), window.innerWidth - 16);
       setHelpPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + 6, width });
     };
     place();
@@ -435,7 +452,7 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
-  }, [helpOpen, expanded]);
+  }, [helpOpen, expanded, phone]);
 
   // ---- actions
 
@@ -531,8 +548,10 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
   const canExpand = expanded || lines > 1 || text.length > (phone ? 20 : 60);
   // One line high, a long formula wraps out of sight: its lines are then as tall as the bar, so the
   // next one never peeks in under the first (the caret's line scrolls in whole). Expanded, normal lines.
+  // (The textarea and its coloured copy share this, so they stay in step. Touch screens: 16 px
+  // text, or an iPhone zooms the page when the bar is tapped.)
   const textStyle = cn(
-    "px-2.5 text-[13.5px] whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+    "px-2.5 text-[13.5px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] [@media(hover:none)]:text-[16px]",
     expanded ? "py-1.5 leading-[20px]" : "py-0 leading-[32px]",
   );
 
@@ -551,7 +570,13 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
       typed={text.slice(suggestions.start, caret)}
       onPick={take}
       onHover={(i) => setAssist({ key: assistKey, pick: i, closed: false })}
+      compact={phone}
     />
+  ) : phone ? (
+    <div className="flex items-baseline gap-2 px-3 py-1.5 text-[12.5px] leading-snug">
+      {argument ? <ArgumentHint fn={argument.fn} index={argument.index} locale={locale} t={t} compact /> : <span className="text-ink-2">{t.result}</span>}
+      {preview !== null && <span className="ml-auto max-w-[50%] shrink-0 truncate tabular-nums text-ink">= {preview}</span>}
+    </div>
   ) : argument ? (
     <ArgumentHint fn={argument.fn} index={argument.index} locale={locale} t={t} />
   ) : null;
@@ -559,8 +584,12 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
   return (
     <>
       <div role="group" aria-label={t.formulaBar} className="flex min-w-0 items-start gap-1 rounded-xl border border-line bg-raised p-1 shadow-card">
-        <NameBox store={store} t={t} phone={phone} />
-        <span aria-hidden className="mx-0.5 mt-1.5 h-5 w-px shrink-0 bg-line" />
+        {!roomy && (
+          <>
+            <NameBox store={store} t={t} phone={phone} bare={phone && !!edit} />
+            <span aria-hidden className="mx-0.5 mt-1.5 h-5 w-px shrink-0 bg-line" />
+          </>
+        )}
         {edit && !readOnly && (
           <>
             <button
@@ -587,6 +616,19 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
             </button>
           </>
         )}
+        {pad && padContext && (
+          <button
+            type="button"
+            // The cell editor keeps the keyboard (a tap here must not take the focus and close it).
+            onMouseDown={keepFocus}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => chooseKeypad(padContext, pad === "decimal" ? "text" : "decimal")}
+            aria-label={pad === "decimal" ? `ABC – ${sheetGridText[locale].letterPad}` : `123 – ${sheetGridText[locale].numberPad}`}
+            className="relative grid h-9 w-11 shrink-0 place-items-center rounded-lg bg-paper text-[13px] font-semibold tabular-nums text-ink-2 transition-colors after:absolute after:-inset-y-0.5 after:inset-x-0 after:content-[''] active:bg-hover"
+          >
+            {pad === "decimal" ? "ABC" : "123"}
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={keepFocus}
@@ -594,7 +636,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
           aria-label={t.insertFunction}
           data-tip={t.insertFunction}
           data-keys={keys("Shift+F3").join("|")}
-          className="grid h-8 shrink-0 place-items-center rounded-lg px-2 font-serif text-[15px] italic text-ink-2 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9"
+          // A finger gets 40 × 40 px (the button looks 36 px high; the rest reaches into the bar's padding).
+          className="relative grid h-8 shrink-0 place-items-center rounded-lg px-2 font-serif text-[15px] italic text-ink-2 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [@media(hover:none)]:w-10 [@media(hover:none)]:px-0 [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-y-0.5 [@media(hover:none)]:after:inset-x-0 [@media(hover:none)]:after:content-['']"
         >
           fx
         </button>
@@ -613,6 +656,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
+            // Enter takes the entry and gives the sheet the keyboard back (it closes on a touch screen).
+            enterKeyHint="done"
             placeholder={readOnly ? undefined : t.formulaPlaceholder}
             aria-label={t.formula(cellName)}
             aria-autocomplete={isFormula ? "list" : undefined}
@@ -621,7 +666,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
             aria-invalid={error ? true : undefined}
             aria-describedby={helpOpen ? `${listId}-help` : undefined}
             className={cn(
-              "block w-full resize-none overflow-hidden rounded-lg bg-transparent outline-none transition-[box-shadow] placeholder:text-ink-3/70 focus:shadow-[inset_0_0_0_1.5px_var(--blob)]",
+              // The first hint a student reads: the placeholder is dark enough to read (4.5:1 and more).
+              "block w-full resize-none overflow-hidden rounded-lg bg-transparent outline-none transition-[box-shadow] placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] focus:shadow-[inset_0_0_0_1.5px_var(--blob)]",
               expanded && "overflow-y-auto",
               textStyle,
               showMirror ? "text-transparent caret-ink selection:bg-blob/25" : "text-ink",
@@ -659,7 +705,7 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
             onKeyDown={onKeyDown}
           />
         </div>
-        {preview !== null && (
+        {preview !== null && !phone && (
           <span
             className="mt-1 max-w-[34%] shrink-0 truncate rounded-md bg-paper px-2 py-[3px] text-[12.5px] tabular-nums text-ink-2"
             title={`${t.result}: ${preview}`}

@@ -1,15 +1,13 @@
 "use client";
 
-// Short messages from smart tables ("Diese Zellen gehören schon zu einer Tabelle") and what the
-// panel says about a table that was just made: whether its first row became the header, with a
-// one-tap correction while nothing else has changed. Kept per editor store outside React, so the
-// actions (plain functions the toolbar and keyboard call) can post them.
+// What the panel says about a smart table that was just made: whether its first row became the
+// header, with a one-tap correction while nothing else has changed. Kept per editor store outside
+// React, so the actions (plain functions the toolbar and keyboard call) can set it. (Messages such
+// as "Diese Zellen gehören schon zu einer intelligenten Tabelle" go through ../notice.ts.)
 
 import { useSyncExternalStore } from "react";
 import type { Area, Workbook } from "@/sheet/types";
 import type { SheetStore, Selection } from "../store";
-
-export type TableNotice = { id: number; text: string; tone: "info" | "error" };
 
 /** A table made a moment ago, and how to make it again with the other header choice. */
 export type FreshTable = {
@@ -24,36 +22,18 @@ export type FreshTable = {
   after: Workbook;
 };
 
-type Slot = { notice: TableNotice | null; fresh: FreshTable | null; listeners: Set<() => void>; timer: ReturnType<typeof setTimeout> | null };
+type Slot = { fresh: FreshTable | null; listeners: Set<() => void> };
 
 const slots = new WeakMap<SheetStore, Slot>();
-let nextId = 1;
 
 function slot(store: SheetStore): Slot {
   let s = slots.get(store);
-  if (!s) slots.set(store, (s = { notice: null, fresh: null, listeners: new Set(), timer: null }));
+  if (!s) slots.set(store, (s = { fresh: null, listeners: new Set() }));
   return s;
 }
 
 function emit(s: Slot) {
   for (const l of [...s.listeners]) l();
-}
-
-/** Show a short message at the bottom of the editor for a few seconds. */
-export function showTableNotice(store: SheetStore, text: string, tone: TableNotice["tone"] = "info") {
-  const s = slot(store);
-  const notice = { id: nextId++, text, tone };
-  s.notice = notice;
-  if (s.timer) clearTimeout(s.timer);
-  s.timer = setTimeout(() => hideTableNotice(store, notice.id), tone === "error" ? 6000 : 4500);
-  emit(s);
-}
-
-export function hideTableNotice(store: SheetStore, id?: number) {
-  const s = slot(store);
-  if (!s.notice || (id !== undefined && s.notice.id !== id)) return;
-  s.notice = null;
-  emit(s);
 }
 
 export function setFreshTable(store: SheetStore, fresh: FreshTable | null) {
@@ -88,14 +68,6 @@ function subscribe(store: SheetStore) {
     subscribers.set(store, f);
   }
   return f;
-}
-
-export function useTableNotice(store: SheetStore): TableNotice | null {
-  return useSyncExternalStore(
-    subscribe(store),
-    () => slot(store).notice,
-    () => null,
-  );
 }
 
 /** The fresh-table info for this table (re-renders when it goes stale). */

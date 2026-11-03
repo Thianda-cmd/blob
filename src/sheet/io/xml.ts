@@ -4,17 +4,17 @@
 // keep their prefix ("r:id", "x:Row"); `local` drops it, so files in the "strict" OOXML namespace
 // read the same.
 //
-// Files come from anywhere, so reading stays bounded: a budget caps the elements of one file (a
-// few kilobytes of zip can hold millions of "<c/>"), an end tag of an element that isn't open is
-// skipped at once, and attribute names from the file never reach an object's prototype.
+// Files come from anywhere, so reading stays bounded: a budget caps the elements and attributes of
+// one file (a few kilobytes of zip can hold millions of "<c/>", or of attributes on one element),
+// an end tag of an element that isn't open is skipped at once, and attribute names from the file
+// never reach an object's prototype.
+
+import { lookup } from "./lookup";
+
+export { lookup };
 
 export type XmlEl = { name: string; local: string; attrs: Record<string, string>; kids: XmlNode[] };
 export type XmlNode = XmlEl | string;
-
-/** A value of a lookup table for a key from a file: never one of Object's own ("constructor", "__proto__"). */
-export function lookup<T>(table: Readonly<Record<string, T>>, key: string | null | undefined): T | undefined {
-  return key != null && Object.hasOwn(table, key) ? table[key] : undefined;
-}
 
 const NAMED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
@@ -42,7 +42,7 @@ export const localName = (name: string) => {
 const KEEPS_SPACE = new Set(["t"]);
 
 export class XmlError extends Error {
-  /** `tooBig`: the file has more elements than its budget allows (not broken, just too much). */
+  /** `tooBig`: the file has more elements and attributes than its budget allows (not broken, just too much). */
   constructor(
     message: string,
     public tooBig = false,
@@ -52,25 +52,37 @@ export class XmlError extends Error {
 }
 
 /**
- * How many more elements one file may have, shared by all its parts. A full sheet of 20,000 rows
- * and 200 columns stays below the default, and Blob can't save anything near that big anyway.
+ * How many more elements and attributes one file may have, shared by all its parts (each costs
+ * about the same memory). A sheet of 600,000 cells stays below the default, far more than a
+ * spreadsheet page can save (5 MB, a few hundred thousand cells), and reading a file at the
+ * limit takes a few hundred megabytes.
  */
-export type XmlBudget = { elements: number };
-export const MAX_XML_ELEMENTS = 8_000_000;
-export const xmlBudget = (elements = MAX_XML_ELEMENTS): XmlBudget => ({ elements });
+export type XmlBudget = { nodes: number };
+export const MAX_XML_NODES = 4_000_000;
+export const xmlBudget = (nodes = MAX_XML_NODES): XmlBudget => ({ nodes });
 
 /** Space, tab, line feed, carriage return. */
 const space = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
 /** Where a tag or attribute name ends: whitespace, "/" or ">". */
 const nameEnd = (c: number) => space(c) || c === 47 || c === 62;
 
-/** What elements without attributes or children share (never changed after reading), so big parts stay small. */
+/**
+ * What elements without attributes or children share (never changed after reading), so big parts
+ * stay small: a sheet is millions of "<c>" with one "<v>" in each.
+ */
 const NO_ATTRS: Record<string, string> = Object.freeze(Object.create(null) as Record<string, string>);
 const NO_KIDS: XmlNode[] = Object.freeze([] as XmlNode[]) as XmlNode[];
 
+/** A child added to an element (its own list made on the first one, exactly as long as needed). */
+function addKid(parent: XmlEl, kid: XmlNode) {
+  if (parent.kids === NO_KIDS) parent.kids = [kid];
+  else parent.kids.push(kid);
+}
+
 /**
  * The document's root element. Throws XmlError when the text isn't XML, or (with `tooBig` set)
- * when it has more elements than `budget` has left; the budget is shared by the parts of a file.
+ * when it has more elements and attributes than `budget` has left; the budget is shared by the
+ * parts of a file.
  */
 export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
   const doc: XmlEl = { name: "#document", local: "#document", attrs: NO_ATTRS, kids: [] };
@@ -78,8 +90,8 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
   // How many elements of each name are open: an end tag of one that isn't is skipped at once
   // (looking for it through the whole stack each time made such files take minutes).
   const open = new Map<string, number>();
-  // One string per tag name (a sheet repeats "c", "v" and "row" millions of times).
-  const names = new Map<string, string>();
+  // One string per tag name and its local name (a sheet repeats "c", "v" and "row" millions of times).
+  const names = new Map<string, { name: string; local: string }>();
   let i = 0;
   const n = src.length;
   while (i < n) {
@@ -88,7 +100,7 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
     if (end > i) {
       const raw = src.slice(i, end);
       const top = stack[stack.length - 1];
-      if (top !== doc && (KEEPS_SPACE.has(top.local) || /\S/.test(raw))) top.kids.push(decodeEntities(raw));
+      if (top !== doc && (KEEPS_SPACE.has(top.local) || /\S/.test(raw))) addKid(top, decodeEntities(raw));
     }
     if (lt < 0) break;
     const next = src.charCodeAt(lt + 1);
@@ -109,7 +121,7 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
         const close = src.indexOf("]]>", lt + 9);
         if (close < 0) throw new XmlError("xml: unclosed CDATA");
         const top = stack[stack.length - 1];
-        if (top !== doc) top.kids.push(src.slice(lt + 9, close));
+        if (top !== doc) addKid(top, src.slice(lt + 9, close));
         i = close + 3;
         continue;
       }
@@ -146,12 +158,13 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
     while (j < n && !nameEnd(src.charCodeAt(j))) j++;
     const raw = src.slice(lt + 1, j);
     if (!raw) throw new XmlError("xml: empty tag name");
-    if (--budget.elements < 0) throw new XmlError("xml: too many elements", true);
-    let name = names.get(raw);
-    if (name === undefined) {
-      name = raw;
-      if (names.size < 10_000) names.set(raw, raw);
+    if (--budget.nodes < 0) throw new XmlError("xml: too many elements", true);
+    let tag = names.get(raw);
+    if (!tag) {
+      tag = { name: raw, local: localName(raw) };
+      if (names.size < 10_000) names.set(raw, tag);
     }
+    const { name, local } = tag;
     let attrs = NO_ATTRS;
     let selfClosing = false;
     for (;;) {
@@ -183,13 +196,14 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
       const close = src.indexOf(q, j + 1);
       if (close < 0) throw new XmlError("xml: unclosed attribute");
       const value = src.slice(j + 1, close);
+      if (--budget.nodes < 0) throw new XmlError("xml: too many attributes", true);
       // Without a prototype, a file's attribute named "constructor" or "__proto__" is just a name.
       if (attrs === NO_ATTRS) attrs = Object.create(null) as Record<string, string>;
       attrs[attr] = decodeEntities(/[\t\n\r]/.test(value) ? value.replace(/[\t\n\r]/g, " ") : value);
       j = close + 1;
     }
-    const el: XmlEl = { name, local: localName(name), attrs, kids: selfClosing ? NO_KIDS : [] };
-    stack[stack.length - 1].kids.push(el);
+    const el: XmlEl = { name, local, attrs, kids: NO_KIDS };
+    addKid(stack[stack.length - 1], el);
     if (!selfClosing) {
       stack.push(el);
       open.set(name, (open.get(name) ?? 0) + 1);

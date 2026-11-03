@@ -20,7 +20,7 @@ export function describeFilter(f: FilterSpec, kind: ColumnKind, locale: Locale, 
     case "number": {
       const names = kind === "date" ? t.dateOps : t.numberOps;
       if (f.op === "between") return `${names.between} ${num(f.a)} ${t.and} ${num(f.b)}`;
-      if (f.op === "top" || f.op === "bottom") return names[f.op].replace(/10 …|…/, String(f.a ?? 10));
+      if (f.op === "top" || f.op === "bottom") return t.ranked[kind === "date" ? "date" : "number"][f.op](f.a ?? 10);
       if (f.op === "aboveAverage" || f.op === "belowAverage") return names[f.op];
       return `${names[f.op]} ${num(f.a)}`;
     }

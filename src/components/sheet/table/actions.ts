@@ -4,7 +4,7 @@
 //
 // Each change is one undo step with its own name ("Tabelle sortieren"); the store's undo covers
 // all of them. Messages for things that can't be done appear at the bottom of the editor
-// (TableOverlays), so callers don't need to show anything themselves.
+// (../notice.ts), so callers don't need to show anything themselves.
 
 import { sheetTableText } from "@/i18n/messages/sheetTable";
 import type { Locale } from "@/i18n/config";
@@ -24,8 +24,9 @@ import {
 } from "@/sheet/table/model";
 import type { Area, FilterSpec, TableSpec, TotalFn } from "@/sheet/types";
 import { insertChart } from "../chart/actions";
+import { showSheetNotice } from "../notice";
 import { activeArea, type SheetStore } from "../store";
-import { freshTable, setFreshTable, showTableNotice } from "./notice";
+import { freshTable, setFreshTable } from "./notice";
 
 const textOf = (store: SheetStore) => sheetTableText[store.get().locale];
 const localeOf = (store: SheetStore): Locale => store.get().locale;
@@ -52,7 +53,8 @@ function createTable(store: SheetStore, area: Area, header: "auto" | "yes" | "no
   const t = sheetTableText[s.locale];
   const r = makeTableWith(s.workbook, s.calc, s.sheetId, area, s.locale, { header });
   if ("error" in r) {
-    showTableNotice(store, t.errors[r.error], "error");
+    // Overlapping another table is a clash to sort out; an empty selection only needs a hint.
+    showSheetNotice(store, t.errors[r.error], r.error === "overlap" ? "error" : "info");
     return false;
   }
   const before = s.workbook;
@@ -140,7 +142,7 @@ export function changeTableLook(store: SheetStore, tableId: string, patch: Parti
   store.apply(label, (wb) => setTableLook(wb, tableId, patch));
 }
 
-/** Back to plain cells ("In normalen Bereich umwandeln"). */
+/** Back to plain cells ("In Bereich umwandeln"). */
 export function convertTableToRange(store: SheetStore, tableId: string) {
   store.apply(textOf(store).undo.unmake, (wb) => unmakeTable(wb, tableId));
   if (store.get().focus?.id === tableId) store.setFocus(null);
@@ -163,6 +165,6 @@ export function chartFromTable(store: SheetStore, tableId: string): boolean {
   const d = dataRows(table);
   store.select({ r0: table.area.r0, c0: table.area.c0, r1: Math.max(table.area.r0, d.r1), c1: table.area.c1 });
   const ok = insertChart(store);
-  if (!ok) showTableNotice(store, textOf(store).noChart, "error");
+  if (!ok) showSheetNotice(store, textOf(store).noChart);
   return ok;
 }

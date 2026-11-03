@@ -161,7 +161,7 @@ const fractionDigits = (body: string) => {
 function validDate(y: number, m: number, d: number): number | null {
   // The serial numbers start at 30.12.1899 (0) and 31.12.1899 (1): those two read back too, so a
   // date cell holding 0 or 1 can be edited without turning into text.
-  if (y === 1899 && m === 12 && d >= 30) return serialFromYMD(y, m, d);
+  if (y === 1899 && m === 12 && (d === 30 || d === 31)) return serialFromYMD(y, m, d);
   if (m < 1 || m > 12 || d < 1 || y < 1900 || y > 9999) return null;
   if (d > daysInMonth(y, m)) return null;
   return serialFromYMD(y, m, d);
@@ -284,10 +284,11 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
     }
   }
 
-  // A lab unit after the number: "12,5 mg/L", "37 °C", "100µl", "1,02 g/cm3" (g/cm³).
+  // A lab unit after the number: "12,5 mg/L", "37 °C", "100µl", "1,02 g/cm3" (g/cm³). The power
+  // follows the unit directly: "10 cm 3" stays text.
   let unit: string | null = null;
   if (opts?.units && !percent && !currency) {
-    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)\s*([^\s0-9.,+\-][^0-9]*)([23]?)$/.exec(rest);
+    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)\s*([^\s0-9.,+\-][^0-9]*?)((?<!\s)[23])?$/.exec(rest);
     const name = um ? um[2].trim() + (um[3] === "2" ? "²" : um[3] === "3" ? "³" : "") : "";
     if (um && LAB_UNITS.has(name)) {
       unit = name;

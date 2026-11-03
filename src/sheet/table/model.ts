@@ -17,10 +17,12 @@ import { clearAreas, copyArea, growTableReferences, insertRows, newId, pasteClip
 import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type FilterSpec, type Sheet, type TableColumn, type TableSpec, type TableStyle, type TotalFn, type Workbook } from "../types";
 import { columnPattern, genericColumnName, headerGaps } from "./columns";
 import { hiddenByFilters, shownText } from "./filter";
+import { cleanTableName, freeTableName, validTableName } from "./names";
 import { dataRows, isCountTotal, refreshTotals, totalFormula } from "./totals";
 
 export { dataRows, refreshTotals, totalFormula, TOTAL_FNS, TOTAL_CODES, totalOfCell, parseTotalFormula } from "./totals";
 export { genericColumnName, columnPattern } from "./columns";
+export { cleanTableName, validTableName } from "./names";
 export { columnKind, columnValues, columnAverage, shownText, valueKey, type ColumnKind, type ColumnValue } from "./filter";
 
 /** The colours a table can have, in the order the panel shows them. */
@@ -503,19 +505,7 @@ export function setColumnTotal(wb: Workbook, tableId: string, columnId: string, 
 }
 
 // ----------------------------------------------------------------------------------------------
-// Name and look
-
-/** Excel's rules for table names: a letter or _ first, then letters, digits, _ and dots; not a cell address. */
-export function validTableName(name: string): boolean {
-  if (!name || name.length > 255) return false;
-  if (!/^[A-Za-z_\\À-ÖØ-öø-ɏ][A-Za-z0-9_.À-ÖØ-öø-ɏ]*$/.test(name)) return false;
-  if (/^[A-Za-z]{1,3}[0-9]+$/.test(name)) return false;
-  if (/^[RrCc]$/.test(name) || /^[Rr][0-9]*[Cc][0-9]*$/.test(name)) return false;
-  return true;
-}
-
-/** What someone typed as a name, made closer to a valid one: trimmed, spaces as _. */
-export const cleanTableName = (name: string) => name.trim().replace(/\s+/g, "_");
+// Name and look (the rules for names are in ./names.ts, which ops.ts uses too)
 
 /** Why a name can't be this table's name (null: it can). */
 export function tableNameProblem(wb: Workbook, tableId: string, name: string): "empty" | "taken" | "invalid" | null {
@@ -539,25 +529,9 @@ export function setTableLook(wb: Workbook, tableId: string, patch: Partial<Pick<
   return next === t ? wb : putTable(wb, next);
 }
 
-/** A name not used by another table ("Tabelle1", "Tabelle2"… / "Table1"…). */
+/** A name not used by another table ("Tabelle1", "Tabelle2"… / "Table1"…; a wished name, made unique). */
 export function uniqueTableName(wb: Workbook, locale: Locale, base?: string): string {
-  const taken = new Set(wb.tables.map((t) => t.name.toLowerCase()));
-  const free = (n: string) => !taken.has(n.toLowerCase()) && validTableName(n);
-  const wanted = base === undefined ? "" : cleanTableName(base);
-  if (wanted && validTableName(wanted)) {
-    if (free(wanted)) return wanted;
-    const m = /^(.*?)(\d+)$/.exec(wanted);
-    let root = m && m[1] ? m[1] : wanted;
-    let n = m && m[1] ? Number(m[2]) + 1 : 2;
-    // "AB" + 2 would be a cell address.
-    if (/^[A-Za-z]{1,3}$/.test(root)) root += "_";
-    while (!free(`${root}${n}`)) n++;
-    return `${root}${n}`;
-  }
-  const root = locale === "de" ? "Tabelle" : "Table";
-  let n = 1;
-  while (!free(`${root}${n}`)) n++;
-  return `${root}${n}`;
+  return freeTableName(wb.tables.map((t) => t.name), locale, base);
 }
 
 // ----------------------------------------------------------------------------------------------

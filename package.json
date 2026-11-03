@@ -24,6 +24,8 @@
     "check:sheet-io": "tsx --tsconfig tsconfig.json scripts/check-sheet-io.ts",
     "check:sheet-templates": "tsx --tsconfig tsconfig.json scripts/check-sheet-templates.ts",
     "check:sheet-chrome": "tsx --tsconfig tsconfig.json scripts/check-sheet-chrome.ts",
+    "check:sheet-merge": "tsx --tsconfig tsconfig.json scripts/check-sheet-merge.ts",
+    "check:palette": "tsx --tsconfig tsconfig.json scripts/check-palette.ts",
     "app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "app:build": "tauri build",
     "tauri": "tauri"

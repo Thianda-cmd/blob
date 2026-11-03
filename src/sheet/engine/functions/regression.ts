@@ -8,7 +8,7 @@
 
 import { ERR, isErr, isRef, mkErr, type CellError, type Matrix, type Scalar, type Value } from "../values";
 import type { Ctx, FnDef } from "./types";
-import { asMatrix, mean, numResult, pairs, toBool, toNum } from "./util";
+import { asMatrix, mean, numResult, pairs, toBool, toNum, why } from "./util";
 
 type Data = { values: number[]; rows: number; cols: number };
 
@@ -233,7 +233,7 @@ function linest(args: Value[], ctx: Ctx, log: boolean): Value {
   if (isErr(d)) return d;
   let y = d.y;
   if (log) {
-    if (y.some((v) => v <= 0)) return ERR.num;
+    if (y.some((v) => v <= 0)) return why.arg(1, "pos");
     y = y.map(Math.log);
   }
   const fit = linearFit(d.X, y, withConst);
@@ -248,7 +248,7 @@ function trend(args: Value[], ctx: Ctx, log: boolean): Value {
   if (isErr(d)) return d;
   let y = d.y;
   if (log) {
-    if (y.some((v) => v <= 0)) return ERR.num;
+    if (y.some((v) => v <= 0)) return why.arg(1, "pos");
     y = y.map(Math.log);
   }
   const fit = linearFit(d.X, y, withConst);
@@ -302,9 +302,8 @@ function simple(ys: Value, xs: Value, ctx: Ctx) {
   const p = pairs(ys, xs, ctx);
   if (isErr(p)) return p;
   const n = p.x.length;
-  if (n < 1) return ERR.div0;
-  const mx = mean(p.x);
-  const my = mean(p.y);
+  const mx = n ? mean(p.x) : 0;
+  const my = n ? mean(p.y) : 0;
   let sxx = 0;
   let syy = 0;
   let sxy = 0;
@@ -318,6 +317,13 @@ function simple(ys: Value, xs: Value, ctx: Ctx) {
   return { n, mx, my, sxx, syy, sxy };
 }
 
+/** Why no line fits these pairs: fewer than `need` of them, or all x the same (with `ys` also all y). */
+function lineProblem(s: { n: number; sxx: number; syy: number }, need: number, ys = false): CellError | null {
+  if (s.n < need) return why.few(need, s.n, "#DIV/0!", "pairs");
+  if (s.sxx === 0 || (ys && s.syy === 0)) return why.same();
+  return null;
+}
+
 export const REGRESSION: FnDef[] = [
   {
     name: "SLOPE",
@@ -327,8 +333,7 @@ export const REGRESSION: FnDef[] = [
     impl: ([ys, xs], ctx) => {
       const s = simple(ys, xs, ctx);
       if (isErr(s)) return s;
-      if (s.n < 2 || s.sxx === 0) return ERR.div0;
-      return numResult(s.sxy / s.sxx);
+      return lineProblem(s, 2) ?? numResult(s.sxy / s.sxx);
     },
   },
   {
@@ -339,8 +344,7 @@ export const REGRESSION: FnDef[] = [
     impl: ([ys, xs], ctx) => {
       const s = simple(ys, xs, ctx);
       if (isErr(s)) return s;
-      if (s.n < 2 || s.sxx === 0) return ERR.div0;
-      return numResult(s.my - (s.sxy / s.sxx) * s.mx);
+      return lineProblem(s, 2) ?? numResult(s.my - (s.sxy / s.sxx) * s.mx);
     },
   },
   {
@@ -351,8 +355,7 @@ export const REGRESSION: FnDef[] = [
     impl: ([ys, xs], ctx) => {
       const s = simple(ys, xs, ctx);
       if (isErr(s)) return s;
-      if (s.n < 2 || s.sxx === 0 || s.syy === 0) return ERR.div0;
-      return numResult((s.sxy * s.sxy) / (s.sxx * s.syy));
+      return lineProblem(s, 2, true) ?? numResult((s.sxy * s.sxy) / (s.sxx * s.syy));
     },
   },
   {
@@ -363,8 +366,7 @@ export const REGRESSION: FnDef[] = [
     impl: ([ys, xs], ctx) => {
       const s = simple(ys, xs, ctx);
       if (isErr(s)) return s;
-      if (s.n < 3 || s.sxx === 0) return ERR.div0;
-      return numResult(Math.sqrt(Math.max(0, s.syy - (s.sxy * s.sxy) / s.sxx) / (s.n - 2)));
+      return lineProblem(s, 3) ?? numResult(Math.sqrt(Math.max(0, s.syy - (s.sxy * s.sxy) / s.sxx) / (s.n - 2)));
     },
   },
   ...(["FORECAST", "FORECAST.LINEAR"] as const).map(
@@ -378,7 +380,8 @@ export const REGRESSION: FnDef[] = [
         if (typeof x !== "number") return x;
         const s = simple(ys, xs, ctx);
         if (isErr(s)) return s;
-        if (s.n < 2 || s.sxx === 0) return ERR.div0;
+        const bad = lineProblem(s, 2);
+        if (bad) return bad;
         const m = s.sxy / s.sxx;
         return numResult(s.my - m * s.mx + m * x);
       },

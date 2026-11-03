@@ -21,15 +21,22 @@
 //   - with the engine: every formula calculates without an error, the key numbers (slope, R²,
 //     concentrations, means, µ, masses, volumes, grade averages) match an independent calculation,
 //     and every formula survives the round trip into German and back
+//   - the range checks ("Im Messbereich?") and the samples on the calibration charts; Bradford's
+//     samples step by step (net, concentration, protein) with the values LibreOffice gives
+//   - a standard left out the way the notes say (its row deleted; for Bradford also its readings
+//     deleted) leaves no error anywhere, and slope and R² follow without it
+//   - notes that send you to the cell menu („Zeile löschen“) name an item the menu really has
 // Problems make the script exit with 1.
 
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { resolveText } from "@/i18n/text";
 import { cellKey, parseKey, parsePos } from "@/sheet/a1";
 import { FUNCTION_DOCS, type FnDoc } from "@/sheet/engine/docs";
 import { FUNCTION_BY_DE, FUNCTION_BY_EN, FUNCTION_NAMES } from "@/sheet/engine/names";
+import { deleteRows } from "@/sheet/ops";
 import { SHEET_TEMPLATES } from "@/sheet/templates";
 import { textWidth } from "@/sheet/chart/scene";
-import { DEFAULT_COL_W, MAX_COLS, MAX_ROWS, type Area, type RangeRef, type Sheet, type Workbook } from "@/sheet/types";
+import { DEFAULT_COL_W, MAX_COLS, MAX_ROWS, type Area, type Cell, type RangeRef, type Sheet, type Workbook } from "@/sheet/types";
 import * as engine from "@/sheet/engine";
 
 const LOCALES = ["en", "de"] as const;
@@ -531,15 +538,20 @@ function checkWorkbook(where: string, wb: Workbook) {
 // Templates: what fits at 100 % zoom
 
 /**
- * Rough widths from the chart module's character table (within a few per cent of the app's font,
- * Geist at 14 px), so a template whose number shows "###" or whose header is cut by the filter
- * button is caught here and not first on screen: Bradford's slope "0,000900 mL/µg" once did, and
- * its "Messwert 1" headers were cut. (Checked against the real editor at 100 %: what passes here
- * fits there.)
+ * Rough widths from the chart module's character table at 14 px, so a template whose number shows
+ * "###" or whose header is cut by the filter button is caught here and not first on screen:
+ * Bradford's slope "0,000900 mL/µg" once did, and its "Messwert 1" headers were cut. The editor
+ * draws cells in Geist at 13 px, which the 14 px widths overestimate a little (for every template
+ * header, measured in the browser, they were at most half a pixel short of the real bold text).
+ * (Checked against the real editor at 100 %: what passes here fits there.)
  */
 const TEXT_SLACK = 1;
-/** A smart table's header cell: its text, padding and the filter button. */
-const HEADER_EXTRA = 18;
+/**
+ * A smart table's header cell: its text starts 5 px in, and the 18 px filter button ends 3 px
+ * before the edge. (With 18 here, the English "Concentration" and "Grades" passed although they ran
+ * into the button.)
+ */
+const HEADER_EXTRA = 25;
 /** Any other cell: its padding. */
 const CELL_EXTRA = 10;
 
@@ -618,6 +630,80 @@ function formulaCell(s: Sheet, prefix: string): { row: number; col: number } {
   return hit;
 }
 
+/** The workbook with cells of its first sheet set to a value, or emptied (undefined). */
+function withCells(wb: Workbook, values: Record<string, number | undefined>): Workbook {
+  const [s, ...rest] = wb.sheets;
+  const cells: Record<string, Cell> = { ...s.cells };
+  for (const [key, v] of Object.entries(values)) {
+    if (v === undefined) delete cells[key];
+    else cells[key] = { ...cells[key], v };
+  }
+  return { ...wb, sheets: [{ ...s, cells }, ...rest] };
+}
+
+/** The formulas of a workbook that give an error value ("key =formula → error"). */
+function errorsIn(wb: Workbook, lang: Lang): string[] {
+  const calc = engine.createCalc(wb, { now: () => new Date(2026, 10, 3, 12), locale: lang });
+  const out: string[] = [];
+  for (const sheet of wb.sheets)
+    for (const [key, c] of Object.entries(sheet.cells)) {
+      if (c.f === undefined) continue;
+      const { row, col } = parseKey(key);
+      const v = calc.value(sheet.id, row, col);
+      if (engine.isError(v)) out.push(`${key} =${c.f} → ${v.error}`);
+    }
+  return out;
+}
+
+/** A standard left out: no error anywhere, and slope, intercept and R² (the cells from `slope` down) are the fit without it. */
+function checkLeftOut(where: string, how: string, wb: Workbook, lang: Lang, slope: { row: number; col: number }, fit: { m: number; b: number; r2: number }) {
+  const errors = errorsIn(wb, lang);
+  if (errors.length) fail(where, `${how}: ${errors.join("; ")}`);
+  const calc = engine.createCalc(wb, { locale: lang });
+  [fit.m, fit.b, fit.r2].forEach((want, i) => {
+    const got = calc.value(wb.sheets[0].id, slope.row + i, slope.col);
+    if (typeof got !== "number" || Math.abs(got - want) > 1e-9 * Math.max(1, Math.abs(want))) fail(where, `${how}: ${["slope", "intercept", "R²"][i]} is ${JSON.stringify(got)}, expected ${want}`);
+  });
+}
+
+/** The samples are on the chart too (rows r0…r1, x and y from their columns), so one beyond the standards shows at once. */
+function checkSamplesOnChart(where: string, wb: Workbook, r0: number, r1: number, xCol: number, yCol: number) {
+  const column = (r: RangeRef | null, c: number) => !!r && r.r0 === r0 && r.r1 === r1 && r.c0 === c && r.c1 === c;
+  if (!wb.charts.some((chart) => chart.series.some((x) => column(x.y, yCol) && column(x.x, xCol)))) fail(where, "the samples aren't on the chart");
+}
+
+/** The R² label's note says how to leave out an outlier: delete its row, with the cell menu's own words. */
+function outlierAdvice(s: Sheet, lang: Lang): boolean {
+  const r2 = formulaCell(s, "RSQ(");
+  const item = sheetGridText[lang].deleteRows(1);
+  return (s.cells[cellKey(r2.row, 0)]?.note ?? "").includes(lang === "de" ? `„${item}“` : `“${item}”`);
+}
+
+/** Every text of the grid's messages in a language (the cell menu's items among them; plurals for one). */
+function gridLabels(lang: Lang): Set<string> {
+  const out = new Set<string>();
+  const walk = (v: unknown) => {
+    if (typeof v === "string") out.add(v);
+    else if (typeof v === "function") {
+      try {
+        const text = (v as (n: number) => unknown)(1);
+        if (typeof text === "string") out.add(text);
+      } catch {}
+    } else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  walk(sheetGridText[lang]);
+  return out;
+}
+
+/** Notes that send you to the cell menu („Zeile oberhalb einfügen“) name an item it really has. */
+function checkMenuQuotes(where: string, wb: Workbook, lang: Lang) {
+  const labels = gridLabels(lang);
+  const quote = lang === "de" ? /Zellmenü: „([^“]+)“/g : /cell menu: “([^”]+)”/g;
+  for (const s of wb.sheets)
+    for (const [key, c] of Object.entries(s.cells))
+      for (const m of c.note?.matchAll(quote) ?? []) if (!labels.has(m[1])) fail(`${where} ${key}`, `the note sends you to “${m[1]}” in the cell menu, which has no such item`);
+}
+
 function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
   const calc = engine.createCalc(wb, { now: () => new Date(2026, 10, 3, 12), locale: lang });
   const s = wb.sheets[0];
@@ -650,6 +736,10 @@ function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
     }
 
   const col = (r0: number, r1: number, c: number) => Array.from({ length: r1 - r0 + 1 }, (_, i) => typed(r0 + i, c));
+  // "Im Messbereich?": above the top standard too high; below the lowest one, or a negative result
+  // (the line can meet 0 above the lowest standard), too low; on a standard itself still in range.
+  const [tooHigh, tooLow, yes] = lang === "de" ? ["zu hoch – verdünnen", "zu niedrig", "ja"] : ["too high – dilute", "too low", "yes"];
+  const verdict = (y: number, standards: number[], result: number) => (y > Math.max(...standards) ? tooHigh : y < Math.min(...standards) || result < 0 ? tooLow : yes);
   if (id === "calibration") {
     const slope = formulaCell(s, "SLOPE(");
     const first = slope.row - 8; // standards start 8 rows above the slope (layout of the template)
@@ -660,15 +750,37 @@ function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
     near("slope through 0", num(slope.row + 3, slope.col), fit.m0);
     if (num(slope.row, slope.col).toFixed(4) !== "0.0523" || num(slope.row + 1, slope.col).toFixed(4) !== "0.0012") fail(where, "the example line isn't y = 0.0523x + 0.0012 any more");
     const conc = formulaCell(s, "IF(B");
+    const ys = col(first, first + 5, 2);
+    let lastSample = conc.row;
     for (let r = conc.row; s.cells[cellKey(r, 1)]; r++) {
+      lastSample = r;
       const e = typed(r, 1);
       const c = (e - fit.b) / fit.m;
       near(`sample row ${r + 1}`, num(r, 2), c);
       near(`sample row ${r + 1} undiluted`, num(r, 4), c * typed(r, 3));
-      const ys = col(first, first + 5, 2);
-      const want = e > Math.max(...ys) ? (lang === "de" ? "zu hoch – verdünnen" : "too high – dilute") : lang === "de" ? "ja" : "yes";
-      if (calc.value(s.id, r, 5) !== want) fail(where, `range check row ${r + 1}: ${JSON.stringify(calc.value(s.id, r, 5))}`);
+      const want = verdict(e, ys, c);
+      if (calc.value(s.id, r, 5) !== want) fail(where, `range check row ${r + 1}: ${JSON.stringify(calc.value(s.id, r, 5))}, expected ${want}`);
     }
+    // The range check's edges, on the first sample: below the blank, exactly on the top standard, and
+    // between the blank and a line that meets 0 mg/L above it (standards S1–S5 read 0,030 higher).
+    const sample = (values: Record<string, number>) => engine.createCalc(withCells(wb, values), { locale: lang });
+    const rangeCase = (what: string, values: Record<string, number>, want: string) => {
+      const got = sample(values).value(s.id, conc.row, 5);
+      if (got !== want) fail(where, `range check ${what}: ${JSON.stringify(got)}, expected ${want}`);
+    };
+    rangeCase("below the blank", { [cellKey(conc.row, 1)]: -0.01 }, tooLow);
+    rangeCase("on the top standard", { [cellKey(conc.row, 1)]: Math.max(...ys) }, yes);
+    const raised = ys.map((y, i) => (i ? y + 0.03 : y));
+    const above = lin(col(first, first + 5, 1), raised);
+    if (!(Math.min(...raised) < 0.01 && 0.01 < above.b)) fail(where, `the raised line meets 0 mg/L at ${above.b}: 0,010 isn't between it and the blank`);
+    rangeCase("between the blank and the line's start (a negative result)", { ...Object.fromEntries(raised.map((y, i) => [cellKey(first + i, 2), y])), [cellKey(conc.row, 1)]: 0.01 }, tooLow);
+    checkSamplesOnChart(where, wb, conc.row, lastSample, 2, 1);
+    // S3 left out the way the R² note says (its row deleted): no error anywhere, LINEST included
+    // (a deleted value would break it), and the line follows.
+    const keep = [0, 1, 2, 4, 5];
+    const refit = lin(keep.map((i) => typed(first + i, 1)), keep.map((i) => typed(first + i, 2)));
+    checkLeftOut(where, "with the row of S3 deleted", deleteRows(wb, s.id, first + 3, 1), lang, { row: slope.row - 1, col: slope.col }, refit);
+    if (!outlierAdvice(s, lang)) fail(where, "the R² note doesn't say how to leave out an outlier (delete its row in the cell menu)");
   } else if (id === "bradford") {
     const slope = formulaCell(s, "SLOPE(");
     const first = slope.row - 8;
@@ -681,14 +793,54 @@ function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
       near(`net row ${first + i + 1}`, num(first + i, 6), mean(reps) - mean([typed(first, 1), typed(first, 2), typed(first, 3)]));
     }
     const net = means.map((m) => m - means[0]);
-    const fit = lin(col(first, first + 5, 0), net);
+    const xs = col(first, first + 5, 0);
+    const fit = lin(xs, net);
     near("slope", num(slope.row, slope.col), fit.m);
     near("intercept", num(slope.row + 1, slope.col), fit.b);
     near("R²", num(slope.row + 2, slope.col), fit.r2);
-    for (let r = slope.row + 7; s.cells[cellKey(r, 1)]; r++) {
-      const m = mean([typed(r, 1), typed(r, 2), typed(r, 3)]);
-      near(`protein row ${r + 1}`, num(r, 6), ((m - means[0] - fit.b) / fit.m) * typed(r, 5));
+    // The samples step by step (mean, net, concentration measured, the range check right beside it,
+    // dilution, protein), each one's net absorbance against the standards' (before the dilution).
+    const [RANGE, DILUTION, PROTEIN] = [7, 8, 9];
+    const firstSample = slope.row + 7;
+    let lastSample = firstSample;
+    for (let r = firstSample; s.cells[cellKey(r, 1)]; r++) {
+      lastSample = r;
+      const sampleNet = mean([typed(r, 1), typed(r, 2), typed(r, 3)]) - means[0];
+      const measured = (sampleNet - fit.b) / fit.m;
+      near(`net row ${r + 1}`, num(r, 5), sampleNet);
+      near(`concentration row ${r + 1}`, num(r, 6), measured);
+      near(`protein row ${r + 1}`, num(r, PROTEIN), measured * typed(r, DILUTION));
+      const want = verdict(sampleNet, net, measured);
+      if (calc.value(s.id, r, RANGE) !== want) fail(where, `range check row ${r + 1}: ${JSON.stringify(calc.value(s.id, r, RANGE))}, expected ${want}`);
     }
+    // The example's protein contents, the same in LibreOffice.
+    [4835.386134497454, 3313.519904375844, 188.7927450368984].forEach((want, i) => near(`protein row ${firstSample + i + 1} (example)`, num(firstSample + i, PROTEIN), want));
+    // A lysate above the top standard, the most common Bradford mistake, is called out (the reviewer's
+    // 1,62/1,60/1,63: LibreOffice gives the same 12667 µg/mL); so is a sample below the blank.
+    const readings = (r: number, [a, b, c]: number[]) => ({ [cellKey(r, 1)]: a, [cellKey(r, 2)]: b, [cellKey(r, 3)]: c });
+    const high = engine.createCalc(withCells(wb, readings(firstSample, [1.62, 1.6, 1.63])), { locale: lang });
+    near("protein above the standards", high.value(s.id, firstSample, PROTEIN) as number, 12666.887537677994);
+    if (high.value(s.id, firstSample, RANGE) !== tooHigh) fail(where, `a lysate above the top standard says ${JSON.stringify(high.value(s.id, firstSample, RANGE))}`);
+    // Its "zu hoch – verdünnen" and five-digit protein content fit their columns too.
+    checkFits(`${where}, a lysate above the standards`, withCells(wb, readings(firstSample, [1.62, 1.6, 1.63])), lang);
+    const low = engine.createCalc(withCells(wb, readings(lastSample, [0.43, 0.44, 0.435])), { locale: lang });
+    if (low.value(s.id, lastSample, RANGE) !== tooLow) fail(where, `a sample below the blank says ${JSON.stringify(low.value(s.id, lastSample, RANGE))}`);
+    // A sample that reads like the blank: net 0, the lowest standard's, but the bent curve's line
+    // meets 0 µg/mL above the blank, so it comes out negative (LibreOffice: −27 µg/mL): too low, not
+    // "ja" beside a negative protein content. One that reads like the top standard is still in range.
+    const blankLike = engine.createCalc(withCells(wb, readings(lastSample, [0, 1, 2].map((j) => typed(first, 1 + j)))), { locale: lang });
+    const negative = blankLike.value(s.id, lastSample, 6);
+    if (!(typeof negative === "number" && negative < 0 && fit.b > 0)) fail(where, `a sample at the blank comes out at ${JSON.stringify(negative)}, not below 0`);
+    if (blankLike.value(s.id, lastSample, RANGE) !== tooLow) fail(where, `a sample at the blank (${JSON.stringify(negative)} µg/mL) says ${JSON.stringify(blankLike.value(s.id, lastSample, RANGE))}`);
+    const topLike = engine.createCalc(withCells(wb, readings(firstSample, [0, 1, 2].map((j) => typed(first + 5, 1 + j)))), { locale: lang });
+    if (topLike.value(s.id, firstSample, RANGE) !== yes) fail(where, `a sample that reads like the top standard says ${JSON.stringify(topLike.value(s.id, firstSample, RANGE))}`);
+    checkSamplesOnChart(where, wb, firstSample, lastSample, 6, 5);
+    // The bent top of the curve left out: its row deleted (as the R² note says) or just its readings.
+    const top = first + 5;
+    const refit = lin(xs.slice(0, 5), net.slice(0, 5));
+    checkLeftOut(where, "with the top standard's row deleted", deleteRows(wb, s.id, top, 1), lang, { row: slope.row - 1, col: slope.col }, refit);
+    checkLeftOut(where, "with the top standard's readings deleted", withCells(wb, { [cellKey(top, 1)]: undefined, [cellKey(top, 2)]: undefined, [cellKey(top, 3)]: undefined }), lang, slope, refit);
+    if (!outlierAdvice(s, lang)) fail(where, "the R² note doesn't say how to leave out standards (delete their rows in the cell menu)");
   } else if (id === "replicates") {
     for (let r = 3; r <= 8; r++) {
       const reps = [typed(r, 1), typed(r, 2), typed(r, 3)];
@@ -705,6 +857,11 @@ function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
     near("g (min)", num(mu.row + 2, mu.col), (60 * Math.LN2) / fit.m);
     near("R²", num(mu.row + 3, mu.col), fit.r2);
     if (Math.abs((60 * Math.LN2) / fit.m - 30) > 1) fail(where, "the example generation time isn't about 30 min any more");
+    // The phases are named alike: lag-Phase, log-Phase, Verzögerungsphase, stationäre Phase.
+    for (let r = 3; s.cells[cellKey(r, 0)]; r++) {
+      const phase = s.cells[cellKey(r, 3)]?.v;
+      if (typeof phase !== "string" || !/phase$/i.test(phase)) fail(where, `phase in row ${r + 1} is ${JSON.stringify(phase)}, not a "… phase"`);
+    }
   } else if (id === "dilution") {
     const pw = formulaCell(s, "POWER(");
     const stock = typed(4, 1);
@@ -716,6 +873,14 @@ function checkValues(where: string, wb: Workbook, id: string, lang: Lang) {
       near(`diluent tube ${i + 1}`, num(pw.row + i, 3), volume - volume / factor);
       near(`transfer tube ${i + 1}`, num(pw.row + i, 4), volume / factor);
     }
+    // What stays in each tube once part of it has gone on to the next: 500 µL of the 1000 µL in a
+    // 1:2 series, 900 µL in a 1:10 series (the 900 + 100 µL scheme), as LibreOffice calculates too.
+    near("left in each tube", num(7, 1), volume - volume / factor);
+    near("left in each tube (example)", num(7, 1), 500);
+    const tenfold = engine.createCalc(withCells(wb, { [cellKey(5, 1)]: 10 }), { locale: lang });
+    near("left in each tube, 1:10", tenfold.value(s.id, 7, 1) as number, 900);
+    near("diluent per tube, 1:10", tenfold.value(s.id, pw.row, 3) as number, 900);
+    near("transfer per tube, 1:10", tenfold.value(s.id, pw.row, 4) as number, 100);
     const v1 = pw.row + 13; // V₁ sits 13 rows below the first tube (layout of the template)
     near("V1", num(v1, 1), (typed(v1 - 2, 1) * typed(v1 - 1, 1)) / typed(v1 - 3, 1));
     near("V1 value", num(v1, 1), 0.5);
@@ -774,6 +939,7 @@ function main() {
       try {
         const wb = tpl.build(lang);
         checkWorkbook(`${tpl.id} (${lang})`, wb);
+        checkMenuQuotes(`${tpl.id} (${lang})`, wb, lang);
         if (tpl.preview) {
           const s = wb.sheets[0];
           const [r0, r1] = tpl.preview.rows;

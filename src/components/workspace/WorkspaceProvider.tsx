@@ -10,7 +10,6 @@ import { useTableChanges } from "@/lib/live";
 import { cleanLook } from "@/components/blob/look";
 import { BlobLookProvider } from "@/components/blob/LookContext";
 import { createClient } from "@/lib/supabase/client";
-import { newWorkbook } from "@/sheet/doc";
 import {
   PAGE_META_COLUMNS,
   type DeckContent,
@@ -215,10 +214,19 @@ export function WorkspaceProvider({
           subject_id: foreignParent ? null : (input.subject_id ?? null),
           parent_id: input.parent_id ?? null,
           position,
-          // A folder only holds pages: it has no content of its own.
+          // A folder only holds pages: it has no content of its own. (The spreadsheet code loads only
+          // when a spreadsheet is made: every page of the app has this provider.)
           content:
             input.content ??
-            (kind === "deck" ? newDeckContent(input.title, locale) : kind === "cv" ? newCv(locale) : kind === "ink" ? { v: 1 } : kind === "sheet" ? newWorkbook(locale) : {}),
+            (kind === "deck"
+              ? newDeckContent(input.title, locale)
+              : kind === "cv"
+                ? newCv(locale)
+                : kind === "ink"
+                  ? { v: 1 }
+                  : kind === "sheet"
+                    ? (await import("@/sheet/doc")).newWorkbook(locale)
+                    : {}),
           ...(input.plain_text !== undefined && { plain_text: input.plain_text }),
           ...(input.tags?.length && { tags: input.tags.slice(0, 20) }),
           ...(input.topics?.length && { topics: input.topics.slice(0, 20) }),

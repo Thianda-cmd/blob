@@ -212,10 +212,10 @@ export function ColumnMenuContent({
         <span className="min-w-0 flex-1 truncate font-display text-[14px] font-semibold text-ink" title={name}>
           {name}
         </span>
-        <span className="shrink-0 rounded-full bg-hover px-2 py-0.5 text-[11px] font-medium text-ink-3">{t.kinds[kind]}</span>
+        <span className="shrink-0 rounded-full bg-hover px-2 py-0.5 text-[12px] font-medium text-ink-2">{t.kinds[kind]}</span>
       </div>
 
-      {readOnly && <p className="px-2 pb-1 text-[12px] leading-snug text-ink-3">{t.readOnly}</p>}
+      {readOnly && <p className="px-2 pb-1 text-[12px] leading-snug text-ink-2">{t.readOnly}</p>}
 
       <MenuRow icon={ascIcon} onClick={() => sort("asc")} disabled={readOnly} checked={sorted === "asc"}>
         {t.sortAsc[kind]}

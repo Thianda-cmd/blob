@@ -437,7 +437,8 @@ export function InkEditor({ page, role = "owner", members = [] }: { page: Page; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, state.selection, readOnly, update, lastPen]);
 
-  const saveState: SaveState = status === "waiting" ? "device" : status === "error" || status === "denied" ? "error" : status === "saving" ? "saving" : "saved";
+  // (Without a connection the sync says "waiting": its "error" is the server's, and "denied" stays.)
+  const saveState: SaveState = status === "waiting" ? "device" : status === "denied" ? "refused" : status === "error" ? "failed" : status === "saving" ? "saving" : "saved";
   const sheet = parts?.doc.sheets[state.page] ?? null;
 
   const paper = (close: () => void) => (

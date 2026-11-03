@@ -12,31 +12,39 @@
 // - LibreOffice, Numbers, Word tables and web pages: an HTML table, and text with tabs (or not).
 // Both carry the values as the cells show them ("1,5" in German), which is what pasting wants:
 // every value is read like typing in the user's language. A spreadsheet's HTML also carries each
-// number's full value (Excel x:num, LibreOffice sdval, Google Sheets data-sheets-value): pasting
-// keeps those (clipboardNumbers, pasteExactNumbers), so 0,12 shown is 0,123456789 pasted, as
-// between two spreadsheet programs.
+// number's full value (Excel x:num, LibreOffice sdval, Google Sheets data-sheets-value) and its
+// number format: pasting keeps those (clipboardCells, pasteExactNumbers), so 0,12 shown is
+// 0,123456789 pasted, as between two spreadsheet programs.
+//
+// Only as much is read as a sheet can hold (ReadLimit): a pasted text of millions of lines would
+// otherwise take the page's memory before a single cell lands.
 
 import type { Locale } from "@/i18n/config";
 import { cellKey } from "../a1";
 import { formatValue, parseInput } from "../engine";
 import { setCells } from "../ops";
-import type { Cell, NumberFormat, Pos, Workbook } from "../types";
-import { lookup } from "./xml";
+import { MAX_COLS, MAX_ROWS, type Cell, type NumberFormat, type Pos, type Workbook } from "../types";
+import { fromExcelFormat, fromSigStyle, withoutUnit } from "./formatCodes";
+import type { ReadLimit } from "./limits";
+import { lookup } from "./lookup";
+
+/** What a paste reads at most: a whole sheet (pass the rows and columns swapped for a transposed paste). */
+export const SHEET_LIMIT: ReadLimit = { rows: MAX_ROWS, cols: MAX_COLS };
 
 /** Rows of cell texts from clipboard data; null when it isn't table-like (then paste as one value). */
-export function parseClipboard(data: { text?: string; html?: string }): string[][] | null {
+export function parseClipboard(data: { text?: string; html?: string }, limit: ReadLimit = SHEET_LIMIT): string[][] | null {
   const text = data.text ?? "";
   const plain = text.replace(/\r\n?/g, "\n");
   const html = data.html && /<table[\s>]/i.test(data.html) ? data.html : null;
   let rows: string[][] | null = null;
   // Spreadsheets' own text is exact (their HTML collapses spaces); Word's and web pages' text
   // loses the table (a cell with two paragraphs breaks the line), so their HTML comes first.
-  if (html && !SPREADSHEET_HTML.test(html)) rows = parseHtmlTable(html);
-  if (!rows && plain.includes("\t")) rows = parseDelimited(text, "\t");
-  if (!rows && html) rows = parseHtmlTable(html);
+  if (html && !SPREADSHEET_HTML.test(html)) rows = parseHtmlTable(html, limit);
+  if (!rows && plain.includes("\t")) rows = parseDelimited(text, "\t", limit);
+  if (!rows && html) rows = parseHtmlTable(html, limit);
   if (!rows && plain) {
     const sep = csvishSeparator(plain);
-    rows = sep ? parseDelimited(text, sep) : plain.replace(/\n$/, "").includes("\n") ? parseDelimited(text, "\t") : null;
+    rows = sep ? parseDelimited(text, sep, limit) : plain.replace(/\n$/, "").includes("\n") ? parseDelimited(text, "\t", limit) : null;
   }
   if (!rows || !rows.length) return null;
   // One cell is one value: the caller pastes it as typed, unless reading took something off
@@ -65,9 +73,11 @@ const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").re
 /**
  * How a copied cell goes into the HTML. `num`: its full value, for Excel (x:num), which then
  * calculates with it rather than with the rounded text. `fmt`: its number format as an Excel
- * format code, so Excel shows it the same (a unit too, which the text leaves out).
+ * format code, so Excel shows it the same (a unit too, which the text leaves out); a paste into
+ * another Blob spreadsheet reads it back. `style`: Blob's named style for significant figures
+ * ("Blob sig 3", as in .xlsx files), which no format code can say.
  */
-export type HtmlCellLook = { bold?: boolean; align?: "left" | "center" | "right"; num?: number; fmt?: string };
+export type HtmlCellLook = { bold?: boolean; align?: "left" | "center" | "right"; num?: number; fmt?: string; style?: string };
 
 /** A number as Excel writes x:num ("1E-7", never "-0"). */
 const excelNum = (n: number) => (Object.is(n, -0) ? "0" : String(n).replace("e", "E"));
@@ -89,9 +99,10 @@ export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]
         if (look?.bold) css += ";font-weight:bold";
         if (look?.fmt) css += `;mso-number-format:${cssString(look.fmt)}`;
         const num = look?.num !== undefined && Number.isFinite(look.num) ? ` x:num="${excelNum(look.num)}"` : "";
+        const named = look?.style ? ` data-blob-style="${escHtml(look.style)}"` : "";
         const inner = escHtml(text).replace(/\r\n|\r|\n/g, "<br>");
         // In single quotes like Excel's own, so the format's double quotes need no entities.
-        return `<td${num} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
+        return `<td${num}${named} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
       });
       return `<tr>${cells.join("")}</tr>`;
     })
@@ -105,22 +116,28 @@ export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]
  * Rows of text separated by `sep`, with quoted fields like Excel and RFC 4180: "a""b" is a"b, and
  * a quoted field may hold the separator and line breaks. A field that only starts with a quote but
  * doesn't end as a quoted field (`"Hallo" sagte sie`) is taken as it is, as Excel writes those.
- * The last line break is no extra row.
+ * The last line break is no extra row. Reading stops after `limit.rows` rows, and cells after
+ * `limit.cols` in a row are left out.
  */
-export function parseDelimited(text: string, sep: string): string[][] {
+export function parseDelimited(text: string, sep: string, limit: ReadLimit = SHEET_LIMIT): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let i = 0;
   const n = text.length;
+  const add = (field: string) => {
+    if (row.length < limit.cols) row.push(field);
+  };
+  /** true when no more rows are read. */
   const endRow = () => {
     rows.push(row);
     row = [];
+    return rows.length >= limit.rows;
   };
   while (i <= n) {
     if (i === n) {
       // The text ended right after a separator (a last empty cell) or in the middle of a row.
       if (row.length) {
-        row.push("");
+        add("");
         endRow();
       }
       break;
@@ -154,14 +171,14 @@ export function parseDelimited(text: string, sep: string): string[][] {
       field = text.slice(i, j);
       next = j;
     }
-    row.push(field);
+    add(field);
     const c = text[next];
     if (c === sep) {
       i = next + 1;
       continue;
     }
     // End of line (\n, \r\n or \r) or of the text.
-    endRow();
+    if (endRow()) break;
     if (c === "\r" && text[next + 1] === "\n") i = next + 2;
     else if (c === "\r" || c === "\n") i = next + 1;
     else break;
@@ -189,7 +206,13 @@ function countsPerLine(text: string, sep: string, maxLines = 30): number[] {
   return counts;
 }
 
-const looksNumeric = (s: string) => /^\s*[-+]?[\d.,\s]*\d[\d.,\s]*%?\s*$/.test(s);
+/** Digits with separators and spaces, a sign before and a percent sign after: a number in some language's style. */
+function looksNumeric(s: string): boolean {
+  // Step by step, not one pattern: overlapping repeats like [\d\s]*\d[\d\s]* take seconds on a long pasted line.
+  let t = s.trim().replace(/^[-+]/, "");
+  if (t.endsWith("%")) t = t.slice(0, -1);
+  return /\d/.test(t) && /^[\d.,\s]*$/.test(t);
+}
 
 /**
  * Text copied from a text file or a web page that is a table without tabs: ";" between values on
@@ -332,19 +355,133 @@ const SKIP = new Set(["style", "script", "head", "title", "template", "noscript"
 /** Elements that end a line of text inside a cell. */
 const BLOCK = new Set(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "blockquote", "dt", "dd", "tr", "ul", "ol"]);
 
-type HtmlCell = { text: string; colspan: number; rowspan: number; num: number | null };
-/** A cell of the laid-out table: its text, and the exact number a spreadsheet gave it (or null). */
-type GridCell = { text: string; num: number | null };
+/**
+ * The number format a spreadsheet's HTML gives a cell: an Excel format code (Excel and Blob write
+ * mso-number-format, Google Sheets data-sheets-numberformat), true when it gives one in another
+ * form (LibreOffice's are written in the language of whoever copied: the text shows it), or null
+ * for none (General).
+ */
+export type CopiedFormat = string | true | null;
+
+/**
+ * What a spreadsheet's copy says about a cell besides its text: its exact number (or null), its
+ * number format, and Blob's named style for significant figures (see HtmlCellLook).
+ */
+export type CopiedCell = { num: number | null; format: CopiedFormat; style: string | null };
+
+/** A cell nothing is known about but its text. */
+const NOTHING: CopiedCell = { num: null, format: null, style: null };
+
+type HtmlCell = CopiedCell & { text: string; colspan: number; rowspan: number };
+/** A cell of the laid-out table: its text, and what a spreadsheet said about it. */
+type GridCell = CopiedCell & { text: string };
 
 /**
  * The rows of the HTML tables in a clipboard fragment, as the cells read: line breaks from <br>
  * and paragraphs, spaces collapsed as a browser shows them, character references decoded. Merged
  * cells (colspan/rowspan) are not merged in a sheet: the text goes into the first cell and the
  * cells it covered stay empty, so the columns stay in line. Tables nested inside a cell are read
- * as that cell's text.
+ * as that cell's text. At most `limit.rows` rows and `limit.cols` columns are read.
  */
-export function parseHtmlTable(html: string): string[][] | null {
-  return htmlGrid(html)?.map((row) => row.map((c) => c.text)) ?? null;
+export function parseHtmlTable(html: string, limit: ReadLimit = SHEET_LIMIT): string[][] | null {
+  return htmlGrid(html, limit)?.map((row) => row.map((c) => c.text)) ?? null;
+}
+
+/** Excel's names for its built-in formats in mso-number-format (Blob writes two of them too). */
+const MSO_NAMES: Record<string, string> = {
+  general: "General",
+  "general number": "General",
+  fixed: "0.00",
+  standard: "#,##0.00",
+  percent: "0.00%",
+  scientific: "0.00E+00",
+  "short date": "mm-dd-yy",
+  "medium date": "dd-mmm-yy",
+  "long date": "dddd, mmmm d, yyyy",
+  "general date": "m/d/yy h:mm",
+  "short time": "h:mm",
+  "medium time": "h:mm AM/PM",
+  "long time": "h:mm:ss",
+};
+
+/** CSS text with its escapes resolved ("0\.00" → "0.00", "\0022" → a quote). */
+const cssUnescape = (s: string) =>
+  s.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\r\n\f]?|([\s\S]))/g, (_, hex: string | undefined, ch: string | undefined) => {
+    if (hex === undefined) return ch ?? "";
+    const code = parseInt(hex, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+  });
+
+/** The format code in CSS declarations ("mso-number-format:Percent"), or null without one. */
+function msoNumberFormat(css: string): string | null {
+  const m = /mso-number-format\s*:\s*(?:"((?:[^"\\]|\\[\s\S])*)"|'((?:[^'\\]|\\[\s\S])*)'|([^;"'{}]*))/i.exec(css);
+  if (!m) return null;
+  const code = cssUnescape(m[1] ?? m[2] ?? m[3] ?? "").trim();
+  return code ? (lookup(MSO_NAMES, code.toLowerCase()) ?? code) : null;
+}
+
+/**
+ * Excel's formats by class: its HTML defines them in <style> (.xl65 {mso-number-format:"0\.00";})
+ * and gives each cell a class. Found with indexOf, so a <style> without an end costs one search.
+ */
+function classFormats(html: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const lower = html.toLowerCase();
+  for (let at = 0; ; ) {
+    const open = lower.indexOf("<style", at);
+    const start = open < 0 ? -1 : lower.indexOf(">", open);
+    const close = start < 0 ? -1 : lower.indexOf("</style", start);
+    if (close < 0) break;
+    // A rule's body ends at the next brace: "{" without "}" can't make the search run on.
+    for (const rule of html.slice(start + 1, close).matchAll(/\.([\w-]+)\s*\{([^{}]*)\}/g)) {
+      const code = msoNumberFormat(rule[2]);
+      if (code !== null) out.set(rule[1].toLowerCase(), code);
+    }
+    at = close + 7;
+  }
+  return out;
+}
+
+const ATTRS = new Map<string, RegExp>();
+
+/** An attribute's value from a tag's attribute text (entities decoded), or null. */
+function attrValue(attrs: string, name: string): string | null {
+  let re = ATTRS.get(name);
+  if (!re) ATTRS.set(name, (re = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i")));
+  const m = re.exec(attrs);
+  return m ? decodeHtmlEntities(m[1] ?? m[2] ?? m[3] ?? "") : null;
+}
+
+/** The number format a cell of a spreadsheet's HTML declares (see CopiedFormat). */
+function formatOf(attrs: string, classes: Map<string, string> | null): CopiedFormat {
+  const style = attrValue(attrs, "style");
+  let code = style ? msoNumberFormat(style) : null;
+  if (code === null && classes?.size) {
+    for (const name of (attrValue(attrs, "class") ?? "").toLowerCase().split(/\s+/)) {
+      code = classes.get(name) ?? null;
+      if (code !== null) break;
+    }
+  }
+  if (code === null) {
+    // Google Sheets: data-sheets-numberformat='{"1":2,"2":"0.00","3":1}' (2: its pattern).
+    const g = attrValue(attrs, "data-sheets-numberformat");
+    if (g !== null) {
+      try {
+        const v = JSON.parse(g) as Record<string, unknown> | null;
+        code = v && typeof v["2"] === "string" && v["2"] ? v["2"] : null;
+      } catch {
+        // Not readable: the text shows the format.
+      }
+      if (code === null) return true;
+    }
+  }
+  if (code === null) {
+    // LibreOffice: sdnum="1031;0;0,00" (language; ?; its format code in that language).
+    const lo = attrValue(attrs, "sdnum");
+    const own = lo?.split(";").slice(2).join(";").trim();
+    return own && !/^(standard|general)$/i.test(own) ? true : null;
+  }
+  return /^general$/i.test(code) ? null : code;
 }
 
 /**
@@ -369,14 +506,38 @@ function exactOf(attrs: string): number | null {
   }
 }
 
-function htmlGrid(html: string): GridCell[][] | null {
+/** HTML without its comments; one that isn't closed runs to the end, as in a browser. */
+function withoutComments(html: string): string {
+  if (!html.includes("<!--")) return html;
+  // indexOf, not /<!--[\s\S]*?-->/: each unclosed "<!--" would search the rest of the text again.
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = html.indexOf("<!--", at);
+    if (open < 0) break;
+    out += html.slice(at, open);
+    const close = html.indexOf("-->", open + 4);
+    at = close < 0 ? html.length : close + 3;
+  }
+  return out + html.slice(at);
+}
+
+/**
+ * The table laid out as rows of cells, at most `limit.rows` by `limit.cols`. `copied`: also read
+ * what a spreadsheet says about each cell (its number and format), else only the text.
+ */
+function htmlGrid(html: string, limit: ReadLimit, copied = false): GridCell[][] | null {
+  // Spreadsheets' number formats: Excel gives them by class, in a <style> inside a comment.
+  const classes = copied && html.includes("mso-number-format") ? classFormats(html) : null;
   // Comments and Office's conditional comments (<!--[if …]> … <![endif]-->) carry no cell text.
-  const src = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<!\[(?:if|endif)[^\]]*\]>/gi, "");
-  const tagRe = /<\/?([A-Za-z][A-Za-z0-9:-]*)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*\/?>/g;
+  const src = withoutComments(html).replace(/<!\[(?:if|endif)[^\]<>]*\]>/gi, "");
+  // A tag's attributes never run past the next "<" (outside quotes): an unclosed tag then costs
+  // only its own length, not the rest of the text (which made long broken HTML take minutes).
+  const tagRe = /<\/?([A-Za-z][A-Za-z0-9:-]*)((?:\s+[^\s=>/<]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s><]+))?)*)\s*\/?>/g;
   const out: HtmlCell[][] = [];
   let depth = 0;
   let row: HtmlCell[] | null = null;
-  let cell: { parts: string[]; colspan: number; rowspan: number; num: number | null; depth: number } | null = null;
+  let cell: (CopiedCell & { parts: string[]; colspan: number; rowspan: number; depth: number }) | null = null;
   let skip: string | null = null;
   let at = 0;
   let m: RegExpExecArray | null;
@@ -389,7 +550,7 @@ function htmlGrid(html: string): GridCell[][] | null {
     if (cell && !skip) cell.parts.push("\n");
   };
 
-  while ((m = tagRe.exec(src))) {
+  while ((m = tagRe.exec(src)) && out.length < limit.rows) {
     addText(src.slice(at, m.index));
     at = tagRe.lastIndex;
     const closing = m[0][1] === "/";
@@ -434,16 +595,19 @@ function htmlGrid(html: string): GridCell[][] | null {
       if (!closing) {
         row ??= [];
         const attrs = m[2] ?? "";
-        cell = { parts: [], colspan: spanAttr(attrs, "colspan"), rowspan: spanAttr(attrs, "rowspan"), num: exactOf(attrs), depth };
+        const about: CopiedCell = copied ? { num: exactOf(attrs), format: formatOf(attrs, classes), style: attrValue(attrs, "data-blob-style") } : NOTHING;
+        cell = { parts: [], colspan: spanAttr(attrs, "colspan"), rowspan: spanAttr(attrs, "rowspan"), ...about, depth };
       }
       continue;
     }
     if (local === "br") lineBreak();
     else if (BLOCK.has(local)) lineBreak();
   }
-  addText(src.slice(at));
-  if (cell) closeCell();
-  if (row) closeRow();
+  if (out.length < limit.rows) {
+    addText(src.slice(at));
+    if (cell) closeCell();
+    if (row) closeRow();
+  }
 
   function closeCell() {
     if (!cell || !row) {
@@ -457,7 +621,8 @@ function htmlGrid(html: string): GridCell[][] | null {
       .join("\n")
       .replace(/^\n+|\n+$/g, "")
       .replace(/\n{2,}/g, "\n");
-    row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan, num: cell.num });
+    // Cells past the last column read can't land anywhere.
+    if (row.length < limit.cols) row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan, num: cell.num, format: cell.format, style: cell.style });
     cell = null;
   }
   function closeRow() {
@@ -466,8 +631,8 @@ function htmlGrid(html: string): GridCell[][] | null {
   }
 
   if (!out.length) return null;
-  // Lay the cells out on a grid: spans leave empty cells to the right and below.
-  const EMPTY: GridCell = { text: "", num: null };
+  // Lay the cells out on a grid: spans leave empty cells to the right and below (as far as read).
+  const EMPTY: GridCell = { text: "", ...NOTHING };
   const grid: GridCell[][] = [];
   const taken: boolean[][] = [];
   out.forEach((cells, r) => {
@@ -476,13 +641,14 @@ function htmlGrid(html: string): GridCell[][] | null {
     let c = 0;
     for (const cellAt of cells) {
       while (taken[r][c]) c++;
-      for (let dr = 0; dr < cellAt.rowspan; dr++) {
+      if (c >= limit.cols) break;
+      for (let dr = 0; dr < cellAt.rowspan && r + dr < out.length; dr++) {
         const rr = r + dr;
         grid[rr] ??= [];
         taken[rr] ??= [];
-        for (let dc = 0; dc < cellAt.colspan; dc++) {
+        for (let dc = 0; dc < cellAt.colspan && c + dc < limit.cols; dc++) {
           taken[rr][c + dc] = true;
-          grid[rr][c + dc] = dr === 0 && dc === 0 ? { text: cellAt.text, num: cellAt.num } : EMPTY;
+          grid[rr][c + dc] = dr === 0 && dc === 0 ? { text: cellAt.text, num: cellAt.num, format: cellAt.format, style: cellAt.style } : EMPTY;
         }
       }
       c += cellAt.colspan;
@@ -529,11 +695,12 @@ function decimalsShown(text: string, locale: Locale): NumberFormat | undefined {
 }
 
 /**
- * Cells pasted as text (pasteText's result) with the exact numbers of the copy: a cell whose text
- * was read as a number gets the full value when that value, shown the way its text is written
- * (decimals, percent, date, unit…), reads the same text, so a number can't land in the wrong cell.
- * A cell without a number format of its own gets the decimals the text showed, so it still looks
- * as it did where it came from. `locale`: the one the text was read in.
+ * Cells pasted as text (pasteText's result) with the exact numbers of the copy. A cell gets the
+ * full value only when its text was read plainly as a number (not, say, divided by 100 for a
+ * percent cell) and that value, shown the way the text is written (decimals, percent, date,
+ * unit…), gives the same text: so a number can't land in the wrong cell. A cell without a number
+ * format of its own gets the one the text showed (0,12 stays 0,12 on screen, 0,123456789 inside).
+ * `locale`: the one the text was read in.
  */
 export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: string[][], exact: (number | null)[][], locale: Locale): Workbook {
   const sheet = wb.sheets.find((s) => s.id === sheetId);
@@ -544,10 +711,12 @@ export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: 
       const text = rows[i]?.[j];
       const cell = sheet.cells[cellKey(at.row + i, at.col + j)];
       if (x === null || text === undefined || !cell || cell.f !== undefined || typeof cell.v !== "number" || cell.v === x) return;
-      const shown = parseInput(text, locale).fmt ?? decimalsShown(text, locale);
+      const plain = parseInput(text, locale);
+      if (plain.cell.v !== cell.v) return;
+      const shown = plain.fmt ?? decimalsShown(text, locale);
       if (!shown || !sameText(formatValue(x, shown, locale), text)) return;
-      const fmt = cell.s?.fmt ?? (sameText(formatValue(x, undefined, locale), text) ? undefined : shown);
-      updates.push({ row: at.row + i, col: at.col + j, cell: { ...cell, v: x, ...(fmt && !cell.s?.fmt ? { s: { ...cell.s, fmt } } : {}) } });
+      const fmt = cell.s?.fmt ? undefined : shown;
+      updates.push({ row: at.row + i, col: at.col + j, cell: { ...cell, v: x, ...(fmt ? { s: { ...cell.s, fmt } } : {}) } });
     }),
   );
   return setCells(wb, sheetId, updates);

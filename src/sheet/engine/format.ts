@@ -169,7 +169,12 @@ function currency(n: number, decimals: number, symbol: "€" | "$" | "£" | "CHF
   return symbol === "CHF" ? `${neg}CHF${NBSP}${body}` : `${neg}${symbol}${body}`;
 }
 
-const withUnit = (s: string, unit: string | undefined) => (unit && unit.trim() ? `${s}${UNIT_SPACE}${unit.trim()}` : s);
+/** The number and its unit, with a narrow space between ("12,5 mg/L", "37 °C"); an angle's degree sign goes right after the number ("45°"). */
+const withUnit = (s: string, unit: string | undefined) => {
+  const u = unit?.trim();
+  if (!u) return s;
+  return u === "°" ? `${s}°` : `${s}${UNIT_SPACE}${u}`;
+};
 
 /** The text a cell shows for a value with its format (no format: "general", like Excel). */
 export function formatValue(value: CellValue, fmt: NumberFormat | undefined, locale: Locale): string {

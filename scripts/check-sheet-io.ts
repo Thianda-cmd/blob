@@ -14,6 +14,13 @@
 //     formulas, inline strings, table and defined-name references, theme colours, an Excel
 //     chart, things Blob skips)
 //   - embed: reading block attributes, the table shown in a note, its Markdown
+//   - reading files safely: zip and XML limits, crafted names ("constructor"), files of every kind
+//     (text and HTML named .xls, old .xls, too many sheets, long formulas, too many series), and
+//     long inputs that once took minutes (spaces, unclosed tags)
+//   - clipboard numbers: pasting a spreadsheet's full numbers (Excel, LibreOffice, Google Sheets)
+//     with its safeguards, copying numbers without their unit (and Excel's markup for them)
+//   - round trips: smart-table totals and significant figures through .xlsx
+//   - adding to a note: the one-time token; exports with each trendline's equation and R²
 // Problems make the script exit with 1.
 
 import { collectLinks } from "@/components/editor/links";
@@ -21,19 +28,25 @@ import { sheetEmbedTexts, withSheetEmbeds } from "@/components/editor/sheetEmbed
 import { noteSchema, plainTextOf } from "@/components/editor/schema";
 import { noteToDocx } from "@/notes/docx";
 import { noteToMarkdown } from "@/notes/markdown";
-import { calcOf } from "@/components/editor/blocks/sheetEmbedData";
-import { readSheetFile } from "@/components/sheet/importFile";
-import { addToNoteHref, embedFromParam, embedTableMarkdown, embedTableModel, embedTarget, itemFromParam, readEmbedAttrs, readEmbedItem, sameItem, sheetItemHref, usedArea } from "@/sheet/embed";
+import { calcOf } from "@/components/editor/blocks/sheetEmbedCalc";
+import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
+import { appendWorkbook, freshIds, readSheetFile } from "@/components/sheet/importFile";
+import { createSheetStore, type SheetStore } from "@/components/sheet/store";
+import { sheetIoText } from "@/i18n/messages/sheetIo";
+import { chartData } from "@/sheet/chart/data";
+import { equationText, isFitError, r2Text } from "@/sheet/chart/regression";
+import { addToNoteHref, embedFromParam, embedFromToken, embedTableMarkdown, embedTableModel, embedTarget, forgetEmbedToken, isEmbedToken, itemFromParam, readEmbedAttrs, readEmbedItem, sameItem, sheetItemHref, usedArea } from "@/sheet/embed";
 import { createCalc } from "@/sheet/engine";
-import { parseClipboard, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
+import { decodeHtmlEntities, parseClipboard, parseHtmlTable, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
 import { csvNumberLocale, detectSeparator, parseCsv, sheetToCsv } from "@/sheet/io/csv";
+import { readSheetBytes } from "@/sheet/io/readFile";
 import { exportXlsx, importXlsx, XlsxError } from "@/sheet/io/xlsx";
-import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
+import { parseChartRef, trendLabelFormat } from "@/sheet/io/xlsxCharts";
 import { importFormula, toFileFormula, type FileTable, type FormulaContext } from "@/sheet/io/xlsxFormulas";
-import { fromExcelFormat, nearestSheetColor, toExcelFormat } from "@/sheet/io/xlsxStyles";
-import { parseXml, textOf } from "@/sheet/io/xml";
-import { crc32, makeZip, readZip } from "@/sheet/io/zip";
-import type { Cell, Sheet, Workbook } from "@/sheet/types";
+import { fromExcelFormat, fromSigStyle, nearestSheetColor, sigStyleName, toExcelFormat } from "@/sheet/io/xlsxStyles";
+import { attr, decodeEntities, lookup, parseXml, textOf, XmlError, xmlBudget } from "@/sheet/io/xml";
+import { crc32, deflateRaw, inflateRaw, makeZip, readZip, ZipError } from "@/sheet/io/zip";
+import type { Cell, ChartSpec, Sheet, Workbook } from "@/sheet/types";
 
 const problems: string[] = [];
 let checks = 0;
@@ -526,15 +539,10 @@ async function xlsxRoundTrip() {
   eq("sheet names", back.sheets.map((s) => s.name), ["Kalibrierung", "Blatt 2 (Rohdaten)", "Leer"]);
   const a = wb.sheets[0];
   const b = back.sheets[0];
-  // Values, formulas and notes come back exactly; looks too, except what Excel can't say.
-  const expectStyle = (key: string) => {
-    const s = a.cells[key]?.s;
-    if (!s) return undefined;
-    const out = { ...s };
-    // Significant figures become the decimals they showed (Excel has no such format).
-    if (out.fmt?.kind === "significant") out.fmt = { kind: "number", decimals: 4 };
-    return out;
-  };
+  // Values, formulas, notes and looks come back exactly; significant figures too, through the
+  // named cell style Blob gives them (Excel has no such number format, see sigStyleName).
+  ok("significant figures as a named style", styles.includes('<cellStyle name="Blob sig 4" xfId="1"/>'), styles.slice(styles.indexOf("<cellStyles")));
+  const expectStyle = (key: string) => a.cells[key]?.s;
   for (const key of Object.keys(a.cells)) {
     const want = a.cells[key];
     const got = b.cells[key];
@@ -1052,6 +1060,343 @@ async function csvImport() {
   else eq("no decimals shown: the reader's language", plain.workbook.sheets[0].cells["2,0"]?.v, 1234);
 }
 
+// Reading files safely ----------------------------------------------------------------------------
+
+/** What a call throws: a zip's or XML's code, else the message; "" when it doesn't. */
+async function thrown(fn: () => unknown): Promise<string> {
+  try {
+    await fn();
+    return "";
+  } catch (e) {
+    if (e instanceof ZipError) return e.code;
+    if (e instanceof XmlError) return e.tooBig ? "tooBig" : "broken";
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+/** The zip's first central directory entry (its declared sizes are at +20 and +24). */
+function centralEntry(zip: Uint8Array, name: string): number {
+  const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  for (let i = 0; i + 46 <= zip.length; i++) {
+    if (view.getUint32(i, true) !== 0x02014b50) continue;
+    const len = view.getUint16(i + 28, true);
+    if (dec.decode(zip.subarray(i + 46, i + 46 + len)) === name) return i;
+  }
+  return -1;
+}
+
+/** An .xlsx with some of its parts changed (as a hand-made or crafted file would have them). */
+async function patchXlsx(bytes: Uint8Array, change: Record<string, (xml: string) => string>): Promise<Uint8Array> {
+  const z = readZip(bytes);
+  const parts = await Promise.all(z.names.map(async (name) => ({ name, data: (await z.get(name))! })));
+  return makeZip(parts.map((p) => (change[p.name] ? { name: p.name, data: enc.encode(change[p.name](dec.decode(p.data))) } : p)));
+}
+
+const xlsxOf = async (wb: Workbook) => new Uint8Array(await (await exportXlsx(wb, createCalc(wb, { locale: "de" }), "de")).arrayBuffer());
+const book = (sheets: Sheet[], extra: Partial<Workbook> = {}): Workbook => ({ v: 1, sheets, charts: [], tables: [], ...extra });
+
+async function readingSafely() {
+  // Zip: a part is unpacked only within the limits, and stops as soon as it gives more than it says.
+  const many = enc.encode("<c/>".repeat(50_000));
+  const packed = await makeZip([{ name: "x.xml", data: many }], { compress: true });
+  ok("repeated text packs very small", packed.length < 4000, `${packed.length} bytes`);
+  eq("a part over the limit for one part: refused before unpacking", await thrown(() => readZip(packed, { part: 100_000 }).get("x.xml")), "tooBig");
+  const twice = readZip(packed, { total: 300_000 });
+  eq("a read within the limit for all parts", (await twice.get("x.xml"))?.length, many.length);
+  eq("…the next one over it: refused", await thrown(() => twice.get("x.xml")), "tooBig");
+  const lying = packed.slice();
+  new DataView(lying.buffer).setUint32(centralEntry(lying, "x.xml") + 24, 1000, true);
+  eq("a part that unpacks to more than it says: stopped while unpacking", await thrown(() => readZip(lying).get("x.xml")), "broken");
+  const raw = await deflateRaw(many);
+  if (raw) eq("inflating stops at its limit", await thrown(() => inflateRaw(raw, 1000)), "tooBig");
+
+  // XML: one budget of elements for the whole file, end tags of elements that aren't open skipped
+  // at once, and names from the file never reach an object's prototype.
+  const budget = xmlBudget(1500);
+  parseXml(`<a>${"<c/>".repeat(1000)}</a>`, budget);
+  eq("elements count against the file's budget", budget.elements, 499);
+  eq("more elements than the budget: too big, not broken", await thrown(() => parseXml(`<a>${"<c/>".repeat(1000)}</a>`, budget)), "tooBig");
+  let t0 = performance.now();
+  const stray = parseXml(`<sst><si><t>x</t></si>${"<x>".repeat(60_000)}${"</y>".repeat(60_000)}</sst>`);
+  let ms = performance.now() - t0;
+  ok("60,000 end tags of elements that aren't open: quick (24 s before)", ms < 3000, `${Math.round(ms)} ms`);
+  eq("…what came before them stays", textOf(stray.kids[0] as Exclude<(typeof stray.kids)[number], string>), "x");
+  const el = parseXml('<a constructor="1" __proto__="2" toString="3"/>');
+  eq("attributes named like an object's own are plain attributes", [attr(el, "constructor"), attr(el, "__proto__"), attr(el, "toString"), attr(el, "valueOf")], ["1", "2", "3", undefined]);
+  eq("entities named like an object's own stay as written", decodeEntities("A &constructor; B &toString; &amp;"), "A &constructor; B &toString; &");
+  eq("…in pasted HTML too", decodeHtmlEntities("&constructor; &__proto__; &lt;"), "&constructor; &__proto__; <");
+  eq("lookup reads a table's own keys only", [lookup({ sum: 1 }, "constructor"), lookup({ sum: 1 }, "__proto__"), lookup({ sum: 1 }, "sum"), lookup({ sum: 1 }, undefined)], [undefined, undefined, 1, undefined]);
+
+  // A file whose kinds are named like an object's own: never a function in the workbook.
+  const wb = labWorkbook();
+  const crafted = await patchXlsx(await xlsxOf(wb), {
+    "xl/tables/table1.xml": (x) =>
+      x
+        .replace(/totalsRowFunction="[^"]*"/g, 'totalsRowFunction="constructor"')
+        .replace(/<autoFilter ref="([^"]*)"\/>/, '<autoFilter ref="$1"><filterColumn colId="1"><customFilters><customFilter operator="constructor" val="1"/></customFilters></filterColumn></autoFilter>'),
+    "xl/charts/chart1.xml": (x) => x.replace(/<c:trendlineType val="[^"]*"\/>/, '<c:trendlineType val="constructor"/>').replace(/<c:errValType val="[^"]*"\/>/, '<c:errValType val="toString"/>'),
+  });
+  const { workbook: odd, skipped } = await importXlsx(crafted, "de");
+  const fns: string[] = [];
+  const walk = (x: unknown, path: string) => {
+    if (typeof x === "function") fns.push(path);
+    else if (x && typeof x === "object") for (const k of Object.keys(x)) walk((x as Record<string, unknown>)[k], `${path}.${k}`);
+  };
+  walk(odd, "wb");
+  eq("crafted names: no function anywhere", fns, []);
+  eq("crafted totals: what the totals row's cells say", odd.tables[0].columns.map((c) => c.total), ["none", "average", "none"]);
+  eq("crafted filter operator: left out, and listed", [odd.tables[0].filters, skipped.some((l) => l.startsWith("1 Filter"))], [{}, true]);
+  const series = odd.charts.find((c) => c.title === "Kalibriergerade")?.series[0];
+  eq("crafted trendline and error bar kinds: the defaults", [series?.trendline?.type, series?.errorBars?.kind], ["linear", "fixed"]);
+
+  // A part that says it unpacks to 80 MB: the file is refused as too big, at once.
+  const plain = await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: 1 } })]));
+  const huge = plain.slice();
+  new DataView(huge.buffer).setUint32(centralEntry(huge, "xl/worksheets/sheet1.xml") + 24, 80 * 1024 * 1024, true);
+  const bomb = await readSheetBytes(huge, "bombe.xlsx", "de");
+  eq("a file that would unpack too big: refused, with the reason", "error" in bomb ? [bomb.error, bomb.message] : bomb, ["tooBig", sheetIoText.de.errors.tooBig]);
+
+  // Long runs that took seconds or minutes before: the number style of a CSV, pasted lines, HTML
+  // with unclosed tags, chart references.
+  const spaces = Array.from({ length: 10 }, () => ["1" + " ".repeat(30_000) + "x"]);
+  t0 = performance.now();
+  csvNumberLocale(spaces, "de");
+  parseClipboard({ text: Array.from({ length: 3 }, () => "1 ".repeat(15_000) + "x,1").join("\n") });
+  parseHtmlTable("<table><tr><td>" + "<a b ".repeat(8000) + '<a b="x '.repeat(8000));
+  parseChartRef(" ".repeat(30_000) + "x", () => "s1");
+  ms = performance.now() - t0;
+  ok("long spaces, lines and unclosed tags: quick", ms < 1500, `${Math.round(ms)} ms`);
+  const spacesCsv = await readSheetBytes(enc.encode(spaces.map((r) => r[0]).join("\n")), "leer.csv", "de");
+  ok("a CSV of long space runs: read", !("error" in spacesCsv), JSON.stringify(spacesCsv).slice(0, 200));
+}
+
+// Files of every kind -----------------------------------------------------------------------------
+
+async function fileKinds() {
+  const read = (text: string, name: string) => readSheetBytes(enc.encode(text), name, "de");
+  const cellsOf = (r: Awaited<ReturnType<typeof read>>) => ("error" in r ? r : r.workbook.sheets[0].cells);
+  // Text named .xls (photometers and web tools save it so): read like CSV.
+  const photometer = await read("Probe\tExtinktion\nS1\t0,104\nS2\t0,212\n", "Photometer-Export.xls");
+  eq(".xls with tab text inside: its rows", "error" in photometer ? photometer : [photometer.kind, photometer.workbook.sheets[0].name, photometer.workbook.sheets[0].cells["1,1"]?.v], ["csv", "Photometer-Export", 0.104]);
+  eq(".xls with an HTML table inside: its rows", cellsOf(await read("<html><body><table><tr><td>Probe</td><td>Wert</td></tr><tr><td>A</td><td>0,5</td></tr></table></body></html>", "Web.xls")), { "0,0": { v: "Probe" }, "0,1": { v: "Wert" }, "1,0": { v: "A" }, "1,1": { v: 0.5 } });
+  const lims = await read('<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet/></Workbook>', "LIMS.xls");
+  eq(".xls with XML inside: a clear message", "error" in lims ? [lims.error, lims.message] : lims, ["failed", sheetIoText.de.errors.notTable]);
+  eq("a first value below the detection limit is data, not markup", cellsOf(await read("<NWG;0,5\n<0,1;2\n", "werte.csv")), { "0,0": { v: "<NWG" }, "0,1": { v: 0.5 }, "1,0": { v: "<0,1" }, "1,1": { v: 2 } });
+  const utf16 = "Probe\tµg\nS1\t0,5\n";
+  const u16 = new Uint8Array(2 + utf16.length * 2);
+  u16.set([0xff, 0xfe]);
+  for (let i = 0; i < utf16.length; i++) new DataView(u16.buffer).setUint16(2 + i * 2, utf16.charCodeAt(i), true);
+  eq("UTF-16 text (Excel's Unicode text): read", cellsOf(await readSheetBytes(u16, "unicode.txt", "de")), { "0,0": { v: "Probe" }, "0,1": { v: "µg" }, "1,0": { v: "S1" }, "1,1": { v: 0.5 } });
+  // An old binary .xls says how to save it; a password-protected .xlsx (also an Office container) says that.
+  const ole = new Uint8Array(4096);
+  ole.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+  const old = await readSheetBytes(ole, "Alt.xls", "de");
+  eq("old .xls: refused, saying how to save it", "error" in old ? [old.error, old.message] : old, ["oldXls", sheetIoText.de.errors.oldXls]);
+  const locked = ole.slice();
+  [..."EncryptionInfo"].forEach((ch, i) => (locked[1024 + i * 2] = ch.charCodeAt(0)));
+  const pw = await readSheetBytes(locked, "Geheim.xlsx", "de");
+  eq("password-protected .xlsx: says so", "error" in pw ? [pw.error, pw.message] : pw, ["failed", sheetIoText.de.errors.encrypted]);
+
+  // More sheets than a spreadsheet holds: the first come in, the rest are listed.
+  const many = book(Array.from({ length: 260 }, (_, i) => sheet(`s${i}`, `S${i}`, { "0,0": { v: i } })));
+  const manyFile = await xlsxOf(many);
+  const all = await readSheetBytes(manyFile, "viele.xlsx", "de");
+  eq("260 sheets: 250 come in, the rest are listed", "error" in all ? all : [all.workbook.sheets.length, all.skipped], [250, ["10 Blätter nach den ersten 250 (mehr passen nicht in diese Tabelle)"]]);
+  const room = await readSheetBytes(manyFile, "viele.xlsx", "de", { sheetRoom: 3 });
+  eq("added to a spreadsheet with room for 3: 3 come in", "error" in room ? room : [room.workbook.sheets.length, room.skipped], [3, ["257 Blätter nach den ersten 3 (mehr passen nicht in diese Tabelle)"]]);
+  const full = await readSheetBytes(manyFile, "viele.xlsx", "de", { sheetRoom: 0 });
+  eq("no room left: refused, with the reason", "error" in full ? [full.error, full.message] : full, ["full", sheetIoText.de.full(250)]);
+  const into = book(many.sheets.slice(0, 248));
+  eq("appendWorkbook stops at 250 sheets", appendWorkbook(into, freshIds(book(many.sheets.slice(0, 5))), "de").sheets.length, 250);
+
+  // A formula longer than 8,192 characters (LibreOffice writes such): its value stays, and it is listed.
+  const longF = await readSheetBytes(await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: 1 }, "0,1": { f: "A1" + "+A1".repeat(3000) } })])), "lang.xlsx", "de");
+  eq("a formula over 8,192 characters: its value, listed", "error" in longF ? longF : [longF.workbook.sheets[0].cells["0,1"], longF.skipped], [{ v: 3001 }, ["1 Formel mit mehr als 8.192 Zeichen: als Werte übernommen"]]);
+
+  // A chart with more series than Blob keeps (one line per well): cut when it comes in, and listed.
+  const r = (r0: number, c0: number, r1: number, c1: number) => ({ sheetId: "s1", r0, c0, r1, c1 });
+  const wells: Record<string, Cell> = {};
+  for (let c = 0; c < 70; c++) for (let row = 0; row < 3; row++) wells[`${row},${c}`] = { v: row + c };
+  const chart: ChartSpec = {
+    id: "w",
+    sheetId: "s1",
+    at: { row: 5, col: 0, dx: 0, dy: 0 },
+    size: { w: 480, h: 300 },
+    kind: "line",
+    title: "Platte",
+    x: null,
+    series: Array.from({ length: 70 }, (_, c) => ({ id: `w${c}`, name: `W${c}`, nameRef: null, y: r(0, c, 2, c), x: null, color: null, marker: "none" as const, line: "straight" as const, labels: false, errorBars: null, trendline: null })),
+    xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "none",
+  };
+  const plate = await readSheetBytes(await xlsxOf(book([sheet("s1", "Blatt 1", wells)], { charts: [chart] })), "platte.xlsx", "de");
+  eq("70 series in one chart: 64 come in, the rest are listed", "error" in plate ? plate : [plate.workbook.charts[0].series.length, plate.skipped], [64, ["6 Datenreihen (ein Diagramm hat höchstens 64)"]]);
+}
+
+// Clipboard numbers -------------------------------------------------------------------------------
+
+const EXCEL_HTML = `<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta name=ProgId content=Excel.Sheet><style><!--.xl65 {mso-number-format:"0\\.00";} --></style></head><body><table>
+<!--StartFragment-->
+ <tr height=20>
+  <td height=20 class=xl65 align=right x:num="0.12345678900000001">0,12</td>
+  <td class=xl66 align=right x:num="0.123456">12,35%</td>
+  <td class=xl67 align=right x:num="46329">03.11.2026</td>
+ </tr>
+ <tr height=20>
+  <td height=20 class=xl65 align=right x:num="2.6666666666666665">2,67</td>
+  <td align=right x:num>3</td>
+  <td x:str>Probe 1</td>
+ </tr>
+<!--EndFragment-->
+</table></body></html>`;
+const EXCEL_TEXT = "0,12\t12,35%\t03.11.2026\r\n2,67\t3\tProbe 1\r\n";
+
+function clipboardNumbers() {
+  const fresh = (cells: Record<string, Cell> = {}, pageId = "clip-d") => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", cells)]), locale: "de", readOnly: false });
+  const cells = (s: SheetStore) => s.get().workbook.sheets[0].cells;
+  const paste = (s: SheetStore, data: { text?: string; html?: string }, at = { row: 0, col: 0 }, mode: "all" | "values" | "transpose" = "all") => {
+    s.select(at);
+    pasteData(s, data, mode);
+    return cells(s);
+  };
+  // Excel copies rounded text and, in its HTML, the full numbers: those are pasted, shown as before.
+  const excel = paste(fresh(), { text: EXCEL_TEXT, html: EXCEL_HTML });
+  eq("from Excel: the full numbers (Excel's own digits)", [excel["0,0"]?.v, excel["0,1"]?.v, excel["0,2"]?.v, excel["1,0"]?.v, excel["1,1"]?.v, excel["1,2"]?.v], [Number("0.12345678900000001"), 0.123456, 46329, 2.6666666666666665, 3, "Probe 1"]);
+  eq("…shown with the decimals they showed", [excel["0,0"]?.s?.fmt, excel["0,1"]?.s?.fmt, excel["1,0"]?.s?.fmt], [{ kind: "number", decimals: 2 }, { kind: "percent", decimals: 2 }, { kind: "number", decimals: 2 }]);
+  const lo = paste(fresh(), { text: "0,12\t2,67\n", html: `<table><tr><td sdval="0.123456789" sdnum="1031;0;0,00">0,12</td><td sdval="2.6666666667" sdnum="1031;0;0,00">2,67</td></tr></table>` });
+  eq("from LibreOffice (sdval)", [lo["0,0"]?.v, lo["0,1"]?.v], [0.123456789, 2.6666666667]);
+  const google = paste(fresh(), { text: "0,12", html: `<google-sheets-html-origin><table data-sheets-root="1"><tr><td data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:0.123456789}">0,12</td></tr></table>` });
+  eq("from Google Sheets (data-sheets-value)", google["0,0"]?.v, 0.123456789);
+  // Safeguards: an HTML table that doesn't line up with the text, a full number the text doesn't
+  // show, a cell whose text means something else (percent cell): the text as typed.
+  const shifted = paste(fresh(), { text: EXCEL_TEXT, html: EXCEL_HTML.replace("<!--StartFragment-->", '<!--StartFragment--><tr><td x:num="9">9</td></tr>') });
+  eq("HTML with another row count: the text", shifted["0,0"]?.v, 0.12);
+  const stale = paste(fresh(), { text: "0,12\t1", html: '<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="0.5">0,12</td><td x:num="1">1</td></tr></table>' });
+  eq("a full number that doesn't give the shown text: the text", stale["0,0"]?.v, 0.12);
+  const percentCell = paste(fresh({ "0,0": { s: { fmt: { kind: "percent", decimals: 0 } } } }), { text: "0,12", html: '<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="0.123456">0,12</td></tr></table>' });
+  eq("into a percent cell: as typing it there", percentCell["0,0"]?.v, 0.0012);
+  const turned = paste(fresh(), { text: "0,12\t2,67", html: '<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="0.123456">0,12</td><td x:num="2.666">2,67</td></tr></table>' }, { row: 0, col: 0 }, "transpose");
+  eq("transposed: each full number where its text goes", [turned["0,0"]?.v, turned["1,0"]?.v], [0.123456, 2.666]);
+
+  // Copying: numbers without their unit (Excel, LibreOffice and Google Sheets take them as numbers),
+  // and Excel's full value and format (with the unit) in the HTML.
+  const unit = createSheetStore({
+    pageId: "copy-d",
+    workbook: book([
+      sheet("s1", "Blatt 1", {
+        "0,0": { v: 2.0001, s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } },
+        "0,1": { v: 0.0523285714, s: { fmt: { kind: "number", decimals: 4, unit: "L/mg" }, bold: true } },
+        "0,2": { v: "Probe" },
+        "0,3": { f: "A1*2", s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } },
+      }),
+    ]),
+    locale: "de",
+    readOnly: false,
+  });
+  unit.select({ anchor: { row: 0, col: 0 }, focus: { row: 0, col: 3 }, extra: [] });
+  const copied = copySelection(unit, false);
+  eq("copy: numbers without their unit", copied.text, "2,0\t0,0523\tProbe\t4,0");
+  ok("copy: Excel gets the full numbers", copied.html.includes('x:num="2.0001"') && copied.html.includes('x:num="0.0523285714"') && copied.html.includes('x:num="4.0002"'), copied.html);
+  ok("copy: …and the unit as their number format", copied.html.includes(`mso-number-format:"0.0\\" mg/L\\""`) && copied.html.includes(`mso-number-format:"0.0000\\" L/mg\\""`), copied.html);
+  ok("copy: text has no number", !/x:num="[^"]*"[^>]*>Probe/.test(copied.html), copied.html);
+  // Back into Blob: its own copy (formula, unit and look come along).
+  const back = paste(unit, { text: copied.text, html: copied.html }, { row: 2, col: 0 });
+  eq("Blob to Blob: its own copy", [back["2,0"], back["2,3"]?.f], [{ v: 2.0001, s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } }, "A3*2"]);
+  // Blob in another tab (its own copy is something else): the full numbers from the HTML.
+  const elsewhere = fresh({ "0,0": { v: "x" } }, "copy-other");
+  elsewhere.select({ row: 0, col: 0 });
+  copySelection(elsewhere, false);
+  const other = paste(fresh({}, "copy-third"), { text: copied.text, html: copied.html });
+  eq("Blob to another tab: the full numbers", [other["0,0"]?.v, other["0,1"]?.v, other["0,3"]?.v], [2.0001, 0.0523285714, 4.0002]);
+}
+
+// Round trips through .xlsx -----------------------------------------------------------------------
+
+async function roundTrips() {
+  // Smart-table totals: Excel files say "custom" for Blob's own; the totals row's cells say which.
+  const totals = book([sheet("s1", "Blatt 1", { "0,0": { v: "Probe" }, "0,1": { v: "µL" }, "0,2": { v: "Mittel" }, "1,1": { v: 2 }, "1,2": { v: 3 }, "2,1": { v: 4 }, "2,2": { v: 5 }, "3,0": { v: "Summe" }, "3,1": { f: "SUBTOTAL(109,B2:B3)" }, "3,2": { f: "SUBTOTAL(101,C2:C3)" } })], {
+    tables: [{ id: "t", sheetId: "s1", name: "Mix", area: { r0: 0, c0: 0, r1: 3, c1: 2 }, columns: [{ id: "a", total: "none" }, { id: "b", total: "sum" }, { id: "c", total: "average" }], totals: true, style: "blue", banded: true, filters: {}, sort: null }],
+  });
+  const { workbook: t } = await importXlsx(await xlsxOf(totals), "de");
+  eq("totals: the functions come back", t.tables[0].columns.map((c) => c.total), ["none", "sum", "average"]);
+  // Significant figures: a named cell style Excel and LibreOffice keep ("Blob sig 3").
+  eq("significant figures' style name", [sigStyleName({ kind: "significant", digits: 3 }), sigStyleName({ kind: "number", decimals: 2 })], ["Blob sig 3", undefined]);
+  eq("…read back with the unit", fromSigStyle("Blob sig 3", { kind: "number", decimals: 2, unit: "µg/mL" }), { kind: "significant", digits: 3, unit: "µg/mL" });
+  eq("…a percent someone chose in Excel stays", fromSigStyle("Blob sig 3", { kind: "percent", decimals: 1 }), { kind: "percent", decimals: 1 });
+  eq("…other styles mean nothing", [fromSigStyle("Normal", undefined), fromSigStyle("Blob sig 99", undefined)], [undefined, undefined]);
+  const sig = book([sheet("s1", "Blatt 1", { "0,0": { v: 0.0001234, s: { fmt: { kind: "significant", digits: 3, unit: "µg/mL" } } }, "1,0": { v: 31.25, s: { fmt: { kind: "significant", digits: 3 } } } })]);
+  const { workbook: sb } = await importXlsx(await xlsxOf(sig), "de");
+  eq("significant figures come back", [sb.sheets[0].cells["0,0"]?.s?.fmt, sb.sheets[0].cells["1,0"]?.s?.fmt], [{ kind: "significant", digits: 3, unit: "µg/mL" }, { kind: "significant", digits: 3 }]);
+}
+
+// Adding to a note, and exports -------------------------------------------------------------------
+
+async function embedRequests() {
+  // "Add to note" keeps what to add in this tab, under a one-time token in the note's address.
+  const kept = new Map<string, string>();
+  const g = globalThis as { sessionStorage?: Pick<Storage, "getItem" | "setItem" | "removeItem"> };
+  g.sessionStorage = { getItem: (k) => kept.get(k) ?? null, setItem: (k, v) => void kept.set(k, String(v)), removeItem: (k) => void kept.delete(k) };
+  try {
+    const attrs = { pageId: "0b5f3c1e-9a2d-4c7e-8f10-2b3c4d5e6f70", item: { kind: "chart" as const, chartId: "c1" } };
+    const token = new URL(addToNoteHref("11111111-2222-4333-8444-555555555555", attrs), "https://blob.test").searchParams.get("sheetEmbed");
+    ok("Add to note: a one-time token, not the attributes", isEmbedToken(token), String(token));
+    eq("…which this tab turns into the attributes", token ? embedFromToken(token) : null, attrs);
+    eq("…a token is no attributes", embedFromParam(token), null);
+    if (token) forgetEmbedToken(token);
+    eq("…used once", token ? embedFromToken(token) : "no token", null);
+    eq("another tab's token (or a made-up one): nothing", embedFromToken("0123456789abcdef01234567"), null);
+    eq("attributes in an address are still read (the note asks first)", embedFromParam(JSON.stringify(attrs)), attrs);
+  } finally {
+    delete g.sessionStorage;
+  }
+
+  // Exports: each trendline's equation and R² under its chart, as the chart's label writes them.
+  const page = "0b5f3c1e-9a2d-4c7e-8f10-2b3c4d5e6f70";
+  const r = (r0: number, c0: number, r1: number, c1: number) => ({ sheetId: "s1", r0, c0, r1, c1 });
+  const data: Record<string, Cell> = { "0,1": { v: "Standards" } };
+  [[0, 0.002], [2, 0.105], [4, 0.209], [6, 0.311], [8, 0.418], [10, 0.52]].forEach(([x, y], i) => ((data[`${i + 1},0`] = { v: x }), (data[`${i + 1},1`] = { v: y })));
+  const trend = { type: "linear" as const, order: 2, period: 2, intercept: null, showEquation: true, showR2: true, forward: 0, backward: 0, name: "" };
+  const spec: ChartSpec = {
+    id: "k",
+    sheetId: "s1",
+    at: { row: 0, col: 3, dx: 0, dy: 0 },
+    size: { w: 480, h: 300 },
+    kind: "scatter",
+    title: "Kalibriergerade",
+    x: r(1, 0, 6, 0),
+    series: [{ id: "a", name: "", nameRef: r(0, 1, 0, 1), y: r(1, 1, 6, 1), x: null, color: null, marker: "circle", line: "none", labels: false, errorBars: null, trendline: trend }],
+    xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "none",
+  };
+  const wb = book([sheet("s1", "Blatt 1", data)], { charts: [spec, { ...spec, id: "k2", series: [{ ...spec.series[0], trendline: { ...trend, showEquation: false } }] }] });
+  const fit = chartData(spec, calcOf(wb, "de"), "de").series[0].fit;
+  if (!fit || isFitError(fit)) return fail("export trend", "no fit");
+  const line = `Standards: ${equationText(fit, "de")} · ${r2Text(fit.r2!, "de")}`;
+  ok("the line reads like the chart's label", /^Standards: y = 0,05\d+x \+ 0,00\d+ · R² = 0,999\d+$/.test(line), line);
+  const source = async () => ({ wb, title: "Kalibrierung" });
+  const note = {
+    type: "doc",
+    content: [
+      { type: "sheetEmbed", attrs: { pageId: page, item: { kind: "chart", chartId: "k" }, size: "m", caption: "Abb. 1" } },
+      { type: "sheetEmbed", attrs: { pageId: page, item: { kind: "chart", chartId: "k2" }, size: "m", caption: "" } },
+    ],
+  };
+  const md = noteToMarkdown((await withSheetEmbeds(note, "markdown", "de", source)).doc, { locale: "de", title: "Notiz", pageHref: (id) => `https://blob.test/p/${id}` });
+  ok("markdown: equation and R² under the chart, then its caption", md.includes(`[Diagramm: Kalibriergerade](https://blob.test/p/${page})\n\n${line}\n\n*Abb. 1*`), md);
+  ok("markdown: a hidden equation stays hidden", md.includes(`\n\nStandards: ${r2Text(fit.r2!, "de")}`), md);
+  const schema = noteSchema("de");
+  const texts = schema.nodeFromJSON(note).content.content.map(await sheetEmbedTexts(schema.nodeFromJSON(note), "de", (id) => `https://blob.test/p/${id}`, source));
+  eq("text: the same line", texts[0], `[Diagramm: Kalibriergerade] https://blob.test/p/${page}\n${line}\nAbb. 1`);
+  const forWord = await withSheetEmbeds(note, "docx", "de", source);
+  const word = await noteToDocx(forWord.doc, { locale: "de", title: "Notiz", pageHref: (id) => `/p/${id}`, absolute: (h) => h, image: async () => null, drawings: [] });
+  forWord.done();
+  const wordXml = (await readZip(new Uint8Array(await word.arrayBuffer())).text("word/document.xml")) ?? "";
+  ok("Word: the line as text to copy", wordXml.includes(r2Text(fit.r2!, "de")), wordXml.slice(0, 300));
+}
+
 async function main() {
   clipboard();
   csv();
@@ -1063,6 +1408,11 @@ async function main() {
   await csvImport();
   await xlsxImport();
   await embed();
+  await readingSafely();
+  await fileKinds();
+  clipboardNumbers();
+  await roundTrips();
+  await embedRequests();
   if (problems.length) {
     console.error(`check:sheet-io: ${problems.length} problem(s) in ${checks} checks`);
     for (const p of problems) console.error(`  - ${p}`);

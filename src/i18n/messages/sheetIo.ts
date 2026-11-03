@@ -10,6 +10,8 @@ export const sheetIoText = defineMessages({
     sheet: (n: number) => `Sheet ${n}`,
     /** Who wrote a note (comments in the Excel file). */
     author: "Blob",
+    /** No sheet of a file fits into the spreadsheet any more. */
+    full: (max: number) => `This spreadsheet already has ${max} sheets, the most it can hold. Import the file as a new spreadsheet instead: “Import a file” in Notes.`,
     errors: {
       notXlsx: "This isn't an Excel file (.xlsx). Excel, LibreOffice and Google Sheets can save one: File → Save as → Excel workbook.",
       oldXls: "This is an old Excel file (.xls). Open it in Excel or LibreOffice and save it as .xlsx or CSV, then try again.",
@@ -21,7 +23,7 @@ export const sheetIoText = defineMessages({
       unsupported: "I can't open this file. Save it again as .xlsx in Excel and try once more.",
       tooBig: "This file is too big to open here, or it is damaged. Split it into smaller files, or save it again in Excel.",
       slow: "Reading this file took too long, so I stopped. Is it very big? Split it into smaller files and try again.",
-      notTable: "This file is called .xls, but there is no table in it that I can read. Open it in Excel or LibreOffice and save it as .xlsx or CSV.",
+      notTable: "There is no table in this file that I can read. Open it in Excel or LibreOffice and save it as .xlsx or CSV.",
     },
     /** What an import left out (each a short line, number first). */
     skipped: {
@@ -48,17 +50,19 @@ export const sheetIoText = defineMessages({
       outline: "groups of rows or columns (what was collapsed stays hidden)",
       tooBig: (n: number, rows: string, cols: number) => `${n === 1 ? "1 cell" : `${n} cells`} beyond ${rows} rows and ${cols} columns`,
       longText: (n: number) => `${n === 1 ? "1 very long text" : `${n} very long texts`} (shortened)`,
-      sheets: (n: number, max: number) => `${n === 1 ? "1 sheet" : `${n} sheets`} after the first ${max} (a spreadsheet holds ${max} at most)`,
+      sheetLimit: (n: number, max: number) => `${n === 1 ? "1 sheet" : `${n} sheets`} after the first ${max} (no more fit into this spreadsheet)`,
       longFormulas: (n: number, max: string) => `${n === 1 ? "1 formula" : `${n} formulas`} longer than ${max} characters: kept as values`,
-      charts: (n: number, max: number) => `${n === 1 ? "1 chart" : `${n} charts`} after the first ${max}`,
-      series: (n: number, max: number) => `${n === 1 ? "1 data series" : `${n} data series`} (a chart holds ${max} at most)`,
-      tables: (n: number, max: number) => `${n === 1 ? "1 smart table" : `${n} smart tables`} after the first ${max}`,
+      chartLimit: (n: number, max: number) => `${n === 1 ? "1 chart" : `${n} charts`} after the first ${max}`,
+      seriesLimit: (n: number, max: number) => `${n === 1 ? "1 data series" : `${n} data series`} (a chart holds ${max} at most)`,
+      tableLimit: (n: number) =>
+        n === 1 ? "1 smart table that overlaps another or is one too many (kept as plain cells)" : `${n} smart tables that overlap others or are too many (kept as plain cells)`,
       cells: (n: number) => (n === 1 ? "1 cell Blob can't keep" : `${n} cells Blob can't keep`),
     },
   },
   de: {
     sheet: (n) => `Blatt ${n}`,
     author: "Blob",
+    full: (max) => `Diese Tabelle hat schon ${max} Blätter, mehr passen nicht hinein. Importiere die Datei lieber als neue Tabelle: „Datei importieren“ in den Notizen.`,
     errors: {
       notXlsx: "Das ist keine Excel-Datei (.xlsx). Excel, LibreOffice und Google Tabellen können eine speichern: Datei → Speichern unter → Excel-Arbeitsmappe.",
       oldXls: "Das ist eine alte Excel-Datei (.xls). Öffne sie in Excel oder LibreOffice, speichere sie als .xlsx oder CSV und versuch es dann nochmal.",
@@ -70,7 +74,7 @@ export const sheetIoText = defineMessages({
       unsupported: "Diese Datei kann ich nicht öffnen. Speichere sie in Excel nochmal als .xlsx und versuch es erneut.",
       tooBig: "Diese Datei ist zu groß, um sie hier zu öffnen, oder sie ist beschädigt. Teile sie in kleinere Dateien auf oder speichere sie in Excel nochmal.",
       slow: "Das Lesen hat zu lange gedauert, deshalb habe ich aufgehört. Ist die Datei sehr groß? Teile sie in kleinere Dateien auf und versuch es nochmal.",
-      notTable: "Diese Datei heißt .xls, aber darin ist keine Tabelle, die ich lesen kann. Öffne sie in Excel oder LibreOffice und speichere sie als .xlsx oder CSV.",
+      notTable: "In dieser Datei ist keine Tabelle, die ich lesen kann. Öffne sie in Excel oder LibreOffice und speichere sie als .xlsx oder CSV.",
     },
     skipped: {
       merged: (n) => (n === 1 ? "1 verbundener Zellbereich (der Text steht in der ersten Zelle)" : `${n} verbundene Zellbereiche (der Text steht jeweils in der ersten Zelle)`),
@@ -96,11 +100,14 @@ export const sheetIoText = defineMessages({
       outline: "Gruppierungen von Zeilen oder Spalten (Eingeklapptes bleibt ausgeblendet)",
       tooBig: (n, rows, cols) => `${n === 1 ? "1 Zelle" : `${n} Zellen`} jenseits von ${rows} Zeilen und ${cols} Spalten`,
       longText: (n) => `${n === 1 ? "1 sehr langer Text" : `${n} sehr lange Texte`} (gekürzt)`,
-      sheets: (n, max) => `${n === 1 ? "1 Blatt" : `${n} Blätter`} nach den ersten ${max} (mehr passen nicht in eine Tabelle)`,
+      sheetLimit: (n, max) => `${n === 1 ? "1 Blatt" : `${n} Blätter`} nach den ersten ${max} (mehr passen nicht in diese Tabelle)`,
       longFormulas: (n, max) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit mehr als ${max} Zeichen: als Werte übernommen`,
-      charts: (n, max) => `${n === 1 ? "1 Diagramm" : `${n} Diagramme`} nach den ersten ${max}`,
-      series: (n, max) => `${n === 1 ? "1 Datenreihe" : `${n} Datenreihen`} (ein Diagramm hat höchstens ${max})`,
-      tables: (n, max) => `${n === 1 ? "1 intelligente Tabelle" : `${n} intelligente Tabellen`} nach den ersten ${max}`,
+      chartLimit: (n, max) => `${n === 1 ? "1 Diagramm" : `${n} Diagramme`} nach den ersten ${max}`,
+      seriesLimit: (n, max) => `${n === 1 ? "1 Datenreihe" : `${n} Datenreihen`} (ein Diagramm hat höchstens ${max})`,
+      tableLimit: (n) =>
+        n === 1
+          ? "1 intelligente Tabelle, die eine andere überlappt oder zu viel ist (als normale Zellen übernommen)"
+          : `${n} intelligente Tabellen, die andere überlappen oder zu viele sind (als normale Zellen übernommen)`,
       cells: (n) => (n === 1 ? "1 Zelle, die Blob nicht behalten kann" : `${n} Zellen, die Blob nicht behalten kann`),
     },
   },

@@ -2,15 +2,21 @@
 // tab-separated text and as an HTML table (so Excel, Google Sheets, Word or a Blob note can take
 // them), and keeps Blob's own copy with formulas and looks. Pasting the same text back inside
 // Blob uses that copy (formulas move like in Excel, a cut moves the cells); anything else is
-// parsed like typing.
+// parsed like typing, with the full numbers a spreadsheet's copy carries besides its text.
+//
+// Numbers go out without their unit ("2,0", not "2,0 mg/L"): Excel, LibreOffice and Google Sheets
+// then take them as numbers to calculate with, not as text. Excel also gets each number's full
+// value and its format, unit included, so it shows the cell as Blob does.
 
+import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { sameArea } from "@/sheet/a1";
 import { defaultAlign } from "@/sheet/engine";
-import { parseClipboard, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
-import { csvNumberLocale } from "@/sheet/io/csv";
+import { clipboardNumbers, parseClipboard, pasteExactNumbers, toHtmlTable, toTsv, type HtmlCellLook } from "@/sheet/io/clipboard";
+import { csvNumberLocale, withoutUnit } from "@/sheet/io/csv";
+import { BUILTIN_CODES, toExcelFormat } from "@/sheet/io/xlsxStyles";
 import { copyArea, pasteClip, pasteText, type ClipData } from "@/sheet/ops";
-import type { Area } from "@/sheet/types";
+import type { Area, NumberFormat } from "@/sheet/types";
 import { activeArea, tablesAfterPaste, type SheetStore } from "../store";
 import { shownText } from "./cellLook";
 
@@ -41,7 +47,7 @@ function tsv(rows: string[][]): string {
   }
 }
 
-function htmlTable(rows: string[][], styles: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[][]): string {
+function htmlTable(rows: string[][], styles: (HtmlCellLook | null)[][]): string {
   try {
     return toHtmlTable(rows, styles);
   } catch (e) {
@@ -61,6 +67,34 @@ function parse(data: { text?: string; html?: string }): string[][] | null {
   }
 }
 
+/** The full numbers behind a spreadsheet's copy (see clipboardNumbers); null when there are none, or reading them failed. */
+function exactNumbers(html: string | undefined, rows: string[][]): (number | null)[][] | null {
+  try {
+    return clipboardNumbers(html, rows);
+  } catch (e) {
+    reportOnce("clipboardNumbers", e);
+    return null;
+  }
+}
+
+/**
+ * A number format as Excel's mso-number-format in copied HTML (undefined for General). Built-in
+ * formats that depend on the language go by Excel's names for them.
+ */
+function msoFormat(fmt: NumberFormat | undefined, locale: Locale, value: number): string | undefined {
+  try {
+    const x = toExcelFormat(fmt, locale, value);
+    if ("code" in x) return x.code;
+    if (x.id === 0) return undefined;
+    if (x.id === 14) return "Short Date";
+    if (x.id === 22) return "General Date";
+    return BUILTIN_CODES[x.id];
+  } catch (e) {
+    reportOnce("toExcelFormat", e);
+    return undefined;
+  }
+}
+
 export type CopyPayload = { text: string; html: string; area: Area; sheetId: string };
 
 /** What copying the selection gives: TSV and HTML of the shown values; Blob's own copy is remembered and the marching ants start. */
@@ -69,15 +103,21 @@ export function copySelection(store: SheetStore, cut: boolean): CopyPayload {
   const area = activeArea(s.selection);
   const sheet = s.workbook.sheets.find((x) => x.id === s.sheetId)!;
   const rows: string[][] = [];
-  const styles: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[][] = [];
+  const styles: (HtmlCellLook | null)[][] = [];
   for (let r = area.r0; r <= area.r1; r++) {
     const line: string[] = [];
-    const look: ({ bold?: boolean; align?: "left" | "center" | "right" } | null)[] = [];
+    const look: (HtmlCellLook | null)[] = [];
     for (let c = area.c0; c <= area.c1; c++) {
       const cell = sheet.cells[`${r},${c}`];
       const value = cell ? s.calc.value(s.sheetId, r, c) : null;
-      line.push(shownText(value, cell?.s?.fmt, s.locale));
-      look.push(cell ? { bold: cell.s?.bold, align: cell.s?.align ?? (value === null ? undefined : defaultAlign(value)) } : null);
+      const fmt = cell?.s?.fmt;
+      // Without the unit (see the top of the file); the HTML says it to Excel as the format.
+      line.push(shownText(value, withoutUnit(fmt), s.locale));
+      if (!cell) look.push(null);
+      else {
+        const base: HtmlCellLook = { bold: cell.s?.bold, align: cell.s?.align ?? (value === null ? undefined : defaultAlign(value)) };
+        look.push(typeof value === "number" ? { ...base, num: value, fmt: msoFormat(fmt, s.locale, value) } : base);
+      }
     }
     rows.push(line);
     styles.push(look);
@@ -138,7 +178,12 @@ export function pasteData(store: SheetStore, data: { text?: string; html?: strin
   if (!data || (!data.text && !data.html)) return false;
   const parsed = parse({ text: data.text, html: data.html }) ?? (text ? [[text]] : null);
   if (!parsed || !parsed.length) return false;
-  const rows = mode === "transpose" ? transposeRows(parsed) : parsed;
+  // Excel, LibreOffice and Google Sheets copy rounded text ("0,12") and, in their HTML, the full
+  // number (0,123456789): that one is pasted, so means and fits match the source.
+  const exact = exactNumbers(data.html, parsed);
+  const transpose = mode === "transpose";
+  const rows = transpose ? transposeRows(parsed, "") : parsed;
+  const exactRows = exact && transpose ? transposeRows(exact, null) : exact;
   const height = rows.length;
   const width = Math.max(1, ...rows.map((r) => r.length));
   const at = { row: target.r0, col: target.c0 };
@@ -147,16 +192,24 @@ export function pasteData(store: SheetStore, data: { text?: string; html?: strin
   // by a German user stay 0,123 (not 123); data that doesn't show it is read in the user's own.
   const numbers = csvNumberLocale(rows, s.locale);
   store.apply(labels.paste, (wb) => {
-    const next = pasteText(wb, s.sheetId, at, rows, numbers);
+    let next = pasteText(wb, s.sheetId, at, rows, numbers);
+    if (exactRows) {
+      try {
+        next = pasteExactNumbers(next, s.sheetId, at, rows, exactRows, numbers);
+      } catch (e) {
+        // The rounded text is pasted then, as before.
+        reportOnce("pasteExactNumbers", e);
+      }
+    }
     return next === wb ? wb : tablesAfterPaste(next, s.sheetId, pasted, s.locale);
   });
   store.select(pasted);
   return true;
 }
 
-function transposeRows(rows: string[][]): string[][] {
+function transposeRows<T>(rows: T[][], empty: T): T[][] {
   const width = Math.max(0, ...rows.map((r) => r.length));
-  return Array.from({ length: width }, (_, c) => rows.map((r) => r[c] ?? ""));
+  return Array.from({ length: width }, (_, c) => rows.map((r) => r[c] ?? empty));
 }
 
 /** Is there a copy of Blob's own for this page (so the menu can paste even when the system clipboard can't be read)? */

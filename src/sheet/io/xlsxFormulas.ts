@@ -218,7 +218,18 @@ export type FormulaContext = {
   tableAt: (sheet: string, row: number, col: number) => FileTable | null;
 };
 
-export type ImportedFormula = { formula: string } | { problem: "external" | "table-ref" };
+/** Why a file's formula can't come along: "long" when it is far longer than any Blob keeps. */
+export type FormulaProblem = "external" | "table-ref" | "long";
+
+/** A formula as Blob writes it, or why it can't be. */
+export type ImportedFormula = { formula: string } | { problem: FormulaProblem };
+
+/**
+ * How much formula text reading one cell's formula may go through, with the defined names it
+ * uses (a name can use names that use names: a file could make one formula grow without end).
+ * Far more than the longest formula Blob keeps (MAX_FORMULA_LENGTH, 8,192 characters).
+ */
+export const MAX_FORMULA_WORK = 65_536;
 
 /** Drop the file format's prefixes: _xlfn.STDEV.S → STDEV.S, _xlfn._xlws.SORT → SORT, _xlpm.x → x. */
 export function stripPrefixes(f: string): string {
@@ -349,8 +360,11 @@ function nameText(def: string): string {
 /**
  * A formula from a file → a Blob formula (still to be checked by the engine): prefixes dropped,
  * smart table references and defined names replaced by the A1 references they stand for.
+ * `work`: what is left of MAX_FORMULA_WORK, shared with the names it reads.
  */
-export function importFormula(raw: string, ctx: FormulaContext, depth = 0): ImportedFormula {
+export function importFormula(raw: string, ctx: FormulaContext, depth = 0, work = { left: MAX_FORMULA_WORK }): ImportedFormula {
+  work.left -= raw.length;
+  if (work.left < 0) return { problem: "long" };
   const f = stripPrefixes(raw.replace(/^=/, ""));
   const toks = scanFormula(f);
   // References into other files: [1]Blatt1!A1, '[1]Blatt 1'!A1, 'C:\…\[Mappe.xlsx]Blatt1'!A1.
@@ -404,7 +418,7 @@ export function importFormula(raw: string, ctx: FormulaContext, depth = 0): Impo
         const name = ctx.names.get(upper);
         const def = name ? (name.local.get(ctx.sheet.toLowerCase()) ?? name.global) : undefined;
         if (def !== undefined) {
-          const inner = importFormula(def, ctx, depth + 1);
+          const inner = importFormula(def, ctx, depth + 1, work);
           if ("problem" in inner) return inner;
           out.push({ k: "ident", text: nameText(inner.formula) });
           continue;
