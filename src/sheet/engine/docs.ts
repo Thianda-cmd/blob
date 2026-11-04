@@ -1573,6 +1573,22 @@ const OLDER: Record<string, Pair> = {
     en: { summary: "The older name of CHISQ.INV.RT: the critical χ², with the same result.", args: same("CHISQ.INV.RT", "en"), example: "=CHIINV(0.05,3)", exampleResult: "7.815, the same as CHISQ.INV.RT." },
     de: { summary: "Der ältere Name von CHIQU.INV.RE: das kritische χ², mit gleichem Ergebnis.", args: same("CHISQ.INV.RT", "de"), example: "=CHIINV(0,05;3)", exampleResult: "7,815, wie mit CHIQU.INV.RE." },
   },
+  COVAR: {
+    en: {
+      summary: "The older name of COVARIANCE.P: the covariance of a whole population (divides by n), with the same result.",
+      args: same("COVARIANCE.P", "en"),
+      example: "=COVAR(B2:B7,C2:C7)",
+      exampleResult: "The same as COVARIANCE.P.",
+      tip: "For a sample, as measurements usually are, use COVARIANCE.S.",
+    },
+    de: {
+      summary: "Der ältere Name von KOVARIANZ.P: die Kovarianz einer Grundgesamtheit (teilt durch n), mit gleichem Ergebnis.",
+      args: same("COVARIANCE.P", "de"),
+      example: "=KOVAR(B2:B7;C2:C7)",
+      exampleResult: "Dasselbe wie mit KOVARIANZ.P.",
+      tip: "Für eine Stichprobe, wie Messwerte meist eine sind, nimm KOVARIANZ.S.",
+    },
+  },
 };
 
 // ----------------------------------------------------------------------------------------------
@@ -2303,14 +2319,14 @@ const TEXT: Record<string, Pair> = {
       args: [a("value", "The number or date."), a("format_text", 'The format code in quotes, e.g. "0.00", "0.0%" or "MM/DD/YYYY".')],
       example: '=TEXT(0.0523,"0.000")',
       exampleResult: "“0.052” as text.",
-      tip: 'The result is text, so you can\'t calculate with it any more. Format codes follow the language: German uses "0,000".',
+      tip: 'The result is text, so you can\'t calculate with it any more. Format codes follow the language: German uses "0,000". Show a duration (end − start) in hours with "[h]:mm" (54:00), in days and hours with =INT(B2-A2)&" days "&TEXT(B2-A2,"hh:mm").',
     },
     de: {
       summary: "Macht aus einer Zahl Text in einem Format deiner Wahl, z. B. für Beschriftungen.",
       args: [a("Wert", "Die Zahl oder das Datum."), a("Textformat", 'Der Formatcode in Anführungszeichen, z. B. "0,00", "0,0 %" oder "TT.MM.JJJJ".')],
       example: '=TEXT(0,0523;"0,000")',
       exampleResult: "„0,052“ als Text.",
-      tip: 'Das Ergebnis ist Text, damit rechnest du nicht mehr. Die Formatcodes folgen der Sprache: Englisch schreibt "0.000".',
+      tip: 'Das Ergebnis ist Text, damit rechnest du nicht mehr. Die Formatcodes folgen der Sprache: Englisch schreibt "0.000". Eine Dauer (Ende − Beginn) zeigst du mit "[h]:mm" in Stunden (54:00), mit =GANZZAHL(B2-A2)&" Tage "&TEXT(B2-A2;"hh:mm") in Tagen und Stunden.',
     },
   },
   VALUE: {
@@ -2498,8 +2514,20 @@ const DATE: Record<string, Pair> = {
     de: { summary: "Der Monat eines Datums, 1 bis 12.", args: SERIAL.de, example: "=MONAT(DATUM(2026;11;3))", exampleResult: "11" },
   },
   DAY: {
-    en: { summary: "The day of the month of a date, 1 to 31.", args: SERIAL.en, example: "=DAY(DATE(2026,11,3))", exampleResult: "3" },
-    de: { summary: "Der Tag im Monat eines Datums, 1 bis 31.", args: SERIAL.de, example: "=TAG(DATUM(2026;11;3))", exampleResult: "3" },
+    en: {
+      summary: "The day of the month of a date, 1 to 31.",
+      args: SERIAL.en,
+      example: "=DAY(DATE(2026,11,3))",
+      exampleResult: "3",
+      tip: 'Not for a duration (end − start): =INT(B2-A2) gives you its whole days, =TEXT(B2-A2,"[h]:mm") its hours (54:00).',
+    },
+    de: {
+      summary: "Der Tag im Monat eines Datums, 1 bis 31.",
+      args: SERIAL.de,
+      example: "=TAG(DATUM(2026;11;3))",
+      exampleResult: "3",
+      tip: 'Nicht für eine Dauer (Ende − Beginn): Die ganzen Tage gibt dir =GANZZAHL(B2-A2), die Stunden =TEXT(B2-A2;"[h]:mm") (54:00).',
+    },
   },
   HOUR: {
     en: { summary: "The hour of a time, 0 to 23.", args: SERIAL.en, example: "=HOUR(TIME(14,30,0))", exampleResult: "14" },
@@ -2665,9 +2693,41 @@ const INFO: Record<string, Pair> = {
     en: { summary: "TRUE when the value is a text.", args: CHECK.en, example: "=ISTEXT(A2)", exampleResult: "TRUE when A2 holds a text, e.g. a sample name." },
     de: { summary: "WAHR, wenn der Wert ein Text ist.", args: CHECK.de, example: "=ISTTEXT(A2)", exampleResult: "WAHR, wenn in A2 ein Text steht, z. B. ein Probenname." },
   },
+  ISNONTEXT: {
+    en: {
+      summary: "TRUE when the value isn't a text: a number, an empty cell, TRUE or FALSE, or an error.",
+      args: CHECK.en,
+      example: "=ISNONTEXT(B2)",
+      exampleResult: "TRUE for a measured value, FALSE for a text such as “n.d.”.",
+      tip: "The opposite of ISTEXT.",
+    },
+    de: {
+      summary: "WAHR, wenn der Wert kein Text ist: eine Zahl, eine leere Zelle, WAHR oder FALSCH oder ein Fehler.",
+      args: CHECK.de,
+      example: "=ISTKTEXT(B2)",
+      exampleResult: "WAHR bei einem Messwert, FALSCH bei Text wie „n. b.“.",
+      tip: "Das Gegenteil von ISTTEXT.",
+    },
+  },
   ISERROR: {
     en: { summary: "TRUE for any error value (#DIV/0!, #N/A, #VALUE!…).", args: CHECK.en, example: "=ISERROR(C2/B2)", exampleResult: "TRUE when B2 is empty or 0." },
     de: { summary: "WAHR bei jedem Fehlerwert (#DIV/0!, #NV, #WERT! …).", args: CHECK.de, example: "=ISTFEHLER(C2/B2)", exampleResult: "WAHR, wenn B2 leer oder 0 ist." },
+  },
+  ISERR: {
+    en: {
+      summary: "TRUE for any error value except #N/A (#DIV/0!, #VALUE!…).",
+      args: CHECK.en,
+      example: "=ISERR(NA())",
+      exampleResult: "FALSE: ISERR leaves out #N/A, ISERROR would give TRUE.",
+      tip: "To catch every error, take ISERROR or IFERROR.",
+    },
+    de: {
+      summary: "WAHR bei jedem Fehlerwert außer #NV (#DIV/0!, #WERT! …).",
+      args: CHECK.de,
+      example: "=ISTFEHL(NV())",
+      exampleResult: "FALSCH: ISTFEHL lässt #NV aus, ISTFEHLER gäbe WAHR.",
+      tip: "Um jeden Fehler abzufangen, nimm ISTFEHLER oder WENNFEHLER.",
+    },
   },
   ISNA: {
     en: { summary: "TRUE only for the error #N/A.", args: CHECK.en, example: '=ISNA(MATCH("Tris",A2:A20,0))', exampleResult: "TRUE when Tris isn't in the list." },

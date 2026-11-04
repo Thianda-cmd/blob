@@ -7,7 +7,7 @@
 // An SVG that scales as a whole, like a picture, and follows dark mode through the colour variables.
 
 import { colName } from "@/sheet/a1";
-import { previewLook, type PreviewChart, type SheetPreview } from "@/sheet/doc";
+import { cutText, previewLook, type PreviewChart, type SheetPreview } from "@/sheet/doc";
 import type { SheetColor } from "@/sheet/types";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,9 @@ const tableInk = (c: SheetColor) => `color-mix(in oklab, var(--sheet-${c}) 62%, 
 function fit(text: string, width: number, bold: boolean): string {
   const max = Math.floor((width - 6) / (bold ? CHAR * 1.1 : CHAR));
   if (max <= 0) return "";
-  return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
+  // Cut between characters: half an emoji renders differently on the server and in the browser
+  // (React then rebuilds the whole list, error #418).
+  return text.length <= max ? text : `${cutText(text, Math.max(1, max - 1))}…`;
 }
 
 export function SheetThumb({ preview, className }: { preview: SheetPreview | null | undefined; className?: string }) {

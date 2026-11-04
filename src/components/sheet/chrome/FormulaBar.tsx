@@ -21,6 +21,7 @@ import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { cn } from "@/lib/utils";
 import { areaName, colIndex, colName, parseArea } from "@/sheet/a1";
 import { sheetColor } from "@/sheet/colors";
+import { cutText } from "@/sheet/doc";
 import { editText, errorText, formatValue, isError, toCanonicalFormula, type Calc, type CellValue, type FormulaToken, type FunctionName } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import { MAX_COLS, MAX_ROWS, type Area, type NumberFormat, type Workbook } from "@/sheet/types";
@@ -28,7 +29,7 @@ import { SHEET_EVENT, type SheetEventDetail } from "../events";
 import { fillSelectionWith } from "../grid/actions";
 import { chooseKeypad, keypadContext, keypadFor, useKeypad } from "../grid/keypad";
 import { cycleReference } from "../grid/point";
-import { activeArea, growSheet, openParens, useSheet, type SheetStore } from "../store";
+import { activeArea, growSheet, openParens, typingFormat, useSheet, type SheetStore } from "../store";
 import { insertFunction } from "./actions";
 import { ArgumentHint, localName, SuggestionList } from "./FormulaHelp";
 import { applySuggestion, argumentAt, formulaTokensOf, matchingParens, refColors, suggestFunctions } from "./formulaInput";
@@ -253,18 +254,31 @@ function shown(value: CellValue, fmt: NumberFormat | undefined, locale: Locale):
   return formatValue(value, fmt, locale);
 }
 
-/** The result of a formula being typed, with parentheses still open closed (like Excel's preview); null when it doesn't parse yet. */
-export function previewValue(text: string, locale: Locale, calc: Calc, at: { sheetId: string; row: number; col: number }): CellValue | undefined {
-  // What is still being typed at the end (a separator, an operator) doesn't count yet:
-  // "=MITTELWERT(B2:B7;" shows the mean of B2:B7, not of B2:B7 and an empty 0.
+/**
+ * The formula (canonical) the result shown while typing is worked out from, with parentheses still
+ * open closed (like Excel's preview); undefined when it doesn't parse yet. What is still being typed
+ * at the end (a separator, an operator) doesn't count yet: "=MITTELWERT(B2:B7;" shows the mean of
+ * B2:B7, not of B2:B7 and an empty 0.
+ */
+export function previewFormula(text: string, locale: Locale): string | undefined {
   const body = text.slice(1).replace(/[\s;,:+\-*/^&=<>]+$/, "");
   if (!text.startsWith("=") || !body) return undefined;
   try {
     let canonical = toCanonicalFormula(body, locale);
     const open = openParens(body);
     if (!("formula" in canonical) && open > 0) canonical = toCanonicalFormula(body + ")".repeat(open), locale);
-    if (!("formula" in canonical)) return undefined;
-    return calc.evaluate(canonical.formula, at);
+    return "formula" in canonical ? canonical.formula : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The result of a formula being typed (see previewFormula); undefined when it doesn't parse yet. */
+export function previewValue(text: string, locale: Locale, calc: Calc, at: { sheetId: string; row: number; col: number }): CellValue | undefined {
+  const formula = previewFormula(text, locale);
+  if (formula === undefined) return undefined;
+  try {
+    return calc.evaluate(formula, at);
   } catch {
     return undefined;
   }
@@ -370,16 +384,17 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
   })() : null;
   const error = edit?.error ?? null;
 
-  const fmt = cell?.s?.fmt;
   const preview = useMemo(() => {
     if (!edit || !isFormula) return null;
     const v = previewValue(text, locale, calc, cellPos);
-    if (v === undefined) return null;
-    const s = shown(v, fmt, locale);
-    return s.length > 40 ? `${s.slice(0, 40)}…` : s;
+    const formula = previewFormula(text, locale);
+    if (v === undefined || formula === undefined) return null;
+    // As the cell will show it once entered: =B2-A2 of two times 06:30, not 0,270833333 (typingFormat).
+    const s = shown(v, typingFormat({ workbook, calc }, cellPos.sheetId, cellPos, formula), locale);
+    return s.length > 40 ? `${cutText(s, 40)}…` : s;
     // cellPos is rebuilt every render; its parts are what matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edit, isFormula, text, locale, calc, cellPos.sheetId, cellPos.row, cellPos.col, fmt]);
+  }, [edit, isFormula, text, locale, calc, workbook, cellPos.sheetId, cellPos.row, cellPos.col]);
 
   // A phone's bar is narrow: while a formula is typed here the name box steps aside, the result
   // moves into the help, and the help is one line (the cells under it stay in view to be tapped).
@@ -567,6 +582,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
       pick={pick}
       locale={locale}
       t={t}
+      // (The same words as under the cell's own list.)
+      tapHint={sheetGridText[locale].pickHintTouch}
       typed={text.slice(suggestions.start, caret)}
       onPick={take}
       onHover={(i) => setAssist({ key: assistKey, pick: i, closed: false })}
@@ -592,6 +609,8 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
         )}
         {edit && !readOnly && (
           <>
+            {/* A finger gets 36 × 40 px, like fx beside them: the rest reaches into the bar's padding
+                (not sideways, which would take room from the phone's narrow text field). */}
             <button
               type="button"
               onMouseDown={keepFocus}
@@ -599,7 +618,7 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
               aria-label={t.cancelEdit}
               data-tip={t.cancelEdit}
               data-keys={t.keys.esc}
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-danger [@media(hover:none)]:size-9"
+              className="relative grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-danger [@media(hover:none)]:size-9 [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-y-0.5 [@media(hover:none)]:after:inset-x-0 [@media(hover:none)]:after:content-['']"
             >
               <X className="size-4" />
             </button>
@@ -610,7 +629,7 @@ export function FormulaBar({ store }: { store: SheetStore }): ReactNode {
               aria-label={t.enter}
               data-tip={t.enter}
               data-keys={t.keys.enter}
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ok [@media(hover:none)]:size-9"
+              className="relative grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ok [@media(hover:none)]:size-9 [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-y-0.5 [@media(hover:none)]:after:inset-x-0 [@media(hover:none)]:after:content-['']"
             >
               <Check className="size-4" />
             </button>

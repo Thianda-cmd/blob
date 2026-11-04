@@ -356,8 +356,11 @@ const GridCell = memo(function GridCell(p: CellProps) {
           color: look.color ?? (look.kind === "error" ? "var(--sheet-red)" : undefined),
         }}
       >
+        {/* A smart table's header ends before its button ("Konzentr…"): the box's padding keeps the
+            button's room, but text running on past it would still show between the button and the
+            cell's edge. Other text is cut without dots where its cell (or its spill) ends, as in Excel. */}
         <span
-          className={look.wrap ? "block w-full whitespace-pre-wrap [overflow-wrap:anywhere]" : "whitespace-pre"}
+          className={look.wrap ? "block w-full whitespace-pre-wrap [overflow-wrap:anywhere]" : buttonLabel ? "min-w-0 overflow-hidden text-ellipsis whitespace-pre" : "whitespace-pre"}
           style={look.wrap ? { textAlign: look.align } : undefined}
         >
           {p.text}

@@ -20,7 +20,7 @@ import { sheetChromeText, type SheetChromeText } from "@/i18n/messages/sheetChro
 import { cn } from "@/lib/utils";
 import { FUNCTION_BY_EN, FUNCTION_NAMES, type FunctionCategory, type FunctionName } from "@/sheet/engine";
 import { fnDoc, localName, Syntax } from "./FormulaHelp";
-import { POPULAR_FUNCTIONS } from "./formulaInput";
+import { offeredLater, POPULAR_FUNCTIONS } from "./formulaInput";
 import { foldSearch, functionsForWords } from "./functionWords";
 import { focusGrid } from "./parts";
 
@@ -73,7 +73,7 @@ export function browseFunctions(query: string, category: Category, locale: Local
     const i = POPULAR_FUNCTIONS.indexOf(f.en);
     return i < 0 ? 1000 : i;
   };
-  scored.sort((a, b) => a.score - b.score || older(a.fn) - older(b.fn) || pop(a.fn) - pop(b.fn) || localName(a.fn, locale).localeCompare(localName(b.fn, locale), locale));
+  scored.sort((a, b) => a.score - b.score || Number(offeredLater(a.fn)) - Number(offeredLater(b.fn)) || pop(a.fn) - pop(b.fn) || localName(a.fn, locale).localeCompare(localName(b.fn, locale), locale));
   return scored.map((s) => s.fn);
 }
 
@@ -277,10 +277,10 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
         spellCheck={false}
         autoComplete="off"
         enterKeyHint="search"
-        className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3 [@media(hover:none)]:text-[16px]"
+        className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] [@media(hover:none)]:text-[16px]"
       />
       {query && (
-        <button type="button" onClick={() => setQuery("")} aria-label={t.close} className="grid size-6 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink">
+        <button type="button" onClick={() => setQuery("")} aria-label={t.clearSearch} className="grid size-6 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink">
           <X className="size-3.5" />
         </button>
       )}

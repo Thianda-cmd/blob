@@ -30,37 +30,36 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import type { MenuPoint } from "@/components/ui/ContextMenu";
+import { closesPanel, type MenuPoint } from "@/components/ui/ContextMenu";
 import { useKeyboard } from "@/components/ui/useKeyboard";
 import { useIsMac, useTouch } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
-import { areaName, cellKey, inArea, parseKey } from "@/sheet/a1";
+import { areaName, cellKey, parseKey } from "@/sheet/a1";
 import { isError, type Calc, type CellError } from "@/sheet/engine";
 import { setColWidths, setRowHeights, sheetById } from "@/sheet/ops";
 import { DEFAULT_COL_W, DEFAULT_ROW_H, MAX_ROWS, type Area, type Pos, type Sheet } from "@/sheet/types";
 import { cn } from "@/lib/utils";
 import { useChartUi } from "../chart/selection";
 import { errorHelp } from "../chrome/errorHelp";
+import { currentSheetNotice, noticeDuration, showSheetNotice, useSheetNotice } from "../notice";
 import { activeArea, mainArea, rowHiddenIn, selectionAreas, useSheet, type SheetStore } from "../store";
 import { fillTo, fitColumns, fitRows, isSelected, menuKindFor, selectedIndexes, addRoom, unhideNear } from "./actions";
 import { BASE_FONT, CELL_PAD, numberAsText, numberLike, shownText } from "./cellLook";
 import { CellEditor } from "./CellEditor";
 import { copySelection, pasteData, type PasteMode } from "./clipboard";
-import { Chooser, GridMenu, NotePopover, type MenuKind } from "./ContextMenu";
+import { Chooser, GridMenu, NotePopover, pasteFromMenu, type MenuKind } from "./ContextMenu";
+import { FillHint, type FillHintPlace } from "./FillHint";
 import {
   buildLayout,
   cellRect,
-  colAt,
   colWidth,
   contentToView,
   geometryOf,
   hitTest,
   renderWindow,
-  rowAt,
   rowHeight,
   scrollToShow,
-  viewToContent,
   type Hit,
   type Layout,
   type Scroll,
@@ -71,8 +70,9 @@ import { ColumnHeaders, CornerHeader, RowHeaders } from "./Headers";
 import { handleGridKey } from "./keys";
 import { LINE_HEIGHT, resetMeasure, setMeasureFamily, wrappedLines } from "./measure";
 import { fillDownEnd } from "./navigation";
-import { formulaTokens, pointAt, pointing, refFrames } from "./point";
+import { extendSelection, formulaTokens, pointAt, pointing, refFrames, resizedCorner } from "./point";
 import { SelectionLayer, type Bounds, type RefFrame } from "./Selection";
+import { dragCell, fillTarget, noticeBeside, noticeTop, scrollSpeed, shownBottom, shownCells } from "./shown";
 
 /** Extra look for a cell, from a smart table (header row, banding, totals row). */
 export type CellDecor = {
@@ -148,10 +148,10 @@ const HANDLE_SLOP = 6;
 type Box = { x: number; y: number; w: number; h: number };
 
 /**
- * A finger that is down but not yet a gesture: lifting it is a tap, holding it opens the menu,
- * moving it scrolls the sheet (on a cell) or starts a drag (a handle, the column letters or row
- * numbers; from a border between them, resizing). `handle`: it came down on a selection or fill
- * handle.
+ * A finger that is down but not yet a gesture: lifting it is a tap, holding it opens the menu
+ * (while a formula wants a reference: points at the cell, like a tap), moving it scrolls the sheet
+ * (on a cell) or starts a drag (a handle, the column letters or row numbers; from a border between
+ * them, resizing). `handle`: it came down on a selection or fill handle.
  */
 type Pending = {
   id: number;
@@ -162,11 +162,14 @@ type Pending = {
   /** The handle's visible dot (its box's centre), on screen. */
   dot: { x: number; y: number } | null;
   long: boolean;
+  /** Held on a cell while a formula wanted a reference: it points there, and moving on takes in the cells up to the finger. */
+  pointed: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 };
 
 type Drag =
-  | { kind: "cells"; id: number; anchor: Pos; extra: Area[] }
+  // shift: Shift was held, so the drag extends the selection as one range (extendSelection).
+  | { kind: "cells"; id: number; anchor: Pos; extra: Area[]; shift: boolean }
   | { kind: "cols"; id: number; anchor: number; extra: Area[] }
   | { kind: "rows"; id: number; anchor: number; extra: Area[] }
   | { kind: "point"; id: number; anchor: Pos; axis: "cells" | "cols" | "rows" }
@@ -209,26 +212,41 @@ function tallRows(sheet: Sheet, calc: Calc, locale: Locale, fonts: number): Read
   return out ?? NO_ROWS;
 }
 
-/** How much of the grid's height shows above the on-screen keyboard (the visual viewport ends there), less a small margin. */
-function shownHeight(el: HTMLElement): number {
-  const vv = window.visualViewport;
+/** How much of the grid's height can be seen, above docked settings and the on-screen keyboard (see shownBottom, also for `least`), less `margin`. */
+function shownHeight(el: HTMLElement, margin = 0, least = 0): number {
   const r = el.getBoundingClientRect();
-  const bottom = Math.min(r.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight);
-  return Math.max(0, Math.min(el.clientHeight, bottom - r.top - el.clientTop - 12));
+  return Math.max(0, Math.min(el.clientHeight, shownBottom(el, least) - r.top - el.clientTop - margin));
 }
 
-/** The target of a fill-handle drag: the selection stretched toward the pointer, along the way it moved most. */
-function fillTarget(from: Area, p: Pos): Area | null {
-  if (inArea(from, p.row, p.col)) return null;
-  const down = p.row - from.r1;
-  const up = from.r0 - p.row;
-  const right = p.col - from.c1;
-  const left = from.c0 - p.col;
-  const vertical = Math.max(down, up);
-  const horizontal = Math.max(right, left);
-  if (vertical >= horizontal && vertical > 0) return down > 0 ? { ...from, r1: p.row } : { ...from, r0: p.row };
-  if (horizontal > 0) return right > 0 ? { ...from, c1: p.col } : { ...from, c0: p.col };
-  return null;
+/** How far down from the grid's top its cells must show to keep `row` in view: the column letters, the frozen rows and that row. */
+const keepRoom = (l: Layout, row: number) => l.headerH + l.frozenH + (rowHeight(l, row) || Math.round(DEFAULT_ROW_H * l.zoom));
+
+/** Column `col`'s cells across the screen (viewport x), with the grid scrolled `left` px sideways. */
+function columnSpan(el: HTMLElement, l: Layout, col: number, left: number): { left: number; right: number } {
+  const cell = cellRect(l, 0, col);
+  const x = el.getBoundingClientRect().left + el.clientLeft + l.headerW + cell.x - (col < l.freezeCols ? 0 : left);
+  return { left: x, right: x + cell.w };
+}
+
+/** The least room beside the cell being typed in for the sheet's notices: a 16rem card and the 12 px either side of it. */
+const NOTICE_ROOM = 280;
+
+/**
+ * Where the sheet's notices go across the editor (SheetNotice.tsx reads --sheet-notice-left and
+ * --sheet-notice-right from it): beside the cell being typed in (`cell`) while the on-screen
+ * keyboard is up (`typing`) and leaves no room for them above its row (see noticeBeside; `need`:
+ * how far down from the grid's top it shows that row, plus a gap), else across it as always.
+ */
+function placeNotices(el: HTMLElement, typing: boolean, cell: { left: number; right: number }, need: number) {
+  const editor = el.closest<HTMLElement>("[data-sheet-editor]");
+  if (!editor) return;
+  const holder = typing ? editor.querySelector<HTMLElement>("[data-sheet-notice]")?.parentElement : null;
+  const box = holder?.offsetParent?.getBoundingClientRect();
+  const at = holder && box ? noticeBeside(holder.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientTop, need, cell, box, NOTICE_ROOM) : null;
+  for (const side of ["left", "right"] as const) {
+    if (at) editor.style.setProperty(`--sheet-notice-${side}`, `${at[side]}px`);
+    else editor.style.removeProperty(`--sheet-notice-${side}`);
+  }
 }
 
 export function Grid({ store, decorate, overlay, contextMenu, className }: GridProps): ReactNode {
@@ -268,7 +286,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   /** Filling by touch ("Ausfüllen" in the menu): for this selection, the bottom-right handle fills instead of selecting. */
   const [fillFor, setFillFor] = useState<{ sheetId: string; area: Area } | null>(null);
   const [tip, setTip] = useState<Tip | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  /** What filling by touch says showing, and where (see FillHint); `notice`: the sheet notice showing when it came up (see showFillHint). */
+  const [fillHint, setFillHint] = useState<(FillHintPlace & { notice: number | null }) | null>(null);
   const [said, setSaid] = useState("");
 
   // Sizes of everything, and what is on screen.
@@ -281,7 +300,9 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   const win = renderWindow(layout, scroll, view, SLACK);
 
   const areas = useMemo(() => selectionAreas(selection), [selection]);
-  const main = useMemo(() => mainArea(selection), [selection]);
+  // The selected range (where the handles go): also the block Ctrl+A selected, or the range Enter
+  // walks through, while the active cell sits inside it.
+  const main = useMemo(() => activeArea(selection), [selection]);
   const active = selection.anchor;
   // A chart selected on this sheet has the keyboard (its frame shows it): meanwhile the cells'
   // selection is only a faint outline, without its fill, handles and header highlight, so only one
@@ -352,9 +373,10 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     };
   }, []);
 
-  // Typing into a cell on a tablet: the on-screen keyboard must not hide the cell being edited.
-  // (Typing in the formula bar it may: the bar shows the formula, and scrolling the cell up would
-  // push the data at the top, the cells a formula points at, out of view.)
+  // Typing into a cell on a tablet: the on-screen keyboard, or settings docked over the grid's
+  // lower part, must not hide the cell being edited. (Typing in the formula bar it may: the bar
+  // shows the formula, and scrolling the cell up would push the data at the top, the cells a
+  // formula points at, out of view.)
   const keyboard = useKeyboard();
   const editRow = edit && edit.sheetId === sheetId && edit.via === "cell" ? edit.row : -1;
   const editCol = edit && edit.sheetId === sheetId && edit.via === "cell" ? edit.col : -1;
@@ -366,9 +388,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const el = scroller.current;
     const field = textarea.current;
     if (!el || !field || editRow < 0 || !keyboard.open) return;
-    const vv = window.visualViewport;
-    const bottom = Math.min(el.getBoundingClientRect().bottom, vv ? vv.offsetTop + vv.height : window.innerHeight);
-    const over = field.getBoundingClientRect().bottom + 12 - bottom;
+    const over = field.getBoundingClientRect().bottom + 12 - shownBottom(el, keepRoom(latest.current.layout, editRow));
     if (over > 0) el.scrollTop += over;
   }, [keyboard.open, keyboard.height, view.h, editRow, editCol]);
 
@@ -382,22 +402,32 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   const shownSheet = useRef(sheetId);
   const shownFocus = useRef({ row: focusRow, col: focusCol });
   const restored = useRef<{ row: number; col: number } | null>(null);
-  /** Where a selection made for a menu ended (see selectForMenu): not brought into view, that scroll would close the menu. */
+  /**
+   * Where a selection made for a menu ended (see selectForMenu): not brought into view, that scroll
+   * would close the menu. Nor where a drag moved it (updateDrag): that cell is on screen already
+   * and the drag scrolls on by itself (autoScroll). Bringing a cell only partly shown at the edge
+   * fully into view as well would let the drag reach the next one, and so on, a row each frame.
+   */
   const stay = useRef<Pos | null>(null);
+  /** What the pointer is dragging (see press): meanwhile the selection isn't kept clear of a notice. */
+  const drag = useRef<Drag | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el || shownSheet.current === sheetId) return;
     scrolls.current.set(shownSheet.current, { left: el.scrollLeft, top: el.scrollTop, ...shownFocus.current });
     shownSheet.current = sheetId;
+    // (Where a menu or a drag left the selection was on the sheet left behind.)
+    stay.current = null;
     const back = scrolls.current.get(sheetId);
     el.scrollTo({ left: back?.left ?? 0, top: back?.top ?? 0 });
     restored.current = back ? { row: back.row, col: back.col } : null;
   }, [sheetId]);
 
   // The moving end of the selection stays in view (keys, Enter, pointing at cells for a formula),
-  // above the on-screen keyboard while it is open (typing a column of values, Enter after Enter).
-  // Whole columns only scroll sideways and whole rows only up and down: clicking a column's
-  // letter doesn't jump to its last row.
+  // above settings docked over the grid's lower part and above the on-screen keyboard while it is
+  // open (typing a column of values, Enter after Enter). Whole columns only scroll sideways and
+  // whole rows only up and down: clicking a column's letter doesn't jump to its last row. (A drag
+  // keeps its own moving end in view, see stay.)
   useLayoutEffect(() => {
     const back = restored.current;
     restored.current = null;
@@ -412,12 +442,48 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const a = mainArea(store.get().selection);
     const wholeCols = a.r0 === 0 && a.r1 >= l.rows - 1;
     const wholeRows = a.c0 === 0 && a.c1 >= l.cols - 1;
-    const h = latestKeyboard.current ? shownHeight(el) : el.clientHeight;
-    const next = scrollToShow(l, { row: focusRow, col: focusCol }, { left: el.scrollLeft, top: el.scrollTop }, { w: el.clientWidth, h });
+    // (A little room above the keyboard, so the caret isn't right at its edge.) Nor under the
+    // notice at the bottom (SheetNotice.tsx) when its card is over the cell's column: the "1.234"
+    // hint stays while the next values are typed down a column. Where the keyboard leaves no room
+    // for the card above the cell's row (a phone held sideways), the card goes beside the cell
+    // first (placeNotices). Not while the pointer drags: the drag goes by the cells that can be
+    // seen (dragCell, autoScroll), and a press beside the card or on a cell half under it doesn't
+    // scroll.
+    const least = keepRoom(l, focusRow);
+    const shown = { w: el.clientWidth, h: shownHeight(el, latestKeyboard.current ? 12 : 0, least) };
+    const from = { left: el.scrollLeft, top: el.scrollTop };
+    let next = scrollToShow(l, { row: focusRow, col: focusCol }, from, shown);
+    if (!drag.current) {
+      const box = el.getBoundingClientRect();
+      const x = columnSpan(el, l, focusCol, next.left);
+      placeNotices(el, latestKeyboard.current, x, least + 8);
+      const notice = noticeTop(el, x.left, x.right);
+      if (notice !== null) next = scrollToShow(l, { row: focusRow, col: focusCol }, from, { ...shown, h: Math.min(shown.h, Math.max(least, notice - box.top - el.clientTop - 8)) });
+    }
     const left = wholeRows ? el.scrollLeft : next.left;
     const top = wholeCols ? el.scrollTop : next.top;
     if (Math.abs(left - el.scrollLeft) > 0.5 || Math.abs(top - el.scrollTop) > 0.5) el.scrollTo({ left, top });
   }, [focusRow, focusCol, sheetId, ready, store]);
+
+  // After Ctrl+A the active cell stays put while Shift moves the far corner of the block around
+  // it (extendSelection in point.ts): that corner is then the moving end to keep in view (the
+  // effect above follows the focus, which stays on the active cell). Whole columns only scroll
+  // sideways and whole rows only up and down, and where a drag left the corner it stays.
+  useLayoutEffect(() => {
+    const corner = resizedCorner(store, selection);
+    const el = scroller.current;
+    if (!corner || !el || !el.clientWidth) return;
+    const kept = stay.current;
+    stay.current = null;
+    if (kept && kept.row === corner.row && kept.col === corner.col) return;
+    const l = latest.current.layout;
+    const a = activeArea(selection);
+    const shown = { w: el.clientWidth, h: shownHeight(el, latestKeyboard.current ? 12 : 0, keepRoom(l, corner.row)) };
+    const next = scrollToShow(l, corner, { left: el.scrollLeft, top: el.scrollTop }, shown);
+    const left = a.c0 === 0 && a.c1 >= l.cols - 1 ? el.scrollLeft : next.left;
+    const top = a.r0 === 0 && a.r1 >= l.rows - 1 ? el.scrollTop : next.top;
+    if (Math.abs(left - el.scrollLeft) > 0.5 || Math.abs(top - el.scrollTop) > 0.5) el.scrollTo({ left, top });
+  }, [selection, store]);
 
   // Zooming around a point (Ctrl+wheel, pinch): that point of the sheet stays under the pointer.
   const zoomAnchor = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
@@ -461,18 +527,54 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   // Pointer: mouse and pen select by pressing and dragging; a finger scrolls, taps select, a
   // tap on the active cell (or a double tap) edits, a long press opens the menu, two fingers zoom.
 
-  const drag = useRef<Drag | null>(null);
   const lastPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  /** The drag going on is a finger's: it scrolls the grid more gently (see autoScroll). */
+  const dragFinger = useRef(false);
   const autoFrame = useRef<number | null>(null);
   const touch = useRef<Pending | null>(null);
   const lastTap = useRef<{ at: number; row: number; col: number } | null>(null);
   const lastLongPress = useRef(0);
-  /** A long press opened the menu: the finger must not scroll the sheet any more, nor click whatever is under it when it lifts (see the touch listeners). */
+  /** A long press opened the menu (or pointed at a cell for a formula): the finger must not scroll the sheet any more, nor click whatever is under it when it lifts (see the touch listeners). */
   const swallowClick = useRef(false);
   const hoverKey = useRef("");
   const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fillHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pasteMode = useRef<PasteMode>("all");
+  // Whether the page may read the clipboard without asking (Chrome, once allowed). Then Ctrl+Shift+V
+  // reads it itself, as the menu's "Nur Werte einfügen" does: the browser's own paste event carries
+  // only plain text there, without the copy's text marks ('007) and exact numbers.
+  const canRead = useRef(false);
+  useEffect(() => {
+    let status: PermissionStatus | null = null;
+    navigator.permissions
+      ?.query({ name: "clipboard-read" as PermissionName })
+      .then((st) => {
+        status = st;
+        canRead.current = st.state === "granted";
+        st.onchange = () => {
+          canRead.current = st.state === "granted";
+        };
+      })
+      .catch(() => {});
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, []);
+
+  // A finger coming down while a menu, popover or card that closes on a press outside it is open
+  // (the grid's menu, the insert/delete chooser, the note card, the toolbar's "Mehr" and its other
+  // popovers, a smart table column's menu: see useClosesOutside) closes it (their own listeners on
+  // the document); see onPointerDown. Its press is noted here, at the window, before they close: by
+  // the time the grid hears of it React may already show them closed. Mouse and pen clicks close
+  // them and act as before.
+  const closedBy = useRef<PointerEvent | null>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && closesPanel(e.target)) closedBy.current = e;
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, []);
 
   const local = (clientX: number, clientY: number) => {
     const el = scroller.current!;
@@ -483,12 +585,14 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const { px, py, el } = local(clientX, clientY);
     return hitTest(latest.current.layout, px, py, { left: el.scrollLeft, top: el.scrollTop }, slop);
   };
-  /** The cell under a point, clamped into the sheet (dragging beyond the edges keeps going). */
+  /**
+   * The cell a drag is over, kept inside the sheet and inside the cells that can be seen: dragging
+   * beyond them (past the grid's edge, over docked settings or the keyboard) stays on the last one
+   * while the grid scrolls on (see autoScroll), so nothing out of sight gets selected or filled.
+   */
   const cellAtClient = (clientX: number, clientY: number): Pos => {
     const { px, py, el } = local(clientX, clientY);
-    const l = latest.current.layout;
-    const c = viewToContent(l, Math.max(px, l.headerW), Math.max(py, l.headerH), { left: el.scrollLeft, top: el.scrollTop });
-    return { row: rowAt(l, c.y), col: colAt(l, c.x) };
+    return dragCell(latest.current.layout, px, py, { left: el.scrollLeft, top: el.scrollTop }, { w: el.clientWidth, h: shownHeight(el) });
   };
   /** A cell's box on screen (viewport coordinates). */
   const cellBox = (p: Pos): Box => {
@@ -500,11 +604,14 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     return { x: r.left + el.clientLeft + v.x, y: r.top + el.clientTop + v.y, w: c.w, h: c.h };
   };
 
-  const notify = useCallback((text: string) => {
-    setNotice(text);
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(null), 4500);
-  }, []);
+  // What the cells' menu has to say (nothing to paste…) is one of the sheet's notices: it shows
+  // above settings docked over the grid, is announced, and can be closed (notice.ts).
+  const notify = useCallback(
+    (text: string) => {
+      showSheetNotice(store, text);
+    },
+    [store],
+  );
   const saidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Tell screen readers (copied, cut…) for a moment; then the selection is announced again. */
   const say = (text: string) => {
@@ -512,6 +619,117 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     if (saidTimer.current) clearTimeout(saidTimer.current);
     saidTimer.current = setTimeout(() => setSaid(""), 2500);
   };
+
+  /**
+   * Filling by touch says how it works (after "Ausfüllen …" in the menu, and when the fill square
+   * is tapped): over the cells that can be seen, away from the square (FillHint), for as long as
+   * reading it takes. It goes sooner once the square is dragged, the sheet scrolls, what can be seen
+   * of it changes, or filling by touch ends.
+   */
+  const showFillHint = () => {
+    const el = scroller.current;
+    if (!el) return;
+    const a = activeArea(store.get().selection);
+    const corner = cellBox({ row: a.r1, col: a.c1 });
+    const y = corner.y + corner.h;
+    // The square sits on the selection's bottom-right corner, in a finger-sized box (44 px).
+    const keep = { top: Math.min(cellBox({ row: a.r0, col: a.c0 }).y, y - 22), bottom: y + 22 };
+    const cells = shownCells(el, latest.current.layout.headerH);
+    // A notice at the bottom of the editor (the "1.234" hint with its button, say) stays readable:
+    // the hint keeps above it (its floor), while what can be seen of the cells stays as measured (the
+    // check below compares that).
+    setFillHint({ ...cells, keep, floor: noticeTop(el, cells.left, cells.right), notice: currentSheetNotice(store)?.id ?? null });
+    say(t.fillByTouch);
+    if (fillHintTimer.current) clearTimeout(fillHintTimer.current);
+    fillHintTimer.current = setTimeout(() => setFillHint(null), noticeDuration(t.fillByTouch, "info"));
+  };
+  const hideFillHint = useCallback(() => {
+    if (fillHintTimer.current) clearTimeout(fillHintTimer.current);
+    fillHintTimer.current = null;
+    setFillHint(null);
+  }, []);
+  // The hint was placed for the cells that could be seen when it came up. When those change
+  // (docked settings come, go or change size, the on-screen keyboard comes or goes, the screen
+  // turns), it goes, as when the sheet scrolls: it could now cover the square or float over the
+  // settings. A tap on the square shows it again.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!fillHint || !el) return;
+    const editor = el.closest("[data-sheet-editor]");
+    const dock = editor?.querySelector(":scope > [data-sheet-dock]");
+    const check = () => {
+      const now = shownCells(el, latest.current.layout.headerH);
+      const off = Math.max(Math.abs(now.top - fillHint.top), Math.abs(now.bottom - fillHint.bottom), Math.abs(now.left - fillHint.left), Math.abs(now.right - fillHint.right));
+      if (off > 1) hideFillHint();
+    };
+    const sizes = new ResizeObserver(check);
+    sizes.observe(el);
+    if (dock) sizes.observe(dock);
+    // Settings docked or closed meanwhile.
+    const docking = new MutationObserver(check);
+    if (editor) docking.observe(editor, { childList: true });
+    const vv = window.visualViewport;
+    window.addEventListener("resize", check);
+    vv?.addEventListener("resize", check);
+    return () => {
+      sizes.disconnect();
+      docking.disconnect();
+      window.removeEventListener("resize", check);
+      vv?.removeEventListener("resize", check);
+    };
+  }, [fillHint, hideFillHint]);
+  // A notice that comes up after it (not the one it keeps above) shows at the bottom of what can be
+  // seen, where the hint may be: the hint goes too. A tap on the square shows it again, clear of it.
+  const noticeId = useSheetNotice(store)?.id ?? null;
+  if (fillHint && noticeId !== null && noticeId !== fillHint.notice) setFillHint(null);
+
+  // The sheet's notices (SheetNotice.tsx) stay above the on-screen keyboard: how much of the editor
+  // is under it, below what can be seen (the visual viewport, also after the browser has panned to
+  // the cell being typed in), goes on the editor as --sheet-kb. Measured again as the keyboard or
+  // the pan changes, and as the editor changes size (on phones it grows down to the screen's edge
+  // as the app's tabs give way to the keyboard). Where that leaves no room for a notice above the
+  // row being typed in, the notice goes beside the cell (placeNotices), also when one comes up or
+  // the grid is scrolled sideways meanwhile. Here rather than in SheetEditor: the grid follows the
+  // keyboard anyway, and it can only tell where the notice goes once it is above the keyboard.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const editor = el?.closest<HTMLElement>("[data-sheet-editor]");
+    if (!el || !editor) return;
+    const vv = window.visualViewport;
+    const place = () => {
+      if (drag.current) return;
+      const l = latest.current.layout;
+      const { row, col } = shownFocus.current;
+      placeNotices(el, keyboard.open, columnSpan(el, l, col, el.scrollLeft), keepRoom(l, row) + 8);
+    };
+    const measure = () => {
+      const seen = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const over = keyboard.open ? editor.getBoundingClientRect().bottom - seen : 0;
+      editor.style.setProperty("--sheet-kb", `${Math.max(0, Math.round(over))}px`);
+      place();
+    };
+    measure();
+    const sizes = new ResizeObserver(measure);
+    sizes.observe(editor);
+    if (keyboard.open) {
+      el.addEventListener("scroll", place, { passive: true });
+      vv?.addEventListener("resize", measure);
+      vv?.addEventListener("scroll", measure);
+    }
+    return () => {
+      sizes.disconnect();
+      el.removeEventListener("scroll", place);
+      vv?.removeEventListener("resize", measure);
+      vv?.removeEventListener("scroll", measure);
+    };
+  }, [keyboard.open, noticeId, zoom]);
+  // (Gone with the grid: only it keeps them up to date.)
+  useLayoutEffect(() => {
+    const editor = scroller.current?.closest<HTMLElement>("[data-sheet-editor]");
+    return () => {
+      for (const name of ["--sheet-kb", "--sheet-notice-left", "--sheet-notice-right"]) editor?.style.removeProperty(name);
+    };
+  }, []);
 
   const tipFor = (p: Pos): Tip | null => {
     const s = store.get();
@@ -549,19 +767,25 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const R = sh.size.rows - 1;
     const C = sh.size.cols - 1;
     const l = latest.current.layout;
+    /** The selection's moving end, where the drag puts it: left where it is (see stay). */
+    const end = (focus: Pos) => {
+      stay.current = focus;
+      return focus;
+    };
     switch (d.kind) {
       case "cells":
-        store.select({ anchor: d.anchor, focus: cellAtClient(clientX, clientY), extra: d.extra });
+        if (d.shift) extendSelection(store, end(cellAtClient(clientX, clientY)));
+        else store.select({ anchor: d.anchor, focus: end(cellAtClient(clientX, clientY)), extra: d.extra });
         return;
       case "cols":
-        store.select({ anchor: { row: 0, col: d.anchor }, focus: { row: R, col: cellAtClient(clientX, clientY).col }, extra: d.extra });
+        store.select({ anchor: { row: 0, col: d.anchor }, focus: end({ row: R, col: cellAtClient(clientX, clientY).col }), extra: d.extra });
         return;
       case "rows":
-        store.select({ anchor: { row: d.anchor, col: 0 }, focus: { row: cellAtClient(clientX, clientY).row, col: C }, extra: d.extra });
+        store.select({ anchor: { row: d.anchor, col: 0 }, focus: end({ row: cellAtClient(clientX, clientY).row, col: C }), extra: d.extra });
         return;
       case "point": {
         const p = cellAtClient(clientX, clientY);
-        pointAt(store, d.anchor, d.axis === "cols" ? { row: R, col: p.col } : d.axis === "rows" ? { row: p.row, col: C } : p);
+        pointAt(store, d.anchor, end(d.axis === "cols" ? { row: R, col: p.col } : d.axis === "rows" ? { row: p.row, col: C } : p));
         return;
       }
       case "fill": {
@@ -573,7 +797,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       case "handle": {
         const p = cellAtClient(clientX, clientY);
         const m = d.main;
-        if (d.corner === "br") store.select({ anchor: { row: m.r0, col: m.c0 }, focus: p, extra: [] });
+        if (d.corner === "br") store.select({ anchor: { row: m.r0, col: m.c0 }, focus: end(p), extra: [] });
         else store.select({ anchor: p, focus: { row: m.r1, col: m.c1 }, extra: [] });
         return;
       }
@@ -598,34 +822,54 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     }
   };
 
-  /** While dragging near or past an edge, the grid scrolls that way (faster the further out). */
+  /**
+   * While dragging near or past an edge, the grid scrolls that way, faster the further out, and more
+   * gently for a finger (scrollSpeed). The bottom edge is where the cells stop being seen: the top
+   * of settings docked over the grid, or of the on-screen keyboard. It goes by the time passed, not
+   * by frames, so a 120 Hz screen doesn't scroll twice as fast.
+   */
   const autoScroll = () => {
     stopAuto();
-    const step = () => {
+    let last = 0;
+    // Whole pixels each frame; what is left over goes into the next one (a finger's slowest speed
+    // is less than a pixel a frame).
+    let carryX = 0;
+    let carryY = 0;
+    const step = (now: number) => {
       const d = drag.current;
       const el = scroller.current;
       if (!d || !el || d.kind === "colSize" || d.kind === "rowSize") {
         autoFrame.current = null;
         return;
       }
+      // (A frame that came late counts for 50 ms at most.)
+      const dt = last ? Math.min(50, now - last) / 1000 : 1 / 60;
+      last = now;
       const l = latest.current.layout;
       const r = el.getBoundingClientRect();
       const { x, y } = lastPoint.current;
       const edge = 28;
       const top = r.top + l.headerH + l.frozenH;
       const left = r.left + l.headerW + l.frozenW;
-      const bottom = r.top + el.clientHeight;
+      const bottom = shownBottom(el);
       const right = r.left + el.clientWidth;
-      const speed = (dist: number) => Math.min(48, 2 + dist / 2.5);
+      const down = (dist: number) => scrollSpeed(dist, edge, DEFAULT_ROW_H * l.zoom, dragFinger.current) * dt;
+      const across = (dist: number) => scrollSpeed(dist, edge, DEFAULT_COL_W * l.zoom, dragFinger.current) * dt;
       let dx = 0;
       let dy = 0;
-      if (d.kind !== "cols" && y > bottom - edge) dy = speed(y - (bottom - edge));
-      else if (d.kind !== "cols" && y < top + edge && el.scrollTop > 0) dy = -speed(top + edge - y);
-      if (d.kind !== "rows" && x > right - edge) dx = speed(x - (right - edge));
-      else if (d.kind !== "rows" && x < left + edge && el.scrollLeft > 0) dx = -speed(left + edge - x);
-      if (dx || dy) {
-        el.scrollLeft += dx;
-        el.scrollTop += dy;
+      if (d.kind !== "cols" && y > bottom - edge) dy = down(y - (bottom - edge));
+      else if (d.kind !== "cols" && y < top + edge && el.scrollTop > 0) dy = -down(top + edge - y);
+      if (d.kind !== "rows" && x > right - edge) dx = across(x - (right - edge));
+      else if (d.kind !== "rows" && x < left + edge && el.scrollLeft > 0) dx = -across(left + edge - x);
+      carryX = dx ? carryX + dx : 0;
+      carryY = dy ? carryY + dy : 0;
+      const sx = Math.trunc(carryX);
+      const sy = Math.trunc(carryY);
+      carryX -= sx;
+      carryY -= sy;
+      if (sx || sy) {
+        el.scrollLeft += sx;
+        el.scrollTop += sy;
         updateDrag(d, x, y);
       }
       autoFrame.current = requestAnimationFrame(step);
@@ -691,15 +935,18 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const follow = (d: Drag) => {
       if (!drags) return;
       drag.current = d;
+      dragFinger.current = e.pointerType === "touch";
       lastPoint.current = { x: e.clientX, y: e.clientY };
       e.currentTarget.setPointerCapture(id);
     };
     if (handle === "fill") {
+      // The hint has done its job, and would hide the cells being filled.
+      hideFillHint();
       follow({ kind: "fill", id, from: activeArea(sel), to: null });
       return;
     }
     if (handle === "tl" || handle === "br") {
-      follow({ kind: "handle", id, corner: handle, main: mainArea(sel) });
+      follow({ kind: "handle", id, corner: handle, main: activeArea(sel) });
       return;
     }
     if (!s.readOnly && hit.kind === "colHeader" && hit.edge !== null) {
@@ -759,9 +1006,10 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
           }
         }
       }
-      if (e.shiftKey) store.select({ anchor: sel.anchor, focus: p, extra: sel.extra });
+      // Shift: one range up to here, also from a block Ctrl+A selected around the active cell.
+      if (e.shiftKey) extendSelection(store, p);
       else store.select({ anchor: p, focus: p, extra });
-      if (!store.get().edit) follow({ kind: "cells", id, anchor: e.shiftKey ? sel.anchor : p, extra: e.shiftKey ? sel.extra : extra });
+      if (!store.get().edit) follow({ kind: "cells", id, anchor: p, extra, shift: e.shiftKey });
     }
     if (!store.get().edit) focusGrid();
   };
@@ -799,7 +1047,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       textarea.current?.focus({ preventScroll: true });
       return;
     }
-    if (e.shiftKey) store.select({ anchor: s.selection.anchor, focus: p, extra: s.selection.extra });
+    if (e.shiftKey) extendSelection(store, p);
     else store.select(p);
     if (store.get().edit) return;
     focusGrid();
@@ -814,6 +1062,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
    * isn't scrolled into view, as that scroll would close the menu again at once.
    */
   const selectForMenu = (hit: Hit) => {
+    // Never while a formula wants a reference: selecting would end the formula half-typed.
+    if (pointing(store)) return;
     const s = store.get();
     const sh = sheetById(s.workbook, s.sheetId)!;
     const R = sh.size.rows - 1;
@@ -841,6 +1091,10 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const sh = sheetById(s.workbook, s.sheetId);
     if (!sh || s.edit) return;
     setTip(null);
+    // A finger's menu is about the cells, not typing: the empty cell editor lets go of the
+    // on-screen keyboard it kept up for the next value (see CellEditor) before the menu finds its
+    // place, so the menu gets the whole screen.
+    if (at.finger) focusGrid();
     setMenu({ at, kind: menuKindFor(s.selection, sh) });
   };
 
@@ -850,6 +1104,20 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     tp.long = true;
     tp.timer = null;
     lastLongPress.current = clock();
+    // While a formula wants a reference, a cell held a little long (a careful finger) is pointed at
+    // like a tapped one, and moving on from there takes in the cells up to the finger (see
+    // onPointerMove). No menu: selecting for it would end the formula half-typed. Lifting the
+    // finger clicks nothing.
+    if (pointing(store)) {
+      swallowClick.current = true;
+      if (tp.hit.kind !== "cell") return;
+      const p = { row: tp.hit.row, col: tp.hit.col };
+      setFillFor(null);
+      pointAt(store, p, p);
+      keepTyping();
+      tp.pointed = true;
+      return;
+    }
     // A finger held on a handle's dot holds the selection's corner: the menu is for the selection.
     // Elsewhere in the handle's box it is held on the cell under it (the boxes reach into the neighbours).
     if (!onDot(tp, tp.x, tp.y)) {
@@ -871,6 +1139,19 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     swallowClick.current = false;
+    // A finger that came down to close a menu, a popover or the note card (see closedBy) only
+    // closes it, as with the system's own menus: no tap (that would start editing a cell tapped
+    // twice), no long press. It may still scroll the sheet. The keyboard, should it have gone with
+    // what closed (a column's menu holds it), comes back to the cells, for a keyboard at hand.
+    const closing = closedBy.current === e.nativeEvent;
+    closedBy.current = null;
+    if (closing) {
+      requestAnimationFrame(() => {
+        const at = document.activeElement;
+        if (!at || at === document.body) focusGrid();
+      });
+      return;
+    }
     const target = e.target as HTMLElement;
     // (A finger the browser moved onto a table header's button from the cell below is for that cell.)
     if (target.closest("[data-grid-overlay], [data-grid-ignore], textarea, input, button, a, [role=listbox], [role=dialog]") && !movedOntoButton(e)) return;
@@ -895,7 +1176,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       cancelTouch();
       const r = handleEl?.getBoundingClientRect();
       const dot = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
-      touch.current = { id: e.pointerId, x: e.clientX, y: e.clientY, hit, handle, dot, long: false, timer: setTimeout(longPress, LONG_PRESS) };
+      touch.current = { id: e.pointerId, x: e.clientX, y: e.clientY, hit, handle, dot, long: false, pointed: false, timer: setTimeout(longPress, LONG_PRESS) };
       return;
     }
     press(e, hit, handle);
@@ -914,8 +1195,9 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       if (Math.hypot(e.clientX - tp.x, e.clientY - tp.y) <= (tp.handle ? HANDLE_SLOP : TOUCH_SLOP)) return;
       cancelTouch();
       // After a long press (the menu is open) moving does nothing more; on a cell the finger scrolls
-      // the sheet (the browser does that). On a handle or a header it drags from where it came down.
-      if (tp.long || (!tp.handle && tp.hit.kind === "cell")) return;
+      // the sheet (the browser does that). On a handle or a header it drags from where it came down,
+      // and so does a finger that held a cell for a formula: the reference takes in the cells up to it.
+      if (!tp.pointed && (tp.long || (!tp.handle && tp.hit.kind === "cell"))) return;
       press(e, tp.hit, tp.handle);
       const started = drag.current;
       if (started) {
@@ -955,7 +1237,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       // for that cell. Only a tap on the dot itself is for the handle (the fill square then says
       // how it works).
       if (onDot(tp, e.clientX, e.clientY)) {
-        if (tp.handle === "fill") notify(t.fillByTouch);
+        if (tp.handle === "fill") showFillHint();
         return;
       }
       const under = hitAt(e.clientX, e.clientY, TOUCH_SLOP);
@@ -1029,6 +1311,10 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const target = e.target as HTMLElement;
     if (target.closest("textarea, input, [data-grid-overlay]")) return;
     e.preventDefault();
+    // No menu while a formula wants a reference (selecting for it would end the formula
+    // half-typed): a finger held on a cell points at it instead (see longPress; Android's own long
+    // press can come before that), a right-click does nothing.
+    if (pointing(store)) return;
     // A long press on a touch screen already opened the menu.
     if (clock() - lastLongPress.current < 1200) return;
     // A finger still down (Android's own long press): the menu opens beside it, and lifting it clicks nothing.
@@ -1076,6 +1362,11 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       view: l.view,
       typeInto: () => textarea.current?.focus({ preventScroll: true }),
       prepareClipboard,
+      pasteValues: () => {
+        if (store.get().readOnly || !canRead.current) return false;
+        void pasteFromMenu(store, "values", notify, t);
+        return true;
+      },
       openMenu: openMenuAtActive,
       openChooser: (kind) => {
         const box = cellBox(store.get().selection.anchor);
@@ -1090,7 +1381,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
         const el = scroller.current;
         if (!el) return;
         const f = store.get().selection.anchor;
-        const next = scrollToShow(l.layout, f, { left: el.scrollLeft, top: el.scrollTop }, { w: el.clientWidth, h: el.clientHeight });
+        const next = scrollToShow(l.layout, f, { left: el.scrollLeft, top: el.scrollTop }, { w: el.clientWidth, h: shownHeight(el, latestKeyboard.current ? 12 : 0, keepRoom(l.layout, f.row)) });
         el.scrollTo({ left: next.left, top: next.top });
       },
     });
@@ -1146,7 +1437,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   useEffect(
     () => () => {
       if (tipTimer.current) clearTimeout(tipTimer.current);
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      if (fillHintTimer.current) clearTimeout(fillHintTimer.current);
       if (saidTimer.current) clearTimeout(saidTimer.current);
       if (autoFrame.current !== null) cancelAnimationFrame(autoFrame.current);
       if (touch.current?.timer) clearTimeout(touch.current.timer);
@@ -1161,6 +1452,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     let start: { dist: number; zoom: number } | null = null;
     const spread = (e: TouchEvent) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) listenAt(e.target);
       if (e.touches.length !== 2) return;
       start = { dist: spread(e), zoom: store.get().zoom };
       const tp = touch.current;
@@ -1169,7 +1461,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     };
     const onMove = (e: TouchEvent) => {
       // The finger that opened the menu with a long press slides on: the sheet stays still (its
-      // scrolling would close the menu).
+      // scrolling would close the menu). So it does under a finger that held a cell for a formula
+      // and moves on to take in more cells (scrolling would end that drag).
       if (swallowClick.current && e.cancelable) e.preventDefault();
       if (!start || e.touches.length !== 2 || start.dist <= 0) return;
       e.preventDefault();
@@ -1187,11 +1480,39 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
         if (e.cancelable) e.preventDefault();
       }
     };
+    // Touch events go to the element a finger came down on, also once the grid no longer renders
+    // it: a cell that a drag scrolled away (a cell held for a formula, then the finger moved on; see
+    // onPointerMove). They don't reach the grid then, so they are heard on that element too.
+    // Otherwise the browser would take the finger for scrolling the sheet, which ends the drag and
+    // pans the sheet back, and lifting it could click.
+    let away: (() => void) | null = null;
+    const listenAt = (target: EventTarget | null) => {
+      away?.();
+      if (!(target instanceof Node) || target === el) return;
+      const at = target;
+      // (Only while it is gone: in the grid, its events come to the listeners below anyway.)
+      const moved = (e: Event) => {
+        if (!at.isConnected) onMove(e as TouchEvent);
+      };
+      const ended = (e: Event) => {
+        if (!at.isConnected) onEnd(e as TouchEvent);
+      };
+      at.addEventListener("touchmove", moved, { passive: false });
+      at.addEventListener("touchend", ended, { passive: false });
+      at.addEventListener("touchcancel", ended);
+      away = () => {
+        at.removeEventListener("touchmove", moved);
+        at.removeEventListener("touchend", ended);
+        at.removeEventListener("touchcancel", ended);
+        away = null;
+      };
+    };
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: false });
     el.addEventListener("touchcancel", onEnd);
     return () => {
+      away?.();
       el.removeEventListener("touchstart", onStart);
       el.removeEventListener("touchmove", onMove);
       el.removeEventListener("touchend", onEnd);
@@ -1206,6 +1527,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const top = Math.floor(el.scrollTop / SLACK) * SLACK;
     setScroll((s) => (s.left === left && s.top === top ? s : { left, top }));
     if (tip) setTip(null);
+    // The fill hint was placed away from the square; scrolled, the square may come under it.
+    if (fillHint) hideFillHint();
   };
 
   // ------------------------------------------------------------------------------------------
@@ -1438,11 +1761,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
         {live}
       </div>
 
-      {notice && (
-        <div role="status" className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
-          <div className="max-w-md rounded-xl border border-line bg-raised px-3.5 py-2 text-[13px] text-ink-2 shadow-pop">{notice}</div>
-        </div>
-      )}
+      {fillHint && touchFill && <FillHint text={t.fillByTouch} place={fillHint} />}
 
       <GridMenu
         store={store}
@@ -1454,14 +1773,16 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
         onFill={
           pointerKind === "touch"
             ? () => {
-                setFillFor({ sheetId: store.get().sheetId, area: mainArea(store.get().selection) });
-                notify(t.fillByTouch);
+                setFillFor({ sheetId: store.get().sheetId, area: activeArea(store.get().selection) });
+                showFillHint();
               }
             : undefined
         }
         notify={notify}
         t={t}
         keys={{ mod: mac ? "⌘" : t.ctrl, shift: mac ? "⇧" : t.shift }}
+        // Opened by a finger (a long press), not from a keyboard: an iPad's keyboard still gets its shortcuts.
+        finger={!!menu && !menu.at.keyboard && pointerKind === "touch"}
       />
       <Chooser
         store={store}

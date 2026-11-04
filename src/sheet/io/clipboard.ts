@@ -12,9 +12,10 @@
 // - LibreOffice, Numbers, Word tables and web pages: an HTML table, and text with tabs (or not).
 // Both carry the values as the cells show them ("1,5" in German), which is what pasting wants:
 // every value is read like typing in the user's language. A spreadsheet's HTML also carries each
-// number's full value (Excel x:num, LibreOffice sdval, Google Sheets data-sheets-value) and its
-// number format: pasting keeps those (clipboardCells, pasteExactNumbers), so 0,12 shown is
-// 0,123456789 pasted, as between two spreadsheet programs.
+// number's full value (Excel x:num, LibreOffice sdval, Google Sheets data-sheets-value), its
+// number format and which cells are text: pasting keeps those (clipboardCells, pasteExactNumbers,
+// pasteText), so 0,12 shown is 0,123456789 pasted and the sample ID 007 stays 007, as between two
+// spreadsheet programs.
 //
 // Only as much is read as a sheet can hold (ReadLimit): a pasted text of millions of lines would
 // otherwise take the page's memory before a single cell lands.
@@ -53,8 +54,13 @@ export function parseClipboard(data: { text?: string; html?: string }, limit: Re
   return rows;
 }
 
-/** HTML written by Excel, Google Sheets, LibreOffice Calc or Blob's own spreadsheets. */
-const SPREADSHEET_HTML = /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|data-sheets-|\bsdval=|\bsdnum=|data-blob-sheet/i;
+/**
+ * HTML written by Excel, Google Sheets, LibreOffice Calc or Blob's own spreadsheets. Excel's also
+ * as a browser's clipboard hands it over without its <style> and namespace: its cells keep their
+ * x:num and x:str (a cell's attributes end at the next "<" or ">", so a long broken tag costs
+ * only its length).
+ */
+const SPREADSHEET_HTML = /urn:schemas-microsoft-com:office:excel|google-sheets-html-origin|data-sheets-|\bsdval=|\bsdnum=|data-blob-sheet|<t[dh]\b[^<>]*\sx:(?:num|str)\b/i;
 
 /** A cell needs quotes in TSV and CSV when it holds the separator, a line break or a quote. */
 function needsQuotes(cell: string, sep: string) {
@@ -75,15 +81,18 @@ const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").re
  * calculates with it rather than with the rounded text. `fmt`: its number format as an Excel
  * format code, so Excel shows it the same (a unit too, which the text leaves out); a paste into
  * another Blob spreadsheet reads it back. `style`: Blob's named style for significant figures
- * ("Blob sig 3", as in .xlsx files), which no format code can say.
+ * ("Blob sig 3", as in .xlsx files), which no format code can say. `text`: a text that typing
+ * would read as something else ("007", "1E5", "1.11.2026"), or one in a text cell: Excel gets its
+ * text format "@" so it keeps the text as it is, and a paste into another Blob spreadsheet keeps
+ * it as text too (data-blob-text).
  */
-export type HtmlCellLook = { bold?: boolean; align?: "left" | "center" | "right"; num?: number; fmt?: string; style?: string };
+export type HtmlCellLook = { bold?: boolean; align?: "left" | "center" | "right"; num?: number; fmt?: string; style?: string; text?: boolean };
 
 /** A number as Excel writes x:num ("1E-7", never "-0"). */
 const excelNum = (n: number) => (Object.is(n, -0) ? "0" : String(n).replace("e", "E"));
 
-/** An Excel format code as a CSS string (Excel reads mso-number-format with CSS escapes). */
-const cssString = (code: string) => `"${code.replace(/[\\"]/g, "\\$&")}"`;
+/** An Excel format code as a CSS string (Excel reads mso-number-format with CSS escapes, and writes its text format as "\@"). */
+const cssString = (code: string) => `"${code.replace(/[\\"@]/g, "\\$&")}"`;
 
 /** An HTML table (escaped), optionally with bold/colour per cell, for pasting into rich editors. */
 export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]): string {
@@ -97,10 +106,13 @@ export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]
         let css = cell;
         if (look?.align) css += `;text-align:${look.align}`;
         if (look?.bold) css += ";font-weight:bold";
-        if (look?.fmt) css += `;mso-number-format:${cssString(look.fmt)}`;
+        // A text cell gets Excel's text format, so Excel doesn't read "007" as 7; Blob's own
+        // reading of it is the format Blob gave the cell (see formatOf).
+        const code = look?.fmt ?? (look?.text ? "@" : undefined);
+        if (code) css += `;mso-number-format:${cssString(code)}`;
         const num = look?.num !== undefined && Number.isFinite(look.num) ? ` x:num="${excelNum(look.num)}"` : "";
         // Blob's own reading of the format: an attribute, which a browser's clipboard keeps where it drops styles.
-        const own = `${look?.fmt ? ` data-blob-format="${escHtml(look.fmt)}"` : ""}${look?.style ? ` data-blob-style="${escHtml(look.style)}"` : ""}`;
+        const own = `${look?.fmt ? ` data-blob-format="${escHtml(look.fmt)}"` : ""}${look?.style ? ` data-blob-style="${escHtml(look.style)}"` : ""}${look?.text ? ' data-blob-text="1"' : ""}`;
         const inner = escHtml(text).replace(/\r\n|\r|\n/g, "<br>");
         // In single quotes like Excel's own, so the format's double quotes need no entities.
         return `<td${num}${own} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
@@ -359,17 +371,20 @@ const BLOCK = new Set(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "pr
 
 /**
  * The number format a spreadsheet's HTML gives a cell: an Excel format code (Excel and Blob write
- * mso-number-format, Google Sheets data-sheets-numberformat); true when the text has to show it
- * (LibreOffice writes its codes in the language of whoever copied, and some copies carry no
- * formats at all); or null for none (General).
+ * mso-number-format, Google Sheets data-sheets-numberformat, LibreOffice's is translated from its
+ * language); true when the text has to show it (a LibreOffice code in a language Blob can't
+ * translate, and some copies carry no formats at all); or null for none (General).
  */
 export type CopiedFormat = string | true | null;
 
 /**
  * What a spreadsheet's copy says about a cell besides its text: its exact number (or null), its
- * number format, and Blob's named style for significant figures (see HtmlCellLook).
+ * number format, and Blob's named style for significant figures (see HtmlCellLook). `asText`:
+ * the copy says the cell is text (Excel's and LibreOffice's text format "@", a text value in
+ * Google Sheets' and LibreOffice's data-sheets-value, Excel's x:str, Blob's data-blob-text), so
+ * "007" is pasted as it is written, not as 7.
  */
-export type CopiedCell = { num: number | null; format: CopiedFormat; style: string | null };
+export type CopiedCell = { num: number | null; format: CopiedFormat; style: string | null; asText?: boolean };
 
 /** A cell nothing is known about but its text. */
 const NOTHING: CopiedCell = { num: null, format: null, style: null };
@@ -456,24 +471,29 @@ function attrValue(attrs: string, name: string): string | null {
 
 /**
  * Where a spreadsheet's HTML gives number formats (looked up once for the whole copy, so cells
- * skip what it doesn't have): mso-number-format on cells or by class, Blob's data-blob-format,
- * Google Sheets' or LibreOffice's attributes. `known`: the HTML says which cells have none.
- * Without that (a browser's clipboard can hand over HTML without its styles), the text says it.
+ * skip what it doesn't have): mso-number-format on cells or by class, Blob's data-blob-format
+ * and data-blob-text, Google Sheets' or LibreOffice's attributes. `known`: the HTML says which
+ * cells have none. Without that (a browser's clipboard can hand over HTML without its styles),
+ * the text says it.
  */
-type FormatSources = { inline: boolean; blob: boolean; classes: Map<string, string> | null; google: boolean; libre: boolean; known: boolean };
+type FormatSources = { inline: boolean; blob: boolean; blobText: boolean; classes: Map<string, string> | null; google: boolean; libre: boolean; known: boolean };
 
 function formatSources(html: string): FormatSources {
   const mso = html.includes("mso-number-format");
   const classes = mso ? classFormats(html) : null;
   const blob = html.includes("data-blob-format");
+  const blobText = html.includes("data-blob-text");
   const google = html.includes("data-sheets-numberformat");
   const libre = html.includes("sdnum");
-  return { inline: mso, blob, classes: classes?.size ? classes : null, google, libre, known: mso || blob || google || libre || html.includes("data-blob-sheet") };
+  return { inline: mso, blob, blobText, classes: classes?.size ? classes : null, google, libre, known: mso || blob || google || libre || html.includes("data-blob-sheet") };
 }
 
 /** The number format a cell of a spreadsheet's HTML declares (see CopiedFormat). */
 function formatOf(attrs: string, sources: FormatSources): CopiedFormat {
   if (!sources.known) return true;
+  // Blob's text cells carry Excel's text format "@" for Excel; their own format is the one Blob
+  // gave them (none, or a text cell's "@").
+  if (sources.blobText && attrValue(attrs, "data-blob-text") !== null) return attrValue(attrs, "data-blob-format") || null;
   const style = sources.inline ? attrValue(attrs, "style") : null;
   let code = style ? msoNumberFormat(style) : null;
   // Blob's own, also as an attribute: a browser's clipboard keeps those where it drops styles.
@@ -483,6 +503,12 @@ function formatOf(attrs: string, sources: FormatSources): CopiedFormat {
       code = sources.classes.get(name) ?? null;
       if (code !== null) break;
     }
+  }
+  if (code === null && sources.libre) {
+    // LibreOffice's sdnum says which language its code is written in (its
+    // data-sheets-numberformat has the same code without saying it).
+    const lo = attrValue(attrs, "sdnum");
+    if (lo !== null) return libreFormat(lo);
   }
   if (code === null && sources.google) {
     // Google Sheets: data-sheets-numberformat='{"1":2,"2":"0.00","3":1}' (2: its pattern).
@@ -497,14 +523,44 @@ function formatOf(attrs: string, sources: FormatSources): CopiedFormat {
       if (code === null) return true;
     }
   }
-  if (code === null) {
-    if (!sources.libre) return null;
-    // LibreOffice: sdnum="1031;0;0,00" (language; ?; its format code in that language).
-    const lo = attrValue(attrs, "sdnum");
-    const own = lo?.split(";").slice(2).join(";").trim();
-    return own && !/^(standard|general)$/i.test(own) ? true : null;
-  }
+  if (code === null) return null;
   return /^general$/i.test(code) ? null : code;
+}
+
+/** LibreOffice languages whose codes swap Excel's separators ("#.##0,00"): German in Germany, Austria and Luxembourg. */
+const COMMA_CODES = new Set([0x0407, 0x0c07, 0x1007]);
+
+/**
+ * LibreOffice's number format, sdnum="1031;1031;0,00" (the copy's language; the language of the
+ * format, 0 for the copy's; its code in that language), as an Excel code: English codes are
+ * Excel's, German ones swap its separators ("#.##0,00" is "#,##0.00"), and a code without any
+ * ("0", "@", 0" Zellen") reads the same in every language. true for other codes (the text shows
+ * the format); null for none (Standard, General).
+ */
+function libreFormat(sdnum: string): CopiedFormat {
+  const [copyLang, codeLang, ...rest] = sdnum.split(";");
+  const code = rest.join(";").trim();
+  if (!code || /^(standard|general)$/i.test(code)) return null;
+  const lang = Number(codeLang) || Number(copyLang);
+  if (!/[.,]/.test(code) || (lang & 0x3ff) === 0x09) return code;
+  return COMMA_CODES.has(lang) ? swapSeparators(code) : true;
+}
+
+/** "," and "." swapped outside quoted text, escaped characters and [brackets]: a German format code with Excel's separators. */
+function swapSeparators(code: string): string {
+  let out = "";
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    const end = c === '"' ? code.indexOf('"', i + 1) : c === "[" ? code.indexOf("]", i + 1) : c === "\\" ? i + 1 : i;
+    if (end !== i) {
+      const last = end < 0 ? code.length - 1 : end;
+      out += code.slice(i, last + 1);
+      i = last;
+      continue;
+    }
+    out += c === "," ? "." : c === "." ? "," : c;
+  }
+  return out;
 }
 
 /**
@@ -513,20 +569,49 @@ function formatOf(attrs: string, sources: FormatSources): CopiedFormat {
  * (type 3 is a number). null for anything else.
  */
 function exactOf(attrs: string): number | null {
-  const m = /(?:^|\s)(?:x:num|sdval)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+  const m = /(?:^|\s)(x:num|sdval)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
   if (m) {
-    const raw = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    let raw = (m[2] ?? m[3] ?? m[4] ?? "").trim();
+    // LibreOffice writes sdval in the copy's language ("0,26" in German), never with thousands
+    // separators. (Its data-sheets-value then holds only the whole number: never used.)
+    if (m[1].toLowerCase() === "sdval" && /^[-+]?\d+,\d+(?:E[-+]?\d+)?$/i.test(raw)) raw = raw.replace(",", ".");
     const n = Number(raw);
     return raw && Number.isFinite(n) ? n : null;
   }
+  const v = sheetsValue(attrs);
+  return v && v["1"] === 3 && typeof v["3"] === "number" && Number.isFinite(v["3"]) ? v["3"] : null;
+}
+
+/** Google Sheets' (and LibreOffice's) data-sheets-value on a cell: {"1": its type, …}; null without one. */
+function sheetsValue(attrs: string): Record<string, unknown> | null {
   const g = /(?:^|\s)data-sheets-value\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
   if (!g) return null;
   try {
-    const v = JSON.parse(decodeHtmlEntities(g[1] ?? g[2] ?? "")) as Record<string, unknown> | null;
-    return v && v["1"] === 3 && typeof v["3"] === "number" && Number.isFinite(v["3"]) ? v["3"] : null;
+    const v = JSON.parse(decodeHtmlEntities(g[1] ?? g[2] ?? "")) as unknown;
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Does the copy say a cell is text (see CopiedCell.asText)? Excel's and LibreOffice's text format
+ * "@" (Blob's text cells have it too), Blob's data-blob-text, Excel's x:str, and type 2 (text) in
+ * data-sheets-value, which Google Sheets and LibreOffice put on every text cell.
+ */
+function saysText(attrs: string, format: CopiedFormat, sources: FormatSources): boolean {
+  if (typeof format === "string" && fromExcelFormat(format, "en")?.kind === "text") return true;
+  if (sources.blobText && attrValue(attrs, "data-blob-text") !== null) return true;
+  if (/(?:^|\s)x:str\b/i.test(attrs)) return true;
+  return sheetsValue(attrs)?.["1"] === 2;
+}
+
+/** What a spreadsheet's HTML says about a cell besides its text (see CopiedCell). `named`: the HTML has Blob's named styles. */
+function aboutCell(attrs: string, sources: FormatSources, named: boolean): CopiedCell {
+  const num = exactOf(attrs);
+  const format = formatOf(attrs, sources);
+  const style = named ? attrValue(attrs, "data-blob-style") : null;
+  return num === null && saysText(attrs, format, sources) ? { num, format, style, asText: true } : { num, format, style };
 }
 
 /** HTML without its comments; one that isn't closed runs to the end, as in a browser. */
@@ -620,7 +705,7 @@ function htmlGrid(html: string, limit: ReadLimit, copied = false): GridCell[][] 
       if (!closing) {
         row ??= [];
         const attrs = m[2] ?? "";
-        const about: CopiedCell = sources ? { num: exactOf(attrs), format: formatOf(attrs, sources), style: named ? attrValue(attrs, "data-blob-style") : null } : NOTHING;
+        const about: CopiedCell = sources ? aboutCell(attrs, sources, named) : NOTHING;
         cell = { parts: [], colspan: spanAttr(attrs, "colspan"), rowspan: spanAttr(attrs, "rowspan"), ...about, depth };
       }
       continue;
@@ -651,7 +736,7 @@ function htmlGrid(html: string, limit: ReadLimit, copied = false): GridCell[][] 
           .replace(/^\n+|\n+$/g, "")
           .replace(/\n{2,}/g, "\n");
     // Cells past the last column read can't land anywhere.
-    if (row.length < limit.cols) row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan, num: cell.num, format: cell.format, style: cell.style });
+    if (row.length < limit.cols) row.push({ text, colspan: cell.colspan, rowspan: cell.rowspan, num: cell.num, format: cell.format, style: cell.style, asText: cell.asText });
     cell = null;
   }
   function closeRow() {
@@ -677,7 +762,7 @@ function htmlGrid(html: string, limit: ReadLimit, copied = false): GridCell[][] 
         taken[rr] ??= [];
         for (let dc = 0; dc < cellAt.colspan && c + dc < limit.cols; dc++) {
           taken[rr][c + dc] = true;
-          grid[rr][c + dc] = dr === 0 && dc === 0 ? { text: cellAt.text, num: cellAt.num, format: cellAt.format, style: cellAt.style } : EMPTY;
+          grid[rr][c + dc] = dr === 0 && dc === 0 ? { text: cellAt.text, num: cellAt.num, format: cellAt.format, style: cellAt.style, asText: cellAt.asText } : EMPTY;
         }
       }
       c += cellAt.colspan;
@@ -695,15 +780,15 @@ function htmlGrid(html: string, limit: ReadLimit, copied = false): GridCell[][] 
 /** The same text, whatever the spaces (HTML collapses them; Blob puts a thin one before a unit). */
 const sameText = (a: string, b: string) => a === b || a.replace(/\s+/g, "") === b.replace(/\s+/g, "");
 
-/** A spreadsheet's HTML that says more than the text: exact numbers or number formats. */
-const SAYS_MORE = /\bx:num\b|\bsdval=|\bsdnum=|data-sheets-value|data-sheets-numberformat|mso-number-format/i;
+/** A spreadsheet's HTML that says more than the text: exact numbers, number formats, text cells. */
+const SAYS_MORE = /\bx:num\b|\bx:str\b|\bsdval=|\bsdnum=|data-sheets-value|data-sheets-numberformat|mso-number-format|data-blob-text/i;
 
 /**
  * What a spreadsheet's copy says about its cells besides their text (exact numbers, number
- * formats), cell by cell as `rows` (the text that is pasted) has them. Only where the
- * spreadsheet's HTML table lines up with that text: the same number of rows and, for each cell,
- * the same text (a filtered or merged copy that differs leaves those cells to their text). null
- * when there is nothing to use. `limit`: the one the text was read with.
+ * formats, which cells are text), cell by cell as `rows` (the text that is pasted) has them. Only
+ * where the spreadsheet's HTML table lines up with that text: the same number of rows and, for
+ * each cell, the same text (a filtered or merged copy that differs leaves those cells to their
+ * text). null when there is nothing to use. `limit`: the one the text was read with.
  */
 export function clipboardCells(html: string | undefined, rows: string[][], limit: ReadLimit = SHEET_LIMIT): (CopiedCell | null)[][] | null {
   if (!html || !SPREADSHEET_HTML.test(html) || !SAYS_MORE.test(html) || !/<table[\s>]/i.test(html)) return null;
@@ -713,9 +798,9 @@ export function clipboardCells(html: string | undefined, rows: string[][], limit
   const out = rows.map((row, r) =>
     row.map((text, c) => {
       const cell = grid[r][c];
-      if (!cell || cell.num === null || !sameText(cell.text, text)) return null;
+      if (!cell || (cell.num === null && !cell.asText) || !sameText(cell.text, text)) return null;
       found = true;
-      return { num: cell.num, format: cell.format, style: cell.style };
+      return cell.asText ? { num: null, format: cell.format, style: cell.style, asText: true } : { num: cell.num, format: cell.format, style: cell.style };
     }),
   );
   return found ? out : null;
@@ -736,8 +821,8 @@ function declaredFormat(code: string, style: string | null, locale: Locale): Num
 const sameFormat = (a: NumberFormat | undefined, b: NumberFormat | undefined) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 
 /**
- * Cells pasted as text (pasteText's result) with what the copy says besides the text. Only for
- * cells whose text was read plainly as a number (not, say, divided by 100 for a percent cell):
+ * Cells pasted as text (pasteText's result) with what the copy says besides the text. For cells
+ * whose text was read plainly as a number (not, say, divided by 100 for a percent cell):
  * - The copy's number format, when the cell shows the same text with it (a unit may be what the
  *   text lacks: Blob's copies leave it out for other programs): "2,0" from a "2,0 mg/L" cell
  *   becomes 2 with its decimals and unit again. A format the target cell had already stays.
@@ -745,9 +830,13 @@ const sameFormat = (a: NumberFormat | undefined, b: NumberFormat | undefined) =>
  *   format Blob can't read, or none), so a number can't land in the wrong cell: 0,12 stays 0,12
  *   on screen and is 0,123456789 inside.
  * A copied cell without a format (General) gets none: it shows the full number as Blob does.
- * `locale`: the one the text was read in.
+ * For cells that stayed text: a text cell of the copy gets its text format "@" (pasteText kept
+ * the text as written); a number whose unit typing doesn't read ("12 Zellen", "40 Kolonien")
+ * becomes that number, when the copy's format shows it as exactly this text, and keeps the unit.
+ * A format the target cell had already stays here too. `locale`: the one the text was read in.
+ * `toRows`: the sheet row of each line, as given to pasteText.
  */
-export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: string[][], copied: (CopiedCell | null)[][], locale: Locale): Workbook {
+export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: string[][], copied: (CopiedCell | null)[][], locale: Locale, toRows?: readonly number[] | null): Workbook {
   const sheet = wb.sheets.find((s) => s.id === sheetId);
   if (!sheet) return wb;
   const updates: { row: number; col: number; cell: Cell }[] = [];
@@ -762,8 +851,25 @@ export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: 
   copied.forEach((line, i) =>
     line.forEach((copy, j) => {
       const text = rows[i]?.[j];
-      const cell = sheet.cells[cellKey(at.row + i, at.col + j)];
-      if (!copy || copy.num === null || text === undefined || !cell || cell.f !== undefined || typeof cell.v !== "number") return;
+      const row = toRows?.[i] ?? at.row + i;
+      const col = at.col + j;
+      const cell = sheet.cells[cellKey(row, col)];
+      if (!copy || text === undefined || !cell || cell.f !== undefined) return;
+      if (typeof cell.v === "string") {
+        const own = cell.s?.fmt;
+        // A text cell of the copy: its text format too.
+        if (copy.asText) {
+          if (!own && formatOfCopy(copy)?.kind === "text") updates.push({ row, col, cell: { ...cell, s: { ...cell.s, fmt: { kind: "text" } } } });
+          return;
+        }
+        // A number with a unit typing doesn't read. (Typing into a text cell keeps text, and so does pasting.)
+        if (copy.num === null || cell.v !== text || own?.kind === "text") return;
+        const declared = formatOfCopy(copy);
+        if (!declared || !sameText(formatValue(copy.num, declared, locale), text)) return;
+        updates.push({ row, col, cell: { ...cell, v: copy.num, s: { ...cell.s, fmt: own ?? declared } } });
+        return;
+      }
+      if (copy.num === null || typeof cell.v !== "number") return;
       // The same number and no format to bring: nothing to do (most cells of a long paste).
       if (copy.num === cell.v && copy.format === null) return;
       // How typing the text reads it. A cell without a format got exactly that (so it needn't be
@@ -784,7 +890,7 @@ export function pasteExactNumbers(wb: Workbook, sheetId: string, at: Pos, rows: 
       const v = copy.num !== cell.v && shows(copy.num, look ?? shown) ? copy.num : cell.v;
       const fmt = look ?? (copy.format !== null && !cell.s?.fmt ? shown : cell.s?.fmt);
       if (v === cell.v && sameFormat(fmt, cell.s?.fmt)) return;
-      updates.push({ row: at.row + i, col: at.col + j, cell: { ...cell, v, ...(fmt ? { s: { ...cell.s, fmt } } : {}) } });
+      updates.push({ row, col, cell: { ...cell, v, ...(fmt ? { s: { ...cell.s, fmt } } : {}) } });
     }),
   );
   return setCells(wb, sheetId, updates);

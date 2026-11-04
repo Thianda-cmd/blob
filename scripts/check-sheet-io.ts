@@ -19,8 +19,26 @@
 //     long inputs that once took minutes (spaces, unclosed tags)
 //   - clipboard numbers: pasting a spreadsheet's full numbers (Excel, LibreOffice, Google Sheets)
 //     with its safeguards, copying numbers without their unit (and Excel's markup for them)
+//   - copy and paste: a filtered smart table copies the rows it shows (formulas still pointing at
+//     their own rows), LibreOffice's real clipboard in German and English, the units Blob's
+//     templates show typed and pasted back, text that stays text ("007") from every source
+//   - pasting after rows moved: a filtered copy at its old place after rows were inserted,
+//     deleted or sorted (no hidden measurement overwritten), in place after a collaborator's
+//     edit elsewhere, values as copied (errors too, also into another spreadsheet), a cut that
+//     moves its own cells and is cancelled once they are sorted apart; Excel's clipboard through
+//     the menu and Ctrl+Shift+V as through Ctrl+V (also as browsers sanitize it); a picture on the
+//     clipboard pastes nothing; copied text marked exactly as typing reads it (in the year it is
+//     read in), without reading names and IDs
 //   - round trips: smart-table totals and significant figures through .xlsx
 //   - adding to a note: the one-time token; exports with each trendline's equation and R²
+//   - files in: CSV numbers in the file's language (else its separator's) and slash dates in the
+//     order its own dates show (the sweep's files), those without a year as the reader types them;
+//     web pages behind any first tag; NUL and UTF-16 without a byte order mark; both halves of a
+//     character as XML references; files too big to save refused while read, with their size (blanks
+//     of every kind no cell), and measured once in the editor; .ods and Numbers files in both
+//     pickers; smart-table filters out to .xlsx (rows they hide hidden) and back, with rows hidden
+//     by hand and values filters read in the other language; LibreOffice's chart names and ISO
+//     dates; Excel's days-and-hours durations
 // Problems make the script exit with 1.
 
 import { collectLinks } from "@/components/editor/links";
@@ -29,24 +47,32 @@ import { noteSchema, plainTextOf } from "@/components/editor/schema";
 import { noteToDocx } from "@/notes/docx";
 import { noteToMarkdown } from "@/notes/markdown";
 import { calcOf } from "@/components/editor/blocks/sheetEmbedCalc";
-import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
-import { appendWorkbook, freshIds, readSheetFile } from "@/components/sheet/importFile";
+import { copySelection, endCut, pasteData, readSystemClipboard, textsRead } from "@/components/sheet/grid/clipboard";
+import { currentSheetNotice, hideSheetNotice } from "@/components/sheet/notice";
+import { appendFits, appendWorkbook, freshIds, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT } from "@/components/sheet/importFile";
+import { IMPORT_ACCEPT, importable, isSheetFile } from "@/components/notes/useImporter";
 import { createSheetStore, type SheetStore } from "@/components/sheet/store";
+import type { Locale } from "@/i18n/config";
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { sheetIoText } from "@/i18n/messages/sheetIo";
 import { chartData } from "@/sheet/chart/data";
 import { equationText, isFitError, r2Text } from "@/sheet/chart/regression";
+import { workbookPreview } from "@/sheet/doc";
 import { addToNoteHref, embedFromParam, embedFromToken, embedTableMarkdown, embedTableModel, embedTarget, forgetEmbedToken, isEmbedToken, itemFromParam, readEmbedAttrs, readEmbedItem, sameItem, sheetItemHref, usedArea } from "@/sheet/embed";
-import { createCalc } from "@/sheet/engine";
+import { createCalc, formatValue, parseInput } from "@/sheet/engine";
 import { decodeHtmlEntities, parseClipboard, parseHtmlTable, toHtmlTable, toTsv } from "@/sheet/io/clipboard";
-import { csvNumberLocale, detectSeparator, parseCsv, sheetToCsv } from "@/sheet/io/csv";
+import { csvNumberLocale, detectSeparator, parseCsv, separatorLocale, sheetToCsv, slashDatesFor } from "@/sheet/io/csv";
 import { readSheetBytes } from "@/sheet/io/readFile";
 import { exportXlsx, importXlsx, XlsxError } from "@/sheet/io/xlsx";
 import { parseChartRef, trendLabelFormat } from "@/sheet/io/xlsxCharts";
 import { importFormula, toFileFormula, type FileTable, type FormulaContext } from "@/sheet/io/xlsxFormulas";
 import { builtinFormat, fromExcelFormat, fromSigStyle, nearestSheetColor, sigStyleName, toExcelFormat } from "@/sheet/io/xlsxStyles";
-import { attr, decodeEntities, lookup, parseXml, textOf, XmlError, xmlBudget } from "@/sheet/io/xml";
+import { attr, decodeEntities, lookup, parseXml, savableText, textOf, XmlError, xmlBudget } from "@/sheet/io/xml";
 import { crc32, deflateRaw, inflateRaw, makeZip, readZip, ZipError } from "@/sheet/io/zip";
-import type { Cell, ChartSpec, Sheet, Workbook } from "@/sheet/types";
+import { copyArea, deleteRows, insertRows, pasteClip, sortArea } from "@/sheet/ops";
+import { filteredRows, setTableFilter, sortTable } from "@/sheet/table/model";
+import { SHEET_TEMPLATES } from "@/sheet/templates";
+import type { Cell, ChartSpec, FilterSpec, Sheet, Workbook } from "@/sheet/types";
 
 const problems: string[] = [];
 let checks = 0;
@@ -1461,6 +1487,822 @@ function clipboardNumbers() {
   eq("…back in another tab", paste(fresh({}, "copy-sig-other"), { text: sigCopy.text, html: sigCopy.html })["0,0"], { v: 62.5, s: { fmt: { kind: "significant", digits: 3, unit: "µg/mL" } } });
 }
 
+// Copy and paste: filtered tables, LibreOffice, units, text that stays text -----------------------
+
+/** A smart table A1:C7 filtered on "Probe begins with A" (rows 3, 5 and 7 hidden), C = B × 2, row 9 hidden by hand, and an empty Blatt 2. */
+function filteredBook(): Workbook {
+  const cells: Record<string, Cell> = { "0,0": { v: "Probe" }, "0,1": { v: "Extinktion" }, "0,2": { v: "Doppelt" }, "8,0": { v: "von Hand versteckt" }, "8,1": { v: 99 } };
+  ["A1", "B1", "A2", "B2", "A3", "B3"].forEach((name, i) => {
+    cells[`${i + 1},0`] = { v: name };
+    cells[`${i + 1},1`] = { v: [0.11, 0.52, 0.13, 0.55, 0.12, 0.6][i] };
+    cells[`${i + 1},2`] = { f: `B${i + 2}*2` };
+  });
+  return book([sheet("s1", "Blatt 1", cells, { rows: { "8": { hidden: true } } }), sheet("s2", "Blatt 2", {})], {
+    tables: [{ id: "t", sheetId: "s1", name: "Proben", area: { r0: 0, c0: 0, r1: 6, c1: 2 }, columns: [{ id: "a", total: "none" }, { id: "b", total: "none" }, { id: "c", total: "none" }], totals: false, style: "blue", banded: true, filters: { a: { kind: "text", op: "begins", text: "A" } }, sort: null }],
+  });
+}
+
+/** The cells of an area as rows: a formula as "=…", else the stored value (null when empty). */
+function cellGrid(s: SheetStore, sheetId: string, r0: number, c0: number, r1: number, c1: number): unknown[][] {
+  const cells = s.get().workbook.sheets.find((x) => x.id === sheetId)!.cells;
+  const out: unknown[][] = [];
+  for (let r = r0; r <= r1; r++) {
+    const line: unknown[] = [];
+    for (let c = c0; c <= c1; c++) {
+      const cell = cells[`${r},${c}`];
+      line.push(cell?.f !== undefined ? `=${cell.f}` : (cell?.v ?? null));
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+function filteredCopies() {
+  const fresh = (pageId: string, readOnly = false) => createSheetStore({ pageId, workbook: filteredBook(), locale: "de", readOnly });
+  const all = { r0: 0, c0: 0, r1: 8, c1: 2 };
+  const shownRows = "Probe\tExtinktion\tDoppelt\nA1\t0,11\t0,22\nA2\t0,13\t0,26\nA3\t0,12\t0,24\n\t\t\nvon Hand versteckt\t99\t";
+  const st = fresh("filter-copy");
+  st.select(all);
+  const copied = copySelection(st, false);
+  eq("a filtered table: the copy has the rows it shows (and the one hidden by hand, as in Excel)", copied.text, shownRows);
+  eq("…its HTML too", [(copied.html.match(/<tr>/g) ?? []).length, copied.html.includes(">B1<")], [6, false]);
+  // Inside Blob (its own copy), where no filter hides rows: the rows next to each other, each
+  // formula from its own row.
+  st.select({ row: 30, col: 4 });
+  pasteData(st, { text: copied.text, html: copied.html }, "all");
+  eq("…pasted: next to each other, each formula pointing at its own row", cellGrid(st, "s1", 30, 4, 33, 6), [["Probe", "Extinktion", "Doppelt"], ["A1", 0.11, "=F32*2"], ["A2", 0.13, "=F33*2"], ["A3", 0.12, "=F34*2"]]);
+  eq("…the pasted cells selected", [st.get().selection.anchor, st.get().selection.focus], [{ row: 30, col: 4 }, { row: 35, col: 6 }]);
+  // Beside the table, in its rows: next to the rows the filter shows (as in LibreOffice), not in the
+  // rows it hides.
+  st.select(all);
+  const beside = copySelection(st, false);
+  st.select({ row: 0, col: 4 });
+  pasteData(st, beside, "all");
+  eq("…pasted beside the table: next to the rows it shows", cellGrid(st, "s1", 0, 4, 8, 6), [["Probe", "Extinktion", "Doppelt"], ["A1", 0.11, "=F2*2"], [null, null, null], ["A2", 0.13, "=F4*2"], [null, null, null], ["A3", 0.12, "=F6*2"], [null, null, null], [null, null, null], ["von Hand versteckt", 99, null]]);
+  eq("…selected from its first row to its last", [st.get().selection.anchor, st.get().selection.focus], [{ row: 0, col: 4 }, { row: 8, col: 6 }]);
+  st.select(all);
+  const again = copySelection(st, false);
+  st.select({ row: 10, col: 4 });
+  pasteData(st, { text: again.text, html: again.html }, "values");
+  eq("…as values: each row's own result", cellGrid(st, "s1", 11, 4, 13, 6), [["A1", 0.11, 0.22], ["A2", 0.13, 0.26], ["A3", 0.12, 0.24]]);
+  st.select(all);
+  const turned = copySelection(st, false);
+  st.select({ row: 20, col: 4 });
+  pasteData(st, { text: turned.text, html: turned.html }, "transpose");
+  eq("…transposed: each formula pointing at its own value", cellGrid(st, "s1", 21, 5, 22, 7), [[0.11, 0.13, 0.12], ["=F22*2", "=G22*2", "=H22*2"]]);
+  st.select(all);
+  const across = copySelection(st, false);
+  st.setSheet("s2");
+  st.select({ row: 0, col: 0 });
+  pasteData(st, { text: across.text, html: across.html }, "all");
+  eq("…on another sheet", cellGrid(st, "s2", 1, 0, 3, 2), [["A1", 0.11, "=B2*2"], ["A2", 0.13, "=B3*2"], ["A3", 0.12, "=B4*2"]]);
+  // The clip itself: each line knows its row, so a formula after a left-out row shifts from that row.
+  const wb = filteredBook();
+  const calc = createCalc(wb, { locale: "de" });
+  const clip = copyArea(wb, "s1", { r0: 0, c0: 0, r1: 4, c1: 2 }, [0, 1, 3]);
+  eq("a clip that leaves rows out keeps where its lines came from", [clip.rows, clip.cells.map((line) => line[0]?.v)], [[0, 1, 3], ["Probe", "A1", "A2"]]);
+  const one = { r0: 0, c0: 0, r1: 0, c1: 0 };
+  eq("…a formula after the left-out row: pasted, it points at its own row", pasteClip(wb, calc, "s2", one, clip, { mode: "all" }).sheets[1].cells["2,2"], { f: "B3*2" });
+  eq("…as a value: its own row's result", pasteClip(wb, calc, "s2", one, clip, { mode: "values" }).sheets[1].cells["2,2"], { v: 0.26 });
+  eq("…transposed", pasteClip(wb, calc, "s2", one, clip, { mode: "all", transpose: true }).sheets[1].cells["2,2"], { f: "C2*2" });
+  eq("a plain copy (or one of every row) has no row list", ["rows" in copyArea(wb, "s1", one), "rows" in copyArea(wb, "s1", { r0: 0, c0: 0, r1: 2, c1: 2 }, [0, 1, 2])], [false, false]);
+  // A cut moves the whole block, filtered rows too (Excel does the same): nothing is left behind half.
+  const cut = fresh("filter-cut");
+  cut.select({ r0: 1, c0: 0, r1: 6, c1: 2 });
+  const moved = copySelection(cut, true);
+  eq("a cut takes the whole block, filtered rows too", moved.text.split("\n").length, 6);
+  cut.select({ row: 11, col: 4 });
+  pasteData(cut, { text: moved.text, html: moved.html }, "all");
+  eq("…pasted: all six rows moved, formulas following", cellGrid(cut, "s1", 11, 4, 16, 6), [["A1", 0.11, "=F12*2"], ["B1", 0.52, "=F13*2"], ["A2", 0.13, "=F14*2"], ["B2", 0.55, "=F15*2"], ["A3", 0.12, "=F16*2"], ["B3", 0.6, "=F17*2"]]);
+  eq("…and gone from where they were", cellGrid(cut, "s1", 1, 0, 6, 0).flat(), [null, null, null, null, null, null]);
+  const viewer = fresh("filter-view", true);
+  viewer.select(all);
+  eq("read-only, a cut is a copy: the rows shown", copySelection(viewer, true).text, shownRows);
+  const picked = fresh("filter-picked");
+  picked.select({ r0: 2, c0: 0, r1: 2, c1: 1 });
+  eq("cells only in a filtered row: copied as they are (they were picked)", copySelection(picked, false).text, "B1\t0,52");
+  // Another tab: the text and HTML only.
+  const source = fresh("filter-tab-a");
+  source.select(all);
+  const out = copySelection(source, false);
+  const elsewhere = createSheetStore({ pageId: "filter-tab-b", workbook: book([sheet("s1", "Blatt 1", { "0,0": { v: "x" } })]), locale: "de", readOnly: false });
+  elsewhere.select({ row: 0, col: 0 });
+  copySelection(elsewhere, false);
+  const tab = createSheetStore({ pageId: "filter-tab-c", workbook: book([sheet("s1", "Blatt 1", {})]), locale: "de", readOnly: false });
+  tab.select({ row: 0, col: 0 });
+  pasteData(tab, { text: out.text, html: out.html }, "all");
+  eq("…in another tab: the rows it showed", cellGrid(tab, "s1", 0, 0, 3, 2), [["Probe", "Extinktion", "Doppelt"], ["A1", 0.11, 0.22], ["A2", 0.13, 0.26], ["A3", 0.12, 0.24]]);
+
+  // Pasted back where it came from (Ctrl+C, then Ctrl+Shift+V on the same cells: formulas to
+  // values): each line goes back to its own row, and the rows the filter hides keep their cells.
+  const column = { r0: 0, c0: 2, r1: 6, c1: 2 };
+  const place = fresh("filter-in-place");
+  place.select(column);
+  pasteData(place, copySelection(place, false), "values");
+  eq("formulas to values on a filtered column: each row its own value, the hidden rows untouched", cellGrid(place, "s1", 0, 2, 6, 2).flat(), ["Doppelt", 0.22, "=B3*2", 0.26, "=B5*2", 0.24, "=B7*2"]);
+  eq("…the same cells selected", [place.get().selection.anchor, place.get().selection.focus], [{ row: 0, col: 2 }, { row: 6, col: 2 }]);
+  place.undo();
+  const unchanged = cellGrid(place, "s1", 0, 0, 8, 2);
+  place.select(all);
+  const whole = copySelection(place, false);
+  pasteData(place, whole, "all");
+  eq("Ctrl+V on the cells just copied: nothing changes", cellGrid(place, "s1", 0, 0, 8, 2), unchanged);
+  place.select({ row: 0, col: 0 });
+  pasteData(place, whole, "all");
+  eq("…nor at their first cell", cellGrid(place, "s1", 0, 0, 8, 2), unchanged);
+  const cleared = fresh("filter-cleared");
+  cleared.select(column);
+  const kept = copySelection(cleared, false);
+  cleared.apply("Filter", (wb) => setTableFilter(wb, "t", "a", null));
+  cleared.select({ row: 0, col: 2 });
+  pasteData(cleared, kept, "values");
+  eq("…also when the filter was cleared meanwhile", cellGrid(cleared, "s1", 0, 2, 6, 2).flat(), ["Doppelt", 0.22, "=B3*2", 0.26, "=B5*2", 0.24, "=B7*2"]);
+
+  // Any paste into rows a filter hides fills only the rows it shows (as LibreOffice does).
+  const fill = fresh("filter-fill");
+  fill.select({ row: 8, col: 1 });
+  const single = copySelection(fill, false);
+  fill.select({ r0: 0, c0: 4, r1: 6, c1: 4 });
+  pasteData(fill, single, "all");
+  eq("one cell pasted on a filtered column: the rows shown get it", cellGrid(fill, "s1", 0, 4, 6, 4).flat(), [99, 99, null, 99, null, 99, null]);
+  eq("…selected down to the last of them", [fill.get().selection.anchor, fill.get().selection.focus], [{ row: 0, col: 4 }, { row: 5, col: 4 }]);
+  fill.undo();
+  eq("…undone in one step", cellGrid(fill, "s1", 0, 4, 6, 4).flat(), [null, null, null, null, null, null, null]);
+  const typed = fresh("filter-text");
+  typed.select({ row: 1, col: 4 });
+  pasteData(typed, { text: "x\ny\nz" }, "all");
+  eq("text from elsewhere: next to the rows shown", cellGrid(typed, "s1", 1, 4, 5, 4).flat(), ["x", null, "y", null, "z"]);
+  eq("…selected", [typed.get().selection.anchor, typed.get().selection.focus], [{ row: 1, col: 4 }, { row: 5, col: 4 }]);
+  typed.select({ row: 1, col: 5 });
+  pasteData(typed, { text: "0,12\n0,65", html: `<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="0.123456">0,12</td></tr><tr><td x:num="0.654321">0,65</td></tr></table>` }, "all");
+  eq("…Excel's full numbers in the same rows", cellGrid(typed, "s1", 1, 5, 3, 5).flat(), [0.123456, null, 0.654321]);
+  const numbers = createSheetStore({ pageId: "filter-values-src", workbook: book([sheet("s1", "Blatt 1", { "0,0": { v: 0.123456, s: { fmt: { kind: "number", decimals: 2 } } }, "1,0": { v: "007", s: { fmt: { kind: "text" } } } })]), locale: "de", readOnly: false });
+  numbers.select({ r0: 0, c0: 0, r1: 1, c1: 0 });
+  const values = copySelection(numbers, false);
+  typed.select({ row: 1, col: 6 });
+  pasteData(typed, values, "values");
+  eq("…values from another spreadsheet: their full numbers and text in the rows shown", cellGrid(typed, "s1", 1, 6, 3, 6).flat(), [0.123456, null, "007"]);
+  const sideways = fresh("filter-turned");
+  sideways.select({ r0: 8, c0: 0, r1: 8, c1: 1 });
+  const line = copySelection(sideways, false);
+  sideways.select({ row: 1, col: 4 });
+  pasteData(sideways, line, "transpose");
+  eq("…transposed too", cellGrid(sideways, "s1", 1, 4, 3, 4).flat(), ["von Hand versteckt", null, 99]);
+  const named = fresh("filter-named");
+  named.select({ row: 2, col: 4 });
+  pasteData(named, { text: "x\ny" }, "all");
+  eq("a cell picked in a hidden row (by its name): the paste starts there, rows as they follow", cellGrid(named, "s1", 2, 4, 3, 4).flat(), ["x", "y"]);
+  const into = fresh("filter-cut-into");
+  into.select({ r0: 7, c0: 0, r1: 8, c1: 1 });
+  const block = copySelection(into, true);
+  into.select({ row: 1, col: 4 });
+  pasteData(into, block, "all");
+  eq("a cut moves its block as it is, also into rows a filter hides", cellGrid(into, "s1", 1, 4, 3, 5), [[null, null], ["von Hand versteckt", 99], [null, null]]);
+  eq("pasteClip: each line onto the row given, its formula shifted from its own row to that one", pasteClip(wb, calc, "s2", one, clip, { mode: "all", toRows: [0, 2, 5] }).sheets[1].cells["5,2"], { f: "B6*2" });
+  const repeated = pasteClip(wb, calc, "s2", one, copyArea(wb, "s1", { r0: 8, c0: 1, r1: 8, c1: 1 }), { mode: "all", toRows: [1, 3, 5] }).sheets[1].cells;
+  eq("…a target as tall as the rows given", [repeated["0,0"], repeated["1,0"], repeated["2,0"], repeated["3,0"], repeated["5,0"]], [undefined, { v: 99 }, undefined, { v: 99 }, { v: 99 }]);
+}
+
+// LibreOffice 24.2's real clipboard (.uno:Copy, read back from the system clipboard) in German and
+// in English: sdval in the copy's language, data-sheets-value with whole numbers only, a unit in
+// the format, and a text cell "007".
+const LO_CLIP_DE = String.raw`<!DOCTYPE html>
+
+<html>
+<head>
+
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 24.2.7.2 (Linux)"/>
+	<style type="text/css">
+		body,div,table,thead,tbody,tfoot,tr,th,td,p { font-family:"Liberation Sans"; font-size:x-small }
+		a.comment-indicator:hover + comment { background:#ffd; position:absolute; display:block; border:1px solid black; padding:0.5em;  }
+		a.comment-indicator { background:red; display:inline-block; border:1px solid black; width:0.5em; height:0.5em;  }
+		comment { display:none;  }
+	</style>
+
+</head>
+
+<body>
+<table cellspacing="0" border="0">
+	<colgroup span="2" width="85"></colgroup>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Mittel&quot;}">Mittel</td>
+		<td align="right" sdval="0,260166666666667" sdnum="1031;1031;0,000" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 0}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0,000&quot;, &quot;3&quot;: 1}">0,260</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Steigung&quot;}">Steigung</td>
+		<td align="right" sdval="0,0518714285714286" sdnum="1031;1031;0,0000&quot; L/mg&quot;" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 0}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0,0000\&quot; L\/mg\&quot;&quot;, &quot;3&quot;: 1}">0,0519 L/mg</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Sig&quot;}">Sig</td>
+		<td align="right" sdval="1234,5678" sdnum="1031;1031;0" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 1234}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0&quot;, &quot;3&quot;: 1}">1235</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;ID&quot;}">ID</td>
+		<td align="left" sdnum="1031;0;@" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;007&quot;}">007</td>
+	</tr>
+</table>
+</body>
+
+</html>
+`;
+const LO_TEXT_DE = "Mittel\t0,260\nSteigung\t0,0519 L/mg\nSig\t1235\nID\t007\n";
+const LO_CLIP_EN = String.raw`<!DOCTYPE html>
+
+<html>
+<head>
+
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 24.2.7.2 (Linux)"/>
+	<style type="text/css">
+		body,div,table,thead,tbody,tfoot,tr,th,td,p { font-family:"Liberation Sans"; font-size:x-small }
+		a.comment-indicator:hover + comment { background:#ffd; position:absolute; display:block; border:1px solid black; padding:0.5em;  }
+		a.comment-indicator { background:red; display:inline-block; border:1px solid black; width:0.5em; height:0.5em;  }
+		comment { display:none;  }
+	</style>
+
+</head>
+
+<body>
+<table cellspacing="0" border="0">
+	<colgroup span="2" width="85"></colgroup>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Mittel&quot;}">Mittel</td>
+		<td align="right" sdval="0.260166666666667" sdnum="1033;1033;0.000" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 0}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0.000&quot;, &quot;3&quot;: 1}">0.260</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Steigung&quot;}">Steigung</td>
+		<td align="right" sdval="0.0518714285714286" sdnum="1033;1033;0.0000&quot; L/mg&quot;" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 0}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0.0000\&quot; L\/mg\&quot;&quot;, &quot;3&quot;: 1}">0.0519 L/mg</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;Sig&quot;}">Sig</td>
+		<td align="right" sdval="1234.5678" sdnum="1033;1033;0" data-sheets-value="{ &quot;1&quot;: 3, &quot;3&quot;: 1234}" data-sheets-numberformat="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;0&quot;, &quot;3&quot;: 1}">1235</td>
+	</tr>
+	<tr>
+		<td height="17" align="left" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;ID&quot;}">ID</td>
+		<td align="left" sdnum="1033;0;@" data-sheets-value="{ &quot;1&quot;: 2, &quot;2&quot;: &quot;007&quot;}">007</td>
+	</tr>
+</table>
+</body>
+
+</html>
+`;
+const LO_TEXT_EN = "Mittel\t0.260\nSteigung\t0.0519 L/mg\nSig\t1235\nID\t007\n";
+
+function libreOfficeClipboard() {
+  const fresh = (pageId: string, locale: "de" | "en") => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", {})]), locale, readOnly: false });
+  const paste = (s: SheetStore, data: { text: string; html: string }) => {
+    s.select({ row: 0, col: 0 });
+    pasteData(s, data, "all");
+    return s.get().workbook.sheets[0].cells;
+  };
+  const expected = [
+    { v: 0.260166666666667, s: { fmt: { kind: "number", decimals: 3 } } },
+    { v: 0.0518714285714286, s: { fmt: { kind: "number", decimals: 4, unit: "L/mg" } } },
+    { v: 1234.5678, s: { fmt: { kind: "number", decimals: 0 } } },
+    { v: "007", s: { fmt: { kind: "text" } } },
+  ];
+  const cases: [string, string, string, "de" | "en"][] = [
+    ["German", LO_CLIP_DE, LO_TEXT_DE, "de"],
+    ["English", LO_CLIP_EN, LO_TEXT_EN, "en"],
+    ["English, pasted in German", LO_CLIP_EN, LO_TEXT_EN, "de"],
+  ];
+  for (const [what, html, text, locale] of cases) {
+    const c = paste(fresh(`lo-${what}`, locale), { text, html });
+    eq(`LibreOffice's clipboard (${what}): the exact numbers, their formats (a unit too), text as text`, [c["0,1"], c["1,1"], c["2,1"], c["3,1"]], expected);
+  }
+  // German codes are read in German: a unit Blob doesn't know with decimals, thousands, scientific.
+  const de = paste(fresh("lo-codes", "de"), {
+    text: "12,0 Zellen\t1.234,57\t1,23E-07\n",
+    html: '<table><tr><td sdval="12" sdnum="1031;1031;0,0&quot; Zellen&quot;">12,0 Zellen</td><td sdval="1234,5678" sdnum="1031;1031;#.##0,00">1.234,57</td><td sdval="1,23456E-07" sdnum="1031;1031;0,00E+00">1,23E-07</td></tr></table>',
+  });
+  eq("German LibreOffice codes: a unit with decimals, thousands, scientific", [de["0,0"], de["0,1"], de["0,2"]], [
+    { v: 12, s: { fmt: { kind: "number", decimals: 1, unit: "Zellen" } } },
+    { v: 1234.5678, s: { fmt: { kind: "number", decimals: 2, group: true } } },
+    { v: 1.23456e-7, s: { fmt: { kind: "scientific", decimals: 2 } } },
+  ]);
+}
+
+async function templateUnits() {
+  // What a template shows types back as the same number with the same unit.
+  const seen = new Set<string>();
+  for (const locale of ["de", "en"] as const) {
+    for (const template of SHEET_TEMPLATES) {
+      for (const s of template.build(locale).sheets) {
+        for (const cell of Object.values(s.cells)) {
+          const fmt = cell.s?.fmt;
+          if (!fmt || !("unit" in fmt) || !fmt.unit || seen.has(`${locale}:${fmt.unit}`)) continue;
+          seen.add(`${locale}:${fmt.unit}`);
+          for (const value of [0.0518714, 26.4, 1234]) {
+            const shown = formatValue(value, fmt, locale);
+            const back = parseInput(shown, locale);
+            const unit = back.fmt && "unit" in back.fmt ? back.fmt.unit : undefined;
+            eq(`a template's unit typed back: ${shown} (${template.id}, ${locale})`, [typeof back.cell.v, formatValue(back.cell.v ?? null, back.fmt, locale), unit], ["number", shown, fmt.unit]);
+          }
+        }
+      }
+    }
+  }
+  ok("…among them the calibration slope, the growth rate and the master mix's reactions", ["de:L/mg", "en:L/mg", "de:1/h", "en:1/h", "de:Ansätze", "en:reactions"].every((u) => seen.has(u)), [...seen].join(" "));
+  const typed = (text: string, locale: "de" | "en") => {
+    const p = parseInput(text, locale);
+    return [p.cell.v, p.fmt && "unit" in p.fmt ? p.fmt.unit : undefined];
+  };
+  eq("typed: a slope in L/mg, rates per hour and per day", [typed("0,0523 L/mg", "de"), typed("0,693 1/h", "de"), typed("0.693 1/h", "en"), typed("2 1/d", "de")], [[0.0523, "L/mg"], [0.693, "1/h"], [0.693, "1/h"], [2, "1/d"]]);
+  eq("…not a fraction, a word Blob doesn't know, or 1/h without a space", [typed("2 1/2", "de"), typed("3 Proben", "de"), typed("0,6931/h", "de")], [["2 1/2", undefined], ["3 Proben", undefined], ["0,6931/h", undefined]]);
+  const file = await readSheetBytes(enc.encode("Steigung;0,0523 L/mg\r\nWachstumsrate;0,693 1/h\r\n"), "einheiten.csv", "de");
+  eq("a CSV file with them", "error" in file ? file : [file.workbook.sheets[0].cells["0,1"], file.workbook.sheets[0].cells["1,1"]], [{ v: 0.0523, s: { fmt: { kind: "number", decimals: 4, unit: "L/mg" } } }, { v: 0.693, s: { fmt: { kind: "number", decimals: 3, unit: "1/h" } } }]);
+
+  // Pasted from a spreadsheet: a unit typing doesn't read is a number when the copy's format shows
+  // the copy's number as exactly the text.
+  const fresh = (cells: Record<string, Cell>, pageId: string) => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", cells)]), locale: "de", readOnly: false });
+  const paste = (s: SheetStore, data: { text: string; html: string }) => {
+    s.select({ row: 0, col: 0 });
+    pasteData(s, data, "all");
+    return s.get().workbook.sheets[0].cells;
+  };
+  const excel = {
+    text: "12 Zellen\t12 Zellen\r\n",
+    html: `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><style><!--.xl1 {mso-number-format:"0\\0022 Zellen\\0022";}--></style></head><body><table><tr><td class=xl1 x:num="12">12 Zellen</td><td class=xl1 x:num="13">12 Zellen</td></tr></table></body></html>`,
+  };
+  const fromExcel = paste(fresh({}, "unit-excel"), excel);
+  eq("from Excel: 12 Zellen is 12 with its unit; a number the text doesn't show stays text", [fromExcel["0,0"], fromExcel["0,1"]], [{ v: 12, s: { fmt: { kind: "number", decimals: 0, unit: "Zellen" } } }, { v: "12 Zellen" }]);
+  const ownFormat = paste(fresh({ "0,0": { s: { fmt: { kind: "number", decimals: 2 } } }, "0,1": { s: { fmt: { kind: "text" } } } }, "unit-own"), excel);
+  eq("…a target cell's own format stays, a text cell stays text", [ownFormat["0,0"], ownFormat["0,1"]], [{ v: 12, s: { fmt: { kind: "number", decimals: 2 } } }, { v: "12 Zellen", s: { fmt: { kind: "text" } } }]);
+  const google = paste(fresh({}, "unit-google"), {
+    text: "12,5 Kolonien",
+    html: '<google-sheets-html-origin><table data-sheets-root="1"><tr><td data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:12.5}" data-sheets-numberformat="{&quot;1&quot;:2,&quot;2&quot;:&quot;0.0\\&quot; Kolonien\\&quot;&quot;,&quot;3&quot;:1}">12,5 Kolonien</td></tr></table>',
+  });
+  eq("from Google Sheets: the same", google["0,0"], { v: 12.5, s: { fmt: { kind: "number", decimals: 1, unit: "Kolonien" } } });
+}
+
+function textCells() {
+  const fresh = (cells: Record<string, Cell>, pageId: string) => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", cells)]), locale: "de", readOnly: false });
+  const paste = (s: SheetStore, data: { text?: string; html?: string }, mode: "all" | "values" | "transpose" = "all") => {
+    s.select({ row: 0, col: 0 });
+    pasteData(s, data, mode);
+    return s.get().workbook.sheets[0].cells;
+  };
+  // Blob's copy: a text that typing would read as something else, or one in a text cell, says so.
+  const texts = ["007", "012", "1E5", "1.11.2026", "Probe", "1-2", "TRUE"];
+  const src = fresh(Object.fromEntries(texts.map((v, r) => [`${r},0`, r === 1 ? { v, s: { fmt: { kind: "text" } } } : { v }])), "text-src");
+  src.select({ r0: 0, c0: 0, r1: texts.length - 1, c1: 0 });
+  const copied = copySelection(src, false);
+  const tds = copied.html.match(/<td[^>]*>/g) ?? [];
+  eq("copy: texts that would read as something else are marked (TRUE is true in English)", tds.map((td) => td.includes('data-blob-text="1"')), [true, true, true, true, false, false, true]);
+  ok("…with Excel's text format, so Excel keeps 007", (tds[0] ?? "").includes('mso-number-format:"\\@"'), tds[0]);
+  ok("…a text cell also with its own format", (tds[1] ?? "").includes('data-blob-format="@"'), tds[1]);
+  // Another tab: Blob's own copy is something else there.
+  const elsewhere = fresh({ "0,0": { v: "x" } }, "text-elsewhere");
+  elsewhere.select({ row: 0, col: 0 });
+  copySelection(elsewhere, false);
+  const want = texts.map((v, r) => (r === 1 ? { v, s: { fmt: { kind: "text" } } } : { v }));
+  eq("another tab: text stays text", texts.map((_, r) => paste(fresh({}, "text-other"), copied)[`${r},0`]), want);
+  const values = paste(fresh({}, "text-values"), copied, "values");
+  eq("…pasted as values", texts.map((_, r) => values[`${r},0`]), want);
+  const turned = paste(fresh({}, "text-turned"), copied, "transpose");
+  eq("…transposed", texts.map((_, c) => turned[`0,${c}`]), want);
+  const unstyled = paste(fresh({}, "text-unstyled"), { text: copied.text, html: copied.html.replace(/ style='[^']*'/g, "") });
+  eq("…from HTML without its styles", texts.map((_, r) => unstyled[`${r},0`]), want);
+  const ownFormat = paste(fresh({ "0,0": { s: { fmt: { kind: "number", decimals: 2 } } } }, "text-own"), copied);
+  eq("…a target cell's own format stays", ownFormat["0,0"], { v: "007", s: { fmt: { kind: "number", decimals: 2 } } });
+  // In the same tab, values into another spreadsheet come from the text, and Ctrl+Shift+V hands
+  // over nothing else: Blob's own copy says the rest.
+  src.select({ r0: 0, c0: 0, r1: texts.length - 1, c1: 0 });
+  const mine = copySelection(src, false);
+  const plainValues = paste(fresh({}, "text-plain-values"), { text: mine.text }, "values");
+  eq("…Ctrl+Shift+V into another spreadsheet of the same tab (only the text): still text", texts.map((_, r) => plainValues[`${r},0`]), want);
+  // Other programs' text cells.
+  const excel = paste(fresh({}, "text-excel"), {
+    text: "007\t1.5\t012\r\n",
+    html: `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><style><!--td {mso-number-format:General;} .xl70 {mso-number-format:"\\@";}--></style></head><body><table><tr><td class=xl70>007</td><td x:str>1.5</td><td style='mso-number-format:"\\@"'>012</td></tr></table></body></html>`,
+  });
+  eq("from Excel: its text format (by class or on the cell) and x:str", [excel["0,0"], excel["0,1"], excel["0,2"]], [{ v: "007", s: { fmt: { kind: "text" } } }, { v: "1.5" }, { v: "012", s: { fmt: { kind: "text" } } }]);
+  const google = paste(fresh({}, "text-google"), {
+    text: "007\t0,5",
+    html: '<google-sheets-html-origin><table data-sheets-root="1"><tr><td data-sheets-value="{&quot;1&quot;:2,&quot;2&quot;:&quot;007&quot;}">007</td><td data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:0.5}">0,5</td></tr></table>',
+  });
+  eq("from Google Sheets: a text value stays text, a number is a number", [google["0,0"], google["0,1"]], [{ v: "007" }, { v: 0.5, s: { fmt: { kind: "number", decimals: 1 } } }]);
+  const libre = paste(fresh({}, "text-libre"), { text: "007\n", html: '<table><tr><td sdnum="1031;0;@">007</td></tr></table>' });
+  eq("from an older LibreOffice: its text format", libre["0,0"], { v: "007", s: { fmt: { kind: "text" } } });
+}
+
+// Pasting after rows moved, Excel through the menu, a picture on the clipboard, copying text fast --
+
+/** Measurements in a smart table A1:C7 filtered on "Probe begins with Std" (Probe X, Y and Z in rows 3, 5 and 7 hidden), C = B × 2, their mean in row 10. */
+function measurements(): Workbook {
+  const cells: Record<string, Cell> = { "0,0": { v: "Probe" }, "0,1": { v: "Extinktion" }, "0,2": { v: "Doppelt" }, "9,0": { v: "Mittelwert" }, "9,1": { f: "AVERAGE(B2:B7)" } };
+  ["Std 1", "Probe X", "Std 2", "Probe Y", "Std 3", "Probe Z"].forEach((name, i) => {
+    cells[`${i + 1},0`] = { v: name };
+    cells[`${i + 1},1`] = { v: [0.101, 0.734, 0.205, 0.811, 0.309, 0.902][i] };
+    cells[`${i + 1},2`] = { f: `B${i + 2}*2` };
+  });
+  return book([sheet("s1", "Blatt 1", cells)], {
+    tables: [{ id: "t", sheetId: "s1", name: "Messung", area: { r0: 0, c0: 0, r1: 6, c1: 2 }, columns: [{ id: "a", total: "none" }, { id: "b", total: "none" }, { id: "c", total: "none" }], totals: false, style: "blue", banded: true, filters: { a: { kind: "text", op: "begins", text: "Std" } }, sort: null }],
+  });
+}
+
+function movedRows() {
+  const selected = (s: SheetStore) => [s.get().selection.anchor, s.get().selection.focus];
+  /** Ctrl+C on the filtered table, a change of its rows, then a paste at A1, where the table started. */
+  const copyThenPaste = (pageId: string, change: (s: SheetStore) => void, mode: "all" | "values" = "all") => {
+    const s = createSheetStore({ pageId, workbook: measurements(), locale: "de", readOnly: false });
+    s.select({ r0: 0, c0: 0, r1: 6, c1: 2 });
+    const copied = copySelection(s, false);
+    change(s);
+    s.select({ row: 0, col: 0 });
+    pasteData(s, copied, mode);
+    return s;
+  };
+  const insertAbove = (count: number) => (s: SheetStore) => s.apply("Zeilen einfügen", (wb) => insertRows(wb, "s1", 0, count));
+  const sortDown = (s: SheetStore) => s.apply("Sortieren", (wb, calc) => sortTable(wb, calc, "t", "b", "desc", "de"));
+  // A row inserted above: the table is in A2:C8 now, Probe X, Y and Z in rows 4, 6 and 8. Each line
+  // back in its old row would put "Std 1" over the header and Std 2 and 3 over Probe X and Y.
+  const inserted = copyThenPaste("moved-insert", insertAbove(1));
+  eq("a filtered copy pasted at its old place after a row was inserted above: next to each other from A1, past the rows the filter hides", cellGrid(inserted, "s1", 0, 0, 7, 2), [
+    ["Probe", "Extinktion", "Doppelt"],
+    ["Std 1", 0.101, "=B2*2"],
+    ["Std 2", 0.205, "=B3*2"],
+    ["Probe X", 0.734, "=B4*2"],
+    ["Std 3", 0.309, "=B5*2"],
+    ["Probe Y", 0.811, "=B6*2"],
+    ["Std 3", 0.309, "=B7*2"],
+    ["Probe Z", 0.902, "=B8*2"],
+  ]);
+  eq("…selected from A1 to its last row", selected(inserted), [{ row: 0, col: 0 }, { row: 4, col: 2 }]);
+  const room = copyThenPaste("moved-room", insertAbove(4));
+  eq("…four rows inserted above to make room: the rows shown land there, the table below stays", cellGrid(room, "s1", 0, 0, 10, 1), [
+    ["Probe", "Extinktion"],
+    ["Std 1", 0.101],
+    ["Std 2", 0.205],
+    ["Std 3", 0.309],
+    ["Probe", "Extinktion"],
+    ["Std 1", 0.101],
+    ["Probe X", 0.734],
+    ["Std 2", 0.205],
+    ["Probe Y", 0.811],
+    ["Std 3", 0.309],
+    ["Probe Z", 0.902],
+  ]);
+  const deleted = copyThenPaste("moved-delete", (s) => s.apply("Zeilen löschen", (wb) => deleteRows(wb, "s1", 0, 7)));
+  eq("…the table's rows deleted (to keep only what the filter shows): no gaps", cellGrid(deleted, "s1", 0, 0, 4, 2), [["Probe", "Extinktion", "Doppelt"], ["Std 1", 0.101, "=B2*2"], ["Std 2", 0.205, "=B3*2"], ["Std 3", 0.309, "=B4*2"], [null, null, null]]);
+  // Sorted by Extinktion, largest first: Probe Z, Y and X (hidden) on top.
+  const sorted = copyThenPaste("moved-sort", sortDown, "values");
+  eq("…sorted, then pasted as values: each name with its own result, the hidden measurements untouched", cellGrid(sorted, "s1", 0, 0, 6, 2), [
+    ["Probe", "Extinktion", "Doppelt"],
+    ["Probe Z", 0.902, "=B2*2"],
+    ["Probe Y", 0.811, "=B3*2"],
+    ["Probe X", 0.734, "=B4*2"],
+    ["Std 1", 0.101, 0.202],
+    ["Std 2", 0.205, 0.41],
+    ["Std 3", 0.309, 0.618],
+  ]);
+  eq("…with its formulas: each pointing at its own row", cellGrid(copyThenPaste("moved-sort-all", sortDown), "s1", 4, 0, 6, 2), [["Std 1", 0.101, "=B5*2"], ["Std 2", 0.205, "=B6*2"], ["Std 3", 0.309, "=B7*2"]]);
+  const undone = copyThenPaste("moved-undone", (s) => {
+    insertAbove(1)(s);
+    s.undo();
+  }, "values");
+  eq("…a row inserted and undone: formulas to values in place again, the hidden rows keep theirs", cellGrid(undone, "s1", 0, 2, 6, 2).flat(), ["Doppelt", 0.202, "=B3*2", 0.41, "=B5*2", 0.618, "=B7*2"]);
+  // A collaborator's edit arrives as their whole version, read from JSON (saver → replaceRemote):
+  // every cell a new object, the copied ones as they were.
+  const remote = copyThenPaste("moved-remote", (s) => {
+    s.apply("Filter", (wb) => setTableFilter(wb, "t", "a", null));
+    const theirs = JSON.parse(JSON.stringify(s.get().workbook)) as Workbook;
+    theirs.sheets[0].cells["49,25"] = { v: "von Anna" };
+    s.replaceRemote(theirs);
+  }, "values");
+  eq("…the filter cleared and a collaborator's edit elsewhere arrived: formulas to values in place all the same", cellGrid(remote, "s1", 0, 0, 6, 2), [
+    ["Probe", "Extinktion", "Doppelt"],
+    ["Std 1", 0.101, 0.202],
+    ["Probe X", 0.734, "=B3*2"],
+    ["Std 2", 0.205, 0.41],
+    ["Probe Y", 0.811, "=B5*2"],
+    ["Std 3", 0.309, 0.618],
+    ["Probe Z", 0.902, "=B7*2"],
+  ]);
+
+  // Without a filter too: values pasted after rows moved are those copied, not the results of the
+  // formulas now in the rows they were copied from.
+  const plainBook = () => book([sheet("s1", "Blatt 1", { "0,0": { v: "Probe" }, "0,1": { v: "E" }, "0,2": { v: "Doppelt" }, "1,0": { v: "S1" }, "1,1": { v: 0.1 }, "1,2": { f: "B2*2" }, "2,0": { v: "S2" }, "2,1": { v: 0.2 }, "2,2": { f: "B3*2" }, "3,0": { v: "S3" }, "3,1": { v: 0.3 }, "3,2": { f: "B4*2" } })]);
+  const valuesAfter = (pageId: string, change: (s: SheetStore) => void) => {
+    const s = createSheetStore({ pageId, workbook: plainBook(), locale: "de", readOnly: false });
+    s.select({ r0: 0, c0: 0, r1: 3, c1: 2 });
+    const copied = copySelection(s, false);
+    change(s);
+    s.select({ row: 0, col: 4 });
+    pasteData(s, copied, "values");
+    return s;
+  };
+  eq("a copy, a row inserted above, pasted as values elsewhere: each row's own results", cellGrid(valuesAfter("moved-plain", insertAbove(1)), "s1", 0, 4, 3, 6), [["Probe", "E", "Doppelt"], ["S1", 0.1, 0.2], ["S2", 0.2, 0.4], ["S3", 0.3, 0.6]]);
+  const typedOver = valuesAfter("moved-typed", (s) => s.input({ row: 1, col: 1 }, "0,9"));
+  eq("…a copied cell typed over meanwhile: the values as copied (not the old number beside the new result)", cellGrid(typedOver, "s1", 1, 4, 1, 6), [["S1", 0.1, 0.2]]);
+  eq("…nothing changed: the results read where they were copied from", cellGrid(valuesAfter("moved-none", () => {}), "s1", 1, 4, 3, 6), [["S1", 0.1, 0.2], ["S2", 0.2, 0.4], ["S3", 0.3, 0.6]]);
+  // What the copied cells held, as it was: an error stays an error, ="" an empty text, a big
+  // number gets no format it didn't have (none of it read back from the copy's text).
+  const kinds = () => book([sheet("s1", "Blatt 1", { "0,0": { f: "1/0" }, "0,1": { f: "NA()" }, "0,2": { f: '""' }, "0,3": { v: 1e21 }, "0,4": { f: "D1/1E41" }, "0,5": { v: "007" }, "0,6": { v: true }, "0,7": { v: 0.10437, s: { fmt: { kind: "number", decimals: 3 } } } })]);
+  const asCopied = [{ f: "#DIV/0!" }, { f: "#N/A" }, { v: "" }, { v: 1e21 }, { v: 1e-20 }, { v: "007" }, { v: true }, { v: 0.10437, s: { fmt: { kind: "number", decimals: 3 } } }];
+  for (const locale of ["de", "en"] as const) {
+    const copyKinds = (pageId: string) => {
+      const s = createSheetStore({ pageId, workbook: kinds(), locale, readOnly: false });
+      s.select({ r0: 0, c0: 0, r1: 0, c1: 7 });
+      return { s, copied: copySelection(s, false) };
+    };
+    const valuesAt = (s: SheetStore, copied: { text: string; html?: string }) => {
+      s.select({ row: 4, col: 0 });
+      pasteData(s, copied, "values");
+      return [0, 1, 2, 3, 4, 5, 6, 7].map((c) => s.get().workbook.sheets[0].cells[`4,${c}`] ?? null);
+    };
+    const still = copyKinds(`kinds-none-${locale}`);
+    const shifted = copyKinds(`kinds-moved-${locale}`);
+    shifted.s.apply("Zeile einfügen", (wb) => insertRows(wb, "s1", 0, 1));
+    const from = copyKinds(`kinds-from-${locale}`);
+    const into = (pageId: string) => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", {})]), locale, readOnly: false });
+    eq(`values of errors, ="", big and small numbers, nothing moved; a row inserted above; into another spreadsheet, also from the text alone (${locale})`, [valuesAt(still.s, still.copied), valuesAt(shifted.s, shifted.copied), valuesAt(into(`kinds-into-${locale}`), from.copied), valuesAt(into(`kinds-text-${locale}`), { text: from.copied.text })], [asCopied, asCopied, asCopied, asCopied]);
+  }
+
+  // A cut moves its own cells, from where they are now.
+  const cutBook = () => book([sheet("s1", "Blatt 1", { "0,0": { v: "a1" }, "1,0": { v: "a2" }, "2,0": { v: "a3" }, "3,0": { v: "a4" }, "5,0": { f: "COUNTA(A1:A3)" } })]);
+  const cutThenPaste = (pageId: string, change: (s: SheetStore) => void, mode: "all" | "values" = "all") => {
+    const s = createSheetStore({ pageId, workbook: cutBook(), locale: "de", readOnly: false });
+    s.select({ r0: 0, c0: 0, r1: 2, c1: 0 });
+    const cutOut = copySelection(s, true);
+    change(s);
+    s.select({ row: 0, col: 3 });
+    pasteData(s, cutOut, mode);
+    return s;
+  };
+  const moved = (s: SheetStore, r1: number) => [cellGrid(s, "s1", 0, 3, 2, 3).flat(), cellGrid(s, "s1", 0, 0, r1, 0).flat()];
+  const above = cutThenPaste("cut-insert", insertAbove(1));
+  eq("a cut, a row inserted above, pasted: its own cells move, from where they are now", moved(above, 4), [["a1", "a2", "a3"], [null, null, null, null, "a4"]]);
+  eq("…a reference to them follows, the ants are gone", [above.get().workbook.sheets[0].cells["6,0"], above.get().clip], [{ f: "COUNTA(D1:D3)" }, null]);
+  eq("…one of its rows deleted: the others move", moved(cutThenPaste("cut-delete-one", (s) => s.apply("Zeile löschen", (wb) => deleteRows(wb, "s1", 1, 1))), 2), [["a1", "a3", null], [null, null, "a4"]]);
+  const gone = cutThenPaste("cut-deleted", (s) => s.apply("Zeilen löschen", (wb) => deleteRows(wb, "s1", 0, 3)));
+  eq("…all its rows deleted: what was cut is pasted, and the cut ends", [cellGrid(gone, "s1", 0, 3, 2, 3).flat(), gone.get().clip], [["a1", "a2", "a3"], null]);
+  eq("…a row inserted and undone: moved from where it was", moved(cutThenPaste("cut-undone", (s) => {
+    insertAbove(1)(s);
+    s.undo();
+  }), 3), [["a1", "a2", "a3"], [null, null, null, "a4"]]);
+  eq("…pasted as values: moved all the same, as without the row inserted", moved(cutThenPaste("cut-values", insertAbove(1), "values"), 4), [["a1", "a2", "a3"], [null, null, null, null, "a4"]]);
+  // Sorted apart, its cells can't move together, and pasted as a copy they would be there twice:
+  // the cut is cancelled, as by someone else's change.
+  const apart = createSheetStore({ pageId: "cut-sorted", workbook: cutBook(), locale: "de", readOnly: false });
+  apart.select({ r0: 0, c0: 0, r1: 2, c1: 0 });
+  const apartCut = copySelection(apart, true);
+  apart.apply("Sortieren", (wb, calc) => sortArea(wb, calc, "s1", { r0: 0, c0: 0, r1: 4, c1: 0 }, [{ col: 0, dir: "desc" }], "de"));
+  apart.select({ row: 0, col: 3 });
+  const noticeOf = (s: SheetStore) => {
+    const text = currentSheetNotice(s)?.text ?? null;
+    hideSheetNotice(s);
+    return text;
+  };
+  const cancelled = [true, [[null, null, null], ["a4", "a3", "a2", "a1", null]], sheetGridText.de.cutApart];
+  eq("…its rows sorted apart: nothing pasted, the cut cancelled and said so, its ants gone", [pasteData(apart, apartCut, "all"), moved(apart, 4), noticeOf(apart), apart.get().clip], [...cancelled, null]);
+  eq("…pasted again, as values too: the same", [pasteData(apart, apartCut, "values"), moved(apart, 4), noticeOf(apart)], cancelled);
+  endCut();
+  eq("…after Escape: pasted as a copy, of the cells as they were cut", [pasteData(apart, apartCut, "all"), moved(apart, 4)], [true, [["a1", "a2", "a3"], ["a4", "a3", "a2", "a1", null]]]);
+}
+
+// Excel 365's clipboard in German (the second sweep's tester's): text, and HTML as Excel writes it
+// and as Chrome's navigator.clipboard.read() hands it over without asking for it unsanitized
+// (no <style>, no namespace: classes without their rules, x:num kept, a bare x:num as x:num="").
+const XL_TEXT = "Probe\tExtinktion\tKonz\tAnteil\tDatum\tDauer\tSteigung\r\n007\t0,104\t2,0 mg/L\t12,35%\t03.11.2026\t36:30\t0,0523\r\n012\t0,207\t4,0 mg/L\t100,00%\t04.11.2026\t48:00\t1.234,50 €\r\n";
+const XL_HTML = String.raw`<html xmlns:v="urn:schemas-microsoft-com:vml"
+xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:x="urn:schemas-microsoft-com:office:excel"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+<meta name=ProgId content=Excel.Sheet>
+<meta name=Generator content="Microsoft Excel 15">
+<style>
+<!--table
+	{mso-displayed-decimal-separator:"\,";
+	mso-displayed-thousand-separator:"\.";}
+td
+	{padding-top:1px;
+	mso-number-format:General;
+	white-space:nowrap;}
+.xl65
+	{mso-number-format:"0\.000";}
+.xl66
+	{mso-number-format:"0\.0\0022 mg\/L\0022";}
+.xl67
+	{mso-number-format:"0\.00%";}
+.xl68
+	{mso-number-format:"Short Date";}
+.xl69
+	{mso-number-format:"\[h\]\:mm";}
+.xl70
+	{mso-number-format:"\@";}
+.xl71
+	{mso-number-format:"0\.0000";}
+.xl72
+	{mso-number-format:"\#\,\#\#0\.00\\ \0022€\0022";}
+-->
+</style>
+</head>
+<body link="#0563C1" vlink="#954F72">
+<table border=0 cellpadding=0 cellspacing=0 width=448 style='border-collapse:
+ collapse;width:336pt'>
+<!--StartFragment-->
+ <col width=64 span=7 style='width:48pt'>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 width=64 style='height:15.0pt;width:48pt'>Probe</td>
+  <td width=64 style='width:48pt'>Extinktion</td>
+  <td width=64 style='width:48pt'>Konz</td>
+  <td width=64 style='width:48pt'>Anteil</td>
+  <td width=64 style='width:48pt'>Datum</td>
+  <td width=64 style='width:48pt'>Dauer</td>
+  <td width=64 style='width:48pt'>Steigung</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl70 style='height:15.0pt'>007</td>
+  <td class=xl65 align=right x:num="0.10437">0,104</td>
+  <td class=xl66 align=right x:num="2.04">2,0 mg/L</td>
+  <td class=xl67 align=right x:num="0.123456">12,35%</td>
+  <td class=xl68 align=right x:num="46329">03.11.2026</td>
+  <td class=xl69 align=right x:num="1.5208333333333333">36:30</td>
+  <td class=xl71 align=right x:num="5.2328571428571427E-2">0,0523</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl70 style='height:15.0pt'>012</td>
+  <td align=right x:num>0,207</td>
+  <td class=xl66 align=right x:num="4">4,0 mg/L</td>
+  <td class=xl67 align=right x:num="1">100,00%</td>
+  <td class=xl68 align=right x:num="46330">04.11.2026</td>
+  <td class=xl69 align=right x:num="2">48:00</td>
+  <td class=xl72 align=right x:num="1234.5">1.234,50 €</td>
+ </tr>
+<!--EndFragment-->
+</table>
+</body>
+</html>`;
+const XL_SANITIZED = String.raw`<table border="0" cellpadding="0" cellspacing="0" width="448" style="letter-spacing: normal; orphans: 2; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; border-collapse: collapse; width: 336pt;"><colgroup><col width="64" span="7" style="width: 48pt;"></colgroup><tbody><tr height="20" style="height: 15pt;"><td height="20" width="64" style="padding-top: 1px; white-space: nowrap; height: 15pt; width: 48pt;">Probe</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Extinktion</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Konz</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Anteil</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Datum</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Dauer</td>
+<td width="64" style="padding-top: 1px; white-space: nowrap; width: 48pt;">Steigung</td></tr>
+<tr height="20" style="height: 15pt;"><td height="20" class="xl70" style="padding-top: 1px; white-space: nowrap; height: 15pt;">007</td>
+<td class="xl65" align="right" x:num="0.10437" style="padding-top: 1px; white-space: nowrap;">0,104</td>
+<td class="xl66" align="right" x:num="2.04" style="padding-top: 1px; white-space: nowrap;">2,0 mg/L</td>
+<td class="xl67" align="right" x:num="0.123456" style="padding-top: 1px; white-space: nowrap;">12,35%</td>
+<td class="xl68" align="right" x:num="46329" style="padding-top: 1px; white-space: nowrap;">03.11.2026</td>
+<td class="xl69" align="right" x:num="1.5208333333333333" style="padding-top: 1px; white-space: nowrap;">36:30</td>
+<td class="xl71" align="right" x:num="5.2328571428571427E-2" style="padding-top: 1px; white-space: nowrap;">0,0523</td></tr>
+<tr height="20" style="height: 15pt;"><td height="20" class="xl70" style="padding-top: 1px; white-space: nowrap; height: 15pt;">012</td>
+<td align="right" x:num="" style="padding-top: 1px; white-space: nowrap;">0,207</td>
+<td class="xl66" align="right" x:num="4" style="padding-top: 1px; white-space: nowrap;">4,0 mg/L</td>
+<td class="xl67" align="right" x:num="1" style="padding-top: 1px; white-space: nowrap;">100,00%</td>
+<td class="xl68" align="right" x:num="46330" style="padding-top: 1px; white-space: nowrap;">04.11.2026</td>
+<td class="xl69" align="right" x:num="2" style="padding-top: 1px; white-space: nowrap;">48:00</td>
+<td class="xl72" align="right" x:num="1234.5" style="padding-top: 1px; white-space: nowrap;">1.234,50 €</td></tr></tbody></table>`.replace(/\n/g, "");
+
+async function menuClipboard() {
+  // navigator.clipboard as a browser has it: read() with Chromium's option for unsanitized HTML.
+  type Item = { types: string[]; getType: (type: string) => Promise<Blob> };
+  const item = (data: Record<string, string>): Item => ({ types: Object.keys(data), getType: async (type) => new Blob([data[type]], { type }) });
+  let items: (unsanitized: boolean) => Item[] = () => [];
+  let refused: "option" | "read" | "all" | null = null;
+  const asked: unknown[] = [];
+  const clipboard = {
+    read: async (options?: { unsanitized?: string[] }) => {
+      asked.push(options ?? null);
+      if (refused === "option" && options) throw new TypeError("unsanitized");
+      if (refused === "read" || refused === "all") throw new DOMException("refused", "NotAllowedError");
+      return items(!!options?.unsanitized?.includes("text/html"));
+    },
+    readText: async () => {
+      if (refused === "all") throw new DOMException("refused", "NotAllowedError");
+      return "nur Text";
+    },
+  };
+  if (typeof globalThis.navigator === "undefined") Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true });
+  const had = Object.getOwnPropertyDescriptor(globalThis.navigator, "clipboard");
+  Object.defineProperty(globalThis.navigator, "clipboard", { value: clipboard, configurable: true });
+  try {
+    const fresh = (pageId: string, cells: Record<string, Cell> = {}) => createSheetStore({ pageId, workbook: book([sheet("s1", "Blatt 1", cells)]), locale: "de", readOnly: false });
+    const pasted = (s: SheetStore) => cellGrid(s, "s1", 1, 0, 2, 6);
+    // Excel's clipboard: Chromium hands over the HTML as Excel wrote it when asked.
+    items = (unsanitized) => [item({ "text/plain": XL_TEXT, "text/html": unsanitized ? XL_HTML : XL_SANITIZED })];
+    const keyboard = fresh("menu-ctrl-v");
+    keyboard.select({ row: 0, col: 0 });
+    pasteData(keyboard, { text: XL_TEXT, html: XL_HTML }, "all");
+    const cells = (s: SheetStore) => [1, 2].map((r) => [0, 1, 2, 3, 4, 5, 6].map((c) => s.get().workbook.sheets[0].cells[`${r},${c}`]));
+    for (const mode of ["all", "values"] as const) {
+      const menu = fresh(`menu-${mode}`);
+      menu.select({ row: 0, col: 0 });
+      asked.length = 0;
+      pasteData(menu, await readSystemClipboard(), mode);
+      eq(`Excel's clipboard through the menu (${mode === "all" ? "Einfügen" : "Nur Werte einfügen, Ctrl+Shift+V"}): what Ctrl+V gives, 007 text, the numbers exact`, cells(menu), cells(keyboard));
+      eq("…its HTML asked for unsanitized", asked, [{ unsanitized: ["text/html"] }]);
+    }
+    eq("…which is: 007 and 012 as text, 0,104 as 0,10437, 2,0 mg/L as 2,04, the slope with all its digits", pasted(keyboard).map((line) => [line[0], line[1], line[2], line[6]]), [["007", 0.10437, 2.04, 0.052328571428571426], ["012", 0.207, 4, 1234.5]]);
+    // Other browsers hand over the HTML without its <style>: Excel's exact numbers still come
+    // (its x:num), the text decides their format. (Which cells are text it can't tell then: "007" is 7.)
+    items = () => [item({ "text/plain": XL_TEXT, "text/html": XL_SANITIZED })];
+    const other = fresh("menu-sanitized");
+    other.select({ row: 0, col: 0 });
+    pasteData(other, await readSystemClipboard(), "values");
+    eq("…a browser that hands over Excel's HTML without its styles: the numbers exact all the same", pasted(other).map((line) => line.slice(1)), pasted(keyboard).map((line) => line.slice(1)));
+    eq("…and with their formats", cells(other).map((line) => line.slice(1)), cells(keyboard).map((line) => line.slice(1)));
+    refused = "option";
+    asked.length = 0;
+    eq("a browser that refuses the option: read again without it", [(await readSystemClipboard())?.text, asked], [XL_TEXT, [{ unsanitized: ["text/html"] }, null]]);
+    refused = "read";
+    eq("reading refused: plain text", await readSystemClipboard(), { text: "nur Text" });
+    refused = "all";
+    eq("…that too: null (Blob's own copy then)", await readSystemClipboard(), null);
+    refused = null;
+
+    // A picture (a screenshot) or a file on the clipboard: nothing to paste, not Blob's last copy,
+    // and not a cut given up by copying something else.
+    items = () => [item({ "image/png": "PNG" })];
+    const picture = await readSystemClipboard();
+    eq("a picture on the clipboard: read, no text", picture, { text: "" });
+    const old = fresh("menu-picture", { "0,0": { v: "alt 1" }, "1,0": { v: "alt 2" }, "2,0": { v: 0.5 } });
+    old.select({ r0: 0, c0: 0, r1: 2, c1: 0 });
+    copySelection(old, false);
+    old.select({ row: 0, col: 3 });
+    eq("…pasted (menu, Ctrl+Shift+V): nothing, not Blob's old copy", [pasteData(old, picture, "values"), pasteData(old, picture, "all"), cellGrid(old, "s1", 0, 3, 2, 3).flat()], [false, false, [null, null, null]]);
+    old.select({ r0: 0, c0: 0, r1: 2, c1: 0 });
+    copySelection(old, true);
+    old.select({ row: 0, col: 3 });
+    eq("…a cut is not carried out", [pasteData(old, picture, "all"), cellGrid(old, "s1", 0, 0, 2, 3)], [false, [["alt 1", null, null, null], ["alt 2", null, null, null], [0.5, null, null, null]]]);
+    eq("…while the clipboard can't be read at all, Blob's own copy is pasted", [pasteData(old, null, "all"), cellGrid(old, "s1", 0, 3, 2, 3).flat()], [true, ["alt 1", "alt 2", 0.5]]);
+  } finally {
+    if (had) Object.defineProperty(globalThis.navigator, "clipboard", had);
+    else delete (globalThis.navigator as { clipboard?: unknown }).clipboard;
+  }
+}
+
+function textMarks() {
+  // What a copy marks as text (data-blob-text, Excel's "@") is what typing reads as something
+  // else, in the user's language or, where that one reads it differently, in the other one. This is
+  // that rule as it reads every text (the copy tells most texts that start with a letter without).
+  const reads = (text: string, l: Locale) => {
+    const p = parseInput(text, l);
+    return p.cell.f !== undefined || p.cell.v !== text || !!p.fmt || !!p.error;
+  };
+  const readsAsOther = (text: string, l: Locale) => {
+    const truth = /^\s*(wahr|falsch|true|false)\s*$/i.test(text);
+    if (!truth && !/\d/.test(text) && !/^[=+\-']/.test(text)) return false;
+    return reads(text, l) || ((truth || /[.,/]|^[=+-]/.test(text)) && reads(text, l === "de" ? "en" : "de"));
+  };
+  const marked = (texts: string[], locale: Locale) => {
+    const cells: Record<string, Cell> = {};
+    texts.forEach((v, r) => (cells[`${r},0`] = { v }));
+    const s = createSheetStore({ pageId: `marks-${locale}-${texts.length}`, workbook: book([sheet("s1", "Blatt 1", cells, { size: { rows: texts.length + 1, cols: 2 } })]), locale, readOnly: false });
+    s.select({ r0: 0, c0: 0, r1: texts.length - 1, c1: 0 });
+    return (copySelection(s, false).html.match(/<td[^>]*>/g) ?? []).map((td) => td.includes('data-blob-text="1"'));
+  };
+  eq("copy: names and IDs aren't text that reads as something else, a month or a currency in front is", marked(["Probe 1.2", "P-00001-0", "Lösung 5, Charge 3/7", "Std 1", "pH 7", "Mo 3.11.", "Nov 3, 2026", "Mär 2026", "Jan 26", "EUR 5", "chf 12.50", "€5", "WAHR", "true"], "de"), [false, false, false, false, false, false, true, true, true, true, true, true, true, true]);
+  const long = [`1${"0".repeat(80)}`, `12. Versuch ${"x".repeat(80)}`];
+  eq("…long texts too (each read every time)", [marked(long, "de"), marked(long, "de")], [[true, false], [true, false]]);
+  // Every combination of what a text may start with, hold and end with, each twice.
+  const heads = ["", " ", "P", "Probe ", "Lösung ", "Nov ", "nov. ", "November ", "Mär ", "März ", "Maerz ", "Mai ", "Mais ", "Sept ", "Okt. ", "Mo ", "Montag, ", "EUR ", "eur", "Euro ", "CHF ", "chf", "€", "$", "£", "-", "+", "−", "=", "'", "(", "#", "µ", "é", "x", "E", "T", "WAHR", "true", "﻿"];
+  const bodies = ["", "0", "007", "1,5", "1.5", "1.234", "1E5", "1,5E-3", "3/7", "11/1/2026", "1.11.2026", "1.11.", "2026-11-04", "14:30", "2:30 PM", "36:00", "3, 2026", "26", "12 mg/L", "0,693 1/h", "50 %", "A1", "SUM(A1)", "00001-0"];
+  const tails = ["", " ", "%", " €", " EUR", " mg/L", "x", "T12:30", " 14:30", "-B"];
+  const texts = heads.flatMap((h) => bodies.flatMap((b) => tails.map((t) => h + b + t)));
+  for (const locale of ["de", "en"] as const) {
+    const twice = texts.flatMap((t) => [t, t]);
+    const got = marked(twice, locale);
+    const wrong = twice.filter((t, i) => got[i] !== readsAsOther(t, locale));
+    eq(`copy marks every text that reads as something else, and only those (${texts.length} texts, ${locale})`, wrong.slice(0, 5), []);
+  }
+  // Names and IDs are told without reading them: reading each, in both languages, made copying
+  // them 2.5 to 3.5 times as slow. A month or a currency in front, or a digit, needs reading.
+  let before = textsRead();
+  marked(Array.from({ length: 20_000 }, (_, i) => `Probe ${i}.${i % 7}`), "de");
+  eq("copy: 20,000 names (Probe 12.5) copied without reading one", textsRead() - before, 0);
+  before = textsRead();
+  marked(["Nov 3, 1999", "EUR 5,55", "12.5-AB"], "de");
+  eq("…texts that may read as something else are read", textsRead() - before, 3);
+
+  // Typing reads a day and month without a year in the current year, and "29.2." is a date only in
+  // a leap year: what a copy remembers of how texts read holds for the year it read them in.
+  const RealDate = Date;
+  const inYear = (year: number) => {
+    globalThis.Date = class extends RealDate {
+      constructor(...args: unknown[]) {
+        if (args.length) super(...(args as [number]));
+        else super(year, 5, 1);
+      }
+    } as DateConstructor;
+  };
+  try {
+    inYear(2027);
+    const before = marked(["29.2."], "de");
+    inYear(2028);
+    eq("copy: 29.2. is text in 2027, a date in 2028 (read again in the new year)", [before, marked(["29.2."], "de")], [[false], [true]]);
+  } finally {
+    globalThis.Date = RealDate;
+  }
+}
+
 // Round trips through .xlsx -----------------------------------------------------------------------
 
 async function roundTrips() {
@@ -1568,6 +2410,355 @@ async function embedRequests() {
   ok("Word: the line as text to copy", wordXml.includes(r2Text(fit.r2!, "de")), wordXml.slice(0, 300));
 }
 
+// Files in: CSV language, web pages, odd text, sizes, pickers ---------------------------------------
+
+/** The values of a read file's cells below its first row, row by row (or the problem). */
+async function valuesBelowHeader(file: string | Uint8Array, name: string, locale: "de" | "en"): Promise<unknown> {
+  const r = await readSheetBytes(typeof file === "string" ? enc.encode(file) : file, name, locale);
+  if ("error" in r) return r;
+  const cells = r.workbook.sheets[0].cells;
+  return Object.keys(cells)
+    .map((k) => k.split(",").map(Number))
+    .filter(([row]) => row > 0)
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .map(([row, col]) => cells[`${row},${col}`].v);
+}
+
+/** CSV numbers in the file's language (its values, else its separator), slash dates in the order its own dates show. */
+async function csvLanguage() {
+  eq("separator ',' means English numbers", separatorLocale(",", [["a", "b"]]), "en");
+  eq("separator ';' means German numbers", separatorLocale(";", [["a", "b"]]), "de");
+  eq("tab says nothing", separatorLocale("\t", [["a", "b"]]), null);
+  eq("a file of one column says nothing", separatorLocale(";", [["1.234"], ["2.500"]]), null);
+  eq("dates: day first where a first part is above 12, written the way English reads them", slashDatesFor([["13/3/2026"], ["3/4/2026 14:00"]], "en", "de"), [["3/13/2026"], ["4/3/2026 14:00"]]);
+  eq("dates: nothing to turn when the order is the one numbers are read in", slashDatesFor([["11/3/2026"]], "de", "de"), [["11/3/2026"]]);
+  eq("no year: as the reader reads it (German: the dilution 1/20 stays text, 3/4 is the 3rd of April)", slashDatesFor([["1/20", "13/3/2026", "3/4", "3/4 14:00", "1/100"]], "en", "de"), [["'1/20", "3/13/2026", "4/3", "4/3 14:00", "1/100"]]);
+  eq("no year, numbers read in the reader's language: nothing to change", slashDatesFor([["1/20", "3/4"]], "de", "de"), [["1/20", "3/4"]]);
+
+  // The files the pre-release sweep found the problems with (numbers only the separator tells, UK
+  // and US dates), as they were. Serial dates: 46329 is 3 November 2026.
+  const nov = (d: number) => 46326 + d;
+  const typed = (text: string, locale: "de" | "en") => parseInput(text, locale).cell.v;
+  const mar11 = 46092;
+  const cases: [string, string, "de" | "en", unknown][] = [
+    ["ambig.csv", "Sample,Count\nA,1.234\nB,2.500\nC,3.750\n", "de", ["A", 1.234, "B", 2.5, "C", 3.75]],
+    ["ambig.csv", "Sample,Count\nA,1.234\nB,2.500\nC,3.750\n", "en", ["A", 1.234, "B", 2.5, "C", 3.75]],
+    ["iso.csv", "Sample,Date,Value\n2026-11-03,1.250,4\n", "de", [nov(3), 1.25, 4]],
+    ["mixed.csv", "Sample,Abs\nBlank,0.045\nA,1.234\nB,2.500\n", "de", ["Blank", 0.045, "A", 1.234, "B", 2.5]],
+    ["de-semi.csv", "Probe;Masse\r\nA;1,234\r\nB;2,500\r\n", "en", ["A", 1.234, "B", 2.5]],
+    ["de-3dec.csv", "Probe;Extinktion;Datum\r\nS1;1,234;03.11.2026\r\nS2;2,500;04.11.2026\r\n", "en", ["S1", 1.234, nov(3), "S2", 2.5, nov(4)]],
+    // A ";" file is German, a "," file English, when no value shows it.
+    ["en-semi.csv", "Sample;Mass\r\nA;1.234\r\nB;2.500\r\n", "en", ["A", 1234, "B", 2500]],
+    ["de-quoted-comma.csv", 'Probe,Wert\n"A","1,234"\n"B","2,500"\n', "de", ["A", 1234, "B", 2500]],
+    // Tab-separated text keeps the reader's language.
+    ["tab.tsv", "Sample\tMass\nA\t1.234\nB\t2.500\n", "de", ["A", 1234, "B", 2500]],
+    ["tab.tsv", "Sample\tMass\nA\t1.234\nB\t2.500\n", "en", ["A", 1.234, "B", 2.5]],
+    // Dates: a part above 12 decides, per column; else the reader's order; never the numbers.
+    ["uk-dates.csv", "Sample,Date,Count\r\nS1,13/3/2026,5\r\nS2,11/4/2026,7\r\n", "en", ["S1", 46094, 5, "S2", 46123, 7]],
+    ["uk-dec.csv", "Sample,Date,Abs\nS1,13/3/2026,0.104\nS2,3/4/2026,0.207\n", "de", ["S1", 46094, 0.104, "S2", 46115, 0.207]],
+    ["uk-dec.csv", "Sample,Date,Abs\nS1,13/3/2026,0.104\nS2,3/4/2026,0.207\n", "en", ["S1", 46094, 0.104, "S2", 46115, 0.207]],
+    ["us-dates.csv", "Sample,Date,Count\r\nS1,11/3/2026,5\r\nS2,11/4/2026,7\r\nS3,12/1/2026,9\r\n", "de", ["S1", mar11, 5, "S2", 46123, 7, "S3", 46034, 9]],
+    ["us-dates.csv", "Sample,Date,Count\r\nS1,11/3/2026,5\r\nS2,11/4/2026,7\r\nS3,12/1/2026,9\r\n", "en", ["S1", nov(3), 5, "S2", nov(4), 7, "S3", 46357, 9]],
+    ["us-month.csv", "Day,Date,OD600\n1,11/1/2026,0.052\n2,11/2/2026,0.101\n13,11/13/2026,0.91\n", "de", [1, nov(1), 0.052, 2, nov(2), 0.101, 13, nov(13), 0.91]],
+    ["us-datetime.csv", "Time,Temp\n11/3/2026 14:00,37.0\n", "de", [mar11 + 14 / 24, 37]],
+    ["us-datetime.csv", "Time,Temp\n11/3/2026 14:00,37.0\n", "en", [nov(3) + 14 / 24, 37]],
+    // A column whose dates don't show it follows the file's other date columns.
+    ["start-end.csv", "Probe,Start,Ende\nA,11/3/2026,11/14/2026\nB,11/4/2026,11/20/2026\n", "de", ["A", nov(3), nov(14), "B", nov(4), nov(20)]],
+    // What isn't a date the file's way round stays text, as written.
+    ["kaputt.csv", "Probe,Datum\nA,13/3/2026\nB,13/13/2026\n", "de", ["A", 46094, "B", "13/13/2026"]],
+    // Two numbers with a slash and no year are read as the reader would type them (this year): in
+    // German the dilution 1/20 stays text and 3/4 is the 3rd of April, in English both are dates.
+    ["verduennung.csv", "Probe,Verd\nS1,1/20\nS2,3/4\nS3,1/100\n", "de", ["S1", "1/20", "S2", typed("3/4", "de"), "S3", "1/100"]],
+    ["verduennung.csv", "Probe,Verd\nS1,1/20\nS2,3/4\nS3,1/100\n", "en", ["S1", typed("1/20", "en"), "S2", typed("3/4", "en"), "S3", "1/100"]],
+    ["verduennung-de.csv", "Probe;Verd\nS1;1/20\nS2;3/4\n", "en", ["S1", typed("1/20", "en"), "S2", typed("3/4", "en")]],
+  ];
+  for (const [name, text, locale, want] of cases) eq(`csv ${name} read in ${locale}`, await valuesBelowHeader(text, name, locale), want);
+}
+
+/** HTML saved as .xls behind any first tag, NUL characters, UTF-16 without a byte order mark. */
+async function oddFiles() {
+  const table = "<table><tr><td>Probe</td><td>Wert</td></tr><tr><td>A</td><td>1,5</td></tr></table>";
+  const cells = async (text: string) => {
+    const r = await readSheetBytes(enc.encode(text), "Export.xls", "de");
+    return "error" in r ? r : r.workbook.sheets[0].cells;
+  };
+  const want = { "0,0": { v: "Probe" }, "0,1": { v: "Wert" }, "1,0": { v: "A" }, "1,1": { v: 1.5 } };
+  eq("web page: a table inside a <div>", await cells(`<div class="export">${table}</div>`), want);
+  eq("web page: a heading before the table", await cells(`<h2>Messprotokoll</h2>\n${table}`), want);
+  eq("web page: a long preamble before the table", await cells(`<div><style>${".x{color:red}".repeat(400)}</style><p>Export</p>${table}</div>`), want);
+  eq("data with a tag and no table stays data", await cells("<b>Probe</b>;Wert\nA;1,5\n"), { "0,0": { v: "<b>Probe</b>" }, "0,1": { v: "Wert" }, "1,0": { v: "A" }, "1,1": { v: 1.5 } });
+
+  eq("NUL characters in a field don't come along", await valuesBelowHeader("Probe;Notiz\r\nA;ok\u0000\u0000\r\n", "nul.csv", "de"), ["A", "ok"]);
+  const text = "Probe\tµg\nS1\t0,5\n";
+  const le = new Uint8Array(text.length * 2);
+  const be = new Uint8Array(text.length * 2);
+  for (let i = 0; i < text.length; i++) {
+    new DataView(le.buffer).setUint16(i * 2, text.charCodeAt(i), true);
+    new DataView(be.buffer).setUint16(i * 2, text.charCodeAt(i), false);
+  }
+  for (const [order, bytes] of [["little", le], ["big", be]] as const) {
+    const r = await readSheetBytes(bytes, "messung.txt", "de");
+    eq(`UTF-16 (${order} endian) without a byte order mark`, "error" in r ? r : r.workbook.sheets[0].cells, { "0,0": { v: "Probe" }, "0,1": { v: "µg" }, "1,0": { v: "S1" }, "1,1": { v: 0.5 } });
+  }
+  eq("XML: no NUL and no half character from character references", [decodeEntities("a&#0;b"), decodeEntities("&#xD83E;"), decodeEntities("&#x1F9EB;"), decodeEntities("&#xDDEB;&#xD83E;x")], ["ab", "�", "🧫", "��x"]);
+  eq("XML: both halves of a character as two references are the character", [decodeEntities("&#55358;&#56811;"), decodeEntities("Kultur &#xD83E;&#xDDEB;"), textOf(parseXml('<t a="&#xD83E;&#xDDEB;">&#xD83E;&#xDDEB; Probe</t>', xmlBudget())), attr(parseXml('<t a="&#xD83E;&#xDDEB;"/>', xmlBudget()), "a")], ["🧫", "Kultur 🧫", "🧫 Probe", "🧫"]);
+  eq("text a cell can keep", [savableText("ok\u0000"), savableText("a\ud83e"), savableText("\udc00x"), savableText("🧫 Probe")], ["ok", "a�", "�x", "🧫 Probe"]);
+  const escaped = await patchXlsx(await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: "Probe" } })])), { "xl/sharedStrings.xml": (x) => x.replace(">Probe<", ">Pro_x0000_be_xD83E_<") });
+  const esc = await readSheetBytes(escaped, "esc.xlsx", "de");
+  eq(".xlsx: _x0000_ and half a character in a text don't come along", "error" in esc ? esc : esc.workbook.sheets[0].cells["0,0"]?.v, "Probe�");
+}
+
+/** A file too big to save as a spreadsheet is refused while it is read, with its size; one that fits never is. */
+async function savedSizes() {
+  // Blanks of every kind (a no-break space, a byte order mark, an ideographic space) become no cell.
+  const fields = ["0,123", "03.11.2026", "Probe A", " ", "'", "'007", "=A1*2", "=", "1.234", "ü", "🧪 Kultur", "", "12,5 mg/L", "WAHR", "14:30", "\u00a0", "\ufeff", "\u3000", "'\u00a0"];
+  const rows = Array.from({ length: 300 }, (_, r) => Array.from({ length: 8 }, (_, c) => fields[(r * 7 + c * 3) % fields.length]));
+  const text = rows.map((r) => r.join(";")).join("\r\n");
+  const read = (opts: { maxBytes?: number; openBytes?: number }) => readSheetBytes(enc.encode(text), "gross.csv", "de", opts);
+  const free = await read({});
+  if ("error" in free) return fail("sizes: reading without a limit", free.error);
+  const exact = enc.encode(JSON.stringify(free.workbook)).length;
+  const outcome = (r: Awaited<ReturnType<typeof read>>) => ("error" in r ? [r.error, r.bytes] : ["read", r.bytes]);
+  eq("a file exactly at the limit is read, with its size", outcome(await read({ maxBytes: exact })), ["read", exact]);
+  eq("one byte over: refused, with its size", outcome(await read({ maxBytes: exact - 1 })), ["sheetTooBig", exact]);
+  eq("added to an open spreadsheet that leaves exactly room for it: read", outcome(await read({ maxBytes: exact + 1000 - 64, openBytes: 1000 })), ["read", exact]);
+  eq("one byte less room: refused, with the size both would have", outcome(await read({ maxBytes: exact + 1000 - 65, openBytes: 1000 })), ["noRoom", exact + 1000]);
+  const early = await read({ maxBytes: Math.floor(exact / 3) });
+  ok("far too big: refused before any cell is made, its size about right", "error" in early && early.error === "sheetTooBig" && Math.abs((early.bytes ?? 0) - exact) < exact * 0.1, JSON.stringify(outcome(early)) + ` (exact ${exact})`);
+  const file = await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: "Probe" }, "1,0": { v: 0.123 } })]));
+  const xlsxFree = await readSheetBytes(file, "klein.xlsx", "de");
+  const xlsxExact = "error" in xlsxFree ? 0 : enc.encode(JSON.stringify(xlsxFree.workbook)).length;
+  eq(".xlsx one byte over: refused, with its size", outcome(await readSheetBytes(file, "klein.xlsx", "de", { maxBytes: xlsxExact - 1 })), ["sheetTooBig", xlsxExact]);
+  eq(".xlsx that fits: read", outcome(await readSheetBytes(file, "klein.xlsx", "de", { maxBytes: xlsxExact })), ["read", xlsxExact]);
+  // A file of no-break spaces where the wells are empty (as some plate readers write them) is no bigger than its values.
+  const wells = Array.from({ length: 2000 }, (_, r) => [`A${r + 1}`, ...Array.from({ length: 12 }, (_, c) => ((r + c) % 3 ? "\u00a0" : "0,5"))].join(";")).join("\r\n");
+  const wellsFree = await readSheetBytes(enc.encode(wells), "platte.csv", "de");
+  const wellsExact = "error" in wellsFree ? 0 : enc.encode(JSON.stringify(wellsFree.workbook)).length;
+  eq("blanks of no-break spaces: read at exactly its size", outcome(await readSheetBytes(enc.encode(wells), "platte.csv", "de", { maxBytes: wellsExact })), ["read", wellsExact]);
+  eq("…and with exactly the room it needs beside an open spreadsheet", outcome(await readSheetBytes(enc.encode(wells), "platte.csv", "de", { maxBytes: wellsExact + 5000 - 64, openBytes: 5000 })), ["read", wellsExact]);
+
+  // The editor measures a file it adds once more only when the sizes it has don't tell that it fits.
+  const table = (id: string, sheetId: string, name: string) => ({ id, sheetId, name, area: { r0: 0, c0: 0, r1: 2, c1: 1 }, columns: [{ id: `${id}a`, total: "none" as const }, { id: `${id}b`, total: "none" as const }], totals: false, style: "blue" as const, banded: true, filters: {}, sort: null });
+  const chart = (id: string, sheetId: string): ChartSpec => ({
+    id,
+    sheetId,
+    at: { row: 0, col: 3, dx: 0, dy: 0 },
+    size: { w: 300, h: 200 },
+    kind: "scatter",
+    title: "Ä",
+    x: null,
+    series: [{ id: `${id}s`, name: "Werte", nameRef: null, y: { sheetId, r0: 1, c0: 0, r1: 5, c1: 0 }, x: null, color: null, marker: "circle", line: "none", labels: false, errorBars: null, trendline: null }],
+    xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "none",
+  });
+  const cellsOf = (n: number): Record<string, Cell> => Object.fromEntries(Array.from({ length: n }, (_, i) => [`${i},0`, { v: i ? i / 7 : "Größe µg" }]));
+  const openWb = book([sheet("o1", "Messung", cellsOf(9))], { tables: [table("ot", "o1", "Proben")], charts: [chart("oc", "o1")] });
+  const utf8 = (wb: Workbook) => enc.encode(JSON.stringify({ ...wb, preview: workbookPreview(wb, createCalc(wb, { locale: "de" }), "de") })).length;
+  const fileOf = async (sheetName: string, tableName: string) => {
+    const file = freshIds(book([sheet("f1", sheetName, cellsOf(30)), sheet("f2", "Mehr", { "0,0": { f: `'${sheetName}'!A2*2` } })], { tables: [table("ft", "f1", tableName)], charts: [chart("fc", "f1"), chart("fd", "f2")] }));
+    const read = await readSheetBytes(await xlsxOf(file), "datei.xlsx", "de", { maxBytes: MAX_SHEET_BYTES });
+    if ("error" in read) throw new Error(read.error);
+    return read;
+  };
+  const plain = await fileOf("Daten", "Werte");
+  eq("(the file has its charts and table)", [plain.workbook.charts.length, plain.workbook.tables.length], [2, 1]);
+  const plainNext = appendWorkbook(openWb, plain.workbook, "de");
+  const openSize = importedBytes(openWb, createCalc(openWb, { locale: "de" }), "de");
+  ok("nothing renamed: fits without measuring, and the two sizes are more than it takes", appendFits(openWb, openSize, plain.workbook, plain.bytes, plainNext) && utf8(plainNext) <= utf8(openWb) + plain.bytes!, `${utf8(plainNext)} > ${utf8(openWb)} + ${plain.bytes}`);
+  for (const [label, sheetName, tableName] of [["a sheet", "Messung", "Werte"], ["a table", "Daten", "Proben"]]) {
+    const read = await fileOf(sheetName, tableName);
+    ok(`${label} renamed: measured again`, !appendFits(openWb, openSize, read.workbook, read.bytes, appendWorkbook(openWb, read.workbook, "de")));
+  }
+  ok("without the file's size: measured again", !appendFits(openWb, openSize, plain.workbook, undefined, plainNext));
+  const chartless = book([sheet("o1", "Messung", cellsOf(9))]);
+  ok("the file brings the first chart, which the preview would show: measured again", !appendFits(chartless, importedBytes(chartless, createCalc(chartless, { locale: "de" }), "de"), plain.workbook, plain.bytes, appendWorkbook(chartless, plain.workbook, "de")));
+  ok("two sizes over the limit: measured again", !appendFits(openWb, MAX_SHEET_BYTES - plain.bytes! + 1, plain.workbook, plain.bytes, plainNext));
+  ok("an open size counted in characters may be three times as many bytes", !appendFits(openWb, 1_300_000, plain.workbook, 1_200_000, plainNext) && appendFits(openWb, 1_300_000, plain.workbook, 1_000_000, plainNext));
+}
+
+/** LibreOffice's and Numbers files can be picked and dropped everywhere: the reader says how to save them. */
+async function otherPrograms() {
+  ok("the editor's picker offers .ods and .numbers", [".ods", ".numbers", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.apple.numbers"].every((t) => SHEET_FILE_ACCEPT.split(",").includes(t)), SHEET_FILE_ACCEPT);
+  ok("the notes' picker offers .ods and .numbers", [".ods", ".numbers", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.apple.numbers"].every((t) => IMPORT_ACCEPT.split(",").includes(t)), IMPORT_ACCEPT);
+  eq("they go the way of spreadsheets (picked or dropped)", [new File(["x"], "Kalibrierung.ods"), new File(["x"], "Messung.numbers"), new File(["x"], "export", { type: "application/vnd.oasis.opendocument.spreadsheet" }), new File(["x"], "export", { type: "application/vnd.apple.numbers" })].map((f) => [isSheetFile(f), importable(f)]), [
+    [true, true],
+    [true, true],
+    [true, true],
+    [true, true],
+  ]);
+  ok("a picture still isn't one", !isSheetFile(new File(["x"], "foto.png", { type: "image/png" })));
+  const ods = await makeZip([{ name: "mimetype", data: enc.encode("application/vnd.oasis.opendocument.spreadsheet") }, { name: "content.xml", data: enc.encode("<x/>") }]);
+  const numbers = await makeZip([{ name: "Index/Document.iwa", data: enc.encode("x") }]);
+  const said = async (bytes: Uint8Array, name: string) => {
+    const r = await readSheetBytes(bytes, name, "de");
+    return "error" in r ? r.message : "read";
+  };
+  eq("an .ods says how to save it as .xlsx", await said(ods, "Kalibrierung.ods"), sheetIoText.de.errors.ods);
+  eq("a Numbers file too", await said(numbers, "Messung.numbers"), sheetIoText.de.errors.numbers);
+}
+
+/** A smart table's filter goes to .xlsx (rows it hides hidden there too) and comes back the same. */
+async function xlsxFilters() {
+  const rows: [string, number | null][] = [["A1", 1], ["B2", 2], ["a3", 3], ["C4", null], ["A*5", 5], ["", 6], ["Probe?", 4], ["P~7", 7], ["P~~8", 8]];
+  const cases: [string, string, FilterSpec][] = [
+    ["values with blanks", "p", { kind: "values", values: ["A1", "a3", ""] }],
+    ["values of numbers", "w", { kind: "values", values: ["1", "5"] }],
+    ["begins with", "p", { kind: "text", op: "begins", text: "A" }],
+    ["contains a star itself", "p", { kind: "text", op: "contains", text: "~*" }],
+    ["contains with a wildcard", "p", { kind: "text", op: "contains", text: "A?" }],
+    ["ends with", "p", { kind: "text", op: "ends", text: "3" }],
+    ["equals", "p", { kind: "text", op: "equals", text: "a1" }],
+    ["equals a question mark itself", "p", { kind: "text", op: "equals", text: "Probe~?" }],
+    ["doesn't contain", "p", { kind: "text", op: "notContains", text: "A" }],
+    ["between", "w", { kind: "number", op: "between", a: 2, b: 4 }],
+    ["top 2", "w", { kind: "number", op: "top", a: 2, b: null }],
+    ["bottom 2", "w", { kind: "number", op: "bottom", a: 2, b: null }],
+    ["above average", "w", { kind: "number", op: "aboveAverage", a: null, b: null }],
+    ["below average", "w", { kind: "number", op: "belowAverage", a: null, b: null }],
+    ["at least 3", "w", { kind: "number", op: "gte", a: 3, b: null }],
+    ["not 2", "w", { kind: "number", op: "neq", a: 2, b: null }],
+    ["less than 2,5", "w", { kind: "number", op: "lt", a: 2.5, b: null }],
+    // A tilde at the end is the sign itself, also with the star written after it.
+    ["contains a tilde at the end", "p", { kind: "text", op: "contains", text: "P~" }],
+    ["begins with a tilde at the end", "p", { kind: "text", op: "begins", text: "p~" }],
+    ["doesn't contain a tilde at the end", "p", { kind: "text", op: "notContains", text: "P~" }],
+    ["contains two tildes", "p", { kind: "text", op: "contains", text: "~~~~" }],
+  ];
+  for (const [label, col, filter] of cases) {
+    const cells: Record<string, Cell> = { "0,0": { v: "Probe" }, "0,1": { v: "Wert" } };
+    rows.forEach(([p, w], i) => {
+      if (p) cells[`${i + 1},0`] = { v: p };
+      if (w !== null) cells[`${i + 1},1`] = { v: w };
+    });
+    const table = { id: "t1", sheetId: "s1", name: "Proben", area: { r0: 0, c0: 0, r1: rows.length, c1: 1 }, columns: [{ id: "p", total: "none" as const }, { id: "w", total: "none" as const }], totals: false, style: "blue" as const, banded: true, filters: { [col]: filter }, sort: null };
+    const wb = book([sheet("s1", "Blatt 1", cells)], { tables: [table] });
+    const calc = createCalc(wb, { locale: "de" });
+    const hidden = [...filteredRows(wb, calc, "s1", "de")].sort((a, b) => a - b);
+    const bytes = await xlsxOf(wb);
+    const sheetXml = (await readZip(bytes).text("xl/worksheets/sheet1.xml")) ?? "";
+    eq(`filter "${label}": the rows it hides are hidden in the file`, [...sheetXml.matchAll(/<row r="(\d+)"[^>]*hidden="1"/g)].map((m) => Number(m[1]) - 1), hidden);
+    const back = await importXlsx(bytes, "de");
+    const t = back.workbook.tables[0];
+    const again = [...filteredRows(back.workbook, createCalc(back.workbook, { locale: "de" }), back.workbook.sheets[0].id, "de")].sort((a, b) => a - b);
+    eq(`filter "${label}": back from .xlsx, hiding the same rows`, [Object.values(t?.filters ?? {}).length, again, back.workbook.sheets[0].rows, back.skipped], [1, hidden, {}, []]);
+  }
+  // The verifier's case: a reading filtered out of a calibration; its total and trendline in Blob,
+  // in the file, and back from the file.
+  const conc = [0, 2, 4, 6, 8, 10];
+  const ext = [0.002, 0.105, 0.209, 0.95, 0.418, 0.52];
+  const cells: Record<string, Cell> = { "0,0": { v: "Konz" }, "0,1": { v: "Extinktion" }, "7,0": { v: "Ergebnis" }, "7,1": { f: "SUBTOTAL(101,B2:B7)" } };
+  conc.forEach((c, i) => {
+    cells[`${i + 1},0`] = { v: c };
+    cells[`${i + 1},1`] = { v: ext[i] };
+  });
+  const r = (r0: number, c0: number, r1: number, c1: number) => ({ sheetId: "s1", r0, c0, r1, c1 });
+  const chart: ChartSpec = {
+    id: "k",
+    sheetId: "s1",
+    at: { row: 0, col: 3, dx: 0, dy: 0 },
+    size: { w: 480, h: 300 },
+    kind: "scatter",
+    title: "Kalibriergerade",
+    x: r(1, 0, 6, 0),
+    series: [{ id: "e", name: "Extinktion", nameRef: null, y: r(1, 1, 6, 1), x: null, color: null, marker: "circle", line: "none", labels: false, errorBars: null, trendline: { type: "linear", order: 2, period: 2, intercept: null, showEquation: true, showR2: true, forward: 0, backward: 0, name: "" } }],
+    xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "none",
+  };
+  const measured = book([sheet("s1", "Blatt 1", cells)], {
+    charts: [chart],
+    tables: [{ id: "t1", sheetId: "s1", name: "Messung", area: { r0: 0, c0: 0, r1: 7, c1: 1 }, columns: [{ id: "c", total: "none" }, { id: "e", total: "average" }], totals: true, style: "blue", banded: true, filters: { e: { kind: "number", op: "lt", a: 0.9, b: null } }, sort: null }],
+  });
+  const looks = (wb: Workbook) => {
+    const s = createSheetStore({ pageId: "IOB", workbook: wb, locale: "de", readOnly: false }).get();
+    const fit = chartData(s.workbook.charts[0], s.calc, "de").series[0].fit;
+    return [s.calc.value(s.workbook.sheets[0].id, 7, 1), fit && !isFitError(fit) ? [equationText(fit, "de"), r2Text(fit.r2!, "de")] : fit];
+  };
+  const store = createSheetStore({ pageId: "IOB", workbook: measured, locale: "de", readOnly: false }).get();
+  const file = new Uint8Array(await (await exportXlsx(store.workbook, store.calc, "de")).arrayBuffer());
+  const tableXml = (await readZip(file).text("xl/tables/table1.xml")) ?? "";
+  ok("the filter is in the file", tableXml.includes('<filterColumn colId="1"><customFilters><customFilter operator="lessThan" val="0.9"/></customFilters></filterColumn>'), tableXml);
+  eq("total and trendline back from the file as in Blob", looks((await importXlsx(file, "de")).workbook), looks(measured));
+
+  // A row hidden by hand inside the filtered table stays hidden by hand (the filter's come back
+  // through the filter), so the total and trendline are still Blob's.
+  const byHand: Workbook = { ...measured, sheets: [{ ...measured.sheets[0], rows: { "3": { hidden: true } } }] };
+  const handStore = createSheetStore({ pageId: "IOB-hand", workbook: byHand, locale: "de", readOnly: false }).get();
+  const handBack = (await importXlsx(new Uint8Array(await (await exportXlsx(handStore.workbook, handStore.calc, "de")).arrayBuffer()), "de")).workbook;
+  eq("a row hidden by hand in a filtered table: hidden by hand again, the filter kept", [handBack.sheets[0].rows, Object.values(handBack.tables[0].filters)], [{ "3": { hidden: true } }, [{ kind: "number", op: "lt", a: 0.9, b: null }]]);
+  eq("…with Blob's total and trendline", looks(handBack), looks(byHand));
+  // Under a filter Blob can't read (Excel's date tree), hidden rows come back as before: why they
+  // were hidden can't be told.
+  const tree = await patchXlsx(await xlsxOf(byHand), { "xl/tables/table1.xml": (x) => x.replace(/<filterColumn colId="1">.*?<\/filterColumn>/, '<filterColumn colId="1"><filters><dateGroupItem year="2026" dateTimeGrouping="year"/></filters></filterColumn>') });
+  const treeBack = await importXlsx(tree, "de");
+  eq("a filter Blob can't read: its rows come back, and it is named", [treeBack.workbook.sheets[0].rows, treeBack.workbook.tables[0].filters, treeBack.skipped.length], [{}, {}, 1]);
+
+  // A values filter shows texts in the language it was made in: read in the other one, it gets
+  // the texts that language shows (else it would hide every row).
+  const two = { kind: "number" as const, decimals: 2 };
+  const values = book([sheet("s1", "Blatt 1", { "0,0": { v: "Probe" }, "0,1": { v: "Wert" }, "1,0": { v: "P1" }, "1,1": { v: 0.5, s: { fmt: two } }, "2,0": { v: "P2" }, "2,1": { v: 1.25, s: { fmt: two } }, "3,0": { v: "P3" }, "3,1": { v: 0.5, s: { fmt: two } } })], {
+    tables: [{ id: "t1", sheetId: "s1", name: "Proben", area: { r0: 0, c0: 0, r1: 3, c1: 1 }, columns: [{ id: "p", total: "none" }, { id: "w", total: "none" }], totals: false, style: "blue", banded: true, filters: { w: { kind: "values", values: ["0,50"] } }, sort: null }],
+  });
+  const valuesFile = await xlsxOf(values);
+  for (const [locale, want] of [["de", "0,50"], ["en", "0.50"]] as const) {
+    const back = (await importXlsx(valuesFile, locale)).workbook;
+    const hides = [...filteredRows(back, createCalc(back, { locale }), back.sheets[0].id, locale)];
+    eq(`a values filter made in German, read in ${locale}: the texts ${locale} shows, hiding the same row`, [Object.values(back.tables[0].filters), hides], [[{ kind: "values", values: [want] }], [2]]);
+  }
+}
+
+/** Charts and formats of files LibreOffice saved; Excel's days and hours. */
+async function xlsxFromOthers() {
+  const r = (r0: number, c0: number, r1: number, c1: number) => ({ sheetId: "s1", r0, c0, r1, c1 });
+  const series = (id: string, name: string, nameRef: ReturnType<typeof r> | null, col: number) => ({ id, name, nameRef, y: r(1, col, 3, col), x: null, color: null, marker: "circle" as const, line: "none" as const, labels: false, errorBars: null, trendline: null });
+  const chart: ChartSpec = {
+    id: "k",
+    sheetId: "s1",
+    at: { row: 5, col: 0, dx: 0, dy: 0 },
+    size: { w: 480, h: 300 },
+    kind: "scatter",
+    title: "Kalibriergerade",
+    x: r(1, 0, 3, 0),
+    series: [series("a", "Standards", null, 1), series("b", "", r(0, 2, 0, 2), 2), series("c", "Probe \"A\"", null, 3)],
+    xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null },
+    yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null },
+    legend: "right",
+  };
+  const cells: Record<string, Cell> = { "0,0": { v: "c" }, "0,1": { v: "E" }, "0,2": { v: "Proben" }, "0,3": { v: "x" } };
+  for (let i = 1; i <= 3; i++) for (let c = 0; c < 4; c++) cells[`${i},${c}`] = { v: i * (c + 1) };
+  cells["4,4"] = { v: 2.25, s: { fmt: { kind: "time", seconds: false, duration: true } } };
+  cells["4,5"] = { v: 46329.5, s: { fmt: { kind: "time", seconds: false, duration: true } } };
+  cells["4,6"] = { v: 46329, s: { fmt: { kind: "date", style: "iso" } } };
+  const file = await xlsxOf(book([sheet("s1", "Blatt 1", cells)], { charts: [chart] }));
+  // As LibreOffice saves it again: names as quoted text in <c:f> (with their cache), ISO dates as
+  // yyyy\-mm\-dd; a series named by a sheet that doesn't come along; Excel's days and hours.
+  const lo = await patchXlsx(file, {
+    "xl/charts/chart1.xml": (x) =>
+      x
+        .replace("<c:tx><c:v>Standards</c:v></c:tx>", '<c:tx><c:strRef><c:f>"Standards"</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Standards</c:v></c:pt></c:strCache></c:strRef></c:tx>')
+        .replace(/<c:f>'Blatt 1'!\$C\$1<\/c:f>/, "<c:f>Fehlt!$C$1</c:f>")
+        .replace("<c:tx><c:v>Probe &quot;A&quot;</c:v></c:tx>", "<c:tx><c:strRef><c:f>&quot;Probe &quot;&quot;A&quot;&quot;&quot;</c:f></c:strRef></c:tx>"),
+    "xl/styles.xml": (x) => x.replace('formatCode="yyyy-mm-dd"', 'formatCode="yyyy\\-mm\\-dd"').replace('formatCode="[h]:mm"', 'formatCode="d hh:mm"'),
+  });
+  const back = await importXlsx(lo, "de");
+  eq("LibreOffice's chart: series names kept (quoted text, a name from the cache, doubled quotes)", back.workbook.charts[0]?.series.map((s) => s.name), ["Standards", "Proben", 'Probe "A"']);
+  const c = back.workbook.sheets[0].cells;
+  eq("LibreOffice's yyyy\\-mm\\-dd: an ISO date", c["4,6"]?.s?.fmt, { kind: "date", style: "iso" });
+  eq("Excel's d hh:mm on 2,25 days: a time span (54:00)", c["4,4"]?.s?.fmt, { kind: "time", seconds: false, duration: true });
+  eq("…and on a date and time it stays one", c["4,5"]?.s?.fmt, { kind: "datetime" });
+  eq("day codes and ISO codes", ["d hh:mm", 'd "Tage" hh:mm', "dd:hh:mm:ss", "d.m. hh:mm", "dddd hh:mm", "d h:mm AM/PM", "yyyy\\-mm\\-dd;@", 'yyyy"-"mm"-"dd'].map((code) => fromExcelFormat(code, "de")), [
+    { kind: "time", seconds: false, duration: true },
+    { kind: "time", seconds: false, duration: true },
+    { kind: "time", seconds: true, duration: true },
+    { kind: "datetime" },
+    { kind: "datetime" },
+    { kind: "datetime" },
+    { kind: "date", style: "iso" },
+    { kind: "date", style: "iso" },
+  ]);
+}
+
 async function main() {
   clipboard();
   csv();
@@ -1582,8 +2773,21 @@ async function main() {
   await readingSafely();
   await fileKinds();
   clipboardNumbers();
+  filteredCopies();
+  libreOfficeClipboard();
+  await templateUnits();
+  textCells();
+  movedRows();
+  await menuClipboard();
+  textMarks();
   await roundTrips();
   await embedRequests();
+  await csvLanguage();
+  await oddFiles();
+  await savedSizes();
+  await otherPrograms();
+  await xlsxFilters();
+  await xlsxFromOthers();
   if (problems.length) {
     console.error(`check:sheet-io: ${problems.length} problem(s) in ${checks} checks`);
     for (const p of problems) console.error(`  - ${p}`);

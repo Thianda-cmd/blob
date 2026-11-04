@@ -52,6 +52,7 @@ export const POPULAR_FUNCTIONS: string[] = [
   "TREND",
   "LINEST",
   "CORREL",
+  "COVARIANCE.S",
   "STDEV.P",
   "VAR.S",
   "CONFIDENCE.T",
@@ -89,6 +90,19 @@ export const POPULAR_FUNCTIONS: string[] = [
 ];
 
 const POPULARITY = new Map(POPULAR_FUNCTIONS.map((name, i) => [name, i]));
+
+/**
+ * Functions with a sibling that is meant far more often when the start of both is typed: ISTFEHL
+ * (ISERR, every error but #NV) after ISTFEHLER (ISERROR), so =WENN(ISTF and Tab gives the usual
+ * "nicht gefunden" check; ISTKTEXT (ISNONTEXT) after ISTTEXT.
+ */
+const RARER = new Set(["ISERR", "ISNONTEXT"]);
+
+/**
+ * Offered after the functions meant more often: Excel's older names (STABW after STABW.S, TVERT…)
+ * and rarer siblings (ISTFEHL after ISTFEHLER). Typed in full, they still come first.
+ */
+export const offeredLater = (fn: FunctionName): boolean => !!fn.newer || RARER.has(fn.en);
 
 /** Characters of a function name as people type them ("STABW.S", "ZÄHLENWENN", "LOG10"). */
 const NAME_CHAR = /[A-Za-z0-9_.À-ɏ]/;
@@ -204,7 +218,8 @@ function wordAt(text: string, caret: number): { start: number; end: number; type
 /**
  * The functions whose name starts with `typed`, best first. German: German names before English
  * ones (both work in formulas); English: English names only (German names aren't functions there).
- * Within a group: an exact name, then the popular ones, then shorter names, then A–Z.
+ * Within a group: an exact name, then the popular ones, then shorter names, then A–Z; older names
+ * and rarer siblings after the rest (offeredLater).
  */
 export function matchFunctions(typed: string, locale: Locale): FunctionName[] {
   const upper = typed.toUpperCase();
@@ -222,8 +237,8 @@ export function matchFunctions(typed: string, locale: Locale): FunctionName[] {
     (a, b) =>
       a.group - b.group ||
       Number(b.exact) - Number(a.exact) ||
-      // Excel's older names (STABW, TVERT…) after the modern ones they stand for.
-      Number(!!a.fn.newer) - Number(!!b.fn.newer) ||
+      // Excel's older names (STABW, TVERT…) after the modern ones they stand for, ISTFEHL after ISTFEHLER.
+      Number(offeredLater(a.fn)) - Number(offeredLater(b.fn)) ||
       pop(a.fn) - pop(b.fn) ||
       a.name.length - b.name.length ||
       a.name.localeCompare(b.name),

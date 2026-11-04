@@ -15,6 +15,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   loading,
+  focusCancel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -23,6 +24,8 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel: string;
   loading?: boolean;
+  /** Starts with the keyboard on Abbrechen, for a choice that deletes what can't come back. */
+  focusCancel?: boolean;
 }) {
   const t = useMessages(trashText);
   return (
@@ -46,10 +49,10 @@ export function ConfirmDialog({
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading} autoFocus={focusCancel}>
             {t.cancel}
           </Button>
-          <Button type="submit" variant="danger" loading={loading} autoFocus>
+          <Button type="submit" variant="danger" loading={loading} autoFocus={!focusCancel}>
             {confirmLabel}
           </Button>
         </div>

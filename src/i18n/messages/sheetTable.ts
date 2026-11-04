@@ -154,7 +154,8 @@ export const sheetTableText = defineMessages({
     sortedBy: (name: string, dir: "asc" | "desc") => `Sorted by ${name} (${dir === "asc" ? "ascending" : "descending"})`,
     clearAll: "Clear all filters",
     chart: "Chart from table",
-    chartHint: "Makes a chart of the table's columns. With numbers in the first column it's a scatter chart, ready for a trendline.",
+    chartHint:
+      "Makes a chart of the table's columns. It becomes a scatter chart for a trendline when the first column holds numbers or times. Or when sample names (S1, S2 … or 1:2, 1:4 …) are followed by at least four numbers that only rise or only fall, such as concentrations: those numbers become x. With a date in the first column it becomes a line chart, otherwise a column chart, also when the first column names days, weeks or months (Day 1, Week 2, Jan …).",
     noChart: "The table needs numbers for a chart.",
     addToNote: "Add to note",
     actions: "Actions",
@@ -189,11 +190,11 @@ export const sheetTableText = defineMessages({
 
     errors: {
       overlap: "Diese Zellen gehören schon zu einer intelligenten Tabelle. Wähl Zellen außerhalb davon aus.",
-      empty: "Hier steht noch nichts. Tippe zuerst ein paar Werte ein oder wähle Zellen mit Daten aus.",
+      empty: "Hier steht noch nichts. Tipp zuerst ein paar Werte ein oder wähl Zellen mit Daten aus.",
     },
     made: (name) => `Intelligente Tabelle „${name}“ erstellt`,
     headerFound: (names, more) => `Die erste Zeile ist die Überschrift: ${names.join(", ")}${more === 1 ? " und eine weitere" : more > 1 ? ` und ${more} weitere` : ""}.`,
-    headerAdded: "Die erste Zeile sah nach Daten aus, deshalb gibt es darüber jetzt eine Überschriftenzeile. Tippe hinein, um die Spalten zu benennen.",
+    headerAdded: "Die erste Zeile sah nach Daten aus, deshalb gibt es darüber jetzt eine Überschriftenzeile. Tipp hinein, um die Spalten zu benennen.",
     headerIsData: "Erste Zeile ist keine Überschrift",
     headerIsHeader: "Erste Zeile ist die Überschrift",
     undoMake: "Rückgängig",
@@ -213,7 +214,7 @@ export const sheetTableText = defineMessages({
     selectAllResults: "(Alle Suchergebnisse auswählen)",
     emptyValue: "(Leer)",
     noMatches: "Nichts gefunden",
-    moreValues: (n) => `… und ${n} weitere. Suche, um sie zu finden.`,
+    moreValues: (n) => `… und ${n} weitere. Tipp in die Suche, um sie zu finden.`,
     nothingChecked: "Hake mindestens einen Wert an.",
     apply: "Anwenden",
     cancel: "Abbrechen",
@@ -261,7 +262,7 @@ export const sheetTableText = defineMessages({
     wildcards: "? steht für ein Zeichen, * für beliebig viele.",
     total: "Ergebnis",
     custom: "Eigene Formel",
-    tableSettings: "Tabelleneinstellungen",
+    tableSettings: "Einstellungen der intelligenten Tabelle",
     readOnly: "Du kannst dir diese Tabelle ansehen, aber nicht ändern.",
 
     filterValues: (n) => (n === 1 ? "1 Wert" : `${n} Werte`),
@@ -305,7 +306,8 @@ export const sheetTableText = defineMessages({
     sortedBy: (name, dir) => `Sortiert nach ${name} (${dir === "asc" ? "aufsteigend" : "absteigend"})`,
     clearAll: "Alle Filter löschen",
     chart: "Diagramm aus Tabelle",
-    chartHint: "Macht ein Diagramm aus den Spalten der Tabelle. Stehen in der ersten Spalte Zahlen, wird es ein Punktdiagramm – bereit für eine Trendlinie.",
+    chartHint:
+      "Macht ein Diagramm aus den Spalten der Tabelle. Ein Punktdiagramm für eine Trendlinie wird es, wenn in der ersten Spalte Zahlen oder Zeiten stehen. Oder wenn nach Probennamen (S1, S2 … oder 1:2, 1:4 …) mindestens vier Zahlen kommen, die nur steigen oder nur fallen, z. B. Konzentrationen: Diese Zahlen werden x. Steht in der ersten Spalte ein Datum, wird es ein Liniendiagramm, sonst ein Säulendiagramm – auch wenn dort Tage, Wochen oder Monate stehen (Tag 1, KW 12, Jan …).",
     noChart: "Für ein Diagramm braucht die Tabelle Zahlen.",
     addToNote: "In Notiz einfügen",
     actions: "Aktionen",
@@ -316,7 +318,7 @@ export const sheetTableText = defineMessages({
     removeYes: "Löschen",
 
     makeTable: "Als Tabelle formatieren",
-    openTable: "Tabelleneinstellungen",
+    openTable: "Intelligente Tabelle bearbeiten",
   },
 });
 

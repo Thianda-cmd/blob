@@ -8,8 +8,10 @@
 
 import type { ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { FUNCTION_BY_DE, FUNCTION_BY_EN, type FunctionName } from "@/sheet/engine";
 import { FUNCTION_DOCS } from "@/sheet/engine/docs";
+import { HELP_TEXT } from "../chrome/FormulaHelp";
 import { argumentAt, suggestFunctions } from "../chrome/formulaInput";
 
 /** Run a helper that may still be missing or fail on half-typed input; a hint is never worth breaking typing for. */
@@ -78,9 +80,9 @@ export function ArgumentHint({ fn, index, locale }: { fn: string; index: number;
       <div className="font-mono text-[12px] leading-snug text-ink-2">
         <span className="font-semibold text-ink">{shown}</span>(<span>{parts}</span>)
       </div>
-      {doc?.summary && <div className="mt-0.5 text-[11.5px] leading-snug text-ink-3">{doc.summary}</div>}
+      {doc?.summary && <div className={`mt-0.5 ${HELP_TEXT}`}>{doc.summary}</div>}
       {current >= 0 && current <= last && args[current]?.desc && (
-        <div className="mt-0.5 text-[11.5px] leading-snug text-ink-2">
+        <div className={`mt-0.5 ${HELP_TEXT}`}>
           <span className="font-medium">{args[current].name}</span>: {args[current].desc}
         </div>
       )}
@@ -124,11 +126,15 @@ export function SuggestionList({
             className={`flex cursor-pointer flex-col rounded-lg px-2 py-1 [@media(hover:none)]:py-2 ${i === pick ? "bg-blob-soft" : "hover:bg-hover"}`}
           >
             <span className={`font-mono text-[12.5px] font-medium ${i === pick ? "text-blob-ink" : "text-ink"}`}>{localName(fn, locale)}</span>
-            {summaryOf(fn.en, locale) && <span className="line-clamp-1 text-[11.5px] text-ink-3">{summaryOf(fn.en, locale)}</span>}
+            {summaryOf(fn.en, locale) && <span className={`line-clamp-1 ${HELP_TEXT}`}>{summaryOf(fn.en, locale)}</span>}
           </li>
         ))}
       </ul>
-      <div className="border-t border-line px-2.5 py-1 text-[11px] text-ink-3">{hint}</div>
+      {/* A finger takes a function by tapping it: an on-screen keyboard has no Tab key. */}
+      <div className={`border-t border-line px-2.5 py-1 ${HELP_TEXT}`}>
+        <span className="[@media(hover:none)]:hidden">{hint}</span>
+        <span className="hidden [@media(hover:none)]:inline">{sheetGridText[locale].pickHintTouch}</span>
+      </div>
     </div>
   );
 }

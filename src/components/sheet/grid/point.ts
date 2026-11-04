@@ -9,7 +9,7 @@ import { tokenizeFormula, type FormulaToken } from "@/sheet/engine";
 import { sheetById } from "@/sheet/ops";
 import type { Area, Pos, SheetColor, Workbook } from "@/sheet/types";
 import { insertRef, REF_COLORS, refColors, wantsRef } from "../chrome/formulaInput";
-import { mainArea, type SheetStore } from "../store";
+import { activeArea, mainArea, type Selection, type SheetStore } from "../store";
 import { dataEdge } from "./navigation";
 import type { RefFrame } from "./Selection";
 
@@ -125,7 +125,7 @@ export function pointing(store: SheetStore): boolean {
 /** The selection as a reference for the formula being typed ("B3", "B3:B9", "B:B", "'Blatt 2'!A1" when it is on another sheet). */
 function selectionRef(store: SheetStore): string {
   const s = store.get();
-  const area = mainArea(s.selection);
+  const area = activeArea(s.selection);
   const sheet = sheetById(s.workbook, s.sheetId);
   let name = areaName(area);
   if (sheet && area.r0 === 0 && area.r1 >= sheet.size.rows - 1 && sheet.size.rows > 1) name = `${colName(area.c0)}:${colName(area.c1)}`;
@@ -174,13 +174,65 @@ export function pointByKey(store: SheetStore, dRow: number, dCol: number, extend
   insertSelectionRef(store);
 }
 
+/**
+ * The range the active cell walks in, kept apart from it (after Ctrl+A, or Enter and Tab inside a
+ * selected range: see Selection.extra), or null.
+ */
+function walkedRange(sel: Selection): Area | null {
+  const a = activeArea(sel);
+  const m = mainArea(sel);
+  return a.r0 === m.r0 && a.c0 === m.c0 && a.r1 === m.r1 && a.c1 === m.c1 ? null : a;
+}
+
+/** The corner Shift with the arrow keys moves: the selection's moving end, or the bottom-right corner of a range the active cell walks in. */
+export function movingEnd(sel: Selection): Pos {
+  const range = walkedRange(sel);
+  return range ? { row: range.r1, col: range.c1 } : sel.focus;
+}
+
+/**
+ * The selection extendSelection last made by moving the far corner of a range the active cell
+ * walks in, per editor. The grid keeps a selection's moving end in view by its focus, which stays
+ * on the active cell then: it asks resizedCorner instead.
+ */
+const resized = new WeakMap<SheetStore, Selection>();
+
+/** The corner to keep in view when `sel` is a range extendSelection has just grown or shrunk around the active cell (after Ctrl+A), or null. */
+export function resizedCorner(store: SheetStore, sel: Selection): Pos | null {
+  return resized.get(store) === sel ? movingEnd(sel) : null;
+}
+
+/**
+ * The selection grown or shrunk to `to`, as Shift with an arrow key, a click or a tap does. A range
+ * the active cell walks in (after Ctrl+A) keeps its top-left corner, and the active cell stays
+ * where it is while it is still inside, as in Excel; once it isn't, the range runs from that
+ * corner, the new active cell. Either way it stays one range. Areas added with Ctrl/⌘ stay.
+ */
+export function extendSelection(store: SheetStore, to: Pos, opts: { keepEdit?: boolean } = {}) {
+  const sel = store.get().selection;
+  const range = walkedRange(sel);
+  if (!range) {
+    store.select({ anchor: sel.anchor, focus: to, extra: sel.extra }, opts);
+    return;
+  }
+  const rest = sel.extra.slice(0, -1);
+  const corner = { row: range.r0, col: range.c0 };
+  const p = sel.anchor;
+  if (p.row > to.row || p.col > to.col) store.select({ anchor: corner, focus: to, extra: rest }, opts);
+  else if (corner.row === to.row && corner.col === to.col) store.select({ anchor: p, focus: p, extra: rest }, opts);
+  else {
+    store.select({ anchor: p, focus: p, extra: [...rest, { r0: corner.row, c0: corner.col, r1: to.row, c1: to.col }] }, opts);
+    resized.set(store, store.get().selection);
+  }
+}
+
 /** Arrow keys on the grid: one cell (skipping hidden rows and columns) or to the edge of the data; Shift extends. */
 export function moveSelection(store: SheetStore, dRow: number, dCol: number, opts: { extend: boolean; jump: boolean; keepEdit?: boolean }) {
   const s = store.get();
   const sheet = sheetById(s.workbook, s.sheetId);
   if (!sheet) return;
   const hidden = (r: number) => store.isRowHidden(s.sheetId, r);
-  const from = opts.extend ? s.selection.focus : s.selection.anchor;
+  const from = opts.extend ? movingEnd(s.selection) : s.selection.anchor;
   let to: Pos;
   if (opts.jump) to = dataEdge(sheet, from, dRow, dCol, hidden);
   else {
@@ -192,7 +244,7 @@ export function moveSelection(store: SheetStore, dRow: number, dCol: number, opt
     if (c < 0 || c >= sheet.size.cols) c = from.col;
     to = { row: r, col: c };
   }
-  if (opts.extend) store.select({ anchor: s.selection.anchor, focus: to, extra: s.selection.extra }, { keepEdit: opts.keepEdit });
+  if (opts.extend) extendSelection(store, to, { keepEdit: opts.keepEdit });
   else store.select(to, { keepEdit: opts.keepEdit });
 }
 

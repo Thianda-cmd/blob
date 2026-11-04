@@ -297,7 +297,7 @@ function Answer({ q, current, onAnswer }: { q: Question; current: Given | null; 
               onClick={() => onAnswer({ correct: o.value === q.truth, answer: o.label })}
               className={cn(
                 "flex h-14 items-center justify-center gap-2 rounded-2xl border text-[15px] font-semibold shadow-card transition-[border-color,background,transform] active:scale-[0.99]",
-                right ? "border-ok bg-ok/10 text-ok" : wrong ? "border-danger/60 bg-danger/8 text-danger" : "border-line bg-raised text-ink hover:border-blob/40",
+                right ? "border-ok bg-ok/10 text-ok" : wrong ? "border-danger/60 bg-danger/8 text-danger-ink" : "border-line bg-raised text-ink hover:border-blob/40",
                 current && !right && !wrong && "opacity-55",
               )}
             >

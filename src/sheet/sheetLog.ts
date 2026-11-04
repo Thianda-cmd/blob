@@ -14,10 +14,19 @@
 
 import { MAX_COLS, MAX_ROWS, type Area, type Pos, type Sheet, type SheetOp } from "./types";
 
-/** A sheet keeps at most this many entries… */
-export const LOG_ENTRIES = 50;
-/** …and sort orders of at most this many rows in all (a longer sort is kept as a barrier). */
-export const LOG_SORT_ROWS = 10000;
+/**
+ * A sheet keeps at most this many entries: more than twice as many as the editor's undo history
+ * has steps (store.ts UNDO_LIMIT), since every undo and redo adds one, so taking steps back while
+ * others edit too can go as far back as the history does…
+ */
+export const LOG_ENTRIES = 450;
+/** …a sort of any block of rows a sheet can hold… */
+export const LOG_SORT_ROWS = MAX_ROWS;
+/**
+ * …and sort orders of at most this many rows in all: two sorts of the longest block (a sort and
+ * its undo), about 240 KB. (Older entries go first; at least the newest sort stays.)
+ */
+export const LOG_SORT_BUDGET = 2 * MAX_ROWS;
 
 const sortRows = (op: SheetOp) => (op.kind === "sort" ? op.order.length : 0);
 const barrier = (id: string): SheetOp => ({ id, kind: "barrier" });
@@ -30,13 +39,12 @@ const barrier = (id: string): SheetOp => ({ id, kind: "barrier" });
 export function capLog(log: SheetOp[]): SheetOp[] {
   let start = log.length;
   let rows = 0;
-  while (start > 0 && log.length - start < LOG_ENTRIES && rows + sortRows(log[start - 1]) <= LOG_SORT_ROWS) {
+  while (start > 0 && log.length - start < LOG_ENTRIES && rows + sortRows(log[start - 1]) <= LOG_SORT_BUDGET) {
     start--;
     rows += sortRows(log[start]);
   }
   if (start === 0) return log;
-  // Even the newest entry is too long alone (a sort of very many rows): only a barrier is left.
-  if (start === log.length) return [barrier(log[log.length - 1].id)];
+  // (The newest entry always fits: no sort is longer than the budget.)
   const kept = log.slice(start);
   kept[0] = barrier(kept[0].id);
   return kept;
@@ -151,6 +159,30 @@ export function followCell(ops: readonly SheetOp[], sheetId: string, pos: Pos): 
     }
   }
   return { row, col };
+}
+
+/**
+ * Is what a cell of sheet `sheetId` holds gone after `ops`: its row or column deleted ("rows",
+ * "cols"), or other cells cut and pasted over it ("pasted")? Then the change that did it (its
+ * index in `ops`) and where the cell was right before it; null when it is still there. (Cut and
+ * pasted itself, it goes along, to another sheet too.)
+ */
+export function lostCell(ops: readonly SheetOp[], sheetId: string, pos: Pos): { op: number; how: "rows" | "cols" | "pasted"; at: Pos } | null {
+  let at = pos;
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    if (op.kind === "move" && op.dst === sheetId) {
+      const f = op.from;
+      const moving = op.src === sheetId && at.row >= f.r0 && at.row <= f.r1 && at.col >= f.c0 && at.col <= f.c1;
+      const r = at.row - op.to.row;
+      const c = at.col - op.to.col;
+      if (!moving && r >= 0 && r <= f.r1 - f.r0 && c >= 0 && c <= f.c1 - f.c0) return { op: i, how: "pasted", at };
+    }
+    const next = followCell([op], sheetId, at);
+    if (!next) return op.kind === "deleteRows" ? { op: i, how: "rows", at } : op.kind === "deleteCols" ? { op: i, how: "cols", at } : null;
+    at = next;
+  }
+  return null;
 }
 
 /** Rows (or columns) i0…i1 after `count` of them were deleted at `at`: the part left, or null. */

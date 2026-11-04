@@ -15,6 +15,7 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { editorText } from "@/i18n/messages/editor";
 import { panesText } from "@/i18n/messages/panes";
 import { transferText } from "@/i18n/messages/transfer";
+import { pageTitle } from "@/lib/utils";
 import { BLOB_EXT, BLOB_MIME, fileNameFor } from "@/notes/blobFile";
 import { printNote } from "./notePrint";
 import { contentToSave } from "./schema";
@@ -38,7 +39,8 @@ const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingm
  */
 export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { editor: Editor | null; pageId: string; title: string; icon: string | null; beforeExport: () => Promise<unknown> }) {
   const t = useMessages(transferText);
-  const untitled = useMessages(editorText).untitled;
+  const words = useMessages(editorText);
+  const untitled = words.untitled;
   const shortcuts = useMessages(panesText).shortcuts;
   const locale = useLocale();
   const mac = useIsMac();
@@ -64,8 +66,11 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     const result = await exportPages([pageId], editor && !editor.isDestroyed ? { id: pageId, content: contentToSave(editor) } : undefined);
     if (!result) return blob.say(t.export.failed, { mood: "worried" });
     download(name(BLOB_EXT), JSON.stringify(result.file), BLOB_MIME);
-    // Something left out is a hint, so it shows with Blob's tips switched off too.
-    blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: result.missing ? "thinking" : "happy", ms: 6000 });
+    // Something left out is a hint, so it shows with Blob's tips switched off too. (Pages in the
+    // trash by the name the trash lists them under.)
+    const named = result.left.map((p) => ({ kind: p.kind, title: p.title === null ? null : pageTitle(p.title, p.kind, locale) }));
+    const left = [named.length ? words.export.leftOut(named) : "", result.missing ? t.export.missing(result.missing) : ""].filter(Boolean).join(" ");
+    blob.say(left || t.export.done(result.pages), { mood: left ? "thinking" : "happy", ms: left ? 9000 : 6000 });
   };
 
   /** The note as Markdown, spreadsheet embeds as their tables and links. */

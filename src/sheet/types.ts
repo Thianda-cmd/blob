@@ -41,6 +41,12 @@ export type Sheet = {
    * src/sheet/collab.ts). Missing in older content: nothing recorded.
    */
   log?: SheetOp[];
+  /**
+   * On the copy merging makes when two people's versions of a sheet can't be combined (the second
+   * one's version, next to the sheet; src/sheet/collab.ts): the id of that sheet. The other person
+   * is told when it arrives in their editor. Missing on every other sheet (and in older content).
+   */
+  copyOf?: string;
 };
 
 /**
@@ -53,7 +59,7 @@ export type SheetOp = { id: string; inv?: string } & (
   | { kind: "sort"; r0: number; c0: number; c1: number; order: number[] }
   /** Cut and paste: the block `from` of sheet `src` moved to `to` on sheet `dst` (the same sheet or another; kept in both logs). */
   | { kind: "move"; src: string; from: Area; dst: string; to: Pos }
-  /** A change that can't be repeated on another version: the entries before it were dropped, or a sort too long to keep. */
+  /** A change that can't be repeated on another version: the entries before it were dropped, or what it was couldn't be read. */
   | { kind: "barrier" }
 );
 

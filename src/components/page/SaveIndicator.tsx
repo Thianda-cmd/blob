@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check, CloudAlert, CloudOff, TriangleAlert } from "lucide-react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useMessages } from "@/i18n/client";
 import { pageText } from "@/i18n/messages/page";
 import { cn } from "@/lib/utils";
@@ -10,9 +11,51 @@ import type { SaveState } from "./useAutosave";
 /** Not saved, and the person should know: in red, with its words on phones too. */
 const PROBLEM = new Set<SaveState>(["error", "failed", "refused", "tooBig"]);
 
+/** How long the words for screen readers stay (then they go, so reading the page later doesn't find old news). */
+const SPOKEN_MS = 7000;
+
+/**
+ * What screen readers hear when the save state becomes `state`, given the problem they last heard
+ * about (`heard`; null: none, or it is over): a problem once, not again while it lasts (every new
+ * try passes through "saving"), "saved" once when it is over, and nothing about routine saving.
+ * Being offline counts as a problem (the work is only on this device). `say`: what to say, if anything.
+ */
+export function saveAnnouncement(heard: SaveState | null, state: SaveState): { heard: SaveState | null; say: SaveState | null } {
+  if (PROBLEM.has(state) || state === "device") return { heard: state, say: state === heard ? null : state };
+  if (state === "saved" && heard) return { heard: null, say: "saved" };
+  return { heard, say: null };
+}
+
+/**
+ * News about saving that the page says itself, in fuller words (the spreadsheet's notices: "Speichern
+ * klappt gerade nicht. Deine Änderungen bleiben auf diesem Gerät…", "Gespeichert. Jetzt klappt es
+ * wieder."): the save state it is about, and a number that is new each time. The indicator doesn't
+ * say that state then, so screen readers hear it once. Pages that don't give it (notes, decks,
+ * quizzes) hear every problem and its end from the indicator.
+ */
+export type PageSaid = { state: SaveState; n: number } | null;
+export const PageSaidContext = createContext<PageSaid>(null);
+
+/**
+ * What the indicator has for screen readers (`say`: the state whose words its status holds), after
+ * the save state became `state` (saveAnnouncement), given what the page said itself (`page`): news
+ * about this very state that the indicator hasn't taken yet (`took`: the last one it took) is the
+ * page's to say, and the indicator stays quiet; it may come before the state does ("Gespeichert.
+ * Jetzt klappt es wieder." while more changes wait to be saved). Once the indicator says something
+ * itself, news it hasn't taken is old (it was offline before those changes were saved, say): what
+ * comes next is the indicator's to say, the end of that problem too.
+ */
+export type IndicatorVoice = { state: SaveState; heard: SaveState | null; say: SaveState | null; took: number };
+
+export function indicatorVoice(was: IndicatorVoice, state: SaveState, page: PageSaid): IndicatorVoice {
+  const next = saveAnnouncement(was.heard, state);
+  if (page && page.n !== was.took && page.state === state) return { state, heard: next.heard, say: null, took: page.n };
+  return { state, heard: next.heard, say: next.say ?? was.say, took: page && next.say ? page.n : was.took };
+}
+
 export function SaveIndicator({ state }: { state: SaveState }) {
   const t = useMessages(pageText);
-  const label = {
+  const labels: Record<SaveState, string> = {
     saved: t.saved,
     pending: t.saving,
     saving: t.saving,
@@ -21,14 +64,27 @@ export function SaveIndicator({ state }: { state: SaveState }) {
     failed: t.notSavedRetrying,
     refused: t.notSaved,
     tooBig: t.tooBigToSave,
-  }[state];
+  };
+  const label = labels[state];
   const problem = PROBLEM.has(state);
+  // The words beside the icon change with every save, so screen readers get their own live region:
+  // a problem said once, and that it is over (saveAnnouncement), unless the page says it (PageSaid).
+  const page = useContext(PageSaidContext);
+  const [voice, setVoice] = useState<IndicatorVoice>(() => ({ state, heard: saveAnnouncement(null, state).heard, say: null, took: 0 }));
+  if (voice.state !== state) setVoice(indicatorVoice(voice, state, page));
+  const said = voice.say;
+  useEffect(() => {
+    if (!said) return;
+    const timer = setTimeout(() => setVoice((v) => ({ ...v, say: null })), SPOKEN_MS);
+    return () => clearTimeout(timer);
+  }, [said]);
   // Phones show a problem in fewer words where it is long, so the page's buttons beside it stay on
   // screen (the icon tells "trying again" from "can't save", the editor says below the bar what to
   // do; the full words are in the tooltip and for screen readers).
   const short = state === "failed" ? t.notSaved : state === "tooBig" ? t.tooBigShort : label;
+  // (Its words in the mid-tone between ink-2 and ink-3: quiet, still 4.5:1 and more.)
   return (
-    <div className="flex h-7 items-center gap-1.5 px-1.5 text-[12px] text-ink-3" aria-live="polite" title={label}>
+    <div className="flex h-7 items-center gap-1.5 px-1.5 text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" title={label}>
       <AnimatePresence mode="wait" initial={false}>
         {state === "saved" ? (
           <motion.span key="saved" initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 600, damping: 18 }}>
@@ -69,6 +125,9 @@ export function SaveIndicator({ state }: { state: SaveState }) {
           {short}
         </span>
       )}
+      <span role="status" className="sr-only">
+        {said && labels[said]}
+      </span>
     </div>
   );
 }

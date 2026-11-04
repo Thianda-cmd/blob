@@ -27,6 +27,7 @@ export const panesText = defineMessages({
     shortcuts: {
       title: "Keyboard shortcuts",
       open: "Keyboard shortcuts",
+      close: "Close",
       groups: { general: "Everywhere", notes: "Notes", text: "Text", lists: "Lists", blocks: "Blocks" },
       items: {
         search: "Search and commands",
@@ -90,6 +91,7 @@ export const panesText = defineMessages({
     shortcuts: {
       title: "Tastenkürzel",
       open: "Tastenkürzel",
+      close: "Schließen",
       groups: { general: "Überall", notes: "Notizen", text: "Text", lists: "Listen", blocks: "Blöcke" },
       items: {
         search: "Suche und Befehle",

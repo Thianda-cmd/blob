@@ -132,7 +132,7 @@ export function setTableTotals(store: SheetStore, tableId: string, on: boolean) 
 /** One column's function in the totals row. */
 export function setTableColumnTotal(store: SheetStore, tableId: string, columnId: string, fn: TotalFn) {
   const locale = localeOf(store);
-  store.apply(textOf(store).undo.total, (wb) => setColumnTotal(wb, tableId, columnId, fn, locale));
+  store.apply(textOf(store).undo.total, (wb, calc) => setColumnTotal(wb, tableId, columnId, fn, locale, calc));
 }
 
 /** Name, colour or banding (one undo step each, named after what changed). */
@@ -156,7 +156,9 @@ export function deleteTableWithCells(store: SheetStore, tableId: string) {
 
 /**
  * A chart of the table: its header and data rows selected, then the chart is made like from any
- * selection (numbers in the first column give a scatter chart). Opens the chart's panel.
+ * selection (numbers or times in the first column, or sample names followed by at least four numbers
+ * that only rise or only fall, give a scatter chart; see src/sheet/chart/create.ts). Opens the chart's
+ * panel.
  */
 export function chartFromTable(store: SheetStore, tableId: string): boolean {
   const table = tableById(store.get().workbook, tableId);

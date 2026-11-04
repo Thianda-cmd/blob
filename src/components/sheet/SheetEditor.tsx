@@ -11,39 +11,50 @@
 import { ChartScatter, Eye, FileDown, FileSpreadsheet, FileUp, Gauge, Keyboard, NotebookPen, Printer, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { blob } from "@/components/blob/bus";
 import { download } from "@/components/notes/transfer";
 import { isSheetFile } from "@/components/notes/useImporter";
 import { OpenSheetCopy } from "@/components/page/OpenSheetCopy";
+import { takeJustCopied, useSaveAsCopy } from "@/components/page/useSaveAsCopy";
 import { PageTopBar } from "@/components/page/PageTopBar";
+import { PageSaidContext } from "@/components/page/SaveIndicator";
 import { usePanes } from "@/components/shell/Panes";
+import { Button } from "@/components/ui/Button";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useIsMac, usePhone } from "@/components/ui/useMediaQuery";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { panesText } from "@/i18n/messages/panes";
 import { sheetText } from "@/i18n/messages/sheet";
+import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import type { AccessRole, Member, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { copyTies, ownVersion, tiedCopy } from "@/sheet/collab";
 import { isBlankWorkbook, isUnreadableWorkbook, normalizeWorkbook } from "@/sheet/doc";
 import type { SheetEmbedItem } from "@/sheet/embed";
+import { createCalc } from "@/sheet/engine";
 import { sheetToCsv } from "@/sheet/io/csv";
-import { setColWidths, sheetById } from "@/sheet/ops";
+import { deleteSheet, setColWidths, sheetById } from "@/sheet/ops";
 import { currentRegion, tableAt } from "@/sheet/table/model";
-import { DEFAULT_COL_W, type Workbook } from "@/sheet/types";
-import { insertChart } from "./chart/actions";
-import { ChartLayer } from "./chart/ChartLayer";
+import type { Workbook } from "@/sheet/types";
+import { chartDataBlock, makeChart } from "./chart/actions";
+import { chartByKeys, ChartLayer } from "./chart/ChartLayer";
 import { ChartPanel } from "./chart/ChartPanel";
+import { chartUi } from "./chart/selection";
 import { FormulaBar } from "./chrome/FormulaBar";
 import { SheetTabs } from "./chrome/SheetTabs";
 import { StatusBar } from "./chrome/StatusBar";
 import { Toolbar } from "./chrome/Toolbar";
+import { BannerVoice } from "./BannerVoice";
 import { AddToNoteDialog } from "./embed/AddToNote";
-import { contentWidth } from "./grid/actions";
+import { letGoOf } from "./drafts";
+import { HEADER_H } from "./grid/geometry";
 import { focusCellEditor, focusSheetGrid, Grid, type GridGeometry } from "./grid/Grid";
-import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, sheetPageContent, sheetRoom, type ReadProblem } from "./importFile";
+import { afterPaint, appendFits, appendWorkbook, csvColumnWidths, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, sheetPageContent, sheetRoom, type ReadProblem } from "./importFile";
 import { currentSheetNotice, hideSheetNotice, showSheetNotice } from "./notice";
 import { printSheet } from "./print";
+import { storedContent } from "./saver";
 import { SheetNotices } from "./SheetNotice";
 import { activeArea, createSheetStore, SheetStoreContext, useSheet, type SheetStore } from "./store";
 import { TableMenuItems } from "./table/TableMenuItems";
@@ -51,18 +62,23 @@ import { TablePanel } from "./table/TablePanel";
 import { useTableDecor } from "./table/useTableDecor";
 import { PANEL_MIN_WIDTH, PANEL_WIDTH } from "./panelLayout";
 import { TemplatePicker } from "./TemplatePicker";
-import { useSheetSave } from "./useSheetSave";
+import { copyReaders, markOwnVersion, sameOwnVersion, takeOwnVersion, tooBigBecause, useSheetSave } from "./useSheetSave";
 
 /** The docked panel's two heights: part of the editor (at most DOCK_LOW_MAX px) or nearly all of it (keep in step with the classes below). */
 const DOCK_LOW = 0.58;
 const DOCK_LOW_MAX = 600;
 const DOCK_TALL = 0.88;
+/** A low dock that leaves less than this of the cells above it (px, not even a row and a half) covers them all: a chart's settings start tall instead. */
+const LOW_DOCK_ROOM = 40;
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-/** While a file is dragged, only its type is known: could it be an Excel or CSV file (no type: maybe)? */
+/**
+ * While a file is dragged, only its type is known: could it be an Excel or CSV file (no type:
+ * maybe)? LibreOffice and Numbers files count too: dropping one says how to save it as .xlsx.
+ */
 const mightBeSheet = (data: DataTransfer) => {
   const files = Array.from(data.items).filter((item) => item.kind === "file");
-  return files.length === 0 || files.some((item) => !item.type || /csv|tab-separated|excel|spreadsheet/.test(item.type));
+  return files.length === 0 || files.some((item) => !item.type || /csv|tab-separated|excel|spreadsheet|numbers/.test(item.type));
 };
 
 /** A file name from the title: no characters file systems refuse. */
@@ -84,6 +100,42 @@ function firstSetting(panel: HTMLElement): HTMLElement | null {
     (el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0 && el.getClientRects().length > 0,
   );
   return controls.find((el) => !header?.contains(el)) ?? controls[0] ?? null;
+}
+
+/**
+ * Where F6 lands among the charts on the sheet on screen (`cards`): the chart selected, the one
+ * whose settings are open, one drawn over the selected cells, one made from the cells the active
+ * cell is in, one that can be seen already (the cells stay where they are), or else the first
+ * (Tab goes on from a chart to its bar and to the next chart).
+ */
+function chartForKeys(store: SheetStore, cards: HTMLElement[]): HTMLElement {
+  const s = store.get();
+  const byId = (id: string | null | undefined) => (id ? cards.find((card) => card.dataset.chartCard === id) : undefined);
+  const area = activeArea(s.selection);
+  const p = s.selection.anchor;
+  // The cells under a chart, as ChartLayer measures them ("r0,c0,r1,c1").
+  const drawnOver = (card: HTMLElement) => {
+    const [r0, c0, r1, c1] = (card.dataset.chartCells ?? "").split(",").map(Number);
+    return r0 <= area.r1 && area.r0 <= r1 && c0 <= area.c1 && area.c0 <= c1;
+  };
+  const madeFrom = (card: HTMLElement) => {
+    const spec = s.workbook.charts.find((c) => c.id === card.dataset.chartCard);
+    const block = spec ? chartDataBlock(s.workbook, spec) : null;
+    return !!block && p.row >= block.r0 && p.row <= block.r1 && p.col >= block.c0 && p.col <= block.c1;
+  };
+  const grid = cards[0]?.closest("[data-sheet-grid]")?.getBoundingClientRect();
+  const shown = (card: HTMLElement) => {
+    const r = card.getBoundingClientRect();
+    return !!grid && r.right > grid.left && r.left < grid.right && r.bottom > grid.top && r.top < grid.bottom;
+  };
+  return (
+    byId(chartUi(store).selected) ??
+    byId(s.focus?.kind === "chart" ? s.focus.id : null) ??
+    cards.find(drawnOver) ??
+    cards.find(madeFrom) ??
+    cards.find(shown) ??
+    cards[0]
+  );
 }
 
 export function SheetEditor({ page, role = "owner", members = [] }: { page: Page; role?: AccessRole; members?: Member[] }) {
@@ -127,7 +179,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   const saveTitle = save.setTitle;
   const onTitle = (value: string) => {
     if (readOnly) return;
-    const next = value.slice(0, 200);
+    // 200 characters, not UTF-16 units: an emoji at the cut goes as a whole.
+    const next = Array.from(value).slice(0, 200).join("");
     showTitle(next);
     saveTitle(next);
   };
@@ -192,10 +245,32 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   }, [store]);
   // The docked panel (narrow screens): about half the editor, or nearly all of it. Its handle
   // switches between the two with a tap, or is dragged (down to the bottom closes the panel). On
-  // phones a chart's settings start tall: they show the chart themselves.
+  // phones a chart's settings start tall: they show the chart themselves. So they do where a low
+  // dock would leave no cells above it (a short window: 200 % zoom, a phone held sideways): low,
+  // they would hide the chart and still have no room for their own settings.
   const phone = usePhone();
   const [dockTall, setDockTall] = useState<boolean | null>(null);
-  const tall = dockTall ?? (focus?.kind === "chart" && phone);
+  const [lowHidesCells, setLowHidesCells] = useState(false);
+  const zoom = useSheet(store, (s) => s.zoom);
+  useEffect(() => {
+    const editor = bodyRef.current;
+    const grid = editor?.querySelector<HTMLElement>("[data-sheet-grid]");
+    if (!editor || !grid) return;
+    const measure = () => {
+      // Where a low dock's top would be (it ends above the tabs row, on phones at the bottom), and
+      // where the grid's cells start: below its column letters, which are HEADER_H tall at the
+      // grid's zoom (worked out, as they may not be drawn yet when this first runs).
+      const bottom = editor.getBoundingClientRect().top + editor.clientTop + editor.clientHeight - (phone ? 0 : (footRef.current?.offsetHeight ?? 0));
+      const lowTop = bottom - Math.min(editor.clientHeight * DOCK_LOW, DOCK_LOW_MAX);
+      const cellsTop = grid.getBoundingClientRect().top + grid.clientTop + Math.round(HEADER_H * zoom);
+      setLowHidesCells(lowTop - cellsTop < LOW_DOCK_ROOM);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(editor);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, [phone, zoom]);
+  const tall = dockTall ?? (focus?.kind === "chart" && (phone || lowHidesCells));
   const [dragH, setDragH] = useState<number | null>(null);
   const dockDrag = useRef<{ id: number; startY: number; startH: number; max: number; room: number; moved: boolean } | null>(null);
   const justDragged = useRef(false);
@@ -239,11 +314,16 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     closePanel();
   };
 
-  // F6 moves the keyboard between the parts of the editor, as in Excel: the cells, the open
-  // settings, the toolbar (Shift+F6 the other way round). Ctrl+F6 does the same, for browsers that
-  // keep F6 for their address bar (Office on the web uses it too). A notice with a button ("Als
-  // 1,234 lesen") is a part too while it shows, right after the cells it is about: the grid keeps
-  // Tab for moving between cells, so this is how the keyboard gets to that button.
+  // F6 moves the keyboard between the parts of the editor, as in Excel: the cells, the charts on
+  // the sheet, the open settings, the toolbar (Shift+F6 the other way round). Ctrl+F6 does the
+  // same, for browsers that keep F6 for their address bar (Office on the web uses it too). A notice
+  // with a button ("Als 1,234 lesen") is a part too while it shows, right after the cells it is
+  // about: the grid keeps Tab for moving between cells, so this is how the keyboard gets to that
+  // button (the notice says F6 gets there). So are the settings of a smart table just made, while
+  // they show what became its header with the buttons to change that (TablePanel says F6 gets
+  // there too). The charts come next, so a chart already on the sheet (from a template, or
+  // inserted before) is reached as easily as a new one: Enter opens its settings, Tab goes on to
+  // its bar and the next chart.
   const cycleParts = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "F6" || e.altKey || !e.currentTarget.contains(e.target as Node)) return;
     const editor = e.currentTarget;
@@ -252,30 +332,69 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     // The card showing now, not one still fading out.
     const shown = currentSheetNotice(store);
     const notice = shown?.action ? editor.querySelector<HTMLElement>(`[data-sheet-notice-id="${shown.id}"]`) : null;
+    const freshTable = !!settings?.querySelector("[data-table-fresh]");
+    // The charts on the sheet on screen (ChartLayer shows only those), each with its bar.
+    const charts = [...editor.querySelectorAll<HTMLElement>("[data-chart-card]")];
     const at = document.activeElement;
-    const parts = ["grid", ...(notice ? ["notice"] : []), ...(settings ? ["panel"] : []), ...(toolbar ? ["toolbar"] : [])];
-    const here = notice?.contains(at) ? "notice" : settings?.contains(at) ? "panel" : toolbar?.contains(at) ? "toolbar" : "grid";
+    const parts = [
+      "grid",
+      ...(notice ? ["notice"] : []),
+      ...(settings && freshTable ? ["panel"] : []),
+      ...(charts.length ? ["charts"] : []),
+      ...(settings && !freshTable ? ["panel"] : []),
+      ...(toolbar ? ["toolbar"] : []),
+    ];
+    // (A chart and its bar lie inside the grid: they count as the charts.)
+    const here = notice?.contains(at)
+      ? "notice"
+      : settings?.contains(at)
+        ? "panel"
+        : toolbar?.contains(at)
+          ? "toolbar"
+          : at?.closest("[data-chart-card]")
+            ? "charts"
+            : "grid";
     const next = parts[(parts.indexOf(here) + (e.shiftKey ? parts.length - 1 : 1)) % parts.length];
     e.preventDefault();
     e.stopPropagation();
     if (next === "toolbar") toolbar?.querySelector<HTMLElement>('button[tabindex="0"]')?.focus();
     else if (next === "notice") notice?.querySelector<HTMLElement>("[data-sheet-notice-action]")?.focus();
+    // Selected, its frame showing where the keyboard is, and scrolled into view like a chart just
+    // inserted (the cells come back as they were when the keyboard leaves it again).
+    else if (next === "charts") chartByKeys(store, chartForKeys(store, charts));
     else if (next === "panel" && settings) firstSetting(settings)?.focus();
     else focusSheetGrid();
   };
 
   const panel: ReactNode = focus ? (
     focus.kind === "chart" ? (
-      <ChartPanel key={`chart:${focus.id}`} store={store} chartId={focus.id} onClose={closePanel} />
+      <ChartPanel key={`chart:${focus.id}`} store={store} chartId={focus.id} onClose={closePanel} dock={wide ? undefined : tall ? "tall" : "low"} />
     ) : (
       <TablePanel key={`table:${focus.id}`} store={store} tableId={focus.id} onClose={closePanel} />
     )
   ) : null;
 
   // A new spreadsheet starts with the templates (until one is picked, it's dismissed or something is typed).
+  // Only one that was empty when it opened: a spreadsheet emptied later (Ctrl+A, Entf) stays an
+  // empty sheet with the keyboard in it, so Ctrl+Z still brings everything back. Content that came
+  // some other way ("arrived": work kept on this device put back, a partner's save) ends them for
+  // good too.
   const blank = useSheet(store, (s) => isBlankWorkbook(s.workbook));
-  const [dismissed, setDismissed] = useState(false);
-  const showPicker = blank && !dismissed && !readOnly;
+  const [startedBlank] = useState(() => isBlankWorkbook(start.workbook));
+  const [dismissed, setDismissed] = useState<boolean | "arrived">(false);
+  if (startedBlank && !blank && !dismissed) setDismissed("arrived");
+  const showPicker = startedBlank && blank && !dismissed && !readOnly;
+  // The templates gone that way while they had the keyboard (it fell back to the page with them):
+  // with a keyboard at hand it goes to the cells, as when a spreadsheet with content opens (touch
+  // screens wait for a tap).
+  useEffect(() => {
+    if (dismissed !== "arrived" || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    const frame = requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!at || at === document.body || at.closest("[data-sheet-picker]")) focusSheetGrid();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [dismissed]);
   const titleRef = useRef(title);
   useEffect(() => {
     titleRef.current = title;
@@ -299,9 +418,11 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     requestAnimationFrame(() => focusSheetGrid());
   }, []);
   // Typing while the templates show starts blank with what was typed, in A1: the keyboard moves
-  // into the cell's editor during the key press, so the letter (and the next ones) land there.
+  // into the cell's editor during the key press, so the letter (and the next ones) land there. The
+  // templates go at once (flushSync): until they do, the cells behind them are inert and the cell's
+  // editor couldn't take the keyboard.
   const typeIntoBlank = useCallback(() => {
-    setDismissed(true);
+    flushSync(() => setDismissed(true));
     focusCellEditor();
   }, []);
 
@@ -371,29 +492,43 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   // it is over the editor; the hint goes when it stops: the file left, or the drag was cancelled).
   const [dropping, setDropping] = useState(false);
   const dropTimer = useRef(0);
-  const problemText = (p: ReadProblem) => (p === "tooBig" ? t.importTooBig : p === "oldXls" ? t.importOldXls : p === "empty" ? t.importEmpty : t.importFailed);
+  const problemText = (r: { error: ReadProblem; bytes?: number }) => {
+    const p = r.error;
+    if (p === "sheetTooBig") return t.importTooBigSheet(r.bytes ?? 0);
+    if (p === "noRoom") return t.importNoRoom(r.bytes ?? 0);
+    return p === "tooBig" ? t.importTooBig : p === "oldXls" ? t.importOldXls : p === "empty" ? t.importEmpty : t.importFailed;
+  };
   const importFile = async (file: File) => {
     if (readOnly) return;
     const busy = showSheetNotice(store, t.reading, "busy");
     try {
-      // Only the sheets that still fit are read (the rest are named as not brought over).
-      const r = await readSheetFile(file, locale, { sheetRoom: sheetRoom(store.get().workbook) });
+      // "Deine Datei wird gelesen…" shows first: measuring a big spreadsheet takes a moment.
+      await afterPaint();
+      // Only the sheets that still fit are read (the rest are named as not brought over), and a
+      // file too big to save with what is here already is refused while it is read.
+      const open = store.get();
+      const openBytes = importedBytes(open.workbook, open.calc, locale);
+      const r = await readSheetFile(file, locale, { sheetRoom: sheetRoom(open.workbook), maxBytes: MAX_SHEET_BYTES, openBytes });
       if ("error" in r) {
         // The reader's own words when it knows more (a password, a LibreOffice file, too much text,
         // took too long, no room for another sheet).
-        showSheetNotice(store, r.message ?? problemText(r.error), "error");
+        showSheetNotice(store, r.message ?? problemText(r), "error");
         return;
       }
       const ids = r.workbook.sheets.map((s) => s.id);
-      // Too big to save with the file in it: nothing changes. It can go into a spreadsheet of its
-      // own, unless it is too big for that as well (measured as the importer would).
+      // Too big to save with the file in it (the reader only refused what is too big for sure):
+      // nothing changes. Measured exactly, unless the sizes measured already say it fits. It can go
+      // into a spreadsheet of its own, unless it is too big for that as well (measured as the
+      // importer would).
       const before = store.get();
       const next = appendWorkbook(before.workbook, r.workbook, locale);
-      const bytes = importedBytes(next, before.calc, locale);
-      if (bytes > MAX_SHEET_BYTES) {
-        const alone = sheetPageContent(r.workbook, locale).bytes;
-        showSheetNotice(store, alone > MAX_SHEET_BYTES ? t.importTooBigSheet(alone) : t.importNoRoom(bytes), "error");
-        return;
+      if (before.workbook !== open.workbook || !appendFits(open.workbook, openBytes, r.workbook, r.bytes, next)) {
+        const bytes = importedBytes(next, before.calc, locale);
+        if (bytes > MAX_SHEET_BYTES) {
+          const alone = sheetPageContent(r.workbook, locale).bytes;
+          showSheetNotice(store, alone > MAX_SHEET_BYTES ? t.importTooBigSheet(alone) : t.importNoRoom(bytes), "error");
+          return;
+        }
       }
       setDismissed(true);
       store.apply(t.importLabel, (wb) => (wb === before.workbook ? next : appendWorkbook(wb, r.workbook, locale)));
@@ -402,13 +537,11 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
       // A CSV comes without column widths: columns with longer content get the room they need.
       if (r.kind === "csv") {
         const s = store.get();
-        const sheet = sheetById(s.workbook, ids[0]);
-        const cols = sheet ? Array.from({ length: Math.min(sheet.size.cols, 60) }, (_, i) => i) : [];
-        const widths = cols.map((c) => [c, contentWidth(store, c)] as const).filter(([, w]) => w !== null && w > DEFAULT_COL_W);
+        const widths = csvColumnWidths(s.workbook, s.calc, ids[0], s.locale);
         if (widths.length) {
           store.apply(t.importLabel, (wb) => {
             let out = wb;
-            for (const [c, w] of widths) out = setColWidths(out, ids[0], [c], Math.min(w!, 360));
+            for (const [c, w] of widths) out = setColWidths(out, ids[0], [c], w);
             return out;
           });
         }
@@ -494,6 +627,75 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     </>
   );
 
+  // The work can't be saved here (no access any more, or the save was refused as it is): kept as a
+  // spreadsheet of your own, as it is on screen. This page's draft goes then: the copy has the work.
+  const copyOf = useSaveAsCopy();
+  const [copying, setCopying] = useState(false);
+  const saveAsCopy = async () => {
+    // (A formula with a mistake still in its cell, which now says what is wrong: no copy yet.)
+    if (store.get().edit && !store.commitEdit(null)) return;
+    const s = store.get();
+    const { content, plain } = storedContent(s.workbook, s.calc, s.locale);
+    setCopying(true);
+    try {
+      await copyOf({ title, content, plain_text: plain, beside: pages.find((p) => p.id === page.id) ?? page, made: () => letGoOf(page.id) });
+    } finally {
+      setCopying(false);
+    }
+  };
+  // A copy just made that way (here, or from work left on the device: DeniedDrafts) says what it is,
+  // and so does one made with my version of a sheet (saveOwnVersion).
+  useEffect(() => {
+    if (!takeJustCopied(page.id)) return;
+    const sheet = takeOwnVersion(page.id);
+    showSheetNotice(store, sheet === undefined ? t.savedAsCopy : t.savedOwnVersion(sheet), "done");
+  }, [page.id, store, t]);
+
+  // Too big to save with the conflict copy that holds my version of a sheet (both sides moved its
+  // rows, collab.ts): my version kept as a spreadsheet of my own (ownVersion, with its charts and
+  // smart tables), and the copy goes from this one, which is then saved with the other version as
+  // its editor closes. (Not letGoOf: this page's work goes on being saved.) Only while nothing ties
+  // the copy to other sheets (copyTies): deleting it would break what reads it. The copy stays when
+  // it was changed while the new spreadsheet was being made (that change isn't in the new one), or
+  // when something came to read it meanwhile.
+  const tc = useMessages(sheetChromeText);
+  const saveOwnVersion = async (copyId: string) => {
+    if (store.get().edit && !store.commitEdit(null)) return;
+    const then = store.get().workbook;
+    if (tiedCopy(copyTies(then, copyId))) return;
+    const own = ownVersion(then, copyId, locale);
+    if (!own) return;
+    const { content, plain } = storedContent(own, createCalc(own, { locale }), locale);
+    setCopying(true);
+    try {
+      const made = await copyOf({
+        title,
+        content,
+        plain_text: plain,
+        beside: pages.find((p) => p.id === page.id) ?? page,
+        made: () => {
+          const now = store.get().workbook;
+          if (sameOwnVersion(then, now, copyId) && !tiedCopy(copyTies(now, copyId))) store.apply(tc.steps.deleteSheet, (wb) => deleteSheet(wb, copyId));
+        },
+      });
+      if (made) markOwnVersion(made.id, own.sheets[0].name);
+    } finally {
+      setCopying(false);
+    }
+  };
+  // While it is too big to save, the workbook tells which words and button fit (read only then, so
+  // typing doesn't draw the editor again): a copy this editor's merge made with my version is
+  // offered as my own spreadsheet, unless something ties it to other sheets (copyTies). What reads
+  // it from elsewhere (what I wrote for my version) would break here: the words name it, to be
+  // moved over first. What it reads elsewhere wouldn't be in the new spreadsheet: only the words to
+  // move what's needed. Any other copy may hold someone else's only version (after a reload it
+  // isn't known whose), so the words only say to move what's needed first.
+  const bigWb = useSheet(store, (s) => (save.notice === "tooBig" && !readOnly ? s.workbook : null));
+  const big = bigWb && tooBigBecause(bigWb.sheets, save.ownCopies);
+  const ties = bigWb && big?.kind === "own" ? copyTies(bigWb, big.copy.id) : null;
+  const readers = bigWb && ties && (ties.cells.length > 0 || ties.charts.length > 0) ? copyReaders(bigWb, ties) : null;
+  const ownCopy = big?.kind === "own" && ties && !tiedCopy(ties) ? big.copy : undefined;
+
   const notice = start.unreadable
     ? t.unreadable
     : role === "viewer"
@@ -501,23 +703,40 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
       : save.notice === "denied"
         ? t.denied
         : save.notice === "tooBig"
-          ? t.tooBig
-          : save.notice === "large"
-            ? t.nearlyFull(save.bytes)
-            : null;
+          ? big?.kind === "own"
+            ? readers
+              ? t.tooBigReaders(big.original.name, big.copy.name, readers)
+              : t.tooBigConflict(big.original.name, big.copy.name)
+            : big?.kind === "copies"
+              ? t.tooBigCopies
+              : t.tooBig
+          : save.notice === "rejected"
+            ? t.rejected
+            : save.notice === "large"
+              ? t.nearlyFull(save.bytes)
+              : null;
   // (Close to the size limit is a heads-up, not yet a problem.)
-  const noticeIsProblem = start.unreadable || save.notice === "denied" || save.notice === "tooBig";
+  const noticeIsProblem = start.unreadable || save.notice === "denied" || save.notice === "tooBig" || save.notice === "rejected";
+  // Ways to keep the work when it can't be saved here.
+  const noticeActions = !readOnly && (save.notice === "denied" || save.notice === "rejected" || (save.notice === "tooBig" && !!ownCopy));
+  // What the bar is about (for screen readers: BannerVoice).
+  const noticeKind = start.unreadable ? "unreadable" : role === "viewer" ? "viewOnly" : save.notice;
 
   return (
     <SheetStoreContext.Provider value={store}>
-      <PageTopBar pageId={page.id} saveState={save.state} peers={save.peers} role={role} members={members} menu={pageMenu} />
+      {/* (The editor's notices say when saving fails and when it works again: the top bar's indicator doesn't say it too.) */}
+      <PageSaidContext.Provider value={save.said}>
+        <PageTopBar pageId={page.id} saveState={save.state} peers={save.peers} role={role} members={members} menu={pageMenu} />
+      </PageSaidContext.Provider>
       {/* "Duplizieren" copies the spreadsheet as it is on screen (part of this module: nothing to load later). */}
       <OpenSheetCopy pageId={page.id} />
+      <BannerVoice kind={noticeKind} text={notice} state={save.state} />
+      {/* (Not a live region itself: BannerVoice says what is new in it. Its words are read where it is.) */}
       {notice && (
         <p
-          role="status"
+          data-sheet-save-notice=""
           className={cn(
-            "flex items-center gap-2 border-t border-line px-4 py-2 text-[13px]",
+            "flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-line px-4 py-2 text-[13px]",
             noticeIsProblem ? "bg-danger/8 text-ink" : "bg-blob-soft/60 text-blob-ink",
           )}
         >
@@ -528,7 +747,26 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
           ) : (
             <Eye className="size-3.5 shrink-0" />
           )}
-          <span className="min-w-0">{notice}</span>
+          <span className="min-w-0 flex-1 basis-60">{notice}</span>
+          {noticeActions && (
+            // (On phones below the words, at the right.)
+            <span className="ml-auto flex shrink-0 flex-wrap justify-end gap-1.5">
+              {save.notice === "rejected" && (
+                <Button size="sm" onClick={() => void exportXlsxFile()}>
+                  {t.exportXlsx}
+                </Button>
+              )}
+              {ownCopy ? (
+                <Button size="sm" onClick={() => void saveOwnVersion(ownCopy.id)} loading={copying}>
+                  {t.saveOwnVersion}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => void saveAsCopy()} loading={copying}>
+                  {t.saveAsCopy}
+                </Button>
+              )}
+            </span>
+          )}
         </p>
       )}
       <div
@@ -565,7 +803,10 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === "Escape") {
                   e.preventDefault();
-                  focusSheetGrid();
+                  // While the templates show, the keyboard goes to their first choice ("Leere
+                  // Tabelle", where typing starts a blank sheet): the cells behind them can't take it.
+                  if (showPicker) bodyRef.current?.querySelector<HTMLElement>("[data-sheet-picker] [data-pick]")?.focus();
+                  else focusSheetGrid();
                 }
               }}
               maxLength={200}
@@ -596,13 +837,15 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
             {/* Two cards with a little room around them, like the rest of Blob; the grid below runs edge
                 to edge. Only a little at the sides: on laptops every pixel of the toolbar counts
                 (the words on "Als Tabelle" and "Diagramm", the tools beside them).
-                Viewers keep the toolbar too: finding, the function list (it leaves out what changes cells). */}
-            <div className="flex shrink-0 flex-col gap-1.5 px-1.5 pb-2 max-sm:gap-1 max-sm:px-2 max-sm:pb-1.5">
+                Viewers keep the toolbar too: finding, the function list (it leaves out what changes cells).
+                While the templates cover them, these, the grid and the row below are inert: Tab and
+                Shift+Tab never go behind the templates, nor do keys change cells nobody can see. */}
+            <div inert={showPicker} className="flex shrink-0 flex-col gap-1.5 px-1.5 pb-2 max-sm:gap-1 max-sm:px-2 max-sm:pb-1.5">
               <Toolbar store={store} />
               <FormulaBar store={store} />
             </div>
             {/* Its own stacking context: the grid's sticky headers stay under the templates and panels. */}
-            <div className="relative isolate min-h-0 flex-1 border-t border-line">
+            <div inert={showPicker} className="relative isolate min-h-0 flex-1 border-t border-line">
               <div className="absolute inset-0">
                 <Grid store={store} decorate={decorate} overlay={overlay} contextMenu={contextMenu} />
               </div>
@@ -610,7 +853,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
             {/* One row, also on phones: the tabs keep room for their list button, + and one tab; the
                 status bar gets what its figures need of the rest. Settings docked at the bottom end
                 above this row (--sheet-foot), so Summe and Mittelwert stay in sight. */}
-            <div ref={footRef} className="flex shrink-0 items-stretch border-t border-line bg-surface">
+            <div ref={footRef} inert={showPicker} className="flex shrink-0 items-stretch border-t border-line bg-surface">
               <div className="min-w-[9rem] flex-1">
                 <SheetTabs store={store} />
               </div>
@@ -621,7 +864,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
             </div>
 
             {showPicker && (
-              <div className="absolute inset-0 z-30 bg-paper">
+              <div data-sheet-picker="" className="absolute inset-0 z-30 bg-paper">
                 <TemplatePicker onPick={pickTemplate} onDismiss={dismissPicker} onType={typeIntoBlank} autoFocus />
               </div>
             )}
@@ -674,7 +917,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
               exit={{ y: "100%", transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
               transition={{ type: "spring", stiffness: 420, damping: 40 }}
               role="region"
-              data-sheet-dock=""
+              // Low or tall: in the low dock a chart shows on the grid above it (ChartLayer), not in its settings.
+              data-sheet-dock={tall ? "tall" : "low"}
               data-sheet-panel=""
               aria-label={focus?.kind === "chart" ? t.chartSettings : t.tableSettings}
               onKeyDown={onPanelKey}
@@ -747,7 +991,7 @@ function CellMenuItems({ store, close, onAddToNote }: { store: SheetStore; close
           icon={<ChartScatter />}
           onSelect={() => {
             close();
-            if (!insertChart(store)) showSheetNotice(store, t.noChart);
+            makeChart(store);
           }}
         >
           {t.insertChart}

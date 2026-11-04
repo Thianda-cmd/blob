@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const TABBABLE = 'a[href], area[href], button, input:not([type="hidden"]), select, textarea, iframe, [contenteditable]:not([contenteditable="false"]), [tabindex]';
 
 /** What Tab can reach inside `root`, in order (of a group of radio buttons only the checked one, as the browser does). */
-function tabbables(root: HTMLElement): HTMLElement[] {
+export function tabbables(root: HTMLElement): HTMLElement[] {
   const out: HTMLElement[] = [];
   for (const el of root.querySelectorAll<HTMLElement>(TABBABLE)) {
     if (el.tabIndex < 0 || (el as HTMLButtonElement).disabled || el.closest("[inert]") || !el.getClientRects().length) continue;
@@ -19,6 +19,26 @@ function tabbables(root: HTMLElement): HTMLElement[] {
     out.push(el);
   }
   return out;
+}
+
+/**
+ * Tab and Shift+Tab go round inside `root` (a modal, a popover that took the keyboard): from its
+ * last stop to its first and back, instead of on to the page behind it. With no stop in it, the
+ * keyboard stays (on `root` itself when it can take it).
+ */
+export function keepTabInside(e: { shiftKey: boolean; preventDefault(): void }, root: HTMLElement) {
+  const items = tabbables(root);
+  const at = document.activeElement;
+  if (!items.length) {
+    e.preventDefault();
+    root.focus({ preventScroll: true });
+  } else if (e.shiftKey && (at === items[0] || at === root)) {
+    e.preventDefault();
+    items[items.length - 1].focus();
+  } else if (!e.shiftKey && at === items[items.length - 1]) {
+    e.preventDefault();
+    items[0].focus();
+  }
 }
 
 /** Can the keyboard go back to this element (still on the page, shown, enabled)? */
@@ -71,18 +91,7 @@ export function useModalFocus(open: boolean, panel: RefObject<HTMLElement | null
       const el = panel.current;
       // Keys from menus that open out of the dialog (other places on the page, same React tree) are theirs.
       if (e.key !== "Tab" || e.defaultPrevented || !el || !el.contains(e.target as Node)) return;
-      const items = tabbables(el);
-      const at = document.activeElement;
-      if (!items.length) {
-        e.preventDefault();
-        el.focus({ preventScroll: true });
-      } else if (e.shiftKey && (at === items[0] || at === el)) {
-        e.preventDefault();
-        items[items.length - 1].focus();
-      } else if (!e.shiftKey && at === items[items.length - 1]) {
-        e.preventDefault();
-        items[0].focus();
-      }
+      keepTabInside(e, el);
     },
   };
 }
@@ -93,6 +102,8 @@ export function Dialog({
   children,
   className,
   labelledBy,
+  describedBy,
+  role = "dialog",
   returnFocus,
 }: {
   open: boolean;
@@ -100,6 +111,10 @@ export function Dialog({
   children: ReactNode;
   className?: string;
   labelledBy?: string;
+  /** The id of the text that says what the dialog is about (screen readers read it with the title). */
+  describedBy?: string;
+  /** "alertdialog" for a question about something that can't simply be taken back (deleting). */
+  role?: "dialog" | "alertdialog";
   /** Where the keyboard goes after closing when the element that opened the dialog is gone. */
   returnFocus?: () => void;
 }) {
@@ -127,9 +142,10 @@ export function Dialog({
           />
           <motion.div
             ref={panel}
-            role="dialog"
+            role={role}
             aria-modal="true"
             aria-labelledby={labelledBy}
+            aria-describedby={describedBy}
             tabIndex={-1}
             onFocus={focus.onFocus}
             onKeyDown={focus.onKeyDown}

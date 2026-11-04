@@ -168,8 +168,73 @@ function oneOf<T>(x: unknown, list: readonly T[], fallback: T): T {
   return list.includes(x as T) ? (x as T) : fallback;
 }
 
-/** A string cut to `max` characters, or `fallback` when it isn't one. */
-const text = (x: unknown, max: number, fallback = ""): string => (typeof x === "string" ? (x.length > max ? x.slice(0, max) : x) : fallback);
+/**
+ * `s` cut to at most `max` UTF-16 units, between characters: an emoji (two units) at the cut goes
+ * as a whole. Half of one is text the database refuses (storableText).
+ */
+export function cutText(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const last = s.charCodeAt(max - 1);
+  return s.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max);
+}
+
+/**
+ * Text the database can store: half of an emoji (a lone surrogate, as a cut in the middle of one or
+ * LEFT on emoji text leaves) becomes the replacement character U+FFFD, and NUL characters (from some
+ * files) go. Either makes PostgREST refuse the whole request, every time it is sent.
+ */
+export function storableText(s: string): string {
+  let out = s;
+  if (/[\ud800-\udfff]/.test(out)) out = out.replace(/[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g, (c) => (c.length === 2 ? c : "�"));
+  return out.includes("\u0000") ? out.split("\u0000").join("") : out;
+}
+
+/** How many values storable has looked at so far (to tell the parts that take long to go through). */
+let looked = 0;
+
+/** How many values storable has looked at so far: how much going through something cost (store.ts repair stops at a limit). */
+export function storableWork(): number {
+  return looked;
+}
+
+/**
+ * `value` with all text in it storable (storableText), sharing whatever needed no repair: the same
+ * object when nothing did. (The keys are Blob's own: cell addresses, ids, settings.) Saving repairs
+ * a workbook this way (src/components/sheet/saver.ts storedContent), and the editor its undo steps
+ * along with it (store.ts repair): `memo` (an object gone through → its repaired version) keeps
+ * what several of them share shared: a part that needed repair becomes the same repaired part
+ * wherever it is, and a big part (a sheet's cells) is gone through once. (Small parts that needed
+ * nothing, most cells, aren't kept: looking at one again costs less than keeping them all.)
+ */
+export function storable<T>(value: T, memo?: WeakMap<object, unknown>): T {
+  looked++;
+  if (typeof value === "string") return storableText(value) as T;
+  if (typeof value !== "object" || value === null) return value;
+  const had = memo?.get(value);
+  if (had !== undefined) return had as T;
+  const start = looked;
+  let out: Record<string, unknown> | unknown[] | null = null;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const was: unknown = value[i];
+      const now = storable(was, memo);
+      if (now !== was) ((out as unknown[] | null) ??= value.slice())[i] = now;
+    }
+  } else {
+    const from = value as Record<string, unknown>;
+    for (const key in from) {
+      const was = from[key];
+      const now = storable(was, memo);
+      if (now !== was) ((out as Record<string, unknown> | null) ??= { ...from })[key] = now;
+    }
+  }
+  const result = (out ?? value) as T;
+  if (memo && (out || looked - start > 64)) memo.set(value, result);
+  return result;
+}
+
+/** A string cut to `max` characters (cutText), or `fallback` when it isn't one. */
+const text = (x: unknown, max: number, fallback = ""): string => (typeof x === "string" ? cutText(x, max) : fallback);
 
 const isColor = (x: unknown): x is SheetColor => SHEET_COLORS.includes(x as SheetColor);
 
@@ -279,13 +344,14 @@ function normList<T>(raw: unknown, max: number, norm: (x: unknown, i: number, ta
 function sheetName(x: unknown, locale: Locale, i: number, taken: Set<string>): string {
   let name = typeof x === "string" ? x : "";
   if (!(name.length >= 1 && name.length <= 31 && name.trim() && !/[[\]:*?/\\]/.test(name) && !name.startsWith("'") && !name.endsWith("'"))) {
-    name = name
-      .replace(/[[\]:*?/\\\u0000-\u001f]/g, "")
-      .trim()
-      .replace(/^'+|'+$/g, "")
-      .trim()
-      .slice(0, 31)
-      .trim();
+    name = cutText(
+      name
+        .replace(/[[\]:*?/\\\u0000-\u001f]/g, "")
+        .trim()
+        .replace(/^'+|'+$/g, "")
+        .trim(),
+      31,
+    ).trim();
   }
   if (!name) name = `${sheetBase(locale)} ${i + 1}`;
   if (taken.has(name.toLowerCase())) {
@@ -293,7 +359,7 @@ function sheetName(x: unknown, locale: Locale, i: number, taken: Set<string>): s
     const root = m ? m[1] : name;
     for (let n = m ? Number(m[2]) + 1 : 2; ; n++) {
       const suffix = ` (${n})`;
-      const candidate = root.slice(0, 31 - suffix.length) + suffix;
+      const candidate = cutText(root, 31 - suffix.length) + suffix;
       if (!taken.has(candidate.toLowerCase())) {
         name = candidate;
         break;
@@ -320,6 +386,8 @@ function normSheet(s: Obj, id: string, name: string, sheetIds: ReadonlyMap<strin
   const freeze = freezeSame ? (s.freeze as Sheet["freeze"]) : { rows: fr, cols: fc };
   // The log of inserted, deleted, sorted and moved rows and columns that merging lines versions up with.
   const log = readLog(s.log, id, sheetIds);
+  // A copy merging made of another sheet: that sheet's id (as it is now), so the other person is told.
+  const copyOf = typeof s.copyOf === "string" ? (sheetIds.get(s.copyOf) ?? (goodId(s.copyOf) ? s.copyOf : undefined)) : undefined;
   const same =
     id === s.id &&
     name === s.name &&
@@ -329,10 +397,12 @@ function normSheet(s: Obj, id: string, name: string, sheetIds: ReadonlyMap<strin
     rowsMap.same &&
     freezeSame &&
     log.same &&
-    onlyKeys(s, ["id", "name", "cells", "cols", "rows", "freeze", "size", "log"]);
+    copyOf === s.copyOf &&
+    onlyKeys(s, ["id", "name", "cells", "cols", "rows", "freeze", "size", "log", "copyOf"]);
   if (same) return s as Sheet;
   const out: Sheet = { id, name, cells: cells.map, cols: cols.map, rows: rowsMap.map, freeze, size };
   if (log.log) out.log = log.log;
+  if (copyOf) out.copyOf = copyOf;
   return out;
 }
 
@@ -473,7 +543,7 @@ function normFormat(x: unknown): NumberFormat | undefined {
   if (!isObj(x)) return undefined;
   const decimals = () => int(x.decimals, 0, 20, 2);
   const unit = (): { unit?: string } => {
-    const u = typeof x.unit === "string" ? x.unit.trim().slice(0, MAX_UNIT) : "";
+    const u = typeof x.unit === "string" ? cutText(x.unit.trim(), MAX_UNIT) : "";
     return u ? { unit: u } : {};
   };
   let out: NumberFormat;
@@ -691,7 +761,7 @@ function normFilter(x: unknown): FilterSpec | null {
     const values = raw
       .filter((v): v is string => typeof v === "string")
       .slice(0, 10000)
-      .map((v) => v.slice(0, MAX_NAME));
+      .map((v) => cutText(v, MAX_NAME));
     out = { kind: "values", values };
     const same = Array.isArray(x.values) && raw.length === values.length && values.every((v, i) => v === raw[i]) && onlyKeys(x, ["kind", "values"]);
     return same ? (x as FilterSpec) : out;
@@ -864,7 +934,7 @@ export function workbookPlainText(wb: Workbook, calc: Calc, locale: Locale): str
       if (s.trendline?.name) add(s.trendline.name);
     }
   }
-  return lines.join("\n").slice(0, PLAIN_MAX);
+  return cutText(lines.join("\n"), PLAIN_MAX);
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -972,7 +1042,7 @@ export function workbookPreview(wb: Workbook, calc: Calc, locale: Locale): Sheet
         }
       }
       let shown = formatValue(value, cell?.s?.fmt, locale);
-      if (shown.length > PREVIEW_TEXT) shown = `${shown.slice(0, PREVIEW_TEXT - 1)}…`;
+      if (shown.length > PREVIEW_TEXT) shown = `${cutText(shown, PREVIEW_TEXT - 1)}…`;
       line.push(shown.replace(/\s*\n\s*/g, " "));
       const s = cell?.s;
       const align = s?.align ?? (typeof value === "number" ? "right" : typeof value === "boolean" || isError(value) ? "center" : "left");
@@ -1104,7 +1174,7 @@ export function readSheetPreview(raw: unknown): SheetPreview | null {
   if (!isObj(raw) || !Array.isArray(raw.rows)) return null;
   const rows = raw.rows
     .slice(0, PREVIEW_ROWS)
-    .map((line) => (Array.isArray(line) ? line.slice(0, PREVIEW_COLS).map((x) => (typeof x === "string" ? x.slice(0, PREVIEW_TEXT) : "")) : []));
+    .map((line) => (Array.isArray(line) ? line.slice(0, PREVIEW_COLS).map((x) => (typeof x === "string" ? cutText(x, PREVIEW_TEXT) : "")) : []));
   const count = (x: unknown) => (finite(x) ? Math.max(0, Math.min(100000, Math.round(x))) : 0);
   const out: SheetPreview = { rows, charts: count(raw.charts), tables: count(raw.tables) };
   if (Array.isArray(raw.look)) {

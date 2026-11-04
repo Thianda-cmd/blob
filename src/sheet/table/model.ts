@@ -12,9 +12,10 @@
 
 import { isLocale, type Locale } from "@/i18n/config";
 import { cellKey, inArea, normArea, overlaps, parseKey } from "../a1";
-import { shiftFormula, type Calc } from "../engine";
+import { createCalc, isDuration, shiftFormula, typedFormat, type Calc, type CellValue } from "../engine";
+import { formulaFormat, inTypedHours, worksOnRanges, type FormulaSources } from "../engine/input";
 import { clearAreas, copyArea, growTableReferences, insertRows, newId, pasteClip, putTable, removeTable, setCells, setStyle, sheetById, sortArea } from "../ops";
-import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type FilterSpec, type Sheet, type TableColumn, type TableSpec, type TableStyle, type TotalFn, type Workbook } from "../types";
+import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type FilterSpec, type NumberFormat, type Sheet, type TableColumn, type TableSpec, type TableStyle, type TotalFn, type Workbook } from "../types";
 import { columnPattern, genericColumnName, headerGaps } from "./columns";
 import { hiddenByFilters, shownText } from "./filter";
 import { cleanTableName, freeTableName, validTableName } from "./names";
@@ -408,18 +409,78 @@ export function sortTable(wb: Workbook, calc: Calc, tableId: string, columnId: s
 // ----------------------------------------------------------------------------------------------
 // The totals row
 
-/** The format a total of this column shows its result in: the column's number format, except for counts. */
-function dataFormat(sheet: Sheet, t: TableSpec, col: number): CellStyle["fmt"] {
+/**
+ * Two number formats alike, whatever order their keys come in: a format loaded back from the
+ * database has jsonb's order ({kind, unit, decimals}), one made in this session the code's.
+ */
+function sameFormat(a: NumberFormat | undefined, b: NumberFormat | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  for (const k in x) if (x[k] !== y[k]) return false;
+  for (const k in y) if (!(k in x) && y[k] !== undefined) return false;
+  return true;
+}
+
+/** A clock time's format as a duration (36:00 past a day, not 12:00); undefined for any other format. */
+const durationOf = (fmt: NumberFormat): NumberFormat | undefined => (fmt.kind === "time" && !isDuration(fmt) ? { kind: "time", seconds: fmt.seconds, duration: true } : undefined);
+
+/** A time format and the other way to read it, as a clock time or a duration (the same seconds): what a time column's total switches between. */
+const sameTime = (a: NumberFormat, b: NumberFormat) => a.kind === "time" && b.kind === "time" && a.seconds === b.seconds;
+
+/** What a cell of the table's sheet holds: its formula's result (asked only for formulas, when needed). */
+type ValueAt = (row: number, col: number) => CellValue;
+
+/** A column's number format, and whether it shows moments: timestamps shown as their clock time (an instrument's log). */
+type ColumnFormat = { fmt: NumberFormat; moment: boolean };
+
+/**
+ * A column's number format: its last data cell's that has one (of the last 50 rows). Among clock
+ * times a duration decides, as when formulas sum them up (src/sheet/engine/input.ts join): times
+ * typed down a growth curve, 0:00, 12:00, 24:00, 36:00, 18:00, are durations (Max 36:00, not the
+ * clock time 12:00), and so is a clock time of a day or more.
+ */
+function dataFormat(sheet: Sheet, t: TableSpec, col: number, value: ValueAt): ColumnFormat | undefined {
   const d = dataRows(t);
-  for (let r = d.r1, seen = 0; r >= d.r0 && seen < 50; r--, seen++) {
+  const top = Math.max(d.r0, d.r1 - 49);
+  // A time cell's format, and for a clock time its value (a duration needs none), which tells a
+  // moment or a day or more apart.
+  const timeAt = (r: number) => {
+    const c = sheet.cells[cellKey(r, col)];
+    if (c?.s?.fmt?.kind !== "time") return undefined;
+    const fmt = c.s.fmt;
+    return { fmt, v: isDuration(fmt) ? undefined : c.f === undefined ? c.v : value(r, col) };
+  };
+  for (let r = d.r1; r >= top; r--) {
     const fmt = sheet.cells[cellKey(r, col)]?.s?.fmt;
-    if (fmt && fmt.kind !== "text") return fmt;
+    if (!fmt || fmt.kind === "text") continue;
+    const time = timeAt(r);
+    if (!time || isDuration(fmt)) return { fmt, moment: false };
+    if (typeof time.v === "number" && !inTypedHours(time.v)) return { fmt, moment: true };
+    for (let q = r; q >= top; q--) {
+      const o = timeAt(q);
+      if (o && (isDuration(o.fmt) || (typeof o.v === "number" && o.v >= 1 && inTypedHours(o.v)))) return { fmt: durationOf(fmt) ?? fmt, moment: false };
+    }
+    return { fmt, moment: false };
   }
   return undefined;
 }
 
+/**
+ * The format a total shows its result in: the column's (a sum of milligrams is milligrams), but a
+ * sum or mean of clock times is how long they took, a duration (08:30 + 07:45 + 09:15 is 25:30,
+ * not the time 01:30), as AutoSum and the status bar show it; moments stay moments (the mean of an
+ * instrument's timestamps is one too). A count is a plain number.
+ */
+function totalFormat(fn: TotalFn, column: ColumnFormat | undefined): NumberFormat | undefined {
+  if (!column || isCountTotal(fn)) return undefined;
+  if ((fn === "sum" || fn === "average") && !column.moment) return durationOf(column.fmt) ?? column.fmt;
+  return column.fmt;
+}
+
 /** The cell of one column in the totals row: its SUBTOTAL, the label (first column without a function) or nothing. */
-function totalsCell(sheet: Sheet, t: TableSpec, i: number, locale: Locale | undefined): Update {
+function totalsCell(sheet: Sheet, t: TableSpec, i: number, locale: Locale | undefined, value: ValueAt): Update {
   const col = t.area.c0 + i;
   const row = t.area.r1;
   const cell = sheet.cells[cellKey(row, col)];
@@ -427,12 +488,15 @@ function totalsCell(sheet: Sheet, t: TableSpec, i: number, locale: Locale | unde
   const d = dataRows(t);
   const f = totalFormula(fn, col, d.r0, d.r1);
   let s = cell?.s;
-  const fmt = dataFormat(sheet, t, col);
   if (f) {
-    // A sum of milligrams is milligrams too; a count is a plain number.
-    if (isCountTotal(fn)) {
-      if (s?.fmt && fmt && JSON.stringify(s.fmt) === JSON.stringify(fmt)) s = { ...s, fmt: undefined };
-    } else if (!s?.fmt && fmt) s = { ...s, fmt };
+    // The format follows the function while it is one a total gave (the column's, as a clock time
+    // or a duration): Max then Summe shows 25:30, Summe then Anzahl a plain 3. One picked by hand stays.
+    const column = dataFormat(sheet, t, col, value);
+    const had = s?.fmt;
+    if (!had || (column && (sameFormat(had, column.fmt) || sameTime(had, column.fmt)))) {
+      const fmt = totalFormat(fn, column);
+      if (!sameFormat(had, fmt)) s = { ...s, fmt };
+    }
     return { row, col, cell: { ...cell, v: undefined, f, s } };
   }
   if (i === 0 && locale) return { row, col, cell: { ...cell, v: locale === "de" ? "Ergebnis" : "Total", f: undefined } };
@@ -478,19 +542,24 @@ export function setTotals(wb: Workbook, calc: Calc, tableId: string, on: boolean
   const table: TableSpec = { ...t1, totals: true, area: { ...t1.area, r1: row }, columns };
   let next = putTable(ensureSize(room, t.sheetId, table.area), table);
   const sheet = sheetById(next, t.sheetId)!;
+  // The data rows didn't move (the room is made below them): their values are calc's.
+  const value = (r: number, c: number) => calc.value(t.sheetId, r, c);
   next = writeCells(
     next,
     t.sheetId,
-    table.columns.map((_, i) => totalsCell(sheet, table, i, locale)),
+    table.columns.map((_, i) => totalsCell(sheet, table, i, locale, value)),
   );
   return next;
 }
 
 /**
  * A column's function in the totals row, written as =SUBTOTAL(109; …) etc. into its cell.
- * `locale` (optional): with "none" the first column gets its label back ("Ergebnis").
+ * `locale` (optional): with "none" the first column gets its label back ("Ergebnis"). `calc`
+ * (optional): the workbook's values, for a column of formulas whose results decide the total's
+ * format (a mean of timestamps made by formulas is a moment, not 1111908:45 hours); without it
+ * they are worked out here.
  */
-export function setColumnTotal(wb: Workbook, tableId: string, columnId: string, fn: TotalFn, locale?: Locale): Workbook {
+export function setColumnTotal(wb: Workbook, tableId: string, columnId: string, fn: TotalFn, locale?: Locale, calc?: Calc): Workbook {
   const t = tableById(wb, tableId);
   if (!t) return wb;
   const i = t.columns.findIndex((c) => c.id === columnId);
@@ -500,7 +569,9 @@ export function setColumnTotal(wb: Workbook, tableId: string, columnId: string, 
   if (!table.totals) return next;
   const sheet = sheetById(next, table.sheetId);
   if (!sheet) return next;
-  next = writeCells(next, table.sheetId, [totalsCell(sheet, table, i, locale)]);
+  let values = calc;
+  const value = (r: number, c: number) => (values ??= createCalc(wb, { locale })).value(table.sheetId, r, c);
+  next = writeCells(next, table.sheetId, [totalsCell(sheet, table, i, locale, value)]);
   return next;
 }
 
@@ -615,8 +686,18 @@ function continueRows(sheet: Sheet, t: TableSpec, from: number, to: number, give
  * Excel's calculated column: a formula typed into a data cell fills the whole column (moved along
  * with each row) when the column's other cells are empty or hold one formula pattern themselves.
  * Values typed by hand are never overwritten.
+ *
+ * Each cell shows what the typed one shows: the format typing its formula there gives (=B3-A3 of
+ * two times a duration, =(B3-A3)*24 none), and where that says nothing or only a clock time (a row
+ * still empty, or with only its Start yet) the typed cell's, so times typed into it later show as a
+ * duration too. A formula over ranges (=SUMME($B$2:B2), =B2-MIN(B:B)) gives every row the typed
+ * cell's: looking through its ranges again for each of 5,000 rows would take seconds. A format the
+ * column's old formula gave a cell goes with that formula, as when the cell itself is typed into
+ * anew (src/components/sheet/store.ts typingBase), also in a cell emptied with Entf (which keeps
+ * its look): =B2-A2 edited to =(B2-A2)*24 shows hours in every row, not 204:00. A format picked by
+ * hand stays, and the typed cell's own spreads to the cells without one.
  */
-function fillColumn(sheet: Sheet, t: TableSpec, row: number, col: number): Update[] {
+function fillColumn(wb: Workbook, calc: Calc, sheet: Sheet, t: TableSpec, row: number, col: number): Update[] {
   const typed = sheet.cells[cellKey(row, col)];
   if (!typed || typed.f === undefined) return [];
   const d = dataRows(t);
@@ -630,14 +711,35 @@ function fillColumn(sheet: Sheet, t: TableSpec, row: number, col: number): Updat
     if (!ref) ref = { f: c.f, row: r };
     else if (shiftFormula(ref.f, r - ref.row, 0) !== c.f) return [];
   }
-  const fmt = typed.s?.fmt;
+  const src: FormulaSources = { wb, sheetId: sheet.id, value: (id, r, c) => calc.value(id, r, c) };
+  const implied = formulaFormat(typed.f, src);
+  const each = !worksOnRanges(typed.f);
+  // The old formula, with what it gives in the typed row (what the rows empty then took) and in its
+  // own first row (what it gave, also when the typed row's cells have been emptied since).
+  const old = ref && { ...ref, here: formulaFormat(shiftFormula(ref.f, row - ref.row, 0), src), first: formulaFormat(ref.f, src), each: !worksOnRanges(ref.f) };
+  const oldGave = (fmt: NumberFormat) => !!old && (sameFormat(fmt, old.here) || sameFormat(fmt, old.first));
+  /** Whether `had` is a format the old formula gave row r: what it gives there, in the typed row or in its first row, or as a fill puts them together. */
+  const fromOld = (had: NumberFormat, r: number) => {
+    if (!old) return false;
+    if (oldGave(had)) return true;
+    if (!old.each) return false;
+    const there = formulaFormat(shiftFormula(old.f, r - old.row, 0), src);
+    return sameFormat(had, there) || sameFormat(had, typedFormat(there, old.here));
+  };
+  // The typed cell's own format: one neither its formula nor the old one gave (picked by hand).
+  const mine = typed.s?.fmt;
+  const own = mine && !sameFormat(mine, implied) && !oldGave(mine) ? mine : undefined;
   const out: Update[] = [];
   for (let r = d.r0; r <= d.r1; r++) {
     if (r === row) continue;
     const f = shiftFormula(typed.f, r - row, 0);
     const c = sheet.cells[cellKey(r, col)];
     if (c?.f === f) continue;
-    out.push({ row: r, col, cell: { ...c, v: undefined, f, s: c?.s ?? (fmt ? { fmt } : undefined) } });
+    const had = c?.s?.fmt;
+    const hand = had && !fromOld(had, r) ? had : undefined;
+    const here = each ? typedFormat(formulaFormat(f, src), implied) : implied;
+    const fmt = typedFormat(hand ?? own, here);
+    out.push({ row: r, col, cell: { ...c, v: undefined, f, s: c?.s || fmt ? { ...c?.s, fmt } : undefined } });
   }
   return out;
 }
@@ -678,7 +780,7 @@ export function afterInput(wb: Workbook, calc: Calc, sheetId: string, row: numbe
     // A header can't be empty (Excel puts "Spalte2" back): menus and charts need a name.
     next = writeCells(next, sheetId, headerGaps(now, t.area, lang).filter((u) => u.col === col));
   } else if (row >= d.r0 && row <= d.r1 && typed?.f !== undefined) {
-    next = writeCells(next, sheetId, fillColumn(now, t, row, col));
+    next = writeCells(next, sheetId, fillColumn(next, calc, now, t, row, col));
   }
   return refreshTotals(next, sheetId);
 }

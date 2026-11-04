@@ -9,26 +9,35 @@
 // log; undo and redo of every kind of step keep a partner's later edits, and a refused one says
 // why; the selection, the cell being typed into and what was cut follow a partner's change of
 // rows as it arrives; a template picked can't be undone into an empty sheet; a duplicated sheet's
-// tables get names that aren't cells.
+// tables get names that aren't cells. And what someone saved is never lost, nor does a number
+// silently read someone else's rows (the sweep's COL findings): a sheet, or rows that were empty for
+// whoever deleted them, deleted on a stale view stay when the other side wrote into them; undo and
+// redo keep a partner's later edits and say so; formulas and charts written for my version follow
+// it to its copy; sorts of any size line up; undo alone goes back as far as the history; formulas
+// follow renames; undo after a conflict says where my version is, once; the copy is marked and the
+// other person told, with wording for the reason; a cancelled cut pastes nothing; the saver says
+// when a copy makes the spreadsheet too big, and my version can become a spreadsheet of its own.
 //
 //   npm run check:sheet-merge
 //
 // Problems make the script exit with 1.
 import { deleteAtSelection, insertAtSelection } from "@/components/sheet/grid/actions";
+import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
 import { currentSheetNotice, hideSheetNotice } from "@/components/sheet/notice";
+import { MAX_BYTES, SheetSaver, type SaveArgs, type SaverApi, type SheetConflict } from "@/components/sheet/saver";
 import { createSheetStore, mainArea, type SheetStore } from "@/components/sheet/store";
 import type { Locale } from "@/i18n/config";
 import { sheetText } from "@/i18n/messages/sheet";
-import { cellKey, parsePos } from "@/sheet/a1";
-import { mergeWorkbooks, takeBack, type MergeReport } from "@/sheet/collab";
+import { cellKey, parsePos, posName } from "@/sheet/a1";
+import { arrivedCopies, copyTies, mergeWorkbooks, ownVersion, takeBack, tiedCopy, type MergeReport } from "@/sheet/collab";
 import { normalizeWorkbook } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
 import * as O from "@/sheet/ops";
-import { capLog, inverseOp, LOG_ENTRIES, netOps, opsSince } from "@/sheet/sheetLog";
+import { capLog, inverseOp, LOG_ENTRIES, LOG_SORT_ROWS, netOps, opsSince } from "@/sheet/sheetLog";
 import * as T from "@/sheet/table/model";
 import { freeTableName } from "@/sheet/table/names";
 import { SHEET_TEMPLATES } from "@/sheet/templates";
-import type { Cell, Sheet, SheetOp, Workbook } from "@/sheet/types";
+import { MAX_ROWS, type Cell, type Sheet, type SheetOp, type Workbook } from "@/sheet/types";
 
 // ----------------------------------------------------------------------------------------------
 // Tiny test kit
@@ -190,14 +199,17 @@ run("the log: columns inserted into a table get the same ids on every version", 
 
 run("the log: helpers", () => {
   const ins = (id: string, at = 0): SheetOp => ({ id, kind: "insertRows", at, count: 1 });
-  const many = Array.from({ length: 60 }, (_, i) => ins(`e${i}`, i));
+  const many = Array.from({ length: LOG_ENTRIES + 10 }, (_, i) => ins(`e${i}`, i));
   const capped = capLog(many);
-  eq("capped to the newest", [capped.length, capped[0].kind, capped[0].id, capped[1].id, capped[capped.length - 1].id], [LOG_ENTRIES, "barrier", "e10", "e11", "e59"]);
+  eq("capped to the newest", [capped.length, capped[0].kind, capped[0].id, capped[1].id, capped[capped.length - 1].id], [LOG_ENTRIES, "barrier", "e10", "e11", `e${LOG_ENTRIES + 9}`]);
+  check("more than twice the undo history (200 steps)", LOG_ENTRIES >= 2 * 200);
   const short = many.slice(0, 5);
   check("short logs stay the same", capLog(short) === short);
   const sort = (id: string, n: number): SheetOp => ({ id, kind: "sort", r0: 0, c0: 0, c1: 0, order: Array.from({ length: n }, (_, i) => n - 1 - i) });
-  eq("a very long sort is only a barrier", capLog([ins("a"), sort("big", 12000)]), [{ id: "big", kind: "barrier" }]);
-  eq("two long sorts: the older goes", capLog([ins("a"), sort("s1", 6000), sort("s2", 6000)]).map((op) => op.kind), ["barrier"]);
+  const full = [ins("a"), sort("big", MAX_ROWS)];
+  check("a sort of every row a sheet holds is kept (COL-4)", capLog(full) === full && LOG_SORT_ROWS === MAX_ROWS);
+  check("…and its undo too", capLog([...full, sort("back", MAX_ROWS)]).every((op) => op.kind !== "barrier"));
+  eq("three of them: the oldest goes", capLog([ins("a"), sort("s1", MAX_ROWS), sort("s2", MAX_ROWS), sort("s3", MAX_ROWS)]).map((op) => op.kind), ["barrier", "sort"]);
   eq("since: the newer entries", opsSince([ins("a"), ins("b")], [ins("a"), ins("b"), ins("c")])?.map((op) => op.id), ["c"]);
   eq("since: nothing new", opsSince([ins("a")], [ins("a")]), []);
   eq("since: no base log, everything", opsSince(undefined, [ins("a")])?.map((op) => op.id), ["a"]);
@@ -245,9 +257,11 @@ run("normalizeWorkbook keeps and checks the log", () => {
   eq("the same on every device", normalizeWorkbook(JSON.parse(JSON.stringify(raw)), "de").sheets[0].log, fixed);
   raw.sheets[0].log = [];
   eq("an empty log is no log", "log" in normalizeWorkbook(raw, "de").sheets[0], false);
-  raw.sheets[0].log = Array.from({ length: 70 }, (_, i) => ({ id: `e${i}`, kind: "insertRows", at: 1, count: 1 }));
+  raw.sheets[0].log = Array.from({ length: LOG_ENTRIES + 20 }, (_, i) => ({ id: `e${i}`, kind: "insertRows", at: 1, count: 1 }));
   const long = normalizeWorkbook(raw, "de").sheets[0].log!;
-  eq("at most the newest entries", [long.length, long[0].kind, long[long.length - 1].id], [LOG_ENTRIES, "barrier", "e69"]);
+  eq("at most the newest entries", [long.length, long[0].kind, long[long.length - 1].id], [LOG_ENTRIES, "barrier", `e${LOG_ENTRIES + 19}`]);
+  raw.sheets[0].log = [{ id: "s", kind: "sort", r0: 0, c0: 0, c1: 0, order: Array.from({ length: MAX_ROWS }, (_, i) => MAX_ROWS - 1 - i) }];
+  eq("a sort of every row read back as a sort", normalizeWorkbook(raw, "de").sheets[0].log!.map((op) => op.kind), ["sort"]);
   raw.sheets[0].log = "nonsense";
   eq("not a list: no log", "log" in normalizeWorkbook(raw, "de").sheets[0], false);
   // A move naming a sheet whose id normalizing had to change (two sheets with one id).
@@ -514,8 +528,10 @@ run("merge: a cut into a new sheet (only one side has it)", () => {
   const gone = O.deleteSheet(set(b0, "D1", "Notiz"), "s2");
   const { m, report } = reported(b0, into, gone);
   eq("cut into a sheet they deleted: theirs keeps the cells, mine is a copy", [names(m), column(m, "B", 2, 4), report.conflicts.map((c) => c.copyName)], [["Blatt 1", "Blatt 1 (Konflikt)"], [0.1, 0.2, 0.3], ["Blatt 1 (Konflikt)"]]);
+  // The other way round, their cut into the sheet I deleted is work they saved: that sheet stays (COL-1).
   const back = reported(b0, gone, into);
-  eq("…the other way round: the cells in the copy", [names(back.m), column(back.m, "B", 2, 4, back.report.conflicts[0]?.copyId)], [["Blatt 1", "Blatt 1 (Konflikt)"], [0.1, 0.2, 0.3]]);
+  eq("…the other way round: the cells in the copy, and the sheet they cut into stays", [names(back.m), column(back.m, "B", 2, 4, back.report.conflicts[0]?.copyId), column(back.m, "C", 2, 4, "s2")], [["Blatt 1", "Blatt 1 (Konflikt)", "Notizen"], [0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]);
+  eq("…reported", back.report.conflicts.map((c) => c.why), ["gone", "keptTheirs"]);
 });
 
 run("merge: a cut both sides have already, then more changes of rows", () => {
@@ -544,18 +560,18 @@ run("merge: a copy never pushes another sheet out of a full workbook", () => {
   const full = mk(...sheets);
   const { m, report } = reported(full, O.insertRows(full, "s1", 3, 1), O.deleteRows(full, "s1", 5, 1));
   eq("every sheet still there, theirs kept, no copy", [m.sheets.length, m.sheets[249].name, at(m, "A1", "s250")?.v, rowOf(m, "P6")], [250, "Blatt 250", "Daten 250", 5]);
-  eq("reported without a copy", report.conflicts, [{ sheetId: "s1", name: "Blatt 1", copyId: "", copyName: "" }]);
+  eq("reported without a copy", report.conflicts, [{ sheetId: "s1", name: "Blatt 1", copyId: "", copyName: "", why: "moved" }]);
   const one = mk(...sheets.slice(0, 249));
   const room = reported(one, O.insertRows(one, "s1", 3, 1), O.deleteRows(one, "s1", 5, 1));
   eq("room for one copy", [room.m.sheets.length, room.m.sheets[1].name, room.report.conflicts[0]?.copyName], [250, "Blatt 1 (Konflikt)", "Blatt 1 (Konflikt)"]);
   // What the editor says (useSheetSave.ts, flushDrafts.ts): no empty „“ for a copy that wasn't made.
-  const start = "In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben.";
-  eq("said without a copy", sheetText.de.conflict(report.conflicts), `${start} Weil eine Tabelle höchstens 250 Blätter haben kann, konnte deine Version von „Blatt 1“ kein eigenes Blatt bekommen: Es gibt nur noch die andere Version.`);
-  eq("said with a copy", sheetText.de.conflict(room.report.conflicts), `${start} Damit nichts verloren geht, steht deine Version von „Blatt 1“ jetzt auf einem eigenen Blatt: „Blatt 1 (Konflikt)“.`);
-  const both = [...room.report.conflicts, { sheetId: "s2", name: "Blatt 2", copyId: "", copyName: "" }];
+  const start = "Du und jemand anderes (oder du auf einem anderen Gerät) habt gleichzeitig in „Blatt 1“ Zeilen oder Spalten eingefügt, gelöscht, sortiert oder verschoben.";
+  eq("said without a copy", sheetText.de.conflict(report.conflicts), `${start} Weil eine Tabelle höchstens 250 Blätter haben kann, konnte deine Version kein eigenes Blatt bekommen: Es gibt nur noch die andere Version.`);
+  eq("said with a copy, and what to do next (COL-9)", sheetText.de.conflict(room.report.conflicts), `${start} Damit nichts verloren geht, steht deine Version jetzt auf „Blatt 1 (Konflikt)“. Kopier, was du aus „Blatt 1 (Konflikt)“ brauchst, nach „Blatt 1“ und lösch dann die Konflikt-Kopie.`);
+  const both = [...room.report.conflicts, { sheetId: "s2", name: "Blatt 2", copyId: "", copyName: "", why: "unknown" as const }];
   const said = sheetText.en.conflictElsewhere("Messung", both);
-  check("one copy made, one without room: both said", said.includes("is now on a sheet of its own: “Blatt 1 (Konflikt)”") && said.includes("your version of “Blatt 2” couldn't be kept") && !said.includes("“”"), show(said));
-  eq("in English, two without room", sheetText.en.conflict([report.conflicts[0], both[1]]), "Rows or columns of this spreadsheet were moved in two places at once. A spreadsheet holds at most 250 sheets, so your versions of “Blatt 1”, “Blatt 2” couldn't be kept as sheets of their own: only the other versions are left.");
+  check("one copy made, one without room: both said", said.startsWith("Spreadsheet “Messung”: ") && said.includes("your version is now on “Blatt 1 (Konflikt)”") && said.includes("Your changes to “Blatt 2” couldn't be combined") && said.includes("only the other version is left") && !said.includes("“”"), show(said));
+  eq("in English, two without room", sheetText.en.conflict([report.conflicts[0], both[1]]), "You and someone else (or you on another device) inserted, deleted, sorted or moved rows or columns in “Blatt 1” at the same time. A spreadsheet holds at most 250 sheets, so your version couldn't get a sheet of its own: only the other version is left. Your changes to “Blatt 2” couldn't be combined with someone else's (or yours from another device). A spreadsheet holds at most 250 sheets, so your version couldn't get a sheet of its own: only the other version is left.");
 });
 
 run("merge: a big sheet stays quick", () => {
@@ -584,7 +600,8 @@ run("both moved rows of the same sheet: their sheet stays, mine is a copy", () =
   eq("their log kept", m.sheets[0].log, theirs.sheets[0].log);
   eq("mine in the copy", m.sheets[1].cells, mine.sheets[0].cells);
   eq("the copy starts without a log", m.sheets[1].log, undefined);
-  eq("reported", report.conflicts, [{ sheetId: "s1", name: "Blatt 1", copyId: m.sheets[1].id, copyName: "Blatt 1 (Konflikt)" }]);
+  eq("reported", report.conflicts, [{ sheetId: "s1", name: "Blatt 1", copyId: m.sheets[1].id, copyName: "Blatt 1 (Konflikt)", why: "moved" }]);
+  eq("the copy is marked as one (COL-9)", [m.sheets[1].copyOf, m.sheets[0].copyOf], ["s1", undefined]);
   const other = mergeWorkbooks(b0, theirs, mine);
   eq("the other way round", [other.sheets[0].cells, other.sheets[1].cells], [mine.sheets[0].cells, theirs.sheets[0].cells]);
   // Without a report object the copy is still made.
@@ -1077,11 +1094,661 @@ run("picking a template can't be undone into an empty sheet (UXD-2)", () => {
 });
 
 // ==============================================================================================
-if (failures.length) {
-  console.error(`check:sheet-merge — ${failures.length} of ${count} checks failed:`);
-  for (const f of failures) console.error(`  ✗ ${f}`);
-  process.exit(1);
+// Work someone saved is never lost, and a number never silently reads someone else's rows
+// (the sweep's COL findings)
+
+/** The notice on screen, then gone. */
+const noticeOf = (s: SheetStore) => {
+  const text = currentSheetNotice(s)?.text ?? "";
+  hideSheetNotice(s);
+  return text;
+};
+/** A chart over column B of sheet `sheetId`, rows r0…r1, floating on sheet `on`. */
+const chartOver = (id: string, on: string, sheetId: string, r0: number, r1: number) => {
+  const c = template("calibration").charts[0];
+  return { ...c, id, sheetId: on, x: null, series: [{ ...c.series[0], id: `${id}-y`, x: null, nameRef: null, errorBars: null, y: { sheetId, r0, c0: 1, r1, c1: 1 } }] };
+};
+
+run("COL-1: a sheet deleted on a stale view stays when the other side wrote into it (both orders)", () => {
+  const b0 = mk(lab(), mkSheet({ A1: "Summe", B1: "=SUM('Messung 2'!B2:B3)" }, "s2", "Auswertung"), mkSheet({}, "s3", "Messung 2"));
+  const del = O.deleteSheet(b0, "s3");
+  const filled = set(set(set(b0, "A1", "Probe", "s3"), "A2", "M1", "s3"), "B2", 0.512, "s3");
+  const cases = [
+    ["the one who deleted it saves second", del, filled, "keptTheirs"],
+    ["the one who wrote into it saves second", filled, del, "keptMine"],
+  ] as const;
+  for (const [who, mine, theirs, why] of cases) {
+    const { m, report } = reported(b0, mine, theirs);
+    eq(`${who}: the sheet stays with what was written`, [names(m), at(m, "A2", "s3")?.v, at(m, "B2", "s3")?.v], [["Blatt 1", "Auswertung", "Messung 2"], "M1", 0.512]);
+    eq(`${who}: the formula reading it still does`, [at(m, "B1", "s2")?.f, column(m, "B", 1, 1, "s2")], ["SUM('Messung 2'!B2:B3)", [0.512]]);
+    eq(`${who}: reported`, report.conflicts.map((c) => [c.why, c.name, c.copyName]), [[why, "Messung 2", ""]]);
+  }
+  // A chart over it on another sheet and a table on it come back with it.
+  const withChart = O.putChart(b0, chartOver("c1", "s2", "s3", 1, 3));
+  const tb = T.makeTable(set(set(withChart, "A1", "M", "s3"), "A2", 1, "s3"), calc0(withChart), "s3", { r0: 0, c0: 0, r1: 1, c1: 0 }, "de");
+  if (!("wb" in tb)) throw new Error("no table");
+  const filled2 = set(tb.wb, "A3", 2, "s3");
+  for (const m of bothOrders(tb.wb, O.deleteSheet(tb.wb, "s3"), filled2)) eq("its chart and table stay too", [m.charts.map((c) => c.series[0].y.sheetId), m.tables.map((t) => t.sheetId)], [["s3"], ["s3"]]);
+  // Left as it was by the other side (renamed only, or edited elsewhere): deleted.
+  for (const m of bothOrders(b0, del, O.renameSheet(set(b0, "A5", "x", "s2"), "s3", "Messung B"))) eq("only renamed by the other side: deleted", names(m), ["Blatt 1", "Auswertung"]);
+  // Its cells cut and pasted to another sheet by the other side: nothing is left on it, so it stays
+  // deleted (and isn't said to be back), whoever saves second.
+  const full = mk(lab(), mkSheet({ A1: "M1", A2: 0.5, A3: 0.6 }, "s3", "Messung 2"));
+  const cutOut = CUT(full, { r0: 0, c0: 0, r1: 2, c1: 0 }, { row: 0, col: 4 }, "s1", "s3");
+  for (const [i, { m, report }] of [reported(full, O.deleteSheet(full, "s3"), cutOut), reported(full, cutOut, O.deleteSheet(full, "s3"))].entries()) {
+    eq(`emptied by a cut on the other side (${i ? "the cutter" : "the deleter"} saves second): stays deleted`, [names(m).includes("Messung 2"), report.conflicts.some((c) => c.why === "keptMine" || c.why === "keptTheirs")], [false, false]);
+  }
+  eq("said to the one who deleted it", sheetText.de.conflict([{ name: "Messung 2", copyName: "", why: "keptTheirs" }]), "Du hattest „Messung 2“ gelöscht, aber inzwischen hat jemand (oder du auf einem anderen Gerät) darin etwas eingetragen. Damit nichts verloren geht, ist das Blatt wieder da.");
+  // The one who deleted it saved first: told when it comes back with the other's save.
+  const deleter = storeOf(b0);
+  deleter.apply("Blatt löschen", (wb) => O.deleteSheet(wb, "s3"));
+  deleter.replaceRemote(mergeWorkbooks(b0, filled, deleter.get().workbook));
+  eq("…the one who deleted it first, on the next sync", [names(deleter.get().workbook), noticeOf(deleter)], [["Blatt 1", "Auswertung", "Messung 2"], "„Messung 2“ ist wieder da: Du hattest das Blatt gelöscht, aber inzwischen hatte jemand (oder du auf einem anderen Gerät) darin etwas eingetragen."]);
+  const told = storeOf(b0);
+  told.apply("Blatt löschen", (wb) => O.deleteSheet(wb, "s3"));
+  const r = reported(b0, told.get().workbook, filled);
+  told.replaceRemote(r.m, r.report.conflicts);
+  eq("…not twice when the merge's report says it", noticeOf(told), "");
+  eq("said to the one who wrote into it", sheetText.en.conflict([{ name: "Messung 2", copyName: "", why: "keptMine" }]), "Someone (or you on another device) deleted “Messung 2” while you were working in it. So nothing gets lost, the sheet is still there.");
+});
+
+run("COL-1: rows deleted on a stale view that the other side wrote into: both versions kept (both orders)", () => {
+  const b0 = mk(lab());
+  const del = O.deleteRows(b0, "s1", 11, 3);
+  const filled = set(set(set(b0, "A13", "S7"), "B13", 0.61), "A14", "S8");
+  const cases = [
+    ["the one who deleted them saves second", del, filled, "s1"],
+    ["the one who wrote into them saves second", filled, del, "copy"],
+  ] as const;
+  for (const [who, mine, theirs, where] of cases) {
+    const { m, report } = reported(b0, mine, theirs);
+    const id = where === "copy" ? report.conflicts[0]?.copyId : "s1";
+    eq(`${who}: a copy, reported`, [names(m), report.conflicts.map((c) => c.why)], [["Blatt 1", "Blatt 1 (Konflikt)"], ["deleted"]]);
+    eq(`${who}: what was written is there`, [at(m, "A13", id)?.v, at(m, "B13", id)?.v, at(m, "A14", id)?.v], ["S7", 0.61, "S8"]);
+    eq(`${who}: and the rows deleted on the other version`, [at(m, "A11", id === "s1" ? report.conflicts[0]?.copyId : "s1")?.v, at(m, "A12", id === "s1" ? report.conflicts[0]?.copyId : "s1")?.v], ["Summe", undefined]);
+  }
+  // Cells cut and pasted over what the other side just typed there: kept too.
+  const cut = CUT(b0, { r0: 1, c0: 0, r1: 2, c1: 1 }, { row: 13, col: 0 });
+  const typed = set(b0, "B15", 0.99);
+  for (const { m, report } of [reported(b0, cut, typed), reported(b0, typed, cut)]) check("cut pasted over what was just typed: kept", report.conflicts[0]?.why === "deleted" && m.sheets.some((s) => s.cells["14,1"]?.v === 0.99), show(report));
+  // A value that was there goes with its deleted row (checked above); inserted rows destroy nothing.
+  eq("rows inserted vs rows written below them: no copy", bothOrders(b0, O.insertRows(b0, "s1", 11, 2), filled).map((m) => m.sheets.length), [1, 1]);
+  // Only rows (or columns) that were empty for whoever deleted them: one with something in it they
+  // deleted on purpose, and what was added to it goes with it, like an edit there.
+  const typedOff = set(b0, "D3", "Notiz");
+  eq("a note typed into a data row deleted meanwhile: goes with its row, no copy", bothOrders(b0, O.deleteRows(b0, "s1", 2, 1), typedOff).map((m) => [m.sheets.length, column(m, "A", 3, 3), column(m, "D", 1, 12).filter((v) => v !== null)]), [[1, ["P3"], []], [1, ["P3"], []]]);
+  const newColumn = O.setCells(b0, "s1", Array.from({ length: 8 }, (_, i) => ({ row: i + 1, col: 2, cell: { v: (i + 1) * 10 } })));
+  for (const [i, { m, report }] of [reported(b0, O.deleteRows(b0, "s1", 5, 1), newColumn), reported(b0, newColumn, O.deleteRows(b0, "s1", 5, 1))].entries()) {
+    eq(`a new column filled while P5's row is deleted (${i ? "the filler" : "the deleter"} saves second): no copy, each value on its sample's row`, [m.sheets.length, report.conflicts.length, column(m, "A", 2, 8), column(m, "C", 2, 8)], [1, 0, ["P1", "P2", "P3", "P4", "P6", "P7", "P8"], [10, 20, 30, 40, 60, 70, 80]]);
+  }
+  const emptyCol = set(set(b0, "E2", 1), "E3", 2);
+  eq("an empty column deleted while the other side fills it: kept on a copy", bothOrders(b0, O.deleteCols(b0, "s1", 4, 1), emptyCol).map((m) => m.sheets.length), [2, 2]);
+  eq("a column with data deleted, a value typed below its data: goes with it", bothOrders(b0, O.deleteCols(b0, "s1", 1, 1), set(b0, "B12", 0.9)).map((m) => [m.sheets.length, column(m, "B", 1, 12).filter((v) => v !== null).length]), [[1, 0], [1, 0]]);
+  // The rows as they were right before the deletion: after an insert or a sort before it too.
+  const s7 = set(b0, "A12", "S7");
+  eq("a row inserted, then the empty row it moved down deleted: kept on a copy", bothOrders(b0, O.deleteRows(O.insertRows(b0, "s1", 0, 1), "s1", 12, 1), s7).map((m) => m.sheets.length), [2, 2]);
+  const sortedThenDeleted = O.deleteRows(SORT_DESC(b0), "s1", 11, 1);
+  eq("a sort, then an empty row below deleted: kept on a copy", bothOrders(b0, sortedThenDeleted, s7).map((m) => m.sheets.length), [2, 2]);
+  // Undo deletes nothing someone wrote since, whatever is next to it: an insert typed into in the
+  // same step (a row with something in it), with the partner's value beside it since.
+  const stepped = set(O.insertRows(b0, "s1", 2, 1), "A3", "neu");
+  const back = takeBack(stepped, b0, set(stepped, "B3", 0.5));
+  eq("undo of an insert someone wrote into since, next to what the step wrote: refused", "refused" in back ? back.refused : "taken back", "deleted");
+  // …nor does it put a cell back into a row deleted since, quietly losing it: refused.
+  const cleared = set(b0, "B5", null);
+  const undoClear = takeBack(cleared, b0, O.deleteRows(cleared, "s1", 4, 1));
+  eq("undo of a cleared cell whose row was deleted since: refused", "refused" in undoClear ? undoClear.refused : "taken back", "deleted");
+  eq("said", sheetText.de.conflict([{ name: "Blatt 1", copyName: "Blatt 1 (Konflikt)", why: "deleted" }]), "In „Blatt 1“ wurden Zeilen oder Spalten gelöscht, in die gleichzeitig etwas eingetragen wurde. Damit nichts verloren geht, steht deine Version jetzt auf „Blatt 1 (Konflikt)“. Kopier, was du aus „Blatt 1 (Konflikt)“ brauchst, nach „Blatt 1“ und lösch dann die Konflikt-Kopie.");
+});
+
+run("COL-2: undo and redo keep what someone changed after the step", () => {
+  const b0 = mk(lab());
+  const take = (from: Workbook, to: Workbook, now: Workbook) => {
+    const r = takeBack(from, to, now);
+    if (!("wb" in r)) throw new Error(`refused: ${r.refused}`);
+    return r;
+  };
+  const after = set(b0, "B5", 0.315);
+  const r1 = take(after, b0, set(after, "B5", 0.318));
+  eq("their newer value stays, and is named", [at(r1.wb, "B5")?.v, r1.kept?.cells], [0.318, [{ sheetId: "s1", row: 4, col: 1 }]]);
+  eq("their newer formula too", at(take(after, b0, set(after, "B5", "=AVERAGE(0.312,0.318)")).wb, "B5")?.f, "AVERAGE(0.312,0.318)");
+  const bold = O.setStyle(after, "s1", [{ r0: 4, c0: 1, r1: 4, c1: 1 }], { bold: true });
+  const r2 = take(after, b0, bold);
+  eq("only their look: my value goes back, their look stays, nothing to say", [at(r2.wb, "B5"), r2.kept], [{ v: 0.4, s: { bold: true } }, undefined]);
+  const r3 = take(after, b0, set(after, "B6", 0.55));
+  eq("their edit of another cell: plain undo", [at(r3.wb, "B5")?.v, at(r3.wb, "B6")?.v, r3.kept], [0.4, 0.55, undefined]);
+  // Through the store, as in the browser (c10, c10b).
+  const store = storeOf(b0);
+  store.input({ row: 4, col: 1 }, "0,315");
+  store.input({ row: 29, col: 5 }, "x");
+  store.replaceRemote(set(store.get().workbook, "B5", 0.318));
+  store.undo();
+  store.undo();
+  eq("undo: their 0,318 stays, and the notice says so", [at(store.get().workbook, "B5")?.v, at(store.get().workbook, "F30"), noticeOf(store)], [0.318, undefined, "Rückgängig gemacht, bis auf B5: Das hat inzwischen jemand anderes (oder du auf einem anderen Gerät) geändert, darum bleibt es so."]);
+  const redo = storeOf(b0);
+  redo.input({ row: 4, col: 1 }, "0,315");
+  redo.undo();
+  redo.replaceRemote(set(redo.get().workbook, "B5", 0.318));
+  redo.redo();
+  eq("redo: the same", [at(redo.get().workbook, "B5")?.v, noticeOf(redo)], [0.318, "Wiederholt, bis auf B5: Das hat inzwischen jemand anderes (oder du auf einem anderen Gerät) geändert, darum bleibt es so."]);
+  // A step on two sheets (the undo shows the first): the other sheet's cell is named with it.
+  const en = storeOf(mk(lab("Sheet 1"), mkSheet({}, "s2", "Sheet 2")), "en");
+  en.apply("Paste", (wb) => set(set(wb, "B5", 0.315), "A1", "x", "s2"));
+  en.replaceRemote(set(set(en.get().workbook, "A1", "y", "s2"), "B5", 0.318));
+  en.undo();
+  eq("in English, a cell on another sheet named with it", noticeOf(en), "Undone, except B5 and 'Sheet 2'!A1: someone else (or you on another device) changed that in the meantime, so it stays as it is.");
+  // A new sheet they wrote into stays (c: undo_addsheet); an empty one goes.
+  const s = storeOf(mk(lab()));
+  let added = "";
+  s.apply("Blatt", (wb) => {
+    const a = O.addSheet(wb, "de");
+    added = a.sheetId;
+    return a.wb;
+  });
+  s.replaceRemote(set(set(s.get().workbook, "A1", "Messung", added), "A2", 0.512, added));
+  s.undo();
+  eq("undo of a new sheet they wrote into: it stays, said", [names(s.get().workbook), at(s.get().workbook, "A2", added)?.v, noticeOf(s)], [["Blatt 1", "Blatt 2"], 0.512, "Rückgängig gemacht, bis auf das Blatt „Blatt 2“: Das hat inzwischen jemand anderes (oder du auf einem anderen Gerät) geändert, darum bleibt es so."]);
+  const e = storeOf(mk(lab()));
+  e.apply("Blatt", (wb) => O.addSheet(wb, "de").wb);
+  e.replaceRemote(set(e.get().workbook, "D1", "x"));
+  e.undo();
+  eq("an empty new sheet goes, without a word", [names(e.get().workbook), noticeOf(e)], [["Blatt 1"], ""]);
+  // A chart I added that they changed since stays.
+  const c = storeOf(mk(lab()));
+  c.apply("Diagramm", (wb) => O.putChart(wb, chartOver("c1", "s1", "s1", 1, 8)));
+  c.replaceRemote(O.putChart(c.get().workbook, { ...c.get().workbook.charts[0], title: "Nitrat" }));
+  c.undo();
+  eq("a chart they changed since stays, said", [c.get().workbook.charts.map((x) => x.title), noticeOf(c).startsWith("Rückgängig gemacht, bis auf das, was inzwischen")], [["Nitrat"], true]);
+  // Taking back rows I inserted that they wrote into would delete it: refused, nothing lost.
+  const ins = storeOf(mk(lab()));
+  ins.select({ row: 2, col: 0 });
+  insertAtSelection(ins, "rows");
+  ins.replaceRemote(set(ins.get().workbook, "B3", 0.15));
+  ins.undo();
+  eq("undo of an insert they wrote into: refused, nothing lost", [at(ins.get().workbook, "B3")?.v, noticeOf(ins)], [0.15, "Das lässt sich nicht mehr rückgängig machen: Inzwischen hat jemand (oder du auf einem anderen Gerät) in „Blatt 1“ etwas eingetragen oder Zeilen oder Spalten gelöscht, und dabei ginge etwas verloren."]);
+  // A sheet's name, or the order of the tabs, someone changed again since: theirs stays, and that is said.
+  const two = mk(lab(), mkSheet({}, "s2", "Blatt 2"));
+  const renamedBack = takeBack(O.renameSheet(two, "s2", "Messung"), two, O.renameSheet(two, "s2", "Messung B"));
+  eq("undo of a rename they renamed again: their name stays, noted", "wb" in renamedBack ? [names(renamedBack.wb), renamedBack.kept?.other] : renamedBack, [["Blatt 1", "Messung B"], true]);
+  const tabs = storeOf(mk(lab(), mkSheet({}, "s2", "Blatt 2"), mkSheet({}, "s3", "Blatt 3")));
+  tabs.apply("Verschieben", (wb) => O.moveSheet(wb, "s3", 0));
+  tabs.replaceRemote(O.moveSheet(tabs.get().workbook, "s2", 0));
+  tabs.undo();
+  eq("undo of a tab move they reordered again: their order stays, said", [names(tabs.get().workbook), noticeOf(tabs).startsWith("Rückgängig gemacht, bis auf das, was inzwischen")], [["Blatt 2", "Blatt 3", "Blatt 1"], true]);
+  const alone = storeOf(mk(lab(), mkSheet({}, "s2", "Blatt 2"), mkSheet({}, "s3", "Blatt 3")));
+  alone.apply("Verschieben", (wb) => O.moveSheet(wb, "s3", 0));
+  alone.replaceRemote(set(alone.get().workbook, "A1", "x", "s2"));
+  alone.undo();
+  eq("…a tab move nobody else reordered: undone, nothing said", [names(alone.get().workbook), noticeOf(alone)], [["Blatt 1", "Blatt 2", "Blatt 3"], ""]);
+});
+
+run("COL-3: what I wrote elsewhere for my version of a sheet kept as theirs reads my copy (both orders)", () => {
+  const b0 = mk(lab(), mkSheet({ A1: "Summe", B1: "=SUM('Blatt 1'!B2:B9)" }, "s2", "Auswertung"));
+  // B deletes P2's row and then writes formulas meaning P4 (row 4 for B); A inserts a row above P2.
+  let b = O.deleteRows(b0, "s1", 2, 1);
+  b = O.putChart(set(set(b, "B5", "='Blatt 1'!B4*2", "s2"), "B6", "='Blatt 1'!A4", "s2"), chartOver("cb", "s2", "s1", 1, 7));
+  const a = O.putChart(O.insertRows(b0, "s1", 2, 1), chartOver("ca", "s2", "s1", 1, 9));
+  const { m, report } = reported(b0, b, a);
+  const copy = report.conflicts[0]?.copyId;
+  eq("B saves second: B's formulas read B's version on the copy", [at(m, "B5", "s2")?.f, column(m, "B", 5, 6, "s2")], ["'Blatt 1 (Konflikt)'!B4*2", [0.8, "P4"]]);
+  eq("…B's chart too, A's chart stays on A's sheet", [m.charts.find((x) => x.id === "cb")?.series[0].y.sheetId, m.charts.find((x) => x.id === "ca")?.series[0].y.sheetId], [copy, "s1"]);
+  eq("…the sum that was there fits the sheet that stays", at(m, "B1", "s2")?.f, "SUM('Blatt 1'!B2:B10)");
+  const other = mergeWorkbooks(b0, a, b);
+  eq("A saves second: B's version is the sheet, B's formulas read it", [at(other, "B5", "s2")?.f, column(other, "B", 5, 6, "s2"), other.charts.find((x) => x.id === "cb")?.series[0].y.sheetId], ["'Blatt 1'!B4*2", [0.8, "P4"], "s1"]);
+  // A formula on the copy naming its own sheet reads the copy (a duplicated sheet too, as in Excel).
+  const self = mk(mkSheet({ A1: 1, A2: "='Blatt 1'!A1*2", A3: "=A1" }));
+  const dup = O.duplicateSheet(self, "s1");
+  eq("duplicated: its formulas naming itself name the copy", [at(dup.wb, "A2", dup.sheetId)?.f, at(dup.wb, "A3", dup.sheetId)?.f, at(dup.wb, "A2")?.f], ["'Blatt 1 (2)'!A1*2", "A1", "'Blatt 1'!A1*2"]);
+  const sb = set(O.deleteRows(self, "s1", 3, 1), "A1", 5);
+  const sm = reported(self, sb, O.insertRows(self, "s1", 0, 1));
+  eq("the conflict copy too", column(sm.m, "A", 2, 2, sm.report.conflicts[0]?.copyId), [10]);
+  // No room for a copy: the report names my formulas that were written for my version.
+  const full = mk(lab(), mkSheet({}, "s2", "Auswertung"), ...Array.from({ length: 248 }, (_, i) => mkSheet({}, `x${i}`, `Blatt ${i + 3}`)));
+  const nb = set(O.deleteRows(full, "s1", 2, 1), "B5", "='Blatt 1'!B4*2", "s2");
+  const nr = reported(full, nb, O.insertRows(full, "s1", 2, 1));
+  eq("no room: the formulas named", nr.report.conflicts.map((x) => [x.copyName, x.formulas]), [["", ["Auswertung!B5"]]]);
+  check("…and said", sheetText.de.conflict(nr.report.conflicts).endsWith("Prüf diese Formeln, du hast sie für deine Version geschrieben: Auswertung!B5."), show(sheetText.de.conflict(nr.report.conflicts)));
+  // I renamed the sheet too: the copy with my version keeps my name for it (theirs keeps theirs), and my formulas follow.
+  const renamer = set(O.renameSheet(O.deleteRows(b0, "s1", 2, 1), "s1", "Messwerte"), "B5", "=Messwerte!B4*2", "s2");
+  const rn = reported(b0, renamer, a);
+  eq("my rename stays on the copy's name, my formula reads it", [names(rn.m), at(rn.m, "B5", "s2")?.f, column(rn.m, "B", 5, 5, "s2")], [["Blatt 1", "Messwerte (Konflikt)", "Auswertung"], "'Messwerte (Konflikt)'!B4*2", [0.8]]);
+});
+
+run("COL-4: a sort of every row a sheet holds is replayed like a small one (both orders)", () => {
+  const n = MAX_ROWS - 1;
+  const cells: Record<string, Cell> = { "0,0": { v: "Probe" }, "0,1": { v: "Wert" } };
+  for (let i = 1; i <= n; i++) Object.assign(cells, { [cellKey(i, 0)]: { v: `P${i}` }, [cellKey(i, 1)]: { v: ((i * 7919) % 20011) / 10 } });
+  const b0 = mk({ ...mkSheet({}), cells, size: { rows: MAX_ROWS, cols: 26 } });
+  const sorted = O.sortArea(b0, calc0(b0), "s1", { r0: 1, c0: 0, r1: n, c1: 1 }, [{ col: 1, dir: "desc" }], "de");
+  eq("logged as a sort, not a barrier", kinds(sorted), ["sort"]);
+  const fix = O.setCells(b0, "s1", [{ row: 15000, col: 1, cell: { v: -15.5 } }]);
+  for (const [i, { m, report }] of [reported(b0, sorted, fix), reported(b0, fix, sorted)].entries()) {
+    const r = rowOf(m, "P15000");
+    eq(`no copy, the correction on P15000's row (${i ? "the sorter" : "the corrector"} saves second)`, [m.sheets.length, report.conflicts.length, O.getCell(m, "s1", r, 1)?.v], [1, 0, -15.5]);
+  }
+  eq("said when it is too big with both versions", sheetText.de.conflict([{ name: "Platte", copyName: "Platte (Konflikt)", why: "moved", tooBig: true }]).endsWith("Bis dahin ist die Tabelle mit beiden Versionen zu groß zum Speichern (mehr als 5 MB): Deine Änderungen bleiben so lange auf diesem Gerät."), true);
+  // The way out: my version of that sheet as a spreadsheet of its own (collab.ts ownVersion), so
+  // the copy can go and the spreadsheet is saved again with everything else.
+  const lab2 = mk(lab(), mkSheet({ A1: "Summe", B1: "=SUM('Blatt 1'!B2:B9)" }, "s2", "Auswertung"));
+  let mine = set(set(set(O.deleteRows(lab2, "s1", 2, 1), "B4", 0.45), "C2", "='Blatt 1'!B2*2"), "C3", "=Auswertung!B1");
+  mine = O.putChart(mine, chartOver("cm", "s1", "s1", 1, 7));
+  const conflict = reported(lab2, mine, O.insertRows(lab2, "s1", 2, 1));
+  const copyId = conflict.report.conflicts[0]?.copyId ?? "";
+  const own = ownVersion(conflict.m, copyId, "de");
+  eq("my version alone, under the original's name, unmarked", own && [names(own), own.sheets[0].copyOf, column(own, "A", 2, 4, own.sheets[0].id), column(own, "B", 4, 4, own.sheets[0].id)], [["Blatt 1"], undefined, ["P1", "P3", "P4"], [0.45]]);
+  eq("…its formulas naming it read it, its chart is on it", own && [at(own, "C2", own.sheets[0].id)?.f, column(own, "C", 2, 2, own.sheets[0].id), own.charts.map((x) => x.series[0].y.sheetId)], ["'Blatt 1'!B2*2", [0.2], [own?.sheets[0].id]]);
+  eq("…one naming another sheet stays as written (that sheet isn't in it)", own && at(own, "C3", own.sheets[0].id)?.f, "Auswertung!B1");
+  eq("not for a sheet that isn't such a copy, nor once its original is gone", [ownVersion(conflict.m, "s2", "de"), ownVersion(O.deleteSheet(conflict.m, "s1"), copyId, "de")], [null, null]);
+});
+
+run("COL2-1: what ties a conflict copy to the other sheets (copyTies): my version as a spreadsheet of its own breaks nothing", () => {
+  // B deletes P4's row, then writes its own analysis on Auswertung: P8 times a factor beside it, a
+  // mean, a chart over the rows; A inserts a row. Whoever saves second has their version on the copy.
+  const b0 = mk(lab(), mkSheet({ A1: "Faktor", B1: 2 }, "s2", "Auswertung"));
+  let mineB = set(set(O.deleteRows(b0, "s1", 4, 1), "B3", "='Blatt 1'!B8*$B$1", "s2"), "B4", "=AVERAGE('Blatt 1'!B2:B8)", "s2");
+  mineB = O.putChart(mineB, chartOver("ch", "s2", "s1", 1, 7));
+  const theirsA = O.insertRows(b0, "s1", 2, 1);
+  const where = (wb: Workbook, ps: { sheetId: string; row: number; col: number }[]) => ps.map((p) => `${O.sheetById(wb, p.sheetId)?.name}!${posName(p)}`);
+  const second = reported(b0, mineB, theirsA);
+  const copyId = second.report.conflicts[0]?.copyId ?? "";
+  const ties = copyTies(second.m, copyId);
+  eq("B saves second: B's formulas and chart read B's copy", [where(second.m, ties.cells), ties.charts, ties.readsOthers, tiedCopy(ties)], [["Auswertung!B3", "Auswertung!B4"], ["ch"], false, true]);
+  eq("…with the values B had (the factor beside it too)", column(second.m, "B", 3, 4, "s2"), column(mineB, "B", 3, 4, "s2"));
+  const first = reported(b0, theirsA, mineB);
+  eq("A saves second: A's copy, which nothing of A's elsewhere reads", tiedCopy(copyTies(first.m, first.report.conflicts[0]?.copyId ?? "")), false);
+  // Pointed at the original (or deleted), nothing ties it: kept as my own, the copy goes, and
+  // nothing elsewhere breaks.
+  const moved = set(set({ ...second.m, charts: second.m.charts.filter((c) => c.id !== "ch") }, "B3", "='Blatt 1'!B10*$B$1", "s2"), "B4", null, "s2");
+  eq("pointed at the original: untied", tiedCopy(copyTies(moved, copyId)), false);
+  const after = O.deleteSheet(moved, copyId);
+  eq("…the copy deleted, B3 still reads (no #REF!)", [at(after, "B3", "s2")?.f, column(after, "B", 3, 3, "s2")], ["'Blatt 1'!B10*$B$1", [1.6]]);
+  // Every range of a chart elsewhere counts: its x, a series' x, name and error bar cells.
+  const range = { sheetId: copyId, r0: 1, c0: 0, r1: 3, c1: 0 };
+  const plain = chartOver("c2", "s2", "s2", 0, 0);
+  const s0 = plain.series[0];
+  const variants = [
+    { ...plain, x: range },
+    { ...plain, series: [{ ...s0, x: range }] },
+    { ...plain, series: [{ ...s0, nameRef: { ...range, r1: 1 } }] },
+    { ...plain, series: [{ ...s0, errorBars: { kind: "custom" as const, value: 1, plus: null, minus: range, direction: "both" as const } }] },
+  ];
+  eq("a chart's x, a series' x, name or error bar cells on the copy tie it", variants.map((c) => copyTies(O.putChart(moved, c), copyId).charts), [["c2"], ["c2"], ["c2"], ["c2"]]);
+  // The copy reading another sheet ties it too: kept on its own, that would read nothing, and a
+  // formula naming its original would read my own rows there (its name is the original's).
+  const reads = (f: string) => copyTies(set(moved, "E2", f, copyId), copyId).readsOthers;
+  eq("the copy reads another sheet, its original too; naming itself doesn't count", [reads("=B2*Auswertung!$B$1"), reads("=B2-'Blatt 1'!B2"), reads(`='${O.sheetById(moved, copyId)?.name}'!B2*2`), reads("=B2*2")], [true, true, false, false]);
+  eq("a chart on the copy over another sheet ties it", copyTies(O.putChart(moved, chartOver("c3", copyId, "s2", 0, 0)), copyId).readsOthers, true);
+  eq("a sheet's name in text is no reference", tiedCopy(copyTies(set(moved, "A9", '="siehe Blatt 1 (Konflikt)"', "s2"), copyId)), false);
+  eq("not a sheet of the workbook: nothing", copyTies(moved, "nope"), { cells: [], charts: [], readsOthers: false });
+});
+
+run("COL-6: working alone, undo goes as far back as the history (no capped log stops it)", () => {
+  const start = mk(lab());
+  const store = storeOf(start);
+  for (let i = 0; i < 60; i++) store.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 1, 1));
+  let refused = "";
+  while (store.get().canUndo && !refused) {
+    store.undo();
+    refused = noticeOf(store);
+  }
+  eq("60 inserts all undone, back to the start", [refused, store.get().workbook.sheets[0].cells], ["", start.sheets[0].cells]);
+  // Big sorts: their undos count against the log's sort rows too.
+  const cells: Record<string, Cell> = {};
+  for (let i = 1; i <= 2000; i++) Object.assign(cells, { [cellKey(i, 0)]: { v: `P${i}` }, [cellKey(i, 1)]: { v: (i * 7919) % 1009 }, [cellKey(i, 2)]: { v: (i * 104729) % 997 } });
+  const big = mk({ ...mkSheet({}), cells, size: { rows: 2010, cols: 26 } });
+  const sorts = storeOf(big);
+  for (let i = 0; i < 8; i++) sorts.apply("Sortieren", (wb, calc) => O.sortArea(wb, calc, "s1", { r0: 1, c0: 0, r1: 2000, c1: 2 }, [{ col: [1, 2, 0][i % 3], dir: i % 2 ? "asc" : "desc" }], "de"));
+  let said = "";
+  while (sorts.get().canUndo && !said) {
+    sorts.undo();
+    said = noticeOf(sorts);
+  }
+  eq("8 sorts of 2,000 rows all undone", [said, sorts.get().workbook.sheets[0].cells], ["", big.sheets[0].cells]);
+  // Undo and redo again and again, then everything back.
+  const toggle = storeOf(start);
+  toggle.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 5, 1));
+  toggle.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 1, 1));
+  for (let i = 0; i < 30; i++) {
+    toggle.undo();
+    toggle.redo();
+  }
+  toggle.undo();
+  toggle.undo();
+  eq("30 times undo and redo, then both undone", [noticeOf(toggle), toggle.get().workbook.sheets[0].cells], ["", start.sheets[0].cells]);
+  // A cell step undone doesn't shorten the log (it only grows).
+  const typed = storeOf(start);
+  typed.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 1, 1));
+  typed.input({ row: 0, col: 5 }, "x");
+  const before = typed.get().workbook.sheets[0].log!.length;
+  typed.undo();
+  typed.undo();
+  typed.redo();
+  typed.redo();
+  typed.undo();
+  check("the log only grows", typed.get().workbook.sheets[0].log!.length >= before + 2, show(typed.get().workbook.sheets[0].log?.length));
+  // With someone else in between, undo goes on past the old 25-step limit too.
+  const shared = storeOf(mk(lab(), mkSheet({}, "s2", "Blatt 2")));
+  for (let i = 0; i < 40; i++) shared.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 1, 1));
+  shared.replaceRemote(set(shared.get().workbook, "A1", "fremd", "s2"));
+  let refused2 = "";
+  while (shared.get().canUndo && !refused2) {
+    shared.undo();
+    refused2 = noticeOf(shared);
+  }
+  eq("40 inserts undone with a partner's edit in between", [refused2, column(shared.get().workbook, "A", 1, 3), at(shared.get().workbook, "A1", "s2")?.v], ["", ["Probe", "P1", "P2"], "fremd"]);
+});
+
+run("COL-7: a formula typed with a sheet's old name follows the rename (both orders)", () => {
+  const b0 = mk(lab(), mkSheet({ A1: "Summe", B1: "=SUM('Blatt 1'!B2:B9)" }, "s2", "Auswertung"));
+  const typed = set(b0, "B4", "=AVERAGE('Blatt 1'!B2:B9)", "s2");
+  const renamed = O.renameSheet(b0, "s1", "Messwerte");
+  for (const m of bothOrders(b0, typed, renamed)) {
+    eq("the new formula names the new name", [names(m), at(m, "B4", "s2")?.f, column(m, "B", 4, 4, "s2")], [["Messwerte", "Auswertung"], "AVERAGE(Messwerte!B2:B9)", [0.45]]);
+    eq("the old one too", at(m, "B1", "s2")?.f, "SUM(Messwerte!B2:B9)");
+  }
+  // Both renamed it: mine wins, their formulas follow mine.
+  const theirs = set(O.renameSheet(b0, "s1", "Werte"), "B5", "=Werte!B2", "s2");
+  const m2 = mergeWorkbooks(b0, O.renameSheet(b0, "s1", "Messwerte"), theirs);
+  eq("both renamed it: their new formula follows my name", [names(m2), at(m2, "B5", "s2")?.f, column(m2, "B", 5, 5, "s2")], [["Messwerte", "Auswertung"], "Messwerte!B2", [0.1]]);
+  // Two sheets that swap names: every formula still reads the sheet it meant.
+  const two = mk(lab(), mkSheet({ A1: 7 }, "s2", "Blatt 2"), mkSheet({}, "s3", "Auswertung"));
+  const swapped = O.renameSheet(O.renameSheet(O.renameSheet(two, "s1", "tmp"), "s2", "Blatt 1"), "s1", "Blatt 2");
+  const reads = set(set(two, "A1", "='Blatt 1'!B2", "s3"), "A2", "='Blatt 2'!A1", "s3");
+  for (const m of bothOrders(two, swapped, reads)) eq("swapped names: each formula reads what it meant", [names(m), column(m, "A", 1, 2, "s3")], [["Blatt 2", "Blatt 1", "Auswertung"], [0.1, 7]]);
+  // Both add a sheet with the same name: the second gets a number, and my formulas follow mine.
+  const mine = O.addSheet(b0, "de", "Rohdaten");
+  const their = O.addSheet(b0, "de", "Rohdaten");
+  const myRef = set(set(mine.wb, "A1", 1, mine.sheetId), "C1", "=Rohdaten!A1", "s2");
+  const theirRef = set(set(their.wb, "A1", 2, their.sheetId), "D1", "=Rohdaten!A1", "s2");
+  for (const [i, m] of bothOrders(b0, myRef, theirRef).entries()) {
+    eq(`same name added on both sides (${i ? "they" : "I"} save second): each formula reads its own`, [names(m).filter((n) => n.startsWith("Rohdaten")).length, column(m, "C", 1, 1, "s2"), column(m, "D", 1, 1, "s2")], [2, [1], [2]]);
+  }
+  // A sheet deleted on one side whose name another sheet took there: what named the deleted one
+  // doesn't read the other one (#REF!, as when it is deleted), and what named the other one follows it.
+  const three = mk(lab(), mkSheet({}, "s2", "Auswertung"), mkSheet({ B2: 99 }, "s3", "Daten"));
+  const takenOver = O.renameSheet(O.deleteSheet(three, "s1"), "s3", "Blatt 1");
+  const refs = set(set(three, "A1", "='Blatt 1'!B2", "s2"), "A2", "=Daten!B2", "s2");
+  for (const m of bothOrders(three, refs, takenOver)) eq("a name taken over: no formula reads the wrong sheet", [names(m), at(m, "A1", "s2")?.f, at(m, "A2", "s2")?.f, column(m, "A", 2, 2, "s2")], [["Auswertung", "Blatt 1"], "#REF!", "'Blatt 1'!B2", [99]]);
+});
+
+run("COL-8: undo right after a conflict copy says where my version is, and changes nothing", () => {
+  const b0 = mk(lab());
+  const b = storeOf(b0);
+  b.input({ row: 4, col: 1 }, "0,315");
+  b.select({ row: 2, col: 0 });
+  deleteAtSelection(b, "rows");
+  const a = O.setCells(O.insertRows(b0, "s1", 2, 1), "s1", [{ row: 5, col: 1, cell: { v: 0.316 } }]);
+  const { m, report } = reported(b0, b.get().workbook, a);
+  b.replaceRemote(m, report.conflicts);
+  const merged = b.get().workbook;
+  b.undo();
+  eq("refused, naming the copy", noticeOf(b), "Das lässt sich nicht mehr rückgängig machen: Deine Version von „Blatt 1“ steht jetzt auf „Blatt 1 (Konflikt)“ – ändere sie dort.");
+  eq("the step before it on that sheet went with it: their 0,316 stays, nothing changed", [b.get().workbook === merged, at(merged, "B6")?.v, b.get().canUndo], [true, 0.316, false]);
+  // Steps on that sheet in a row, an older one elsewhere (e3 G1): one refusal for all of them, and
+  // the next undo takes back the one elsewhere. One between them on another sheet stops it.
+  const g0 = mk(lab(), mkSheet({}, "s2", "Auswertung"));
+  const g = storeOf(g0);
+  g.apply("Auswertung", (wb) => set(wb, "A1", "auf Auswertung", "s2"));
+  for (let i = 0; i < 5; i++) g.input({ row: 20 + i, col: 0 }, `x${i}`);
+  g.apply("Auswertung", (wb) => set(wb, "A2", "dazwischen", "s2"));
+  g.select({ row: 2, col: 0 });
+  deleteAtSelection(g, "rows");
+  g.input({ row: 25, col: 0 }, "y");
+  const gm = reported(g0, g.get().workbook, O.insertRows(g0, "s1", 2, 1));
+  g.replaceRemote(gm.m, gm.report.conflicts);
+  const presses: string[] = [];
+  for (let k = 0; k < 5 && g.get().canUndo; k++) {
+    g.undo();
+    presses.push(noticeOf(g).startsWith("Das lässt sich nicht mehr") ? "refused" : `${at(g.get().workbook, "A1", "s2")?.v ?? "-"}/${at(g.get().workbook, "A2", "s2")?.v ?? "-"}`);
+  }
+  eq("one refusal for the steps on that sheet in a row, then the step elsewhere", presses, ["refused", "auf Auswertung/-", "refused", "-/-"]);
+  // Redo the same way: two values typed after my row deletion, undone, then the conflict.
+  const rd = storeOf(b0);
+  rd.select({ row: 2, col: 0 });
+  deleteAtSelection(rd, "rows");
+  rd.input({ row: 4, col: 1 }, "0,315");
+  rd.input({ row: 5, col: 1 }, "0,415");
+  rd.undo();
+  rd.undo();
+  const rm = reported(b0, rd.get().workbook, O.insertRows(b0, "s1", 2, 1));
+  rd.replaceRemote(rm.m, rm.report.conflicts);
+  rd.redo();
+  eq("redo: one refusal for both, naming the copy", [noticeOf(rd), rd.get().canRedo], ["Das lässt sich nicht mehr wiederholen: Deine Version von „Blatt 1“ steht jetzt auf „Blatt 1 (Konflikt)“ – ändere sie dort.", false]);
+  // A step made after the conflict is undone as usual.
+  b.input({ row: 0, col: 3 }, "neu");
+  b.undo();
+  eq("a later step: undone", [at(b.get().workbook, "D1"), noticeOf(b)], [undefined, ""]);
+  // No edit running when the conflict arrives (between two values typed): the screen goes on in my
+  // version too, so the next value lands on my rows, not over theirs.
+  const between = storeOf(b0);
+  between.select({ row: 2, col: 0 });
+  insertAtSelection(between, "rows");
+  const r1 = reported(b0, between.get().workbook, O.deleteRows(b0, "s1", 1, 1));
+  between.select({ row: 2, col: 0 });
+  between.replaceRemote(r1.m, r1.report.conflicts);
+  const copyId = r1.report.conflicts[0]?.copyId;
+  eq("the screen on my copy, the selection kept", [between.get().sheetId, between.get().selection.anchor], [copyId, { row: 2, col: 0 }]);
+  between.input(between.get().selection.anchor, "S1b");
+  eq("typed into my version, their sheet untouched", [at(between.get().workbook, "A3", copyId)?.v, column(between.get().workbook, "A", 1, 4)], ["S1b", ["Probe", "P2", "P3", "P4"]]);
+  noticeOf(between);
+  // The copy deleted meanwhile: said too.
+  const c = storeOf(b0);
+  c.select({ row: 2, col: 0 });
+  deleteAtSelection(c, "rows");
+  const r2 = reported(b0, c.get().workbook, O.insertRows(b0, "s1", 2, 1));
+  c.replaceRemote(r2.m, r2.report.conflicts);
+  c.replaceRemote(O.deleteSheet(c.get().workbook, r2.report.conflicts[0].copyId));
+  c.undo();
+  eq("its copy deleted since", noticeOf(c), "Das lässt sich nicht mehr rückgängig machen: Von „Blatt 1“ gibt es nur noch die andere Version.");
+});
+
+run("COL-9: the copy is marked, kept as such, and the other person is told; the notice fits the reason", () => {
+  const b0 = mk(lab());
+  const { m, report } = reported(b0, O.insertRows(b0, "s1", 3, 1), O.deleteRows(b0, "s1", 5, 1));
+  const copyId = report.conflicts[0].copyId;
+  eq("marked", O.sheetById(m, copyId)?.copyOf, "s1");
+  eq("kept when read again", normalizeWorkbook(JSON.parse(JSON.stringify(m)), "de").sheets.find((s) => s.id === copyId)?.copyOf, "s1");
+  const raw = JSON.parse(JSON.stringify(m));
+  raw.sheets[1].copyOf = "<bad>";
+  eq("a bad mark dropped", normalizeWorkbook(raw, "de").sheets[1].copyOf, undefined);
+  const renamedCopy = O.renameSheet(m, copyId, "Meine Messung");
+  eq("kept through a merge and a rename", O.sheetById(mergeWorkbooks(m, renamedCopy, set(m, "A1", "x", copyId)), copyId)?.copyOf, "s1");
+  eq("a duplicate isn't one", O.sheetById(O.duplicateSheet(m, copyId).wb, O.duplicateSheet(m, copyId).sheetId)?.copyOf, undefined);
+  // The first saver: it arrives with the other's save.
+  eq("arrived, for the one who saved first", arrivedCopies(b0, O.insertRows(b0, "s1", 3, 1), m), [{ sheetId: "s1", name: "Blatt 1", copyId, copyName: "Blatt 1 (Konflikt)", why: "arrived" }]);
+  eq("not again once seen", arrivedCopies(m, m, set(m, "A1", "x")), []);
+  // The copy holds the other person's only version: the one who saved first is told to leave it until that is moved over.
+  eq("said to the one who saved first", sheetText.de.conflict(arrivedCopies(b0, b0, m)), "Jemand (oder du auf einem anderen Gerät) hat gleichzeitig mit dir an „Blatt 1“ gearbeitet, und die beiden Versionen ließen sich nicht zusammenführen. Damit nichts verloren geht, steht die andere Version jetzt auf „Blatt 1 (Konflikt)“. Lösch diese Kopie erst, wenn alles, was davon nach „Blatt 1“ gehört, dort steht.");
+  eq("…in English", sheetText.en.conflict(arrivedCopies(b0, b0, m)).split(". ").at(-1), "Only delete that copy once everything from it that belongs in “Blatt 1” is there.");
+  // Only a value typed against a big sort or 60 inserts: no copy any more (c7, v9_barrier); a log that can't be told says so.
+  const many = storeOf(b0);
+  for (let i = 0; i < 60; i++) many.apply("Zeile einfügen", (wb) => O.insertRows(wb, "s1", 1, 1));
+  eq("60 inserts vs one value: merged, no copy", mergeWorkbooks(b0, set(b0, "B6", 15.5), many.get().workbook).sheets.length, 1);
+  const logged = O.insertRows(b0, "s1", 12, 1);
+  const unknown = reported(logged, set(logged, "B6", 15.5), stripLogs(O.insertRows(logged, "s1", 1, 1)));
+  eq("what can't be told: reported as such", unknown.report.conflicts.map((c) => c.why), ["unknown"]);
+  eq("…and said so", sheetText.de.conflict(unknown.report.conflicts).split(".")[0], "Deine Änderungen an „Blatt 1“ ließen sich nicht mit denen von jemand anderem (oder von dir auf einem anderen Gerät) zusammenführen");
+  const de = sheetText.de.conflict(report.conflicts);
+  check("never advises deleting the original, only the copy", !de.includes("an zwei Stellen") && de.endsWith("und lösch dann die Konflikt-Kopie.") && sheetText.en.conflict(report.conflicts).endsWith("then delete the conflict copy."), de);
+});
+
+run("COL-11: a cut a partner's change cancelled pastes nothing, and says so again", () => {
+  const b0 = mk(lab());
+  const store = storeOf(b0);
+  store.select({ r0: 4, c0: 0, r1: 4, c1: 1 });
+  const copied = copySelection(store, true);
+  store.replaceRemote(O.insertRows(b0, "s1", 2, 1));
+  const cancelled = noticeOf(store);
+  check("the cut is cancelled, with a notice", store.get().clip === null && cancelled.startsWith("Ausschneiden abgebrochen"), cancelled);
+  const before = store.get().workbook;
+  store.select({ row: 13, col: 0 });
+  check("Ctrl+V: handled", pasteData(store, { text: copied.text, html: copied.html }, "all"));
+  eq("…nothing pasted, the notice again", [store.get().workbook === before, noticeOf(store)], [true, cancelled]);
+  check("the menu's paste (no clipboard text) neither", pasteData(store, null, "all") && store.get().workbook === before);
+  hideSheetNotice(store);
+  // Cut again: pasting moves the cells, as usual.
+  store.select({ r0: 5, c0: 0, r1: 5, c1: 1 });
+  const again = copySelection(store, true);
+  store.select({ row: 13, col: 0 });
+  pasteData(store, { text: again.text, html: again.html }, "all");
+  eq("cut again: moved", [column(store.get().workbook, "A", 14, 14), column(store.get().workbook, "A", 6, 6)], [["P4"], [null]]);
+  // A copy (not a cut) followed the partner's rows and still pastes.
+  const copyStore = storeOf(b0);
+  copyStore.select({ r0: 4, c0: 0, r1: 4, c1: 1 });
+  const c2 = copySelection(copyStore, false);
+  copyStore.replaceRemote(O.insertRows(b0, "s1", 2, 1));
+  copyStore.select({ row: 13, col: 0 });
+  pasteData(copyStore, { text: c2.text, html: c2.html }, "all");
+  eq("a copy still pastes", column(copyStore.get().workbook, "A", 14, 14), ["P4"]);
+});
+
+// ==============================================================================================
+// The saver (saver.ts absorb): the one who saved first hears about the copy; a copy that makes
+// the spreadsheet too big to save says so, and keeps both versions on the device.
+
+/** localStorage and Web Locks for Node, as the saver's drafts use them (drafts.ts). */
+const memory = new Map<string, string>();
+(globalThis as { localStorage?: unknown }).localStorage = {
+  getItem: (k: string) => memory.get(k) ?? null,
+  setItem: (k: string, v: string) => void memory.set(k, String(v)),
+  removeItem: (k: string) => void memory.delete(k),
+  key: (i: number) => [...memory.keys()][i] ?? null,
+  get length() {
+    return memory.size;
+  },
+  clear: () => memory.clear(),
+};
+Object.defineProperty(globalThis.navigator, "locks", {
+  configurable: true,
+  value: {
+    request: async (_name: string, a: unknown, b?: unknown) => ((typeof a === "function" ? a : b) as (lock: unknown) => unknown)({}),
+    query: async () => ({ held: [], pending: [] }),
+  },
+});
+
+/** One page on the "server", saved as save_sheet does (a save that is behind gets the newer content back). */
+class Server implements SaverApi {
+  rev = 0;
+  content: unknown;
+  constructor(wb: Workbook) {
+    this.content = JSON.parse(JSON.stringify(wb));
+  }
+  async saveSheet(a: SaveArgs) {
+    const json = JSON.stringify(a.p_content);
+    if (json.length > MAX_BYTES) return { data: { ok: false, reason: "too_big" }, error: null };
+    if (a.p_rev !== this.rev) return { data: { ok: false, reason: "behind", rev: this.rev, content: JSON.parse(JSON.stringify(this.content)), title: "" }, error: null };
+    this.content = JSON.parse(json);
+    this.rev++;
+    return { data: { ok: true, rev: this.rev, title: "" }, error: null };
+  }
+  async loadRow() {
+    return { rev: this.rev, content: JSON.parse(JSON.stringify(this.content)), title: "" };
+  }
+  async landed() {
+    return false;
+  }
 }
-console.log(`check:sheet-merge — all ${count} checks passed.`);
-// (A notice's timer would keep Node waiting.)
-process.exit(0);
+
+function editorOn(server: Server, pageId: string) {
+  const wb = normalizeWorkbook(JSON.parse(JSON.stringify(server.content)), "de");
+  const store = storeOf(wb);
+  const told: SheetConflict[][] = [];
+  const states: string[] = [];
+  const noop = () => {};
+  const saver = new SheetSaver({ store, pageId, userId: "u1", locale: "de", rev: server.rev, base: wb, title: "", readOnly: false, api: server, on: { state: (s) => states.push(s), notice: noop, title: noop, saved: noop, restored: noop, trouble: noop, conflict: (c) => told.push(c) } });
+  return { store, saver, told, states };
+}
+
+async function saverChecks() {
+  section("COL-9: the one who saved first is told about the copy (saver)");
+  {
+    const server = new Server(mk(lab()));
+    const a = editorOn(server, "p-a");
+    const b = editorOn(server, "p-b");
+    a.store.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 3, 1));
+    await a.saver.flush();
+    b.store.apply("Zeilen löschen", (wb) => O.deleteRows(wb, "s1", 5, 1));
+    await b.saver.flush();
+    eq("the second saver: their sheet and my copy, said", [names(b.store.get().workbook), b.told.flat().map((c) => c.why)], [["Blatt 1", "Blatt 1 (Konflikt)"], ["moved"]]);
+    await a.saver.remote(server.rev);
+    eq("the first saver gets the copy, with a notice", [names(a.store.get().workbook), a.told.flat().map((c) => [c.why, c.name, c.copyName])], [["Blatt 1", "Blatt 1 (Konflikt)"], [["arrived", "Blatt 1", "Blatt 1 (Konflikt)"]]]);
+    a.store.input({ row: 0, col: 4 }, "x");
+    await a.saver.flush();
+    await a.saver.remote(server.rev + 1);
+    eq("told once", a.told.length, 1);
+    await a.saver.close();
+    await b.saver.close();
+  }
+  section("COL-1: a sheet deleted on a stale view stays, and the one merging is told (saver, c12)");
+  for (const deleterSecond of [false, true]) {
+    const server = new Server(mk(lab(), mkSheet({}, "s2", "Auswertung"), mkSheet({}, "s3", "Messung 2")));
+    const filler = editorOn(server, `p-f${deleterSecond}`);
+    const deleter = editorOn(server, `p-d${deleterSecond}`);
+    const fill = () => {
+      filler.store.setSheet("s3");
+      filler.store.input({ row: 0, col: 0 }, "Probe");
+      filler.store.input({ row: 1, col: 1 }, "0,512");
+    };
+    const del = () => deleter.store.apply("Blatt löschen", (wb) => O.deleteSheet(wb, "s3"));
+    const [first, second] = deleterSecond ? [filler, deleter] : [deleter, filler];
+    if (deleterSecond) fill();
+    else del();
+    await first.saver.flush();
+    if (deleterSecond) del();
+    else fill();
+    await second.saver.flush();
+    const stored = normalizeWorkbook(server.content, "de");
+    eq(`${deleterSecond ? "the deleter" : "the filler"} saves second: the sheet and what was typed stay, the second saver is told`, [names(stored), O.getCell(stored, "s3", 1, 1)?.v, second.told.flat().map((c) => c.why)], [["Blatt 1", "Auswertung", "Messung 2"], 0.512, [deleterSecond ? "keptTheirs" : "keptMine"]]);
+    await filler.saver.close();
+    await deleter.saver.close();
+  }
+  section("COL-4: a copy that makes the spreadsheet too big to save says so, and nothing is lost (saver)");
+  {
+    // About 2.6 MB: two versions of it are more than save_sheet takes.
+    const cells: Record<string, Cell> = {};
+    for (let i = 0; i < 19000; i++) for (let c = 0; c < 6; c++) cells[cellKey(i, c)] = { v: Math.round(i * 1000 + c * 7.123456789 * 1e6) / 1e6 };
+    const bigWb = mk({ ...mkSheet({}, "s1", "Platte"), cells, size: { rows: 20000, cols: 26 } });
+    const server = new Server(bigWb);
+    const a = editorOn(server, "p-c");
+    const b = editorOn(server, "p-d");
+    a.store.apply("Zeilen einfügen", (wb) => O.insertRows(wb, "s1", 3, 1));
+    await a.saver.flush();
+    b.store.apply("Zeilen löschen", (wb) => O.deleteRows(wb, "s1", 5, 1));
+    b.store.input({ row: 10, col: 7 }, "15,5");
+    await b.saver.flush();
+    const said = b.told.flat();
+    eq("the copy made and marked too big", said.map((c) => [c.why, c.copyName, c.tooBig]), [["moved", "Platte (Konflikt)", true]]);
+    check("…the notice says what to do", sheetText.de.conflict(said).includes("Kopier, was du aus „Platte (Konflikt)“ brauchst, nach „Platte“ und lösch dann die Konflikt-Kopie. Bis dahin ist die Tabelle mit beiden Versionen zu groß zum Speichern"), sheetText.de.conflict(said));
+    const copy = b.store.get().workbook.sheets.find((s) => s.id === said[0]?.copyId);
+    eq("both versions in the editor, my correction on my copy", [names(b.store.get().workbook), copy?.cells["10,7"]?.v], [["Platte", "Platte (Konflikt)"], 15.5]);
+    eq("not saved, waiting on this device", [server.rev, b.states.at(-1), b.saver.dirty()], [1, "tooBig", true]);
+    // The way out with one click (SheetEditor): my version as a spreadsheet of its own, small enough
+    // to save, with my correction; then the copy goes here.
+    const own = ownVersion(b.store.get().workbook, said[0].copyId, "de");
+    check("my version as its own spreadsheet: small enough to save, my correction in it", !!own && JSON.stringify(own).length < MAX_BYTES && names(own).join() === "Platte" && own.sheets[0].cells["10,7"]?.v === 15.5, own ? `${JSON.stringify(own).length} bytes, ${names(own)}` : "null");
+    // The copy deleted (after taking over what is needed): saved again.
+    b.store.apply("Blatt löschen", (wb) => O.deleteSheet(wb, said[0].copyId));
+    await b.saver.flush();
+    eq("saved once the copy is gone", [server.rev, b.states.at(-1)], [2, "saved"]);
+    await a.saver.close();
+    await b.saver.close();
+  }
+}
+
+// ==============================================================================================
+void (async () => {
+  try {
+    await saverChecks();
+  } catch (e) {
+    count++;
+    failures.push(`saver › threw: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
+  }
+  if (failures.length) {
+    console.error(`check:sheet-merge — ${failures.length} of ${count} checks failed:`);
+    for (const f of failures) console.error(`  ✗ ${f}`);
+    process.exit(1);
+  }
+  console.log(`check:sheet-merge — all ${count} checks passed.`);
+  // (A notice's timer would keep Node waiting.)
+  process.exit(0);
+})();

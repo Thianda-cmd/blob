@@ -2,14 +2,23 @@
 
 // Saving a spreadsheet: saves through save_sheet (migration 0024) that name the revision they
 // build on, merging cell by cell when someone else saved first; other people's saves pulled in as
-// they happen; retries with growing pauses when the connection is gone; and a draft of unsaved
-// work on this device the whole time (drafts.ts), so nothing typed is ever lost.
+// they happen; retries with growing pauses when the connection is gone or the server has a problem
+// (the editor tells the two apart: "Auf diesem Gerät gespeichert", or "Nicht gespeichert,
+// versuche erneut" and a notice that saving isn't working); and a draft of unsaved work on this
+// device the whole time (drafts.ts), so nothing typed is ever lost.
 //
 // Every save has an id. When its answer never comes (the connection dropped on the way, the page
 // was closed), the save may still have landed, so before anything else the editor, or whoever
 // takes its draft later, asks whether it did (pages.save_ids). If it did, the work kept here is
 // merged starting from what that save sent, not from the older version, so a change made elsewhere
-// since then isn't overwritten with the old value.
+// since then isn't overwritten with the old value. While that can't be found out, nothing of it is
+// sent: a draft stays on the device as it is, or an editor that opened with the draft's version or
+// an older one carries on from it (SheetSaver.restore). A device remembers its last save that went
+// through (drafts.ts readLastSave): its next visit's first save takes that one's place there.
+//
+// Saving can't always work: no access any more ("denied"), too big, or a request the database
+// refuses as it is ("rejected", which trying again can't fix). Then the work stays in the draft and
+// the editor says what to do (export it, or keep it as a copy of your own).
 //
 // SheetSaver is plain TypeScript (no React), driven by useSheetSave; saveOnce is also used by the
 // background save of drafts whose editor was closed (flushDrafts.ts).
@@ -18,13 +27,25 @@ import type { SaveState } from "@/components/page/useAutosave";
 import type { Locale } from "@/i18n/config";
 import { isNetworkError, isOnline, onConnectivity, reportNetworkError, reportOk } from "@/lib/offline/net";
 import { createClient } from "@/lib/supabase/client";
-import { mergeWorkbooks, sameJson, type MergeReport } from "@/sheet/collab";
-import { normalizeWorkbook, workbookPlainText, workbookPreview, type SheetPreview } from "@/sheet/doc";
+import { arrivedCopies, mergeWorkbooks, sameJson, type MergeReport } from "@/sheet/collab";
+import { normalizeWorkbook, storable, storableText, workbookPlainText, workbookPreview, type SheetPreview } from "@/sheet/doc";
 import { editText, type Calc } from "@/sheet/engine";
 import { getCell, setCells } from "@/sheet/ops";
 import type { Workbook } from "@/sheet/types";
-import { clearDraft, closingDone, flushedRev, newWriterId, openSheet, randomUuid, takeDrafts, writeDraft, type SheetDraft } from "./drafts";
-import { parseTyped, typedCell, type SheetStore } from "./store";
+import {
+  clearDraft,
+  closingDone,
+  flushedRev,
+  newWriterId,
+  openSheet,
+  randomUuid,
+  readLastSave,
+  takeDrafts,
+  writeDraft,
+  writeLastSave,
+  type SheetDraft,
+} from "./drafts";
+import { parseTyped, typedCell, typingAt, type SheetStore } from "./store";
 
 /** Quiet time after the last change before saving… */
 export const SAVE_DELAY = 800;
@@ -45,11 +66,26 @@ export const MAX_BYTES = 5_000_000;
 /** From this size on, the editor says the spreadsheet is getting close to that. */
 export const LARGE_BYTES = 4_000_000;
 
+/**
+ * What a save came to. "rejected": the database refused the request as it is (it can't read it,
+ * or a number in it), so sending it again would be refused again; "error": anything else that went
+ * wrong on the server, worth trying again. `unsure`: a server error (5xx), which may come from in
+ * front of save_sheet while the save itself went through, as when the answer is lost.
+ */
 export type SaveOutcome =
   | { ok: true; rev: number; title: string | null; bytes: number }
   | { ok: false; reason: "behind"; rev: number; content: unknown; title: string }
   | { ok: false; reason: "too_big"; bytes: number }
-  | { ok: false; reason: "offline" | "error" | "denied" };
+  | { ok: false; reason: "error"; unsure?: true }
+  | { ok: false; reason: "offline" | "denied" | "rejected" };
+
+/**
+ * The server answered with an error of its own (HTTP 5xx: the database, or a gateway in front of it,
+ * has a problem) while the connection works. Not "offline" for saving: the top bar would say so,
+ * and a connection check getting through would set off a new try every second while it lasts.
+ * (src/lib/offline/net.ts counts it as no connection for the rest of Blob, whose changes wait then.)
+ */
+const serverError = (status?: number) => status !== undefined && status >= 500;
 
 /** What save_sheet gets (migration 0024). */
 export type SaveArgs = {
@@ -69,8 +105,11 @@ export type SaveArgs = {
 export type SaverApi = {
   saveSheet(args: SaveArgs): Promise<{ data: unknown; error: unknown; status?: number }>;
   loadRow(pageId: string): Promise<{ rev: number; content: unknown; title: string | null } | null>;
-  /** Whether the save with this id went through (pages.save_ids); null while that can't be found out (offline). */
-  landed(pageId: string, saveId: string): Promise<boolean | null>;
+  /**
+   * Whether the save with this id went through (pages.save_ids). While that can't be found out:
+   * null without a connection, undefined while the server has a problem (landedFrom).
+   */
+  landed(pageId: string, saveId: string): Promise<boolean | null | undefined>;
 };
 
 export const supabaseApi: SaverApi = {
@@ -83,33 +122,93 @@ export const supabaseApi: SaverApi = {
     return error || !data ? null : (data as { rev: number; content: unknown; title: string | null });
   },
   async landed(pageId, saveId) {
-    const { data, error, status } = await createClient().from("pages").select("save_ids").eq("id", pageId).maybeSingle();
-    if (error && isNetworkError(error, status)) {
-      reportNetworkError();
-      return null;
-    }
-    // Any other trouble (or a page that can't be read any more) counts as "didn't land": the work
-    // kept here is then merged from its older start, which keeps all of it.
-    const ids = (data as { save_ids?: unknown } | null)?.save_ids;
-    return Array.isArray(ids) && ids.includes(saveId);
+    // (Without a network the look can't even leave: postgrest-js would try it for seconds, with the
+    // bar on "Speichert…". Blob's connection state says offline already.)
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return null;
+    return landedFrom(await createClient().from("pages").select("save_ids").eq("id", pageId).maybeSingle(), saveId);
   },
 };
 
-/** What pages.content gets: the workbook and, beside it, its preview for lists (see src/sheet/doc.ts). */
-export function storedContent(wb: Workbook, calc: Calc, locale: Locale): { content: Workbook & { preview?: SheetPreview }; plain: string } {
+/**
+ * What the answer to a look at pages.save_ids says about the save `saveId`: whether it went
+ * through, or why that can't be found out now: null without a connection (reported, as a save
+ * reports it), undefined while the server has a problem (a 5xx, which isn't the connection:
+ * serverError). The editor goes by this, not by Blob's connection state, which other parts of Blob
+ * set to offline on a 5xx.
+ */
+export function landedFrom(res: { data: unknown; error: unknown; status?: number }, saveId: string): boolean | null | undefined {
+  if (res.error && serverError(res.status)) return undefined;
+  if (res.error && isNetworkError(res.error, res.status)) {
+    reportNetworkError();
+    return null;
+  }
+  // Any other trouble (or a page that can't be read any more) counts as "didn't land": the work
+  // kept here is then merged from its older start, which keeps all of it.
+  const ids = (res.data as { save_ids?: unknown } | null)?.save_ids;
+  return Array.isArray(ids) && ids.includes(saveId);
+}
+
+// (Text the database can store: src/sheet/doc.ts, where the editor's undo steps are repaired too.)
+export { storableText };
+
+/** A page title as the database keeps it: storable, at most 200 characters (cut between characters, never inside one). */
+const storableTitle = (title: string) => Array.from(storableText(title)).slice(0, 200).join("");
+
+/**
+ * Text storableText repairs, as JSON writes it: a lone surrogate or NUL is always an escape
+ * (`\ud83e`, `\u0000`), and the backslash before it isn't one written for a backslash in the text.
+ */
+const UNSTORABLE_JSON = /(?:^|[^\\])(?:\\\\)*\\u(?:0000|d[89a-f])/;
+
+/** The bytes of JSON text as UTF-8. Exact from LARGE_BYTES on; below that it may count less (sizes don't matter there). */
+function utf8Bytes(json: string): number {
+  // A character is 1 to 3 bytes: counted only where that could matter.
+  return json.length * 3 < LARGE_BYTES ? json.length : new TextEncoder().encode(json).length;
+}
+
+/** What a spreadsheet page stores (storedContent). */
+export type StoredContent = {
+  /** The workbook with its preview beside it. */
+  content: Workbook & { preview?: SheetPreview };
+  /** The workbook in `content`: the one given, or a copy of it with its text repaired. */
+  workbook: Workbook;
+  /** The words for search (pages.plain_text). */
+  plain: string;
+  /** The size of `content` as save_sheet measures it: its JSON, UTF-8. */
+  bytes: number;
+};
+
+/**
+ * What pages.content gets: the workbook and, beside it, its preview for lists (see src/sheet/doc.ts),
+ * with its words for search and its size. All text in it is storable (storableText). What the
+ * formulas show, in the preview and the search text (LEFT on emoji text can be half of one), is
+ * repaired as it is worked out. Text kept in the workbook itself (half an emoji pasted, a NUL from a
+ * file) is rare: the JSON written to measure it shows when there is some, and only then is the
+ * workbook gone through (`workbook` is the repaired copy, which the editor takes: SheetSaver.run,
+ * store.ts repair).
+ */
+export function storedContent(wb: Workbook, calc: Calc, locale: Locale): StoredContent {
   let preview: SheetPreview | undefined;
   try {
-    preview = workbookPreview(wb, calc, locale);
+    preview = storable(workbookPreview(wb, calc, locale));
   } catch (e) {
     console.error("sheet: preview failed", e);
   }
   let plain = "";
   try {
-    plain = workbookPlainText(wb, calc, locale);
+    plain = storableText(workbookPlainText(wb, calc, locale));
   } catch (e) {
     console.error("sheet: search text failed", e);
   }
-  return { content: preview ? { ...wb, preview } : wb, plain };
+  let workbook = wb;
+  let content: Workbook & { preview?: SheetPreview } = preview ? { ...wb, preview } : wb;
+  let json = JSON.stringify(content) ?? "";
+  if (UNSTORABLE_JSON.test(json)) {
+    workbook = storable(wb);
+    content = preview ? { ...workbook, preview } : workbook;
+    json = JSON.stringify(content);
+  }
+  return { content, workbook, plain, bytes: utf8Bytes(json) };
 }
 
 /**
@@ -117,18 +216,26 @@ export function storedContent(wb: Workbook, calc: Calc, locale: Locale): { conte
  * from LARGE_BYTES on; below that it may count less (sizes don't matter there).
  */
 export function jsonBytes(content: unknown): number {
-  const json = JSON.stringify(content) ?? "";
-  // A character is 1 to 3 bytes: counted only where that could matter.
-  return json.length * 3 < LARGE_BYTES ? json.length : new TextEncoder().encode(json).length;
+  return utf8Bytes(JSON.stringify(content) ?? "");
 }
 
-/** One save_sheet call (`saveId` names it; see the top of this file). */
+/**
+ * The database refused the request as it is, and would refuse it again however often it came:
+ * text or JSON in it that can't be read (22P02, 22P05 and the other data errors of class 22, or
+ * PGRST102 for the request body), or a request too big to take (413). Not the connection, not
+ * access, not a passing server problem.
+ */
+function refusedAsSent(error: unknown, status?: number): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return status === 413 || (status === 400 && typeof code === "string" && (code.startsWith("22") || code === "PGRST102"));
+}
+
+/** One save_sheet call (`saveId` names it; see the top of this file). `stored`: storedContent of `wb`, when the caller has it already. */
 export async function saveOnce(
-  s: { pageId: string; rev: number; wb: Workbook; calc: Calc; title: string; baseTitle: string; saveId: string; lastSave: string | null; locale: Locale },
+  s: { pageId: string; rev: number; wb: Workbook; calc: Calc; title: string; baseTitle: string; saveId: string; lastSave: string | null; locale: Locale; stored?: StoredContent },
   api: SaverApi = supabaseApi,
 ): Promise<SaveOutcome> {
-  const { content, plain } = storedContent(s.wb, s.calc, s.locale);
-  const bytes = jsonBytes(content);
+  const { content, plain, bytes } = s.stored ?? storedContent(s.wb, s.calc, s.locale);
   if (bytes > MAX_BYTES) return { ok: false, reason: "too_big", bytes };
   let res: { data: unknown; error: unknown; status?: number };
   try {
@@ -136,9 +243,9 @@ export async function saveOnce(
       p_page: s.pageId,
       p_rev: s.rev,
       p_content: content,
-      p_title: s.title.slice(0, 200),
+      p_title: storableTitle(s.title),
       p_plain: plain,
-      p_base_title: s.baseTitle.slice(0, 200),
+      p_base_title: storableTitle(s.baseTitle),
       p_save_id: s.saveId,
       p_last_save: s.lastSave,
     });
@@ -150,12 +257,17 @@ export async function saveOnce(
     return { ok: false, reason: "error" };
   }
   if (res.error) {
+    // (Tried again after the saver's own pauses, with the sheet's notice that saving isn't working.)
+    if (serverError(res.status)) {
+      console.error("sheet: save failed", res.status, res.error);
+      return { ok: false, reason: "error", unsure: true };
+    }
     if (isNetworkError(res.error, res.status)) {
       reportNetworkError();
       return { ok: false, reason: "offline" };
     }
     console.error("sheet: save failed", res.error);
-    return { ok: false, reason: "error" };
+    return { ok: false, reason: refusedAsSent(res.error, res.status) ? "rejected" : "error" };
   }
   reportOk();
   const r = (res.data ?? {}) as { ok?: boolean; reason?: string; rev?: number; content?: unknown; title?: unknown };
@@ -163,14 +275,19 @@ export async function saveOnce(
   if (r.reason === "behind" && typeof r.rev === "number") return { ok: false, reason: "behind", rev: r.rev, content: r.content, title: typeof r.title === "string" ? r.title : "" };
   if (r.reason === "too_big") return { ok: false, reason: "too_big", bytes };
   if (r.reason === "denied") return { ok: false, reason: "denied" };
+  // ("invalid": something in it save_sheet can't take, which sending it again won't change.)
+  if (r.reason === "invalid") return { ok: false, reason: "rejected" };
   return { ok: false, reason: "error" };
 }
 
 /** A title merged like the content: mine if I changed it since base, else theirs. */
 export const mergeTitle = (base: string, mine: string, theirs: string) => (mine !== base ? mine : theirs);
 
-/** Something the person should know that stays until it is solved ("large": a warning, until it shrinks). */
-export type SaveNotice = "denied" | "tooBig" | "large";
+/**
+ * Something the person should know that stays until it is solved ("large": a warning, until it
+ * shrinks; "rejected": the database refused the last save as it is, tried again with the next change).
+ */
+export type SaveNotice = "denied" | "tooBig" | "rejected" | "large";
 
 /** A sheet both versions had moved rows or columns on: theirs kept, mine beside it as a copy (src/sheet/collab.ts). */
 export type SheetConflict = MergeReport["conflicts"][number];
@@ -209,8 +326,18 @@ type Options = {
 /** Pauses before trying again: growing, at most a minute. */
 const backoff = (failures: number, first: number) => Math.min(60_000, first * 2 ** Math.max(0, failures - 1));
 
+/**
+ * A save looks at drafts left waiting again (restore) only this long after the last look, and
+ * doesn't wait for it: a look that can't get through takes seconds (postgrest-js tries a GET four
+ * times), and reads the drafts.
+ */
+const LOOK_AGAIN = 5000;
+
 /** A save as it was sent: it may land even when its answer never comes. */
 type Sent = { id: string; rev: number; wb: Workbook; title: string };
+
+/** Where a draft's own changes start (restore): the version they were made on, and its title. */
+type Start = { base: Workbook; baseTitle: string };
 
 export class SheetSaver {
   /** This editor's id: its draft on this device (drafts.ts). */
@@ -229,17 +356,24 @@ export class SheetSaver {
   /** The newest revision announced while a pull was on its way (it may have read the page before that save). */
   private announced = 0;
   private failures = 0;
+  /**
+   * The last try failed for lack of a connection: it goes out as soon as Blob is online again,
+   * not after its pause. (After a server error the pause stays: being online is no news then.)
+   */
+  private noConnection = false;
   private troubled = false;
   private denied = false;
   /** Closing (the editor went away): no new timers, pulls or restores; the last save still goes out. */
   private stopped = false;
   private closing: Promise<void> | null = null;
-  /** Signed out: nothing more is saved or kept on this device. */
+  /** Signed out, or the work saved as a copy (letGo): nothing more is saved or kept on this device. */
   private discarded = false;
   private current: SaveState = "saved";
   private notice: SaveNotice | null = null;
   /** The size measured at the last try to save (bytes, as save_sheet counts them; 0: none yet). */
   private measured = 0;
+  /** The workbook last found too big to save (it still is, while it is the one in the editor). */
+  private bigWb: Workbook | null = null;
   /** The size of `base`, when this editor measured it (-1: not known, e.g. someone else's save). */
   private savedBytes = -1;
   /** When the first change not yet on its way to the server was made (0: none). */
@@ -252,18 +386,49 @@ export class SheetSaver {
   private sending: Sent | null = null;
   /** A save that went out and got no answer: it may have landed (settle finds out). */
   private unsure: Sent | null = null;
-  /** This editor's last save that went through: the next one takes its place in pages.save_ids. */
-  private lastSave: string | null = null;
+  /**
+   * This device's last save that went through: the next one takes its place in pages.save_ids.
+   * From the device's record at first (drafts.ts readLastSave), so a visit doesn't take a new place.
+   */
+  private lastSave: string | null;
+  /**
+   * Drafts restore() left on the device: whether their save that got no answer landed can't be
+   * found out yet (startOf). `wb` and `title`: the editor's version when they were left, which they
+   * are put back onto once that is known (what was done here since then comes on top of them).
+   * `offline`: the last look found no connection, so being online again is the time to look again
+   * (after a server error being online is no news: the pause stays, as for saves).
+   */
+  private waiting: { wb: Workbook; title: string; offline: boolean } | null = null;
+  /** When the last look left drafts waiting (ms; LOOK_AGAIN). */
+  private lookedAt = 0;
+  /** restore() on its way: one at a time. */
+  private restoring: Promise<void> | null = null;
+  /** The next look at drafts left waiting, after a pause that grows with each one (restoreTries). */
+  private restoreTimer: ReturnType<typeof setTimeout> | undefined;
+  private restoreTries = 0;
+  /**
+   * Opened without a connection (the app's copy of the page, public/sw.js): nothing tells it of
+   * saves made meanwhile, so once Blob is online again it fetches the newest version, once. (Work of
+   * its own waiting to go out is merged with that as it is saved.)
+   */
+  private openedOffline = !isOnline();
   private offConnectivity: () => void;
   private release: () => void;
 
   constructor(private o: Options) {
+    this.lastSave = o.readOnly ? null : readLastSave(o.userId, o.pageId);
     this.rev = o.rev;
     this.base = o.base;
     this.baseTitle = o.title;
     this.title = o.title;
     this.offConnectivity = onConnectivity(() => {
-      if (isOnline() && this.failures > 0 && !this.denied) void this.flush();
+      if (!isOnline()) return;
+      if (this.noConnection && !this.denied) void this.flush();
+      if (this.waiting?.offline) void this.restore();
+      if (this.openedOffline) {
+        this.openedOffline = false;
+        if (!this.unsure && !this.waiting && !this.dirty()) void this.pull();
+      }
     });
     this.release = openSheet({
       pageId: o.pageId,
@@ -271,6 +436,7 @@ export class SheetSaver {
       flush: () => this.flush(),
       unsaved: () => !o.readOnly && !this.discarded && (this.dirty() || !!this.unsure),
       discard: () => this.discard(),
+      letGo: () => this.letGo(),
       remote: (rev) => this.remote(rev),
       closing: () => this.closing,
     });
@@ -346,14 +512,16 @@ export class SheetSaver {
 
   /**
    * Nothing waits to be saved: the server has what the editor shows (a change was undone, say), so
-   * a problem saving it is over as well: no more tries, "Gespeichert". Not when access is gone, nor
-   * while a save that got no answer may still have landed (the next try finds out).
+   * a problem saving it is over as well: no more tries, "Gespeichert" (or "Auf diesem Gerät
+   * gespeichert" while drafts restore left wait there). Not when access is gone, nor while a save
+   * that got no answer may still have landed (the next try finds out).
    */
   private upToDate() {
     if (this.denied || this.unsure) return;
     clearTimeout(this.timer);
     this.timer = undefined;
     this.failures = 0;
+    this.noConnection = false;
     if (this.notice === "tooBig") {
       // Back to the size that was saved: the warning near the limit, if it was that close.
       if (this.savedBytes >= 0) {
@@ -361,8 +529,10 @@ export class SheetSaver {
         this.o.on.size?.(this.savedBytes);
       }
       this.setNotice(this.savedBytes > LARGE_BYTES ? "large" : null);
+    } else if (this.notice === "rejected") {
+      this.setNotice(this.measured > LARGE_BYTES ? "large" : null);
     }
-    this.setState("saved");
+    this.setState(this.waiting ? "device" : "saved");
   }
 
   setTitle(title: string) {
@@ -397,6 +567,9 @@ export class SheetSaver {
       at: Date.now(),
       ...(sent && { sending: sent.wb === mine ? { id: sent.id, title: sent.title } : { id: sent.id, title: sent.title, wb: sent.wb } }),
       ...(this.lastSave && { lastSave: this.lastSave }),
+      // (No more tries in the background. The notice here has said it can't be saved; once this
+      // editor is closed, Blob asks what to do with it the next time the app starts: DeniedDrafts.)
+      ...(this.denied && { denied: true }),
     });
     this.drafted = true;
   }
@@ -411,9 +584,9 @@ export class SheetSaver {
     const e = s.edit;
     if (!e) return wb;
     try {
-      const current = getCell(wb, e.sheetId, e.row, e.col);
-      if (e.text === editText(current, this.o.locale)) return wb;
-      const parsed = parseTyped(e.text, this.o.locale, current);
+      if (e.text === editText(getCell(wb, e.sheetId, e.row, e.col), this.o.locale)) return wb;
+      const { current, place } = typingAt(s, e.sheetId, { row: e.row, col: e.col });
+      const parsed = parseTyped(e.text, this.o.locale, current, place);
       if (parsed.error) return wb;
       return setCells(wb, e.sheetId, [{ row: e.row, col: e.col, cell: typedCell(current, parsed) }]);
     } catch {
@@ -426,6 +599,10 @@ export class SheetSaver {
     clearTimeout(this.timer);
     this.timer = undefined;
     if (this.o.readOnly || this.denied || this.discarded) return;
+    // Drafts restore left waiting are looked at again too, now and then (LOOK_AGAIN). This save
+    // doesn't wait for that: what is put back goes out with the next one. (Not while closing: they
+    // stay on the device for the next editor.)
+    if (this.waiting && !this.stopped && Date.now() - this.lookedAt >= LOOK_AGAIN) void this.restore();
     while (this.running) await this.running;
     if (!this.dirty() && !this.unsure) {
       this.upToDate();
@@ -440,28 +617,45 @@ export class SheetSaver {
 
   private async run(): Promise<void> {
     const { store, pageId, locale } = this.o;
-    let outcome: "ok" | "offline" | "error" | "denied" | "too_big" = "ok";
+    let outcome: "ok" | "offline" | "error" | "denied" | "too_big" | "rejected" = "ok";
     /** The size the last try measured (-1: none). */
     let bytes = -1;
     this.setState("saving");
     for (let attempt = 0; ; attempt++) {
-      // A save that got no answer comes first: did it land?
-      if (!(await this.settle())) {
-        outcome = "offline";
+      // A save that got no answer comes first: did it land? While that can't be found out (no
+      // connection, or the server has a problem: the lookup's answer says which), nothing is sent.
+      const settled = await this.settle();
+      if (settled !== true) {
+        outcome = settled;
         break;
       }
       const s = store.get();
-      const wb = s.workbook;
+      let wb = s.workbook;
       const title = this.title;
       if (wb === this.base && title === this.baseTitle) break;
       if (attempt >= 6) {
         outcome = "error";
         break;
       }
-      // Without a network the request can't even leave.
+      // Without a network the request can't even leave. A spreadsheet found too big to save stays
+      // that offline too (being online again wouldn't help): known without measuring while it is
+      // the same workbook, measured here (no network needed) once it has changed.
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        outcome = "offline";
+        if (this.notice === "tooBig" && wb !== this.bigWb) {
+          bytes = storedContent(wb, s.calc, locale).bytes;
+          if (bytes > MAX_BYTES) this.bigWb = wb;
+        }
+        outcome = this.notice === "tooBig" && wb === this.bigWb ? "too_big" : "offline";
         break;
+      }
+      // What goes out (storedContent). Text in the workbook that had to be repaired for it (half an
+      // emoji pasted, say) is repaired in the editor as well, its undo steps too (store.repair): what
+      // the server has is what is on screen, the next saves don't repair it again, and undo still
+      // takes back the step that brought it.
+      const stored = storedContent(wb, s.calc, locale);
+      if (stored.workbook !== wb) {
+        store.repair(stored.workbook);
+        wb = stored.workbook;
       }
       const sent: Sent = { id: randomUuid(), rev: this.rev, wb, title };
       this.sending = sent;
@@ -469,7 +663,7 @@ export class SheetSaver {
       // A draft on the device (or a page that is closing) learns about this save first: should the
       // page go before the answer comes, whoever takes the draft finds out whether it landed.
       if (this.drafted || this.stopped) this.keepDraft();
-      const r = await saveOnce({ pageId, rev: sent.rev, wb, calc: s.calc, title, baseTitle: this.baseTitle, saveId: sent.id, lastSave: this.lastSave, locale }, this.o.api);
+      const r = await saveOnce({ pageId, rev: sent.rev, wb, calc: s.calc, title, baseTitle: this.baseTitle, saveId: sent.id, lastSave: this.lastSave, locale, stored }, this.o.api);
       this.sending = null;
       if (r.ok) {
         this.rev = r.rev;
@@ -486,9 +680,12 @@ export class SheetSaver {
         this.absorb(r.rev, r.content, r.title);
         continue;
       }
-      // The connection dropped on the way: the save may have landed all the same.
-      if (r.reason === "offline") this.unsure = sent;
-      if (r.reason === "too_big") bytes = r.bytes;
+      // The connection dropped on the way, or a server error came back: the save may have landed all the same.
+      if (r.reason === "offline" || (r.reason === "error" && r.unsure)) this.unsure = sent;
+      if (r.reason === "too_big") {
+        bytes = r.bytes;
+        this.bigWb = wb;
+      }
       outcome = r.reason;
       break;
     }
@@ -496,6 +693,7 @@ export class SheetSaver {
       this.measured = bytes;
       this.o.on.size?.(bytes);
     }
+    this.noConnection = outcome === "offline";
 
     if (outcome === "ok") {
       if (this.troubled) {
@@ -510,6 +708,8 @@ export class SheetSaver {
         clearDraft(this.o.userId, pageId, this.writer);
         this.drafted = false;
       }
+      // (Once no draft names it as a save that may have landed.)
+      if (this.lastSave) writeLastSave(this.o.userId, pageId, this.lastSave);
       if (this.dirty()) {
         this.setState("pending");
         if (!this.pendingSince) this.pendingSince = Date.now();
@@ -520,29 +720,36 @@ export class SheetSaver {
           this.scheduleSave();
         }
       } else {
-        this.setState("saved");
+        this.setState(this.waiting ? "device" : "saved");
         this.undraftedSince = 0;
         clearTimeout(this.draftTimer);
       }
       return;
     }
 
-    // Not saved: the work stays on this device until it is.
+    // Not saved: the work stays on this device until it is (or, with no access, until you decide).
+    if (outcome === "denied") this.denied = true;
     this.keepDraft();
     this.failures++;
     clearTimeout(this.timer);
     this.timer = undefined;
     if (outcome === "offline") {
+      // (Measured offline after a change and small enough now: it goes out once online again.)
+      if (this.notice === "tooBig" && bytes >= 0) this.setNotice(bytes > LARGE_BYTES ? "large" : null);
       this.setState("device");
       if (!this.stopped) this.timer = setTimeout(() => void this.flush(), backoff(this.failures, 3000));
     } else if (outcome === "denied") {
-      this.denied = true;
       this.setState("refused");
       this.setNotice("denied");
     } else if (outcome === "too_big") {
       // Tried again with the next change (deleting rows makes it fit); nothing is sent until then.
       this.setState("tooBig");
       this.setNotice("tooBig");
+    } else if (outcome === "rejected") {
+      // The same save would be refused again: none goes out until the spreadsheet changes, and the
+      // editor says how to keep the work meanwhile (as an Excel file, or as a copy).
+      this.setState("refused");
+      this.setNotice("rejected");
     } else {
       this.setState("failed");
       if (!this.troubled) {
@@ -554,15 +761,17 @@ export class SheetSaver {
   }
 
   /**
-   * Whether the save that got no answer landed (false: that can't be found out now). If it did, it
-   * made the next revision and what it sent is the base: work done since is merged on top of that,
-   * not of the older version (so a change someone made after it stays).
+   * Find out whether the save that got no answer landed: true once that's known, else why it can't
+   * be found out now ("offline": no connection; "error": the server has a problem). If it did land,
+   * it made the next revision and what it sent is the base: work done since is merged on top of
+   * that, not of the older version (so a change someone made after it stays).
    */
-  private async settle(): Promise<boolean> {
+  private async settle(): Promise<true | "offline" | "error"> {
     const u = this.unsure;
     if (!u) return true;
     const landed = await (this.o.api ?? supabaseApi).landed(this.o.pageId, u.id);
-    if (landed === null) return false;
+    if (landed === null) return "offline";
+    if (landed === undefined) return "error";
     // (Settled meanwhile by the pull or the save next to this.)
     if (this.unsure !== u) return true;
     this.unsure = null;
@@ -595,6 +804,9 @@ export class SheetSaver {
     const theirs = normalizeWorkbook(content, locale);
     const now = store.get().workbook;
     this.savedBytes = -1;
+    // Someone else's merge couldn't combine their version of a sheet with this one and put theirs
+    // on a copy next to it: said here too (the first time it arrives), with what to do.
+    const arrived = arrivedCopies(this.base, now, theirs);
     if (now === this.base) {
       // Nothing of ours waiting: theirs as it is (or ours, when it's the same anyway).
       if (sameJson(theirs, now)) this.base = now;
@@ -602,13 +814,22 @@ export class SheetSaver {
         this.base = theirs;
         store.replaceRemote(theirs);
       }
+      if (arrived.length) this.o.on.conflict?.(arrived);
     } else {
       const report: MergeReport = { conflicts: [] };
       const merged = mergeWorkbooks(this.base, now, theirs, report, locale);
       this.base = theirs;
       // A sheet kept as theirs has my version on a copy: a running edit there goes on in the copy.
       if (merged !== now && !sameJson(merged, now)) store.replaceRemote(merged, report.conflicts);
-      if (report.conflicts.length) this.o.on.conflict?.(report.conflicts);
+      // A copy keeps my version safe, but with both versions the spreadsheet may be too big to
+      // save (measured as saving measures it): then it waits on this device until the copy is
+      // gone, and the notice says so.
+      if (report.conflicts.some((c) => c.copyId)) {
+        const s = store.get();
+        if (storedContent(s.workbook, s.calc, locale).bytes > MAX_BYTES) for (const c of report.conflicts) if (c.copyId) c.tooBig = true;
+      }
+      const told = [...report.conflicts, ...arrived];
+      if (told.length) this.o.on.conflict?.(told);
     }
     this.rev = rev;
     const next = mergeTitle(this.baseTitle, this.title, title);
@@ -654,7 +875,7 @@ export class SheetSaver {
     this.announced = 0;
     let row: { rev: number; content: unknown; title: string | null } | null = null;
     try {
-      if (!(await this.settle())) return;
+      if ((await this.settle()) !== true) return;
       row = await (this.o.api ?? supabaseApi).loadRow(this.o.pageId);
       if (!row) return;
       while (this.running) await this.running;
@@ -680,10 +901,25 @@ export class SheetSaver {
    * Put back unsaved work this device kept from earlier visits, closed tabs or crashed ones (drafts
    * whose editor is gone): merged with what the server has now, the drafts' changes winning, and
    * saved. This editor takes them over, so none is put back twice.
+   *
+   * A draft whose save may have landed is put back only once that is known (startOf). Until then it
+   * stays on the device as it is, and the bar says the work is there ("Auf diesem Gerät
+   * gespeichert"). It is looked at again once Blob is online again, after a pause (growing), and now
+   * and then before a save. The background save may take it meanwhile (flushDrafts.ts finds out the
+   * same way): what that saves comes in like anyone's save. Only an editor that opened with the
+   * version that draft was made on, or an older one, carries on from it at once (putBack).
    */
-  async restore() {
+  restore(): Promise<void> {
+    this.restoring ??= this.putBack().finally(() => {
+      this.restoring = null;
+    });
+    return this.restoring;
+  }
+
+  private async putBack() {
     const { store, userId, pageId, locale } = this.o;
-    if (this.o.readOnly || !userId) return;
+    if (this.o.readOnly || !userId || this.stopped) return;
+    clearTimeout(this.restoreTimer);
     // The background save (flushDrafts.ts) sent a draft while this page was on its way with the
     // version before: that newer version comes in now, as if someone had saved it.
     const flushed = flushedRev(pageId);
@@ -691,55 +927,121 @@ export class SheetSaver {
     // An editor of this page closing in this tab (you came straight back): its last save first.
     await closingDone(pageId);
     if (this.stopped) return;
+    const waited = !!this.waiting;
     try {
       await takeDrafts(userId, pageId, async (drafts) => {
-        if (!drafts.length || this.stopped) return;
-        const starts: { base: Workbook; baseTitle: string }[] = [];
+        if (this.stopped) return;
+        const starts: (Start | "offline" | "error")[] = [];
         for (const d of drafts) starts.push(await this.startOf(d));
         // (Closed meanwhile: the drafts wait for the next editor.)
         if (this.stopped) return;
         const now = store.get().workbook;
-        const report: MergeReport = { conflicts: [] };
-        let wb = now;
-        let title = this.title;
-        drafts.forEach((d, i) => {
-          wb = mergeWorkbooks(starts[i].base, normalizeWorkbook(d.mine, locale), wb, report, locale);
-          title = mergeTitle(starts[i].baseTitle, d.title, title);
-        });
-        const changed = !sameJson(wb, now);
-        // (Nothing changes when the drafts outlived their saves.)
-        if (changed || title !== this.title) {
-          // Without the report: here the editor's version is "theirs", so a sheet both moved rows of
-          // keeps what is on the screen, and only the draft's version goes on a copy. A running edit
-          // stays where it is.
-          if (changed) store.replaceRemote(wb);
-          if (title !== this.title) {
-            this.title = title;
-            this.o.on.title(title);
-          }
-          this.o.on.restored();
-          if (report.conflicts.length) this.o.on.conflict?.(report.conflicts);
+        // A draft whose save can't be looked up, made on the version this editor opened with or a
+        // newer one (the page came from the app's copy of an earlier visit, say: public/sw.js, opened
+        // without a connection). An editor untouched so far carries on from it as that draft's own
+        // editor would have: its version, and its save that got no answer, become this editor's. Its
+        // work is on the screen at once, and settle finds out whether that save landed before
+        // anything is sent, so nothing it sent goes over a change made elsewhere since. The newest
+        // such draft; any other waits, as does one made on an older version than this editor's.
+        const untouched = !this.waiting && !this.unsure && !this.running && !this.pulling && !this.dirty();
+        const carry = untouched ? drafts.findLast((d, i) => typeof starts[i] !== "object" && d.rev >= this.rev) : undefined;
+        let carried: Workbook | null = null;
+        if (carry?.sending) {
+          carried = normalizeWorkbook(carry.mine, locale);
+          this.rev = carry.rev;
+          this.base = normalizeWorkbook(carry.base, locale);
+          this.baseTitle = carry.baseTitle;
+          this.savedBytes = -1;
+          // (What the screen shows, when that save sent all the draft has: once it is known to have
+          // landed, there is nothing more to save.)
+          const sent = carry.sending;
+          this.unsure = { id: sent.id, rev: carry.rev, wb: sent.wb ? normalizeWorkbook(sent.wb, locale) : carried, title: sent.title };
         }
-        // What was taken is this editor's work now: its own draft holds it (written before the
-        // others go), and it is saved in a moment.
-        this.keepDraft();
-        for (const d of drafts) clearDraft(userId, pageId, d.writer);
-        this.changed();
+        const taken: { d: SheetDraft; start: Start; mine: Workbook }[] = [];
+        const left: ("offline" | "error")[] = [];
+        drafts.forEach((d, i) => {
+          const start = starts[i];
+          if (d === carry && carried) taken.push({ d, start: { base: this.base, baseTitle: this.baseTitle }, mine: carried });
+          else if (typeof start === "object") taken.push({ d, start, mine: normalizeWorkbook(d.mine, locale) });
+          else left.push(start);
+        });
+        if (taken.length) {
+          // Drafts that waited go onto the editor's version from when they were left, and what was
+          // done here since comes on top: it is newer than they are. (Carrying on from a draft, the
+          // editor's version is the one that draft was made on, with nothing done here yet.)
+          const ours = carried ? { wb: this.base, title: this.baseTitle } : { wb: now, title: this.title };
+          const from = this.waiting ?? ours;
+          const report: MergeReport = { conflicts: [] };
+          let wb = from.wb;
+          let title = from.title;
+          for (const { d, start, mine } of taken) {
+            wb = mergeWorkbooks(start.base, mine, wb, report, locale);
+            title = mergeTitle(start.baseTitle, d.title, title);
+          }
+          const since: MergeReport = { conflicts: [] };
+          if (from.wb !== ours.wb) wb = mergeWorkbooks(from.wb, ours.wb, wb, since, locale);
+          title = mergeTitle(from.title, ours.title, title);
+          const changed = !sameJson(wb, now);
+          // (Nothing changes when the drafts outlived their saves.)
+          if (changed || title !== this.title) {
+            // For the drafts the editor's version is "theirs": a sheet both moved rows of keeps what
+            // is on the screen, and only the draft's version goes on a copy (a running edit stays
+            // where it is). Only rows moved here since drafts were left that moved them too go the
+            // other way (`since`): this version on a copy, and a running edit goes on there.
+            if (changed) store.replaceRemote(wb, since.conflicts);
+            if (title !== this.title) {
+              this.title = title;
+              this.o.on.title(title);
+            }
+            this.o.on.restored();
+            const told = [...report.conflicts, ...since.conflicts];
+            if (told.length) this.o.on.conflict?.(told);
+          }
+          // What was taken is this editor's work now: its own draft holds it (written before the
+          // others go), and it is saved in a moment. Without a last save remembered on this device,
+          // the newest draft's is this device's place in pages.save_ids.
+          if (!this.lastSave) for (const { d } of taken) if (d.lastSave) this.lastSave = d.lastSave;
+          this.keepDraft();
+          for (const { d } of taken) clearDraft(userId, pageId, d.writer);
+        }
+        // The others stay on the device as they are: not merged, not removed.
+        this.waiting = left.length ? { ...(this.waiting ?? { wb: store.get().workbook, title: this.title }), offline: left.includes("offline") } : null;
+        if (taken.length) this.changed();
       });
     } catch (e) {
       console.error("sheet: restoring the drafts failed", e);
     }
+    if (this.stopped) return;
+    if (this.waiting) {
+      // (A save on its way says so as it ends; a problem the bar shows already stays.)
+      if (this.current === "saved") this.setState("device");
+      this.lookedAt = Date.now();
+      this.restoreTimer = setTimeout(() => void this.restore(), backoff(++this.restoreTries, 3000));
+    } else {
+      this.restoreTries = 0;
+      // Nothing waits any more (put back, or the background save took it): the bar says so too.
+      if (waited && !this.running && !this.dirty()) this.upToDate();
+    }
   }
 
   /**
-   * Where a draft's own changes start: its base, or, when its save got no answer but landed (the
-   * page has moved on since), what that save sent. When that can't be found out, its base: all of
-   * its work is put back.
+   * Where a draft's own changes start: its base, or, when its save got no answer but landed, what
+   * that save sent. Looked up whenever the draft names such a save, even when this editor's version
+   * seems no newer than the draft's: a page opened without a connection is the app's copy of an
+   * earlier visit. While it can't be found out whether that save landed, why ("offline": no
+   * connection; "error": the server has a problem): merged from its base, the values that save sent
+   * could go over a change made elsewhere since (putBack keeps such a draft waiting, or carries on
+   * from it).
    */
-  private async startOf(d: SheetDraft): Promise<{ base: Workbook; baseTitle: string }> {
+  private async startOf(d: SheetDraft): Promise<Start | "offline" | "error"> {
     const { locale, pageId } = this.o;
-    if (d.sending && this.rev > d.rev && (await (this.o.api ?? supabaseApi).landed(pageId, d.sending.id))) {
-      return { base: normalizeWorkbook(d.sending.wb ?? d.mine, locale), baseTitle: d.sending.title };
+    if (d.sending) {
+      // (Without a network the look can't even leave: postgrest-js would try it for seconds.)
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return "offline";
+      const landed = await (this.o.api ?? supabaseApi).landed(pageId, d.sending.id);
+      if (landed === null) return "offline";
+      if (landed === undefined) return "error";
+      if (landed) return { base: normalizeWorkbook(d.sending.wb ?? d.mine, locale), baseTitle: d.sending.title };
     }
     return { base: normalizeWorkbook(d.base, locale), baseTitle: d.baseTitle };
   }
@@ -760,11 +1062,29 @@ export class SheetSaver {
       } finally {
         clearTimeout(this.timer);
         clearTimeout(this.draftTimer);
+        clearTimeout(this.restoreTimer);
         this.offConnectivity();
         this.release();
       }
     })();
     return this.closing;
+  }
+
+  /**
+   * Its work was saved as a spreadsheet of your own (SheetEditor, when it couldn't be saved here):
+   * nothing more is saved or kept on this device for this page, and its draft goes.
+   */
+  letGo() {
+    if (this.discarded) return;
+    this.discarded = true;
+    this.stopped = true;
+    clearTimeout(this.timer);
+    clearTimeout(this.draftTimer);
+    clearTimeout(this.restoreTimer);
+    this.offConnectivity();
+    this.release();
+    if (this.drafted) clearDraft(this.o.userId, this.o.pageId, this.writer);
+    this.drafted = false;
   }
 
   /** Signed out (here or in another tab): stops at once, saving and keeping nothing more on this device. */
@@ -774,9 +1094,10 @@ export class SheetSaver {
     this.stopped = true;
     clearTimeout(this.timer);
     clearTimeout(this.draftTimer);
+    clearTimeout(this.restoreTimer);
     this.offConnectivity();
     this.release();
-    // What it held goes with the session: the bar doesn't claim it is saved.
-    if (!this.o.readOnly && (this.dirty() || this.unsure)) this.setState("refused");
+    // What it held goes with the session (drafts left waiting too): the bar doesn't claim it is saved.
+    if (!this.o.readOnly && (this.dirty() || this.unsure || this.waiting)) this.setState("refused");
   }
 }

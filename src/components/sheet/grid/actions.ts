@@ -23,7 +23,7 @@ import {
   sheetById,
 } from "@/sheet/ops";
 import { DEFAULT_COL_W, type Area, type Cell, type Pos, type Sheet } from "@/sheet/types";
-import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, tablesAfterPaste, typedCell, type Selection, type SheetStore } from "../store";
+import { activeArea, growSheet, parseTyped, selectionAreas, singleCell, tablesAfterPaste, typedCell, typingAt, type Selection, type SheetStore } from "../store";
 import { BASE_FONT, CELL_PAD, shownText } from "./cellLook";
 import type { MenuKind } from "./ContextMenu";
 import { textWidth } from "./measure";
@@ -123,7 +123,9 @@ export function fillSelectionWith(store: SheetStore, text: string): boolean {
   const e = s.edit;
   if (!e) return false;
   const at: Pos = { row: e.row, col: e.col };
-  const parsed = parseTyped(text, s.locale, getCell(s.workbook, e.sheetId, at.row, at.col));
+  // Read as Enter reads it there: =B2-A2 of two times shows 06:30 in each cell (typingAt).
+  const { current, place } = typingAt(s, e.sheetId, at);
+  const parsed = parseTyped(text, s.locale, current, place);
   if (parsed.error) return store.commitEdit(null);
   // The cells selected when typing began (pointing at cells for a formula moved the selection since).
   const sel = store.editSelection() ?? singleCell(at);
@@ -138,7 +140,7 @@ export function fillSelectionWith(store: SheetStore, text: string): boolean {
         for (let c = a.c0; c <= a.c1; c++) {
           const f = parsed.cell.f;
           const p = f !== undefined && (r !== at.row || c !== at.col) ? { ...parsed, cell: { f: shiftFormula(f, r - at.row, c - at.col) } } : parsed;
-          updates.push({ row: r, col: c, cell: typedCell(getCell(wb, e.sheetId, r, c), p) });
+          updates.push({ row: r, col: c, cell: typedCell(typingAt(s, e.sheetId, { row: r, col: c }).current, p) });
         }
       }
     }
@@ -284,17 +286,22 @@ export function fitRows(store: SheetStore, rows: number[]) {
   store.apply(labelsOf(store).rowHeight, (wb) => setRowHeights(wb, sheetId, rows, null));
 }
 
-/** Ctrl/⌘+A: the block of data around the active cell first, everything the second time. */
+/**
+ * Ctrl/⌘+A: the block of data around the active cell first, everything the second time. The
+ * active cell stays where it is, as in Excel: sorting goes by its column, and typing goes into it.
+ * (Either range holds it: it is kept as the range the active cell walks in, see Selection.extra.)
+ */
 export function selectRegionOrAll(store: SheetStore) {
   const s = store.get();
   const sheet = sheetOf(store);
+  const p = s.selection.anchor;
   const all: Area = { r0: 0, c0: 0, r1: sheet.size.rows - 1, c1: sheet.size.cols - 1 };
-  const region = currentRegion(sheet, s.selection.anchor);
+  const region = currentRegion(sheet, p);
   const current = activeArea(s.selection);
   const single = region.r0 === region.r1 && region.c0 === region.c1;
   const same = current.r0 === region.r0 && current.r1 === region.r1 && current.c0 === region.c0 && current.c1 === region.c1;
   const target = single || same ? all : region;
-  store.select({ anchor: { row: target.r0, col: target.c0 }, focus: { row: target.r1, col: target.c1 }, extra: [] });
+  store.select({ anchor: p, focus: p, extra: [target] });
 }
 
 /** Add rows (or columns) at the end of the sheet. */

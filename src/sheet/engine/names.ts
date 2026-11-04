@@ -152,6 +152,7 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("PEARSON", "PEARSON", "stats"),
   f("COVARIANCE.S", "KOVARIANZ.S", "stats"),
   f("COVARIANCE.P", "KOVARIANZ.P", "stats"),
+  f("COVAR", "KOVAR", "stats", "COVARIANCE.P"),
   f("SKEW", "SCHIEFE", "stats"),
   f("KURT", "KURT", "stats"),
 
@@ -242,7 +243,9 @@ export const FUNCTION_NAMES: FunctionName[] = [
   f("ISBLANK", "ISTLEER", "info"),
   f("ISNUMBER", "ISTZAHL", "info"),
   f("ISTEXT", "ISTTEXT", "info"),
+  f("ISNONTEXT", "ISTKTEXT", "info"),
   f("ISERROR", "ISTFEHLER", "info"),
+  f("ISERR", "ISTFEHL", "info"),
   f("ISNA", "ISTNV", "info"),
   f("ISLOGICAL", "ISTLOG", "info"),
   f("ISEVEN", "ISTGERADE", "info"),

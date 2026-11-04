@@ -12,12 +12,26 @@
 // - Pages first for any other query; the actions that match before the new-page fallbacks ("cv");
 //   on the way to a kind ("tab") or to one of its words ("kalib", "formel") its new page first among
 //   those; no query: three actions, then pages.
+// - Which pages a query finds, in which order (findPages, the palette's own): each word of a title on
+//   its own, in any order ("Nitrat Photometrie"); the kind and words of a name ("Tabelle Nitrat",
+//   "Ordner Chemie") find the pages of that kind with those words, before making one called "Nitrat"
+//   (LAB-3), but no page of another kind; the kind alone ("Tabelle", "Ordner") still makes one first;
+//   a title typed as it is still comes first, before newer pages that only have its words, then the
+//   kind with the name as typed ("Tabelle Versuch 3": "Versuch 3" before a newer "Versuch 13"). Words
+//   count where a title's word starts and numbers whole, so "Tabelle Versuch 3" still makes "Versuch 3"
+//   when there is only "Versuch 13", as it did before words counted on their own. Tags too.
+// - A note made for a spreadsheet ("In Notiz einfügen → Neue Notiz") has a name of its own, so the
+//   palette doesn't list two pages of one name (LAB-11): untitled stays untitled, and a long name keeps
+//   its ending within the 200 characters a title can have.
 // - English labels too, and each group (pages, actions, found…) stays one block under its heading.
 // The palette's own labels and words are used, so a change to them is checked too.
 // Problems make the script exit with 1.
 
-import { CALENDAR_WORDS, CV_WORDS, INK_WORDS, SHEET_WORDS, newPageFor, paletteOrder, type NewKind, type PaletteEntry } from "@/components/shell/paletteNew";
+import { newNoteTitle } from "@/components/sheet/embed/noteTitle";
+import { CALENDAR_WORDS, CV_WORDS, FOLDER_WORDS, INK_WORDS, SHEET_WORDS, findPages, newPageFor, paletteOrder, type NewKind, type PaletteEntry } from "@/components/shell/paletteNew";
+import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { shellText } from "@/i18n/messages/shell";
+import type { PageKind } from "@/lib/types";
 
 let passed = 0;
 const problems: string[] = [];
@@ -26,16 +40,19 @@ function check(name: string, ok: boolean, detail?: unknown) {
   else problems.push(`${name}${detail === undefined ? "" : `: ${typeof detail === "string" ? detail : JSON.stringify(detail).slice(0, 600)}`}`);
 }
 
-type Entry = PaletteEntry & { group: "actions" | "pages" | "found" };
+type Entry = PaletteEntry & { group: "actions" | "pages" | "found"; hint?: string };
+/** A page of the workspace, as far as finding it goes (its title as shown, its tags). */
+type Page = { kind: PageKind; title: string; tags: string[] };
+const page = (kind: PageKind, title: string, tags: string[] = []): Page => ({ kind, title, tags });
 
 /**
  * The palette's list for a query, built like CommandPalette.tsx builds it, with the real labels:
- * pages match by their title, `found` are pages found by the words inside them.
+ * `pages` (the most recent first) are found by their title or tags (a page found by a tag has it as
+ * its hint), `found` are pages found by the words inside them.
  */
-function listFor(query: string, titles: string[], opts: { found?: string[]; lang?: "de" | "en" } = {}): Entry[] {
+function listFor(query: string, pages: Page[], opts: { found?: string[]; lang?: "de" | "en" } = {}): Entry[] {
   const t = shellText[opts.lang ?? "de"].palette;
   const q = query.trim();
-  const lower = q.toLowerCase();
   const newPage = (kind: NewKind, bare: string, named: (q: string) => string, keywords?: string): Entry => {
     const { rank, title } = newPageFor(kind, q, bare, keywords);
     return { id: `new-${kind}`, group: "actions", label: title ? named(title) : bare, keywords, rank, title };
@@ -47,13 +64,16 @@ function listFor(query: string, titles: string[], opts: { found?: string[]; lang
     newPage("deck", t.newDeck, t.newDeckNamed),
     { id: "new-task", group: "actions", label: t.addTask },
     { id: "new-event", group: "actions", label: t.newEvent, keywords: CALENDAR_WORDS },
+    { id: "folder-new", group: "actions", label: t.newFolder, keywords: FOLDER_WORDS },
     { id: "cv-new", group: "actions", label: t.newCv, keywords: CV_WORDS },
     { id: "home", group: "actions", label: t.goHome },
     { id: "settings", group: "actions", label: t.settings },
   ];
-  const pages = titles.filter((title) => !lower || title.toLowerCase().includes(lower)).map((title): Entry => ({ id: `page-${title}`, group: "pages", label: title }));
+  // A minute apart, the first the most recent.
+  const dated = pages.map((p, i) => ({ ...p, updated_at: new Date(Date.UTC(2026, 10, 1) - i * 60_000).toISOString() }));
+  const found = findPages(q, dated, (p) => p.title).map(({ page: p, tag }): Entry => ({ id: `page-${p.title}`, group: "pages", label: p.title, hint: tag && `#${tag}` }));
   const results = (opts.found ?? []).map((title): Entry => ({ id: `found-${title}`, group: "found", label: title }));
-  return paletteOrder(q, { actions, pages, results });
+  return paletteOrder(q, { actions, pages: found, results });
 }
 
 const labels = (list: Entry[]) => list.map((e) => e.label);
@@ -65,10 +85,19 @@ const KLIMA = "review-integration Präsentation Klimawandel";
 const TITRATION = "review-integration Tabelle Titration";
 const MATHE = "Note Mathe Klausur";
 const UNTITLED = "Unbenannte Tabelle";
-const library = [ZELLATMUNG, KLIMA, TITRATION, MATHE, UNTITLED, "Mitochondrien", "CV-Entwurf"];
+const library = [
+  page("note", ZELLATMUNG),
+  page("deck", KLIMA),
+  page("sheet", TITRATION),
+  // Grades: a spreadsheet, found by the words of its title although "Note" names notes.
+  page("sheet", MATHE),
+  page("sheet", UNTITLED),
+  page("note", "Mitochondrien"),
+  page("cv", "CV-Entwurf"),
+];
 const all: Entry[][] = [];
-const run = (query: string, titles = library, opts: { found?: string[]; lang?: "de" | "en" } = {}) => {
-  const list = listFor(query, titles, opts);
+const run = (query: string, pages = library, opts: { found?: string[]; lang?: "de" | "en" } = {}) => {
+  const list = listFor(query, pages, opts);
   all.push(list);
   return list;
 };
@@ -99,11 +128,11 @@ const run = (query: string, titles = library, opts: { found?: string[]; lang?: "
 
 // … and when nothing has that title, making the page comes first.
 {
-  const list = run("Tabelle Titration", ["Mitochondrien"]);
+  const list = run("Tabelle Titration", [page("note", "Mitochondrien")]);
   check("'Tabelle Titration' without such a page makes it first", list[0]?.label === "Neue Tabelle „Titration“", labels(list));
 }
 {
-  const list = run("Notiz zur Zellatmung", ["Mitochondrien"], { found: ["Biologie Kapitel 4"] });
+  const list = run("Notiz zur Zellatmung", [page("note", "Mitochondrien")], { found: ["Biologie Kapitel 4"] });
   check("found only in a page's text: making the note still comes first", list[0]?.label === "Neue Notiz „zur Zellatmung“" && list[1]?.label === "Biologie Kapitel 4", labels(list));
 }
 
@@ -153,7 +182,7 @@ for (const query of ["kalib", "formel"]) {
   check("'skizze': the new handwritten note first among the new pages", firstNew >= 0 && list[firstNew]?.id === "new-ink", labels(list));
 }
 {
-  const list = run("Zellatmung", [ZELLATMUNG], { found: ["Biologie Kapitel 4"] });
+  const list = run("Zellatmung", [page("note", ZELLATMUNG)], { found: ["Biologie Kapitel 4"] });
   check("pages by title, then by their words, then the actions", labels(list).slice(0, 2).join(" | ") === `${ZELLATMUNG} | Biologie Kapitel 4` && list[2]?.group === "actions", labels(list));
 }
 {
@@ -161,18 +190,177 @@ for (const query of ["kalib", "formel"]) {
   check("no query: three actions, then the recent pages", labels(list).join(" | ") === ["Neue Notiz", "Neue handschriftliche Notiz", "Neue Tabelle", ZELLATMUNG, KLIMA].join(" | "), labels(list));
 }
 
+// LAB-3: the kind and some words of a name, in any order, find the page. Enter opens it instead of
+// making a second spreadsheet with a strange name (the sweep's queries, with a lab's pages).
+const NITRAT = "sweep-lab Photometrie Nitrat";
+const PHOTO = "Tabelle sweep-lab Photometrie";
+const DRINKING = "Nitrat im Trinkwasser";
+const lab = [page("sheet", NITRAT), page("note", "sweep-lab Laborjournal"), page("note", DRINKING), page("sheet", PHOTO), page("folder", "Chemie")];
+const pageLabels = (list: Entry[]) => list.filter((e) => e.group === "pages").map((e) => e.label);
+{
+  const list = run("Tabelle sweep-lab Nitrat", lab);
+  check("'Tabelle sweep-lab Nitrat' opens the spreadsheet 'sweep-lab Photometrie Nitrat'", list[0]?.label === NITRAT && list[1]?.label === "Neue Tabelle „sweep-lab Nitrat“", labels(list));
+}
+{
+  const list = run("Tabelle Nitrat", lab);
+  check("'Tabelle Nitrat' opens the spreadsheet, making one comes right after", list[0]?.label === NITRAT && list[1]?.label === "Neue Tabelle „Nitrat“", labels(list));
+  check("… and finds no note: only spreadsheets drop the word 'Tabelle'", pageLabels(list).join(" | ") === NITRAT, labels(list));
+}
+for (const query of ["Nitrat Photometrie", "photometrie nitrat", "Photometrie sweep-lab"]) {
+  const list = run(query, lab);
+  check(`'${query}': the words in any order find the spreadsheet`, list[0]?.label === NITRAT, labels(list));
+}
+{
+  const list = run("tabelle photo", lab);
+  check("'tabelle photo' lists both spreadsheets with 'photo' before making one", pageLabels(list).join(" | ") === `${NITRAT} | ${PHOTO}` && list[2]?.label === "Neue Tabelle „photo“", labels(list));
+}
+{
+  const list = run("Notiz Nitrat", lab);
+  check("'Notiz Nitrat' opens the note, not the spreadsheet", list[0]?.label === DRINKING && list[1]?.label === "Neue Notiz „Nitrat“" && !pageLabels(list).includes(NITRAT), labels(list));
+}
+{
+  const VERIFY = "sweep-verify-lab Titration";
+  let list = run(`Tabelle ${VERIFY}`, [page("sheet", VERIFY)]);
+  check("'Tabelle <the whole title>' opens the spreadsheet", list[0]?.label === VERIFY && list[1]?.label === `Neue Tabelle „${VERIFY}“`, labels(list));
+  list = run("Titration sweep-verify-lab", [page("sheet", VERIFY)]);
+  check("'Titration sweep-verify-lab' (words swapped) opens it", list[0]?.label === VERIFY, labels(list));
+}
+{
+  // The palette's own "Tabelle Titration" makes a spreadsheet called "Titration": the same query opens it later.
+  const made = newPageFor("sheet", "Tabelle Titration", shellText.de.palette.newSheet, SHEET_WORDS).title;
+  const pages = [page("sheet", "Photometrie Nitrat"), page("sheet", made), page("sheet", "Wachstumskurve E. coli")];
+  let list = run("Tabelle Titration", pages);
+  check("'Tabelle Titration' opens the spreadsheet it made before, no second one", made === "Titration" && list[0]?.label === "Titration" && list[1]?.label === "Neue Tabelle „Titration“", labels(list));
+  list = run("Tabelle Wachstumskurve", pages);
+  check("'Tabelle Wachstumskurve' opens 'Wachstumskurve E. coli'", list[0]?.label === "Wachstumskurve E. coli", labels(list));
+}
+{
+  const list = run("Präsentation Zellbiologie", [page("deck", "Zellbiologie Referat"), page("note", "Zellbiologie Mitschrift")]);
+  check("'Präsentation Zellbiologie' opens the presentation, not the note", pageLabels(list).join(" | ") === "Zellbiologie Referat" && list[1]?.label === "Neue Präsentation „Zellbiologie“", labels(list));
+}
+{
+  const list = run("Handschrift Mitose", [page("ink", "Mitose Skizze"), page("note", "Mitose")]);
+  check("'Handschrift Mitose' opens the handwritten note", pageLabels(list).join(" | ") === "Mitose Skizze" && list[1]?.label === "Neue handschriftliche Notiz „Mitose“", labels(list));
+}
+{
+  const list = run("Ordner Chemie", lab);
+  check("'Ordner Chemie' opens the folder, not a new note called 'Ordner Chemie'", list[0]?.label === "Chemie" && pageLabels(list).join(" | ") === "Chemie", labels(list));
+}
+{
+  const list = run("Ordner", lab);
+  check("'Ordner' alone: making a folder comes first, the folders don't jump ahead", list[0]?.id === "folder-new" && !pageLabels(list).includes("Chemie"), labels(list));
+}
+{
+  const list = run("Tabelle", lab);
+  check("'Tabelle' alone: only the titles with the word, after making one", list[0]?.id === "new-sheet" && pageLabels(list).join(" | ") === PHOTO, labels(list));
+}
+{
+  const list = run("Zellatmung Notiz");
+  check("'Zellatmung Notiz' (kind last) finds the note by its words", list[0]?.label === ZELLATMUNG, labels(list));
+}
+// A title typed as it is still comes first, before newer pages that only have its words: what Enter
+// opened before the words counted on their own, it still opens.
+{
+  const list = run("Zellatmung Zusammenfassung", [page("note", "Zusammenfassung Zellatmung Teil 2"), page("note", "Zellatmung Zusammenfassung")]);
+  check("the title as typed first, the newer page with the same words after it", pageLabels(list).join(" | ") === "Zellatmung Zusammenfassung | Zusammenfassung Zellatmung Teil 2", labels(list));
+}
+{
+  const list = run("Notiz zur Zellatmung", [page("note", "Fragen zur Zellatmung"), page("note", ZELLATMUNG)]);
+  check("'Notiz zur Zellatmung' opens the note with that title, not a newer note 'zur Zellatmung'", list[0]?.label === ZELLATMUNG && list[1]?.label === "Fragen zur Zellatmung" && list[2]?.label === "Neue Notiz „zur Zellatmung“", labels(list));
+}
+{
+  const list = run("Zellatmung  Teil", [page("note", "Zellatmung Teil 2")]);
+  check("two spaces between the words still find the title", list[0]?.label === "Zellatmung Teil 2", labels(list));
+}
+
+// Numbered lab pages: the kind and a name a page has as typed come before newer pages that only have
+// its words; a word counts where a title's word starts, a number whole (the verifier's cases).
+{
+  const list = run("Tabelle Versuch 3", [page("sheet", "Versuch 13"), page("sheet", "Versuch 3")]);
+  check("'Tabelle Versuch 3' opens 'Versuch 3', not the newer 'Versuch 13'", pageLabels(list).join(" | ") === "Versuch 3" && list[1]?.label === "Neue Tabelle „Versuch 3“", labels(list));
+}
+{
+  const list = run("Tabelle Gruppe 1", [page("sheet", "Gruppe 2 – Messung 1"), page("sheet", "Gruppe 1")]);
+  check("'Tabelle Gruppe 1' opens 'Gruppe 1' before the newer 'Gruppe 2 – Messung 1'", pageLabels(list).join(" | ") === "Gruppe 1 | Gruppe 2 – Messung 1", labels(list));
+}
+{
+  const list = run("Tabelle Titration", [page("sheet", "Rücktitration"), page("note", "Tabelle zur Titration"), page("sheet", "Titration")]);
+  check("'Tabelle Titration' opens the spreadsheet 'Titration', not a newer note 'Tabelle zur Titration' or 'Rücktitration'", pageLabels(list).join(" | ") === "Titration | Tabelle zur Titration" && list[2]?.label === "Neue Tabelle „Titration“", labels(list));
+}
+// Making a spreadsheet still works as before when only pages with a longer number or word exist.
+for (const [name, title] of [["Versuch 3", "Versuch 13"], ["Messung 2", "Messung 12.02."], ["Tag 1", "Wachstum Tag 12"], ["Lab 3", "Lab 2 (2023)"], ["Versuch 2", "Versuch 2.1"], ["Titration", "Rücktitration"], ["a", "Photometrie Nitrat"]]) {
+  const list = run(`Tabelle ${name}`, [page("sheet", title)]);
+  check(`'Tabelle ${name}' with only '${title}': makes „${name}“ first`, list[0]?.label === `Neue Tabelle „${name}“` && !pageLabels(list).length, labels(list));
+}
+{
+  let list = run("Tabelle Versuch 3", [page("sheet", "Versuch3 Kalibrierung")]);
+  check("a number right after a word counts: 'Tabelle Versuch 3' finds 'Versuch3 Kalibrierung'", list[0]?.label === "Versuch3 Kalibrierung", labels(list));
+  list = run("Tabelle Titration", [page("sheet", "Säure-Base-Titration")]);
+  check("… and a word after a hyphen: 'Tabelle Titration' finds 'Säure-Base-Titration'", list[0]?.label === "Säure-Base-Titration", labels(list));
+  list = run("Tabelle pH 7", [page("sheet", "Puffer pH 7,4"), page("sheet", "Puffer pH 7")]);
+  check("a decimal is one number: 'Tabelle pH 7' opens 'Puffer pH 7', not the newer 'Puffer pH 7,4'", pageLabels(list).join(" | ") === "Puffer pH 7", labels(list));
+  list = run("Tabelle Versuch 2.1", [page("sheet", "Versuch 2.1 Wiederholung"), page("sheet", "Versuch 2. Teil")]);
+  check("… typed on, 'Versuch 2.1' finds it; a point after a number is no decimal ('Versuch 2. Teil')", pageLabels(list).join(" | ") === "Versuch 2.1 Wiederholung" && run("Tabelle Versuch 2", [page("sheet", "Versuch 2. Teil")])[0]?.label === "Versuch 2. Teil", labels(list));
+}
+{
+  // The query as typed finds what it always found, parts of words and numbers too (while typing).
+  let list = run("Versuch 1", [page("sheet", "Versuch 13")]);
+  check("without a kind's name, the query as typed: 'Versuch 1' still finds 'Versuch 13'", list[0]?.label === "Versuch 13", labels(list));
+  list = run("trat", [page("sheet", "Photometrie Nitrat")]);
+  check("… and 'trat' 'Photometrie Nitrat'", list[0]?.label === "Photometrie Nitrat", labels(list));
+}
+
+// Tags find pages as well as titles; the tag shows as the hint of a page its title didn't find.
+{
+  const pages = [page("note", "Zellbiologie", ["Klausur"]), page("note", "Klausur Mathe"), page("note", "Mathe Klausur Fragen", ["klausur"]), page("note", "Mitose")];
+  let list = run("klausur", pages);
+  const hints = (l: Entry[]) => l.filter((e) => e.group === "pages").map((e) => `${e.label}${e.hint ? ` ${e.hint}` : ""}`).join(" | ");
+  check("'klausur': titles and tags, the most recent first, the tag next to the page its title didn't find", hints(list) === "Zellbiologie #Klausur | Klausur Mathe | Mathe Klausur Fragen", hints(list));
+  list = run("#klausur", pages);
+  check("'#klausur': the pages with the tag only", hints(list) === "Zellbiologie #Klausur | Mathe Klausur Fragen #klausur", hints(list));
+}
+
 // In English.
 {
-  const list = run("spreadsheet Lab 3", ["spreadsheet Lab 3 results"], { lang: "en" });
+  const list = run("spreadsheet Lab 3", [page("sheet", "spreadsheet Lab 3 results")], { lang: "en" });
   check("English: 'spreadsheet Lab 3' opens the page", list[0]?.label === "spreadsheet Lab 3 results" && list[1]?.label === "New spreadsheet “Lab 3”", labels(list));
 }
 {
-  const list = run("New spreadsheet", ["Untitled spreadsheet"], { lang: "en" });
+  const list = run("spreadsheet Lab 3", [page("sheet", "Lab 2 (2023)"), page("sheet", "Lab 3")], { lang: "en" });
+  check("English: 'spreadsheet Lab 3' opens 'Lab 3', not the newer 'Lab 2 (2023)'", pageLabels(list).join(" | ") === "Lab 3" && list[1]?.label === "New spreadsheet “Lab 3”", labels(list));
+}
+{
+  const list = run("New spreadsheet", [page("sheet", "Untitled spreadsheet")], { lang: "en" });
   check("English: 'New spreadsheet' makes one first", list[0]?.id === "new-sheet" && list[0]?.label === "New spreadsheet", labels(list));
 }
 {
-  const list = run("note Krebs cycle", ["note Krebs cycle summary"], { lang: "en" });
+  const list = run("note Krebs cycle", [page("note", "note Krebs cycle summary")], { lang: "en" });
   check("English: 'note Krebs cycle' opens the note", list[0]?.label === "note Krebs cycle summary" && list[1]?.label === "New note “Krebs cycle”", labels(list));
+}
+{
+  const list = run("spreadsheet nitrate", [page("note", "nitrate notes"), page("sheet", "Photometry nitrate")], { lang: "en" });
+  check("English: 'spreadsheet nitrate' opens the spreadsheet, not the note", pageLabels(list).join(" | ") === "Photometry nitrate" && list[1]?.label === "New spreadsheet “nitrate”", labels(list));
+}
+{
+  const list = run("folder chemistry", [page("folder", "Chemistry")], { lang: "en" });
+  check("English: 'folder chemistry' opens the folder", list[0]?.label === "Chemistry", labels(list));
+}
+
+// LAB-11: the note that "In Notiz einfügen → Neue Notiz" makes for a spreadsheet has a name of its own.
+{
+  const de = noteBlocksText.de.sheet.addToNote.newNoteTitle;
+  const en = noteBlocksText.en.sheet.addToNote.newNoteTitle;
+  const SHEET = "sweep-lab Kalibrierung";
+  const note = newNoteTitle(SHEET, de);
+  const list = run("Kalibrierung", [page("note", note), page("sheet", SHEET)]);
+  check("the spreadsheet's new note: '… – Auswertung', two rows told apart by name", note === `${SHEET} – Auswertung` && pageLabels(list).join(" | ") === `${note} | ${SHEET}`, labels(list));
+  check("English: '… – notes'", newNoteTitle("Calibration", en) === "Calibration – notes", newNoteTitle("Calibration", en));
+  check("an untitled spreadsheet gives an untitled note, never just the ending", [undefined, null, "", "   "].every((title) => newNoteTitle(title, de) === "" && newNoteTitle(title, en) === ""));
+  // 200 characters, a title's most: shortened for the ending, here right after a space, which goes too.
+  const long = newNoteTitle("Extinktion ".repeat(19).slice(0, 200), de);
+  check("a 200-character name: the note's still fits the 200 characters, ending kept", Array.from(long).length <= 200 && long.endsWith("Extinktion – Auswertung") && !long.includes("  "), long);
+  const emoji = newNoteTitle("🧪".repeat(200), en);
+  check("… counted as the database counts characters (no half emoji)", Array.from(emoji).length === 200 && /^(🧪)+ – notes$/u.test(emoji), Array.from(emoji).length);
 }
 
 // Every list above keeps its groups together (one heading each).

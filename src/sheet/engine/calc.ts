@@ -706,7 +706,7 @@ function call(node: Extract<Node, { t: "call" }>, ctx: EvalCtx): Value {
     }
     vals[i] = v;
   }
-  if (!lift) return named(def.impl!(vals, ctx), def);
+  if (!lift) return emptyLookup(named(def.impl!(vals, ctx), def), def, vals[0]);
   // Excel 365: a function of one value given arrays runs once per element.
   const lifted: (Scalar | Matrix)[] = [];
   const idx: number[] = [];
@@ -723,7 +723,7 @@ function call(node: Extract<Node, { t: "call" }>, ctx: EvalCtx): Value {
       if (!def.takesErrors && isErr(x)) return x;
       args[idx[k]] = x;
     }
-    const r = named(def.impl!(args, ctx), def);
+    const r = emptyLookup(named(def.impl!(args, ctx), def), def, args[0]);
     if (isRef(r)) return ctx.calc.cellValue(r.sheet, r.r0, r.c0);
     if (isMatrix(r)) return r[0]?.[0] ?? null;
     return r;
@@ -742,6 +742,14 @@ function named(r: Value, def: FnDef): Value {
   if (!isErr(r) || !r.detail) return r;
   const m = WHY_DETAIL.exec(r.detail);
   return m ? mkErr(r.error, `${m[1]}:${def.name}${r.detail.slice(m[0].length)}`) : r;
+}
+
+/**
+ * A lookup value from an empty cell finds nothing (#NV, like Excel), and the error says that the
+ * cell is empty: "the value isn't in the lookup range" would send the student searching the table.
+ */
+function emptyLookup(r: Value, def: FnDef, lookup: Value): Value {
+  return def.lookupValue && lookup === null && isErr(r) && r.error === "#N/A" && r.detail === "not-found" ? mkErr("#N/A", "empty-lookup") : r;
 }
 
 export function createCalcImpl(wb: Workbook, opts?: CalcOptions): Calc {

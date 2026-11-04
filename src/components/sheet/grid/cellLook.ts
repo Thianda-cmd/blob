@@ -81,10 +81,10 @@ export function numberAsText(cell: Cell | undefined, near: (dRow: -1 | 1) => Cel
   return typeof near(-1) === "number" || typeof near(1) === "number";
 }
 
-/** Text of digits and number signs only, as typed for a number ("12", "0,1040,110", "O,104" with the letter O). */
+/** Text of digits and number signs only, as typed for a number ("12", "0,1040,110", "O,104" with the letter O, "1.5E-3" with an exponent). */
 export function numberLike(text: string): boolean {
   const t = text.trim();
-  return /\d/.test(t) && /^[+-]?[\dOo.,' ]+%?$/.test(t);
+  return /\d/.test(t) && /^[+-]?[\dOo.,' ]+(?:[eE][+-]?\d+)?%?$/.test(t);
 }
 
 /** CSS for one border line (an Excel border is dark, like ink). */

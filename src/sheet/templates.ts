@@ -426,7 +426,7 @@ function bradford(locale: Locale): Workbook {
       ),
       7: t(
         "The line is only reliable between the lowest and the highest standard (their net absorbances are compared). Above it: dilute the sample more and measure again. Below it, or a result under 0: dilute it less.",
-        "Die Gerade gilt nur sicher zwischen dem kleinsten und dem größten Standard (verglichen wird das Netto). Liegt eine Probe darüber: stärker verdünnen und neu messen. Liegt sie darunter oder ergibt sie weniger als 0: weniger verdünnen.",
+        "Die Gerade gilt nur sicher zwischen dem kleinsten und dem größten Standard (verglichen wird die Spalte „Netto“). Liegt eine Probe darüber: stärker verdünnen und neu messen. Liegt sie darunter oder ergibt sie weniger als 0: weniger verdünnen.",
       ),
       8: t("The sample's dilution before measuring, e.g. 10 for 1:10.", "Verdünnungsfaktor der Probe vor dem Messen, z. B. 10 für 1:10."),
       9: t("Concentration × dilution: the protein content of the undiluted sample.", "Konzentration × Verdünnung: der Proteingehalt der unverdünnten Probe."),
@@ -678,7 +678,7 @@ function dilution(locale: Locale): Workbook {
     ),
   });
   d.set(VOLUME, 0, t("Total volume per tube", "Gesamtvolumen je Röhrchen"));
-  d.set(VOLUME, 1, 1000, { fmt: dec(0, "µL"), style: INPUT, note: t("Diluent + transfer: what each tube holds right after mixing.", "Verdünnungsmittel + Übertragen: So viel ist direkt nach dem Mischen in jedem Röhrchen.") });
+  d.set(VOLUME, 1, 1000, { fmt: dec(0, "µL"), style: INPUT, note: t("“Diluent” + “Transfer”: what each tube holds right after mixing.", "„Verdünnungsmittel“ + „Übertragen“: So viel ist direkt nach dem Mischen in jedem Röhrchen.") });
   // Part of it goes on to the next tube (from the last one it is discarded), so less stays than was mixed.
   d.set(LEFT, 0, t("Left in each tube", "Bleibt je Röhrchen"));
   d.set(LEFT, 1, `=${at(VOLUME, 1)}-${at(VOLUME, 1)}/${at(FACTOR, 1)}`, {

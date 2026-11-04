@@ -5,7 +5,7 @@
 import type { KeyboardEvent } from "react";
 import { sheetById } from "@/sheet/ops";
 import type { Pos } from "@/sheet/types";
-import { insertChart } from "../chart/actions";
+import { makeChart } from "../chart/actions";
 import { autoSum, toggleStyle } from "../chrome/actions";
 import { openSheetPanel } from "../events";
 import { activeArea, type SheetStore } from "../store";
@@ -15,7 +15,7 @@ import { nowText } from "./CellEditor";
 import { endCut } from "./clipboard";
 import { pageRows, type Layout, type Viewport } from "./geometry";
 import { lastInRow, usedArea } from "./navigation";
-import { moveSelection } from "./point";
+import { extendSelection, moveSelection, movingEnd } from "./point";
 
 export type GridKeyContext = {
   store: SheetStore;
@@ -25,6 +25,11 @@ export type GridKeyContext = {
   typeInto: () => void;
   /** Get the hidden clipboard field ready, so the browser copies from it or pastes into it. `plain`: paste values only (Ctrl+Shift+V). */
   prepareClipboard: (kind: "copy" | "cut" | "paste", plain: boolean) => void;
+  /**
+   * Ctrl+Shift+V when the page may read the clipboard: paste values with all the clipboard holds
+   * (true). false: it may not, and the browser pastes plain text through the hidden field.
+   */
+  pasteValues?: () => boolean;
   /** The context menu at the active cell (context-menu key, Shift+F10). */
   openMenu: () => void;
   /** Ctrl++ / Ctrl+- when neither whole rows nor whole columns are selected: ask which. */
@@ -54,7 +59,7 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
     e.stopPropagation();
   };
   const sel = s.selection;
-  const extendTo = (p: Pos) => store.select({ anchor: sel.anchor, focus: p, extra: sel.extra });
+  const extendTo = (p: Pos) => extendSelection(store, p);
   const goTo = (p: Pos) => (e.shiftKey ? extendTo(p) : store.select(p));
 
   // Alt+= : AutoSum (on a German keyboard "=" is Shift+0).
@@ -72,7 +77,8 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
     return;
   }
   // Typing a character starts editing (replacing the cell): the key itself lands in the editor.
-  const printable = key.length === 1 || key === "Dead" || key === "Process" || e.keyCode === 229;
+  // (One character, which may be two UTF-16 units: an emoji.)
+  const printable = Array.from(key).length === 1 || key === "Dead" || key === "Process" || e.keyCode === 229;
   if (printable && !mod && (!e.altKey || altGr || isMac())) {
     if (!s.readOnly) ctx.typeInto();
     return;
@@ -92,7 +98,7 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
     return;
   }
 
-  const from = e.shiftKey ? sel.focus : sel.anchor;
+  const from = e.shiftKey ? movingEnd(sel) : sel.anchor;
   switch (key) {
     case "Home":
       done();
@@ -161,14 +167,15 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
         openSheetPanel("functions");
       }
       return;
+    // A chart, as Excel's Alt+F1 and F11 make one (with nothing to chart, the hint the toolbar gives).
     case "F11":
       done();
-      if (!s.readOnly) insertChart(store);
+      if (!s.readOnly) makeChart(store);
       return;
     case "F1":
       if (e.altKey) {
         done();
-        if (!s.readOnly) insertChart(store);
+        if (!s.readOnly) makeChart(store);
       }
       return;
     case "F10":
@@ -196,7 +203,12 @@ export function handleGridKey(e: KeyboardEvent<HTMLElement>, ctx: GridKeyContext
     case "x":
     case "v":
       // The browser copies or pastes (with the system clipboard); the hidden field and the
-      // copy/cut/paste handlers do the rest. Shift+V: paste values only, through the same field.
+      // copy/cut/paste handlers do the rest. Shift+V: paste values only, through the same field,
+      // unless the grid may read the clipboard itself (then the copy's HTML comes along too).
+      if (k === "v" && e.shiftKey && ctx.pasteValues?.()) {
+        done();
+        return;
+      }
       ctx.prepareClipboard(k === "c" ? "copy" : k === "x" ? "cut" : "paste", e.shiftKey);
       return;
     case "z":

@@ -162,7 +162,7 @@ export function FilterValues({
           type="button"
           onClick={apply}
           disabled={!chosen.length || disabled}
-          className="inline-flex h-8 items-center rounded-lg bg-blob px-3.5 text-[12.5px] font-medium text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-colors hover:bg-blob-deep disabled:opacity-45 [@media(hover:none)]:h-10"
+          className="inline-flex h-8 items-center rounded-lg bg-blob px-3.5 text-[12.5px] font-medium text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-colors hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)] disabled:opacity-45 [@media(hover:none)]:h-10"
         >
           {t.apply}
         </button>

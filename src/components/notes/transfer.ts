@@ -7,6 +7,7 @@ import type { Locale } from "@/i18n/config";
 import { fileUrl, uploadFile } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import type { PageKind, PageMeta } from "@/lib/types";
+import { embedPageId } from "@/sheet/embedAttrs";
 import {
   BLOB_FORMAT_VERSION,
   MAX_ASSET_BYTES,
@@ -27,6 +28,7 @@ import {
 
 type Row = { id: string; kind: PageKind; title: string; icon: string | null; tags: string[] | null; topics: string[] | null; content: unknown; parent_id: string | null };
 const KINDS = new Set<PageKind>(["note", "deck", "folder", "ink", "sheet"]);
+const COLS = "id, kind, title, icon, tags, topics, content, parent_id";
 
 /**
  * A title from a file (its name, its first heading) as a page can keep it: at most 200 characters,
@@ -66,19 +68,59 @@ function fromBase64(data: string) {
 /** The pages and everything below them (not in the trash, CVs left out), as stored. */
 async function loadTree(rootIds: string[]): Promise<Row[] | null> {
   const db = createClient();
-  const cols = "id, kind, title, icon, tags, topics, content, parent_id";
-  const { data, error } = await db.from("pages").select(cols).in("id", rootIds).is("trashed_at", null);
+  const { data, error } = await db.from("pages").select(COLS).in("id", rootIds).is("trashed_at", null);
   if (error) return null;
   const rows = (data ?? []) as Row[];
   let level = rows.map((r) => r.id);
   for (let depth = 0; depth < 12 && level.length; depth++) {
-    const { data: kids, error: kidsError } = await db.from("pages").select(cols).in("parent_id", level).is("trashed_at", null).order("position");
+    const { data: kids, error: kidsError } = await db.from("pages").select(COLS).in("parent_id", level).is("trashed_at", null).order("position");
     if (kidsError) return null;
     const fresh = ((kids ?? []) as Row[]).filter((k) => !rows.some((r) => r.id === k.id));
     rows.push(...fresh);
     level = fresh.map((k) => k.id);
   }
   return rows.filter((r) => KINDS.has(r.kind));
+}
+
+/** A spreadsheet or presentation a note shows that couldn't come along: in the trash (its title known), or deleted or not shared with you (null). */
+export type LeftOut = { kind: "sheet" | "deck"; title: string | null };
+
+/**
+ * The pages a note's blocks show, by id: spreadsheets (a chart, smart table or cells: `pageId`)
+ * and presentations (`id`), in the order they come in the note. Adds to `into`.
+ */
+export function shownPages(content: unknown, into = new Map<string, LeftOut["kind"]>()) {
+  const walk = (node: JSONContent) => {
+    const id = node.type === "sheetEmbed" ? embedPageId(node.attrs?.pageId) : node.type === "deckEmbed" ? embedPageId(node.attrs?.id) : null;
+    if (id && !into.has(id)) into.set(id, node.type === "sheetEmbed" ? "sheet" : "deck");
+    node.content?.forEach(walk);
+  };
+  if (isDoc(content)) walk(content);
+  return into;
+}
+
+/**
+ * The pages notes show that aren't among those exported, as stored: only the page itself (what is
+ * below it stays home). One in the trash or out of reach stays out (`left`); one that isn't what
+ * its block expects (a block's own notice says so) too, without a word. Null without a connection.
+ */
+async function loadShown(shown: Map<string, LeftOut["kind"]>): Promise<{ rows: Row[]; left: LeftOut[] } | null> {
+  if (!shown.size) return { rows: [], left: [] };
+  const { data, error } = await createClient()
+    .from("pages")
+    .select(`${COLS}, trashed_at`)
+    .in("id", [...shown.keys()]);
+  if (error) return null;
+  const found = new Map(((data ?? []) as (Row & { trashed_at: string | null })[]).map((r) => [r.id, r]));
+  const rows: Row[] = [];
+  const left: LeftOut[] = [];
+  for (const [id, kind] of shown) {
+    const row = found.get(id);
+    if (row && row.kind !== kind) continue;
+    if (row && !row.trashed_at) rows.push(row);
+    else left.push({ kind, title: row ? row.title : null });
+  }
+  return { rows, left };
 }
 
 /** Everything on a handwritten note, as stored (without what was deleted). */
@@ -99,15 +141,29 @@ async function inkItems(pageId: string) {
   return out;
 }
 
-export type ExportResult = { file: BlobFile; pages: number; /** Pictures and files that couldn't come along (too big, or unreachable). */ missing: number };
+export type ExportResult = {
+  file: BlobFile;
+  pages: number;
+  /** Pictures and files that couldn't come along (too big, or unreachable). */
+  missing: number;
+  /** Spreadsheets and presentations the notes show that couldn't come along. */
+  left: LeftOut[];
+};
 
 /**
- * A Blob file of these pages and all their sub-pages, pictures and attached files inside.
+ * A Blob file of these pages and all their sub-pages, pictures and attached files inside, and of
+ * the spreadsheets and presentations their notes show from elsewhere (so their charts, tables and
+ * slides open with them in another account: importing points the blocks to the copies).
  * `current` replaces a page's stored content with what an open editor holds right now.
  */
 export async function exportPages(rootIds: string[], current?: { id: string; content: JSONContent }): Promise<ExportResult | null> {
   const rows = await loadTree(rootIds);
   if (!rows) return null;
+  const shown = new Map<string, LeftOut["kind"]>();
+  for (const r of rows) if (r.kind === "note") shownPages(current && r.id === current.id ? current.content : r.content, shown);
+  for (const r of rows) shown.delete(r.id);
+  const extra = await loadShown(shown);
+  if (!extra) return null;
   const byParent = new Map<string, Row[]>();
   for (const r of rows) if (r.parent_id && !rootIds.includes(r.id)) byParent.set(r.parent_id, [...(byParent.get(r.parent_id) ?? []), r]);
 
@@ -135,7 +191,8 @@ export async function exportPages(rootIds: string[], current?: { id: string; con
     }
   };
 
-  const build = async (r: Row): Promise<BlobFilePage> => {
+  /** A page for the file, with its sub-pages unless `alone`. */
+  const build = async (r: Row, alone = false): Promise<BlobFilePage> => {
     let content: unknown = current && r.id === current.id ? current.content : r.content;
     // Handwritten notes: what is on their sheets comes along.
     if (r.kind === "ink") content = { v: 1, preview: (r.content as { preview?: unknown } | null)?.preview ?? null, items: await inkItems(r.id) };
@@ -153,7 +210,7 @@ export async function exportPages(rootIds: string[], current?: { id: string; con
       if (id) found.set(path, assetRef(id));
       else missing++;
     }
-    const kids = await Promise.all((byParent.get(r.id) ?? []).map(build));
+    const kids = alone ? [] : await Promise.all((byParent.get(r.id) ?? []).map((kid) => build(kid)));
     return {
       ref: r.id,
       kind: page.kind,
@@ -169,10 +226,13 @@ export async function exportPages(rootIds: string[], current?: { id: string; con
   const roots = rootIds.map((id) => rows.find((r) => r.id === id)).filter((r): r is Row => !!r);
   const pages = [];
   for (const r of roots) pages.push(await build(r));
+  // What the notes show comes after the pages asked for (an import opens the first page).
+  for (const r of extra.rows) pages.push(await build(r, true));
   return {
     file: { format: "blob", version: BLOB_FORMAT_VERSION, exportedAt: new Date().toISOString(), app: "Blob", pages, assets },
-    pages: rows.length,
+    pages: rows.length + extra.rows.length,
     missing,
+    left: extra.left,
   };
 }
 

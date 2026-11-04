@@ -11,7 +11,7 @@ import type { Locale } from "@/i18n/config";
 import { cellKey, parsePos } from "@/sheet/a1";
 import { createCalc, formatValue, FUNCTION_NAMES, isError, tokenizeFormula, type FormulaToken } from "@/sheet/engine";
 import { getCell } from "@/sheet/ops";
-import type { Cell, Sheet, Workbook } from "@/sheet/types";
+import type { Cell, NumberFormat, Sheet, Workbook } from "@/sheet/types";
 import {
   autoSum,
   autoSumCells,
@@ -35,20 +35,32 @@ import { previewValue, resolveName, selectionName } from "@/components/sheet/chr
 import { errorHelp } from "@/components/sheet/chrome/errorHelp";
 import { browseFunctions, newerNames } from "@/components/sheet/chrome/FunctionBrowser";
 import { functionsForWords, squeeze } from "@/components/sheet/chrome/functionWords";
-import { formatFor, formatId, shownDecimals } from "@/components/sheet/chrome/NumberFormatMenu";
+import { FormatPanel, formatFor, formatId, shownDecimals, UnitPanel } from "@/components/sheet/chrome/NumberFormatMenu";
 import { sheetHasContent, sheetNameProblem } from "@/components/sheet/chrome/SheetTabs";
 import { fitFigures, selectionStats, type FigureKey } from "@/components/sheet/chrome/StatusBar";
-import { barWidth, labelRoom, toolbarLayout, type GroupId } from "@/components/sheet/chrome/Toolbar";
-import { makeChart } from "@/components/sheet/chrome/ToolbarPanels";
+import { barWidth, labelRoom, Toolbar, toolbarLayout, type GroupId } from "@/components/sheet/chrome/Toolbar";
+import { ColorPanel, paletteStep } from "@/components/sheet/chrome/ToolbarPanels";
+import { makeChart } from "@/components/sheet/chart/actions";
+import { SaveIndicator } from "@/components/page/SaveIndicator";
+import { inputClass } from "@/components/ui/Input";
+import { Kbd } from "@/components/ui/Kbd";
+import { panesText } from "@/i18n/messages/panes";
 import { currentSheetNotice, hideSheetNotice, holdSheetNotice, noticeDuration, sheetNoticeCountsDown, showSheetNotice } from "@/components/sheet/notice";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { SHEET_EVENT, type SheetEventDetail } from "@/components/sheet/events";
 import { clearSelection, fillFrom, fillSelectionWith, fillTo, menuKindFor, selectRegionOrAll } from "@/components/sheet/grid/actions";
 import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
-import { formulaArgument, formulaSuggestions } from "@/components/sheet/grid/FormulaHints";
+import { ArgumentHint, formulaArgument, formulaSuggestions, SuggestionList } from "@/components/sheet/grid/FormulaHints";
 import { handleGridKey, type GridKeyContext } from "@/components/sheet/grid/keys";
-import { cycleReference, formulaTokens, insertSelectionRef, pointAt, pointing, refFrames } from "@/components/sheet/grid/point";
-import { createSheetStore, type SheetStore } from "@/components/sheet/store";
+import { cycleReference, extendSelection, formulaTokens, insertSelectionRef, moveSelection, movingEnd, pointAt, pointing, refFrames, resizedCorner } from "@/components/sheet/grid/point";
+import { chartData } from "@/sheet/chart/data";
+import { buildChartScene } from "@/sheet/chart/scene";
+import { SHEET_TEMPLATES } from "@/sheet/templates";
+import { sheetText } from "@/i18n/messages/sheet";
+import { sheetChartText } from "@/i18n/messages/sheetChart";
+import { sheetTableText } from "@/i18n/messages/sheetTable";
+import { noteBlocksText } from "@/i18n/messages/noteBlocks";
+import { activeArea, createSheetStore, selectionAreas, type SheetStore } from "@/components/sheet/store";
 import { makeTable, setTableFilter } from "@/sheet/table/model";
 import { helpFrame, placeHelp } from "@/components/sheet/grid/CellEditor";
 import { numberAsText, numberLike } from "@/components/sheet/grid/cellLook";
@@ -56,7 +68,18 @@ import { describer } from "@/components/sheet/grid/GridCells";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { keypadContext, keypadFor } from "@/components/sheet/grid/keypad";
 import { currentRegion } from "@/components/sheet/grid/navigation";
-import { placeMenu } from "@/components/ui/ContextMenu";
+import { buildLayout, rowAt } from "@/components/sheet/grid/geometry";
+import { dragCell, fillTarget, noticeBeside, placeFillHint, scrollSpeed } from "@/components/sheet/grid/shown";
+import { placeMenu, placeMenuIn, shownArea } from "@/components/ui/ContextMenu";
+import { MenuItem, nearestWorking, placePopover, uncappedHeight } from "@/components/ui/Menu";
+import { pageIndex, roveIndex } from "@/components/ui/menuKeys";
+import { NOTICE_BOTTOM, NoticeAction, SheetNotices } from "@/components/sheet/SheetNotice";
+import { pasteNotice } from "@/components/sheet/grid/ContextMenu";
+import { Note as TableNote } from "@/components/sheet/table/parts";
+import { Note as ChartNote } from "@/components/sheet/chart/PanelParts";
+import { ArgumentHint as BarArgumentHint, HELP_TEXT, SuggestionList as BarSuggestionList } from "@/components/sheet/chrome/FormulaHelp";
+import { createElement, type ComponentProps } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 // Helpers that wrap other modules report a failure on the console; in normal use nothing may be
 // reported. Every console.error from here on is collected and checked at the end.
@@ -995,11 +1018,12 @@ section("German 1.234: a hint with a one-click correction (FORM-2)");
   typeAt(unit, "C2", "2.345 g");
   currentSheetNotice(unit)?.action?.run();
   eq("2.345 g → 2,345 g", [valueOf(unit, "C2"), shown(unit, "C2")], [2.345, "2,345 g"]);
-  // It goes once you edit or select something else, and a stale click changes nothing.
+  // It stays while the next values are typed and other cells are selected (column entry is value,
+  // Enter, next value), goes once its cell holds something else, and a stale click changes nothing.
   const next = storeOf({});
   typeAt(next, "A2", "1.234");
   next.startEdit({ via: "cell", replace: true, text: "5" });
-  eq("typing on: the hint goes", currentSheetNotice(next), null);
+  eq("typing on: the hint stays", currentSheetNotice(next)?.action?.label, "Als 1,234 lesen");
   next.cancelEdit();
   const clicked = storeOf({});
   selectA1(clicked, "A2");
@@ -1007,13 +1031,14 @@ section("German 1.234: a hint with a one-click correction (FORM-2)");
   selectA1(clicked, "C5");
   eq("finished by clicking another cell: the hint stays, as with Enter", [valueOf(clicked, "A2"), currentSheetNotice(clicked)?.action?.label], [1234, "Als 1,234 lesen"]);
   selectA1(clicked, "D6");
-  eq("…and goes with the next click", currentSheetNotice(clicked), null);
+  eq("…and with the next click", currentSheetNotice(clicked)?.action?.label, "Als 1,234 lesen");
   const away = storeOf({});
   typeAt(away, "A2", "1.234");
   const stale = currentSheetNotice(away)?.action;
   selectA1(away, "D9");
-  eq("selecting another cell: the hint goes", currentSheetNotice(away), null);
+  eq("selecting another cell: the hint stays", currentSheetNotice(away)?.action?.label, "Als 1,234 lesen");
   typeAt(away, "A2", "7");
+  eq("its cell typed over: the hint goes", currentSheetNotice(away), null);
   stale?.run();
   eq("a click on a hint whose cell changed since does nothing", [valueOf(away, "A2"), away.get().undoLabel], [7, "Eingabe"]);
   // …and once the cell holds something else, with the same cell still selected: typed without
@@ -1466,7 +1491,8 @@ section("the block of data around a cell (Ctrl+A, sorting)");
   t0 = performance.now();
   selectRegionOrAll(store);
   const selectMs = performance.now() - t0;
-  eq("Ctrl+A in A6 selects all 20,000 rows", store.get().selection, { anchor: { row: 0, col: 0 }, focus: { row: rows - 1, col: 2 }, extra: [] });
+  eq("Ctrl+A in A6 selects all 20,000 rows", activeArea(store.get().selection), { r0: 0, c0: 0, r1: rows - 1, c1: 2 });
+  eq("…the active cell staying in A6 (as in Excel)", store.get().selection.anchor, pos("A6"));
   check("…in well under a second", selectMs < 500, `${Math.round(selectMs)} ms`);
   t0 = performance.now();
   const plan = sortPlan(big, store.get().calc, "s1", { anchor: pos("B2"), focus: pos("B2"), extra: [] });
@@ -1643,6 +1669,927 @@ section("phones and tablets: digits where numbers are typed, letters elsewhere")
   eq("numbers get the digits keyboard", keypadFor("number", none), "decimal");
   eq("the rest the letters", keypadFor("other", none), "text");
   eq("a choice by hand sticks for that kind of cell", [keypadFor("number", { number: "text", other: null }), keypadFor("other", { number: "text", other: null })], ["text", "text"]);
+}
+
+// ==============================================================================================
+// Sweep fixes, lane TM: menus with the on-screen keyboard up, pasting from a finger's menu, the
+// formula help's size and contrast, the number-as-text tip.
+section("menus stay where they can be seen while the on-screen keyboard is up");
+{
+  const view = (offsetTop: number, height: number, scale = 1) => ({ offsetTop, height, scale });
+  eq("typing on a phone, the keyboard up (300 px): above it", shownArea(view(0, 544), 844, true), { top: 0, bottom: 544 });
+  eq("…the page pushed up for the field: from where it starts now", shownArea(view(120, 424), 844, true), { top: 120, bottom: 544 });
+  eq("no text field has the keyboard: it is on its way down, the whole window will be seen", shownArea(view(0, 544), 844, false), { top: 0, bottom: 844 });
+  eq("a pinch zoom: only the zoomed part", shownArea(view(300, 422, 2), 844, false), { top: 300, bottom: 722 });
+  eq("no visual viewport: the window", shownArea(null, 844, true), { top: 0, bottom: 844 });
+
+  // The cells' menu (267 px wide, 1013 px of items) while the keyboard covers the screen's bottom
+  // and the page is pushed up by 0 or 60 px: opened by a finger, and by the menu key.
+  const w = 267;
+  const full = 1013;
+  let tries = 0;
+  let outside = 0;
+  let under = 0;
+  let short = 0;
+  for (const [vw, vh, kb] of [[390, 844, 300], [360, 640, 260], [820, 1180, 360], [1180, 820, 360], [1280, 800, 360]]) {
+    const cap = Math.min(vh * 0.7, 520);
+    for (const off of [0, 60]) {
+      const area = { top: off, bottom: off + vh - kb };
+      for (let x = 2; x < vw; x += 23) {
+        for (let y = area.top + 2; y < area.bottom; y += 17) {
+          for (const finger of [true, false]) {
+            tries++;
+            const p = placeMenuIn({ x, y, keyboard: !finger, finger }, w, full, cap, vw, area);
+            const h = p.maxHeight ?? Math.min(full, cap);
+            if (p.left < 7.5 || p.left + w > vw - 7.5 || p.top < area.top + 7.5 || p.top + h > area.bottom - 7.5) outside++;
+            if (finger && x > p.left - 16 && x < p.left + w + 16 && y > p.top - 16 && y < p.top + h + 16) under++;
+            if (h < 120) short++;
+          }
+        }
+      }
+    }
+  }
+  eq(`${tries} menus with the keyboard up: all inside what can be seen (the rest of the list scrolls)`, outside, 0);
+  eq("…never under the finger", under, 0);
+  eq("…and at least 120 px tall", short, 0);
+  const desk = placeMenuIn({ x: 100, y: 100, keyboard: false }, 220, 300, 520, 1280, { top: 0, bottom: 800 });
+  eq("a mouse, no keyboard up: at the pointer, as before", [desk.left, desk.top, desk.maxHeight], [100, 100, null]);
+  const corner = placeMenuIn({ x: 1200, y: 700, keyboard: false }, 220, 300, 520, 1280, { top: 0, bottom: 800 });
+  eq("…flipped near the window's edges, as before", [corner.left, corner.top, corner.maxHeight], [980, 400, null]);
+  const tablet = placeMenuIn({ x: 300, y: 400, keyboard: false, finger: true }, w, full, 520, 1280, { top: 0, bottom: 800 });
+  eq("a finger on a tablet, no keyboard up: beside it, as before", [tablet.left, tablet.maxHeight], [328, 520]);
+}
+
+section("popovers (the toolbar's “Mehr”, every menu of the app) stay where they can be seen");
+{
+  // Without a keyboard up, every popover goes exactly where it went before the keyboard counted.
+  const before = (r: { top: number; bottom: number; left: number; right: number }, w: number, h: number, side: "bottom" | "top" | "right", align: "start" | "end", vw: number, vh: number) => {
+    let left = side === "right" ? r.right + 6 : align === "start" ? r.left : r.right - w;
+    let top = side === "bottom" ? r.bottom + 6 : side === "top" ? r.top - h - 6 : r.top;
+    left = Math.max(8, Math.min(left, vw - w - 8));
+    top = Math.max(8, Math.min(top, vh - h - 8));
+    return { top, left, maxHeight: null };
+  };
+  let all = 0;
+  let same = 0;
+  for (const [vw, vh] of [[1440, 900], [1280, 800], [390, 844]]) {
+    for (let x = 0; x < vw; x += 97) {
+      for (let y = 0; y < vh; y += 41) {
+        for (const h of [74, 211, 515]) {
+          for (const side of ["bottom", "top", "right"] as const) {
+            for (const align of ["start", "end"] as const) {
+              all++;
+              const r = { top: y, bottom: y + 30, left: x, right: x + 36 };
+              if (show(placePopover(r, 240, h, side, align, { top: 0, bottom: vh }, vw)) === show(before(r, 240, h, side, align, vw, vh))) same++;
+            }
+          }
+        }
+      }
+    }
+  }
+  eq(`${all} popovers without a keyboard up: placed exactly as before`, same, all);
+  // The tester's case: "Mehr" (530 px) under the phone's toolbar while a cell is being typed in.
+  eq(
+    "“Mehr” with the keyboard up: above it, as tall as fits, scrolling",
+    placePopover({ top: 92, bottom: 130, left: 330, right: 366 }, 294, 530, "bottom", "end", { top: 0, bottom: 544 }, 390),
+    { top: 8, left: 72, maxHeight: 528 },
+  );
+  let n = 0;
+  let out = 0;
+  let capped = 0;
+  for (const [vw, vh, kb, off] of [[390, 844, 300, 0], [390, 844, 300, 80], [820, 1180, 360, 0], [1280, 800, 360, 40], [844, 390, 200, 0]]) {
+    const area = { top: off, bottom: off + vh - kb };
+    for (let y = area.top; y < area.bottom - 30; y += 19) {
+      for (const h of [60, 300, 520, 900]) {
+        for (const side of ["bottom", "top", "right"] as const) {
+          n++;
+          const p = placePopover({ top: y, bottom: y + 30, left: 40, right: 76 }, 280, h, side, "start", area, vw);
+          const shown = p.maxHeight ?? h;
+          if (p.top < area.top + 7.5 || p.top + shown > area.bottom - 7.5) out++;
+          if ((p.maxHeight !== null) !== h > area.bottom - area.top - 16) capped++;
+        }
+      }
+    }
+  }
+  eq(`${n} popovers with the keyboard up: all inside what can be seen`, out, 0);
+  eq("…shortened (and scrolling) only when taller than that", capped, 0);
+
+  // A shortened popover is measured again whenever the keyboard or the page moves, by lifting its
+  // cap for a moment. A browser lays it out then and scrolls the list (which fits without the cap)
+  // back to its top; this stand-in for 530 px of entries does the same.
+  const panel = (cap: string, scrolled: number) => {
+    const style = { maxHeight: cap };
+    const room = () => (style.maxHeight ? Math.max(0, 530 - parseFloat(style.maxHeight)) : 0);
+    let top = scrolled;
+    return {
+      style,
+      get scrollTop() {
+        return Math.min(top, room());
+      },
+      set scrollTop(v: number) {
+        top = Math.max(0, Math.min(v, room()));
+      },
+      get offsetHeight() {
+        top = Math.min(top, room());
+        return style.maxHeight ? parseFloat(style.maxHeight) : 530;
+      },
+    };
+  };
+  const scrolled = panel("448px", 60);
+  eq("a shortened popover is measured as tall as its entries", uncappedHeight(scrolled as unknown as HTMLElement), 530);
+  eq("…and stays where a finger scrolled it, still shortened", [scrolled.scrollTop, scrolled.style.maxHeight], [60, "448px"]);
+  eq("a popover that fits is measured as it is", uncappedHeight(panel("", 0) as unknown as HTMLElement), 530);
+}
+
+section("pasting from a finger's menu says how, without keyboard shortcuts");
+{
+  for (const locale of ["de", "en"] as const) {
+    const t = sheetGridText[locale];
+    eq(`${locale}: the clipboard refused, from a mouse's menu: the keyboard's way`, pasteNotice(false, false, false, t), t.pasteHint);
+    eq(`${locale}: …from a finger's menu: the touch screen's way`, pasteNotice(false, false, true, t), t.pasteHintTouch);
+    check(`${locale}: …which needs no key`, !/Strg|Ctrl|⌘|\bTab\b/.test(t.pasteHintTouch), t.pasteHintTouch);
+    eq(`${locale}: an empty clipboard, or Blob's own copy that didn't fit: nothing to paste`, [pasteNotice(true, false, true, t), pasteNotice(false, true, false, t)], [t.pasteNothing, t.pasteNothing]);
+  }
+  // A finger's menu hides the shortcuts beside its items by this mark (see the grid's menu).
+  // (The label goes in as the third argument, which React hands the item as its children.)
+  const item = renderToStaticMarkup(createElement(MenuItem, { shortcut: "Strg+X" } as ComponentProps<typeof MenuItem>, "Ausschneiden"));
+  check("a menu item's shortcut carries data-shortcut", /<span data-shortcut="" [^>]*>Strg\+X<\/span>/.test(item), item);
+}
+
+section("the formula help is as big and dark as the panels' hints, and tells a finger to tap");
+{
+  const avg = FUNCTION_NAMES.find((f) => f.en === "AVERAGE")!;
+  const avgIfs = FUNCTION_NAMES.find((f) => f.en === "AVERAGEIFS")!;
+  const d = sheetGridText.de;
+  const cellList = renderToStaticMarkup(createElement(SuggestionList, { items: [avg, avgIfs], pick: 0, locale: "de", label: d.functions, hint: d.pickHint, onPick: () => {} }));
+  const cellHint = renderToStaticMarkup(createElement(ArgumentHint, { fn: "AVERAGE", index: 0, locale: "de" }));
+  const barList = renderToStaticMarkup(createElement(BarSuggestionList, { id: "fx", items: [avg, avgIfs], pick: 0, locale: "de", t: sheetChromeText.de, tapHint: d.pickHintTouch, typed: "MITTELW", onPick: () => {} }));
+  const barHint = renderToStaticMarkup(createElement(BarArgumentHint, { fn: "AVERAGE", index: 0, locale: "de", t: sheetChromeText.de }));
+  eq("the help's text: 12 px, ink-2 (4.5:1 and more)", HELP_TEXT, "text-[12px] leading-snug text-ink-2");
+  // (Not lighter than ink-2 nor under 12 px; the formula bar's category tags are tags, not help.)
+  const readable = (html: string) => !/text-ink-3|text-\[1[01](?:\.5)?px\]/.test(html);
+  check("in the cell: the list's summaries and its last line", readable(cellList), cellList);
+  check("…what the function does and what the argument is", readable(cellHint), cellHint);
+  check("formula bar: what the function does and what the argument is", readable(barHint), barHint);
+  check("…the list's summaries", barList.includes(`class="line-clamp-1 ${HELP_TEXT}"`), barList);
+  for (const [name, html] of [["in the cell", cellList], ["formula bar", barList]] as const) {
+    check(`${name}: a finger is told to tap a function (an on-screen keyboard has no Tab)`, html.includes(`hidden [@media(hover:none)]:inline">${d.pickHintTouch}<`) && html.includes(`[@media(hover:none)]:hidden">`), html);
+  }
+  check("en: the same", sheetGridText.en.pickHintTouch.startsWith("Tap a function"), sheetGridText.en.pickHintTouch);
+}
+
+section("the number-as-text tip says what formulas really do with the cell");
+{
+  // SUMME/STEIGUNG leave text out; others (RGP, =C9*2) give #WERT!: the tip says both.
+  const de = sheetGridText.de.numberText.text;
+  const en = sheetGridText.en.numberText.text;
+  check("de: SUMME, STEIGUNG and charts leave it out, others show #WERT!", /SUMME/.test(de) && /STEIGUNG/.test(de) && /Diagramme lassen diese Zelle aus/.test(de) && /andere zeigen #WERT!/.test(de), de);
+  check("en: SUM, SLOPE and charts leave it out, others show #VALUE!", /SUM\b/.test(en) && /SLOPE/.test(en) && /charts leave this cell out/.test(en) && /others show #VALUE!/.test(en), en);
+}
+
+// ==============================================================================================
+// The grid on touch screens with settings docked over it (lane TG): drags stop at the cells that
+// can be seen, and filling by touch explains itself without covering what it talks about.
+
+section("drags stop at the last cell that can be seen (settings docked over the grid, the keyboard)");
+{
+  // A phone (390 × 844) with the chart settings docked low: the grid is 546 px high, but from 165 px
+  // down (from the grid's top) the settings cover it. Rows of 28 px under 24 px of column letters:
+  // rows 1–5 can be seen, of row 6 one pixel.
+  const sheet = mkSheet("s1", "Blatt 1");
+  const l = buildLayout(sheet, 1, () => false, new Map());
+  const docked = { w: 390, h: 165 };
+  const top = { left: 0, top: 0 };
+  const inA = (py: number, scroll = top, shown = docked) => dragCell(l, 60, py, scroll, shown);
+  eq("the finger on A3: A3", inA(24 + 2 * 28 + 10), pos("A3"));
+  eq("the finger on the settings, 60 px below their top: A5, not a row hidden under them", inA(165 + 60), pos("A5"));
+  eq("…at the bottom of the screen: still A5", inA(844 - 192), pos("A5"));
+  eq("…a row of which 20 px show counts (half of it can be seen)", inA(400, top, { w: 390, h: 24 + 5 * 28 + 20 }), pos("A6"));
+  eq("…one of which 13 px show doesn't", inA(400, top, { w: 390, h: 24 + 5 * 28 + 13 }), pos("A5"));
+  eq("scrolled down 1000 px: the last row seen there (A41)", inA(600, { left: 0, top: 1000 }), pos("A41"));
+  eq("above the column letters: the first row seen", inA(-40, { left: 0, top: 280 }), pos("A11"));
+  eq("no settings: inside the grid, the row under the finger as before", inA(24 + 15 * 28 + 3, top, { w: 390, h: 546 }), pos("A16"));
+  eq("past the right edge: the last column more than half of which shows (D, 50 of 100 px)", dragCell(l, 500, 60, top, docked), pos("D2"));
+  eq("…a grid 20 px narrower, D shows 30 px: C", dragCell(l, 500, 60, top, { w: 370, h: 165 }), pos("C2"));
+
+  // The last row at least half of which can be seen, found row by row (frozen rows always can).
+  const lastSeen = (lay: ReturnType<typeof buildLayout>, scrollTop: number, h: number) => {
+    const end = scrollTop + h - lay.headerH;
+    const start = scrollTop + lay.frozenH;
+    let last = 0;
+    for (let r = 0; r < lay.rows; r++) {
+      const r0 = lay.rowTop[r];
+      const size = lay.rowTop[r + 1] - r0;
+      if (size === 0 || (r >= lay.freezeRows && r0 + size <= start)) continue;
+      if (r >= lay.freezeRows && r0 >= end) break;
+      if (r < lay.freezeRows || r0 <= start || end - r0 >= size / 2) last = r;
+    }
+    return last;
+  };
+  eq("(the phone with low settings: the last row seen is A5)", lastSeen(l, 0, 165), 4);
+
+  // Every drag past the cells that can be seen, on phones and tablets, with and without settings,
+  // scrolled anywhere, frozen rows or not, at 100 % and 125 %: it is on the last row that can be
+  // seen, and filling down from A2:A3 never goes further. Inside what can be seen, it is on the row
+  // under the finger, as before.
+  const frozen = { ...sheet, freeze: { rows: 1, cols: 0 } };
+  let tries = 0;
+  let notLast = 0;
+  let filledHidden = 0;
+  let moved = 0;
+  for (const [s, zoom] of [[sheet, 1], [sheet, 1.25], [frozen, 1]] as const) {
+    const lay = buildLayout(s, zoom, () => false, new Map());
+    for (const shown of [{ w: 390, h: 165 }, { w: 390, h: 546 }, { w: 820, h: 331 }, { w: 820, h: 931 }, { w: 1280, h: 120 }]) {
+      for (let scrollTop = 0; scrollTop < 3000; scrollTop += 37) {
+        const scroll = { left: 0, top: scrollTop };
+        const last = lastSeen(lay, scrollTop, shown.h);
+        for (let py = shown.h - 30; py < shown.h + 700; py += 11) {
+          tries++;
+          const p = dragCell(lay, 60, py, scroll, shown);
+          if (py >= shown.h) {
+            if (p.row !== last) notLast++;
+            const to = fillTarget(areaOf("A2:A3"), p);
+            if (to && to.r1 > Math.max(last, 2)) filledHidden++;
+          } else {
+            const sy = py - lay.headerH;
+            if (p.row !== rowAt(lay, sy < lay.frozenH ? sy : sy + scrollTop)) moved++;
+          }
+        }
+      }
+    }
+  }
+  eq(`${tries} drags near and past the edge of what can be seen: past it, always on the last row seen`, notLast, 0);
+  eq("…filling down never reaches a row out of sight", filledHidden, 0);
+  eq("…inside what can be seen, the row under the finger, as before", moved, 0);
+}
+
+section("a drag scrolls on at a speed a finger can follow (per second, not per frame)");
+{
+  // The edge zone is 28 px wide (from inside the edge on); rows are 28 px, columns 100 px at 100 %.
+  const rows = (dist: number) => scrollSpeed(dist, 28, 28, true) / 28;
+  eq("outside the zone: no scrolling", [scrollSpeed(0, 28, 28, true), scrollSpeed(-5, 28, 28, true), scrollSpeed(0, 28, 28, false), scrollSpeed(-5, 28, 28, false)], [0, 0, 0, 0]);
+  check("a finger coming into the zone: about 2 rows a second", rows(0.5) >= 2 && rows(0.5) < 2.1, String(rows(0.5)));
+  check("…on the edge (the settings' top, the grid's bottom): 4 to 5 rows a second", rows(28) >= 4 && rows(28) <= 5, String(rows(28)));
+  check("…a zone past it: about 12", rows(56) > 11 && rows(56) < 13, String(rows(56)));
+  eq("…from 2 zones past it on (deep in the settings): 25 at most", [rows(84), rows(120 + 28), rows(600)], [25, 25, 25]);
+  eq("…sideways the same in columns: 25 columns a second at most", scrollSpeed(300, 28, 100, true), 2500);
+  // A mouse or pen: as before at 60 Hz (2 px a frame coming into the zone, faster further out, at most 48).
+  let unchanged = true;
+  for (let dist = 0.5; dist < 400; dist += 0.5) if (Math.abs(scrollSpeed(dist, 28, 28, false) - 60 * Math.min(48, 2 + dist / 2.5)) > 1e-9) unchanged = false;
+  check("a mouse or pen: the same speeds as before at 60 Hz, now per second", unchanged);
+  let steady = true;
+  let capped = true;
+  for (const finger of [true, false]) {
+    for (const cell of [28, 35, 100, 125]) {
+      let was = 0;
+      for (let dist = 0.5; dist < 800; dist += 0.5) {
+        const v = scrollSpeed(dist, 28, cell, finger);
+        if (v < was) steady = false;
+        if (v > (finger ? 25 * cell : 2880)) capped = false;
+        was = v;
+      }
+    }
+  }
+  check("never slower further out (finger, mouse; rows and columns; 100 % and 125 %)", steady);
+  check("…and never faster than 25 cells a second for a finger, 48 px a frame for a mouse", capped);
+}
+
+section("filling by touch explains itself without covering the selection or its square");
+{
+  // A phone with the chart settings docked low: cells can be seen from 216 (under the column
+  // letters) to 357 (the settings' top). A3 selected (272–300), its square on the corner at 300, a
+  // finger's room around it: 272–322. The hint is 76 px tall (three lines).
+  const phone = { top: 216, bottom: 357 };
+  eq("phone, low settings, A3: over the column letters and the bar above them", placeFillHint(phone, { top: 272, bottom: 322 }, 76), 140);
+  eq("…A5 selected (lower down): right under the column letters", placeFillHint(phone, { top: 328, bottom: 378 }, 76), 224);
+  eq("…A4 selected (in the middle): over the column letters", placeFillHint(phone, { top: 300, bottom: 350 }, 76), 140);
+  eq("phone without settings, A3: at the bottom of the cells", placeFillHint({ top: 216, bottom: 738 }, { top: 272, bottom: 322 }, 76), 654);
+  eq("…A13: right under the column letters", placeFillHint({ top: 216, bottom: 738 }, { top: 552, bottom: 602 }, 76), 224);
+  eq("tablet, low settings, A3: at the bottom, just above the settings", placeFillHint({ top: 224, bottom: 531 }, { top: 280, bottom: 330 }, 57), 466);
+  eq("the grid at the window's top, no room anywhere: under the column letters", placeFillHint({ top: 60, bottom: 160 }, { top: 70, bottom: 150 }, 76), 68);
+
+  let tries = 0;
+  let covered = 0;
+  let overSettings = 0;
+  for (let cellsTop = 150; cellsTop <= 260; cellsTop += 22) {
+    for (let room = 40; room <= 900; room += 31) {
+      const cells = { top: cellsTop, bottom: cellsTop + room };
+      for (const h of [44, 57, 76, 110]) {
+        for (let k = cells.top - 40; k < cells.bottom + 20; k += 13) {
+          for (const tall of [28, 50, 120, 400]) {
+            tries++;
+            const keep = { top: k, bottom: k + tall };
+            const at = placeFillHint(cells, keep, h);
+            // Inside the cells: clear of the selection and the square, ending above the settings;
+            // otherwise wholly above the cells (over the column letters, never over a cell).
+            if (at >= cells.top) {
+              if (at < keep.bottom + 8 && keep.top < at + h + 8) covered++;
+              if (at + h > cells.bottom) overSettings++;
+            } else if (at + h > cells.top) covered++;
+          }
+        }
+      }
+    }
+  }
+  eq(`${tries} selections, screens and hint sizes: the hint never covers the selection or its square`, covered, 0);
+  eq("…and never reaches over docked settings", overSettings, 0);
+}
+
+// ==============================================================================================
+// Sweep fixes, lane ACCS: Ctrl+A keeps the active cell (sorting, typing, filling and Shift+arrows
+// go by it and by the block), what a chart's keyboard stop says, and the copy.
+
+section("Ctrl+A keeps the active cell: sorting, typing, filling and Shift+arrows (COL-5)");
+{
+  const lab = () =>
+    storeOf({
+      A1: "Probe",
+      B1: "Extinktion",
+      C1: "Notiz",
+      A2: "Blank",
+      B2: 0.004,
+      C2: "a",
+      A3: "Kontrolle",
+      B3: 0.812,
+      C3: "b",
+      A4: "Probe A",
+      B4: 0.355,
+      C4: "c",
+      A5: "Probe B",
+      B5: 0.921,
+      C5: "d",
+      A6: "Standard 1",
+      B6: 0.102,
+      C6: "e",
+      A7: "Zelle X",
+      B7: 0.233,
+      C7: "f",
+    });
+  const ctrlA = (s: SheetStore, at: string) => {
+    selectA1(s, at);
+    selectRegionOrAll(s);
+  };
+  const now = (s: SheetStore) => [activeArea(s.get().selection), s.get().selection.anchor];
+  let s = lab();
+  ctrlA(s, "B3");
+  eq("Ctrl+A in B3: the block A1:C7, the active cell still B3", now(s), [areaOf("A1:C7"), pos("B3")]);
+  eq("…the block counts once (sums, formats, Delete)", selectionAreas(s.get().selection), [areaOf("A1:C7")]);
+  eq("…Shift+arrows move its bottom-right corner", movingEnd(s.get().selection), pos("C7"));
+  eq("…the cells' menu, not a row or column menu", menuKindFor(s.get().selection, s.get().workbook.sheets[0]), "cells");
+  eq("…sorting goes by the active cell's column (Extinktion)", sortPlan(s.get().workbook.sheets[0], s.get().calc, "s1", s.get().selection)?.col, 1);
+  sortSelection(s, "desc");
+  eq("…Z → A puts the highest Extinktion first, each row whole", [valueOf(s, "A2"), valueOf(s, "B2"), valueOf(s, "C2")], ["Probe B", 0.921, "d"]);
+  selectRegionOrAll(s);
+  eq("Ctrl+A again: everything, still from B3", now(s), [areaOf("A1:Z200"), pos("B3")]);
+  selectRegionOrAll(s);
+  eq("…and once more: the block again", now(s), [areaOf("A1:C7"), pos("B3")]);
+
+  // Typing goes into B3; Enter walks on inside the block, which stays selected.
+  s = lab();
+  ctrlA(s, "B3");
+  s.startEdit({ via: "cell", replace: true, text: "0,5" });
+  s.commitEdit("down");
+  eq("typing after Ctrl+A goes into B3", valueOf(s, "B3"), 0.5);
+  eq("…Enter walks on to B4, the block still selected", now(s), [areaOf("A1:C7"), pos("B4")]);
+
+  // Ctrl+D and Delete act on the whole block.
+  s = lab();
+  ctrlA(s, "B3");
+  fillFrom(s, "down");
+  eq("Ctrl+D after Ctrl+A fills the whole block from its first row", [valueOf(s, "A7"), valueOf(s, "B7"), valueOf(s, "C7")], ["Probe", "Extinktion", "Notiz"]);
+  s = lab();
+  ctrlA(s, "B3");
+  clearSelection(s);
+  check("Delete after Ctrl+A empties the whole block", ["A1", "B3", "C7"].every((a) => cellOf(s, a)?.v === undefined), JSON.stringify([cellOf(s, "A1"), cellOf(s, "C7")]));
+
+  // Shift+arrows: the block keeps its top-left corner, and the active cell while it is inside.
+  s = lab();
+  ctrlA(s, "B3");
+  const shift = (dRow: number, dCol: number, jump = false) => moveSelection(s, dRow, dCol, { extend: true, jump });
+  shift(1, 0);
+  eq("Shift+↓: A1:C8, still B3", now(s), [areaOf("A1:C8"), pos("B3")]);
+  shift(0, 1);
+  eq("Shift+→: A1:D8", now(s), [areaOf("A1:D8"), pos("B3")]);
+  shift(-1, 0);
+  shift(-1, 0);
+  shift(0, -1);
+  shift(0, -1);
+  eq("Shift+↑ ×2, Shift+← ×2: A1:B6", now(s), [areaOf("A1:B6"), pos("B3")]);
+  shift(1, 0, true);
+  eq("Ctrl+Shift+↓: the bottom edge to the end of the data", now(s), [areaOf("A1:B7"), pos("B3")]);
+  shift(0, -1);
+  eq("Shift+← past the active cell: A1:A7 from A1, its new active cell", s.get().selection, { anchor: pos("A1"), focus: pos("A7"), extra: [] });
+  // extendSelection is what Shift+click, Shift+tap and Shift+drag on the grid do (Grid.tsx).
+  s = lab();
+  ctrlA(s, "B3");
+  eq("Ctrl+A itself scrolls nowhere (no corner to keep in view)", resizedCorner(s, s.get().selection), null);
+  extendSelection(s, pos("C10"));
+  eq("extendSelection (Shift+click, tap, drag) to C10 after Ctrl+A: one range A1:C10, still B3", [selectionAreas(s.get().selection), s.get().selection.anchor], [[areaOf("A1:C10")], pos("B3")]);
+  eq("…the grid keeps its far corner in view", resizedCorner(s, s.get().selection), pos("C10"));
+  s.select(pos("E5"));
+  eq("…and nothing once something else is selected", resizedCorner(s, s.get().selection), null);
+
+  // Shift with End, Home or Page Down after Ctrl+A (keys.ts), then Z → A: whatever those keys make
+  // of the selection, every row stays whole (several areas sort the block around the active cell).
+  const keyCtx = (st: SheetStore) =>
+    ({ store: st, layout: { headerH: 24, frozenH: 0, zoom: 1 }, view: { w: 800, h: 600 }, typeInto() {}, prepareClipboard() {}, openMenu() {}, openChooser() {}, openDecor() {}, reveal() {} }) as unknown as GridKeyContext;
+  const shiftKey = (st: SheetStore, key: string, ctrl: boolean) =>
+    handleGridKey({ key, code: key, keyCode: 0, ctrlKey: ctrl, metaKey: false, altKey: false, shiftKey: true, preventDefault() {}, stopPropagation() {} } as never, keyCtx(st));
+  const rows = (st: SheetStore) => [2, 3, 4, 5, 6, 7].map((r) => [valueOf(st, `A${r}`), valueOf(st, `B${r}`), valueOf(st, `C${r}`)].join(" | "));
+  const whole = new Set(rows(lab()));
+  for (const [name, key, ctrl] of [
+    ["Shift+End", "End", false],
+    ["Shift+Home", "Home", false],
+    ["Shift+Page Down", "PageDown", false],
+    ["Ctrl+Shift+End", "End", true],
+    ["Ctrl+Shift+Home", "Home", true],
+  ] as const) {
+    s = lab();
+    ctrlA(s, "B3");
+    shiftKey(s, key, ctrl);
+    sortSelection(s, "desc");
+    const after = rows(s);
+    check(`${name} after Ctrl+A, then Z → A: every row stays whole`, after.every((r) => whole.has(r)) && new Set(after).size === 6, after.join(" / "));
+  }
+  for (const [name, key, ctrl, want] of [
+    ["Shift+End", "End", false, "A1:C7"],
+    ["Shift+Page Down", "PageDown", false, "A1:C26"],
+    ["Ctrl+Shift+End", "End", true, "A1:C7"],
+  ] as const) {
+    s = lab();
+    ctrlA(s, "B3");
+    shiftKey(s, key, ctrl);
+    eq(`${name} after Ctrl+A: one range ${want}, still B3`, [selectionAreas(s.get().selection), s.get().selection.anchor], [[areaOf(want)], pos("B3")]);
+  }
+  s = lab();
+  s.select({ anchor: pos("C1"), focus: pos("C7"), extra: [areaOf("A1:A7")] });
+  const two = sortPlan(s.get().workbook.sheets[0], s.get().calc, "s1", s.get().selection);
+  eq("columns A and C picked with Ctrl: the whole block is sorted, by the active cell's column, and B is said to come along", [two?.area, two?.col, two?.widened], [areaOf("A2:C7"), 2, true]);
+  s.select({ anchor: pos("B3"), focus: pos("C3"), extra: [areaOf("A1:C7")] });
+  eq("…a range inside the block Ctrl+A selected: the block, nothing more to say", sortPlan(s.get().workbook.sheets[0], s.get().calc, "s1", s.get().selection)?.widened, false);
+  s = lab();
+  selectA1(s, "B3");
+  shift(1, 0);
+  eq("without Ctrl+A, Shift+↓ from B3 as ever: B3:B4", s.get().selection, { anchor: pos("B3"), focus: pos("B4"), extra: [] });
+
+  // The reference a formula gets from the selection is the whole block.
+  s = lab();
+  selectA1(s, "E1");
+  s.startEdit({ via: "cell", replace: true, text: "=SUMME(" });
+  s.select({ anchor: pos("B3"), focus: pos("B3"), extra: [areaOf("A1:C7")] }, { keepEdit: true });
+  insertSelectionRef(s);
+  eq("pointing at the block Ctrl+A keeps inserts all of it", editOf(s), "=SUMME(A1:C7|");
+}
+
+section("a chart's keyboard stop says what it shows (ACC-4)");
+{
+  const tpl = SHEET_TEMPLATES.find((t) => t.id === "calibration")!;
+  const wb = tpl.build("de");
+  const calc = createCalc(wb, { locale: "de" });
+  const spec = wb.charts[0];
+  const opts = { width: 480, height: 300, locale: "de" as const };
+  const scene = buildChartScene(spec, chartData(spec, calc, "de"), opts);
+  check("the summary has the series, the equation and R²", /^2 Reihen, Trendlinie y = 0,0523\d*x \+ 0,00119, R² = 0,999\d*$/.test(scene.summary), scene.summary);
+  eq("…and is the label without the kind and title", scene.label, `Punktdiagramm ${spec.title}, ${scene.summary}`);
+  const none = { ...spec, series: [] };
+  eq("a chart without numbers says so", buildChartScene(none, chartData(none, calc, "de"), opts).summary, "Noch keine Zahlen");
+  const txt = createSheetStore({ pageId: "p1", workbook: book({ A1: "c", B1: "E", A2: "Blank", B2: 0.003, A3: 2, B3: 0.104, A4: 4, B4: 0.207 }), locale: "de", readOnly: false });
+  const ref = (a: string) => ({ sheetId: "s1", ...areaOf(a) });
+  const textX = { ...spec, sheetId: "s1", x: ref("A2:A4"), series: [{ ...spec.series[0], nameRef: null, name: "E", y: ref("B2:B4"), x: null }] };
+  const tx = buildChartScene(textX, chartData(textX, txt.get().calc, "de"), opts);
+  check("the notes under the plot are in the summary too", tx.summary.endsWith(". Text in A2 statt Zahl – x ist hier 1, 2, 3 …"), tx.summary);
+  for (const locale of ["de", "en"] as const) {
+    const t = sheetChartText[locale];
+    check(`keys hint (${locale}): Enter, the arrows, Delete and Esc, no dragging`, /Enter/.test(t.keysHint) && /Esc/.test(t.keysHint) && !/Zieh|Drag/.test(t.keysHint), t.keysHint);
+    check(`…for viewers only the way back (${locale})`, /Esc/.test(t.keysHintReadOnly) && !/Enter/.test(t.keysHintReadOnly), t.keysHintReadOnly);
+  }
+  check("the shortcuts list says F6 reaches the charts", /Diagrammen/.test(sheetText.de.shortcuts.items.areas) && /charts/.test(sheetText.en.shortcuts.items.areas));
+}
+
+section("copy: the smart table says so, Du-form, one way of saying each thing (ACC-11, ACC-12)");
+{
+  check("the smart table's settings are named as such", sheetText.de.tableSettings === "Einstellungen der intelligenten Tabelle" && sheetTableText.de.tableSettings === "Einstellungen der intelligenten Tabelle");
+  eq("…and the cell menu opens them by that name", sheetTableText.de.openTable, "Intelligente Tabelle bearbeiten");
+  check("error bars: in the Du-form", sheetChartText.de.errorHint.includes("Wähl „Benutzerdefiniert“ und nimm die Spalte"), sheetChartText.de.errorHint);
+  const ignored = sheetChartText.de.interceptIgnored("0");
+  check("an ignored intercept: trendlines named, not option labels", ignored.startsWith("Bei einer exponentiellen Trendlinie") && ignored.endsWith("Bei einer linearen oder Polynom-Trendlinie gilt er wieder."), ignored);
+  check("a note's block: the spreadsheet in the bin is named", noteBlocksText.de.sheet.trashed("Laborjournal").includes("Stell die Tabelle wieder her"));
+  eq("English: back to saving", sheetText.en.saveBack, "Saved – it's working again.");
+  // The templates' notes name their columns in quotes.
+  const notes = (locale: Locale) => SHEET_TEMPLATES.flatMap((tpl) => tpl.build(locale).sheets.flatMap((sh) => Object.values(sh.cells).map((c) => c.note ?? "")));
+  check("dilution: the columns quoted", notes("de").some((n) => n.startsWith("„Verdünnungsmittel“ + „Übertragen“: ")) && notes("en").some((n) => n.startsWith("“Diluent” + “Transfer”: ")));
+  check("Bradford: the column Netto named", notes("de").some((n) => n.includes("(verglichen wird die Spalte „Netto“)")) && !notes("de").some((n) => n.includes("verglichen wird das Netto")));
+  // The short imperative (wähl, tipp, lösch, kopier, prüf…), as in the rest of the spreadsheet's copy.
+  const longForms = /(?<!\p{L})(Wähle|wähle|Tippe|tippe|Lösche|lösche|Schreibe|schreibe|Ziehe|ziehe|Klicke|klicke|Trage|trage|Übertrage|übertrage|Prüfe|prüfe|Speichere|speichere|Kopiere|kopiere|Importiere|importiere|Markiere|markiere|Entferne|entferne)(?!\p{L})/u;
+  for (const file of ["sheet.ts", "sheetChart.ts", "sheetTable.ts", "sheetIo.ts"]) {
+    const src = readFileSync(join(process.cwd(), "src/i18n/messages", file), "utf8");
+    const at = src.indexOf("\n  de: {");
+    check(`${file}: its German half found`, at >= 0);
+    const de = at >= 0 ? src.slice(at) : "";
+    const hit = de.split("\n").find((line) => longForms.test(line));
+    check(`${file}: short imperatives in German`, !hit, hit?.trim().slice(0, 100));
+  }
+  // What merging says (conflictDe, above the German half) and the bar while the spreadsheet is too
+  // big are put together as they are said: asked here with every kind of conflict and of readers.
+  const conflicts: Parameters<typeof sheetText.de.conflict>[0] = [
+    { name: "Platte", copyName: "Platte (Konflikt)", why: "moved" },
+    { name: "Platte", copyName: "Platte (Konflikt)", why: "moved", tooBig: true },
+    { name: "Platte", copyName: "Platte (Konflikt)", why: "deleted" },
+    { name: "Platte", copyName: "Platte (Konflikt)", why: "unknown" },
+    { name: "Platte", copyName: "", why: "moved", formulas: ["Auswertung!B5"] },
+    { name: "Platte", copyName: "Platte (Konflikt)", why: "arrived" },
+    { name: "Platte", copyName: "", why: "keptMine" },
+    { name: "Platte", copyName: "", why: "keptTheirs" },
+  ];
+  const readers = [
+    { cells: ["Auswertung!B3"], more: 0, charts: 0, chartSheet: null },
+    { cells: ["Auswertung!B3", "B4", "B5"], more: 2, charts: 1, chartSheet: "Auswertung" },
+    { cells: [], more: 0, charts: 2, chartSheet: null },
+    { cells: ["Auswertung!B3"], more: 0, charts: 2, chartSheet: null },
+    { cells: ["Auswertung!B3", "B4", "B5"], more: 1, charts: 0, chartSheet: null },
+  ];
+  const conflictWords = (locale: Locale) => {
+    const t = sheetText[locale];
+    return [t.conflict(conflicts), t.conflictElsewhere("Labor", conflicts), t.tooBigConflict("Platte", "Platte (Konflikt)"), t.tooBigCopies, ...readers.map((r) => t.tooBigReaders("Platte", "Platte (Konflikt)", r))];
+  };
+  const deWords = conflictWords("de");
+  check("what merging and the too-big bar say: short imperatives in German", !deWords.some((x) => longForms.test(x)), deWords.find((x) => longForms.test(x)));
+  // When a conflict copy may go is said actively (not "wenn übertragen ist, was davon gebraucht wird").
+  const passive = /übertragen ist|gebraucht wird|wird wieder gespeichert|zusammengeführt werden/;
+  check("…and not in the passive", !deWords.some((x) => passive.test(x)), deWords.find((x) => passive.test(x)));
+  const enWords = conflictWords("en");
+  check("…nor in English", !enWords.some((x) => /has been moved|it is saved again/.test(x)), enWords.find((x) => /has been moved|it is saved again/.test(x)));
+  // COL2-1: the bar names what still reads the copy (deleting it would break that), in agreement.
+  eq("one formula reads the copy", sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[0]).split(". ").slice(1, 3).join(". "), "Die Formel in Auswertung!B3 nutzt noch „Platte (Konflikt)“. Kopier, was du von dort brauchst, nach „Platte“, stell die Formel auf „Platte“ um und lösch erst dann die Konflikt-Kopie");
+  check(
+    "several formulas and a chart: a few named, the rest counted",
+    sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[1]).includes("Die Formeln in Auswertung!B3, B4, B5 und 2 weiteren Zellen sowie ein Diagramm auf „Auswertung“ nutzen noch „Platte (Konflikt)“. Kopier, was du von dort brauchst, nach „Platte“, stell die Formeln und das Diagramm auf „Platte“ um und lösch erst dann die Konflikt-Kopie."),
+    sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[1]),
+  );
+  check("…in English", sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[1]).includes("The formulas in Auswertung!B3, B4, B5 and 2 more cells, as well as a chart on “Auswertung”, still use “Platte (conflict)”. Move what you need from there to “Platte”, point the formulas and the chart at “Platte”, and only then delete the conflict copy."), sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[1]));
+  check("charts only", sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[2]).includes("2 Diagramme nutzen noch „Platte (Konflikt)“. Kopier, was du von dort brauchst, nach „Platte“, stell die Diagramme auf „Platte“ um"), sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[2]));
+  // After "…, as well as …," the English verb goes with what comes first.
+  check("one formula as well as charts: “uses”", sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[3]).includes("The formula in Auswertung!B3, as well as 2 charts, still uses “Platte (conflict)”. Move what you need from there to “Platte”, point the formula and the charts at “Platte”"), sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[3]));
+  check("…formulas as well as a chart: “use”", sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[1]).includes(", as well as a chart on “Auswertung”, still use "), sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[1]));
+  check("one cell more: “einer weiteren Zelle”", sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[4]).includes("Die Formeln in Auswertung!B3, B4, B5 und einer weiteren Zelle nutzen noch „Platte (Konflikt)“."), sheetText.de.tooBigReaders("Platte", "Platte (Konflikt)", readers[4]));
+  check("…“one more cell”", sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[4]).includes("The formulas in Auswertung!B3, B4, B5 and one more cell still use “Platte (conflict)”."), sheetText.en.tooBigReaders("Platte", "Platte (conflict)", readers[4]));
+  const sheetBlocks = noteBlocksText.de.sheet;
+  const blocks = [sheetBlocks.noCharts, sheetBlocks.noTables, sheetBlocks.trashed("Laborjournal")];
+  check("a note's spreadsheet blocks: short imperatives too", !blocks.some((x) => longForms.test(x)), blocks.find((x) => longForms.test(x)));
+}
+
+// ==============================================================================================
+section("the toolbar by keyboard: its menus, the chart keys, names and contrast (ACC-1, 6, 7, 9, 10, 13)");
+{
+  const de = sheetChromeText.de;
+  const en = sheetChromeText.en;
+  // ACC-1: in a menu that took the keyboard, the arrows go round its entries; Home and End to its ends.
+  eq("ArrowDown from no entry: the first", roveIndex(5, -1, "ArrowDown"), 0);
+  eq("ArrowDown from the last: round to the first", roveIndex(5, 4, "ArrowDown"), 0);
+  eq("ArrowUp from the first, or from no entry: the last", [roveIndex(5, 0, "ArrowUp"), roveIndex(5, -1, "ArrowUp")], [4, 4]);
+  eq("Home and End", [roveIndex(5, 2, "Home"), roveIndex(5, 2, "End")], [0, 4]);
+  eq("other keys are left alone (Enter, a letter, nothing to go to)", [roveIndex(5, 2, "Enter"), roveIndex(5, 2, "a"), roveIndex(0, -1, "ArrowDown")], [null, null, null]);
+  // The entry under the keyboard stops working (the decimals' − at 0): it goes on to the next one
+  // that works, else back to the one before; none works: -1 (the panel takes it, see Popover).
+  eq("an entry stops working: the next one that works", nearestWorking([true, false, false, true, true], 1), 3);
+  eq("…the last one: the one before that works", nearestWorking([true, true, false, false], 3), 1);
+  eq("…none works", nearestWorking([false, false], 0), -1);
+  // The colours: "Automatisch" (entry 0) above a grid of 10, five to a row.
+  eq("ArrowRight along the colours, round from the last to Automatisch", [paletteStep(0, "ArrowRight", 11), paletteStep(3, "ArrowRight", 11), paletteStep(10, "ArrowRight", 11)], [1, 4, 0]);
+  eq("ArrowLeft back, round from Automatisch to the last colour", [paletteStep(4, "ArrowLeft", 11), paletteStep(0, "ArrowLeft", 11)], [3, 10]);
+  eq("ArrowDown and ArrowUp: the colour below and above", [paletteStep(2, "ArrowDown", 11), paletteStep(9, "ArrowUp", 11)], [7, 4]);
+  eq("…past the first or last row: Automatisch", [paletteStep(2, "ArrowUp", 11), paletteStep(8, "ArrowDown", 11)], [0, 0]);
+  eq("…from Automatisch the menu's own arrows (to the first or last colour)", [paletteStep(0, "ArrowDown", 11), paletteStep(0, "ArrowUp", 11)], [null, null]);
+  const tags = (html: string) => [...html.matchAll(/<button[^>]*>/g)].map((m) => m[0]);
+  const attr = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
+  const fills = tags(renderToStaticMarkup(createElement(ColorPanel, { kind: "fill", current: "yellow", onPick: () => {} })));
+  check("the colours are a menu of choices", fills.length === 11 && fills.every((b) => attr(b, "role") === "menuitemradio"));
+  eq("…the cell's colour is the checked one (the keyboard starts there)", fills.filter((b) => attr(b, "aria-checked") === "true").map((b) => attr(b, "aria-label")), ["Gelb"]);
+  const plain = tags(renderToStaticMarkup(createElement(ColorPanel, { kind: "color", current: undefined, onPick: () => {} })));
+  eq("…no colour set: Automatisch is checked", plain.map((b) => attr(b, "aria-checked") === "true").indexOf(true), 0);
+
+  // ACC-6: Alt+F1 and F11 with nothing to chart give the toolbar's hint; with numbers, a chart.
+  const notice = (store: SheetStore) => {
+    const n = currentSheetNotice(store);
+    return n && [n.tone, n.text];
+  };
+  const key = (store: SheetStore, k: string, alt = false) => {
+    const ctx = { store, layout: null, view: { w: 800, h: 600 }, typeInto() {}, prepareClipboard() {}, openMenu() {}, openChooser() {}, openDecor() {}, reveal() {} } as unknown as GridKeyContext;
+    handleGridKey({ key: k, code: k, keyCode: 0, ctrlKey: false, metaKey: false, altKey: alt, shiftKey: false, preventDefault() {}, stopPropagation() {} } as never, ctx);
+  };
+  const empty = storeOf({ A1: "x" });
+  selectA1(empty, "F5:G9");
+  key(empty, "F1", true);
+  eq("Alt+F1 with nothing to chart: the toolbar's hint", notice(empty), ["info", de.chartNeedsData]);
+  hideSheetNotice(empty);
+  key(empty, "F11");
+  eq("F11 too", notice(empty), ["info", de.chartNeedsData]);
+  check("…and no chart", empty.get().workbook.charts.length === 0);
+  const data = storeOf({ A1: "c", B1: "E", A2: 1, B2: 0.1, A3: 2, B3: 0.2, A4: 3, B4: 0.3 });
+  selectA1(data, "A1:B4");
+  key(data, "F1", true);
+  check("Alt+F1 on numbers: a chart, no hint", data.get().workbook.charts.length === 1 && currentSheetNotice(data) === null);
+  const readOnly = storeOf({ A1: 1, A2: 2 }, "de", true);
+  selectA1(readOnly, "A1:A2");
+  key(readOnly, "F11");
+  check("read-only: no chart, no hint", readOnly.get().workbook.charts.length === 0 && currentSheetNotice(readOnly) === null);
+  check("one wording: the cells' menu has no hint of its own any more", !("noChart" in sheetText.de) && !("noChart" in sheetText.en));
+
+  // ACC-7 and ACC-10: names that say what a button does.
+  eq("the shortcuts list's close button", [panesText.de.shortcuts.close, panesText.en.shortcuts.close], ["Schließen", "Close"]);
+  check("…not the side-by-side one's words", panesText.de.shortcuts.close !== panesText.de.split.close && panesText.en.shortcuts.close !== panesText.en.split.close);
+  eq("the function search's clear button isn't called Schließen", [de.clearSearch, en.clearSearch], ["Suche löschen", "Clear search"]);
+  const bar = renderToStaticMarkup(createElement(Toolbar, { store: storeOf({ A1: 1 }) }));
+  const names = [...bar.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
+  check("the colour buttons say text or fill, unlike their arrows", ["Schriftfarbe Rot anwenden", "Schriftfarbe", "Füllfarbe Gelb anwenden", "Füllfarbe"].every((n) => names.includes(n)), names.join(" | "));
+  check("…also with the same colour for both", de.applyTextColor("Gelb") !== de.applyFillColor("Gelb") && en.applyTextColor("Yellow") !== en.applyFillColor("Yellow"));
+
+  // ACC-9: the mid-tone between ink-2 and ink-3 (placeholders, key caps, the save status) reads at
+  // 4.5:1 on every background in both themes, with the colours in globals.css; white on the
+  // deeper purple too (buttons in dark mode).
+  const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  const tokens = (start: string) => {
+    const block = css.slice(css.indexOf(start), css.indexOf("}", css.indexOf(start)));
+    return (name: string) => {
+      const hex = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "i").exec(block)?.[1] ?? "#000000";
+      return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    };
+  };
+  const lum = (c: number[]) => {
+    const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: number[], b: number[]) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  for (const [theme, start] of [["light", ":root {"], ["dark", '[data-theme="dark"] {']] as const) {
+    const t = tokens(start);
+    const mid = t("ink-2").map((v, i) => 0.45 * v + 0.55 * t("ink-3")[i]);
+    const worst = Math.min(...["paper", "surface", "raised"].map((bg) => ratio(mid, t(bg))));
+    check(`${theme}: the mid-tone reads at 4.5:1 or more`, worst >= 4.5, worst.toFixed(2));
+    check(`${theme}: white on the deeper purple, 4.5:1 or more`, ratio([255, 255, 255], t("blob-deep")) >= 4.5);
+  }
+  const midTone = "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]";
+  check("key caps in the mid-tone", renderToStaticMarkup(createElement(Kbd, null, "F6")).includes(midTone));
+  check("the save status in the mid-tone", renderToStaticMarkup(createElement(SaveIndicator, { state: "saved" })).includes(midTone));
+  check("fields' placeholders in the mid-tone", inputClass.includes(`placeholder:${midTone}`));
+  const unitPanel = renderToStaticMarkup(createElement(UnitPanel, { store: storeOf({ A1: 1 }), onDone: () => {} }));
+  check("the unit's field and its button: mid-tone placeholder, deeper purple in dark mode", unitPanel.includes(`placeholder:${midTone}`) && unitPanel.includes("dark:bg-blob-deep"));
+
+  // ACC-1: the format panel's stepper switches a button off at its end with aria-disabled, so the
+  // keyboard on it stays there (see Stepper): decimals 0 to 15, significant digits 1 to 15.
+  const formats = (fmt: NumberFormat) => renderToStaticMarkup(createElement(FormatPanel, { store: storeOf({ A1: { v: 0.5, s: { fmt } } }), onDone() {}, onUnit() {} }));
+  const ends = (fmt: NumberFormat) => {
+    const buttons = tags(formats(fmt));
+    return [de.fewerDecimals, de.moreDecimals].map((label) => {
+      const b = buttons.find((x) => attr(x, "aria-label") === label) ?? "";
+      if (/ disabled=""/.test(b)) return "disabled: the keyboard on it would drop out of the panel";
+      return attr(b, "aria-disabled") === "true";
+    });
+  };
+  eq("decimals: − off at 0, + still on", ends({ kind: "number", decimals: 0 }), [true, false]);
+  eq("…+ off at 15", ends({ kind: "number", decimals: 15 }), [false, true]);
+  eq("…both on between", ends({ kind: "number", decimals: 3 }), [false, false]);
+  eq("significant digits: − off at 1 (fewer isn't possible), on at 2", [ends({ kind: "significant", digits: 1 }), ends({ kind: "significant", digits: 2 })], [[true, false], [false, false]]);
+  check("the formats list draws the keyboard's ring inside its entries (its edges would cut it off)", /role="menu"[^>]*outline-offset-\[-2px\]/.test(formats({ kind: "number", decimals: 2 })));
+
+  // ACC-13: the notice with a button says F6 gets there (for screen readers; the card shows the key).
+  check("the notice's button: F6 named", sheetText.de.noticeActionKey("Als 1,234 lesen").includes("F6") && sheetText.en.noticeActionKey("Read as 1.234").includes("F6"));
+  const action = renderToStaticMarkup(createElement(NoticeAction, { action: { label: "Als 1,234 lesen", run() {} } }));
+  check("…its button shows F6 as a key cap, hidden from screen readers and on touch screens", /<span aria-hidden="true" class="[^"]*\[@media\(hover:none\)\]:hidden[^"]*"><kbd[^>]*>F6<\/kbd><\/span>/.test(action), action);
+  eq("…its name is the words alone", action.replace(/<span aria-hidden="true"[\s\S]*?<\/span>/, "").replace(/<[^>]+>/g, ""), "Als 1,234 lesen");
+}
+
+// ==============================================================================================
+// Sweep-2 fixes, lane UI2: the notice above the on-screen keyboard, the fill hint clear of the
+// notice, the cells' menu by keyboard, danger text on its tint, the note card's field on touch.
+
+section("the notice stays above the on-screen keyboard, also on a phone held sideways (TCH2-1)");
+{
+  // NOTICE_BOTTOM is CSS: worked out here as the browser does, in px (`full`: the editor's height,
+  // its 100 %; foot, dock, kb: --sheet-foot, --sheet-dock, --sheet-kb).
+  const bottomOf = (vars: { foot?: number; dock?: number; kb?: number }, full: number): number => {
+    const js = NOTICE_BOTTOM.replace(/var\(--sheet-(foot|dock|kb), 0px\)/g, (_, n: "foot" | "dock" | "kb") => String(vars[n] ?? 0))
+      .replace(/(\d+(?:\.\d+)?)rem/g, (_, n: string) => String(Number(n) * 16))
+      .replace(/(\d+(?:\.\d+)?)px/g, "$1")
+      .replace(/(\d+(?:\.\d+)?)%/g, (_, n: string) => String((Number(n) / 100) * full))
+      .replace(/calc\(/g, "(")
+      .replace(/(max|min)\(/g, "Math.$1(");
+    return Number(new Function(`return ${js}`)());
+  };
+  eq("no keyboard: just above the tabs row", bottomOf({ foot: 48 }, 700), 60);
+  eq("…above settings docked over the editor", bottomOf({ foot: 48, dock: 400 }, 700), 412);
+  eq("…tall settings: at most up to the top of the editor", bottomOf({ foot: 48, dock: 616 }, 700), 588);
+  eq("phone, a 300-px keyboard over the editor: 12 px above it", bottomOf({ foot: 48, kb: 300 }, 700), 312);
+  eq("…settings docked higher than the keyboard's top: above them", bottomOf({ foot: 48, dock: 400, kb: 300 }, 700), 412);
+  eq("phone held sideways (editor 300 px, a 200-px keyboard over it): still above the keyboard", bottomOf({ foot: 48, kb: 200 }, 300), 212);
+  eq("…with tall settings too", bottomOf({ foot: 48, dock: 264, kb: 200 }, 300), 212);
+  let under = 0;
+  let moved = 0;
+  for (let full = 150; full <= 1100; full += 37) {
+    for (const foot of [0, 44, 48]) {
+      for (let dock = 0; dock <= full; dock += 53) {
+        for (let kb = 0; kb <= 420; kb += 19) {
+          const b = bottomOf({ foot, dock, kb }, full);
+          if (b < kb + 12) under++;
+          if (kb === 0 && b !== Math.min(Math.max(foot, dock) + 12, full - 112)) moved++;
+        }
+      }
+    }
+  }
+  eq("every editor height, dock and keyboard: never under the keyboard", under, 0);
+  eq("…and without a keyboard where it always was", moved, 0);
+
+  // A phone held sideways (844 × 390, a 200-px keyboard, the browser panned to the cell) leaves one
+  // row of cells above the keyboard, where a centred card would cover the cell being typed in: it
+  // goes beside that cell instead (noticeBeside; Grid.tsx sets the insets on the editor). Cells
+  // from x 40, 100 px wide; the grid needs 24 + 28 + 8 px down to the row's bottom and a gap.
+  const wide = { left: 0, right: 844 };
+  const col = (c: number) => ({ left: 40 + 100 * c, right: 140 + 100 * c });
+  eq("phone held upright (the card's top 218 px below the grid's): centred, the grid keeps the row above it", noticeBeside(218, 60, col(1), { left: 0, right: 390 }, 280), null);
+  eq("tablet held sideways (110 px): centred", noticeBeside(110, 60, col(4), { left: 0, right: 1180 }, 280), null);
+  eq("phone held sideways (the card's top 14 px above the grid's), typing in B: the right half", noticeBeside(-14, 60, col(1), wide, 280), { left: 422, right: 0 });
+  eq("…in D, its right edge past the middle: clear of it", noticeBeside(-14, 60, col(3), wide, 280), { left: 440, right: 0 });
+  eq("…in E or F: the left half", [noticeBeside(-14, 60, col(4), wide, 280), noticeBeside(-14, 60, col(5), wide, 280)], [{ left: 0, right: 422 }, { left: 0, right: 422 }]);
+  eq("…once beside it is taller (its top higher still): it stays there", noticeBeside(-50, 60, col(1), wide, 280), { left: 422, right: 0 });
+  eq("…laid out from x 100: by that box", noticeBeside(-14, 60, { left: 240, right: 340 }, { left: 100, right: 944 }, 280), { left: 422, right: 0 });
+  eq("…a cell too wide to leave room beside it: centred, as before", noticeBeside(-14, 60, { left: 200, right: 640 }, wide, 280), null);
+  eq("…a box narrower than two cards: centred", noticeBeside(-14, 60, col(1), { left: 0, right: 390 }, 280), null);
+  let covered = 0;
+  let narrow = 0;
+  for (const w of [568, 667, 740, 844, 932]) {
+    for (let x = -60; x < w; x += 7) {
+      for (const cw of [60, 100, 160, 240]) {
+        const cell = { left: x, right: x + cw };
+        const at = noticeBeside(0, 60, cell, { left: 0, right: w }, 280);
+        if (!at) continue;
+        // The card stays 12 px inside its holder.
+        if (at.left + 12 < cell.right && w - at.right - 12 > cell.left) covered++;
+        if (w - at.left - at.right < 280) narrow++;
+      }
+    }
+  }
+  eq("every cell on phones held sideways (568 to 932 px): the card's room never covers it", covered, 0);
+  eq("…and is never narrower than 280 px", narrow, 0);
+  const holder = renderToStaticMarkup(createElement(SheetNotices, { store: storeOf() }));
+  check("the notices' holder takes those insets (none: across the editor) and is a container", /style="bottom:[^"]*;left:var\(--sheet-notice-left, 0px\);right:var\(--sheet-notice-right, 0px\)"/.test(holder) && /^<div class="[^"]*@container/.test(holder), holder.slice(0, 400));
+  const beside = renderToStaticMarkup(createElement(NoticeAction, { action: { label: "Als 1,456 lesen", run() {} } }));
+  check("…where the card's button goes beside the words only with room for them (else under them)", /\[@media\(max-height:600px\)_and_\(min-width:520px\)\]:@min-\[26rem\]:ml-0/.test(beside), beside);
+}
+
+section("filling by touch keeps clear of the notice at the bottom of the editor (SEAM-4)");
+{
+  // A phone without settings: cells from 216 to 738, the "1.234" notice from 628 down, A2:A3
+  // selected (244–300, the square's room down to 322). The hint is 76 px tall.
+  const phone = { top: 216, bottom: 738 };
+  const a2a3 = { top: 244, bottom: 322 };
+  eq("no notice: at the bottom of the cells", placeFillHint(phone, a2a3, 76), 654);
+  eq("the notice showing: above it", placeFillHint({ ...phone, floor: 628 }, a2a3, 76), 544);
+  eq("…a notice that ends further down than the cells: as without", placeFillHint({ ...phone, floor: 760 }, a2a3, 76), 654);
+  eq("…the selection lower down: still right under the column letters", placeFillHint({ ...phone, floor: 628 }, { top: 440, bottom: 518 }, 76), 224);
+  eq("…no room between the selection and the notice: over the column letters", placeFillHint({ ...phone, floor: 400 }, { top: 244, bottom: 400 }, 76), 140);
+  let tries = 0;
+  let overNotice = 0;
+  let covered = 0;
+  for (let cellsTop = 150; cellsTop <= 260; cellsTop += 22) {
+    for (let room = 40; room <= 900; room += 47) {
+      const cells = { top: cellsTop, bottom: cellsTop + room };
+      for (let floor = cells.top - 30; floor <= cells.bottom + 30; floor += 41) {
+        for (const h of [44, 57, 76, 110]) {
+          for (let k = cells.top - 40; k < cells.bottom + 20; k += 17) {
+            for (const tall of [28, 50, 120]) {
+              tries++;
+              const keep = { top: k, bottom: k + tall };
+              const at = placeFillHint({ ...cells, floor }, keep, h);
+              // Over the cells: ending above the notice and clear of the selection; otherwise
+              // wholly above the cells (over the column letters).
+              if (at >= cells.top) {
+                if (at + h > floor) overNotice++;
+                if (at < keep.bottom + 8 && keep.top < at + h + 8) covered++;
+              } else if (at + h > cells.top) covered++;
+            }
+          }
+        }
+      }
+    }
+  }
+  eq(`${tries} screens, notices, selections and hint sizes: the hint never covers the notice`, overNotice, 0);
+  eq("…nor the selection or its square", covered, 0);
+}
+
+section("the cells' menu by keyboard: Home, End, PageUp and PageDown move the keyboard, never just the list (SEAM-8)");
+{
+  // The cells' menu in a short window: 23 entries, 32 px apart, the list 364 px tall.
+  const tops = Array.from({ length: 23 }, (_, i) => i * 32);
+  eq("Home and End: the first and the last entry", [roveIndex(23, 7, "Home"), roveIndex(23, 7, "End")], [0, 22]);
+  eq("PageDown from the first: the last entry starting less than a page below", pageIndex(tops, 0, 364, true), 11);
+  eq("…again: the last entry", pageIndex(tops, 11, 364, true), 22);
+  eq("…on the last: stays", pageIndex(tops, 22, 364, true), 22);
+  eq("PageUp back", [pageIndex(tops, 22, 364, false), pageIndex(tops, 11, 364, false)], [11, 0]);
+  eq("…on the first: stays", pageIndex(tops, 0, 364, false), 0);
+  eq("a list shorter than an entry's distance: still one entry further", [pageIndex([0, 400, 800], 0, 300, true), pageIndex([0, 400, 800], 2, 300, false)], [1, 1]);
+  eq("separators make the entries uneven: by where they are", pageIndex([0, 32, 73, 105, 146, 178], 1, 100, true), 3);
+}
+
+section("danger text on its tint reads at 4.5:1 in both themes (ACC2-5)");
+{
+  const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const lum = (c: number[]) => {
+    const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: number[], b: number[]) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  // Danger text on its tint in the theme block of `sheet` that opens with `start`: the worst ratio
+  // over paper, surface and raised. A token that names another (var(--danger)) is followed; one
+  // that is missing, or isn't a colour written #rrggbb, is named instead of being guessed.
+  const dangerContrast = (sheet: string, start: string): { worst: number } | { missing: string } => {
+    const own = sheet.slice(sheet.indexOf(start), sheet.indexOf("}", sheet.indexOf(start)));
+    const missing: string[] = [];
+    const token = (name: string): number[] => {
+      const value = new RegExp(`--${name}:\\s*([^;]+);`).exec(own)?.[1].trim() ?? "";
+      const ref = /^var\(--([\w-]+)\)$/.exec(value);
+      if (ref) return token(ref[1]);
+      if (/^#[0-9a-f]{6}$/i.test(value)) return rgb(value);
+      missing.push(name);
+      return [0, 0, 0];
+    };
+    const ink = token("danger-ink");
+    const tint = token("danger");
+    const worst = Math.min(...["paper", "surface", "raised"].map((bg) => ratio(ink, tint.map((v, i) => 0.08 * v + 0.92 * token(bg)[i]))));
+    return missing.length ? { missing: missing[0] } : { worst };
+  };
+  for (const [theme, start] of [["light", ":root {"], ["dark", '[data-theme="dark"] {']] as const) {
+    const got = dangerContrast(css, start);
+    check(`${theme}: danger text on the 8 % danger tint, over paper, surface or raised: 4.5:1 or more`, "worst" in got && got.worst >= 4.5, "worst" in got ? got.worst.toFixed(2) : `--${got.missing} missing`);
+  }
+  eq("…a theme without its own --danger-ink is caught, not read as black text", dangerContrast(css.replace(/(:root \{[^}]*?)--danger-ink:[^;]*;/, "$1"), ":root {"), { missing: "danger-ink" });
+  check("text-danger-ink is a colour of the theme", /--color-danger-ink:\s*var\(--danger-ink\)/.test(css));
+  const warn = (html: string) => /bg-danger\/8 text-danger-ink/.test(html);
+  check("the table settings' warning note uses it", warn(renderToStaticMarkup(createElement(TableNote, { tone: "warn" } as ComponentProps<typeof TableNote>, "Achtung"))));
+  check("…the chart settings' too (the sample outside the calibration, text on the x axis)", warn(renderToStaticMarkup(createElement(ChartNote, { tone: "warn" } as ComponentProps<typeof ChartNote>, "Achtung"))));
+}
+
+section("the note card's field has 16-px text on touch screens, so an iPhone doesn't zoom in (TCH2-7)");
+{
+  const src = readFileSync(join(process.cwd(), "src/components/sheet/grid/ContextMenu.tsx"), "utf8");
+  const field = /<textarea[\s\S]*?className="([^"]*)"/.exec(src.slice(src.indexOf("export function NotePopover")))?.[1] ?? "";
+  check("its textarea", field.includes("[@media(hover:none)]:text-[16px]"), field);
+}
+
+// Sweep-2 fixes, lane CHART2: ratios typed down a column (Verdünnung: 1:1, 1:2, 1:4 …) are read as
+// clock times, each with its notice taking the place of the one before; the newest one's button
+// keeps all of them as text, in one undo step (LAB2-3).
+section("ratios typed down a column: one click keeps them all as text (LAB2-3)");
+{
+  const label = (s: SheetStore) => currentSheetNotice(s)?.action?.label ?? null;
+  const type = (s: SheetStore, a1: string, text: string) => s.input(pos(a1), text);
+  for (const [locale, header, labels] of [
+    ["de", "Verdünnung", ["Als Text „1:1“", "Als Text „1:1, 1:2“", "Als Text „1:1 … 1:4“", "Als Text „1:1 … 1:8“", "Als Text „1:1 … 1:16“"]],
+    ["en", "Dilution", ['As text "1:1"', 'As text "1:1, 1:2"', 'As text "1:1 … 1:4"', 'As text "1:1 … 1:8"', 'As text "1:1 … 1:16"']],
+  ] as const) {
+    const s = storeOf({ A1: header }, locale);
+    const seen = ["1:1", "1:2", "1:4", "1:8", "1:16"].map((t, i) => {
+      type(s, `A${i + 2}`, t);
+      return label(s);
+    });
+    eq(`${locale}: the button names all the ratios typed so far`, seen, labels);
+    check(`${locale}: …each of them a clock time until then`, ["A2", "A3", "A4", "A5", "A6"].every((a) => cellOf(s, a)?.s?.fmt?.kind === "time"));
+    currentSheetNotice(s)?.action?.run();
+    eq(`${locale}: one click: all five are the text typed, without the time format`, ["A2", "A3", "A4", "A5", "A6"].map((a) => cellOf(s, a)), ["1:1", "1:2", "1:4", "1:8", "1:16"].map((v) => ({ v })));
+    s.undo();
+    check(`${locale}: one undo step brings all five times back`, ["A2", "A3", "A4", "A5", "A6"].every((a) => cellOf(s, a)?.s?.fmt?.kind === "time"));
+    hideSheetNotice(s);
+  }
+  // Typed from the bottom up, the button still names them from the top down.
+  const up = storeOf({ A1: "Verdünnung" });
+  for (const [a1, t] of [["A6", "1:16"], ["A5", "1:8"], ["A4", "1:4"], ["A3", "1:2"], ["A2", "1:1"]]) type(up, a1, t);
+  eq("typed bottom up: the column's first and last, top down", label(up), "Als Text „1:1 … 1:16“");
+  hideSheetNotice(up);
+  // A cell changed meanwhile is left as it is now; another column, a notice that went, or the
+  // "1.234" hint start anew.
+  const s = storeOf({ A1: "Verdünnung", B1: "Verdünnung" });
+  type(s, "A2", "1:1");
+  type(s, "A3", "1:2");
+  type(s, "A2", "'1:1");
+  type(s, "A4", "1:4");
+  eq("a ratio kept as text meanwhile (typed with ') is left out", label(s), "Als Text „1:2, 1:4“");
+  type(s, "B2", "1:10");
+  eq("another column: its own ratios only", label(s), "Als Text „1:10“");
+  type(s, "A5", "1:8");
+  eq("…back in the first column after it: anew too", label(s), "Als Text „1:8“");
+  hideSheetNotice(s);
+  type(s, "A6", "1:16");
+  eq("the notice gone: the next one starts anew", label(s), "Als Text „1:16“");
+  type(s, "A7", "1:32");
+  type(s, "A6", "x");
+  currentSheetNotice(s)?.action?.run();
+  eq("a cell typed over before the click keeps what it holds now", [cellOf(s, "A6")?.v, cellOf(s, "A7")], ["x", { v: "1:32" }]);
+  const de = storeOf({ A1: "Masse" });
+  type(de, "A2", "1.234");
+  type(de, "A3", "2.345");
+  eq("the thousands hint stays about its own cell", label(de), "Als 2,345 lesen");
+  currentSheetNotice(de)?.action?.run();
+  eq("…and its click reads only that one", [valueOf(de, "A2"), valueOf(de, "A3")], [1234, 2.345]);
+  hideSheetNotice(de);
 }
 
 console.error = consoleError;

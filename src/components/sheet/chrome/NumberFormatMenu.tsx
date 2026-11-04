@@ -164,19 +164,27 @@ function useActive(store: SheetStore) {
   return { fmt: cell?.s?.fmt, value, text };
 }
 
-/** A − value + stepper. */
-function Stepper({ label, value, onLess, onMore, lessLabel, moreLabel }: { label: string; value: number; onLess: () => void; onMore: () => void; lessLabel: string; moreLabel: string }) {
-  const btn = "grid size-7 place-items-center rounded-md text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-35 [@media(hover:none)]:size-9";
+/**
+ * A − value + stepper, from `min` up to 15. At an end its button is switched off with
+ * aria-disabled, not disabled: pressed from the keyboard down to 0 decimals, the keyboard stays on
+ * it (a disabled button would drop it out of the panel), and pressing it again does nothing, as in
+ * a number field.
+ */
+function Stepper({ label, value, min, onLess, onMore, lessLabel, moreLabel }: { label: string; value: number; min: number; onLess: () => void; onMore: () => void; lessLabel: string; moreLabel: string }) {
+  const first = value <= min;
+  const last = value >= 15;
+  // (Only the sign fades at an end: the keyboard's ring around it stays as clear as anywhere.)
+  const btn = "grid size-7 place-items-center rounded-md text-ink-2 transition-colors hover:bg-hover hover:text-ink aria-disabled:cursor-default aria-disabled:[&>svg]:opacity-35 [@media(hover:none)]:size-9";
   return (
     <div className="flex min-h-8 items-center gap-2 px-2 text-[13px] text-ink-2">
       <span className="flex-1">{label}</span>
-      <button type="button" className={btn} onClick={onLess} aria-label={lessLabel} disabled={value <= 0}>
+      <button type="button" className={btn} onClick={first ? undefined : onLess} aria-label={lessLabel} aria-disabled={first || undefined}>
         <Minus className="size-3.5" />
       </button>
       <span className="w-5 text-center font-medium tabular-nums text-ink" aria-live="polite">
         {value}
       </span>
-      <button type="button" className={btn} onClick={onMore} aria-label={moreLabel} disabled={value >= 15}>
+      <button type="button" className={btn} onClick={last ? undefined : onMore} aria-label={moreLabel} aria-disabled={last || undefined}>
         <Plus className="size-3.5" />
       </button>
     </div>
@@ -199,7 +207,10 @@ export function FormatPanel({ store, onDone, onUnit }: { store: SheetStore; onDo
 
   return (
     <div className="w-[min(310px,calc(100vw-24px))]" onMouseDown={keepFocus}>
-      <div role="menu" aria-label={t.numberFormat} className="max-h-[min(52vh,420px)] overflow-y-auto overscroll-contain">
+      {/* The keyboard's focus ring goes inside each entry here: outside it, the edges of the
+          scrolling list would cut it off (the current format, where the keyboard starts, is often
+          the first or last entry in view). */}
+      <div role="menu" aria-label={t.numberFormat} className="max-h-[min(52vh,420px)] overflow-y-auto overscroll-contain [&_button]:outline-offset-[-2px]">
         {ORDER.map((id) => {
           const target = formatFor(id, fmt, locale, value);
           const hint = id === "general" || id === "significant" || id === "duration" || id === "text" ? t.formatHints[id] : undefined;
@@ -208,12 +219,13 @@ export function FormatPanel({ store, onDone, onUnit }: { store: SheetStore; onDo
       </div>
       {(currentId === "general" || decimals !== null || fmt?.kind === "significant") && <div className="mx-1 my-1 h-px bg-line" />}
       {fmt?.kind === "significant" ? (
-        <Stepper label={t.digits} value={fmt.digits} onLess={() => changeDecimals(store, -1)} onMore={() => changeDecimals(store, 1)} lessLabel={t.fewerDecimals} moreLabel={t.moreDecimals} />
+        <Stepper label={t.digits} value={fmt.digits} min={1} onLess={() => changeDecimals(store, -1)} onMore={() => changeDecimals(store, 1)} lessLabel={t.fewerDecimals} moreLabel={t.moreDecimals} />
       ) : (
         (decimals !== null || currentId === "general") && (
           <Stepper
             label={t.decimals}
             value={shownDecimals(fmt, value, locale)}
+            min={0}
             onLess={() => changeDecimals(store, -1)}
             onMore={() => changeDecimals(store, 1)}
             lessLabel={t.fewerDecimals}
@@ -240,7 +252,12 @@ export function FormatPanel({ store, onDone, onUnit }: { store: SheetStore; onDo
           ))}
         </div>
       )}
-      {takesUnit(fmt) && <Choice role="menuitem" icon={<Ruler />} label={t.unitMenu} right={unit || undefined} onSelect={onUnit} />}
+      {/* (data-drill: Back from the unit puts the keyboard here again.) */}
+      {takesUnit(fmt) && (
+        <div data-drill="unit">
+          <Choice role="menuitem" icon={<Ruler />} label={t.unitMenu} right={unit || undefined} onSelect={onUnit} />
+        </div>
+      )}
     </div>
   );
 }
@@ -279,12 +296,13 @@ export function UnitPanel({ store, onDone }: { store: SheetStore; onDone: () => 
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none transition-[border,box-shadow] placeholder:text-ink-3 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-50 [@media(hover:none)]:h-10 [@media(hover:none)]:text-[16px]"
+          className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none transition-[border,box-shadow] placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-50 [@media(hover:none)]:h-10 [@media(hover:none)]:text-[16px]"
         />
+        {/* In dark mode white text needs the deeper purple (4.5:1 and more). */}
         <button
           type="submit"
           disabled={!allowed}
-          className="h-8 shrink-0 rounded-lg bg-blob px-3 text-[13px] font-medium text-white transition-colors hover:bg-blob-deep disabled:opacity-40 [@media(hover:none)]:h-10"
+          className="h-8 shrink-0 rounded-lg bg-blob px-3 text-[13px] font-medium text-white transition-colors hover:bg-blob-deep disabled:opacity-40 dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)] [@media(hover:none)]:h-10"
         >
           {t.unitApply}
         </button>

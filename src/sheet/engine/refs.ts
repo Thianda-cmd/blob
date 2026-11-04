@@ -249,18 +249,26 @@ export function tableRowsArea(a: Area, rows: Omit<TableRows, "sheet">): Area | n
  * A formula on sheet `host` after a smart table's rows changed: =STEIGUNG(C6:C11;B6:B11) →
  * C6:C12, B6:B12 when the table's data rows 6…11 became 6…12, also as $C$6:$C$11 or
  * 'Blatt 1'!C6:C11 from another sheet, the way Excel's Tabelle1[Extinktion] would follow. Only
- * ranges (A1:A5), never single cells. `at`: the formula's own cell; a range that would come to
- * include it (=MITTELWERT(C6:C11) typed right below the table, into C12) stays as it is, so the
- * table growing never makes a formula circular.
+ * ranges (A1:A5), never single cells. `at`: the formula's own cell; when one of its ranges would
+ * come to include it (=MITTELWERT(C6:C11) typed right below the table, into C12; a fill over the
+ * rows under the table, where =STEIGUNG(B2:B7;A2:A7) sits in B9), the formula stays as it is, all
+ * of its ranges: the table growing never makes a formula circular, and the ranges of one formula
+ * keep the same rows (one grown, its partner not, would give #NV). So it does when one of them
+ * would take in a cell of `keepOut` (on the table's sheet): other formulas over the table's data in
+ * the rows it takes in, a summary under it (the fill reaching row 9, =BESTIMMTHEITSMASS(B2:B7;A2:A7)
+ * in B10 must not count B9's slope as a measurement).
  */
-export function growTableRefs(canonical: string, host: string, rows: TableRows, at?: { row: number; col: number }): string {
+export function growTableRefs(canonical: string, host: string, rows: TableRows, at?: { row: number; col: number }, keepOut: readonly { row: number; col: number }[] = []): string {
   const own = same(host, rows.sheet);
-  return rewriteRefs(canonical, (ref) => {
+  let stays = false;
+  const grown = rewriteRefs(canonical, (ref) => {
     if (ref.kind !== "range" || !same(ref.sheet ?? host, rows.sheet)) return undefined;
     const n = normalizeRef(ref);
     const a = tableRowsArea(n, rows);
     if (!a) return undefined;
-    if (at && own && at.row >= a.r0 && at.row <= a.r1 && at.col >= a.c0 && at.col <= a.c1) return undefined;
+    const takesIn = (p: { row: number; col: number }) => p.row >= a.r0 && p.row <= a.r1 && p.col >= a.c0 && p.col <= a.c1;
+    if ((at && own && takesIn(at)) || keepOut.some(takesIn)) stays = true;
     return { ...n, r0: a.r0, r1: a.r1 };
   });
+  return stays ? canonical : grown;
 }

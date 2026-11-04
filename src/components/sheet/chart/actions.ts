@@ -3,12 +3,14 @@
 // CONTRACT: keep names and signatures.
 
 import { sheetChartText } from "@/i18n/messages/sheetChart";
+import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cellKey, normArea } from "@/sheet/a1";
-import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
+import { CHART_MIN, chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
 import { chartData, type ChartData } from "@/sheet/chart/data";
 import { saveChart } from "@/sheet/chart/export";
 import { newId, putChart, removeChart, sheetById } from "@/sheet/ops";
-import type { Area, ChartKind, ChartSpec, RangeRef, TrendlineSpec, Workbook } from "@/sheet/types";
+import type { Area, ChartKind, ChartSpec, RangeRef, Sheet, TrendlineSpec, Workbook } from "@/sheet/types";
+import { showSheetNotice } from "../notice";
 import { selectionAreas, type SheetStore } from "../store";
 import { chartViewport, selectChart, setChartUi, type ChartViewport } from "./selection";
 
@@ -16,10 +18,20 @@ import { chartViewport, selectChart, setChartUi, type ChartViewport } from "./se
 const CLOSE_GAP = 16;
 /** On a grid where less than this share of a new chart's width can show beside its data, it goes below the data instead, if more of it shows there. */
 const BESIDE_MIN = 0.5;
+/** Room kept right of a new chart made as wide as a phone's grid, for its handles there (logical px). */
+const PHONE_MARGIN = 24;
+/** Height to width of a chart made on a phone: the usual 480 × 300. */
+const CHART_RATIO = 0.625;
 
 /** The ranges a chart reads on its own sheet: values, x values, series names. */
 function ownRanges(spec: ChartSpec): RangeRef[] {
   return [spec.x, ...spec.series.flatMap((s) => [s.y, s.x, s.nameRef])].filter((r): r is RangeRef => !!r && r.sheetId === spec.sheetId);
+}
+
+/** Whether a cell holds something: a value or a formula (a format alone doesn't count). */
+export function holdsSomething(sheet: Sheet | undefined, row: number, col: number): boolean {
+  const c = sheet?.cells[cellKey(row, col)];
+  return !!c && ((c.v !== undefined && c.v !== "") || c.f !== undefined);
 }
 
 const inArea = (row: number, col: number, a: Area) => row >= a.r0 && row <= a.r1 && col >= a.c0 && col <= a.c1;
@@ -85,6 +97,51 @@ function belowData(spec: ChartSpec, view: ChartViewport, data: Area, filled: (ro
 }
 
 /**
+ * Whether a chart of the spec's size at `at` would lie on cells that hold something; `gap`: or the
+ * column just left of it holds something in its rows (a note there would run into the chart).
+ * Hidden rows and columns don't count.
+ */
+function coversCells(spec: ChartSpec, view: ChartViewport, at: ChartSpec["at"], filled: (row: number, col: number) => boolean, gap: boolean): boolean {
+  const x1 = view.colX(at.col) + (at.dx + spec.size.w) * view.zoom;
+  const y1 = view.rowY(at.row) + (at.dy + spec.size.h) * view.zoom;
+  const rows: number[] = [];
+  for (let r = at.row; r < at.row + 400 && view.rowY(r) < y1; r++) if (view.rowY(r + 1) > view.rowY(r)) rows.push(r);
+  for (let c = gap ? Math.max(0, at.col - 1) : at.col; c < at.col + 200 && view.colX(c) < x1; c++) {
+    if (view.colX(c + 1) > view.colX(c) && rows.some((r) => filled(r, c))) return true;
+  }
+  return false;
+}
+
+/**
+ * The chart beside its data further right, past what is in its way, with an empty column before
+ * it (at most 60 columns on). `within`: only where all of it shows left of this edge. null when
+ * there is no such place.
+ */
+function furtherRight(spec: ChartSpec, view: ChartViewport, filled: (row: number, col: number) => boolean, within: number | null): ChartSpec | null {
+  for (let col = spec.at.col + 1; col <= spec.at.col + 60; col++) {
+    if (within !== null && view.colX(col) + spec.size.w * view.zoom > within) return null;
+    const at = { row: spec.at.row, col, dx: 0, dy: 0 };
+    if (!coversCells(spec, view, at, filled, true)) return { ...spec, at };
+  }
+  return null;
+}
+
+/**
+ * A new chart's size on this grid: the usual 480 × 300 px, unless fewer px of cells show than that
+ * and a margin (a phone, even with its zoom at 75 %): then it is as wide as the cells that show,
+ * less the margin for its right handles (at least CHART_MIN), in the same proportions, so all of
+ * it shows once it is scrolled to. The stored size is the chart's everywhere (a laptop, PNG and
+ * SVG files), so a grid that can show the usual size keeps it; a panel about to open beside the
+ * grid doesn't count, it takes the room only for a while.
+ */
+function fitToGrid(spec: ChartSpec, view: ChartViewport): ChartSpec {
+  const room = (view.right - view.left) / view.zoom;
+  if (room >= spec.size.w + PHONE_MARGIN) return spec;
+  const w = Math.max(CHART_MIN.w, Math.floor(room - PHONE_MARGIN));
+  return { ...spec, size: { w, h: Math.max(CHART_MIN.h, Math.round(w * CHART_RATIO)) } };
+}
+
+/**
  * A new chart goes beside its data with one empty column between them (chartFromAreas). When it
  * wouldn't fit on screen that way (the settings that open with it take room too), it goes right
  * next to the data instead, a little gap away: on a laptop at 1440 px with the sidebar open chart
@@ -94,6 +151,11 @@ function belowData(spec: ChartSpec, view: ChartViewport, data: Area, filled: (ro
  * taken: there it is as wide as the screen allows, and scrolling down shows it. Not on a wider
  * grid: data that merely sits far right is scrolled to, and settings opening beside the grid take
  * its room only for a while; a chart below the data would cover the rows where more measurements go.
+ *
+ * It never covers the student's own cells (a result or a note beside the data), when `below` says
+ * which cells are taken: where they are in the way beside the data, it goes further right if all
+ * of it shows there, else below the data, else further right all the same. On a phone it is made
+ * smaller first (fitToGrid), so all of it fits on the screen.
  */
 export function placeInView(
   spec: ChartSpec,
@@ -102,15 +164,32 @@ export function placeInView(
   below?: { data: Area; filled: (row: number, col: number) => boolean },
 ): ChartSpec {
   if (!view) return spec;
-  const width = spec.size.w * view.zoom;
+  const made = fitToGrid(spec, view);
+  const width = made.size.w * view.zoom;
   const right = view.right - view.sidePanel;
-  const usual = view.colX(spec.at.col) + spec.at.dx * view.zoom;
-  if (usual + width <= right || usual < view.left) return spec;
-  const close = spec.at.col >= 1 && freeColumn(spec.at.col - 1) ? view.colX(spec.at.col - 1) + CLOSE_GAP * view.zoom : null;
+  const filled = below?.filled;
+  const usual = view.colX(made.at.col) + made.at.dx * view.zoom;
+  const usualFree = !filled || !coversCells(made, view, made.at, filled, true);
+  if (usualFree && (usual + width <= right || usual < view.left)) return made;
+  const closeAt = { ...made.at, col: made.at.col - 1, dx: CLOSE_GAP };
+  const close = made.at.col >= 1 && freeColumn(made.at.col - 1) ? view.colX(made.at.col - 1) + CLOSE_GAP * view.zoom : null;
   const nearer = close !== null && close >= view.left && close < usual;
-  const beside = nearer ? { ...spec, at: { ...spec.at, col: spec.at.col - 1, dx: CLOSE_GAP } } : spec;
-  const x = nearer ? close : usual;
-  if (x + width <= right) return beside;
+  const closeFree = nearer && (!filled || !coversCells(made, view, closeAt, filled, false));
+  if (closeFree && close + width <= right) return { ...made, at: closeAt };
+
+  if (!usualFree && !closeFree && below) {
+    // The student's own cells beside the data: past them where all of the chart shows, else
+    // below the data (which skips filled rows), else past them all the same. Nothing free at all:
+    // beside the data, where most of it shows.
+    return (
+      furtherRight(made, view, below.filled, right) ??
+      belowData(made, view, below.data, below.filled) ??
+      furtherRight(made, view, below.filled, null) ??
+      (nearer ? { ...made, at: closeAt } : made)
+    );
+  }
+  const beside = closeFree ? { ...made, at: closeAt } : made;
+  const x = closeFree ? close : usual;
   if (below) {
     // How much of the chart can show beside the data and below it, with the data at the grid's
     // left edge and no settings beside the grid.
@@ -118,7 +197,7 @@ export function placeInView(
     const besideShare = Math.max(0, Math.min(1, (room - (x - view.colX(below.data.c0))) / width));
     const belowShare = Math.min(1, room / width);
     if (besideShare < BESIDE_MIN && belowShare >= besideShare + 0.25) {
-      const low = belowData(spec, view, below.data, below.filled);
+      const low = belowData(made, view, below.data, below.filled);
       if (low) return low;
     }
   }
@@ -135,24 +214,48 @@ export function insertChart(store: SheetStore, kind?: ChartKind): boolean {
   if (!made) return false;
   // The empty column it would cover instead must be empty beside the chart (about 30 rows).
   const sheet = state.workbook.sheets.find((x) => x.id === state.sheetId);
-  const hasContent = (r: number, col: number) => {
-    const c = sheet?.cells[cellKey(r, col)];
-    return !!c && ((c.v !== undefined && c.v !== "") || c.f !== undefined);
-  };
+  const hasContent = (r: number, col: number) => holdsSomething(sheet, r, col);
   const freeColumn = (col: number) => {
     for (let r = made.at.row; r < made.at.row + 30; r++) if (hasContent(r, col)) return false;
     return true;
   };
-  // Below the data, the chart covers only empty cells inside the sheet.
+  // The chart covers only empty cells inside the sheet, and none under the sheet's other charts:
+  // a second chart of the same data doesn't hide the first.
+  const view = chartViewport(store);
+  const underCharts = new Set<string>();
+  if (view) {
+    for (const c of state.workbook.charts) {
+      if (c.sheetId !== state.sheetId) continue;
+      const x1 = view.colX(c.at.col) + (c.at.dx + c.size.w) * view.zoom;
+      const y1 = view.rowY(c.at.row) + (c.at.dy + c.size.h) * view.zoom;
+      for (let r = c.at.row; r < c.at.row + 400 && view.rowY(r) < y1; r++) {
+        for (let col = c.at.col; col < c.at.col + 200 && view.colX(col) < x1; col++) underCharts.add(cellKey(r, col));
+      }
+    }
+  }
   const data = chartDataBlock(state.workbook, made);
-  const filled = (r: number, col: number) => !sheet || r >= sheet.size.rows || col >= sheet.size.cols || hasContent(r, col);
-  const spec = placeInView(made, chartViewport(store), freeColumn, data ? { data, filled } : undefined);
+  const filled = (r: number, col: number) => !sheet || r >= sheet.size.rows || col >= sheet.size.cols || hasContent(r, col) || underCharts.has(cellKey(r, col));
+  const spec = placeInView(made, view, freeColumn, data ? { data, filled } : undefined);
   store.apply(sheetChartText[state.locale].undo.insert, (wb) => putChart(wb, spec));
   if (!store.get().workbook.charts.some((c) => c.id === spec.id)) return false;
   selectChart(store, spec.id, { reveal: true });
   setChartUi(store, { section: null, series: null });
   store.setFocus({ kind: "chart", id: spec.id });
   return true;
+}
+
+/**
+ * A chart of the selection for the toolbar's "Diagramm", the cells' menu, Alt+F1 and F11; when
+ * there is nothing to chart, the notice says how to pick the data (the same words everywhere).
+ */
+export function makeChart(store: SheetStore, kind?: ChartKind) {
+  let made = false;
+  try {
+    made = insertChart(store, kind);
+  } catch (err) {
+    console.error("sheet: inserting a chart failed", err);
+  }
+  if (!made && !store.get().readOnly) showSheetNotice(store, sheetChromeText[store.get().locale].chartNeedsData);
 }
 
 // ----------------------------------------------------------------------------------------------

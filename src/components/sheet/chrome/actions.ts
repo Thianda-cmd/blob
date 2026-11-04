@@ -11,12 +11,13 @@ import type { Locale } from "@/i18n/config";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { areaName, cellKey, parseKey } from "@/sheet/a1";
 import { FUNCTION_BY_EN, formatValue, type Calc, type CellValue } from "@/sheet/engine";
+import { formulaFormat } from "@/sheet/engine/input";
 import { getCell, setCells, setFreeze, setStyle as styleCells, sheetById, sortArea } from "@/sheet/ops";
 import { tableAt } from "@/sheet/table/model";
 import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type Area, type BorderLine, type Cell, type CellStyle, type NumberFormat, type Pos, type Sheet, type Workbook } from "@/sheet/types";
 import { currentRegion, filled } from "../grid/navigation";
 import { showSheetNotice } from "../notice";
-import { activeArea, selectionAreas, type Selection, type SheetStore } from "../store";
+import { activeArea, selectionAreas, typedCell, typingAt, type Selection, type SheetStore } from "../store";
 import { sortTableColumn } from "../table/actions";
 import { insertFunctionCall } from "./formulaInput";
 
@@ -453,14 +454,6 @@ export function autoSumCells(sheet: Sheet, calc: Calc, sheetId: string, area0: A
   return out;
 }
 
-/** A formula cell that keeps the look and note of the cell it replaces. */
-function formulaCell(current: Cell | undefined, f: string): Cell {
-  const cell: Cell = { f };
-  if (current?.s) cell.s = current.s;
-  if (current?.note) cell.note = current.note;
-  return cell;
-}
-
 /** Excel's AutoSum (Alt+=): =SUMME(…) (or another function) of the numbers above/left of the selection, or below/right of a selected range. */
 export function autoSum(store: SheetStore, fn?: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN" | "STDEV.S"): void {
   const which: SumFn = fn ?? "SUM";
@@ -498,7 +491,14 @@ export function autoSum(store: SheetStore, fn?: "SUM" | "AVERAGE" | "COUNT" | "M
     return;
   }
   const sheetId = s.sheetId;
-  store.apply(t.steps.autoSum, (wb) => setCells(wb, sheetId, cells.map((c) => ({ row: c.row, col: c.col, cell: formulaCell(getCell(wb, sheetId, c.row, c.col), c.f) }))));
+  // Each formula as if typed into its cell, keeping its look and note: =SUMME of run times shows
+  // 49:15 (see formulaFormat).
+  const typed = cells.map((c) => {
+    const { current, place } = typingAt(s, sheetId, c);
+    const fmt = formulaFormat(c.f, place);
+    return { row: c.row, col: c.col, cell: typedCell(current, fmt ? { cell: { f: c.f }, fmt } : { cell: { f: c.f } }) };
+  });
+  store.apply(t.steps.autoSum, (wb) => setCells(wb, sheetId, typed));
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -547,13 +547,19 @@ export function hasHeaderRow(sheet: Sheet, calc: Calc, sheetId: string, a: Area)
  * What sorting the selection sorts: the selected rows, or the block of data around the active
  * cell, without a header row on top; sorted by the active cell's column. A single selected column
  * inside a bigger block takes the whole block along (`widened`), so rows never fall apart (Excel
- * asks; this is its default answer). null: fewer than two rows to sort.
+ * asks; this is its default answer). So do several selected areas: they can't each be sorted on
+ * their own (Excel refuses), so the block around the active cell is, as for one cell. null: fewer
+ * than two rows to sort.
  */
 export function sortPlan(sheet: Sheet, calc: Calc, sheetId: string, sel: Selection): { area: Area; col: number; header: boolean; widened: boolean } | null {
   const at = sel.anchor;
+  const areas = selectionAreas(sel);
   let area: Area | null = activeArea(sel);
   let widened = false;
-  if (area.r0 === area.r1 && area.c0 === area.c1) area = currentRegion(sheet, at);
+  if (areas.length > 1) {
+    area = currentRegion(sheet, at);
+    for (let c = area.c0; c <= area.c1 && !widened; c++) widened = !areas.some((a) => a.c0 <= c && c <= a.c1);
+  } else if (area.r0 === area.r1 && area.c0 === area.c1) area = currentRegion(sheet, at);
   else {
     area = clipToData(sheet, area);
     if (!area) return null;

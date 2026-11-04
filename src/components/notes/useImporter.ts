@@ -15,13 +15,24 @@ import { clipTitle, importBlobFile, settleNote } from "./transfer";
 const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
 /**
  * What the file picker offers. ".xls" too: photometers and web tools save CSV text or an HTML table
- * under that name (a real old Excel file gets a message saying how to save it).
+ * under that name (a real old Excel file gets a message saying how to save it). LibreOffice (.ods)
+ * and Numbers files too: the spreadsheet reader says how to save them as .xlsx.
  */
-export const IMPORT_ACCEPT = `${BLOB_EXT},.md,.markdown,.txt,text/markdown,text/plain,.xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel`;
+export const IMPORT_ACCEPT = `${BLOB_EXT},.md,.markdown,.txt,text/markdown,text/plain,.xlsx,.xls,.csv,.tsv,.ods,.numbers,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,application/vnd.apple.numbers`;
 
-/** Excel and CSV files become spreadsheets ("Tabellen"). */
-export const isSheetFile = (f: File) =>
-  /\.(xlsx|xls|csv|tsv)$/i.test(f.name) || f.type === "text/csv" || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || f.type === "application/vnd.ms-excel";
+const SHEET_TYPES = new Set([
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.apple.numbers",
+]);
+
+/**
+ * Excel and CSV files become spreadsheets ("Tabellen"). LibreOffice (.ods) and Numbers files go the
+ * same way, so wherever one is picked or dropped the reader's words say how to save it as .xlsx.
+ */
+export const isSheetFile = (f: File) => /\.(xlsx|xls|csv|tsv|ods|numbers)$/i.test(f.name) || SHEET_TYPES.has(f.type);
 
 const IMPORTABLE = new RegExp(`(\\${BLOB_EXT}|\\.md|\\.markdown|\\.txt)$`, "i");
 /**
@@ -72,11 +83,13 @@ export function useImporter() {
           if (isSheetFile(file)) {
             // A spreadsheet: read in the browser (the spreadsheet code loads only now).
             const { readSheetFile, sheetPageContent, MAX_SHEET_BYTES } = await import("@/components/sheet/importFile");
-            const read = await readSheetFile(file, locale);
+            // A file too big to save as a spreadsheet is refused while it is read.
+            const read = await readSheetFile(file, locale, { maxBytes: MAX_SHEET_BYTES });
             if ("error" in read) {
               // The reader's own words when it knows more (a password, a LibreOffice file, too much text…).
               const p = read.error;
-              tell(read.message ?? (p === "tooBig" ? ts.importTooBig : p === "oldXls" ? ts.importOldXls : p === "empty" ? ts.importEmpty : ts.importFailed), "worried", 7000);
+              if (p === "sheetTooBig") tell(ts.importTooBigSheet(read.bytes ?? 0), "worried", 9000);
+              else tell(read.message ?? (p === "tooBig" ? ts.importTooBig : p === "oldXls" ? ts.importOldXls : p === "empty" ? ts.importEmpty : ts.importFailed), "worried", 7000);
               continue;
             }
             const { content, plain_text, bytes } = sheetPageContent(read.workbook, locale);

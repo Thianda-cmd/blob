@@ -8,8 +8,9 @@
 
 import { ArrowDown01, ArrowDown10, ArrowDownAZ, ArrowDownZA, Check, FunnelX, Settings2, Sigma } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useClosesOutside } from "@/components/ui/ContextMenu";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet as BottomSheet } from "@/components/ui/Sheet";
 import { usePhone } from "@/components/ui/useMediaQuery";
@@ -23,11 +24,12 @@ import { cellKey } from "@/sheet/a1";
 import type { FilterSpec, TableSpec, TotalFn, Workbook } from "@/sheet/types";
 import { focusSheetGrid } from "../grid/Grid";
 import { useSheet, type SheetStore } from "../store";
-import { filterTableColumn, openTablePanel, setTableColumnTotal, sortTableColumn } from "./actions";
+import { filterTableColumn, setTableColumnTotal, sortTableColumn } from "./actions";
 import type { ColumnMenuRequest } from "./decor";
 import { FilterCondition } from "./FilterCondition";
 import { FilterValues } from "./FilterValues";
 import { Select } from "./parts";
+import { openTableSettings } from "./TablePanel";
 
 export function ColumnMenu({ store, request, onClose }: { store: SheetStore; request: ColumnMenuRequest; onClose: () => void }) {
   const table = useSheet(store, (s) => s.workbook.tables.find((t) => t.id === request.tableId));
@@ -70,6 +72,8 @@ function Anchored({ anchor, label, onClose, onEscape, children }: { anchor: HTML
   useEffect(() => {
     latest.current = { onClose, onEscape };
   });
+  // (Open while it is there: it closes on a press outside it, below.)
+  useClosesOutside(panel, true);
 
   useLayoutEffect(() => {
     const el = panel.current;
@@ -278,9 +282,10 @@ export function ColumnMenuContent({
       <div className="mx-1 my-1.5 h-px bg-line" />
       <MenuRow
         icon={<Settings2 />}
-        onClick={() => {
+        onClick={(e) => {
           done();
-          openTablePanel(store, table.id);
+          // Chosen with the keyboard (Enter or Space), the keyboard goes into the settings too.
+          openTableSettings(store, table.id, e.detail === 0);
         }}
       >
         {t.tableSettings}
@@ -289,7 +294,7 @@ export function ColumnMenuContent({
   );
 }
 
-function MenuRow({ icon, children, onClick, disabled, checked }: { icon: ReactNode; children: ReactNode; onClick: () => void; disabled?: boolean; checked?: boolean }) {
+function MenuRow({ icon, children, onClick, disabled, checked }: { icon: ReactNode; children: ReactNode; onClick: (e: MouseEvent<HTMLButtonElement>) => void; disabled?: boolean; checked?: boolean }) {
   return (
     <button
       type="button"

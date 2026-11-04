@@ -10,15 +10,17 @@ import type { Locale } from "@/i18n/config";
 import { cellKey, parsePos } from "@/sheet/a1";
 import { normalizeWorkbook } from "@/sheet/doc";
 import * as E from "@/sheet/engine";
+import { formulaFormat } from "@/sheet/engine/input";
 import * as O from "@/sheet/ops";
 import * as T from "@/sheet/table/model";
 import { buildDecorate } from "@/components/sheet/table/decor";
 import { calcFor, createSheetStore } from "@/components/sheet/store";
+import { clearSelection } from "@/components/sheet/grid/actions";
 import { currentSheetNotice } from "@/components/sheet/notice";
 import { chartFromTable, makeTableFromSelection } from "@/components/sheet/table/actions";
 import { describeFilter } from "@/components/sheet/table/describe";
 import { sheetTableText } from "@/i18n/messages/sheetTable";
-import type { Area, Cell, ChartSpec, FilterSpec, RangeRef, Sheet, TableSpec, Workbook } from "@/sheet/types";
+import type { Area, Cell, ChartSpec, FilterSpec, NumberFormat, RangeRef, Sheet, TableSpec, TotalFn, Workbook } from "@/sheet/types";
 
 // ----------------------------------------------------------------------------------------------
 // Tiny test kit
@@ -1275,6 +1277,206 @@ run("the table UI's messages and words", () => {
   check("the confirm says what goes and what stays", de.removeConfirm.includes("intelligente Tabelle") && de.removeConfirm.includes("Rest des Blatts") && en.removeConfirm.includes("rest of the sheet"));
   eq("making one: the same words as the toolbar's button and Excel", [de.makeTable, en.makeTable], ["Als Tabelle formatieren", "Format as table"]);
   eq("the panel's group", [de.table, en.table], ["Intelligente Tabelle", "Smart table"]);
+});
+
+// ==============================================================================================
+// Formats in smart tables (lane FMT2): a total of clock times, a calculated column typed anew
+
+/** A clock time as typing gives it (08:30). */
+const clock = (h: number, m: number): Cell => ({ v: (h * 60 + m) / 1440, s: { fmt: { kind: "time", seconds: false } } });
+const clockFmt: NumberFormat = { kind: "time", seconds: false };
+const durationFmt: NumberFormat = { kind: "time", seconds: false, duration: true };
+/** What a cell shows. */
+const shown = (wb: Workbook, a1: string, locale: Locale = "de") => E.formatValue(val(wb, a1, locale), cell(wb, a1)?.s?.fmt, locale);
+
+run("totals of clock times (FX2-1)", () => {
+  section("totals row: a sum of clock times is a duration");
+  const runs = make(book({ A1: "Probe", B1: "Laufzeit", A2: "P1", B2: clock(8, 30), A3: "P2", B3: clock(7, 45), A4: "P3", B4: clock(9, 15) }), "A1:B4").wb;
+  const t = only(runs);
+  const on = T.setTotals(runs, calcOf(runs), t.id, true, "de");
+  eq("Summe of 08:30, 07:45 and 09:15: 25:30 (not the time 01:30)", [cell(on, "A5")?.v, cell(on, "B5")?.f, shown(on, "B5"), cell(on, "B5")?.s?.fmt], ["Ergebnis", "SUBTOTAL(109,B2:B4)", "25:30", durationFmt]);
+  eq("…the format AutoSum gives the same formula", formulaFormat("SUBTOTAL(109,B2:B4)", { wb: on, sheetId: "s1" }), durationFmt);
+  // Each function from the one before it: the format follows (Max then Summe, Summe then Anzahl).
+  const b = t.columns[1].id;
+  let w = on;
+  const steps: [TotalFn, string, NumberFormat | undefined][] = [
+    ["average", "08:30", durationFmt],
+    ["max", "09:15", clockFmt],
+    ["sum", "25:30", durationFmt],
+    ["count", "3", undefined],
+    ["sum", "25:30", durationFmt],
+    ["min", "07:45", clockFmt],
+    ["countNumbers", "3", undefined],
+    ["max", "09:15", clockFmt],
+  ];
+  for (const [fn, text, fmt] of steps) {
+    w = T.setColumnTotal(w, t.id, b, fn, "de");
+    eq(`then ${fn}: ${text}`, [shown(w, "B5"), cell(w, "B5")?.s?.fmt], [text, fmt]);
+  }
+  w = T.setColumnTotal(T.setColumnTotal(w, t.id, b, "none", "de"), t.id, b, "sum", "de");
+  eq("Keine, then Summe: 25:30", shown(w, "B5"), "25:30");
+  // Ten runs of 03:00: 30:00, also in English
+  const ten: Record<string, CellInput> = { A1: "Lauf" };
+  for (let r = 2; r <= 11; r++) ten[`A${r}`] = clock(3, 0);
+  const tenWb = make(book(ten), "A1:A11", "en").wb;
+  const tenOn = T.setTotals(tenWb, calcOf(tenWb, "en"), only(tenWb).id, true, "en");
+  eq("ten runs of 03:00: 30:00 (English)", [cell(tenOn, "A12")?.f, shown(tenOn, "A12", "en")], ["SUBTOTAL(109,A2:A11)", "30:00"]);
+  // A format picked by hand for the total stays, whatever the function
+  const own = O.setStyle(on, "s1", [A("B5")], { fmt: { kind: "number", decimals: 2 } });
+  eq("a format picked by hand stays", [T.setColumnTotal(own, t.id, b, "average", "de"), T.setColumnTotal(own, t.id, b, "count", "de")].map((x) => cell(x, "B5")?.s?.fmt), [
+    { kind: "number", decimals: 2 },
+    { kind: "number", decimals: 2 },
+  ]);
+  // Number formats as before: a sum in mg with one decimal, a spread of percentages
+  const mg = make(book({ A1: "Masse", B1: "Anteil", A2: { v: 1.25, s: { fmt: { kind: "number", decimals: 1, unit: "mg" } } }, A3: { v: 2.5, s: { fmt: { kind: "number", decimals: 1, unit: "mg" } } }, B2: { v: 0.05, s: { fmt: { kind: "percent", decimals: 1 } } }, B3: { v: 0.1, s: { fmt: { kind: "percent", decimals: 1 } } } }), "A1:B3").wb;
+  const mt = only(mg);
+  let mgOn = T.setTotals(mg, calcOf(mg), mt.id, true, "de");
+  mgOn = T.setColumnTotal(T.setColumnTotal(mgOn, mt.id, mt.columns[0].id, "sum", "de"), mt.id, mt.columns[1].id, "stdev", "de");
+  eq("a sum in mg and a spread of percentages keep their formats", [shown(mgOn, "A4"), shown(mgOn, "B4")], ["3,8 mg", "3,5%"]);
+  // Timestamps shown as their clock time (an instrument's log): their mean is a moment
+  const log = make(book({ A1: "Messzeit", A2: { v: 46329.6, s: { fmt: clockFmt } }, A3: { v: 46329.65, s: { fmt: clockFmt } }, A4: { v: 46329.7, s: { fmt: clockFmt } } }), "A1:A4").wb;
+  const logOn = T.setColumnTotal(T.setTotals(log, calcOf(log), only(log).id, true, "de"), only(log).id, only(log).columns[0].id, "average", "de");
+  eq("the mean of timestamps shown as clock times: a time of day", [shown(logOn, "A5"), cell(logOn, "A5")?.s?.fmt], ["15:36", clockFmt]);
+  // …also when formulas make them (Start + n × 30 min): their results count, with the editor's
+  // values or worked out by setColumnTotal itself (12:45, not 1111908:45 hours)
+  const made: Record<string, CellInput> = { A1: "Messzeit", D1: { v: 46329.5, s: { fmt: { kind: "datetime" } } } };
+  for (let r = 2; r <= 5; r++) made[`A${r}`] = { f: `$D$1+${r - 2}/48`, s: { fmt: clockFmt } };
+  const madeWb = make(book(made), "A1:A5").wb;
+  const mtId = only(madeWb).id;
+  const madeCol = only(madeWb).columns[0].id;
+  const madeOn = T.setTotals(madeWb, calcOf(madeWb), mtId, true, "de");
+  eq("timestamps made by formulas: the totals row's Summe keeps the clock format", cell(madeOn, "A6")?.s?.fmt, clockFmt);
+  const madeMean = [T.setColumnTotal(madeOn, mtId, madeCol, "average", "de"), T.setColumnTotal(madeOn, mtId, madeCol, "average", "de", calcOf(madeOn))];
+  eq("…their mean a time of day, with or without the editor's values", madeMean.map((x) => [shown(x, "A6"), cell(x, "A6")?.s?.fmt]), [
+    ["12:45", clockFmt],
+    ["12:45", clockFmt],
+  ]);
+  eq("…the same as AutoSum gives", formulaFormat("SUBTOTAL(101,A2:A5)", { wb: madeOn, sheetId: "s1", value: (id, r, c) => calcOf(madeOn).value(id, r, c) }), clockFmt);
+  // Growth-curve times typed in any order: a duration among them makes Max and Min durations too
+  const growth = make(book({ A1: "Zeit", A2: { v: 0, s: { fmt: clockFmt } }, A3: { v: 0.5, s: { fmt: clockFmt } }, A4: { v: 1, s: { fmt: durationFmt } }, A5: { v: 1.5, s: { fmt: durationFmt } }, A6: { v: 0.75, s: { fmt: clockFmt } } }), "A1:A6").wb;
+  const gId = only(growth).id;
+  const gCol = only(growth).columns[0].id;
+  let g = T.setTotals(growth, calcOf(growth), gId, true, "de");
+  const gSteps: [TotalFn, string, NumberFormat | undefined][] = [
+    ["max", "36:00", durationFmt],
+    ["min", "00:00", durationFmt],
+    ["sum", "90:00", durationFmt],
+    ["count", "5", undefined],
+    ["max", "36:00", durationFmt],
+  ];
+  for (const [fn, text, fmt] of gSteps) {
+    g = T.setColumnTotal(g, gId, gCol, fn, "de");
+    eq(`0:00, 12:00, 24:00, 36:00, 18:00, ${fn}: ${text} (not the clock time 12:00)`, [shown(g, "A7"), cell(g, "A7")?.s?.fmt], [text, fmt]);
+  }
+  // A total loaded back from the database has jsonb's key order: still the column's, so Anzahl drops it
+  const loaded = O.setStyle(mgOn, "s1", [A("A4")], { fmt: { kind: "number", unit: "mg", decimals: 1 } as NumberFormat });
+  eq("a total's mg format in another key order still follows the function", [shown(T.setColumnTotal(loaded, mt.id, mt.columns[0].id, "count", "de"), "A4"), cell(T.setColumnTotal(loaded, mt.id, mt.columns[0].id, "count", "de"), "A4")?.s?.fmt], ["2", undefined]);
+});
+
+run("a calculated column typed anew (FX2-2)", () => {
+  section("calculated columns: a format the old formula gave goes with it");
+  const times: Record<string, CellInput> = { A1: "Start", B1: "Ende", C1: "Dauer", A2: clock(8, 0), B2: clock(14, 30), A3: clock(9, 15), B3: clock(17, 45), A4: clock(22, 0), B4: clock(23, 15), A5: clock(7, 30), B5: clock(8, 15) };
+  const base = make(book(times), "A1:C5").wb;
+  const storeOn = (wb: Workbook, locale: Locale = "de") => createSheetStore({ pageId: "p1", workbook: wb, locale, readOnly: false });
+  const s = storeOn(base);
+  const shownIn = (store: ReturnType<typeof storeOn>, a1s: string[]) => a1s.map((a1) => shown(store.get().workbook, a1, store.get().locale));
+  const C = ["C2", "C3", "C4", "C5"];
+  s.input(at("C2"), "=B2-A2");
+  eq("=B2-A2 fills the column: durations", [shownIn(s, C), cell(s.get().workbook, "C3")?.s?.fmt], [["06:30", "08:30", "01:15", "00:45"], durationFmt]);
+  s.input(at("C2"), "=(B2-A2)*24");
+  eq("typed anew as =(B2-A2)*24: hours in every row (not 204:00)", shownIn(s, C), ["6,5", "8,5", "1,25", "0,75"]);
+  eq("…stored without the old format", [cell(s.get().workbook, "C3"), cell(s.get().workbook, "C5")], [{ f: "(B3-A3)*24" }, { f: "(B5-A5)*24" }]);
+  s.undo();
+  eq("undo: durations again", [shownIn(s, C), cell(s.get().workbook, "C3")?.s?.fmt], [["06:30", "08:30", "01:15", "00:45"], durationFmt]);
+  s.redo();
+  eq("redo: hours again", [shownIn(s, C), cell(s.get().workbook, "C3")?.s], [["6,5", "8,5", "1,25", "0,75"], undefined]);
+  s.input(at("A6"), "10:00");
+  s.input(at("B6"), "12:30");
+  eq("a row typed below goes on with hours", [cell(s.get().workbook, "C6"), shownIn(s, ["C6"])], [{ f: "(B6-A6)*24" }, ["2,5"]]);
+  s.input(at("C2"), '=WENN(B2="";"";B2-A2)');
+  eq('typed anew as =WENN(B2="";"";B2-A2): durations in every row', shownIn(s, [...C, "C6"]), ["06:30", "08:30", "01:15", "00:45", "02:30"]);
+  s.apply("format", (wb) => O.setStyle(wb, "s1", [A("C4")], { fmt: { kind: "number", decimals: 3 } }));
+  s.input(at("C2"), "=(B2-A2)*24");
+  eq("a format picked by hand stays", [shownIn(s, C), cell(s.get().workbook, "C4")?.s?.fmt], [["6,5", "8,5", "1,250", "0,75"], { kind: "number", decimals: 3 }]);
+  // The typed cell's own format goes down the column with the formula
+  const own = storeOn(base);
+  own.apply("format", (wb) => O.setStyle(wb, "s1", [A("C2")], { fmt: { kind: "number", decimals: 2 } }));
+  own.input(at("C2"), "=B2-A2");
+  eq("a format picked for the typed cell goes down the column", shownIn(own, C), ["0,27", "0,35", "0,05", "0,03"]);
+  // Rows still empty: the typed row's format, so times typed into them later show as durations
+  const planned = make(book({ A1: "Start", B1: "Ende", C1: "Dauer", A2: clock(8, 0), B2: clock(14, 30) }), "A1:C6", "de", { header: "yes" }).wb;
+  const p = storeOn(planned);
+  p.input(at("C2"), "=B2-A2");
+  p.input(at("A4"), "09:00");
+  p.input(at("B4"), "10:30");
+  eq("empty rows filled later show durations", [shownIn(p, ["C2", "C4"]), cell(p.get().workbook, "C6")?.s?.fmt], [["06:30", "01:30"], durationFmt]);
+  p.input(at("C2"), "=(B2-A2)*24");
+  eq("…typed anew: hours there too, the empty rows without a format", [shownIn(p, ["C2", "C4"]), cell(p.get().workbook, "C6")], [["6,5", "1,5"], { f: "(B6-A6)*24" }]);
+  // Dates: =A2+7 typed anew as =B2-A2 counts days in every row (not 04.01.1900); a cell's own look stays
+  const day = (n: number): Cell => ({ v: n, s: { fmt: { kind: "date", style: "short" } } });
+  const dates = make(book({ A1: "Ansatz", B1: "Ernte", C1: "Tage", A2: day(46329), B2: day(46333), A3: day(46330), B3: day(46335), C3: { s: { bold: true } }, A4: day(46331), B4: day(46340) }), "A1:C4").wb;
+  const ds = storeOn(dates);
+  ds.input(at("C2"), "=A2+7");
+  eq("=A2+7: dates", shownIn(ds, ["C2", "C3", "C4"]), ["10.11.2026", "11.11.2026", "12.11.2026"]);
+  ds.input(at("C2"), "=B2-A2");
+  eq("…typed anew as =B2-A2: days, the bold cell still bold", [shownIn(ds, ["C2", "C3", "C4"]), cell(ds.get().workbook, "C3")?.s], [["4", "5", "9"], { bold: true }]);
+  // English
+  const en = storeOn(base, "en");
+  en.input(at("C2"), "=B2-A2");
+  en.input(at("C2"), "=(B2-A2)*24");
+  eq("in English", shownIn(en, C), ["6.5", "8.5", "1.25", "0.75"]);
+
+  section("calculated columns: cells emptied with Entf, rows half typed, big tables");
+  // Entf keeps a cell's look: the old formula's duration still goes with that formula
+  const entf = storeOn(base);
+  entf.input(at("C2"), "=B2-A2");
+  entf.select({ anchor: at("C4"), focus: at("C4"), extra: [] });
+  clearSelection(entf);
+  entf.input(at("C2"), "=(B2-A2)*24");
+  eq("a row emptied with Entf, the column typed anew: hours there too (not 30:00)", [shownIn(entf, C), cell(entf.get().workbook, "C4")], [["6,5", "8,5", "1,25", "0,75"], { f: "(B4-A4)*24" }]);
+  const last = storeOn(base, "en");
+  last.input(at("C2"), "=B2-A2");
+  last.select({ anchor: at("C5"), focus: at("C5"), extra: [] });
+  clearSelection(last);
+  last.input(at("C2"), "=(B2-A2)*24");
+  last.input(at("A6"), "10:00");
+  last.input(at("B6"), "12:30");
+  eq("the last row emptied, typed anew, a row typed below: 2.5 hours (not 60:00)", [shownIn(last, ["C5", "C6"]), cell(last.get().workbook, "C6")], [["0.75", "2.5"], { f: "(B6-A6)*24" }]);
+  // The typed row's Start and Ende emptied since: the duration its cell kept isn't one picked by hand for the column
+  const gone = storeOn(base);
+  gone.input(at("C2"), "=B2-A2");
+  gone.apply("clear", (wb) => O.setCells(wb, "s1", [{ row: 1, col: 0, cell: null }, { row: 1, col: 1, cell: null }]));
+  gone.input(at("C2"), "=(B2-A2)*24");
+  eq("the typed row emptied before: hours in the other rows", shownIn(gone, ["C3", "C4", "C5"]), ["8,5", "1,25", "0,75"]);
+  // A row with only its Start yet gets the typed row's duration: an overnight Ende typed later shows -16:15
+  const half = storeOn(make(book({ A1: "Start", B1: "Ende", C1: "Dauer", A2: clock(22, 0), B2: clock(6, 0), A3: clock(22, 30) }), "A1:C4", "de", { header: "yes" }).wb);
+  half.input(at("C2"), "=B2-A2");
+  eq("a row half typed: a duration, not a clock time", cell(half.get().workbook, "C3")?.s?.fmt, durationFmt);
+  half.input(at("B3"), "06:15");
+  eq("…its overnight Ende typed later shows -16:15 (not -0,677083333)", shownIn(half, ["C2", "C3"]), ["-16:00", "-16:15"]);
+  // 5,000 rows of times: a formula over ranges fills the column without looking through them for
+  // each row (seconds before), a formula of single cells works out each row
+  const rows: Record<string, CellInput> = { A1: "Start", B1: "Ende", C1: "Dauer" };
+  for (let r = 2; r <= 5001; r++) {
+    rows[`A${r}`] = { v: ((r % 40) + 20) / 96, s: { fmt: clockFmt } };
+    rows[`B${r}`] = { v: ((r % 40) + 30) / 96, s: { fmt: clockFmt } };
+  }
+  const bigBook = book(rows);
+  bigBook.sheets[0].size = { rows: 5010, cols: 26 };
+  const big = make(bigBook, "A1:C5001").wb;
+  for (const [typed, last5001, bound] of [
+    ["=B2-MIN(B:B)", "B5001-MIN(B:B)", 1000],
+    ["=B2-MIN($B$2:$B$5001)", "B5001-MIN($B$2:$B$5001)", 1000],
+    ["=SUMME($B$2:B2)", "SUM($B$2:B5001)", 1000],
+    ["=B2-A2", "B5001-A5001", 2500],
+  ] as const) {
+    const bs = storeOn(big);
+    const t0 = performance.now();
+    bs.input(at("C2"), typed);
+    const ms = performance.now() - t0;
+    eq(`5,000 rows, ${typed}: filled, a duration`, [cell(bs.get().workbook, "C5001")?.f, cell(bs.get().workbook, "C5001")?.s?.fmt], [last5001, durationFmt]);
+    check(`5,000 rows, ${typed}: quickly`, ms < bound, `${ms.toFixed(0)} ms`);
+  }
 });
 
 // ==============================================================================================

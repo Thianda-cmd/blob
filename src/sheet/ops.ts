@@ -6,7 +6,8 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey, inArea, parseKey } from "./a1";
-import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, typedFormat, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
+import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, typedFormat, type Calc, type CellValue, type Glob, type ParsedInput, type StructuralChange, type TableRows } from "./engine";
+import { rewriteRefs } from "./engine/refs";
 import { seriesOf } from "./engine/series";
 import { withOp } from "./sheetLog";
 // Smart-table helpers that import nothing from this file (table/model.ts does, so it can't be used here).
@@ -339,16 +340,33 @@ export function growTableReferences(wb: Workbook, table: TableSpec, from: { r0: 
   const sheet = sheetById(wb, table.sheetId);
   if (!sheet || from.r1 < from.r0 || to.r1 < to.r0 || (from.r0 === to.r0 && from.r1 === to.r1)) return wb;
   const rows: TableRows = { sheet: sheet.name, c0: table.area.c0, c1: table.area.c1, header: table.area.r0, from, to };
+  // Formulas over the table's data in the rows it takes in (a summary under it: =STEIGUNG(B2:B7;A2:A7)
+  // in B9 when a fill reaches row 9): no formula's ranges grow over them (growTableRefs' keepOut),
+  // or the R² under the slope would count the slope as a measurement.
+  const keepOut: Pos[] = [];
+  for (let row = from.r1 + 1; row <= to.r1; row++) {
+    for (let col = rows.c0; col <= rows.c1; col++) {
+      const f = sheet.cells[cellKey(row, col)]?.f;
+      if (f && growTableRefs(f, sheet.name, rows) !== f) keepOut.push({ row, col });
+    }
+  }
   // Every range that ends on the last data row names that row's number: a cheap first test.
   const mark = String(from.r1 + 1);
-  const next = mapFormulas(wb, (host, f, key) => (f.includes(mark) ? growTableRefs(f, host.name, rows, parseKey(key)) : f));
+  const next = mapFormulas(wb, (host, f, key) => (f.includes(mark) ? growTableRefs(f, host.name, rows, parseKey(key), keepOut) : f));
   const fix = <T extends RangeRef>(ref: T): T => {
     if (ref.sheetId !== table.sheetId) return ref;
     const a = tableRowsArea(ref, rows);
     return a ? { ...ref, r0: a.r0, r1: a.r1 } : ref;
   };
+  // A chart whose ranges would take in one of those cells keeps all of them: its x and y values stay in step.
+  const keeps = (chart: ChartSpec) =>
+    [chart.x, ...chart.series.flatMap((s) => [s.y, s.x, s.errorBars?.plus, s.errorBars?.minus])].some((ref) => {
+      const a = ref && ref.sheetId === table.sheetId ? tableRowsArea(ref, rows) : null;
+      return !!a && keepOut.some((p) => inArea(a, p.row, p.col));
+    });
   let chartsChanged = false;
   const charts = next.charts.map((chart) => {
+    if (keeps(chart)) return chart;
     const x = chart.x ? fix(chart.x) : null;
     let changed = x !== chart.x;
     // The legend name (nameRef) is the header cell: it stays.
@@ -665,19 +683,36 @@ export function setFreeze(wb: Workbook, sheetId: string, rows: number, cols: num
 // ----------------------------------------------------------------------------------------------
 // Copy, paste, fill, sort
 
-/** What copying puts on Blob's own clipboard: the source cells row by row (null = empty). */
-export type ClipData = { sheetId: string; area: Area; cells: (Cell | null)[][] };
+/**
+ * What copying puts on Blob's own clipboard: the source cells row by row (null = empty). `rows`:
+ * each line's row in the source, when the copy left rows of the area out (the ones a smart
+ * table's filter hides, as Excel does); without it the lines are area.r0, area.r0 + 1, …
+ */
+export type ClipData = { sheetId: string; area: Area; cells: (Cell | null)[][]; rows?: number[] };
 
-export function copyArea(wb: Workbook, sheetId: string, area: Area): ClipData {
+/** The row of the source a clip's line `i` comes from. */
+const clipRow = (clip: ClipData, i: number) => clip.rows?.[i] ?? clip.area.r0 + i;
+
+/**
+ * Copy an area. `rows`: only these rows of it, in this order (the ones a filter shows); the
+ * lines then sit next to each other and remember where they came from (ClipData.rows), so a
+ * pasted formula still points where it did.
+ */
+export function copyArea(wb: Workbook, sheetId: string, area: Area, rows?: number[]): ClipData {
   const sheet = sheetById(wb, sheetId);
   const a = { r0: Math.min(area.r0, area.r1), c0: Math.min(area.c0, area.c1), r1: Math.max(area.r0, area.r1), c1: Math.max(area.c0, area.c1) };
+  const kept = rows?.filter((r) => r >= a.r0 && r <= a.r1);
+  // Every row of the area (or none): a plain copy.
+  const some = kept && kept.length && kept.length < a.r1 - a.r0 + 1 ? kept : null;
   const cells: (Cell | null)[][] = [];
-  for (let r = a.r0; r <= a.r1; r++) {
-    const line: (Cell | null)[] = [];
-    for (let c = a.c0; c <= a.c1; c++) line.push(sheet?.cells[cellKey(r, c)] ?? null);
-    cells.push(line);
-  }
-  return { sheetId, area: a, cells };
+  const line = (r: number) => {
+    const out: (Cell | null)[] = [];
+    for (let c = a.c0; c <= a.c1; c++) out.push(sheet?.cells[cellKey(r, c)] ?? null);
+    return out;
+  };
+  if (some) for (const r of some) cells.push(line(r));
+  else for (let r = a.r0; r <= a.r1; r++) cells.push(line(r));
+  return some ? { sheetId, area: a, cells, rows: some } : { sheetId, area: a, cells };
 }
 
 export type PasteMode = "all" | "values" | "formats" | "formulas";
@@ -691,11 +726,16 @@ function valueCell(v: CellValue): Pick<Cell, "v" | "f"> {
 
 /**
  * Paste a clip with its top-left at target's top-left. Formulas shift by the distance from the
- * source, like Excel; "values" pastes calculated values (from calc); "formats" only looks.
- * `cut`: move instead (the source is cleared, references to it anywhere follow the cells).
- * When the target area is a whole multiple of the clip's size, the clip repeats to fill it.
+ * source, like Excel (each from its own row when the copy left rows out); "values" pastes
+ * calculated values (from calc, or `values`: the clip's cells' values, line by line, as they were
+ * when copied); "formats" only looks. `cut`: move instead (the source is cleared, references to it
+ * anywhere follow the cells; always the whole area). When the target area is a whole multiple of
+ * the clip's size, the clip repeats to fill it. `toRows`: the sheet rows the target is made of,
+ * top to bottom, when they don't follow each other (a paste leaves out the rows a smart table's
+ * filter hides; a copy pasted back where it came from goes back to its own rows); the target is
+ * then as tall as that list.
  */
-export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Area, clip: ClipData, opts: { mode: PasteMode; transpose?: boolean; cut?: boolean }): Workbook {
+export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Area, clip: ClipData, opts: { mode: PasteMode; transpose?: boolean; cut?: boolean; toRows?: readonly number[]; values?: readonly (readonly CellValue[])[] }): Workbook {
   const h = clip.cells.length;
   const w = clip.cells[0]?.length ?? 0;
   if (!h || !w) return wb;
@@ -707,7 +747,8 @@ export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Are
   const transpose = !!opts.transpose;
   const H = transpose ? w : h;
   const W = transpose ? h : w;
-  const th = t.r1 - t.r0 + 1;
+  const toRows = opts.toRows;
+  const th = toRows ? toRows.length : t.r1 - t.r0 + 1;
   const tw = t.c1 - t.c0 + 1;
   const reps = th % H === 0 && tw % W === 0 ? { r: th / H, c: tw / W } : { r: 1, c: 1 };
   const updates: { row: number; col: number; cell: Cell | null }[] = [];
@@ -718,11 +759,11 @@ export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Are
           const si = transpose ? j : i;
           const sj = transpose ? i : j;
           const src = clip.cells[si][sj];
-          const srcRow = clip.area.r0 + si;
+          const srcRow = clipRow(clip, si);
           const srcCol = clip.area.c0 + sj;
-          const row = t.r0 + rr * H + i;
+          const row = toRows ? toRows[rr * H + i] : t.r0 + rr * H + i;
           const col = t.c0 + rc * W + j;
-          if (row >= MAX_ROWS || col >= MAX_COLS) continue;
+          if (row === undefined || row >= MAX_ROWS || col >= MAX_COLS) continue;
           const existing = dest.cells[cellKey(row, col)];
           const shifted = (c: Cell): Cell => {
             if (c.f === undefined) return c;
@@ -737,7 +778,7 @@ export function pasteClip(wb: Workbook, calc: Calc, sheetId: string, target: Are
               cell = { ...(src ? shifted({ v: src.v, f: src.f }) : {}), s: existing?.s, note: existing?.note };
               break;
             case "values": {
-              const val = src?.f !== undefined ? calc.value(clip.sheetId, srcRow, srcCol) : (src?.v ?? null);
+              const val = src?.f === undefined ? (src?.v ?? null) : opts.values ? (opts.values[si]?.[sj] ?? null) : calc.value(clip.sheetId, srcRow, srcCol);
               const fmt = src?.s?.fmt;
               cell = { ...valueCell(val), s: fmt ? { ...existing?.s, fmt } : existing?.s, note: existing?.note };
               break;
@@ -807,18 +848,24 @@ function moveCells(wb: Workbook, clip: ClipData, toSheetId: string, to: Pos, hea
   return logOp({ ...next, charts, tables }, [clip.sheetId, toSheetId], op);
 }
 
-/** Paste text from outside Blob (Excel, Google Sheets, a web table): each piece parsed like typing. */
-export function pasteText(wb: Workbook, sheetId: string, at: Pos, rows: string[][], locale: Locale): Workbook {
+/**
+ * Paste text from outside Blob (Excel, Google Sheets, a web table): each piece parsed like typing.
+ * `asText`: the pieces the copy says are text (a text cell from Excel, LibreOffice, Google Sheets
+ * or another Blob tab): those stay as they are written, so the sample ID 007 isn't the number 7.
+ * `toRows`: the sheet row of each line, when they don't follow each other from at.row (a paste
+ * leaves out the rows a smart table's filter hides).
+ */
+export function pasteText(wb: Workbook, sheetId: string, at: Pos, rows: string[][], locale: Locale, asText?: readonly (readonly boolean[])[] | null, toRows?: readonly number[] | null): Workbook {
   const sheet = sheetById(wb, sheetId);
   if (!sheet) return wb;
   const updates: { row: number; col: number; cell: Cell | null }[] = [];
   rows.forEach((line, i) => {
     line.forEach((text, j) => {
-      const row = at.row + i;
+      const row = toRows?.[i] ?? at.row + i;
       const col = at.col + j;
       if (row >= MAX_ROWS || col >= MAX_COLS) return;
       const existing = sheet.cells[cellKey(row, col)];
-      const p = parseInput(text, locale, existing);
+      const p: ParsedInput = asText?.[i]?.[j] ? { cell: text === "" ? {} : { v: text } } : parseInput(text, locale, existing);
       const content: Pick<Cell, "v" | "f"> = p.error ? { v: text } : p.cell;
       const fmt = typedFormat(existing?.s?.fmt, p.fmt);
       const s = fmt !== existing?.s?.fmt ? { ...existing?.s, fmt } : existing?.s;
@@ -1073,10 +1120,39 @@ export function renameSheet(wb: Workbook, sheetId: string, name: string): Workbo
   return mapFormulas(renamed, (host, f) => (mayName(f, sheet.name) ? adjustFormula(f, host.name, change) : f));
 }
 
+/**
+ * Sheet names in formulas rewritten all at once, as merging needs it (collab.ts): `names` maps a
+ * name (in lower case: formulas compare names without case) to the name it stands for now, or to
+ * null when references to it become #REF!. In one pass, so two sheets that swapped names stay apart.
+ */
+export function renameInFormulas(wb: Workbook, names: ReadonlyMap<string, string | null>): Workbook {
+  return names.size ? mapFormulas(wb, (_host, f) => renameSheetRefs(f, names)) : wb;
+}
+
+/** One formula with sheet names rewritten as renameInFormulas does (the same text when it names none of them). */
+export function renameSheetRefs(f: string, names: ReadonlyMap<string, string | null>): string {
+  for (const n of names.keys()) {
+    if (!mayName(f, n)) continue;
+    return rewriteRefs(f, (ref) => {
+      const to = ref.sheet === null ? undefined : names.get(ref.sheet.toLowerCase());
+      return to === undefined || to === null ? to : { ...ref, sheet: to };
+    });
+  }
+  return f;
+}
+
 /** Never the last sheet. Its charts and tables go too; references to it become #REF!. */
 export function deleteSheet(wb: Workbook, sheetId: string): Workbook {
+  return wb.sheets.length <= 1 ? wb : withoutSheet(wb, sheetId);
+}
+
+/**
+ * What deleting a sheet does, also to the last one: merging compares with it (collab.ts), where a
+ * sheet one side deleted is kept because the other side changed it.
+ */
+export function withoutSheet(wb: Workbook, sheetId: string): Workbook {
   const sheet = sheetById(wb, sheetId);
-  if (!sheet || wb.sheets.length <= 1) return wb;
+  if (!sheet) return wb;
   const change: StructuralChange = { kind: "deleteSheet", sheet: sheet.name };
   const rest: Workbook = { ...wb, sheets: wb.sheets.filter((s) => s.id !== sheetId), charts: wb.charts.filter((c) => c.sheetId !== sheetId), tables: wb.tables.filter((t) => t.sheetId !== sheetId) };
   const next = mapFormulas(rest, (host, f) => (mayName(f, sheet.name) ? adjustFormula(f, host.name, change) : f));
@@ -1111,9 +1187,13 @@ export function duplicateSheet(wb: Workbook, sheetId: string): { wb: Workbook; s
 export function copySheetInto(wb: Workbook, from: Workbook, sheetId: string, name: string, at: number): { wb: Workbook; sheetId: string } {
   const sheet = sheetById(from, sheetId);
   if (!sheet) return { wb, sheetId };
-  const copy: Sheet = { ...sheet, id: newId(), name };
-  // Its log of rows and columns stays with the original: the copy starts without a history.
+  let copy: Sheet = { ...sheet, id: newId(), name };
+  // Its log of rows and columns stays with the original: the copy starts without a history (and
+  // isn't a copy merging made: collab.ts marks those itself).
   delete copy.log;
+  delete copy.copyOf;
+  // Formulas on it that name its own sheet name the copy, as in Excel: they read the copy's cells.
+  if (name.toLowerCase() !== sheet.name.toLowerCase()) copy = renameInFormulas({ v: 1, sheets: [copy], charts: [], tables: [] }, new Map([[sheet.name.toLowerCase(), name]])).sheets[0];
   const i = Math.max(0, Math.min(wb.sheets.length, at));
   const sheets = [...wb.sheets.slice(0, i), copy, ...wb.sheets.slice(i)];
   const onCopy = <T extends RangeRef>(ref: T): T => (ref.sheetId === sheetId ? { ...ref, sheetId: copy.id } : ref);

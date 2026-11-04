@@ -276,6 +276,18 @@ export function chartData(spec: ChartSpec, calc: Calc, locale: Locale): ChartDat
   return { categories, series, xDecimals, yDecimals, xFormat, yFormat };
 }
 
+/**
+ * The first cell of a range that holds a number, as the chart's sheet writes it ("A2", or
+ * "'Blatt 2'!A2"): where a formula for a new column of x values starts. null when none does.
+ */
+export function firstNumberCell(calc: Calc, hostSheetId: string, ref: RangeRef): string | null {
+  const last = Math.min(ref.r1, ref.r0 + Math.floor(MAX_CELLS / Math.max(1, ref.c1 - ref.c0 + 1)) - 1);
+  for (let r = ref.r0; r <= last; r++) {
+    for (let c = ref.c0; c <= ref.c1; c++) if (Number.isFinite(num(calc.value(ref.sheetId, r, c)))) return cellName(calc.workbook, hostSheetId, ref.sheetId, r, c);
+  }
+  return null;
+}
+
 /** A cell as the chart's sheet writes it: "A7", or "'Blatt 2'!A7" on another sheet. */
 function cellName(wb: Workbook, hostSheetId: string, sheetId: string, row: number, col: number): string {
   const name = posName({ row, col });

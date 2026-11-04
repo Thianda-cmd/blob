@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, Reveal, Row, SavedBadge, Section } from "./primitives";
 import { forgetDevice } from "@/lib/offline/device";
 import { useSignOutGuard } from "@/components/offline/useSignOutGuard";
+import { holdDeniedDrafts } from "@/components/sheet/DeniedDrafts";
 
 export function SecuritySection() {
   const t = useMessages(settingsText).security;
@@ -253,16 +254,25 @@ function SessionsRow() {
   async function signOutEverywhere() {
     setLoading(true);
     setError(null);
-    if (!(await guard.ready())) return setLoading(false);
-    const { error } = await createClient().auth.signOut({ scope: "global" });
-    if (error) {
-      setLoading(false);
-      return setError(authMessage(error, locale));
+    // As in the sidebar's sign-out: Blob's question about spreadsheet work it can't save waits while
+    // the guard asks, and comes when signing out is called off (DeniedDrafts.tsx).
+    const release = holdDeniedDrafts();
+    let go = false;
+    try {
+      go = await guard.ready();
+      if (!go) return setLoading(false);
+      const { error } = await createClient().auth.signOut({ scope: "global" });
+      if (error) {
+        setLoading(false);
+        return setError(authMessage(error, locale));
+      }
+      resetBoot();
+      await forgetDevice();
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      release(!go);
     }
-    resetBoot();
-    await forgetDevice();
-    router.replace("/login");
-    router.refresh();
   }
 
   return (

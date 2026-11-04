@@ -28,10 +28,11 @@ export const why = {
   /**
    * Argument i is outside what the function allows (#NUM!, or the code Excel gives): "gt0" must
    * be > 0, "ge0" not negative, "ge1" / "ge2" at least 1 / 2, "p" between 0 and 1, "pos" only
-   * numbers > 0, "num" only numbers (no empty cells or text), "opt" one of the options its help
-   * lists, "range" between lo and hi.
+   * numbers > 0, "num" only numbers (no empty cells or text: counts, where none is 0), "posnum"
+   * only numbers > 0 (no empty cells or text either: expected counts), "opt" one of the options its
+   * help lists, "range" between lo and hi.
    */
-  arg: (i: number, rule: "gt0" | "ge0" | "ge1" | "ge2" | "p" | "pos" | "num" | "opt", code: ErrorCode = "#NUM!"): CellError => mkErr(code, `arg:@:${i}:${rule}`),
+  arg: (i: number, rule: "gt0" | "ge0" | "ge1" | "ge2" | "p" | "pos" | "num" | "posnum" | "opt", code: ErrorCode = "#NUM!"): CellError => mkErr(code, `arg:@:${i}:${rule}`),
   range: (i: number, lo: number, hi: number): CellError => mkErr("#NUM!", `arg:@:${i}:range:${lo}:${hi}`),
   /** No value occurs more than once (#N/A from MODUS.EINF). */
   noRepeat: (): CellError => mkErr("#N/A", "norepeat:@"),
@@ -144,13 +145,16 @@ export function numbersWithGaps(v: Value, ctx: Ctx): { values: number[]; rows: n
   return { values, rows: m.length, cols: m[0]?.length ?? 0 };
 }
 
-/** Pairs (x, y) where both are numbers, from two ranges of the same size (else #N/A). */
+/**
+ * Pairs (x, y) where both are numbers, from two ranges of the same size (else #N/A, saying so: a
+ * calibration line over B2:B7 and C2:C6 is the classic slip, not a missing value).
+ */
 export function pairs(ys: Value, xs: Value, ctx: Ctx): { x: number[]; y: number[] } | CellError {
   const a = numbersWithGaps(ys, ctx);
   if (isErr(a)) return a;
   const b = numbersWithGaps(xs, ctx);
   if (isErr(b)) return b;
-  if (a.values.length !== b.values.length) return ERR.na;
+  if (a.values.length !== b.values.length) return why.sizes();
   const x: number[] = [];
   const y: number[] = [];
   for (let i = 0; i < a.values.length; i++) {

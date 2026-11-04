@@ -42,7 +42,7 @@ import {
   WrapText,
 } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
-import { Popover } from "@/components/ui/Menu";
+import { focusStart, Popover } from "@/components/ui/Menu";
 import { useIsMac, useTouch } from "@/components/ui/useMediaQuery";
 import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
@@ -50,6 +50,7 @@ import { sheetColor } from "@/sheet/colors";
 import { isDuration } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { CellStyle, SheetColor } from "@/sheet/types";
+import { makeChart } from "../chart/actions";
 import { SHEET_EVENT, type SheetEventDetail } from "../events";
 import { useSheet, type SheetStore } from "../store";
 import { makeTableFromSelection } from "../table/actions";
@@ -58,7 +59,7 @@ import { FindReplace } from "./FindReplace";
 import { FunctionBrowser } from "./FunctionBrowser";
 import { FormatPanel, UnitPanel } from "./NumberFormatMenu";
 import { Choice, Divider, focusGrid, HoverTips, keepFocus, PanelHeader, SplitButton, ToolButton, useKeys } from "./parts";
-import { BorderPanel, ChartPanel, ColorPanel, FreezePanel, SizePanel, SumPanel, makeChart } from "./ToolbarPanels";
+import { BorderPanel, ChartPanel, ColorPanel, FreezePanel, SizePanel, SumPanel } from "./ToolbarPanels";
 
 // ----------------------------------------------------------------------------------------------
 // Which groups fit
@@ -257,6 +258,13 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
   // What the open popover shows: its own panel, the "Mehr" list, or a panel opened from there. It
   // stays after closing, so the popover keeps its content while it fades out.
   const [panel, setPanel] = useState<{ anchor: Anchor; stack: View[] }>({ anchor: "more", stack: [] });
+  // Whether it opened from the keyboard (Enter, Space or ArrowDown on its button, Ctrl+1 in the
+  // grid): then the keyboard goes into it, onto the current choice or the first one (see Popover).
+  const [keyed, setKeyed] = useState(false);
+  // The open popover's content, and whether it is being used with the keyboard (a key pressed in
+  // it last, not a click or a tap).
+  const content = useRef<HTMLDivElement>(null);
+  const keyIn = useRef(false);
   const [lastColor, setLastColor] = useState<SheetColor>("red");
   const [lastFill, setLastFill] = useState<SheetColor>("yellow");
   // The find panel: open, a counter that gives its field the keyboard again (Ctrl+F twice), and
@@ -270,8 +278,9 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
 
   /**
    * Where the keyboard was when a panel opened with the mouse, pen or a finger (the grid, the cell
-   * being typed in): it goes back there when the panel closes, also after Escape (which would
-   * otherwise leave it on the toolbar button). Opened from the keyboard, it stays on the button.
+   * being typed in), or with Ctrl+1 in the grid: it goes back there when the panel closes, also
+   * after Escape (which would otherwise leave it on the toolbar button). Opened from the toolbar
+   * with the keyboard, it goes back to the panel's button (see Popover).
    */
   const restoreTo = useRef<HTMLElement | null>(null);
   const close = () => {
@@ -279,26 +288,66 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
     const back = restoreTo.current;
     restoreTo.current = null;
     if (!back) return;
+    // The keyboard in the panel (Ctrl+1) goes straight back, not to the panel's button first.
+    if (content.current?.contains(document.activeElement) && back.isConnected) {
+      back.focus({ preventScroll: true });
+      return;
+    }
     requestAnimationFrame(() => {
       const at = document.activeElement;
       if (back.isConnected && (!at || at === document.body || root.current?.contains(at))) back.focus({ preventScroll: true });
     });
   };
   const show = (anchor: Anchor, stack: View[] = [anchor === "more" ? "list" : anchor]) => {
+    keyIn.current = false;
     setOpen(anchor);
     setPanel({ anchor, stack });
   };
-  const toggle = (anchor: Anchor, e?: { detail: number }) => {
+  const toggle = (anchor: Anchor, e: { detail: number }) => {
     if (open === anchor) {
       close();
       return;
     }
+    // The empty cell editor keeps a phone's keyboard up for the next value (see CellEditor): a
+    // panel opened with a tap lets go of it first and gets the whole screen. While a cell is being
+    // typed in, the keyboard stays (the panel fits above it and scrolls, see Popover).
+    const focused = document.activeElement;
+    if (e.detail > 0 && focused instanceof HTMLElement && focused.matches("[data-sheet-cell-editor]") && !store.get().edit) focusGrid();
     const at = document.activeElement;
-    restoreTo.current = e && e.detail > 0 && at instanceof HTMLElement && !root.current?.contains(at) ? at : null;
+    restoreTo.current = e.detail > 0 && at instanceof HTMLElement && !root.current?.contains(at) ? at : null;
+    // (A click from the keyboard, Enter or Space on the button, has no presses: detail 0.)
+    setKeyed(e.detail === 0);
     show(anchor);
   };
-  const push = (v: View) => setPanel((p) => ({ ...p, stack: [...p.stack, v] }));
-  const back = () => setPanel((p) => ({ ...p, stack: p.stack.length > 1 ? p.stack.slice(0, -1) : p.stack }));
+
+  /**
+   * How the open panel's view last changed: drilled in (null: into the formats or a group of
+   * "Mehr", the unit from the formats), or back from a view. The keyboard, when it is in the panel,
+   * goes on into the new view: the entry it came back from, else the current or first choice (a
+   * field that took it, the unit's, keeps it).
+   */
+  const turned = useRef<View | null | undefined>(undefined);
+  const push = (v: View) => {
+    turned.current = null;
+    setPanel((p) => ({ ...p, stack: [...p.stack, v] }));
+  };
+  const back = () => {
+    turned.current = panel.stack[panel.stack.length - 1] ?? null;
+    setPanel((p) => ({ ...p, stack: p.stack.length > 1 ? p.stack.slice(0, -1) : p.stack }));
+  };
+  useEffect(() => {
+    const from = turned.current;
+    turned.current = undefined;
+    const box = content.current;
+    const view = box?.querySelector<HTMLElement>("[data-view]");
+    const at = document.activeElement;
+    if (from === undefined || !box || !view || !keyIn.current || (at && at !== document.body && !box.contains(at))) return;
+    if (from === null && view.contains(at)) return;
+    const entry = from === null ? null : view.querySelector<HTMLElement>(`[data-drill="${from}"] button`);
+    // (Nothing in the view works just now, a unit for a date: the way back.)
+    if (entry) entry.focus();
+    else if (!focusStart(view)) focusStart(box);
+  }, [panel]);
 
   // The grid's Ctrl+F opens find here, Ctrl+1 the number formats (in "Mehr" when they're tucked away there).
   const formatOnBar = useRef(true);
@@ -311,9 +360,12 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
       if (detail?.open === "find" || detail?.open === "replace") setFind((f) => ({ open: true, nonce: f.nonce + 1, replace: detail.open === "replace" }));
       else if (detail?.open === "format" && !store.get().readOnly) {
         const anchor: Anchor = formatOnBar.current ? "format" : "more";
-        // Opened from the grid (Ctrl+1): the keyboard goes back to the grid afterwards.
+        // Opened from the grid (Ctrl+1): the keyboard goes onto the cell's format, and back to
+        // the grid afterwards.
         const at = document.activeElement;
         restoreTo.current = at instanceof HTMLElement && at !== document.body && !root.current?.contains(at) ? at : null;
+        keyIn.current = false;
+        setKeyed(true);
         setOpen(anchor);
         setPanel({ anchor, stack: anchor === "format" ? ["format"] : ["list", "format"] });
       }
@@ -382,11 +434,19 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
     const { stack } = panel;
     const v = stack[stack.length - 1];
     if (!v) return null;
-    if (v === "list") return moreList();
     return (
-      <div onMouseDown={keepFocus}>
-        {stack.length > 1 && <PanelHeader title={titles[v]} onBack={back} backLabel={t.back} />}
-        {viewContent(v)}
+      <div
+        ref={content}
+        onMouseDown={keepFocus}
+        onKeyDownCapture={() => {
+          keyIn.current = true;
+        }}
+        onPointerDownCapture={() => {
+          keyIn.current = false;
+        }}
+      >
+        {v !== "list" && stack.length > 1 && <PanelHeader title={titles[v]} onBack={back} backLabel={t.back} />}
+        <div data-view="">{v === "list" ? moreList() : viewContent(v)}</div>
       </div>
     );
   };
@@ -398,7 +458,13 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
       align={align}
       role="dialog"
       label={anchor === "more" ? t.more : titles[anchor]}
-      className="p-1.5"
+      // "Mehr" can be long: the popover itself scrolls (one scroller, also when an on-screen
+      // keyboard leaves it less room, see Popover).
+      className={anchor === "more" ? "max-h-[min(70vh,560px)] overflow-y-auto overscroll-contain p-1.5" : "p-1.5"}
+      // Every panel works from the keyboard alone: arrows between its choices, Tab round its
+      // fields and buttons, Escape or a choice back to the button (or the grid, for Ctrl+1).
+      keyboard
+      focusOnOpen={keyed}
       trigger={({ ref }) => trigger(ref)}
     >
       {panel.anchor === anchor ? popoverContent() : null}
@@ -497,7 +563,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
           <>
             {popover("color", (ref) => (
               <SplitButton
-                label={t.applyColor(t.colors[lastColor])}
+                label={t.applyTextColor(t.colors[lastColor])}
                 tip={`${t.textColor}: ${t.colors[lastColor]}`}
                 menuLabel={t.textColor}
                 onClick={() => setStyle(store, { color: lastColor })}
@@ -511,7 +577,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
             ))}
             {popover("fill", (ref) => (
               <SplitButton
-                label={t.applyColor(t.colors[lastFill])}
+                label={t.applyFillColor(t.colors[lastFill])}
                 tip={`${t.fillColor}: ${t.colors[lastFill]}`}
                 menuLabel={t.fillColor}
                 onClick={() => setStyle(store, { fill: lastFill })}
@@ -630,8 +696,11 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
   // ---- the same groups as entries of "Mehr"
 
   const iconRow = (children: ReactNode) => <div className="flex flex-wrap items-center gap-0.5 px-1 py-0.5">{children}</div>;
+  // (data-drill: Back puts the keyboard on the entry it came from.)
   const drill = (icon: ReactNode, label: string, v: PanelId, right?: string) => (
-    <Choice role="menuitem" icon={icon} label={label} right={right ?? <ChevronRight className="inline !size-3.5" />} onSelect={() => push(v)} disabled={off} />
+    <div data-drill={v}>
+      <Choice role="menuitem" icon={icon} label={label} right={right ?? <ChevronRight className="inline !size-3.5" />} onSelect={() => push(v)} disabled={off} />
+    </div>
   );
   const run = (icon: ReactNode, label: string, action: () => void, disabled = off) => (
     <Choice
@@ -715,7 +784,7 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
   const moreList = () => {
     let section = -1;
     return (
-      <div className="max-h-[min(70vh,560px)] w-[min(280px,calc(100vw-24px))] overflow-y-auto overscroll-contain" role="menu" aria-label={t.more} onMouseDown={keepFocus}>
+      <div className="w-[min(280px,calc(100vw-24px))]" role="menu" aria-label={t.more}>
         {overflow.map((g) => {
           const sep = section >= 0 && SECTION[g] !== section;
           section = SECTION[g];
@@ -741,8 +810,17 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
     items.push(<Fragment key={g}>{bar(g)}</Fragment>);
   }
 
-  /** Arrow keys move between the tools (Home and End to the ends), like a toolbar should. */
+  /**
+   * Arrow keys move between the tools (Home and End to the ends), like a toolbar should; ArrowDown
+   * on a tool with a menu opens it, the keyboard going into it as with Enter.
+   */
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const at = e.target;
+    if (e.key === "ArrowDown" && at instanceof HTMLButtonElement && root.current?.contains(at) && at.hasAttribute("aria-haspopup") && at.getAttribute("aria-expanded") !== "true") {
+      e.preventDefault();
+      at.click();
+      return;
+    }
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
     const buttons = [...(root.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
     const i = buttons.indexOf(document.activeElement as HTMLButtonElement);

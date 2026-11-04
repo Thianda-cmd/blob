@@ -8,31 +8,41 @@
 // Also: R² semantics of every model (fixed intercepts, logarithms), domain errors, the equation
 // and R² text in German and English (4 significant digits per coefficient, the same rule as the
 // .xlsx label format), solving for x and "Probe berechnen" (a worked line that adds up, advice
-// above and below the standards, what it makes of what the student types), axis ticks, reading
-// chart data from cells (with a small fake Calc, so this doesn't need the formula engine: hidden
-// points, text among x values), the chart a selection makes and where it lands (beside the data,
-// below it on a phone), the drawing itself (no NaN, the equation in the SVG, wrapped when long,
-// forecasts on category charts, log axes with values ≤ 0, notes under the plot and in the aria
-// label), and the chart on the screen (how far opening its settings scrolls, when the panel
-// shows a copy of it, its action bar on a phone, reduced motion) with the panel's words.
+// above and below the standards, what it makes of what the student types), axis ticks (times in
+// clock steps), reading chart data from cells (with a small fake Calc, so this doesn't need the
+// formula engine: hidden points, text among x values), the chart a selection or a smart table
+// makes (lab layouts from the templates and the sweeps: Extinktion against Konzentration, means ±
+// SD against c whatever the number of rows, also on a plain range, standards measured twice,
+// fractions and samples that aren't weekdays, ratios kept as times, times as a scatter chart) and
+// where it lands (beside the data, never on the student's own cells, below it on a phone and made
+// to fit there), the note on times counting in days, the drawing itself (no NaN, the equation in
+// the SVG, wrapped when long, forecasts on category charts, log axes with values ≤ 0, notes under
+// the plot and in the aria label), and the chart on the screen (how far opening its settings
+// scrolls, when and how big the panel shows a copy of it, its action bar on a phone and under its
+// data, "Probe berechnen" above the keyboard, reduced motion) with the panel's words.
 // Problems make the script exit with 1.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { chartDataBlock, placeInView } from "@/components/sheet/chart/actions";
-import { barShift, inViewNext, revealScroll, scrollBehavior, shownShare, type Rect } from "@/components/sheet/chart/reveal";
+import { bandOverCells, barOverData, barShift, barWords, copySize, inViewNext, probeScroll, revealScroll, revealUnder, scrollBehavior, shownShare, type Rect } from "@/components/sheet/chart/reveal";
 import type { ChartViewport } from "@/components/sheet/chart/selection";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
-import { cellKey } from "@/sheet/a1";
-import { linearAxis, logAxis, logTickLabel, logTicksScientific, niceStep } from "@/sheet/chart/axis";
+import { sheetTableText } from "@/i18n/messages/sheetTable";
+import { cellKey, posName } from "@/sheet/a1";
+import { linearAxis, logAxis, logTickLabel, logTicksScientific, niceStep, timeStep } from "@/sheet/chart/axis";
 import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/create";
-import { chartData } from "@/sheet/chart/data";
+import { chartData, firstNumberCell } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
 import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, isCalendarFormat, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
 import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe, titleUnit } from "@/sheet/chart/probe";
-import { aOutOfRange, equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
+import { aOutOfRange, equationParts, equationText, fitTrendline, isFitError, perHour, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
 import { buildChartScene, textWidth, wrapEquation, type SvgNode } from "@/sheet/chart/scene";
-import { formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
+import { createCalc, formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
 import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
-import type { Cell, ChartSpec, NumberFormat, RangeRef, SeriesSpec, TrendlineSpec, Workbook } from "@/sheet/types";
+import { deleteRows } from "@/sheet/ops";
+import { SHEET_TEMPLATES } from "@/sheet/templates";
+import type { Cell, ChartSpec, NumberFormat, RangeRef, SeriesSpec, TableSpec, TrendlineSpec, Workbook } from "@/sheet/types";
 
 let passed = 0;
 const problems: string[] = [];
@@ -728,6 +738,21 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   eq("fixed ends", [fixed.min, fixed.max], [0, 0.5]);
   const days = linearAxis(46325, 46329, { min: null, max: null, target: 7.4, zero: "excel", pad: true, minStep: 1 });
   eq("dates without times: whole days (not half days, where each date would show twice)", [days.step, days.ticks], [1, [46324, 46325, 46326, 46327, 46328, 46329, 46330]]);
+  // Times (in days, as in cells) tick in steps a clock counts in: 0:30, not 0:28 or 0:57.
+  const minutes = (v: number) => Math.round(v * 1440 * 1e6) / 1e6;
+  eq("time steps: seconds, minutes, hours, days", [15 / 86400, 40 / 86400, 7 / 1440, 20 / 1440, 25.7 / 1440, 50 / 1440, 2.5 / 24, 5 / 24, 9 / 24, 0.8, 3].map((r) => minutes(timeStep(r))), [
+    0.25, 0.5, 5, 15, 30, 60, 180, 360, 720, 1440, 2880,
+  ]);
+  const growthAxis = linearAxis(0, 3 / 24, { min: null, max: null, target: 7, zero: "excel", pad: true, time: true });
+  eq("growth curve 0:00 … 3:00: every 30 min", [minutes(growthAxis.step), growthAxis.ticks.map(minutes)], [30, [0, 30, 60, 90, 120, 150, 180, 210]]);
+  const hm: NumberFormat = { kind: "time", seconds: false };
+  eq("…its tick labels", growthAxis.ticks.map((v) => formatValue(v, hm, "de")), ["00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30"]);
+  eq("fewer ticks: every hour", linearAxis(0, 3 / 24, { min: null, max: null, target: 4, zero: "excel", pad: true, time: true }).ticks.map(minutes), [0, 60, 120, 180, 240]);
+  eq("a day and a half of durations: every 6 hours", minutes(linearAxis(0, 1.5625, { min: null, max: null, target: 7, zero: "excel", pad: true, time: true }).step), 360);
+  eq("a week: whole days", linearAxis(0, 7, { min: null, max: null, target: 5, zero: "excel", pad: true, time: true }).step, 1);
+  eq("two weeks: every second day", linearAxis(0, 14, { min: null, max: null, target: 5, zero: "excel", pad: true, time: true }).step, 2);
+  eq("90 s at whole minutes (h:mm shows no seconds)", linearAxis(0, 90 / 86400, { min: null, max: null, target: 6, zero: "excel", pad: true, time: true, minStep: 1 / 1440 }).ticks.map(minutes), [0, 1, 2]);
+  eq("clock times from 8:15 start near them", minutes(linearAxis(8.25 / 24, 12.25 / 24, { min: null, max: null, target: 5, zero: "never", pad: true, time: true }).min), 480);
   const one = linearAxis(5, 5, { min: null, max: null, target: 5, zero: "excel", pad: true });
   check("one value 5 → from 0", one.min === 0 && one.max >= 5, one);
   const cols = linearAxis(12, 33, { min: null, max: null, target: 5, zero: "always", pad: true });
@@ -943,8 +968,8 @@ if (engineReady) {
   // Where it fits on screen: one empty column between data and chart when there is room, else
   // right beside the data (a laptop at 1440 px with the sidebar open and the settings beside the grid).
   if (sc) {
-    const widths = [170, 100, 100, 100, 100, 100, 100, 100, 100, 100];
-    const colX = (c: number) => widths.slice(0, c).reduce((a, b) => a + b, 0);
+    // Column A 170 px, the others 100 px.
+    const colX = (c: number) => (c <= 0 ? 0 : 170 + (c - 1) * 100);
     const rowY = (r: number) => r * 26;
     const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, colX, rowY, zoom: 1, sidePanel: 0, ...extra });
     eq("room for the gap column", placeInView(sc, view(1200)).at, sc.at);
@@ -985,8 +1010,39 @@ if (engineReady) {
     // to the chart beside it; below is only for grids too narrow for data and chart side by side.
     eq("data far right on a wide grid: beside it", placeInView(sc, view(1000, { sidePanel: 352, colX: (c) => colX(c) + 600 }), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("room for the gap column: as made, also with below", placeInView(sc, view(1200), undefined, below()).at, sc.at);
-    const wide = (r: number, c: number) => r >= 8 && r <= 20 && c === 4;
-    eq("phone: the chart's width counts (a filled cell under its right part)", placeInView(sc, view(350), undefined, below(wide)).at, { row: 22, col: 0, dx: 0, dy: 0 });
+    // Made on the phone 326 px wide (A and B and most of C): what is in C counts, what is in E doesn't.
+    const underC = (r: number, c: number) => r >= 8 && r <= 20 && c === 2;
+    eq("phone: the chart's width counts (a filled cell under its right part)", placeInView(sc, view(350), undefined, below(underC)).at, { row: 22, col: 0, dx: 0, dy: 0 });
+    eq("phone: what is right of the narrower chart doesn't count", placeInView(sc, view(350), undefined, below((r, c) => r >= 8 && r <= 20 && c === 4)).at, { row: 8, col: 0, dx: 0, dy: 0 });
+
+    // The student's own cells beside the data (results, a note) are never covered: past them
+    // where all of the chart shows, else below the data, else past them all the same.
+    const cells = (list: [number, number][]) => (r: number, c: number) => list.some(([rr, cc]) => rr === r && cc === c);
+    const besideData = cells([[0, 3], [0, 4], [1, 3], [1, 4], [2, 3], [2, 4]]);
+    eq("results in D1:E3, room on the screen: past them, an empty column between", placeInView(sc, view(1200), undefined, below(besideData)).at, { row: 0, col: 6, dx: 0, dy: 0 });
+    const note = cells([[1, 3]]);
+    eq("a note in D2: past it", placeInView(sc, view(1200), undefined, below(note)).at, { row: 0, col: 5, dx: 0, dy: 0 });
+    eq("a note in D2, no room past it on the screen: below the data", placeInView(sc, view(900), undefined, below(note)).at, { row: 8, col: 0, dx: 0, dy: 0 });
+    eq("a note in D2, settings about to open beside the grid: below the data", placeInView(sc, view(1134, { sidePanel: 352 }), undefined, below(note)).at, { row: 8, col: 0, dx: 0, dy: 0 });
+    eq("results beside the data, no room for the gap column: not pulled back onto them", placeInView(sc, view(782), undefined, below(besideData)).at, { row: 8, col: 0, dx: 0, dy: 0 });
+    eq("a note in the empty column C: past it", placeInView(sc, view(1200), undefined, below(cells([[1, 2]]))).at, { row: 0, col: 4, dx: 0, dy: 0 });
+    eq("a note under the usual place only: right beside the data", placeInView(sc, view(1200), undefined, below(cells([[3, 7]]))).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    eq("a note far below the chart: as made", placeInView(sc, view(1200), undefined, below(cells([[20, 3]]))).at, sc.at);
+    const crowded = (r: number, c: number) => besideData(r, c) || (r >= 7 && c <= 5);
+    eq("nothing free below or on the screen: past them all the same", placeInView(sc, view(900), undefined, below(crowded)).at, { row: 0, col: 7, dx: 0, dy: 0 });
+    eq("phone: results beside the data, below it as before", placeInView(sc, view(350), undefined, below(besideData)).at, { row: 8, col: 0, dx: 0, dy: 0 });
+
+    // Made on a phone: as wide as the cells that show, less a margin for its right handles, in the
+    // usual proportions, never smaller than the smallest chart. Wider grids keep 480 × 300.
+    const onPhone = placeInView(sc, view(350), undefined, below());
+    eq("phone: 326 × 204", onPhone.size, { w: 326, h: 204 });
+    check("phone: all of it shows, its right handles too", colX(onPhone.at.col) + onPhone.size.w <= 350 - 20, onPhone);
+    const z75 = { colX: (c: number) => colX(c) * 0.75, rowY: (r: number) => rowY(r) * 0.75, zoom: 0.75 };
+    eq("phone at 75 %: 456 × 285", placeInView(sc, view(360, z75), undefined, below()).size, { w: 456, h: 285 });
+    eq("phone at 150 %: the smallest chart", placeInView(sc, view(350, { colX: (c) => colX(c) * 1.5, rowY: (r) => rowY(r) * 1.5, zoom: 1.5 }), undefined, below()).size, { w: 240, h: 160 });
+    eq("tablet: the usual size", placeInView(sc, view(740), undefined, below()).size, { w: 480, h: 300 });
+    eq("laptop with the settings about to open: the usual size", placeInView(sc, view(840, { sidePanel: 352 }), undefined, below()).size, { w: 480, h: 300 });
+    eq("desktop: the usual size", placeInView(sc, view(1200)).size, { w: 480, h: 300 });
   }
   eq("default size", sc?.size, { w: 480, h: 300 });
   eq("one series: no legend", sc?.legend, "none");
@@ -1037,6 +1093,287 @@ if (engineReady) {
   eq("a range stays", chartSourceAreas(lab, "s1", [{ r0: 0, c0: 0, r1: 6, c1: 1 }]), [{ r0: 0, c0: 0, r1: 6, c1: 1 }]);
   const auto: Workbook = { ...named, tables: [{ ...named.tables[0], name: "Tabelle1" }] };
   eq("an automatic table name isn't", chartFromAreas(auto, fakeCalc(auto), "s1", [{ r0: 0, c0: 0, r1: 6, c1: 1 }], "de")?.title, "Extinktion");
+}
+
+// ----------------------------------------------------------------------------------------------
+// Lab tables: what "Diagramm aus Tabelle" and the toolbar's "Diagramm" make of the usual layouts
+// (a smart table's columns are its fields: a calibration gives Extinktion against Konzentration,
+// replicates their means ± SD against c, whatever the number of rows; times sit at their times)
+
+{
+  /** A range as A1 text ("B6:B11"), so checks read like the sheet. */
+  const a1 = (r: RangeRef | null | undefined) => (r ? `${posName({ row: r.r0, col: r.c0 })}:${posName({ row: r.r1, col: r.c1 })}` : null);
+  /** What a chart is made of: its kind, x, and each series' values (± their error amounts). */
+  const shape = (c: ChartSpec | null) => c && { kind: c.kind, x: a1(c.x), series: c.series.map((s) => a1(s.y) + (s.errorBars?.plus ? ` ± ${a1(s.errorBars.plus)}` : "")) };
+  const smartTable = (area: TableSpec["area"], name = "Tabelle1"): TableSpec => ({
+    id: "t1",
+    sheetId: "s1",
+    name,
+    area,
+    columns: Array.from({ length: area.c1 - area.c0 + 1 }, (_, i) => ({ id: `tc${i}`, total: "none" as const })),
+    totals: false,
+    style: "blue",
+    banded: true,
+    filters: {},
+    sort: null,
+  });
+  /** A header and rows at A1, as a smart table unless `plain`. */
+  const labWb = (rows: (number | string | null)[][], opts: { plain?: boolean; styles?: Record<string, Cell["s"]> } = {}): Workbook => {
+    const wb = workbook(rows, opts.styles);
+    return opts.plain ? wb : { ...wb, tables: [smartTable({ r0: 0, c0: 0, r1: rows.length - 1, c1: rows[0].length - 1 })] };
+  };
+  /** "Diagramm aus Tabelle": the table's header and data rows selected, then the chart (chartFromTable → insertChart). */
+  const fromTable = (wb: Workbook, t: TableSpec = wb.tables[0], c: Calc = fakeCalc(wb), kind?: ChartSpec["kind"]) =>
+    chartFromAreas(wb, c, t.sheetId, chartSourceAreas(wb, t.sheetId, [{ r0: t.area.r0, c0: t.area.c0, r1: t.totals ? t.area.r1 - 1 : t.area.r1, c1: t.area.c1 }]), "de", kind);
+  /** The toolbar's "Diagramm" on a selection (the same path: chartSourceAreas, then chartFromAreas). */
+  const fromSelection = (wb: Workbook, sel: { r0: number; c0: number; r1: number; c1: number }, kind?: ChartSpec["kind"]) => chartFromAreas(wb, fakeCalc(wb), "s1", chartSourceAreas(wb, "s1", [sel]), "de", kind);
+  const template = (id: string) => {
+    const t = SHEET_TEMPLATES.find((x) => x.id === id);
+    if (!t) throw new Error(`no template ${id}`);
+    return t.build("de");
+  };
+
+  // The calibration template's own Standards table (Standard | Konzentration | Extinktion).
+  const cal = template("calibration");
+  const standards = cal.tables.find((t) => t.name === "Standards");
+  const calChart = standards ? fromTable(cal, standards, createCalc(cal)) : null;
+  eq("calibration template, Standards: Extinktion against Konzentration, the labels left out", shape(calChart), { kind: "scatter", x: "B6:B11", series: ["C6:C11"] });
+  eq("calibration template, Standards: axis titles and the table's name", [calChart?.xAxis.title, calChart?.yAxis.title, calChart?.title], ["Konzentration", "Extinktion", "Standards"]);
+  eq("…points only, ready for a trendline", [calChart?.series[0].marker, calChart?.series[0].line], ["circle", "none"]);
+  // Its results table (Probe | Extinktion | Konzentration | … | Im Messbereich?): no series of
+  // numbers to plot against each other, so columns over the samples, one per number column.
+  const proben = cal.tables.find((t) => t.name === "Proben");
+  eq("calibration template, Proben: columns over the samples", shape(proben ? fromTable(cal, proben, createCalc(cal)) : null), { kind: "column", x: "A21:A24", series: ["B21:B24", "C21:C24", "D21:D24", "E21:E24"] });
+
+  // The replicates template (6 temperatures × 7 columns), and with one row deleted (5 × 7, wider
+  // than tall: it used to flip to one series per row).
+  const rep = template("replicates");
+  eq("replicates template: means ± Stabw. against Temperatur", shape(fromTable(rep, rep.tables[0], createCalc(rep))), { kind: "scatter", x: "A4:A9", series: ["E4:E9 ± F4:F9"] });
+  const rep5 = deleteRows(rep, rep.tables[0].sheetId, rep.tables[0].area.r1, 1);
+  eq("replicates template minus a row: still means ± Stabw. against Temperatur", shape(fromTable(rep5, rep5.tables[0], createCalc(rep5))), { kind: "scatter", x: "A4:A8", series: ["E4:E8 ± F4:F8"] });
+  // The Bradford template's BSA table (numbers first) as before; its Proben table holds replicates
+  // (Messwert 1, 2, 3), not x values: columns over the samples.
+  const brad = template("bradford");
+  const bsa = brad.tables.find((t) => t.name === "BSA");
+  eq("bradford template, BSA: means ± Stabw. against BSA", shape(bsa ? fromTable(brad, bsa, createCalc(brad)) : null), { kind: "scatter", x: "A6:A11", series: ["E6:E11 ± F6:F11"] });
+  const bradProben = brad.tables.find((t) => t.name === "Proben");
+  eq("bradford template, Proben: replicates aren't x values", shape(bradProben ? fromTable(brad, bradProben, createCalc(brad)) : null)?.kind, "column");
+
+  // A student's own calibration with a label column and four standards.
+  const own = labWb([["Probe", "c (mg/L)", "E"], ["Blank", 0, 0.002], ["St1", 5, 0.12], ["St2", 10, 0.25], ["St3", 20, 0.49]]);
+  const ownChart = fromTable(own);
+  eq("label | c | E, 4 standards: E against c", shape(ownChart), { kind: "scatter", x: "B2:B5", series: ["C2:C5"] });
+  eq("label | c | E: axis titles from the headers", [ownChart?.xAxis.title, ownChart?.yAxis.title], ["c (mg/L)", "E"]);
+  // The toolbar's "Diagramm" on a selection goes the same way: one cell of the table, or a range in it.
+  eq("toolbar, one cell of the table: the same chart", shape(fromSelection(own, { r0: 2, c0: 1, r1: 2, c1: 1 })), shape(ownChart));
+  eq("toolbar, the table selected: the same chart", shape(fromSelection(own, { r0: 0, c0: 0, r1: 4, c1: 2 })), shape(ownChart));
+  eq("toolbar, the same cells without a table: the same chart", shape(fromSelection(labWb([["Probe", "c (mg/L)", "E"], ["Blank", 0, 0.002], ["St1", 5, 0.12], ["St2", 10, 0.25], ["St3", 20, 0.49]], { plain: true }), { r0: 0, c0: 0, r1: 4, c1: 2 })), shape(ownChart));
+
+  // A dilution series with replicates, as in the sweep (5 dilutions × 9 columns; c falls).
+  const dil = (n: number, plain = false) =>
+    labWb(
+      [
+        ["Verdünnung", "c (µg/mL)", "E1", "E2", "E3", "Mittelwert", "SD", "VK (%)", "Netto"],
+        ...Array.from({ length: n }, (_, i) => {
+          const d = 2 ** i;
+          return [`1:${d}`, 1000 / d, 1.5 / d, 1.49 / d, 1.51 / d, 1.5 / d, 0.01 / d, 0.7, 1.5 / d - 0.003];
+        }),
+      ],
+      { plain },
+    );
+  eq("dilution table, 5 rows × 9 columns: means ± SD against the falling c", shape(fromTable(dil(5))), { kind: "scatter", x: "B2:B6", series: ["F2:F6 ± G2:G6"] });
+  eq("dilution table, 8 rows: the same", shape(fromTable(dil(8))), { kind: "scatter", x: "B2:B9", series: ["F2:F9 ± G2:G9"] });
+  // Outside a smart table a block wider than tall keeps one series per row, as in Excel: a plate
+  // reader's export, wells down and times across.
+  const plateRows = [
+    ["Well", "0 min", "30 min", "60 min", "90 min", "120 min", "150 min"],
+    ...["A1", "A2", "A3"].map((w, i) => [w, ...[0, 1, 2, 3, 4, 5].map((k) => 0.05 * Math.exp(0.2 * k) + i * 0.01)]),
+  ];
+  eq("plate reader outside a table: one series per well over the times", shape(fromSelection(labWb(plateRows, { plain: true }), { r0: 0, c0: 0, r1: 3, c1: 6 })), {
+    kind: "column",
+    x: "B1:G1",
+    series: ["B2:G2", "B3:G3", "B4:G4"],
+  });
+  // …except where its columns make a lab series under a header that names a concentration or a
+  // dilution (LAB2-2): the dilution block outside a table is charted as in one.
+  eq("the dilution block outside a table: means ± SD against c too", shape(fromSelection(dil(5, true), { r0: 0, c0: 0, r1: 5, c1: 8 })), { kind: "scatter", x: "B2:B6", series: ["F2:F6 ± G2:G6"] });
+  eq("…from one of its cells too (the toolbar's Diagramm)", shape(fromSelection(dil(5, true), { r0: 3, c0: 1, r1: 3, c1: 1 })), { kind: "scatter", x: "B2:B6", series: ["F2:F6 ± G2:G6"] });
+  // In a smart table the same block has its fields in columns.
+  eq("plate reader as a smart table: its columns", shape(fromTable(labWb(plateRows)))?.series.length, 6);
+
+  // Not a lab series: columns over the labels, as before.
+  eq("three standards are too few to tell", shape(fromTable(labWb([["Probe", "c", "E"], ["A", 1, 0.1], ["B", 2, 0.2], ["C", 3, 0.3]])))?.kind, "column");
+  eq("numbers that go up and down: columns", shape(fromTable(labWb([["Probe", "E", "c"], ["A", 0.287, 5.4], ["B", 0.452, 8.6], ["C", 0.164, 3.1], ["D", 0.638, 12.2]])))?.kind, "column");
+  eq("rising means with SD: columns of the means ± SD per sample", shape(fromTable(labWb([["Probe", "Mittelwert", "SD"], ["A", 1, 0.1], ["B", 2, 0.2], ["C", 3, 0.1], ["D", 4, 0.3]]))), {
+    kind: "column",
+    x: "A2:A5",
+    series: ["B2:B5 ± C2:C5"],
+  });
+  eq("rising first replicate: columns", shape(fromTable(labWb([["Standard", "E1", "E2", "E3"], ["S1", 0.1, 0.11, 0.1], ["S2", 0.2, 0.21, 0.2], ["S3", 0.3, 0.29, 0.3], ["S4", 0.4, 0.41, 0.4]])))?.kind, "column");
+  eq("one number column after the labels: columns", shape(fromTable(labWb([["Probe", "c"], ["A", 1], ["B", 2], ["C", 3], ["D", 4]])))?.kind, "column");
+  // Days, weeks or months as the labels are the x axis themselves, and the numbers are measured
+  // over them (growth on labelled days rises by nature, one condition against another means
+  // nothing): columns over the labels, in a smart table and on a plain range.
+  const cress = [["Tag", "Kresse hell (mm)", "Kresse dunkel (mm)"], ["Tag 1", 2, 3], ["Tag 2", 5, 8], ["Tag 3", 9, 15], ["Tag 4", 14, 24], ["Tag 5", 20, 33]];
+  eq("cress over days: columns over the days", shape(fromTable(labWb(cress))), { kind: "column", x: "A2:A6", series: ["B2:B6", "C2:C6"] });
+  eq("…the same on a plain range (toolbar)", shape(fromSelection(labWb(cress, { plain: true }), { r0: 0, c0: 0, r1: 5, c1: 2 })), { kind: "column", x: "A2:A6", series: ["B2:B6", "C2:C6"] });
+  const overTime: [string, (string | number)[][]][] = [
+    ["weekdays", [["Wochentag", "Licht", "Dunkel"], ["Mo", 1, 2], ["Di", 3, 5], ["Mi", 6, 9], ["Do", 10, 14], ["Fr", 15, 18]]],
+    ["calendar weeks", [["Woche", "Gewicht Maus A (g)", "Gewicht Maus B (g)"], ["KW 1", 18.2, 19], ["KW 2", 19.5, 20.1], ["KW 3", 20.8, 21.7], ["KW 4", 22, 22.4]]],
+    ["months", [["Monat", "Einnahmen (€)", "Ausgaben (€)"], ["Jan", 1200, 900], ["Feb", 1350, 1100], ["Mär", 1400, 950], ["Apr", 1600, 1200], ["Mai", 1750, 1000]]],
+    ["months with a year", [["Monat", "Temperatur (°C)", "Niederschlag (mm)"], ["Jan 2026", 0.5, 55], ["Feb 2026", 1.4, 45], ["Mär 2026", 4.9, 50], ["Apr 2026", 9, 48]]],
+    ["days under another header", [["Probe", "hell", "dunkel"], ["Tag 1", 2, 3], ["Tag 2", 5, 8], ["Tag 3", 9, 15], ["Tag 4", 14, 24]]],
+    ["days in English", [["Sample", "light", "dark"], ["Day 1", 2, 3], ["Day 2", 5, 8], ["Day 3", 9, 15], ["Day 4", 14, 24]]],
+    ["hours typed as text", [["Zeit", "OD A", "OD B"], ["0 h", 0.05, 0.06], ["2 h", 0.08, 0.1], ["4 h", 0.14, 0.17], ["6 h", 0.25, 0.3]]],
+    ["time points by their header", [["Zeitpunkt", "OD A", "OD B"], ["T0", 0.05, 0.06], ["T1", 0.07, 0.08], ["T2", 0.1, 0.12], ["T3", 0.14, 0.17]]],
+  ];
+  for (const [name, rows] of overTime) eq(`${name} as the labels: columns`, shape(fromTable(labWb(rows)))?.kind, "column");
+  // …unless a column of times follows them: then that is x.
+  eq("time points, then t (min): OD against t", shape(fromTable(labWb([["Zeitpunkt", "t (min)", "OD"], ["T0", 0, 0.05], ["T1", 30, 0.07], ["T2", 60, 0.1], ["T3", 90, 0.14]]))), {
+    kind: "scatter",
+    x: "B2:B5",
+    series: ["C2:C5"],
+  });
+  // Points asked for over days: both measurements at 1, 2, 3 … (one point per day), not one against the other.
+  eq("asked for points over days: x is 1, 2, 3 …", shape(fromTable(labWb(cress), undefined, undefined, "scatter")), { kind: "scatter", x: null, series: ["B2:B6", "C2:C6"] });
+  // Words name categories (subjects, names, levels): their first number column may rise by chance
+  // or because the table is sorted by it. Points asked for by name still take it as x.
+  const subjects = labWb([["Fach", "Punkte", "Note"], ["Mathe", 14, 1], ["Deutsch", 11, 2], ["Bio", 8, 3], ["Englisch", 5, 4]]);
+  eq("subjects sorted by points: columns", shape(fromTable(subjects)), { kind: "column", x: "A2:A5", series: ["B2:B5", "C2:C5"] });
+  eq("names sorted by points: columns", shape(fromTable(labWb([["Name", "Punkte", "Note"], ["Ana", 58, 1], ["Ben", 51, 2], ["Cem", 44, 3], ["Dana", 37, 4], ["Eli", 25, 5]])))?.kind, "column");
+  eq("levels in words: columns", shape(fromTable(labWb([["Stufe", "c", "E"], ["leer", 0, 0], ["niedrig", 1, 0.1], ["mittel", 2, 0.2], ["hoch", 3, 0.3]])))?.kind, "column");
+  eq("…points asked for: x is the first number column", shape(fromTable(subjects, undefined, undefined, "scatter")), { kind: "scatter", x: "B2:B5", series: ["C2:C5"] });
+  // Samples named by a letter, or a word among numbered ones, are a lab series.
+  eq("solutions A–E: E against c", shape(fromTable(labWb([["Lösung", "c (mmol/L)", "E"], ["A", 0.1, 0.05], ["B", 0.2, 0.1], ["C", 0.3, 0.16], ["D", 0.4, 0.2], ["E", 0.5, 0.26]]))), {
+    kind: "scatter",
+    x: "B2:B6",
+    series: ["C2:C6"],
+  });
+  eq("unverdünnt, 1:2, 1:4, 1:8: E against the falling c", shape(fromTable(labWb([["Verdünnung", "c", "E"], ["unverdünnt", 1000, 1.2], ["1:2", 500, 0.6], ["1:4", 250, 0.3], ["1:8", 125, 0.15]]))), {
+    kind: "scatter",
+    x: "B2:B5",
+    series: ["C2:C5"],
+  });
+  eq("U and I measured as M1…M4: I against U", shape(fromTable(labWb([["Messung", "U (V)", "I (mA)"], ["M1", 1, 10], ["M2", 2, 21], ["M3", 3, 29], ["M4", 4, 41]]))), {
+    kind: "scatter",
+    x: "B2:B5",
+    series: ["C2:C5"],
+  });
+  // Asked for by name: a scatter chart takes the first number column after the labels as x (the
+  // labels can't be); columns keep the labels as categories, as in Excel.
+  const three = labWb([["Probe", "c", "E"], ["A", 1, 0.1], ["B", 2, 0.2], ["C", 3, 0.3]]);
+  eq("asked for points: x after the labels", shape(fromTable(three, three.tables[0], fakeCalc(three), "scatter")), { kind: "scatter", x: "B2:B4", series: ["C2:C4"] });
+  eq("asked for columns: over the labels", shape(fromTable(own, own.tables[0], fakeCalc(own), "column")), { kind: "column", x: "A2:A5", series: ["B2:B5", "C2:C5"] });
+
+  // Times (LAB-2): a growth curve typed as 0:00, 0:30 … 3:00 is a scatter chart, its points joined.
+  const hm: NumberFormat = { kind: "time", seconds: false };
+  const timeStyles = (col: number, n: number, fmt: NumberFormat = hm) => Object.fromEntries(Array.from({ length: n }, (_, i) => [cellKey(i + 1, col), { fmt }]));
+  const od = [0.05, 0.0642, 0.0824, 0.1058, 0.1359, 0.1745, 0.2241];
+  const growth = labWb([["Zeit", "OD600"], ...od.map((v, i) => [i / 48, v])], { plain: true, styles: timeStyles(0, 7) });
+  const gc = fromSelection(growth, { r0: 0, c0: 0, r1: 7, c1: 1 });
+  eq("times first: a scatter chart at the real times", shape(gc), { kind: "scatter", x: "A2:A8", series: ["B2:B8"] });
+  eq("…points joined by straight lines", [gc?.series[0].marker, gc?.series[0].line], ["circle", "straight"]);
+  eq("…x titled by its header", gc?.xAxis.title, "Zeit");
+  const durations = labWb([["Dauer", "OD600"], ...od.map((v, i) => [0.5 + i / 4, v])], { plain: true, styles: timeStyles(0, 7, { kind: "time", seconds: false, duration: true }) });
+  eq("durations ([h]:mm) first: a scatter chart too", shape(fromSelection(durations, { r0: 0, c0: 0, r1: 7, c1: 1 }))?.kind, "scatter");
+  const dates = labWb([["Datum", "Wert"], ...[46270, 46271, 46273, 46280].map((d, i) => [d, i + 1])], { plain: true, styles: timeStyles(0, 4, { kind: "date", style: "short" }) });
+  eq("calendar dates first: still a line over the dates", shape(fromSelection(dates, { r0: 0, c0: 0, r1: 4, c1: 1 })), { kind: "line", x: "A2:A5", series: ["B2:B5"] });
+  const stamps = labWb([["Zeitpunkt", "OD600"], ...[46270.25, 46270.5, 46270.75].map((d, i) => [d, od[i]])], { plain: true, styles: timeStyles(0, 3, { kind: "datetime" }) });
+  eq("date and time first: still a line", shape(fromSelection(stamps, { r0: 0, c0: 0, r1: 3, c1: 1 }))?.kind, "line");
+  const clock = labWb([["Probe", "Uhrzeit", "OD600"], ...od.slice(0, 5).map((v, i) => [`t${i}`, 8.25 / 24 + i / 48, v])], { styles: timeStyles(1, 5) });
+  const cc = fromTable(clock);
+  eq("labels, then clock times: OD against the times, joined", [shape(cc), cc?.series[0].line], [{ kind: "scatter", x: "B2:B6", series: ["C2:C6"] }, "straight"]);
+  eq("asked for a line over times: categories as before", shape(fromSelection(growth, { r0: 0, c0: 0, r1: 7, c1: 1 }, "line")), { kind: "line", x: "A2:A8", series: ["B2:B8"] });
+  eq("asked for points over times: not joined", fromSelection(growth, { r0: 0, c0: 0, r1: 7, c1: 1 }, "scatter")?.series[0].line, "none");
+
+  // Sweep 2 (LAB2-2, LAB2-3). A plain block wider than tall still goes along rows when its first
+  // number column isn't named as a concentration: a kinetic plate reader's sorted wells, doses
+  // along the header row.
+  const kinetic = labWb([["Well", "0 s", "30 s", "60 s", "90 s", "120 s", "150 s"], ...["S1", "S2", "S3", "S4"].map((w, i) => [w, ...[0, 1, 2, 3, 4, 5].map((k) => 0.1 * (i + 1) + 0.02 * k)])], { plain: true });
+  eq("kinetic plate reader, wells sorted: one series per well over the times", shape(fromSelection(kinetic, { r0: 0, c0: 0, r1: 4, c1: 6 })), { kind: "column", x: "B1:G1", series: ["B2:G2", "B3:G3", "B4:G4", "B5:G5"] });
+  const doses = labWb([["Well", "0 mg/L", "5 mg/L", "10 mg/L", "20 mg/L", "40 mg/L"], ...["A1", "A2", "A3", "A4"].map((w, i) => [w, ...[0, 1, 2, 3, 4].map((k) => 0.05 * (i + 1) + 0.1 * k)])], { plain: true });
+  eq("doses along the header row: one series per well", shape(fromSelection(doses, { r0: 0, c0: 0, r1: 4, c1: 5 }))?.series.length, 4);
+  // A blank or the standards measured twice repeat a concentration: still a calibration.
+  const twice = (labels: string[], c: number[]) => labWb([["Standard", "c (mg/L)", "E"], ...labels.map((l, i) => [l, c[i], 0.052 * c[i] + 0.003 + (i % 2) * 0.002])]);
+  const calibration = (n: number) => ({ kind: "scatter" as const, x: `B2:B${n + 1}`, series: [`C2:C${n + 1}`] });
+  eq("the blank measured twice: E against c", shape(fromTable(twice(["Blank", "Blank", "S1", "S2", "S3", "S4"], [0, 0, 2, 4, 6, 8]))), calibration(6));
+  eq("Leerwert 1 and 2: E against c", shape(fromTable(twice(["Leerwert 1", "Leerwert 2", "Std 1", "Std 2", "Std 3", "Std 4"], [0, 0, 2, 4, 6, 8]))), calibration(6));
+  eq("standards in duplicate, one per row: E against c", shape(fromTable(twice(["S0", "S0", "S1", "S1", "S2", "S2", "S3", "S3"], [0, 0, 2, 2, 4, 4, 6, 6]))), calibration(8));
+  eq("…on a plain range too", shape(fromSelection(twice(["S0", "S0", "S1", "S1", "S2", "S2", "S3", "S3"], [0, 0, 2, 2, 4, 4, 6, 6]), { r0: 2, c0: 1, r1: 2, c1: 1 })), calibration(8));
+  eq("only two different concentrations: too few to tell, columns", shape(fromTable(twice(["S0", "S0", "S1", "S1"], [0, 0, 1, 1])))?.kind, "column");
+  eq("a concentration that falls back: columns", shape(fromTable(twice(["S0", "S1", "S2", "S3", "S4"], [0, 2, 4, 2, 6])))?.kind, "column");
+  // Weekdays cut short only on their own (or with a date): with a number they name samples, as
+  // chromatography fractions (Fr. 1 …) or solutions (So 1 …) do.
+  const fractions = (label: (i: number) => string) => labWb([["Fraktion", "Volumen (mL)", "E280"], ...[0.01, 0.02, 0.4, 0.9, 0.5, 0.1, 0.03, 0.02].map((e, i) => [label(i + 1), (i + 1) * 2, e])]);
+  for (const [name, label] of [["Fr. 1", (i: number) => `Fr. ${i}`], ["Fr.1", (i: number) => `Fr.${i}`], ["Fr 1", (i: number) => `Fr ${i}`]] as const) {
+    eq(`fractions ${name} …: the elution profile, E280 against the volume`, shape(fromTable(fractions(label))), { kind: "scatter", x: "B2:B9", series: ["C2:C9"] });
+  }
+  for (const stem of ["Mo", "So", "Sa", "Di"]) {
+    eq(`samples ${stem} 1 …: E against c`, shape(fromTable(labWb([["Probe", "c", "E"], ...[1, 2, 3, 4, 5].map((i) => [`${stem} ${i}`, i * 2, i * 0.1])])))?.kind, "scatter");
+  }
+  eq("weekdays on their own under any header: columns over them", shape(fromTable(labWb([["Probe", "Licht", "Dunkel"], ["Mo", 1, 2], ["Di", 3, 5], ["Mi", 6, 9], ["Do", 10, 14], ["Fr", 15, 18]])))?.kind, "column");
+  const dated: [string, string[]][] = [
+    ["with a dot", ["Mo.", "Di.", "Mi.", "Do."]],
+    ["with a date", ["Mo 02.11.", "Di 03.11.", "Mi 04.11.", "Do 05.11."]],
+    ["with a date and a year", ["Mo, 02.11.2026", "Di, 03.11.2026", "Mi, 04.11.2026", "Do, 05.11.2026"]],
+    ["in English, with a date", ["Mon 11/2", "Tue 11/3", "Wed 11/4", "Thu 11/5"]],
+    ["with a clock time", ["Mo 08:00", "Mo 14:00", "Di 08:00", "Di 14:00"]],
+    ["with a date and a clock time", ["Mo 02.11. 08:00", "Mo 02.11. 14:00", "Di 03.11. 08:00", "Di 03.11. 14:00"]],
+    ["with Uhr or am", ["Mo 8 Uhr", "Mo 14 Uhr", "Mon 8 am", "Mon 2:30 pm"]],
+  ];
+  for (const [name, days] of dated) eq(`weekdays ${name}: columns over them`, shape(fromTable(labWb([["Probe", "Licht", "Dunkel"], ...days.map((d, i) => [d, i + 1, (i + 1) * 2])])))?.kind, "column");
+  // A weekly log by weekday and clock time, a repeated value in the first number column: points in
+  // time, not a series to plot one column against the other.
+  const weekly = labWb([["Messung", "Temperatur (°C)", "Luftfeuchte (%)"], ["Mo 08:00", 14, 80], ["Mo 14:00", 18, 60], ["Di 08:00", 18, 75], ["Di 14:00", 21, 55], ["Mi 08:00", 22, 70]]);
+  eq("weekly log by weekday and clock time: columns over the times", [shape(fromTable(weekly))?.kind, shape(fromSelection(weekly, { r0: 1, c0: 1, r1: 1, c1: 1 }))?.kind], ["column", "column"]);
+  // Ratios typed as clock times under a header that names a ratio (1:2 became 01:02) are the
+  // dilutions' labels they were meant as: means ± SD against c, not points over the times.
+  const ratioTimes = (text: boolean[], plain = false) => {
+    const wb = dil(5, plain);
+    text.forEach((t, i) => {
+      if (!t) wb.sheets[0].cells[cellKey(i + 1, 0)] = { v: 1 / 24 + 2 ** i / 1440, s: { fmt: hm } };
+    });
+    return wb;
+  };
+  const meansAgainstC = { kind: "scatter" as const, x: "B2:B6", series: ["F2:F6 ± G2:G6"] };
+  const allTimes = fromTable(ratioTimes([false, false, false, false, false]));
+  eq("dilutions 1:1 … 1:16 kept as times: means ± SD against c", [shape(allTimes), allTimes?.series[0].line], [meansAgainstC, "none"]);
+  eq("…the last one corrected to text", shape(fromTable(ratioTimes([false, false, false, false, true]))), meansAgainstC);
+  eq("…on a plain range", shape(fromSelection(ratioTimes([false, false, false, false, false], true), { r0: 0, c0: 0, r1: 5, c1: 8 })), meansAgainstC);
+  const ratioE = labWb([["Verdünnung", "E"], ...[1, 2, 4, 8, 16].map((d) => [1 / 24 + d / 1440, 1.5 / d])], { styles: timeStyles(0, 5) });
+  eq("ratios kept as times with only E beside them: columns over them, not a curve over times", shape(fromTable(ratioE))?.kind, "column");
+  eq("times under Zeit are still a growth curve", shape(fromSelection(growth, { r0: 0, c0: 0, r1: 7, c1: 1 }))?.kind, "scatter");
+  // The table panel's hint says the rule.
+  const hintHas = (text: string, parts: string[]) => parts.every((p) => text.includes(p));
+  check("table hint names the rule (de)", hintHas(sheetTableText.de.chartHint, ["mindestens vier", "nur steigen oder nur fallen", "Liniendiagramm", "Säulendiagramm", "Tag 1"]), sheetTableText.de.chartHint);
+  check("table hint names the rule (en)", hintHas(sheetTableText.en.chartHint, ["at least four", "only rise or only fall", "line chart", "column chart", "Day 1"]), sheetTableText.en.chartHint);
+}
+
+// ----------------------------------------------------------------------------------------------
+// Times as x count in days, as in Excel and in STEIGUNG: the trendline's note works out the rate
+// per hour and names the cell a column of hours starts from. The panel's other words: a result
+// outside the standards says so in its label, "Mehr Stellen" says what it changes.
+
+{
+  const days = [0, 0.5, 1, 1.5, 2, 2.5, 3].map((h) => h / 24);
+  const exp = fit("growth over times", days, days.map((d) => 0.05 * Math.exp(12 * d)), spec("exponential"));
+  eq("exponential over times: 12 per day = 0,5 per hour", perHour(exp, "de"), { kind: "exponent", perDay: "12", perHour: "0,5" });
+  const lin = fit("line over times", days, days.map((d) => 0.1 + 0.6 * d), spec("linear"));
+  eq("line over times: the slope per hour", perHour(lin, "en"), { kind: "slope", perDay: "0.6", perHour: "0.025" });
+  eq("other models: no rate", perHour(fit("parabola over times", days, days.map((d) => 1 + d * d), spec("polynomial")), "de"), null);
+  const de = sheetChartText.de.timeTip(perHour(exp, "de"), "A2");
+  check("time note (de) works it out", de.includes("in Tagen") && de.includes("12 ÷ 24 = 0,5 pro Stunde") && de.includes("=A2*24"), de);
+  const en = sheetChartText.en.timeTip(perHour(lin, "en"), "'Blatt 2'!A2");
+  check("time note (en) works it out", en.includes("The slope") && en.includes("0.6 ÷ 24 = 0.025 per hour") && en.includes("='Blatt 2'!A2*24"), en);
+  check("time note without a rate", !sheetChartText.de.timeTip(null, "A2").includes("÷") && sheetChartText.de.timeTip(null, "A2").includes("=A2*24"));
+  const tw = workbook([["Zeit", "OD"], [0, 0.05], [1 / 48, 0.06]]);
+  eq("the first time below the header", firstNumberCell(fakeCalc(tw), "s1", ref(0, 0, 2, 0)), "A2");
+  eq("…named with its sheet from another sheet", firstNumberCell(fakeCalc(tw), "s2", ref(0, 0, 2, 0)), "'Blatt 1'!A2");
+  eq("…none", firstNumberCell(fakeCalc(tw), "s1", ref(0, 0, 0, 1)), null);
+
+  eq("probe outside: its label says so (de)", sheetChartText.de.probeOutside("Konzentration"), "Konzentration – außerhalb des Messbereichs");
+  eq("probe outside: its label says so (en)", sheetChartText.en.probeOutside("Concentration"), "Concentration – outside the measured range");
+  check("more digits: only here, not on the chart", sheetChartText.de.moreDigitsHint.includes("Diagramm") && sheetChartText.en.moreDigitsHint.includes("chart"));
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -1235,6 +1572,22 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
     const clear = labels.every((l, i) => i === 0 || l.x - labels[i - 1].x >= (textWidth(l.text, l.size) + textWidth(labels[i - 1].text, l.size)) / 2);
     check(`dates on the x axis, ${width} px: each once, clear of each other`, labels.length >= 2 && new Set(labels.map((l) => l.text)).size === labels.length && clear, labels);
   }
+  // Times on the x axis (a growth curve typed as 0:00 … 3:00, or clock times from 8:15): ticks at
+  // whole half hours or hours, each once, starting near the first time.
+  const timeLabels = (nodes: (SvgNode | string)[]) => sceneTexts(nodes).filter((s) => /^\d\d:\d\d$/.test(s));
+  const onSteps = (labels: string[], step: number) => labels.every((s) => (Number(s.slice(0, 2)) * 60 + Number(s.slice(3))) % step === 0);
+  const timeFmt = { fmt: { kind: "time" as const, seconds: false } };
+  const od = [0.05, 0.0642, 0.0824, 0.1058, 0.1359, 0.1745, 0.2241];
+  const growthWb = workbook([["Zeit", "OD600"], ...od.map((v, i) => [i / 48, v])], Object.fromEntries(od.map((_, i) => [cellKey(i + 1, 0), timeFmt])));
+  const clockWb = workbook([["Uhrzeit", "OD600"], ...od.map((v, i) => [(8.25 + i * 2 / 3) / 24, v])], Object.fromEntries(od.map((_, i) => [cellKey(i + 1, 0), timeFmt])));
+  for (const width of [300, 480, 700]) {
+    const gc = chart("scatter", ref(1, 0, 7, 0), [series("g", ref(1, 1, 7, 1), { line: "straight" })]);
+    const labels = timeLabels(buildChartScene(gc, chartData(gc, fakeCalc(growthWb), "de"), { width, height: 300, locale: "de" }).nodes);
+    check(`times 0:00 … 3:00 on the x axis, ${width} px: whole quarter hours, each once`, labels.length >= 3 && labels[0] === "00:00" && onSteps(labels, 15) && new Set(labels).size === labels.length, labels);
+    const clockLabels = timeLabels(buildChartScene(gc, chartData(gc, fakeCalc(clockWb), "de"), { width, height: 300, locale: "de" }).nodes);
+    check(`clock times 8:15 … 12:15, ${width} px: from 08:00 in whole quarter hours`, clockLabels[0] === "08:00" && onSteps(clockLabels, 15) && new Set(clockLabels).size === clockLabels.length, clockLabels);
+  }
+
   // A trendline with nothing to draw on the axes has no legend entry.
   const negWb = workbook([["x", "y"], [1, 5], [2, 4], [3, 3.2], [4, 2.1]]);
   const negLine = chart("scatter", ref(1, 0, 4, 0), [series("n", ref(1, 1, 4, 1), { trendline: { ...linearTl, forward: 0 } })], { legend: "bottom", yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } });
@@ -1333,6 +1686,87 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
     "mg/L is the unit of the result. Enter your measured value for Fluorescence (RFU) here, as a number.",
   ]);
   check("unit of the result typed: no brackets in brackets", xUnit.every((s) => !/\([^)]*\(/.test(s)), xUnit);
+}
+
+// ----------------------------------------------------------------------------------------------
+// Sweep 2 (lane CHART2): a chart placed under its data (and past the results under it) has its
+// action bar below it (LAB2-4); the copy of a chart its settings show, docked beside them or above
+// them, beside the grid at their top (ACC2-1); "Probe berechnen" bringing its result above the
+// settings' edge and the on-screen keyboard without moving "Kopieren" once it shows (TCH2-2,
+// LAB2-1). Screen px, measured in the browser at 1440 × 900, 720 × 450, 844 × 390, 1024 × 768
+// and on a phone.
+
+{
+  const r = (left: number, top: number, right: number, bottom: number): Rect => ({ left, top, right, bottom });
+  // Data A1:B8 (content px 0..270 wide, 0..252 tall); the chart below it at A10, or beside it.
+  const data = r(0, 0, 270, 252);
+  eq("chart under its data: the bar's band is over the last rows, the bar goes below", barOverData(r(0, 280, 480, 580), data), true);
+  eq("…two rows further down: the band is clear", barOverData(r(0, 308, 480, 608), data), false);
+  eq("chart beside its data, further down: the band is beside the data", barOverData(r(370, 140, 850, 440), data), false);
+  eq("chart above its data: the band is above it", barOverData(r(0, 60, 480, 360), r(0, 400, 270, 600)), false);
+  // A chart placed past the results under its data (the calibration's samples and their
+  // concentrations, a slope and R²): the band over any cell that holds something sends the bar
+  // below it. Cells 100 × 28 px; the band is 52 px tall, as wide as the chart.
+  const cells = { cellAt: (x: number, y: number) => ({ row: Math.floor(y / 28), col: Math.floor(x / 100) }), rect: (row: number, col: number) => ({ w: col === 3 ? 0 : 100, h: 28 }) };
+  const taken = (list: string[]) => (row: number, col: number) => list.includes(`${row},${col}`);
+  eq("band over a result in a row it crosses: the bar goes below", bandOverCells(r(0, 676, 480, 728), cells, taken(["24,1"])), true);
+  eq("…a result in the row above the band: out of it", bandOverCells(r(0, 676, 480, 728), cells, taken(["23,1"])), false);
+  eq("…a note right of the chart: out of it", bandOverCells(r(0, 676, 480, 728), cells, taken(["24,5"])), false);
+  eq("…a value in a hidden column under the band doesn't count", bandOverCells(r(0, 676, 480, 728), cells, taken(["24,3"])), false);
+  eq("…an empty band", bandOverCells(r(0, 676, 480, 676), cells, taken(["24,1"])), false);
+
+  // The copy, docked: beside the settings from 600 px of dock (200 % zoom, a phone held sideways, an
+  // iPad in landscape), above them otherwise, at most 40 % of their room and 230 px tall.
+  eq("copy at 200 % zoom (720 × 450, settings tall): beside them", copySize({ w: 720, h: 221 }, 0.625, true), { w: 300, h: 188, beside: true });
+  eq("copy on a phone held sideways (844 × 390, settings tall)", copySize({ w: 844, h: 133 }, 0.625, true), { w: 174, h: 109, beside: true });
+  eq("copy on an iPad in landscape (1024 × 768, settings low)", copySize({ w: 1024, h: 246 }, 0.625, true), { w: 355, h: 222, beside: true });
+  eq("copy on a phone held upright (settings tall): above them, 40 % of their room", copySize({ w: 390, h: 490 }, 0.625, true), { w: 275, h: 172, beside: false });
+  eq("copy of a tall chart: as tall as it may be, narrower", copySize({ w: 390, h: 490 }, 1.5, true), { w: 114, h: 171, beside: false });
+  eq("no room for a copy", copySize({ w: 390, h: 80 }, 0.625, true), null);
+  // Beside the grid (a laptop's side panel) it is the settings' first item and scrolls away with
+  // them: as wide as they are and at most 230 px tall, however little room the panel has (it
+  // doesn't take 40 % of it for good, 1280 × 800: 535 px of settings).
+  eq("copy beside the grid at 1280 × 800 (a 352 px panel): at most 230 px tall", copySize({ w: 352, h: 535 }, 0.625, false), { w: 328, h: 205, beside: false });
+  eq("…on a short laptop too (1280 × 720), never beside the settings", copySize({ w: 700, h: 455 }, 0.625, false), { w: 368, h: 230, beside: false });
+  // Settings docked low on a phone held upright leave the copy out while some of the chart shows
+  // above them (TCH-7); docked low elsewhere, the chart must be in view as for any settings.
+  eq("phone, settings made low, half of the chart above them: seen", inViewNext(null, 0.47, true), true);
+  eq("…hardly any of it: the copy", inViewNext(null, 0.15, true), false);
+  eq("an iPad in landscape, a fifth of the chart above the low settings: the copy", inViewNext(null, 0.2), false);
+
+  // "Probe berechnen" on a phone, settings tall, keyboard up (what shows of them: y 239..544).
+  const seen = { top: 239, bottom: 544 };
+  eq("result under the keyboard: up as far as it needs", revealUnder(r(16, 552, 374, 608), r(16, 492, 374, 532), seen), 72);
+  eq("…but the field stays in view, 8 px below the settings' top", revealUnder(r(16, 552, 374, 900), r(16, 300, 374, 340), seen), 53);
+  eq("result in view: nothing moves", revealUnder(r(16, 400, 374, 456), r(16, 340, 374, 380), seen), 0);
+  eq("field at the top already: nothing moves", revealUnder(r(16, 300, 374, 900), r(16, 240, 374, 280), seen), 0);
+  // When the result first shows, it comes up with how it is worked out (52 px of result, 44 of
+  // lines under it); after that the settings stay put while the result shows whole: the warning
+  // coming when typing pauses (the advice under the result) or the keyboard changing size never
+  // moves "Kopieren" under a finger or a mouse on its way there (LAB2-1, TCH2-2).
+  const field = r(16, 492, 374, 532);
+  const result = r(16, 542, 374, 594);
+  eq("result first shows under the keyboard: up with its worked lines", probeScroll(true, result, r(16, 542, 374, 644), field, seen), 108);
+  const shown = r(16, 434, 374, 486);
+  eq("typing paused, the result shows whole (the advice under it doesn't): nothing moves", probeScroll(false, shown, r(16, 434, 374, 620), r(16, 384, 374, 424), seen), 0);
+  eq("…its lower edge right at the keyboard: nothing moves", probeScroll(false, r(16, 490, 374, 544), r(16, 490, 374, 600), r(16, 440, 374, 480), seen), 0);
+  eq("keyboard came up over the result: it comes back with its lines", probeScroll(false, result, r(16, 542, 374, 700), field, seen), 164);
+  eq("…as far as the field stays in view", probeScroll(false, r(16, 300, 374, 600), r(16, 300, 374, 700), r(16, 250, 374, 290), seen), 3);
+
+  // The action bar's words on a phone (TCH2-4): decided by the cells on screen (the screen less the
+  // row numbers and the bar's margins), not by the chart's width. Its widths as measured on a touch
+  // screen: German 347 px with both words, 261 with "Trendlinie" only; English 313 and 258.
+  const room = (screen: number) => screen - 40 - 16;
+  const de = { all: 347, trend: 261 };
+  const en = { all: 313, trend: 258 };
+  eq("German bar at 412, 390, 375, 360 px: both words, then Trendlinie's", [412, 390, 375, 360].map((w) => barWords(de, room(w))), ["all", "trend", "trend", "trend"]);
+  eq("English bar at 412, 390, 375, 360 px", [412, 390, 375, 360].map((w) => barWords(en, room(w))), ["all", "all", "all", "trend"]);
+  eq("too little room for any word: icons", barWords(de, 220), "none");
+
+  // Settings made low with their handle scroll the grid to the chart; closing them scrolls back to
+  // where it was (TCH2-5): that scroll is kept like the one opening them made.
+  const layer = readFileSync(join(process.cwd(), "src/components/sheet/chart/ChartLayer.tsx"), "utf8");
+  check("settings made low: their scroll is kept for closing them", /if \(nowLow && !low\) settingsOpened\(revealNow\("settings"\)\)/.test(layer));
 }
 
 const failed = problems.length;

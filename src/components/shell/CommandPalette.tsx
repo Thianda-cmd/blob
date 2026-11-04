@@ -57,6 +57,7 @@ import {
   NOTES_WORDS,
   PROJECT_WORDS,
   SHEET_WORDS,
+  findPages,
   newPageFor,
   paletteOrder,
   type NewKind,
@@ -268,32 +269,28 @@ function Palette({ onClose }: { onClose: () => void }) {
       },
     ];
 
-    // Titles and tags ("#klausur" or just "klausur") find pages, yours and the ones shared with you.
+    // Titles and tags ("#klausur" or just "klausur") find pages, yours and the ones shared with you;
+    // "Tabelle Nitrat" finds the spreadsheet "Photometrie Nitrat" (findPages).
     const tagQuery = lower.replace(/^#/, "");
-    const tagHit = (p: (typeof pages)[number]) => (tagQuery ? p.tags.find((tag) => tag.toLowerCase().includes(tagQuery)) : undefined);
-    const pageItems: Item[] = [...pages]
-      .filter((p) => (lower.startsWith("#") ? Boolean(tagHit(p)) : match(pageTitle(p.title, p.kind, locale)) || Boolean(tagHit(p))))
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-      .slice(0, q ? 12 : 6)
-      .map((p) => {
-        const subject = subjects.find((s) => s.id === p.subject_id);
-        const tag = q && !match(pageTitle(p.title, p.kind, locale)) ? tagHit(p) : undefined;
-        return {
-          id: `page-${p.id}`,
-          group: "pages",
-          label: pageTitle(p.title, p.kind, locale),
-          hint: tag ? `#${tag}` : p.user_id !== userId ? t.shared : subject?.name,
-          icon: <PageIcon page={p} />,
-          run: () => go(`/p/${p.id}`),
-          beside:
-            p.kind === "note"
-              ? () => {
-                  onClose();
-                  openBeside(p.id);
-                }
-              : undefined,
-        };
-      });
+    const pageItems: Item[] = findPages(q, pages, (p) => pageTitle(p.title, p.kind, locale)).map(({ page: p, tag }) => {
+      const subject = subjects.find((s) => s.id === p.subject_id);
+      return {
+        id: `page-${p.id}`,
+        group: "pages",
+        label: pageTitle(p.title, p.kind, locale),
+        // Found by a tag, not by the title: the hint says which.
+        hint: tag ? `#${tag}` : p.user_id !== userId ? t.shared : subject?.name,
+        icon: <PageIcon page={p} />,
+        run: () => go(`/p/${p.id}`),
+        beside:
+          p.kind === "note"
+            ? () => {
+                onClose();
+                openBeside(p.id);
+              }
+            : undefined,
+      };
+    });
 
     const tagCounts = new Map<string, { tag: string; n: number }>();
     for (const p of pages) for (const tag of p.tags) {

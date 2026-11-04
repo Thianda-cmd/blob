@@ -6,7 +6,8 @@ type Size = "xs" | "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary: "bg-ink text-paper hover:bg-ink/88 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]",
-  blob: "bg-blob text-white hover:bg-blob-deep shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.1)]",
+  // (In the dark theme --blob is lighter; white on it falls under 4.5:1, so the deeper one.)
+  blob: "bg-blob text-white hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)] shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.1)]",
   secondary: "bg-raised text-ink border border-line hover:border-line-2 hover:bg-hover/60 shadow-card",
   ghost: "text-ink-2 hover:text-ink hover:bg-hover",
   danger: "bg-danger text-white hover:bg-danger/90",

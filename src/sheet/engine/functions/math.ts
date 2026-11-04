@@ -1,7 +1,7 @@
 // Mathematik: SUMME, RUNDEN, REST, WURZEL… with Excel's rules (ROUND rounds half away from zero
 // on the decimal value, so RUNDEN(2,675; 2) = 2,68 like in Excel).
 
-import { ERR, isErr, isMatrix, isRef, type CellError, type Matrix, type Scalar, type Value } from "../values";
+import { ERR, isErr, isMatrix, isRef, mkErr, type CellError, type Matrix, type Scalar, type Value } from "../values";
 import { factorial } from "./distributions";
 import type { Ctx, FnDef } from "./types";
 import { asMatrix, collectNumbers, first, numFn, numResult, sum, toInt, toNum } from "./util";
@@ -74,7 +74,8 @@ function sumProduct(args: Value[], ctx: Ctx): number | CellError {
   const mats: Matrix[] = [];
   for (const a of args) {
     const m = asMatrix(isRef(a) ? ctx.deref(a) : (a as Scalar | Matrix));
-    if (mats.length && (m.length !== mats[0].length || m[0].length !== mats[0][0].length)) return ERR.value;
+    // Excel's #VALUE!, saying why: "the wrong type" would send the student looking for text.
+    if (mats.length && (m.length !== mats[0].length || m[0].length !== mats[0][0].length)) return mkErr("#VALUE!", "sizes");
     mats.push(m);
   }
   if (!mats.length) return ERR.value;

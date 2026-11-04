@@ -12,10 +12,11 @@ import { createPortal } from "react-dom";
 import type { Locale } from "@/i18n/config";
 import { posName } from "@/sheet/a1";
 import { sheetColor } from "@/sheet/colors";
+import { cutText } from "@/sheet/doc";
 import { toCanonicalFormula, type FunctionName } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import { applySuggestion } from "../chrome/formulaInput";
-import { openParens, useSheet, type SheetStore } from "../store";
+import { openParens, typingFormat, useSheet, type SheetStore } from "../store";
 import { fillSelectionWith } from "./actions";
 import { BASE_FONT, CELL_PAD, shownText } from "./cellLook";
 import { formulaArgument, formulaSuggestions, localName, ArgumentHint, SuggestionList } from "./FormulaHints";
@@ -153,7 +154,6 @@ export function CellEditor({ store, layout, scroll, view, sheetId, locale, t, gr
   const listOpen = !!suggestions && !(assist.key === assistKey && assist.closed);
   const pick = assist.key === assistKey ? Math.min(assist.pick, (suggestions?.items.length ?? 1) - 1) : 0;
   const argument = isFormula && !listOpen ? formulaArgument(text, caret, locale) : null;
-  const fmt = cell?.s?.fmt;
   const preview = useMemo(() => {
     if (!isFormula || text.length < 2) return null;
     try {
@@ -163,12 +163,13 @@ export function CellEditor({ store, layout, scroll, view, sheetId, locale, t, gr
       if (!("formula" in canonical) && open > 0) canonical = toCanonicalFormula(text.slice(1) + ")".repeat(open), locale);
       if (!("formula" in canonical)) return null;
       const value = calc.evaluate(canonical.formula, { sheetId, row: pos.row, col: pos.col });
-      const shown = shownText(value, fmt, locale);
-      return shown.length > 60 ? `${shown.slice(0, 60)}…` : shown;
+      // As the cell will show it once entered: =B2-A2 of two times 06:30, not 0,270833333 (typingFormat).
+      const shown = shownText(value, typingFormat({ workbook, calc }, sheetId, { row: pos.row, col: pos.col }, canonical.formula), locale);
+      return shown.length > 60 ? `${cutText(shown, 60)}…` : shown;
     } catch {
       return null;
     }
-  }, [isFormula, text, locale, calc, sheetId, pos.row, pos.col, fmt]);
+  }, [isFormula, text, locale, calc, workbook, sheetId, pos.row, pos.col]);
 
   // Keep the caret where the store says when the text changed elsewhere (a reference was inserted,
   // a suggestion taken, the formula bar typed); leave it alone while the user moves it. A number a

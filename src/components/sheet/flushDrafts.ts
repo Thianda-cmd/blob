@@ -6,6 +6,11 @@
 // gone are taken (drafts.ts), one taker at a time, so an editor that is open saves its own, and no
 // draft is sent twice. Loaded only when drafts.ts says there is something to send
 // (src/lib/offline/useOfflineDevice.ts, signing out), since it brings the formula engine along.
+//
+// A draft this account can't save any more (access gone, or the page is) stays on the device,
+// marked, and isn't sent again: Blob asks whether to keep it as a spreadsheet of your own
+// (draftAsPage) or to let it go (DeniedDrafts.tsx). Not copied by itself: an owner who took
+// someone off a page didn't mean them to keep a copy of all of it.
 
 import { blob } from "@/components/blob/bus";
 import type { Locale } from "@/i18n/config";
@@ -13,8 +18,15 @@ import { sheetText } from "@/i18n/messages/sheet";
 import { mergeWorkbooks, sameJson, type MergeReport } from "@/sheet/collab";
 import { normalizeWorkbook } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
-import { clearDraft, draftPages, markFlushed, randomUuid, takeDrafts, writeDraft, type SheetDraft } from "./drafts";
-import { mergeTitle, saveOnce, supabaseApi, type SaverApi } from "./saver";
+import { announceDenied, clearDraft, draftPages, markFlushed, randomUuid, takeDrafts, writeDraft, writeLastSave, type SheetDraft } from "./drafts";
+import { mergeTitle, saveOnce, storedContent, supabaseApi, type SaverApi } from "./saver";
+
+/** What a new spreadsheet of your own gets from a draft (its work as it is on the device): content and search text. */
+export function draftAsPage(d: SheetDraft, locale: Locale): { content: unknown; plain_text: string } {
+  const wb = normalizeWorkbook(d.mine, locale);
+  const { content, plain } = storedContent(wb, createCalc(wb, { locale }), locale);
+  return { content, plain_text: plain };
+}
 
 /** Send every waiting draft. Returns how many were saved. */
 export async function flushSheetDrafts(userId: string, locale: Locale, api: SaverApi = supabaseApi): Promise<number> {
@@ -36,9 +48,11 @@ export async function flushSheetDrafts(userId: string, locale: Locale, api: Save
   return saved;
 }
 
-/** One waiting draft: saved (or found saved already), dropped, kept for later, or offline. */
-async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: SaverApi): Promise<"saved" | "dropped" | "kept" | "offline"> {
+/** One waiting draft: saved (or found saved already), kept for later, or offline. */
+async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: SaverApi): Promise<"saved" | "kept" | "offline"> {
   const { pageId, writer } = d;
+  // Refused for good already: it waits for you to decide (DeniedDrafts.tsx), not for the server.
+  if (d.denied) return "kept";
   let base = normalizeWorkbook(d.base, locale);
   let mine = normalizeWorkbook(d.mine, locale);
   let baseTitle = d.baseTitle;
@@ -48,7 +62,8 @@ async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: Sav
   // Its save that got no answer: if it landed, the draft's own changes start from what it sent.
   if (d.sending) {
     const landed = await api.landed(pageId, d.sending.id);
-    if (landed === null) return "offline";
+    // (Not found out now: no connection, or the server has a problem: saver.ts landedFrom.)
+    if (landed == null) return "offline";
     if (landed) {
       base = normalizeWorkbook(d.sending.wb ?? d.mine, locale);
       baseTitle = d.sending.title;
@@ -77,6 +92,7 @@ async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: Sav
     const r = await saveOnce({ pageId, rev, wb: mine, calc: createCalc(mine, { locale }), title, baseTitle, saveId, lastSave, locale }, api);
     if (r.ok) {
       clearDraft(userId, pageId, writer);
+      writeLastSave(userId, pageId, saveId);
       markFlushed(pageId, r.rev);
       return "saved";
     }
@@ -91,17 +107,20 @@ async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: Sav
       rev = r.rev;
       continue;
     }
-    // No access any more (or the page is gone): nothing on this device can change that.
+    // No access any more (or the page is gone): nothing on this device can change that, so it isn't
+    // sent again. The work stays, as merged so far, until you decide what happens to it.
     if (r.reason === "denied") {
-      clearDraft(userId, pageId, writer);
-      return "dropped";
+      writeDraft(userId, { ...d, rev, base, mine, baseTitle, title, at: Date.now(), sending: undefined, lastSave: lastSave ?? undefined, denied: true });
+      announceDenied();
+      return "kept";
     }
     if (r.reason === "offline") {
       keep({ id: saveId, title });
       return "offline";
     }
-    // An error or too big: it waits for the editor or the next try.
-    keep();
+    // An error, refused as sent, or too big: it waits for the editor or the next try. (A server
+    // error may come from a gateway after the save went through: the draft says so, as for "offline".)
+    keep(r.reason === "error" && r.unsure ? { id: saveId, title } : undefined);
     return "kept";
   }
   keep();

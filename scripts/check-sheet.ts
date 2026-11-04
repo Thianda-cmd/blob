@@ -6,10 +6,18 @@
 // hand-worked lab examples), in German and English: localisation round trips, precedence, every
 // function, criteria, dates, formats and typing, moving references, every operation on a workbook,
 // long chains, circular references and timings. Problems make the script exit with 1.
+import { selectionStats, statFormat } from "@/components/sheet/chrome/StatusBar";
+import { applySuggestion, matchFunctions, POPULAR_FUNCTIONS, suggestFunctions } from "@/components/sheet/chrome/formulaInput";
+import { numberAsText, numberLike } from "@/components/sheet/grid/cellLook";
+import { currentSheetNotice, hideSheetNotice } from "@/components/sheet/notice";
+import { createSheetStore, typingFormat, type SheetStore } from "@/components/sheet/store";
 import type { Locale } from "@/i18n/config";
 import { cellKey, parsePos } from "@/sheet/a1";
 import * as E from "@/sheet/engine";
 import { FUNCTION_DOCS } from "@/sheet/engine/docs";
+import { EXCEL_FUNCTIONS } from "@/sheet/engine/excelNames";
+import { formulaFormat, inSheet } from "@/sheet/engine/input";
+import { parseValueText } from "@/sheet/engine/parse";
 import * as O from "@/sheet/ops";
 import { hiddenByFilters } from "@/sheet/table/filter";
 import type { Cell, ChartSpec, NumberFormat, Sheet, TableSpec, Workbook } from "@/sheet/types";
@@ -1882,6 +1890,44 @@ section("ops: smart tables keep their formulas, totals and references");
   check("…or nothing changes", O.growTableReferences(wb, t, { r0: 1, r1: 5 }, { r0: 1, r1: 5 }) === wb);
 }
 
+// ==============================================================================================
+// Sweep-2 fixes, lane UI2
+section("a smart table growing over a formula's own row leaves all its ranges as they were (TCH2-6)");
+{
+  // A lab sheet: the table A1:B7, under it the slope and R² of its rows (and the slope again beside
+  // the table, in D9). A fill from A2:A3 down to A14 grows the table over them (writing over the
+  // labels, as in Excel).
+  const cells: Record<string, CellInput> = { A1: "Konzentration", B1: "Extinktion", A9: "Steigung", B9: "=SLOPE(B2:B7,A2:A7)", A10: "R²", B10: "=RSQ(B2:B7,A2:A7)", D9: "=SLOPE(B2:B7,A2:A7)" };
+  for (let r = 2; r <= 7; r++) {
+    cells[`A${r}`] = (r - 2) * 2;
+    cells[`B${r}`] = 0.002 + (r - 2) * 0.104;
+  }
+  const wb: Workbook = { ...book1(cells), tables: [{ ...tableOn("s1", "A1:B7"), filters: {}, sort: null }] };
+  const rows: E.TableRows = { sheet: "Blatt 1", c0: 0, c1: 1, header: 0, from: { r0: 1, r1: 6 }, to: { r0: 1, r1: 13 } };
+  const G = (formula: string, at: string, to = rows.to) => E.growTableRefs(formula, "Blatt 1", { ...rows, to }, parsePos(at)!);
+  eq("the slope under the table: neither range grows over its own cell", G("SLOPE(B2:B7,A2:A7)", "B9"), "SLOPE(B2:B7,A2:A7)");
+  eq("…with the ranges the other way round too", G("SLOPE(A2:A7,B2:B7)", "A9"), "SLOPE(A2:A7,B2:B7)");
+  eq("…beside the table both grow", G("SLOPE(B2:B7,A2:A7)", "D9"), "SLOPE(B2:B14,A2:A14)");
+  eq("…grown to just above it: both grow", G("SLOPE(B2:B7,A2:A7)", "B9", { r0: 1, r1: 7 }), "SLOPE(B2:B8,A2:A8)");
+  const over = O.growTableReferences(wb, wb.tables[0], rows.from, rows.to);
+  eq("in the workbook: the slope and R² under the table keep their rows", [f(over, "B9"), f(over, "B10")], ["SLOPE(B2:B7,A2:A7)", "RSQ(B2:B7,A2:A7)"]);
+  check("…so they stay numbers, not #NV", typeof val(over, "B9") === "number" && typeof val(over, "B10") === "number", show([val(over, "B9"), val(over, "B10")]));
+  eq("…the one beside the table keeps its rows too: grown, it would take in the slope and R² under the table", f(over, "D9"), "SLOPE(B2:B7,A2:A7)");
+  // A fill ending on the slope's row (to A9): the R² under it would take in B9, the slope itself,
+  // as a measurement (0.13 instead of 0.99997). Cells to keep out (formulas over the table's data
+  // in the rows it takes in) leave a formula as it is, like its own cell.
+  const toA9 = { r0: 1, r1: 8 };
+  const keep = [parsePos("B9")!];
+  const K = (formula: string, at: string) => E.growTableRefs(formula, "Blatt 1", { ...rows, to: toA9 }, parsePos(at)!, keep);
+  eq("fill to A9, the R² under the slope: its ranges stay off the slope's cell", K("RSQ(B2:B7,A2:A7)", "B10"), "RSQ(B2:B7,A2:A7)");
+  eq("…from another sheet too", E.growTableRefs("RSQ('Blatt 1'!B2:B7,'Blatt 1'!A2:A7)", "Daten", { ...rows, to: toA9 }, parsePos("A1")!, keep), "RSQ('Blatt 1'!B2:B7,'Blatt 1'!A2:A7)");
+  eq("…the slope itself keeps its rows (its own cell)", K("SLOPE(B2:B7,A2:A7)", "B9"), "SLOPE(B2:B7,A2:A7)");
+  eq("…a range over column A alone still grows (it takes in no such cell)", K("AVERAGE(A2:A7)", "D2"), "AVERAGE(A2:A9)");
+  eq("…nothing to keep out: as before", E.growTableRefs("RSQ(B2:B7,A2:A7)", "Blatt 1", { ...rows, to: toA9 }, parsePos("B10")!), "RSQ(B2:B9,A2:A9)");
+  const wbA9 = O.growTableReferences(wb, wb.tables[0], rows.from, toA9);
+  eq("a fill ending on the slope's row (A9): the R² under it and the slope beside keep their rows", [f(wbA9, "B10"), f(wbA9, "D9")], ["RSQ(B2:B7,A2:A7)", "SLOPE(B2:B7,A2:A7)"]);
+}
+
 section("ops: speed on a big sheet");
 {
   const big: Record<string, CellInput> = {};
@@ -2908,6 +2954,693 @@ section("formula length");
   check("far too long: refused without reading it", !!huge.error?.message.startsWith("Die Formel ist zu lang"));
   check("+A1 without = as well", !!E.parseInput(`+A1${"+1".repeat(4100)}`, "de").error);
 }
+
+// ==============================================================================================
+// The formula engine (lane EN): TEXT times and day codes, E-notation typed with a point, Excel's
+// functions Blob lacks and names typed in part, errors that name their cause, decimal commas
+
+section("TEXT: the time of a timestamp (FX-1)");
+{
+  // TEXT(date+time;"hh:mm") showed one minute early for 40 % of typed timestamps: a serial number
+  // rounded to the second is a fraction again. Every minute of three days, typed as in a lab journal.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wrong: string[] = [];
+  let tried = 0;
+  for (let day = 0; day < 3; day++)
+    for (let h = 0; h < 24; h++)
+      for (let mi = 0; mi < 60; mi++) {
+        const date = `${pad(3 + day)}.11.2026`;
+        const time = `${pad(h)}:${pad(mi)}`;
+        const typed = E.parseInput(`${date} ${time}`, "de");
+        const v = typed.cell.v as number;
+        const got = [E.formatWithCode(v, "hh:mm", "de"), E.formatWithCode(v, "hh:mm:ss", "de"), E.formatWithCode(v, "TT.MM.JJJJ hh:mm", "de"), E.formatWithCode(v, "[h]:mm", "de"), E.formatValue(v, typed.fmt, "de")];
+        const want = [time, `${time}:00`, `${date} ${time}`, `${(46329 + day) * 24 + h}:${pad(mi)}`, `${date} ${time}`];
+        tried++;
+        if (show(got) !== show(want)) wrong.push(`${date} ${time}: ${show(got)}`);
+      }
+  eq(`TEXT and the cell show every typed minute of three days (${tried}, ${wrong.length} wrong)`, wrong.slice(0, 3), []);
+  // LibreOffice 24.2 gives the same (sweepfix/EN/lo_fx1.json).
+  const at = { A1: "=DATE(2026,11,3)+TIME(14,30,0)" };
+  eq("TEXT(DATUM(2026;11;3)+ZEIT(14;30;0);…)", ['TEXT(A1;"hh:mm")', 'TEXT(A1;"hh:mm:ss")', 'TEXT(A1;"[h]:mm")', 'TEXT(A1;"[m]:ss")', 'TEXT(A1;"[s]")'].map((f) => de(f, at)), ["14:30", "14:30:00", "1111910:30", "66714630:00", "4002877800"]);
+  eq("a date with its time, a label", [de('TEXT(DATUM(2026;11;4)+ZEIT(8;30;0);"TT.MM.JJJJ hh:mm")'), de('"Probe "&TEXT(DATUM(2026;11;5)+ZEIT(0;15;0);"hh:mm")')], ["04.11.2026 08:30", "Probe 00:15"]);
+  eq("…in English", en('TEXT(DATE(2026,11,3)+TIME(14,30,0),"h:mm AM/PM")'), "2:30 PM");
+  // Excel rounds to the seconds shown, then cuts off the minutes (SheetJS numfmt agrees).
+  const t = (h: number, m: number, s: number) => 46329 + (h * 3600 + m * 60 + s) / 86400;
+  eq("14:29:40 is 14:29, 14:29:59,6 is 14:30", [E.formatWithCode(t(14, 29, 40), "hh:mm", "de"), E.formatWithCode(t(14, 29, 59.6), "hh:mm", "de"), E.formatWithCode(t(14, 29, 59.6), "hh:mm:ss", "de"), E.formatWithCode(t(14, 29, 59.96), "hh:mm:ss,0", "de")], ["14:29", "14:30", "14:30:00", "14:30:00,0"]);
+  eq("fractions of a second", [E.formatWithCode(t(14, 30, 0.125), "hh:mm:ss.000", "en"), E.formatWithCode(t(14, 30, 0.25), "hh:mm:ss.00", "en")], ["14:30:00.125", "14:30:00.25"]);
+  eq("rounded into the next day, as the cell shows it", [E.formatWithCode(t(23, 59, 59.6), "TT.MM.JJJJ hh:mm:ss", "de"), E.formatValue(t(23, 59, 59.6), { kind: "datetime" }, "de")], ["04.11.2026 00:00:00", "04.11.2026 00:00"]);
+  eq("the last second Excel knows", E.formatWithCode(2958465 + 86399 / 86400, "TT.MM.JJJJ hh:mm:ss", "de"), "31.12.9999 23:59:59");
+  // [hh] [mm] [ss] keep their width, like Excel (SheetJS numfmt) and LibreOffice (sweepfix/EN/r2/lo_hh.json).
+  const span = (h: number, m: number, s: number) => (h * 3600 + m * 60 + s) / 86400;
+  eq("[hh]:mm, [mm]:ss and [ss] in two digits", [de('TEXT(5/24;"[hh]:mm")'), de('TEXT(5/24;"[h]:mm")'), E.formatWithCode(span(0, 1, 2), "[mm]:ss", "de"), E.formatWithCode(span(0, 0, 5), "[ss]", "de"), E.formatWithCode(span(125, 0, 0), "[hh]:mm", "de")], ["05:00", "5:00", "01:02", "05", "125:00"]);
+  eq("fractions of elapsed seconds", [E.formatWithCode(t(14, 30, 0.125), "[s].00", "en"), E.formatWithCode(span(0, 0, 5.25), "[ss],0", "de")], ["4002877800.13", "05,3"]);
+}
+
+// ==============================================================================================
+section("TEXT: the days of a duration (FX-8)");
+{
+  // Days without a month or year show a duration: Excel counts them from 0.1.1900 (SheetJS SSF and
+  // numfmt, sweep/formulas/verify-1), so an incubation of 2¼ days shows 2 days, not 1 or 31.
+  eq("T hh:mm", ['TEXT(1,5;"T hh:mm")', 'TEXT(0,5;"T hh:mm")', 'TEXT(2,25;"T ""Tage"" hh:mm")', 'TEXT(3,75;"TT:hh:mm")', 'TEXT(2,25;"TT hh:mm")'].map((f) => de(f)), ["1 12:00", "0 12:00", "2 Tage 06:00", "03:18:00", "02 06:00"]);
+  eq("an incubation from 04.11. 08:00 to 06.11. 14:00", de('TEXT(B1-A1;"T ""Tage"" hh:mm")', { A1: "=DATE(2026,11,4)+TIME(8,0,0)", B1: "=DATE(2026,11,6)+TIME(14,0,0)" }), "2 Tage 06:00");
+  eq("…in English", en('TEXT(2.25,"d ""days"" h:mm")'), "2 days 6:00");
+  eq("past 31 days into February 1900, like Excel", [32.5, 45.5, 59.5, 60.5, 61.5].map((v) => E.formatWithCode(v, "d hh:mm", "en")), ["1 12:00", "14 12:00", "28 12:00", "29 12:00", "1 12:00"]);
+  eq("rounded first", [E.formatWithCode(1.999999, "d hh:mm", "en"), E.formatWithCode(1.99999, "d hh:mm", "en")], ["2 00:00", "1 23:59"]);
+  eq("a date keeps its day, a code with the month Blob's numbering", [E.formatWithCode(46329.5, "d hh:mm", "en"), de('TEXT(DATUM(2026;11;3);"TT.MM.JJJJ")'), E.formatWithCode(61, "dd.mm.yyyy", "en"), E.formatWithCode(1.5, "TT.MM.JJJJ", "de")], ["3 12:00", "03.11.2026", "01.03.1900", "31.12.1899"]);
+  eq("weekdays as before", [E.formatWithCode(1.5, "ddd d", "en"), E.formatWithCode(1.5, "TTTT", "de")], ["Sun 1", "Sonntag"]);
+  eq("[h]:mm for the hours, TAG stays the day of the month", [de('TEXT(2,25;"[h]:mm")'), de("TAG(2,25)")], ["54:00", 1]);
+  check("the help of TEXT and TAG shows a duration with [h]:mm", ["TEXT", "DAY"].every((fn) => (["de", "en"] as const).every((l) => !!FUNCTION_DOCS[fn][l].tip?.includes('"[h]:mm"'))));
+}
+
+// ==============================================================================================
+section("1.5E-3 typed in German (FX-2)");
+{
+  // What typing reads (input.ts's options, with foreignExponent): a point before an exponent is a
+  // decimal point, so a replicate typed so doesn't silently drop out of MITTELWERT.
+  const typing = { bools: true, units: true, zeroDecimal: true, thousandsHint: true, foreignExponent: true };
+  const read = (text: string, locale: Locale = "de") => {
+    const p = parseValueText(text, locale, typing);
+    return p?.kind === "number" ? [p.value, E.formatValue(p.value, p.fmt, locale)] : null;
+  };
+  eq("1.5E-3, 2.4E6, 6.022E23, 1.234E-03", ["1.5E-3", "2.4E6", "6.022E23", "1.234E-03"].map((x) => read(x)), [[0.0015, "1,50E-03"], [2400000, "2,40E+06"], [6.022e23, "6,022E+23"], [0.001234, "1,234E-03"]]);
+  eq("with a sign, a small e, a unit", ["-1.5E-3", "1.5e-3", "2.500E3", "1.5E-3 mg/L"].map((x) => read(x)), [[-0.0015, "-1,50E-03"], [0.0015, "1,50E-03"], [2500, "2,500E+03"], [0.0015, "1,50E-03 mg/L"]]);
+  eq("never thousands", read("1.234E3"), [1234, "1,234E+03"]);
+  eq("English: 1,5E-3", read("1,5E-3", "en"), [0.0015, "1.50E-03"]);
+  eq("what typing read before stays", ["1,5E-3", "1.5", "0.512", "1.234"].map((x) => read(x)?.[0]), [0.0015, 1.5, 0.512, 1234]);
+  eq("no number: 1.E3, 1.5.3E-3", [read("1.E3"), read("1.5.3E-3")], [null, null]);
+  // VALUE(), arithmetic and criteria keep Excel's reading.
+  const txt = { A1: "1.5E-3" };
+  eq("WERT, A1+0 and ZÄHLENWENN as in Excel", [de('WERT("1.5E-3")'), de("A1+0", txt), de('ZÄHLENWENN(A1;">0")', txt)].map((v) => (E.isError(v) ? v.error : v)), ["#VALUE!", "#VALUE!", 0]);
+  // What stays text gets the number-as-text mark.
+  eq("number-like with an exponent", ["1.5E-3", "1,5.E-3", "-2,4E+06", "12", "Probe 1", "1E", "E-3"].map(numberLike), [true, true, true, true, false, false, false]);
+  const above = (v: E.CellValue) => (d: -1 | 1) => (d === -1 ? v : null);
+  eq("marked under a number, not among words", [numberAsText({ v: "1.5.3E-3" }, above(0.0016)), numberAsText({ v: "1.5.3E-3" }, above("Probe"))], [true, false]);
+  // Typing itself (parseInput passes foreignExponent): the replicate becomes a number.
+  eq("typed into a cell", ["1.5E-3", "2.4E6", "1.5E-3 mg/L"].map((t) => E.parseInput(t, "de").cell.v), [0.0015, 2400000, 0.0015]);
+  eq("…with the scientific format", E.parseInput("1.5E-3", "de").fmt, { kind: "scientific", decimals: 2 });
+}
+
+// ==============================================================================================
+section("Excel's functions Blob lacks, and names typed in part (FX-5)");
+{
+  const S = E.suggestFunction;
+  const alike = (a: E.FunctionName, b: E.FunctionName | undefined) => !!b && (a === b || (a.newer?.length === 1 && a.newer[0] === b.en) || (b.newer?.length === 1 && b.newer[0] === a.en));
+  // ISTFEHL, ISTKTEXT and KOVAR are Blob's now, with Excel's results.
+  const v = { A1: "Probe", A2: 0.5, A3: "=NA()", A4: "=1/0", A5: '=""' };
+  eq("ISTFEHL leaves out #NV", ["ISTFEHL(A3)", "ISTFEHL(A4)", "ISTFEHL(A2)", "ISTFEHLER(A3)"].map((f) => de(f, v)), [false, true, false, true]);
+  eq("ISTKTEXT: the opposite of ISTTEXT", ["ISTKTEXT(A1)", "ISTKTEXT(A2)", "ISTKTEXT(A9)", "ISTKTEXT(A3)", "ISTKTEXT(A5)"].map((f) => de(f, v)), [false, true, true, true, false]);
+  eq("…in English", [en("ISERR(A3)", v), en("ISERR(A4)", v), en("ISNONTEXT(A1)", v)], [false, true, false]);
+  const cal = { B2: 0, B3: 2, B4: 4, B5: 6, C2: 0.003, C3: 0.104, C4: 0.207, C5: 0.318 };
+  eq("KOVAR is KOVARIANZ.P, an older name", [de("KOVAR(B2:B5;C2:C5)", cal) === de("KOVARIANZ.P(B2:B5;C2:C5)", cal), E.FUNCTION_BY_DE.get("KOVAR")?.newer, canon("KOVAR(B2:B5;C2:C5)")], [true, ["COVARIANCE.P"], "COVAR(B2:B5,C2:C5)"]);
+  // Excel's list (excelNames.ts) agrees with Blob's names, and every function in it Blob lacks is
+  // named as such, never guessed by spelling (ISTKTEXT got ISTTEXT, PHI got PI).
+  const differ = EXCEL_FUNCTIONS.filter((x) => {
+    const f = E.FUNCTION_BY_EN.get(x.en) ?? E.FUNCTION_BY_DE.get(x.de);
+    return f && (f.en !== x.en || f.de !== x.de);
+  });
+  eq("Excel's list names Blob's functions as names.ts does", [differ, E.FUNCTION_NAMES.filter((f) => !EXCEL_FUNCTIONS.some((x) => x.en === f.en)).map((f) => f.en)], [[], []]);
+  const lacking = EXCEL_FUNCTIONS.flatMap((x) => [x.en, x.de]).filter((n) => !E.FUNCTION_BY_EN.has(n) && !E.FUNCTION_BY_DE.has(n));
+  const guessed = lacking.flatMap((n) => (["de", "en"] as const).filter((l) => S(n, l) !== null || !/noch nicht|doesn't have/.test(canon(`${n}(1)`, l))).map((l) => `${n} ${l}`));
+  eq(`${new Set(lacking).size} names of Excel's that Blob lacks: "noch nicht", no guess`, guessed.slice(0, 5), []);
+  eq("the sweep's", ["PHI", "WURZELPI", "GGANZZAHL", "ZUZEILE", "ARCCOT", "COSEC", "NPV"].map((n) => E.explainError({ error: "#NAME?", detail: `unknown-function:${n}` }, "de")), ["PHI", "WURZELPI", "GGANZZAHL", "ZUZEILE", "ARCCOT", "COSEC", "NPV"].map((n) => `Die Funktion „${n}“ gibt es in Blob noch nicht.`));
+  eq("…in English", ["SQRTPI", "ASINH", "ACOSH", "ATANH"].map((n) => S(n, "en")), [null, null, null, null]);
+  check("typed as they may be: without dots or umlauts", ["ROEMISCH", "BINOMVERT", "POISSONVERT", "SAEUBERN"].every((n) => E.explainError({ error: "#NAME?", detail: `unknown-function:${n}` }, "de").endsWith("gibt es in Blob noch nicht.")));
+  // A name typed only in part: the function it begins, never a near one (MITTELW isn't MITTELABW).
+  eq("cut short", [S("MITTELW", "de"), S("SUMMEW", "de"), S("BESTIMMTHEITSM", "de"), S("ZÄHLENWEN", "de"), S("AVERAGEI", "en"), S("MITTE", "de"), S("CHOOS", "en")], ["MITTELWERT", "SUMMEWENN", "BESTIMMTHEITSMASS", "ZÄHLENWENN", "AVERAGEIF", "MITTELWERT", "CHOOSE"]);
+  eq("…no guess where the functions it begins calculate differently", ["STAB", "KONFI", "KOVA", "VARIAN", "NORM.", "ZEI"].map((n) => S(n, "de")).concat([S("STDE", "en"), S("COV", "en")]), Array(8).fill(null));
+  eq("…nor where it is just as well a slip on another name", [S("ROUNDD", "en"), S("WENNN", "de"), S("IND", "en"), S("ERST", "de")], [null, null, null, null]);
+  // Excel's functions Blob lacks count as names too: PROGN can be PROGNOSE.ETS, DATWER is DATWERT
+  // begun (not DATUM), GGANZZHL is GGANZZAHL mistyped (not GANZZAHL), WRKDAY is WORKDAY (not WEEKDAY).
+  eq("…nor where it begins one of Excel's that Blob lacks", [S("PROGN", "de"), S("DATWER", "de"), S("ARCCO", "de"), S("TEXTV", "de"), S("LOGIN", "en"), S("COU", "en")], Array(6).fill(null));
+  eq("…or is a slip on one", ["GGANZZHL", "GGANZZAH", "WRKDAY", "TZEST", "MIDIV", "MDAX", "COHS", "SIHN"].map((n) => S(n, "de")).concat([S("LOGNV", "en"), S("WRKDAY", "en")]), Array(10).fill(null));
+  eq("a word stays one, but not cut short at its dot", [S("SUMMEN", "de"), S("QUARTIL", "de"), S("QUARTIL.", "de"), S("MODUS.", "de")], ["SUMME", "QUARTILE.INKL", null, null]);
+  // Every beginning of every name: no guess, the same maths, or a name it begins that the whole
+  // name goes on from. Words students use for a function (MEANT in messages.ts) are their own case.
+  const words = new Set(["ZÄHLEN", "MITTE", "MITTEL", "QUARTIL", "SUMMEN", "MODUS"]);
+  const sp = (s: string) => s.replace(/Ä/g, "AE").replace(/Ö/g, "OE").replace(/Ü/g, "UE");
+  let tried = 0;
+  const other: string[] = [];
+  for (const f of E.FUNCTION_NAMES) {
+    for (const locale of ["de", "en"] as const) {
+      const name = locale === "de" ? f.de : f.en;
+      for (let k = 3; k < name.length; k++) {
+        const typed = name.slice(0, k);
+        if (E.FUNCTION_BY_DE.has(typed) || E.FUNCTION_BY_EN.has(typed) || words.has(typed)) continue;
+        tried++;
+        const s = S(typed, locale);
+        const g = E.FUNCTION_NAMES.find((x) => (locale === "de" ? x.de : x.en) === s);
+        if (s !== null && !alike(f, g) && !(sp(s).startsWith(sp(typed)) && sp(name).startsWith(sp(s)))) other.push(`${typed} (${name}) → ${s}`);
+      }
+    }
+  }
+  eq(`a name typed in part never leads to another function (${tried} tried)`, [other.slice(0, 5), tried > 1500], [[], true]);
+  // The same for Excel's names Blob lacks: every beginning, and every slip of the short ones (where
+  // nearly all such guesses were): no guess, or a name of Blob's the Excel name goes on from (CHOOS:
+  // CHOOSE, for CHOOSECOLS too). German names go first in German: REC and GRO begin RECHTS and GROSS.
+  const near: string[] = [];
+  let lackTried = 0;
+  for (const locale of ["de", "en"] as const) {
+    const lacking = new Set(EXCEL_FUNCTIONS.flatMap((x) => (locale === "de" ? [x.de, x.en] : [x.en])).filter((n) => !E.FUNCTION_BY_EN.has(n) && !E.FUNCTION_BY_DE.has(n)));
+    for (const name of lacking) {
+      const typed = new Set<string>();
+      for (let k = 3; k < name.length; k++) typed.add(name.slice(0, k));
+      if (name.length <= 7)
+        for (let i = 0; i < name.length; i++) {
+          typed.add(name.slice(0, i) + name.slice(i + 1));
+          typed.add(name.slice(0, i) + name[i] + name.slice(i));
+          if (i + 1 < name.length) typed.add(name.slice(0, i) + name[i + 1] + name[i] + name.slice(i + 2));
+        }
+      for (const t of typed) {
+        if (t.length < 3 || E.FUNCTION_BY_DE.has(t) || E.FUNCTION_BY_EN.has(t) || lacking.has(t) || words.has(t)) continue;
+        lackTried++;
+        const s = S(t, locale);
+        const g = E.FUNCTION_NAMES.find((x) => (locale === "de" ? x.de : x.en) === s);
+        if (g && ![g.de, g.en].some((m) => sp(name).startsWith(sp(m)))) near.push(`${t} (${name}) → ${s}`);
+      }
+    }
+  }
+  eq(`…nor one of Excel's that Blob lacks, begun or mistyped (${lackTried} tried)`, [near, lackTried > 8000], [["REC (RECEIVED) → RECHTS", "GRO (GROUPBY) → GROSS"], true]);
+}
+
+// ==============================================================================================
+section("errors that name their cause (FX-6)");
+{
+  const why = (formula: string, cells: Record<string, CellInput> = {}, locale: Locale = "de") => {
+    const v = (locale === "de" ? de : en)(formula, cells);
+    return E.isError(v) ? `${E.errorText(v.error, locale)} ${E.explainError(v, locale)}` : `no error: ${show(v)}`;
+  };
+  // A calibration line over B1:B5 and C1:C4: the classic slip, not "a value is missing".
+  const cal = { B1: 1, B2: 2.1, B3: 2.9, B4: 4.2, B5: 5, C1: 0.1, C2: 0.2, C3: 0.3, C4: 0.4 };
+  const sizes = "#NV Die Bereiche sind unterschiedlich groß.";
+  eq("STEIGUNG and the like over ranges of different size", ["STEIGUNG", "KORREL", "ACHSENABSCHNITT", "BESTIMMTHEITSMASS", "PEARSON", "STFEHLERYX"].map((f) => why(`${f}(B1:B5;C1:C4)`, cal)), Array(6).fill(sizes));
+  eq("PROGNOSE and PROGNOSE.LINEAR", [why("PROGNOSE(3;B1:B5;C1:C4)", cal), why("PROGNOSE.LINEAR(3;B1:B5;C1:C4)", cal)], [sizes, sizes]);
+  eq("…in English", why("SLOPE(B1:B5,C1:C4)", cal, "en"), "#N/A The ranges have different sizes.");
+  eq("SUMMENPRODUKT and XVERWEIS: #WERT!, saying why", [why("SUMMENPRODUKT(B1:B5;C1:C4)", cal), why("XVERWEIS(3;B1:B5;C1:C4)", cal)], Array(2).fill("#WERT! Die Bereiche sind unterschiedlich groß."));
+  // The …WENNS functions (Excel: #WERT!) blamed text where a number belongs.
+  const ifs = ['SUMMEWENNS(B1:B5;C1:C4;">0")', 'ZÄHLENWENNS(B1:B5;">0";C1:C4;">0")', 'MITTELWERTWENNS(B1:B5;C1:C4;">0")', 'MAXWENNS(B1:B5;C1:C4;">0")', 'MINWENNS(B1:B5;C1:C4;">0")'];
+  eq("SUMMEWENNS, ZÄHLENWENNS, MITTELWERTWENNS, MAXWENNS and MINWENNS", ifs.map((f) => why(f, cal)), Array(ifs.length).fill("#WERT! Die Bereiche sind unterschiedlich groß."));
+  eq("…in English", why('AVERAGEIFS(B1:B5,C1:C4,">0")', cal, "en"), "#VALUE! The ranges have different sizes.");
+  // An empty lookup cell finds nothing (#NV, like Excel) and says so.
+  const table = { A1: 1, A2: 2, A3: 3, B1: 10, B2: 20, B3: 30, G1: 1, H1: 2, G2: 10, H2: 20 };
+  const empty = "#NV Die Zelle mit dem Suchwert ist leer.";
+  const lookups = ["SVERWEIS(N9;A1:B3;2;0)", "SVERWEIS(N9;A1:B3;2)", "WVERWEIS(N9;G1:H2;2;0)", "VERGLEICH(N9;A1:A3;0)", "XVERWEIS(N9;A1:A3;B1:B3)", "XVERGLEICH(N9;A1:A3)", "VERWEIS(N9;A1:A3;B1:B3)"];
+  eq("SVERWEIS, WVERWEIS, VERGLEICH, XVERWEIS, XVERGLEICH and VERWEIS of an empty cell", lookups.map((f) => why(f, table)), Array(lookups.length).fill(empty));
+  eq("…in English", why("VLOOKUP(N9,A1:B3,2,FALSE)", table, "en"), "#N/A The cell with the lookup value is empty.");
+  eq("a value not in the table is still not found; XVERWEIS's own answer stays", [why("SVERWEIS(9;A1:B3;2;0)", table), de('XVERWEIS(N9;A1:A3;B1:B3;"fehlt")', table)], ["#NV Der gesuchte Wert kommt im Suchbereich nicht vor.", "fehlt"]);
+  eq("element by element", why("INDEX(SVERWEIS(A2:A4;A1:B3;2;0);3)", table), empty);
+  // INDEX over a failed RGP: its error, whichever element (Excel: #WERT! for both).
+  const nb = { A1: 1, A2: 2, A3: 3, A4: 4, A5: 5, D1: "n.b.", D2: 2, D3: 3, D4: 4, D5: 5 };
+  eq("INDEX(RGP(…);1) and (…;2)", [why("INDEX(RGP(D1:D5;A1:A5);1)", nb), why("INDEX(RGP(D1:D5;A1:A5);2)", nb)], Array(2).fill("#WERT! Hier wird mit einem Text gerechnet, der keine Zahl ist."));
+  // "für „keine“ trag 0 ein" only for the counts observed: an expected 0 can't be divided by.
+  eq("CHIQU.TEST with an empty expected value", why("CHIQU.TEST(A1:A2;B1:B2)", { A1: 5, A2: 4, B1: 3 }), "#ZAHL! Bei CHIQU.TEST darf „Erwart_Werte“ nur Zahlen größer als 0 enthalten, keine leeren Zellen und keinen Text.");
+  eq("…in English", why("CHISQ.TEST(A1:A2,B1:B2)", { A1: 5, A2: 4, B1: 3 }, "en"), '#NUM! In CHISQ.TEST, "expected_range" may only hold numbers greater than 0, no empty cells or text.');
+  check("an empty observed count keeps the advice", why("CHIQU.TEST(A1:A2;B1:B2)", { A1: 5, B1: 4, B2: 3 }).endsWith("(für „keine“ trag 0 ein)."));
+}
+
+// ==============================================================================================
+section("German formulas: a decimal comma where an argument is missing (FX-7)");
+{
+  const msg = (local: string) => {
+    const r = E.toCanonicalFormula(local, "de");
+    return "error" in r ? r.error : `OK ${r.formula}`;
+  };
+  // "10,3" is one number in German formulas: name it and what is missing, and offer the ";" version.
+  eq("REST(10,3)", msg("REST(10,3)"), "„10,3“ ist hier eine Zahl mit Dezimalkomma, dann fehlt REST noch ein Argument. Meintest du =REST(10;3)?");
+  eq("POTENZ, RUNDEN, VRUNDEN, WENN", ["POTENZ(2,3)", "RUNDEN(2,5)", "VRUNDEN(10,3)", "WENN(A1>0,5)"].map((f) => /Meintest du (=.*)\?$/.exec(msg(f))?.[1]), ["=POTENZ(2;3)", "=RUNDEN(2;5)", "=VRUNDEN(10;3)", "=WENN(A1>0;5)"]);
+  eq("too few with ; as well: no formula offered", msg("SVERWEIS(1,5)"), "„1,5“ ist hier eine Zahl mit Dezimalkomma, dann fehlen SVERWEIS noch 2 Argumente. In deutschen Formeln trennt ; die Argumente.");
+  // A list that already separates with ";" has its decimal comma: =SVERWEIS(2;5;J2:K6) would put 5 where the table belongs.
+  eq("a list with ; gets no formula offered", msg("SVERWEIS(2,5;J2:K6)"), "„2,5“ ist hier eine Zahl mit Dezimalkomma, dann fehlt SVERWEIS noch ein Argument. In deutschen Formeln trennt ; die Argumente.");
+  check("…nor XVERWEIS or DATUM", ["XVERWEIS(1,5;A1:A5)", "DATUM(2024,1;5)"].every((f) => msg(f).includes("Dezimalkomma") && !msg(f).includes("Meintest du")));
+  eq("…in English", E.parseErrorMessage({ code: "decimal-comma", at: 0, end: 4, text: "10,3", fn: "MOD", count: 1, meant: "=MOD(10;3)" }, "en"), '"10,3" is a number with a decimal comma here, so MOD is still an argument short. Did you mean =MOD(10;3)?');
+  eq("no decimal comma of its own: as before", [msg("REST(10)"), msg("REST(MITTELWERT(1,5;2))"), msg("RUNDEN(,5)")], ["REST braucht mindestens 2 Argumente.", "REST braucht mindestens 2 Argumente.", "RUNDEN braucht mindestens 2 Argumente."]);
+  eq("what works stays", [msg("RUNDEN(A1,2)"), msg("MAX(1,2)"), msg("SUMME(1,5;2)"), msg("REST(10;3)")], ["OK ROUND(A1,2)", "OK MAX(1.2)", "OK SUM(1.5,2)", "OK MOD(10,3)"]);
+  const typed = E.parseInput("=REST(10,3)", "de");
+  eq("typing it keeps the editor open, the caret on 10,3", [typed.cell, typed.error?.at], [{}, 6]);
+}
+
+// ==============================================================================================
+// Typing in the editor (lane ST): formats of formulas over times and dates, the status bar, hints
+
+/** Editors for the typing checks; their notices are hidden at the end (else Node waits for their timers). */
+const typingStores: SheetStore[] = [];
+function typingStore(wb: Workbook = book1(), locale: Locale = "de"): SheetStore {
+  const s = createSheetStore({ pageId: "p1", workbook: wb, locale, readOnly: false });
+  typingStores.push(s);
+  return s;
+}
+/** Type `text` into a cell and press Enter (or nothing: Ctrl+Enter stays). */
+function typeAt(s: SheetStore, a1: string, text: string, move: "down" | null = "down") {
+  s.select(parsePos(a1)!);
+  s.startEdit({ via: "cell", replace: true, text });
+  s.commitEdit(move);
+}
+const cellIn = (s: SheetStore, a1: string) => {
+  const p = parsePos(a1)!;
+  return O.getCell(s.get().workbook, s.get().sheetId, p.row, p.col);
+};
+/** What a cell shows. */
+const shownIn = (s: SheetStore, a1: string) => {
+  const p = parsePos(a1)!;
+  return E.formatValue(s.get().calc.value(s.get().sheetId, p.row, p.col), cellIn(s, a1)?.s?.fmt, s.get().locale);
+};
+/** Cells typed as text, with the formats typing gives them (14:30 a clock time, 36:00 a duration, 25 % a percentage). */
+function typedBook(cells: Record<string, string>, ...more: Sheet[]): Workbook {
+  const out: Record<string, CellInput> = {};
+  for (const [a1, text] of Object.entries(cells)) {
+    const p = E.parseInput(text, "de");
+    out[a1] = p.fmt ? { ...p.cell, s: { fmt: p.fmt } } : p.cell;
+  }
+  return book(mkSheet("s1", "Blatt 1", out), ...more);
+}
+const durationFmt = (seconds = false): NumberFormat => ({ kind: "time", seconds, duration: true });
+const clockFmt: NumberFormat = { kind: "time", seconds: false };
+const dateFmt: NumberFormat = { kind: "date", style: "short" };
+
+// ==============================================================================================
+section("a typed formula takes the format of what it adds, subtracts, sums or averages (FX-3, LAB-4)");
+{
+  /** A formula typed into Z99, read as the editor reads it there: what the cell shows, and the format it gets. */
+  const typeIn = (wb: Workbook, text: string, locale: Locale = "de") => {
+    const calc = calcOf(wb, locale);
+    const parsed = inSheet(E.parseInput(text, locale), text, locale, { wb, sheetId: "s1", row: 98, col: 25, value: (s, r, c) => calc.value(s, r, c) });
+    const next = O.setCells(wb, "s1", [{ row: 98, col: 25, cell: parsed.fmt ? { ...parsed.cell, s: { fmt: parsed.fmt } } : parsed.cell }]);
+    return { shown: E.formatValue(calcOf(next, locale).value("s1", 98, 25), parsed.fmt, locale), fmt: parsed.fmt };
+  };
+  const shows = (wb: Workbook, texts: string[], locale: Locale = "de") => texts.map((t) => typeIn(wb, t, locale).shown);
+  const fmts = (wb: Workbook, texts: string[]) => texts.map((t) => typeIn(wb, t).fmt);
+  // The tester's sheet: Start and Ende, incubation times (36:00 a duration, 12:30 and 0:45 clock
+  // times as typed), dates and timestamps, percentages, money. Today is 03.11.2026 14:30 (NOW).
+  const lab = typedBook({
+    A2: "08:00",
+    B2: "14:30",
+    A5: "08:00:15",
+    D2: "36:00",
+    D3: "12:30",
+    D4: "0:45",
+    H2: "03.11.2026",
+    H3: "05.11.2026",
+    H4: "28.10.2026",
+    T2: "03.11.2026 08:00",
+    T3: "04.11.2026 20:30",
+    P2: "25 %",
+    P3: "10 %",
+    M2: "12,50 €",
+    N2: "7",
+  });
+  // LibreOffice 24.2 shows the same (sweepfix/ST/lo): 06:30:00, 49:15, 16:25, a date.
+  eq("Ende − Start, a sum and a mean of run times, a date + 7", shows(lab, ["=B2-A2", "=SUMME(D2:D4)", "=MITTELWERT(D2:D4)", "=H2+7"]), ["06:30", "49:15", "16:25", "10.11.2026"]);
+  eq("…as durations and a date", fmts(lab, ["=B2-A2", "=SUMME(D2:D4)", "=MITTELWERT(D2:D4)", "=H2+7"]), [durationFmt(), durationFmt(), durationFmt(), dateFmt]);
+  eq("a single reference keeps its cell's format", shows(lab, ["=A2", "=D2", "=H2", "=P2", "=M2", "=N2", "=T2"]), ["08:00", "36:00", "03.11.2026", "25%", "12,50 €", "7", "03.11.2026 08:00"]);
+  eq("…a clock time stays one, a plain number plain", fmts(lab, ["=A2", "=N2"]), [clockFmt, undefined]);
+  // + and − chains of references and numbers.
+  eq("times added and subtracted are durations", shows(lab, ["=A2+B2", "=B2-A2-D4", "=D2-A2", "=D2+A2"]), ["22:30", "05:45", "28:00", "44:00"]);
+  eq("…with seconds when one of them has seconds", [typeIn(lab, "=B2-A5").shown, typeIn(lab, "=B2-A5").fmt], ["06:29:45", durationFmt(true)]);
+  eq("a clock time and a number stays a clock time (an hour later)", [typeIn(lab, "=A2+1/24").shown, typeIn(lab, "=A2+1/24").fmt], ["09:00", clockFmt]);
+  eq("date ± days is a date", shows(lab, ["=H2-7", "=7+H2", "=H2+N2"]), ["27.10.2026", "10.11.2026", "10.11.2026"]);
+  eq("date − date is a number of days (Tage seit Ansatz)", [typeIn(lab, "=H3-H2").shown, typeIn(lab, "=H3-H2").fmt], ["2", undefined]);
+  eq("timestamp − timestamp is a duration (growth curves)", [typeIn(lab, "=T3-T2").shown, typeIn(lab, "=T3-T2").fmt], ["36:30", durationFmt()]);
+  eq("a date and a time or duration make a timestamp", shows(lab, ["=H2+A2", "=T2+D2", "=H2+D2"]), ["03.11.2026 08:00", "04.11.2026 20:00", "04.11.2026 12:00"]);
+  eq("percentages and money keep theirs", shows(lab, ["=P2+P3", "=1-P2", "=M2+M2", "=SUMME(P2:P3)"]), ["35%", "75%", "25,00 €", "35%"]);
+  // SUMME, MITTELWERT, MIN, MAX, MEDIAN, TEILERGEBNIS over ranges and references.
+  eq("MIN, MAX, MEDIAN and means of dates and times", shows(lab, ["=MIN(H2:H3)", "=MITTELWERT(H2:H3)", "=MAX(A2:B2)", "=MEDIAN(D2:D4)", "=SUMME(A2;B2)", "=MAX(B2-A2;0)"]), ["03.11.2026", "04.11.2026", "14:30", "12:30", "22:30", "06:30"]);
+  eq("…the latest clock time is a clock time", typeIn(lab, "=MAX(A2:B2)").fmt, clockFmt);
+  eq("TEILERGEBNIS: sum, sum without hidden rows, mean, maximum", shows(lab, ["=TEILERGEBNIS(9;D2:D4)", "=TEILERGEBNIS(109;D2:D4)", "=TEILERGEBNIS(101;D2:D4)", "=TEILERGEBNIS(4;D2:D4)"]), ["49:15", "49:15", "16:25", "36:00"]);
+  // × ÷ and counting stay plain numbers (LibreOffice too: =A1*24 is General).
+  eq("× and ÷ and counting stay plain numbers", shows(lab, ["=SUMME(D2:D4)*24", "=(B2-A2)/2", "=A2*P2", "=ANZAHL(D2:D4)", "=TEILERGEBNIS(2;D2:D4)", "=M2*2"]), ["49,25", "0,135416667", "0,083333333", "3", "3", "25"]);
+  eq("…without a format", fmts(lab, ["=SUMME(D2:D4)*24", "=(B2-A2)/2", "=ANZAHL(D2:D4)"]), [undefined, undefined, undefined]);
+  // Today and now: =HEUTE()-A2 with a date in A2 is a number of days, not 05.01.1900.
+  eq("=HEUTE()-date and =JETZT()-date are days, =JETZT()-timestamp a duration", shows(lab, ["=HEUTE()-H4", "=JETZT()-H4", "=JETZT()-T2", "=DATUM(2026;12;24)-HEUTE()"]), ["6", "6,604166667", "06:30", "51"]);
+  eq("…=HEUTE(), =HEUTE()+7, =JETZT() and =ZEIT() as before", shows(lab, ["=HEUTE()", "=HEUTE()+7", "=JETZT()", "=ZEIT(8;30;0)"]), ["03.11.2026", "10.11.2026", "03.11.2026 14:30", "08:30"]);
+  // The lab tester's growth curve 0:00 … 48:00 every 4 hours (from 24:00 durations), and the verifier's 0:00 … 3:00.
+  const curve: Record<string, string> = {};
+  for (let i = 0; i <= 12; i++) curve[`G${i + 2}`] = `${i * 4}:00`;
+  for (let i = 0; i <= 6; i++) curve[`K${i + 2}`] = `${Math.floor(i / 2)}:${i % 2 ? "30" : "00"}`;
+  const growth = typedBook(curve);
+  eq("0:00 … 48:00: =G14−G2, =SUMME, =MAX, =G14, =MITTELWERT, =MIN", shows(growth, ["=G14-G2", "=SUMME(G2:G14)", "=MAX(G2:G14)", "=G14", "=MITTELWERT(G2:G14)", "=MIN(G2:G14)"]), ["48:00", "312:00", "48:00", "48:00", "24:00", "00:00"]);
+  eq("…=SUMME(G2:G14)*24 stays 312", typeIn(growth, "=SUMME(G2:G14)*24").shown, "312");
+  eq("0:00 … 3:00: =K8−K2, =SUMME, =MAX, =K8, *24", shows(growth, ["=K8-K2", "=SUMME(K2:K8)", "=MAX(K2:K8)", "=K8", "=SUMME(K2:K8)*24"]), ["03:00", "10:30", "03:00", "03:00", "10,5"]);
+  // Whole columns, other sheets, English, and an old 36:00 kept as the clock time 12:00.
+  eq("a whole column", typeIn(lab, "=SUMME(D:D)").shown, "49:15");
+  const twoSheets = typedBook({ A2: "08:00" }, mkSheet("s2", "Messung 2", { B3: { v: 1.5, s: { fmt: durationFmt() } } }));
+  eq("a reference to another sheet", shows(twoSheets, ["='Messung 2'!B3", "='messung 2'!B3+A2"]), ["36:00", "44:00"]);
+  eq("in English", shows(lab, ["=B2-A2", "=SUM(D2:D4)", "=AVERAGE(D2:D4)", "=H2+7", "=TODAY()-H4"], "en"), ["06:30", "49:15", "16:25", "11/10/2026", "6"]);
+  const legacy = book1({ A1: { v: 0.5, s: { fmt: clockFmt } }, A2: { v: 1.5, s: { fmt: clockFmt } } });
+  eq("a clock time of a day or more counts as a duration", typeIn(legacy, "=MAX(A1:A2)").shown, "36:00");
+  // Without the sheet (formulas pasted from elsewhere) only the date and time functions count.
+  eq("without the sheet", [E.parseInput("=B2-A2", "de").fmt, E.parseInput("=HEUTE()+7", "de").fmt, E.parseInput("=DATUM(2026;12;24)-HEUTE()", "de").fmt, E.parseInput("+HEUTE()", "de").fmt], [undefined, dateFmt, undefined, dateFmt]);
+  eq("a chain of 4,096 terms is read without trouble", formulaFormat(["A2", ...Array(4095).fill("1")].join("+"), { wb: lab, sheetId: "s1" }), clockFmt);
+
+  // In the editor: only into a cell without a format of its own (as in Excel), worked out once.
+  const s = typingStore();
+  typeAt(s, "A2", "08:00");
+  typeAt(s, "B2", "14:30");
+  typeAt(s, "C2", "=B2-A2");
+  eq("typed in the editor: 06:30, a duration", [shownIn(s, "C2"), cellIn(s, "C2")?.s?.fmt], ["06:30", durationFmt()]);
+  typeAt(s, "D2", "=C2*24");
+  eq("…its hours: 6,5", [shownIn(s, "D2"), cellIn(s, "D2")?.s], ["6,5", undefined]);
+  typeAt(s, "C3", "=B2-A2+C2");
+  typeAt(s, "C4", "=SUMME(C2:C3)");
+  eq("formulas over formula cells", [shownIn(s, "C3"), shownIn(s, "C4")], ["13:00", "19:30"]);
+  s.apply("format", (wb) => O.setStyle(wb, "s1", [{ r0: 1, c0: 4, r1: 1, c1: 4 }], { fmt: { kind: "number", decimals: 2 } }));
+  typeAt(s, "E2", "=B2-A2");
+  eq("a cell with a format of its own keeps it", [shownIn(s, "E2"), cellIn(s, "E2")?.s?.fmt], ["0,27", { kind: "number", decimals: 2 }]);
+  s.apply("format", (wb) => O.setStyle(wb, "s1", [{ r0: 1, c0: 0, r1: 1, c1: 1 }], { fmt: { kind: "number", decimals: 3 } }));
+  eq("Start and Ende shown as numbers later: C2 stays a duration", [shownIn(s, "A2"), shownIn(s, "C2")], ["0,333", "06:30"]);
+  const u = typingStore();
+  typeAt(u, "A2", "08:00");
+  typeAt(u, "B2", "14:30");
+  typeAt(u, "C2", "=B2-A2");
+  u.undo();
+  eq("undo takes the formula back with its format", cellIn(u, "C2"), undefined);
+  const enStore = typingStore(book1(), "en");
+  typeAt(enStore, "A2", "8:00 AM");
+  typeAt(enStore, "B2", "2:30 PM");
+  typeAt(enStore, "C2", "=B2-A2");
+  eq("…and in English", shownIn(enStore, "C2"), "06:30");
+  // The result shown while a formula is typed (the formula bar, the cell) takes the format Enter gives.
+  const preview = typingStore();
+  typeAt(preview, "A2", "08:00");
+  typeAt(preview, "B2", "14:30");
+  typeAt(preview, "C2", "=B2-A2");
+  preview.apply("format", (wb) => O.setStyle(wb, "s1", [{ r0: 1, c0: 4, r1: 1, c1: 4 }], { fmt: { kind: "number", decimals: 2 } }));
+  const previewIn = (a1: string, f: string) => typingFormat(preview.get(), "s1", parsePos(a1)!, f);
+  eq("the format of the result shown while typing, as Enter gives it", [previewIn("F2", "B2-A2"), previewIn("E2", "B2-A2"), previewIn("F2", "(B2-A2)*24"), previewIn("C2", "(B2-A2)*24")], [durationFmt(), { kind: "number", decimals: 2 }, undefined, undefined]);
+
+  // Typed into again: a format the formula only implied goes with it (what typing into an empty
+  // cell gives), a format picked by hand stays. LibreOffice shows 6,5 and 5 here too.
+  const again = typingStore();
+  for (const [a1, text] of [["A2", "08:00"], ["B2", "14:30"], ["H2", "03.11.2026"]]) typeAt(again, a1, text);
+  typeAt(again, "C2", "=B2-A2");
+  typeAt(again, "C2", "=(B2-A2)*24");
+  typeAt(again, "C3", "=B2-A2");
+  typeAt(again, "C3", "=ANZAHL(A2:B2)");
+  typeAt(again, "I2", "=H2+7");
+  typeAt(again, "I2", "5");
+  eq("=B2-A2 edited to =(B2-A2)*24: 6,5; to =ANZAHL(A2:B2): 2; 5 typed over =H2+7: 5", [shownIn(again, "C2"), shownIn(again, "C3"), cellIn(again, "I2")], ["6,5", "2", { v: 5 }]);
+  typeAt(again, "C4", "=B2-A2");
+  typeAt(again, "C4", "=B2-A2+1/24");
+  eq("…edited to another formula over times: that one's format", [shownIn(again, "C4"), cellIn(again, "C4")?.s?.fmt], ["07:30", durationFmt()]);
+  typeAt(again, "I3", "=H2+7");
+  typeAt(again, "I3", "1.234");
+  eq("…1.234 typed over =H2+7: 1234, not a date", shownIn(again, "I3"), "1234");
+  currentSheetNotice(again)?.action?.run();
+  eq("…read as 1,234: a plain 1,234", cellIn(again, "I3"), { v: 1.234 });
+  again.apply("format", (wb) => O.setStyle(wb, "s1", [{ r0: 4, c0: 2, r1: 5, c1: 2 }], { fmt: { kind: "number", decimals: 3 } }));
+  typeAt(again, "C5", "=B2-A2");
+  typeAt(again, "C5", "=(B2-A2)*24");
+  typeAt(again, "C6", "=A2");
+  again.apply("format", (wb) => O.setStyle(wb, "s1", [{ r0: 5, c0: 2, r1: 5, c1: 2 }], { fmt: durationFmt() }));
+  typeAt(again, "C6", "=A2*2");
+  eq("a format picked by hand stays (Zahl, Dauer)", [shownIn(again, "C5"), shownIn(again, "C6")], ["6,500", "16:00"]);
+  const reedit = typingStore();
+  typeAt(reedit, "A2", "08:00");
+  typeAt(reedit, "C2", "=A2");
+  reedit.startEdit({ via: "cell", replace: false });
+  reedit.commitEdit("down");
+  eq("F2 and Enter without a change keep it", cellIn(reedit, "C2")?.s?.fmt, clockFmt);
+
+  // Timestamps shown as their clock time (an instrument's log imported with "hh:mm").
+  const stamps = book1({ A2: { v: 46329.6, s: { fmt: clockFmt } }, A3: { v: 46329.65, s: { fmt: clockFmt } } });
+  eq("timestamps shown as clock times: =A2 that time, =A3−A2 a duration, mean and latest moments, an hour later", shows(stamps, ["=A2", "=A3-A2", "=MITTELWERT(A2:A3)", "=MAX(A2:A3)", "=A2+1/24"]), ["14:24", "01:12", "15:00", "15:36", "15:24"]);
+
+  // A big sheet (50,000 times): single references cost nothing, whole columns little.
+  const many: Record<string, Cell> = {};
+  for (let r = 0; r < 10000; r++) for (let c = 0; c < 5; c++) many[cellKey(r, c)] = { v: (r % 96) / 96, s: { fmt: clockFmt } };
+  const bigBook = book(mkSheet("s1", "Blatt 1", {}, { cells: many, size: { rows: 10001, cols: 26 } }));
+  const bigCalc = calcOf(bigBook);
+  const bigSrc = { wb: bigBook, sheetId: "s1", value: (sheetId: string, r: number, c: number) => bigCalc.value(sheetId, r, c) };
+  const chain200 = Array.from({ length: 200 }, (_, i) => `A${i + 1}`).join("+");
+  let t0 = performance.now();
+  const chainFmt = formulaFormat(chain200, bigSrc);
+  const chainMs = performance.now() - t0;
+  t0 = performance.now();
+  const colFmt = formulaFormat("SUM(A:A)", bigSrc);
+  const colMs = performance.now() - t0;
+  timings.push(`the format of =A1+…+A200 on 50,000 cells ${chainMs.toFixed(1)} ms, of =SUM(A:A) ${colMs.toFixed(1)} ms`);
+  check(`=A1+…+A200 on a 50,000-cell sheet: a duration in ${chainMs.toFixed(1)} ms (< 30)`, chainMs < 30 && show(chainFmt) === show(durationFmt()));
+  check(`=SUMME(A:A) there: a duration in ${colMs.toFixed(1)} ms (< 150)`, colMs < 150 && show(colFmt) === show(durationFmt()));
+}
+
+// ==============================================================================================
+section("the status bar shows times as times (LAB-4)");
+{
+  /** The figures for a selection, as the status bar shows them: Summe, Mittelwert, Anzahl, Min, Max, Stdabw. */
+  const figures = (wb: Workbook, range: string) => {
+    const [a, b] = range.split(":").map((x) => parsePos(x)!);
+    const stats = selectionStats(wb.sheets[0], calcOf(wb), "s1", { anchor: a, focus: b, extra: [] }, () => false);
+    const fmt = statFormat(O.getCell(wb, "s1", a.row, a.col)?.s?.fmt, stats);
+    const f = (n: number) => E.formatValue(n, fmt, "de");
+    return [f(stats.sum), f(stats.mean), E.formatValue(stats.count, undefined, "de"), f(stats.min), f(stats.max), stats.stdev === null ? null : f(stats.stdev)];
+  };
+  const cells: Record<string, string> = { A1: "Zeit", B1: "OD600", C1: "Dauer" };
+  for (let i = 0; i <= 12; i++) cells[`A${i + 2}`] = `${i * 4}:00`;
+  for (let i = 0; i <= 6; i++) cells[`B${i + 2}`] = `${Math.floor(i / 2)}:${i % 2 ? "30" : "00"}`;
+  Object.assign(cells, { C2: "0:00:30", C3: "0:01:00", D2: "0:30", D3: "0,05", E2: "50 %", E3: "25 %" });
+  const wb = typedBook(cells);
+  eq("0:00 … 48:00: Summe 312:00, Max 48:00 (not 13 and 2)", figures(wb, "A2:A14"), ["312:00", "24:00", "13", "00:00", "48:00", "15:34"]);
+  eq("0:00 … 3:00: Summe 10:30, Max 03:00", figures(wb, "B2:B8"), ["10:30", "01:30", "7", "00:00", "03:00", "01:04"]);
+  eq("selected with the header: the same", figures(wb, "A1:A14")[0], "312:00");
+  eq("with seconds", figures(wb, "C2:C3").slice(0, 2), ["00:01:30", "00:00:45"]);
+  eq("times mixed with other numbers: plain numbers", figures(wb, "D2:D3").slice(0, 2), ["0,070833333", "0,035416667"]);
+  eq("percentages as before", figures(wb, "E2:E3").slice(0, 2), ["75%", "38%"]);
+  const stamps = book1({ A1: "Zeit", A2: { v: 46329.6, s: { fmt: clockFmt } }, A3: { v: 46329.65, s: { fmt: clockFmt } } });
+  eq("timestamps shown as clock times: plain numbers, as before (not 1111910:24)", figures(stamps, "A2:A3").slice(0, 2), ["92659,25", "46329,625"]);
+}
+
+// ==============================================================================================
+section("the 1.234 hint stays while a column is typed on (FX-4)");
+{
+  const hint = (s: SheetStore) => currentSheetNotice(s)?.action?.label ?? null;
+  // Column entry: value, Enter, next value, with the eyes on the notebook.
+  const col = typingStore();
+  typeAt(col, "M2", "0.512");
+  // How long its notice stays: the time it is armed with.
+  const timers = globalThis as { setTimeout: unknown };
+  const realTimeout = globalThis.setTimeout;
+  let armed = 0;
+  timers.setTimeout = (fn: () => void, ms?: number) => {
+    armed = Math.max(armed, ms ?? 0);
+    return realTimeout(fn, ms);
+  };
+  try {
+    typeAt(col, "M3", "1.456");
+  } finally {
+    timers.setTimeout = realTimeout;
+  }
+  eq("after Enter: the hint", [shownIn(col, "M3"), hint(col)], ["1456", "Als 1,456 lesen"]);
+  check(`…for 12 s at least (${armed} ms)`, armed >= 12_000);
+  col.startEdit({ via: "cell", replace: true, text: "0" });
+  eq("the next value begun: still there", hint(col), "Als 1,456 lesen");
+  col.updateEdit("0,987", 5);
+  col.commitEdit("down");
+  eq("…entered: still there", [shownIn(col, "M4"), hint(col)], ["0,987", "Als 1,456 lesen"]);
+  col.select(parsePos("P9")!);
+  col.select(parsePos("A1")!);
+  eq("other cells selected: still there", hint(col), "Als 1,456 lesen");
+  currentSheetNotice(col)?.action?.run();
+  eq("one click still reads M3 as 1,456 (one undo step), the hint gone", [shownIn(col, "M3"), col.get().undoLabel, hint(col)], ["1,456", "Als 1,456 lesen", null]);
+  // It goes once its cell holds something else, or another sheet is shown.
+  const over = typingStore();
+  typeAt(over, "A2", "1.234");
+  typeAt(over, "A3", "5");
+  typeAt(over, "A2", "7");
+  eq("its cell typed over: gone", hint(over), null);
+  const back = typingStore();
+  typeAt(back, "A2", "1.234");
+  back.undo();
+  eq("undone: gone", hint(back), null);
+  const sheets = typingStore();
+  typeAt(sheets, "A2", "1.234");
+  let other = "";
+  sheets.apply("Blatt", (wb) => {
+    const r = O.addSheet(wb, "de");
+    other = r.sheetId;
+    return r.wb;
+  });
+  eq("a sheet added: still there", hint(sheets), "Als 1,234 lesen");
+  sheets.setSheet(other);
+  eq("another sheet shown: gone", hint(sheets), null);
+  // A newer hint replaces it; a click on the old one still finds what was typed there.
+  const two = typingStore();
+  typeAt(two, "A2", "1.234");
+  const older = currentSheetNotice(two)?.action;
+  typeAt(two, "A3", "2.345");
+  eq("a newer hint replaces it", hint(two), "Als 2,345 lesen");
+  older?.run();
+  eq("…the older one's click still corrects its own cell only", [shownIn(two, "A2"), shownIn(two, "A3")], ["1,234", "2345"]);
+}
+
+// ==============================================================================================
+section("a ratio typed as 1:2 under Verdünnung (LAB-5)");
+{
+  /** The notice after typing `text` into A5 under `header` in A1. */
+  const notice = (header: string | null, text: string, locale: Locale = "de", cells: Record<string, CellInput> = {}) => {
+    const wb = book1(header === null ? cells : { A1: header, ...cells });
+    return inSheet(E.parseInput(text, locale), text, locale, { wb, sheetId: "s1", row: 4, col: 0 }).notice;
+  };
+  const n = notice("Verdünnung", "1:2");
+  eq("1:2 under Verdünnung: what it became, and the way back", [n?.message, n?.action, n?.other], ["„1:2“ ist jetzt die Uhrzeit 01:02. Für ein Verhältnis tipp '1:2 (mit Apostroph davor).", "Als Text „1:2“", { cell: { v: "1:2" } }]);
+  const en = notice("Dilution", "1:2", "en");
+  eq("in English", [en?.message, en?.action], ['"1:2" is now the time 01:02. For a ratio, type \'1:2 (with an apostrophe in front).', 'As text "1:2"']);
+  eq("50:1 is a duration", notice(null, "50:1")?.message, "„50:1“ ist jetzt die Dauer 50:01. Für ein Verhältnis tipp '50:1 (mit Apostroph davor).");
+  eq("one digit after the colon: a ratio under any header (nobody writes 01:02 as 1:2)", ["1:2", "1:4", "1:8", "3:1", "10:1"].map((t) => !!notice("Zeit", t)), [true, true, true, true, true]);
+  eq("two digits only under a header that names a ratio", [!!notice("Verdünnung", "1:10"), !!notice("Verdünnung", "1:50"), !!notice("Zeit", "1:10"), !!notice(null, "1:10")], [true, true, false, false]);
+  eq("times typed under a time header never get it", ["0:30", "1:00", "1:15", "1:30", "1:45", "12:30", "8:00"].map((t) => notice("Zeit", t) ?? null), Array(7).fill(null));
+  const ratioHeaders = ["Verdünnung", "Verdünnungsreihe", "Verduennung", "Mischungsverhältnis", "Verhaeltnis", "Dilution", "Dilution ratio", "Ratio", "1:x", "1:100"];
+  eq("headers that name a ratio", ratioHeaders.map((h) => !!notice(h, "1:10")), Array(ratioHeaders.length).fill(true));
+  eq("…and headers that don't (Konzentration has no ratio in it)", ["Konzentration", "Titration", "Ratiometrie", "Zeit", "Probe"].map((h) => !!notice(h, "1:10")), [false, false, false, false, false]);
+  eq("the first text above counts, numbers between don't", !!notice("Verdünnung", "1:10", "de", { A2: 5, A3: 7 }), true);
+  eq("1:100 stays text and needs nothing", [E.parseInput("1:100", "de").cell, notice("Verdünnung", "1:100") ?? null], [{ v: "1:100" }, null]);
+  eq("'1:2, formulas and seconds get none", ["'1:2", "=1+1", "1:2:30"].map((t) => notice("Verdünnung", t) ?? null), [null, null, null]);
+
+  // In the editor: one click keeps it as text, one undo step brings the time back.
+  const s = typingStore(book1({ L1: "Verdünnung" }));
+  typeAt(s, "L2", "1:2");
+  eq("typed under Verdünnung: 01:02, and the notice", [shownIn(s, "L2"), currentSheetNotice(s)?.action?.label], ["01:02", "Als Text „1:2“"]);
+  currentSheetNotice(s)?.action?.run();
+  eq("one click: the text 1:2 without the time format, shown on the left, edited as '1:2", [cellIn(s, "L2"), E.defaultAlign(s.get().calc.value("s1", 1, 11)), E.editText(cellIn(s, "L2"), "de")], [{ v: "1:2" }, "left", "'1:2"]);
+  s.undo();
+  eq("one undo step back to 01:02", shownIn(s, "L2"), "01:02");
+  s.redo();
+  typeAt(s, "L3", "1:10");
+  eq("the next one down (1:10, under the text 1:2): offered too", currentSheetNotice(s)?.action?.label, "Als Text „1:10“");
+  typeAt(s, "L4", "1:100");
+  eq("1:100 is text already", cellIn(s, "L4"), { v: "1:100" });
+  const zeit = typingStore(book1({ A1: "Zeit" }));
+  for (const [i, t] of ["0:00", "0:30", "1:00", "1:15", "1:30"].entries()) typeAt(zeit, `A${i + 2}`, t);
+  eq("a time column typed down: never a notice", currentSheetNotice(zeit), null);
+
+  // Clock times kept as text above (imported, or typed with an apostrophe) say nothing of the column.
+  eq("a text 12:30 or 8:00 above doesn't make the next times ratios", [notice("Zeit", "8:30", "de", { A2: "12:30" }), notice("Uhrzeit", "10:15", "de", { A2: "8:00" }), notice(null, "10:15", "de", { A3: "08:00:15" })].map((x) => x ?? null), [null, null, null]);
+  eq("…a ratio kept as text there ('1:10) leaves it to the header above", [!!notice("Verdünnung", "1:20", "de", { A2: "1:10" }), !!notice("Zeit", "1:20", "de", { A2: "1:10" })], [true, false]);
+  eq("headers spaced or with a letter name a ratio", ["1 : 10", "1:x"].map((h) => !!notice(h, "1:20")), [true, true]);
+  // The notice says what the cell shows: none in a cell formatted as a number or percentage (0,04, 4 %).
+  const inOwn = (fmt: NumberFormat) => {
+    const wb = book1({ A1: "Verdünnung", A5: { v: 0.5, s: { fmt } } });
+    const own = O.getCell(wb, "s1", 4, 0);
+    return inSheet(E.parseInput("1:2", "de", own), "1:2", "de", { wb, sheetId: "s1", row: 4, col: 0 }, own?.s?.fmt).notice?.message ?? null;
+  };
+  eq("in a cell formatted as a number or percentage: none", [inOwn({ kind: "number", decimals: 2 }), inOwn({ kind: "percent", decimals: 0 })], [null, null]);
+  eq("…formatted as a time with seconds: that time", inOwn({ kind: "time", seconds: true }), "„1:2“ ist jetzt die Uhrzeit 01:02:00. Für ein Verhältnis tipp '1:2 (mit Apostroph davor).");
+  const own = typingStore(book1({ L1: "Verdünnung", L2: { v: 0.5, s: { fmt: { kind: "time", seconds: true } } } }));
+  typeAt(own, "L2", "1:2");
+  currentSheetNotice(own)?.action?.run();
+  eq("…one click there: the text, with the format set by hand", cellIn(own, "L2"), { v: "1:2", s: { fmt: { kind: "time", seconds: true } } });
+}
+
+// ==============================================================================================
+// Formats that formulas imply, second sweep (lane FMT2): what WENN, WENNFEHLER, WAHL and INDEX give
+// back, values that aren't alike, a duration below zero, and =WENN(ISTF with Tab
+
+section("WENN, WENNFEHLER, WAHL and INDEX show what they give back (FX2-3)");
+{
+  const s = typingStore();
+  for (const [a1, text] of [["A2", "09:15"], ["B2", "17:45"], ["A3", "22:00"], ["B3", "06:00"], ["H2", "03.11.2026"], ["H3", "05.11.2026"], ["N2", "4"], ["P2", "25 %"], ["Q2", "09:15"], ["Q3", "17:45"], ["Q4", "03.11.2026"]]) typeAt(s, a1, text);
+  /** Formulas typed one below the other from row 10 of a column: what each shows. */
+  const typed = (col: string, texts: string[]) =>
+    texts.map((text, i) => {
+      typeAt(s, `${col}${10 + i}`, text);
+      return shownIn(s, `${col}${10 + i}`);
+    });
+  // LibreOffice 24.2 shows the same (sweep2/formulas/verify-0/lo): 08:30:00, overnight 08:00:00.
+  eq("Ende − Start in WENN or WENNFEHLER: 08:30, like =B2-A2", typed("C", ["=B2-A2", '=WENN(B2="";"";B2-A2)', '=WENNFEHLER(B2-A2;"")', "=WENN(B2>A2;B2-A2;0)"]), ["08:30", "08:30", "08:30", "08:30"]);
+  eq("…as durations", ["C11", "C12", "C13"].map((a1) => cellIn(s, a1)?.s?.fmt), [durationFmt(), durationFmt(), durationFmt()]);
+  eq("the overnight recipe =WENN(B3<A3;B3+1-A3;B3-A3): 08:00", typed("D", ["=WENN(B3<A3;B3+1-A3;B3-A3)"]), ["08:00"]);
+  eq("WENNNV, WAHL and INDEX: what they pick", typed("E", ["=WENNNV(B2;0)", "=WAHL(2;A2;B2)", "=INDEX(A2:B2;2)", "=INDEX(A2:B3;2;2)", "=INDEX(H2:H3;2)"]), ["17:45", "17:45", "17:45", "06:00", "05.11.2026"]);
+  eq("WENNS and ERSTERWERT: their results, not the values compared", typed("F", ["=WENNS(N2>5;A2;N2>3;B2)", "=ERSTERWERT(N2;4;B2-A2;0)"]), ["17:45", "08:30"]);
+  eq("…results that aren't alike: a plain number", typed("G", ["=ERSTERWERT(N2;4;B2;N2)", "=WENN(N2>0;H2;A2)"]), ["0,739583333", "46329"]);
+  eq("a percentage with a text in the other branch", typed("I", ['=WENN(N2>0;P2;"-")']), ["25%"]);
+  eq("ABS and RUNDEN stay plain numbers (LibreOffice too)", typed("J", ["=ABS(B2-A2)", "=RUNDEN(B2-A2;4)"]), ["0,354166667", "0,3542"]);
+  // Hours, a count or a rounded number in one branch, a duration in the other: a plain number
+  eq("hours (×24), a count or RUNDEN next to a duration: 8,5 and 2, not 204:00 and 48:00", typed("K", ["=WENN(N2>3;(B2-A2)*24;B2-A2)", "=WENN(N2>5;B2-A2;ANZAHL(A2:B2))", "=WENN(N2>3;RUNDEN((B2-A2)*24;2);B2-A2)"]), ["8,5", "2", "8,5"]);
+  eq("…saved without a format", ["K10", "K11", "K12"].map((a1) => cellIn(s, a1)?.s?.fmt ?? null), [null, null, null]);
+  eq("INDEX picks the row and column written as numbers: that cell's format (row 0: all of them, not alike here)", typed("R", ["=INDEX(Q2:Q4;1)", "=INDEX(Q2:Q4;3)", "=INDEX(Q2:Q4;3;1)", "=INDEX(Q2:Q4;0;1)"]), ["09:15", "03.11.2026", "03.11.2026", "0,385416667"]);
+  const enStore = typingStore(book1(), "en");
+  for (const [a1, text] of [["A2", "9:15"], ["B2", "17:45"], ["C2", '=IF(B2="","",B2-A2)'], ["C3", '=IFERROR(B2-A2,"")'], ["C4", "=IF(B2>A2,(B2-A2)*24,B2-A2)"]]) typeAt(enStore, a1, text);
+  eq("…in English", [shownIn(enStore, "C2"), shownIn(enStore, "C3"), shownIn(enStore, "C4")], ["08:30", "08:30", "8.5"]);
+}
+
+// ==============================================================================================
+section("values that aren't alike make a plain number (FX2-5)");
+{
+  const s = typingStore();
+  const data: [string, string][] = [
+    ["A2", "12"],
+    ["A3", "50 %"],
+    ["A4", "7"],
+    ["B2", "5"],
+    ["B3", "1:30"],
+    ["B4", "7"],
+    ["C2", "4"],
+    ["C3", "3"],
+    ["C4", "12.11.2026"],
+    ["D2", "0"],
+    ["D3", "0:30"],
+    ["D4", "1:00"],
+    ["E2", "n. b."],
+    ["E3", "0:30"],
+    ["E4", "1:00"],
+    ["F2", "25 %"],
+    ["F3", "12,50 €"],
+  ];
+  for (const [a1, text] of data) typeAt(s, a1, text);
+  /** Formulas typed: what each shows, and its format. */
+  const typed = (pairs: [string, string][]) =>
+    pairs.map(([a1, text]) => {
+      typeAt(s, a1, text);
+      return [shownIn(s, a1), cellIn(s, a1)?.s?.fmt ?? null];
+    });
+  // LibreOffice: 19.5, 12, 4.02083333333333, 12.0625 (sweep2/formulas/verify-0/lo).
+  eq("12, 50 % and 7: SUMME 19,5 and MAX 12 (not 1950 % and 1200 %)", typed([["A6", "=SUMME(A2:A4)"], ["A7", "=MAX(A2:A4)"]]), [["19,5", null], ["12", null]]);
+  eq("5, 1:30 and 7: MITTELWERT and SUMME plain numbers (not 96:30 and 289:30)", typed([["B6", "=MITTELWERT(B2:B4)"], ["B7", "=SUMME(B2:B4)"]]), [["4,020833333", null], ["12,0625", null]]);
+  eq("4, 3 and a date: a number", typed([["C6", "=SUMME(C2:C4)"]]), [["46345", null]]);
+  eq("a date next to a time, a percentage next to money", typed([["H6", "=MAX(C4;B3)"], ["H7", "=SUMME(F2:F3)"]]), [["46338", null], ["12,75", null]]);
+  // On purpose: a time column that starts with a plain 0 holds numbers, as the status bar says too.
+  eq("0, 0:30 and 1:00: MAX and SUMME plain numbers", typed([["D6", "=MAX(D2:D4)"], ["D7", "=SUMME(D2:D4)"]]), [["0,041666667", null], ["0,0625", null]]);
+  const stats = selectionStats(s.get().workbook.sheets[0], s.get().calc, "s1", { anchor: parsePos("D2")!, focus: parsePos("D4")!, extra: [] }, () => false);
+  eq("…the status bar's Summe", E.formatValue(stats.sum, statFormat(cellIn(s, "D2")?.s?.fmt, stats), "de"), "0,0625");
+  eq("times alike keep their format; a text among them says nothing", typed([["D8", "=SUMME(D3:D4)"], ["E6", "=SUMME(E2:E4)"], ["E7", "=MAX(E2:E4)"]]), [["01:30", durationFmt()], ["01:30", durationFmt()], ["01:00", clockFmt]]);
+  eq("+ and − as before: a date plus days, 1 − 25 %", typed([["H8", "=C4+C2"], ["H9", "=1-F2"]]), [["16.11.2026", dateFmt], ["75%", { kind: "percent", decimals: 0 }]]);
+}
+
+// ==============================================================================================
+section("a duration below zero shows as one (FX2-6)");
+{
+  const s = typingStore();
+  for (const [a1, text] of [["A2", "22:00"], ["B2", "06:00"], ["C2", "=B2-A2"]]) typeAt(s, a1, text);
+  // LibreOffice: -16:00:00 (sweep2/formulas/cases/lofmt2).
+  eq("Ende 06:00 before Start 22:00 (overnight): -16:00", [shownIn(s, "C2"), cellIn(s, "C2")?.s?.fmt], ["-16:00", durationFmt()]);
+  eq("with seconds, in English, past a day", [E.formatValue(-2 / 3, durationFmt(true), "de"), E.formatValue(-2 / 3, durationFmt(), "en"), E.formatValue(-(36 * 60 + 15) / 1440, durationFmt(), "de")], ["-16:00:00", "-16:00", "-36:15"]);
+  eq("less than a second below zero: 00:00", [E.formatValue(-1e-9, durationFmt(), "de"), E.formatValue(-0.4 / 86400, durationFmt(true), "de")], ["00:00", "00:00:00"]);
+  eq("a clock time or a date below zero: the number", [E.formatValue(-2 / 3, clockFmt, "de"), E.formatValue(-2, dateFmt, "de")], ["-0,666666667", "-2"]);
+  for (const [a1, text] of [["D2", "=B2-A2+1"], ["E2", "=B2-A2+(B2<A2)"], ["F2", "=WENN(B2<A2;B2+1-A2;B2-A2)"]]) typeAt(s, a1, text);
+  eq("the overnight recipes: 08:00", ["D2", "E2", "F2"].map((a1) => shownIn(s, a1)), ["08:00", "08:00", "08:00"]);
+  // Typed (or read back from a CSV) as it shows: the negative duration again, not a text.
+  for (const [a1, text] of [["G2", "-16:00"], ["G3", "-36:15"], ["G4", "-16:00:00"]]) typeAt(s, a1, text);
+  eq("-16:00, -36:15 and -16:00:00 typed: negative durations", ["G2", "G3", "G4"].map((a1) => [cellIn(s, a1)?.v, shownIn(s, a1)]), [[-2 / 3, "-16:00"], [-(36 * 60 + 15) / 1440, "-36:15"], [-2 / 3, "-16:00:00"]]);
+  eq("…a sign before a clock time with AM/PM stays text", parseValueText("-2:30 PM", "en"), null);
+}
+
+// ==============================================================================================
+section("=WENN(ISTF and Tab: ISTFEHLER (FX2-4)");
+{
+  const first = (typed: string, locale: Locale = "de") => {
+    const fn = matchFunctions(typed, locale)[0];
+    return locale === "de" ? fn?.de : fn?.en;
+  };
+  eq("ISTF, ISTFE, ISTFEH: ISTFEHLER first (ISTFEHL leaves out #NV)", ["ISTF", "ISTFE", "ISTFEH"].map((t) => first(t)), ["ISTFEHLER", "ISTFEHLER", "ISTFEHLER"]);
+  eq("ISER: ISERROR first in English", [first("ISER", "en"), first("iser", "en")], ["ISERROR", "ISERROR"]);
+  eq("the rarer ones still offered, and first when typed in full", [matchFunctions("ISTF", "de").some((f) => f.de === "ISTFEHL"), first("ISTFEHL"), first("ISERR", "en"), first("ISTKTEXT")], [true, "ISTFEHL", "ISERR", "ISTKTEXT"]);
+  eq("ISTTEXT before ISTKTEXT, ISNUMBER before ISNONTEXT", [matchFunctions("IST", "de").map((f) => f.de).filter((n) => n === "ISTTEXT" || n === "ISTKTEXT"), matchFunctions("ISN", "en").map((f) => f.en)], [["ISTTEXT", "ISTKTEXT"], ["ISNA", "ISNUMBER", "ISNONTEXT"]]);
+  eq("KOV and COV: the covariance of measurements (.S) first", [first("KOV"), first("COV", "en")], ["KOVARIANZ.S", "COVARIANCE.S"]);
+  const text = "=WENN(ISTF";
+  const offer = suggestFunctions(text, text.length, "de");
+  eq("Tab takes the first: =WENN(ISTFEHLER(", offer && applySuggestion(text, offer, offer.items[0].de).text, "=WENN(ISTFEHLER(");
+  // The function browser's "Häufig verwendet" (the first 16) stays as it was, WENNFEHLER included.
+  eq("Häufig verwendet", POPULAR_FUNCTIONS.slice(0, 16), ["SUM", "AVERAGE", "IF", "COUNT", "MIN", "MAX", "ROUND", "STDEV.S", "SLOPE", "INTERCEPT", "RSQ", "VLOOKUP", "COUNTIF", "SUMIF", "MEDIAN", "IFERROR"]);
+}
+
+for (const s of typingStores) hideSheetNotice(s);
 
 // ==============================================================================================
 if (failures.length) {

@@ -33,7 +33,7 @@ export function useSignOutGuard() {
   };
 
   const dialog = (
-    <ConfirmDialog open={!!asking} onClose={() => close(false)} onConfirm={() => close(true)} title={t.title} confirmLabel={t.confirm}>
+    <ConfirmDialog open={!!asking} onClose={() => close(false)} onConfirm={() => close(true)} title={t.title} confirmLabel={t.confirm} focusCancel>
       {(asking?.online ? t.bodyOnline : t.body)(asking?.left ?? 0)}
     </ConfirmDialog>
   );

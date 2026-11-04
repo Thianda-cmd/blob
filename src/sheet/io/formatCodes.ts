@@ -219,6 +219,37 @@ function decimalsOf(pattern: string): number {
 const MAX_CODE_LENGTH = 255;
 
 /**
+ * Whether a code's placeholders are days and a clock and nothing else of a date: "d hh:mm",
+ * "dd:hh:mm:ss" ("T hh:mm" in German Excel). Excel's recipe for showing a time span as days and
+ * hours, not a date: no year, no month (an "m" right after hours or before seconds is minutes, as
+ * Excel reads it), no weekday name, no AM/PM.
+ */
+function isDayClock(pattern: string): boolean {
+  if (/AM\/PM|A\/P/i.test(pattern)) return false;
+  const runs = pattern.toLowerCase().match(/y+|m+|d+|h+|s+/g) ?? [];
+  let days = false;
+  let clock = false;
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    if (run[0] === "y" || (run[0] === "d" && run.length > 2)) return false;
+    if (run[0] === "d") days = true;
+    else if (run[0] !== "m") clock = true;
+    else if (runs[i - 1]?.[0] === "h" || runs[i + 1]?.[0] === "s") clock = true;
+    else return false;
+  }
+  return days && clock;
+}
+
+/**
+ * Whether an Excel format code shows days and hours ("d hh:mm"), which fromExcelFormat reads as a
+ * time span: the .xlsx reader keeps a date and time (a logger's timestamps) as one.
+ */
+export function isDayClockCode(code: string): boolean {
+  const trimmed = code.trim();
+  return trimmed.length <= MAX_CODE_LENGTH && isDayClock(splitCode(firstSection(trimmed)).pattern);
+}
+
+/**
  * An Excel format code → Blob's format (undefined: general). Lossy where Blob has no equivalent:
  * fractions and thousands scaling read as general, any date as a date, any clock time as a time.
  */
@@ -234,11 +265,19 @@ export function fromExcelFormat(code: string, locale: Locale): NumberFormat | un
   const hasClock = /[hs]/i.test(p) || elapsed || /AM\/PM/i.test(pattern);
   const hasMonth = /m/i.test(p);
   if (hasDate || hasClock || (hasMonth && !/[0#?]/.test(p))) {
+    // Days and hours ("d hh:mm"): Excel's way to show a time span; Blob shows the span in hours.
+    if (isDayClock(pattern)) return { kind: "time", seconds: /s/i.test(p), duration: true };
     if (hasDate && hasClock) return { kind: "datetime" };
     // Elapsed time ([h]:mm, [mm]:ss): a duration, whose hours go on past 24.
     if (hasClock && !hasDate) return elapsed ? { kind: "time", seconds: /s/i.test(p), duration: true } : { kind: "time", seconds: /s/i.test(p) };
     if (/m{4}/i.test(p) || /d{3,}/i.test(p)) return { kind: "date", style: "long" };
-    if (/^y{4}-m{1,2}-d{1,2}$/i.test(section.replace(/\[[^\]]*\]/g, "").trim())) return { kind: "date", style: "iso" };
+    // yyyy-mm-dd, also as LibreOffice writes it (yyyy\-mm\-dd) or with quoted dashes.
+    const plain = section
+      .replace(/\[[^\]]*\]/g, "")
+      .replace(/\\(.)/g, "$1")
+      .replace(/"([^"]*)"/g, "$1")
+      .trim();
+    if (/^y{4}-m{1,2}-d{1,2}$/i.test(plain)) return { kind: "date", style: "iso" };
     return { kind: "date", style: "short" };
   }
   if (!/[0#?]/.test(p)) return undefined;

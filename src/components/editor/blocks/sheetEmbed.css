@@ -230,6 +230,9 @@
 }
 .prose-blob .blob-sheet-table .is-wrap {
   white-space: pre-wrap;
+  /* A long word without break points (a DNA sequence, a link) breaks instead of running over the
+     next cells. */
+  overflow-wrap: break-word;
   min-width: 8em;
   max-width: 22em;
 }
@@ -577,4 +580,23 @@
 }
 .note-print table.blob-sheet-table tr {
   break-inside: avoid;
+}
+/* A table wider than the paper (notePrint.ts, fitWideTables) prints in pieces, one below the
+   other; each starts with the first column again, set off by a line like a frozen column. */
+.note-print table.blob-sheet-table.is-piece + table.blob-sheet-table.is-piece {
+  margin-top: 0.9rem;
+}
+.note-print table.blob-sheet-table.has-lead tr > :first-child {
+  border-right: 1.5px solid var(--line-2);
+}
+/* A cell that wraps is at most 22em wide: a word longer than that (a DNA sequence, a web address)
+   breaks at its edge instead of running over the next cells and off the paper. (Unlike `anywhere`,
+   this doesn't change how wide the table lays out its columns.) */
+.note-print table.blob-sheet-table .is-wrap {
+  overflow-wrap: break-word;
+}
+/* A word longer than the paper is wide breaks where it has to. */
+.note-print table.blob-sheet-table.is-squeezed :is(td, th) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

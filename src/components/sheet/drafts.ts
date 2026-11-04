@@ -19,6 +19,10 @@
 // another account signing in on this device removes them too (registerOffline). The key names the
 // account, so another account never reads it.
 //
+// A draft the server refused for good (this account can't edit the page any more) is marked and
+// stays until you decide (DeniedDrafts.tsx): kept as a spreadsheet of your own, or let go. Beside
+// the drafts, each page keeps this device's last save that went through (readLastSave).
+//
 // This module stays light (no engine): the shell asks draftPages when it catches up, and only
 // loads the saving code (flushDrafts.ts) when there is something to send.
 
@@ -46,6 +50,12 @@ export type SheetDraft = {
   sending?: { id: string; title: string; wb?: Workbook };
   /** The editor's last save that went through: the next save takes its place in pages.save_ids. */
   lastSave?: string;
+  /**
+   * The server said this account can't save the page any more (access gone, or the page is): the
+   * background save leaves it alone, and Blob asks whether to keep the work as a spreadsheet of
+   * your own or to let it go (DeniedDrafts.tsx). Until then it counts as unsaved (signing out).
+   */
+  denied?: boolean;
 };
 
 export const DRAFT_PREFIX = "blob-sheet-draft:";
@@ -80,7 +90,8 @@ const isDraft = (x: unknown): x is SheetDraft => {
     !!d.base &&
     !!d.mine &&
     typeof d.at === "number" &&
-    (d.sending === undefined || (typeof d.sending?.id === "string" && typeof d.sending.title === "string"))
+    (d.sending === undefined || (typeof d.sending?.id === "string" && typeof d.sending.title === "string")) &&
+    (d.denied === undefined || typeof d.denied === "boolean")
   );
 };
 
@@ -172,19 +183,54 @@ export async function draftPages(userId: string): Promise<string[]> {
 
 /**
  * Another account signed in on this device: drafts of every other account go (they stayed when a
- * session ended without signing out; their key names the account, so nobody else could use them).
+ * session ended without signing out; their key names the account, so nobody else could use them),
+ * and so do their last saves (readLastSave).
  */
 export function forgetOtherAccounts(userId: string) {
   try {
-    const mine = `${DRAFT_PREFIX}${userId}:`;
     const others: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key?.startsWith(DRAFT_PREFIX) && !key.startsWith(mine)) others.push(key);
+      for (const prefix of [DRAFT_PREFIX, LAST_SAVE_PREFIX]) if (key?.startsWith(prefix) && !key.startsWith(`${prefix}${userId}:`)) others.push(key);
     }
     for (const key of others) localStorage.removeItem(key);
   } catch {
     // No storage.
+  }
+}
+
+/** Per account and page: this device's last save that went through (readLastSave). Signing out removes them (forgetDevice). */
+export const LAST_SAVE_PREFIX = "blob-sheet-last-save:";
+const lastSaveKey = (userId: string, pageId: string) => `${LAST_SAVE_PREFIX}${userId}:${pageId}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * This device's last save of the page that went through (its answer came), or null. A new editor
+ * names it as the save its own first one replaces in pages.save_ids (save_sheet's p_last_save), so
+ * a device keeps one place there however often the page is opened, and a save whose answer was lost
+ * is still recognized there much later (SheetSaver.settle).
+ */
+export function readLastSave(userId: string, pageId: string): string | null {
+  if (!userId) return null;
+  try {
+    const id = localStorage.getItem(lastSaveKey(userId, pageId));
+    return id && UUID.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A save of the page went through on this device, its answer came, and no draft here still names
+ * it as a save that may have landed (call it once the draft is updated or gone): replacing it later
+ * can't hide a save someone still has to look up.
+ */
+export function writeLastSave(userId: string, pageId: string, saveId: string) {
+  if (!userId) return;
+  try {
+    localStorage.setItem(lastSaveKey(userId, pageId), saveId);
+  } catch {
+    // Storage full or switched off: the next visit just takes a new place.
   }
 }
 
@@ -201,6 +247,8 @@ export type OpenSheet = {
   unsaved(): boolean;
   /** Signing out: stop at once, keeping nothing more on this device. */
   discard(): void;
+  /** Its work was kept as a spreadsheet of your own (letGoOf): stop, and its draft goes. */
+  letGo(): void;
   /** Someone saved revision `rev`. */
   remote(rev: number): Promise<void>;
   /** Closing: done once its last save went out (or couldn't). */
@@ -309,6 +357,36 @@ export function takeDrafts<T>(userId: string, pageId: string, fn: (drafts: Sheet
     })
     .catch(() => {});
   return next;
+}
+
+/**
+ * The work of a spreadsheet open here was saved as a copy of your own (it couldn't be saved where it
+ * was, SheetEditor): its editors in this tab stop saving it, and their drafts go.
+ */
+export function letGoOf(pageId: string) {
+  for (const s of [...openSheets]) if (s.pageId === pageId) s.letGo();
+}
+
+/** Drafts the server refused for good (`denied`) whose editor is closed, on every page, oldest first. */
+export async function deniedDrafts(userId: string): Promise<SheetDraft[]> {
+  const out: SheetDraft[] = [];
+  for (const pageId of await draftPages(userId)) out.push(...(await waitingDrafts(userId, pageId)).filter((d) => d.denied));
+  return out.sort((a, b) => a.at - b.at);
+}
+
+const deniedListeners = new Set<() => void>();
+
+/** Hear when a draft was newly refused for good (DeniedDrafts.tsx asks what to do with it). Returns the function that stops. */
+export function onDeniedDrafts(fn: () => void): () => void {
+  deniedListeners.add(fn);
+  return () => {
+    deniedListeners.delete(fn);
+  };
+}
+
+/** The background save found a draft refused for good: whoever asks about such drafts looks again. */
+export function announceDenied() {
+  for (const fn of [...deniedListeners]) fn();
 }
 
 /** Signing out: the open editors in this tab save what they hold now. */

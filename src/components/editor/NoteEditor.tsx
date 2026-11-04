@@ -1044,7 +1044,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
           role="status"
           className={cn(
             "flex items-center gap-2 border-t border-line px-4 py-2 text-[13px]",
-            notice.tone === "warn" ? "bg-danger/8 text-danger" : "bg-blob-soft/60 text-blob-ink",
+            notice.tone === "warn" ? "bg-danger/8 text-danger-ink" : "bg-blob-soft/60 text-blob-ink",
           )}
         >
           {notice.icon}

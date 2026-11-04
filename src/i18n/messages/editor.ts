@@ -225,6 +225,33 @@ export const editorText = defineMessages({
       liveHint: "Play it with your class",
       due: (n: number) => (n === 1 ? "1 card due today" : `${n} cards due today`),
     },
+
+    /** Saving the note as a Blob file (useNoteExport.tsx). */
+    export: {
+      /**
+       * Spreadsheets and presentations the note shows that the file couldn't carry: in the trash
+       * (`title`: its name as the trash lists it, pageTitle), or deleted or not shared (null).
+       */
+      leftOut: (items: { kind: "sheet" | "deck"; title: string | null }[]) => {
+        const what = (kind: "sheet" | "deck") => (kind === "sheet" ? "spreadsheet" : "presentation");
+        const trashed = items.filter((i) => i.title !== null);
+        const gone = items.filter((i) => i.title === null);
+        const names = trashed.map((i) => `“${i.title}”`);
+        const named = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+        const inTrash = !trashed.length
+          ? ""
+          : trashed.length === 1
+            ? `The ${what(trashed[0].kind)} ${named} is in the trash, so it isn't in the file. Restore it and it comes along.`
+            : `${named} are in the trash, so they aren't in the file. Restore them and they come along.`;
+        const several = new Set(gone.map((i) => i.kind)).size > 1 ? "spreadsheets and presentations" : `${what(gone[0]?.kind ?? "sheet")}s`;
+        const outOfReach = !gone.length
+          ? ""
+          : gone.length === 1
+            ? `A ${what(gone[0].kind)} in your note was deleted or isn't shared with you, so it isn't in the file.`
+            : `${gone.length} ${several} in your note were deleted or aren't shared with you, so they aren't in the file.`;
+        return [inTrash, outOfReach].filter(Boolean).join(" ");
+      },
+    },
   },
   de: {
     untitled: "Ohne Titel",
@@ -434,6 +461,28 @@ export const editorText = defineMessages({
       live: "Live-Quiz",
       liveHint: "Mit der Klasse spielen",
       due: (n) => (n === 1 ? "1 Karte ist heute dran" : `${n} Karten sind heute dran`),
+    },
+
+    export: {
+      leftOut: (items) => {
+        const what = (kind: "sheet" | "deck") => (kind === "sheet" ? "Tabelle" : "Präsentation");
+        const trashed = items.filter((i) => i.title !== null);
+        const gone = items.filter((i) => i.title === null);
+        const names = trashed.map((i) => `„${i.title}“`);
+        const named = names.length > 1 ? `${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}` : names[0];
+        const inTrash = !trashed.length
+          ? ""
+          : trashed.length === 1
+            ? `Die ${what(trashed[0].kind)} ${named} liegt im Papierkorb, deshalb ist sie nicht in der Datei. Stell sie wieder her, dann kommt sie mit.`
+            : `${named} liegen im Papierkorb, deshalb sind sie nicht in der Datei. Stell sie wieder her, dann kommen sie mit.`;
+        const several = new Set(gone.map((i) => i.kind)).size > 1 ? "Tabellen und Präsentationen" : gone[0]?.kind === "deck" ? "Präsentationen" : "Tabellen";
+        const outOfReach = !gone.length
+          ? ""
+          : gone.length === 1
+            ? `Eine ${what(gone[0].kind)} aus deiner Notiz wurde gelöscht oder ist nicht mit dir geteilt, deshalb ist sie nicht in der Datei.`
+            : `${gone.length} ${several} aus deiner Notiz wurden gelöscht oder sind nicht mit dir geteilt, deshalb sind sie nicht in der Datei.`;
+        return [inTrash, outOfReach].filter(Boolean).join(" ");
+      },
     },
   },
 });

@@ -56,7 +56,9 @@ export const sheetChartText = defineMessages({
     saveImage: "Save as picture",
     remove: "Delete",
     resize: "Resize",
-    moveHint: "Drag to move, arrow keys nudge it, Delete removes it",
+    /** What the keyboard does on a chart (screen readers say it after the chart's summary); for viewers, only the way back. */
+    keysHint: "Enter opens the settings, arrow keys move it, Delete removes it, Esc goes back to the cells",
+    keysHintReadOnly: "Esc goes back to the cells",
 
     // Undo steps
     undo: {
@@ -139,10 +141,19 @@ export const sheetChartText = defineMessages({
     xTextPanel: (cell: string, text: string, trend: boolean) =>
       `${cell} holds text (“${text}”) instead of a number, so the chart just numbers the points (x = 1, 2, 3 …), as Excel does.${trend ? " The trendline and the sample results are wrong this way." : ""} Type a number in ${cell}, e.g. 0 for a blank.`,
     datesTip: "Tip: use the time since the start as x (0, 1, 2 … days) instead of the date. Then a is your starting value and the equation is easy to read.",
+    /**
+     * Times as x (0:00, 0:30 …) count in days, and so does the equation. `rate`: a line's slope or
+     * the number in a growth curve's exponent, per day and per hour; `cell`: the first time, for
+     * the formula that gives hours.
+     */
+    timeTip: (rate: { kind: "slope" | "exponent"; perDay: string; perHour: string } | null, cell: string) =>
+      `Times count in days here (1 hour = 1/24 day), and so does the equation.${rate ? ` ${rate.kind === "slope" ? "The slope" : "The number in the exponent"} is per day: ${rate.perDay} ÷ 24 = ${rate.perHour} per hour.` : ""} For an equation in hours, type =${cell}*24 in a new column, fill it down and use that column as x.`,
     categoryX: "In line, column and area charts x is the number of the category (1, 2, 3 …), as in Excel. For real x values use a scatter chart.",
     noTrendPie: "Pie charts have no trendlines.",
     moreDigits: "More digits",
     fewerDigits: "Fewer digits",
+    /** What "More digits" changes: this read-out and the copied equation, not the chart's label. */
+    moreDigitsHint: "Only here and when you copy the equation: the label on the chart stays as it is.",
     copy: "Copy",
     copied: "Copied",
     copyEquation: "Copy the equation",
@@ -160,6 +171,8 @@ export const sheetChartText = defineMessages({
     /** Dates or times as x: no lab advice, only where the result lies. */
     probeAfter: (last: string) => `After the last measurement (${last}): the trendline isn't backed by measurements there, so the result is only an estimate.`,
     probeBefore: (first: string) => `Before the first measurement (${first}): the trendline isn't backed by measurements there, so the result is only an estimate.`,
+    /** The result's label when it lies outside the standards (or the measured times). */
+    probeOutside: (name: string) => `${name} – outside the measured range`,
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x is where the curve reaches y (inside the measured range).",
@@ -184,7 +197,7 @@ export const sheetChartText = defineMessages({
     errorPlus: "Plus values (+)",
     errorMinus: "Minus values (−)",
     errorMinusSame: "Empty: same as plus",
-    errorHint: "Means with their own standard deviation per sample: choose Custom and pick the column of standard deviations.",
+    errorHint: "Means with their own standard deviation per sample: choose “Custom” and pick the column of standard deviations.",
     stderrHint: "The standard error of the series (SD / √n), the same for every point.",
     axisX: "Horizontal axis (x)",
     axisY: "Vertical axis (y)",
@@ -221,6 +234,9 @@ export const sheetChartText = defineMessages({
     exportSvg: "Save as SVG",
     exportPngShort: "Save PNG",
     exportSvgShort: "Save SVG",
+    /** The file format alone, next to the save icon where the words don't fit (settings docked on a phone). */
+    exportPngFormat: "PNG",
+    exportSvgFormat: "SVG",
     addToNote: "Add to a note",
     deleteChart: "Delete chart",
     fileName: "Chart",
@@ -238,7 +254,7 @@ export const sheetChartText = defineMessages({
     },
     kindNames: { scatter: "Punktdiagramm", line: "Liniendiagramm", column: "Säulendiagramm", bar: "Balkendiagramm", area: "Flächendiagramm", pie: "Kreisdiagramm" },
     chart: "Diagramm",
-    nothingToChart: "Markiere zuerst Zellen mit Zahlen, dann wird daraus ein Diagramm.",
+    nothingToChart: "Markier zuerst Zellen mit Zahlen, dann wird daraus ein Diagramm.",
     seriesDefault: (n) => `Reihe ${n}`,
     seriesCount: (n) => (n === 1 ? "1 Reihe" : `${n} Reihen`),
     trendTypes: {
@@ -260,7 +276,7 @@ export const sheetChartText = defineMessages({
       })[type],
     ariaTrend: "Trendlinie",
     emptyTitle: "Noch keine Zahlen",
-    emptyHint: "Wähle in den Einstellungen Zellen mit Zahlen.",
+    emptyHint: "Wähl in den Einstellungen Zellen mit Zahlen.",
     noPositive: "Eine logarithmische Achse braucht Werte über 0",
     logSkipped: (n) => (n === 1 ? "1 Wert ≤ 0 nicht gezeigt (Log-Achse)" : `${n} Werte ≤ 0 nicht gezeigt (Log-Achse)`),
     xTextNote: (cell) => `Text in ${cell} statt Zahl – x ist hier 1, 2, 3 …`,
@@ -273,7 +289,8 @@ export const sheetChartText = defineMessages({
     saveImage: "Als Bild speichern",
     remove: "Löschen",
     resize: "Größe ändern",
-    moveHint: "Ziehen zum Verschieben, Pfeiltasten schieben, Entf löscht",
+    keysHint: "Enter öffnet die Einstellungen, Pfeiltasten verschieben, Entf löscht, Esc führt zurück zu den Zellen",
+    keysHintReadOnly: "Esc führt zurück zu den Zellen",
 
     undo: {
       insert: "Diagramm einfügen",
@@ -328,7 +345,7 @@ export const sheetChartText = defineMessages({
     interceptValue: "y-Achsenabschnitt (y bei x = 0)",
     interceptHint: "z. B. 0 für eine Kalibriergerade durch den Ursprung",
     interceptHintExp: "Der Wert bei x = 0 (a in y = a·e^(bx)), z. B. die Start-OD. Er muss über 0 liegen.",
-    interceptIgnored: (v) => `Bei Exponentiell muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). Dein Wert ${v} gilt hier also nicht: Blob passt die Kurve frei an die Punkte an. Bei Linear und Polynom gilt er wieder.`,
+    interceptIgnored: (v) => `Bei einer exponentiellen Trendlinie muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). Dein Wert ${v} gilt hier also nicht: Blob passt die Kurve frei an die Punkte an. Bei einer linearen oder Polynom-Trendlinie gilt er wieder.`,
     interceptNotHere: "Logarithmische und Potenz-Trendlinien haben keinen festen Schnittpunkt (wie in Excel).",
     showEquation: "Formel im Diagramm anzeigen",
     showR2: "Bestimmtheitsmaß (R²) im Diagramm anzeigen",
@@ -352,10 +369,13 @@ export const sheetChartText = defineMessages({
     xTextPanel: (cell, text, trend) =>
       `In ${cell} steht Text („${text}“) statt einer Zahl. Darum zählt das Diagramm die Punkte wie Excel einfach durch (x = 1, 2, 3 …).${trend ? " Trendlinie und Probe stimmen so nicht." : ""} Trag in ${cell} eine Zahl ein, z. B. 0 für einen Blindwert.`,
     datesTip: "Tipp: Nimm als x die Zeit seit dem Start (0, 1, 2 … Tage) statt des Datums. Dann ist a dein Startwert und die Formel gut lesbar.",
+    timeTip: (rate, cell) =>
+      `Die Zeiten zählen hier in Tagen (1 Stunde = 1/24 Tag), die Gleichung also auch.${rate ? ` ${rate.kind === "slope" ? "Die Steigung" : "Die Zahl im Exponenten"} gilt pro Tag: ${rate.perDay} ÷ 24 = ${rate.perHour} pro Stunde.` : ""} Für eine Gleichung in Stunden schreib in eine neue Spalte =${cell}*24, zieh die Formel nach unten und nimm diese Spalte als x.`,
     categoryX: "In Linien-, Säulen- und Flächendiagrammen ist x die Nummer der Kategorie (1, 2, 3 …), wie in Excel. Für echte x-Werte nimm ein Punktdiagramm.",
     noTrendPie: "Kreisdiagramme haben keine Trendlinie.",
     moreDigits: "Mehr Stellen",
     fewerDigits: "Weniger Stellen",
+    moreDigitsHint: "Nur hier und beim Kopieren der Formel: Die Beschriftung im Diagramm bleibt, wie sie ist.",
     copy: "Kopieren",
     copied: "Kopiert",
     copyEquation: "Formel kopieren",
@@ -370,6 +390,7 @@ export const sheetChartText = defineMessages({
     probeNegative: "Unter dem Blindwert: In der Probe ist so nichts nachweisbar. Miss sie konzentrierter (weniger verdünnen oder mehr Probe einsetzen).",
     probeAfter: (last) => `Nach der letzten Messung (${last}): Dort ist die Trendlinie nicht durch Messungen gestützt, das Ergebnis ist nur eine Schätzung.`,
     probeBefore: (first) => `Vor der ersten Messung (${first}): Dort ist die Trendlinie nicht durch Messungen gestützt, das Ergebnis ist nur eine Schätzung.`,
+    probeOutside: (name) => `${name} – außerhalb des Messbereichs`,
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x ist die Stelle, an der die Kurve y erreicht (im Messbereich).",
@@ -392,7 +413,7 @@ export const sheetChartText = defineMessages({
     errorPlus: "Plus-Werte (+)",
     errorMinus: "Minus-Werte (−)",
     errorMinusSame: "Leer: wie Plus",
-    errorHint: "Mittelwerte mit eigener Standardabweichung je Probe: Benutzerdefiniert wählen und die Spalte mit den Standardabweichungen nehmen. (In Excel heißen Fehlerbalken „Fehlerindikatoren“.)",
+    errorHint: "Mittelwerte mit eigener Standardabweichung je Probe: Wähl „Benutzerdefiniert“ und nimm die Spalte mit den Standardabweichungen. (In Excel heißen Fehlerbalken „Fehlerindikatoren“.)",
     stderrHint: "Der Standardfehler der Reihe (Stabw / √n), für jeden Punkt gleich.",
     axisX: "Horizontale Achse (x)",
     axisY: "Vertikale Achse (y)",
@@ -428,6 +449,8 @@ export const sheetChartText = defineMessages({
     exportSvg: "Als SVG speichern",
     exportPngShort: "PNG speichern",
     exportSvgShort: "SVG speichern",
+    exportPngFormat: "PNG",
+    exportSvgFormat: "SVG",
     addToNote: "In Notiz einfügen",
     deleteChart: "Diagramm löschen",
     fileName: "Diagramm",

@@ -202,7 +202,7 @@ export function ActionButton({
       aria-describedby={describedBy ?? (hint ? hintId : undefined)}
       className={cn(
         "inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-[12.5px] font-medium transition-colors disabled:opacity-50 [@media(hover:none)]:h-11 [&_svg]:size-4 [&_svg]:shrink-0",
-        tone === "primary" && "border-transparent bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.1)] hover:bg-blob-deep",
+        tone === "primary" && "border-transparent bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.1)] hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]",
         tone === "plain" && "border-line bg-raised text-ink-2 shadow-card hover:border-line-2 hover:text-ink",
         tone === "danger" && "border-transparent text-danger hover:bg-danger/10",
         className,
@@ -225,7 +225,7 @@ export function Note({ icon, children, tone = "plain" }: { icon?: ReactNode; chi
     <div
       className={cn(
         "flex gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug",
-        tone === "accent" ? "bg-blob-soft text-ink" : tone === "warn" ? "bg-danger/8 text-danger" : "bg-hover/70 text-ink-2",
+        tone === "accent" ? "bg-blob-soft text-ink" : tone === "warn" ? "bg-danger/8 text-danger-ink" : "bg-hover/70 text-ink-2",
       )}
     >
       {icon && <span className="mt-px shrink-0 [&_svg]:size-3.5">{icon}</span>}

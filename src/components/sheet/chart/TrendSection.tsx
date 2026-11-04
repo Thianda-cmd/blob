@@ -4,8 +4,8 @@
 // its options, the fitted equation and R² read out live, and "Probe berechnen": type a measured
 // value and get x back (the concentration of a sample from its absorbance).
 
-import { Calculator, Check, ClipboardCopy, Info, Lightbulb, TriangleAlert } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Calculator, Check, ClipboardCopy, Clock, Info, Lightbulb, TriangleAlert } from "lucide-react";
+import { useEffect, useEffectEvent, useId, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
 import type { Locale } from "@/i18n/config";
 import type { SheetChartText } from "@/i18n/messages/sheetChart";
@@ -13,12 +13,13 @@ import { cn } from "@/lib/utils";
 import type { ChartSeriesData } from "@/sheet/chart/data";
 import { formatCoefficient, isCalendarFormat, isDateFormat } from "@/sheet/chart/format";
 import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe } from "@/sheet/chart/probe";
-import { aOutOfRange, equationParts, equationText, isFitError, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
+import { aOutOfRange, equationParts, equationText, isFitError, perHour, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
 import { trendlineName } from "@/sheet/chart/scene";
 import type { ChartSpec, NumberFormat, SeriesSpec, TrendlineSpec } from "@/sheet/types";
 import type { SheetStore } from "../store";
 import { LINEAR_TRENDLINE, updateChart } from "./actions";
 import { Chips, Field, fieldClass, HINT_TEXT, Note, NumberField, TextField, Toggle } from "./PanelParts";
+import { probeScroll, scrollBehavior } from "./reveal";
 
 /** A pause in typing (ms) after which an unfinished number ("1e-") counts as typed: Probe berechnen then says what is wrong. */
 const PROBE_PAUSE = 1200;
@@ -65,7 +66,7 @@ function Equation({ fit, locale, digits }: { fit: Fit; locale: Locale; digits?: 
   );
 }
 
-function CopyButton({ text, label, t }: { text: string; label: string; t: SheetChartText }) {
+function CopyButton({ text, label, t, className }: { text: string; label: string; t: SheetChartText; className?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
@@ -81,7 +82,10 @@ function CopyButton({ text, label, t }: { text: string; label: string; t: SheetC
           setDone(false);
         }
       }}
-      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [&_svg]:size-3.5"
+      className={cn(
+        "inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-9 [&_svg]:size-3.5",
+        className,
+      )}
     >
       {done ? <Check className="text-ok" /> : <ClipboardCopy />}
       {done ? t.copied : t.copy}
@@ -107,6 +111,7 @@ export function TrendSection({
   series,
   data,
   xFormat,
+  xCell,
   locale,
   t,
   readOnly,
@@ -116,8 +121,10 @@ export function TrendSection({
   spec: ChartSpec;
   series: SeriesSpec;
   data: ChartSeriesData | undefined;
-  /** The number format of the chart's x values (calendar dates get a tip for exponential and power fits). */
+  /** The number format of the chart's x values (calendar dates get a tip for exponential and power fits, times a note on days). */
   xFormat?: NumberFormat | null;
+  /** The series' first x cell holding a number ("A2"), for the formula that turns times into hours. */
+  xCell?: string | null;
   locale: Locale;
   t: SheetChartText;
   readOnly: boolean;
@@ -126,6 +133,7 @@ export function TrendSection({
   const tl = series.trendline;
   const fit = data?.fit ?? null;
   const [more, setMore] = useState(false);
+  const moreHintId = useId();
   if (spec.kind === "pie") return <Note icon={<Info />}>{t.noTrendPie}</Note>;
 
   const set = (patch: Partial<TrendlineSpec> | null) =>
@@ -148,6 +156,9 @@ export function TrendSection({
   // Dates as x (46 000 days since 1900) make a growth curve's a meaningless: the tip says to use the
   // time since the start. Not for times (0:00, 0:30 …), which often are just that.
   const datesTip = spec.kind === "scatter" && !!fitted && (fitted.type === "exponential" || fitted.type === "power") && (isCalendarFormat(xFormat) || aOutOfRange(fitted));
+  // Times as x (0:00, 0:30 … or durations) count in days, as in Excel and in formulas like
+  // STEIGUNG: the slope of a line or a growth rate is per day. The note works it out per hour.
+  const timeTip = spec.kind === "scatter" && !!fitted && fitted.type !== "movingAverage" && xFormat?.kind === "time";
 
   return (
     <div className="space-y-3.5">
@@ -200,15 +211,24 @@ export function TrendSection({
                   </div>
                   {fit.type !== "movingAverage" && <CopyButton text={equationText(fit, locale, more ? 6 : undefined)} label={t.copyEquation} t={t} />}
                 </div>
-                {/* Big enough for a finger, its words still in line with the equation above. */}
+                {/* Big enough for a finger, its words still in line with the equation above. It
+                    changes this read-out (and the copied equation), never the chart: with more
+                    digits on, the line under it says so. */}
                 {fit.type !== "movingAverage" && (
-                  <button
-                    type="button"
-                    onClick={() => setMore((m) => !m)}
-                    className="-ml-2 mt-1 inline-flex h-7 items-center rounded-md px-2 text-[12px] font-medium text-blob-ink transition-colors hover:bg-blob-soft [@media(hover:none)]:h-9"
-                  >
-                    {more ? t.fewerDigits : t.moreDigits}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMore((m) => !m)}
+                      title={t.moreDigitsHint}
+                      aria-describedby={moreHintId}
+                      className="-ml-2 mt-1 inline-flex h-7 items-center rounded-md px-2 text-[12px] font-medium text-blob-ink transition-colors hover:bg-blob-soft [@media(hover:none)]:h-9"
+                    >
+                      {more ? t.fewerDigits : t.moreDigits}
+                    </button>
+                    <p id={moreHintId} className={more ? cn(HINT_TEXT, "mt-0.5") : "sr-only"}>
+                      {t.moreDigitsHint}
+                    </p>
+                  </>
                 )}
               </>
             ) : null}
@@ -217,6 +237,7 @@ export function TrendSection({
           {!!data?.hiddenPoints && <Note icon={<Info />}>{t.hiddenPoints(data.hiddenPoints)}</Note>}
           {interceptIgnored && <Note icon={<Info />}>{t.interceptIgnored(formatCoefficient(tl.intercept!, locale, 6))}</Note>}
           {datesTip && <Note icon={<Lightbulb />}>{t.datesTip}</Note>}
+          {timeTip && <Note icon={<Clock />}>{t.timeTip(perHour(fitted, locale), xCell ?? "A2")}</Note>}
           {spec.kind !== "scatter" && <Note icon={<Info />}>{t.categoryX}</Note>}
 
           {fitted && <Probe fit={fitted} spec={spec} locale={locale} t={t} seriesName={seriesName} xFormat={xFormat} />}
@@ -275,6 +296,15 @@ export function TrendSection({
  * "Probe berechnen": a measured y → x along the trendline, with how it is worked out. What can't
  * be read as a number gets a reason under the field (an unfinished number like "1e-" only once
  * the student stops typing). With dates or times as x (`xFormat`) the result is a date or time.
+ *
+ * The number follows every key. Whether it lies outside the standards (the warning and what to do
+ * about it) shows once she stops typing or leaves the field: "0" on the way to "0,42" is no sample
+ * below the blank. Screen readers hear the result once then too, from a status region that is
+ * there before the first key (not a stream of in-between numbers).
+ *
+ * "Kopieren" stays where she aims at it: it sits at the top right of the result, so the warning
+ * appearing in the result's label (it may take two lines) never moves it between pressing and
+ * letting go, and nothing scrolls the settings while the result shows whole (see reveal).
  */
 function Probe({ fit, spec, locale, t, seriesName, xFormat }: { fit: Fit; spec: ChartSpec; locale: Locale; t: SheetChartText; seriesName: string; xFormat?: NumberFormat | null }) {
   const [text, setText] = useState("");
@@ -288,11 +318,74 @@ function Probe({ fit, spec, locale, t, seriesName, xFormat }: { fit: Fit; spec: 
   const x = y === null ? null : solveForX(fit, y);
   const yName = spec.yAxis.title.trim() || seriesName || "y";
   const xName = spec.kind === "scatter" ? spec.xAxis.title.trim() || "x" : "x";
-  const outside = x === null ? null : probeRange(fit, x);
+  // Outside the standards, once typed (see above).
+  const outside = x === null || !typed ? null : probeRange(fit, x);
   const xText = x === null ? "" : probeResultText(x, locale, xFormat);
   const steps = y === null ? null : probeSteps(fit, y, x, locale, xFormat);
   const problem =
     read.problem === null || (read.problem === "typing" && !typed) ? null : typeof read.problem === "object" ? t.probeXUnit(read.problem.xUnit, yName) : t.probeNotNumber;
+  const advice = outside ? probeAdvice(fit, outside, locale, xFormat) : null;
+  // What a screen reader hears once typing pauses or the field is left: the result with its
+  // advice, or why there is none.
+  const spoken = !typed ? "" : (problem ?? (y === null ? "" : x === null ? t.probeNone : `${outside ? t.probeOutside(xName) : xName}: ${xText}${advice ? `. ${advice}` : ""}`));
+
+  // The result comes into view while she types: above the settings' lower edge and above the
+  // on-screen keyboard, as far as the field stays in view (the focus and the keyboard stay where
+  // they are). When it first shows, all of it (with how it is worked out) at once: nothing there
+  // was aimed at yet, and the browser keeping the caret in view as the next key comes would stop a
+  // smooth scroll halfway. After that the settings stay put while the result shows whole, also
+  // when typing pauses and the warning comes: "Kopieren" doesn't move while a mouse or a finger is
+  // on its way to it. Only the keyboard coming up (or changing size) over the result brings all of
+  // it back into view. Never while a pointer is pressed (a finger scrolling or zooming), nor once
+  // she has left the field (see probeScroll).
+  const field = useRef<HTMLInputElement>(null);
+  const block = useRef<HTMLDivElement>(null);
+  const pressed = useRef(false);
+  useEffect(() => {
+    const note = (e: PointerEvent) => {
+      pressed.current = e.buttons !== 0;
+    };
+    const types = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
+    for (const type of types) document.addEventListener(type, note, true);
+    return () => {
+      for (const type of types) document.removeEventListener(type, note, true);
+    };
+  }, []);
+  const reveal = useEffectEvent((first: boolean) => {
+    const input = field.current;
+    const all = block.current;
+    const result = all?.firstElementChild;
+    if (!input || !all || !result || document.activeElement !== input || pressed.current) return;
+    let box = all.parentElement;
+    while (box && !(box.scrollHeight > box.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+    if (!box) return;
+    const room = box.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const view = { top: Math.max(room.top, vv?.offsetTop ?? 0), bottom: Math.min(room.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight) };
+    const dy = probeScroll(first, result.getBoundingClientRect(), all.getBoundingClientRect(), input.getBoundingClientRect(), view);
+    if (dy > 0) box.scrollBy({ top: dy, behavior: first ? "auto" : scrollBehavior() });
+  });
+  const hasResult = y !== null;
+  useEffect(() => {
+    if (hasResult) reveal(true);
+  }, [hasResult]);
+  // The keyboard coming up (or changing size) over the result: once it has settled.
+  const revealAgain = useEffectEvent(() => reveal(false));
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settled = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => revealAgain(), 150);
+    };
+    vv.addEventListener("resize", settled);
+    return () => {
+      clearTimeout(timer);
+      vv.removeEventListener("resize", settled);
+    };
+  }, []);
+
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-1 flex items-center gap-2 text-[13px] font-medium text-ink">
@@ -305,6 +398,7 @@ function Probe({ fit, spec, locale, t, seriesName, xFormat }: { fit: Fit; spec: 
           {t.measured} ({yName})
         </span>
         <input
+          ref={field}
           inputMode="decimal"
           value={text}
           placeholder={locale === "de" ? "z. B. 0,42" : "e.g. 0.42"}
@@ -321,32 +415,49 @@ function Probe({ fit, spec, locale, t, seriesName, xFormat }: { fit: Fit; spec: 
           className={cn(fieldClass, "tabular-nums")}
         />
       </label>
+      <p role="status" className="sr-only">
+        {spoken}
+      </p>
       {problem && (
-        <p id={hintId} role="status" className="mt-1.5 flex gap-1.5 text-[12px] leading-snug text-danger">
+        <p id={hintId} className="mt-1.5 flex gap-1.5 text-[12px] leading-snug text-danger">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
           {problem}
         </p>
       )}
       {y !== null && (
-        <div className="mt-2.5 space-y-1.5" aria-live="polite">
+        <div ref={block} className="mt-2.5 space-y-1.5">
           {x === null ? (
             <p className="text-[12.5px] text-ink-2">{t.probeNone}</p>
           ) : (
-            <div className="flex items-center justify-between gap-2 rounded-lg bg-blob-soft px-3 py-2">
-              <div className="min-w-0">
-                <div className="truncate text-[12px] text-blob-ink">{xName}</div>
-                <div className={cn("truncate text-[18px] font-semibold tabular-nums leading-tight text-blob-ink")}>{xText}</div>
+            // Outside the standards the result says so itself, in the warning's colour: it reads
+            // right even while the advice below it is scrolled out of view. "Kopieren" is beside
+            // the label and the number (level with both while they take a line each) and keeps its
+            // place however many lines the label takes.
+            <div className={cn("flex items-start gap-2 rounded-lg px-3 py-2", outside ? "bg-danger/8 text-danger-ink ring-1 ring-inset ring-danger/25" : "bg-blob-soft text-blob-ink")}>
+              <div className="min-w-0 flex-1">
+                {outside ? (
+                  <div className="flex gap-1 text-[12px] font-medium leading-[18px]">
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                    {t.probeOutside(xName)}
+                  </div>
+                ) : (
+                  <div className="truncate text-[12px] leading-[18px]" title={xName}>
+                    {xName}
+                  </div>
+                )}
+                <div className="truncate text-[18px] font-semibold tabular-nums leading-tight">{xText}</div>
               </div>
-              <CopyButton text={isDateFormat(xFormat) ? xText : formatCoefficient(x, locale, 6)} label={t.copy} t={t} />
+              <CopyButton text={isDateFormat(xFormat) ? xText : formatCoefficient(x, locale, 6)} label={t.copy} t={t} className="mt-1.5 [@media(hover:none)]:mt-0.5" />
             </div>
+          )}
+          {/* What to do about it, right under the number it is about. */}
+          {advice && (
+            <Note tone="warn" icon={<TriangleAlert />}>
+              {advice}
+            </Note>
           )}
           {steps && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.formula}</p>}
           {steps?.line && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.line}</p>}
-          {outside && (
-            <Note tone="warn" icon={<TriangleAlert />}>
-              {probeAdvice(fit, outside, locale, xFormat)}
-            </Note>
-          )}
         </div>
       )}
     </div>

@@ -28,6 +28,12 @@ export type ChartViewProps = {
   interactive?: boolean;
   /** Highlight one series (its settings are open). */
   selectedSeries?: string | null;
+  /**
+   * Also write what the chart shows (its summary: series, trendlines with equation and R², notes)
+   * into a hidden element with this id, for a card around it that is named by the chart's kind and
+   * title and describes itself with that (aria-describedby).
+   */
+  summaryId?: string;
   className?: string;
 };
 
@@ -71,7 +77,7 @@ export function hitAt(hits: ChartHit[], x: number, y: number): number | null {
 }
 
 export function ChartView(props: ChartViewProps): ReactNode {
-  const { spec, data, width, height, locale, theme, interactive, selectedSeries, className } = props;
+  const { spec, data, width, height, locale, theme, interactive, selectedSeries, summaryId, className } = props;
   const uid = useId().replace(/[^A-Za-z0-9_-]/g, "");
   const scene = useMemo(
     () => buildChartScene(spec, data, { width, height, locale, theme, selectedSeries, idPrefix: `chart${uid}` }),
@@ -90,7 +96,7 @@ export function ChartView(props: ChartViewProps): ReactNode {
   const same = (a: typeof active, b: typeof active) => a === b || (!!a && !!b && a.scene === b.scene && a.index === b.index);
   const show = (next: typeof active) => setActive((cur) => (same(cur, next) ? cur : next));
 
-  return (
+  const drawing = (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={width}
@@ -108,6 +114,16 @@ export function ChartView(props: ChartViewProps): ReactNode {
       {scene.nodes.map((n, i) => renderNode(n, i))}
       {hit && <Tooltip scene={scene} hit={hit} />}
     </svg>
+  );
+  if (!summaryId) return drawing;
+  // A sentence of its own: the card's description may go on after it.
+  return (
+    <>
+      {drawing}
+      <span id={summaryId} hidden>
+        {/[.!?…]$/.test(scene.summary) ? scene.summary : `${scene.summary}.`}
+      </span>
+    </>
   );
 }
 

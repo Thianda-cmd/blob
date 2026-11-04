@@ -16,7 +16,8 @@ import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
 import { cellKey, parseKey } from "@/sheet/a1";
-import { formatValue, isError, type Calc } from "@/sheet/engine";
+import { formatValue, isDuration, isError, type Calc } from "@/sheet/engine";
+import { inTypedHours } from "@/sheet/engine/input";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { Area, NumberFormat, Sheet } from "@/sheet/types";
 import { showSheetNotice } from "../notice";
@@ -25,11 +26,23 @@ import { errorHelp } from "./errorHelp";
 import { HoverTips, keepFocus } from "./parts";
 import { wantsRef } from "./formulaInput";
 
-export type SelectionStats = { cells: number; filled: number; count: number; sum: number; mean: number; min: number; max: number; stdev: number | null };
+export type SelectionStats = {
+  cells: number;
+  filled: number;
+  count: number;
+  sum: number;
+  mean: number;
+  min: number;
+  max: number;
+  stdev: number | null;
+  /** The numbers are all times (Uhrzeit or Dauer), some of them shown with seconds or none; null: not all times, or no numbers. */
+  time: { seconds: boolean } | null;
+};
 
 /**
  * The numbers of the selected cells (each counted once, hidden rows and columns left out, like
- * what you see): how many, their sum, mean, min, max and sample standard deviation (STABW.S).
+ * what you see): how many, their sum, mean, min, max and sample standard deviation (STABW.S), and
+ * whether they are all times (then the figures are too, see statFormat).
  */
 export function selectionStats(sheet: Sheet, calc: Calc, sheetId: string, sel: Selection, rowHidden: (row: number) => boolean): SelectionStats {
   const areas = selectionAreas(sel).map((a) => ({ r0: a.r0, c0: a.c0, r1: Math.min(a.r1, sheet.size.rows - 1), c1: Math.min(a.c1, sheet.size.cols - 1) }));
@@ -37,15 +50,26 @@ export function selectionStats(sheet: Sheet, calc: Calc, sheetId: string, sel: S
   for (const a of areas) cells += Math.max(0, a.r1 - a.r0 + 1) * Math.max(0, a.c1 - a.c0 + 1);
   const values: number[] = [];
   let filled = 0;
+  // How many of the numbers are times, and whether one of those shows seconds.
+  let times = 0;
+  let seconds = false;
   const hiddenRow = new Map<number, boolean>();
-  const visit = (row: number, col: number) => {
+  const visit = (key: string, row: number, col: number) => {
     let h = hiddenRow.get(row);
     if (h === undefined) hiddenRow.set(row, (h = rowHidden(row)));
     if (h || sheet.cols[col]?.hidden) return;
     const v = calc.value(sheetId, row, col);
     if (v === null || v === "") return;
     filled++;
-    if (typeof v === "number" && Number.isFinite(v)) values.push(v);
+    if (typeof v !== "number" || !Number.isFinite(v)) return;
+    values.push(v);
+    // A timestamp shown as its clock time (an instrument's log with "hh:mm") is no time to add up:
+    // its sum and mean as hours would read 1111910:24. Such figures stay plain numbers.
+    const fmt = sheet.cells[key]?.s?.fmt;
+    if (fmt?.kind === "time" && (isDuration(fmt) || inTypedHours(v))) {
+      times++;
+      seconds ||= fmt.seconds;
+    }
   };
   const inside = (a: Area, r: number, c: number) => r >= a.r0 && r <= a.r1 && c >= a.c0 && c <= a.c1;
   const keys = Object.keys(sheet.cells);
@@ -53,7 +77,7 @@ export function selectionStats(sheet: Sheet, calc: Calc, sheetId: string, sel: S
     // A big selection (whole columns): only the cells that exist can hold numbers.
     for (const key of keys) {
       const p = parseKey(key);
-      if (areas.some((a) => inside(a, p.row, p.col))) visit(p.row, p.col);
+      if (areas.some((a) => inside(a, p.row, p.col))) visit(key, p.row, p.col);
     }
   } else {
     const seen = areas.length > 1 ? new Set<string>() : null;
@@ -66,7 +90,7 @@ export function selectionStats(sheet: Sheet, calc: Calc, sheetId: string, sel: S
             if (seen.has(key)) continue;
             seen.add(key);
           }
-          visit(r, c);
+          visit(key, r, c);
         }
       }
     }
@@ -87,11 +111,16 @@ export function selectionStats(sheet: Sheet, calc: Calc, sheetId: string, sel: S
     for (const v of values) sq += (v - mean) * (v - mean);
     stdev = Math.sqrt(sq / (count - 1));
   }
-  return { cells, filled, count, sum, mean, min: count ? min : 0, max: count ? max : 0, stdev };
+  return { cells, filled, count, sum, mean, min: count ? min : 0, max: count ? max : 0, stdev, time: count && times === count ? { seconds } : null };
 }
 
-/** Number formats the figures borrow from the active cell (dates and text don't make sense for a sum). */
-function statFormat(fmt: NumberFormat | undefined): NumberFormat | undefined {
+/**
+ * The format of the figures (Anzahl stays a plain count). Times, clock times and durations alike,
+ * as durations: a sum of run times is 312:00 hours, not a time of day (under a day the two read the
+ * same: 03:00). Else the number format of the active cell (dates and text don't make sense for a sum).
+ */
+export function statFormat(fmt: NumberFormat | undefined, stats: SelectionStats | null): NumberFormat | undefined {
+  if (stats?.time) return { kind: "time", seconds: stats.time.seconds, duration: true };
   if (!fmt) return undefined;
   return fmt.kind === "number" || fmt.kind === "percent" || fmt.kind === "scientific" || fmt.kind === "significant" || fmt.kind === "currency" ? fmt : undefined;
 }
@@ -210,7 +239,7 @@ export function StatusBar({ store }: { store: SheetStore }): ReactNode {
   }, [sheet, single, calc, sheetId, selection, store]);
 
   const activeCell = getCell(workbook, sheetId, anchor.row, anchor.col);
-  const fmt = statFormat(activeCell?.s?.fmt);
+  const fmt = statFormat(activeCell?.s?.fmt, stats);
   const fmtNumber = (n: number, plain = false) => formatValue(n, plain ? undefined : fmt, locale);
   const activeValue = single ? calc.value(sheetId, anchor.row, anchor.col) : null;
 

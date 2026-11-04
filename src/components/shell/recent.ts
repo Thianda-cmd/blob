@@ -1,28 +1,25 @@
 "use client";
 
 // The pages you opened, newest first (this browser only): the note switcher and "side by side"
-// pick from them.
+// pick from them. Read from storage each time (a short list, read when the switcher opens): a copy
+// kept in memory would outlive signing out (src/lib/offline/device.ts, forgetDevice, here or in
+// another tab) and bring the account's pages back with the next page opened.
 
 const KEY = "blob-recent-pages";
 const MAX = 20;
 
-let cache: string[] | null = null;
-
 function load(): string[] {
-  if (cache) return cache;
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    cache = Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, MAX) : [];
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, MAX) : [];
   } catch {
-    cache = [];
+    return [];
   }
-  return cache;
 }
 
 function store(ids: string[]) {
-  cache = ids.slice(0, MAX);
   try {
-    localStorage.setItem(KEY, JSON.stringify(cache));
+    localStorage.setItem(KEY, JSON.stringify(ids.slice(0, MAX)));
   } catch {}
 }
 

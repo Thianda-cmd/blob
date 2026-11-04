@@ -19,9 +19,10 @@ import type { Locale } from "@/i18n/config";
 import { sheetIoText, type SheetIoText } from "@/i18n/messages/sheetIo";
 import { areaName, cellKey, colIndex, colName } from "../a1";
 import { COLOR_HEX } from "../colors";
-import { adjustFormula, formatValue, getFunction, MAX_FORMULA_LENGTH, shiftFormula, toCanonicalFormula, type Calc, type CellValue } from "../engine";
+import { adjustFormula, createCalc, formatValue, getFunction, MAX_FORMULA_LENGTH, shiftFormula, toCanonicalFormula, type Calc, type CellValue } from "../engine";
 import { newId } from "../ops";
-import { totalOfCell } from "../table/totals";
+import { hiddenByFilters, shownText, valueKey } from "../table/filter";
+import { dataRows, totalOfCell } from "../table/totals";
 import {
   DEFAULT_COL_W,
   DEFAULT_ROW_H,
@@ -42,7 +43,7 @@ import {
   type TotalFn,
   type Workbook,
 } from "../types";
-import { attr, boolAttr, child, children, descendants, escAttr, escText, lookup, numAttr, parseXml, textOf, XML_HEAD, XmlError, xmlBudget, type XmlBudget, type XmlEl } from "./xml";
+import { attr, boolAttr, child, children, descendants, escAttr, escText, lookup, numAttr, parseXml, savableText, textOf, XML_HEAD, XmlError, xmlBudget, type XmlBudget, type XmlEl } from "./xml";
 import { chartFromXml, chartXml, drawingXml, EMU } from "./xlsxCharts";
 import { calledFunctions, importFormula, MAX_FORMULA_WORK, stripPrefixes, toFileFormula, type FileTable, type FormulaContext, type FormulaProblem, type ImportedFormula } from "./xlsxFormulas";
 import { MAX_IMPORT_TEXT, MAX_SHEETS } from "./limits";
@@ -57,6 +58,7 @@ import {
   fromExcelFormat,
   fromSigStyle,
   heightToPx,
+  isDayClockCode,
   INDEXED_COLORS,
   mixWhite,
   nearestSheetColor,
@@ -102,8 +104,8 @@ function xstring(s: string, inAttribute = false): string {
   return out;
 }
 
-/** _xHHHH_ escapes → characters. */
-const unxstring = (s: string) => (s.includes("_x") ? s.replace(/_x([0-9A-Fa-f]{4})_/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))) : s);
+/** _xHHHH_ escapes → characters (never a NUL or half a character: see savableText). */
+const unxstring = (s: string) => (s.includes("_x") ? savableText(s.replace(/_x([0-9A-Fa-f]{4})_/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)))) : s);
 
 /** A number as the file writes it (no "-0", no NaN). */
 function numText(n: number): string {
@@ -364,6 +366,51 @@ function vmlXml(notes: { row: number; col: number }[], sheetNo: number): string 
 
 const TOTAL_FN_LABEL = /^[^=]/;
 
+const FILTER_OPS = { gt: "greaterThan", gte: "greaterThanOrEqual", lt: "lessThan", lte: "lessThanOrEqual", eq: "equal", neq: "notEqual" } as const;
+
+const customFilter = (operator: string, val: number | string) =>
+  `<customFilter operator="${operator}" val="${typeof val === "number" ? numText(val) : escAttr(xstring(val, true))}"/>`;
+
+/**
+ * A smart table's filter on one column (`colId`: from the table's first column) as Excel writes
+ * it, so Excel, LibreOffice and an import into Blob show the table filtered; "" for a filter that
+ * asks nothing. Text conditions keep their wildcards as they are: Blob's are Excel's (* ? and ~).
+ */
+function filterColumnXml(colId: number, f: FilterSpec): string {
+  let inner = "";
+  if (f.kind === "values") {
+    const blank = f.values.includes("") ? ' blank="1"' : "";
+    inner = `<filters${blank}>${f.values
+      .filter((v) => v !== "")
+      .map((v) => `<filter val="${escAttr(xstring(v, true))}"/>`)
+      .join("")}</filters>`;
+  } else if (f.kind === "text") {
+    const t = f.text ?? "";
+    // An empty pattern asks nothing (Blob shows every row), unless it asks for empty cells.
+    if (!t && f.op !== "equals") return "";
+    // A tilde at the end ("P~", the sign itself) would turn the star put after it into a star
+    // itself: it is written as "~~", which means the same tilde.
+    const before = /(?:^|[^~])(?:~~)*~$/.test(t) ? `${t}~` : t;
+    const val = f.op === "contains" || f.op === "notContains" ? `*${before}*` : f.op === "begins" ? `${before}*` : f.op === "ends" ? `*${t}` : t;
+    inner = `<customFilters>${customFilter(f.op === "notContains" ? "notEqual" : "equal", val)}</customFilters>`;
+  } else if (f.op === "top" || f.op === "bottom") {
+    inner = `<top10${f.op === "bottom" ? ' top="0"' : ""} val="${Math.max(1, Math.floor(f.a ?? 10))}"/>`;
+  } else if (f.op === "aboveAverage" || f.op === "belowAverage") {
+    inner = `<dynamicFilter type="${f.op}"/>`;
+  } else if (f.op === "between") {
+    // The range as Blob reads it: either end may be open.
+    const lo = f.a === null ? null : f.b === null ? f.a : Math.min(f.a, f.b);
+    const hi = f.b === null ? null : f.a === null ? f.b : Math.max(f.a, f.b);
+    const parts = [lo === null ? "" : customFilter("greaterThanOrEqual", lo), hi === null ? "" : customFilter("lessThanOrEqual", hi)].filter(Boolean);
+    if (!parts.length) return "";
+    inner = `<customFilters${parts.length > 1 ? ' and="1"' : ""}>${parts.join("")}</customFilters>`;
+  } else {
+    if (f.a === null) return "";
+    inner = `<customFilters>${customFilter(FILTER_OPS[f.op], f.a)}</customFilters>`;
+  }
+  return `<filterColumn colId="${colId}">${inner}</filterColumn>`;
+}
+
 export async function exportXlsx(wb: Workbook, calc: Calc, locale: Locale): Promise<Blob> {
   const enc = new TextEncoder();
   const files: { name: string; data: string; type?: string }[] = [];
@@ -399,9 +446,20 @@ export async function exportXlsx(wb: Workbook, calc: Calc, locale: Locale): Prom
     const tables = wb.tables.filter((t) => t.sheetId === sheet.id);
     const headerText = new Map<string, string>();
     const tableXml: { file: string; rel: string }[] = [];
+    // Rows the tables' filters hide: hidden in the file too. Excel and LibreOffice don't filter
+    // again when they open a file, and they leave hidden rows out of SUBTOTAL and of charts, so
+    // totals and trendlines come out as in Blob.
+    const filtered = new Set<number>();
     for (const t of tables) {
       const a = t.area;
       if (a.r1 < a.r0 + (t.totals ? 1 : 0) || a.r1 >= MAX_ROWS || a.c1 >= MAX_COLS) continue;
+      if (Object.keys(t.filters).length) {
+        try {
+          hiddenByFilters(calc, sheet, t, locale, filtered);
+        } catch (e) {
+          console.error("sheet: filtered rows for the export failed", e);
+        }
+      }
       const used = new Set<string>();
       const cols = Array.from({ length: a.c1 - a.c0 + 1 }, (_, i) => {
         const c = a.c0 + i;
@@ -425,10 +483,12 @@ export async function exportXlsx(wb: Workbook, calc: Calc, locale: Locale): Prom
       tableNo++;
       const name = excelTableName(t.name, tableNames);
       const filterEnd = t.totals ? a.r1 - 1 : a.r1;
+      const filterRef = areaName({ ...a, r1: Math.max(a.r0, filterEnd) });
+      const filterCols = t.columns.map((c, i) => (t.filters[c.id] ? filterColumnXml(i, t.filters[c.id]) : "")).join("");
       const xml =
         XML_HEAD +
         `<table xmlns="${NS_MAIN}" id="${tableNo}" name="${escAttr(name)}" displayName="${escAttr(name)}" ref="${areaName(a)}"${t.totals ? ' totalsRowCount="1"' : ' totalsRowShown="0"'}>` +
-        `<autoFilter ref="${areaName({ ...a, r1: Math.max(a.r0, filterEnd) })}"/>` +
+        (filterCols ? `<autoFilter ref="${filterRef}">${filterCols}</autoFilter>` : `<autoFilter ref="${filterRef}"/>`) +
         `<tableColumns count="${cols.length}">${cols.join("")}</tableColumns>` +
         `<tableStyleInfo name="${escAttr(styles.tableStyle(t.style))}" showFirstColumn="0" showLastColumn="0" showRowStripes="${t.banded ? 1 : 0}" showColumnStripes="0"/>` +
         "</table>";
@@ -466,6 +526,7 @@ export async function exportXlsx(wb: Workbook, calc: Calc, locale: Locale): Prom
       const r = Number(k);
       if (Number.isInteger(r) && r >= 0 && r < MAX_ROWS && (v.h !== undefined || v.hidden)) rowProps.set(r, v);
     }
+    for (const r of filtered) rowProps.set(r, { ...rowProps.get(r), hidden: true });
     const rowsOut: string[] = [];
     const notes: { row: number; col: number; text: string }[] = [];
     const allRows = [...new Set([...byRow.keys(), ...rowProps.keys()])].sort((a, b) => a - b);
@@ -679,7 +740,8 @@ async function readRels(zip: ZipReader, part: string, budget: XmlBudget): Promis
 
 const relIs = (rel: Rel, kind: string) => rel.type.endsWith(`/${kind}`);
 
-type XfLook = { style: CellStyle | undefined; fmt: NumberFormat | undefined };
+/** `dayClock`: the format shows days and hours ("d hh:mm"), read as a time span (see isDayClockCode). */
+type XfLook = { style: CellStyle | undefined; fmt: NumberFormat | undefined; dayClock?: boolean };
 
 /** styles.xml read for cells: each cell format (xf) → Blob's look. */
 class FileStyles {
@@ -819,7 +881,8 @@ class FileStyles {
     // Significant figures come back through the named style Blob gave the cell.
     const fmt = fromSigStyle(this.styleNames.get(xf.xfId), this.format(xf.numFmtId));
     if (fmt) s.fmt = fmt;
-    look = { style: Object.keys(s).length ? s : undefined, fmt };
+    const code = this.numFmts.get(xf.numFmtId);
+    look = { style: Object.keys(s).length ? s : undefined, fmt, dayClock: fmt?.kind === "time" && code !== undefined && isDayClockCode(code) };
     this.looks.set(index, look);
     return look;
   }
@@ -892,7 +955,7 @@ function filterFromExcel(fc: XmlEl): FilterSpec | null {
   const filters = child(fc, "filters");
   if (filters) {
     if (children(filters, "dateGroupItem").length) return null;
-    const values = children(filters, "filter").map((f) => attr(f, "val") ?? "");
+    const values = children(filters, "filter").map((f) => unxstring(attr(f, "val") ?? ""));
     if (boolAttr(filters, "blank")) values.push("");
     return values.length ? { kind: "values", values } : null;
   }
@@ -900,18 +963,21 @@ function filterFromExcel(fc: XmlEl): FilterSpec | null {
   if (custom) {
     const list = children(custom, "customFilter");
     const ops: Record<string, "gt" | "gte" | "lt" | "lte" | "eq" | "neq"> = { greaterThan: "gt", greaterThanOrEqual: "gte", lessThan: "lt", lessThanOrEqual: "lte", equal: "eq", notEqual: "neq" };
-    const read = (el: XmlEl) => ({ op: lookup(ops, attr(el, "operator") ?? "equal"), val: attr(el, "val") ?? "" });
+    const read = (el: XmlEl) => ({ op: lookup(ops, attr(el, "operator") ?? "equal"), val: unxstring(attr(el, "val") ?? "") });
     if (list.length === 1) {
       const { op, val } = read(list[0]);
       const n = Number(val);
       if (op && val !== "" && Number.isFinite(n)) return { kind: "number", op, a: n, b: null };
-      // Text: "Probe*" (begins), "*Probe" (ends), "*Probe*" (contains), "Probe" (equals).
+      // Text: "*Probe*" (contains), "Probe*" (begins), "*Probe" (ends), "Probe" (equals). Blob's
+      // text filters know Excel's wildcards, so "~*" (a star itself) and "?" stay as they are.
       if (op === "eq" || op === "neq") {
-        const text = val.replace(/~([*?])/g, "$1");
-        if (/^\*.+\*$/.test(val)) return { kind: "text", op: op === "eq" ? "contains" : "notContains", text: text.slice(1, -1) };
-        if (op === "eq" && /^[^*]+\*$/.test(val)) return { kind: "text", op: "begins", text: text.slice(0, -1) };
-        if (op === "eq" && /^\*[^*]+$/.test(val)) return { kind: "text", op: "ends", text: text.slice(1) };
-        if (op === "eq" && !/[*?]/.test(val)) return { kind: "text", op: "equals", text };
+        const lead = val.startsWith("*");
+        // A star at the end that isn't the sign itself ("~*"; "~~*" is a tilde, then a wildcard).
+        const trail = /(?:^|[^~])(?:~~)*\*$/.test(val);
+        if (lead && trail && val.length > 2) return { kind: "text", op: op === "eq" ? "contains" : "notContains", text: val.slice(1, -1) };
+        if (op === "eq" && trail && !lead && val.length > 1) return { kind: "text", op: "begins", text: val.slice(0, -1) };
+        if (op === "eq" && lead && !trail && val.length > 1) return { kind: "text", op: "ends", text: val.slice(1) };
+        if (op === "eq" && !lead && !trail) return { kind: "text", op: "equals", text: val };
       }
       return null;
     }
@@ -935,6 +1001,64 @@ function filterFromExcel(fc: XmlEl): FilterSpec | null {
     if (type === "belowAverage") return { kind: "number", op: "belowAverage", a: null, b: null };
   }
   return null;
+}
+
+/**
+ * The smart tables' filters as Blob applies them, once the whole workbook is read (formulas worked
+ * out as Blob works them out):
+ * - A values filter written in the other language ("0,50" from German Excel or Blob, read in
+ *   English) gets the texts its column shows in this one ("0.50"). As written it would hide every row.
+ * - Rows the file hides inside tables whose filters Blob read (`hidden`, by sheet id) that those
+ *   filters don't hide were hidden by hand: they stay hidden.
+ */
+function settleFilters(wb: Workbook, hidden: ReadonlyMap<string, number[]>, locale: Locale): void {
+  const filtered = wb.tables.filter((t) => Object.keys(t.filters).length);
+  if (!filtered.length) return;
+  try {
+    const calc = createCalc(wb, { locale });
+    const sheetOf = new Map(wb.sheets.map((s) => [s.id, s]));
+    for (const t of filtered) {
+      const sheet = sheetOf.get(t.sheetId);
+      if (!sheet) continue;
+      for (const [id, spec] of Object.entries(t.filters)) {
+        const i = t.columns.findIndex((c) => c.id === id);
+        if (spec.kind === "values" && i >= 0) t.filters[id] = { ...spec, values: valuesShown(calc, sheet, t, t.area.c0 + i, spec.values, locale) };
+      }
+    }
+    for (const [sheetId, rows] of hidden) {
+      const sheet = sheetOf.get(sheetId);
+      if (!sheet || !rows.length) continue;
+      const byFilters = new Set<number>();
+      for (const t of filtered) if (t.sheetId === sheetId) hiddenByFilters(calc, sheet, t, locale, byFilters);
+      for (const r of rows) if (!byFilters.has(r)) sheet.rows[String(r)] = { ...sheet.rows[String(r)], hidden: true };
+    }
+  } catch (e) {
+    // The filters stay as the file has them, and the rows they hide come back.
+    console.error("sheet: reading a table's filters failed", e);
+  }
+}
+
+/**
+ * A values filter's texts as column `col` shows them in `locale`: one that no cell shows here but
+ * one shows in the other language ("0,50" for 0,5 read in English) becomes what that cell shows here.
+ */
+function valuesShown(calc: Calc, sheet: Sheet, t: TableSpec, col: number, values: string[], locale: Locale): string[] {
+  const { r0, r1 } = dataRows(t);
+  const shown = (r: number, lang: Locale) => {
+    const cell = sheet.cells[cellKey(r, col)];
+    const value = cell && (cell.v !== undefined || cell.f !== undefined) ? calc.value(sheet.id, r, col) : null;
+    return shownText(value, cell?.s?.fmt, lang);
+  };
+  const here = new Set<string>();
+  for (let r = r0; r <= r1; r++) here.add(valueKey(shown(r, locale), locale));
+  if (values.every((v) => here.has(valueKey(v, locale)))) return values;
+  const other: Locale = locale === "de" ? "en" : "de";
+  const there = new Map<string, string>();
+  for (let r = r0; r <= r1; r++) {
+    const key = valueKey(shown(r, other), other);
+    if (!there.has(key)) there.set(key, shown(r, locale));
+  }
+  return [...new Set(values.map((v) => (here.has(valueKey(v, locale)) ? v : (there.get(valueKey(v, other)) ?? v))))];
 }
 
 /** Notes of a sheet from its comments part ("Lena:" before the text, as Excel writes the author, dropped). */
@@ -1190,7 +1314,8 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
 
   // Smart tables first: formulas anywhere may refer to them.
   const fileTables = new Map<string, FileTable>();
-  const tablesBySheet = new Map<number, { table: TableSpec; filtered: boolean }[]>();
+  // `filtered`: the file filters the table; `whole`: Blob read all of its filters.
+  const tablesBySheet = new Map<number, { table: TableSpec; filtered: boolean; whole: boolean }[]>();
   const blobTables: TableSpec[] = [];
   const tableNames = new Set<string>();
   for (let si = 0; si < sheetParts.length; si++) {
@@ -1250,7 +1375,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
       blobTables.push(table);
       let list = tablesBySheet.get(si);
       if (!list) tablesBySheet.set(si, (list = []));
-      list.push({ table, filtered: !!child(af, "filterColumn") });
+      list.push({ table, filtered: !!child(af, "filterColumn"), whole: !lost });
     }
   }
   const tableAt = (sheet: string, row: number, col: number) => {
@@ -1285,21 +1410,28 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
 
   // Formulas name sheets as the file did; Blob's names differ only where the file's weren't valid.
   const renames = sheetParts.map((p, i) => ({ from: p.name, to: blobSheets[i].name })).filter((r) => r.from !== r.to);
+  // Rows the file hides inside filtered tables, by sheet: by their filters or by hand (settleFilters).
+  const hiddenInTables = new Map<string, number[]>();
 
   for (let si = 0; si < sheetParts.length; si++) {
     const part = sheetParts[si];
     const sheet = blobSheets[si];
     const root = part.root;
     const tables = tablesBySheet.get(si) ?? [];
-    // Rows a table's filter hides come back through the filter, not as rows hidden by hand.
-    const filterRows: Area[] = tables.filter((x) => x.filtered).map((x) => ({ ...x.table.area, r0: x.table.area.r0 + 1 }));
+    // Rows a table's filter hides come back through the filter, not as rows hidden by hand. Where
+    // Blob read all of the filters, a row they don't hide was hidden by hand: told apart once the
+    // whole workbook is read (settleFilters). Under a filter Blob doesn't have (the sheet's own,
+    // one it couldn't read) that can't be told: the row comes back.
+    const filterRows: { area: Area; whole: boolean }[] = tables.filter((x) => x.filtered).map((x) => ({ area: { ...x.table.area, r0: x.table.area.r0 + 1 }, whole: x.whole }));
     const sheetFilter = child(root, "autoFilter");
     if (sheetFilter && child(sheetFilter, "filterColumn")) {
       counts.sheetFilter++;
       const a = parseRange(attr(sheetFilter, "ref"));
-      if (a) filterRows.push({ ...a, r0: a.r0 + 1 });
+      if (a) filterRows.push({ area: { ...a, r0: a.r0 + 1 }, whole: false });
     }
-    const hiddenByFilter = (r: number) => filterRows.some((a) => r >= a.r0 && r <= a.r1);
+    const filtersAt = (r: number) => filterRows.filter(({ area }) => r >= area.r0 && r <= area.r1);
+    const maybeByHand: number[] = [];
+    if (filterRows.some((x) => x.whole)) hiddenInTables.set(sheet.id, maybeByHand);
 
     // Columns.
     for (const c of children(child(root, "cols"), "col")) {
@@ -1415,7 +1547,11 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
         const px = heightToPx(ht);
         if (Math.abs(px - DEFAULT_ROW_H) > 1) rowEntry.h = px;
       }
-      if (boolAttr(rowEl, "hidden") && !hiddenByFilter(r)) rowEntry.hidden = true;
+      if (boolAttr(rowEl, "hidden")) {
+        const by = filtersAt(r);
+        if (!by.length) rowEntry.hidden = true;
+        else if (by.every((x) => x.whole)) maybeByHand.push(r);
+      }
       if (rowEntry.h !== undefined || rowEntry.hidden) sheet.rows[String(r)] = rowEntry;
 
       let nextCol = 0;
@@ -1518,6 +1654,9 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
             if (value !== "") out.v = value.slice(0, MAX_TEXT);
             spend(Math.min(value.length, MAX_TEXT));
           } else if (typeof value === "number") {
+            // A date and time under a days-and-hours code (a logger's timestamps as "dd hh:mm")
+            // stays a date and time: as a time span it would show hundreds of thousands of hours.
+            if (look.dayClock && value >= 367) out.s = { ...out.s, fmt: { kind: "datetime" } };
             const fmt = out.s?.fmt;
             out.v = date1904 && fmt && (fmt.kind === "date" || fmt.kind === "datetime") ? value + DAYS_1904 : value;
           } else out.v = value;
@@ -1566,6 +1705,7 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
   }
 
   const workbook: Workbook = { v: 1, sheets: blobSheets, charts: blobCharts, tables: blobTables };
+  settleFilters(workbook, hiddenInTables, locale);
   return { workbook, skipped: skippedLines(counts, locale, maxSheets) };
 }
 

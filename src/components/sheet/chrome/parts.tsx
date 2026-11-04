@@ -49,7 +49,8 @@ export function ariaKeys(spec: string | undefined): string | undefined {
 // ----------------------------------------------------------------------------------------------
 // Tooltips: one for the whole page, for every element with data-tip (and data-keys)
 
-type Tip = { label: string; keys: string[]; x: number; top: number; bottom: number };
+/** `panel`: the open popover the element is in (the toolbar's "Mehr", a palette), if any. */
+type Tip = { label: string; keys: string[]; x: number; top: number; bottom: number; panel?: { left: number; right: number } };
 
 let tip: Tip | null = null;
 const tipListeners = new Set<() => void>();
@@ -80,7 +81,15 @@ function install() {
   const show = (el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     if (!el.isConnected || (r.width === 0 && r.height === 0)) return;
-    setTip({ label: el.dataset.tip ?? "", keys: el.dataset.keys ? el.dataset.keys.split("|") : [], x: r.left + r.width / 2, top: r.top, bottom: r.bottom });
+    const pop = el.closest("body > [role=dialog], body > [role=menu]")?.getBoundingClientRect();
+    setTip({
+      label: el.dataset.tip ?? "",
+      keys: el.dataset.keys ? el.dataset.keys.split("|") : [],
+      x: r.left + r.width / 2,
+      top: r.top,
+      bottom: r.bottom,
+      panel: pop ? { left: pop.left, right: pop.right } : undefined,
+    });
     warm = true;
     if (cool) clearTimeout(cool);
     cool = null;
@@ -178,6 +187,18 @@ const subscribeOwners = (l: () => void) => {
 };
 
 /**
+ * Where the tip of an element inside an open popover goes: beside the popover (left of it, else
+ * right of it), at the element's height, so it doesn't cover the next row of entries while the
+ * arrows step through them. null when neither side has room (phones): then as any other tip.
+ */
+function besideOf(panel: Tip["panel"]): { left?: number; right?: number; maxWidth: number } | null {
+  if (!panel) return null;
+  if (panel.left >= 134) return { right: window.innerWidth - panel.left + 6, maxWidth: Math.min(280, panel.left - 14) };
+  if (window.innerWidth - panel.right >= 134) return { left: panel.right + 6, maxWidth: Math.min(280, window.innerWidth - panel.right - 14) };
+  return null;
+}
+
+/**
  * Tooltips for every [data-tip] element on the page (label, plus key caps from data-keys,
  * "Strg|B"). Each part of the chrome mounts one; only the first one mounted shows them.
  */
@@ -194,19 +215,24 @@ export function HoverTips() {
   const box = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = box.current;
-    if (!el || !current) return;
+    if (!el || !current || besideOf(current.panel)) return;
     const w = el.offsetWidth;
     el.style.left = `${Math.max(8, Math.min(window.innerWidth - 8 - w, current.x - w / 2))}px`;
   }, [current, shows]);
   if (!shows || !current || typeof document === "undefined") return null;
-  // Below the button, or above it near the bottom of the screen.
+  // Below the button, or above it near the bottom of the screen; beside an open popover.
   const below = current.bottom + 44 < window.innerHeight;
+  const beside = besideOf(current.panel);
   return createPortal(
     <div
       ref={box}
       role="tooltip"
       className="pointer-events-none fixed z-[95] flex w-max max-w-[min(280px,calc(100vw-16px))] items-center gap-2 rounded-lg border border-line bg-raised px-2 py-1 text-[12px] leading-snug text-ink shadow-pop"
-      style={{ left: current.x, ...(below ? { top: current.bottom + 6 } : { bottom: window.innerHeight - current.top + 6 }) }}
+      style={
+        beside
+          ? { ...beside, top: (current.top + current.bottom) / 2, transform: "translateY(-50%)" }
+          : { left: current.x, ...(below ? { top: current.bottom + 6 } : { bottom: window.innerHeight - current.top + 6 }) }
+      }
     >
       <span>{current.label}</span>
       {current.keys.length > 0 && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { noteCache } from "@/components/editor/noteCache";
-import { DRAFT_PREFIX, discardOpenSheets, draftPages, flushOpenSheets, forgetOtherAccounts, unsavedSheets } from "@/components/sheet/drafts";
+import { DRAFT_PREFIX, discardOpenSheets, draftPages, flushOpenSheets, forgetOtherAccounts, LAST_SAVE_PREFIX, unsavedSheets } from "@/components/sheet/drafts";
 import type { Locale } from "@/i18n/config";
 import { blobApp, setOfflineReady } from "@/lib/native";
 import { clearNotifications, NOTIFY_EXTRA_KEY } from "@/lib/notify/scheduler";
@@ -22,6 +22,19 @@ export const DEVICE_USER_KEY = "blob-device-user";
 const WARM_EVERY = 6 * 3600e3;
 /** Reworded flashcards that couldn't be saved yet (src/components/notes/study/useCardEdits.ts; the key doesn't name the account). */
 const CARD_EDITS_UNSENT = "blob-card-edits-unsent:";
+/**
+ * What this browser remembers of the account's pages, subjects and projects (their ids): the pages
+ * opened lately (src/components/shell/recent.ts) and the note shown beside (Panes.tsx), the pages
+ * open and the subjects folded in the sidebar (Sidebar.tsx), the subjects hidden in the calendar
+ * (CalendarView.tsx), each project's view, list or board (ProjectBoard.tsx), the files a note's
+ * clean-up saw unused (FileSweep.tsx) and the Atlas's ticks (src/learn/atlas/seen.ts). The
+ * device's own preferences (theme, text size, the calendar's and tasks' views) stay.
+ */
+const ACCOUNT_KEYS = new Set(["blob-recent-pages", "blob-side-page", "blob-open-pages", "blob-folded-subjects", "blob-cal-filters", "blob-project-view"]);
+const ACCOUNT_PREFIXES = ["blob-file-sweep:", "blob-atlas-seen:"];
+
+/** Whether a key in this browser's storage remembers something of the signed-in account's pages, subjects or projects. */
+export const isAccountKey = (key: string) => ACCOUNT_KEYS.has(key) || ACCOUNT_PREFIXES.some((prefix) => key.startsWith(prefix));
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -156,8 +169,10 @@ export async function forgetDevice() {
       key.startsWith("blob-card-reviews") ||
       key.startsWith(CARD_EDITS_UNSENT) ||
       key.startsWith(DRAFT_PREFIX) ||
+      key.startsWith(LAST_SAVE_PREFIX) ||
       key === NOTIFY_EXTRA_KEY ||
-      key === DEVICE_USER_KEY,
+      key === DEVICE_USER_KEY ||
+      isAccountKey(key),
   );
 }
 

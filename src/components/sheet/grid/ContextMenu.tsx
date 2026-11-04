@@ -32,7 +32,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
-import { ContextMenu, type MenuPoint } from "@/components/ui/ContextMenu";
+import { ContextMenu, useClosesOutside, visibleArea, type MenuPoint } from "@/components/ui/ContextMenu";
 import { MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { posName } from "@/sheet/a1";
 import { sheetById } from "@/sheet/ops";
@@ -45,16 +45,31 @@ import type { GridText } from "./GridCells";
 
 export type MenuKind = "cells" | "rows" | "cols";
 
-/** Fingers get taller menu entries (40 px) than the shared menu's 32 px, without changing the shared menu item. */
-const TOUCH_ITEMS = "[@media(hover:none)]:[&_[role=menuitem]]:h-10";
+/**
+ * Fingers get taller menu entries (40 px) than the shared menu's 32 px, without changing the shared
+ * menu item. Also for the spreadsheet's other menus (the sheet tabs').
+ */
+export const TOUCH_ITEMS = "[@media(hover:none)]:[&_[role=menuitem]]:h-10";
+
+/** A menu opened by a finger shows no keyboard shortcuts (they can't be pressed on a phone). */
+const NO_SHORTCUTS = "[&_[data-shortcut]]:hidden";
 
 type Keys = { mod: string; shift: string };
 
-/** Paste from a menu: the system clipboard when the browser lets us read it, else Blob's own copy, else a hint to use the keyboard. */
-export async function pasteFromMenu(store: SheetStore, mode: PasteMode, notify: (text: string) => void, t: GridText) {
+/**
+ * What a menu's paste says when it pasted nothing: that there is nothing (the clipboard could be
+ * `read`, or there is Blob's `own` copy), else how to paste: with the keyboard, or (`touch`, a
+ * menu opened by a finger, which has no keyboard shortcut) by letting the browser read the clipboard.
+ */
+export function pasteNotice(read: boolean, own: boolean, touch: boolean, t: GridText): string {
+  return read || own ? t.pasteNothing : touch ? t.pasteHintTouch : t.pasteHint;
+}
+
+/** Paste from a menu: the system clipboard when the browser lets us read it, else Blob's own copy, else a hint (see pasteNotice). */
+export async function pasteFromMenu(store: SheetStore, mode: PasteMode, notify: (text: string) => void, t: GridText, touch = false) {
   const data = await readSystemClipboard();
   if (pasteData(store, data, mode)) return;
-  notify(data || hasOwnCopy(store.get().pageId) ? t.pasteNothing : t.pasteHint);
+  notify(pasteNotice(!!data, hasOwnCopy(store.get().pageId), touch, t));
 }
 
 /** Copy or cut from a menu (no keyboard event: the async clipboard). */
@@ -74,6 +89,7 @@ export function GridMenu({
   notify,
   t,
   keys,
+  finger = false,
 }: {
   store: SheetStore;
   at: MenuPoint | null;
@@ -86,6 +102,8 @@ export function GridMenu({
   notify: (text: string) => void;
   t: GridText;
   keys: Keys;
+  /** Opened by a finger: no keyboard shortcuts beside the items, and paste hints for touch screens. */
+  finger?: boolean;
 }) {
   const s = store.get();
   const readOnly = s.readOnly;
@@ -124,13 +142,13 @@ export function GridMenu({
         </MenuItem>
         {!readOnly && (
           <>
-            <MenuItem icon={<ClipboardPaste />} shortcut={`${keys.mod}V`} onSelect={run(() => void pasteFromMenu(store, "all", notify, t))}>
+            <MenuItem icon={<ClipboardPaste />} shortcut={`${keys.mod}V`} onSelect={run(() => void pasteFromMenu(store, "all", notify, t, finger))}>
               {t.paste}
             </MenuItem>
-            <MenuItem icon={<ClipboardType />} shortcut={`${keys.mod}${keys.shift}V`} onSelect={run(() => void pasteFromMenu(store, "values", notify, t))}>
+            <MenuItem icon={<ClipboardType />} shortcut={`${keys.mod}${keys.shift}V`} onSelect={run(() => void pasteFromMenu(store, "values", notify, t, finger))}>
               {t.pasteValues}
             </MenuItem>
-            <MenuItem icon={<ArrowRightLeft />} onSelect={run(() => void pasteFromMenu(store, "transpose", notify, t))}>
+            <MenuItem icon={<ArrowRightLeft />} onSelect={run(() => void pasteFromMenu(store, "transpose", notify, t, finger))}>
               {t.pasteTransposed}
             </MenuItem>
             {/* A finger has no fill handle: this turns the bottom-right handle into one (near the top, so it is found). */}
@@ -255,7 +273,7 @@ export function GridMenu({
     );
   }
   return (
-    <ContextMenu at={at} onClose={onClose} label={t.menu} className={TOUCH_ITEMS}>
+    <ContextMenu at={at} onClose={onClose} label={t.menu} className={finger ? `${TOUCH_ITEMS} ${NO_SHORTCUTS}` : TOUCH_ITEMS}>
       {body}
     </ContextMenu>
   );
@@ -322,6 +340,8 @@ export function NotePopover({
   const [text, setText] = useState(initial);
   const panel = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
+  // (Open while it is there: a press outside it saves and closes it, below.)
+  useClosesOutside(panel, true);
   const latest = useRef(text);
   useEffect(() => {
     latest.current = text;
@@ -332,20 +352,33 @@ export function NotePopover({
     onClose();
   };
 
-  // Placed beside the cell before the first paint (right of it, or left when there is no room).
+  // Placed beside the cell before the first paint (right of it, or left when there is no room),
+  // inside what can be seen: above the on-screen keyboard that its field brings up on a phone, once
+  // that is there (see visibleArea).
   useLayoutEffect(() => {
     const el = panel.current;
     if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    let left = rect.x + rect.w + 8;
-    if (left + w > window.innerWidth - 8) left = Math.max(8, rect.x - w - 8);
-    let top = rect.y;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, window.innerHeight - h - 8);
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
+    const place = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const area = visibleArea();
+      let left = rect.x + rect.w + 8;
+      if (left + w > window.innerWidth - 8) left = Math.max(8, rect.x - w - 8);
+      el.style.left = `${left}px`;
+      el.style.top = `${Math.max(area.top + 8, Math.min(rect.y, area.bottom - h - 8))}px`;
+    };
+    place();
     field.current?.focus();
     field.current?.setSelectionRange(field.current.value.length, field.current.value.length);
+    const view = window.visualViewport;
+    view?.addEventListener("resize", place);
+    view?.addEventListener("scroll", place);
+    window.addEventListener("resize", place);
+    return () => {
+      view?.removeEventListener("resize", place);
+      view?.removeEventListener("scroll", place);
+      window.removeEventListener("resize", place);
+    };
   }, [rect]);
 
   useEffect(() => {
@@ -387,7 +420,8 @@ export function NotePopover({
         onChange={(e) => setText(e.target.value)}
         placeholder={t.notePlaceholder}
         rows={4}
-        className="block w-full resize-none rounded-lg border border-line bg-paper px-2.5 py-2 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-blob/60"
+        // 16 px on touch screens, like the sheet's other fields: an iPhone zooms the page in on a smaller one.
+        className="block w-full resize-none rounded-lg border border-line bg-paper px-2.5 py-2 text-[13px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] focus:border-blob/60 [@media(hover:none)]:text-[16px]"
       />
       <div className="mt-2 flex items-center gap-1.5">
         <span className="mr-auto whitespace-nowrap text-[11px] text-ink-3 [@media(hover:none)]:invisible">{t.noteHint}</span>

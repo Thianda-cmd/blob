@@ -4,7 +4,7 @@
 // equation, R², forecast), error bars, axes (titles, min/max, log scale, grid), look, legend;
 // export as PNG/SVG; add to a note. Side panel on wide screens, bottom sheet on phones (SheetEditor decides).
 //
-// CONTRACT: <ChartPanel store chartId onClose /> is placed by SheetEditor.
+// CONTRACT: <ChartPanel store chartId onClose /> is placed by SheetEditor (docked: with `dock`).
 //
 // Every change is one undo step with its own name ("Trendlinie ändern"); typed text and numbers
 // are saved when you leave the field. Sections fold, so the panel stays short on a phone.
@@ -29,14 +29,15 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
+import { useKeyboard } from "@/components/ui/useKeyboard";
 import type { Locale } from "@/i18n/config";
 import { sheetChartText, type SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import { ChartView } from "@/sheet/chart/ChartView";
 import { newSeries } from "@/sheet/chart/create";
-import { chartData, seriesColor, type ChartData, type ChartSeriesData } from "@/sheet/chart/data";
+import { chartData, firstNumberCell, seriesColor, type ChartData, type ChartSeriesData } from "@/sheet/chart/data";
 import type { Calc } from "@/sheet/engine";
 import type { AxisSpec, ChartKind, ChartSpec, ErrorBarSpec, RangeRef, SeriesSpec, Workbook } from "@/sheet/types";
 import { AddToNoteDialog } from "../embed/AddToNote";
@@ -44,7 +45,7 @@ import { useSheet, type SheetStore } from "../store";
 import { deleteChart, saveChartFile, updateChart } from "./actions";
 import { Chips, Field, HINT_TEXT, Note, NumberField, RangeField, Section, SeriesPicker, Swatches, TextField, Toggle } from "./PanelParts";
 import { selectionRef } from "./ranges";
-import { scrollBehavior } from "./reveal";
+import { copySize, scrollBehavior } from "./reveal";
 import { setChartUi, useChartUi, type ChartSection } from "./selection";
 import { TrendSection, XTextNote } from "./TrendSection";
 
@@ -58,9 +59,6 @@ const KIND_ICONS: Record<ChartKind, ReactNode> = {
 };
 const KINDS: ChartKind[] = ["scatter", "line", "column", "bar", "area", "pie"];
 
-/** The live copy of the chart at the top of the panel is at most this tall (px), so the settings keep room. */
-const PREVIEW_MAX_H = 230;
-
 function safeData(spec: ChartSpec, calc: Calc, locale: Locale): ChartData {
   try {
     return chartData(spec, calc, locale);
@@ -70,7 +68,13 @@ function safeData(spec: ChartSpec, calc: Calc, locale: Locale): ChartData {
   }
 }
 
-export function ChartPanel({ store, chartId, onClose }: { store: SheetStore; chartId: string; onClose: () => void }): ReactNode {
+/**
+ * Where the settings sit: beside the grid (no `dock`), or docked over the lower part of the editor
+ * on phones and tablets held upright, low (about half of it) or tall (nearly all of it).
+ */
+export type ChartPanelDock = "low" | "tall";
+
+export function ChartPanel({ store, chartId, onClose, dock }: { store: SheetStore; chartId: string; onClose: () => void; dock?: ChartPanelDock }): ReactNode {
   const spec = useSheet(store, (s) => s.workbook.charts.find((c) => c.id === chartId));
   const wb = useSheet(store, (s) => s.workbook);
   const calc = useSheet(store, (s) => s.calc);
@@ -89,32 +93,17 @@ export function ChartPanel({ store, chartId, onClose }: { store: SheetStore; cha
       </div>
     );
   }
-  return <PanelBody key={spec.id} store={store} spec={spec} wb={wb} calc={calc} locale={locale} readOnly={readOnly} pageId={pageId} t={t} onClose={onClose} />;
+  return <PanelBody key={spec.id} store={store} spec={spec} wb={wb} calc={calc} locale={locale} readOnly={readOnly} pageId={pageId} t={t} onClose={onClose} dock={dock} />;
 }
 
 /**
- * The chart at the top of the panel while it can't be seen on the sheet, drawn for the size it
- * gets (at most PREVIEW_MAX_H tall), like a chart in a note: its text stays readable instead of
- * shrinking with the picture.
+ * The chart in the panel while it can't be seen on the sheet, drawn for the size it gets (see
+ * copySize), like a chart in a note: its text stays readable instead of shrinking with the picture.
  */
-function PreviewChart({ spec, data, locale, selectedSeries }: { spec: ChartSpec; data: ChartData; locale: Locale; selectedSeries: string | null }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const ratio = Math.max(1, spec.size.h) / Math.max(1, spec.size.w);
+function PreviewChart({ spec, data, locale, selectedSeries, width, height }: { spec: ChartSpec; data: ChartData; locale: Locale; selectedSeries: string | null; width: number; height: number }) {
   return (
-    <div ref={box} className="mx-auto overflow-hidden rounded-xl bg-raised shadow-card ring-1 ring-line" style={{ maxWidth: Math.round(PREVIEW_MAX_H / ratio) }}>
-      {width > 0 ? (
-        <ChartView spec={spec} data={data} width={width} height={Math.round(width * ratio)} locale={locale} selectedSeries={selectedSeries} />
-      ) : (
-        <div style={{ aspectRatio: `${spec.size.w} / ${spec.size.h}` }} />
-      )}
+    <div className="overflow-hidden rounded-xl bg-raised shadow-card ring-1 ring-line" style={{ width, height }}>
+      <ChartView spec={spec} data={data} width={width} height={height} locale={locale} selectedSeries={selectedSeries} />
     </div>
   );
 }
@@ -154,6 +143,7 @@ function PanelBody({
   pageId,
   t,
   onClose,
+  dock,
 }: {
   store: SheetStore;
   spec: ChartSpec;
@@ -164,24 +154,59 @@ function PanelBody({
   pageId: string;
   t: SheetChartText;
   onClose: () => void;
+  dock?: ChartPanelDock;
 }) {
   const ui = useChartUi(store);
   // The chart can't be seen on the sheet (docked settings cover it, or showing it would push its
-  // data out of view): the panel shows it at its top. ChartLayer measures where it is, before the
-  // panel is first painted.
+  // data out of view): the panel shows a copy of it. Docked, it stays beside the settings or above
+  // them while they scroll (docked settings never hide the chart they change); beside the grid it
+  // is their first item (see copySize). ChartLayer measures where the chart is, before the panel
+  // is first painted; above settings docked low on a phone it counts as seen while some of it shows
+  // there (see inViewNext), so their little room is theirs.
   const covered = ui.inView?.id === spec.id && !ui.inView.shown;
+  // The room the copy and the settings share (`inner`: the settings' own width, less a scrollbar),
+  // measured before the panel is first painted (the copy's place doesn't pop in a moment later and
+  // push the settings down), and as it changes.
+  const middle = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState<{ w: number; h: number; inner: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = middle.current;
+    const settings = scroller.current;
+    if (!el || !settings) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      const inner = settings.clientWidth;
+      setArea((a) => (a?.w === w && a.h === h && a.inner === inner ? a : { w, h, inner }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    ro.observe(settings);
+    return () => ro.disconnect();
+  }, []);
+  // Above docked settings it gives way to the on-screen keyboard while she types: the settings need
+  // all the room left above it then ("Probe berechnen" shows its result there).
+  const keyboard = useKeyboard();
+  const ratio = Math.max(1, spec.size.h) / Math.max(1, spec.size.w);
+  const fitted = covered && area ? (dock ? copySize(area, ratio, true) : copySize({ w: area.inner, h: area.h }, ratio, false)) : null;
+  const copy = fitted && (!dock || fitted.beside || !keyboard.open) ? fitted : null;
   const data = useMemo(() => safeData(spec, calc, locale), [spec, calc, locale]);
   const [open, setOpen] = useState<Set<ChartSection>>(() => new Set<ChartSection>(spec.kind === "scatter" ? ["chart", "trend"] : ["chart", "data"]));
   const [noteOpen, setNoteOpen] = useState(false);
   const [saving, setSaving] = useState<"png" | "svg" | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
 
-  // A section asked for from outside (the card's "Trendlinie" button) is open and in view.
+  // A section asked for from outside (the card's "Trendlinie" button) is open and in view. Only the
+  // settings scroll: scrollIntoView would also shift the page around them, which can't be
+  // scrolled back (its header would stay hidden).
   const isOpen = (id: ChartSection) => open.has(id) || ui.section === id;
   useEffect(() => {
-    if (!ui.section) return;
-    scroller.current?.querySelector(`[data-chart-section="${ui.section}"]`)?.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+    const box = scroller.current;
+    const section = ui.section ? box?.querySelector(`[data-chart-section="${ui.section}"]`) : null;
+    if (!box || !section) return;
+    box.scrollTo({ top: box.scrollTop + section.getBoundingClientRect().top - box.getBoundingClientRect().top, behavior: scrollBehavior() });
   }, [ui.section]);
   const toggle = (id: ChartSection) => {
     // The section asked for from outside stays open as an ordinary open section.
@@ -199,6 +224,9 @@ function PanelBody({
   const seriesId = ui.series && spec.series.some((s) => s.id === ui.series) ? ui.series : (spec.series[0]?.id ?? "");
   const current = spec.series.find((s) => s.id === seriesId) ?? null;
   const currentData = data.series.find((s) => s.id === seriesId);
+  // Times as x: where the formula that turns them into hours starts (the trendline's note).
+  const xRef = current?.x ?? spec.x;
+  const xCell = spec.kind === "scatter" && data.xFormat?.kind === "time" && xRef ? firstNumberCell(calc, spec.sheetId, xRef) : null;
   const seriesChoices = spec.series.map((s, i) => ({ id: s.id, name: data.series[i]?.name ?? s.name, color: seriesColor(s, i) }));
   const picker = <SeriesPicker label={t.series} series={seriesChoices} value={seriesId} onChange={(id) => setChartUi(store, { series: id })} />;
 
@@ -244,158 +272,162 @@ function PanelBody({
     setChartUi(store, { series: s.id });
   };
 
+  // The chart, live, while it can't be seen on the sheet.
+  const copyBox = copy && (
+    <div className={cn("grid shrink-0 place-items-center border-line bg-paper/60 p-3", copy.beside ? "border-r" : "border-b")} data-chart-preview="">
+      <PreviewChart spec={spec} data={data} locale={locale} selectedSeries={ui.series} width={copy.w} height={copy.h} />
+    </div>
+  );
+
   return (
     // (Named by the editor's side panel or dock around it, "Diagrammeinstellungen": no second region.)
     <div data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface">
       <PanelHeader title={spec.title.trim() || t.kindNames[spec.kind]} icon={KIND_ICONS[spec.kind]} t={t} onClose={onClose} />
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {/* The chart, live, while it can't be seen on the sheet. */}
-        {covered && (
-          <div className="border-b border-line bg-paper/60 p-3" data-chart-preview="">
-            <PreviewChart spec={spec} data={data} locale={locale} selectedSeries={ui.series} />
-          </div>
-        )}
+      <div ref={middle} className={cn("flex min-h-0 flex-1", copy?.beside ? "flex-row" : "flex-col")}>
+        {dock && copyBox}
+        <div ref={scroller} className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+          {!dock && copyBox}
+          <Section id="chart" title={t.sections.chart} icon={<SlidersHorizontal />} open={isOpen("chart")} onToggle={() => toggle("chart")}>
+            <Field label={t.chartType}>
+              <Chips label={t.chartType} value={spec.kind} size="tile" columns={3} onChange={changeKind} options={KINDS.map((k) => ({ value: k, label: t.kinds[k], icon: KIND_ICONS[k], title: t.kindHints[k], disabled: readOnly }))} />
+            </Field>
+            <Field label={t.title}>
+              <TextField value={spec.title} placeholder={t.titlePlaceholder} label={t.title} onCommit={(v) => change(t.undo.title, (c) => ({ ...c, title: v.trim() }))} />
+            </Field>
+            <Field label={t.legend}>
+              <Segmented
+                label={t.legend}
+                value={spec.legend}
+                options={(["top", "right", "bottom", "none"] as const).map((v) => ({ value: v, label: t.legendPos[v] }))}
+                onChange={(v) => change(t.undo.legend, (c) => ({ ...c, legend: v }))}
+              />
+            </Field>
+          </Section>
 
-        <Section id="chart" title={t.sections.chart} icon={<SlidersHorizontal />} open={isOpen("chart")} onToggle={() => toggle("chart")}>
-          <Field label={t.chartType}>
-            <Chips label={t.chartType} value={spec.kind} size="tile" columns={3} onChange={changeKind} options={KINDS.map((k) => ({ value: k, label: t.kinds[k], icon: KIND_ICONS[k], title: t.kindHints[k], disabled: readOnly }))} />
-          </Field>
-          <Field label={t.title}>
-            <TextField value={spec.title} placeholder={t.titlePlaceholder} label={t.title} onCommit={(v) => change(t.undo.title, (c) => ({ ...c, title: v.trim() }))} />
-          </Field>
-          <Field label={t.legend}>
-            <Segmented
-              label={t.legend}
-              value={spec.legend}
-              options={(["top", "right", "bottom", "none"] as const).map((v) => ({ value: v, label: t.legendPos[v] }))}
-              onChange={(v) => change(t.undo.legend, (c) => ({ ...c, legend: v }))}
-            />
-          </Field>
-        </Section>
-
-        <Section id="data" title={t.sections.data} icon={<Database />} open={isOpen("data")} onToggle={() => toggle("data")}>
-          {spec.series.map((s, i) => (
-            <SeriesCard
-              key={s.id}
-              s={s}
-              index={i}
-              name={data.series[i]?.name ?? s.name}
-              xText={s.x ? data.series[i]?.xText : undefined}
-              spec={spec}
+          <Section id="data" title={t.sections.data} icon={<Database />} open={isOpen("data")} onToggle={() => toggle("data")}>
+            {spec.series.map((s, i) => (
+              <SeriesCard
+                key={s.id}
+                s={s}
+                index={i}
+                name={data.series[i]?.name ?? s.name}
+                xText={s.x ? data.series[i]?.xText : undefined}
+                spec={spec}
+                wb={wb}
+                t={t}
+                readOnly={readOnly}
+                onChange={(fn) => changeSeries(t.undo.series, s.id, fn)}
+                onRemove={spec.series.length > 1 ? () => change(t.undo.removeSeries, (c) => ({ ...c, series: c.series.filter((x) => x.id !== s.id) })) : undefined}
+                fromSelection={fromSelection}
+              />
+            ))}
+            {!readOnly && spec.kind !== "pie" && (
+              <button
+                type="button"
+                onClick={addSeries}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-2 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-blob hover:text-blob-ink [@media(hover:none)]:h-10"
+              >
+                <Plus className="size-4" />
+                {t.addSeries}
+              </button>
+            )}
+            <RangeField
+              label={scatter ? t.xShared : t.categories}
+              value={spec.x}
               wb={wb}
+              hostSheetId={spec.sheetId}
+              allowEmpty
+              hint={t.noX}
               t={t}
-              readOnly={readOnly}
-              onChange={(fn) => changeSeries(t.undo.series, s.id, fn)}
-              onRemove={spec.series.length > 1 ? () => change(t.undo.removeSeries, (c) => ({ ...c, series: c.series.filter((x) => x.id !== s.id) })) : undefined}
-              fromSelection={fromSelection}
+              onCommit={(r) => change(t.undo.x, (c) => ({ ...c, x: r }))}
+              onUseSelection={readOnly ? undefined : () => change(t.undo.x, (c) => ({ ...c, x: fromSelection() }))}
             />
-          ))}
-          {!readOnly && spec.kind !== "pie" && (
-            <button
-              type="button"
-              onClick={addSeries}
-              className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-2 text-[12.5px] font-medium text-ink-2 transition-colors hover:border-blob hover:text-blob-ink [@media(hover:none)]:h-10"
-            >
-              <Plus className="size-4" />
-              {t.addSeries}
-            </button>
+            {sharedXText && <XTextNote xText={sharedXText} trend={sharedXTrend} t={t} />}
+          </Section>
+
+          {spec.kind !== "pie" && current && (
+            <Section id="trend" title={t.sections.trend} icon={<TrendingUp />} open={isOpen("trend")} onToggle={() => toggle("trend")}>
+              <TrendSection store={store} spec={spec} series={current} data={currentData} xFormat={data.xFormat} xCell={xCell} locale={locale} t={t} readOnly={readOnly} picker={picker} />
+            </Section>
           )}
-          <RangeField
-            label={scatter ? t.xShared : t.categories}
-            value={spec.x}
-            wb={wb}
-            hostSheetId={spec.sheetId}
-            allowEmpty
-            hint={t.noX}
-            t={t}
-            onCommit={(r) => change(t.undo.x, (c) => ({ ...c, x: r }))}
-            onUseSelection={readOnly ? undefined : () => change(t.undo.x, (c) => ({ ...c, x: fromSelection() }))}
-          />
-          {sharedXText && <XTextNote xText={sharedXText} trend={sharedXTrend} t={t} />}
-        </Section>
 
-        {spec.kind !== "pie" && current && (
-          <Section id="trend" title={t.sections.trend} icon={<TrendingUp />} open={isOpen("trend")} onToggle={() => toggle("trend")}>
-            <TrendSection store={store} spec={spec} series={current} data={currentData} xFormat={data.xFormat} locale={locale} t={t} readOnly={readOnly} picker={picker} />
-          </Section>
-        )}
+          {spec.kind !== "pie" && current && (
+            <Section id="errors" title={t.sections.errors} icon={<ErrorBarIcon />} open={isOpen("errors")} onToggle={() => toggle("errors")}>
+              {picker}
+              <ErrorBars
+                eb={current.errorBars}
+                wb={wb}
+                spec={spec}
+                locale={locale}
+                t={t}
+                readOnly={readOnly}
+                fromSelection={fromSelection}
+                onChange={(eb) => changeSeries(t.undo.errors, current.id, (s) => ({ ...s, errorBars: eb }))}
+              />
+            </Section>
+          )}
 
-        {spec.kind !== "pie" && current && (
-          <Section id="errors" title={t.sections.errors} icon={<ErrorBarIcon />} open={isOpen("errors")} onToggle={() => toggle("errors")}>
-            {picker}
-            <ErrorBars
-              eb={current.errorBars}
-              wb={wb}
-              spec={spec}
-              locale={locale}
-              t={t}
-              readOnly={readOnly}
-              fromSelection={fromSelection}
-              onChange={(eb) => changeSeries(t.undo.errors, current.id, (s) => ({ ...s, errorBars: eb }))}
-            />
-          </Section>
-        )}
+          {/* Named by where they run on the chart: a bar chart has its categories up the side. */}
+          {spec.kind !== "pie" && (
+            <Section id="axes" title={t.sections.axes} icon={<Axis3d />} open={isOpen("axes")} onToggle={() => toggle("axes")}>
+              <AxisFields
+                title={scatter ? t.axisX : t.axisCategories(spec.kind === "bar")}
+                axis={spec.xAxis}
+                numeric={scatter}
+                locale={locale}
+                t={t}
+                onChange={(a) => change(t.undo.axis, (c) => ({ ...c, xAxis: a }))}
+              />
+              <div className="h-px bg-line" />
+              <AxisFields
+                title={scatter ? t.axisY : t.axisValues(spec.kind !== "bar")}
+                axis={spec.yAxis}
+                numeric
+                locale={locale}
+                t={t}
+                onChange={(a) => change(t.undo.axis, (c) => ({ ...c, yAxis: a }))}
+              />
+            </Section>
+          )}
 
-        {/* Named by where they run on the chart: a bar chart has its categories up the side. */}
-        {spec.kind !== "pie" && (
-          <Section id="axes" title={t.sections.axes} icon={<Axis3d />} open={isOpen("axes")} onToggle={() => toggle("axes")}>
-            <AxisFields
-              title={scatter ? t.axisX : t.axisCategories(spec.kind === "bar")}
-              axis={spec.xAxis}
-              numeric={scatter}
-              locale={locale}
-              t={t}
-              onChange={(a) => change(t.undo.axis, (c) => ({ ...c, xAxis: a }))}
-            />
-            <div className="h-px bg-line" />
-            <AxisFields
-              title={scatter ? t.axisY : t.axisValues(spec.kind !== "bar")}
-              axis={spec.yAxis}
-              numeric
-              locale={locale}
-              t={t}
-              onChange={(a) => change(t.undo.axis, (c) => ({ ...c, yAxis: a }))}
-            />
-          </Section>
-        )}
-
-        {current && (
-          <Section id="look" title={t.sections.look} icon={<Palette />} open={isOpen("look")} onToggle={() => toggle("look")}>
-            {spec.kind !== "pie" && picker}
-            {spec.kind !== "pie" && (
-              <Field label={t.color}>
-                <Swatches
-                  label={t.color}
-                  value={current.color}
-                  autoColor={seriesColor({ color: null }, spec.series.indexOf(current))}
-                  t={t}
-                  onChange={(color) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, color }))}
-                />
-              </Field>
-            )}
-            {lineKind && (
-              <Field label={t.marker}>
-                <Chips
-                  label={t.marker}
-                  value={current.marker}
-                  onChange={(marker) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, marker }))}
-                  options={(["none", "circle", "square", "triangle", "diamond"] as const).map((m) => ({ value: m, label: t.markers[m], icon: <MarkerGlyph kind={m} /> }))}
-                />
-              </Field>
-            )}
-            {lineKind && (
-              <Field label={t.line}>
-                <Segmented
-                  label={t.line}
-                  value={current.line}
-                  options={(["none", "straight", "smooth"] as const).map((v) => ({ value: v, label: t.lines[v] }))}
-                  onChange={(line) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, line }))}
-                />
-              </Field>
-            )}
-            <Toggle label={t.dataLabels} checked={current.labels} disabled={readOnly} onChange={(labels) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, labels }))} />
-          </Section>
-        )}
+          {current && (
+            <Section id="look" title={t.sections.look} icon={<Palette />} open={isOpen("look")} onToggle={() => toggle("look")}>
+              {spec.kind !== "pie" && picker}
+              {spec.kind !== "pie" && (
+                <Field label={t.color}>
+                  <Swatches
+                    label={t.color}
+                    value={current.color}
+                    autoColor={seriesColor({ color: null }, spec.series.indexOf(current))}
+                    t={t}
+                    onChange={(color) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, color }))}
+                  />
+                </Field>
+              )}
+              {lineKind && (
+                <Field label={t.marker}>
+                  <Chips
+                    label={t.marker}
+                    value={current.marker}
+                    onChange={(marker) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, marker }))}
+                    options={(["none", "circle", "square", "triangle", "diamond"] as const).map((m) => ({ value: m, label: t.markers[m], icon: <MarkerGlyph kind={m} /> }))}
+                  />
+                </Field>
+              )}
+              {lineKind && (
+                <Field label={t.line}>
+                  <Segmented
+                    label={t.line}
+                    value={current.line}
+                    options={(["none", "straight", "smooth"] as const).map((v) => ({ value: v, label: t.lines[v] }))}
+                    onChange={(line) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, line }))}
+                  />
+                </Field>
+              )}
+              <Toggle label={t.dataLabels} checked={current.labels} disabled={readOnly} onChange={(labels) => changeSeries(t.undo.look, current.id, (s) => ({ ...s, labels }))} />
+            </Section>
+          )}
+        </div>
       </div>
 
       <div className="shrink-0 space-y-2 border-t border-line bg-surface px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
@@ -404,16 +436,18 @@ function PanelBody({
             {t.saveFailed}
           </p>
         )}
-        {/* Docked across a tablet's width: one row, so the settings above keep their room. */}
-        <div className="grid grid-cols-2 gap-2 @[540px]/chartpanel:flex @[540px]/chartpanel:items-center">
-          <FooterButton onClick={() => save("png")} busy={saving === "png"} icon={<ImageDown />} label={t.exportPng}>
+        {/* Docked: one row, so the settings above keep their room. On a phone that row holds the
+            icons, with the file format on the two save buttons (named for screen readers, and by a
+            tooltip); across a tablet their words too. */}
+        <div className={dock ? "flex flex-wrap items-center gap-2" : "grid grid-cols-2 gap-2 @[540px]/chartpanel:flex @[540px]/chartpanel:items-center"}>
+          <FooterButton onClick={() => save("png")} busy={saving === "png"} icon={<ImageDown />} label={t.exportPng} compact={!!dock} format={t.exportPngFormat}>
             {t.exportPngShort}
           </FooterButton>
-          <FooterButton onClick={() => save("svg")} busy={saving === "svg"} icon={<FileDown />} label={t.exportSvg}>
+          <FooterButton onClick={() => save("svg")} busy={saving === "svg"} icon={<FileDown />} label={t.exportSvg} compact={!!dock} format={t.exportSvgFormat}>
             {t.exportSvgShort}
           </FooterButton>
           {!readOnly && pageId && (
-            <FooterButton onClick={() => setNoteOpen(true)} icon={<NotebookPen />} className="col-span-2">
+            <FooterButton onClick={() => setNoteOpen(true)} icon={<NotebookPen />} compact={!!dock} className={dock ? undefined : "col-span-2"}>
               {t.addToNote}
             </FooterButton>
           )}
@@ -425,7 +459,8 @@ function PanelBody({
               }}
               icon={<Trash2 />}
               danger
-              className="col-span-2 @[540px]/chartpanel:ml-auto"
+              compact={!!dock}
+              className={dock ? "ml-auto" : "col-span-2 @[540px]/chartpanel:ml-auto"}
             >
               {t.deleteChart}
             </FooterButton>
@@ -437,22 +472,51 @@ function PanelBody({
   );
 }
 
-function FooterButton({ onClick, icon, children, label, busy, danger, className }: { onClick: () => void; icon: ReactNode; children: ReactNode; label?: string; busy?: boolean; danger?: boolean; className?: string }) {
+/**
+ * `compact` (docked under the cells): the words only where all four fit on one line, from 540 px,
+ * or with a `format` from 640 px (the German row needs about 610). Narrower, just the icon, or the
+ * icon and the format, since the two save icons look alike. The name for screen readers and the
+ * tooltip always has the words.
+ */
+function FooterButton({
+  onClick,
+  icon,
+  children,
+  label,
+  busy,
+  danger,
+  compact,
+  format,
+  className,
+}: {
+  onClick: () => void;
+  icon: ReactNode;
+  children: string;
+  label?: string;
+  busy?: boolean;
+  danger?: boolean;
+  compact?: boolean;
+  format?: string;
+  className?: string;
+}) {
+  const name = label ?? (compact ? children : undefined);
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={label}
-      title={label}
+      aria-label={name}
+      title={name}
       disabled={busy}
       className={cn(
         "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors disabled:opacity-50 [@media(hover:none)]:h-10 [&_svg]:size-4 [&_svg]:shrink-0",
+        compact && "[@media(hover:none)]:min-w-10",
         danger ? "border-transparent text-danger hover:bg-danger/10" : "border-line bg-raised text-ink-2 shadow-card hover:border-line-2 hover:text-ink",
         className,
       )}
     >
       {icon}
-      <span className="truncate">{children}</span>
+      {compact && format && <span className="@[640px]/chartpanel:hidden">{format}</span>}
+      <span className={compact ? cn("hidden whitespace-nowrap", format ? "@[640px]/chartpanel:inline" : "@[540px]/chartpanel:inline") : "truncate"}>{children}</span>
     </button>
   );
 }

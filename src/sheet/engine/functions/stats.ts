@@ -27,9 +27,12 @@ function resizedLike(v: Value, like: Grid, ctx: Ctx): Grid {
   return gridOf(v, ctx);
 }
 
-/** The values of `target` (or the first range) where every (range, criterion) pair matches; null when sizes differ. */
+/**
+ * The values of `target` (or the first range) where every (range, criterion) pair matches. Ranges of
+ * different sizes give Excel's #VALUE!, explained as that (not as text where a number belongs).
+ */
 function matching(target: Grid, conds: { grid: Grid; test: Criterion }[]): Scalar[] | CellError {
-  for (const c of conds) if (c.grid.rows !== target.rows || c.grid.cols !== target.cols) return ERR.value;
+  for (const c of conds) if (c.grid.rows !== target.rows || c.grid.cols !== target.cols) return mkErr("#VALUE!", "sizes");
   const out: Scalar[] = [];
   for (let i = 0; i < target.rows; i++) {
     for (let j = 0; j < target.cols; j++) {
@@ -840,7 +843,7 @@ export const STATS: FnDef[] = [
         // Every cell counts toward the degrees of freedom, so an empty or text cell can't just be
         // left out (LibreOffice refuses it too): a count of nothing is 0.
         if (Number.isNaN(o)) return why.arg(1, "num");
-        if (Number.isNaN(x)) return why.arg(2, "num");
+        if (Number.isNaN(x)) return why.arg(2, "posnum");
         if (x < 0) return why.arg(2, "pos");
         if (x === 0) return mkErr("#DIV/0!", "expected-zero");
         chi += ((o - x) * (o - x)) / x;
@@ -944,5 +947,6 @@ const SAME_AS: [old: string, now: string][] = [
   ["CHIDIST", "CHISQ.DIST.RT"],
   ["CHIINV", "CHISQ.INV.RT"],
   ["CHITEST", "CHISQ.TEST"],
+  ["COVAR", "COVARIANCE.P"],
 ];
 for (const [old, now] of SAME_AS) STATS.push({ ...STATS.find((f) => f.name === now)!, name: old });

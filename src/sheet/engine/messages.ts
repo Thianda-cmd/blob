@@ -2,6 +2,7 @@
 // Klammer"), and what an error value in a cell means (for the tooltip on #WERT!, #BEZUG!…).
 
 import type { Locale } from "@/i18n/config";
+import { EXCEL_FUNCTIONS } from "./excelNames";
 import { FUNCTION_BY_DE, FUNCTION_BY_EN, FUNCTION_NAMES, type FunctionName } from "./names";
 import type { ParseError } from "./parser";
 import type { CellError } from "./values";
@@ -14,7 +15,7 @@ export function localName(canonical: string, locale: Locale): string {
 
 /** A name with its umlauts spelled out: ZÄHLENWENN and ZAEHLENWENN are one. */
 const spelled = (name: string) => name.replace(/Ä/g, "AE").replace(/Ö/g, "OE").replace(/Ü/g, "UE").replace(/ß/g, "SS");
-/** …and without dots (the keys of MEANT). */
+/** …and without dots (the keys of MEANT and NOT_YET). */
 const plain = (name: string) => spelled(name).replace(/\./g, "");
 
 /** Is the typed name this name with some of its dots left out (STABWS for STABW.S)? Both spelled out. */
@@ -69,6 +70,20 @@ function isSlip(typed: string, name: string, c: number): boolean {
   return a.every((part, i) => Math.min(part.length, b[i].length) > 4 || cost(part, b[i]) % 64 === 0);
 }
 
+/** Is the typed name this name with one letter dropped, one typed twice or two next to each other swapped? Both spelled out. */
+function oneSlip(typed: string, name: string): boolean {
+  const d = typed.length - name.length;
+  for (let i = 0; i < name.length; i++) {
+    if (d === -1 && name.slice(0, i) + name.slice(i + 1) === typed) return true;
+    if (d === 1 && name.slice(0, i) + name[i] + name.slice(i) === typed) return true;
+    if (d === 0 && i + 1 < name.length && name.slice(0, i) + name[i + 1] + name[i] + name.slice(i + 2) === typed) return true;
+  }
+  return false;
+}
+
+/** The same function, or one an older name of the other (STABW and STABW.S calculate alike). */
+const alike = (a: FunctionName, b: FunctionName) => a === b || (a.newer?.length === 1 && a.newer[0] === b.en) || (b.newer?.length === 1 && b.newer[0] === a.en);
+
 /**
  * Words often typed for a function that aren't its name in either language, and the function
  * meant (the same maths), where spelling alone would guess wrong or not at all: MODUS isn't REST,
@@ -78,9 +93,12 @@ const MEANT = new Map(
   Object.entries({
     MODUS: "MODE.SNGL",
     MITTEL: "AVERAGE",
+    MITTE: "AVERAGE",
     DURCHSCHNITT: "AVERAGE",
     AVG: "AVERAGE",
     MEAN: "AVERAGE",
+    // The plural, which is also the start of SUMMENPRODUKT.
+    SUMMEN: "SUM",
     // The words a student knows from the lesson (the function browser finds them too, functionWords.ts).
     STANDARDABWEICHUNG: "STDEV.S",
     RQUADRAT: "RSQ",
@@ -106,30 +124,62 @@ const MEANT = new Map(
 );
 
 /**
- * Excel functions Blob doesn't have yet. Typed, they are named as such, without a guess by
- * spelling: the nearest name would calculate something else (BINOM.VERT is not T.VERT).
+ * Excel functions Blob doesn't have yet: every name of Excel's (excelNames.ts) that isn't Blob's.
+ * Typed, they are named as such, without a guess by spelling: the nearest name would calculate
+ * something else (BINOM.VERT is not T.VERT, ISTKTEXT is the opposite of ISTTEXT, PHI isn't PI).
+ * Compared without dots and umlauts, as they may be typed (BINOMVERT, ROEMISCH), but never where
+ * that is how one of Blob's names may be typed too (TTEST).
  */
-const NOT_YET = new Set(
-  (
-    "BINOM.DIST BINOM.VERT BINOMDIST BINOMVERT BINOM.INV CRITBINOM KRITBINOM POISSON.DIST POISSON.VERT POISSON EXPON.DIST EXPON.VERT EXPONDIST EXPONVERT " +
-    "GAMMA GAMMA.DIST GAMMA.VERT GAMMADIST GAMMAVERT GAMMALN LOGNORM.DIST LOGNORM.VERT LOGNORMDIST LOGNORMVERT WEIBULL WEIBULL.DIST WEIBULL.VERT " +
-    "Z.TEST G.TEST ZTEST GTEST MODE.MULT MODUS.VIELF PERCENTRANK QUANTILSRANG PERCENTRANK.INC QUANTILSRANG.INKL PERCENTRANK.EXC QUANTILSRANG.EXKL " +
-    "TRIMMEAN GESTUTZTMITTEL COVAR KOVAR PROB WAHRSCHBEREICH FISHER FISHERINV PERMUT VARIATIONEN COMBINA KOMBINATIONEN2 MAXA MINA " +
-    "UNIQUE EINDEUTIG SORT SORTIEREN SORTBY SORTIERENNACH FILTER SEQUENCE SEQUENZ TEXTSPLIT TEXTTEILEN TEXTBEFORE TEXTVOR TEXTAFTER TEXTNACH " +
-    "INDIRECT INDIREKT OFFSET BEREICH.VERSCHIEBEN ADDRESS ADRESSE TRANSPOSE MTRANS MMULT MINVERSE MINV MDETERM MDET LET LAMBDA " +
-    "CLEAN SÄUBERN NUMBERVALUE ZAHLENWERT DATEVALUE DATWERT TIMEVALUE ZEITWERT WORKDAY ARBEITSTAG YEARFRAC BRTEILJAHRE ROMAN RÖMISCH " +
-    "SINH SINHYP COSH COSHYP TANH TANHYP AGGREGATE AGGREGAT ERROR.TYPE FEHLER.TYP TYPE TYP CELL ZELLE HYPERLINK"
-  ).split(" "),
-);
+const NOT_YET = (() => {
+  const blob = new Set(FUNCTION_NAMES.flatMap((f) => [plain(f.en), plain(f.de)]));
+  return new Set(EXCEL_FUNCTIONS.flatMap((f) => [plain(f.en), plain(f.de)]).filter((name) => !blob.has(name)));
+})();
 
 /** Is this an Excel function Blob doesn't have yet (BINOM.VERT, EINDEUTIG…)? */
-export const notYetInBlob = (typed: string) => NOT_YET.has(typed.toUpperCase());
+export const notYetInBlob = (typed: string) => NOT_YET.has(plain(typed.toUpperCase()));
+
+/**
+ * The names in NOT_YET as each language writes them (with their dots, umlauts spelled out). A guess
+ * by spelling weighs them like Blob's names and never lands on one: DATWER is DATWERT begun, not
+ * DATUM, and GGANZZHL is GGANZZAHL mistyped, not GANZZAHL.
+ */
+const NOT_YET_NAMES = {
+  de: EXCEL_FUNCTIONS.map((f) => spelled(f.de)).filter((name) => NOT_YET.has(plain(name))),
+  en: EXCEL_FUNCTIONS.map((f) => spelled(f.en)).filter((name) => NOT_YET.has(plain(name))),
+};
+
+/**
+ * The function a name typed only in part begins (MITTELW, SUMMEW): undefined when no name in the
+ * user's language goes on from it (German: then no English one either), null when several do and
+ * none of them is the one to name. That is the only one; or the shortest when all the others go on
+ * from it (MITTELWERT for MITTELWERTA and …WENN, SUMMEWENN for SUMMEWENNS), unless it is an older
+ * name: KONF can be KONFIDENZ.T or KONFIDENZ.NORM, STAB STABW.S or STABW.N. Excel's functions Blob
+ * lacks count as names here too, but are never the one: PROGN can be PROGNOSE.ETS, ARCCO ARCCOT.
+ * Never a function the typed text isn't the beginning of: MITTELW isn't MITTELABW, SUMMEW isn't
+ * SUMME. `typed` with its umlauts spelled out.
+ */
+function completion(typed: string, locale: Locale): FunctionName | null | undefined {
+  for (const lang of locale === "de" ? (["de", "en"] as const) : (["en"] as const)) {
+    const name = (f: FunctionName) => spelled(lang === "de" ? f.de : f.en);
+    const goesOn = (n: string) => n.length > typed.length && n.startsWith(typed);
+    const found = FUNCTION_NAMES.filter((f) => goesOn(name(f)));
+    const lacking = NOT_YET_NAMES[lang].filter(goesOn);
+    if (!found.length && !lacking.length) continue;
+    if (!found.length) return null;
+    const [shortest, ...rest] = [...found].sort((a, b) => name(a).length - name(b).length);
+    if (!rest.length && !lacking.length) return shortest;
+    return !shortest.newer && [...rest.map(name), ...lacking].every((n) => n.startsWith(name(shortest))) ? shortest : null;
+  }
+  return undefined;
+}
 
 /**
  * The function a mistyped or foreign name stands for ("SUMM" → "SUMME", "STABWS" → "STABW.S",
  * SUMME typed in English → "SUM"), or null. Only suggests a function with the same maths: the
- * same name in the other language or without its dots or umlauts, a known synonym, or else the
- * closest spelling, when that is one function only and a slip of the fingers (see isSlip).
+ * same name in the other language or without its dots or umlauts, a known synonym, the function
+ * a name typed only in part begins (see completion), or else the closest spelling, when that is
+ * one function only and a slip of the fingers (see isSlip). Excel's functions Blob lacks count as
+ * names in all of this, and are never the guess.
  */
 export function suggestFunction(typed: string, locale: Locale): string | null {
   const up = typed.toUpperCase();
@@ -142,34 +192,50 @@ export function suggestFunction(typed: string, locale: Locale): string | null {
   const same = FUNCTION_NAMES.filter((f) => dotsLeftOut(typedSpelled, spelled(f.de)) || dotsLeftOut(typedSpelled, spelled(f.en)));
   if (same.length) {
     const now = same.filter((f) => !f.newer);
-    const alike = now.length === 1 && same.every((f) => f === now[0] || (f.newer?.length === 1 && f.newer[0] === now[0].en));
-    return same.length === 1 ? shown(same[0]) : alike ? shown(now[0]) : null;
+    return same.length === 1 ? shown(same[0]) : now.length === 1 && same.every((f) => alike(f, now[0])) ? shown(now[0]) : null;
   }
-  const meant = MEANT.get(plain(up));
+  // A word, not one cut short at its dot: QUARTIL. can be QUARTIL.INKL or QUARTIL.EXKL.
+  const meant = up.endsWith(".") ? undefined : MEANT.get(plain(up));
   if (meant) {
     const f = FUNCTION_BY_EN.get(meant);
     if (f) return shown(f);
   }
-  if (NOT_YET.has(up) || up.length < 3) return null;
-  let best = Infinity;
-  let closest: { f: FunctionName; name: string; c: number }[] = [];
-  for (const f of FUNCTION_NAMES) {
-    for (const name of locale === "de" ? [f.de, f.en] : [f.en]) {
-      const s = spelled(name);
-      const c = cost(typedSpelled, s);
-      // On a tie a name in the user's language goes first.
-      const score = name === shown(f) ? c : c + 0.5;
-      if (score < best) {
-        best = score;
-        closest = [{ f, name: s, c }];
-      } else if (score === best) closest.push({ f, name: s, c });
-    }
+  if (notYetInBlob(up) || up.length < 3) return null;
+  // The names a German types in are German and English ones.
+  const langs = locale === "de" ? (["de", "en"] as const) : (["en"] as const);
+  const names = (f: FunctionName) => langs.map((lang) => (lang === "de" ? f.de : f.en));
+  const notYet = langs.flatMap((lang) => NOT_YET_NAMES[lang]);
+  // A name typed only in part, unless it is just as well a slip of the fingers on another
+  // function's name: ROUNDD is ROUND with its D typed twice or the start of ROUNDDOWN, IND is FIND
+  // without its F or the start of INDEX. Two readings, no guess.
+  const begun = completion(typedSpelled, locale);
+  if (begun !== undefined) {
+    const slipOfAnother =
+      !!begun && (FUNCTION_NAMES.some((f) => !alike(f, begun) && names(f).some((n) => oneSlip(typedSpelled, spelled(n)))) || notYet.some((n) => oneSlip(typedSpelled, n)));
+    return begun && !slipOfAnother ? shown(begun) : null;
   }
+  // The closest spelling, of Blob's names and of Excel's that Blob lacks (`f` null).
+  let best = Infinity;
+  let closest: { f: FunctionName | null; name: string; c: number }[] = [];
+  const weigh = (f: FunctionName | null, s: string, own: boolean) => {
+    // Each letter more or less costs 64: a name that much longer or shorter can't come closer.
+    if (Math.abs(s.length - typedSpelled.length) * 64 > best) return;
+    const c = cost(typedSpelled, s);
+    // On a tie a name in the user's language goes first.
+    const score = own ? c : c + 0.5;
+    if (score < best) {
+      best = score;
+      closest = [{ f, name: s, c }];
+    } else if (score === best) closest.push({ f, name: s, c });
+  };
+  for (const f of FUNCTION_NAMES) for (const name of names(f)) weigh(f, spelled(name), name === shown(f));
+  // One of those as close as Blob's, in either language, can be meant just as well (COHS: COS or COSH).
+  for (const name of notYet) weigh(null, name, true);
   // Two functions just as close is no slip to guess (SUMMEWENSN: SUMMEWENN or SUMMEWENNS?); nor is
-  // the closest when it is another function (see isSlip), however close.
+  // the closest when it is another function (see isSlip), however close, or one Blob lacks.
   if (new Set(closest.map((x) => x.f)).size !== 1) return null;
   const { f, name, c } = closest[0];
-  return isSlip(typedSpelled, name, c) ? shown(f) : null;
+  return f && isSlip(typedSpelled, name, c) ? shown(f) : null;
 }
 
 const q = (locale: Locale, s: string) => (locale === "de" ? `„${s}“` : `"${s}"`);
@@ -189,6 +255,16 @@ export function formulaTooLongMessage(locale: Locale): string {
 export function thousandsNotice(typed: string, read: string, decimal: string, locale: Locale): { message: string; action: string } {
   if (locale === "de") return { message: `${q(locale, typed)} ist ${read}: Der Punkt trennt Tausender. Für ${decimal} tipp ein Komma.`, action: `Als ${decimal} lesen` };
   return { message: `${q(locale, typed)} is ${read}: the point separates thousands. For ${decimal}, type a comma.`, action: `Read as ${decimal}` };
+}
+
+/**
+ * A ratio typed as "1:2" read as a time (the colon separates hours and minutes): the note after
+ * typing it, and the label of the button that keeps it as text instead. `shown` is the time as the
+ * cell shows it ("01:02"); `duration`: 24 hours or more ("50:01" is a duration, not a time of day).
+ */
+export function colonNotice(typed: string, shown: string, duration: boolean, locale: Locale): { message: string; action: string } {
+  if (locale === "de") return { message: `${q(locale, typed)} ist jetzt die ${duration ? "Dauer" : "Uhrzeit"} ${shown}. Für ein Verhältnis tipp '${typed} (mit Apostroph davor).`, action: `Als Text ${q(locale, typed)}` };
+  return { message: `${q(locale, typed)} is now the ${duration ? "duration" : "time"} ${shown}. For a ratio, type '${typed} (with an apostrophe in front).`, action: `As text ${q(locale, typed)}` };
 }
 
 /** A parse error in plain words of the user's language. */
@@ -256,6 +332,16 @@ export function parseErrorMessage(e: ParseError, locale: Locale): string {
       if (text) return de ? `${why} Meintest du ${text}?` : `${why} Did you mean ${text}?`;
       if (fnName) return de ? `${why} Trenn die Argumente von ${fnName} mit ;.` : `${why} Separate the arguments of ${fnName} with ;.`;
       return de ? `${why} Trenn die Argumente mit ;.` : `${why} Separate the arguments with ;.`;
+    }
+    case "decimal-comma": {
+      // =REST(10,3): the number 10,3 and one argument short, or two arguments with a comma between
+      // (`e.meant`: the formula with ";", when the function takes that many).
+      const missing = e.count ?? 1;
+      const read = de
+        ? `${q(locale, text)} ist hier eine Zahl mit Dezimalkomma, dann ${missing === 1 ? `fehlt ${fnName} noch ein Argument` : `fehlen ${fnName} noch ${missing} Argumente`}.`
+        : `${q(locale, text)} is a number with a decimal comma here, so ${fnName} is still ${missing === 1 ? "an argument" : `${missing} arguments`} short.`;
+      if (e.meant) return de ? `${read} Meintest du ${e.meant}?` : `${read} Did you mean ${e.meant}?`;
+      return de ? `${read} In deutschen Formeln trennt ; die Argumente.` : `${read} In German formulas ; separates the arguments.`;
     }
     case "too-many-args":
       return de
@@ -378,6 +464,8 @@ function explainWhy(detail: string, locale: Locale): string {
         p: ["muss", "zwischen 0 und 1 liegen", "must be between 0 and 1"],
         pos: ["darf", "nur Zahlen größer als 0 enthalten", "may only hold numbers greater than 0"],
         num: ["darf", "nur Zahlen enthalten, keine leeren Zellen und keinen Text (für „keine“ trag 0 ein)", "may only hold numbers, no empty cells or text (for “none”, enter 0)"],
+        // Expected counts: a 0 there can't be divided by, so no advice to enter one.
+        posnum: ["darf", "nur Zahlen größer als 0 enthalten, keine leeren Zellen und keinen Text", "may only hold numbers greater than 0, no empty cells or text"],
         range: ["muss", `zwischen ${lo} und ${hi} liegen`, `must be between ${lo} and ${hi}`],
       };
       const r = rules[rule];
@@ -403,6 +491,7 @@ export function explainError(err: CellError, locale: Locale): string {
       return de ? "Division durch null: Der Teiler ist 0 oder eine leere Zelle." : "Division by zero: the divisor is 0 or an empty cell.";
     case "#N/A":
       if (key === "not-found") return de ? "Der gesuchte Wert kommt im Suchbereich nicht vor." : "The value you're looking for isn't in the lookup range.";
+      if (key === "empty-lookup") return de ? "Die Zelle mit dem Suchwert ist leer." : "The cell with the lookup value is empty.";
       if (key === "no-match") return de ? "Keine der Bedingungen trifft zu." : "None of the conditions is true.";
       if (key === "unit") return de ? `Die Einheit ${q(locale, arg)} kenne ich nicht, oder die Einheiten passen nicht zusammen.` : `The unit ${q(locale, arg)} is unknown, or the units don't belong together.`;
       return de ? "Kein Wert verfügbar (#NV)." : "No value is available (#N/A).";

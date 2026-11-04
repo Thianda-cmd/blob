@@ -11,6 +11,13 @@ import { cn } from "@/lib/utils";
 import { FUNCTION_BY_EN, type FunctionName } from "@/sheet/engine";
 import { FUNCTION_DOCS, type FnArgDoc, type FnDoc } from "@/sheet/engine/docs";
 
+/**
+ * What the help says about a function and its arguments, read while typing to learn the function
+ * (here and in the cell's own help): as big and as dark as the settings panels' hints (12 px, 4.5:1
+ * and more on every theme).
+ */
+export const HELP_TEXT = "text-[12px] leading-snug text-ink-2";
+
 /** A function's name in the user's language. */
 export const localName = (fn: FunctionName, locale: Locale) => (locale === "de" ? fn.de : fn.en);
 
@@ -69,7 +76,7 @@ export function ArgumentHint({ fn, index, locale, t, compact = false }: { fn: st
         <Syntax name={name} args={args} locale={locale} current={current} />
       </div>
       {doc?.summary ? (
-        <div className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-ink-3">{doc.summary}</div>
+        <div className={cn("mt-0.5 line-clamp-2", HELP_TEXT)}>{doc.summary}</div>
       ) : (
         info && <div className="mt-0.5 text-[12px] text-ink-3">{t.categories[info.category]}</div>
       )}
@@ -93,6 +100,7 @@ export function SuggestionList({
   pick,
   locale,
   t,
+  tapHint,
   typed,
   onPick,
   onHover,
@@ -103,6 +111,8 @@ export function SuggestionList({
   pick: number;
   locale: Locale;
   t: SheetChromeText;
+  /** The list's last line on touch screens, in place of the keys (t.pickHint). */
+  tapHint: string;
   /** What was typed, to tell when an item matched by its other language's name. */
   typed: string;
   onPick: (fn: FunctionName) => void;
@@ -136,12 +146,18 @@ export function SuggestionList({
                 {other && <span className="font-mono text-[11px] text-ink-3">{other}</span>}
                 <span className="ml-auto shrink-0 text-[10.5px] text-ink-3">{t.categories[fn.category]}</span>
               </span>
-              {doc?.summary && !compact && <span className="line-clamp-1 text-[11.5px] text-ink-3">{doc.summary}</span>}
+              {doc?.summary && !compact && <span className={cn("line-clamp-1", HELP_TEXT)}>{doc.summary}</span>}
             </li>
           );
         })}
       </ul>
-      {!compact && <div className="border-t border-line px-2.5 py-1 text-[11px] text-ink-3">{t.pickHint}</div>}
+      {/* A finger takes a function by tapping it: an on-screen keyboard has no Tab key. */}
+      {!compact && (
+        <div className={cn("border-t border-line px-2.5 py-1", HELP_TEXT)}>
+          <span className="[@media(hover:none)]:hidden">{t.pickHint}</span>
+          <span className="hidden [@media(hover:none)]:inline">{tapHint}</span>
+        </div>
+      )}
     </div>
   );
 }

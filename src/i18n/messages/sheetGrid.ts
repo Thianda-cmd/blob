@@ -103,16 +103,21 @@ export const sheetGridText = defineMessages({
     functions: "Functions",
     formulaProblem: "Check the formula",
     pickHint: "Tab or Enter inserts the function",
+    /** The same on a touch screen, where a tap on the list is the way. */
+    pickHintTouch: "Tap a function to insert it",
     result: "Result",
 
-    // Pasting from the menu when the browser won't let the page read the clipboard
+    // Pasting from the menu when the browser won't let the page read the clipboard (with the
+    // keyboard; on a touch screen, by letting the browser read it or pasting in the cell itself)
     pasteHint: "Press Ctrl+V (⌘V on a Mac) to paste from the clipboard.",
+    pasteHintTouch: "Blob isn't allowed to read the clipboard. Try again and allow it when your browser asks (“Paste” or “Allow”). A single value can also be pasted in the cell: double-tap, press and hold, “Paste”.",
     pasteNothing: "There is nothing to paste.",
+    cutApart: "Cut cancelled: since you cut the cells, something was sorted or moved there, and they aren't next to each other any more. Cut them again.",
 
     // Text that looks like a number (a mark in the cell's corner, its tip and what screen readers hear)
     numberText: {
       title: "Number stored as text",
-      text: "This looks like a number, but it's text, for example because of an extra point or comma, or a space. Formulas and charts leave this cell out. Type the value again.",
+      text: "This looks like a number, but it's text, for example because of an extra point or comma, or a space. Formulas like SUM or SLOPE and charts leave this cell out, others show #VALUE!. Type the value again.",
     },
 
     // Filling on a touch screen: the menu entry, and how it works
@@ -232,20 +237,23 @@ export const sheetGridText = defineMessages({
       "#REF!": { title: "Ungültiger Bezug", text: "Die Formel zeigt auf eine Zelle, die es nicht mehr gibt: Sie wurde gelöscht oder liegt außerhalb des Blatts." },
       "#VALUE!": { title: "Falscher Wert", text: "Ein Wert hat den falschen Typ. Zum Beispiel steht dort Text, wo eine Zahl gebraucht wird." },
       "#CALC!": { title: "Nicht berechenbar", text: "Das Ergebnis lässt sich nicht berechnen, zum Beispiel weil ein Bereich leer ist." },
-      "#CIRC!": { title: "Zirkelbezug", text: "Die Formel hängt (direkt oder über andere Zellen) von ihrer eigenen Zelle ab. Entferne den Bezug auf sich selbst." },
+      "#CIRC!": { title: "Zirkelbezug", text: "Die Formel hängt (direkt oder über andere Zellen) von ihrer eigenen Zelle ab. Entfern den Bezug auf sich selbst." },
     },
 
     functions: "Funktionen",
     formulaProblem: "Formel prüfen",
     pickHint: "Tab oder Enter übernimmt die Funktion",
+    pickHintTouch: "Tipp auf eine Funktion, um sie zu übernehmen",
     result: "Ergebnis",
 
     pasteHint: "Drück Strg+V (⌘V am Mac), um aus der Zwischenablage einzufügen.",
+    pasteHintTouch: "Blob darf die Zwischenablage nicht lesen. Versuch es noch mal und erlaub es, wenn dein Browser fragt („Einfügen“ oder „Zulassen“). Einen einzelnen Wert kannst du auch in der Zelle einfügen: doppelt tippen, lange drücken, „Einfügen“.",
     pasteNothing: "Es gibt nichts zum Einfügen.",
+    cutApart: "Ausschneiden abgebrochen: Seit du die Zellen ausgeschnitten hast, wurde dort sortiert oder verschoben, und sie sind nicht mehr beieinander. Schneid sie noch einmal aus.",
 
     numberText: {
       title: "Zahl als Text",
-      text: "Das sieht aus wie eine Zahl, ist aber Text, zum Beispiel wegen eines zweiten Kommas oder eines Leerzeichens. Formeln und Diagramme lassen diese Zelle aus. Tipp den Wert neu ein.",
+      text: "Das sieht aus wie eine Zahl, ist aber Text, zum Beispiel wegen eines zweiten Kommas oder eines Leerzeichens. Formeln wie SUMME oder STEIGUNG und Diagramme lassen diese Zelle aus, andere zeigen #WERT!. Tipp den Wert neu ein.",
     },
 
     fillTouch: "Ausfüllen …",

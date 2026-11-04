@@ -10,6 +10,7 @@ import { useOfflineDevice } from "@/lib/offline/useOfflineDevice";
 import { useStartSync } from "@/lib/offline/useSync";
 import { useNotifications } from "@/lib/notify/useNotifications";
 import { FileDrop } from "@/components/notes/FileDrop";
+import { DeniedDrafts } from "@/components/sheet/DeniedDrafts";
 import { useOpenedFiles } from "@/components/notes/useOpenedFiles";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
@@ -135,6 +136,7 @@ export function AppShell({ children, isAdmin = false }: { children: ReactNode; i
       </div>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <BlobHelper />
+      <DeniedDrafts />
       <FileDrop />
       </PanesProvider>
     </ShellCtx.Provider>

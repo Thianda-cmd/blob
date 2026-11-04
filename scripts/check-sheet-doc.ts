@@ -23,31 +23,60 @@
 //   typing goes on (longer for big spreadsheets); a rename made elsewhere; the size limit as
 //   save_sheet measures it, the warning near it and the import check; the notice when rows were
 //   moved on both sides at once; and a change that couldn't be saved, undone.
+// - What the database can't store or take (lane SV): half an emoji or NUL in any text (the stand-in
+//   refuses them as PostgREST does), a save refused as sent (no endless retries), work that can't be
+//   saved any more (kept, marked, asked about), each device's one place in save_ids, and a sheet too
+//   big to save while offline.
+// - A server error (HTTP 5xx) while the connection works (lane ACC3): a failed save, tried again
+//   after the saver's own pauses with the notice once, never "offline"; one that may have landed;
+//   back online after a real network failure at once; what screen readers hear (SaveIndicator); and
+//   the way out of a conflict copy that makes the spreadsheet too big to save (COL-4).
+// - A draft whose save may have landed, put back only once that is known (lane SAVE2, SQL2-3): it
+//   waits on the device while the look-up gets no answer, looked at again once online again, after
+//   a pause and now and then before a save (which doesn't wait for it); the others put back at
+//   once; typing meanwhile stays; the background save taking it; closing and signing out meanwhile.
+//   An editor opened with the draft's version or an older one (the app's copy, offline) carries on
+//   from it: its work shown at once, nothing sent until that save is found out (landed or not; a
+//   copy older than the draft; typed into first; two such drafts). And what screen readers hear
+//   from the bar under the top bar (BannerVoice): each problem once, with the indicator's words.
 // Problems make the script exit with 1.
 
 import {
   clearDraft,
+  deniedDrafts,
   discardOpenSheets,
   draftPages,
   flushOpenSheets,
   flushedRev,
   forgetOtherAccounts,
+  LAST_SAVE_PREFIX,
+  letGoOf,
+  onDeniedDrafts,
   readDrafts,
+  readLastSave,
   unsavedSheets,
   waitingDrafts,
   writeDraft,
   type SheetDraft,
 } from "@/components/sheet/drafts";
-import { flushSheetDrafts } from "@/components/sheet/flushDrafts";
+import { draftAsPage, flushSheetDrafts } from "@/components/sheet/flushDrafts";
 import { appendWorkbook, freshIds, importedBytes, MAX_SHEET_BYTES, sheetPageContent } from "@/components/sheet/importFile";
 import { newPageFor } from "@/components/shell/paletteNew";
-import { jsonBytes, LARGE_BYTES, MAX_BYTES, SheetSaver, storedContent, type SaveArgs, type SaverApi, type SheetConflict } from "@/components/sheet/saver";
+import { jsonBytes, landedFrom, LARGE_BYTES, MAX_BYTES, SAVE_DELAY, saveOnce, SheetSaver, storableText, storedContent, supabaseApi, type SaveArgs, type SaveNotice, type SaverApi, type SheetConflict } from "@/components/sheet/saver";
+import { currentSheetNotice, showSheetNotice } from "@/components/sheet/notice";
 import { createSheetStore } from "@/components/sheet/store";
-import { reportOk } from "@/lib/offline/net";
-import { mergeWorkbooks, sameJson } from "@/sheet/collab";
-import { isBlankWorkbook, isUnreadableWorkbook, newWorkbook, normalizeWorkbook, previewLook, readSheetPreview, workbookPlainText, workbookPreview } from "@/sheet/doc";
+import { copyReaders, markOwnVersion, ownBigCopies, sameOwnVersion, takeOwnVersion, tooBigBecause, troubleSaid } from "@/components/sheet/useSheetSave";
+import { sheetText } from "@/i18n/messages/sheet";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { indicatorVoice, SaveIndicator, saveAnnouncement, type IndicatorVoice, type PageSaid } from "@/components/page/SaveIndicator";
+import { BannerVoice, bannerAtStart, bannerNext, type BannerKind } from "@/components/sheet/BannerVoice";
+import type { SaveState } from "@/components/page/useAutosave";
+import { isOnline, reportNetworkError, reportOk } from "@/lib/offline/net";
+import { copyTies, mergeWorkbooks, ownVersion, sameJson, tiedCopy } from "@/sheet/collab";
+import { cutText, isBlankWorkbook, isUnreadableWorkbook, newWorkbook, normalizeWorkbook, previewLook, readSheetPreview, storable, storableWork, workbookPlainText, workbookPreview } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
-import { insertRows, setCells } from "@/sheet/ops";
+import { deleteRows, deleteSheet, insertRows, setCells } from "@/sheet/ops";
 import { MAX_COLS, MAX_ROWS, type Cell, type ChartSpec, type SeriesSpec, type Sheet, type TableSpec, type Workbook } from "@/sheet/types";
 
 let passed = 0;
@@ -722,19 +751,22 @@ section("merge: sheets", () => {
   const theirsSame: Workbook = clone({ ...base, sheets: [...base.sheets, blank("t3", "Meins")] });
   const ms = mergeWorkbooks(base, mine, theirsSame);
   check("same new name on both sides: numbered", ms.sheets.filter((s) => /^Meins/.test(s.name)).length === 2 && validate(ms).length === 0, ms.sheets.map((s) => s.name));
-  // Delete.
+  // Delete. A sheet deleted on one side that the other side changed meanwhile stays, with that
+  // side's work (COL-1: a deletion made without seeing it never destroys it); untouched, it goes.
   const theirsDel: Workbook = clone({ ...base, sheets: [base.sheets[0]], charts: base.charts, tables: base.tables });
   const mineEdits = setCell(base, "lab2", "3,3", { v: "lost?" });
   const md = mergeWorkbooks(base, mineEdits, theirsDel);
-  check("sheet deleted by them stays deleted (even though I edited it)", md.sheets.length === 1 && md.sheets[0].id === "lab1", md.sheets.map((s) => s.id));
+  check("sheet deleted by them that I filled in: stays, with my work", md.sheets.length === 2 && cellOf(md, "lab2", "3,3")?.v === "lost?", md.sheets.map((s) => s.id));
   const mineDel: Workbook = { ...base, sheets: [base.sheets[0]] };
   const md2 = mergeWorkbooks(base, mineDel, clone(setCell(base, "lab2", "1,1", { v: 5 })));
-  check("sheet deleted by me stays deleted", md2.sheets.length === 1);
-  // Chart on a sheet they deleted goes too.
+  check("sheet deleted by me that they filled in: stays, with their work", md2.sheets.length === 2 && cellOf(md2, "lab2", "1,1")?.v === 5, md2.sheets.map((s) => s.id));
+  const md3 = mergeWorkbooks(base, mineDel, clone(updateSheet(base, "lab2", (s) => ({ ...s, name: "Umbenannt" }))));
+  check("sheet deleted by me that they only renamed: stays deleted", md3.sheets.length === 1, md3.sheets.map((s) => s.id));
+  // My chart on a sheet they deleted counts as work on it: the sheet stays, with the chart.
   const mineChart: Workbook = { ...base, charts: [...base.charts, { ...base.charts[0], id: "ch9", sheetId: "lab2", x: null, series: [series("z", range("lab2", 1, 1, 3, 1))] }] };
   const theirsDel2: Workbook = clone({ ...base, sheets: [base.sheets[0]] });
   const mc = mergeWorkbooks(base, mineChart, theirsDel2);
-  check("my chart on their deleted sheet: dropped, workbook valid", !mc.charts.some((c) => c.id === "ch9") && validate(mc).length === 0, validate(mc));
+  check("my chart on their deleted sheet: the sheet stays with it, workbook valid", mc.sheets.some((s) => s.id === "lab2") && mc.charts.some((c) => c.id === "ch9") && validate(mc).length === 0, validate(mc));
   // Both delete each other's sheets: one is left.
   const both = mergeWorkbooks(base, { ...base, sheets: [base.sheets[1]], charts: [], tables: [] }, clone({ ...base, sheets: [base.sheets[0]] }));
   check("both deleted the other's sheet: one left, valid", both.sheets.length >= 1 && validate(both).length === 0, validate(both));
@@ -850,10 +882,11 @@ section("merge: undo while others edit", () => {
   const now = clone(setCell(after, "lab1", "3,1", { v: 0.5 }));
   const undone = mergeWorkbooks(after, before, now);
   check("undo puts back my cell, keeps theirs", cellOf(undone, "lab1", "2,1")?.v === 0.002 && cellOf(undone, "lab1", "3,1")?.v === 0.5);
-  // Undo of adding a sheet that someone has since typed into: the sheet goes.
+  // Undo of adding a sheet: it goes, unless someone has since typed into it (COL-2: then it stays).
   const added: Workbook = { ...before, sheets: [...before.sheets, { ...before.sheets[1], id: "x", name: "Neu" }] };
   const typed = clone(setCell(added, "x", "0,0", { v: "da" }));
-  check("undo of an added sheet", mergeWorkbooks(added, before, typed).sheets.length === 2);
+  check("undo of an added sheet", mergeWorkbooks(added, before, clone(added)).sheets.length === 2);
+  check("undo of an added sheet someone typed into: it stays", mergeWorkbooks(added, before, typed).sheets.length === 3);
   // Undo of deleting a sheet brings it back, their other edits stay.
   const deleted: Workbook = { ...before, sheets: [before.sheets[0]] };
   const theirs = clone(setCell(deleted, "lab1", "5,5", { v: 1 }));
@@ -965,10 +998,25 @@ section("merge: random edits on both sides", () => {
         if (bad < 4) check("random merge: new sheets kept", false, s.id);
       }
     }
-    // Sheets deleted on one side stay deleted.
+    // Sheets deleted on one side stay deleted, unless the other side worked on them meanwhile
+    // (cells, rows, columns, frozen panes, size, or a chart or table on it; a rename doesn't
+    // count): then they stay (COL-1).
+    const on = <T extends { sheetId: string }>(list: T[], id: string) => list.filter((x) => x.sheetId === id);
+    const work = (x: Sheet) => [x.cells, x.cols, x.rows, x.freeze, x.size];
+    const workedOn = (side: Workbook, id: string) =>
+      !sameJson(work(base.sheets.find((x) => x.id === id)!), work(side.sheets.find((x) => x.id === id)!)) ||
+      !sameJson(on(base.charts, id), on(side.charts, id)) ||
+      !sameJson(on(base.tables, id), on(side.tables, id));
     for (const s of base.sheets) {
-      const gone = !mine.sheets.some((x) => x.id === s.id) || !theirs.sheets.some((x) => x.id === s.id);
-      if (gone && merged.sheets.some((x) => x.id === s.id) && merged.sheets.length > 1) {
+      const inMine = mine.sheets.some((x) => x.id === s.id);
+      const inTheirs = theirs.sheets.some((x) => x.id === s.id);
+      if (inMine && inTheirs) continue;
+      const kept = merged.sheets.some((x) => x.id === s.id);
+      const stays = (inMine && workedOn(mine, s.id)) || (inTheirs && workedOn(theirs, s.id));
+      if (stays && !kept) {
+        bad++;
+        if (bad < 4) check("random merge: a deleted sheet the other side worked on stays", false, s.id);
+      } else if (!stays && kept && merged.sheets.length > 1) {
         bad++;
         if (bad < 4) check("random merge: deleted sheets stay deleted", false, s.id);
       }
@@ -1054,13 +1102,15 @@ class FakeServer implements SaverApi {
   saves = 0;
   calls = 0;
   loads = 0;
-  /** save_sheet's pages.save_ids: each editor's newest save. */
+  /** save_sheet's pages.save_ids: each device's newest save (the newest 200). */
   saveIds: string[] = [];
   /**
    * offline: nothing gets through. lost: the save lands but its answer doesn't come back (the
    * connection dropped on the way, the tab closed), once. error, denied: what the server says.
+   * reject: PostgREST refuses every request as it is (400, 22P02), as for a body it can't read;
+   * invalid: save_sheet answers 'invalid'.
    */
-  mode: "ok" | "offline" | "lost" | "error" | "denied" = "ok";
+  mode: "ok" | "offline" | "lost" | "error" | "denied" | "reject" | "invalid" = "ok";
   /** Make each save take this long (ms), to type while one is on its way. */
   delay = 0;
   /** Make loading the page take this long (ms): the row is read after `loadAt` ms. */
@@ -1074,19 +1124,27 @@ class FakeServer implements SaverApi {
     this.calls++;
     if (this.delay) await new Promise((r) => setTimeout(r, this.delay));
     if (this.mode === "offline") throw new TypeError("Failed to fetch");
+    // PostgREST hands the body to Postgres as JSON, which refuses half an emoji (a lone surrogate,
+    // which JSON.stringify writes as an escape) and NUL anywhere in it: the whole request, every time.
+    const body = JSON.stringify(a);
+    if (/\\ud[89a-f][0-9a-f]{2}/.test(body)) return { data: null, error: { code: "22P02", message: "invalid input syntax for type json" }, status: 400 };
+    if (body.includes("\\u0000")) return { data: null, error: { code: "22P05", message: "unsupported Unicode escape sequence" }, status: 400 };
+    if (this.mode === "reject") return { data: null, error: { code: "22P02", message: "invalid input syntax for type json" }, status: 400 };
     if (this.mode === "error") return { data: null, error: { message: "boom" }, status: 400 };
     if (this.mode === "denied") return { data: { ok: false, reason: "denied" }, error: null, status: 200 };
+    if (this.mode === "invalid") return { data: { ok: false, reason: "invalid" }, error: null, status: 200 };
     // Measured as sent, UTF-8 (save_sheet's p_content is json).
     const json = JSON.stringify(a.p_content);
     if (new TextEncoder().encode(json).length > 5_000_000) return { data: { ok: false, reason: "too_big" }, error: null, status: 200 };
     if (a.p_rev !== this.rev) return { data: { ok: false, reason: "behind", rev: this.rev, content: clone(this.content), title: this.title }, error: null, status: 200 };
     this.content = JSON.parse(json);
     // The title only when this editor renamed it (p_base_title).
-    if (a.p_title !== a.p_base_title) this.title = a.p_title.slice(0, 200);
+    // (Postgres' left() counts characters, not UTF-16 units.)
+    if (a.p_title !== a.p_base_title) this.title = Array.from(a.p_title).slice(0, 200).join("");
     this.plain = a.p_plain;
     this.rev++;
     this.saves++;
-    this.saveIds = [...this.saveIds.filter((x) => x !== a.p_last_save && x !== a.p_save_id), a.p_save_id].slice(-50);
+    this.saveIds = [...this.saveIds.filter((x) => x !== a.p_last_save && x !== a.p_save_id), a.p_save_id].slice(-200);
     if (this.mode === "lost") {
       this.mode = "ok";
       throw new TypeError("Failed to fetch");
@@ -1102,7 +1160,7 @@ class FakeServer implements SaverApi {
     await new Promise((r) => setTimeout(r, this.loadDelay - this.loadAt));
     return row;
   }
-  async landed(_pageId: string, saveId: string) {
+  async landed(_pageId: string, saveId: string): ReturnType<SaverApi["landed"]> {
     return this.mode === "offline" ? null : this.saveIds.includes(saveId);
   }
   cell(key: string, sheet = 0) {
@@ -1970,6 +2028,1588 @@ async function savingTests() {
     await sleep(20);
     otherTabs.close();
     check("signing out here tells the other tabs", heard.length === 1, heard);
+  }
+
+  // 19. SQL-1: text the database can't store (half an emoji, NUL) never goes out. Where the app cuts
+  //     text (the preview, the search text, the title) it cuts between characters; text that comes
+  //     in otherwise (LEFT on emoji text, a NUL from a file) is made storable. The stand-in refuses
+  //     both as PostgREST does, so without that each of these saves would be refused for good.
+  {
+    const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+    const unstorable = (x: unknown) => /\\u(?:0000|d[89a-f])/.test(JSON.stringify(x));
+    check("storableText: halves become U+FFFD, whole emoji stay, NUL goes", storableText("a\ud83eb🧪\udc00\u0000c") === "a\ufffdb🧪\ufffdc", storableText("a\ud83eb🧪\udc00\u0000c"));
+    check("cutText: an emoji at the cut goes as a whole", cutText("ab🧪", 3) === "ab" && cutText("ab🧪", 4) === "ab🧪" && cutText("abc", 2) === "ab" && cutText("ab", 5) === "ab");
+    const user = "storable";
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    const a = openEditor(server, id, { userId: user });
+    // The tester's text: the emoji right where the preview cuts (UTF-16 unit 38).
+    const t1 = "Kolonien gezählt, Platte 2 fast leer: 🧫 Mo nochmal";
+    a.type(0, 0, t1);
+    a.type(1, 1, "0,42");
+    await a.saver.flush();
+    const shown = readSheetPreview((server.content as { preview?: unknown }).preview)?.rows[0]?.[0] ?? "";
+    check("emoji at the preview's cut: saved", server.rev === 1 && a.saver.state === "saved" && server.cell("0,0")?.v === t1, { rev: server.rev, state: a.saver.state });
+    check("emoji at the preview's cut: cut before it, never through it", shown === `${t1.slice(0, 38)}…`, shown);
+    // =LINKS(A3;1) on emoji text is half the emoji (Excel counts UTF-16 units too): shown and found
+    // as the replacement character U+FFFD; the formula itself stays as it is.
+    a.type(2, 0, "🧪 Probe 1");
+    a.type(2, 1, "=LINKS(A3;1)");
+    await a.saver.flush();
+    const preview = readSheetPreview((server.content as { preview?: unknown }).preview);
+    check("LEFT on emoji text: saved, the formula kept", server.rev === 2 && !!server.cell("2,1")?.f && a.saver.state === "saved", { rev: server.rev, cell: server.cell("2,1"), state: a.saver.state });
+    check("LEFT on emoji text: the preview and the search text are storable", preview?.rows[2]?.[1] === "\ufffd" && !lone.test(server.plain) && !unstorable(server.content), preview?.rows[2]);
+    // (Repaired where it is worked out: the workbook, which has nothing to repair, isn't gone
+    // through or copied, so a big spreadsheet doesn't pay for it at every save.)
+    const formulaShown = a.store.get();
+    const shownStored = storedContent(formulaShown.workbook, formulaShown.calc, "de");
+    check("LEFT on emoji text: only what it shows is repaired, the workbook not gone through", shownStored.workbook === formulaShown.workbook && shownStored.content.sheets === formulaShown.workbook.sheets && shownStored.bytes === jsonBytes(shownStored.content));
+    // A NUL from a file (a CSV, a UTF-16 text file read as UTF-8): dropped, the rest kept.
+    a.store.apply("nul", (wb) => setCells(wb, a.sheetId, [{ row: 4, col: 0, cell: { v: "ok\u0000\u0000" } }]));
+    await a.saver.flush();
+    check("NUL in a cell: saved without it", server.rev === 3 && server.cell("4,0")?.v === "ok", server.cell("4,0"));
+    // Text kept in the workbook itself is repaired in the editor too (what the server has is on
+    // screen, and the next save has nothing to repair): no second save for it, and undo goes on.
+    check("NUL in a cell: the editor has the repaired text, nothing left to repair", a.cell("4,0")?.v === "ok" && a.saver.state === "saved" && storedContent(a.store.get().workbook, a.store.get().calc, "de").workbook === a.store.get().workbook, a.cell("4,0"));
+    a.store.apply("half", (wb) => setCells(wb, a.sheetId, [{ row: 5, col: 0, cell: { v: "Probe \ud83e" } }]));
+    await a.saver.flush();
+    await sleep(SAVE_DELAY + 50);
+    check("half an emoji in a cell: saved and shown as U+FFFD, one save", server.rev === 4 && server.cell("5,0")?.v === "Probe \ufffd" && a.cell("5,0")?.v === "Probe \ufffd" && a.saver.state === "saved", { rev: server.rev, here: a.cell("5,0"), there: server.cell("5,0") });
+    a.type(6, 0, "weiter");
+    a.store.undo();
+    check("\u2026undo after it takes back the step, the repaired cell stays", a.cell("6,0") === undefined && a.cell("5,0")?.v === "Probe \ufffd", { a7: a.cell("6,0"), a6: a.cell("5,0") });
+    await a.saver.flush();
+    // A title of 199 characters ending in emoji (201 UTF-16 units): kept whole; a longer one is cut
+    // at 200 characters (as the database counts), between them.
+    const long = `${"x".repeat(197)}🧪🧪`;
+    a.saver.setTitle(long);
+    await a.saver.flush();
+    check("a title of 199 characters ending in emoji: saved whole", server.title === long && a.saver.state === "saved", { length: server.title.length, state: a.saver.state });
+    a.saver.setTitle(`${"x".repeat(150)}${"🧪".repeat(60)}`);
+    await a.saver.flush();
+    check("a longer title: cut at 200 characters, never through one", Array.from(server.title).length === 200 && !lone.test(server.title) && a.saver.state === "saved", Array.from(server.title).length);
+    await a.close();
+    // The search text's cut (20,000 units) never splits an emoji: a 600-row journal with one 🧪 a row,
+    // the cut moved through 46 places (a longer sheet name each time).
+    const fresh = newWorkbook("de");
+    const journal = setCells(fresh, fresh.sheets[0].id, Array.from({ length: 600 }, (_, r) => ({ row: r, col: 0, cell: { v: `Probe ${String(r + 1).padStart(3, "0")}: OD600 gemessen 🧪 Kolonien ok` } })));
+    let split = 0;
+    for (let k = 0; k < 46; k++) {
+      const w: Workbook = { ...journal, sheets: [{ ...journal.sheets[0], name: `B${"x".repeat(k)}` }] };
+      if (lone.test(workbookPlainText(w, createCalc(w, { locale: "de" }), "de"))) split++;
+    }
+    check("search text: cut between characters, wherever the cut falls", split === 0, `${split} of 46`);
+    // New pages with their content in one insert (imports, Blob files, "Duplizieren") are storable too.
+    const odd = setCells(fresh, fresh.sheets[0].id, [
+      { row: 0, col: 0, cell: { v: "ok\u0000" } },
+      { row: 1, col: 0, cell: { v: "x\ud83e" } },
+    ]);
+    const imported = sheetPageContent(odd, "de");
+    check("import / Blob file: storable, measured as stored", !unstorable(imported) && imported.bytes === jsonBytes(imported.content), JSON.stringify(imported.content).slice(0, 200));
+    // Nothing to repair: nothing is copied (the check runs on the JSON written to measure it anyway).
+    const clean = labWorkbook();
+    const stored = storedContent(clean, createCalc(clean, { locale: "de" }), "de");
+    check("nothing to repair: the workbook isn't copied", stored.workbook === clean && stored.content.sheets === clean.sheets && stored.bytes === jsonBytes(stored.content));
+    // Something to repair on one sheet: only what holds it is copied, the rest is shared.
+    const two: Workbook = { ...clean, sheets: [clean.sheets[0], { ...clean.sheets[1], cells: { ...clean.sheets[1].cells, "40,0": { v: "x\ud83e\u0000" } } }] };
+    const fixed = storedContent(two, createCalc(two, { locale: "de" }), "de");
+    const keys = Object.keys(two.sheets[1].cells).filter((k) => k !== "40,0");
+    check(
+      "a repair copies only the way to the text",
+      fixed.workbook.sheets[1].cells["40,0"]?.v === "x\ufffd" && fixed.workbook.sheets[0] === two.sheets[0] && keys.every((k) => fixed.workbook.sheets[1].cells[k] === two.sheets[1].cells[k]) && fixed.workbook.charts === two.charts && !unstorable(fixed.content) && fixed.bytes === jsonBytes(fixed.content),
+      fixed.workbook.sheets[1].cells["40,0"],
+    );
+    // A backslash typed before "ud83e" is no half emoji (JSON writes it "\\ud83e"): left alone. A
+    // backslash typed right before a real half emoji doesn't hide it.
+    const typed = setCells(clean, clean.sheets[0].id, [{ row: 40, col: 0, cell: { v: "C:\\ud83e\\u0000" } }]);
+    const typedStored = storedContent(typed, createCalc(typed, { locale: "de" }), "de");
+    check("a backslash and 'u' typed as text: not taken for a half emoji", typedStored.workbook === typed && typedStored.content.sheets[0].cells["40,0"]?.v === "C:\\ud83e\\u0000");
+    const both = setCells(clean, clean.sheets[0].id, [{ row: 40, col: 0, cell: { v: "a\\\ud83e" } }]);
+    check("a backslash before a real half emoji: still repaired", storedContent(both, createCalc(both, { locale: "de" }), "de").workbook.sheets[0].cells["40,0"]?.v === "a\\\ufffd");
+  }
+
+  // 20. A save the database refuses as it is (400 with 22P02, as for a request body it can't read, or
+  //     save_sheet's 'invalid'): sent again it would be refused again, so no endless "Nicht
+  //     gespeichert, versuche erneut". Its own notice, "Nicht gespeichert", the work kept in the
+  //     draft, no tries until the spreadsheet changes; saved once a change goes through.
+  {
+    const quiet = console.error;
+    console.error = () => {};
+    const user = "rejected";
+    const runs: { mode: string; server: FakeServer; id: string; e: ReturnType<typeof openEditor>; calls: number }[] = [];
+    for (const mode of ["reject", "invalid"] as const) {
+      const server = new FakeServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: user });
+      server.mode = mode;
+      e.type(0, 0, "x");
+      await e.saver.flush();
+      check(`${mode}: the notice 'rejected', 'Nicht gespeichert' (not 'versuche erneut'), nothing said about trying again`, e.log.notices.at(-1) === "rejected" && e.saver.state === "refused" && e.log.trouble.length === 0, e.log);
+      check(`${mode}: the work kept on the device`, localDrafts(user, id).length === 1);
+      runs.push({ mode, server, id, e, calls: server.calls });
+    }
+    // A server error (a 400 without a data error's code) is tried again by itself after 4 s.
+    const errServer = new FakeServer(newWorkbook("de"));
+    const err = openEditor(errServer, page(), { userId: user });
+    errServer.mode = "error";
+    err.type(0, 0, "x");
+    await err.saver.flush();
+    const errCalls = errServer.calls;
+    await sleep(4500);
+    check("a server error, by contrast: 'failed', tried again by itself", err.saver.state === "failed" && err.log.notices.at(-1) !== "rejected" && errServer.calls === errCalls + 1, { state: err.saver.state, tries: errServer.calls - errCalls });
+    errServer.mode = "ok";
+    await err.saver.flush();
+    await err.close();
+    for (const { mode, server, id, e, calls } of runs) {
+      check(`${mode}: not tried again by itself`, server.calls === calls, server.calls - calls);
+      server.mode = "ok";
+      e.type(1, 0, "y");
+      await e.saver.flush();
+      check(`${mode}: the next change saves, the notice goes`, server.rev === 1 && server.cell("1,0")?.v === "y" && e.saver.state === "saved" && e.log.notices.at(-1) === null && localDrafts(user, id).length === 0, { rev: server.rev, state: e.saver.state, notice: e.log.notices.at(-1) });
+      await e.close();
+    }
+    // The background save keeps such a draft (one request each time it runs, no loop).
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    const off = openEditor(server, id, { userId: user });
+    server.mode = "offline";
+    off.type(0, 0, "z");
+    await off.saver.flush();
+    await off.close();
+    reportOk();
+    server.mode = "reject";
+    const calls = server.calls;
+    await flushSheetDrafts(user, "de", server);
+    check("refused as sent in the background: kept, one request", localDrafts(user, id).length === 1 && server.calls === calls + 1, server.calls - calls);
+    for (const d of localDrafts(user, id)) clearDraft(user, id, d.writer);
+    // Which answers count as refused as sent (no more tries until the spreadsheet changes): a
+    // data error of class 22 (22P02 JSON it can't read, 22P05 a NUL, 22003 a number out of range),
+    // a body PostgREST can't read (PGRST102), too big to take (413), save_sheet's 'invalid'. A
+    // passing server problem (5xx) is an error too, tried again (ACC-3: not the connection, see §24);
+    // anything else is an error, tried again.
+    const answering = (res: { data?: unknown; error?: unknown; status: number }): SaverApi => ({
+      saveSheet: async () => ({ data: res.data ?? null, error: res.error ?? null, status: res.status }),
+      loadRow: async () => null,
+      landed: async () => false,
+    });
+    const tiny = newWorkbook("de");
+    const outcomes: [string, { data?: unknown; error?: unknown; status: number }, string][] = [
+      ["413", { error: { message: "Payload Too Large" }, status: 413 }, "rejected"],
+      ["400 PGRST102", { error: { code: "PGRST102", message: "Empty or invalid json" }, status: 400 }, "rejected"],
+      ["400 22P02", { error: { code: "22P02", message: "invalid input syntax for type json" }, status: 400 }, "rejected"],
+      ["400 22P05", { error: { code: "22P05", message: "unsupported Unicode escape sequence" }, status: 400 }, "rejected"],
+      ["400 22003", { error: { code: "22003", message: "numeric field overflow" }, status: 400 }, "rejected"],
+      ["save_sheet 'invalid'", { data: { ok: false, reason: "invalid" }, status: 200 }, "rejected"],
+      ["503", { error: { message: "Service Unavailable" }, status: 503 }, "error"],
+      ["502 22P02", { error: { code: "22P02", message: "bad gateway" }, status: 502 }, "error"],
+      ["400 BL409", { error: { code: "BL409", message: "pages: this note has newer changes" }, status: 400 }, "error"],
+      ["400 without a code", { error: { message: "boom" }, status: 400 }, "error"],
+      ["400 42501", { error: { code: "42501", message: "permission denied" }, status: 400 }, "error"],
+      ["401 PGRST301", { error: { code: "PGRST301", message: "JWT expired" }, status: 401 }, "error"],
+      ["403 42501", { error: { code: "42501", message: "permission denied" }, status: 403 }, "error"],
+      ["404 PGRST202", { error: { code: "PGRST202", message: "Could not find the function" }, status: 404 }, "error"],
+      ["save_sheet 'denied'", { data: { ok: false, reason: "denied" }, status: 200 }, "denied"],
+    ];
+    const wrong: string[] = [];
+    for (const [name, res, want] of outcomes) {
+      const r = await saveOnce({ pageId: "p", rev: 0, wb: tiny, calc: createCalc(tiny, { locale: "de" }), title: "", baseTitle: "", saveId: crypto.randomUUID(), lastSave: null, locale: "de" }, answering(res));
+      const got = r.ok ? "ok" : r.reason;
+      if (got !== want) wrong.push(`${name}: ${got}, not ${want}`);
+      reportOk();
+    }
+    check("refused as sent: exactly 413, PGRST102, class 22 and 'invalid'; 5xx and the rest errors", wrong.length === 0, wrong);
+    console.error = quiet;
+  }
+
+  // 21. SQL-2: work that can't be saved any more (access gone, or the page) stays with the student:
+  //     the background save keeps the draft, marked, sends it no more, still counts it as unsaved
+  //     (signing out warns) and says so once, so Blob can ask: a spreadsheet of your own from it
+  //     (draftAsPage), or let it go. Back access, the work comes back. An editor refused the same
+  //     way marks its draft too (its notice has said so: closing it doesn't say it again, Blob asks
+  //     when the app starts next); saved as a copy, its draft goes.
+  {
+    const user = "taken-off";
+    let heard = 0;
+    const stop = onDeniedDrafts(() => heard++);
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    // Typed offline, the editor closed: a draft waits.
+    const e = openEditor(server, id, { userId: user });
+    server.mode = "offline";
+    e.type(1, 1, "0,105");
+    e.type(2, 1, "0,209");
+    e.type(3, 1, "0,311");
+    await e.saver.flush();
+    await e.close();
+    reportOk();
+    // The owner moved the sheet out of the shared folder: the background save is refused.
+    server.mode = "denied";
+    const saved = await flushSheetDrafts(user, "de", server);
+    const kept = localDrafts(user, id);
+    check("denied in the background: the draft kept, marked, with the work", saved === 0 && kept.length === 1 && kept[0].denied === true && kept[0].mine.sheets[0].cells["3,1"]?.v === 0.311, kept);
+    check("denied in the background: said once", heard === 1, heard);
+    check("denied in the background: still counted as unsaved (signing out warns)", (await unsavedSheets(user)) === 1);
+    const calls = server.calls;
+    await flushSheetDrafts(user, "de", server);
+    check("denied in the background: not sent again, not said again", server.calls === calls && heard === 1 && localDrafts(user, id).length === 1, { calls: server.calls - calls, heard });
+    const listed = await deniedDrafts(user);
+    check("denied drafts are listed for Blob's question", listed.length === 1 && listed[0].pageId === id, listed.length);
+    // "Als Kopie speichern": a spreadsheet of your own from the draft, with a preview and search text.
+    const copy = draftAsPage(listed[0], "de");
+    const copied = copy.content as Workbook & { preview?: unknown };
+    check("as a copy: the work, its preview and its search text", copied.sheets[0].cells["3,1"]?.v === 0.311 && !!readSheetPreview(copied.preview) && typeof copy.plain_text === "string", copied.sheets[0].cells);
+    // Access back, and the spreadsheet opened again: the work comes back and is saved.
+    server.mode = "ok";
+    const back = openEditor(server, id, { userId: user });
+    await back.saver.restore();
+    await back.saver.flush();
+    check("access back, opened again: the work is saved", server.cell("3,1")?.v === 0.311 && localDrafts(user, id).length === 0 && (await unsavedSheets(user)) === 0, server.content);
+    await back.close();
+    // An editor whose save is refused marks its draft too; closing it doesn't say so again (its
+    // notice did), and the draft is listed for the next start.
+    const id2 = page();
+    const server2 = new FakeServer(newWorkbook("de"));
+    const d2 = openEditor(server2, id2, { userId: user });
+    server2.mode = "denied";
+    d2.type(0, 0, "x");
+    await d2.saver.flush();
+    check("denied in the editor: its draft marked", localDrafts(user, id2)[0]?.denied === true, localDrafts(user, id2));
+    await d2.close();
+    check("denied in the editor: closing it says nothing more, the draft is listed", heard === 1 && (await deniedDrafts(user)).length === 1, heard);
+    // "Verwerfen".
+    for (const d of localDrafts(user, id2)) clearDraft(user, id2, d.writer);
+    check("discarded: gone, nothing unsaved", (await deniedDrafts(user)).length === 0 && (await unsavedSheets(user)) === 0);
+    // Saved as a copy from the editor (letGoOf): this page's work goes, the copy has it, also when the editor closes.
+    const id3 = page();
+    const server3 = new FakeServer(newWorkbook("de"));
+    const d3 = openEditor(server3, id3, { userId: user });
+    server3.mode = "denied";
+    d3.type(0, 0, "y");
+    await d3.saver.flush();
+    const had = localDrafts(user, id3).length;
+    letGoOf(id3);
+    await d3.close();
+    check("saved as a copy from the editor: its draft goes and stays gone", had === 1 && localDrafts(user, id3).length === 0 && heard === 1, { had, now: localDrafts(user, id3).length, heard });
+    stop();
+  }
+
+  // 22. SQL-4: each device keeps one place in pages.save_ids however often the spreadsheet is opened
+  //     (it remembers its last save that went through), so a save whose answer was lost is still
+  //     found after hundreds of visits, and a partner's later correction isn't overwritten.
+  {
+    const lap = "laptop";
+    const partner = "partner";
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    // The laptop saves D4 = 0,333: it lands, the answer is lost, the tab goes.
+    const l = openEditor(server, id, { userId: lap });
+    server.mode = "lost";
+    l.type(3, 3, "0,333");
+    await l.saver.flush();
+    l.kill();
+    reportOk();
+    // The partner corrects D4 to 0,209, then opens the spreadsheet 250 more times on the same
+    // device (weeks of a lab group), filling in a cell each time.
+    const p = openEditor(server, id, { userId: partner });
+    p.type(3, 3, "0,209");
+    await p.saver.flush();
+    await p.close();
+    for (let i = 0; i < 250; i++) {
+      const v = openEditor(server, id, { userId: partner });
+      v.type(20 + (i % 150), 0, String(i + 1));
+      await v.saver.flush();
+      await v.close();
+    }
+    check("250 visits on one device: one place in save_ids", server.saveIds.length === 2 && readLastSave(partner, id) === server.saveIds.at(-1), server.saveIds.length);
+    // The laptop's background save: its lost save is found, the correction stays.
+    await flushSheetDrafts(lap, "de", server);
+    check("after 250 visits: the lost save is still found, the partner's correction stays", server.cell("3,3")?.v === 0.209 && localDrafts(lap, id).length === 0, server.cell("3,3"));
+    // A device without the record (a draft from before it existed): restoring the draft takes its
+    // last save's place instead of a new one.
+    const solo = "solo";
+    const s2 = new FakeServer(newWorkbook("de"));
+    const id2 = page();
+    const first = openEditor(s2, id2, { userId: solo });
+    first.type(0, 0, "a");
+    await first.saver.flush();
+    const last = s2.saveIds[0];
+    s2.mode = "offline";
+    first.type(1, 0, "b");
+    await first.saver.flush();
+    first.kill();
+    memory.delete(`${LAST_SAVE_PREFIX}${solo}:${id2}`);
+    reportOk();
+    s2.mode = "ok";
+    const again = openEditor(s2, id2, { userId: solo });
+    await again.saver.restore();
+    await again.saver.flush();
+    check("restored without a record: the draft's last save is replaced", s2.saveIds.length === 1 && !s2.saveIds.includes(last) && s2.cell("1,0")?.v === "b", s2.saveIds);
+    await again.close();
+    // Another account signing in on this device removes the others' records (signing out removes
+    // every record: src/lib/offline/device.ts forgetDevice, the same prefix).
+    forgetOtherAccounts(solo);
+    check("sign-in: other accounts' last saves removed, this one's kept", readLastSave(partner, id) === null && readLastSave(lap, id) === null && readLastSave(solo, id2) !== null);
+  }
+
+  // 23. COL-10: offline, a spreadsheet too big to save stays "Zu groß zum Speichern" (being online
+  //     again wouldn't help), not measured again while it is the same and not tried every few
+  //     seconds; a change is measured on the device, and once it fits it is "Auf diesem Gerät
+  //     gespeichert" and goes out when online again.
+  {
+    const user = "big-offline";
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    const big = openEditor(server, id, { userId: user });
+    big.store.apply("big", (wb) => setCells(wb, big.sheetId, Array.from({ length: 170 }, (_, i) => ({ row: i, col: 0, cell: { v: "x".repeat(32000) } }))));
+    await big.saver.flush();
+    const sizes = big.log.sizes.length;
+    Object.defineProperty(globalThis.navigator, "onLine", { value: false, configurable: true });
+    await big.saver.flush();
+    check("offline, too big: still 'Zu groß zum Speichern'", big.saver.state === "tooBig" && !big.log.states.includes("device"), big.log.states);
+    check("offline, too big: not measured again", big.log.sizes.length === sizes, big.log.sizes.length - sizes);
+    big.type(180, 0, "noch mehr");
+    await big.saver.flush();
+    check("offline, a change: measured on the device, still too big", big.saver.state === "tooBig" && big.log.sizes.length === sizes + 1 && !big.log.states.includes("device"), big.log.states);
+    big.store.apply("smaller", (wb) => setCells(wb, big.sheetId, Array.from({ length: 160 }, (_, i) => ({ row: i, col: 0, cell: null }))));
+    await big.saver.flush();
+    check("offline, small enough again: 'Auf diesem Gerät gespeichert', the notice gone", big.saver.state === "device" && big.log.notices.at(-1) === null, { state: big.saver.state, notice: big.log.notices.at(-1) });
+    Reflect.deleteProperty(globalThis.navigator, "onLine");
+    await big.saver.flush();
+    check("online again: saved", big.saver.state === "saved" && server.rev === 1 && server.calls === 1, { state: big.saver.state, rev: server.rev, calls: server.calls });
+    await big.close();
+  }
+
+  // 24. ACC-3: a server error (HTTP 5xx) while the connection works is a save that failed: tried
+  //     again after the saver's own pauses (4 s, 8 s, …) with the sheet's notice once. The
+  //     connection isn't reported gone (no "Offline" in the top bar, no connection checks), and the
+  //     connection found again elsewhere in Blob doesn't cut the pause short. The answer may come
+  //     from a gateway after the save went through, so the next try finds out first; when that
+  //     lookup fails, its own answer (not Blob's connection state) tells a server error from no
+  //     connection. After a real network failure the work goes out as soon as Blob is online again.
+  //     Screen readers hear a problem once and its end once, never routine saving.
+  {
+    /**
+     * save_sheet behind a gateway: `failing` (an HTTP status) answers each save with it, after
+     * saving it when `landsFirst`; `outage`: looking up saves (pages.save_ids) gets a server error
+     * too (undefined, as landedFrom gives for one), while the rest of Blob takes that for no
+     * connection (as lib/offline/sync.ts does) when `flipping`. `lookups` counts them.
+     */
+    class TroubledServer extends FakeServer {
+      failing = 0;
+      landsFirst = false;
+      outage = false;
+      flipping = false;
+      lookups = 0;
+      async saveSheet(a: SaveArgs): ReturnType<FakeServer["saveSheet"]> {
+        if (!this.failing) return super.saveSheet(a);
+        if (this.landsFirst) await super.saveSheet(a);
+        else this.calls++;
+        return { data: null, error: { message: "Service Unavailable" }, status: this.failing };
+      }
+      async landed(pageId: string, saveId: string) {
+        this.lookups++;
+        if (!this.outage) return super.landed(pageId, saveId);
+        if (this.flipping) reportNetworkError();
+        return undefined;
+      }
+    }
+    const quiet = console.error;
+    console.error = () => {};
+    reportOk();
+    // saveOnce: any 5xx is an error that may have landed; a failed fetch (status 0) is the connection.
+    const tiny = newWorkbook("de");
+    const once = (status: number) =>
+      saveOnce(
+        { pageId: "p", rev: 0, wb: tiny, calc: createCalc(tiny, { locale: "de" }), title: "", baseTitle: "", saveId: crypto.randomUUID(), lastSave: null, locale: "de" },
+        { saveSheet: async () => ({ data: null, error: { message: status ? "unavailable" : "TypeError: Failed to fetch", code: status ? "XX000" : "" }, status }), loadRow: async () => null, landed: async () => false },
+      );
+    const wrong: string[] = [];
+    for (const status of [500, 502, 503, 504]) {
+      const r = await once(status);
+      if (r.ok || r.reason !== "error" || !r.unsure || !isOnline()) wrong.push(`${status}: ${JSON.stringify(r)}, online ${isOnline()}`);
+    }
+    check("5xx: an error that may have landed, the connection not reported gone", wrong.length === 0, wrong);
+    const gone = await once(0);
+    check("status 0: offline, the connection reported gone", !gone.ok && gone.reason === "offline" && !isOnline(), gone);
+    reportOk();
+    // The look at pages.save_ids (supabaseApi.landed) the same way: a 5xx is the server's problem,
+    // a failed fetch the connection; an answer says whether the save is in it.
+    const lookup = (status: number, data: unknown = null) =>
+      landedFrom({ data, error: status === 200 ? null : { message: status ? "unavailable" : "TypeError: Failed to fetch", code: status ? "XX000" : "" }, status }, "s1");
+    const looked = [500, 502, 503, 504].map((status) => ({ status, landed: lookup(status), online: isOnline() }));
+    check("lookup, 5xx: not found out (the server's problem), the connection not reported gone", looked.every((l) => l.landed === undefined && l.online), looked);
+    const unreachable = lookup(0);
+    check("lookup, status 0: not found out, the connection reported gone", unreachable === null && !isOnline(), unreachable);
+    reportOk();
+    check(
+      "lookup answered: whether the save is in pages.save_ids (other trouble: didn't land)",
+      lookup(200, { save_ids: ["s0", "s1"] }) === true && lookup(200, { save_ids: ["s0"] }) === false && lookup(200, null) === false && lookup(401) === false && isOnline(),
+    );
+
+    // The editor: "Nicht gespeichert, versuche erneut" and the notice once; while the pause lasts
+    // nothing is sent, however much is typed or the connection found again elsewhere.
+    {
+      const user = "acc3";
+      const server = new TroubledServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: user });
+      server.failing = 503;
+      e.type(1, 3, "5");
+      await e.saver.flush();
+      check("5xx in the editor: 'failed' (not 'Auf diesem Gerät gespeichert'), the notice, online", e.saver.state === "failed" && !e.log.states.includes("device") && e.log.trouble.join() === "failed" && isOnline(), { states: e.log.states, trouble: e.log.trouble, online: isOnline() });
+      check("5xx in the editor: the work kept on the device", draftOf(user, id)?.mine.sheets[0].cells["1,3"]?.v === 5);
+      const calls = server.calls;
+      e.type(2, 3, "6");
+      reportNetworkError();
+      reportOk();
+      await sleep(3500);
+      check("5xx: nothing sent before the pause is over (typing, the connection found again elsewhere)", server.calls === calls && e.saver.state === "failed", { tries: server.calls - calls, state: e.saver.state });
+      await sleep(1000);
+      check("5xx: one try after 4 s, still 'failed', the notice not again", server.calls === calls + 1 && e.saver.state === "failed" && e.log.trouble.join() === "failed" && isOnline(), { tries: server.calls - calls, state: e.saver.state, trouble: e.log.trouble });
+      // The server works again: the next try saves everything and says so once.
+      server.failing = 0;
+      await e.saver.flush();
+      check("5xx over: saved, 'Gespeichert', said once", server.cell("1,3")?.v === 5 && server.cell("2,3")?.v === 6 && e.saver.state === "saved" && e.log.trouble.join() === "failed,recovered" && localDrafts(user, id).length === 0, { state: e.saver.state, trouble: e.log.trouble });
+      await e.close();
+    }
+
+    // A gateway's 5xx after the save went through: the next try finds out it landed, so a value
+    // corrected elsewhere meanwhile stays (merged from what landed, not from the older version).
+    {
+      const server = new TroubledServer(newWorkbook("de"), "Messung");
+      const id = page();
+      const lap = openEditor(server, id, { userId: "acc3-lap" });
+      lap.type(3, 1, "0,333");
+      server.failing = 502;
+      server.landsFirst = true;
+      await lap.saver.flush();
+      check("5xx after landing: 'failed', and it is on the server", lap.saver.state === "failed" && server.rev === 1 && server.cell("3,1")?.v === 0.333, { state: lap.saver.state, rev: server.rev });
+      server.failing = 0;
+      const phone = openEditor(server, id, { userId: "acc3-phone" });
+      phone.type(3, 1, "0,209");
+      await phone.saver.flush();
+      await phone.close();
+      lap.type(5, 0, "weiter");
+      await lap.saver.flush();
+      check("5xx after landing: the correction made elsewhere stays, later typing saved", server.cell("3,1")?.v === 0.209 && server.cell("5,0")?.v === "weiter" && lap.cell("3,1")?.v === 0.209 && !lap.saver.dirty(), server.content);
+      await lap.close();
+    }
+
+    // The whole server down (the lookup gets a server error too): still "failed", never "offline",
+    // and nothing is sent while it can't be found out whether the last save landed.
+    {
+      const server = new TroubledServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: "acc3-down" });
+      server.failing = 503;
+      server.outage = true;
+      e.type(0, 0, "x");
+      await e.saver.flush();
+      const calls = server.calls;
+      await e.saver.flush();
+      check("server down: 'failed', nothing sent, not offline", server.calls === calls && e.saver.state === "failed" && !e.log.states.includes("device") && isOnline(), { tries: server.calls - calls, states: e.log.states, online: isOnline() });
+      // In a real outage the rest of Blob takes its own 5xx answers for no connection, now and then
+      // (lib/offline/sync.ts). The sheet goes by what its lookup got: still "failed", and the
+      // connection found again elsewhere doesn't start another try.
+      server.flipping = true;
+      const lookups = server.lookups;
+      await e.saver.flush();
+      const offlineMeanwhile = !isOnline();
+      reportOk();
+      await sleep(50);
+      check(
+        "server down, Blob offline elsewhere meanwhile: 'failed' (never 'Auf diesem Gerät gespeichert'), no try when it's back",
+        offlineMeanwhile && server.lookups === lookups + 1 && server.calls === calls && e.saver.state === "failed" && !e.log.states.includes("device"),
+        { offlineMeanwhile, lookups: server.lookups - lookups, tries: server.calls - calls, states: e.log.states },
+      );
+      server.flipping = false;
+      server.failing = 0;
+      server.outage = false;
+      await e.saver.flush();
+      check("server up again: saved", server.cell("0,0")?.v === "x" && e.saver.state === "saved", e.saver.state);
+      await e.close();
+    }
+
+    // No connection (a failed fetch): "Auf diesem Gerät gespeichert", and once the connection
+    // check gets through it goes out at once, not after its pause.
+    {
+      const server = new TroubledServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: "acc3-net" });
+      server.mode = "offline";
+      e.type(0, 0, "y");
+      await e.saver.flush();
+      check("no connection: 'Auf diesem Gerät gespeichert', reported", e.saver.state === "device" && !isOnline(), e.saver.state);
+      server.mode = "ok";
+      reportOk();
+      for (let i = 0; i < 50 && e.saver.state !== "saved"; i++) await sleep(10);
+      check("back online: saved at once", server.cell("0,0")?.v === "y" && e.saver.state === "saved", e.saver.state);
+      await e.close();
+    }
+
+    // The background save of drafts against a server error: kept for later, one request, and
+    // the connection not reported gone.
+    {
+      const user = "acc3-bg";
+      const server = new TroubledServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: user });
+      server.mode = "offline";
+      e.type(0, 0, "z");
+      await e.saver.flush();
+      await e.close();
+      server.mode = "ok";
+      reportOk();
+      server.failing = 503;
+      const calls = server.calls;
+      const n = await flushSheetDrafts(user, "de", server);
+      check("background save, 5xx: kept, one request, online", n === 0 && localDrafts(user, id).length === 1 && server.calls === calls + 1 && isOnline(), { n, tries: server.calls - calls, online: isOnline() });
+      server.failing = 0;
+      await flushSheetDrafts(user, "de", server);
+      check("background save, the server works again: saved", server.cell("0,0")?.v === "z" && localDrafts(user, id).length === 0);
+    }
+
+    // The background save after a gateway's 5xx that came after the save landed: the draft says
+    // the save may have landed, so a correction made elsewhere meanwhile stays; also when the next
+    // look at pages.save_ids gets a server error too (then it waits, and nothing is sent).
+    for (const down of [false, true]) {
+      const user = down ? "acc3-bglanded-down" : "acc3-bglanded";
+      const server = new TroubledServer(newWorkbook("de"));
+      const id = page();
+      const e = openEditor(server, id, { userId: user });
+      server.mode = "offline";
+      e.type(3, 3, "0,333");
+      await e.saver.flush();
+      await e.close();
+      server.mode = "ok";
+      reportOk();
+      server.failing = 502;
+      server.landsFirst = true;
+      await flushSheetDrafts(user, "de", server);
+      const marked = !!draftOf(user, id)?.sending;
+      server.landsFirst = false;
+      const calls = server.calls;
+      if (down) {
+        server.failing = 503;
+        server.outage = true;
+        await flushSheetDrafts(user, "de", server);
+        server.outage = false;
+      }
+      const tries = server.calls - calls;
+      server.failing = 0;
+      const partner = openEditor(server, id, { userId: `${user}-partner` });
+      partner.type(3, 3, "0,209");
+      await partner.saver.flush();
+      await partner.close();
+      await flushSheetDrafts(user, "de", server);
+      check(
+        `background save, 5xx after landing${down ? ", then the server down" : ""}: the draft says it may have landed, the correction made elsewhere stays`,
+        marked && tries === 0 && server.cell("3,3")?.v === 0.209 && localDrafts(user, id).length === 0,
+        { marked, tries, d4: server.cell("3,3"), drafts: localDrafts(user, id).length },
+      );
+    }
+    console.error = quiet;
+
+    // What screen readers hear (SaveIndicator's live region), for the states one after the other.
+    const said = (states: SaveState[]) => {
+      let heard: SaveState | null = null;
+      const out: SaveState[] = [];
+      for (const s of states) {
+        const next = saveAnnouncement(heard, s);
+        heard = next.heard;
+        if (next.say) out.push(next.say);
+      }
+      return out.join(",");
+    };
+    const shown = renderToStaticMarkup(createElement(SaveIndicator, { state: "saving" }));
+    check("the indicator's words aren't a live region; its own one starts empty", !shown.includes("aria-live") && shown.includes('<span role="status" class="sr-only"></span>'), shown);
+    check("heard: nothing about routine saving", said(["pending", "saving", "saved", "pending", "saving", "pending", "saving", "saved"]) === "");
+    check("heard: a server error once while it is tried again, and once that it's over", said(["pending", "saving", "failed", "saving", "failed", "pending", "saving", "failed", "saving", "saved", "pending", "saving", "saved"]) === "failed,saved");
+    check("heard: offline once, saved again once", said(["saving", "device", "saving", "device", "saving", "saved", "pending", "saving", "saved"]) === "device,saved");
+    check("heard: a different problem is said", said(["saving", "failed", "saving", "device", "saving", "saved"]) === "failed,device,saved");
+    check(
+      "heard: notes' 'Offline, versuche erneut', too big, no access: once each",
+      [said(["saving", "error", "saving", "error"]), said(["saving", "tooBig", "pending", "saving", "tooBig"]), said(["saving", "refused", "pending", "refused"])].join("|") === "error|tooBig|refused",
+    );
+    reportOk();
+  }
+
+  // 25. COL-4's way out: a conflict copy with my version that makes the spreadsheet too big to save.
+  //     The editor's banner names it and offers my version as a spreadsheet of my own, only for a copy
+  //     this editor's merge made (one that arrived may hold someone else's only version, and after a
+  //     reload whose version a copy holds isn't known); kept that way, the copy goes here (unless it
+  //     changed meanwhile) and the spreadsheet is saved again, and the new one says what it holds.
+  {
+    // About 2.6 MB: with two versions of "Platte" more than save_sheet takes.
+    const cells: Record<string, Cell> = {};
+    for (let i = 0; i < 19000; i++) for (let c = 0; c < 6; c++) cells[`${i},${c}`] = { v: Math.round(i * 1000 + c * 7.123456789 * 1e6) / 1e6 };
+    const empty = newWorkbook("de");
+    const server = new FakeServer({ ...empty, sheets: [{ ...empty.sheets[0], name: "Platte", cells, size: { rows: 20000, cols: 26 } }] });
+    const id = page();
+    const a = openEditor(server, id, { userId: "col4-a" });
+    const b = openEditor(server, id, { userId: "col4-b" });
+    a.store.apply("Zeilen einfügen", (wb) => insertRows(wb, a.sheetId, 3, 1));
+    await a.saver.flush();
+    b.store.apply("Zeilen löschen", (wb) => deleteRows(wb, b.sheetId, 5, 1));
+    b.type(10, 7, "15,5");
+    await b.saver.flush();
+    const own = ownBigCopies([], b.log.conflicts.flat());
+    const why = tooBigBecause(b.store.get().workbook.sheets, own);
+    check(
+      "too big with my copy: offered, named with its original, my correction on it",
+      b.saver.state === "tooBig" && why.kind === "own" && why.copy.name === "Platte (Konflikt)" && why.original.name === "Platte" && why.copy.cells["10,7"]?.v === 15.5,
+      { state: b.saver.state, why: why.kind, own },
+    );
+    // A copy that arrived with someone else's version (or any copy after a reload): never offered as mine.
+    const arrived = b.log.conflicts.flat().map((c) => ({ ...c, why: "arrived" as const, tooBig: undefined }));
+    check("someone else's copy: not offered, the words say to move what's needed first", ownBigCopies([], arrived).length === 0 && tooBigBecause(b.store.get().workbook.sheets, []).kind === "copies");
+    check("nothing new told: the same list", ownBigCopies(own, arrived) === own);
+    // The button: my version as a spreadsheet of its own, and the copy goes here (SheetEditor),
+    // unless the copy changed while the new spreadsheet was being made (that change would be in
+    // neither); changes elsewhere, or the same copy drawn anew by a merge, don't count.
+    const copyId = why.kind === "own" ? why.copy.id : "";
+    const then = b.store.get().workbook;
+    const mine = ownVersion(then, copyId, "de");
+    const cell = (sheetId: string) => setCells(then, sheetId, [{ row: 0, col: 0, cell: { v: "neu" } }]);
+    const redrawn = { ...then, sheets: then.sheets.map((s) => (s.id === copyId ? clone(s) : s)) };
+    check(
+      "the copy goes only as it went into my spreadsheet",
+      sameOwnVersion(then, then, copyId) && sameOwnVersion(then, cell(b.sheetId), copyId) && sameOwnVersion(then, redrawn, copyId) && !sameOwnVersion(then, cell(copyId), copyId) && !sameOwnVersion(then, deleteSheet(then, copyId), copyId),
+    );
+    // The new spreadsheet says what it is once, as it opens.
+    markOwnVersion("col4-new", "Platte");
+    check("my spreadsheet says once whose version of which sheet it is", takeOwnVersion("col4-new") === "Platte" && takeOwnVersion("col4-new") === undefined);
+    b.store.apply("Blatt löschen", (wb) => deleteSheet(wb, copyId));
+    await b.saver.flush();
+    check(
+      "kept as my own, the copy gone here: saved again, the banner gone",
+      mine?.sheets[0].name === "Platte" && mine.sheets[0].cells["10,7"]?.v === 15.5 && b.saver.state === "saved" && server.rev === 2 && b.log.notices.at(-1) === null && tooBigBecause(b.store.get().workbook.sheets, own).kind === "big",
+      { state: b.saver.state, rev: server.rev, notice: b.log.notices.at(-1) },
+    );
+    await a.close();
+    await b.close();
+  }
+
+  // 25b. COL2-1: what I wrote on other sheets for my version reads its copy (merging points it there:
+  //      a formula with a factor beside it, a chart). Kept as a spreadsheet of my own, the copy would
+  //      go here, and with it what reads it (#BEZUG!, the chart gone, saved for both people): that
+  //      way out isn't offered then, and the bar names what reads the copy and how to go on. Once
+  //      nothing does (pointed at the original, the chart deleted), it is, and what I wrote survives;
+  //      my version in the new spreadsheet shows the numbers my device showed. In the other order the
+  //      one whose copy nothing reads gets the way out at once, and the other's work stays as it was.
+  {
+    const cells: Record<string, Cell> = {};
+    for (let i = 0; i < 19000; i++) for (let c = 0; c < 6; c++) cells[`${i},${c}`] = { v: Math.round(i * 1000 + c * 7.123456789 * 1e6) / 1e6 };
+    const empty = newWorkbook("de");
+    const plate = { ...empty.sheets[0], name: "Platte", cells, size: { rows: 20000, cols: 26 } };
+    const start: Workbook = { ...empty, sheets: [plate, { ...empty.sheets[0], id: "aus", name: "Auswertung", cells: { "0,0": { v: "Faktor" }, "0,1": { v: 2 } } }] };
+    const chartOn = (id: string, on: string, over: string): ChartSpec => ({ ...labWorkbook().charts[0], id, sheetId: on, x: range(over, 1, 0, 9, 0), series: [series(`${id}-s`, range(over, 1, 1, 9, 1))] });
+    // B's own analysis while offline: deletes row 6 of Platte, reads row 10 times the factor and the
+    // mean of rows 2-10 on Auswertung, a chart there over them, and a formula on Platte itself.
+    const analyse = (e: ReturnType<typeof openEditor>) => {
+      e.store.apply("Zeilen löschen", (wb) => deleteRows(wb, plate.id, 5, 1));
+      e.store.apply("Eingabe", (wb) => setCells(wb, "aus", [{ row: 2, col: 1, cell: { f: "Platte!B10*$B$1" } }, { row: 3, col: 1, cell: { f: "AVERAGE(Platte!B2:B10)" } }]));
+      e.store.apply("Eingabe", (wb) => setCells(wb, plate.id, [{ row: 1, col: 7, cell: { f: "B2*2" } }]));
+      e.store.apply("Diagramm einfügen", (wb) => ({ ...wb, charts: [...wb.charts, chartOn("chB", "aus", plate.id)] }));
+    };
+    const value = (wb: Workbook, sheetId: string, row: number, col: number) => createCalc(wb, { locale: "de" }).value(sheetId, row, col);
+    {
+      const server = new FakeServer(start);
+      const id = page();
+      const a = openEditor(server, id, { userId: "col21-a" });
+      const b = openEditor(server, id, { userId: "col21-b" });
+      a.store.apply("Zeilen einfügen", (wb) => insertRows(wb, plate.id, 3, 1));
+      await a.saver.flush();
+      analyse(b);
+      const onDevice = b.store.get().workbook;
+      const before = [value(onDevice, "aus", 2, 1), value(onDevice, "aus", 3, 1), value(onDevice, plate.id, 1, 7)];
+      await b.saver.flush();
+      const wb = b.store.get().workbook;
+      const why = tooBigBecause(wb.sheets, ownBigCopies([], b.log.conflicts.flat()));
+      const copyId = why.kind === "own" ? why.copy.id : "";
+      const ties = copyTies(wb, copyId);
+      check(
+        "B saves second, too big: B's formulas and chart on Auswertung read B's copy, which can't go",
+        b.saver.state === "tooBig" && why.kind === "own" && tiedCopy(ties) && ties.cells.length === 2 && ties.charts.join() === "chB" && !ties.readsOthers,
+        { state: b.saver.state, why: why.kind, ties },
+      );
+      check("…with the numbers B had", sameJson([value(wb, "aus", 2, 1), value(wb, "aus", 3, 1), value(wb, copyId, 1, 7)], before), { before });
+      const bar = why.kind === "own" ? sheetText.de.tooBigReaders(why.original.name, why.copy.name, copyReaders(wb, ties)) : "";
+      check(
+        "the bar names them (no button), and says to move what's needed first",
+        bar.includes("Die Formeln in Auswertung!B3 und B4 sowie ein Diagramm auf „Auswertung“ nutzen noch „Platte (Konflikt)“. Kopier, was du von dort brauchst, nach „Platte“, stell die Formeln und das Diagramm auf „Platte“ um und lösch erst dann die Konflikt-Kopie."),
+        bar,
+      );
+      // B points them at Platte (row 10 of B's version is row 12 of A's) and deletes the chart.
+      b.store.apply("Eingabe", (w) => setCells(w, "aus", [{ row: 2, col: 1, cell: { f: "Platte!B12*$B$1" } }, { row: 3, col: 1, cell: { f: "AVERAGE(Platte!B2:B12)" } }]));
+      b.store.apply("Diagramm löschen", (w) => ({ ...w, charts: w.charts.filter((c) => c.id !== "chB") }));
+      const then = b.store.get().workbook;
+      check("pointed at the original, the chart deleted: nothing ties the copy, the way out is offered", !tiedCopy(copyTies(then, copyId)));
+      const mine = ownVersion(then, copyId, "de");
+      check("my version as a spreadsheet of its own: its formula, and the number my device showed", !!mine && mine.sheets[0].cells["1,7"]?.f === "B2*2" && sameJson(value(mine, mine.sheets[0].id, 1, 7), before[2]), mine && value(mine, mine.sheets[0].id, 1, 7));
+      b.store.apply("Blatt löschen", (w) => deleteSheet(w, copyId));
+      await b.saver.flush();
+      const aus = (server.content as Workbook).sheets.find((s) => s.id === "aus");
+      check(
+        "…the copy gone: saved, the formulas on Auswertung as B pointed them (no #BEZUG!)",
+        b.saver.state === "saved" && aus?.cells["2,1"]?.f === "Platte!B12*$B$1" && !JSON.stringify(aus).includes("#REF!") && sameJson(value(server.content as Workbook, "aus", 2, 1), value(then, "aus", 2, 1)),
+        { state: b.saver.state, aus: aus?.cells },
+      );
+      await a.close();
+      await b.close();
+    }
+    {
+      const server = new FakeServer(start);
+      const id = page();
+      const a = openEditor(server, id, { userId: "col21-c" });
+      const b = openEditor(server, id, { userId: "col21-d" });
+      analyse(b);
+      await b.saver.flush();
+      a.store.apply("Zeilen einfügen", (wb) => insertRows(wb, plate.id, 3, 1));
+      await a.saver.flush();
+      const wb = a.store.get().workbook;
+      const why = tooBigBecause(wb.sheets, ownBigCopies([], a.log.conflicts.flat()));
+      const copyId = why.kind === "own" ? why.copy.id : "";
+      check("A saves second: A's copy, which nothing reads: offered at once", a.saver.state === "tooBig" && why.kind === "own" && !tiedCopy(copyTies(wb, copyId)), { state: a.saver.state, why: why.kind });
+      a.store.apply("Blatt löschen", (w) => deleteSheet(w, copyId));
+      await a.saver.flush();
+      const saved = server.content as Workbook;
+      check(
+        "…the copy gone: B's formulas and chart as B wrote them",
+        a.saver.state === "saved" && saved.sheets.find((s) => s.id === "aus")?.cells["2,1"]?.f === "Platte!B10*$B$1" && saved.charts.some((c) => c.id === "chB"),
+        { state: a.saver.state },
+      );
+      await a.close();
+      await b.close();
+    }
+  }
+
+  // 26. SQL2-3: a draft whose save may have landed (its answer was lost, then the tab went) is put
+  //     back only once it is known whether that save landed. While the look at pages.save_ids gets
+  //     no answer (no connection, or a server error), nothing goes over a correction made elsewhere
+  //     meanwhile. An editor with a newer version leaves the draft on the device as it is, the bar
+  //     saying "Auf diesem Gerät gespeichert"; it is looked at again once Blob is online again,
+  //     after a pause, and now and then before a save (which doesn't wait for it); other drafts are
+  //     put back at once; what was typed here meanwhile is newer and stays; the background save may
+  //     take it meanwhile; an editor closed or signed out meanwhile leaves it on the device. An
+  //     editor opened with the draft's version or an older one (the app's copy of the page, opened
+  //     without a connection) carries on from it at once: its work on the screen, its save as the
+  //     editor's own, found out before anything is sent.
+  {
+    /**
+     * The look at pages.save_ids gets no answer the next `blind` times: null (no connection, told to
+     * the rest of Blob as landedFrom does) or undefined (a server error), as `how` says. Each look
+     * takes `slow` ms.
+     */
+    class BlindServer extends FakeServer {
+      blind = 0;
+      how: null | undefined = null;
+      lookups = 0;
+      slow = 0;
+      async landed(pageId: string, saveId: string) {
+        this.lookups++;
+        if (this.slow) await sleep(this.slow);
+        if (this.blind <= 0) return super.landed(pageId, saveId);
+        this.blind--;
+        if (this.how === null) reportNetworkError();
+        return this.how;
+      }
+    }
+    /**
+     * A save a few seconds after the last look, as far as the editor can tell (it looks at drafts
+     * left waiting again before a save only that long after a look, saver.ts LOOK_AGAIN): the clock
+     * is ahead while the save starts, then right again. (The look it starts isn't waited for.)
+     */
+    const flushLater = async (editor: { saver: SheetSaver }) => {
+      const now = Date.now;
+      Date.now = () => now() + 6000;
+      // (flush is async: it never throws before the clock is right again.)
+      const saving = editor.saver.flush();
+      Date.now = now;
+      await saving;
+    };
+    /** Waits until `done()`, at most `ms` (less than the first pause before a look by itself, 3 s). */
+    const until = async (done: () => boolean, ms = 1500) => {
+      for (let t = 0; t < ms && !done(); t += 10) await sleep(10);
+    };
+    // The laptop saves D4 = 0,333: it lands, the answer is lost, and the tab goes (`typeAfter`: with
+    // C6 = 0,93 typed after that save). Then the partner corrects D4 to 0,209.
+    const lostThenCorrected = async (server: BlindServer, user: string, typeAfter = false) => {
+      const id = page();
+      const lap = openEditor(server, id, { userId: user });
+      lap.type(3, 3, "0,333");
+      server.mode = "lost";
+      await lap.saver.flush();
+      if (typeAfter) lap.type(5, 2, "0,93");
+      lap.saver.keepDraft();
+      lap.kill();
+      reportOk();
+      const partner = openEditor(server, id, { userId: `${user}-partner` });
+      partner.type(3, 3, "0,209");
+      await partner.saver.flush();
+      await partner.close();
+      return id;
+    };
+    /** The page's drafts on the device other than the editor's own. */
+    const waitingOn = (user: string, id: string, editor: { saver: SheetSaver }) => localDrafts(user, id).filter((d) => d.writer !== editor.saver.writer);
+
+    // No connection at restore: the correction stays; online again, looked at again at once.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23";
+      const id = await lostThenCorrected(server, user);
+      server.blind = 1;
+      const calls = server.calls;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      const left = waitingOn(user, id, again);
+      check(
+        "look-up unanswered at restore: the correction stays (on screen, on the server), the draft waits as it was, 'Auf diesem Gerät gespeichert'",
+        again.cell("3,3")?.v === 0.209 && server.cell("3,3")?.v === 0.209 && server.calls === calls && left.length === 1 && !!left[0].sending && again.saver.state === "device" && again.log.restored === 0,
+        { shown: again.cell("3,3"), server: server.cell("3,3"), sent: server.calls - calls, waiting: left.length, state: again.saver.state },
+      );
+      reportOk();
+      await until(() => again.saver.state === "saved");
+      check(
+        "online again: looked at again at once, that save had landed: the correction stays, nothing put back, the draft gone, 'Gespeichert'",
+        server.cell("3,3")?.v === 0.209 && again.cell("3,3")?.v === 0.209 && server.rev === 2 && localDrafts(user, id).length === 0 && again.saver.state === "saved" && again.log.restored === 0,
+        { server: server.cell("3,3"), rev: server.rev, drafts: localDrafts(user, id).length, state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // A server error at restore, and then nobody types and the connection doesn't change: it looks
+    // again by itself after a pause, and what was typed after that save comes back.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-5xx";
+      const id = await lostThenCorrected(server, user, true);
+      server.blind = 1;
+      server.how = undefined;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      check(
+        "server error at restore: nothing put back yet, the draft waits, 'Auf diesem Gerät gespeichert', Blob still online",
+        again.cell("5,2") === undefined && again.cell("3,3")?.v === 0.209 && waitingOn(user, id, again).length === 1 && again.saver.state === "device" && isOnline(),
+        { c6: again.cell("5,2"), state: again.saver.state, online: isOnline() },
+      );
+      // (The connection found again elsewhere in Blob is no news after a server error: no look for it.)
+      reportNetworkError();
+      reportOk();
+      await sleep(2500);
+      const early = server.lookups;
+      for (let i = 0; i < 80 && (server.rev < 3 || again.saver.state !== "saved"); i++) await sleep(50);
+      check(
+        "…not when Blob is online again elsewhere, but by itself after a pause: put back from what that save sent (the correction stays, C6 back), said once, saved",
+        early === 1 && server.lookups === 2 && server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && again.cell("5,2")?.v === 0.93 && again.log.restored === 1 && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { early, lookups: server.lookups, rev: server.rev, d4: server.cell("3,3"), c6: server.cell("5,2"), restored: again.log.restored, state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // A save that didn't land (the laptop was offline), put back later: its other work comes back,
+    // and a value typed here again since then is newer and stays. (Online again, the editor's own
+    // save that failed for lack of a connection goes out, and the draft is looked at, both at once.)
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-no";
+      const id = page();
+      const lap = openEditor(server, id, { userId: user });
+      server.mode = "offline";
+      lap.type(3, 3, "0,333");
+      lap.type(5, 2, "0,93");
+      await lap.saver.flush();
+      lap.kill();
+      server.mode = "ok";
+      reportOk();
+      const partner = openEditor(server, id, { userId: `${user}-partner` });
+      partner.type(1, 4, "ok");
+      await partner.saver.flush();
+      await partner.close();
+      check("didn't land: the draft names a save that may have landed, the page moved on", !!draftOf(user, id)?.sending && server.rev === 1 && server.cell("3,3") === undefined);
+      server.blind = 1;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      again.type(3, 3, "0,25");
+      server.mode = "offline";
+      await again.saver.flush();
+      server.mode = "ok";
+      reportOk();
+      await until(() => again.log.restored === 1);
+      await again.saver.flush();
+      check(
+        "didn't land, put back once online again (with the editor's own save): the draft's other work is back, the value typed here since stays",
+        server.cell("3,3")?.v === 0.25 && server.cell("5,2")?.v === 0.93 && server.cell("1,4")?.v === "ok" && again.cell("3,3")?.v === 0.25 && again.log.restored === 1 && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { d4: server.cell("3,3"), c6: server.cell("5,2"), e2: server.cell("1,4"), restored: again.log.restored, state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // The connection gone right after the page came (with the partner's newer version): the draft
+    // waits; online again, it is put back at once (not only after the pause) and saved.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-offline";
+      const id = await lostThenCorrected(server, user, true);
+      server.mode = "offline";
+      reportNetworkError();
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      check(
+        "a newer version, then no connection: the draft waits, 'Auf diesem Gerät gespeichert', the correction on screen",
+        again.saver.state === "device" && again.cell("3,3")?.v === 0.209 && again.cell("5,2") === undefined && waitingOn(user, id, again).length === 1,
+        { state: again.saver.state, c6: again.cell("5,2") },
+      );
+      server.mode = "ok";
+      const t0 = Date.now();
+      reportOk();
+      for (let i = 0; i < 80 && (server.rev < 3 || again.saver.state !== "saved"); i++) await sleep(25);
+      const took = Date.now() - t0;
+      check(
+        "…online again: put back at once and saved (the correction stays, C6 back)",
+        took < 2500 && server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && again.log.restored === 1 && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { took, rev: server.rev, d4: server.cell("3,3"), c6: server.cell("5,2"), state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // Opened from the app's copy of the page (public/sw.js: the version the laptop's lost save was
+    // made on) without a connection, so the browser knows it is offline: the editor carries on from
+    // the draft. Its work is on the screen at once, nothing is sent until it is known whether that
+    // save landed, and then the correction stays.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-copy";
+      const copy = { rev: server.rev, content: clone(server.content), title: server.title };
+      const id = await lostThenCorrected(server, user, true);
+      server.mode = "offline";
+      reportNetworkError();
+      Object.defineProperty(globalThis.navigator, "onLine", { value: false, configurable: true });
+      const calls = server.calls;
+      const again = openEditor(server, id, { userId: user, opened: copy });
+      await again.saver.restore();
+      const own = localDrafts(user, id);
+      check(
+        "opened from the app's copy, offline: the work is back on the screen at once (said once), not looked up, kept in the editor's own draft with the save that got no answer",
+        again.cell("3,3")?.v === 0.333 && again.cell("5,2")?.v === 0.93 && again.log.restored === 1 && server.lookups === 0 && own.length === 1 && own[0].writer === again.saver.writer && !!own[0].sending && own[0].rev === 0,
+        { d4: again.cell("3,3"), c6: again.cell("5,2"), restored: again.log.restored, lookups: server.lookups, drafts: own.map((d) => ({ writer: d.writer === again.saver.writer ? "own" : d.writer, rev: d.rev, sending: !!d.sending })) },
+      );
+      await again.saver.flush();
+      check(
+        "…its first save finds out nothing yet: nothing sent, 'Auf diesem Gerät gespeichert'",
+        server.calls === calls && again.saver.state === "device" && server.cell("3,3")?.v === 0.209,
+        { sent: server.calls - calls, state: again.saver.state },
+      );
+      Reflect.deleteProperty(globalThis.navigator, "onLine");
+      server.mode = "ok";
+      reportOk();
+      await until(() => server.rev === 3 && again.saver.state === "saved");
+      check(
+        "…online again: that save had landed, so the work goes on what it sent: the correction stays (on the screen too), C6 saved",
+        server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && again.cell("3,3")?.v === 0.209 && again.cell("5,2")?.v === 0.93 && server.rev === 3 && localDrafts(user, id).length === 0 && again.log.restored === 1,
+        { rev: server.rev, d4: server.cell("3,3"), c6: server.cell("5,2"), shown: again.cell("3,3"), state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // The app's copy older than the draft (the visit's earlier saves went through before the lost
+    // one): carrying on from the draft shows that work too, not the older copy.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-older";
+      const id = page();
+      const copy = { rev: server.rev, content: clone(server.content), title: server.title };
+      const lap = openEditor(server, id, { userId: user });
+      lap.type(1, 1, "Probe");
+      await lap.saver.flush();
+      lap.type(3, 3, "0,333");
+      server.mode = "lost";
+      await lap.saver.flush();
+      lap.type(5, 2, "0,93");
+      lap.saver.keepDraft();
+      lap.kill();
+      reportOk();
+      const partner = openEditor(server, id, { userId: `${user}-partner` });
+      partner.type(3, 3, "0,209");
+      await partner.saver.flush();
+      await partner.close();
+      check("older copy: the draft was made on revision 1, its save landed as 2, the correction is 3", draftOf(user, id)?.rev === 1 && !!draftOf(user, id)?.sending && server.rev === 3);
+      server.blind = 1;
+      const again = openEditor(server, id, { userId: user, opened: copy });
+      await again.saver.restore();
+      check(
+        "…opened from it, the look-up unanswered: the visit's saved work and the draft's are on the screen",
+        again.cell("1,1")?.v === "Probe" && again.cell("3,3")?.v === 0.333 && again.cell("5,2")?.v === 0.93 && again.log.restored === 1,
+        { b2: again.cell("1,1"), d4: again.cell("3,3"), c6: again.cell("5,2") },
+      );
+      reportOk();
+      await again.saver.flush();
+      check(
+        "…saved: the correction stays, the work goes on top",
+        server.cell("1,1")?.v === "Probe" && server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && again.cell("3,3")?.v === 0.209 && server.rev === 4 && again.saver.state === "saved",
+        { rev: server.rev, d4: server.cell("3,3"), c6: server.cell("5,2"), state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // From the app's copy, and the lost save never reached the server: carried on from, then sent
+    // in full once that is known (the partner's own work stays).
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-copy-no";
+      const id = page();
+      const copy = { rev: server.rev, content: clone(server.content), title: server.title };
+      const lap = openEditor(server, id, { userId: user });
+      server.mode = "offline";
+      lap.type(3, 3, "0,333");
+      lap.type(5, 2, "0,93");
+      await lap.saver.flush();
+      lap.kill();
+      server.mode = "ok";
+      reportOk();
+      const partner = openEditor(server, id, { userId: `${user}-partner` });
+      partner.type(1, 4, "ok");
+      await partner.saver.flush();
+      await partner.close();
+      server.blind = 1;
+      const again = openEditor(server, id, { userId: user, opened: copy });
+      await again.saver.restore();
+      reportOk();
+      await again.saver.flush();
+      check(
+        "from the app's copy, a save that didn't land: carried on from, then all of it saved, the partner's work stays",
+        server.cell("3,3")?.v === 0.333 && server.cell("5,2")?.v === 0.93 && server.cell("1,4")?.v === "ok" && again.cell("1,4")?.v === "ok" && again.log.restored === 1 && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { d4: server.cell("3,3"), c6: server.cell("5,2"), e2: server.cell("1,4"), state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // From the app's copy, but typed into before the look-up came back: that editor doesn't carry
+    // on from the draft (what was typed would go); the draft waits, and goes on it later.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-touched";
+      const copy = { rev: server.rev, content: clone(server.content), title: server.title };
+      const id = await lostThenCorrected(server, user, true);
+      server.blind = 1;
+      server.slow = 100;
+      const again = openEditor(server, id, { userId: user, opened: copy });
+      const restoring = again.saver.restore();
+      again.type(9, 0, "zuerst");
+      await restoring;
+      check(
+        "typed into before the look-up came back: nothing carried on from, the typing stays, the draft waits",
+        again.cell("9,0")?.v === "zuerst" && again.cell("5,2") === undefined && again.log.restored === 0 && waitingOn(user, id, again).length === 1,
+        { a10: again.cell("9,0"), c6: again.cell("5,2"), waiting: waitingOn(user, id, again).length },
+      );
+      server.slow = 0;
+      reportOk();
+      await until(() => again.log.restored === 1);
+      await again.saver.flush();
+      check(
+        "…online again: put back from what that save sent: the correction stays, C6 and the typing saved",
+        server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && server.cell("9,0")?.v === "zuerst" && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { d4: server.cell("3,3"), c6: server.cell("5,2"), a10: server.cell("9,0"), state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // Two drafts from the app's copy whose saves can't be looked up: the newest is carried on
+    // from, the other waits, and goes on it once it can be looked up.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-copy-two";
+      const id = page();
+      const empty = normalizeWorkbook(server.content, "de");
+      const at = Date.now();
+      const draft = (writer: string, key: string, v: string, n: number): SheetDraft => {
+        const mine = setCell(empty, empty.sheets[0].id, key, { v });
+        return { v: 1, pageId: id, writer, rev: 0, base: empty, mine, baseTitle: "Messung", title: "Messung", at: at + n, sending: { id: `lost-${writer}`, title: "Messung" } };
+      };
+      writeDraft(user, draft("tab-a", "0,0", "von A", 0));
+      writeDraft(user, draft("tab-b", "1,0", "von B", 1));
+      server.blind = 2;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      const left = waitingOn(user, id, again);
+      check(
+        "two drafts from the app's copy, neither looked up: the newer one carried on from, the other waits",
+        again.cell("1,0")?.v === "von B" && again.cell("0,0") === undefined && left.length === 1 && left[0].writer === "tab-a",
+        { a1: again.cell("0,0"), a2: again.cell("1,0"), waiting: left.map((d) => d.writer) },
+      );
+      reportOk();
+      await until(() => server.rev >= 1 && again.saver.state === "saved");
+      await again.saver.flush();
+      check(
+        "…online again: both found not to have landed, both saved",
+        server.cell("0,0")?.v === "von A" && server.cell("1,0")?.v === "von B" && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { a1: server.cell("0,0"), a2: server.cell("1,0"), state: again.saver.state, drafts: localDrafts(user, id).length },
+      );
+      await again.close();
+    }
+
+    // Typing while a draft waits: saved at once, not after a look that can't get through, and the
+    // bar keeps saying the work is on this device until the draft is put back. A save looks at it
+    // again only some seconds after the last look.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-typing";
+      const id = await lostThenCorrected(server, user);
+      server.blind = 2;
+      server.how = undefined;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      again.type(7, 0, "neu");
+      await again.saver.flush();
+      check(
+        "typing right after a look that got no answer: saved, not looked at again yet, the bar still 'Auf diesem Gerät gespeichert'",
+        server.lookups === 1 && server.cell("7,0")?.v === "neu" && again.saver.state === "device" && waitingOn(user, id, again).length === 1,
+        { lookups: server.lookups, n7: server.cell("7,0"), state: again.saver.state },
+      );
+      server.slow = 400;
+      again.type(8, 0, "mehr");
+      const t0 = Date.now();
+      await flushLater(again);
+      const took = Date.now() - t0;
+      check(
+        "…a save some seconds later looks again, and doesn't wait for that look (a slow one): saved at once",
+        took < 200 && server.lookups === 2 && server.cell("8,0")?.v === "mehr" && again.saver.state === "device",
+        { took, lookups: server.lookups, n8: server.cell("8,0"), state: again.saver.state },
+      );
+      await sleep(server.slow + 150);
+      server.slow = 0;
+      await flushLater(again);
+      await until(() => again.saver.state === "saved");
+      check(
+        "…the next such look gets an answer: nothing to put back (that save had landed), 'Gespeichert'",
+        server.lookups === 3 && again.saver.state === "saved" && server.cell("3,3")?.v === 0.209 && localDrafts(user, id).length === 0,
+        { lookups: server.lookups, state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // Two drafts, one of which can't be looked up: the other is put back at once.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-two";
+      const id = await lostThenCorrected(server, user);
+      const now = normalizeWorkbook(server.content, "de");
+      writeDraft(user, { v: 1, pageId: id, rev: server.rev, base: now, mine: setCell(now, now.sheets[0].id, "0,0", { v: "aus Tab 2" }), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "tab-2" });
+      server.blind = 1;
+      server.how = undefined;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      const left = waitingOn(user, id, again);
+      check(
+        "two drafts, one can't be looked up: the other is put back at once, that one waits",
+        again.cell("0,0")?.v === "aus Tab 2" && again.cell("3,3")?.v === 0.209 && again.log.restored === 1 && left.length === 1 && left[0].writer !== "tab-2" && !!left[0].sending,
+        { a1: again.cell("0,0"), waiting: left.map((d) => d.writer) },
+      );
+      await flushLater(again);
+      await until(() => again.saver.state === "saved");
+      check(
+        "…a save a while later looks again: nothing waits any more, both saved, the correction stays",
+        server.cell("0,0")?.v === "aus Tab 2" && server.cell("3,3")?.v === 0.209 && localDrafts(user, id).length === 0 && again.saver.state === "saved" && again.log.restored === 1,
+        { a1: server.cell("0,0"), d4: server.cell("3,3"), drafts: localDrafts(user, id).length, state: again.saver.state },
+      );
+      await again.close();
+    }
+
+    // The background save takes a waiting draft (its editor is gone): it finds out itself, and the
+    // open editor gets what it saved as a new revision.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-bg";
+      const id = await lostThenCorrected(server, user, true);
+      server.blind = 1;
+      server.how = undefined;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      const n = await flushSheetDrafts(user, "de", server);
+      for (let i = 0; i < 50 && again.cell("5,2") === undefined; i++) await sleep(10);
+      await flushLater(again);
+      await until(() => again.saver.state === "saved");
+      check(
+        "the background save takes a waiting draft: saved from what that save sent, the editor gets it, its next look finds nothing waiting",
+        n === 1 && server.cell("3,3")?.v === 0.209 && server.cell("5,2")?.v === 0.93 && again.cell("5,2")?.v === 0.93 && again.cell("3,3")?.v === 0.209 && again.log.restored === 0 && again.saver.state === "saved" && localDrafts(user, id).length === 0,
+        { n, c6: again.cell("5,2"), state: again.saver.state, drafts: localDrafts(user, id).length },
+      );
+      await again.close();
+    }
+
+    // Closed or signed out while a draft waits: it stays on the device for the next editor.
+    {
+      const server = new BlindServer(newWorkbook("de"), "Messung");
+      const user = "sql23-close";
+      const id = await lostThenCorrected(server, user);
+      server.blind = 1;
+      server.how = undefined;
+      const again = openEditor(server, id, { userId: user });
+      await again.saver.restore();
+      again.type(8, 0, "zuletzt");
+      const t0 = Date.now();
+      await again.close();
+      const left = localDrafts(user, id);
+      check(
+        "closed while a draft waits: the last save goes out at once, the draft stays on the device as it was",
+        Date.now() - t0 < 1000 && server.cell("8,0")?.v === "zuletzt" && left.length === 1 && !!left[0].sending && server.cell("3,3")?.v === 0.209,
+        { ms: Date.now() - t0, drafts: left.length },
+      );
+      server.blind = 1;
+      const signedOut = openEditor(server, id, { userId: user });
+      await signedOut.saver.restore();
+      signedOut.kill();
+      check("signed out while a draft waits: the bar doesn't claim the work is saved", signedOut.saver.state === "refused", signedOut.saver.state);
+      const next = openEditor(server, id, { userId: user });
+      await next.saver.restore();
+      await next.saver.flush();
+      check("the next editor looks it up: nothing goes over the correction, the draft gone", server.cell("3,3")?.v === 0.209 && localDrafts(user, id).length === 0 && next.saver.state === "saved", next.saver.state);
+      await next.close();
+    }
+    reportOk();
+  }
+
+  // 27. The bar under the spreadsheet's top bar (BannerVoice, ACCS's request): screen readers hear
+  //     each problem once. The top bar's indicator says the save state (SaveIndicator); the bar
+  //     speaks only when that doesn't: close to the size limit, or another reason while the state
+  //     stays. A bar there from the start is read with the page; its words changing (the size,
+  //     which copy is in the way) aren't said again; the same words coming back are said again.
+  {
+    /** Everything said through the steps (the bar's kind, the save state, its words): the indicator's and the bar's, in order. */
+    const said = (steps: [BannerKind | null, SaveState, string?][], start: [BannerKind | null, SaveState] = [null, "saved"]) => {
+      let bar = bannerAtStart(start[0], start[1]);
+      let heard = saveAnnouncement(null, start[1]).heard;
+      const out: string[] = [];
+      for (const [kind, state, text = null] of steps) {
+        if (state !== bar.state) {
+          const indicator = saveAnnouncement(heard, state);
+          heard = indicator.heard;
+          if (indicator.say) out.push(`indicator:${indicator.say}`);
+        }
+        if (kind === bar.kind && state === bar.state) continue;
+        const next = bannerNext(bar, kind, text, state);
+        if (next.n !== bar.n) out.push(`bar:${next.say}`);
+        bar = next;
+      }
+      return out.join(" | ");
+    };
+    const saving: [null, SaveState][] = [[null, "pending"], [null, "saving"]];
+    check("no access any more: said once (the indicator's 'Nicht gespeichert'), not again while typing", said([...saving, ["denied", "refused", "D"], ["denied", "refused", "D"]]) === "indicator:refused");
+    check("too big: said once, not again when its words change", said([...saving, ["tooBig", "tooBig", "B"], ["tooBig", "tooBig", "B2"]]) === "indicator:tooBig");
+    check(
+      "refused as sent, then no access any more (the state stays 'Nicht gespeichert'): the bar says the new reason",
+      said([...saving, ["rejected", "refused", "R"], ["rejected", "pending", "R"], ["rejected", "saving", "R"], ["denied", "refused", "D"]]) === "indicator:refused | bar:D",
+    );
+    check(
+      "close to the size limit: said once by the bar, not again as the size changes",
+      said([...saving, ["large", "saved", "4,2"], ["large", "pending", "4,2"], ["large", "saving", "4,2"], ["large", "saved", "4,3"]]) === "bar:4,2",
+    );
+    check(
+      "too big, then small enough again: the indicator says it's saved, the bar the heads-up",
+      said([...saving, ["tooBig", "tooBig", "B"], ["tooBig", "pending", "B"], ["tooBig", "saving", "B"], ["large", "saved", "4,9"]]) === "indicator:tooBig | indicator:saved | bar:4,9",
+    );
+    check(
+      "the heads-up arriving with 'Auf diesem Gerät gespeichert' (rows deleted offline after too big; drafts waiting): both said",
+      said([...saving, ["tooBig", "tooBig", "B"], ["tooBig", "pending", "B"], ["tooBig", "saving", "B"], ["large", "device", "4,6"]]) === "indicator:tooBig | indicator:device | bar:4,6" &&
+        said([...saving, ["large", "device", "4,3"]]) === "indicator:device | bar:4,3",
+    );
+    check("no access any more while the work was on this device: said once, by the indicator", said([...saving, [null, "device"], [null, "saving"], ["denied", "refused", "D"]]) === "indicator:device | indicator:refused");
+    check("there from the start (view only, unreadable): read with the page, not said", said([["viewOnly", "saved", "V"]], ["viewOnly", "saved"]) === "" && said([["unreadable", "saved", "U"]], ["unreadable", "saved"]) === "");
+    check("gone and back: the same words said again", said([["large", "saved", "L"], [null, "pending"], [null, "saving"], [null, "saved"], ["large", "saved", "L"]]) === "bar:L | bar:L");
+    check(
+      "its status is there from the start, empty",
+      renderToStaticMarkup(createElement(BannerVoice, { kind: "denied", text: "D", state: "refused" })) === '<div role="status" class="sr-only"></div>',
+    );
+  }
+
+  // 28. SEAM-1, SEAM-6, ACC2-3: on a spreadsheet screen readers hear each save problem and its end
+  //     once, in the words of the editor's notice ("…bleiben auf diesem Gerät…"), and the top bar's
+  //     indicator stays quiet for them (PageSaid). No such notice while the one about a conflict copy
+  //     shows (where my version went stays its 20 s), nor while the bar under the top bar says what
+  //     to do (no access any more, too big, refused as sent), nor that it works again when it didn't
+  //     say the problem: the indicator speaks then. Notes, decks and quizzes hear the indicator as before.
+  {
+    type Step = SaveState | { state: SaveState; trouble: "failed" | "recovered"; conflict?: boolean; banner?: SaveNotice };
+    /** What screen readers hear through the steps (a save state, with the saver's trouble news at the same moment), on a sheet or another page. */
+    const heard = (steps: Step[], sheet = true) => {
+      let shown = false;
+      let said: PageSaid = null;
+      let news = 0;
+      let voice: IndicatorVoice = { state: "saved", heard: null, say: null, took: 0 };
+      const out: string[] = [];
+      for (const step of steps) {
+        const s = typeof step === "string" ? { state: step } : step;
+        if ("trouble" in s && sheet) {
+          const next = troubleSaid(s.trouble, shown, !!s.conflict, s.banner ?? null);
+          shown = next.shown;
+          if (next.say) {
+            out.push(`notice:${next.say}`);
+            said = { state: next.say, n: ++news };
+          }
+        }
+        if (s.state === voice.state) continue;
+        const spoken = saveAnnouncement(voice.heard, s.state).say;
+        const next = indicatorVoice(voice, s.state, sheet ? said : null);
+        // (It speaks when its status gets words of its own just now; quiet, it has none.)
+        if (spoken && next.say) out.push(`indicator:${spoken}`);
+        voice = next;
+      }
+      return out.join(" | ");
+    };
+    const fails: Step[] = ["pending", "saving", { state: "failed", trouble: "failed" }, "saving", "failed", "saving"];
+    const back: Step = { state: "saved", trouble: "recovered" };
+    const cases: [string, Step[], boolean, string][] = [
+      ["a server error and its end: once each, in the notice's words", [...fails, back], true, "notice:failed | notice:saved"],
+      ["…on a note: the indicator, as before", [...fails, back], false, "indicator:failed | indicator:saved"],
+      [
+        "while the conflict notice shows: it stays, the indicator says the problem and its end",
+        ["pending", "saving", { state: "failed", trouble: "failed", conflict: true }, "saving", "failed", "saving", { state: "saved", trouble: "recovered", conflict: true }],
+        true,
+        "indicator:failed | indicator:saved",
+      ],
+      ["the conflict notice came after the problem was said: its end by the indicator, the notice stays", [...fails, { state: "saved", trouble: "recovered", conflict: true }], true, "notice:failed | indicator:saved"],
+      ["refused as sent, then a server error: no notice (the bar says what to do)", ["pending", "saving", "refused", "pending", "saving", { state: "failed", trouble: "failed", banner: "rejected" }, "saving", back], true, "indicator:refused | indicator:failed | indicator:saved"],
+      ["no access any more, then a server error", ["pending", "saving", "refused", "pending", "saving", { state: "failed", trouble: "failed", banner: "denied" }, "saving", back], true, "indicator:refused | indicator:failed | indicator:saved"],
+      ["too big, then a server error", ["pending", "saving", "tooBig", "pending", "saving", { state: "failed", trouble: "failed", banner: "tooBig" }, "saving", back], true, "indicator:tooBig | indicator:failed | indicator:saved"],
+      ["close to the limit is no problem the bar solves: the notice", ["pending", "saving", { state: "failed", trouble: "failed", banner: "large" }, "saving", back], true, "notice:failed | notice:saved"],
+      ["works again while more waits: said then, not again once all is saved", [...fails, { state: "pending", trouble: "recovered" }, "saving", "saved"], true, "notice:failed | notice:saved"],
+      ["…then offline: the indicator, as always", [...fails, { state: "pending", trouble: "recovered" }, "saving", "saved", "pending", "saving", "device", "saving", "saved"], true, "notice:failed | notice:saved | indicator:device | indicator:saved"],
+      ["offline in between: each change of problem said once", [...fails, "device", "saving", "failed", "saving", back], true, "notice:failed | indicator:device | indicator:failed | notice:saved"],
+      // Works again while more waits, and another problem comes before that is saved: the notice's
+      // "Gespeichert…" is old news then, and the indicator says the end of the new problem.
+      ["works again while more waits, then offline before it is saved: its end said too", [...fails, { state: "pending", trouble: "recovered" }, "saving", "device", "saving", "saved"], true, "notice:failed | notice:saved | indicator:device | indicator:saved"],
+      ["…then refused as sent", [...fails, { state: "pending", trouble: "recovered" }, "saving", "refused", "pending", "saving", "saved"], true, "notice:failed | notice:saved | indicator:refused | indicator:saved"],
+      ["…then too big", [...fails, { state: "pending", trouble: "recovered" }, "saving", "tooBig", "pending", "saving", "saved"], true, "notice:failed | notice:saved | indicator:tooBig | indicator:saved"],
+      ["…then a server error again: the notice says it again", [...fails, { state: "pending", trouble: "recovered" }, "saving", { state: "failed", trouble: "failed" }, "saving", back], true, "notice:failed | notice:saved | notice:failed | notice:saved"],
+    ];
+    for (const [name, steps, sheet, expected] of cases) check(name, heard(steps, sheet) === expected, heard(steps, sheet));
+
+    // Through the saver, wired as useSheetSave wires it: a server error on the save right after a merge
+    // that made a conflict copy (SEAM-1). The conflict notice stays; the indicator says the rest.
+    class Flaky extends FakeServer {
+      failFrom = Infinity;
+      async saveSheet(a: SaveArgs): ReturnType<FakeServer["saveSheet"]> {
+        if (this.calls < this.failFrom) return super.saveSheet(a);
+        this.calls++;
+        return { data: null, error: { message: "Service Unavailable" }, status: 503 };
+      }
+    }
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      const server = new Flaky(labWorkbook());
+      const id = page();
+      const opened = normalizeWorkbook(clone(labWorkbook()), "de");
+      const other = openEditor(server, id, { userId: "seam1-b" });
+      other.store.apply("Zeilen einfügen", (wb) => insertRows(wb, "lab1", 4, 1));
+      await other.saver.flush();
+      const store = createSheetStore({ pageId: id, workbook: opened, locale: "de", readOnly: false });
+      const out: string[] = [];
+      let conflictNotice = 0;
+      let shown = false;
+      let banner: SaveNotice | null = null;
+      let said: PageSaid = null;
+      let news = 0;
+      let voice: IndicatorVoice = { state: "saved", heard: null, say: null, took: 0 };
+      // (The indicator draws once after what the saver says at one moment, as React batches it.)
+      let drawn: SaveState | null = null;
+      const draw = () => {
+        const s = drawn;
+        drawn = null;
+        if (!s || s === voice.state) return;
+        const spoken = saveAnnouncement(voice.heard, s).say;
+        const next = indicatorVoice(voice, s, said);
+        if (spoken && next.say) out.push(`indicator:${spoken}`);
+        voice = next;
+      };
+      const saver = new SheetSaver({
+        store,
+        pageId: id,
+        userId: "seam1-a",
+        locale: "de",
+        rev: 0,
+        base: opened,
+        title: "",
+        readOnly: false,
+        api: server,
+        on: {
+          state: (s) => {
+            drawn = s;
+            queueMicrotask(draw);
+          },
+          notice: (n) => {
+            banner = n;
+          },
+          conflict: (found) => {
+            conflictNotice = showSheetNotice(store, sheetText.de.conflict(found), "info", { ms: 20_000 });
+            out.push("notice:conflict");
+          },
+          trouble: (kind) => {
+            const next = troubleSaid(kind, shown, currentSheetNotice(store)?.id === conflictNotice, banner);
+            shown = next.shown;
+            if (!next.say) return;
+            showSheetNotice(store, next.say === "failed" ? sheetText.de.saveTrouble : sheetText.de.saveBack, next.say === "failed" ? "error" : "done");
+            said = { state: next.say, n: ++news };
+            out.push(`notice:${next.say}`);
+          },
+          title: () => {},
+          saved: () => {},
+          restored: () => {},
+        },
+      });
+      let version = store.get().version;
+      const off = store.subscribe(() => {
+        const v = store.get().version;
+        if (v === version) return;
+        version = v;
+        saver.changed();
+      });
+      store.apply("Zeilen löschen", (wb) => deleteRows(wb, "lab1", 5, 1));
+      // Its first save is behind (merged: my version on a copy), the merged one gets a 503.
+      server.failFrom = server.calls + 1;
+      await saver.flush();
+      await sleep(0);
+      const card = currentSheetNotice(store);
+      check(
+        "a 503 right after the merge: the conflict notice stays, the indicator says the problem",
+        out.join(" | ") === "notice:conflict | indicator:failed" && card?.id === conflictNotice && saver.state === "failed",
+        { out, card: card?.text.slice(0, 60), state: saver.state },
+      );
+      server.failFrom = Infinity;
+      await saver.flush();
+      await sleep(0);
+      check(
+        "…and its end: the indicator, the conflict notice still there",
+        out.join(" | ") === "notice:conflict | indicator:failed | indicator:saved" && currentSheetNotice(store)?.id === conflictNotice && saver.state === "saved",
+        { out, state: saver.state },
+      );
+      off();
+      await saver.close();
+      await other.close();
+    } finally {
+      console.error = quiet;
+    }
+  }
+
+  // 29. SEAM-7: half an emoji pasted (Blob's own copy, when the clipboard can't be read) is repaired
+  //     as it is saved, in the editor too, and in its undo steps (store.repair): Ctrl+Z takes the
+  //     paste back, a value it went over comes back, and nothing is said about anyone else; redo
+  //     and undo again; a change someone else made to that cell since is still kept and said.
+  {
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    const e = openEditor(server, id, { userId: "seam7" });
+    const s = e.sheetId;
+    e.store.apply("Einfügen", (wb) => setCells(wb, s, [{ row: 0, col: 2, cell: { v: 0.52 } }, { row: 1, col: 2, cell: { v: 0.418 } }]));
+    await e.saver.flush();
+    e.store.apply("Nur Werte einfügen", (wb) => setCells(wb, s, [{ row: 0, col: 2, cell: { v: "\ud83e" } }, { row: 1, col: 2, cell: { v: "x" } }]));
+    e.store.apply("Eingabe", (wb) => setCells(wb, s, [{ row: 3, col: 3, cell: { v: 42 } }]));
+    await e.saver.flush();
+    check("saved repaired, on screen too", e.cell("0,2")?.v === "�" && server.cell("0,2")?.v === "�" && e.saver.state === "saved", e.cell("0,2"));
+    e.store.undo();
+    e.store.undo();
+    check(
+      "Ctrl+Z twice: the 42 and the paste taken back, the values it went over back, nothing said about anyone else",
+      e.cell("3,3") === undefined && e.cell("0,2")?.v === 0.52 && e.cell("1,2")?.v === 0.418 && currentSheetNotice(e.store) === null,
+      { c1: e.cell("0,2"), c2: e.cell("1,2"), notice: currentSheetNotice(e.store)?.text },
+    );
+    e.store.redo();
+    e.store.redo();
+    check("redo twice: the paste (repaired) and the 42 again", e.cell("0,2")?.v === "�" && e.cell("3,3")?.v === 42 && currentSheetNotice(e.store) === null);
+    await e.saver.flush();
+    e.store.undo();
+    e.store.undo();
+    await e.saver.flush();
+    check("saved again: the values, nothing unstorable sent", e.saver.state === "saved" && server.cell("0,2")?.v === 0.52 && !/\\ud[89a-f]/.test(JSON.stringify(server.content)));
+    // Someone else wrote into the pasted cell after the save: undo keeps theirs and says so.
+    e.store.apply("Nur Werte einfügen", (wb) => setCells(wb, s, [{ row: 5, col: 0, cell: { v: "a\ud83e" } }]));
+    await e.saver.flush();
+    e.store.replaceRemote(setCells(e.store.get().workbook, s, [{ row: 5, col: 0, cell: { v: "von jemand anderem" } }]));
+    e.store.undo();
+    check("a real change by someone else since stays, and is said", e.cell("5,0")?.v === "von jemand anderem" && /jemand anderes/.test(currentSheetNotice(e.store)?.text ?? ""), currentSheetNotice(e.store)?.text);
+    await e.close();
+  }
+  // …and only so far (store.ts REPAIR_WORK, a million values): each step since the paste costs a
+  // walk through its sheet's cells, seconds for a hundred steps on a huge spreadsheet (offline for
+  // long). Past it the older steps go: undo goes back less far, still without a notice. Used up
+  // just as the paste's step is repaired, the steps before it stay (they needed nothing).
+  {
+    const blank = newWorkbook("de");
+    const cells: Record<string, Cell> = {};
+    for (let r = 0; r < 8000; r++) for (let c = 0; c < 6; c++) cells[`${r},${c}`] = { v: r * 10 + c };
+    const big: Workbook = { ...blank, sheets: [{ ...blank.sheets[0], cells, size: { rows: 9000, cols: 26 } }] };
+    const s = big.sheets[0].id;
+    const w0 = storableWork();
+    storable(clone(big));
+    const walk = storableWork() - w0;
+    /** 5 steps, the paste, `edits` more, the save's repair; then undo all that is left. */
+    const history = (edits: number) => {
+      const store = createSheetStore({ pageId: page(), workbook: big, locale: "de", readOnly: false });
+      for (let k = 0; k < 5; k++) store.apply("Eingabe", (wb) => setCells(wb, s, [{ row: k, col: 7, cell: { v: k } }]));
+      store.apply("Nur Werte einfügen", (wb) => setCells(wb, s, [{ row: 2, col: 8, cell: { v: "\ud83e" } }]));
+      for (let k = 0; k < edits; k++) store.apply("Eingabe", (wb) => setCells(wb, s, [{ row: k, col: 9, cell: { v: k } }]));
+      const w = storableWork();
+      store.repair(storable(store.get().workbook));
+      const work = storableWork() - w;
+      let steps = 0;
+      let said = false;
+      while (store.get().canUndo) {
+        store.undo();
+        steps++;
+        said ||= currentSheetNotice(store) !== null;
+      }
+      const left = store.get().workbook.sheets[0].cells;
+      return { steps, said, work, pasted: left["2,8"]?.v, first: left["0,7"]?.v };
+    };
+    // (With the budget's last walk on the paste's step: edits × walk ≤ a million < (edits + 1) × walk.)
+    const edge = Math.floor(1_000_000 / walk);
+    const kept = history(edge);
+    check(
+      `a paste and ${edge} more steps on a big sheet: the budget's end at the paste, all ${edge + 6} steps stay, undone without a notice`,
+      kept.steps === edge + 6 && !kept.said && kept.pasted === undefined && kept.first === undefined,
+      { ...kept, walk },
+    );
+    const many = history(40);
+    check(
+      "40 steps after the paste: the repair stops at its budget, the older steps go, what is left is undone without a notice",
+      many.work < 1_000_000 + 3 * walk && many.steps > 1 && many.steps < 40 && !many.said && many.pasted === "�" && many.first === 0,
+      { ...many, walk },
+    );
+  }
+
+  // 30. SAVE2's note: offline, whether a save landed isn't looked up at all (postgrest-js would try
+  //     for seconds while the bar says "Speichert…"): no connection, at once.
+  {
+    Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+    try {
+      const t0 = Date.now();
+      const r = await supabaseApi.landed("p", "s");
+      check("offline: not looked up, no connection at once", r === null && Date.now() - t0 < 100, r);
+    } finally {
+      delete (navigator as { onLine?: boolean }).onLine;
+    }
+  }
+
+  // 31. SAVE2's note 4: an editor opened without a connection (the app's copy of the page) hears of
+  //     no save made meanwhile: once Blob is online again it fetches the newest version, once.
+  {
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    reportNetworkError();
+    const e = openEditor(server, id, { userId: "note4" });
+    // Someone else saves meanwhile (nothing reaches this editor while it is offline).
+    const theirs = setCells(normalizeWorkbook(clone(server.content), "de"), e.sheetId, [{ row: 1, col: 1, cell: { v: "neu" } }]);
+    server.content = clone(theirs);
+    server.rev = 1;
+    const loads = server.loads;
+    reportOk();
+    await sleep(10);
+    check("opened offline: online again, the newest version fetched", e.cell("1,1")?.v === "neu" && server.loads === loads + 1 && e.saver.state === "saved", { c: e.cell("1,1"), loads: server.loads - loads });
+    reportNetworkError();
+    reportOk();
+    await sleep(10);
+    check("…once", server.loads === loads + 1, server.loads - loads);
+    await e.close();
   }
 }
 

@@ -1,5 +1,5 @@
-// Information: ISTLEER, ISTZAHL, ISTTEXT, ISTFEHLER, ISTNV, ISTLOG, ISTGERADE, ISTUNGERADE,
-// ISTFORMEL, NV.
+// Information: ISTLEER, ISTZAHL, ISTTEXT, ISTKTEXT, ISTFEHLER, ISTFEHL, ISTNV, ISTLOG, ISTGERADE,
+// ISTUNGERADE, ISTFORMEL, NV.
 
 import { ERR, isErr, isRef, type Scalar } from "../values";
 import type { FnDef } from "./types";
@@ -11,7 +11,11 @@ export const INFO: FnDef[] = [
   is("ISBLANK", (v) => v === null),
   is("ISNUMBER", (v) => typeof v === "number"),
   is("ISTEXT", (v) => typeof v === "string"),
+  // Empty cells, true/false and errors aren't text either.
+  is("ISNONTEXT", (v) => typeof v !== "string"),
   is("ISERROR", (v) => isErr(v)),
+  // Every error but #N/A.
+  is("ISERR", (v) => isErr(v) && v.error !== "#N/A"),
   is("ISNA", (v) => isErr(v) && v.error === "#N/A"),
   is("ISLOGICAL", (v) => typeof v === "boolean"),
   {

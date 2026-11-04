@@ -320,6 +320,19 @@ function seriesColor(ser: XmlEl, theme: string[]): SheetColor | null {
   return idx ? nearestSheetColor(theme[3 + Number(idx[1])] ?? "4472C4", "text") : null;
 }
 
+/**
+ * A series' own name (not a cell's): text as Excel writes it (<c:v>), a formula of quoted text as
+ * LibreOffice writes it (<c:f>"Standards"</c:f>), or else the name's last value from the file's
+ * cache (a reference to a sheet that didn't come along).
+ */
+function seriesName(tx: XmlEl | null): string {
+  const f = textOf(descendants(tx, "f")[0] ?? null).trim();
+  const literal = /^"((?:[^"]|"")*)"$/.exec(f);
+  if (literal) return literal[1].replace(/""/g, '"').trim();
+  const cached = descendants(child(tx, "strRef"), "v")[0];
+  return textOf(cached ?? child(tx, "v")).trim();
+}
+
 const TREND_FROM: Record<string, TrendlineSpec["type"]> = { linear: "linear", poly: "polynomial", exp: "exponential", log: "logarithmic", power: "power", movingAvg: "movingAverage" };
 const ERR_FROM: Record<string, ErrorBarSpec["kind"]> = { fixedVal: "fixed", percentage: "percent", stdDev: "stdev", stdErr: "stderr", cust: "custom" };
 
@@ -370,7 +383,7 @@ export function chartFromXml(
     if (!sharedX && xs) sharedX = xs;
     const tx = child(ser, "tx");
     const nameRef = ref(tx);
-    const name = nameRef ? "" : textOf(child(tx, "v")).trim();
+    const name = nameRef ? "" : seriesName(tx);
     const lineEl = child(child(ser, "spPr"), "ln");
     const noLine = !!child(lineEl, "noFill");
     const symbol = attr(child(child(ser, "marker"), "symbol"), "val") ?? (kind === "scatter" ? "circle" : "none");

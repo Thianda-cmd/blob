@@ -4,7 +4,7 @@
 // text and fill colours, borders, font size, AutoSum's functions, chart types and freezing.
 
 import { Ban, ChartArea, ChartBar, ChartColumn, ChartLine, ChartPie, ChartScatter, Columns3, PanelTop, Rows3, SquareFunction, Unlock } from "lucide-react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
@@ -13,8 +13,7 @@ import { SHEET_COLORS, sheetColor, sheetFill } from "@/sheet/colors";
 import { FUNCTION_BY_EN } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { ChartKind, SheetColor } from "@/sheet/types";
-import { insertChart } from "../chart/actions";
-import { showSheetNotice } from "../notice";
+import { makeChart } from "../chart/actions";
 import { useSheet, type SheetStore } from "../store";
 import { autoSum, freezePanes, setBorders, setStyle, type BorderPreset, type SumFn } from "./actions";
 import { Choice, keepFocus } from "./parts";
@@ -22,15 +21,44 @@ import { Choice, keepFocus } from "./parts";
 // ----------------------------------------------------------------------------------------------
 // Colours
 
+/** Colours in a row of the palette (its grid's columns). */
+const PALETTE_COLS = 5;
+
+/**
+ * Where an arrow key goes from entry `i` of the colour panel (0: "Automatisch", then the colours,
+ * PALETTE_COLS to a row): left and right along all of them (round from the last to the first),
+ * up and down between the rows of colours, past the first or last row to "Automatisch". null
+ * where the panel's menu takes the key (up and down from "Automatisch": the first or last colour).
+ */
+export function paletteStep(i: number, key: string, count: number): number | null {
+  if (key === "ArrowLeft" || key === "ArrowRight") return (i + (key === "ArrowRight" ? 1 : count - 1)) % count;
+  if ((key !== "ArrowUp" && key !== "ArrowDown") || i < 1) return null;
+  const k = i - 1 + (key === "ArrowDown" ? PALETTE_COLS : -PALETTE_COLS);
+  return k < 0 || k >= count - 1 ? 0 : k + 1;
+}
+
 /** Text colour or fill: the palette (it follows dark mode), and "Automatisch" / "Keine Füllung". */
 export function ColorPanel({ kind, current, onPick }: { kind: "color" | "fill"; current: SheetColor | undefined; onPick: (c: SheetColor | null) => void }) {
   const t = useMessages(sheetChromeText);
+  // The colours lie in a grid: the arrow keys go along its rows and between them.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const entries = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+    const i = entries.indexOf(e.target as HTMLButtonElement);
+    if (i < 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+    const next = paletteStep(i, e.key, entries.length);
+    if (next === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    entries[next]?.focus();
+  };
+  // A pick-one menu: screen readers hear which colour is the cell's now.
   return (
-    <div className="w-[min(236px,calc(100vw-24px))] p-1" onMouseDown={keepFocus} role="group" aria-label={kind === "color" ? t.textColor : t.fillColor}>
+    <div className="w-[min(236px,calc(100vw-24px))] p-1" onMouseDown={keepFocus} onKeyDown={onKeyDown} role="menu" aria-label={kind === "color" ? t.textColor : t.fillColor}>
       <button
         type="button"
+        role="menuitemradio"
         onClick={() => onPick(null)}
-        aria-pressed={!current}
+        aria-checked={!current}
         className={cn(
           "mb-1.5 flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] transition-colors [@media(hover:none)]:h-10",
           !current ? "bg-blob-soft text-blob-ink" : "text-ink-2 hover:bg-hover hover:text-ink",
@@ -48,9 +76,10 @@ export function ColorPanel({ kind, current, onPick }: { kind: "color" | "fill"; 
           <button
             key={c}
             type="button"
+            role="menuitemradio"
             onClick={() => onPick(c)}
             aria-label={t.colors[c]}
-            aria-pressed={current === c}
+            aria-checked={current === c}
             data-tip={t.colors[c]}
             className="grid h-9 place-items-center rounded-lg transition-colors hover:bg-hover [@media(hover:none)]:h-11"
           >
@@ -187,18 +216,6 @@ export const CHART_KINDS: { kind: ChartKind; icon: ReactNode }[] = [
   { kind: "area", icon: <ChartArea /> },
   { kind: "pie", icon: <ChartPie /> },
 ];
-
-/** A chart from the selection; when there is nothing to chart, say how to pick the data. */
-export function makeChart(store: SheetStore, kind?: ChartKind) {
-  const t = sheetChromeText[store.get().locale];
-  let made = false;
-  try {
-    made = insertChart(store, kind);
-  } catch (err) {
-    console.error("sheet: inserting a chart failed", err);
-  }
-  if (!made && !store.get().readOnly) showSheetNotice(store, t.chartNeedsData);
-}
 
 export function ChartPanel({ store, onDone }: { store: SheetStore; onDone: () => void }) {
   const t = useMessages(sheetChromeText);

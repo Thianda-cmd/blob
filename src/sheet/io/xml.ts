@@ -24,16 +24,38 @@ export type XmlNode = XmlEl | string;
 
 const NAMED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
-/** "&lt;", "&#228;", "&#xE4;" → characters. Unknown named entities stay as they are. */
+/**
+ * "&lt;", "&#228;", "&#xE4;" → characters. Unknown named entities stay as they are. "&#0;" and a
+ * half of a character without its other half ("&#xD83E;" alone), which no valid file holds, don't
+ * come along: a cell with either could never be saved (the database refuses such text). Both
+ * halves one after the other ("&#xD83E;&#xDDEB;", as some programs write an emoji) are the
+ * character.
+ */
 export function decodeEntities(s: string): string {
   if (s.indexOf("&") < 0) return s;
-  return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z]+);/g, (m, e: string) => {
+  let halves = false;
+  const out = s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z]+);/g, (m, e: string) => {
     if (e[0] === "#") {
       const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
+      if (code === 0) return "";
+      if (code >= 0xd800 && code <= 0xdfff) {
+        halves = true;
+        return String.fromCharCode(code);
+      }
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
     return lookup(NAMED, e) ?? m;
   });
+  return halves ? savableText(out) : out;
+}
+
+/**
+ * Text as a cell can keep it: no NUL characters and no half characters (a surrogate without its
+ * partner, shown as �). The database refuses every save of text that holds either.
+ */
+export function savableText(s: string): string {
+  const out = s.includes("\u0000") ? s.replaceAll("\u0000", "") : s;
+  return /[\ud800-\udfff]/.test(out) ? out.replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "�") : out;
 }
 
 export const localName = (name: string) => {

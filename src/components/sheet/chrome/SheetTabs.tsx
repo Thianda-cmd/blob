@@ -19,6 +19,7 @@ import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
 import { addSheet, deleteSheet, duplicateSheet, moveSheet, renameSheet, validSheetName } from "@/sheet/ops";
 import type { Sheet, Workbook } from "@/sheet/types";
+import { TOUCH_ITEMS } from "../grid/ContextMenu";
 import { useSheet, type SheetStore } from "../store";
 import { focusGrid, HoverTips, keepFocus, keysText, useKeys } from "./parts";
 
@@ -475,7 +476,8 @@ export function SheetTabs({ store }: { store: SheetStore }): ReactNode {
         </div>
       )}
 
-      <ContextMenu at={menu?.at ?? null} onClose={() => setMenu(null)} label={menuSheet ? t.sheetMenu(menuSheet.name) : t.sheets}>
+      {/* Finger-sized entries on touch screens, like the cells' menu. */}
+      <ContextMenu at={menu?.at ?? null} onClose={() => setMenu(null)} label={menuSheet ? t.sheetMenu(menuSheet.name) : t.sheets} className={TOUCH_ITEMS}>
         {menuSheet && (
           <>
             <MenuItem icon={<PencilLine />} onSelect={runMenu(() => startRename(menuSheet.id))}>
@@ -498,13 +500,16 @@ export function SheetTabs({ store }: { store: SheetStore }): ReactNode {
         )}
       </ContextMenu>
 
-      <Dialog open={!!confirmSheet} onClose={() => setConfirm(null)} labelledBy="sheet-delete-title" returnFocus={focusGrid}>
+      {/* A question about deleting: screen readers read what goes with it (its cells, charts and tables) along with the title. */}
+      <Dialog open={!!confirmSheet} onClose={() => setConfirm(null)} role="alertdialog" labelledBy="sheet-delete-title" describedBy="sheet-delete-text" returnFocus={focusGrid}>
         {confirmSheet && (
           <div className="p-5">
             <h2 id="sheet-delete-title" className="font-display text-[17px] font-semibold text-ink">
               {t.deleteTitle(confirmSheet.name)}
             </h2>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">{t.deleteText(keysText(keys("Mod+Z"), mac))}</p>
+            <p id="sheet-delete-text" className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
+              {t.deleteText(keysText(keys("Mod+Z"), mac))}
+            </p>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" autoFocus onClick={() => setConfirm(null)}>
                 {t.cancel}

@@ -6,8 +6,9 @@ import { useMessages } from "@/i18n/client";
 import { uiText } from "@/i18n/messages/ui";
 import { useState, type InputHTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 
+// (The placeholder's mid-tone between ink-2 and ink-3 reads at 4.5:1 and more on every background, in both themes.)
 export const inputClass =
-  "w-full rounded-lg border border-line bg-raised px-3 text-[14px] text-ink placeholder:text-ink-3/80 shadow-[inset_0_1px_1px_rgb(0_0_0/0.03)] outline-none transition-[border,box-shadow] hover:border-line-2 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-60 aria-[invalid=true]:border-danger";
+  "w-full rounded-lg border border-line bg-raised px-3 text-[14px] text-ink placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] shadow-[inset_0_1px_1px_rgb(0_0_0/0.03)] outline-none transition-[border,box-shadow] hover:border-line-2 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)] disabled:opacity-60 aria-[invalid=true]:border-danger";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement>; icon?: ReactNode };
 

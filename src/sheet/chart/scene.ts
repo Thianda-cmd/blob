@@ -73,6 +73,12 @@ export type ChartScene = {
   title: string;
   /** aria-label: "Punktdiagramm Kalibrierung, 2 Reihen, Trendlinie y = …, R² = …", then the notes under the plot ("Text in A2 statt Zahl …"). */
   label: string;
+  /**
+   * The label without the kind and title, for describing a chart that is named by them already
+   * (its card on the sheet): "2 Reihen, Trendlinie y = …, R² = …" and the notes; "Noch keine
+   * Zahlen" for a chart without any.
+   */
+  summary: string;
   plot: Box | null;
   hits: ChartHit[];
   fontSize: number;
@@ -236,6 +242,17 @@ function barPath(x0: number, y0: number, x1: number, y1: number, end: "top" | "b
 // ----------------------------------------------------------------------------------------------
 // Numbers on axes and in tooltips
 
+/**
+ * How far apart the ticks of an axis in the cells' format may be: dates without times at whole
+ * days (at half days each date would show twice), times of day and durations in clock steps
+ * (0:00, 0:30, 1:00 …), at whole minutes unless the format shows seconds.
+ */
+function formatSteps(fmt: NumberFormat | null | undefined): { minStep?: number; time?: boolean } {
+  if (fmt?.kind === "date") return { minStep: 1 };
+  if (fmt?.kind === "time") return fmt.seconds ? { time: true } : { time: true, minStep: 1 / 1440 };
+  return {};
+}
+
 /** How a value axis writes its ticks. */
 function tickFormatter(scale: AxisScale, axis: AxisSpec, fmt: NumberFormat | null | undefined, locale: Locale): (v: number) => string {
   if (isDateFormat(fmt)) return (v) => formatValue(v, fmt ?? undefined, locale);
@@ -302,12 +319,13 @@ export function buildChartScene(spec: ChartSpec, data: ChartData, opts: SceneOpt
   const kindName = t.kindNames[spec.kind];
   const titleText = spec.title.trim();
   const shownSeries = spec.kind === "pie" ? data.series.slice(0, 1) : data.series;
-  const label = ariaSummary(ctx, kindName, titleText);
+  const head = titleText ? `${kindName} ${titleText}` : kindName;
+  const details = ariaDetails(ctx);
   const base = {
     width: W,
     height: H,
     title: titleText || kindName,
-    label,
+    label: `${head}, ${details}`,
     fontSize: fs,
     palette: pal,
   };
@@ -326,7 +344,7 @@ export function buildChartScene(spec: ChartSpec, data: ChartData, opts: SceneOpt
   const hasData = shownSeries.some(usable) && (spec.kind !== "pie" || shownSeries[0].points.some((p) => p.y > 0));
   if (!hasData) {
     nodes.push(...emptyState(ctx, frame));
-    return { ...base, nodes: withFont(nodes, opts.fontFamily, pal), plot: null, hits: [] };
+    return { ...base, summary: t.emptyTitle, nodes: withFont(nodes, opts.fontFamily, pal), plot: null, hits: [] };
   }
 
   // Legend.
@@ -342,7 +360,8 @@ export function buildChartScene(spec: ChartSpec, data: ChartData, opts: SceneOpt
   if (legend) nodes.push(...legend.nodes);
   // A screen reader gets the chart as its label only: the notes under the plot go into it too.
   const notes = result.notes ?? [];
-  return { ...base, label: notes.length ? `${label}. ${notes.join(". ")}` : label, nodes: withFont(nodes, opts.fontFamily, pal), plot: result.plot, hits: result.hits };
+  const summary = notes.length ? `${details}. ${notes.join(". ")}` : details;
+  return { ...base, label: `${head}, ${summary}`, summary, nodes: withFont(nodes, opts.fontFamily, pal), plot: result.plot, hits: result.hits };
 }
 
 /** One group with the font, so every <text> inherits it. */
@@ -350,11 +369,11 @@ function withFont(nodes: SvgNode[], fontFamily: string | undefined, pal: Palette
   return [{ tag: "g", attrs: { fontFamily, fill: pal.ink }, children: nodes }];
 }
 
-function ariaSummary(ctx: Ctx, kindName: string, title: string): string {
+/** What the label says after the kind and title: how many series, each trendline with its equation and R². */
+function ariaDetails(ctx: Ctx): string {
   const { t, data, spec, locale } = ctx;
-  const parts = [title ? `${kindName} ${title}` : kindName];
   const n = spec.kind === "pie" ? Math.min(1, data.series.length) : data.series.length;
-  parts.push(t.seriesCount(n));
+  const parts = [t.seriesCount(n)];
   data.series.forEach((s, i) => {
     const tl = spec.series[i]?.trendline;
     if (!tl || !s.fit || isFitError(s.fit) || spec.kind === "pie") return;
@@ -660,13 +679,15 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
     // Value axis along the plot's height (or width for bars).
     const vLen = horizontal ? plot.w : plot.h;
     const vTarget = horizontal ? vLen / Math.max(fs * 5, 60) : vLen / (fs * 2.9);
-    vScale = valueAxis.log ? logAxis(vMin, vMax, valueAxis) : linearAxis(vMin, vMax, { min: valueAxis.min, max: valueAxis.max, target: vTarget, zero: zeroRule, pad: true });
+    vScale = valueAxis.log ? logAxis(vMin, vMax, valueAxis) : linearAxis(vMin, vMax, { min: valueAxis.min, max: valueAxis.max, target: vTarget, zero: zeroRule, pad: true, ...formatSteps(valueFmt) });
     vFmt = tickFormatter(vScale, valueAxis, valueFmt, locale);
     if (scatter) {
       const xTarget = plot.w / Math.max(fs * 5.2, 56);
-      // Dates without times tick at whole days.
-      const minStep = xFmt?.kind === "date" ? 1 : undefined;
-      xScale = catAxis.log ? logAxis(xMin, xMax, catAxis) : linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target: xTarget, zero: "excel", pad: true, minStep });
+      // Times along x start near the first one, not at 0:00 by Excel's rule: clock times noted
+      // from 8:15 to 12:15 would fill only the axis' right third (times since the start begin at
+      // 0:00 anyway).
+      const steps = { ...formatSteps(xFmt), ...(xFmt?.kind === "time" ? { zero: "never" as const } : {}) };
+      xScale = catAxis.log ? logAxis(xMin, xMax, catAxis) : linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target: xTarget, zero: "excel", pad: true, ...steps });
       xFmtFn = tickFormatter(xScale, catAxis, xFmt, locale);
       // Labels too wide for their spacing: fewer ticks, each round asking for fewer than the last
       // (asking for what the ticks were can give the same ticks again: 11 dates at half days).
@@ -677,7 +698,7 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
           const spacing = plot.w / Math.max(1, xScale.ticks.length - 1);
           if (widest + fs * 0.8 <= spacing) break;
           target = Math.max(2, Math.min(target, xScale.ticks.length - 1) * 0.6);
-          xScale = linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target, zero: "excel", pad: true, minStep });
+          xScale = linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target, zero: "excel", pad: true, ...steps });
           xFmtFn = tickFormatter(xScale, catAxis, xFmt, locale);
         }
       }

@@ -24,6 +24,9 @@
   --blob-face: #1d1030;
 
   --danger: #d23b2b;
+  /* Danger text on a danger tint (bg-danger/8: warnings, a wrong answer): deeper, so it reads at
+     4.5:1 and more on the tint over paper, surface or raised. */
+  --danger-ink: #b8382a;
   --ok: #2e8b57;
 
   --subject-ink: #3d3c37;
@@ -141,6 +144,7 @@
   --blob-soft: #272040;
 
   --danger: #ff6b5b;
+  --danger-ink: var(--danger);
   --ok: #5cc28a;
 
   --subject-ink: #c9c7bf;
@@ -239,6 +243,7 @@
   --color-blob-ink: var(--blob-ink);
   --color-blob-soft: var(--blob-soft);
   --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
   --color-ok: var(--ok);
 
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
@@ -3286,12 +3291,13 @@ html:is([data-app="ios"], [data-app="android"]) :is(button, [role="button"], [ro
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* A note on paper (editor/notePrint.ts): laid out off screen, the only thing the print shows. */
+/* A note on paper (editor/notePrint.ts): laid out off screen, the only thing the print shows. Its
+   width is set there, as wide as the paper's text (PAGE / PAPER_WIDTH, 680 px), so wide tables are
+   measured against the paper. */
 .note-print {
   position: fixed;
   left: -100000px;
   top: 0;
-  width: 720px;
   visibility: hidden;
   background: #fff;
   color: var(--ink);

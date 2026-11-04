@@ -12,7 +12,8 @@ import { useIsMac } from "@/components/ui/useMediaQuery";
 import { sheetTableText } from "@/i18n/messages/sheetTable";
 import { tableAt } from "@/sheet/table/model";
 import { useSheet, type SheetStore } from "../store";
-import { chartFromTable, clearAllTableFilters, makeTableFromSelection, openTablePanel, setTableTotals } from "./actions";
+import { chartFromTable, clearAllTableFilters, makeTableFromSelection, setTableTotals } from "./actions";
+import { openTableSettings } from "./TablePanel";
 
 export function TableMenuItems({ store, close, separator = true }: { store: SheetStore; close: () => void; separator?: boolean }) {
   const locale = useSheet(store, (s) => s.locale);
@@ -33,7 +34,14 @@ export function TableMenuItems({ store, close, separator = true }: { store: Shee
         </MenuItem>
       ) : (
         <>
-          <MenuItem icon={<Settings2 />} onSelect={run(() => openTablePanel(store, table.id))}>
+          {/* Chosen with the keyboard (MenuItem hands on its click: detail 0 for Enter or Space), the keyboard goes into the settings too. */}
+          <MenuItem
+            icon={<Settings2 />}
+            onSelect={(e?: { detail: number }) => {
+              close();
+              openTableSettings(store, table.id, e?.detail === 0);
+            }}
+          >
             {t.openTable}
           </MenuItem>
           <MenuItem icon={<ChartScatter />} onSelect={run(() => chartFromTable(store, table.id))}>

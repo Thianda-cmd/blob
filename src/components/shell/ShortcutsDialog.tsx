@@ -2,7 +2,7 @@
 
 import { Keyboard, X } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
 import { useIsMac } from "@/components/ui/useMediaQuery";
@@ -140,6 +140,13 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
   }));
   const sections = inSheet ? [...sheet, ...app] : [...app, ...sheet];
 
+  // The keyboard starts on the list, so the arrow keys, Page Down and Space scroll it (with a big
+  // zoom it is longer than the screen); Tab goes on to the close button and back.
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) list.current?.focus({ preventScroll: true });
+  }, [open]);
+
   return (
     <Dialog open={open} onClose={onClose} labelledBy="shortcuts-title" className="max-w-[720px]!">
       <div className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
@@ -147,14 +154,21 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
         <h2 id="shortcuts-title" className="flex-1 font-display text-[16px] font-semibold tracking-[-0.01em]">
           {t.title}
         </h2>
-        <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label="Esc">
+        <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink" aria-label={t.close}>
           <X className="size-4" />
         </button>
       </div>
-      <div className="grid max-h-[70vh] gap-x-8 gap-y-5 overflow-y-auto px-5 py-4 sm:grid-cols-2">
+      {/* (Headings, slashes and key caps in the mid-tone between ink-2 and ink-3: 4.5:1 and more.) */}
+      <div
+        ref={list}
+        tabIndex={0}
+        role="region"
+        aria-labelledby="shortcuts-title"
+        className="grid max-h-[70vh] gap-x-8 gap-y-5 overflow-y-auto rounded-b-2xl px-5 py-4 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blob sm:grid-cols-2"
+      >
         {sections.map(({ id, title, items }) => (
           <section key={id}>
-            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{title}</h3>
+            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{title}</h3>
             <dl className="space-y-1">
               {items.map(({ id: item, label, combos }) => (
                 <div key={item} className="flex items-center justify-between gap-3 py-0.5 text-[13px]">
@@ -162,7 +176,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
                   <dd className="flex shrink-0 items-center gap-1">
                     {combos.map((keys, i) => (
                       <Fragment key={i}>
-                        {i > 0 && <span className="text-[11px] text-ink-3">/</span>}
+                        {i > 0 && <span className="text-[11px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">/</span>}
                         {keys.map((k, j) => (
                           <Kbd key={j} className="h-5 min-w-5 text-[11px]">
                             {name(k)}

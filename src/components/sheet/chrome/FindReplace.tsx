@@ -276,7 +276,7 @@ export function FindReplace({
                 spellCheck={false}
                 autoComplete="off"
                 enterKeyHint="search"
-                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3 [@media(hover:none)]:text-[16px]"
+                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] [@media(hover:none)]:text-[16px]"
               />
               <span role="status" aria-live="polite" className="shrink-0 text-[12px] tabular-nums text-ink-2">
                 {status}
@@ -303,7 +303,7 @@ export function FindReplace({
                 aria-label={t.replaceField}
                 spellCheck={false}
                 autoComplete="off"
-                className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-blob [@media(hover:none)]:h-9 [@media(hover:none)]:text-[16px]"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] focus:border-blob [@media(hover:none)]:h-9 [@media(hover:none)]:text-[16px]"
               />
               <button
                 type="button"

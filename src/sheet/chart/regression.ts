@@ -653,3 +653,15 @@ export function equationText(fit: Fit, locale: Locale, digits?: number): string 
 export function r2Text(r2: number, locale: Locale, digits?: number): string {
   return `R² = ${digits ? formatR2(r2, locale, Math.max(4, digits), Math.max(6, digits + 3)) : formatR2(r2, locale)}`;
 }
+
+/**
+ * With times as x (0:00, 0:30 …, which count in days, as in Excel and in STEIGUNG): the slope of
+ * a line or the number in a growth curve's exponent, per day as the equation shows it and per hour
+ * (÷ 24), each to `digits` significant digits. null for the other models.
+ */
+export function perHour(fit: Fit, locale: Locale, digits?: number): { kind: "slope" | "exponent"; perDay: string; perHour: string } | null {
+  if (fit.type !== "linear" && fit.type !== "exponential") return null;
+  const day = fit.coefficients[1];
+  if (!Number.isFinite(day)) return null;
+  return { kind: fit.type === "linear" ? "slope" : "exponent", perDay: formatCoefficient(day, locale, digits), perHour: formatCoefficient(day / 24, locale, digits) };
+}

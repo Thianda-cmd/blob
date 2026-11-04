@@ -1,7 +1,9 @@
 // Where a chart on the sheet can be seen, for ChartLayer: how far to scroll the grid so a chart
 // shows (with its action bar), how much of it shows, and where its action bar goes so a finger
-// can reach it. All in screen px from getBoundingClientRect; the measuring is ChartLayer's, the
-// arithmetic is here, pure, so the check script tests it.
+// can reach it; for its settings (ChartPanel, TrendSection): how big the copy of it they show
+// is, and how far "Probe berechnen" scrolls them to show its result. All in screen px from
+// getBoundingClientRect; the measuring is done by the components, the arithmetic is here, pure,
+// so the check script tests it.
 
 /** A box on screen (px). */
 export type Rect = { left: number; top: number; right: number; bottom: number };
@@ -88,13 +90,122 @@ export const IN_VIEW = 0.9;
 /** Once seen, it counts as gone only below this much: scrolling a little doesn't make the copy flick in and out. */
 export const OUT_OF_VIEW = 0.75;
 
-/** Whether the open settings' chart counts as in view now, after counting as `was` (null: not decided yet). */
-export function inViewNext(was: boolean | null, share: number): boolean {
+/**
+ * Above settings docked low in a narrow dock (a phone held upright, the settings made low with
+ * their handle to see the sheet) the chart counts as seen while this much of it shows: there a
+ * copy would take most of the settings' little room, and the chart shows above them.
+ */
+export const LOW_DOCK_SEEN = 0.2;
+
+/**
+ * Whether the open settings' chart counts as in view now, after counting as `was` (null: not
+ * decided yet); `narrowLow`: the settings are docked low in a narrow dock (see LOW_DOCK_SEEN).
+ */
+export function inViewNext(was: boolean | null, share: number, narrowLow = false): boolean {
+  if (narrowLow) return share >= LOW_DOCK_SEEN;
   return was ? share >= OUT_OF_VIEW : share >= IN_VIEW;
 }
 
+/** From this width on (px), settings show the copy of their chart beside them, not above them: docked across a tablet, a phone held sideways, a short window. */
+export const COPY_BESIDE = 600;
+/** The copy is at most this tall (px), and above the settings it takes at most COPY_SHARE of their room, beside them COPY_SIDE of their width. */
+const COPY_MAX_H = 230;
+const COPY_SHARE = 0.4;
+const COPY_SIDE = 0.45;
+/** The room around the copy, each side (px, p-3). */
+const COPY_PAD = 12;
+
+/**
+ * The size the copy of a chart is drawn at in its settings while the chart can't be seen on the
+ * sheet (px; null when there is no room for it), in the chart's proportions (`ratio`: height /
+ * width). Docked settings (`pinned`) keep it in place while they scroll (the student sees what each
+ * change does): `area` is what the copy and the settings share there, between the panel's header
+ * and footer; the copy goes beside them where the dock is wide, so both keep their height, else
+ * above them, small enough that the settings keep most of the room. Beside the grid it is the
+ * settings' first item and scrolls away with them (the panel is tall there, and the chart mostly
+ * shows beside it): as wide as they are (`area.w`), at most COPY_MAX_H tall.
+ */
+export function copySize(area: { w: number; h: number }, ratio: number, pinned: boolean): { w: number; h: number; beside: boolean } | null {
+  const beside = pinned && area.w >= COPY_BESIDE;
+  const maxH = Math.min(COPY_MAX_H, (!pinned ? Infinity : beside ? area.h : area.h * COPY_SHARE) - 2 * COPY_PAD);
+  const maxW = (beside ? area.w * COPY_SIDE : area.w) - 2 * COPY_PAD;
+  const k = Math.max(0.05, ratio);
+  const w = Math.floor(Math.min(maxW, maxH / k));
+  const h = Math.round(w * k);
+  return w >= 40 && h >= 30 ? { w, h, beside } : null;
+}
+
+/**
+ * Whether the band above a chart where its action bar goes (BAR_SPACE tall, as wide as the chart)
+ * lies over `data`, the block of cells the chart is made from: a chart placed under its data gets
+ * the bar below it instead, so the data's last rows show. Both boxes in the same coordinates.
+ */
+export function barOverData(chart: Rect, data: Rect): boolean {
+  return chart.top - BAR_SPACE < data.bottom && chart.top > data.top && chart.left < data.right && chart.right > data.left;
+}
+
+/**
+ * Whether a band of the sheet (content px: where a selected chart's action bar goes, above it or
+ * below it) lies over cells that hold something (`filled`), such as the results under the data a
+ * chart is placed past. The rows and columns it crosses come from `cells` (the grid's geometry);
+ * hidden ones (no size) don't count.
+ */
+export function bandOverCells(
+  band: Rect,
+  cells: { cellAt(x: number, y: number): { row: number; col: number }; rect(row: number, col: number): { w: number; h: number } },
+  filled: (row: number, col: number) => boolean,
+): boolean {
+  if (band.bottom <= band.top || band.right <= band.left) return false;
+  const from = cells.cellAt(band.left, band.top);
+  const to = cells.cellAt(band.right - 1, band.bottom - 1);
+  for (let row = from.row; row <= to.row; row++) {
+    for (let col = from.col; col <= to.col; col++) {
+      const r = cells.rect(row, col);
+      if (r.w > 0 && r.h > 0 && filled(row, col)) return true;
+    }
+  }
+  return false;
+}
+
+/** Room kept between "Probe berechnen"'s result brought into view and the edges of what you see (px). */
+const RESULT_MARGIN = 8;
+
+/**
+ * How far to scroll a chart's settings down (px, 0 for none) so `target` ("Probe berechnen"'s
+ * result, or all it shows) comes into `view`, what can be seen of the settings: their scroller,
+ * less what the on-screen keyboard covers. Never so far that the field above it leaves the top of
+ * the view: she keeps seeing what she types.
+ */
+export function revealUnder(target: Rect, field: Rect, view: { top: number; bottom: number }): number {
+  const need = target.bottom + RESULT_MARGIN - view.bottom;
+  const room = field.top - (view.top + RESULT_MARGIN);
+  return Math.max(0, Math.round(Math.min(need, room)));
+}
+
+/**
+ * How far "Probe berechnen" scrolls its settings down (px, 0 for none; see revealUnder) so all it
+ * shows (`all`: the result and how it is worked out) comes into view: when the result first shows
+ * (`first`), as nothing there was aimed at yet; later (the on-screen keyboard came up or changed
+ * size) only when the result itself doesn't show whole. While it does, nothing moves: "Kopieren" in
+ * it doesn't move while a mouse or a finger is on its way to it.
+ */
+export function probeScroll(first: boolean, result: Rect, all: Rect, field: Rect, view: { top: number; bottom: number }): number {
+  if (!first && result.top >= view.top && result.bottom <= view.bottom) return 0;
+  return revealUnder(all, field, view);
+}
+
 /** Room kept between a selected chart's action bar and the edges of what you see (px). */
-const BAR_MARGIN = 8;
+export const BAR_MARGIN = 8;
+
+/**
+ * Which words a selected chart's action bar shows where `room` px of cells are on screen beside
+ * its margins (its width with all its words and with only "Trendlinie"'s, measured): all where
+ * they fit, else only "Trendlinie" (what the bar is most for), else none (icons with their names
+ * for screen readers and their tooltips).
+ */
+export function barWords(widths: { all: number; trend: number }, room: number): "all" | "trend" | "none" {
+  return widths.all <= room ? "all" : widths.trend <= room ? "trend" : "none";
+}
 
 /**
  * How far to move a selected chart's action bar from its own place (above or below the chart,

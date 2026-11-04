@@ -41,6 +41,14 @@ export type ParseValueOptions = {
    * so silently showing it unchanged as 1234 would hide a factor of 1000.
    */
   thousandsHint?: boolean;
+  /**
+   * Typing only: the other language's decimal sign before an exponent is a decimal sign, as
+   * calculators and instruments show such numbers ("1.5E-3", "2.4E6 Zellen/mL" in German, "1,5E-3"
+   * in English): no number has a thousands separator right before its exponent. Without it the
+   * cell would be text, and a replicate typed so would silently drop out of MITTELWERT. VALUE(),
+   * arithmetic and criteria keep Excel's reading (text).
+   */
+  foreignExponent?: boolean;
 };
 
 /** "0.123" in German typing: a 0 (or 00…) before the dot can't be a thousands group. */
@@ -49,7 +57,9 @@ const zeroBeforeDot = (body: string, locale: Locale, opts?: ParseValueOptions) =
 /**
  * Units typed after a number that make it a number shown with that unit (instead of dead text,
  * as in Excel). Only these, so "3 Proben" or "2 Kolben" stay text. "%" isn't one: "50 %" is a
- * percentage. A 2 or 3 typed right after a unit is its power ("g/cm3" → g/cm³).
+ * percentage. A 2 or 3 typed right after a unit is its power ("g/cm3" → g/cm³). Every unit
+ * Blob's templates show is here, so what a template shows types back as the same number
+ * (scripts/check-sheet-io.ts checks it).
  */
 const LAB_UNITS = new Set([
   // concentration
@@ -59,10 +69,15 @@ const LAB_UNITS = new Set([
   "mg/dL", "mg/dl", "g/dL", "g/dl", "U/L", "U/l", "U/mL", "U/ml", "U/µL", "U/µl", "U/uL", "U/ul", "U/mg", "IU/mL", "IU/ml",
   "Zellen/mL", "Zellen/ml", "cells/mL", "cells/ml", "KBE/mL", "KBE/ml", "CFU/mL", "CFU/ml",
   "ppm", "ppb", "ppt", "mg/kg", "µg/kg", "ug/kg", "g/kg", "mg/g", "µg/g",
+  // a calibration line's slope: absorbance per concentration
+  "L/mg", "l/mg", "mL/mg", "ml/mg", "L/g", "l/g", "mL/µg", "ml/µg",
   // molar mass, density, conductivity, molar energy, extinction coefficient
   "g/mol", "kg/mol", "g/cm³", "kg/m³", "kg/dm³", "µS/cm", "uS/cm", "mS/cm", "kJ/mol", "J/mol", "kcal/mol", "L/(mol·cm)", "l/(mol·cm)",
   // rates: flow, enzyme activity, growth
-  "mL/min", "ml/min", "L/min", "l/min", "µL/min", "µl/min", "mL/h", "ml/h", "L/h", "l/h", "µmol/min", "nmol/min", "h⁻¹", "min⁻¹", "s⁻¹",
+  "mL/min", "ml/min", "L/min", "l/min", "µL/min", "µl/min", "mL/h", "ml/h", "L/h", "l/h", "µmol/min", "nmol/min", "h⁻¹", "min⁻¹", "s⁻¹", "d⁻¹",
+  "1/h", "1/min", "1/s", "1/d",
+  // counts: a master mix's reactions
+  "Ansätze", "Ansatz", "reactions", "reaction",
   // mass, amount, volume, length, area
   "kg", "g", "mg", "µg", "ug", "ng", "pg", "mol", "mmol", "µmol", "umol", "nmol", "pmol", "Da", "kDa",
   "L", "l", "mL", "ml", "µL", "µl", "uL", "ul", "dL", "dl", "nL", "nl", "m³", "dm³", "cm³", "mm³",
@@ -119,8 +134,10 @@ function currencyIn(s: string): { symbol: Currency; rest: string; before: boolea
 
 /** Parse a plain number body (no sign) in the locale's style; null when it isn't one. */
 function parseNumberBody(body: string, locale: Locale, opts?: ParseValueOptions): { value: number; decimals: number; group: boolean; exp: boolean } | null {
-  // Exponent: 1,5E-3 / 1.5e3 (no thousands separators then).
-  const expMatch = locale === "de" ? /^(\d+(?:,\d*)?|,\d+)[eE]([+-]?\d+)$/.exec(body) : /^(\d+(?:\.\d*)?|\.\d+)[eE]([+-]?\d+)$/.exec(body);
+  // Exponent: 1,5E-3 / 1.5e3 (no thousands separators then), typed also 1.5E-3 / 1,5e3 (foreignExponent).
+  const expMatch =
+    (locale === "de" ? /^(\d+(?:,\d*)?|,\d+)[eE]([+-]?\d+)$/.exec(body) : /^(\d+(?:\.\d*)?|\.\d+)[eE]([+-]?\d+)$/.exec(body)) ??
+    (opts?.foreignExponent ? (locale === "de" ? /^(\d+\.\d+)[eE]([+-]?\d+)$/ : /^(\d+,\d+)[eE]([+-]?\d+)$/).exec(body) : null);
   if (expMatch) {
     const mant = expMatch[1].replace(",", ".");
     const dec = mant.includes(".") ? mant.length - mant.indexOf(".") - 1 : 0;
@@ -285,11 +302,12 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
   }
 
   // A lab unit after the number: "12,5 mg/L", "37 °C", "100µl", "1,02 g/cm3" (g/cm³). The power
-  // follows the unit directly: "10 cm 3" stays text.
+  // follows the unit directly: "10 cm 3" stays text. A rate per time ("0,693 1/h") starts with a
+  // digit, so it needs a space before it.
   let unit: string | null = null;
   if (opts?.units && !percent && !currency) {
-    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)\s*([^\s0-9.,+\-][^0-9]*?)((?<!\s)[23])?$/.exec(rest);
-    const name = um ? um[2].trim() + (um[3] === "2" ? "²" : um[3] === "3" ? "³" : "") : "";
+    const um = /^([0-9.,]+(?:[eE][+-]?[0-9]+)?)(?:\s*([^\s0-9.,+\-][^0-9]*?)|\s+(1\/[^\s0-9][^0-9]*?))((?<!\s)[23])?$/.exec(rest);
+    const name = um ? (um[2] ?? um[3]).trim() + (um[4] === "2" ? "²" : um[4] === "3" ? "³" : "") : "";
     if (um && LAB_UNITS.has(name)) {
       unit = name;
       rest = um[1];
@@ -335,6 +353,12 @@ export function parseValueText(input: string, locale: Locale, opts?: ParseValueO
       if (percent) return { kind: "number", value: value / 100, fmt: { kind: "percent", decimals: fractionDigits(rest) } };
       if (currency) return { kind: "number", value, fmt: { kind: "currency", decimals: 2, symbol: currency } };
       return { kind: "number", value };
+    }
+    // A time below zero can only be a duration ("-16:00", an overnight run's Ende − Start, as it is
+    // shown and exported): read back as the negative duration it was.
+    if (sign === -1 && !percent && !currency && !/[AaPp]/.test(rest)) {
+      const t = parseTime(rest);
+      if (t) return { kind: "number", value: -t.value, fmt: { kind: "time", seconds: t.seconds, duration: true } };
     }
     return null;
   }

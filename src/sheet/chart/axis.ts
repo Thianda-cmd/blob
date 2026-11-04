@@ -1,5 +1,6 @@
-// Axis scales for charts: "nice" linear ticks (steps of 1, 2 or 5 × 10ⁿ) and logarithmic axes
-// (decades with minor ticks 2…9), and where values land on screen.
+// Axis scales for charts: "nice" linear ticks (steps of 1, 2 or 5 × 10ⁿ; for times of day and
+// durations 15 min, 30 min, 1 h …), logarithmic axes (decades with minor ticks 2…9), and where
+// values land on screen.
 //
 // Automatic ranges follow Excel closely, so a chart looks like the one from class: the axis starts
 // at 0 when the data's minimum is less than 5/6 of its maximum, and an automatic end gets a little
@@ -49,6 +50,31 @@ export function niceStep(raw: number): number {
   return e < 0 ? best / pow10(-e) : best * pow10(e);
 }
 
+/** A second, a minute and an hour in days, the unit of times in cells (0:30 is 0,0208…). */
+const SECOND = 1 / 86400;
+const MINUTE = 1 / 1440;
+const HOUR = 1 / 24;
+/** Below a day, a time axis ticks in steps a clock or a lab protocol counts in. */
+const TIME_STEPS = [
+  ...[1, 5, 10, 15, 30].map((s) => s * SECOND),
+  ...[1, 5, 10, 15, 30].map((m) => m * MINUTE),
+  ...[1, 2, 3, 4, 6, 12].map((h) => h * HOUR),
+  1,
+];
+
+/**
+ * The step of a time axis (in days) closest to `raw` on a log scale: 1, 5, 10, 15 or 30 seconds
+ * or minutes, 1, 2, 3, 4, 6 or 12 hours, then whole days (1, 2, 5, 10 …), so the ticks read
+ * 0:00, 0:30, 1:00 … instead of 0:00, 0:28, 0:57 … (niceStep on days).
+ */
+export function timeStep(raw: number): number {
+  if (!(raw > 0) || !Number.isFinite(raw)) return HOUR;
+  if (raw > 1) return Math.max(1, niceStep(raw));
+  let best = 1;
+  for (const s of TIME_STEPS) if (Math.abs(Math.log(raw / s)) < Math.abs(Math.log(raw / best))) best = s;
+  return best;
+}
+
 /** The decimals that tick labels of a step need: 0.25 → 2, 0.5 → 1, 2 → 0. */
 export function stepDecimals(step: number): number {
   if (!(step > 0)) return 0;
@@ -69,6 +95,8 @@ export type LinearAxisOptions = {
   pad?: boolean;
   /** The smallest step between ticks: 1 on an axis of dates without times (at half days each date would show twice). */
   minStep?: number;
+  /** Times of day or durations (values in days): steps of whole minutes, hours … (timeStep). */
+  time?: boolean;
 };
 
 /** A linear axis for data from dataMin to dataMax (both NaN or Infinity when there is no data). */
@@ -115,7 +143,7 @@ export function linearAxis(dataMin: number, dataMax: number, opts: LinearAxisOpt
 
   const target = Math.max(2, Math.min(12, opts.target));
   const span = hi - lo;
-  const step = Math.max(opts.minStep ?? 0, niceStep(span / target));
+  const step = Math.max(opts.minStep ?? 0, (opts.time ? timeStep : niceStep)(span / target));
   let min = lo;
   let max = hi;
   if (autoMin) {

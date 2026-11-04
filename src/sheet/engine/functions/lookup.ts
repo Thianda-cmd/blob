@@ -171,6 +171,8 @@ function lookupTable(args: Value[], ctx: Ctx, horizontal: boolean): Value {
 /** INDEX on a reference gives a reference (so ZEILE(INDEX(…)) and A1:INDEX(…) work). */
 function indexOf(args: Value[], ctx: Ctx): Value {
   const arr = args[0];
+  // An error instead of the array (RGP over a text): that error, whichever element is asked for.
+  if (isErr(arr)) return arr;
   const rowArg = args.length > 1 ? (args[1] as Scalar) : null;
   const colArg = args.length > 2 ? (args[2] as Scalar) : null;
   if (args.length > 3 && args[3] !== null) {
@@ -246,7 +248,7 @@ function xlookup(args: Value[], ctx: Ctx): Value {
   if (isErr(found)) return found;
   const { pos, vertical, n } = found;
   const rd = dims(retArr, ctx);
-  if ((vertical ? rd.rows : rd.cols) !== n) return ERR.value;
+  if ((vertical ? rd.rows : rd.cols) !== n) return mkErr("#VALUE!", "sizes");
   if (pos < 0) return notFound === undefined ? ERR.notFound : notFound;
   if (isRef(retArr)) {
     const r = ctx.clip(retArr);

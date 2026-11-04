@@ -7,7 +7,7 @@ import type { BorderLine, SheetColor, TableStyle } from "../types";
 // Number formats ----------------------------------------------------------------------------------
 
 // In formatCodes.ts: copy and paste use them too, and load nothing else of this file.
-export { BUILTIN_CODES, builtinFormat, fromExcelFormat, fromSigStyle, sigStyleName, toExcelFormat } from "./formatCodes";
+export { BUILTIN_CODES, builtinFormat, fromExcelFormat, fromSigStyle, isDayClockCode, sigStyleName, toExcelFormat } from "./formatCodes";
 
 // Colours -----------------------------------------------------------------------------------------
 

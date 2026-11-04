@@ -8,15 +8,20 @@
 // Touch: a tap selects, a double tap opens the settings, a swipe that starts on a chart scrolls
 // the sheet (selected or not), and a selected chart held still for a moment is picked up and
 // follows the finger. Mouse and pen: press and drag moves right away, double-click (double tap)
-// opens the settings. Keyboard (the chart has focus, also right after it is inserted or
-// duplicated): Delete removes it, Enter opens its settings and goes into them, arrows nudge it
-// (Shift: 10 px), Alt + arrows resize it, Ctrl/⌘ + D duplicates it, Ctrl/⌘ + Z / Y undo and redo,
-// Escape lets go of it and closes its settings. The selected frame always shows where the
-// keyboard is: when it goes back into the cells, the chart is let go of.
+// opens the settings. Keyboard (the chart has focus: F6 from the cells gets there, and so does a
+// chart just inserted or duplicated): Delete removes it, Enter opens its settings and goes into
+// them, arrows nudge it (Shift: 10 px), Alt + arrows resize it, Ctrl/⌘ + D duplicates it,
+// Ctrl/⌘ + Z / Y undo and redo, Escape lets go of it and closes its settings. The selected frame
+// always shows where the keyboard is: when it goes anywhere but the charts and their settings
+// (back into the cells, F6 on to the toolbar), the chart is let go of, and the cells F6 scrolled
+// away from come back (chartByKeys).
 //
 // Opening the settings scrolls the chart into view without pushing the cells it is made from out
 // of view, and closing them scrolls back (not for a new chart: it stays in view); what can't be
-// seen, the panel shows itself (inView, decided before the panel is first painted).
+// seen, the panel shows itself (inView, decided before the panel is first painted). Above
+// settings docked low the chart comes into view, its data or not; on a phone held upright some of
+// it showing there is enough (no copy in their little room), elsewhere (a short window, a tablet
+// held sideways) the panel shows the copy whenever too little of the chart shows above them.
 
 import { Copy, ImageDown, Settings2, Trash2, TrendingUp } from "lucide-react";
 import {
@@ -38,20 +43,22 @@ import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import { ChartView } from "@/sheet/chart/ChartView";
+import { CHART_MIN } from "@/sheet/chart/create";
 import { chartData, type ChartData } from "@/sheet/chart/data";
 import type { Calc } from "@/sheet/engine";
-import { DEFAULT_COL_W, type ChartSpec, type Sheet } from "@/sheet/types";
+import { DEFAULT_COL_W, type Area, type ChartSpec, type Sheet } from "@/sheet/types";
 import { useOpenEmbedItem } from "../embed/openItem";
 import { focusSheetGrid, type GridGeometry } from "../grid/Grid";
+import { dockTop } from "../grid/shown";
 import { showSheetNotice } from "../notice";
 import { PANEL_MIN_WIDTH, PANEL_WIDTH } from "../panelLayout";
-import { useSheet, type SheetStore } from "../store";
-import { chartDataBlock, deleteChart, duplicateChart, openChartPanel, quickTrendline, saveChartFile, updateChart } from "./actions";
-import { BAR_SPACE, barShift, inViewNext, revealScroll, scrollBehavior, shownShare, type Rect } from "./reveal";
+import { sameSelection, useSheet, type Selection, type SheetStore } from "../store";
+import { chartDataBlock, deleteChart, duplicateChart, holdsSomething, openChartPanel, quickTrendline, saveChartFile, updateChart } from "./actions";
+import { BAR_MARGIN, BAR_SPACE, bandOverCells, barOverData, barShift, barWords, COPY_BESIDE, inViewNext, revealScroll, scrollBehavior, shownShare, type Rect } from "./reveal";
 import { chartUi, selectChart, setChartUi, setChartViewport, useChartUi, type ChartViewport } from "./selection";
 
-/** The smallest a chart gets by resizing (logical px). */
-export const CHART_MIN = { w: 240, h: 160 } as const;
+/** The smallest a chart gets by resizing (logical px; also the least a chart made on a phone gets). */
+export { CHART_MIN };
 
 type Box = { x: number; y: number; w: number; h: number };
 type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -142,6 +149,54 @@ const rectOf = (el: Element): Rect => {
   return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
 };
 
+/** The action bar's width with all its words and with only "Trendlinie"'s, measured for `key` (the language, a touch screen or not, what the bar holds). */
+type BarWidths = { key: string; all: number; trend: number };
+
+/**
+ * Which words the action bar shows (data-words on it, see barWords; CSS hides the others), where
+ * it has `room` px. Its widths are measured once with all the words showing, again when `key`
+ * changes; returns them to keep.
+ */
+function fitBarWords(bar: HTMLElement, room: number, key: string, known: BarWidths | null): BarWidths {
+  let widths = known;
+  if (widths?.key !== key) {
+    delete bar.dataset.words;
+    const all = bar.getBoundingClientRect().width;
+    const icon = bar.querySelector("[data-bar-icon]")?.getBoundingClientRect().width ?? 0;
+    const settings = bar.querySelector('[data-bar-word="settings"]')?.getBoundingClientRect().width;
+    widths = { key, all, trend: settings && icon ? all - (settings - icon) : all };
+  }
+  const words = barWords(widths, room);
+  if (bar.dataset.words !== words) bar.dataset.words = words;
+  return widths;
+}
+
+/** Whether the settings are docked low in a narrow dock (a phone held upright) over the editor `el` is in: there the chart counts as seen above them while some of it shows (LOW_DOCK_SEEN). */
+function inNarrowLowDock(el: Element): boolean {
+  const dock = el.closest("[data-sheet-editor]")?.querySelector<HTMLElement>(':scope > [data-sheet-dock="low"]');
+  return !!dock && dock.clientWidth < COPY_BESIDE;
+}
+
+/**
+ * Whether a selected chart's action bar goes above it (else below it). Not above the sheet's top.
+ * Not over the block of cells the chart is made from (see barOverData) or other cells that hold
+ * something, such as the results under that data a new chart is placed past (see bandOverCells):
+ * then below, so all of them show right after the chart is made. Unless the cells below the chart
+ * hold something too: then above, as usual.
+ */
+function barGoesAbove(box: Box, block: Area | null, sheet: Sheet | undefined, geom: GridGeometry): boolean {
+  if (box.y < BAR_SPACE) return false;
+  const filled = (row: number, col: number) => holdsSomething(sheet, row, col);
+  let overData = false;
+  if (block) {
+    const a = geom.rect(block.r0, block.c0);
+    const b = geom.rect(block.r1, block.c1);
+    overData = barOverData({ left: box.x, top: box.y, right: box.x + box.w, bottom: box.y + box.h }, { left: a.x, top: a.y, right: b.x + b.w, bottom: b.y + b.h });
+  }
+  if (!overData && !bandOverCells({ left: box.x, top: box.y - BAR_SPACE, right: box.x + box.w, bottom: box.y }, geom, filled)) return true;
+  return bandOverCells({ left: box.x, top: box.y + box.h, right: box.x + box.w, bottom: box.y + box.h + BAR_SPACE }, geom, filled);
+}
+
 /** The frozen columns' width and rows' height of a sheet (content px). */
 function frozenSize(sheet: Sheet | undefined, geom: GridGeometry): { w: number; h: number } {
   const fc = sheet?.freeze.cols ?? 0;
@@ -169,9 +224,8 @@ function gridRoom(card: HTMLElement, frozen: { w: number; h: number }, docked = 
     right: g.left + grid.clientLeft + grid.clientWidth,
     bottom: g.top + grid.clientTop + grid.clientHeight,
   };
-  const editor = card.closest<HTMLElement>("[data-sheet-editor]");
-  const dock = docked ? editor?.querySelector<HTMLElement>(":scope > [data-sheet-dock]") : null;
-  if (editor && dock) room.bottom = Math.min(room.bottom, editor.getBoundingClientRect().top + editor.clientTop + dock.offsetTop);
+  const dock = docked ? dockTop(card) : null;
+  if (dock !== null) room.bottom = Math.min(room.bottom, dock);
   return room;
 }
 
@@ -181,6 +235,26 @@ function gridRoom(card: HTMLElement, frozen: { w: number; h: number }, docked = 
  * the first `from`.
  */
 const settingsScroll = new WeakMap<SheetStore, { from: { left: number; top: number }; to: { left: number; top: number } }>();
+
+/** What a selected chart stays selected for, pressed or given the keyboard: the charts, their settings, and menus and dialogs opened from there. */
+const KEEPS_CHART = "[data-chart-card],[data-chart-panel],[data-sheet-panel],[role=dialog],[role=menu],[role=listbox]";
+
+/** Where the grid was when F6 took the keyboard from the cells to the charts, per editor, with the selection then (see chartByKeys). */
+const keysScroll = new WeakMap<SheetStore, { grid: HTMLElement; left: number; top: number; selection: Selection }>();
+
+/**
+ * F6 to the charts (SheetEditor): `card` gets the keyboard, selected and scrolled into view like a
+ * chart just inserted. When the keyboard leaves the charts again (back into the cells, on to the
+ * toolbar or a notice: all of them about the cells), the grid scrolls back to where it was, so the
+ * active cell shows again; not when the selection changed meanwhile or a press of the pointer
+ * went somewhere itself.
+ */
+export function chartByKeys(store: SheetStore, card: HTMLElement) {
+  const grid = card.closest<HTMLElement>("[data-sheet-grid]");
+  if (grid && !keysScroll.has(store)) keysScroll.set(store, { grid, left: grid.scrollLeft, top: grid.scrollTop, selection: store.get().selection });
+  selectChart(store, card.dataset.chartCard ?? null, { reveal: true });
+  card.focus({ preventScroll: true });
+}
 
 /** After the settings open from the keyboard, the keyboard goes into them: to their title, from where Tab goes on. */
 function focusSettings(chartId: string) {
@@ -247,14 +321,15 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
   }, [store]);
 
   // A press anywhere else (a cell, the toolbar) lets go of the selected chart; its panel and the
-  // menus and dialogs it opens don't. So does the keyboard going into the cells (Escape in the
-  // settings, closing them, Shift+Tab): the frame shows where the keyboard is, so Delete never
-  // seems to be about the chart while it clears cells.
+  // menus and dialogs it opens don't. So does the keyboard going anywhere else (into the cells
+  // with Escape or Shift+Tab, F6 on to the toolbar): the frame shows where the keyboard is, so
+  // Delete never seems to be about the chart while it clears cells, nor Fett while it makes cells
+  // bold.
   useEffect(() => {
     if (!ui.selected) return;
     const onDown = (e: globalThis.PointerEvent) => {
       const t = e.target;
-      if (t instanceof Element && t.closest("[data-chart-card],[data-chart-panel],[data-sheet-panel],[role=dialog],[role=menu],[role=listbox]")) return;
+      if (t instanceof Element && t.closest(KEEPS_CHART)) return;
       selectChart(store, null);
       // The keyboard leaves the chart let go of, for the cells: toolbar buttons keep it where it is
       // (Fett, Rückgängig), and typing after them goes into the cells, as before the chart came.
@@ -263,7 +338,7 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
     };
     const onFocus = (e: FocusEvent) => {
       const t = e.target;
-      if (t instanceof Element && t.closest("[data-sheet-grid]") && !t.closest("[data-chart-card]")) selectChart(store, null);
+      if (t instanceof Element && !t.closest(KEEPS_CHART)) selectChart(store, null);
     };
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("focusin", onFocus);
@@ -272,6 +347,30 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
       document.removeEventListener("focusin", onFocus);
     };
   }, [store, ui.selected]);
+
+  // The keyboard leaving the charts F6 went to (see chartByKeys): the cells come back as they
+  // were, and settings closed meanwhile scroll back no further than that. A press of the pointer
+  // outside the charts forgets where they were: it says where to go itself.
+  useEffect(() => {
+    const onDown = (e: globalThis.PointerEvent) => {
+      if (!(e.target instanceof Element && e.target.closest(KEEPS_CHART))) keysScroll.delete(store);
+    };
+    const onFocus = (e: FocusEvent) => {
+      const memo = keysScroll.get(store);
+      if (!memo || !(e.target instanceof Element) || e.target.closest(KEEPS_CHART)) return;
+      keysScroll.delete(store);
+      if (!memo.grid.isConnected || !sameSelection(memo.selection, store.get().selection)) return;
+      settingsScroll.delete(store);
+      const { grid, left, top } = memo;
+      if (Math.abs(grid.scrollLeft - left) > 2 || Math.abs(grid.scrollTop - top) > 2) grid.scrollTo({ left, top, behavior: scrollBehavior() });
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("focusin", onFocus);
+    };
+  }, [store]);
 
   return (
     <>
@@ -325,8 +424,13 @@ function ChartCard({
   const t = sheetChartText[locale];
   const touch = useTouch();
   const hintId = useId();
+  const summaryId = useId();
   // Live values: a new Calc (any edit) reads the cells again.
   const data = useMemo(() => safeChartData(spec, calc, locale), [spec, calc, locale]);
+  // The sheet's cells and the block of them it is made from, while it is selected: its action bar
+  // keeps off what they hold.
+  const workbook = useSheet(store, (s) => s.workbook);
+  const dataBlock = useMemo(() => (selected ? chartDataBlock(workbook, spec) : null), [selected, workbook, spec]);
   const anchor = geom.rect(spec.at.row, spec.at.col);
   const base: Box = { x: anchor.x + spec.at.dx * scale, y: anchor.y + spec.at.dy * scale, w: spec.size.w * scale, h: spec.size.h * scale };
   const [preview, setPreview] = useState<Box | null>(null);
@@ -341,7 +445,8 @@ function ChartCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const box = preview ?? base;
-  const barAbove = box.y >= BAR_SPACE;
+  // Where the action bar goes while the chart is selected: above it, or below it (see barGoesAbove).
+  const barAbove = selected && barGoesAbove(box, dataBlock, workbook.sheets.find((x) => x.id === spec.sheetId), geom);
   const showBar = selected && !preview && !lifted;
 
   /** Where the grid shows cells on screen now (see gridRoom). */
@@ -370,6 +475,10 @@ function ChartCard({
     // Docked settings that are open cover the grid (also another chart's, when this one is
     // duplicated); ones sliding away after closing don't.
     const room = roomNow(mode === "settings" || !!store.get().focus);
+    // Above settings docked low the chart itself comes into view, even where its data slides away,
+    // and all of that little room is the chart's (its action bar hides meanwhile); where too little
+    // of it shows there, the settings show its copy (see inViewNext).
+    const lowDock = !!el.closest("[data-sheet-editor]")?.querySelector(':scope > [data-sheet-dock="low"]');
     const card = rectOf(el);
     const block = chartDataBlock(store.get().workbook, spec);
     const origin = overlay.getBoundingClientRect();
@@ -383,9 +492,9 @@ function ChartCard({
       ? revealScroll({
           card,
           room,
-          bar: selected ? (barAbove ? "above" : "below") : null,
+          bar: selected && !lowDock ? (barAbove ? "above" : "below") : null,
           data,
-          mode,
+          mode: lowDock ? "show" : mode,
           scroll: { ...from, maxLeft: grid.scrollWidth - grid.clientWidth, maxTop: grid.scrollHeight - grid.clientHeight },
         })
       : null;
@@ -432,7 +541,7 @@ function ChartCard({
   useLayoutEffect(() => {
     if (!panelOpen) return;
     const r = planReveal("settings");
-    setInView(!!r?.room && inViewNext(null, r.shown));
+    setInView(!!r?.room && inViewNext(null, r.shown, !!cardRef.current && inNarrowLowDock(cardRef.current)));
     return () => {
       const open = store.get().focus;
       if (open?.kind === "chart" && open.id === spec.id) setInView(false);
@@ -469,7 +578,7 @@ function ChartCard({
       }
       if (asked || opened) {
         const r = revealNow(panelOpen ? "settings" : "show");
-        if (asked) done.pending = panelOpen && !!r && (!r.room || !inViewNext(null, r.shown));
+        if (asked) done.pending = panelOpen && !!r && (!r.room || !inViewNext(null, r.shown, !!cardRef.current && inNarrowLowDock(cardRef.current)));
         // Closing a new chart's settings scrolls nothing back: it would take the chart away again.
         if (opened && asked) settingsScroll.delete(store);
         else if (opened) settingsOpened(r);
@@ -492,23 +601,32 @@ function ChartCard({
     if (!el) return;
     const room = roomNow();
     const was = chartUi(store).inView;
-    setInView(inViewNext(was?.id === spec.id ? was.shown : null, room ? shownShare(rectOf(el), room) : 0));
+    setInView(inViewNext(was?.id === spec.id ? was.shown : null, room ? shownShare(rectOf(el), room) : 0, inNarrowLowDock(el)));
   });
   useEffect(() => {
     if (!panelOpen) return;
     const el = cardRef.current;
     const grid = el?.closest<HTMLElement>("[data-sheet-grid]");
     if (!el || !grid) return;
+    const dock = el.closest("[data-sheet-editor]")?.querySelector(":scope > [data-sheet-dock]");
+    // Docked settings made low (their handle tapped or dragged down): the chart itself comes into
+    // view above them, and closing them scrolls back to where the grid was before (settingsOpened
+    // keeps the first place the settings started from, also after low → tall → low).
+    let low = dock?.getAttribute("data-sheet-dock") === "low";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const later = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => measureInView(), 160);
+      timer = setTimeout(() => {
+        const nowLow = dock?.getAttribute("data-sheet-dock") === "low";
+        if (nowLow && !low) settingsOpened(revealNow("settings"));
+        low = nowLow;
+        measureInView();
+      }, 160);
     };
     grid.addEventListener("scroll", later, { passive: true });
     const ro = new ResizeObserver(later);
     ro.observe(el);
     ro.observe(grid);
-    const dock = el.closest("[data-sheet-editor]")?.querySelector(":scope > [data-sheet-dock]");
     if (dock) ro.observe(dock);
     return () => {
       clearTimeout(timer);
@@ -542,15 +660,21 @@ function ChartCard({
 
   // The action bar stays where a finger reaches it: inside the cells on screen while the chart
   // shows there (a chart wider than a phone, or half scrolled away), but never over a chart whose
-  // settings are open. Moved directly on the element, as the grid scrolls.
+  // settings are open. Moved directly on the element, as the grid scrolls. Not while it is hidden
+  // (settings docked low): it would measure as an empty box at the corner and keep a shift that is
+  // far off once it shows again. When it shows again, its size comes back and it is placed anew.
+  // Its words ("Einstellungen", "Trendlinie": on a touch screen the only names that show) are
+  // there whenever the bar fits the cells on screen with them (see fitBarWords).
+  const barWidths = useRef<BarWidths | null>(null);
   const placeBar = useEffectEvent(() => {
     const bar = barRef.current;
     const el = cardRef.current;
-    if (!bar || !el) return;
+    if (!bar || !el || !bar.getClientRects().length) return;
+    const room = roomNow(!!store.get().focus);
+    if (room) barWidths.current = fitBarWords(bar, room.right - room.left - 2 * BAR_MARGIN, `${locale} ${touch} ${readOnly} ${spec.kind}`, barWidths.current);
     const sx = Number(bar.dataset.sx) || 0;
     const sy = Number(bar.dataset.sy) || 0;
     const r = rectOf(bar);
-    const room = roomNow(!!store.get().focus);
     const s = room ? barShift({ left: r.left - sx, right: r.right - sx, top: r.top - sy, bottom: r.bottom - sy }, rectOf(el), room, !panelOpen) : { x: 0, y: 0 };
     if (s.x === sx && s.y === sy) return;
     bar.dataset.sx = String(s.x);
@@ -565,6 +689,7 @@ function ChartCard({
     grid?.addEventListener("scroll", onChange, { passive: true });
     const ro = new ResizeObserver(onChange);
     if (grid) ro.observe(grid);
+    if (barRef.current) ro.observe(barRef.current);
     return () => {
       grid?.removeEventListener("scroll", onChange);
       ro.disconnect();
@@ -683,7 +808,8 @@ function ChartCard({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
+    // F6 goes on to the editor's next part (SheetEditor).
+    if (e.target !== e.currentTarget || e.key === "F6") return;
     if (e.ctrlKey || e.metaKey) {
       // The grid only listens to keys typed into it: undo, redo and duplicate work here too.
       const k = e.key.toLowerCase();
@@ -742,17 +868,23 @@ function ChartCard({
   const kindName = t.kindNames[spec.kind];
   const hit = touch ? 36 : 16;
   const dot = touch ? 14 : 9;
-  const wide = box.w >= 380;
+  // The cells the chart is drawn over: F6 in the editor goes to the chart over the selection first.
+  const from = geom.cellAt(box.x + 0.5, box.y + 0.5);
+  const to = geom.cellAt(box.x + box.w - 0.5, box.y + box.h - 0.5);
 
   return (
     <div
       ref={cardRef}
       data-chart-card={spec.id}
+      data-chart-cells={`${from.row},${from.col},${to.row},${to.col}`}
       role="figure"
       tabIndex={0}
+      // Named by its kind and title; described by what it shows (series, trendline with equation
+      // and R², notes such as "Text in A8 statt Zahl") and what the keyboard does with it, so a
+      // screen reader says all of that where the keyboard lands on it.
       aria-label={t.chartLabel(kindName, spec.title.trim())}
-      aria-describedby={hintId}
-      aria-keyshortcuts="Delete Enter Escape"
+      aria-describedby={`${summaryId} ${hintId}`}
+      aria-keyshortcuts={readOnly ? "Escape" : "Delete Enter Escape"}
       // A finger may scroll the sheet over a chart (the grid lets it pan); holding it still picks the chart up.
       className={cn("pointer-events-auto absolute select-none outline-none [-webkit-touch-callout:none]", selected ? "z-[3]" : "z-[2]")}
       style={{
@@ -782,7 +914,7 @@ function ChartCard({
       onKeyDown={onKeyDown}
     >
       <span id={hintId} hidden>
-        {t.moveHint}
+        {readOnly ? t.keysHintReadOnly : t.keysHint}
       </span>
       <div
         className={cn(
@@ -791,7 +923,7 @@ function ChartCard({
           (preview || lifted) && "shadow-pop",
         )}
       >
-        <ChartView spec={spec} data={data} width={box.w} height={box.h} locale={locale} interactive={!preview} selectedSeries={highlight} />
+        <ChartView spec={spec} data={data} width={box.w} height={box.h} locale={locale} interactive={!preview} selectedSeries={highlight} summaryId={summaryId} />
       </div>
 
       {selected &&
@@ -814,17 +946,19 @@ function ChartCard({
           ref={barRef}
           role="toolbar"
           aria-label={t.chartLabel(kindName, spec.title.trim())}
-          className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-line bg-raised p-1 shadow-pop"
+          // Not while a chart's settings are docked low: the little room above them is the chart's
+          // (the bar comes back when they close).
+          className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-line bg-raised p-1 shadow-pop [[data-sheet-editor]:has(>[data-sheet-dock=low]_[data-chart-panel])_&]:hidden"
           style={{ top: barAbove ? -48 : box.h + 10 }}
           onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.key !== "Tab" && e.stopPropagation()}
+          onKeyDown={(e) => e.key !== "Tab" && e.key !== "F6" && e.stopPropagation()}
         >
           {/* From the keyboard (a click without a pointer), the keyboard goes along into the settings. */}
           {!readOnly && (
             <BarButton
               label={t.settings}
-              showLabel={wide}
+              word="settings"
               onClick={(e) => {
                 openChartPanel(store, spec.id);
                 if (e.detail === 0) focusSettings(spec.id);
@@ -837,7 +971,7 @@ function ChartCard({
             <BarButton
               label={t.trendline}
               title={t.addTrendline}
-              showLabel={wide}
+              word="trend"
               onClick={(e) => {
                 if (quickTrendline(store, spec.id) === "opened" && e.detail === 0) focusSettings(spec.id);
               }}
@@ -850,7 +984,7 @@ function ChartCard({
               <Copy />
             </BarButton>
           )}
-          <BarButton label={t.saveImage} onClick={savePng} disabled={saving}>
+          <BarButton label={t.saveImage} onClick={savePng} disabled={saving} icon>
             <ImageDown />
           </BarButton>
           {!readOnly && (
@@ -864,10 +998,16 @@ function ChartCard({
   );
 }
 
+/**
+ * A button of the action bar: its icon, and with a `word` its label beside it while the bar has
+ * room for that word (fitBarWords; the same padding with or without it, so hiding the word takes
+ * away just its width). `icon`: one that never has words, measured against those that do.
+ */
 function BarButton({
   label,
   title,
-  showLabel,
+  word,
+  icon,
   danger,
   disabled,
   onClick,
@@ -875,7 +1015,8 @@ function BarButton({
 }: {
   label: string;
   title?: string;
-  showLabel?: boolean;
+  word?: "settings" | "trend";
+  icon?: boolean;
   danger?: boolean;
   disabled?: boolean;
   onClick: (e: MouseEvent<HTMLButtonElement>) => void;
@@ -888,14 +1029,15 @@ function BarButton({
       title={title ?? label}
       disabled={disabled}
       onClick={onClick}
+      data-bar-word={word}
+      data-bar-icon={icon ? "" : undefined}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg text-[12.5px] font-medium transition-colors disabled:opacity-40 [@media(hover:none)]:h-9 [&_svg]:size-4 [&_svg]:shrink-0",
-        showLabel ? "px-2.5" : "w-8 justify-center [@media(hover:none)]:w-9",
+        "inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors disabled:opacity-40 [@media(hover:none)]:h-9 [@media(hover:none)]:px-2.5 [&_svg]:size-4 [&_svg]:shrink-0",
         danger ? "text-ink-3 hover:bg-danger/10 hover:text-danger" : "text-ink-2 hover:bg-hover hover:text-ink",
       )}
     >
       {children}
-      {showLabel && <span>{label}</span>}
+      {word && <span className={cn("whitespace-nowrap [[data-words=none]_&]:hidden", word === "settings" && "[[data-words=trend]_&]:hidden")}>{label}</span>}
     </button>
   );
 }

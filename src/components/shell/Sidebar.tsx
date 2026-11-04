@@ -38,6 +38,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { useImporter } from "@/components/notes/useImporter";
 import { useShareInfo } from "@/components/notes/useShared";
@@ -57,7 +58,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { forgetDevice } from "@/lib/offline/device";
+import { isNetworkError, isOnline, reportNetworkError } from "@/lib/offline/net";
 import { useSignOutGuard } from "@/components/offline/useSignOutGuard";
+import { holdDeniedDrafts } from "@/components/sheet/DeniedDrafts";
+import { showSignedOut } from "@/components/shell/SignedOut";
 
 // Touch screens (the phone drawer, tablets) get taller rows, bigger icon buttons and always-visible
 // row actions: there is no hover to reveal them and 28 px rows are too small for a finger.
@@ -639,12 +643,31 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
   }
 
   async function signOut() {
-    if (!(await guard.ready())) return;
-    await createClient().auth.signOut();
-    // Nothing of the account stays on this device (its offline copies, unsent changes).
-    await forgetDevice();
-    router.replace("/login");
-    router.refresh();
+    // One question at a time: the guard's (what can't be sent would be deleted). Blob's question
+    // about spreadsheet work it can't save any more waits meanwhile (the guard counts that work too),
+    // and comes when signing out is called off, so the work can still be kept as a copy first.
+    const release = holdDeniedDrafts();
+    let go = false;
+    try {
+      go = await guard.ready();
+      if (!go) return;
+      // (Without a connection this still signs out here, on this device.)
+      const { error } = await createClient().auth.signOut();
+      if (error && isNetworkError(error, error.status)) reportNetworkError();
+      // Offline the sign-in page can't load (the browser would show its own "no internet" page):
+      // Blob says it's signed out in the app's place (SignedOut.tsx) and opens the sign-in page once
+      // it's back online. The account's pages close first, so whatever they save as they close is
+      // removed with the rest below.
+      const offline = !isOnline();
+      if (offline) flushSync(showSignedOut);
+      // Nothing of the account stays on this device (its offline copies, unsent changes).
+      await forgetDevice();
+      if (offline) return;
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      release(!go);
+    }
   }
 
   return (
@@ -654,7 +677,7 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
         align="start"
         className="w-[244px]"
         trigger={(props) => (
-          <button {...props} className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
+          <button {...props} data-account-menu="" className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
@@ -694,7 +717,18 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
             <MenuItem icon={<Settings />} onSelect={() => (close(), router.push("/settings"))}>
               {t.settings}
             </MenuItem>
-            <MenuItem icon={<LogOut />} onSelect={signOut}>
+            {/* (The menu closes first: what signing out asks is then the only thing open, and the
+                keyboard comes back to the account button once it is answered. The button whose
+                menu is open: on narrow screens the drawer has its own, the sidebar's is hidden.) */}
+            <MenuItem
+              icon={<LogOut />}
+              onSelect={() => {
+                const button = document.querySelector<HTMLElement>('[data-account-menu][aria-expanded="true"]');
+                close();
+                button?.focus();
+                void signOut();
+              }}
+            >
               {t.signOut}
             </MenuItem>
           </>

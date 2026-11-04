@@ -23,6 +23,7 @@ import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn, pageTitle } from "@/lib/utils";
 import { addToNoteHref, type SheetEmbedItem } from "@/sheet/embed";
 import { focusGrid } from "../chrome/parts";
+import { newNoteTitle } from "./noteTitle";
 
 export function AddToNoteDialog({ open, onClose, pageId, item }: { open: boolean; onClose: () => void; pageId: string; item: SheetEmbedItem }): ReactNode {
   const phone = usePhone();
@@ -81,9 +82,9 @@ function AddToNoteBody({ pageId, item, onClose, phone }: { pageId: string; item:
     if (busy) return;
     setBusy(true);
     setFailed(false);
-    // Next to the spreadsheet: in its subject (when the spreadsheet is yours), named after it.
+    // Next to the spreadsheet: in its subject (when the spreadsheet is yours), named after it (newNoteTitle).
     const mine = !sheet || sheet.user_id === userId;
-    const created = await createPage({ kind: "note", title: sheet?.title?.trim() ?? "", subject_id: mine ? (sheet?.subject_id ?? null) : null });
+    const created = await createPage({ kind: "note", title: newNoteTitle(sheet?.title, t.newNoteTitle), subject_id: mine ? (sheet?.subject_id ?? null) : null });
     setBusy(false);
     if (!created) {
       setFailed(true);

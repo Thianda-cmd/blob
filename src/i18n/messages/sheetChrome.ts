@@ -78,7 +78,9 @@ export const sheetChromeText = defineMessages({
     strike: "Strikethrough",
     textColor: "Text colour",
     fillColor: "Fill colour",
-    applyColor: (name: string) => `Apply ${name}`,
+    // The colour buttons (beside their arrows, which open the colours): text and fill never sound the same.
+    applyTextColor: (name: string) => `Apply text colour ${name}`,
+    applyFillColor: (name: string) => `Apply fill colour ${name}`,
     automatic: "Automatic",
     noFill: "No fill",
     colors: {
@@ -267,6 +269,7 @@ export const sheetChromeText = defineMessages({
     browserTitle: "Functions",
     browserSearch: "Search functions",
     browserPlaceholder: "Name or what it does, e.g. mean",
+    clearSearch: "Clear search",
     popular: "Most used",
     all: "All functions",
     insert: "Insert",
@@ -380,7 +383,8 @@ export const sheetChromeText = defineMessages({
     strike: "Durchgestrichen",
     textColor: "Schriftfarbe",
     fillColor: "Füllfarbe",
-    applyColor: (name) => `${name} anwenden`,
+    applyTextColor: (name) => `Schriftfarbe ${name} anwenden`,
+    applyFillColor: (name) => `Füllfarbe ${name} anwenden`,
     automatic: "Automatisch",
     noFill: "Keine Füllung",
     colors: {
@@ -437,7 +441,7 @@ export const sheetChromeText = defineMessages({
       area: "Mengen im Verlauf",
       pie: "Anteile an einem Ganzen",
     },
-    chartNeedsData: "Markiere zuerst die Zahlen fürs Diagramm, z. B. zwei Spalten: Konzentration und Extinktion.",
+    chartNeedsData: "Markier zuerst die Zahlen fürs Diagramm, z. B. zwei Spalten: Konzentration und Extinktion.",
 
     sortAsc: "Aufsteigend sortieren (A → Z)",
     sortDesc: "Absteigend sortieren (Z → A)",
@@ -450,7 +454,7 @@ export const sheetChromeText = defineMessages({
     find: "Suchen und Ersetzen",
     functions: "Funktion einfügen",
 
-    nothingToSort: "Hier gibt es nichts zu sortieren. Markiere zuerst die Zeilen, die du sortieren willst.",
+    nothingToSort: "Hier gibt es nichts zu sortieren. Markier zuerst die Zeilen, die du sortieren willst.",
     sortedWithNeighbours: "Zusammen mit den Nachbarspalten sortiert, damit jede Zeile zusammenbleibt.",
     noNumbers: "In der Auswahl stehen keine Zahlen zum Zusammenrechnen.",
 
@@ -560,6 +564,7 @@ export const sheetChromeText = defineMessages({
     browserTitle: "Funktionen",
     browserSearch: "Funktionen suchen",
     browserPlaceholder: "Name oder was sie tut, z. B. Mittelwert",
+    clearSearch: "Suche löschen",
     popular: "Häufig verwendet",
     all: "Alle Funktionen",
     insert: "Einfügen",

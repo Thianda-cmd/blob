@@ -11,8 +11,9 @@
 // became the header and offers the other choice with one tap.
 
 import { ChartScatter, CircleCheck, Filter, Info, NotebookPen, TableProperties, Trash2, Undo2, Ungroup, X } from "lucide-react";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { Locale } from "@/i18n/config";
+import { sheetText } from "@/i18n/messages/sheet";
 import { sheetTableText, type SheetTableText } from "@/i18n/messages/sheetTable";
 import { cn } from "@/lib/utils";
 import { areaName, cellKey } from "@/sheet/a1";
@@ -20,6 +21,8 @@ import { sheetById } from "@/sheet/ops";
 import { columnKind, columnNames, dataRows, filteredRows, TABLE_STYLES, tableNameProblem, TOTAL_FNS, totalOfCell } from "@/sheet/table/model";
 import type { TableSpec, TableStyle, TotalFn } from "@/sheet/types";
 import { AddToNoteDialog } from "../embed/AddToNote";
+import { focusSheetGrid } from "../grid/Grid";
+import { currentSheetNotice } from "../notice";
 import { useSheet, type SheetStore } from "../store";
 import {
   changeTableLook,
@@ -28,6 +31,7 @@ import {
   convertTableToRange,
   deleteTableWithCells,
   filterTableColumn,
+  openTablePanel,
   setTableColumnTotal,
   setTableTotals,
   switchTableHeader,
@@ -35,31 +39,75 @@ import {
 } from "./actions";
 import { describeFilter } from "./describe";
 import { tableLook } from "./look";
-import { setFreshTable, useFreshTable } from "./notice";
+import { setFreshTable, useFreshTable, type FreshTable } from "./notice";
 import { ActionButton, Field, Group, Note, Select, TextField, Toggle } from "./parts";
+
+/**
+ * How long after the card about a table just made appears its words go into its status region
+ * (ms): a region that comes with its words already in it isn't reliably read out.
+ */
+const SAY_AFTER = 150;
+
+/** The table whose settings are opening with the keyboard going there too (see openTableSettings), per editor. */
+const keysFor = new WeakMap<SheetStore, string>();
+
+/**
+ * Open a table's settings from its menus: the cells' menu ("Intelligente Tabelle bearbeiten") or a
+ * column's menu. Chosen with the keyboard (`keys`: Enter or Space), the keyboard goes there too, to
+ * their title, as when a chart's settings open from the chart: a screen reader reads the table's
+ * name, Tab goes on through the settings, and Escape closes them and gives the keyboard back to
+ * the cells. (A table just made with Ctrl+T keeps the keyboard in the cells: its card says F6 gets
+ * there.)
+ */
+export function openTableSettings(store: SheetStore, tableId: string, keys: boolean) {
+  const open = store.get().focus;
+  if (open?.kind === "table" && open.id === tableId) {
+    if (keys) document.querySelector<HTMLElement>(`[data-table-panel="${CSS.escape(tableId)}"] [data-table-panel-title]`)?.focus({ preventScroll: true });
+    return;
+  }
+  if (keys) keysFor.set(store, tableId);
+  openTablePanel(store, tableId);
+  // (A table that is gone opens nothing.)
+  if (store.get().focus?.id !== tableId) keysFor.delete(store);
+}
 
 export function TablePanel({ store, tableId, onClose }: { store: SheetStore; tableId: string; onClose: () => void }): ReactNode {
   const table = useSheet(store, (s) => s.workbook.tables.find((t) => t.id === tableId));
   const locale = useSheet(store, (s) => s.locale);
   const t = sheetTableText[locale];
+  // Opened from a menu with the keyboard (openTableSettings): it goes to the title as they open.
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (keysFor.get(store) !== tableId) return;
+    keysFor.delete(store);
+    title.current?.focus({ preventScroll: true });
+  }, [store, tableId]);
   if (!table) {
     return (
       <div data-table-panel="" className="flex h-full min-h-0 flex-col bg-surface">
-        <PanelHeader title={t.table} t={t} onClose={onClose} />
+        <PanelHeader title={t.table} t={t} onClose={onClose} titleRef={title} />
         <div className="p-4">
           <Note icon={<Info />}>{t.gone}</Note>
         </div>
       </div>
     );
   }
-  return <PanelBody key={table.id} store={store} table={table} locale={locale} t={t} onClose={onClose} />;
+  return <PanelBody key={table.id} store={store} table={table} locale={locale} t={t} onClose={onClose} titleRef={title} />;
 }
 
-function PanelHeader({ title, t, onClose }: { title: string; t: SheetTableText; onClose: () => void }) {
+function PanelHeader({ title, t, onClose, titleRef }: { title: string; t: SheetTableText; onClose: () => void; titleRef: RefObject<HTMLHeadingElement | null> }) {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
       <TableProperties aria-hidden className="size-4 shrink-0 text-ink-3" />
-      <h2 className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold text-ink">{title}</h2>
+      {/* Where the keyboard lands when the settings open from a menu with the keyboard (openTableSettings). */}
+      <h2
+        ref={titleRef}
+        tabIndex={-1}
+        data-table-panel-title=""
+        className="-mx-1 min-w-0 flex-1 truncate rounded-md px-1 font-display text-[15px] font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-blob"
+      >
+        {title}
+      </h2>
       <button
         type="button"
         onClick={onClose}
@@ -73,12 +121,40 @@ function PanelHeader({ title, t, onClose }: { title: string; t: SheetTableText; 
   );
 }
 
-function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; table: TableSpec; locale: Locale; t: SheetTableText; onClose: () => void }) {
+function PanelBody({
+  store,
+  table,
+  locale,
+  t,
+  onClose,
+  titleRef,
+}: {
+  store: SheetStore;
+  table: TableSpec;
+  locale: Locale;
+  t: SheetTableText;
+  onClose: () => void;
+  titleRef: RefObject<HTMLHeadingElement | null>;
+}) {
   const wb = useSheet(store, (s) => s.workbook);
   const calc = useSheet(store, (s) => s.calc);
   const readOnly = useSheet(store, (s) => s.readOnly);
   const pageId = useSheet(store, (s) => s.pageId);
   const fresh = useFreshTable(store, table.id);
+  // The card about a table just made speaks once to screen readers, while the keyboard stays in
+  // the cells: its words go into its status region a moment after the region came with the card.
+  // From the cells, F6 gets to the card's first button (SheetEditor puts these settings right after
+  // the cells while the card shows), and the words say so, unless the keyboard is elsewhere or a
+  // notice's button comes first.
+  const [said, setSaid] = useState<{ fresh: FreshTable; f6: boolean } | null>(null);
+  useEffect(() => {
+    if (!fresh) return;
+    const timer = setTimeout(() => {
+      const f6 = !!document.activeElement?.closest("[data-sheet-grid]") && !currentSheetNotice(store)?.action;
+      setSaid({ fresh, f6 });
+    }, SAY_AFTER);
+    return () => clearTimeout(timer);
+  }, [fresh, store]);
   const nameId = useId();
   const unmakeHintId = useId();
   const removeConfirmId = useId();
@@ -102,31 +178,49 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
   }, [wb, calc, table, locale]);
   const filters = Object.entries(table.filters).filter(([id]) => table.columns.some((c) => c.id === id));
   const sortIndex = table.sort ? table.columns.findIndex((c) => c.id === table.sort!.column) : -1;
+  const headerText = fresh?.header === "found" ? t.headerFound(names.slice(0, 4), Math.max(0, names.length - 4)) : t.headerAdded;
+  const switchLabel = fresh?.header === "found" ? t.headerIsData : t.headerIsHeader;
+  // The card's buttons take it away (or put a new card in its place): the keyboard on one of them
+  // doesn't drop to the top of the page. After switching the header choice it goes to the new
+  // card's same button (to switch back); after undoing or dismissing, back to the cells.
+  const keepKeys = (e: MouseEvent<HTMLButtonElement>, run: () => void, then: "switch" | "cells") => {
+    const had = e.currentTarget === document.activeElement;
+    run();
+    if (!had) return;
+    if (then === "cells") focusSheetGrid();
+    else requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-table-fresh] button")?.focus());
+  };
 
   return (
-    // The panel sits in the editor's side panel or dock, which carry its name ("Tabelleneinstellungen").
+    // The panel sits in the editor's side panel or dock, which carry its name ("Einstellungen der intelligenten Tabelle").
     <div data-table-panel={table.id} className="flex h-full min-h-0 flex-col bg-surface">
-      <PanelHeader title={table.name} t={t} onClose={onClose} />
+      <PanelHeader title={table.name} t={t} onClose={onClose} titleRef={titleRef} />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {fresh && !readOnly && (
-          <div className="border-b border-line bg-blob-soft/70 px-4 py-3" role="status">
+          <div data-table-fresh="" className="border-b border-line bg-blob-soft/70 px-4 py-3">
+            {/* For screen readers: the card's words (shown below for the eyes), once. */}
+            <p role="status" className="sr-only">
+              {said?.fresh === fresh ? `${t.made(table.name)}. ${headerText}${said.f6 ? ` ${sheetText[locale].noticeActionKey(switchLabel)}` : ""}` : ""}
+            </p>
             <div className="flex items-start gap-2.5">
               <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-blob-ink" />
               <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-[13px] font-medium text-ink">{t.made(table.name)}</p>
-                <p className="text-[12px] leading-snug text-ink-2">
-                  {fresh.header === "found" ? t.headerFound(names.slice(0, 4), Math.max(0, names.length - 4)) : t.headerAdded}
+                <p aria-hidden className="text-[13px] font-medium text-ink">
+                  {t.made(table.name)}
+                </p>
+                <p aria-hidden className="text-[12px] leading-snug text-ink-2">
+                  {headerText}
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1.5">
-                  <SmallButton onClick={() => switchTableHeader(store, table.id)}>{fresh.header === "found" ? t.headerIsData : t.headerIsHeader}</SmallButton>
-                  <SmallButton icon={<Undo2 />} onClick={() => undoMakeTable(store, table.id)}>
+                  <SmallButton onClick={(e) => keepKeys(e, () => switchTableHeader(store, table.id), "switch")}>{switchLabel}</SmallButton>
+                  <SmallButton icon={<Undo2 />} onClick={(e) => keepKeys(e, () => undoMakeTable(store, table.id), "cells")}>
                     {t.undoMake}
                   </SmallButton>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setFreshTable(store, null)}
+                onClick={(e) => keepKeys(e, () => setFreshTable(store, null), "cells")}
                 aria-label={t.dismiss}
                 title={t.dismiss}
                 className="-mr-1 -mt-1 grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:size-9"
@@ -331,7 +425,7 @@ function PanelBody({ store, table, locale, t, onClose }: { store: SheetStore; ta
   );
 }
 
-function SmallButton({ onClick, icon, children }: { onClick: () => void; icon?: ReactNode; children: ReactNode }) {
+function SmallButton({ onClick, icon, children }: { onClick: (e: MouseEvent<HTMLButtonElement>) => void; icon?: ReactNode; children: ReactNode }) {
   return (
     <button
       type="button"

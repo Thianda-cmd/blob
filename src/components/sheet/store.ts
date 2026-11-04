@@ -12,14 +12,17 @@ import { createContext, useContext, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/config";
 import { sheetCollabText, type TakeBackRefusal } from "@/i18n/messages/sheetCollab";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
-import { areaOf, inArea, parseKey, sameArea } from "@/sheet/a1";
-import { takeBack, type MergeReport } from "@/sheet/collab";
+import { areaOf, inArea, parseKey, posName, quoteSheetName, sameArea } from "@/sheet/a1";
+import { keptAsTheirs, sameJson, takeBack, type Kept, type MergeReport } from "@/sheet/collab";
+import { storable, storableWork } from "@/sheet/doc";
 import { createCalc, editText, parseInput, typedFormat, type Calc, type ParsedInput } from "@/sheet/engine";
+import { formulaFormat, inSheet, type TypingPlace } from "@/sheet/engine/input";
+import { colonNotice } from "@/sheet/engine/messages";
 import { getCell, setCells, sheetById } from "@/sheet/ops";
 import { followArea, followCell, opsSince } from "@/sheet/sheetLog";
 import { afterInput, afterPaste, filteredRows } from "@/sheet/table/model";
 import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type NumberFormat, type Pos, type Sheet, type SheetOp, type Workbook } from "@/sheet/types";
-import { hideSheetNotice, noticeDuration, showSheetNotice } from "./notice";
+import { currentSheetNotice, hideSheetNotice, noticeDuration, showSheetNotice } from "./notice";
 
 export type Selection = {
   /** Where the selection started; the active cell (the one you type into). */
@@ -65,6 +68,11 @@ export type SheetState = {
   edit: EditState;
   /** Marching ants around what was copied or cut. */
   clip: { sheetId: string; area: Area; cut: boolean } | null;
+  /**
+   * A cut that someone else's change of rows or columns cancelled (replaceRemote): pasting it does
+   * nothing but say so again (grid/clipboard.ts), until something else is copied or cut.
+   */
+  stoppedCut?: { sheetId: string; area: Area } | null;
   /** The chart or smart table whose settings are open (side panel, or a bottom sheet on phones). */
   focus: { kind: "chart" | "table"; id: string } | null;
   readOnly: boolean;
@@ -119,8 +127,9 @@ export interface SheetStore {
 
   /**
    * Undo and redo only take back what that step did: other people's changes since stay, on the
-   * rows they made them on (src/sheet/collab.ts takeBack). A step whose rows or columns others
-   * have moved since can't be taken back without guessing: it is dropped with a message instead.
+   * rows they made them on (src/sheet/collab.ts takeBack), also where they changed what the step
+   * changed (a notice says which cells). A step whose rows or columns others have moved since
+   * can't be taken back without guessing: it is dropped with a message instead.
    */
   undo(): void;
   redo(): void;
@@ -134,9 +143,19 @@ export interface SheetStore {
    * person inserted, deleted, sorted or moved rows or columns (a running edit whose cell is gone
    * ends, with a notice; a cut whose cells moved is cancelled). `conflicts`: the merge's report
    * (collab.ts MergeReport), when it kept a sheet as theirs and put mine on a copy: a running edit
-   * on that sheet goes on in the copy, which has my rows.
+   * on that sheet goes on in the copy, which has my rows, and undo and redo no longer take back
+   * steps made on that sheet before (they say where my version is now).
    */
   replaceRemote(wb: Workbook, conflicts?: MergeReport["conflicts"]): void;
+
+  /**
+   * The workbook with text the database can't store repaired (src/sheet/doc.ts storable: half an
+   * emoji pasted becomes U+FFFD), as saving sent it (saver.ts): replaces the document without an
+   * undo step, and the undo and redo steps get the same repair, so undo still takes back the step
+   * that brought that text (and says nothing about anyone else). On a huge spreadsheet, with many
+   * steps since that text came (offline for long), only the newest steps: the older ones go.
+   */
+  repair(wb: Workbook): void;
 
   /**
    * A new start (a template picked for an empty spreadsheet): replaces the document and clears
@@ -222,6 +241,23 @@ function rowChanges(was: Workbook, now: Workbook): Map<string, SheetOp[] | null>
     if (!ops || ops.length) out.set(s.id, ops);
   }
   return out;
+}
+
+/**
+ * The marching ants after a change of my own: on the copied or cut cells, wherever inserted,
+ * deleted or sorted rows or columns took them; gone when those cells are gone, sorted apart, or
+ * that can't be told, as Excel ends copy mode. (Whether a cut still moves is decided from the
+ * sheet's log when it is pasted: grid/clipboard.ts.)
+ */
+function clipAfter(clip: SheetState["clip"], was: Workbook, now: Workbook): SheetState["clip"] {
+  if (!clip) return clip;
+  const before = sheetById(was, clip.sheetId);
+  const after = sheetById(now, clip.sheetId);
+  if (!after) return null;
+  if (!before || before.log === after.log) return clip;
+  const ops = opsSince(before.log, after.log);
+  const area = ops ? followArea(ops, clip.sheetId, clip.area) : null;
+  return area ? (sameArea(area, clip.area) ? clip : { ...clip, area }) : null;
 }
 
 /**
@@ -379,15 +415,33 @@ export function tablesAfterPaste(wb: Workbook, sheetId: string, areas: Area | Ar
 
 /**
  * takeBack, where a bug means the step can't be taken back (never that someone's changes are
- * lost): the workbook, or why not and the sheet that is about.
+ * lost): the workbook (and what it left as it is now), or why not and the sheet that is about.
  */
-function takeBackSafely(from: Workbook, to: Workbook, now: Workbook, sheetId: string): { wb: Workbook } | { refused: TakeBackRefusal; sheetId: string } {
+function takeBackSafely(from: Workbook, to: Workbook, now: Workbook, sheetId: string): { wb: Workbook; kept?: Kept } | { refused: TakeBackRefusal; sheetId: string } {
   try {
     return takeBack(from, to, now);
   } catch (e) {
     reportOnce("merging for undo", e);
     return { refused: "error", sheetId };
   }
+}
+
+/** Did a step change sheet `id`: its cells, rows, columns or log, or a chart or table on it? */
+function stepTouches(step: { before: Workbook; after: Workbook }, id: string): boolean {
+  const { before, after } = step;
+  if (sheetById(before, id) !== sheetById(after, id)) return true;
+  const on = <T extends { sheetId: string }>(list: T[]) => list.filter((x) => x.sheetId === id);
+  return (before.charts !== after.charts && !sameJson(on(before.charts), on(after.charts))) || (before.tables !== after.tables && !sameJson(on(before.tables), on(after.tables)));
+}
+
+/** The cells an undo or redo left as they are now, for its notice: "C5", "Auswertung!B2" off the sheet on screen; at most 3, and how many more. */
+function keptCells(kept: Kept, wb: Workbook, shown: string): { cells: string[]; more: number } {
+  const names = kept.cells.map((k) => {
+    const sheet = sheetById(wb, k.sheetId);
+    const at = posName(k);
+    return sheet && k.sheetId !== shown ? `${quoteSheetName(sheet.name)}!${at}` : at;
+  });
+  return { cells: names.slice(0, 3), more: Math.max(0, names.length - 3) };
 }
 
 /** What was typed, short enough for a notice. */
@@ -409,24 +463,33 @@ export function openParens(text: string): number {
 
 /**
  * parseInput, but forgiving like Excel: a formula whose closing parentheses are missing gets them
- * ("=MITTELWERT(B2:B7" → "=MITTELWERT(B2:B7)"). Any other error stays.
+ * ("=MITTELWERT(B2:B7" → "=MITTELWERT(B2:B7)"). Any other error stays. `at`: where it is typed,
+ * for what the sheet there tells (inSheet): =B2-A2 of two times shows a duration, =H2+7 a date,
+ * and a "1:2" read as a time under "Verdünnung" gets a notice. `current`: the cell as typing sees
+ * it (typingBase).
  */
-export function parseTyped(text: string, locale: Locale, current: Cell | undefined): ParsedInput {
-  const parsed = parseInput(text, locale, current);
-  if (!parsed.error || !text.startsWith("=")) return parsed;
-  const open = openParens(text);
-  if (open <= 0) return parsed;
-  const closed = parseInput(text + ")".repeat(open), locale, current);
-  return closed.error ? parsed : closed;
+export function parseTyped(text: string, locale: Locale, current: Cell | undefined, at?: TypingPlace): ParsedInput {
+  let parsed = parseInput(text, locale, current);
+  if (parsed.error && text.startsWith("=")) {
+    const open = openParens(text);
+    const closed = open > 0 ? parseInput(text + ")".repeat(open), locale, current) : parsed;
+    if (!closed.error) parsed = closed;
+  }
+  return at ? inSheet(parsed, text, locale, at, current?.s?.fmt) : parsed;
 }
 
+/** A ratio typed into a cell and read as a time (see offerOtherReading): where, the time it became, the cell's format before, and what to keep instead. */
+type TypedRatio = { pos: Pos; typed: Cell["v"]; before: NumberFormat | undefined; other: NonNullable<ParsedInput["notice"]>["other"] };
+
 /**
- * A typed German "1.234" read the other way, as 1,234 (the one-click correction the notice offers,
- * see ParsedInput.notice). Its format: the one that reading comes with ("2,345 g"), else the one the
- * cell had before the typing, with room for the three decimals typed (roomForThree).
+ * What was typed, read the other way (the one-click correction the notice offers, see
+ * ParsedInput.notice): a German "1.234" as 1,234, or a "1:2" as the text 1:2. Its format: the one
+ * that reading comes with ("2,345 g"), else the one the cell had before the typing: for a number with
+ * room for the three decimals typed (roomForThree); for the text as it was (a time format typing
+ * implied goes).
  */
 export function otherReading(cell: Cell, before: NumberFormat | undefined, other: NonNullable<ParsedInput["notice"]>["other"]): Cell {
-  const fmt = other.fmt ?? (before && roomForThree(before, other.cell.v));
+  const fmt = other.fmt ?? (before && typeof other.cell.v === "number" ? roomForThree(before, other.cell.v) : before);
   const s: CellStyle = { ...cell.s };
   if (fmt) s.fmt = fmt;
   else delete s.fmt;
@@ -463,6 +526,50 @@ function roomForThree(fmt: NumberFormat, v: Cell["v"]): NumberFormat | undefined
   }
 }
 
+/** Where typing into a cell of `s` goes, with the cells around it and their values: what parseTyped reads the sheet with. */
+export function typingPlace(s: Pick<SheetState, "workbook" | "calc">, sheetId: string, pos: Pos): TypingPlace {
+  const calc = s.calc;
+  return { wb: s.workbook, sheetId, row: pos.row, col: pos.col, value: (id, row, col) => calc.value(id, row, col) };
+}
+
+/**
+ * A cell as typing into it sees it: a formula's cell without the format its formula implies
+ * (formulaFormat), which was only ever about that formula. So typing anew gives what typing into an
+ * empty cell gives: =B2-A2 (06:30) edited to =(B2-A2)*24 shows 6,5, and 5 typed over =H2+7 (a
+ * date) shows 5, not 05.01.1900. A format picked by hand (any other) stays.
+ */
+export function typingBase(current: Cell | undefined, at: TypingPlace): Cell | undefined {
+  const fmt = current?.s?.fmt;
+  if (!current || current.f === undefined || !fmt || !sameJson(fmt, formulaFormat(current.f, at))) return current;
+  const s: CellStyle = { ...current.s };
+  delete s.fmt;
+  const out: Cell = { ...current };
+  if (Object.keys(s).length) out.s = s;
+  else delete out.s;
+  return out;
+}
+
+/**
+ * The format a formula typed into the cell at `pos` shows its result in once it is entered
+ * (`canonical`: the formula without "="), as parseTyped and typedCell give it: the cell's own, or the
+ * one the formula implies. For the result shown while it is typed: =B2-A2 of two times shows 06:30
+ * there too, not 0,270833333.
+ */
+export function typingFormat(s: Pick<SheetState, "workbook" | "calc">, sheetId: string, pos: Pos, canonical: string): NumberFormat | undefined {
+  const { current, place } = typingAt(s, sheetId, pos);
+  return typedFormat(current?.s?.fmt, formulaFormat(canonical, place));
+}
+
+/**
+ * Typing into the cell at `pos`: the cell as typing sees it (typingBase) and where it is
+ * (typingPlace), what parseTyped and typedCell take. For Enter, Ctrl+Enter, AutoSum, a draft of the
+ * running edit: all give the cell what typing there gives.
+ */
+export function typingAt(s: Pick<SheetState, "workbook" | "calc">, sheetId: string, pos: Pos): { current: Cell | undefined; place: TypingPlace } {
+  const place = typingPlace(s, sheetId, pos);
+  return { current: typingBase(getCell(s.workbook, sheetId, pos.row, pos.col), place), place };
+}
+
 /** A cell after typing: the parsed value or formula, its look kept (plus an implied format, and wrapping for line breaks), its note kept. */
 export function typedCell(current: Cell | undefined, parsed: ParsedInput): Cell {
   let s: CellStyle | undefined = current?.s;
@@ -478,6 +585,16 @@ export function typedCell(current: Cell | undefined, parsed: ParsedInput): Cell 
   return cell;
 }
 
+/**
+ * `memo` (for storable) learns which part of `to`, the repaired copy of `from`, each part of `from`
+ * became: where they differ, the part at the same place (where they don't, nothing needed repair).
+ */
+function repairedAs(memo: WeakMap<object, unknown>, from: unknown, to: unknown) {
+  if (from === to || typeof from !== "object" || from === null || typeof to !== "object" || to === null) return;
+  memo.set(from, to);
+  for (const key in from) repairedAs(memo, (from as Record<string, unknown>)[key], (to as Record<string, unknown>)[key]);
+}
+
 type Step = {
   label: string;
   /** The workbook before and after the change. */
@@ -488,9 +605,20 @@ type Step = {
   selection: Selection;
   /** …and after redoing it (the sheet and selection from when it was undone). */
   redoView?: { sheetId: string; selection: Selection };
+  /**
+   * A sheet it changed whose two versions couldn't be combined since (replaceRemote): theirs is
+   * that sheet now and mine is on the copy `copyId` ("" when there was no room for one), so the
+   * step can't be taken back there.
+   */
+  conflict?: { sheetId: string; copyId: string };
 };
 
 const UNDO_LIMIT = 200;
+/**
+ * How much repairing text in the undo and redo steps may go through (values, src/sheet/doc.ts
+ * storableWork): all the steps of most spreadsheets, a few of a huge one (about half a second).
+ */
+const REPAIR_WORK = 1_000_000;
 export const ZOOM_MIN = 0.75;
 export const ZOOM_MAX = 2;
 
@@ -511,10 +639,11 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   /** Tab moves right along a row; Enter then goes down to the column the tabbing started in (like Excel). */
   let tabStart: Pos | null = null;
   /**
-   * The "1.234 ist 1234" notice showing (offerOtherReading), with the sheet and selection it was
-   * shown at, and the cell it is about with the value typed there.
+   * The notice showing that offers another reading of what was just typed ("1.234 ist 1234", "1:2 ist
+   * jetzt die Uhrzeit 01:02", see offerOtherReading), with the cell it is about and the value typed
+   * there; for a ratio, the ratios typed down that column while it showed (its button keeps them all).
    */
-  let hint: { id: number; sheetId: string; selection: Selection; cell: { sheetId: string; pos: Pos; typed: Cell["v"] } } | null = null;
+  let hint: { id: number; sheetId: string; pos: Pos; typed: Cell["v"]; ratios: TypedRatio[] | null } | null = null;
 
   const makeCalc = (wb: Workbook, previous?: Calc, changed?: Changed[]): Calc => calcFor(wb, locale, previous, changed);
 
@@ -537,12 +666,14 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   };
 
   function emit() {
-    // The "1.234" hint is about what was just typed: it goes once you edit or select something else,
-    // and once the cell holds something else (undone, cleared, changed by someone else).
+    // The hint ("1.234 ist 1234") is about what was just typed. Typing a column goes value, Enter,
+    // next value with the eyes on the notebook: it stays while the next values are typed and other
+    // cells are selected, and goes once its cell holds something else (corrected, undone, cleared,
+    // changed by someone else) or another sheet is shown. Its notice also goes by itself after a
+    // while (12 s or more), with its close button, or when a newer notice replaces it.
     if (hint) {
-      const { sheetId, pos, typed } = hint.cell;
-      const changed = getCell(state.workbook, sheetId, pos.row, pos.col)?.v !== typed;
-      if (changed || state.edit || state.sheetId !== hint.sheetId || state.selection !== hint.selection) {
+      const { sheetId, pos, typed } = hint;
+      if (getCell(state.workbook, sheetId, pos.row, pos.col)?.v !== typed || state.sheetId !== sheetId) {
         hideSheetNotice(store, hint.id);
         hint = null;
       }
@@ -602,11 +733,32 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
    * bottom of the editor says why, naming the sheet that is about (notice.ts). The next undo goes
    * on with the step before it.
    */
-  function refuse(step: Step, what: "undo" | "redo", why: TakeBackRefusal, sheetId: string) {
+  function refuse(step: Step, what: "undo" | "redo", why: TakeBackRefusal, sheetId: string, copy = "") {
     const sheet = sheetById(state.workbook, sheetId) ?? sheetById(step.before, sheetId) ?? sheetById(step.after, sheetId);
     state = { ...state, ...historyState() };
     emit();
-    showSheetNotice(store, sheetCollabText[locale].refused(what, why, sheet?.name ?? ""));
+    showSheetNotice(store, sheetCollabText[locale].refused(what, why, sheet?.name ?? "", copy));
+  }
+
+  /**
+   * A step on a sheet whose two versions couldn't be combined since (replaceRemote): mine is on its
+   * copy now. The steps right before it on that sheet can't be taken back either, so they go with
+   * it, with one notice: the next undo (or redo) goes on with a step that can.
+   */
+  function refuseConflict(stack: Step[], step: Step, conflict: NonNullable<Step["conflict"]>, what: "undo" | "redo") {
+    while (stack[stack.length - 1]?.conflict?.sheetId === conflict.sheetId) stack.pop();
+    refuse(step, what, "conflict", conflict.sheetId, sheetById(state.workbook, conflict.copyId)?.name);
+  }
+
+  /**
+   * Undone or redone, except what someone changed after the step (src/sheet/collab.ts takeBack):
+   * that stays as they left it, and a notice says which cells and sheets (`shown`: the sheet on
+   * screen now, whose cells go without its name).
+   */
+  function tellKept(what: "undo" | "redo", kept: Kept, wb: Workbook, shown: string) {
+    const { cells, more } = keptCells(kept, wb, shown);
+    const sheets = kept.sheets.map((id) => sheetById(wb, id)?.name).filter((n): n is string => !!n);
+    showSheetNotice(store, sheetCollabText[locale].kept(what, cells, more, sheets));
   }
 
   /** One undo step: `next` replaces the workbook. */
@@ -616,6 +768,7 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     undoStack.push({ label, before: prev, after: next, sheetId: state.sheetId, selection: state.selection });
     if (undoStack.length > UNDO_LIMIT) undoStack.shift();
     redoStack.length = 0;
+    state = { ...state, clip: clipAfter(state.clip, prev, next) };
     setDocument(next, calc ?? makeCalc(next, state.calc, cellChanges(prev, next)));
   }
 
@@ -639,30 +792,51 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   }
 
   /**
-   * A German "1.234" was just typed and read as 1234, as Excel does: a notice says so and offers
-   * 1,234 in one click (one undo step). It goes once you edit or select something else, or the cell
-   * holds something else (emit), and a click that comes too late for that changes nothing. Typing
-   * only: pasted values have no hint.
+   * What was just typed was read one way though another may have been meant (a German "1.234" is
+   * 1234, as in Excel; a "1:2" under "Verdünnung" the time 01:02): a notice says so and offers the
+   * other reading in one click (one undo step). It stays while the next values are typed and goes
+   * once the cell holds something else or another sheet is shown (emit); a click that comes too late
+   * for that changes nothing. Typing only: pasted values have no hint.
+   *
+   * Ratios are typed down a column (Verdünnung: 1:1, 1:2, 1:4 …), each with its notice taking the
+   * place of the one before: the newest one's button keeps all the ratios typed down that column
+   * while their notices showed as text ("Als Text „1:1 … 1:16“"), each cell that still holds what
+   * was typed there, in one undo step.
    */
   function offerOtherReading(sheetId: string, pos: Pos, before: Cell | undefined, parsed: ParsedInput) {
     const n = parsed.notice;
     const typed = parsed.cell.v;
     if (!n || getCell(state.workbook, sheetId, pos.row, pos.col)?.v !== typed) return;
+    const own: TypedRatio = { pos, typed, before: before?.s?.fmt, other: n.other };
+    // A ratio read as a time goes back to the text typed; the thousands hint ("1.234") to a number.
+    let ratios: TypedRatio[] | null = null;
+    if (typeof n.other.cell.v === "string") {
+      const prev = hint?.ratios && hint.sheetId === sheetId && hint.pos.col === pos.col && currentSheetNotice(store)?.id === hint.id ? hint.ratios : [];
+      // Top to bottom, however they were typed: the label names the column's first and last.
+      ratios = [...prev.filter((r) => r.pos.row !== pos.row && getCell(state.workbook, sheetId, r.pos.row, r.pos.col)?.v === r.typed), own].sort((a, b) => a.pos.row - b.pos.row);
+    }
+    const label = ratios && ratios.length > 1 ? ratiosLabel(ratios.map((r) => String(r.other.cell.v))) : n.action;
     const id = showSheetNotice(store, n.message, "info", {
       ms: Math.max(12_000, noticeDuration(n.message, "info")),
       action: {
-        label: n.action,
+        label,
         run: () => {
           hideSheetNotice(store, id);
           if (hint?.id === id) hint = null;
-          const cell = getCell(state.workbook, sheetId, pos.row, pos.col);
-          if (state.readOnly || !cell || cell.f !== undefined || cell.v !== typed) return;
-          store.apply(n.action, (wb) => setCells(wb, sheetId, [{ row: pos.row, col: pos.col, cell: otherReading(cell, before?.s?.fmt, n.other) }]));
+          if (state.readOnly) return;
+          const cells = (ratios ?? [own]).flatMap((r) => {
+            const cell = getCell(state.workbook, sheetId, r.pos.row, r.pos.col);
+            return cell && cell.f === undefined && cell.v === r.typed ? [{ row: r.pos.row, col: r.pos.col, cell: otherReading(cell, r.before, r.other) }] : [];
+          });
+          if (cells.length) store.apply(label, (wb) => setCells(wb, sheetId, cells));
         },
       },
     });
-    hint = { id, sheetId: state.sheetId, selection: state.selection, cell: { sheetId, pos, typed } };
+    hint = { id, sheetId, pos, typed, ratios };
   }
+
+  /** The button's label for several ratios kept as text, the one a single ratio's notice has ("Als Text „1:2“") with the first and the last of them: „1:1 … 1:16“ (two: „1:1, 1:2“). */
+  const ratiosLabel = (texts: string[]) => colonNotice(texts.length > 2 ? `${texts[0]} … ${texts[texts.length - 1]}` : texts.join(", "), "", false, locale).action;
 
   /** Back to the sheet and selection the edit started from (pointing at cells for a formula moves them). */
   function restoreEditView(e: NonNullable<EditState>) {
@@ -747,8 +921,8 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       if (unchanged || state.readOnly) restoreEditView(e);
       else {
         const pos = { row: e.row, col: e.col };
-        const current = getCell(state.workbook, e.sheetId, e.row, e.col);
-        const parsed = parseTyped(e.text, locale, current);
+        const { current, place } = typingAt(state, e.sheetId, pos);
+        const parsed = parseTyped(e.text, locale, current, place);
         if (parsed.error) {
           const at = Math.max(0, Math.min(e.text.length, parsed.error.at));
           state = { ...state, edit: { ...e, error: parsed.error, caret: at } };
@@ -762,7 +936,6 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       }
     }
     if (move) moveActive(move);
-    // (After the move, which is part of typing: the hint stays until the next edit or selection.)
     if (typed) offerOtherReading(typed.sheetId, typed.pos, typed.current, typed.parsed);
     emit();
     return true;
@@ -797,8 +970,8 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     input(at, text) {
       if (state.readOnly) return true;
       const sheetId = state.sheetId;
-      const current = getCell(state.workbook, sheetId, at.row, at.col);
-      const parsed = parseTyped(text, locale, current);
+      const { current, place } = typingAt(state, sheetId, at);
+      const parsed = parseTyped(text, locale, current, place);
       if (parsed.error) return false;
       writeParsed(sheetId, at, current, parsed);
       offerOtherReading(sheetId, at, current, parsed);
@@ -825,15 +998,9 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     },
 
     select(sel, opts) {
-      const before = hint;
       if (state.edit && !opts?.keepEdit && !commitEditInternal(null)) return;
       if (!opts?.keepEdit) tabStart = null;
-      // A "1.234" hint the commit just offered belongs to that typing, as with Enter: clicking
-      // another cell to finish typing keeps it (it goes with the next selection or edit after).
-      const fresh = hint !== before ? hint : null;
-      if (fresh) hint = null;
       setSelection(toSelection(sel));
-      if (fresh) hint = { ...fresh, sheetId: state.sheetId, selection: state.selection };
     },
 
     startEdit(opts) {
@@ -898,7 +1065,8 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
 
     setClip(clip) {
       if (clip === state.clip || (clip && state.clip && clip.sheetId === state.clip.sheetId && clip.cut === state.clip.cut && sameArea(clip.area, state.clip.area))) return;
-      state = { ...state, clip };
+      // Something copied or cut anew: a cut cancelled before is forgotten.
+      state = { ...state, clip, stoppedCut: clip ? null : state.stoppedCut };
       emit();
     },
 
@@ -925,13 +1093,17 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       const step = undoStack.pop();
       if (!step) return;
       tabStart = null;
+      // A step on a sheet whose two versions couldn't be combined since: mine is on its copy now.
+      if (step.conflict) return refuseConflict(undoStack, step, step.conflict, "undo");
       const now = state.workbook;
       // Someone else's changes since then stay: only what this step changed goes back.
       const back = takeBackSafely(step.after, step.before, now, step.sheetId);
       if ("refused" in back) return refuse(step, "undo", back.refused, back.sheetId);
       const wb = back.wb;
       redoStack.push({ ...step, before: wb, after: now, redoView: { sheetId: state.sheetId, selection: state.selection } });
+      state = { ...state, clip: clipAfter(state.clip, now, wb) };
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), { sheetId: step.sheetId, selection: step.selection });
+      if (back.kept) tellKept("undo", back.kept, wb, state.sheetId);
     },
 
     redo() {
@@ -942,23 +1114,34 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       const step = redoStack.pop();
       if (!step) return;
       tabStart = null;
+      if (step.conflict) return refuseConflict(redoStack, step, step.conflict, "redo");
       const now = state.workbook;
       const again = takeBackSafely(step.before, step.after, now, step.sheetId);
       if ("refused" in again) return refuse(step, "redo", again.refused, again.sheetId);
       const wb = again.wb;
       undoStack.push({ label: step.label, before: now, after: wb, sheetId: state.sheetId, selection: state.selection });
+      state = { ...state, clip: clipAfter(state.clip, now, wb) };
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(now, wb)), step.redoView ?? { sheetId: step.sheetId, selection: step.selection });
+      if (again.kept) tellKept("redo", again.kept, wb, state.sheetId);
     },
 
     isRowHidden(sheetId, row) {
       return rowHidden(state.workbook, state.calc, sheetId, row, locale);
     },
 
-    replaceRemote(wb, conflicts) {
+    replaceRemote(wb, report) {
       if (wb === state.workbook || !wb.sheets.length) return;
       // No undo step, and the undo history stays: undoing later takes back only what that step
       // changed and keeps the other person's changes, lined up through the sheets' logs where
-      // rows or columns moved (see undo()).
+      // rows or columns moved (see undo()). A sheet kept as theirs with my version on a copy is
+      // no longer the one my steps were made on: those steps can't be taken back there (and taken
+      // back on the copy, a step's cells could land on other rows: the copy has no history).
+      const conflicts = report?.filter(keptAsTheirs);
+      for (const c of conflicts ?? []) {
+        for (const stack of [undoStack, redoStack]) {
+          for (let i = 0; i < stack.length; i++) if (!stack[i].conflict && stepTouches(stack[i], c.sheetId)) stack[i] = { ...stack[i], conflict: { sheetId: c.sheetId, copyId: c.copyId } };
+        }
+      }
       const was = state.workbook;
       // Where the other person moved rows or columns, what points at cells here moves along
       // (else typing would land in another row than the one it was meant for).
@@ -998,7 +1181,17 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
           } else if (at.row !== e.row || at.col !== e.col) edit = { ...e, row: at.row, col: at.col };
         }
       }
-      let cutStopped = false;
+      // The same for the sheet on screen between two edits: what I type next goes on in my version,
+      // on its copy, where my selection's rows are. (Left on their version, it would land in their
+      // rows, over their values.)
+      const shownCopy = conflicts?.find((c) => c.sheetId === sheetId)?.copyId;
+      if (shownCopy) {
+        remembered.set(sheetId, selection);
+        sheetId = shownCopy;
+        selection = state.selection;
+        tabStart = null;
+      }
+      let { stoppedCut } = state;
       if (clip) {
         const c = clip;
         const ops = moved.get(c.sheetId);
@@ -1006,19 +1199,60 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
         const area = ops ? followArea(ops, c.sheetId, c.area) : ops === null ? null : c.area;
         if (c.cut) {
           // Pasting a cut moves the cells at its address: when others may be there now, it is
-          // cancelled (a sheet kept as theirs, rows that moved, or what happened can't be told).
+          // cancelled (a sheet kept as theirs, rows that moved, or what happened can't be told),
+          // and pasting it does nothing (grid/clipboard.ts): pasted as a copy, the cells would
+          // be there twice, with their values from before.
           if (copy !== undefined || ops === null || (ops && (!area || !sameArea(area, c.area) || pastedInto(ops, c.sheetId, c.area)))) {
             clip = null;
-            cutStopped = true;
+            stoppedCut = { sheetId: c.sheetId, area: c.area };
           }
         } else if (copy !== undefined) clip = copy ? { ...c, sheetId: copy } : null;
         else clip = area ? { ...c, area } : null;
       }
-      state = { ...state, sheetId, selection, edit, clip };
+      const cutStopped = stoppedCut !== state.stoppedCut;
+      // A sheet one of my steps deleted that comes back: someone wrote into it meanwhile, so merging
+      // kept it (src/sheet/collab.ts). Said (unless the merge's report says it already), or it would
+      // look as if the deletion hadn't worked.
+      const back = wb.sheets.find((s) => !sheetById(was, s.id) && !report?.some((c) => c.sheetId === s.id) && undoStack.some((step) => sheetById(step.before, s.id) && !sheetById(step.after, s.id)));
+      state = { ...state, sheetId, selection, edit, clip, stoppedCut };
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(was, wb)));
       const text = sheetCollabText[locale];
       if (lost !== null) showSheetNotice(store, text.editGone(shortText(lost)));
       else if (cutStopped) showSheetNotice(store, text.cutStopped);
+      else if (back) showSheetNotice(store, text.sheetBack(back.name));
+    },
+
+    repair(wb) {
+      const was = state.workbook;
+      if (wb === was || !wb.sheets.length) return;
+      // The steps share parts (one step's result is the next one's start, the newest result is the
+      // workbook on screen, sheets nobody changed are the same objects): each part is repaired
+      // once, into the very part the repaired workbook has where they are the same, so undo still
+      // sees that nothing else changed since a step (collab.ts takeBack). From the steps nearest to
+      // the workbook on screen on, by the side a step is taken back from (undo: its result, redo:
+      // its start), which the newer step shares: where that needed no repair, what was repaired
+      // came in after the step, so it and the older ones stay as they are (taking one back may
+      // bring such text back, and the next save repairs it the same way).
+      const memo = new WeakMap<object, unknown>();
+      repairedAs(memo, was, wb);
+      const start = storableWork();
+      for (const stack of [undoStack, redoStack]) {
+        const from = stack === undoStack ? "after" : "before";
+        for (let i = stack.length - 1; i >= 0; i--) {
+          const step = stack[i];
+          if (storable(step[from], memo) === step[from]) break;
+          // Each step's other side is gone through anew (each changed a sheet's cells): next to
+          // nothing on most spreadsheets, a tenth of a second on a huge one. Past REPAIR_WORK the
+          // older steps go instead of the page freezing for seconds: undo goes back less far, but
+          // never says that someone else changed something.
+          if (storableWork() - start > REPAIR_WORK) {
+            stack.splice(0, i + 1);
+            break;
+          }
+          stack[i] = { ...step, before: storable(step.before, memo), after: storable(step.after, memo) };
+        }
+      }
+      setDocument(wb, makeCalc(wb, state.calc, cellChanges(was, wb)));
     },
 
     reset(wb) {

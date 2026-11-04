@@ -44,9 +44,11 @@ export type ParseErrorCode =
   | "too-many-args"
   | "thousands"
   | "ambiguous-comma"
+  | "decimal-comma"
   | "too-deep";
 
-export type ParseError = { code: ParseErrorCode; at: number; end: number; text?: string; fn?: string; count?: number };
+/** `meant`: the formula to offer instead ("decimal-comma": =REST(10;3) for =REST(10,3)). */
+export type ParseError = { code: ParseErrorCode; at: number; end: number; text?: string; fn?: string; count?: number; meant?: string };
 
 export type Parsed = {
   ast: Node;
@@ -245,21 +247,14 @@ class Parser {
     }
     if (this.mode === "de") this.commaOrSemicolon(open, this.p - 1, def, args.length);
     if (def) {
-      if (args.length < def.min) this.warnings.push({ code: "too-few-args", at: t.start, end: t.end, fn: def.name, count: def.min });
+      if (args.length < def.min) this.warnings.push(this.decimalComma(open, this.p - 1, def, args.length) ?? { code: "too-few-args", at: t.start, end: t.end, fn: def.name, count: def.min });
       else if (args.length > def.max) this.warnings.push({ code: "too-many-args", at: t.start, end: t.end, fn: def.name, count: def.max });
     }
     return { t: "call", name: canonical ?? (t.upper ?? t.text.toUpperCase()), fn: def, args, at: t.start };
   }
 
-  /**
-   * German formulas take "," as the separator too (from English habits), and "," is also the decimal
-   * comma. When one argument list has both, the reading is a guess: =SVERWEIS(E2,B2:C6,2,0) would
-   * look up approximately with column 2,0, and =MITTELWERT(1,2,3) would average 1,2 and 3. German
-   * Excel refuses these; refuse them too, with the ";" version to take. Only this call's own list
-   * counts (not nested calls or { }), so =RUNDEN(A1,2) and =MAX(1,2) stay fine. `args` is how many
-   * arguments the list has as read now (2,0 one number).
-   */
-  commaOrSemicolon(open: number, close: number, def: FnDef | null, args: number): void {
+  /** The "," separators and the numbers with a decimal comma in this call's own list (not in nested calls or { }). */
+  ownCommas(open: number, close: number): { seps: Tok[]; nums: Tok[] } {
     const seps: Tok[] = [];
     const nums: Tok[] = [];
     let depth = 0;
@@ -272,12 +267,50 @@ class Parser {
         else if (k.k === "num" && k.text.includes(",")) nums.push(k);
       }
     }
+    return { seps, nums };
+  }
+
+  /**
+   * The formula with these commas each a ";", when the function takes the arguments that makes
+   * (`args` as read now, one more for each decimal comma); otherwise null.
+   */
+  semicolonsFor(seps: Tok[], nums: Tok[], def: FnDef | null, args: number): string | null {
+    const count = args + nums.reduce((n, k) => n + k.text.split(",").length - 1, 0);
+    if (!def || count < def.min || count > def.max) return null;
+    return `=${this.all.map((k) => (seps.includes(k) ? ";" : nums.includes(k) ? k.text.replace(/,/g, ";") : k.text)).join("")}`;
+  }
+
+  /**
+   * German formulas take "," as the separator too (from English habits), and "," is also the decimal
+   * comma. When one argument list has both, the reading is a guess: =SVERWEIS(E2,B2:C6,2,0) would
+   * look up approximately with column 2,0, and =MITTELWERT(1,2,3) would average 1,2 and 3. German
+   * Excel refuses these; refuse them too, with the ";" version to take. Only this call's own list
+   * counts (not nested calls or { }), so =RUNDEN(A1,2) and =MAX(1,2) stay fine. `args` is how many
+   * arguments the list has as read now (2,0 one number).
+   */
+  commaOrSemicolon(open: number, close: number, def: FnDef | null, args: number): void {
+    const { seps, nums } = this.ownCommas(open, close);
     if (!seps.length || !nums.length) return;
     // Every comma a ";" is the guess only when the function takes that many arguments: in
     // =WENN(A1>0,5,1,0) one of the commas is a decimal comma, and only the person knows which.
-    const count = args + nums.reduce((n, k) => n + k.text.split(",").length - 1, 0);
-    const meant = def && count >= def.min && count <= def.max ? this.all.map((k) => (seps.includes(k) ? ";" : nums.includes(k) ? k.text.replace(/,/g, ";") : k.text)).join("") : null;
-    this.fail("ambiguous-comma", nums[0], { text: meant === null ? undefined : `=${meant}`, fn: def?.name });
+    this.fail("ambiguous-comma", nums[0], { text: this.semicolonsFor(seps, nums, def, args) ?? undefined, fn: def?.name });
+  }
+
+  /**
+   * Too few arguments with a decimal comma in this call's own list, in German: =REST(10,3) is REST
+   * of the one number 10,3, and "REST braucht mindestens 2 Argumente" would contradict what the
+   * person sees. Both readings can be meant (=RUNDEN(2,5): round 2,5, the digits not typed yet), so
+   * the message names the number and what is missing, and offers the ";" version when the function
+   * takes that many arguments. A list that already separates with ";" gets no such offer: there the
+   * comma is the decimal one, and =SVERWEIS(2,5;J2:K6) as =SVERWEIS(2;5;J2:K6) would put the 5 where
+   * the table belongs. A number that starts with its comma (,5) is 0,5 and doesn't count.
+   */
+  decimalComma(open: number, close: number, def: FnDef, args: number): ParseError | null {
+    if (this.mode !== "de") return null;
+    const nums = this.ownCommas(open, close).nums.filter((k) => /[0-9],/.test(k.text));
+    if (!nums.length) return null;
+    const meant = args === 1 ? (this.semicolonsFor([], nums, def, args) ?? undefined) : undefined;
+    return { code: "decimal-comma", at: nums[0].start, end: nums[0].end, text: nums[0].text, fn: def.name, count: def.min - args, meant };
   }
 
   parseArray(): Node {

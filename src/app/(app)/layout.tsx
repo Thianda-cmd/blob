@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { BlobBoot } from "@/components/blob/BlobBoot";
 import { AppShell } from "@/components/shell/AppShell";
+import { SignedOutGate } from "@/components/shell/SignedOut";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceProvider";
 import { shellText } from "@/i18n/messages/shell";
 import { getMessages } from "@/i18n/server";
@@ -42,8 +43,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       initialSubjects={(subjectsRes.data ?? []) as Subject[]}
       initialPages={(pagesRes.data ?? []) as PageMeta[]}
     >
-      <AppShell isAdmin={admin}>{children}</AppShell>
-      <BlobBoot greeting={t.welcomeBack(name)} />
+      {/* Signed out without a connection, the signed-out screen takes the place of the whole app,
+          so nothing of the account keeps running behind it (SignedOut.tsx). */}
+      <SignedOutGate>
+        <AppShell isAdmin={admin}>{children}</AppShell>
+        <BlobBoot greeting={t.welcomeBack(name)} />
+      </SignedOutGate>
     </WorkspaceProvider>
   );
 }

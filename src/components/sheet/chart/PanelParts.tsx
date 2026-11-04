@@ -426,7 +426,7 @@ export function SeriesPicker({ label, series, value, onChange }: { label: string
 /** A short note in the panel (hints, why a trendline can't be drawn). */
 export function Note({ tone = "plain", icon, children }: { tone?: "plain" | "warn"; icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className={cn("flex gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug", tone === "warn" ? "bg-danger/8 text-danger" : "bg-hover/70 text-ink-2")}>
+    <div className={cn("flex gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug", tone === "warn" ? "bg-danger/8 text-danger-ink" : "bg-hover/70 text-ink-2")}>
       {icon && <span className="mt-px shrink-0 [&_svg]:size-3.5">{icon}</span>}
       <div className="min-w-0">{children}</div>
     </div>

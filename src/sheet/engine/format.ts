@@ -218,7 +218,14 @@ export function formatNumber(n: number, fmt: NumberFormat | undefined, locale: L
       if (n < 0 || n >= MAX_SERIAL + 1) return formatGeneral(n, locale);
       return fmt.style === "long" ? longDate(n, locale) : fmt.style === "iso" ? isoDate(n) : shortDate(n, locale);
     case "time":
-      if (n < 0) return formatGeneral(n, locale);
+      if (n < 0) {
+        // A duration below zero shows as one, like LibreOffice: Ende 06:00 before Start 22:00
+        // (overnight) is -16:00, not -0,666666667 read as hours. Under a second it is 00:00. A
+        // clock time below zero is no time of day: the number.
+        if (!isDuration(fmt)) return formatGeneral(n, locale);
+        const text = durationText(-n, fmt.seconds);
+        return /[1-9]/.test(text) ? `-${text}` : text;
+      }
       return isDuration(fmt) ? durationText(n, fmt.seconds) : clockTime(n, fmt.seconds);
     case "datetime": {
       if (n < 0 || n >= MAX_SERIAL + 1) return formatGeneral(n, locale);
@@ -244,7 +251,8 @@ type FmtTok =
   | { t: "pct" }
   | { t: "exp"; sign: "+" | "-"; digits: number }
   | { t: "text" }
-  | { t: "date"; code: string };
+  /** `width`: the digits at least of elapsed time ([hh]:mm shows 05:00, [h]:mm 5:00). */
+  | { t: "date"; code: string; width?: number };
 
 /** Split a format into sections at ";" (not inside quotes, brackets or after a backslash). */
 function splitSections(code: string): string[] {
@@ -365,7 +373,7 @@ function parseDateSection(code: string, locale: Locale): Section {
     if (ch === "[") {
       const j = code.indexOf("]", i + 1);
       const inner = code.slice(i + 1, j < 0 ? code.length : j).toLowerCase();
-      if (/^(h+|m+|s+)$/.test(inner)) tokens.push({ t: "date", code: `[${inner[0]}]` });
+      if (/^(h+|m+|s+)$/.test(inner)) tokens.push({ t: "date", code: `[${inner[0]}]`, width: inner.length });
       i = j < 0 ? code.length : j;
       continue;
     }
@@ -396,7 +404,8 @@ function parseDateSection(code: string, locale: Locale): Section {
       i = j - 1;
       continue;
     }
-    if ((ch === "." || ch === ",") && tokens.length && tokens[tokens.length - 1].t === "date" && /^s+$/.test((tokens[tokens.length - 1] as { code: string }).code) && code[i + 1] === "0") {
+    // Fractions of a second, also of elapsed ones ("[s].00").
+    if ((ch === "." || ch === ",") && tokens.length && tokens[tokens.length - 1].t === "date" && /^(s+|\[s\])$/.test((tokens[tokens.length - 1] as { code: string }).code) && code[i + 1] === "0") {
       let j = i + 1;
       while (j < code.length && code[j] === "0") j++;
       tokens.push({ t: "date", code: `frac${j - i - 1}` });
@@ -504,17 +513,29 @@ function renderDate(sec: Section, serial: number, locale: Locale): string | Cell
   const hasAmPm = sec.tokens.some((t) => t.t === "date" && (t.code === "ampm" || t.code === "ap"));
   const fracTok = sec.tokens.find((t) => t.t === "date" && t.code.startsWith("frac")) as { code: string } | undefined;
   const fracDigits = fracTok ? Number(fracTok.code.slice(4)) : 0;
-  // Round to the shown precision first (seconds, or their fraction).
-  const unit = 86400 * Math.pow(10, fracDigits);
-  const rounded = Math.round(serial * unit) / unit;
-  const day = Math.floor(rounded);
-  const secs = (rounded - day) * 86400;
-  const { y, m, d } = ymdFromSerial(day);
+  // Round to the shown precision once, in whole units (seconds, or their tenths to thousandths as
+  // in Excel), and take the day, the time and [h] [m] [s] from that one whole number. A rounded
+  // serial number is a fraction again: for a date with its time (46329,604…) its seconds came out
+  // a millionth too low, and 14:30 showed as 14:29. Whole units are exact, 31.12.9999 counted in
+  // thousandths of a second is far below 2^53. The minutes are then cut off, not rounded, like
+  // Excel: 14:29:40 shows 14:29 in "hh:mm".
+  const prec = Math.min(fracDigits, 3);
+  const per = 10 ** prec;
+  const total = Math.round(serial * (86400 * per));
+  const secs = Math.floor(total / per);
+  const sub = total - secs * per;
+  const day = Math.floor(secs / 86400);
+  const inDay = secs - day * 86400;
+  const h = Math.floor(inDay / 3600);
+  const mi = Math.floor((inDay % 3600) / 60);
+  const s = inDay % 60;
+  const { y, m, d: dayOfMonth } = ymdFromSerial(day);
+  // Days without a month or year ("T hh:mm", "TT:hh:mm") show a duration: Excel counts those days
+  // from 0.1.1900, so 1,5 days shows "1 12:00" and 2¼ days "2 Tage 06:00". Past 31 it goes on into
+  // February 1900 (its 29.02.1900 is 60), and from 61, 1.3.1900, its numbers are Blob's.
+  const duration = !sec.tokens.some((t) => t.t === "date" && /^(m+|y+)$/.test(t.code));
+  const d = duration && day < 61 ? (day <= 31 ? day : day - 31) : dayOfMonth;
   const wd = weekdayOf(day);
-  const h = Math.floor(secs / 3600 + 1e-9);
-  const mi = Math.floor((secs - h * 3600) / 60 + 1e-9);
-  const s = Math.floor(secs - h * 3600 - mi * 60 + 1e-9);
-  const sfrac = secs - Math.floor(secs + 1e-9);
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   let out = "";
   for (const t of sec.tokens) {
@@ -568,13 +589,13 @@ function renderDate(sec: Section, serial: number, locale: Locale): string | Cell
         out += pad(s);
         break;
       case "[h]":
-        out += Math.floor(rounded * 24 + 1e-9);
+        out += pad(Math.floor(secs / 3600), t.width ?? 1);
         break;
       case "[m]":
-        out += Math.floor(rounded * 1440 + 1e-9);
+        out += pad(Math.floor(secs / 60), t.width ?? 1);
         break;
       case "[s]":
-        out += Math.floor(rounded * 86400 + 1e-9);
+        out += pad(secs, t.width ?? 1);
         break;
       case "ampm":
         out += h < 12 ? "AM" : "PM";
@@ -583,7 +604,7 @@ function renderDate(sec: Section, serial: number, locale: Locale): string | Cell
         out += h < 12 ? "A" : "P";
         break;
       default:
-        if (t.code.startsWith("frac")) out += decSep(locale) + fixedParts(sfrac, fracDigits).frac;
+        if (t.code.startsWith("frac")) out += decSep(locale) + String(sub).padStart(prec, "0").padEnd(fracDigits, "0");
         else if (/^d{4,}$/.test(t.code)) out += WEEKDAYS[locale][wd];
         else if (/^m{4}$/.test(t.code) || /^m{6,}$/.test(t.code)) out += MONTHS[locale][m - 1];
         else if (/^y{3,}$/.test(t.code)) out += pad(y, 4);
