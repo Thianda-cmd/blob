@@ -14,7 +14,7 @@ import { chartViewport, selectChart, setChartUi, type ChartViewport } from "./se
 
 /** Gap between a new chart and its data when the usual empty column doesn't leave room for it (logical px). */
 const CLOSE_GAP = 16;
-/** A new chart that would show less than this share of its width beside its data goes below the data instead, if more of it shows there. */
+/** On a grid where less than this share of a new chart's width can show beside its data, it goes below the data instead, if more of it shows there. */
 const BESIDE_MIN = 0.5;
 
 /** The ranges a chart reads on its own sheet: values, x values, series names. */
@@ -89,11 +89,11 @@ function belowData(spec: ChartSpec, view: ChartViewport, data: Area, filled: (ro
  * wouldn't fit on screen that way (the settings that open with it take room too), it goes right
  * next to the data instead, a little gap away: on a laptop at 1440 px with the sidebar open chart
  * and data are then both in view, and on a narrower screen more of the chart shows. On a grid so
- * narrow that not even half of it would show beside the data (a phone), it goes below the data
- * when `below` says where the data is and which cells are taken: there it is as wide as the screen
- * allows, and scrolling down shows it. Settings opening beside the grid don't count for that: they
- * take its room only for a while, and the chart below the data would cover the rows where more
- * measurements go.
+ * narrow that not even half of it can show beside the data, even with the data at the grid's left
+ * edge (a phone), it goes below the data when `below` says where the data is and which cells are
+ * taken: there it is as wide as the screen allows, and scrolling down shows it. Not on a wider
+ * grid: data that merely sits far right is scrolled to, and settings opening beside the grid take
+ * its room only for a while; a chart below the data would cover the rows where more measurements go.
  */
 export function placeInView(
   spec: ChartSpec,
@@ -111,11 +111,16 @@ export function placeInView(
   const beside = nearer ? { ...spec, at: { ...spec.at, col: spec.at.col - 1, dx: CLOSE_GAP } } : spec;
   const x = nearer ? close : usual;
   if (x + width <= right) return beside;
-  // How much of the chart shows from `from` on, once settings beside the grid are closed again.
-  const shown = (from: number) => Math.max(0, Math.min(1, (view.right - Math.max(from, view.left)) / width));
-  if (below && shown(x) < BESIDE_MIN) {
-    const low = belowData(spec, view, below.data, below.filled);
-    if (low && shown(view.colX(low.at.col)) >= shown(x) + 0.25) return low;
+  if (below) {
+    // How much of the chart can show beside the data and below it, with the data at the grid's
+    // left edge and no settings beside the grid.
+    const room = view.right - view.left;
+    const besideShare = Math.max(0, Math.min(1, (room - (x - view.colX(below.data.c0))) / width));
+    const belowShare = Math.min(1, room / width);
+    if (besideShare < BESIDE_MIN && belowShare >= besideShare + 0.25) {
+      const low = belowData(spec, view, below.data, below.filled);
+      if (low) return low;
+    }
   }
   return beside;
 }

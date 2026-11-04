@@ -332,6 +332,9 @@ function ChartCard({
   const [preview, setPreview] = useState<Box | null>(null);
   // Held still by a finger until picked up: it lifts before it follows the finger.
   const [lifted, setLifted] = useState(false);
+  // Last pressed with a pen, which drags it at once: the browser mustn't take a pen's drag on it
+  // for scrolling, as it may (a finger's swipe still scrolls the sheet).
+  const [pen, setPen] = useState(false);
   const [saving, setSaving] = useState(false);
   const gesture = useRef<Gesture | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -595,6 +598,7 @@ function ChartCard({
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.stopPropagation();
     const finger = e.pointerType === "touch";
+    if (e.pointerType !== "mouse") setPen(!finger);
     // The grid may zoom with a CSS transform: screen px → content px.
     const zoom = Math.max(0.25, store.get().zoom / scale) || 1;
     const g: Gesture = { pointerId: e.pointerId, kind, startX: e.clientX, startY: e.clientY, base, moved: false, touch: e.pointerType !== "mouse", held: !finger || kind !== "move", picked: false, timer: null, zoom };
@@ -757,6 +761,7 @@ function ChartCard({
         width: box.w,
         height: box.h,
         cursor: selected && !readOnly ? (preview ? "grabbing" : "grab") : "pointer",
+        touchAction: selected && pen && !readOnly ? "none" : undefined,
       }}
       onPointerDown={(e) => begin(e, "move")}
       onPointerMove={move}

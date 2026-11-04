@@ -911,7 +911,7 @@ if (engineReady) {
     const widths = [170, 100, 100, 100, 100, 100, 100, 100, 100, 100];
     const colX = (c: number) => widths.slice(0, c).reduce((a, b) => a + b, 0);
     const rowY = (r: number) => r * 26;
-    const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, top: 0, bottom: 520, colX, rowY, zoom: 1, sidePanel: 0, ...extra });
+    const view = (right: number, extra: Partial<ChartViewport> = {}): ChartViewport => ({ left: 0, right, colX, rowY, zoom: 1, sidePanel: 0, ...extra });
     eq("room for the gap column", placeInView(sc, view(1200)).at, sc.at);
     eq("no room: beside the data", placeInView(sc, view(782)).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("settings about to open beside the grid", placeInView(sc, view(1134, { sidePanel: 352 })).at, { row: 0, col: 2, dx: 16, dy: 0 });
@@ -928,6 +928,10 @@ if (engineReady) {
     // (a tablet held upright, a laptop with the settings open) it stays beside it.
     const block = chartDataBlock(wbc, sc);
     eq("data block of a chart: the filled cells around its ranges", block, { r0: 0, c0: 0, r1: 6, c1: 7 });
+    // x values in one block, a series in another (empty columns between): both blocks count.
+    const apart = workbook([["x", "y", null, null, "z", "w"], [1, 2, null, null, 3, 4], [2, 3, null, null, 4, 5], [null, null, null, null, null, null, null, "note"]]);
+    const twoBlocks = chartDataBlock(apart, chart("scatter", ref(1, 0, 2, 0), [series("y", ref(1, 1, 2, 1)), series("z", ref(1, 4, 2, 4), { nameRef: ref(0, 4, 0, 4) })]));
+    eq("data block over two blocks of cells: both", twoBlocks, { r0: 0, c0: 0, r1: 2, c1: 5 });
     const data = { r0: 0, c0: 0, r1: 6, c1: 1 };
     const empty = () => false;
     const below = (filled: (r: number, c: number) => boolean = empty) => ({ data, filled });
@@ -938,6 +942,13 @@ if (engineReady) {
     eq("phone at 150 %: below the data", placeInView(sc, view(350, { colX: (c) => colX(c) * 1.5, rowY: (r) => rowY(r) * 1.5, zoom: 1.5 }), undefined, below()).at, { row: 8, col: 0, dx: 0, dy: 0 });
     eq("tablet: beside the data", placeInView(sc, view(740), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("laptop with the settings beside the grid: beside the data", placeInView(sc, view(622), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    // 1180 px with the sidebar (840 px of cells): the settings opening beside the grid would leave
+    // under half of the chart in view, but only until they close. It stays beside the data, not
+    // over the rows where more measurements go.
+    eq("laptop, 1180 px: settings about to open don't put it below the data", placeInView(sc, view(840, { sidePanel: 352 }), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
+    // Data near the right edge of a wide grid (the 1440 px laptop, data in H:I): the grid scrolls
+    // to the chart beside it; below is only for grids too narrow for data and chart side by side.
+    eq("data far right on a wide grid: beside it", placeInView(sc, view(1000, { sidePanel: 352, colX: (c) => colX(c) + 600 }), undefined, below()).at, { row: 0, col: 2, dx: 16, dy: 0 });
     eq("room for the gap column: as made, also with below", placeInView(sc, view(1200), undefined, below()).at, sc.at);
     const wide = (r: number, c: number) => r >= 8 && r <= 20 && c === 4;
     eq("phone: the chart's width counts (a filled cell under its right part)", placeInView(sc, view(350), undefined, below(wide)).at, { row: 22, col: 0, dx: 0, dy: 0 });
@@ -1238,6 +1249,12 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   eq("bar below a chart, past the bottom: up into view", barShift(bar(100, 770, 200), r(40, 460, 520, 760), phone), { x: 0, y: -62 });
   eq("bar of a chart below the screen: stays", barShift(bar(100, 770, 200), r(40, 820, 520, 1120), phone), { x: 0, y: 0 });
   eq("bar in place: no shift", barShift(bar(100, 252, 200), r(40, 300, 520, 600), phone), { x: 0, y: 0 });
+  // The chart's settings are open (the student watches the chart change): the bar doesn't come
+  // up or down over it; the settings have its buttons. Sideways it still moves into view.
+  eq("settings open: the bar below the chart stays off it", barShift(bar(100, 770, 200), r(40, 460, 520, 760), phone, false), { x: 0, y: 0 });
+  eq("settings open: the bar above a chart scrolled up stays off it", barShift(bar(100, 166, 200), r(40, 214, 520, 514), phone, false), { x: 0, y: 0 });
+  eq("settings open: up into view while it stays under the chart", barShift(bar(100, 710, 200), r(40, 400, 520, 700), phone, false), { x: 0, y: -2 });
+  eq("settings open: a wide chart's bar still comes in sideways", barShift(bar(115, 252), r(40, 300, 520, 600), phone, false), { x: -63, y: 0 });
 
   // Less motion: the grid jumps instead of gliding.
   const real = (globalThis as { window?: unknown }).window;
@@ -1256,6 +1273,14 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   eq("axes in English", [en.axisCategories(false), en.axisValues(true)], ["Horizontal axis (categories)", "Vertical axis (values)"]);
   check("no Excel jargon", !/Rubrik|Größenachse/.test(JSON.stringify(de)) && !JSON.stringify(de.sections).includes("Fehlerindikator"));
   check("intercept: switch and field named apart", de.interceptValue !== de.setIntercept && en.interceptValue !== en.setIntercept, [de.interceptValue, en.interceptValue]);
+  // The result's unit typed into "Probe berechnen": what goes there instead, without brackets in
+  // brackets when the axis title has a unit of its own.
+  const xUnit = [de.probeXUnit("mg/L", "Fluoreszenz (RFU)"), en.probeXUnit("mg/L", "Fluorescence (RFU)")];
+  eq("unit of the result typed: what goes there", xUnit, [
+    "mg/L ist die Einheit des Ergebnisses. Gib hier deinen Messwert für Fluoreszenz (RFU) als Zahl ein.",
+    "mg/L is the unit of the result. Enter your measured value for Fluorescence (RFU) here, as a number.",
+  ]);
+  check("unit of the result typed: no brackets in brackets", xUnit.every((s) => !/\([^)]*\(/.test(s)), xUnit);
 }
 
 const failed = problems.length;

@@ -670,9 +670,11 @@ function AxisFields({ title, axis, numeric, locale, t, onChange }: { title: stri
           </div>
           <Toggle label={t.logScale} checked={axis.log} onChange={(log) => onChange({ ...axis, log })} />
           <Field label={t.decimals}>
+            {/* The single digits get a finger's width on touch screens. */}
             <Segmented
               size="sm"
               label={`${title}: ${t.decimals}`}
+              className="[@media(hover:none)]:[&>button]:min-w-9"
               value={decimals}
               options={["auto", "0", "1", "2", "3", "4"].map((v) => ({ value: v, label: v === "auto" ? t.auto : v }))}
               onChange={(v) => onChange({ ...axis, decimals: v === "auto" ? null : Number(v) })}

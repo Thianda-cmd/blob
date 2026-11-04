@@ -154,7 +154,7 @@ export const sheetChartText = defineMessages({
     /** What was typed can't be read as a number. */
     probeNotNumber: "Type the measured value as a number, e.g. 0.42.",
     /** A number with the unit of the result (the x axis) was typed: it goes the other way round. */
-    probeXUnit: (unit: string, measured: string) => `${unit} is the unit of the result. Type what you measured here (${measured}), as a number.`,
+    probeXUnit: (unit: string, measured: string) => `${unit} is the unit of the result. Enter your measured value for ${measured} here, as a number.`,
     probeAbove: (hi: string) => `Above the highest standard (${hi}): the trendline isn't backed by measurements there. Dilute the sample and measure it again.`,
     probeBelow: (lo: string) => `Below the lowest standard (${lo}). Measure a more concentrated sample (dilute it less or use more of it), or report it as “< ${lo}”.`,
     probeNegative: "Below the blank: nothing can be detected in the sample this way. Measure a more concentrated sample (dilute it less or use more of it).",
@@ -363,7 +363,7 @@ export const sheetChartText = defineMessages({
     measured: "Gemessen",
     probeNone: "Für diesen Wert gibt es auf der Trendlinie kein Ergebnis.",
     probeNotNumber: "Gib den Messwert als Zahl ein, z. B. 0,42.",
-    probeXUnit: (unit, measured) => `${unit} ist die Einheit des Ergebnisses. Gib hier ein, was du gemessen hast (${measured}), als Zahl.`,
+    probeXUnit: (unit, measured) => `${unit} ist die Einheit des Ergebnisses. Gib hier deinen Messwert für ${measured} als Zahl ein.`,
     probeAbove: (hi) => `Über dem höchsten Standard (${hi}): Dort ist die Trendlinie nicht durch Messungen gestützt. Verdünne die Probe und miss sie neu.`,
     probeBelow: (lo) => `Unter dem kleinsten Standard (${lo}). Miss die Probe konzentrierter (weniger verdünnen oder mehr Probe einsetzen) oder gib sie als „< ${lo}“ an.`,
     probeNegative: "Unter dem Blindwert: In der Probe ist so nichts nachweisbar. Miss sie konzentrierter (weniger verdünnen oder mehr Probe einsetzen).",
