@@ -18,10 +18,11 @@
 // - Data safety: a save whose answer was lost (it landed, or it didn't) and a partner's correction
 //   afterwards, through the open editor, a reopened one and the background save; two editors (tabs)
 //   offline at once, an open editor's draft left alone (here and, through Web Locks, in another
-//   tab), one taker at a time; what signing out counts, flushes and stops; a pull that misses a
-//   save announced meanwhile; the longest waits for a save and a draft while typing goes on; a
-//   rename made elsewhere; the size limit as save_sheet measures it, the warning near it and the
-//   import check; and the notice when rows were moved on both sides at once.
+//   tab), one taker at a time; what signing out counts, flushes and stops (in other tabs too); a
+//   pull that misses a save announced meanwhile; the longest waits for a save and a draft while
+//   typing goes on (longer for big spreadsheets); a rename made elsewhere; the size limit as
+//   save_sheet measures it, the warning near it and the import check; the notice when rows were
+//   moved on both sides at once; and a change that couldn't be saved, undone.
 // Problems make the script exit with 1.
 
 import {
@@ -1696,6 +1697,25 @@ async function savingTests() {
     stuck.kill();
     for (const d of localDrafts("wait", slowPage)) clearDraft("wait", slowPage, d.writer);
   }
+  // …stretched for a big spreadsheet (about 2.5 MB here: two and a half times as long), where each
+  // save and draft takes a moment of its own: none during 6 s of steady typing, a save once it stops.
+  {
+    const server = new FakeServer(newWorkbook("de"));
+    const bigPage = page();
+    const e = openEditor(server, bigPage, { userId: "wait" });
+    e.store.apply("big", (wb) => setCells(wb, e.sheetId, Array.from({ length: 80 }, (_, i) => ({ row: 100 + i, col: 0, cell: { v: "y".repeat(31_000) } }))));
+    await e.saver.flush();
+    const saves = server.saves;
+    for (let i = 0; i < 15; i++) {
+      e.type(i, 1, String(i));
+      await sleep(400);
+    }
+    const during = { saves: server.saves - saves, drafts: localDrafts("wait", bigPage).length };
+    for (let t = 0; t < 30 && server.saves === saves; t++) await sleep(100);
+    check("max wait, big spreadsheet: no save or draft during 6 s of steady typing", e.log.sizes.at(-1)! > 2_400_000 && during.saves === 0 && during.drafts === 0, { size: e.log.sizes.at(-1), ...during });
+    check("max wait, big spreadsheet: saved once the typing stops", server.saves === saves + 1 && server.cell("14,1")?.v === 14 && !e.saver.dirty(), server.saves - saves);
+    await e.close();
+  }
 
   // 13. DS-13: renamed elsewhere (a rename alone leaves the revision as it is): the open editor's
   //     next save keeps that title and shows it; a rename here still wins.
@@ -1739,10 +1759,15 @@ async function savingTests() {
     await e.saver.flush();
     check("size: exactly 5,000,000 bytes is saved (the server measures the same)", server.rev === 1 && e.saver.state === "saved" && e.log.sizes.at(-1) === MAX_BYTES, e.log.sizes.at(-1));
     check("size: close to the limit, the editor says so", e.log.notices.at(-1) === "large" && MAX_BYTES > LARGE_BYTES);
+    const saved = e.store.get().workbook;
     const calls = server.calls;
     e.store.apply("pad", () => padded(k, "y".repeat(r + 1)));
     await e.saver.flush();
     check("size: one byte more is refused before sending", server.calls === calls && e.saver.state === "tooBig" && e.log.sizes.at(-1) === MAX_BYTES + 1, e.log.sizes.at(-1));
+    // Back to what is saved (undone): nothing too big is left, so "Gespeichert" and the warning
+    // near the limit again, with the saved size.
+    e.store.undo();
+    check("size: too big, undone: saved again, the warning with the saved size", !e.saver.dirty() && e.store.get().workbook === saved && e.saver.state === "saved" && e.log.notices.at(-1) === "large" && e.log.sizes.at(-1) === MAX_BYTES && server.calls === calls, { state: e.saver.state, notice: e.log.notices.at(-1), size: e.log.sizes.at(-1) });
     // Characters beyond ASCII count the bytes they take: "µ" is two.
     e.store.apply("pad", () => padded(k, "µ".repeat(Math.ceil(r / 2) + 1)));
     await e.saver.flush();
@@ -1791,6 +1816,111 @@ async function savingTests() {
     const kept = await readDrafts("new-account", "p-new");
     check("sign-in: this account's draft still readable", kept.length === 1 && kept[0].writer === "w2");
     clearDraft("new-account", "p-new", "w2");
+  }
+
+  // 17. A change that couldn't be saved (a server error, too big, no network) undone back to what is
+  //     saved: nothing is left to save, so the problem is over: "Gespeichert", no more tries, and the
+  //     draft goes. Not when access is gone, nor while a save that got no answer may have landed
+  //     (that is found out first).
+  {
+    const quiet = console.error;
+    console.error = () => {};
+    const user = "undone";
+    // A server error: tried again after 4 s.
+    const errId = page();
+    const errServer = new FakeServer(newWorkbook("de"));
+    const err = openEditor(errServer, errId, { userId: user });
+    errServer.mode = "error";
+    err.type(0, 0, "x");
+    await err.saver.flush();
+    // Too big.
+    const bigId = page();
+    const bigServer = new FakeServer(newWorkbook("de"));
+    const big = openEditor(bigServer, bigId, { userId: user });
+    big.store.apply("big", (wb) => setCells(wb, big.sheetId, Array.from({ length: 170 }, (_, i) => ({ row: i, col: 0, cell: { v: "x".repeat(32000) } }))));
+    await big.saver.flush();
+    // No network at all: the save never left.
+    const offId = page();
+    const offServer = new FakeServer(newWorkbook("de"));
+    const off = openEditor(offServer, offId, { userId: user });
+    Object.defineProperty(globalThis.navigator, "onLine", { value: false, configurable: true });
+    off.type(0, 0, "x");
+    await off.saver.flush();
+    Reflect.deleteProperty(globalThis.navigator, "onLine");
+    // No access any more.
+    const deniedServer = new FakeServer(newWorkbook("de"));
+    const denied = openEditor(deniedServer, page(), { userId: user });
+    deniedServer.mode = "denied";
+    denied.type(0, 0, "x");
+    await denied.saver.flush();
+    const before = [err.saver.state, big.saver.state, off.saver.state, denied.saver.state].join();
+    const drafted = [errId, bigId, offId].every((id) => localDrafts(user, id).length === 1);
+    for (const e of [err, big, off, denied]) e.store.undo();
+    errServer.mode = "ok";
+    const errCalls = errServer.calls;
+    await sleep(4500);
+    check("undone: (first the problem states, each with a draft)", before === "failed,tooBig,device,refused" && drafted, before);
+    check("undone after a server error: 'Gespeichert', no more tries", err.saver.state === "saved" && errServer.calls === errCalls && !err.saver.dirty(), { state: err.saver.state, calls: errServer.calls - errCalls });
+    check("undone when too big: 'Gespeichert', the notice gone, nothing sent", big.saver.state === "saved" && big.log.notices.at(-1) === null && bigServer.calls === 0, { state: big.saver.state, notice: big.log.notices.at(-1) });
+    check("undone without a network: 'Gespeichert'", off.saver.state === "saved" && offServer.calls === 0, off.saver.state);
+    check("undone: their drafts go too", [errId, bigId, offId].every((id) => localDrafts(user, id).length === 0), [errId, bigId, offId].map((id) => localDrafts(user, id).length));
+    check("undone with no access: still 'Nicht gespeichert'", denied.saver.state === "refused", denied.saver.state);
+    for (const e of [err, big, off, denied]) await e.close();
+    // A save whose answer was lost, then undone: it may have landed, so that is found out first. It
+    // had: the undo is saved on top of it.
+    const lostServer = new FakeServer(newWorkbook("de"));
+    const lost = openEditor(lostServer, page(), { userId: user });
+    lostServer.mode = "lost";
+    lost.type(0, 0, "zurückgenommen");
+    await lost.saver.flush();
+    lost.store.undo();
+    const unsure = lost.saver.state;
+    reportOk();
+    await lost.saver.flush();
+    console.error = quiet;
+    check("undone after a lost answer: not 'Gespeichert' before it is known whether that save landed", unsure === "device", unsure);
+    check("undone after a lost answer: it had landed, so the undo is saved on top", lostServer.rev === 2 && lostServer.cell("0,0") === undefined && lost.saver.state === "saved" && !lost.saver.dirty(), { rev: lostServer.rev, cell: lostServer.cell("0,0") });
+    await lost.close();
+    for (const id of [errId, bigId, offId]) for (const d of localDrafts(user, id)) clearDraft(user, id, d.writer);
+  }
+
+  // 18. Signed out in another tab (forgetDevice there): the editors open here stop too, since they
+  //     would save into a session that is gone and write their drafts again after the device was
+  //     wiped; the bar doesn't say "Gespeichert" for what was typed.
+  {
+    const user = "elsewhere";
+    const server = new FakeServer(newWorkbook("de"));
+    const id = page();
+    const e = openEditor(server, id, { userId: user });
+    e.type(0, 0, "getippt");
+    // What the other tab's discardOpenSheets() sends (on the channel drafts.ts listens on).
+    const otherTab = new BroadcastChannel("blob-sheet-sign-out");
+    otherTab.postMessage("discard");
+    otherTab.close();
+    await sleep(20);
+    check("signed out in another tab: the editor here stopped, 'Nicht gespeichert'", e.saver.state === "refused", e.log.states);
+    e.type(1, 0, "danach");
+    await sleep(2200);
+    await e.saver.flush();
+    await e.close();
+    check("signed out in another tab: nothing sent or kept here afterwards", server.calls === 0 && localDrafts(user, id).length === 0, { calls: server.calls, drafts: localDrafts(user, id).length });
+    // An editor opened afterwards listens again.
+    const later = openEditor(server, page(), { userId: user });
+    later.type(0, 0, "neu");
+    const again = new BroadcastChannel("blob-sheet-sign-out");
+    again.postMessage("discard");
+    again.close();
+    await sleep(20);
+    check("signed out in another tab: an editor opened later hears it too", later.saver.state === "refused", later.log.states);
+    await later.close();
+    // …and signing out here (forgetDevice) tells the other tabs.
+    const heard: unknown[] = [];
+    const otherTabs = new BroadcastChannel("blob-sheet-sign-out");
+    otherTabs.onmessage = (m) => heard.push(m.data);
+    discardOpenSheets();
+    await sleep(20);
+    otherTabs.close();
+    check("signing out here tells the other tabs", heard.length === 1, heard);
   }
 }
 

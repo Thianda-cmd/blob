@@ -24,9 +24,9 @@ export function SaveIndicator({ state }: { state: SaveState }) {
   }[state];
   const problem = PROBLEM.has(state);
   // Phones show a problem in fewer words where it is long, so the page's buttons beside it stay on
-  // screen (the icon tells "trying again" from "can't save"; the full words are in the tooltip and
-  // for screen readers).
-  const short = state === "failed" ? t.notSaved : label;
+  // screen (the icon tells "trying again" from "can't save", the editor says below the bar what to
+  // do; the full words are in the tooltip and for screen readers).
+  const short = state === "failed" ? t.notSaved : state === "tooBig" ? t.tooBigShort : label;
   return (
     <div className="flex h-7 items-center gap-1.5 px-1.5 text-[12px] text-ink-3" aria-live="polite" title={label}>
       <AnimatePresence mode="wait" initial={false}>

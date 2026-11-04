@@ -26,6 +26,8 @@ export const pageText = defineMessages({
     notSavedRetrying: "Not saved, retrying",
     notSaved: "Not saved",
     tooBigToSave: "Too big to save",
+    // Phones, where the bar has little room (what to do is said below it).
+    tooBigShort: "Too big",
     cantReach: "I can't reach the server. I'll keep trying.",
     backOnline: "Back online. Everything is saved!",
     // Trashed page
@@ -56,6 +58,7 @@ export const pageText = defineMessages({
     notSavedRetrying: "Nicht gespeichert, versuche erneut",
     notSaved: "Nicht gespeichert",
     tooBigToSave: "Zu groß zum Speichern",
+    tooBigShort: "Zu groß",
     cantReach: "Ich erreiche den Server gerade nicht. Ich versuche es weiter.",
     backOnline: "Wieder online. Alles ist gespeichert!",
     trash: "Papierkorb",

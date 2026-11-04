@@ -3,9 +3,13 @@
 // insert, delete, sort and cut and paste is written into the sheet's log; a partner's edit made at
 // the same time lands on the row it was made on, whoever saves second; both sides moving rows of
 // the same sheet gives a copy of mine instead of a guess (with a report); history that can't be
-// told (old content, a capped log) never lines up by guessing; normalizeWorkbook keeps and checks
-// the log; undo and redo of every kind of step keep a partner's later edits; a template picked
-// can't be undone into an empty sheet; a duplicated sheet's tables get names that aren't cells.
+// told (old content, a capped log) never lines up by guessing; cuts into or out of a sheet only
+// one side has (a new one) line up without a copy, a cut into a sheet the other side deleted gives
+// one; a copy never pushes a sheet out of a full workbook; normalizeWorkbook keeps and checks the
+// log; undo and redo of every kind of step keep a partner's later edits, and a refused one says
+// why; the selection, the cell being typed into and what was cut follow a partner's change of
+// rows as it arrives; a template picked can't be undone into an empty sheet; a duplicated sheet's
+// tables get names that aren't cells.
 //
 //   npm run check:sheet-merge
 //
@@ -895,6 +899,14 @@ run("undo: a cut into a new sheet, with the partner's correction in between", ()
   eq("back on Blatt 1, with the correction", [column(store.get().workbook, "B", 2, 9), column(store.get().workbook, "B", 2, 9, added).every((v) => v === null)], [[0.1, 0.2, 0.3, 0.4, 0.5, 0.66, 0.7, 0.8], true]);
   store.undo();
   eq("and the new sheet gone again", names(store.get().workbook), ["Blatt 1"]);
+  // Taken back in one go: the new sheet, the cut into it, a row inserted and a sort there.
+  const b0 = mk(lab());
+  const added2 = O.addSheet(b0, "de", "Rohdaten");
+  let mine = CUT(added2.wb, P_ROWS, { row: 1, col: 0 }, added2.sheetId);
+  mine = O.insertRows(mine, added2.sheetId, 3, 1);
+  mine = O.sortArea(mine, calc0(mine), added2.sheetId, { r0: 1, c0: 0, r1: 9, c1: 1 }, [{ col: 1, dir: "desc" }], "de");
+  const back = takeBack(mine, b0, mergeWorkbooks(b0, mine, set(set(b0, "B7", 0.66), "B3", 0.22)));
+  eq("all in one go: the new sheet gone, their corrections back on Blatt 1", "wb" in back ? [names(back.wb), column(back.wb, "B", 2, 9)] : back, [["Blatt 1"], [0.1, 0.22, 0.3, 0.4, 0.5, 0.66, 0.7, 0.8]]);
 });
 
 // ==============================================================================================
@@ -986,6 +998,25 @@ run("live: copied cells are followed, a cut whose cells moved is cancelled", () 
   over.replaceRemote(CUT(b0, { r0: 5, c0: 0, r1: 6, c1: 1 }, { row: 1, col: 0 }));
   eq("cut, other cells pasted over it: cancelled", over.get().clip, null);
   hideSheetNotice(over);
+  // A sheet kept as theirs in a merge (both moved its rows): a cut there is cancelled, copied
+  // cells go with my version (the copy); without the report it can't be told, so a cut is cancelled.
+  const mine = O.insertRows(b0, "s1", 2, 1);
+  const { m, report } = reported(b0, mine, O.deleteRows(b0, "s1", 1, 1));
+  const area2 = { r0: 4, c0: 0, r1: 6, c1: 1 };
+  const cutThere = storeOf(mine);
+  cutThere.setClip({ sheetId: "s1", area: area2, cut: true });
+  cutThere.replaceRemote(m, report.conflicts);
+  eq("a cut on a sheet kept as theirs: cancelled", cutThere.get().clip, null);
+  hideSheetNotice(cutThere);
+  const copiedThere = storeOf(mine);
+  copiedThere.setClip({ sheetId: "s1", area: area2, cut: false });
+  copiedThere.replaceRemote(m, report.conflicts);
+  eq("copied cells there: with my version", [copiedThere.get().clip?.sheetId, copiedThere.get().clip?.area], [report.conflicts[0]?.copyId, area2]);
+  const unsure = storeOf(mine);
+  unsure.setClip({ sheetId: "s1", area: area2, cut: true });
+  unsure.replaceRemote(m);
+  eq("a cut where what happened can't be told: cancelled", unsure.get().clip, null);
+  hideSheetNotice(unsure);
 });
 
 run("live: both moved rows of a sheet, my edit goes on in my copy", () => {

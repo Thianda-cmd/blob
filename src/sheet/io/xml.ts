@@ -13,7 +13,13 @@ import { lookup } from "./lookup";
 
 export { lookup };
 
-export type XmlEl = { name: string; local: string; attrs: Record<string, string>; kids: XmlNode[] };
+/**
+ * An element: its name ("r:id" keeps the prefix) and the name without it, its attributes (read
+ * them with attr()) and its children. Attributes are a list of name, value, name, value…: far
+ * smaller than an object for each of a sheet's millions of elements, and no name from a file
+ * ("constructor", "__proto__") can mean anything else.
+ */
+export type XmlEl = { name: string; local: string; attrs: readonly string[]; kids: XmlNode[] };
 export type XmlNode = XmlEl | string;
 
 const NAMED: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
@@ -53,12 +59,11 @@ export class XmlError extends Error {
 
 /**
  * How many more elements and attributes one file may have, shared by all its parts (each costs
- * about the same memory). A sheet of 600,000 cells stays below the default, far more than a
- * spreadsheet page can save (5 MB, a few hundred thousand cells), and reading a file at the
- * limit takes a few hundred megabytes.
+ * about the same memory). A sheet of half a million cells stays below the default, twice what a
+ * spreadsheet page can save (5 MB), and reading a file up to the limit takes 400 MB at most.
  */
 export type XmlBudget = { nodes: number };
-export const MAX_XML_NODES = 4_000_000;
+export const MAX_XML_NODES = 3_000_000;
 export const xmlBudget = (nodes = MAX_XML_NODES): XmlBudget => ({ nodes });
 
 /** Space, tab, line feed, carriage return. */
@@ -70,7 +75,7 @@ const nameEnd = (c: number) => space(c) || c === 47 || c === 62;
  * What elements without attributes or children share (never changed after reading), so big parts
  * stay small: a sheet is millions of "<c>" with one "<v>" in each.
  */
-const NO_ATTRS: Record<string, string> = Object.freeze(Object.create(null) as Record<string, string>);
+const NO_ATTRS: readonly string[] = Object.freeze([]);
 const NO_KIDS: XmlNode[] = Object.freeze([] as XmlNode[]) as XmlNode[];
 
 /** A child added to an element (its own list made on the first one, exactly as long as needed). */
@@ -90,8 +95,12 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
   // How many elements of each name are open: an end tag of one that isn't is skipped at once
   // (looking for it through the whole stack each time made such files take minutes).
   const open = new Map<string, number>();
-  // One string per tag name and its local name (a sheet repeats "c", "v" and "row" millions of times).
+  // One string per tag name and its local name (a sheet repeats "c", "v" and "row" millions of
+  // times), and per attribute name.
   const names = new Map<string, { name: string; local: string }>();
+  const attrNames = new Map<string, string>();
+  // The attributes of the tag being read.
+  const found: string[] = [];
   let i = 0;
   const n = src.length;
   while (i < n) {
@@ -165,7 +174,7 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
       if (names.size < 10_000) names.set(raw, tag);
     }
     const { name, local } = tag;
-    let attrs = NO_ATTRS;
+    found.length = 0;
     let selfClosing = false;
     for (;;) {
       while (j < n && space(src.charCodeAt(j))) j++;
@@ -182,11 +191,11 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
       }
       const a0 = j;
       while (j < n && !nameEnd(src.charCodeAt(j)) && src.charCodeAt(j) !== 61 /* = */) j++;
-      const attr = src.slice(a0, j);
+      const rawName = src.slice(a0, j);
       while (j < n && space(src.charCodeAt(j))) j++;
       if (src.charCodeAt(j) !== 61) {
         // An attribute without a value (not XML, but harmless): skip it.
-        if (!attr) j++;
+        if (!rawName) j++;
         continue;
       }
       j++;
@@ -197,12 +206,16 @@ export function parseXml(src: string, budget: XmlBudget = xmlBudget()): XmlEl {
       if (close < 0) throw new XmlError("xml: unclosed attribute");
       const value = src.slice(j + 1, close);
       if (--budget.nodes < 0) throw new XmlError("xml: too many attributes", true);
-      // Without a prototype, a file's attribute named "constructor" or "__proto__" is just a name.
-      if (attrs === NO_ATTRS) attrs = Object.create(null) as Record<string, string>;
-      attrs[attr] = decodeEntities(/[\t\n\r]/.test(value) ? value.replace(/[\t\n\r]/g, " ") : value);
+      let attrName = attrNames.get(rawName);
+      if (attrName === undefined) {
+        attrName = rawName;
+        if (attrNames.size < 10_000) attrNames.set(rawName, rawName);
+      }
+      found.push(attrName, decodeEntities(/[\t\n\r]/.test(value) ? value.replace(/[\t\n\r]/g, " ") : value));
       j = close + 1;
     }
-    const el: XmlEl = { name, local, attrs, kids: NO_KIDS };
+    // A copy exactly as long as needed (an array grown by push keeps room for more).
+    const el: XmlEl = { name, local, attrs: found.length ? found.slice() : NO_ATTRS, kids: NO_KIDS };
     addKid(stack[stack.length - 1], el);
     if (!selfClosing) {
       stack.push(el);
@@ -254,10 +267,10 @@ export function textOf(el: XmlEl | null | undefined): string {
 /** An attribute by its name, or by its local name when the prefix differs ("r:id", "relationships:id"). */
 export function attr(el: XmlEl | null | undefined, name: string): string | undefined {
   if (!el) return undefined;
-  const direct = el.attrs[name];
-  if (direct !== undefined) return direct;
+  const a = el.attrs;
+  for (let i = 0; i < a.length; i += 2) if (a[i] === name) return a[i + 1];
   const want = localName(name);
-  for (const [k, v] of Object.entries(el.attrs)) if (localName(k) === want && (k.includes(":") || !name.includes(":"))) return v;
+  for (let i = 0; i < a.length; i += 2) if (localName(a[i]) === want && (a[i].includes(":") || !name.includes(":"))) return a[i + 1];
   return undefined;
 }
 

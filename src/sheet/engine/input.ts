@@ -78,10 +78,11 @@ export function parseInput(text: string, locale: Locale, current?: Cell, opts?: 
     const out: ParsedInput = parsed.fmt ? { cell: { v: value }, fmt: parsed.fmt } : { cell: { v: value } };
     if (parsed.orDecimal) {
       // "1.234" stays 1234 (Excel's reading), but the person may have meant 1,234: say so, and
-      // offer it. Both readings written plainly: "„001.234“ ist 1234", "Als 1,234 lesen".
+      // offer it. The reading as the cell shows it ("„001.234“ ist 1234"), the other as typed
+      // with a comma ("Als 1,000 lesen").
       const alt = parsed.orDecimal;
-      const read = formatValue(parsed.value, parsed.fmt, locale);
-      const { message, action } = thousandsNotice(text.trim(), read, formatValue(alt.value, alt.fmt, locale), locale);
+      const typed = text.trim();
+      const { message, action } = thousandsNotice(typed, formatValue(parsed.value, parsed.fmt, locale), typed.replace(/(\d+)\.(\d+)/, "$1,$2"), locale);
       out.notice = { message, action, other: alt.fmt ? { cell: { v: alt.value }, fmt: alt.fmt } : { cell: { v: inPercentCell(undefined, alt.value) } } };
     }
     return out;

@@ -371,12 +371,14 @@ function closeOverMoves(plans: Map<string, Plan>, conflict: (id: string, why: Wh
         if (!q) continue;
         const r = role(p, op.id);
         if (p.kind !== "conflict" && q.kind !== "conflict" && r === role(q, op.id) && (r === "shared" || q.kind === p.kind)) continue;
+        // (A sheet that can't be lined up because the other one can't: for the same reason.)
+        const why = (p.kind === "conflict" ? p.why : q.kind === "conflict" ? q.why : undefined) ?? "moved";
         if (p.kind !== "conflict") {
-          plans.set(id, conflict(id, "moved"));
+          plans.set(id, conflict(id, why));
           again = true;
         }
         if (q.kind !== "conflict") {
-          plans.set(other, conflict(other, "moved"));
+          plans.set(other, conflict(other, why));
           again = true;
         }
       }
@@ -669,9 +671,9 @@ export function takeBack(from: Workbook, to: Workbook, now: Workbook): TakeBack 
   const inverses = new Map<string, SheetOp>();
   const unknown = new Set<string>();
   for (const s of from.sheets) {
-    const t = sheetById(to, s.id);
-    if (!t) continue;
-    const ops = opsSince(t.log, s.log);
+    // (A sheet the step made goes again, but what was done to its rows comes first: cells moved
+    // there are found where they were moved to.)
+    const ops = opsSince(sheetById(to, s.id)?.log, s.log);
     if (ops && !ops.length) continue;
     const list: SheetOp[] = [];
     for (const op of ops ?? []) {

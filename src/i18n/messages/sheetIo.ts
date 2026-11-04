@@ -1,5 +1,9 @@
 import { defineMessages } from "../define";
 
+/** What became of formulas that couldn't come along (the import's note lists them after "Nicht übernommen:"). */
+const keptEn = (n: number) => (n === 1 ? "its result is kept as a value" : "their results are kept as values");
+const keptDe = (n: number) => (n === 1 ? "ihr Ergebnis steht als Wert in der Zelle" : "ihre Ergebnisse stehen als Werte in den Zellen");
+
 /**
  * Getting data in and out of spreadsheets (src/sheet/io): Excel files, CSV and the clipboard. The
  * import's notes say what couldn't come along, in words a student understands.
@@ -35,10 +39,10 @@ export const sheetIoText = defineMessages({
       conditional: (n: number) => (n === 1 ? "1 conditional format" : `${n} conditional formats`),
       validation: (n: number) => (n === 1 ? "1 data validation (drop-down list or input rule)" : `${n} data validations (drop-down lists or input rules)`),
       links: (n: number) => (n === 1 ? "1 hyperlink (the text stays)" : `${n} hyperlinks (the text stays)`),
-      unknownFunctions: (n: number, names: string) => `${n === 1 ? "1 formula" : `${n} formulas`} with functions Blob doesn't know (${names}): kept as values`,
-      external: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} with references to other files: kept as values`,
-      tableRefs: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} with table references Blob couldn't read: kept as values`,
-      badFormulas: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} Blob couldn't read: kept as values`,
+      unknownFunctions: (n: number, names: string) => `${n === 1 ? "1 formula" : `${n} formulas`} with functions Blob doesn't know (${names}; ${keptEn(n)})`,
+      external: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} with references to other files (${keptEn(n)})`,
+      tableRefs: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} with table references Blob couldn't read (${keptEn(n)})`,
+      badFormulas: (n: number) => `${n === 1 ? "1 formula" : `${n} formulas`} Blob couldn't read (${keptEn(n)})`,
       arrays: (n: number) => (n === 1 ? "1 array formula (only its first result is calculated)" : `${n} array formulas (only their first result is calculated)`),
       filters: (n: number) => (n === 1 ? "1 filter Blob doesn't have (all rows are shown)" : `${n} filters Blob doesn't have (all rows are shown)`),
       sheetFilter: "a filter on a whole sheet (all rows are shown)",
@@ -51,7 +55,7 @@ export const sheetIoText = defineMessages({
       tooBig: (n: number, rows: string, cols: number) => `${n === 1 ? "1 cell" : `${n} cells`} beyond ${rows} rows and ${cols} columns`,
       longText: (n: number) => `${n === 1 ? "1 very long text" : `${n} very long texts`} (shortened)`,
       sheetLimit: (n: number, max: number) => `${n === 1 ? "1 sheet" : `${n} sheets`} after the first ${max} (no more fit into this spreadsheet)`,
-      longFormulas: (n: number, max: string) => `${n === 1 ? "1 formula" : `${n} formulas`} longer than ${max} characters: kept as values`,
+      longFormulas: (n: number, max: string) => `${n === 1 ? "1 formula" : `${n} formulas`} longer than ${max} characters (${keptEn(n)})`,
       chartLimit: (n: number, max: number) => `${n === 1 ? "1 chart" : `${n} charts`} after the first ${max}`,
       seriesLimit: (n: number, max: number) => `${n === 1 ? "1 data series" : `${n} data series`} (a chart holds ${max} at most)`,
       tableLimit: (n: number) =>
@@ -85,10 +89,10 @@ export const sheetIoText = defineMessages({
       conditional: (n) => (n === 1 ? "1 bedingte Formatierung" : `${n} bedingte Formatierungen`),
       validation: (n) => (n === 1 ? "1 Datenüberprüfung (Auswahlliste oder Eingaberegel)" : `${n} Datenüberprüfungen (Auswahllisten oder Eingaberegeln)`),
       links: (n) => (n === 1 ? "1 Link (der Text bleibt)" : `${n} Links (der Text bleibt)`),
-      unknownFunctions: (n, names) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Funktionen, die Blob nicht kennt (${names}): als Werte übernommen`,
-      external: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Bezügen auf andere Dateien: als Werte übernommen`,
-      tableRefs: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Tabellenbezügen, die Blob nicht lesen konnte: als Werte übernommen`,
-      badFormulas: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`}, die Blob nicht lesen konnte: als Werte übernommen`,
+      unknownFunctions: (n, names) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Funktionen, die Blob nicht kennt (${names}; ${keptDe(n)})`,
+      external: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Bezügen auf andere Dateien (${keptDe(n)})`,
+      tableRefs: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit Tabellenbezügen, die Blob nicht lesen konnte (${keptDe(n)})`,
+      badFormulas: (n) => `${n === 1 ? "1 Formel" : `${n} Formeln`}, die Blob nicht lesen konnte (${keptDe(n)})`,
       arrays: (n) => (n === 1 ? "1 Matrixformel (nur ihr erstes Ergebnis wird berechnet)" : `${n} Matrixformeln (nur ihr erstes Ergebnis wird berechnet)`),
       filters: (n) => (n === 1 ? "1 Filter, den Blob nicht kennt (alle Zeilen werden gezeigt)" : `${n} Filter, die Blob nicht kennt (alle Zeilen werden gezeigt)`),
       sheetFilter: "ein Filter auf einem ganzen Blatt (alle Zeilen werden gezeigt)",
@@ -101,12 +105,12 @@ export const sheetIoText = defineMessages({
       tooBig: (n, rows, cols) => `${n === 1 ? "1 Zelle" : `${n} Zellen`} jenseits von ${rows} Zeilen und ${cols} Spalten`,
       longText: (n) => `${n === 1 ? "1 sehr langer Text" : `${n} sehr lange Texte`} (gekürzt)`,
       sheetLimit: (n, max) => `${n === 1 ? "1 Blatt" : `${n} Blätter`} nach den ersten ${max} (mehr passen nicht in diese Tabelle)`,
-      longFormulas: (n, max) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit mehr als ${max} Zeichen: als Werte übernommen`,
+      longFormulas: (n, max) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit mehr als ${max} Zeichen (${keptDe(n)})`,
       chartLimit: (n, max) => `${n === 1 ? "1 Diagramm" : `${n} Diagramme`} nach den ersten ${max}`,
       seriesLimit: (n, max) => `${n === 1 ? "1 Datenreihe" : `${n} Datenreihen`} (ein Diagramm hat höchstens ${max})`,
       tableLimit: (n) =>
         n === 1
-          ? "1 intelligente Tabelle, die eine andere überlappt oder zu viel ist (als normale Zellen übernommen)"
+          ? "1 intelligente Tabelle, die eine andere überlappt oder eine zu viel ist (als normale Zellen übernommen)"
           : `${n} intelligente Tabellen, die andere überlappen oder zu viele sind (als normale Zellen übernommen)`,
       cells: (n) => (n === 1 ? "1 Zelle, die Blob nicht behalten kann" : `${n} Zellen, die Blob nicht behalten kann`),
     },

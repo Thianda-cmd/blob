@@ -138,7 +138,8 @@ type Box = { x: number; y: number; w: number; h: number };
 /**
  * A finger that is down but not yet a gesture: lifting it is a tap, holding it opens the menu,
  * moving it scrolls the sheet (on a cell) or starts a drag (a handle, the column letters or row
- * numbers). `handle`: it came down on a selection or fill handle.
+ * numbers; from a border between them, resizing). `handle`: it came down on a selection or fill
+ * handle.
  */
 type Pending = {
   id: number;

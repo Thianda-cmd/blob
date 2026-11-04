@@ -34,7 +34,13 @@ type Piece = {
 };
 
 /** A compiled pattern: the pieces between its stars (one piece: no star at all). */
-export type Glob = { pieces: Piece[]; unicode: boolean; fold: (code: number) => number };
+export type Glob = {
+  pieces: Piece[];
+  unicode: boolean;
+  fold: (code: number) => number;
+  /** Has an I, S, ı, ſ or a character beyond the first 65,536: the ones the browser's upper case folds otherwise (see UPPER_TRAP). */
+  traps: boolean;
+};
 
 const ANY = -1;
 
@@ -93,6 +99,8 @@ function foldUnit(c: number): number {
 
 function foldPoint(c: number): number {
   if (c < 128) return c >= 65 && c <= 90 ? c + 32 : c;
+  // The Turkish dotless ı has no case folding of its own (its upper case I folds to i).
+  if (c === 0x131) return c;
   let f = foldCache.get(c);
   if (f === undefined) {
     const single = (s: string) => (s.length === 1 || (s.length === 2 && s.codePointAt(0)! > 0xffff) ? s.codePointAt(0)! : null);
@@ -139,7 +147,8 @@ export function compileGlob(pattern: string, opts: GlobOptions = {}): Glob {
     }
   }
   pieces.push(piece(items));
-  const glob: Glob = { pieces, unicode, fold };
+  const traps = pieces.some((p) => p.items.some((c) => c === 73 || c === 83 || c === 0x131 || c === 0x17f || (c >= 0xd800 && c <= 0xdfff)));
+  const glob: Glob = { pieces, unicode, fold, traps };
   if (cache.size >= 2000 || cached + pattern.length > 1_000_000) {
     cache.clear();
     cached = 0;
@@ -149,38 +158,55 @@ export function compileGlob(pattern: string, opts: GlobOptions = {}): Glob {
   return glob;
 }
 
-/** ı and ſ turn into the ASCII letters I and S in upper case, which a RegExp's "i" doesn't do. */
-const UPPER_TO_ASCII = /[ıſ]/;
+/**
+ * In upper case ı and ſ become the ASCII letters I and S, which a RegExp's "i" doesn't do, and it
+ * folds UTF-16 units one by one, so it leaves the characters beyond the first 65,536 alone.
+ */
+const UPPER_TRAP = /[\u0131\u017f\ud800-\udfff]/;
 const SURROGATE = /[\ud800-\udfff]/;
 const NOT_ASCII = /[^\x00-\x7f]/;
 
 /**
- * A text as a pattern sees it: folded like the pattern, as text for the browser's own search (its
- * positions must be the pattern's, so not with characters beyond the first 65,536 under
- * `unicode`), and as character codes for the bit-parallel scan, made only when needed.
+ * A text as a pattern sees it: folded like the pattern, as text for the browser's own search, and
+ * as character codes for the bit-parallel scan, each made only when and where needed (a piece at
+ * the start needs just its own few characters folded). Under `unicode` positions count code points,
+ * so a text with characters beyond the first 65,536 is only searched by its codes.
  */
 class Subject {
   /** Its length in the pattern's characters. */
   readonly n: number;
-  readonly folded: string | null;
+  /** Whether the text can be searched as text (see above). */
+  private readonly asText: boolean;
+  private whole: string | null = null;
   private list: number[] | null = null;
 
   constructor(
     private readonly g: Glob,
     private readonly text: string,
   ) {
-    let folded: string | null = null;
-    if (g.fold === same) folded = g.unicode && SURROGATE.test(text) ? null : text;
-    else if (g.fold === foldUnit) {
-      // The browser's upper case is the same character by character, unless a character becomes
-      // several (ß → SS) or an ASCII letter (ı → I), or lies beyond the first 65,536: the "i" flag
-      // folds UTF-16 units one by one, so it leaves those alone.
-      const up = text.toUpperCase();
-      if (up.length === text.length && !UPPER_TO_ASCII.test(text) && !SURROGATE.test(text)) folded = up;
-    } else if (!NOT_ASCII.test(text)) folded = text.toLowerCase();
-    if (folded === null && !(g.unicode && SURROGATE.test(text))) folded = textOf(this.codes());
-    this.folded = folded;
-    this.n = folded !== null ? folded.length : this.codes().length;
+    const astral = g.unicode && SURROGATE.test(text);
+    this.asText = !astral;
+    this.n = astral ? this.codes().length : text.length;
+  }
+
+  /** The folded text from `from` to `to`, or null when it can only be searched by its codes. */
+  part(from: number, to: number): string | null {
+    if (!this.asText) return null;
+    if (from === 0 && to === this.n) return (this.whole ??= this.fold(this.text, 0));
+    return this.whole?.slice(from, to) ?? this.fold(this.text.slice(from, to), from);
+  }
+
+  /** Text folded the browser's fast way when that gives the same as folding it character by character. */
+  private fold(raw: string, from: number): string {
+    const fold = this.g.fold;
+    if (fold === same) return raw;
+    if (fold === foldUnit) {
+      // Upper case is the same character by character unless one becomes several (ß → SS) or is
+      // a trap; a trap only matters when the pattern has its upper case (an I, an S…) to match.
+      const up = raw.toUpperCase();
+      if (up.length === raw.length && !(this.g.traps && UPPER_TRAP.test(raw))) return up;
+    } else if (!NOT_ASCII.test(raw)) return raw.toLowerCase();
+    return textOf(this.codes().slice(from, from + raw.length));
   }
 
   /** The folded character codes (code points with `unicode`). */
@@ -192,15 +218,21 @@ class Subject {
     else for (let i = 0; i < this.text.length; i++) out.push(fold(this.text.charCodeAt(i)));
     return (this.list = out);
   }
+
+  /** One folded character code, without folding the whole text when its positions are its units. */
+  codeAt(i: number): number {
+    return this.list ? this.list[i] : this.asText ? this.g.fold(this.text.charCodeAt(i)) : this.codes()[i];
+  }
 }
 
 /** Does the piece fit the text at this place? */
 function fits(p: Piece, s: Subject, at: number): boolean {
   const items = p.items;
   if (at < 0 || at + items.length > s.n) return false;
-  if (p.text !== null && s.folded !== null) return s.folded.startsWith(p.text, at);
-  const codes = s.codes();
-  for (let j = 0; j < items.length; j++) if (items[j] !== ANY && items[j] !== codes[at + j]) return false;
+  if (!items.length) return true;
+  const here = p.text === null ? null : s.part(at, at + items.length);
+  if (here !== null) return here === p.text;
+  for (let j = 0; j < items.length; j++) if (items[j] !== ANY && items[j] !== s.codeAt(at + j)) return false;
   return true;
 }
 
@@ -213,8 +245,9 @@ function find(p: Piece, s: Subject, from: number, to: number, last: boolean): nu
   const m = p.items.length;
   if (m === 0) return last ? to : from <= to ? from : -1;
   if (to - from < m) return -1;
-  if (!last && p.text !== null && s.folded !== null) {
-    const at = s.folded.indexOf(p.text, from);
+  const folded = last || p.text === null ? null : s.part(0, s.n);
+  if (folded !== null) {
+    const at = folded.indexOf(p.text!, from);
     return at >= 0 && at + m <= to ? at : -1;
   }
   return scan(p, s.codes(), from, to, last);

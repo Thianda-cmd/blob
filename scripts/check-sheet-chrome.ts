@@ -50,7 +50,7 @@ import { handleGridKey, type GridKeyContext } from "@/components/sheet/grid/keys
 import { cycleReference, formulaTokens, insertSelectionRef, pointAt, pointing, refFrames } from "@/components/sheet/grid/point";
 import { createSheetStore, type SheetStore } from "@/components/sheet/store";
 import { makeTable, setTableFilter } from "@/sheet/table/model";
-import { placeHelp } from "@/components/sheet/grid/CellEditor";
+import { helpFrame, placeHelp } from "@/components/sheet/grid/CellEditor";
 import { numberAsText, numberLike } from "@/components/sheet/grid/cellLook";
 import { keypadContext, keypadFor } from "@/components/sheet/grid/keypad";
 import { currentRegion } from "@/components/sheet/grid/navigation";
@@ -1418,6 +1418,42 @@ section("formula help next to the cell editor stays where it can be seen");
     }
   }
   eq(`${tries} cells and help sizes: never over the cell, never outside what can be seen`, bad, 0);
+
+  // What the help may cover: the grid's cells (not the page around the grid), above the keyboard.
+  const desk = { top: 0, bottom: 900, left: 0, right: 1440 };
+  const cells = { top: 225, bottom: 850, left: 297, right: 1431 };
+  eq("desktop: the grid's cells, less a margin", helpFrame(box(561, 467), cells, desk), { top: 229, bottom: 846, left: 301, right: 1427 });
+  eq("the cell scrolled up out of the grid: no help (it doesn't float over the page)", helpFrame(box(-39, 467), cells, desk), null);
+  eq("…scrolled sideways out of it", helpFrame(box(561, -433), cells, desk), null);
+  eq("…under the column letters only", helpFrame(box(195, 467), cells, desk), null);
+  eq("half under the column letters: the help still shows, inside the cells", helpFrame(box(213, 467), cells, desk)?.top, 229);
+  const keyboard = { top: 0, bottom: 440, left: 0, right: 1280 };
+  const tabletCells = { top: 233, bottom: 742, left: 297, right: 1271 };
+  eq("a tablet with the keyboard up: up to the keyboard", helpFrame(box(400, 467), tabletCells, keyboard), { top: 237, bottom: 432, left: 301, right: 1267 });
+  eq("…the cell under the keyboard: no help", helpFrame(box(450, 467), tabletCells, keyboard), null);
+  eq("a phone: the cells reach the screen's edge", helpFrame(box(504, 210), { top: 216, bottom: 795, left: 40, right: 390 }, { top: 0, bottom: 544, left: 0, right: 390 }), { top: 220, bottom: 536, left: 44, right: 382 });
+  let strays = 0;
+  let placed = 0;
+  for (const [g, s] of [[cells, desk], [tabletCells, keyboard], [{ top: 216, bottom: 795, left: 40, right: 390 }, { top: 0, bottom: 544, left: 0, right: 390 }]] as const) {
+    for (let top = g.top - 60; top < g.bottom + 40; top += 17) {
+      for (let left = g.left - 140; left < g.right + 40; left += 41) {
+        const cell = box(top, left, 100);
+        const frame = helpFrame(cell, g, s);
+        const seen = cell.bottom > Math.max(g.top, s.top) && cell.top < Math.min(g.bottom, s.bottom) && cell.right > Math.max(g.left, s.left) && cell.left < Math.min(g.right, s.right);
+        if (!frame) {
+          if (seen) strays++;
+          continue;
+        }
+        placed++;
+        // The help is never wider than the frame (the editor sets its max-width to it).
+        const w = Math.min(300, frame.right - frame.left);
+        const p = placeHelp(cell, w, 150, frame);
+        const shownH = Math.min(150, p.maxHeight ?? 150);
+        if (p.left < g.left || p.left + w > g.right || p.top < Math.max(g.top, s.top) || p.top + shownH > Math.min(g.bottom, s.bottom)) strays++;
+      }
+    }
+  }
+  check(`${placed} cells in view: the help stays on the grid's visible cells; out of view it hides`, strays === 0 && placed > 200, `${strays} strays`);
 }
 
 section("text that looks like a number gets a mark");

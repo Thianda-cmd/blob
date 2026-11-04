@@ -1474,8 +1474,9 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
             else noteProblem(imported.problem, counts);
           }
         }
-        // Each formula read counts against the text budget, kept or not (checking one takes time too).
-        if (formula !== null) spend(formula.length);
+        // Each formula read counts against the text budget, kept or not, and twice: moving and
+        // checking one takes far longer than keeping a text.
+        if (formula !== null) spend(formula.length * 2);
         // LibreOffice writes TRUE and FALSE typed into a cell as the formulas TRUE() and FALSE().
         if (formula !== null && /^(TRUE|FALSE)\(\)$/i.test(formula.trim())) {
           value = /^TRUE/i.test(formula.trim());

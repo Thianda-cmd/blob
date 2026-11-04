@@ -780,8 +780,8 @@ async function xlsxImport() {
     "1 bedingte Formatierung",
     "1 Datenüberprüfung (Auswahlliste oder Eingaberegel)",
     "1 Link (der Text bleibt)",
-    "1 Formel mit Funktionen, die Blob nicht kennt (AGGREGATE): als Werte übernommen",
-    "1 Formel mit Bezügen auf andere Dateien: als Werte übernommen",
+    "1 Formel mit Funktionen, die Blob nicht kennt (AGGREGATE; ihr Ergebnis steht als Wert in der Zelle)",
+    "1 Formel mit Bezügen auf andere Dateien (ihr Ergebnis steht als Wert in der Zelle)",
     "1 Matrixformel (nur ihr erstes Ergebnis wird berechnet)",
   ]);
 
@@ -808,7 +808,7 @@ async function xlsxImport() {
 
 function xml() {
   const root = parseXml(`<?xml version="1.0"?><!-- c --><!DOCTYPE x [<!ENTITY a "b">]><a:root xmlns:a="u" a:x='1 &amp; 2'><b>t&lt;&#228;&#x2264;</b><![CDATA[<raw>]]><c/><t xml:space="preserve">  </t></a:root>`);
-  eq("xml root", [root.name, root.local, root.attrs["a:x"]], ["a:root", "root", "1 & 2"]);
+  eq("xml root", [root.name, root.local, attr(root, "a:x"), attr(root, "x")], ["a:root", "root", "1 & 2", "1 & 2"]);
   eq("xml text", textOf(root), "t<ä≤<raw>  ");
   let threw = false;
   try {
@@ -1110,12 +1110,17 @@ async function readingSafely() {
   const raw = await deflateRaw(many);
   if (raw) eq("inflating stops at its limit", await thrown(() => inflateRaw(raw, 1000)), "tooBig");
 
-  // XML: one budget of elements for the whole file, end tags of elements that aren't open skipped
-  // at once, and names from the file never reach an object's prototype.
+  // XML: one budget of elements and attributes for the whole file, end tags of elements that aren't
+  // open skipped at once, and names from the file never reach an object's prototype.
   const budget = xmlBudget(1500);
   parseXml(`<a>${"<c/>".repeat(1000)}</a>`, budget);
-  eq("elements count against the file's budget", budget.elements, 499);
+  eq("elements count against the file's budget", budget.nodes, 499);
   eq("more elements than the budget: too big, not broken", await thrown(() => parseXml(`<a>${"<c/>".repeat(1000)}</a>`, budget)), "tooBig");
+  const attrBudget = xmlBudget(1000);
+  parseXml(`<a>${'<c x="1" y="2"/>'.repeat(100)}</a>`, attrBudget);
+  eq("…and so do attributes", attrBudget.nodes, 1000 - 1 - 300);
+  const crowded = `<a>${`<x ${Array.from({ length: 100 }, (_, i) => `a${i}=""`).join(" ")}/>`.repeat(50)}</a>`;
+  eq("elements with 100 attributes each: too big after the budget's worth", await thrown(() => parseXml(crowded, xmlBudget(2000))), "tooBig");
   let t0 = performance.now();
   const stray = parseXml(`<sst><si><t>x</t></si>${"<x>".repeat(60_000)}${"</y>".repeat(60_000)}</sst>`);
   let ms = performance.now() - t0;
@@ -1156,6 +1161,69 @@ async function readingSafely() {
   const bomb = await readSheetBytes(huge, "bombe.xlsx", "de");
   eq("a file that would unpack too big: refused, with the reason", "error" in bomb ? [bomb.error, bomb.message] : bomb, ["tooBig", sheetIoText.de.errors.tooBig]);
 
+  // Files within every limit above that make much from little: one long shared text or one shared
+  // formula for thousands of cells, names that use names, a formula or format code of megabytes.
+  // Each is refused or left out at once (they took gigabytes, or minutes, before).
+  const oneText = await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: "x" } })]));
+  const sheetData = (rows: number, cells: (r: number) => string) => (x: string) =>
+    x.replace(/<sheetData>[\s\S]*<\/sheetData>/, `<sheetData>${Array.from({ length: rows }, (_, r) => `<row r="${r + 1}">${cells(r + 1)}</row>`).join("")}</sheetData>`);
+  const timed = async <T,>(f: () => Promise<T>): Promise<[T, number]> => {
+    const start = performance.now();
+    const out = await f();
+    return [out, performance.now() - start];
+  };
+  const sstFile = await patchXlsx(oneText, {
+    "xl/sharedStrings.xml": (x) => x.replace(/<si>[\s\S]*<\/si>/, `<si><t>${"A".repeat(32_767)}</t></si>`),
+    "xl/worksheets/sheet1.xml": sheetData(200, () => '<c t="s"><v>0</v></c>'.repeat(100)),
+  });
+  const [sstRead, sstMs] = await timed(() => readSheetBytes(sstFile, "text.xlsx", "de"));
+  eq("one 32,767-character text for 20,000 cells (655 million characters): too big", "error" in sstRead ? [sstRead.error, sstRead.message] : sstRead.workbook.sheets.length, ["tooBig", sheetIoText.de.errors.tooBig]);
+  ok("…at once", sstMs < 2000, `${Math.round(sstMs)} ms`);
+  const sharedFormula = (master: string) =>
+    patchXlsx(oneText, {
+      "xl/worksheets/sheet1.xml": sheetData(200, (r) => Array.from({ length: 100 }, (_, c) => (r === 1 && c === 0 ? `<c r="A1"><f t="shared" ref="A1:CV200" si="0">${master}</f><v>1</v></c>` : '<c><f t="shared" si="0"/><v>1</v></c>')).join("")),
+    });
+  const [sharedRead, sharedMs] = await timed(async () => readSheetBytes(await sharedFormula(`${"B1+".repeat(1000)}B1`), "formel.xlsx", "de"));
+  eq("one 3,000-character formula shared by 20,000 cells (60 million characters to read): too big", "error" in sharedRead ? [sharedRead.error, sharedRead.message] : sharedRead.workbook.sheets.length, ["tooBig", sheetIoText.de.errors.tooBig]);
+  ok("…at once", sharedMs < 6000, `${Math.round(sharedMs)} ms`);
+  const [longShared, longSharedMs] = await timed(async () => readSheetBytes(await sharedFormula(`${"B1+".repeat(3000)}B1`), "formel.xlsx", "de"));
+  eq("…one too long to keep: the values, listed once for each cell", "error" in longShared ? longShared : [Object.keys(longShared.workbook.sheets[0].cells).length, longShared.workbook.sheets[0].cells["5,5"], longShared.skipped], [20_000, { v: 1 }, ["20000 Formeln mit mehr als 8.192 Zeichen (ihre Ergebnisse stehen als Werte in den Zellen)"]]);
+  ok("…at once (the long one isn't moved for each cell)", longSharedMs < 3000, `${Math.round(longSharedMs)} ms`);
+  const numCell = await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: 7 } })]));
+  const names = ["NA", "NB", "NC", "ND", "NE"];
+  const nested = await patchXlsx(numCell, {
+    "xl/workbook.xml": (x) => x.replace("</sheets>", `</sheets><definedNames>${names.map((n, i) => `<definedName name="${n}">${i + 1 < names.length ? Array(50).fill(names[i + 1]).join("+") : "1"}</definedName>`).join("")}</definedNames>`),
+    "xl/worksheets/sheet1.xml": sheetData(1, () => '<c r="A1"><f>NA</f><v>7</v></c>'),
+  });
+  const [nestedRead, nestedMs] = await timed(() => readSheetBytes(nested, "namen.xlsx", "de"));
+  eq("a name that uses names 50 times each, four deep (6 million references): its value, listed", "error" in nestedRead ? nestedRead : [nestedRead.workbook.sheets[0].cells["0,0"], nestedRead.skipped], [{ v: 7 }, ["1 Formel mit mehr als 8.192 Zeichen (ihr Ergebnis steht als Wert in der Zelle)"]]);
+  ok("…at once", nestedMs < 2000, `${Math.round(nestedMs)} ms`);
+  const longText = await patchXlsx(numCell, { "xl/worksheets/sheet1.xml": sheetData(1, () => `<c r="A1"><f>${"1+".repeat(1_000_000)}1</f><v>5</v></c><c r="B1" t="e"><v>#${"X".repeat(100_000)}</v></c>`) });
+  const [longRead, longMs] = await timed(() => readSheetBytes(longText, "riesig.xlsx", "de"));
+  eq("a 2-megabyte formula: its value, listed; a 100,000-character error: text", "error" in longRead ? longRead : [longRead.workbook.sheets[0].cells["0,0"], longRead.workbook.sheets[0].cells["0,1"]?.v?.toString().length, longRead.skipped.length], [{ v: 5 }, 32_767, 1]);
+  ok("…at once (4.7 GB and 24 s before)", longMs < 2000, `${Math.round(longMs)} ms`);
+  t0 = performance.now();
+  eq("a format code longer than Excel's 255 characters: general", [fromExcelFormat(`0.0" ${"x".repeat(300)}"`, "de"), fromExcelFormat("0".repeat(2_000_000), "de")], [undefined, undefined]);
+  ok("…at once", performance.now() - t0 < 500, `${Math.round(performance.now() - t0)} ms`);
+  eq("importFormula: a text far too long isn't read", importFormula("1+".repeat(40_000) + "1", { tables: new Map(), names: new Map(), sheet: "Blatt 1", row: 0, col: 0, tableAt: () => null }), { problem: "long" });
+
+  // Text files and pasted tables: no more than a sheet holds is read (a million lines took 2 GB).
+  const [lines, linesMs] = await timed(() => readSheetBytes(enc.encode("a\n".repeat(1_000_000)), "zeilen.csv", "de"));
+  eq("a CSV of a million lines: a sheet's worth, and it says so", "error" in lines ? lines : [Object.keys(lines.workbook.sheets[0].cells).length, lines.cutRows], [20_000, 20_000]);
+  ok("…at once", linesMs < 3000, `${Math.round(linesMs)} ms`);
+  const wide = await readSheetBytes(enc.encode(`a${";b".repeat(1_000_000)}\n`), "breit.csv", "de");
+  eq("a CSV line of a million values: 200 columns", "error" in wide ? wide : Object.keys(wide.workbook.sheets[0].cells).length, 200);
+  t0 = performance.now();
+  const spans = parseHtmlTable(`<table>${`<tr>${'<td colspan="200" rowspan="200">x</td>'.repeat(300)}</tr>`.repeat(300)}</table>`);
+  ms = performance.now() - t0;
+  eq("an HTML table of 90,000 cells spanning 200 x 200: no wider than a sheet (empty rows at the end dropped)", spans ? [spans.length, Math.max(...spans.map((r) => r.length))] : spans, [201, 200]);
+  ok("…at once", ms < 2000, `${Math.round(ms)} ms`);
+  t0 = performance.now();
+  parseHtmlTable(`<table><tr><td>1</td></tr></table>${"<!--".repeat(50_000)}${"<![if x ".repeat(20_000)}`);
+  parseClipboard({ text: "1\t2", html: `<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="1">1</td><td>2</td></tr></table>${"<style>.a{mso-number-format:x".repeat(20_000)}` });
+  ms = performance.now() - t0;
+  ok("pasted HTML with unclosed comments and styles: quick", ms < 1500, `${Math.round(ms)} ms`);
+
   // Long runs that took seconds or minutes before: the number style of a CSV, pasted lines, HTML
   // with unclosed tags, chart references.
   const spaces = Array.from({ length: 10 }, () => ["1" + " ".repeat(30_000) + "x"]);
@@ -1182,6 +1250,11 @@ async function fileKinds() {
   const lims = await read('<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet/></Workbook>', "LIMS.xls");
   eq(".xls with XML inside: a clear message", "error" in lims ? [lims.error, lims.message] : lims, ["failed", sheetIoText.de.errors.notTable]);
   eq("a first value below the detection limit is data, not markup", cellsOf(await read("<NWG;0,5\n<0,1;2\n", "werte.csv")), { "0,0": { v: "<NWG" }, "0,1": { v: 0.5 }, "1,0": { v: "<0,1" }, "1,1": { v: 2 } });
+  eq("…so is a first value \"<BG\" (below the measuring range)", cellsOf(await read("<BG\t>MB\n0,1\t2,5\n", "werte.xls")), { "0,0": { v: "<BG" }, "0,1": { v: ">MB" }, "1,0": { v: 0.1 }, "1,1": { v: 2.5 } });
+  eq("…and one written with a tag, \"<b>Probe</b>\"", cellsOf(await read("<b>Probe</b>\tWert\nA\t1\n", "werte.csv")), { "0,0": { v: "<b>Probe</b>" }, "0,1": { v: "Wert" }, "1,0": { v: "A" }, "1,1": { v: 1 } });
+  // Excel's "Web page" (and tools that write like it): the <html> tag over several lines.
+  const webPage = `<html xmlns:v="urn:schemas-microsoft-com:vml"\nxmlns:o="urn:schemas-microsoft-com:office:office"\nxmlns:x="urn:schemas-microsoft-com:office:excel"\nxmlns="http://www.w3.org/TR/REC-html40">\n\n<head>\n<meta name=ProgId content=Excel.Sheet>\n</head>\n<body>\n<table>\n <tr><td>Probe</td><td>Extinktion</td></tr>\n <tr><td>S1</td><td x:num="0.10437">0,104</td></tr>\n</table>\n</body>\n</html>\n`;
+  eq("Excel's web page as .xls: its rows, with the full numbers", cellsOf(await read(webPage, "Laborexport.xls")), { "0,0": { v: "Probe" }, "0,1": { v: "Extinktion" }, "1,0": { v: "S1" }, "1,1": { v: 0.10437 } });
   const utf16 = "Probe\tµg\nS1\t0,5\n";
   const u16 = new Uint8Array(2 + utf16.length * 2);
   u16.set([0xff, 0xfe]);
@@ -1211,7 +1284,7 @@ async function fileKinds() {
 
   // A formula longer than 8,192 characters (LibreOffice writes such): its value stays, and it is listed.
   const longF = await readSheetBytes(await xlsxOf(book([sheet("s1", "Blatt 1", { "0,0": { v: 1 }, "0,1": { f: "A1" + "+A1".repeat(3000) } })])), "lang.xlsx", "de");
-  eq("a formula over 8,192 characters: its value, listed", "error" in longF ? longF : [longF.workbook.sheets[0].cells["0,1"], longF.skipped], [{ v: 3001 }, ["1 Formel mit mehr als 8.192 Zeichen: als Werte übernommen"]]);
+  eq("a formula over 8,192 characters: its value, listed", "error" in longF ? longF : [longF.workbook.sheets[0].cells["0,1"], longF.skipped], [{ v: 3001 }, ["1 Formel mit mehr als 8.192 Zeichen (ihr Ergebnis steht als Wert in der Zelle)"]]);
 
   // A chart with more series than Blob keeps (one line per well): cut when it comes in, and listed.
   const r = (r0: number, c0: number, r1: number, c1: number) => ({ sheetId: "s1", r0, c0, r1, c1 });
@@ -1279,6 +1352,27 @@ function clipboardNumbers() {
   eq("into a percent cell: as typing it there", percentCell["0,0"]?.v, 0.0012);
   const turned = paste(fresh(), { text: "0,12\t2,67", html: '<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td x:num="0.123456">0,12</td><td x:num="2.666">2,67</td></tr></table>' }, { row: 0, col: 0 }, "transpose");
   eq("transposed: each full number where its text goes", [turned["0,0"]?.v, turned["1,0"]?.v], [0.123456, 2.666]);
+  const wideRow = Array.from({ length: 1000 }, (_, i) => String(i)).join("\t");
+  const tall = paste(fresh({}, "clip-tall"), { text: wideRow }, { row: 0, col: 0 }, "transpose");
+  eq("a row of 1,000 values pasted transposed: all of them (more than a sheet's columns)", [tall["999,0"]?.v, tall["0,1"]], [999, undefined]);
+  const across = paste(fresh({}, "clip-across"), { text: wideRow });
+  eq("…pasted as it is: as many as a sheet has columns", [across["0,199"]?.v, across["0,200"]], [199, undefined]);
+
+  // Formats as the copy gives them: none for General (the full number shows, as in Excel), Excel's
+  // own by class and by name, LibreOffice's and Google Sheets'.
+  const xl = (cells: string, style: string) => `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><style><!--${style}--></style></head><body><table><tr>${cells}</tr></table></body></html>`;
+  const fromXl = paste(fresh({}, "clip-xl"), {
+    text: "0,333333333\t0,12\t12%",
+    html: xl('<td x:num="0.33333333333333331">0,333333333</td><td class=xl70 x:num="0.123456">0,12</td><td class="xl71 x" x:num="0.123456">12%</td>', '.xl70\n\t{mso-style-parent:style0;\n\tmso-number-format:Fixed;}\n.xl71 {mso-number-format:"0\\%";}'),
+  });
+  eq("from Excel: General stays General, Fixed is two decimals, 0% a percent", [fromXl["0,0"], fromXl["0,1"], fromXl["0,2"]], [{ v: 0.3333333333333333 }, { v: 0.123456, s: { fmt: { kind: "number", decimals: 2 } } }, { v: 0.123456, s: { fmt: { kind: "percent", decimals: 0 } } }]);
+  const loStandard = paste(fresh({}, "clip-lo"), { text: "0,333333333\t0,12\n", html: '<table><tr><td sdval="0.333333333333333" sdnum="1031;0;Standard">0,333333333</td><td sdval="0.123456" sdnum="1031;0;0,00">0,12</td></tr></table>' });
+  eq("from LibreOffice: Standard stays General, its 0,00 the decimals shown", [loStandard["0,0"], loStandard["0,1"]], [{ v: 0.333333333333333 }, { v: 0.123456, s: { fmt: { kind: "number", decimals: 2 } } }]);
+  const gFmt = paste(fresh({}, "clip-g"), {
+    text: "0,123",
+    html: '<google-sheets-html-origin><table data-sheets-root="1"><tr><td data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:0.123456}" data-sheets-numberformat="{&quot;1&quot;:2,&quot;2&quot;:&quot;0.000&quot;,&quot;3&quot;:1}">0,123</td></tr></table>',
+  });
+  eq("from Google Sheets: its number format", gFmt["0,0"], { v: 0.123456, s: { fmt: { kind: "number", decimals: 3 } } });
 
   // Copying: numbers without their unit (Excel, LibreOffice and Google Sheets take them as numbers),
   // and Excel's full value and format (with the unit) in the HTML.
@@ -1310,6 +1404,21 @@ function clipboardNumbers() {
   copySelection(elsewhere, false);
   const other = paste(fresh({}, "copy-third"), { text: copied.text, html: copied.html });
   eq("Blob to another tab: the full numbers", [other["0,0"]?.v, other["0,1"]?.v, other["0,3"]?.v], [2.0001, 0.0523285714, 4.0002]);
+  eq("…with their formats, unit included (the text leaves it out)", [other["0,0"]?.s?.fmt, other["0,1"]?.s?.fmt, other["0,3"]?.s?.fmt], [{ kind: "number", decimals: 1, unit: "mg/L" }, { kind: "number", decimals: 4, unit: "L/mg" }, { kind: "number", decimals: 1, unit: "mg/L" }]);
+  const ownFormat = paste(fresh({ "0,0": { s: { fmt: { kind: "number", decimals: 3 } } } }, "copy-own-format"), { text: copied.text, html: copied.html });
+  eq("…a cell's own format stays", ownFormat["0,0"], { v: 2.0001, s: { fmt: { kind: "number", decimals: 3 } } });
+  // "Werte einfügen" into another spreadsheet doesn't use Blob's own copy either.
+  unit.select({ anchor: { row: 0, col: 0 }, focus: { row: 0, col: 3 }, extra: [] });
+  const again = copySelection(unit, false);
+  const values = paste(fresh({}, "copy-values"), { text: again.text, html: again.html }, { row: 0, col: 0 }, "values");
+  eq("…pasted as values into another spreadsheet: the same", [values["0,0"], values["0,3"]], [{ v: 2.0001, s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } }, { v: 4.0002, s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } }]);
+  // Significant figures, which no format code can say: Blob's named style rides along.
+  const sig = createSheetStore({ pageId: "copy-sig", workbook: book([sheet("s1", "Blatt 1", { "0,0": { v: 62.5, s: { fmt: { kind: "significant", digits: 3, unit: "µg/mL" } } } })]), locale: "de", readOnly: false });
+  sig.select({ row: 0, col: 0 });
+  const sigCopy = copySelection(sig, false);
+  ok("copy: significant figures as Blob's named style", sigCopy.html.includes('data-blob-style="Blob sig 3"'), sigCopy.html);
+  copySelection(elsewhere, false);
+  eq("…back in another tab", paste(fresh({}, "copy-sig-other"), { text: sigCopy.text, html: sigCopy.html })["0,0"], { v: 62.5, s: { fmt: { kind: "significant", digits: 3, unit: "µg/mL" } } });
 }
 
 // Round trips through .xlsx -----------------------------------------------------------------------

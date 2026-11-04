@@ -209,14 +209,17 @@ function clampSelection(sel: Selection, sheet: Sheet): Selection {
   return { anchor: pos(sel.anchor), focus: pos(sel.focus), extra };
 }
 
-/** What happened to the rows and columns of each sheet from one version to a newer one (the entries its log has since), where anything did. */
-function rowChanges(was: Workbook, now: Workbook): Map<string, SheetOp[]> {
-  const out = new Map<string, SheetOp[]>();
+/**
+ * What happened to the rows and columns of each sheet from one version to a newer one, where
+ * anything did: the entries its log has since, or null when that can't be told.
+ */
+function rowChanges(was: Workbook, now: Workbook): Map<string, SheetOp[] | null> {
+  const out = new Map<string, SheetOp[] | null>();
   for (const s of now.sheets) {
     const old = sheetById(was, s.id);
     if (!old || old.log === s.log) continue;
     const ops = opsSince(old.log, s.log);
-    if (ops?.length) out.set(s.id, ops);
+    if (!ops || ops.length) out.set(s.id, ops);
   }
   return out;
 }
@@ -899,14 +902,19 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       }
       let cutStopped = false;
       if (clip) {
-        const ops = moved.get(clip.sheetId);
-        const area = ops ? followArea(ops, clip.sheetId, clip.area) : clip.area;
-        if (!clip.cut) clip = area ? { ...clip, area } : null;
-        else if (ops && (!area || !sameArea(area, clip.area) || pastedInto(ops, clip.sheetId, clip.area))) {
-          // Cutting moves the cells at the cut address when pasting: other cells are there now.
-          clip = null;
-          cutStopped = true;
-        }
+        const c = clip;
+        const ops = moved.get(c.sheetId);
+        const copy = conflicts?.find((x) => x.sheetId === c.sheetId)?.copyId;
+        const area = ops ? followArea(ops, c.sheetId, c.area) : ops === null ? null : c.area;
+        if (c.cut) {
+          // Pasting a cut moves the cells at its address: when others may be there now, it is
+          // cancelled (a sheet kept as theirs, rows that moved, or what happened can't be told).
+          if (copy !== undefined || ops === null || (ops && (!area || !sameArea(area, c.area) || pastedInto(ops, c.sheetId, c.area)))) {
+            clip = null;
+            cutStopped = true;
+          }
+        } else if (copy !== undefined) clip = copy ? { ...c, sheetId: copy } : null;
+        else clip = area ? { ...c, area } : null;
       }
       state = { ...state, sheetId, selection, edit, clip };
       setDocument(wb, makeCalc(wb, state.calc, cellChanges(was, wb)));

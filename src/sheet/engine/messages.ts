@@ -71,8 +71,8 @@ function isSlip(typed: string, name: string, c: number): boolean {
 
 /**
  * Words often typed for a function that aren't its name in either language, and the function
- * meant (the same maths). A guess by spelling would land on another function: MODUS on REST, VAR.N
- * on VAR.S (the sample's, where the population's is meant, like STABW.N), QUARTIL on QUANTIL.
+ * meant (the same maths), where spelling alone would guess wrong or not at all: MODUS isn't REST,
+ * VAR.N (like STABW.N) is the population's VAR.P, not VAR.S, and QUARTIL is QUARTILE, not QUANTIL.
  */
 const MEANT = new Map(
   Object.entries({
@@ -180,8 +180,8 @@ export function formulaTooLongMessage(locale: Locale): string {
 
 /**
  * German "1.234" read as 1234 (the dot separates thousands): the note after typing it, and the
- * label of the button that stores 1,234 instead. `read` and `decimal` are the two readings as a
- * cell shows them ("1234 mg/L", "1,234 mg/L").
+ * label of the button that stores 1,234 instead. `read` is the reading as the cell shows it
+ * ("1234 mg/L"), `decimal` the typed text with a comma ("1,234 mg/L").
  */
 export function thousandsNotice(typed: string, read: string, decimal: string, locale: Locale): { message: string; action: string } {
   if (locale === "de") return { message: `${q(locale, typed)} ist ${read}: Der Punkt trennt Tausender. Für ${decimal} tipp ein Komma.`, action: `Als ${decimal} lesen` };

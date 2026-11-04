@@ -6,15 +6,17 @@
 //
 // Numbers go out without their unit ("2,0", not "2,0 mg/L"): Excel, LibreOffice and Google Sheets
 // then take them as numbers to calculate with, not as text. Excel also gets each number's full
-// value and its format, unit included, so it shows the cell as Blob does.
+// value and its format, unit included, so it shows the cell as Blob does; so does another Blob
+// spreadsheet that gets the copy without Blob's own (in another tab, after a reload).
 
 import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { sameArea } from "@/sheet/a1";
 import { defaultAlign } from "@/sheet/engine";
-import { clipboardNumbers, parseClipboard, pasteExactNumbers, toHtmlTable, toTsv, type HtmlCellLook } from "@/sheet/io/clipboard";
-import { csvNumberLocale, withoutUnit } from "@/sheet/io/csv";
-import { BUILTIN_CODES, toExcelFormat } from "@/sheet/io/xlsxStyles";
+import { clipboardCells, parseClipboard, pasteExactNumbers, SHEET_LIMIT, toHtmlTable, toTsv, type CopiedCell, type HtmlCellLook } from "@/sheet/io/clipboard";
+import { csvNumberLocale } from "@/sheet/io/csv";
+import { BUILTIN_CODES, sigStyleName, toExcelFormat, withoutUnit } from "@/sheet/io/formatCodes";
+import type { ReadLimit } from "@/sheet/io/limits";
 import { copyArea, pasteClip, pasteText, type ClipData } from "@/sheet/ops";
 import type { Area, NumberFormat } from "@/sheet/types";
 import { activeArea, tablesAfterPaste, type SheetStore } from "../store";
@@ -57,9 +59,9 @@ function htmlTable(rows: string[][], styles: (HtmlCellLook | null)[][]): string 
   }
 }
 
-function parse(data: { text?: string; html?: string }): string[][] | null {
+function parse(data: { text?: string; html?: string }, limit: ReadLimit): string[][] | null {
   try {
-    return parseClipboard(data);
+    return parseClipboard(data, limit);
   } catch (e) {
     reportOnce("parseClipboard", e);
     const text = data.text ? normalize(data.text) : "";
@@ -67,12 +69,12 @@ function parse(data: { text?: string; html?: string }): string[][] | null {
   }
 }
 
-/** The full numbers behind a spreadsheet's copy (see clipboardNumbers); null when there are none, or reading them failed. */
-function exactNumbers(html: string | undefined, rows: string[][]): (number | null)[][] | null {
+/** The full numbers and formats behind a spreadsheet's copy (see clipboardCells); null when there are none, or reading them failed. */
+function copiedCells(html: string | undefined, rows: string[][], limit: ReadLimit): (CopiedCell | null)[][] | null {
   try {
-    return clipboardNumbers(html, rows);
+    return clipboardCells(html, rows, limit);
   } catch (e) {
-    reportOnce("clipboardNumbers", e);
+    reportOnce("clipboardCells", e);
     return null;
   }
 }
@@ -116,7 +118,7 @@ export function copySelection(store: SheetStore, cut: boolean): CopyPayload {
       if (!cell) look.push(null);
       else {
         const base: HtmlCellLook = { bold: cell.s?.bold, align: cell.s?.align ?? (value === null ? undefined : defaultAlign(value)) };
-        look.push(typeof value === "number" ? { ...base, num: value, fmt: msoFormat(fmt, s.locale, value) } : base);
+        look.push(typeof value === "number" ? { ...base, num: value, fmt: msoFormat(fmt, s.locale, value), style: sigStyleName(fmt) } : base);
       }
     }
     rows.push(line);
@@ -176,12 +178,14 @@ export function pasteData(store: SheetStore, data: { text?: string; html?: strin
   }
 
   if (!data || (!data.text && !data.html)) return false;
-  const parsed = parse({ text: data.text, html: data.html }) ?? (text ? [[text]] : null);
+  const transpose = mode === "transpose";
+  // No more than a sheet holds is read (its rows become columns when transposed).
+  const limit: ReadLimit = transpose ? { rows: SHEET_LIMIT.cols, cols: SHEET_LIMIT.rows } : SHEET_LIMIT;
+  const parsed = parse({ text: data.text, html: data.html }, limit) ?? (text ? [[text]] : null);
   if (!parsed || !parsed.length) return false;
   // Excel, LibreOffice and Google Sheets copy rounded text ("0,12") and, in their HTML, the full
-  // number (0,123456789): that one is pasted, so means and fits match the source.
-  const exact = exactNumbers(data.html, parsed);
-  const transpose = mode === "transpose";
+  // number (0,123456789) and its format: those are pasted, so means and fits match the source.
+  const exact = copiedCells(data.html, parsed, limit);
   const rows = transpose ? transposeRows(parsed, "") : parsed;
   const exactRows = exact && transpose ? transposeRows(exact, null) : exact;
   const height = rows.length;

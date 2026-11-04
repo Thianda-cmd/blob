@@ -205,6 +205,18 @@ export function WorkspaceProvider({
       // Your page inside someone else's shared page is yours, but has no subject (theirs decides where it lives).
       const parent = input.parent_id ? pages.find((p) => p.id === input.parent_id) : undefined;
       const foreignParent = Boolean(parent && parent.user_id !== userId);
+      // A new spreadsheet's content: the spreadsheet code loads only when one is made (every page
+      // of the app has this provider). Should it not load (offline), the button says so.
+      let sheetContent: unknown;
+      if (input.content === undefined && kind === "sheet") {
+        try {
+          sheetContent = (await import("@/sheet/doc")).newWorkbook(locale);
+        } catch (e) {
+          console.error("workspace: loading the spreadsheet code failed", e);
+          oops(t.createFailed);
+          return null;
+        }
+      }
       const { data, error } = await createClient()
         .from("pages")
         .insert({
@@ -214,19 +226,10 @@ export function WorkspaceProvider({
           subject_id: foreignParent ? null : (input.subject_id ?? null),
           parent_id: input.parent_id ?? null,
           position,
-          // A folder only holds pages: it has no content of its own. (The spreadsheet code loads only
-          // when a spreadsheet is made: every page of the app has this provider.)
+          // A folder only holds pages: it has no content of its own.
           content:
             input.content ??
-            (kind === "deck"
-              ? newDeckContent(input.title, locale)
-              : kind === "cv"
-                ? newCv(locale)
-                : kind === "ink"
-                  ? { v: 1 }
-                  : kind === "sheet"
-                    ? (await import("@/sheet/doc")).newWorkbook(locale)
-                    : {}),
+            (kind === "deck" ? newDeckContent(input.title, locale) : kind === "cv" ? newCv(locale) : kind === "ink" ? { v: 1 } : kind === "sheet" ? sheetContent : {}),
           ...(input.plain_text !== undefined && { plain_text: input.plain_text }),
           ...(input.tags?.length && { tags: input.tags.slice(0, 20) }),
           ...(input.topics?.length && { topics: input.topics.slice(0, 20) }),

@@ -40,7 +40,7 @@ import { Toolbar } from "./chrome/Toolbar";
 import { AddToNoteDialog } from "./embed/AddToNote";
 import { contentWidth } from "./grid/actions";
 import { focusSheetGrid, Grid, type GridGeometry } from "./grid/Grid";
-import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, type ReadProblem } from "./importFile";
+import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, sheetPageContent, type ReadProblem } from "./importFile";
 import { hideSheetNotice, showSheetNotice } from "./notice";
 import { printSheet } from "./print";
 import { SheetNotices } from "./SheetNotice";
@@ -375,12 +375,14 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
         return;
       }
       const ids = r.workbook.sheets.map((s) => s.id);
-      // Too big to save with the file in it: nothing changes (it can go into a spreadsheet of its own).
+      // Too big to save with the file in it: nothing changes. It can go into a spreadsheet of its
+      // own, unless it is too big for that as well (measured as the importer would).
       const before = store.get();
       const next = appendWorkbook(before.workbook, r.workbook, locale);
       const bytes = importedBytes(next, before.calc, locale);
       if (bytes > MAX_SHEET_BYTES) {
-        showSheetNotice(store, t.importNoRoom(bytes), "error");
+        const alone = sheetPageContent(r.workbook, locale).bytes;
+        showSheetNotice(store, alone > MAX_SHEET_BYTES ? t.importTooBigSheet(alone) : t.importNoRoom(bytes), "error");
         return;
       }
       setDismissed(true);

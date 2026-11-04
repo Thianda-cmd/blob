@@ -2294,6 +2294,15 @@ section("German 1.234: thousands or a decimal?");
   eq("0.512 and 1.5 stay decimals", [P("0.512").cell.v, P("1.5").cell.v, P("1.2345").cell.v], [0.512, 1.5, 1.2345]);
   eq("English is unchanged", [P("1,234", "en").cell.v, P("1,234", "en").notice], [1234, undefined]);
   eq("a percent cell", P("1.234", "de", { s: { fmt: { kind: "percent", decimals: 0 } } }).notice?.other.cell.v, 0.01234);
+  // The hint says what the cell shows (not the typed digits without the dot), and the other
+  // reading as it would be typed.
+  eq("the hint for 001.234, 1.000, -1.234, 1.234 % and 2.345 g", ["001.234", "1.000", "-1.234", "1.234 %", "2.345 g"].map((t) => P(t).notice?.message), [
+    "„001.234“ ist 1234: Der Punkt trennt Tausender. Für 001,234 tipp ein Komma.",
+    "„1.000“ ist 1000: Der Punkt trennt Tausender. Für 1,000 tipp ein Komma.",
+    "„-1.234“ ist -1234: Der Punkt trennt Tausender. Für -1,234 tipp ein Komma.",
+    "„1.234 %“ ist 1234%: Der Punkt trennt Tausender. Für 1,234 % tipp ein Komma.",
+    "„2.345 g“ ist 2345\u202fg: Der Punkt trennt Tausender. Für 2,345 g tipp ein Komma.",
+  ]);
 }
 
 // ==============================================================================================
@@ -2307,8 +2316,12 @@ section("German formulas: comma or semicolon?");
   eq("SVERWEIS with commas", meant("SVERWEIS(E2,B2:C6,2,0)"), "=SVERWEIS(E2;B2:C6;2;0)");
   eq("English names too", meant("VLOOKUP(E2,B2:C6,2,0)"), "=VLOOKUP(E2;B2:C6;2;0)");
   eq("MITTELWERT(1,2,3)", meant("MITTELWERT(1,2,3)"), "=MITTELWERT(1;2;3)");
-  eq("WENN(A1>0,5,1,0)", meant("WENN(A1>0,5,1,0)"), "=WENN(A1>0;5;1;0)");
   eq("SUMME(1,5,2)", meant("SUMME(1,5,2)"), "=SUMME(1;5;2)");
+  // Every comma a ";" would be too many arguments: one of them is a decimal comma, but which?
+  eq("WENN(A1>0,5,1,0): no guess", meant("WENN(A1>0,5,1,0)"), "ERROR: Komma oder Semikolon? In deutschen Formeln trennt ; die Argumente, und das Komma gehört in Dezimalzahlen (0,5). Trenn die Argumente von WENN mit ;.");
+  eq("RUNDEN(2,345,1): no guess", meant("RUNDEN(2,345,1)"), "ERROR: Komma oder Semikolon? In deutschen Formeln trennt ; die Argumente, und das Komma gehört in Dezimalzahlen (0,5). Trenn die Argumente von RUNDEN mit ;.");
+  eq("…nor for a function Blob doesn't know", meant("FOO(1,5,2)"), "ERROR: Komma oder Semikolon? In deutschen Formeln trennt ; die Argumente, und das Komma gehört in Dezimalzahlen (0,5). Trenn die Argumente mit ;.");
+  eq("the guess fits the function", [meant("WENN(A1>0,1,0)"), meant("RUNDEN(A1,2,5)")], ["=WENN(A1>0;1;0)","ERROR: Komma oder Semikolon? In deutschen Formeln trennt ; die Argumente, und das Komma gehört in Dezimalzahlen (0,5). Trenn die Argumente von RUNDEN mit ;."]);
   eq("only the call that mixes", meant("SUMME(MITTELWERT(1,5;2);A1,2,5)"), "=SUMME(MITTELWERT(1,5;2);A1;2;5)");
   eq("unambiguous: RUNDEN(A1,2)", meant("RUNDEN(A1,2)"), "OK ROUND(A1,2)");
   eq("unambiguous: SUMME(1,5;2)", meant("SUMME(1,5;2)"), "OK SUM(1.5,2)");
@@ -2330,9 +2343,42 @@ section("suggestions for unknown functions");
   eq("umlauts spelled out", [S("ZAEHLENWENN", "de"), S("KGROESSTE", "de"), S("LAENGE", "de")], ["ZÄHLENWENN", "KGRÖSSTE", "LÄNGE"]);
   eq("a German name in English", [S("SUMME", "en"), S("MITTELWERT", "en"), S("SVERWEIS", "en")], ["SUM", "AVERAGE", "VLOOKUP"]);
   eq("known words", [S("MODUS", "de"), S("DURCHSCHNITT", "de"), S("AVG", "en")], ["MODUS.EINF", "MITTELWERT", "AVERAGE"]);
-  eq("ties keep the first (most common) function", [S("MITTELWERTS", "de"), S("SUMM", "de"), S("SUME", "de")], ["MITTELWERT", "SUMME", "SUMME"]);
+  eq("a letter more or less wins over a changed one", [S("MITTELWERTS", "de"), S("SUMM", "de"), S("SUME", "de"), S("QUANTILE", "de"), S("QUANTILE.INKL", "de")], ["MITTELWERT", "SUMME", "SUMME", "QUANTIL", "QUANTIL.INKL"]);
   eq("no guess for a short name with a letter changed", [S("RANX", "de"), S("CODX", "en")], [null, null]);
   eq("…but one with a letter more or less", [S("COSX", "en"), S("SINN", "de")], ["COS", "SIN"]);
+  // Never a function with other maths (review: QUARTIL.INKL got QUANTIL.INKL, VAR.N got VAR.S).
+  eq("the population's, not the sample's", [S("VAR.N", "de"), S("VARIANZ.N", "de"), S("STABW.P", "de"), S("KOVARIANZ.N", "de"), S("VARIANZ.S", "de")], ["VAR.P", "VAR.P", "STABW.N", "KOVARIANZ.P", "VAR.S"]);
+  eq("…in English", [S("STDEV.N", "en"), S("VAR.N", "en"), S("COVARIANCE.N", "en")], ["STDEV.P", "VAR.P", "COVARIANCE.P"]);
+  eq("quartiles, not quantiles", [S("QUARTIL", "de"), S("QUARTIL.INKL", "de"), S("QUARTIL.EXKL", "de"), S("QUARTILE.INK", "de"), S("QUARTIL", "en")], ["QUARTILE.INKL", "QUARTILE.INKL", "QUARTILE.EXKL", "QUARTILE.INKL", "QUARTILE.INC"]);
+  eq("KONFIDENZ.N is the normal one, the one-tailed t is .RE", [S("KONFIDENZ.N", "de"), S("CONFIDENCE.N", "en"), S("T.VERT.1S", "de"), S("T.DIST.1T", "en")], ["KONFIDENZ.NORM", "CONFIDENCE.NORM", "T.VERT.RE", "T.DIST.RT"]);
+  eq("no guess where the maths would change", ["T.INV.1S", "F.VERT.LS", "NORMVERT.S", "TVERT2", "F.TEST2", "FTEST2", "LOG2", "LD", "EXP10", "WURZEL3", "STABW.SN", "T.DIST.T", "KONFIDENZ.", "NORM..VERT"].map((t) => S(t, "de")), Array(14).fill(null));
+  eq("…in English", ["LOG2", "T.INV.1T", "STDEV.", "SUMISF", "LVOOKUP"].map((t) => S(t, "en")), Array(5).fill(null));
+  eq("slips that stay with their function", [S("RANG.GLEIH", "de"), S("MODALWER", "de"), S("HAEUFIGKEITEN", "de"), S("XVERGLEICHEN", "de"), S("VERWEISS", "de"), S("MITTLEWERT", "de"), S("EHUTE", "de"), S("TVERT.RE", "de")], ["RANG.GLEICH", "MODALWERT", "HÄUFIGKEIT", "XVERGLEICH", "VERWEIS", "MITTELWERT", "HEUTE", "T.VERT.RE"]);
+  eq("names that differ only in dots and calculate differently: the exact one", [S("TVERT", "en"), S("T.VERT", "en"), S("TV.ERT", "de")], ["TDIST", "T.DIST", null]);
+  // Every function's name with one slip (a letter dropped, doubled or swapped): its own function or no guess.
+  {
+    const own = (a: E.FunctionName, b: E.FunctionName | undefined) => !!b && (a === b || (a.newer?.length === 1 && a.newer[0] === b.en) || (b.newer?.length === 1 && b.newer[0] === a.en));
+    let other = 0;
+    let tried = 0;
+    for (const f of E.FUNCTION_NAMES) {
+      for (const locale of ["de", "en"] as const) {
+        const name = locale === "de" ? f.de : f.en;
+        const slips = new Set<string>();
+        for (let i = 0; i < name.length; i++) {
+          slips.add(name.slice(0, i) + name.slice(i + 1));
+          slips.add(name.slice(0, i) + name[i] + name.slice(i));
+          if (i + 1 < name.length) slips.add(name.slice(0, i) + name[i + 1] + name[i] + name.slice(i + 2));
+        }
+        for (const t of slips) {
+          if (!t || E.FUNCTION_BY_DE.has(t) || E.FUNCTION_BY_EN.has(t)) continue;
+          tried++;
+          const s = S(t, locale);
+          if (s !== null && !own(f, E.FUNCTION_NAMES.find((g) => (locale === "de" ? g.de : g.en) === s)) && other++ < 3) check(`${t} (${name})`, false, `got ${s}`);
+        }
+      }
+    }
+    check(`one slip never leads to another function (${tried} tried, ${other} did)`, other === 0 && tried > 8000);
+  }
   eq("Excel functions Blob lacks get no guess", [S("BINOM.VERT", "de"), S("EINDEUTIG", "de"), S("POISSON", "en")], [null, null, null]);
   check("…and are named as such", E.explainError({ error: "#NAME?", detail: "unknown-function:BINOM.VERT" }, "de").includes("in Blob noch nicht"));
   const msg = E.toCanonicalFormula("BINOM.VERT(3;10;0,5;FALSCH)", "de");
@@ -2402,7 +2448,9 @@ section("Excel's older names, F- and chi-squared tests, XVERGLEICH, VERWEIS, HÄ
     eq(`${deText.split("(")[0]} typed in German`, canon(deText), enText);
     eq(`${deText.split("(")[0]} shown in German`, E.toLocalFormula(enText, "de"), deText);
   }
-  eq("newer functions get _xlfn. in files, older ones don't", E.toFileFormula("T.DIST.RT(2,5)+TDIST(2,5,2)+XMATCH(1,A1:A3)+CHISQ.TEST(A1:A2,B1:B2)+CHITEST(A1:A2,B1:B2)"), "_xlfn.T.DIST.RT(2,5)+TDIST(2,5,2)+_xlfn.XMATCH(1,A1:A3)+_xlfn.CHISQ.TEST(A1:A2,B1:B2)+CHITEST(A1:A2,B1:B2)");
+  eq("TVERT's newer names: T.VERT.RE (Seiten 1) and T.VERT.2S (Seiten 2)", E.FUNCTION_BY_EN.get("TDIST")?.newer, ["T.DIST.RT", "T.DIST.2T"]);
+  eq("every newer name is a function", E.FUNCTION_NAMES.flatMap((f) => f.newer ?? []).filter((n) => !E.FUNCTION_BY_EN.has(n) || E.FUNCTION_BY_EN.get(n)!.newer), []);
+  eq("newer functions get _xlfn. in files, older ones don't",E.toFileFormula("T.DIST.RT(2,5)+TDIST(2,5,2)+XMATCH(1,A1:A3)+CHISQ.TEST(A1:A2,B1:B2)+CHITEST(A1:A2,B1:B2)"), "_xlfn.T.DIST.RT(2,5)+TDIST(2,5,2)+_xlfn.XMATCH(1,A1:A3)+_xlfn.CHISQ.TEST(A1:A2,B1:B2)+CHITEST(A1:A2,B1:B2)");
   // Values from LibreOffice 24.2 (scratchpad fix/B/lo/new.lo.json), to 1e-9.
   const data = { A1: 0.512, A2: 0.498, A3: 0.505, A4: 0.52, A5: 0.49, A6: 0.505, A7: "x", A9: 0.531, A10: 0.487, B1: 0.431, B2: 0.452, B3: 0.44, B4: 0.47, B5: 0.433, B6: 0.461 };
   const lo: [string, number][] = [
@@ -2539,7 +2587,64 @@ section("error messages that say why");
   eq("MITTELWERTWENN without a match", why('MITTELWERTWENN(A1:A3;"x";A1:A3)', one), "#DIV/0! Keine Zelle erfüllt die Bedingung, darum hat MITTELWERTWENN nichts zu mitteln.");
   eq("KORREL of constant data", why("KORREL(A1:A3;B1:B3)", { A1: 1, A2: 2, A3: 3, B1: 5, B2: 5, B3: 5 }), "#DIV/0! KORREL kann nicht rechnen, weil die Werte alle gleich sind (bei Wertepaaren: alle x- oder alle y-Werte). Ohne Streuung gibt es kein Ergebnis.");
   eq("STEIGUNG with all x the same", why("STEIGUNG(A1:A3;B1:B3)", { A1: 1, A2: 2, A3: 3, B1: 5, B2: 5, B3: 5 }).startsWith("#DIV/0! STEIGUNG kann nicht rechnen"), true);
-  eq("STFEHLERYX of 2 points", why("STFEHLERYX(A1:A2;B1:B2)", { A1: 1, A2: 2, B1: 1, B2: 2 }), "#DIV/0! STFEHLERYX braucht mindestens 3 Zahlen – hier sind es nur 2. Leere Zellen und Text zählen nicht.");
+  eq("STFEHLERYX of 2 points", why("STFEHLERYX(A1:A2;B1:B2)", { A1: 1, A2: 2, B1: 1, B2: 2 }), "#DIV/0! STFEHLERYX braucht mindestens 3 Wertepaare – hier sind es nur 2. Ein Paar zählt nur, wenn in beiden Bereichen an derselben Stelle eine Zahl steht.");
+  // Pairs count, not numbers: 4 numbers, but only row 1 has both x and y.
+  const gaps = { A1: 1, A2: 2, B1: 3, B3: 4 };
+  for (const f of ["STEIGUNG", "ACHSENABSCHNITT", "BESTIMMTHEITSMASS", "KORREL", "PEARSON", "KOVARIANZ.S"]) eq(`${f} with one complete pair`, why(`${f}(A1:A3;B1:B3)`, gaps), `#DIV/0! ${f} braucht mindestens 2 Wertepaare – hier ist es nur eins. Ein Paar zählt nur, wenn in beiden Bereichen an derselben Stelle eine Zahl steht.`);
+  eq("PROGNOSE.LINEAR too", why("PROGNOSE.LINEAR(5;A1:A3;B1:B3)", gaps).startsWith("#DIV/0! PROGNOSE.LINEAR braucht mindestens 2 Wertepaare"), true);
+  eq("paired T.TEST", why("T.TEST(A1:A3;B1:B3;2;1)", gaps).startsWith("#DIV/0! T.TEST braucht mindestens 2 Wertepaare – hier ist es nur eins."), true);
+  eq("KOVARIANZ.P without any pair", why("KOVARIANZ.P(A1:A2;B1:B2)", { A1: 1, B2: 2 }), "#DIV/0! KOVARIANZ.P findet kein Wertepaar. Ein Paar zählt nur, wenn in beiden Bereichen an derselben Stelle eine Zahl steht.");
+  eq("…in English", why("SLOPE(A1:A3,B1:B3)", gaps, "en"), "#DIV/0! SLOPE needs at least 2 pairs of values – there is only one here. A pair only counts when both ranges hold a number in the same place.");
+  // The A forms count text as 0.
+  eq("STABWA of one value", why("STABWA(A1:A3)", one), "#DIV/0! STABWA braucht mindestens 2 Werte – hier ist es nur einer. Leere Zellen zählen nicht, Text zählt als 0.");
+  check("…VARIANZA alike", why("VARIANZA(A1:A3)", { A1: "x" }).endsWith("hier ist es nur einer. Leere Zellen zählen nicht, Text zählt als 0."));
+  eq("STABWNA and VARIANZENA of empty cells", [why("STABWNA(A1:A3)"), why("VARIANZENA(A1:A3)")].map((t) => t.slice(t.indexOf("findet"))), Array(2).fill("findet keinen Wert: Leere Zellen zählen nicht. Prüf den Bereich."));
+  eq("MITTELWERTA of empty cells", why("MITTELWERTA(A1:A3)"), "#DIV/0! MITTELWERTA findet keinen Wert: Leere Zellen zählen nicht. Prüf den Bereich.");
+  eq("…in English", why("STDEVA(A1:A3)", one, "en"), "#DIV/0! STDEVA needs at least 2 values – there is only one here. Empty cells don't count; text counts as 0.");
+  // Whole bounds in full.
+  const many: Record<string, CellInput> = {};
+  for (let i = 1; i <= 12345; i++) many[`A${i}`] = i;
+  eq("KGRÖSSTE over 12.345 numbers", why("KGRÖSSTE(A1:A12345;20000)", many), "#ZAHL! Bei KGRÖSSTE muss „k“ zwischen 1 und 12.345 liegen.");
+  eq("…in English", why("LARGE(A1:A12345,20000)", many, "en"), '#NUM! In LARGE, "k" must be between 1 and 12,345.');
+  // "@" in a detail that isn't the function's own (a sheet's name, a unit) stays.
+  eq("a missing sheet with @ in its name", why("SUMME('Messung @ 37 °C'!A1:A3)"), "#BEZUG! Das Blatt „Messung @ 37 °C“ gibt es nicht (mehr).");
+  eq("…the same without a function", why("'Messung @ 37 °C'!A1"), "#BEZUG! Das Blatt „Messung @ 37 °C“ gibt es nicht (mehr).");
+  eq("a unit with @", why('UMWANDELN(1;"m@";"cm")'), "#NV Die Einheit „m@“ kenne ich nicht, oder die Einheiten passen nicht zusammen.");
+  // The argument names of the messages are the help's (src/sheet/engine/docs.ts), in every function.
+  {
+    const differ: string[] = [];
+    let named = 0;
+    for (const [fn, doc] of Object.entries(FUNCTION_DOCS)) {
+      for (const locale of ["de", "en"] as const) {
+        doc[locale].args.forEach((arg, i) => {
+          const text = E.explainError({ error: "#NUM!", detail: `arg:${fn}:${i + 1}:gt0` }, locale);
+          if (text.startsWith(locale === "de" ? "Ein Argument von" : "An argument of")) return;
+          named++;
+          if (!text.includes(locale === "de" ? `„${arg.name}“` : `"${arg.name}"`)) differ.push(`${fn} ${i + 1} ${locale}: ${text}`);
+        });
+      }
+    }
+    eq(`argument names as in the help (${named} named)`, differ, []);
+    const opts: [string, number][] = [["T.TEST", 3], ["T.TEST", 4], ["TTEST", 3], ["TTEST", 4], ["TDIST", 3]];
+    for (const locale of ["de", "en"] as const) for (const [fn, i] of opts) check(`${fn} ${i} lists the help's choices (${locale})`, E.explainError({ error: "#NUM!", detail: `arg:${fn}:${i}:opt` }, locale).endsWith(FUNCTION_DOCS[fn][locale].args[i - 1].desc));
+    // Each error that names an argument, by formula: never the general sentence.
+    const general: string[] = [];
+    const forms = [
+      "QUANTIL.INKL(A1:A3;2)", "QUANTIL(A1:A3;2)", "QUANTIL.EXKL(A1:A3;0,01)", "QUARTILE.INKL(A1:A3;5)", "QUARTILE(A1:A3;5)", "QUARTILE.EXKL(A1:A3;4)",
+      "KGRÖSSTE(A1:A3;9)", "KKLEINSTE(A1:A3;9)", "T.TEST(A1:A3;B1:B3;3;1)", "TTEST(A1:A3;B1:B3;2;7)", "KONFIDENZ.NORM(2;1;5)", "KONFIDENZ(0,05;0;5)",
+      "KONFIDENZ.T(0,05;1;0)", "F.VERT(-1;2;3;WAHR)", "F.VERT.RE(1;0;3)", "FVERT(1;2;0)", "F.INV(1;2;3)", "F.INV.RE(0;2;3)", "FINV(0,5;0;3)",
+      "CHIQU.VERT(-1;2;WAHR)", "CHIQU.VERT.RE(1;0)", "CHIVERT(-1;2)", "CHIQU.INV(1;2)", "CHIQU.INV.RE(0;2)", "CHIINV(0,5;0)", "GEOMITTEL(1;-2)",
+      "HARMITTEL(0;2)", "STANDARDISIERUNG(1;2;0)", "NORM.VERT(1;2;0;WAHR)", "NORMVERT(1;2;-1;WAHR)", "NORM.INV(2;0;1)", "NORMINV(0,5;0;0)",
+      "NORM.S.INV(0)", "STANDNORMINV(1)", "T.VERT(1;0;WAHR)", "T.VERT.2S(-1;5)", "T.VERT.RE(1;0)", "TVERT(1;5;3)", "TVERT(-1;5;1)", "T.INV(0;5)",
+      "T.INV.2S(2;5)", "TINV(0,5;0)", "CHIQU.TEST(E1:E2;B1:B2)", "CHITEST(A1:A2;C1:C2)", "VARIATION(D1:D3)", "RKP(D1:D3)",
+    ];
+    const data = { A1: 1, A2: 2, A3: 3, B1: 1, B2: 2, B3: 4, C1: 1, C2: -1, D1: 1, D2: -2, D3: 3 };
+    for (const f of forms) {
+      const text = why(f, data);
+      if (!/„.+“/.test(text)) general.push(`${f}: ${text}`);
+    }
+    eq(`every argument error names its argument (${forms.length} formulas)`, general, []);
+  }
   eq("T.TEST with one value in a group", why("T.TEST(A1:A2;B1:B2;2;3)", { A1: 1, A2: 2, B1: 3 }), "#DIV/0! T.TEST braucht in jeder Gruppe mindestens 2 Zahlen – in einer ist es nur eine. Leere Zellen und Text zählen nicht.");
   eq("KONFIDENZ.T with n = 1", why("KONFIDENZ.T(0,05;0,1;1)"), "#DIV/0! Bei KONFIDENZ.T muss „Umfang“ mindestens 2 sein.");
   eq("QUANTIL.INKL with k = 1,5", why("QUANTIL.INKL(A1:A3;1,5)", one), "#ZAHL! Bei QUANTIL.INKL muss „k“ zwischen 0 und 1 liegen.");
@@ -2631,6 +2736,12 @@ section("lab units");
   };
   eq("molar mass, ppm, density, conductivity, flow", ["58,44 g/mol", "5 ppm", "12 ppb", "1,02 g/cm³", "450 µS/cm", "2,5 mL/min", "1,5 l/min", "3 mg/kg", "5 U/µL", "0,5 OD", "45°"].map(unit), ["58.44 g/mol", "5 ppm", "12 ppb", "1.02 g/cm³", "450 µS/cm", "2.5 mL/min", "1.5 l/min", "3 mg/kg", "5 U/µL", "0.5 OD", "45 °"]);
   eq("a 3 or 2 after a unit is its power", [unit("1,02 g/cm3"), unit("1,2 kg/m3"), unit("25 cm2")], ["1.02 g/cm³", "1.2 kg/m³", "25 cm²"]);
+  eq("…right after it: a digit on its own is no power", [unit("10 cm 3"), unit("3 g 2")], ['text "10 cm 3"', 'text "3 g 2"']);
+  const shown = (t: string) => {
+    const r = P(t);
+    return E.formatValue(r.cell.v ?? null, r.fmt, "de");
+  };
+  eq("an angle's ° follows the number, °C keeps its (narrow) space", [shown("45°"), shown("45 °"), shown("37 °C"), shown("12,5 mg/L")], ["45°", "45°", "37\u202f°C", "12,5\u202fmg/L"]);
   eq("words stay text", ["3 Proben", "2 Kolben", "3 Tage", "5 g Zucker"].map(unit), ['text "3 Proben"', 'text "2 Kolben"', 'text "3 Tage"', 'text "5 g Zucker"']);
   eq("50 % is a percentage", P("50 %").fmt, { kind: "percent", decimals: 0 });
   eq("MITTELWERT counts them", val(book1({ A1: P("58,44 g/mol").cell.v as number, A2: P("40 g/mol").cell.v as number, A3: "=AVERAGE(A1:A2)" }), "A3"), 49.22);
@@ -2675,6 +2786,68 @@ section("wildcards in linear time");
   eq("find with 8 stars", O.findCells(tb, calcOf(tb), "a*a*a*a*a*a*a*a*b", {}, "de"), []);
   eq("replace with 8 stars", O.replaceCells(tb, calcOf(tb), "a*a*a*a*a*a*a*a*b", "x", {}, "de").count, 0);
   check(`…quick (${(performance.now() - t0).toFixed(1)} ms)`, performance.now() - t0 < 100);
+
+  // A text with wildcards longer than 255 characters is no pattern (#WERT!, as Excel gives for any
+  // criterion or lookup value that long): a sheet under the 5 MB limit with 150 cells of 32,767
+  // characters and one such criteria cell blocked the page for 8 seconds on every open.
+  const crafted: Record<string, CellInput> = { B1: `*${"a".repeat(32764)}b*`, C1: "=COUNTIF(A1:A150,B1)", C2: "=MATCH(B1,A1:A150,0)", C3: "=VLOOKUP(B1,A1:A150,1,FALSE)", C4: "=XLOOKUP(B1,A1:A150,A1:A150,,2)", C5: "=SEARCH(B1,A1)", C6: "=SUMIF(A1:A150,B1)", C7: "=XMATCH(B1,A1:A150,2)" };
+  for (let i = 1; i <= 150; i++) crafted[`A${i}`] = aaa;
+  t0 = performance.now();
+  const cw = book1(crafted);
+  const codes = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"].map((a) => (val(cw, a) as E.CellError).error);
+  const craftedMs = performance.now() - t0;
+  eq("a pattern of 32,767 characters: #WERT! in COUNTIF, MATCH, VLOOKUP, XLOOKUP, SEARCH, SUMIF, XMATCH", codes, Array(7).fill("#VALUE!"));
+  check(`…the crafted sheet calculates in under 200 ms (${craftedMs.toFixed(0)} ms)`, craftedMs < 200, `${craftedMs.toFixed(0)} ms`);
+  eq("…and says why", E.explainError(val(cw, "C1") as E.CellError, "de"), "Das Suchmuster ist zu lang: höchstens 255 Zeichen, wie in Excel.");
+  const p255 = `*${"a".repeat(253)}*`;
+  const p256 = `*${"a".repeat(254)}*`;
+  eq("255 characters still match, 256 don't", [ev(`COUNTIF(A1:A2,"${p255}")`, { A1: aaa, A2: "b" }), (ev(`COUNTIF(A1:A2,"${p256}")`, { A1: aaa }) as E.CellError).error], [1, "#VALUE!"]);
+  // Without wildcards a long text is compared as it is (no pattern to match), as before.
+  const longText = "Kolonie ".repeat(100);
+  eq("long text without wildcards still counts and looks up", [ev("COUNTIF(A1:A3,A1)", { A1: longText, A2: longText, A3: "x" }), ev("MATCH(A1,A2:A3,0)", { A1: longText, A3: longText }), ev("SEARCH(A1,A2)", { A1: longText, A2: `x${longText}` })], [2, 2, 2]);
+  eq("XLOOKUP's exact mode takes * and ? as they are, at any length", ev("XLOOKUP(A1,A2:A3,B2:B3)", { A1: `${longText}*?`, A2: "x", A3: `${longText}*?`, B3: 7 }), 7);
+  eq("comparisons (<, >) take no wildcards", ev(`COUNTIF(A1:A2,">${"*".repeat(300)}")`, { A1: "b", A2: "a" }), 2);
+  t0 = performance.now();
+  const plainSearch = ev("SEARCH(A2,A1)", { A1: aaa, A2: `${"a".repeat(30000)}b` }) as E.CellError;
+  const plainMs = performance.now() - t0;
+  eq("SEARCH of a long text without wildcards in a long text", [plainSearch.error, plainSearch.detail], ["#VALUE!", "not-found"]);
+  check(`…is quick (${plainMs.toFixed(0)} ms)`, plainMs < 100, `${plainMs.toFixed(0)} ms`);
+
+  // The matcher against the RegExp it replaced, on short texts full of case-folding traps (ß, ẞ,
+  // ı, İ, ſ, the Kelvin sign, σ/ς/Σ, emoji, Deseret letters, ǅ, ﬀ): the browser's own search
+  // must find the same.
+  const reSource = (p: string, lazy = false) => {
+    let s = "";
+    for (let i = 0; i < p.length; i++) {
+      const ch = p[i];
+      if (ch === "~" && i + 1 < p.length && "*?~".includes(p[i + 1])) s += p[++i].replace(/[*?]/, "\\$&");
+      else if (ch === "*") s += lazy ? "[\\s\\S]*?" : "[\\s\\S]*";
+      else if (ch === "?") s += "[\\s\\S]";
+      else s += ch.replace(/[\\^$.|+()[\]{}]/g, "\\$&");
+    }
+    return s;
+  };
+  let seed = 4711;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const alphabet = ["a", "A", "b", "B", "ä", "Ä", "ß", "ẞ", "s", "S", "k", "K", "\u212a", "ı", "I", "i", "İ", "σ", "ς", "Σ", "😀", "\u{10428}", "\u{10400}", "\u01c5", "x", " ", ".", "ﬀ", "ſ", "µ", "μ"];
+  const pick = (n: number, extra: string[] = []) => Array.from({ length: n }, () => [...alphabet, ...extra][Math.floor(rnd() * (alphabet.length + extra.length))]).join("");
+  const mismatches: string[] = [];
+  for (let k = 0; k < 4000; k++) {
+    const p = pick(Math.floor(rnd() * 6), ["*", "*", "?", "~*", "~~"]);
+    const t = pick(Math.floor(rnd() * 10));
+    for (const [flags, opts] of [["i", {}], ["iu", { unicode: true }], ["", { matchCase: true }]] as const) {
+      const gl = E.compileGlob(p, opts);
+      if (new RegExp(`^${reSource(p)}$`, flags).test(t) !== E.globTest(gl, t)) mismatches.push(`whole/${flags} ${p} ${t}`);
+      if (new RegExp(reSource(p), flags).test(t) !== E.globTest(gl, t, "contains")) mismatches.push(`contains/${flags} ${p} ${t}`);
+      if (flags === "iu") continue;
+      const m = new RegExp(reSource(p), flags).exec(t);
+      if (show(m && { start: m.index, end: m.index + m[0].length }) !== show(E.globFind(gl, t))) mismatches.push(`find/${flags} ${p} ${t}`);
+      const from = Math.floor(rnd() * (t.length + 1));
+      const lazy = new RegExp(reSource(p, true), flags).exec(t.slice(from));
+      if ((lazy ? lazy.index + from : -1) !== E.globIndex(gl, t, from)) mismatches.push(`index/${flags} ${p} ${t} @${from}`);
+    }
+  }
+  eq("the same results as a RegExp (4,000 patterns × 3 case rules)", mismatches.slice(0, 5), []);
 }
 
 // ==============================================================================================

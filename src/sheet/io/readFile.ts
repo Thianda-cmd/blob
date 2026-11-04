@@ -14,11 +14,11 @@ import { normalizeWorkbook } from "../doc";
 import { MAX_FORMULA_LENGTH } from "../engine";
 import { newId, pasteText } from "../ops";
 import { DEFAULT_SIZE, MAX_COLS, MAX_ROWS, type ChartSpec, type RangeRef, type Sheet, type TableSpec, type Workbook } from "../types";
-import { parseHtmlTable } from "./clipboard";
+import { clipboardCells, parseHtmlTable, pasteExactNumbers, type CopiedCell } from "./clipboard";
 import { csvNumberLocale, parseCsv } from "./csv";
+import { FILE_LIMIT, MAX_IMPORT_TEXT, MAX_SHEETS } from "./limits";
 
-/** The most sheets a spreadsheet holds (as src/sheet/doc.ts keeps). */
-export const MAX_SHEETS = 250;
+export { MAX_SHEETS };
 
 /**
  * Why a file wasn't read: too big to read at all, an old binary Excel file, nothing in it, it
@@ -60,10 +60,11 @@ function decodeText(bytes: Uint8Array): string {
 
 /**
  * Text that is markup, not rows of values: an HTML page or XML (Excel 2003 XML, a LIMS export)
- * saved as .xls. Only a whole first tag counts, so a first value like "<0,1" or "<NWG" (below the
- * detection limit) is still data.
+ * saved as .xls. Only what such files start with counts (a whole tag, which may run over several
+ * lines like Excel's own <html xmlns:v=… xmlns:o=…>), so a first value like "<0,1", "<NWG" (below
+ * the detection limit) or "<b>Probe</b>" is still data.
  */
-const MARKUP = /^\s*<(?:[a-z][\w:.-]*(?:\s[^<>\n]*)?\/?>|!doctype\b|!--|\?xml\b)/i;
+const MARKUP = /^\s*<(?:!doctype\b|!--|\?xml\b|(?:html|head|body|table|meta|style|title|(?:\w+:)?workbook)\b[^<>]*>)/i;
 
 const blankSheet = (id: string, name: string): Sheet => ({ id, name, cells: {}, cols: {}, rows: {}, freeze: { rows: 0, cols: 0 }, size: { rows: DEFAULT_SIZE.rows, cols: DEFAULT_SIZE.cols } });
 
@@ -86,6 +87,7 @@ export async function readSheetBytes(bytes: Uint8Array, fileName: string, locale
         const { workbook, skipped } = await importXlsx(bytes, locale, { maxSheets: room });
         if (!workbook.sheets.length) return { error: "empty" };
         const kept = keepable(workbook, locale);
+        if (cellText(kept.workbook) > MAX_IMPORT_TEXT) return { error: "tooBig", message: errors.tooBig };
         return { workbook: freshIds(kept.workbook), skipped: [...skipped, ...kept.lost], cutRows: null, kind: "xlsx", name };
       } catch (e) {
         if (!(e instanceof XlsxError)) throw e;
@@ -95,12 +97,15 @@ export async function readSheetBytes(bytes: Uint8Array, fileName: string, locale
 
     const text = decodeText(bytes);
     let rows: string[][];
+    let copied: (CopiedCell | null)[][] | null = null;
     if (MARKUP.test(text.slice(0, 2000))) {
       // A web page or XML: its table if it has one (web tools save HTML tables as .xls).
-      const table = /<table[\s>]/i.test(text) ? parseHtmlTable(text) : null;
+      const table = /<table[\s>]/i.test(text) ? parseHtmlTable(text, FILE_LIMIT) : null;
       if (!table) return { error: "failed", message: errors.notTable };
       rows = table;
-    } else rows = parseCsv(text);
+      // Excel's own web pages carry each number's full value and format, as its copies do.
+      copied = clipboardCells(text, rows, FILE_LIMIT);
+    } else rows = parseCsv(text, FILE_LIMIT);
     if (!rows.length || rows.every((r) => r.every((c) => !c.trim()))) return { error: "empty" };
     const cutRows = rows.length > MAX_ROWS ? MAX_ROWS : null;
     rows = rows.slice(0, MAX_ROWS).map((r) => r.slice(0, MAX_COLS));
@@ -108,7 +113,10 @@ export async function readSheetBytes(bytes: Uint8Array, fileName: string, locale
     const sheetName = name.replace(/[[\]:*?/\\]/g, " ").replace(/^'+|'+$/g, "").trim().slice(0, 31) || (locale === "de" ? "Blatt 1" : "Sheet 1");
     // Numbers are read in the language the file writes them in: an English lab CSV opened in
     // German keeps 0.123 as 0,123 (not 123).
-    const wb = pasteText({ v: 1, sheets: [blankSheet(id, sheetName)], charts: [], tables: [] }, id, { row: 0, col: 0 }, rows, csvNumberLocale(rows, locale));
+    const numbers = csvNumberLocale(rows, locale);
+    let wb = pasteText({ v: 1, sheets: [blankSheet(id, sheetName)], charts: [], tables: [] }, id, { row: 0, col: 0 }, rows, numbers);
+    if (copied) wb = pasteExactNumbers(wb, id, { row: 0, col: 0 }, rows, copied, numbers);
+    // (Text files bring no more text than they have: no check for MAX_IMPORT_TEXT needed.)
     const kept = keepable(wb, locale);
     return { workbook: kept.workbook, skipped: kept.lost, cutRows, kind: "csv", name };
   } catch (e) {
@@ -163,6 +171,24 @@ function keepable(wb: Workbook, locale: Locale): { workbook: Workbook; lost: str
 function formulaCount(sheet: Sheet): number {
   let n = 0;
   for (const key in sheet.cells) if (sheet.cells[key].f !== undefined) n++;
+  return n;
+}
+
+/**
+ * Characters of text in a workbook's cells (values, formulas, notes). The Excel reader stops at
+ * MAX_IMPORT_TEXT already; this is the last check before the workbook goes to the page (the
+ * worker's message copies all of it, and the page measures it as JSON).
+ */
+function cellText(wb: Workbook): number {
+  let n = 0;
+  for (const sheet of wb.sheets) {
+    for (const key in sheet.cells) {
+      const c = sheet.cells[key];
+      if (typeof c.v === "string") n += c.v.length;
+      if (c.f !== undefined) n += c.f.length;
+      if (c.note !== undefined) n += c.note.length;
+    }
+  }
   return n;
 }
 

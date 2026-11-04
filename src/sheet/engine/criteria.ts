@@ -11,10 +11,11 @@ export type Criterion = (v: Scalar) => boolean;
 export const hasWildcards = (s: string) => /[*?~]/.test(s);
 
 /**
- * The longest text with wildcards that a criterion, a lookup or SUCHEN takes, as in Excel (255
- * characters; longer gives #WERT!). Matching takes up to (length of the text) × (length of the
- * pattern ÷ 32) steps, so a pattern of 32,767 characters from a cell, against long texts, would
- * hold up the sheet for seconds per formula.
+ * The longest text with wildcards that a criterion, a lookup or SUCHEN takes: 255 characters,
+ * longer gives #WERT! (Excel refuses any text that long there; without wildcards Blob still
+ * compares it). Matching takes up to (length of the text) × (length of the pattern ÷ 32) steps,
+ * so a pattern of 32,767 characters from a cell, against long texts, would hold up the sheet for
+ * seconds per formula.
  */
 export const MAX_PATTERN = 255;
 
