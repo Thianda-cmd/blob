@@ -4,20 +4,20 @@
 // a preview of the active cell's value, the decimals, the thousands separator, the currency
 // symbol, and a unit after the number ("12,5 mg/L") for lab values.
 
-import { Calendar, CalendarClock, Clock, Euro, FlaskConical, Hash, Minus, Percent, Plus, Ruler, Type, X } from "lucide-react";
+import { Calendar, CalendarClock, Clock, Euro, FlaskConical, Hash, Minus, Percent, Plus, Ruler, Timer, Type, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { cn } from "@/lib/utils";
-import { formatValue, serialFromYMD } from "@/sheet/engine";
+import { formatValue, isDuration, serialFromYMD } from "@/sheet/engine";
 import { getCell } from "@/sheet/ops";
 import type { NumberFormat } from "@/sheet/types";
 import { useSheet, type SheetStore } from "../store";
 import { changeDecimals, setNumberFormat, setUnit, stepDecimals, takesUnit, unitOf } from "./actions";
 import { Choice, keepFocus } from "./parts";
 
-export type FormatId = "general" | "number" | "percent" | "scientific" | "significant" | "currency" | "dateShort" | "dateLong" | "dateIso" | "time" | "datetime" | "text";
+export type FormatId = "general" | "number" | "percent" | "scientific" | "significant" | "currency" | "dateShort" | "dateLong" | "dateIso" | "time" | "duration" | "datetime" | "text";
 
 /** Units lab students write after their numbers. */
 export const UNIT_SUGGESTIONS = ["mg/L", "µg/mL", "mol/L", "mM", "µL", "mL", "°C", "nm", "%", "min", "h"];
@@ -28,6 +28,8 @@ export function formatId(fmt: NumberFormat | undefined): FormatId {
   switch (fmt.kind) {
     case "date":
       return fmt.style === "long" ? "dateLong" : fmt.style === "iso" ? "dateIso" : "dateShort";
+    case "time":
+      return isDuration(fmt) ? "duration" : "time";
     default:
       return fmt.kind;
   }
@@ -104,6 +106,8 @@ export function formatFor(id: FormatId, current: NumberFormat | undefined, local
       return { kind: "date", style: "iso" };
     case "time":
       return { kind: "time", seconds: current?.kind === "time" ? current.seconds : false };
+    case "duration":
+      return { kind: "time", seconds: current?.kind === "time" ? current.seconds : false, duration: true };
     case "datetime":
       return { kind: "datetime" };
     case "text":
@@ -122,14 +126,17 @@ const ICONS: Record<FormatId, ReactNode> = {
   dateLong: <Calendar />,
   dateIso: <Calendar />,
   time: <Clock />,
+  duration: <Timer />,
   datetime: <CalendarClock />,
   text: <Type />,
 };
 
-const ORDER: FormatId[] = ["general", "number", "percent", "scientific", "significant", "currency", "dateShort", "dateLong", "dateIso", "time", "datetime", "text"];
+const ORDER: FormatId[] = ["general", "number", "percent", "scientific", "significant", "currency", "dateShort", "dateLong", "dateIso", "time", "duration", "datetime", "text"];
 
 // A fixed example date for the previews when the active cell has none: 3 November 2026, 14:30.
 const SAMPLE_DATE = serialFromYMD(2026, 11, 3) + 14.5 / 24;
+// …and a duration: one and a half days (36:00).
+const SAMPLE_DURATION = 1.5;
 
 /**
  * What a format would show: exactly what the active cell would look like, or (when it holds no
@@ -139,7 +146,7 @@ function preview(id: FormatId, fmt: NumberFormat | null, value: number | null, t
   if (id === "text") return text ?? (value !== null ? formatValue(value, undefined, locale) : "007");
   if (value !== null) return formatValue(value, fmt ?? undefined, locale);
   const dateLike = id === "dateShort" || id === "dateLong" || id === "dateIso" || id === "time" || id === "datetime";
-  const sample = dateLike ? SAMPLE_DATE : id === "percent" ? 0.1234 : id === "scientific" || id === "significant" ? 0.000123456 : 1234.5678;
+  const sample = id === "duration" ? SAMPLE_DURATION : dateLike ? SAMPLE_DATE : id === "percent" ? 0.1234 : id === "scientific" || id === "significant" ? 0.000123456 : 1234.5678;
   return formatValue(sample, fmt ?? undefined, locale);
 }
 
@@ -195,7 +202,7 @@ export function FormatPanel({ store, onDone, onUnit }: { store: SheetStore; onDo
       <div role="menu" aria-label={t.numberFormat} className="max-h-[min(52vh,420px)] overflow-y-auto overscroll-contain">
         {ORDER.map((id) => {
           const target = formatFor(id, fmt, locale, value);
-          const hint = id === "general" || id === "significant" || id === "text" ? t.formatHints[id] : undefined;
+          const hint = id === "general" || id === "significant" || id === "duration" || id === "text" ? t.formatHints[id] : undefined;
           return <Choice key={id} icon={ICONS[id]} label={t.formats[id]} hint={hint} right={preview(id, target, value, text, locale)} checked={currentId === id} onSelect={() => pick(id)} />;
         })}
       </div>

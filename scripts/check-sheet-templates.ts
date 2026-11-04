@@ -233,6 +233,8 @@ function checkDoc(fn: string, lang: Lang, doc: FnDoc) {
   }
   const text = [doc.summary, doc.example, doc.exampleResult, doc.tip ?? "", ...doc.args.flatMap((a) => [a.name, a.desc])].join(" ");
   if (/✨|✨/.test(text)) fail(where, "a sparkle");
+  // German keyboards type the date and the time with Strg+. and Strg+Umschalt+. (grid/keys.ts): ";" needs Shift there.
+  if (lang === "de" && /Strg\+;|Strg\+Umschalt\+:/.test(text)) fail(where, "a shortcut of an English keyboard (Strg+; or Strg+Umschalt+:)");
   if (!doc.example.startsWith("=")) return fail(where, `example doesn't start with "=": ${doc.example}`);
   const body = doc.example.slice(1);
   const outside = body.replace(/"(?:[^"]|"")*"/g, '""');
@@ -310,9 +312,13 @@ const FIXTURES: Record<string, (lang: Lang) => Fixture> = {
   ...Object.fromEntries(["SLOPE", "INTERCEPT", "RSQ", "STEYX", "FORECAST", "FORECAST.LINEAR", "TREND", "LINEST", "CORREL", "PEARSON", "COVARIANCE.S", "COVARIANCE.P", "MIN", "MAX", "INDEX"].map((fn) => [fn, () => CALIBRATION])),
   ...Object.fromEntries(["LOGEST", "GROWTH"].map((fn) => [fn, () => LOG_PHASE])),
   MEDIAN: () => ({ B2: 0.501, B3: 0.498, B4: 0.505, B5: 0.512, B6: 0.731 }),
-  AVERAGEA: (lang) => ({ B2: 2, B3: 4, B4: lang === "de" ? "n. b." : "n.d.", B5: 6 }),
+  // The A forms count a text ("n. b.") as 0.
+  ...Object.fromEntries(["AVERAGEA", "STDEVA", "STDEVPA", "VARA", "VARPA"].map((fn) => [fn, (lang: Lang) => ({ B2: 2, B3: 4, B4: lang === "de" ? "n. b." : "n.d.", B5: 6 })])),
   SUMPRODUCT: () => ({ B2: 2.3, B3: 1.7, B4: 2.7, B5: 1.3, C2: 2, C3: 1, C4: 2, C5: 1 }),
-  "T.TEST": () => ({ ...TRIPLICATE, C2: 0.431, C3: 0.452, C4: 0.44 }),
+  // Treatment and control (their help gives only an "e.g." p-value: the example must calculate).
+  ...Object.fromEntries(["T.TEST", "TTEST", "F.TEST", "FTEST"].map((fn) => [fn, () => ({ ...TRIPLICATE, C2: 0.431, C3: 0.452, C4: 0.44 })])),
+  // Mendel's 3:1, counted against expected.
+  ...Object.fromEntries(["CHISQ.TEST", "CHITEST"].map((fn) => [fn, () => ({ B2: 787, B3: 277, C2: 798, C3: 266 })])),
   IF: () => ({ B2: 0.638, ...CAL_Y }),
   IFS: () => ({ D2: 0.034 }),
   AND: () => ({ B2: 0.5 }),
@@ -322,7 +328,7 @@ const FIXTURES: Record<string, (lang: Lang) => Fixture> = {
   ISNUMBER: () => ({ B2: 0.5 }),
   ISTEXT: (lang) => ({ A2: lang === "de" ? "Probe A" : "Sample A" }),
   ISFORMULA: () => ({ D5: "=1+1" }),
-  MATCH: (lang) => (lang === "de" ? { A2: "Probe A", A3: "Probe B", A4: "Probe C" } : { A2: "Sample A", A3: "Sample B", A4: "Sample C" }),
+  ...Object.fromEntries(["MATCH", "XMATCH"].map((fn) => [fn, (lang: Lang) => (lang === "de" ? { A2: "Probe A", A3: "Probe B", A4: "Probe C" } : { A2: "Sample A", A3: "Sample B", A4: "Sample C" })])),
   VLOOKUP: () => ({ A2: "NaCl", C2: 58.44 }),
   XLOOKUP: () => ({ A2: "NaCl", A3: "Tris", C2: 58.44, C3: 121.14 }),
   COUNTIFS: () => ({ B2: "E. coli", B3: "E. coli", B4: "S. aureus", D2: 350, D3: 120, D4: 400 }),

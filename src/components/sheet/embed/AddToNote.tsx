@@ -22,20 +22,23 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { noteBlocksText } from "@/i18n/messages/noteBlocks";
 import { cn, pageTitle } from "@/lib/utils";
 import { addToNoteHref, type SheetEmbedItem } from "@/sheet/embed";
+import { focusGrid } from "../chrome/parts";
 
 export function AddToNoteDialog({ open, onClose, pageId, item }: { open: boolean; onClose: () => void; pageId: string; item: SheetEmbedItem }): ReactNode {
   const phone = usePhone();
   const t = useMessages(noteBlocksText).sheet.addToNote;
   const body = open ? <AddToNoteBody pageId={pageId} item={item} onClose={onClose} phone={phone} /> : null;
+  // Opened from the page menu (its item is gone) or a chart that was deselected meanwhile: the
+  // keyboard goes back to the cells, not to the top of the page.
   if (phone) {
     return (
-      <Sheet open={open} onClose={onClose} label={t.title}>
+      <Sheet open={open} onClose={onClose} label={t.title} returnFocus={focusGrid}>
         {body}
       </Sheet>
     );
   }
   return (
-    <Dialog open={open} onClose={onClose} labelledBy="add-to-note-title" className="max-w-[460px]">
+    <Dialog open={open} onClose={onClose} labelledBy="add-to-note-title" className="max-w-[460px]" returnFocus={focusGrid}>
       {body}
     </Dialog>
   );

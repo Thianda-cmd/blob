@@ -4,6 +4,36 @@ import { defineMessages } from "../define";
 const mb = (bytes: number, tag: string) => (Math.ceil(bytes / 1e5) / 10).toLocaleString(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /**
+ * A sheet both sides moved rows or columns of (src/sheet/collab.ts MergeReport): theirs stays, and
+ * mine is on the copy `copyName`, or nowhere ("") when the spreadsheet had no room for one more sheet.
+ */
+type Conflict = { name: string; copyName: string };
+
+function conflictEn(start: string, list: Conflict[]): string {
+  const q = (names: string[]) => names.map((n) => `“${n}”`).join(", ");
+  const copied = list.filter((c) => c.copyName);
+  const lost = list.filter((c) => !c.copyName);
+  let out = start;
+  if (copied.length === 1) out += ` So nothing gets lost, your version of “${copied[0].name}” is now on a sheet of its own: “${copied[0].copyName}”.`;
+  else if (copied.length) out += ` So nothing gets lost, your versions are now on sheets of their own: ${q(copied.map((c) => c.copyName))}.`;
+  if (lost.length === 1) out += ` A spreadsheet holds at most 250 sheets, so your version of “${lost[0].name}” couldn't be kept as a sheet of its own: only the other version is left.`;
+  else if (lost.length) out += ` A spreadsheet holds at most 250 sheets, so your versions of ${q(lost.map((c) => c.name))} couldn't be kept as sheets of their own: only the other versions are left.`;
+  return out;
+}
+
+function conflictDe(start: string, list: Conflict[]): string {
+  const q = (names: string[]) => names.map((n) => `„${n}“`).join(", ");
+  const copied = list.filter((c) => c.copyName);
+  const lost = list.filter((c) => !c.copyName);
+  let out = start;
+  if (copied.length === 1) out += ` Damit nichts verloren geht, steht deine Version von „${copied[0].name}“ jetzt auf einem eigenen Blatt: „${copied[0].copyName}“.`;
+  else if (copied.length) out += ` Damit nichts verloren geht, stehen deine Versionen jetzt auf eigenen Blättern: ${q(copied.map((c) => c.copyName))}.`;
+  if (lost.length === 1) out += ` Weil eine Tabelle höchstens 250 Blätter haben kann, konnte deine Version von „${lost[0].name}“ kein eigenes Blatt bekommen: Es gibt nur noch die andere Version.`;
+  else if (lost.length) out += ` Weil eine Tabelle höchstens 250 Blätter haben kann, konnten deine Versionen von ${q(lost.map((c) => c.name))} keine eigenen Blätter bekommen: Es gibt nur noch die anderen Versionen.`;
+  return out;
+}
+
+/**
  * Spreadsheets ("Tabellen", src/components/sheet): the page around the grid — title, saving,
  * import and export, printing, the side panel — and the spreadsheet on public pages.
  * The grid, toolbar, charts, smart tables and templates have their own files (sheetGrid,
@@ -23,12 +53,8 @@ export const sheetText = defineMessages({
     saveTrouble: "Saving isn't working right now. Your changes stay on this device, and I'll keep trying.",
     saveBack: "Saved. It works again.",
     nearlyFull: (bytes: number) => `This spreadsheet is already ${mb(bytes, "en-US")} MB. Above 5 MB it can't be saved any more, so delete sheets or rows you don't need.`,
-    conflict: (list: { name: string; copyName: string }[]) =>
-      list.length === 1
-        ? `Rows or columns of this spreadsheet were moved in two places at once. So nothing gets lost, your version of “${list[0].name}” is now on a sheet of its own: “${list[0].copyName}”.`
-        : `Rows or columns of this spreadsheet were moved in two places at once. So nothing gets lost, your versions are now on sheets of their own: ${list.map((c) => `“${c.copyName}”`).join(", ")}.`,
-    conflictElsewhere: (page: string, copies: string[]) =>
-      `Rows or columns of “${page}” were moved in two places at once. So nothing gets lost, your version is now on ${copies.length === 1 ? "a sheet" : "sheets"} of its own: ${copies.map((c) => `“${c}”`).join(", ")}.`,
+    conflict: (list: Conflict[]) => conflictEn("Rows or columns of this spreadsheet were moved in two places at once.", list),
+    conflictElsewhere: (page: string, list: Conflict[]) => conflictEn(`Rows or columns of “${page}” were moved in two places at once.`, list),
     someoneChanged: (name: string) => `${name} changed something`,
 
     exportXlsx: "Save as Excel file",
@@ -51,9 +77,10 @@ export const sheetText = defineMessages({
     importLabel: "Import",
     dropHere: "Drop to add it as a new sheet",
     dropHint: "An Excel (.xlsx) or CSV file",
-    templateLabel: "Template",
     printEmpty: "There's nothing on this sheet to print yet.",
     noticeClose: "Close message",
+    // Said after a message with a button: the grid keeps Tab, F6 gets there (SheetEditor's parts).
+    noticeActionKey: (label: string) => `Press F6 to get to the “${label}” button.`,
 
     insertChart: "Insert chart",
     addToNote: "Add to a note",
@@ -87,7 +114,7 @@ export const sheetText = defineMessages({
         replace: "Find and replace",
         save: "Save now",
         print: "Print",
-        areas: "Move between cells, settings and toolbar",
+        areas: "Move between cells, message, settings and toolbar",
       },
     },
   },
@@ -104,12 +131,8 @@ export const sheetText = defineMessages({
     saveTrouble: "Speichern klappt gerade nicht. Deine Änderungen bleiben auf diesem Gerät, und ich versuche es weiter.",
     saveBack: "Gespeichert. Jetzt klappt es wieder.",
     nearlyFull: (bytes) => `Diese Tabelle ist schon ${mb(bytes, "de-DE")} MB groß. Ab 5 MB kann sie nicht mehr gespeichert werden – lösche Blätter oder Zeilen, die du nicht brauchst.`,
-    conflict: (list) =>
-      list.length === 1
-        ? `In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, steht deine Version von „${list[0].name}“ jetzt auf einem eigenen Blatt: „${list[0].copyName}“.`
-        : `In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, stehen deine Versionen jetzt auf eigenen Blättern: ${list.map((c) => `„${c.copyName}“`).join(", ")}.`,
-    conflictElsewhere: (page, copies) =>
-      `In „${page}“ wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben. Damit nichts verloren geht, steht deine Version jetzt auf ${copies.length === 1 ? "einem eigenen Blatt" : "eigenen Blättern"}: ${copies.map((c) => `„${c}“`).join(", ")}.`,
+    conflict: (list) => conflictDe("In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben.", list),
+    conflictElsewhere: (page, list) => conflictDe(`In „${page}“ wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben.`, list),
     someoneChanged: (name) => `${name} hat etwas geändert`,
 
     exportXlsx: "Als Excel-Datei speichern",
@@ -132,9 +155,9 @@ export const sheetText = defineMessages({
     importLabel: "Importieren",
     dropHere: "Loslassen für ein neues Blatt",
     dropHint: "Eine Excel- (.xlsx) oder CSV-Datei",
-    templateLabel: "Vorlage",
     printEmpty: "Auf diesem Blatt gibt es noch nichts zu drucken.",
     noticeClose: "Hinweis schließen",
+    noticeActionKey: (label) => `Mit F6 kommst du zum Knopf „${label}“.`,
 
     insertChart: "Diagramm einfügen",
     addToNote: "In Notiz einfügen",
@@ -167,7 +190,7 @@ export const sheetText = defineMessages({
         replace: "Suchen und ersetzen",
         save: "Jetzt speichern",
         print: "Drucken",
-        areas: "Zwischen Zellen, Einstellungen und Werkzeugleiste wechseln",
+        areas: "Zwischen Zellen, Hinweis, Einstellungen und Werkzeugleiste wechseln",
       },
     },
   },

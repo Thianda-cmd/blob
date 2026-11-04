@@ -8,8 +8,8 @@
 // message at a time; a new one replaces the last. Kept per editor store outside React, so plain
 // actions (the toolbar, keyboard shortcuts, menus) can post them.
 //
-// CONTRACT: showSheetNotice(store, text, tone?, { ms }?) from anywhere that has the editor's store;
-// SheetEditor renders <SheetNotices store={store} /> (SheetNotice.tsx) once.
+// CONTRACT: showSheetNotice(store, text, tone?, { ms, action }?) from anywhere that has the editor's
+// store; SheetEditor renders <SheetNotices store={store} /> (SheetNotice.tsx) once.
 
 import { useSyncExternalStore } from "react";
 import type { SheetStore } from "./store";
@@ -21,7 +21,10 @@ import type { SheetStore } from "./store";
  */
 export type SheetNoticeTone = "info" | "done" | "busy" | "error";
 
-export type SheetNotice = { id: number; text: string; tone: SheetNoticeTone };
+/** A button in the notice that undoes a guess in one click ("Als 1,234 lesen"). */
+export type SheetNoticeAction = { label: string; run: () => void };
+
+export type SheetNotice = { id: number; text: string; tone: SheetNoticeTone; action?: SheetNoticeAction };
 
 type Slot = {
   notice: SheetNotice | null;
@@ -70,9 +73,9 @@ function arm(store: SheetStore, s: Slot) {
 }
 
 /** Show a message at the bottom of the editor (it replaces the one showing). Returns its id. */
-export function showSheetNotice(store: SheetStore, text: string, tone: SheetNoticeTone = "info", opts: { ms?: number } = {}): number {
+export function showSheetNotice(store: SheetStore, text: string, tone: SheetNoticeTone = "info", opts: { ms?: number; action?: SheetNoticeAction } = {}): number {
   const s = slot(store);
-  const notice = { id: nextId++, text, tone };
+  const notice: SheetNotice = opts.action ? { id: nextId++, text, tone, action: opts.action } : { id: nextId++, text, tone };
   s.notice = notice;
   s.ms = opts.ms ?? noticeDuration(text, tone);
   arm(store, s);
@@ -108,7 +111,7 @@ export function holdSheetNotice(store: SheetStore, id: number, held: boolean) {
   arm(store, s);
 }
 
-/** The notice showing right now (for checks and tests). */
+/** The notice showing right now (F6 in the editor goes to its button; checks and tests). */
 export function currentSheetNotice(store: SheetStore): SheetNotice | null {
   return slots.get(store)?.notice ?? null;
 }

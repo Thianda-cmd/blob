@@ -81,6 +81,9 @@ const MEANT = new Map(
     DURCHSCHNITT: "AVERAGE",
     AVG: "AVERAGE",
     MEAN: "AVERAGE",
+    // The words a student knows from the lesson (the function browser finds them too, functionWords.ts).
+    STANDARDABWEICHUNG: "STDEV.S",
+    RQUADRAT: "RSQ",
     ZÄHLEN: "COUNT",
     ANZAHLWENN: "COUNTIF",
     QUARTIL: "QUARTILE.INC",

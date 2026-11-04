@@ -51,6 +51,38 @@ async function send(pageId: string, cardId: string, edit: CardEdit | null, at: n
 }
 
 /**
+ * Signing out (src/lib/offline/device.ts flushDevice): the wording of every deck that couldn't be
+ * saved yet goes now, as it would the next time its cards are opened (a newer change saved on
+ * another device since wins). What can't be sent stays, and is counted.
+ */
+export async function flushCardEdits(): Promise<void> {
+  const prefix = unsentKey("");
+  let pages: string[] = [];
+  try {
+    pages = Object.keys(localStorage).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
+  } catch {}
+  await Promise.all(
+    pages.map(async (pageId) => {
+      const unsent = Object.entries(readLocal<Unsent>(unsentKey(pageId)) ?? {});
+      if (!unsent.length) return;
+      const { data, error } = await createClient().from("card_edits").select("card_id, updated_at").eq("page_id", pageId);
+      if (error) return;
+      const saved = new Map(((data ?? []) as { card_id: string; updated_at: string }[]).map((r) => [r.card_id, Date.parse(r.updated_at)]));
+      // Sent now, or a newer change is saved already: either way not waiting any more.
+      const done: [string, number][] = [];
+      for (const [id, u] of unsent) {
+        const at = saved.get(id);
+        if ((at === undefined || at < u.at) && !(await send(pageId, id, u.edit, u.at))) continue;
+        done.push([id, u.at]);
+      }
+      const left = readLocal<Unsent>(unsentKey(pageId)) ?? {};
+      for (const [id, at] of done) if (left[id] && left[id].at <= at) delete left[id];
+      writeLocal(unsentKey(pageId), left);
+    }),
+  );
+}
+
+/**
  * Cards you reworded, saved with your account (the note itself stays as you wrote it), so they
  * follow you to every device. The card id stays the same, so its spaced-repetition progress
  * carries on. Changes show at once; `failed` says one couldn't be saved (it is kept in this

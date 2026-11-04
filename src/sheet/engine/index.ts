@@ -126,7 +126,7 @@ export type ParsedInput = {
 /** The longest formula a cell takes, as in Excel: 8,192 characters (stored, without "="). */
 export { MAX_FORMULA_LENGTH } from "./input";
 /** Durations ("36:00", Excel's [h]:mm): a time format whose hours go on past 24. */
-export { isDuration, type DurationFormat } from "./format";
+export { isDuration, typedFormat, type DurationFormat } from "./format";
 
 /**
  * Text typed into a cell → what to store. "=…" is a formula (canonicalised); "'…" is always text;

@@ -64,7 +64,8 @@ export function useNoteExport({ editor, pageId, title, icon, beforeExport }: { e
     const result = await exportPages([pageId], editor && !editor.isDestroyed ? { id: pageId, content: contentToSave(editor) } : undefined);
     if (!result) return blob.say(t.export.failed, { mood: "worried" });
     download(name(BLOB_EXT), JSON.stringify(result.file), BLOB_MIME);
-    blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: "happy", ms: 6000 });
+    // Something left out is a hint, so it shows with Blob's tips switched off too.
+    blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: result.missing ? "thinking" : "happy", ms: 6000 });
   };
 
   /** The note as Markdown, spreadsheet embeds as their tables and links. */

@@ -28,6 +28,13 @@ import {
 type Row = { id: string; kind: PageKind; title: string; icon: string | null; tags: string[] | null; topics: string[] | null; content: unknown; parent_id: string | null };
 const KINDS = new Set<PageKind>(["note", "deck", "folder", "ink", "sheet"]);
 
+/**
+ * A title from a file (its name, its first heading) as a page can keep it: at most 200 characters,
+ * counted as the database counts them, so a long one is shortened instead of failing the import,
+ * and never in the middle of a character (an emoji).
+ */
+export const clipTitle = (title: string) => Array.from(title.trim()).slice(0, 200).join("").trimEnd();
+
 /** Saves text as a file in the Downloads folder (browsers and the apps alike). */
 export function download(name: string, data: string | Blob, mime: string) {
   const blob = typeof data === "string" ? new Blob([data], { type: mime }) : data;
@@ -215,7 +222,13 @@ type Create = (input: {
   plain_text?: string;
 }) => Promise<PageMeta | null>;
 
-export type ImportResult = { roots: PageMeta[]; pages: number; failed: number };
+export type ImportResult = {
+  roots: PageMeta[];
+  pages: number;
+  failed: number;
+  /** Spreadsheets left out, too big to save (the pages below one come in under its parent). */
+  tooBig: number;
+};
 
 /**
  * Brings the pages of a Blob file into this account (below `parentId`, or in `subjectId`): pictures
@@ -227,6 +240,7 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
   const created: { page: BlobFilePage; id: string }[] = [];
   const roots: PageMeta[] = [];
   let failed = 0;
+  let tooBig = 0;
 
   // First every page (parents before their children), so links can find their new ids.
   const make = async (page: BlobFilePage, parentId: string | null, depth: number): Promise<void> => {
@@ -234,12 +248,20 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
     // spreadsheet code loads only for files that have one.
     let sheet: { content: unknown; plain_text: string } | null = null;
     if (page.kind === "sheet") {
-      const { sheetPageContent } = await import("@/components/sheet/importFile");
-      sheet = sheetPageContent(page.content, opts.locale);
+      const { sheetPageContent, MAX_SHEET_BYTES } = await import("@/components/sheet/importFile");
+      const read = sheetPageContent(page.content, opts.locale);
+      // Too big to save (measured as saving measures it): such a page could never be changed
+      // again, so it isn't made. The pages below it come in where it would have been.
+      if (read.bytes > MAX_SHEET_BYTES) {
+        tooBig++;
+        for (const child of page.children) await make(child, parentId, depth);
+        return;
+      }
+      sheet = read;
     }
     const meta = await opts.createPage({
       kind: page.kind,
-      title: page.title,
+      title: clipTitle(page.title),
       icon: page.icon,
       tags: page.tags,
       topics: page.topics,
@@ -314,5 +336,5 @@ export async function importBlobFile(file: BlobFile, opts: { userId: string; sub
     const { error } = await db.from("pages").update(patch).eq("id", id);
     if (error) failed++;
   }
-  return { roots, pages: created.length, failed };
+  return { roots, pages: created.length, failed, tooBig };
 }

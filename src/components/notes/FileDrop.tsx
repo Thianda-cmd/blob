@@ -6,11 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { useMessages } from "@/i18n/client";
 import { transferText } from "@/i18n/messages/transfer";
-import { BLOB_EXT } from "@/notes/blobFile";
-import { isSheetFile, useImporter } from "./useImporter";
+import { importable, useImporter } from "./useImporter";
 
-const IMPORTABLE = new RegExp(`(\\${BLOB_EXT}|\\.md|\\.markdown|\\.txt)$`, "i");
-const importable = (f: File) => IMPORTABLE.test(f.name) || f.type === "text/markdown" || f.type === "text/plain" || isSheetFile(f);
 const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
 
 /**

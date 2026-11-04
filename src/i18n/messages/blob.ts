@@ -6,6 +6,8 @@ export const blobText = defineMessages({
     helperTitle: "Blob, your helper",
     needAHand: (name: string) => `Hey${name ? ` ${name}` : ""}! Need a hand?`,
     close: "Close",
+    // The plain card that shows problems and hints while Blob's tips are switched off
+    messageClose: "Close message",
     newNote: "New note",
     newDeck: "New presentation",
     addTask: "Add homework or exam",
@@ -36,6 +38,7 @@ export const blobText = defineMessages({
     helperTitle: "Blob, dein Helfer",
     needAHand: (name) => `Hey${name ? ` ${name}` : ""}! Kann ich dir helfen?`,
     close: "Schließen",
+    messageClose: "Hinweis schließen",
     newNote: "Neue Notiz",
     newDeck: "Neue Präsentation",
     addTask: "Hausaufgabe oder Test eintragen",

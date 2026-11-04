@@ -54,9 +54,9 @@ export const sheetIoText = defineMessages({
       outline: "groups of rows or columns (what was collapsed stays hidden)",
       tooBig: (n: number, rows: string, cols: number) => `${n === 1 ? "1 cell" : `${n} cells`} beyond ${rows} rows and ${cols} columns`,
       longText: (n: number) => `${n === 1 ? "1 very long text" : `${n} very long texts`} (shortened)`,
-      sheetLimit: (n: number, max: number) => `${n === 1 ? "1 sheet" : `${n} sheets`} after the first ${max} (no more fit into this spreadsheet)`,
+      sheetLimit: (n: number, max: number) => `${n === 1 ? "1 sheet" : `${n} sheets`} after the first${max === 1 ? " one" : ` ${max}`} (no more fit into this spreadsheet)`,
       longFormulas: (n: number, max: string) => `${n === 1 ? "1 formula" : `${n} formulas`} longer than ${max} characters (${keptEn(n)})`,
-      chartLimit: (n: number, max: number) => `${n === 1 ? "1 chart" : `${n} charts`} after the first ${max}`,
+      chartLimit: (n: number, max: number) => `${n === 1 ? "1 chart" : `${n} charts`} after the first${max === 1 ? " one" : ` ${max}`}`,
       seriesLimit: (n: number, max: number) => `${n === 1 ? "1 data series" : `${n} data series`} (a chart holds ${max} at most)`,
       tableLimit: (n: number) =>
         n === 1 ? "1 smart table that overlaps another or is one too many (kept as plain cells)" : `${n} smart tables that overlap others or are too many (kept as plain cells)`,
@@ -104,9 +104,9 @@ export const sheetIoText = defineMessages({
       outline: "Gruppierungen von Zeilen oder Spalten (Eingeklapptes bleibt ausgeblendet)",
       tooBig: (n, rows, cols) => `${n === 1 ? "1 Zelle" : `${n} Zellen`} jenseits von ${rows} Zeilen und ${cols} Spalten`,
       longText: (n) => `${n === 1 ? "1 sehr langer Text" : `${n} sehr lange Texte`} (gekürzt)`,
-      sheetLimit: (n, max) => `${n === 1 ? "1 Blatt" : `${n} Blätter`} nach den ersten ${max} (mehr passen nicht in diese Tabelle)`,
+      sheetLimit: (n, max) => `${n === 1 ? "1 Blatt" : `${n} Blätter`} ${max === 1 ? "nach dem ersten" : `nach den ersten ${max}`} (mehr passen nicht in diese Tabelle)`,
       longFormulas: (n, max) => `${n === 1 ? "1 Formel" : `${n} Formeln`} mit mehr als ${max} Zeichen (${keptDe(n)})`,
-      chartLimit: (n, max) => `${n === 1 ? "1 Diagramm" : `${n} Diagramme`} nach den ersten ${max}`,
+      chartLimit: (n, max) => `${n === 1 ? "1 Diagramm" : `${n} Diagramme`} ${max === 1 ? "nach dem ersten" : `nach den ersten ${max}`}`,
       seriesLimit: (n, max) => `${n === 1 ? "1 Datenreihe" : `${n} Datenreihen`} (ein Diagramm hat höchstens ${max})`,
       tableLimit: (n) =>
         n === 1

@@ -116,7 +116,9 @@ function trendlineXml(tl: TrendlineSpec, color: string, labelFormat: string): st
   } else {
     if (tl.forward > 0) x += `<c:forward val="${tl.forward}"/>`;
     if (tl.backward > 0) x += `<c:backward val="${tl.backward}"/>`;
-    if (tl.intercept !== null && Number.isFinite(tl.intercept) && (tl.type === "linear" || tl.type === "polynomial" || tl.type === "exponential")) x += `<c:intercept val="${tl.intercept}"/>`;
+    // An exponential curve's a has to be above 0 (Blob fits it freely otherwise, see regression.ts):
+    // a 0 left over from "through the origin" would give Excel a curve it can't draw.
+    if (tl.intercept !== null && Number.isFinite(tl.intercept) && (tl.type === "linear" || tl.type === "polynomial" || (tl.type === "exponential" && tl.intercept > 0))) x += `<c:intercept val="${tl.intercept}"/>`;
     x += `<c:dispRSqr val="${tl.showR2 ? 1 : 0}"/><c:dispEq val="${tl.showEquation ? 1 : 0}"/>`;
     if (tl.showR2 || tl.showEquation) x += `<c:trendlineLbl><c:numFmt formatCode="${escAttr(labelFormat)}" sourceLinked="0"/></c:trendlineLbl>`;
   }

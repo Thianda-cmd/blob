@@ -47,6 +47,7 @@ import { useIsMac, useTouch } from "@/components/ui/useMediaQuery";
 import { useMessages } from "@/i18n/client";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { sheetColor } from "@/sheet/colors";
+import { isDuration } from "@/sheet/engine";
 import { getCell, sheetById } from "@/sheet/ops";
 import type { CellStyle, SheetColor } from "@/sheet/types";
 import { SHEET_EVENT, type SheetEventDetail } from "../events";
@@ -404,7 +405,8 @@ export function Toolbar({ store }: { store: SheetStore }): ReactNode {
     </Popover>
   );
 
-  const fmtKind = style?.fmt?.kind ?? "general";
+  // (A duration is a time format whose hours go on past 24: the button says "Dauer", not "Uhrzeit".)
+  const fmtKind = isDuration(style?.fmt) ? "duration" : (style?.fmt?.kind ?? "general");
   const off = readOnly;
 
   // ---- the groups, as buttons on the bar

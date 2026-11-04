@@ -33,7 +33,7 @@ import { applySuggestion, argumentAt, insertFunctionCall, insertRef, matchFuncti
 import { nextMatch } from "@/components/sheet/chrome/FindReplace";
 import { previewValue, resolveName, selectionName } from "@/components/sheet/chrome/FormulaBar";
 import { errorHelp } from "@/components/sheet/chrome/errorHelp";
-import { browseFunctions } from "@/components/sheet/chrome/FunctionBrowser";
+import { browseFunctions, newerNames } from "@/components/sheet/chrome/FunctionBrowser";
 import { functionsForWords, squeeze } from "@/components/sheet/chrome/functionWords";
 import { formatFor, formatId, shownDecimals } from "@/components/sheet/chrome/NumberFormatMenu";
 import { sheetHasContent, sheetNameProblem } from "@/components/sheet/chrome/SheetTabs";
@@ -43,7 +43,7 @@ import { makeChart } from "@/components/sheet/chrome/ToolbarPanels";
 import { currentSheetNotice, hideSheetNotice, holdSheetNotice, noticeDuration, sheetNoticeCountsDown, showSheetNotice } from "@/components/sheet/notice";
 import { sheetChromeText } from "@/i18n/messages/sheetChrome";
 import { SHEET_EVENT, type SheetEventDetail } from "@/components/sheet/events";
-import { fillFrom, fillSelectionWith, fillTo, menuKindFor, selectRegionOrAll } from "@/components/sheet/grid/actions";
+import { clearSelection, fillFrom, fillSelectionWith, fillTo, menuKindFor, selectRegionOrAll } from "@/components/sheet/grid/actions";
 import { copySelection, pasteData } from "@/components/sheet/grid/clipboard";
 import { formulaArgument, formulaSuggestions } from "@/components/sheet/grid/FormulaHints";
 import { handleGridKey, type GridKeyContext } from "@/components/sheet/grid/keys";
@@ -52,6 +52,8 @@ import { createSheetStore, type SheetStore } from "@/components/sheet/store";
 import { makeTable, setTableFilter } from "@/sheet/table/model";
 import { helpFrame, placeHelp } from "@/components/sheet/grid/CellEditor";
 import { numberAsText, numberLike } from "@/components/sheet/grid/cellLook";
+import { describer } from "@/components/sheet/grid/GridCells";
+import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { keypadContext, keypadFor } from "@/components/sheet/grid/keypad";
 import { currentRegion } from "@/components/sheet/grid/navigation";
 import { placeMenu } from "@/components/ui/ContextMenu";
@@ -390,6 +392,24 @@ section("switching formats keeps the precision");
   eq("Währung: $ in English", formatFor("currency", undefined, "en", 1), { kind: "currency", decimals: 2, symbol: "$" });
   eq("Standard → none", formatFor("general", { kind: "number", decimals: 2 }, "de", 1), null);
   eq("dates by style", [formatId({ kind: "date", style: "long" }), formatId({ kind: "date", style: "iso" }), formatId(undefined)], ["dateLong", "dateIso", "general"]);
+  // Dauer (FORM-1): hours past 24, its own entry next to Uhrzeit, both ways keeping the seconds.
+  eq("a duration is Dauer, a clock time Uhrzeit", [formatId({ kind: "time", seconds: false, duration: true }), formatId({ kind: "time", seconds: true })], ["duration", "time"]);
+  eq("Uhrzeit with seconds → Dauer with seconds", formatFor("duration", { kind: "time", seconds: true }, "de", 1.5), { kind: "time", seconds: true, duration: true });
+  eq("Dauer → Uhrzeit (a clock time again)", formatFor("time", { kind: "time", seconds: false, duration: true }, "de", 1.5), { kind: "time", seconds: false });
+  eq("Zahl → Dauer", formatFor("duration", { kind: "number", decimals: 2 }, "de", 1.5), { kind: "time", seconds: false, duration: true });
+  eq("what Dauer shows for 1,5 days", formatValue(1.5, formatFor("duration", undefined, "de", 1.5) ?? undefined, "de"), "36:00");
+  const tc = sheetChromeText;
+  check("Dauer has its words", tc.de.formats.duration === "Dauer" && tc.en.formats.duration === "Duration" && tc.de.formatShort.duration === "Dauer" && !!tc.de.formatHints.duration && !!tc.en.formatHints.duration);
+  // Typing a column of times: 24:00 and more become durations, and correcting a 36:00 that is
+  // stored as a clock time (12:00) makes it one (the store's typedCell).
+  const store = storeOf({ A6: { v: 1.5, s: { fmt: { kind: "time", seconds: false }, bold: true } } });
+  ["0:00", "12:00", "24:00", "36:00", "48:00"].forEach((t, i) => store.input({ row: i, col: 0 }, t));
+  const shown = (a1: string) => formatValue(valueOf(store, a1), cellOf(store, a1)?.s?.fmt, "de");
+  eq("0:00 … 48:00 typed", ["A1", "A2", "A3", "A4", "A5"].map(shown), ["00:00", "12:00", "24:00", "36:00", "48:00"]);
+  store.input({ row: 5, col: 0 }, "36:05");
+  eq("a 36:00 kept as a clock time, corrected: a duration now", [shown("A6"), cellOf(store, "A6")?.s], ["36:05", { fmt: { kind: "time", seconds: false, duration: true }, bold: true }]);
+  store.input({ row: 3, col: 0 }, "12:30");
+  eq("a duration cell keeps its format for a short time", shown("A4"), "12:30");
 }
 
 // ==============================================================================================
@@ -822,6 +842,20 @@ section("function browser search");
   eq("one or two letters only find their own word", [...functionsForWords("sd").keys()], ["STDEV.S", "STDEV.P"]);
   eq("R² typed any way is one word", [squeeze("R²"), squeeze("R^2"), squeeze("r 2"), squeeze("R-2")], ["r2", "r2", "r2", "r2"]);
   eq("nothing", names("qqqqq"), []);
+  // Excel's older names (FORM-3): after the modern ones, found by search, saying what is newer.
+  const stats = browseFunctions("", "stats", "de");
+  const firstOld = stats.findIndex((f) => f.newer);
+  check("a category lists the older names last", firstOld > 0 && stats.slice(firstOld).every((f) => f.newer) && stats.slice(0, firstOld).every((f) => !f.newer), stats.map((f) => f.de).join(", "));
+  eq("a search: the modern ones first", names("STAB").slice(0, 3), ["STABW.S", "STABW.N", "STABWA"]);
+  check("…and the older names still found", names("STAB").includes("STABW") && names("STAB").includes("STABWN"));
+  eq("the exact older name typed: that one", names("TVERT")[0], "TVERT");
+  const fnOf = (en: string) => FUNCTION_NAMES.find((f) => f.en === en)!;
+  eq("what is newer, in the user's language", [newerNames(fnOf("TDIST"), "de"), newerNames(fnOf("STDEV"), "en"), newerNames(fnOf("STDEV.S"), "de")], [["T.VERT.RE", "T.VERT.2S"], ["STDEV.S"], []]);
+  eq("…said", [sheetChromeText.de.newerNames(newerNames(fnOf("TDIST"), "de")), sheetChromeText.en.newerNames(["STDEV.S"])], ["Neu: T.VERT.RE oder T.VERT.2S", "Newer: STDEV.S"]);
+  // The formula autocomplete too: =STAB offers STABW.S before the older STABW.
+  const offered = matchFunctions("STAB", "de").map((f) => f.de);
+  check("autocomplete: modern names before the older ones", offered.indexOf("STABW.S") < offered.indexOf("STABW") && offered.indexOf("STABW.N") < offered.indexOf("STABWN"), offered.join(", "));
+  eq("autocomplete: the exact older name typed stays first", matchFunctions("STABW", "de")[0]?.de, "STABW");
 }
 
 // ==============================================================================================
@@ -912,6 +946,104 @@ section("sheet notices: answers to the student's own actions");
 }
 
 // ==============================================================================================
+section("German 1.234: a hint with a one-click correction (FORM-2)");
+{
+  const shown = (s: SheetStore, a1: string) => formatValue(valueOf(s, a1), cellOf(s, a1)?.s?.fmt, "de");
+  const typeAt = (s: SheetStore, a1: string, text: string, move: "down" | null = "down") => {
+    selectA1(s, a1);
+    s.startEdit({ via: "cell", replace: true, text });
+    s.commitEdit(move);
+  };
+  const plain = storeOf({});
+  typeAt(plain, "A2", "1.234");
+  const n = currentSheetNotice(plain);
+  eq("read as 1234, the hint says so and offers 1,234", [valueOf(plain, "A2"), n?.tone, n?.text, n?.action?.label], [1234, "info", "„1.234“ ist 1234: Der Punkt trennt Tausender. Für 1,234 tipp ein Komma.", "Als 1,234 lesen"]);
+  eq("…after Enter moved on: still there", plain.get().selection.anchor, pos("A3"));
+  n?.action?.run();
+  eq("one click: 1,234, the hint gone", [valueOf(plain, "A2"), shown(plain, "A2"), currentSheetNotice(plain)], [1.234, "1,234", null]);
+  plain.undo();
+  eq("one undo step back to 1234", valueOf(plain, "A2"), 1234);
+  // In a cell with a thousands format the typing shows "1.234" (= 1234): the correction gives it room for the decimals.
+  const grouped = storeOf({ B2: { v: 1, s: { fmt: { kind: "number", decimals: 0, group: true }, bold: true } } });
+  typeAt(grouped, "B2", "1.234");
+  eq("a thousands format shows 1.234 for 1234", shown(grouped, "B2"), "1.234");
+  currentSheetNotice(grouped)?.action?.run();
+  eq("…corrected: 1,234, the rest of the look kept", [shown(grouped, "B2"), cellOf(grouped, "B2")?.s], ["1,234", { fmt: { kind: "number", decimals: 3, group: true }, bold: true }]);
+  // Every format that rounds gets room for the three decimals typed: a currency would show
+  // 1,23 €, scientific 1,23E+00, three significant digits 1,23.
+  const looks: [Cell["s"], string, string][] = [
+    [{ fmt: { kind: "currency", decimals: 2, symbol: "€" } }, "1.234", "1,234 €"],
+    [{ fmt: { kind: "scientific", decimals: 2 } }, "1.234", "1,234E+00"],
+    [{ fmt: { kind: "scientific", decimals: 1 } }, "12.345", "1,2345E+01"],
+    [{ fmt: { kind: "significant", digits: 3 } }, "1.234", "1,234"],
+    [{ fmt: { kind: "significant", digits: 3 } }, "12.345", "12,345"],
+    [{ fmt: { kind: "significant", digits: 6 } }, "1.234", "1,23400"],
+    [{ fmt: { kind: "percent", decimals: 1 } }, "1.234", "1,234%"],
+    // A date or time would show 31.12.1899 or 05:36: the number as typed instead.
+    [{ fmt: { kind: "date", style: "short" } }, "1.234", "1,234"],
+    [{ fmt: { kind: "time", seconds: false }, bold: true }, "1.234", "1,234"],
+    [{ fmt: { kind: "currency", decimals: 4, symbol: "€" } }, "1.234", "1,2340 €"],
+  ];
+  for (const [look, typed, want] of looks) {
+    const s = storeOf({ D2: { v: 1, s: look } });
+    typeAt(s, "D2", typed);
+    currentSheetNotice(s)?.action?.run();
+    eq(`room for the decimals typed: ${JSON.stringify(look?.fmt)} ${typed}`, shown(s, "D2"), want);
+  }
+  // With a unit: the reading comes with its own format.
+  const unit = storeOf({});
+  typeAt(unit, "C2", "2.345 g");
+  currentSheetNotice(unit)?.action?.run();
+  eq("2.345 g → 2,345 g", [valueOf(unit, "C2"), shown(unit, "C2")], [2.345, "2,345 g"]);
+  // It goes once you edit or select something else, and a stale click changes nothing.
+  const next = storeOf({});
+  typeAt(next, "A2", "1.234");
+  next.startEdit({ via: "cell", replace: true, text: "5" });
+  eq("typing on: the hint goes", currentSheetNotice(next), null);
+  next.cancelEdit();
+  const clicked = storeOf({});
+  selectA1(clicked, "A2");
+  clicked.startEdit({ via: "cell", replace: true, text: "1.234" });
+  selectA1(clicked, "C5");
+  eq("finished by clicking another cell: the hint stays, as with Enter", [valueOf(clicked, "A2"), currentSheetNotice(clicked)?.action?.label], [1234, "Als 1,234 lesen"]);
+  selectA1(clicked, "D6");
+  eq("…and goes with the next click", currentSheetNotice(clicked), null);
+  const away = storeOf({});
+  typeAt(away, "A2", "1.234");
+  const stale = currentSheetNotice(away)?.action;
+  selectA1(away, "D9");
+  eq("selecting another cell: the hint goes", currentSheetNotice(away), null);
+  typeAt(away, "A2", "7");
+  stale?.run();
+  eq("a click on a hint whose cell changed since does nothing", [valueOf(away, "A2"), away.get().undoLabel], [7, "Eingabe"]);
+  // …and once the cell holds something else, with the same cell still selected: typed without
+  // moving (Ctrl+Enter), then undone or cleared. Bold on it keeps the hint: the value is still the one typed.
+  const undone = storeOf({ A2: { v: 5 } });
+  typeAt(undone, "A2", "1.234", null);
+  eq("typed without moving: the hint shows", [valueOf(undone, "A2"), currentSheetNotice(undone)?.action?.label], [1234, "Als 1,234 lesen"]);
+  undone.undo();
+  eq("…undone: 5 again, the hint gone", [valueOf(undone, "A2"), currentSheetNotice(undone)], [5, null]);
+  const cleared = storeOf({});
+  typeAt(cleared, "A2", "1.234", null);
+  clearSelection(cleared);
+  eq("…cleared with Delete: the hint gone", [cellOf(cleared, "A2")?.v ?? null, currentSheetNotice(cleared)], [null, null]);
+  const bolded = storeOf({});
+  typeAt(bolded, "A2", "1.234", null);
+  toggleStyle(bolded, "bold");
+  eq("…made bold: the hint stays", [cellOf(bolded, "A2")?.s?.bold, currentSheetNotice(bolded)?.action?.label], [true, "Als 1,234 lesen"]);
+  // 0.512 and 1,234 need no hint; pasted values get none.
+  const quiet = storeOf({});
+  typeAt(quiet, "A1", "0.512");
+  typeAt(quiet, "A2", "1,234");
+  eq("unambiguous: no hint", currentSheetNotice(quiet), null);
+  pasteData(quiet, { text: "1.234" }, "all");
+  eq("pasted: no hint", currentSheetNotice(quiet), null);
+  const english = storeOf({}, "en");
+  typeAt(english, "A1", "1.234");
+  eq("English: 1.234 is a decimal, no hint", [valueOf(english, "A1"), currentSheetNotice(english)], [1.234, null]);
+}
+
+// ==============================================================================================
 section("error help: the same words for tooltip, status bar and screen readers");
 {
   // A6 can't be read (two ranges side by side, Excel's intersection, isn't supported): #NAME?
@@ -931,6 +1063,17 @@ section("error help: the same words for tooltip, status bar and screen readers")
   eq("a formula that can't be read: not an unknown name, and where it goes wrong", help("A6", "de", true), { title: "Fehler in der Formel", text: "Vor „C1:C3“ fehlt ein Rechenzeichen (+ - * /) oder ein „;“." });
   eq("…without the formula at hand: the engine's sentence", help("A6"), { title: "Fehler in der Formel", text: "Die Formel enthält einen Fehler." });
   eq("…in English", help("A6", "en", true)?.title, "Mistake in the formula");
+  // Screen readers hear the very same words (GridCells' describer), with the note after them.
+  const errorOf = (a1: string) => {
+    const p = pos(a1);
+    const v = calc.value("s1", p.row, p.col);
+    return isError(v) ? v : null;
+  };
+  const say = describer(sheetGridText.de, "de");
+  eq("screen readers: the advice too", say(errorOf("A2"), "Messung 3"), "Division durch null. Hier wird durch 0 oder durch eine leere Zelle geteilt. Prüf den Nenner – oder fang den Fall mit WENNFEHLER ab. Notiz: Messung 3");
+  eq("screen readers: the unknown function and the suggestion", say(errorOf("A3"), ""), "Unbekannter Name. Die Funktion „SUMM“ gibt es nicht. Meintest du SUMME?");
+  eq("screen readers: where a formula goes wrong", say(errorOf("A6"), "", false, getCell(wb, "s1", 5, 0)?.f), "Fehler in der Formel. Vor „C1:C3“ fehlt ein Rechenzeichen (+ - * /) oder ein „;“.");
+  eq("screen readers in English", describer(sheetGridText.en, "en")(errorOf("A3"), ""), 'Unknown name. There is no function called "SUMM". Did you mean SUM?');
 }
 
 // ==============================================================================================

@@ -78,8 +78,7 @@ export const sheetChartText = defineMessages({
       look: "Change look",
     },
 
-    // The settings panel
-    panel: "Chart settings",
+    // The settings panel (named "Chart settings" by the editor around it: sheet.ts chartSettings)
     close: "Close",
     gone: "This chart doesn't exist any more.",
     sections: { chart: "Chart", data: "Data", trend: "Trendline", errors: "Error bars", axes: "Axes", look: "Look" },
@@ -158,6 +157,9 @@ export const sheetChartText = defineMessages({
     probeAbove: (hi: string) => `Above the highest standard (${hi}): the trendline isn't backed by measurements there. Dilute the sample and measure it again.`,
     probeBelow: (lo: string) => `Below the lowest standard (${lo}). Measure a more concentrated sample (dilute it less or use more of it), or report it as “< ${lo}”.`,
     probeNegative: "Below the blank: nothing can be detected in the sample this way. Measure a more concentrated sample (dilute it less or use more of it).",
+    /** Dates or times as x: no lab advice, only where the result lies. */
+    probeAfter: (last: string) => `After the last measurement (${last}): the trendline isn't backed by measurements there, so the result is only an estimate.`,
+    probeBefore: (first: string) => `Before the first measurement (${first}): the trendline isn't backed by measurements there, so the result is only an estimate.`,
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x is where the curve reaches y (inside the measured range).",
@@ -199,7 +201,7 @@ export const sheetChartText = defineMessages({
     color: "Colour",
     autoColor: "Automatic",
     colors: {
-      gray: "Gray",
+      gray: "Grey",
       red: "Red",
       orange: "Orange",
       yellow: "Yellow",
@@ -292,7 +294,6 @@ export const sheetChartText = defineMessages({
       look: "Darstellung ändern",
     },
 
-    panel: "Diagramm-Einstellungen",
     close: "Schließen",
     gone: "Dieses Diagramm gibt es nicht mehr.",
     sections: { chart: "Diagramm", data: "Daten", trend: "Trendlinie", errors: "Fehlerbalken", axes: "Achsen", look: "Darstellung" },
@@ -367,6 +368,8 @@ export const sheetChartText = defineMessages({
     probeAbove: (hi) => `Über dem höchsten Standard (${hi}): Dort ist die Trendlinie nicht durch Messungen gestützt. Verdünne die Probe und miss sie neu.`,
     probeBelow: (lo) => `Unter dem kleinsten Standard (${lo}). Miss die Probe konzentrierter (weniger verdünnen oder mehr Probe einsetzen) oder gib sie als „< ${lo}“ an.`,
     probeNegative: "Unter dem Blindwert: In der Probe ist so nichts nachweisbar. Miss sie konzentrierter (weniger verdünnen oder mehr Probe einsetzen).",
+    probeAfter: (last) => `Nach der letzten Messung (${last}): Dort ist die Trendlinie nicht durch Messungen gestützt, das Ergebnis ist nur eine Schätzung.`,
+    probeBefore: (first) => `Vor der ersten Messung (${first}): Dort ist die Trendlinie nicht durch Messungen gestützt, das Ergebnis ist nur eine Schätzung.`,
     solveHow: {
       linear: "x = (y − b) / m",
       polynomial: "x ist die Stelle, an der die Kurve y erreicht (im Messbereich).",

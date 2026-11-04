@@ -470,6 +470,12 @@ section("repairs", () => {
   check("sort of a missing column dropped", t3?.sort === null);
   check("deterministic", sameJson(normalizeWorkbook(clone(damaged), "de"), wb));
   check("normalized result is stable", normalizeWorkbook(wb, "de") === wb);
+  // A duration (36:00, FORM-1) stays one when the spreadsheet is opened again; a stray flag goes.
+  const times = clone(base) as unknown as { sheets: { cells: Record<string, unknown> }[] };
+  times.sheets[0].cells["20,0"] = { v: 1.5, s: { fmt: { kind: "time", seconds: false, duration: true } } };
+  times.sheets[0].cells["21,0"] = { v: 1.5, s: { fmt: { kind: "time", seconds: true, duration: "yes" } } };
+  const read = normalizeWorkbook(clone(times), "de").sheets[0].cells;
+  check("duration kept when read again", sameJson([read["20,0"]?.s?.fmt, read["21,0"]?.s?.fmt], [{ kind: "time", seconds: false, duration: true }, { kind: "time", seconds: true }]), [read["20,0"], read["21,0"]]);
 });
 
 section("fuzz: random JSON never throws, always valid", () => {
@@ -1803,6 +1809,49 @@ async function savingTests() {
     check("conflict: the copy is saved too", !!c && (server.content as Workbook).sheets.some((s) => s.name === c.copyName));
     await a.close();
     await b.close();
+  }
+
+  // 15b. …while A is typing on that sheet: the merge report reaches the store, so the edit goes on
+  //      in A's copy, which has A's rows. A draft put back works the other way round: the screen's
+  //      version is kept, the draft's goes on the copy, and a running edit stays where it is.
+  {
+    const id = page();
+    const server = new FakeServer(newWorkbook("de"), "Messung");
+    const a = openEditor(server, id, { userId: "conflict-typing" });
+    const b = openEditor(server, id, { userId: "u2" });
+    a.store.apply("insert", (wb) => insertRows(wb, a.sheetId, 1, 1));
+    b.store.apply("insert", (wb) => insertRows(wb, b.sheetId, 3, 1));
+    await b.saver.flush();
+    a.store.select({ row: 4, col: 2 });
+    a.store.startEdit({ via: "cell", replace: true, text: "0,66" });
+    await a.saver.flush();
+    const c = a.log.conflicts.at(-1)?.[0];
+    const s = a.store.get();
+    check("conflict while typing: the edit and the screen go on in my copy", !!c && !!c.copyId && s.edit?.sheetId === c.copyId && s.sheetId === c.copyId && s.edit?.row === 4 && s.edit?.col === 2, { c, edit: s.edit, sheetId: s.sheetId });
+    a.store.commitEdit();
+    await a.saver.flush();
+    const saved = server.content as Workbook;
+    check("conflict while typing: entered in my copy, their sheet untouched", saved.sheets.find((x) => x.id === c?.copyId)?.cells["4,2"]?.v === 0.66 && saved.sheets[0].cells["4,2"] === undefined, saved.sheets.map((x) => [x.name, x.cells["4,2"]]));
+    await a.close();
+    await b.close();
+
+    const id2 = page();
+    const server2 = new FakeServer(newWorkbook("de"), "Messung");
+    const base = normalizeWorkbook(server2.content, "de");
+    const sheetId = base.sheets[0].id;
+    writeDraft("u1", { v: 1, pageId: id2, rev: 0, base, mine: insertRows(base, sheetId, 3, 1), baseTitle: "Messung", title: "Messung", at: Date.now(), writer: "closed-tab" });
+    const e = openEditor(server2, id2);
+    e.store.apply("insert", (wb) => insertRows(wb, sheetId, 1, 1));
+    e.store.select({ row: 4, col: 2 });
+    e.store.startEdit({ via: "cell", replace: true, text: "0,66" });
+    await e.saver.restore();
+    const r = e.store.get();
+    const copy = e.log.conflicts.at(-1)?.[0];
+    check("draft put back while typing: the draft's version is the copy, the edit stays", !!copy?.copyId && r.workbook.sheets.length === 2 && r.edit?.sheetId === sheetId && r.sheetId === sheetId && r.edit?.row === 4, { copy, edit: r.edit, sheetId: r.sheetId });
+    e.store.commitEdit();
+    await e.saver.flush();
+    check("draft put back while typing: entered on the screen's sheet", (server2.content as Workbook).sheets[0].cells["4,2"]?.v === 0.66, (server2.content as Workbook).sheets.map((x) => x.cells["4,2"]));
+    await e.close();
   }
 
   // 16. SEC-7: another account signing in on this device removes every other account's drafts.

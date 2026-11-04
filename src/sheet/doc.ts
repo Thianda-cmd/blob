@@ -25,6 +25,7 @@ import type { Calc } from "./engine";
 import { formatValue } from "./engine/format";
 import { isError, type CellValue } from "./engine/values";
 import { readLog } from "./sheetLog";
+import { validTableName } from "./table/names";
 import {
   DEFAULT_COL_W,
   DEFAULT_SIZE,
@@ -499,7 +500,8 @@ function normFormat(x: unknown): NumberFormat | undefined {
       out = { kind: "date", style: oneOf(x.style, ["short", "long", "iso"] as const, "short") };
       break;
     case "time":
-      out = { kind: "time", seconds: x.seconds === true };
+      // A duration (36:00) keeps its flag, else it would show as a clock time (12:00) once reopened.
+      out = x.duration === true ? { kind: "time", seconds: x.seconds === true, duration: true } : { kind: "time", seconds: x.seconds === true };
       break;
     case "datetime":
       out = { kind: "datetime" };
@@ -666,15 +668,6 @@ function normChart(x: unknown, i: number, taken: Set<string>, sheetIds: Map<stri
 }
 
 // Smart tables ---------------------------------------------------------------------------------
-
-/** Excel's rules for table names (as src/sheet/table/model.ts validTableName, repeated to stay light). */
-function validTableName(name: string): boolean {
-  if (!name || name.length > 255) return false;
-  if (!/^[A-Za-z_\\À-ÖØ-öø-ɏ][A-Za-z0-9_.À-ÖØ-öø-ɏ]*$/.test(name)) return false;
-  if (/^[A-Za-z]{1,3}[0-9]+$/.test(name)) return false;
-  if (/^[RrCc]$/.test(name) || /^[Rr][0-9]*[Cc][0-9]*$/.test(name)) return false;
-  return true;
-}
 
 function tableName(x: unknown, locale: Locale, taken: Set<string>): string {
   const name = typeof x === "string" ? x.trim().replace(/\s+/g, "_") : "";

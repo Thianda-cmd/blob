@@ -33,7 +33,8 @@ export function DataSection() {
     if (!result) return blob.say(t.export.failed, { mood: "worried" });
     const date = new Date().toISOString().slice(0, 10);
     download(fileNameFor(t.export.backupName(date), BLOB_EXT, "Blob"), JSON.stringify(result.file), BLOB_MIME);
-    blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: "happy", ms: 6000 });
+    // Something left out is a hint, so it shows with Blob's tips switched off too.
+    blob.say(result.missing ? t.export.missing(result.missing) : t.export.done(result.pages), { mood: result.missing ? "thinking" : "happy", ms: 6000 });
   };
 
   return (

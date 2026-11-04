@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowLeftRight, Copy, FolderInput, FolderKanban, FileUser, Globe, Link2, LogOut, Star, Trash2, Ellipsis, Check, Eye, UserPlus, X } from "lucide-react";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
@@ -30,9 +29,6 @@ import { cn, pageTitle } from "@/lib/utils";
 import { SaveIndicator } from "./SaveIndicator";
 import type { SaveState } from "./useAutosave";
 import { canDuplicate, useDuplicatePage } from "./useDuplicatePage";
-
-// Lets "Duplizieren" copy an open spreadsheet as it is on screen; loaded on spreadsheet pages only.
-const OpenSheetCopy = dynamic(() => import("./OpenSheetCopy").then((m) => m.OpenSheetCopy), { ssr: false });
 
 /**
  * Breadcrumbs, who is here, save state, sharing, favorite and the page menu. Shared by notes and
@@ -389,7 +385,6 @@ export function PageTopBar({
           }}
         />
       )}
-      {page.kind === "sheet" && <OpenSheetCopy pageId={page.id} />}
     </>
   );
 }

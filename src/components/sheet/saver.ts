@@ -606,7 +606,8 @@ export class SheetSaver {
       const report: MergeReport = { conflicts: [] };
       const merged = mergeWorkbooks(this.base, now, theirs, report, locale);
       this.base = theirs;
-      if (merged !== now && !sameJson(merged, now)) store.replaceRemote(merged);
+      // A sheet kept as theirs has my version on a copy: a running edit there goes on in the copy.
+      if (merged !== now && !sameJson(merged, now)) store.replaceRemote(merged, report.conflicts);
       if (report.conflicts.length) this.o.on.conflict?.(report.conflicts);
     }
     this.rev = rev;
@@ -708,6 +709,9 @@ export class SheetSaver {
         const changed = !sameJson(wb, now);
         // (Nothing changes when the drafts outlived their saves.)
         if (changed || title !== this.title) {
+          // Without the report: here the editor's version is "theirs", so a sheet both moved rows of
+          // keeps what is on the screen, and only the draft's version goes on a copy. A running edit
+          // stays where it is.
           if (changed) store.replaceRemote(wb);
           if (title !== this.title) {
             this.title = title;

@@ -67,6 +67,8 @@ export type LinearAxisOptions = {
   zero: "always" | "excel" | "never";
   /** Room beyond the data at automatic ends (Excel's +5 %). */
   pad?: boolean;
+  /** The smallest step between ticks: 1 on an axis of dates without times (at half days each date would show twice). */
+  minStep?: number;
 };
 
 /** A linear axis for data from dataMin to dataMax (both NaN or Infinity when there is no data). */
@@ -113,7 +115,7 @@ export function linearAxis(dataMin: number, dataMax: number, opts: LinearAxisOpt
 
   const target = Math.max(2, Math.min(12, opts.target));
   const span = hi - lo;
-  const step = niceStep(span / target);
+  const step = Math.max(opts.minStep ?? 0, niceStep(span / target));
   let min = lo;
   let max = hi;
   if (autoMin) {

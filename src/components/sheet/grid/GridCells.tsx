@@ -10,8 +10,9 @@ import { memo, type ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
 import type { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { cellKey } from "@/sheet/a1";
-import type { Calc, CellValue, ErrorCode } from "@/sheet/engine";
+import type { Calc, CellError, CellValue } from "@/sheet/engine";
 import type { Area, BorderLine, Cell, Pos, Sheet } from "@/sheet/types";
+import { errorHelp } from "../chrome/errorHelp";
 import { borderCss, CELL_PAD, fitNumber, lookOf, numberAsText, type CellLook } from "./cellLook";
 import { colWidth, type Layout } from "./geometry";
 import type { CellDecor } from "./Grid";
@@ -45,12 +46,16 @@ export function cellSource(sheet: Sheet, calc: Calc, decorate: Decorate | undefi
 /** The id of a cell's element (for aria-activedescendant). */
 export const cellId = (gridId: string, row: number, col: number) => `${gridId}-c${row}-${col}`;
 
-/** What a screen reader hears about a cell besides its text: its error in words, that it is a number stored as text, its note. */
-export type Describe = (error: ErrorCode | null, note: string, numberText?: boolean) => string | undefined;
+/**
+ * What a screen reader hears about a cell besides its text: its error in words (the same as the
+ * tooltip and the status bar say, errorHelp: `formula` is the cell's own, for one that can't be
+ * read), that it is a number stored as text, its note.
+ */
+export type Describe = (error: CellError | null, note: string, numberText?: boolean, formula?: string) => string | undefined;
 
-export function describer(t: GridText): Describe {
-  return (error, note, numberText) => {
-    const help = error ? t.errors[error] : null;
+export function describer(t: GridText, locale: Locale): Describe {
+  return (error, note, numberText, formula) => {
+    const help = error ? errorHelp(error, locale, formula) : null;
     return [help && `${help.title}. ${help.text}`, numberText && `${t.numberText.title}. ${t.numberText.text}`, note && `${t.note}: ${note}`].filter(Boolean).join(" ") || undefined;
   };
 }
@@ -193,7 +198,7 @@ const GridRow = memo(function GridRow(p: RowProps) {
         spill={spill}
         note={!!cell?.note}
         numberText={numberText}
-        description={p.describe(look.error, cell?.note ?? "", numberText)}
+        description={p.describe(look.error ? { error: look.error, detail: look.errorDetail } : null, cell?.note ?? "", numberText, cell?.f)}
         selected={inSpans(p.selected, c)}
         decorButton={decor?.button ? `${decor.button.state}|${decor.button.label}` : ""}
         lineBelow={decor?.lineBelow === "strong"}
@@ -273,16 +278,31 @@ function sameCell(a: CellProps, b: CellProps): boolean {
 
 const BUTTON_ICONS = { plain: ChevronDown, filtered: Filter, sortedAsc: ArrowUp, sortedDesc: ArrowDown } as const;
 
-/** The finger-sized box (at least 36 px) around a smart table's header button, relative to the button. */
-function touchTarget(row: number, cellH: number, zoom: number) {
+/**
+ * Was a finger's press moved onto a smart table's header button by the browser? Chrome's touch
+ * adjustment hands a touch near a small button to that button (pointer events included), though the
+ * finger came down on the cell below it; the event's point still says where it really was. Such a
+ * press is for the cell under the finger (the grid takes it), not for the button.
+ */
+export function movedOntoButton(e: { target: EventTarget | null; clientX: number; clientY: number; pointerType: string }): boolean {
+  if (e.pointerType !== "touch" || !(e.target instanceof Element)) return false;
+  const cell = e.target.closest("[data-decor-button]")?.closest("[role=gridcell]");
+  if (!cell) return false;
+  const r = cell.getBoundingClientRect();
+  return e.clientX < r.left || e.clientX >= r.right || e.clientY < r.top || e.clientY >= r.bottom;
+}
+
+/**
+ * The finger-sized box around a smart table's header button, relative to the button (which sits
+ * centred at the cell's right edge): 36 px wide, reaching left over the header text, and exactly as
+ * tall as its header cell. Never into the next column or the row above or below: a tap there is
+ * meant for that cell (and the browser's touch adjustment would pull it onto the button).
+ */
+function touchTarget(cellW: number, cellH: number, zoom: number) {
   const size = Math.round(18 * zoom);
   const inset = Math.round(3 * zoom);
-  const w = Math.max(36, size + inset);
-  const h = Math.max(36, size);
-  const centred = (h - size) / 2;
-  // How far the cell reaches above the button: in row 1 nothing above it can take the touch.
-  const above = row === 0 ? Math.min(centred, Math.floor((cellH - size) / 2)) : centred;
-  return { right: -inset, top: -above, width: w, height: h };
+  // (Measured from inside the button's 1 px border.)
+  return { right: -inset - 1, top: -(cellH - size) / 2 - 1, width: Math.min(cellW, Math.max(36, size + inset)), height: cellH };
 }
 
 const GridCell = memo(function GridCell(p: CellProps) {
@@ -376,10 +396,28 @@ const GridCell = memo(function GridCell(p: CellProps) {
           type="button"
           tabIndex={-1}
           data-grid-ignore=""
+          data-decor-button=""
           aria-label={buttonLabel}
           title={buttonLabel}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => p.onDecor(p.row, p.col, e.currentTarget)}
+          onPointerDown={(e) => {
+            // A press the browser moved here from the cell below goes on to the grid (see movedOntoButton).
+            if (movedOntoButton(e)) {
+              delete e.currentTarget.dataset.pressed;
+              return;
+            }
+            e.stopPropagation();
+            e.currentTarget.dataset.pressed = "";
+          }}
+          onClick={(e) => {
+            const pressed = e.currentTarget.dataset.pressed !== undefined;
+            delete e.currentTarget.dataset.pressed;
+            // …and so does its tap: a click made by a pointer (detail > 0) opens the menu only after
+            // a press on the button. Safari moves the tap's click alone onto the button (the press
+            // stays on the cell below), and its click isn't a PointerEvent that would say "touch".
+            // A screen reader's or the keyboard's click (detail 0) has no press and always opens it.
+            if (e.detail > 0 && !pressed) return;
+            p.onDecor(p.row, p.col, e.currentTarget);
+          }}
           className={
             buttonState === "plain"
               ? "absolute top-1/2 z-[1] grid -translate-y-1/2 place-items-center rounded-md border border-line bg-raised text-ink-3 shadow-card transition-colors hover:bg-hover hover:text-ink"
@@ -388,10 +426,9 @@ const GridCell = memo(function GridCell(p: CellProps) {
           style={{ right: Math.round(3 * zoom), width: Math.round(18 * zoom), height: Math.round(18 * zoom) }}
         >
           <Icon style={{ width: Math.round(12 * zoom), height: Math.round(12 * zoom) }} strokeWidth={2.25} />
-          {/* A finger needs more than the small button: on touch screens an invisible 36 px target
-              around it (reaching left over the header text, not into the next column; in the
-              sheet's first row, where the column letters sit right above, reaching down instead). */}
-          <span aria-hidden className="absolute hidden [@media(hover:none)]:block" style={touchTarget(p.row, p.h, zoom)} />
+          {/* A finger needs more than the small button: on touch screens an invisible target around
+              it, 36 px wide over the header text and as tall as the header cell (see touchTarget). */}
+          <span aria-hidden className="absolute hidden [@media(hover:none)]:block" style={touchTarget(p.w, p.h, zoom)} />
         </button>
       )}
     </div>

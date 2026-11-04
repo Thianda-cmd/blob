@@ -664,16 +664,20 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
     vFmt = tickFormatter(vScale, valueAxis, valueFmt, locale);
     if (scatter) {
       const xTarget = plot.w / Math.max(fs * 5.2, 56);
-      xScale = catAxis.log ? logAxis(xMin, xMax, catAxis) : linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target: xTarget, zero: "excel", pad: true });
+      // Dates without times tick at whole days.
+      const minStep = xFmt?.kind === "date" ? 1 : undefined;
+      xScale = catAxis.log ? logAxis(xMin, xMax, catAxis) : linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target: xTarget, zero: "excel", pad: true, minStep });
       xFmtFn = tickFormatter(xScale, catAxis, xFmt, locale);
-      // Labels too wide for their spacing: fewer ticks.
+      // Labels too wide for their spacing: fewer ticks, each round asking for fewer than the last
+      // (asking for what the ticks were can give the same ticks again: 11 dates at half days).
       if (!xScale.log) {
+        let target = xTarget;
         for (let k = 0; k < 4; k++) {
           const widest = Math.max(...xScale.ticks.map((v) => textWidth(xFmtFn(v), tickSize)));
           const spacing = plot.w / Math.max(1, xScale.ticks.length - 1);
           if (widest + fs * 0.8 <= spacing) break;
-          const target = Math.max(2, (xScale.ticks.length - 1) * 0.6);
-          xScale = linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target, zero: "excel", pad: true });
+          target = Math.max(2, Math.min(target, xScale.ticks.length - 1) * 0.6);
+          xScale = linearAxis(xMin, xMax, { min: catAxis.min, max: catAxis.max, target, zero: "excel", pad: true, minStep });
           xFmtFn = tickFormatter(xScale, catAxis, xFmt, locale);
         }
       }

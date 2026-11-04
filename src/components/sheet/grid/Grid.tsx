@@ -36,10 +36,12 @@ import { useIsMac, useTouch } from "@/components/ui/useMediaQuery";
 import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { areaName, cellKey, inArea, parseKey } from "@/sheet/a1";
-import { explainError, isError, type Calc, type CellError } from "@/sheet/engine";
+import { isError, type Calc, type CellError } from "@/sheet/engine";
 import { setColWidths, setRowHeights, sheetById } from "@/sheet/ops";
 import { DEFAULT_COL_W, DEFAULT_ROW_H, MAX_ROWS, type Area, type Pos, type Sheet } from "@/sheet/types";
 import { cn } from "@/lib/utils";
+import { useChartUi } from "../chart/selection";
+import { errorHelp } from "../chrome/errorHelp";
 import { activeArea, mainArea, rowHiddenIn, selectionAreas, useSheet, type SheetStore } from "../store";
 import { fillTo, fitColumns, fitRows, isSelected, menuKindFor, selectedIndexes, addRoom, unhideNear } from "./actions";
 import { BASE_FONT, CELL_PAD, numberAsText, numberLike, shownText } from "./cellLook";
@@ -64,7 +66,7 @@ import {
   type Scroll,
   type Viewport,
 } from "./geometry";
-import { cellId, cellSource, describer, GridLines, PaneCells } from "./GridCells";
+import { cellId, cellSource, describer, GridLines, movedOntoButton, PaneCells } from "./GridCells";
 import { ColumnHeaders, CornerHeader, RowHeaders } from "./Headers";
 import { handleGridKey } from "./keys";
 import { LINE_HEIGHT, resetMeasure, setMeasureFamily, wrappedLines } from "./measure";
@@ -109,7 +111,7 @@ export type GridProps = {
   decorate?: (sheetId: string, row: number, col: number) => CellDecor | null;
   /** Things floating above the cells that scroll with them (charts), positioned with `geom`. */
   overlay?: (geom: GridGeometry) => ReactNode;
-  /** Entries added at the top of the cells' context menu ("Als intelligente Tabelle", "Diagramm einfügen"). */
+  /** Entries added at the top of the cells' context menu ("Als Tabelle formatieren", "Diagramm einfügen"). */
   contextMenu?: (close: () => void) => ReactNode;
   className?: string;
 };
@@ -119,12 +121,22 @@ export function focusSheetGrid() {
   document.querySelector<HTMLElement>("[data-sheet-grid]")?.focus({ preventScroll: true });
 }
 
+/**
+ * Put the keyboard into the cell editor (it is always there, also while no cell is edited): what is
+ * typed next starts editing the active cell. The template picker hands a key press over this way,
+ * during the press, so the letter lands in A1.
+ */
+export function focusCellEditor() {
+  document.querySelector<HTMLTextAreaElement>("[data-sheet-cell-editor]")?.focus({ preventScroll: true });
+}
+
 /** The grid re-renders every this many px of scrolling (each render covers more than the screen). */
 const SLACK = 96;
 const FOOTER = 48;
 const MIN_COL = 12;
 const MIN_ROW = 10;
 const NO_FRAMES: RefFrame[] = [];
+const NO_AREAS: Area[] = [];
 /** The time, for telling taps, double taps and long presses apart (only ever read in event handlers). */
 const clock = () => Date.now();
 const NO_ROWS: ReadonlyMap<number, number> = new Map();
@@ -165,7 +177,8 @@ type Drag =
 
 type Guide = { kind: "col" | "row"; at: number; label: string };
 /** `numberText`: the cell holds text that looks like a number (see numberAsText). */
-type Tip = { box: Box; note: string; error: CellError | null; numberText: string | null };
+/** `formula`: the cell's own (for an error, errorHelp says where one that can't be read goes wrong). */
+type Tip = { box: Box; note: string; error: CellError | null; formula: string | undefined; numberText: string | null };
 
 /**
  * Rows that need more than the default height (wrapped text, big fonts), unless set by hand.
@@ -263,13 +276,20 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   const layout = useMemo(() => buildLayout(sheet, zoom, (r) => rowHiddenIn(calc, sheet.id, r, locale), tall), [sheet, zoom, calc, locale, tall]);
   const geometry = useMemo(() => geometryOf(layout), [layout]);
   const src = useMemo(() => cellSource(sheet, calc, decorate), [sheet, calc, decorate]);
-  const describe = useMemo(() => describer(t), [t]);
+  const describe = useMemo(() => describer(t, locale), [t, locale]);
   const ready = view.w > 0 && view.h > 0;
   const win = renderWindow(layout, scroll, view, SLACK);
 
   const areas = useMemo(() => selectionAreas(selection), [selection]);
   const main = useMemo(() => mainArea(selection), [selection]);
   const active = selection.anchor;
+  // A chart selected on this sheet has the keyboard (its frame shows it): meanwhile the cells'
+  // selection is only a faint outline, without its fill, handles and header highlight, so only one
+  // selection looks active, and you still see what the toolbar and the status bar go by. (ChartLayer
+  // lets go of the chart as soon as a press or the keyboard goes back to the cells.)
+  const chartId = useChartUi(store).selected;
+  const chartHere = useSheet(store, (s) => !!chartId && s.workbook.charts.some((c) => c.id === chartId && c.sheetId === s.sheetId));
+  const shownAreas = chartHere ? NO_AREAS : areas;
   const editText = edit?.text ?? "";
   const editSheet = edit?.sheetId ?? null;
   const tokens = useMemo(() => (editText.startsWith("=") ? formulaTokens(editText, locale) : null), [editText, locale]);
@@ -502,7 +522,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
     const error = isError(value) ? value : null;
     const numberText = numberAsText(cell, (d) => (p.row + d < 0 ? null : s.calc.value(s.sheetId, p.row + d, p.col))) ? String(cell.v) : null;
     if (!cell.note && !error && !numberText) return null;
-    return { box: cellBox(p), note: cell.note ?? "", error, numberText };
+    return { box: cellBox(p), note: cell.note ?? "", error, formula: cell.f, numberText };
   };
   const hover = (p: Pos | null) => {
     const key = p ? `${p.row},${p.col}` : "";
@@ -852,7 +872,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     swallowClick.current = false;
     const target = e.target as HTMLElement;
-    if (target.closest("[data-grid-overlay], [data-grid-ignore], textarea, input, button, a, [role=listbox], [role=dialog]")) return;
+    // (A finger the browser moved onto a table header's button from the cell below is for that cell.)
+    if (target.closest("[data-grid-overlay], [data-grid-ignore], textarea, input, button, a, [role=listbox], [role=dialog]") && !movedOntoButton(e)) return;
     const kind = e.pointerType === "touch" ? "touch" : e.pointerType === "pen" ? "pen" : "mouse";
     if (kind !== lastPointer) setLastPointer(kind);
     if (e.pointerType === "touch") penHover(false);
@@ -1229,6 +1250,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
       main={main}
       active={active}
       quiet={!!edit && edit.text.startsWith("=")}
+      faint={chartHere}
       handles={handles}
       clip={clipHere}
       frames={frames}
@@ -1307,7 +1329,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
               <>
                 <div className="absolute left-0 top-0 bg-hover shadow-[inset_0_-1px_0_var(--line-2)] [touch-action:none]" style={{ width: l.headerW + l.width, height: l.headerH }} />
                 <div className="[touch-action:none]">
-                  <ColumnHeaders layout={l} c0={win.c0} c1={win.c1} areas={areas} t={t} touch={coarse} />
+                  <ColumnHeaders layout={l} c0={win.c0} c1={win.c1} areas={shownAreas} t={t} touch={coarse} />
                 </div>
                 {fr > 0 && (
                   <div className="absolute isolate bg-raised" style={{ left: l.headerW, top: l.headerH, width: l.width, height: l.frozenH }}>
@@ -1327,7 +1349,7 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
               <>
                 <div className="absolute left-0 bg-hover shadow-[inset_-1px_0_0_var(--line-2)] [touch-action:none]" style={{ top: l.headerH, width: l.headerW, height: l.height }} />
                 <div className="[touch-action:none]">
-                  <RowHeaders layout={l} r0={win.r0} r1={win.r1} areas={areas} t={t} touch={coarse} />
+                  <RowHeaders layout={l} r0={win.r0} r1={win.r1} areas={shownAreas} t={t} touch={coarse} />
                 </div>
                 {fc > 0 && (
                   <div className="absolute isolate bg-raised" style={{ left: l.headerW, top: l.headerH, width: l.frozenW, height: l.height }}>
@@ -1360,8 +1382,8 @@ export function Grid({ store, decorate, overlay, contextMenu, className }: GridP
               <>
                 <div className="[touch-action:none]">
                   <CornerHeader layout={l} all={main.r0 === 0 && main.c0 === 0 && main.r1 >= R && main.c1 >= C} t={t} />
-                  {fc > 0 && <ColumnHeaders layout={l} c0={0} c1={fc - 1} areas={areas} t={t} touch={coarse} />}
-                  {fr > 0 && <RowHeaders layout={l} r0={0} r1={fr - 1} areas={areas} t={t} touch={coarse} />}
+                  {fc > 0 && <ColumnHeaders layout={l} c0={0} c1={fc - 1} areas={shownAreas} t={t} touch={coarse} />}
+                  {fr > 0 && <RowHeaders layout={l} r0={0} r1={fr - 1} areas={shownAreas} t={t} touch={coarse} />}
                 </div>
                 {fr > 0 && fc > 0 && (
                   <div className="absolute isolate bg-raised" style={{ left: l.headerW, top: l.headerH, width: l.frozenW, height: l.frozenH }}>
@@ -1487,26 +1509,14 @@ function CellTip({ tip, t, locale }: { tip: Tip; t: (typeof sheetGridText)["en"]
   const width = 280;
   const right = typeof window !== "undefined" && box.x + box.w + width + 12 > window.innerWidth;
   const left = right ? Math.max(8, box.x - width - 6) : box.x + box.w + 6;
-  const error = tip.error;
-  const help = error ? t.errors[error.error] : null;
-  let explained = help?.text ?? "";
-  if (error) {
-    // The engine knows the details ("unknown-function:SUMM" → did you mean SUMME?); our words are the fallback.
-    try {
-      explained = explainError(error, locale) || explained;
-      // The heading already names the error: don't say it twice ("Division durch null: …").
-      if (help && explained.toLowerCase().startsWith(`${help.title.toLowerCase()}:`)) explained = explained.slice(help.title.length + 1).trim();
-    } catch {
-      const unknown = error.detail?.startsWith("unknown-function:") ? error.detail.slice("unknown-function:".length) : null;
-      if (unknown) explained = t.unknownFunction(unknown);
-    }
-  }
+  // The error's name and what to do, in the same words as the status bar and screen readers.
+  const help = tip.error ? errorHelp(tip.error, locale, tip.formula) : null;
   return createPortal(
     <div role="tooltip" className="pointer-events-none fixed z-[85] w-max max-w-[280px] rounded-xl border border-line bg-raised px-3 py-2 text-[12.5px] leading-snug text-ink-2 shadow-pop" style={{ left, top: box.y }}>
       {help && (
         <div>
           <div className="font-semibold text-[var(--sheet-red)]">{help.title}</div>
-          <div className="mt-0.5">{explained}</div>
+          <div className="mt-0.5">{help.text}</div>
         </div>
       )}
       {tip.numberText !== null && (

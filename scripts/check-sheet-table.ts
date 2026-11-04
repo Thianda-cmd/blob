@@ -8,11 +8,12 @@
 // Problems make the script exit with 1.
 import type { Locale } from "@/i18n/config";
 import { cellKey, parsePos } from "@/sheet/a1";
+import { normalizeWorkbook } from "@/sheet/doc";
 import * as E from "@/sheet/engine";
 import * as O from "@/sheet/ops";
 import * as T from "@/sheet/table/model";
 import { buildDecorate } from "@/components/sheet/table/decor";
-import { createSheetStore } from "@/components/sheet/store";
+import { calcFor, createSheetStore } from "@/components/sheet/store";
 import { currentSheetNotice } from "@/components/sheet/notice";
 import { chartFromTable, makeTableFromSelection } from "@/components/sheet/table/actions";
 import { describeFilter } from "@/components/sheet/table/describe";
@@ -419,6 +420,24 @@ run("filteredRows: header and totals never hidden", () => {
   eq("other sheet", [...T.filteredRows(wb, calcOf(wb), "s2", "de")], []);
 });
 
+run("SUBTOTAL in the editor: filtered rows also hidden by hand (FORM-9)", () => {
+  // The editor's own Calc (store.ts calcFor): 1–11 skip every row the filter leaves out, also when
+  // it is hidden by hand as well; 101–111 skip every hidden row. Excel gives 90 / 3 / 30.
+  const cells: Record<string, Cell> = { "0,0": { v: "Wert" }, "0,1": { v: "Gruppe" }, "7,0": { f: "SUBTOTAL(9,A2:A6)" }, "8,0": { f: "SUBTOTAL(109,A2:A6)" }, "9,0": { f: "SUBTOTAL(2,A2:A6)" }, "10,0": { f: "SUBTOTAL(1,A2:A6)" } };
+  [10, 20, 30, 40, 50].forEach((v, i) => {
+    cells[`${i + 1},0`] = { v };
+    cells[`${i + 1},1`] = { v: i % 2 ? "y" : "x" };
+  });
+  const table: TableSpec = { id: "t1", sheetId: "s1", name: "Tabelle1", area: { r0: 0, c0: 0, r1: 5, c1: 1 }, columns: [{ id: "c1", total: "none" }, { id: "c2", total: "none" }], totals: false, style: "purple", banded: true, filters: { c2: { kind: "values", values: ["x"] } }, sort: null };
+  for (const [byHand, sum109] of [[[], 90], [[3], 60], [[4], 90], [[3, 4], 60]] as const) {
+    const rows: Sheet["rows"] = {};
+    for (const r of byHand) rows[String(r)] = { hidden: true };
+    const wb: Workbook = { v: 1, sheets: [{ id: "s1", name: "Blatt 1", cells, cols: {}, rows, freeze: { rows: 0, cols: 0 }, size: { rows: 50, cols: 10 } }], charts: [], tables: [table] };
+    const c = calcFor(wb, "de");
+    eq(`rows ${JSON.stringify(byHand)} hidden by hand`, [7, 8, 9, 10].map((r) => c.value("s1", r, 0)), [90, sum109, 3, 30]);
+  }
+});
+
 // ==============================================================================================
 section("setTableFilter");
 run(current, () => {
@@ -624,6 +643,9 @@ run(current, () => {
     ["", false],
   ] as const) {
     eq(`valid ${name}`, T.validTableName(name), ok);
+    // Opening a saved spreadsheet keeps exactly the names the model accepts (doc.ts uses the same rule).
+    const read = normalizeWorkbook(JSON.parse(JSON.stringify({ ...wb, tables: [{ ...t, name }] })), "de");
+    eq(`kept when read again: ${name}`, read.tables[0]?.name === name, ok);
   }
   const two = O.putTable(wb, { ...t, id: "t2", name: "Andere", area: A("H1:H2") });
   eq("problem taken", T.tableNameProblem(two, t.id, "andere"), "taken");

@@ -81,7 +81,10 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
     const cv = normalizeCv(data?.content ?? item.content, locale);
     // A copy of an automatically named CV stays automatic, so it keeps following the name on it.
     const src = data?.title ?? item.title;
-    const title = !src.trim() || src === cvTitle(cv) ? cvTitle(cv) : t.copyOf(src).slice(0, 200);
+    // A long name is shortened before " (Kopie)" goes on, never the " (Kopie)": the copy must not
+    // get the original's very name. (By characters, as the database counts them: 200 at most.)
+    const room = 200 - Array.from(t.copyOf("")).length;
+    const title = !src.trim() || src === cvTitle(cv) ? cvTitle(cv) : t.copyOf(Array.from(src).slice(0, room).join("").trimEnd());
     const page = await createPage({ kind: "cv", title, content: cv, plain_text: cvPlainText(cv) });
     if (!page) return blob.say(t.duplicateFailed, { mood: "worried" });
     setMade((list) => [{ id: page.id, title: page.title, updated_at: page.updated_at, content: cv }, ...list]);

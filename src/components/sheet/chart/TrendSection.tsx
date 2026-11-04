@@ -11,8 +11,8 @@ import type { Locale } from "@/i18n/config";
 import type { SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import type { ChartSeriesData } from "@/sheet/chart/data";
-import { formatCoefficient, isCalendarFormat } from "@/sheet/chart/format";
-import { probeRange, probeResultText, probeSteps, readProbe } from "@/sheet/chart/probe";
+import { formatCoefficient, isCalendarFormat, isDateFormat } from "@/sheet/chart/format";
+import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe } from "@/sheet/chart/probe";
 import { aOutOfRange, equationParts, equationText, isFitError, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
 import { trendlineName } from "@/sheet/chart/scene";
 import type { ChartSpec, NumberFormat, SeriesSpec, TrendlineSpec } from "@/sheet/types";
@@ -219,7 +219,7 @@ export function TrendSection({
           {datesTip && <Note icon={<Lightbulb />}>{t.datesTip}</Note>}
           {spec.kind !== "scatter" && <Note icon={<Info />}>{t.categoryX}</Note>}
 
-          {fitted && <Probe fit={fitted} spec={spec} locale={locale} t={t} seriesName={seriesName} />}
+          {fitted && <Probe fit={fitted} spec={spec} locale={locale} t={t} seriesName={seriesName} xFormat={xFormat} />}
 
           {tl.type !== "movingAverage" && (
             <div className="space-y-1">
@@ -274,9 +274,9 @@ export function TrendSection({
 /**
  * "Probe berechnen": a measured y → x along the trendline, with how it is worked out. What can't
  * be read as a number gets a reason under the field (an unfinished number like "1e-" only once
- * the student stops typing).
+ * the student stops typing). With dates or times as x (`xFormat`) the result is a date or time.
  */
-function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec; locale: Locale; t: SheetChartText; seriesName: string }) {
+function Probe({ fit, spec, locale, t, seriesName, xFormat }: { fit: Fit; spec: ChartSpec; locale: Locale; t: SheetChartText; seriesName: string; xFormat?: NumberFormat | null }) {
   const [text, setText] = useState("");
   // Typed to the end: the field was left, or typing paused.
   const [typed, setTyped] = useState(false);
@@ -289,8 +289,8 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
   const yName = spec.yAxis.title.trim() || seriesName || "y";
   const xName = spec.kind === "scatter" ? spec.xAxis.title.trim() || "x" : "x";
   const outside = x === null ? null : probeRange(fit, x);
-  const xText = x === null ? "" : probeResultText(x, locale);
-  const steps = y === null ? null : probeSteps(fit, y, x, locale);
+  const xText = x === null ? "" : probeResultText(x, locale, xFormat);
+  const steps = y === null ? null : probeSteps(fit, y, x, locale, xFormat);
   const problem =
     read.problem === null || (read.problem === "typing" && !typed) ? null : typeof read.problem === "object" ? t.probeXUnit(read.problem.xUnit, yName) : t.probeNotNumber;
   return (
@@ -337,14 +337,14 @@ function Probe({ fit, spec, locale, t, seriesName }: { fit: Fit; spec: ChartSpec
                 <div className="truncate text-[12px] text-blob-ink">{xName}</div>
                 <div className={cn("truncate text-[18px] font-semibold tabular-nums leading-tight text-blob-ink")}>{xText}</div>
               </div>
-              <CopyButton text={formatCoefficient(x, locale, 6)} label={t.copy} t={t} />
+              <CopyButton text={isDateFormat(xFormat) ? xText : formatCoefficient(x, locale, 6)} label={t.copy} t={t} />
             </div>
           )}
           {steps && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.formula}</p>}
           {steps?.line && <p className="break-words font-mono text-[12px] leading-relaxed text-ink-2">{steps.line}</p>}
           {outside && (
             <Note tone="warn" icon={<TriangleAlert />}>
-              {outside === "above" ? t.probeAbove(formatCoefficient(fit.xMax!, locale)) : outside === "below" ? t.probeBelow(formatCoefficient(fit.xMin!, locale)) : t.probeNegative}
+              {probeAdvice(fit, outside, locale, xFormat)}
             </Note>
           )}
         </div>

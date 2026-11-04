@@ -46,9 +46,16 @@ export const transferText = defineMessages({
       done: (n: number) => (n === 1 ? "Imported. Here it is!" : `Imported ${n} pages. Here they are!`),
       partly: (n: number) => (n === 1 ? "Imported, but one page didn't make it." : `Imported, but ${n} pages didn't make it.`),
       notBlob: "That isn't a file Blob can open. Try a .blob, .xlsx, .csv, .md or .txt file.",
+      // A picked file of another kind (phones and tablets offer every file in the picker)
+      notImportable: "I can't import this file. That works with Blob files, Excel and CSV files, Markdown and text. You can attach pictures, PDFs and other files to a note.",
       newer: "This file comes from a newer Blob. Reload the page (or update the app) and try again.",
       broken: "This Blob file seems damaged, so I couldn't open it.",
       tooBig: "That file is too big to import (over 100 MB).",
+      // A spreadsheet in a Blob file that couldn't be saved (over 5 MB as saving measures it)
+      sheetTooBig: (n: number) =>
+        n === 1
+          ? "A spreadsheet in this file is too big to save (5 MB at most), so I left it out."
+          : `${n} spreadsheets in this file are too big to save (5 MB at most), so I left them out.`,
       failed: "The import didn't work. Check your connection and try again?",
     },
   },
@@ -96,9 +103,14 @@ export const transferText = defineMessages({
       done: (n) => (n === 1 ? "Importiert. Hier ist es!" : `${n} Seiten importiert. Hier sind sie!`),
       partly: (n) => (n === 1 ? "Importiert, aber eine Seite hat es nicht geschafft." : `Importiert, aber ${n} Seiten haben es nicht geschafft.`),
       notBlob: "Diese Datei kann Blob nicht öffnen. Probier eine .blob-, .xlsx-, .csv-, .md- oder .txt-Datei.",
+      notImportable: "Diese Datei kann ich nicht importieren. Das geht mit Blob-Dateien, Excel- und CSV-Dateien, Markdown und Text. Bilder, PDFs und andere Dateien kannst du an eine Notiz anhängen.",
       newer: "Diese Datei stammt aus einem neueren Blob. Lade die Seite neu (oder aktualisiere die App) und versuch es nochmal.",
       broken: "Diese Blob-Datei scheint beschädigt zu sein, deshalb konnte ich sie nicht öffnen.",
       tooBig: "Diese Datei ist zu groß zum Importieren (über 100 MB).",
+      sheetTooBig: (n) =>
+        n === 1
+          ? "Eine Tabelle in dieser Datei ist zu groß zum Speichern (höchstens 5 MB), deshalb habe ich sie weggelassen."
+          : `${n} Tabellen in dieser Datei sind zu groß zum Speichern (höchstens 5 MB), deshalb habe ich sie weggelassen.`,
       failed: "Der Import hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal?",
     },
   },

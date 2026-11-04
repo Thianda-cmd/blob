@@ -122,7 +122,11 @@ export type NumberFormat =
   | { kind: "currency"; decimals: number; symbol: "€" | "$" | "£" | "CHF" }
   /** short: 01.11.2026 (de) / 11/1/2026 (en); long: 1. November 2026; iso: 2026-11-01 */
   | { kind: "date"; style: "short" | "long" | "iso" }
-  | { kind: "time"; seconds: boolean }
+  /**
+   * `duration`: the hours go on past 24 ([h]:mm), 36:00 instead of the clock time 12:00 (typed
+   * 24:00 or more, or chosen as "Dauer").
+   */
+  | { kind: "time"; seconds: boolean; duration?: boolean }
   | { kind: "datetime" }
   /** Keep what was typed as text, never a number ("007", phone numbers). */
   | { kind: "text" };

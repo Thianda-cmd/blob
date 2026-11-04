@@ -444,6 +444,7 @@ export function CellEditor({ store, layout, scroll, view, sheetId, locale, t, gr
         )}
         <textarea
           ref={textarea}
+          data-sheet-cell-editor=""
           tabIndex={-1}
           value={text}
           rows={1}

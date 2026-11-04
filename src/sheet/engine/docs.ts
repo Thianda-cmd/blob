@@ -2442,7 +2442,7 @@ const DATE: Record<string, Pair> = {
       args: [],
       example: "=HEUTE()",
       exampleResult: "Das heutige Datum, z. B. 03.11.2026.",
-      tip: "Strg+; trägt das heutige Datum als festen Wert ein, der sich nicht mehr ändert.",
+      tip: "Strg+. trägt das heutige Datum als festen Wert ein, der sich nicht mehr ändert.",
     },
   },
   NOW: {
@@ -2458,7 +2458,7 @@ const DATE: Record<string, Pair> = {
       args: [],
       example: "=JETZT()",
       exampleResult: "Z. B. 03.11.2026 14:30.",
-      tip: "Strg+Umschalt+: trägt die aktuelle Uhrzeit als festen Wert ein – praktisch, um festzuhalten, wann du eine Probe genommen hast.",
+      tip: "Strg+Umschalt+. trägt die aktuelle Uhrzeit als festen Wert ein – praktisch, um festzuhalten, wann du eine Probe genommen hast.",
     },
   },
   DATE: {

@@ -17,7 +17,19 @@ import { boolText, errorText, isError, type CellValue, type CellError, ERR } fro
 export type DurationFormat = { kind: "time"; seconds: boolean; duration: true };
 
 /** Is this a duration format (36:00) rather than a clock time (12:00)? */
-export const isDuration = (fmt: NumberFormat | undefined): boolean => fmt?.kind === "time" && "duration" in fmt && fmt.duration === true;
+export const isDuration = (fmt: NumberFormat | undefined): boolean => fmt?.kind === "time" && fmt.duration === true;
+
+/**
+ * The format a cell has after typing or pasting into it: its own, or the one the input implies
+ * ("12 %", "01.11.2026", "36:00") when it has none. A duration replaces a clock time: 36:05 typed
+ * into a cell that shows 36:00 as the clock time 12:00 would show 12:05 otherwise. It keeps the
+ * clock time's seconds: a column set to show them goes on showing them (36:05:00).
+ */
+export function typedFormat(own: NumberFormat | undefined, implied: NumberFormat | undefined): NumberFormat | undefined {
+  if (!implied || !own) return implied ?? own;
+  if (implied.kind === "time" && isDuration(implied) && own.kind === "time" && !isDuration(own)) return { ...implied, seconds: own.seconds || implied.seconds };
+  return own;
+}
 
 /** Narrow no-break space between a number and its unit ("12,5 mg/L"). */
 export const UNIT_SPACE = " ";

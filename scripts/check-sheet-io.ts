@@ -43,7 +43,7 @@ import { readSheetBytes } from "@/sheet/io/readFile";
 import { exportXlsx, importXlsx, XlsxError } from "@/sheet/io/xlsx";
 import { parseChartRef, trendLabelFormat } from "@/sheet/io/xlsxCharts";
 import { importFormula, toFileFormula, type FileTable, type FormulaContext } from "@/sheet/io/xlsxFormulas";
-import { fromExcelFormat, fromSigStyle, nearestSheetColor, sigStyleName, toExcelFormat } from "@/sheet/io/xlsxStyles";
+import { builtinFormat, fromExcelFormat, fromSigStyle, nearestSheetColor, sigStyleName, toExcelFormat } from "@/sheet/io/xlsxStyles";
 import { attr, decodeEntities, lookup, parseXml, textOf, XmlError, xmlBudget } from "@/sheet/io/xml";
 import { crc32, deflateRaw, inflateRaw, makeZip, readZip, ZipError } from "@/sheet/io/zip";
 import type { Cell, ChartSpec, Sheet, Workbook } from "@/sheet/types";
@@ -307,7 +307,17 @@ function formats() {
   eq("read date long", fromExcelFormat("[$-407]d. mmmm yyyy;@", de), { kind: "date", style: "long" });
   eq("read iso", fromExcelFormat("yyyy-mm-dd", de), { kind: "date", style: "iso" });
   eq("read time", fromExcelFormat("h:mm", de), { kind: "time", seconds: false });
-  eq("read time s", fromExcelFormat("[h]:mm:ss", de), { kind: "time", seconds: true });
+  eq("read time s", fromExcelFormat("hh:mm:ss", de), { kind: "time", seconds: true });
+  // Durations (FORM-1): Excel's elapsed hours both ways, so 36:00 stays 36:00 (not the clock's 12:00).
+  eq("fmt duration", [toExcelFormat({ kind: "time", seconds: false, duration: true }, de), toExcelFormat({ kind: "time", seconds: true, duration: true }, de)], [{ code: "[h]:mm" }, { id: 46 }]);
+  eq("read duration", [fromExcelFormat("[h]:mm", de), fromExcelFormat("[h]:mm:ss", de), fromExcelFormat("[mm]:ss", de), builtinFormat(46, de)], [
+    { kind: "time", seconds: false, duration: true },
+    { kind: "time", seconds: true, duration: true },
+    { kind: "time", seconds: true, duration: true },
+    { kind: "time", seconds: true, duration: true },
+  ]);
+  // An angle's degree sign right after the number, as Blob shows it ("45°", FORM-12); °C keeps its space.
+  eq("fmt degrees", [toExcelFormat({ kind: "number", decimals: 0, unit: "°" }, de), toExcelFormat({ kind: "number", decimals: 1, unit: "°C" }, de)], [{ code: '0"°"' }, { code: '0.0" °C"' }]);
   eq("read datetime", fromExcelFormat("dd.mm.yyyy hh:mm", de), { kind: "datetime" });
   eq("read text", fromExcelFormat("@", de), { kind: "text" });
   eq("read currency", fromExcelFormat('#,##0.00 "€"', de), { kind: "currency", decimals: 2, symbol: "€" });
@@ -327,6 +337,8 @@ function formats() {
     { kind: "date", style: "iso" },
     { kind: "date", style: "long" },
     { kind: "time", seconds: false },
+    { kind: "time", seconds: false, duration: true },
+    { kind: "number", decimals: 0, unit: "°" },
   ] as const) {
     const x = toExcelFormat(f, de);
     const back = "code" in x ? fromExcelFormat(x.code, de) : undefined;
@@ -1291,6 +1303,14 @@ async function fileKinds() {
   eq("260 sheets: 250 come in, the rest are listed", "error" in all ? all : [all.workbook.sheets.length, all.skipped], [250, ["10 Blätter nach den ersten 250 (mehr passen nicht in diese Tabelle)"]]);
   const room = await readSheetBytes(manyFile, "viele.xlsx", "de", { sheetRoom: 3 });
   eq("added to a spreadsheet with room for 3: 3 come in", "error" in room ? room : [room.workbook.sheets.length, room.skipped], [3, ["257 Blätter nach den ersten 3 (mehr passen nicht in diese Tabelle)"]]);
+  // Room for one: "nach dem ersten", never "nach den ersten 1".
+  const three = await xlsxOf(book(many.sheets.slice(0, 3)));
+  const one = await Promise.all((["de", "en"] as const).map((l) => readSheetBytes(three, "drei.xlsx", l, { sheetRoom: 1 })));
+  eq("room for 1: said in the singular", one.map((r) => ("error" in r ? r : [r.workbook.sheets.length, r.skipped])), [
+    [1, ["2 Blätter nach dem ersten (mehr passen nicht in diese Tabelle)"]],
+    [1, ["2 sheets after the first one (no more fit into this spreadsheet)"]],
+  ]);
+  eq("…and so are charts", [sheetIoText.de.skipped.chartLimit(3, 1), sheetIoText.en.skipped.chartLimit(1, 1), sheetIoText.de.skipped.chartLimit(2, 250)], ["3 Diagramme nach dem ersten", "1 chart after the first one", "2 Diagramme nach den ersten 250"]);
   const full = await readSheetBytes(manyFile, "viele.xlsx", "de", { sheetRoom: 0 });
   eq("no room left: refused, with the reason", "error" in full ? [full.error, full.message] : full, ["full", sheetIoText.de.full(250)]);
   const into = book(many.sheets.slice(0, 248));
@@ -1458,6 +1478,28 @@ async function roundTrips() {
   const sig = book([sheet("s1", "Blatt 1", { "0,0": { v: 0.0001234, s: { fmt: { kind: "significant", digits: 3, unit: "µg/mL" } } }, "1,0": { v: 31.25, s: { fmt: { kind: "significant", digits: 3 } } } })]);
   const { workbook: sb } = await importXlsx(await xlsxOf(sig), "de");
   eq("significant figures come back", [sb.sheets[0].cells["0,0"]?.s?.fmt, sb.sheets[0].cells["1,0"]?.s?.fmt], [{ kind: "significant", digits: 3, unit: "µg/mL" }, { kind: "significant", digits: 3 }]);
+  // Durations: a 36:00 written as Excel's [h]:mm comes back as one (not as the clock time 12:00).
+  const dur = { kind: "time", seconds: false, duration: true } as const;
+  const durS = { kind: "time", seconds: true, duration: true } as const;
+  const times = book([sheet("s1", "Blatt 1", { "0,0": { v: 1.5, s: { fmt: dur } }, "1,0": { v: 2 + 15 / 86400, s: { fmt: durS } }, "2,0": { v: 0.5, s: { fmt: { kind: "time", seconds: false } } }, "3,0": { v: 45, s: { fmt: { kind: "number", decimals: 0, unit: "°" } } } })]);
+  const timesFile = await xlsxOf(times);
+  const styles = (await readZip(timesFile).text("xl/styles.xml")) ?? "";
+  ok("durations written as [h]:mm", styles.includes('formatCode="[h]:mm"') && !styles.includes('formatCode="hh:mm:ss"'), styles.slice(styles.indexOf("<numFmts"), styles.indexOf("</numFmts>")));
+  const { workbook: tb } = await importXlsx(timesFile, "de");
+  const fmts = ["0,0", "1,0", "2,0", "3,0"].map((k) => tb.sheets[0].cells[k]?.s?.fmt);
+  eq("durations come back as durations, a clock time as one, degrees as degrees", fmts, [dur, durS, { kind: "time", seconds: false }, { kind: "number", decimals: 0, unit: "°" }]);
+  // A fixed intercept: written for lines; for an exponential curve only above 0 (REG-6: a 0 left
+  // over from "through the origin" is ignored by Blob, and Excel can't draw a = 0).
+  const growth: Record<string, Cell> = {};
+  [0.05, 0.09, 0.21, 0.38, 0.81].forEach((y, i) => ((growth[`${i},0`] = { v: i }), (growth[`${i},1`] = { v: y })));
+  const rr = (c: number) => ({ sheetId: "s1", r0: 0, c0: c, r1: 4, c1: c });
+  const interceptXml = async (type: "linear" | "exponential", intercept: number | null) => {
+    const trendline = { type, order: 2, period: 2, intercept, showEquation: true, showR2: true, forward: 0, backward: 0, name: "" };
+    const chart: ChartSpec = { id: "g", sheetId: "s1", at: { row: 0, col: 3, dx: 0, dy: 0 }, size: { w: 480, h: 300 }, kind: "scatter", title: "", x: rr(0), series: [{ id: "a", name: "OD", nameRef: null, y: rr(1), x: null, color: null, marker: "circle", line: "none", labels: false, errorBars: null, trendline }], xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null }, yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null }, legend: "none" };
+    const xml = (await readZip(await xlsxOf(book([sheet("s1", "Blatt 1", growth)], { charts: [chart] }))).text("xl/charts/chart1.xml")) ?? "";
+    return /<c:intercept val="([^"]*)"\/>/.exec(xml)?.[1] ?? null;
+  };
+  eq("intercepts written: exp 0 no, exp 0.05 yes, a line through 0 yes, none none", [await interceptXml("exponential", 0), await interceptXml("exponential", 0.05), await interceptXml("linear", 0), await interceptXml("exponential", null)], [null, "0.05", "0", null]);
 }
 
 // Adding to a note, and exports -------------------------------------------------------------------

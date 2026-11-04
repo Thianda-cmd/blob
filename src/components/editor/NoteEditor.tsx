@@ -832,8 +832,9 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
   // is saved, and sent to the others when working together.
   const followed = useRef<Editor | null>(null);
   const canFollow = !!editor && canEdit && (!collabOn || collab.status === "live");
-  // "Add to note" from a spreadsheet: the chart or table goes in once the note can take it.
-  useSheetEmbedParam({ editor, pageId: page.id, ready: canFollow, blocked: readOnly || broken, enabled: !pane });
+  // "Add to note" from a spreadsheet: the chart or table goes in once the note can take it. A link
+  // someone sent gets a bar that asks first (rendered below the top bar).
+  const embedOffer = useSheetEmbedParam({ editor, pageId: page.id, ready: canFollow, blocked: readOnly || broken, enabled: !pane });
   useEffect(() => {
     if (!canFollow || !editor || followed.current === editor) return;
     followed.current = editor;
@@ -1050,6 +1051,7 @@ function NoteEditorReady({ page, role = "owner", members = [], pane }: { page: P
           <span className="min-w-0">{notice.text}</span>
         </p>
       )}
+      {embedOffer}
 
       <div ref={setScroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {finder.bar}

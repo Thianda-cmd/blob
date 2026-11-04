@@ -104,6 +104,13 @@ function unsentCardEdits(): number {
   return n;
 }
 
+/** Flashcards reworded on this device whose wording couldn't be saved yet: sent now (that code loads only when there are some). */
+async function flushCardWording() {
+  if (!unsentCardEdits()) return;
+  const { flushCardEdits } = await import("@/components/notes/study/useCardEdits");
+  await flushCardEdits();
+}
+
 /** Spreadsheets kept on this device whose editor is closed: sent now (the saving code loads only when there are some). */
 async function flushWaitingSheets(userId: string, locale: Locale) {
   if (!(await draftPages(userId)).length) return;
@@ -114,8 +121,8 @@ async function flushWaitingSheets(userId: string, locale: Locale) {
 /**
  * Before signing out: what's still waiting on this device goes to the server first (while it can):
  * calendar and task changes, note text and spreadsheets (open editors and closed ones), edits to
- * shared notes and flashcard answers. How many are still waiting afterwards (signing out would
- * delete them).
+ * shared notes, flashcard answers and reworded flashcards. How many are still waiting afterwards
+ * (signing out would delete them).
  */
 export async function flushDevice(words: { copyTitle: (t: string) => string; conflict: (t: string) => string }, locale: Locale): Promise<number> {
   const { data } = await createClient().auth.getSession();
@@ -126,7 +133,7 @@ export async function flushDevice(words: { copyTitle: (t: string) => string; con
   if (isOnline()) {
     const rest = (async () => {
       await Promise.all([settleOwed(userId, words), flushReviews(userId)]);
-      await Promise.all([flushWaitingNotes(userId, words, () => {}), flushWaitingSheets(userId, locale).catch(() => {})]);
+      await Promise.all([flushWaitingNotes(userId, words, () => {}), flushWaitingSheets(userId, locale).catch(() => {}), flushCardWording().catch(() => {})]);
     })();
     await Promise.race([rest, wait(8000)]);
   }

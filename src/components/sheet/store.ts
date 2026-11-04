@@ -14,12 +14,12 @@ import { sheetCollabText, type TakeBackRefusal } from "@/i18n/messages/sheetColl
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { areaOf, inArea, parseKey, sameArea } from "@/sheet/a1";
 import { takeBack, type MergeReport } from "@/sheet/collab";
-import { createCalc, editText, parseInput, type Calc, type ParsedInput } from "@/sheet/engine";
+import { createCalc, editText, parseInput, typedFormat, type Calc, type ParsedInput } from "@/sheet/engine";
 import { getCell, setCells, sheetById } from "@/sheet/ops";
 import { followArea, followCell, opsSince } from "@/sheet/sheetLog";
 import { afterInput, afterPaste, filteredRows } from "@/sheet/table/model";
-import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type Pos, type Sheet, type SheetOp, type Workbook } from "@/sheet/types";
-import { showSheetNotice } from "./notice";
+import { MAX_COLS, MAX_ROWS, type Area, type Cell, type CellStyle, type NumberFormat, type Pos, type Sheet, type SheetOp, type Workbook } from "@/sheet/types";
+import { hideSheetNotice, noticeDuration, showSheetNotice } from "./notice";
 
 export type Selection = {
   /** Where the selection started; the active cell (the one you type into). */
@@ -350,6 +350,8 @@ export function calcFor(wb: Workbook, locale: Locale, previous?: Calc, changed?:
   const calc = createCalc(wb, {
     locale,
     isRowHidden: (sheetId, row) => rowHidden(wb, self, sheetId, row, locale),
+    // SUBTOTAL(1–11) skips what a filter leaves out, also when the row is hidden by hand too.
+    isRowFiltered: (sheetId, row) => (self ? filterHidden(self, sheetId, locale).has(row) : false),
     ...(previous && changed ? { previous, changed } : {}),
   });
   self = calc;
@@ -418,10 +420,54 @@ export function parseTyped(text: string, locale: Locale, current: Cell | undefin
   return closed.error ? parsed : closed;
 }
 
+/**
+ * A typed German "1.234" read the other way, as 1,234 (the one-click correction the notice offers,
+ * see ParsedInput.notice). Its format: the one that reading comes with ("2,345 g"), else the one the
+ * cell had before the typing, with room for the three decimals typed (roomForThree).
+ */
+export function otherReading(cell: Cell, before: NumberFormat | undefined, other: NonNullable<ParsedInput["notice"]>["other"]): Cell {
+  const fmt = other.fmt ?? (before && roomForThree(before, other.cell.v));
+  const s: CellStyle = { ...cell.s };
+  if (fmt) s.fmt = fmt;
+  else delete s.fmt;
+  const out: Cell = { ...cell, v: other.cell.v };
+  if (Object.keys(s).length) out.s = s;
+  else delete out.s;
+  return out;
+}
+
+/**
+ * A cell's format with room for the three decimals of a typed "1,234" (`v`, the value the cell
+ * gets): otherwise a thousands format would show 1, a currency 1,23 €, three significant digits
+ * 1,23, and the click would look as if it read something else again. A date or time format goes
+ * (1,234 would show as 31.12.1899 or 05:36).
+ */
+function roomForThree(fmt: NumberFormat, v: Cell["v"]): NumberFormat | undefined {
+  // Where the first digit is (1,234 → 0, 12,345 → 1): scientific and significant formats count from there.
+  const e = typeof v === "number" && v !== 0 ? Math.floor(Math.log10(Math.abs(v))) : 0;
+  switch (fmt.kind) {
+    case "number":
+    case "percent":
+    case "currency":
+      return fmt.decimals < 3 ? { ...fmt, decimals: 3 } : fmt;
+    case "scientific":
+      return fmt.decimals < 3 + e ? { ...fmt, decimals: 3 + e } : fmt;
+    case "significant":
+      return fmt.digits < 4 + e ? { ...fmt, digits: 4 + e } : fmt;
+    case "date":
+    case "time":
+    case "datetime":
+      return undefined;
+    default:
+      return fmt;
+  }
+}
+
 /** A cell after typing: the parsed value or formula, its look kept (plus an implied format, and wrapping for line breaks), its note kept. */
 export function typedCell(current: Cell | undefined, parsed: ParsedInput): Cell {
   let s: CellStyle | undefined = current?.s;
-  if (parsed.fmt && !s?.fmt) s = { ...s, fmt: parsed.fmt };
+  const fmt = typedFormat(s?.fmt, parsed.fmt);
+  if (fmt !== s?.fmt) s = { ...s, fmt };
   const v = parsed.cell.v;
   if (typeof v === "string" && v.includes("\n") && !s?.wrap) s = { ...s, wrap: true };
   const cell: Cell = {};
@@ -464,6 +510,11 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   let editStart: { sheetId: string; selection: Selection; original: string } | null = null;
   /** Tab moves right along a row; Enter then goes down to the column the tabbing started in (like Excel). */
   let tabStart: Pos | null = null;
+  /**
+   * The "1.234 ist 1234" notice showing (offerOtherReading), with the sheet and selection it was
+   * shown at, and the cell it is about with the value typed there.
+   */
+  let hint: { id: number; sheetId: string; selection: Selection; cell: { sheetId: string; pos: Pos; typed: Cell["v"] } } | null = null;
 
   const makeCalc = (wb: Workbook, previous?: Calc, changed?: Changed[]): Calc => calcFor(wb, locale, previous, changed);
 
@@ -486,6 +537,16 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   };
 
   function emit() {
+    // The "1.234" hint is about what was just typed: it goes once you edit or select something else,
+    // and once the cell holds something else (undone, cleared, changed by someone else).
+    if (hint) {
+      const { sheetId, pos, typed } = hint.cell;
+      const changed = getCell(state.workbook, sheetId, pos.row, pos.col)?.v !== typed;
+      if (changed || state.edit || state.sheetId !== hint.sheetId || state.selection !== hint.selection) {
+        hideSheetNotice(store, hint.id);
+        hint = null;
+      }
+    }
     for (const listener of [...listeners]) listener();
   }
 
@@ -577,6 +638,32 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     commit(labels.input, wb2, wb2 === wb1 ? calc1 : undefined);
   }
 
+  /**
+   * A German "1.234" was just typed and read as 1234, as Excel does: a notice says so and offers
+   * 1,234 in one click (one undo step). It goes once you edit or select something else, or the cell
+   * holds something else (emit), and a click that comes too late for that changes nothing. Typing
+   * only: pasted values have no hint.
+   */
+  function offerOtherReading(sheetId: string, pos: Pos, before: Cell | undefined, parsed: ParsedInput) {
+    const n = parsed.notice;
+    const typed = parsed.cell.v;
+    if (!n || getCell(state.workbook, sheetId, pos.row, pos.col)?.v !== typed) return;
+    const id = showSheetNotice(store, n.message, "info", {
+      ms: Math.max(12_000, noticeDuration(n.message, "info")),
+      action: {
+        label: n.action,
+        run: () => {
+          hideSheetNotice(store, id);
+          if (hint?.id === id) hint = null;
+          const cell = getCell(state.workbook, sheetId, pos.row, pos.col);
+          if (state.readOnly || !cell || cell.f !== undefined || cell.v !== typed) return;
+          store.apply(n.action, (wb) => setCells(wb, sheetId, [{ row: pos.row, col: pos.col, cell: otherReading(cell, before?.s?.fmt, n.other) }]));
+        },
+      },
+    });
+    hint = { id, sheetId: state.sheetId, selection: state.selection, cell: { sheetId, pos, typed } };
+  }
+
   /** Back to the sheet and selection the edit started from (pointing at cells for a formula moves them). */
   function restoreEditView(e: NonNullable<EditState>) {
     const start = editStart;
@@ -654,6 +741,7 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
   /** Commit the running edit (if any) and move. false: the formula didn't parse; the editor stays open with the reason. */
   function commitEditInternal(move: Move | null): boolean {
     const e = state.edit;
+    let typed: { sheetId: string; pos: Pos; current: Cell | undefined; parsed: ParsedInput } | null = null;
     if (e) {
       const unchanged = editStart !== null && e.text === editStart.original;
       if (unchanged || state.readOnly) restoreEditView(e);
@@ -670,9 +758,12 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
         // The undo step remembers the edited cell as the selection, not the cells pointed at.
         restoreEditView(e);
         writeParsed(e.sheetId, pos, current, parsed);
+        typed = { sheetId: e.sheetId, pos, current, parsed };
       }
     }
     if (move) moveActive(move);
+    // (After the move, which is part of typing: the hint stays until the next edit or selection.)
+    if (typed) offerOtherReading(typed.sheetId, typed.pos, typed.current, typed.parsed);
     emit();
     return true;
   }
@@ -710,6 +801,7 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
       const parsed = parseTyped(text, locale, current);
       if (parsed.error) return false;
       writeParsed(sheetId, at, current, parsed);
+      offerOtherReading(sheetId, at, current, parsed);
       return true;
     },
 
@@ -733,9 +825,15 @@ export function createSheetStore(init: { pageId: string; workbook: Workbook; loc
     },
 
     select(sel, opts) {
+      const before = hint;
       if (state.edit && !opts?.keepEdit && !commitEditInternal(null)) return;
       if (!opts?.keepEdit) tabStart = null;
+      // A "1.234" hint the commit just offered belongs to that typing, as with Enter: clicking
+      // another cell to finish typing keeps it (it goes with the next selection or edit after).
+      const fresh = hint !== before ? hint : null;
+      if (fresh) hint = null;
       setSelection(toSelection(sel));
+      if (fresh) hint = { ...fresh, sheetId: state.sheetId, selection: state.selection };
     },
 
     startEdit(opts) {

@@ -27,12 +27,12 @@ import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/c
 import { chartData } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
 import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, isCalendarFormat, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
-import { probeRange, probeResultText, probeSteps, readProbe, titleUnit } from "@/sheet/chart/probe";
+import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe, titleUnit } from "@/sheet/chart/probe";
 import { aOutOfRange, equationParts, equationText, fitTrendline, isFitError, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
 import { buildChartScene, textWidth, wrapEquation, type SvgNode } from "@/sheet/chart/scene";
 import { formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
 import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
-import type { Cell, ChartSpec, RangeRef, SeriesSpec, TrendlineSpec, Workbook } from "@/sheet/types";
+import type { Cell, ChartSpec, NumberFormat, RangeRef, SeriesSpec, TrendlineSpec, Workbook } from "@/sheet/types";
 
 let passed = 0;
 const problems: string[] = [];
@@ -450,6 +450,25 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   eq("probe with dates en", steps(datesUp, 1e6, "en").formula.startsWith("x = (ln y − ln a) / b, with ln a = -"), true);
   eq("probe without a result: the formula alone", steps(datesUp, -1), { formula: `x = (ln y − ln a) / b, mit ln a = ${formatCoefficient(datesUp.lnA!, "de", 6)}`, line: null });
   eq("probe on a polynomial: the description, no line", steps(fit("poly probe", [0, 1, 2, 3, 4], [0, 1.1, 3.9, 9.2, 15.8], spec("polynomial")), 5).line, null);
+  // Dates as x: the result is a date as the x column shows it, and no lab advice ("Verdünne…").
+  const day: NumberFormat = { kind: "date", style: "short" };
+  const when = solveForX(datesUp, 1e6)!;
+  eq("probe with dates: the result as a date", [probeResultText(when, "de", day), probeResultText(when, "en", day)], ["01.11.2026", "11/1/2026"]);
+  eq("probe with dates: a time of day as such", probeResultText(46329 + 14.5 / 24, "de", { kind: "datetime" }), "03.11.2026 14:30");
+  // The worked line ends in the day number and the date it names: 46327,59 rounded to 5 digits
+  // would be 46328, the 2nd, so it keeps a decimal.
+  eq("probe with dates: the worked line ends in the day number and its date", (probeSteps(datesUp, 1e6, when, "de", day).line ?? "").split(" = ").pop(), "46327,6 (01.11.2026)");
+  eq("probe with dates: a whole day needs no decimals", (probeSteps(datesUp, 5e6, solveForX(datesUp, 5e6), "de", day).line ?? "").split(" = ").pop(), "46330 (04.11.2026)");
+  eq("probe with dates and times: the number names the same minute", (probeSteps(datesUp, 1e6, when, "en", { kind: "datetime" }).line ?? "").split(" = ").pop(), "46327.595 (11/1/2026 14:16)");
+  // Before 1900 the column shows the plain number, so the brackets would only repeat it.
+  const linearDays = fit("dates linear", [46325, 46326, 46327], [1, 2, 3], spec("linear"));
+  eq("probe with dates: no date before 1900", [probeResultText(-953676, "de", day), probeSteps(linearDays, -1e6, solveForX(linearDays, -1e6), "de", day).line], ["-953676", "x = (-1000000 + 46324) / 1 = -953676"]);
+  const later = solveForX(datesUp, 1e9)!;
+  eq("probe with dates: after the last measurement", [probeRange(datesUp, later), probeAdvice(datesUp, "above", "de", day)], ["above", "Nach der letzten Messung (03.11.2026): Dort ist die Trendlinie nicht durch Messungen gestützt, das Ergebnis ist nur eine Schätzung."]);
+  check("probe with dates: nothing to dilute, in either language", !/verdünn|dilute|konzentriert|concentrated|Blindwert|blank/i.test(["de", "en"].flatMap((l) => (["above", "below", "negative"] as const).map((r) => probeAdvice(datesUp, r, l as "de" | "en", day))).join(" ")));
+  eq("probe with dates: before the first", probeAdvice(datesUp, "below", "en", day), "Before the first measurement (10/30/2026): the trendline isn't backed by measurements there, so the result is only an estimate.");
+  eq("probe with times (h:mm) too", probeAdvice(fit("time probe", [0, 0.25, 0.5], [0.05, 0.1, 0.2], spec("exponential")), "above", "de", { kind: "time", seconds: false, duration: true }).startsWith("Nach der letzten Messung (12:00)"), true);
+  eq("probe on concentrations: the lab advice as before", probeAdvice(brad, "above", "de"), sheetChartText.de.probeAbove(formatCoefficient(1000, "de")));
   // Every worked line, typed into a calculator, gives its own result (all models with a formula).
   const models: [string, Fit][] = [
     ["bradford", brad],
@@ -483,6 +502,20 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
         const line = probeSteps(f, y, x, locale).line!;
         const shown = line.split(" = ").pop();
         check(`worked line adds up: ${name} ${y} ${locale}`, shown === probeResultText(x, locale) && probeResultText(calculator(line, locale), locale) === shown, line);
+      }
+    }
+  }
+  // With dates as x: the line's number names the day (and time) in its brackets, which is the
+  // result shown above it, and the line typed into a calculator, rounded like that number, gives it.
+  for (const fmt of [day, { kind: "datetime" }, { kind: "date", style: "iso" }] as NumberFormat[]) {
+    for (const locale of ["de", "en"] as const) {
+      for (let y = 1.5e5; y < 3e6; y *= 1.37) {
+        const x = solveForX(datesUp, y)!;
+        const line = probeSteps(datesUp, y, x, locale, fmt).line ?? "";
+        const m = / = ([^ ]+) \((.+)\)$/.exec(line);
+        const digits = m ? [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].find((d) => formatCoefficient(x, locale, d) === m[1]) : undefined;
+        const got = m && digits ? [probeResultText(parseChartNumber(m[1], locale)!, locale, fmt), m[2], formatCoefficient(calculator(line, locale), locale, digits)] : line;
+        eq(`probe with dates: one day in the line, ${fmt.kind} ${locale} ${Math.round(y)}`, got, [probeResultText(x, locale, fmt), probeResultText(x, locale, fmt), m?.[1] ?? "a number and a date"]);
       }
     }
   }
@@ -693,6 +726,8 @@ const sse = (xs: number[], ys: number[], f: (x: number) => number) => sum(xs.map
   check("-5…5 spans both", neg.min <= -5 && neg.max >= 5 && neg.ticks.includes(0), neg);
   const fixed = linearAxis(0, 10, { min: 0, max: 0.5, target: 5, zero: "excel", pad: true });
   eq("fixed ends", [fixed.min, fixed.max], [0, 0.5]);
+  const days = linearAxis(46325, 46329, { min: null, max: null, target: 7.4, zero: "excel", pad: true, minStep: 1 });
+  eq("dates without times: whole days (not half days, where each date would show twice)", [days.step, days.ticks], [1, [46324, 46325, 46326, 46327, 46328, 46329, 46330]]);
   const one = linearAxis(5, 5, { min: null, max: null, target: 5, zero: "excel", pad: true });
   check("one value 5 → from 0", one.min === 0 && one.max >= 5, one);
   const cols = linearAxis(12, 33, { min: null, max: null, target: 5, zero: "always", pad: true });
@@ -1182,6 +1217,23 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
     const ds = buildChartScene(dc, chartData(dc, fakeCalc(datesWb), "de"), { width: 480, height: 300, locale: "de" });
     check(`dates ${type}: the trendline is drawn`, pathCoords(trendPaths(ds.nodes)[0] ?? "").length > 100, trendPaths(ds.nodes)[0]?.slice(0, 60));
     check(`dates ${type}: legend entry`, sceneTexts(ds.nodes).some((s) => s.includes("(Reihe 1)")), sceneTexts(ds.nodes));
+  }
+  // Dates on the x axis: each date once, clear of the next (they ran together at half days, and
+  // asking for fewer ticks gave the same ones again).
+  const dateLabels = (nodes: (SvgNode | string)[], out: { text: string; x: number; size: number }[] = []) => {
+    for (const n of nodes) {
+      if (typeof n === "string") continue;
+      const s = n.children?.[0];
+      if (n.tag === "text" && typeof s === "string" && /^\d\d\.\d\d\.\d{4}$/.test(s)) out.push({ text: s, x: Number(n.attrs?.x), size: Number(n.attrs?.fontSize) });
+      else if (n.children) dateLabels(n.children, out);
+    }
+    return out;
+  };
+  for (const width of [300, 480, 700, 1000]) {
+    const dc = chart("scatter", ref(1, 0, 7, 0), [series("c", ref(1, 1, 7, 1))]);
+    const labels = dateLabels(buildChartScene(dc, chartData(dc, fakeCalc(datesWb), "de"), { width, height: 300, locale: "de" }).nodes);
+    const clear = labels.every((l, i) => i === 0 || l.x - labels[i - 1].x >= (textWidth(l.text, l.size) + textWidth(labels[i - 1].text, l.size)) / 2);
+    check(`dates on the x axis, ${width} px: each once, clear of each other`, labels.length >= 2 && new Set(labels.map((l) => l.text)).size === labels.length && clear, labels);
   }
   // A trendline with nothing to draw on the axes has no legend entry.
   const negWb = workbook([["x", "y"], [1, 5], [2, 4], [3, 3.2], [4, 2.1]]);

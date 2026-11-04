@@ -75,6 +75,11 @@ type Props = {
   active: Pos;
   /** Hide the selection (while typing into a cell its references are what matters). */
   quiet: boolean;
+  /**
+   * Only a faint outline of the selected areas: a chart has the keyboard, so the cells' selection
+   * isn't the active one, but the toolbar and the status bar still go by it.
+   */
+  faint?: boolean;
   /** The mouse's small fill handle, a finger's two round handles, or (filling by touch) one big fill handle. */
   handles: "fill" | "touch" | "touchFill" | null;
   clip: { area: Area; cut: boolean } | null;
@@ -90,7 +95,12 @@ export const SelectionLayer = memo(function SelectionLayer(p: Props) {
   const out: ReactNode[] = [];
   const z = l.zoom;
 
-  if (!p.quiet) {
+  if (p.faint && !p.quiet) {
+    p.areas.forEach((a, i) => {
+      const piece = pieceOf(l, a, b);
+      if (piece) out.push(<Frame key={`b${i}`} p={piece} width={1} color="color-mix(in oklab, var(--blob) 45%, transparent)" />);
+    });
+  } else if (!p.quiet) {
     const many = p.areas.length > 1 || p.areas.some((a) => a.r0 !== a.r1 || a.c0 !== a.c1);
     if (many) {
       p.areas.forEach((a, i) => {

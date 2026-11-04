@@ -6,7 +6,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { cellKey, inArea, parseKey } from "./a1";
-import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
+import { adjustArea, adjustFormula, adjustMovedFormula, compileGlob, editText, formatValue, globReplace, globTest, growTableRefs, isError, parseInput, shiftFormula, tableRowsArea, toCanonicalFormula, toLocalFormula, transposeFormula, typedFormat, type Calc, type CellValue, type Glob, type StructuralChange, type TableRows } from "./engine";
 import { seriesOf } from "./engine/series";
 import { withOp } from "./sheetLog";
 // Smart-table helpers that import nothing from this file (table/model.ts does, so it can't be used here).
@@ -820,7 +820,8 @@ export function pasteText(wb: Workbook, sheetId: string, at: Pos, rows: string[]
       const existing = sheet.cells[cellKey(row, col)];
       const p = parseInput(text, locale, existing);
       const content: Pick<Cell, "v" | "f"> = p.error ? { v: text } : p.cell;
-      const s = p.fmt && !existing?.s?.fmt ? { ...existing?.s, fmt: p.fmt } : existing?.s;
+      const fmt = typedFormat(existing?.s?.fmt, p.fmt);
+      const s = fmt !== existing?.s?.fmt ? { ...existing?.s, fmt } : existing?.s;
       updates.push({ row, col, cell: { v: content.v, f: content.f, s, note: existing?.note } });
     });
   });

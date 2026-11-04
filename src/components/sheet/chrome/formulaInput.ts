@@ -222,6 +222,8 @@ export function matchFunctions(typed: string, locale: Locale): FunctionName[] {
     (a, b) =>
       a.group - b.group ||
       Number(b.exact) - Number(a.exact) ||
+      // Excel's older names (STABW, TVERT…) after the modern ones they stand for.
+      Number(!!a.fn.newer) - Number(!!b.fn.newer) ||
       pop(a.fn) - pop(b.fn) ||
       a.name.length - b.name.length ||
       a.name.localeCompare(b.name),

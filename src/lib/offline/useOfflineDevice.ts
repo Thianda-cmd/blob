@@ -22,9 +22,9 @@ const RECENT_INK = 12;
 
 /**
  * Keeps this device ready to work without a connection. Everywhere: unsaved note text stays on
- * the device (noteCache), and shared-note edits that couldn't be sent go out later. In the apps
- * also: the offline helper (public/sw.js) with the main pages and recent notes, and a copy of every
- * note's text.
+ * the device (noteCache), shared-note edits that couldn't be sent go out later, and what another
+ * account left on the device is removed. In the apps also: the offline helper (public/sw.js) with
+ * the main pages and recent notes, and a copy of every note's text.
  */
 export function useOfflineDevice() {
   const { userId, pages, reloadPages } = useWorkspace();
@@ -76,7 +76,9 @@ export function useOfflineDevice() {
 
     void noteCache.load(userId).then(async () => {
       if (!alive) return;
-      if (app) await registerOffline(userId);
+      // In browsers too: what another account left here goes (a shared computer at school keeps
+      // no one else's drafts). Only the apps get the offline helper.
+      await registerOffline(userId);
       await catchUp();
     });
 

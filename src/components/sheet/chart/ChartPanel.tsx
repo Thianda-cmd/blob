@@ -81,7 +81,7 @@ export function ChartPanel({ store, chartId, onClose }: { store: SheetStore; cha
 
   if (!spec) {
     return (
-      <div data-chart-panel className="flex h-full flex-col" aria-label={t.panel}>
+      <div data-chart-panel className="flex h-full flex-col">
         <PanelHeader title={t.chart} t={t} onClose={onClose} />
         <div className="p-4">
           <Note icon={<Info />}>{t.gone}</Note>
@@ -245,7 +245,8 @@ function PanelBody({
   };
 
   return (
-    <div data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface" role="region" aria-label={t.panel}>
+    // (Named by the editor's side panel or dock around it, "Diagrammeinstellungen": no second region.)
+    <div data-chart-panel={spec.id} className="@container/chartpanel flex h-full min-h-0 flex-col bg-surface">
       <PanelHeader title={spec.title.trim() || t.kindNames[spec.kind]} icon={KIND_ICONS[spec.kind]} t={t} onClose={onClose} />
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {/* The chart, live, while it can't be seen on the sheet. */}

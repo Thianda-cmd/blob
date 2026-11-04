@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { blob } from "@/components/blob/bus";
 import { download } from "@/components/notes/transfer";
 import { isSheetFile } from "@/components/notes/useImporter";
+import { OpenSheetCopy } from "@/components/page/OpenSheetCopy";
 import { PageTopBar } from "@/components/page/PageTopBar";
 import { usePanes } from "@/components/shell/Panes";
 import { MenuItem, MenuSeparator } from "@/components/ui/Menu";
@@ -39,9 +40,9 @@ import { StatusBar } from "./chrome/StatusBar";
 import { Toolbar } from "./chrome/Toolbar";
 import { AddToNoteDialog } from "./embed/AddToNote";
 import { contentWidth } from "./grid/actions";
-import { focusSheetGrid, Grid, type GridGeometry } from "./grid/Grid";
-import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, sheetPageContent, type ReadProblem } from "./importFile";
-import { hideSheetNotice, showSheetNotice } from "./notice";
+import { focusCellEditor, focusSheetGrid, Grid, type GridGeometry } from "./grid/Grid";
+import { appendWorkbook, importedBytes, MAX_SHEET_BYTES, readSheetFile, SHEET_FILE_ACCEPT, sheetPageContent, sheetRoom, type ReadProblem } from "./importFile";
+import { currentSheetNotice, hideSheetNotice, showSheetNotice } from "./notice";
 import { printSheet } from "./print";
 import { SheetNotices } from "./SheetNotice";
 import { activeArea, createSheetStore, SheetStoreContext, useSheet, type SheetStore } from "./store";
@@ -240,19 +241,25 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
 
   // F6 moves the keyboard between the parts of the editor, as in Excel: the cells, the open
   // settings, the toolbar (Shift+F6 the other way round). Ctrl+F6 does the same, for browsers that
-  // keep F6 for their address bar (Office on the web uses it too).
+  // keep F6 for their address bar (Office on the web uses it too). A notice with a button ("Als
+  // 1,234 lesen") is a part too while it shows, right after the cells it is about: the grid keeps
+  // Tab for moving between cells, so this is how the keyboard gets to that button.
   const cycleParts = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "F6" || e.altKey || !e.currentTarget.contains(e.target as Node)) return;
     const editor = e.currentTarget;
     const toolbar = editor.querySelector<HTMLElement>("[data-sheet-toolbar]");
     const settings = editor.querySelector<HTMLElement>("[data-sheet-panel]");
+    // The card showing now, not one still fading out.
+    const shown = currentSheetNotice(store);
+    const notice = shown?.action ? editor.querySelector<HTMLElement>(`[data-sheet-notice-id="${shown.id}"]`) : null;
     const at = document.activeElement;
-    const parts = ["grid", ...(settings ? ["panel"] : []), ...(toolbar ? ["toolbar"] : [])];
-    const here = settings?.contains(at) ? "panel" : toolbar?.contains(at) ? "toolbar" : "grid";
+    const parts = ["grid", ...(notice ? ["notice"] : []), ...(settings ? ["panel"] : []), ...(toolbar ? ["toolbar"] : [])];
+    const here = notice?.contains(at) ? "notice" : settings?.contains(at) ? "panel" : toolbar?.contains(at) ? "toolbar" : "grid";
     const next = parts[(parts.indexOf(here) + (e.shiftKey ? parts.length - 1 : 1)) % parts.length];
     e.preventDefault();
     e.stopPropagation();
     if (next === "toolbar") toolbar?.querySelector<HTMLElement>('button[tabindex="0"]')?.focus();
+    else if (next === "notice") notice?.querySelector<HTMLElement>("[data-sheet-notice-action]")?.focus();
     else if (next === "panel" && settings) firstSetting(settings)?.focus();
     else focusSheetGrid();
   };
@@ -295,7 +302,7 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   // into the cell's editor during the key press, so the letter (and the next ones) land there.
   const typeIntoBlank = useCallback(() => {
     setDismissed(true);
-    document.querySelector<HTMLTextAreaElement>("[data-sheet-grid] textarea:not([aria-hidden])")?.focus({ preventScroll: true });
+    focusCellEditor();
   }, []);
 
   // With a keyboard at hand, typing starts right away when the spreadsheet opens (the templates
@@ -369,9 +376,12 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
     if (readOnly) return;
     const busy = showSheetNotice(store, t.reading, "busy");
     try {
-      const r = await readSheetFile(file, locale);
+      // Only the sheets that still fit are read (the rest are named as not brought over).
+      const r = await readSheetFile(file, locale, { sheetRoom: sheetRoom(store.get().workbook) });
       if ("error" in r) {
-        showSheetNotice(store, problemText(r.error), "error");
+        // The reader's own words when it knows more (a password, a LibreOffice file, too much text,
+        // took too long, no room for another sheet).
+        showSheetNotice(store, r.message ?? problemText(r.error), "error");
         return;
       }
       const ids = r.workbook.sheets.map((s) => s.id);
@@ -501,6 +511,8 @@ export function SheetEditor({ page, role = "owner", members = [] }: { page: Page
   return (
     <SheetStoreContext.Provider value={store}>
       <PageTopBar pageId={page.id} saveState={save.state} peers={save.peers} role={role} members={members} menu={pageMenu} />
+      {/* "Duplizieren" copies the spreadsheet as it is on screen (part of this module: nothing to load later). */}
+      <OpenSheetCopy pageId={page.id} />
       {notice && (
         <p
           role="status"

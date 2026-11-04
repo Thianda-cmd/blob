@@ -1,8 +1,9 @@
 "use client";
 
 // The spreadsheet open in this tab, for "Duplizieren" (useDuplicatePage): its store, read as it is
-// on screen when a copy is made. A module of its own that PageTopBar loads only on spreadsheet
-// pages: the store brings the formula engine along, which notes and presentations don't need.
+// on screen when a copy is made. SheetEditor renders it inside its store, as part of its own code:
+// nothing is loaded later that could fail (offline, after an update), and notes and presentations,
+// whose top bar has the same menu, don't load the formula engine for it.
 
 import { useContext, useEffect } from "react";
 import { storedContent } from "@/components/sheet/saver";

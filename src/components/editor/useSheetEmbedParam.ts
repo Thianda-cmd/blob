@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/core";
 import { useSearchParams } from "next/navigation";
 import { createElement, useEffect, useState, type ReactNode } from "react";
 import { blob } from "@/components/blob/bus";
+import { scrollBehavior } from "@/components/sheet/chart/reveal";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { noteBlocksText, type NoteBlocksText } from "@/i18n/messages/noteBlocks";
@@ -107,11 +108,11 @@ function addBlock(editor: Editor, attrs: SheetEmbedAttrs, t: NoteBlocksText["she
   // The spreadsheet may still have been saving when its page closed: look again in a moment.
   const pageOfSheet = attrs.pageId;
   if (pageOfSheet) setTimeout(() => void privateSheets.ensure(pageOfSheet, 0), 2500);
-  // Once the block has drawn: bring it into view.
+  // Once the block has drawn: bring it into view (in one jump when the student asked for less motion).
   requestAnimationFrame(() => {
     if (editor.isDestroyed) return;
     const dom = editor.view.nodeDOM(at);
-    if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: scrollBehavior() });
   });
 }
 

@@ -11,8 +11,9 @@ export function SheetEmbedOffer({ question, add, no, onAnswer }: { question: str
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-blob-soft/60 px-4 py-2 text-[13px] text-blob-ink" aria-live="polite">
       <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1">{question}</span>
-      <span className="flex gap-2">
+      {/* Room enough for the question, else the buttons go below it; a long file name breaks anywhere. */}
+      <span className="min-w-[12rem] flex-1 [overflow-wrap:anywhere]">{question}</span>
+      <span className="ml-auto flex gap-2">
         <Button size="sm" variant="blob" onClick={() => onAnswer(true)}>
           {add}
         </Button>

@@ -2274,6 +2274,15 @@ section("durations of 24 hours and more");
   eq("no other day of December 1899", [P("32.12.1899").cell, P("29.12.1899").cell], [{ v: "32.12.1899" }, { v: "29.12.1899" }]);
   const growth = book1({ A1: { v: 0, s: { fmt: clock } }, A2: { v: 1, s: { fmt: dur(false) } }, A3: { v: 1.5, s: { fmt: dur(false) } }, B1: "=SUM(A1:A3)*24" });
   eq("formulas over durations", val(growth, "B1"), 60);
+  // Typing or pasting: an implied duration replaces a clock time (a 36:00 kept as 12:00 before
+  // durations had their own format would show 36:05 as 12:05), nothing else is replaced.
+  const num: NumberFormat = { kind: "number", decimals: 2 };
+  eq("which format typing leaves", [E.typedFormat(clock, dur(false)), E.typedFormat(undefined, dur(true)), E.typedFormat(dur(false), clock), E.typedFormat(num, dur(false)), E.typedFormat(clock, clock), E.typedFormat(num, undefined)], [dur(false), dur(true), dur(false), num, clock, num]);
+  // A column set to show seconds goes on showing them.
+  const clockSeconds: NumberFormat = { kind: "time", seconds: true };
+  eq("a clock time's seconds stay with the duration that replaces it", [E.typedFormat(clockSeconds, dur(false)), E.typedFormat(clock, dur(true)), E.formatValue(P("36:05").cell.v ?? null, E.typedFormat(clockSeconds, P("36:05").fmt), "de")], [dur(true), dur(true), "36:05:00"]);
+  const pasted = O.pasteText(book1({ A1: { v: 0.5, s: { fmt: clock, bold: true } }, A2: { v: 1.5, s: { fmt: num } } }), "s1", { row: 0, col: 0 }, [["36:05"], ["36:05"]], "de");
+  eq("pasted 36:05 over a clock time: a duration, the rest of the look kept", [pasted.sheets[0].cells["0,0"], pasted.sheets[0].cells["1,0"]?.s], [{ v: P("36:05").cell.v, s: { fmt: dur(false), bold: true } }, { fmt: num }]);
 }
 
 // ==============================================================================================
@@ -2343,6 +2352,7 @@ section("suggestions for unknown functions");
   eq("umlauts spelled out", [S("ZAEHLENWENN", "de"), S("KGROESSTE", "de"), S("LAENGE", "de")], ["ZÄHLENWENN", "KGRÖSSTE", "LÄNGE"]);
   eq("a German name in English", [S("SUMME", "en"), S("MITTELWERT", "en"), S("SVERWEIS", "en")], ["SUM", "AVERAGE", "VLOOKUP"]);
   eq("known words", [S("MODUS", "de"), S("DURCHSCHNITT", "de"), S("AVG", "en")], ["MODUS.EINF", "MITTELWERT", "AVERAGE"]);
+  eq("words from the lesson", [S("STANDARDABWEICHUNG", "de"), S("RQUADRAT", "de"), S("Standardabweichung", "en"), S("RQUADRAT", "en")], ["STABW.S", "BESTIMMTHEITSMASS", "STDEV.S", "RSQ"]);
   eq("a letter more or less wins over a changed one", [S("MITTELWERTS", "de"), S("SUMM", "de"), S("SUME", "de"), S("QUANTILE", "de"), S("QUANTILE.INKL", "de")], ["MITTELWERT", "SUMME", "SUMME", "QUANTIL", "QUANTIL.INKL"]);
   eq("no guess for a short name with a letter changed", [S("RANX", "de"), S("CODX", "en")], [null, null]);
   eq("…but one with a letter more or less", [S("COSX", "en"), S("SINN", "de")], ["COS", "SIN"]);

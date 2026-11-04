@@ -22,7 +22,7 @@ const TITLE_MAX = 200;
 
 /**
  * The spreadsheets open in this tab, read as they are on screen (unsaved changes and what is being
- * typed in a cell included). Their top bar puts them here while they are open (OpenSheetCopy).
+ * typed in a cell included). Their editor puts them here while they are open (OpenSheetCopy).
  * null: a formula with a mistake is still in its cell, which now says what is wrong.
  */
 const openSheets = new Map<string, () => Snapshot | null>();

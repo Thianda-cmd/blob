@@ -31,7 +31,8 @@ import { PageIcon } from "./Sidebar";
 type Panes = {
   /** The note shown beside the page (wide screens), or null. */
   side: string | null;
-  openBeside: (id: string) => void;
+  /** Whether it opened beside: in a narrow window the note opens instead (and Blob says why). */
+  openBeside: (id: string) => boolean;
   closeBeside: () => void;
   /** The side note becomes the main page and the other way round. */
   swap: () => void;
@@ -41,7 +42,7 @@ type Panes = {
 // The editor loads with the first note opened beside (most pages never need it).
 const NoteEditor = dynamic(() => import("@/components/editor/NoteEditor").then((m) => m.NoteEditor), { ssr: false });
 
-const PanesCtx = createContext<Panes>({ side: null, openBeside: () => {}, closeBeside: () => {}, swap: () => {}, showShortcuts: () => {} });
+const PanesCtx = createContext<Panes>({ side: null, openBeside: () => false, closeBeside: () => {}, swap: () => {}, showShortcuts: () => {} });
 export const usePanes = () => useContext(PanesCtx);
 
 const SIDE_KEY = "blob-side-page";
@@ -104,11 +105,12 @@ export function PanesProvider({ children }: { children: ReactNode }) {
       if (!window.matchMedia(WIDE).matches) {
         blob.say(t.split.narrow, { mood: "thinking" });
         router.push(`/p/${id}`);
-        return;
+        return false;
       }
-      if (id === current) return;
+      if (id === current) return false;
       recentPages.visit(id);
       setSide(id);
+      return true;
     },
     [current, router, t.split.narrow],
   );
@@ -137,8 +139,8 @@ export function PanesProvider({ children }: { children: ReactNode }) {
     if (side) return setSide(null);
     const other = recent().find((p) => p.id !== current && p.kind === "note");
     if (!other) return blob.say(t.split.noOther, { mood: "thinking", ms: 6000 });
-    openBeside(other.id);
-    blob.say(t.split.opened(mac ? "⌘⇧L" : "Ctrl+Shift+L"), { mood: "happy" });
+    // Not when the window is too narrow: the other note opened instead, and its hint stays.
+    if (openBeside(other.id)) blob.say(t.split.opened(mac ? "⌘⇧L" : "Ctrl+Shift+L"), { mood: "happy" });
   }, [side, recent, current, openBeside, t.split, mac]);
 
   // The switcher ----------------------------------------------------------------------------

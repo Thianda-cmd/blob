@@ -41,10 +41,10 @@ export const BUILTIN_CODES: Record<number, string> = {
 
 const zeros = (n: number) => "0".repeat(Math.max(0, Math.min(15, Math.round(n))));
 const decimalsPart = (d: number) => (d > 0 ? `.${zeros(d)}` : "");
-/** Text shown after a number ("mg/L"), quoted for a format code. */
+/** Text shown after a number ("mg/L"), quoted for a format code; an angle's degree sign right after it ("45°"), as Blob shows it. */
 const literal = (unit: string | undefined) => {
   const u = (unit ?? "").replace(/"/g, "").trim();
-  return u ? `" ${u}"` : "";
+  return u ? (u === "°" ? '"°"' : `" ${u}"`) : "";
 };
 
 /**
@@ -100,6 +100,8 @@ export function toExcelFormat(fmt: NumberFormat | undefined, locale: Locale, val
       if (fmt.style === "iso") return { code: "yyyy-mm-dd" };
       return { code: locale === "de" ? "[$-407]d. mmmm yyyy" : "[$-409]mmmm d, yyyy" };
     case "time":
+      // A duration's hours go on past 24 ([h]:mm, 36:00); a clock time's start again at 0 (12:00).
+      if (fmt.duration) return fmt.seconds ? { id: 46 } : { code: "[h]:mm" };
       return { code: fmt.seconds ? "hh:mm:ss" : "hh:mm" };
     case "datetime":
       return { id: 22 };
@@ -233,7 +235,8 @@ export function fromExcelFormat(code: string, locale: Locale): NumberFormat | un
   const hasMonth = /m/i.test(p);
   if (hasDate || hasClock || (hasMonth && !/[0#?]/.test(p))) {
     if (hasDate && hasClock) return { kind: "datetime" };
-    if (hasClock && !hasDate) return { kind: "time", seconds: /s/i.test(p) };
+    // Elapsed time ([h]:mm, [mm]:ss): a duration, whose hours go on past 24.
+    if (hasClock && !hasDate) return elapsed ? { kind: "time", seconds: /s/i.test(p), duration: true } : { kind: "time", seconds: /s/i.test(p) };
     if (/m{4}/i.test(p) || /d{3,}/i.test(p)) return { kind: "date", style: "long" };
     if (/^y{4}-m{1,2}-d{1,2}$/i.test(section.replace(/\[[^\]]*\]/g, "").trim())) return { kind: "date", style: "iso" };
     return { kind: "date", style: "short" };

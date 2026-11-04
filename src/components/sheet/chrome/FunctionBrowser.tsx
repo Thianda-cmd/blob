@@ -9,7 +9,7 @@
 // descriptions. Works without help texts too: then a function shows its name and category.
 
 import { ArrowLeft, Lightbulb, Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Sheet } from "@/components/ui/Sheet";
@@ -31,19 +31,22 @@ const POPULAR = POPULAR_FUNCTIONS.slice(0, 16)
   .map((en) => FUNCTION_BY_EN.get(en))
   .filter((f): f is FunctionName => !!f);
 
+/** Excel's older names (STABW, TVERT…: FunctionName.newer) go after the modern ones they stand for. */
+const older = (f: FunctionName) => (f.newer ? 1 : 0);
+
 /**
  * Functions for a search, or a category. A search finds, best first: the name (either language,
  * also without umlauts), names that start with it, the words students use for a function
  * ("Durchschnitt", "R2", "Kalibriergerade": functionWords.ts), names that contain it, then the
  * words of the summary and of the tip. Argument names don't count ("Zahl2" would make "R2" find
- * WENNS). Equal hits go by how common the function is.
+ * WENNS). Equal hits go by how common the function is, older names after modern ones.
  */
 export function browseFunctions(query: string, category: Category, locale: Locale): FunctionName[] {
   const q = foldSearch(query.trim());
   if (!q) {
     if (category === "popular") return POPULAR;
     const list = category === "all" ? FUNCTION_NAMES : FUNCTION_NAMES.filter((f) => f.category === category);
-    return [...list].sort((a, b) => localName(a, locale).localeCompare(localName(b, locale), locale));
+    return [...list].sort((a, b) => older(a) - older(b) || localName(a, locale).localeCompare(localName(b, locale), locale));
   }
   const words = functionsForWords(q);
   const scored: { fn: FunctionName; score: number }[] = [];
@@ -70,8 +73,13 @@ export function browseFunctions(query: string, category: Category, locale: Local
     const i = POPULAR_FUNCTIONS.indexOf(f.en);
     return i < 0 ? 1000 : i;
   };
-  scored.sort((a, b) => a.score - b.score || pop(a.fn) - pop(b.fn) || localName(a.fn, locale).localeCompare(localName(b.fn, locale), locale));
+  scored.sort((a, b) => a.score - b.score || older(a.fn) - older(b.fn) || pop(a.fn) - pop(b.fn) || localName(a.fn, locale).localeCompare(localName(b.fn, locale), locale));
   return scored.map((s) => s.fn);
+}
+
+/** The modern functions an older name stands for, in the user's language ("T.VERT.RE", "T.VERT.2S"). */
+export function newerNames(fn: FunctionName, locale: Locale): string[] {
+  return (fn.newer ?? []).map((en) => FUNCTION_BY_EN.get(en)).flatMap((f) => (f ? [localName(f, locale)] : []));
 }
 
 function countIn(category: Category): number {
@@ -85,14 +93,17 @@ function Details({ fn, locale, t, canInsert, onInsert }: { fn: FunctionName; loc
   const doc = fnDoc(fn.en, locale);
   const name = localName(fn, locale);
   const other = locale === "de" ? fn.en : fn.de;
+  const newer = newerNames(fn, locale);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h3 className="font-mono text-[19px] font-semibold tracking-tight text-ink">{name}</h3>
           <span className="rounded-full bg-hover px-2 py-0.5 text-[12px] font-medium text-ink-2">{t.categories[fn.category]}</span>
+          {newer.length > 0 && <span className="rounded-full border border-line px-2 py-0.5 text-[12px] text-ink-2">{t.olderName}</span>}
         </div>
         {other !== name && <div className="mt-0.5 text-[12px] text-ink-2">{t.otherName(other)}</div>}
+        {newer.length > 0 && <div className="mt-0.5 text-[12.5px] font-medium text-ink">{t.newerNames(newer)}</div>}
         {doc ? (
           <>
             <p className="mt-3 text-[14px] leading-relaxed text-ink">{doc.summary}</p>
@@ -281,26 +292,35 @@ function Browser({ phone, onClose, onPick, canInsert }: { phone: boolean; onClos
       {items.map((fn, i) => {
         const on = current?.en === fn.en;
         const doc = fnDoc(fn.en, locale);
+        // A category lists Excel's older names last, under their own heading; a search marks each.
+        const heading = !query && fn.newer && !items[i - 1]?.newer;
         return (
-          <li
-            key={fn.en}
-            id={`${listId}-${i}`}
-            data-index={i}
-            role="option"
-            aria-selected={on}
-            onClick={() => {
-              setSelected(fn.en);
-              if (phone) setDetail(true);
-            }}
-            onDoubleClick={() => insert(fn)}
-            className={cn("cursor-pointer rounded-lg px-3 py-2 transition-colors [@media(hover:none)]:py-2.5", on && !phone ? "bg-blob-soft" : "hover:bg-hover")}
-          >
-            <div className="flex items-baseline gap-2">
-              <span className={cn("font-mono text-[13px] font-medium", on && !phone ? "text-blob-ink" : "text-ink")}>{localName(fn, locale)}</span>
-              {(query || category === "popular" || category === "all") && <span className="ml-auto shrink-0 text-[12px] text-ink-2">{t.categories[fn.category]}</span>}
-            </div>
-            <div className="line-clamp-2 text-[12.5px] leading-snug text-ink-2">{doc?.summary ?? t.categories[fn.category]}</div>
-          </li>
+          <Fragment key={fn.en}>
+            {heading && (
+              <li aria-hidden role="presentation" className="mx-3 mb-1 mt-3 border-t border-line pt-2 text-[11.5px] font-medium uppercase tracking-wide text-ink-3">
+                {t.olderNames}
+              </li>
+            )}
+            <li
+              id={`${listId}-${i}`}
+              data-index={i}
+              role="option"
+              aria-selected={on}
+              onClick={() => {
+                setSelected(fn.en);
+                if (phone) setDetail(true);
+              }}
+              onDoubleClick={() => insert(fn)}
+              className={cn("cursor-pointer rounded-lg px-3 py-2 transition-colors [@media(hover:none)]:py-2.5", on && !phone ? "bg-blob-soft" : "hover:bg-hover")}
+            >
+              <div className="flex items-baseline gap-2">
+                <span className={cn("font-mono text-[13px] font-medium", on && !phone ? "text-blob-ink" : "text-ink")}>{localName(fn, locale)}</span>
+                {query && fn.newer && <span className="shrink-0 text-[11.5px] text-ink-3">{t.olderName}</span>}
+                {(query || category === "popular" || category === "all") && <span className="ml-auto shrink-0 text-[12px] text-ink-2">{t.categories[fn.category]}</span>}
+              </div>
+              <div className="line-clamp-2 text-[12.5px] leading-snug text-ink-2">{doc?.summary ?? t.categories[fn.category]}</div>
+            </li>
+          </Fragment>
         );
       })}
       {!items.length && <li className="px-3 py-8 text-center text-[13px] text-ink-2">{t.noResults(query)}</li>}

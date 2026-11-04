@@ -84,6 +84,8 @@ const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
  * A spreadsheet's keys, as the grid (src/components/sheet/grid/keys.ts), the cell editor (CellEditor.tsx)
  * and the editor (SheetEditor.tsx) handle them. The date is Strg+. on German keyboards, as in German
  * Excel (";" needs Shift there); Ctrl+; on English ones. ⌘H hides the app on a Mac, so ⌘⌥F replaces.
+ * F6 moves between the cells, a notice with a button ("Als 1,234 lesen"), the open settings and the
+ * toolbar (Shift+F6 the other way round).
  */
 function sheetGroups(mac: boolean, locale: Locale): { group: SheetGroup; items: [SheetItem, string[][]][] }[] {
   const date = locale === "de" ? "." : ";";
@@ -112,6 +114,8 @@ function sheetGroups(mac: boolean, locale: Locale): { group: SheetGroup; items: 
         ["replace", [mac ? ["mod", "alt", "F"] : ["mod", "H"]]],
         ["save", [["mod", "S"]]],
         ["print", [["mod", "P"]]],
+        // F6 as in Excel; Ctrl+F6 for browsers that keep F6 for their address bar.
+        ["areas", [["F6"], ["mod", "F6"]]],
       ],
     },
   ];

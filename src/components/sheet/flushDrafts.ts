@@ -108,8 +108,8 @@ async function sendDraft(userId: string, d: SheetDraft, locale: Locale, api: Sav
   return "kept";
 }
 
-/** Merging kept both versions of sheets whose rows or columns both sides had moved: said, since no editor is open to show it. */
+/** Merging kept both versions of sheets whose rows or columns both sides had moved (mine on a copy, while there is room for one): said, since no editor is open to show it. */
 function sayConflict(locale: Locale, pageTitle: string, report: MergeReport) {
   const t = sheetText[locale];
-  blob.say(t.conflictElsewhere(pageTitle.trim() || t.untitled, report.conflicts.map((c) => c.copyName)), { mood: "thinking", ms: 12000 });
+  blob.say(t.conflictElsewhere(pageTitle.trim() || t.untitled, report.conflicts), { mood: "thinking", ms: 12000 });
 }

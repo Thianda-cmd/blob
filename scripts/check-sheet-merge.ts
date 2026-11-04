@@ -18,6 +18,7 @@ import { deleteAtSelection, insertAtSelection } from "@/components/sheet/grid/ac
 import { currentSheetNotice, hideSheetNotice } from "@/components/sheet/notice";
 import { createSheetStore, mainArea, type SheetStore } from "@/components/sheet/store";
 import type { Locale } from "@/i18n/config";
+import { sheetText } from "@/i18n/messages/sheet";
 import { cellKey, parsePos } from "@/sheet/a1";
 import { mergeWorkbooks, takeBack, type MergeReport } from "@/sheet/collab";
 import { normalizeWorkbook } from "@/sheet/doc";
@@ -547,6 +548,14 @@ run("merge: a copy never pushes another sheet out of a full workbook", () => {
   const one = mk(...sheets.slice(0, 249));
   const room = reported(one, O.insertRows(one, "s1", 3, 1), O.deleteRows(one, "s1", 5, 1));
   eq("room for one copy", [room.m.sheets.length, room.m.sheets[1].name, room.report.conflicts[0]?.copyName], [250, "Blatt 1 (Konflikt)", "Blatt 1 (Konflikt)"]);
+  // What the editor says (useSheetSave.ts, flushDrafts.ts): no empty „“ for a copy that wasn't made.
+  const start = "In dieser Tabelle wurden gleichzeitig an zwei Stellen Zeilen oder Spalten verschoben.";
+  eq("said without a copy", sheetText.de.conflict(report.conflicts), `${start} Weil eine Tabelle höchstens 250 Blätter haben kann, konnte deine Version von „Blatt 1“ kein eigenes Blatt bekommen: Es gibt nur noch die andere Version.`);
+  eq("said with a copy", sheetText.de.conflict(room.report.conflicts), `${start} Damit nichts verloren geht, steht deine Version von „Blatt 1“ jetzt auf einem eigenen Blatt: „Blatt 1 (Konflikt)“.`);
+  const both = [...room.report.conflicts, { sheetId: "s2", name: "Blatt 2", copyId: "", copyName: "" }];
+  const said = sheetText.en.conflictElsewhere("Messung", both);
+  check("one copy made, one without room: both said", said.includes("is now on a sheet of its own: “Blatt 1 (Konflikt)”") && said.includes("your version of “Blatt 2” couldn't be kept") && !said.includes("“”"), show(said));
+  eq("in English, two without room", sheetText.en.conflict([report.conflicts[0], both[1]]), "Rows or columns of this spreadsheet were moved in two places at once. A spreadsheet holds at most 250 sheets, so your versions of “Blatt 1”, “Blatt 2” couldn't be kept as sheets of their own: only the other versions are left.");
 });
 
 run("merge: a big sheet stays quick", () => {

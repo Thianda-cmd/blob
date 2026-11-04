@@ -98,7 +98,6 @@ export const sheetGridText = defineMessages({
       "#CALC!": { title: "Can't calculate", text: "The result can't be calculated, for example because a range is empty." },
       "#CIRC!": { title: "Circular reference", text: "The formula depends on its own cell (directly or through other cells). Remove the reference to itself." },
     } satisfies Record<ErrorCode, ErrorHelp>,
-    unknownFunction: (name: string) => `I don't know a function called “${name}”. Is there a typo?`,
 
     // Typing a formula
     functions: "Functions",
@@ -235,7 +234,6 @@ export const sheetGridText = defineMessages({
       "#CALC!": { title: "Nicht berechenbar", text: "Das Ergebnis lässt sich nicht berechnen, zum Beispiel weil ein Bereich leer ist." },
       "#CIRC!": { title: "Zirkelbezug", text: "Die Formel hängt (direkt oder über andere Zellen) von ihrer eigenen Zelle ab. Entferne den Bezug auf sich selbst." },
     },
-    unknownFunction: (name) => `Eine Funktion „${name}“ kenne ich nicht. Ist da ein Tippfehler?`,
 
     functions: "Funktionen",
     formulaProblem: "Formel prüfen",

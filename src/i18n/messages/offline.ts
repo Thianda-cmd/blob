@@ -19,6 +19,9 @@ export const offlineText = defineMessages({
       title: "Not everything is saved yet",
       body: (n: number) =>
         `${n === 1 ? "1 change" : `${n} changes`} on this device couldn't be sent yet (no connection). Signing out now deletes ${n === 1 ? "it" : "them"} from this device. Sign out once you're online, and nothing is lost.`,
+      // Online: it couldn't be saved for another reason (no access any more, too big, a server error).
+      bodyOnline: (n: number) =>
+        `${n === 1 ? "1 change" : `${n} changes`} on this device couldn't be saved. Signing out now deletes ${n === 1 ? "it" : "them"} from this device.`,
       confirm: "Sign out anyway",
     },
     refused: {
@@ -58,6 +61,8 @@ export const offlineText = defineMessages({
       title: "Noch nicht alles gespeichert",
       body: (n) =>
         `${n === 1 ? "1 Änderung" : `${n} Änderungen`} auf diesem Gerät ${n === 1 ? "konnte" : "konnten"} noch nicht gesendet werden (keine Verbindung). Wenn du dich jetzt abmeldest, ${n === 1 ? "wird sie" : "werden sie"} von diesem Gerät gelöscht. Melde dich ab, wenn du online bist, dann geht nichts verloren.`,
+      bodyOnline: (n) =>
+        `${n === 1 ? "1 Änderung" : `${n} Änderungen`} auf diesem Gerät ${n === 1 ? "konnte" : "konnten"} nicht gespeichert werden. Wenn du dich jetzt abmeldest, ${n === 1 ? "wird sie" : "werden sie"} von diesem Gerät gelöscht.`,
       confirm: "Trotzdem abmelden",
     },
     refused: {
