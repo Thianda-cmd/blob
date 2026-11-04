@@ -21,11 +21,12 @@ export type ChartUi = {
   /** The chart the latest of those requests was for (selecting another chart later doesn't scroll). */
   revealId: string | null;
   /**
-   * The chart whose settings are open, while it can be seen on the sheet (ChartLayer measures it);
-   * null otherwise. Its panel then leaves out the copy of the chart it shows when the chart is
-   * covered or scrolled away.
+   * Whether the chart whose settings are open can be seen on the sheet: ChartLayer measures it
+   * before the settings are first painted, and again when the grid has scrolled. Its panel shows
+   * a copy of the chart while it can't (covered by the docked settings, or scrolled away); null
+   * until measured, and the panel shows no copy until then.
    */
-  inView: string | null;
+  inView: { id: string; shown: boolean } | null;
 };
 
 type Entry = { value: ChartUi; listeners: Set<() => void> };
@@ -69,11 +70,9 @@ export function useChartUi(store: SheetStore): ChartUi {
  * ChartLayer while the grid is on screen; px are the grid's content px (GridGeometry, zoomed).
  */
 export type ChartViewport = {
-  /** The visible part of the scrolling cells, left to right and top to bottom. */
+  /** The visible part of the scrolling cells, left to right. */
   left: number;
   right: number;
-  top: number;
-  bottom: number;
   /** A column's left edge. */
   colX: (col: number) => number;
   /** A row's top edge. */

@@ -93,30 +93,37 @@ export function inViewNext(was: boolean | null, share: number): boolean {
   return was ? share >= OUT_OF_VIEW : share >= IN_VIEW;
 }
 
+/** Room kept between a selected chart's action bar and the edges of what you see (px). */
+const BAR_MARGIN = 8;
+
 /**
  * How far to move a selected chart's action bar from its own place (above or below the chart,
  * centred) so it stays inside the room while the chart shows there: a chart wider than a phone,
  * or scrolled half out of view, keeps its buttons where a finger reaches them. It stays over the
  * part of the chart that shows; wider than that part, it reaches out over the cells beside it, as
  * far as it must to show all its buttons. Nothing moves for a chart that doesn't show.
+ * `overChart: false` (the chart's settings are open, the student watches it change): the bar
+ * doesn't move up or down onto the chart; where it can't be seen beside it, the settings have
+ * the same buttons.
  */
-export function barShift(bar: Rect, chart: Rect, room: Rect, margin = 8): { x: number; y: number } {
+export function barShift(bar: Rect, chart: Rect, room: Rect, overChart = true): { x: number; y: number } {
+  const M = BAR_MARGIN;
   let x = 0;
-  const lo = Math.max(room.left, chart.left) + margin;
-  const hi = Math.min(room.right, chart.right) - margin;
+  const lo = Math.max(room.left, chart.left) + M;
+  const hi = Math.min(room.right, chart.right) - M;
   if (hi > lo) {
     const w = bar.right - bar.left;
     let left = bar.left < lo ? lo : bar.right > hi ? hi - w : bar.left;
-    left = Math.max(room.left + margin, Math.min(left, room.right - margin - w));
+    left = Math.max(room.left + M, Math.min(left, room.right - M - w));
     x = left - bar.left;
   }
   let y = 0;
   const h = bar.bottom - bar.top;
-  const minTop = room.top + margin;
-  const maxTop = room.bottom - margin - h;
-  if (maxTop >= minTop && chart.bottom > minTop && chart.top < room.bottom - margin) {
-    if (bar.top < minTop) y = minTop - bar.top;
-    else if (bar.top > maxTop) y = maxTop - bar.top;
+  const minTop = room.top + M;
+  const maxTop = room.bottom - M - h;
+  if (maxTop >= minTop && chart.bottom > minTop && chart.top < room.bottom - M) {
+    const top = Math.max(minTop, Math.min(maxTop, bar.top));
+    if (overChart || top >= chart.bottom || top + h <= chart.top) y = top - bar.top;
   }
   return { x: Math.round(x), y: Math.round(y) };
 }

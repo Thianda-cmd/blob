@@ -60,7 +60,7 @@ export class XmlError extends Error {
 /**
  * How many more elements and attributes one file may have, shared by all its parts (each costs
  * about the same memory). A sheet of half a million cells stays below the default, twice what a
- * spreadsheet page can save (5 MB), and reading a file up to the limit takes 400 MB at most.
+ * spreadsheet page can save (5 MB), and the elements of a file at the limit take about 350 MB.
  */
 export type XmlBudget = { nodes: number };
 export const MAX_XML_NODES = 3_000_000;
@@ -78,7 +78,7 @@ const nameEnd = (c: number) => space(c) || c === 47 || c === 62;
 const NO_ATTRS: readonly string[] = Object.freeze([]);
 const NO_KIDS: XmlNode[] = Object.freeze([] as XmlNode[]) as XmlNode[];
 
-/** A child added to an element (its own list made on the first one, exactly as long as needed). */
+/** A child added to an element (its own list made on the first one, holding just that: most have one). */
 function addKid(parent: XmlEl, kid: XmlNode) {
   if (parent.kids === NO_KIDS) parent.kids = [kid];
   else parent.kids.push(kid);

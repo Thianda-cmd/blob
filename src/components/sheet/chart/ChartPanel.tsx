@@ -167,8 +167,9 @@ function PanelBody({
 }) {
   const ui = useChartUi(store);
   // The chart can't be seen on the sheet (docked settings cover it, or showing it would push its
-  // data out of view): the panel shows it at its top. ChartLayer measures where it is.
-  const covered = ui.inView !== spec.id;
+  // data out of view): the panel shows it at its top. ChartLayer measures where it is, before the
+  // panel is first painted.
+  const covered = ui.inView?.id === spec.id && !ui.inView.shown;
   const data = useMemo(() => safeData(spec, calc, locale), [spec, calc, locale]);
   const [open, setOpen] = useState<Set<ChartSection>>(() => new Set<ChartSection>(spec.kind === "scatter" ? ["chart", "trend"] : ["chart", "data"]));
   const [noteOpen, setNoteOpen] = useState(false);

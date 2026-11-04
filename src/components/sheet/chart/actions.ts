@@ -22,6 +22,10 @@ function ownRanges(spec: ChartSpec): RangeRef[] {
   return [spec.x, ...spec.series.flatMap((s) => [s.y, s.x, s.nameRef])].filter((r): r is RangeRef => !!r && r.sheetId === spec.sheetId);
 }
 
+const inArea = (row: number, col: number, a: Area) => row >= a.r0 && row <= a.r1 && col >= a.c0 && col <= a.c1;
+const union = (a: Area | null, b: Area): Area =>
+  a ? { r0: Math.min(a.r0, b.r0), c0: Math.min(a.c0, b.c0), r1: Math.max(a.r1, b.r1), c1: Math.max(a.c1, b.c1) } : { ...b };
+
 /**
  * The block of cells a chart is made from as the student sees it: its values, x values and names
  * with the labels and headers around them (the filled cells around each range, and the smart
@@ -32,12 +36,19 @@ export function chartDataBlock(wb: Workbook, spec: ChartSpec): Area | null {
   const sheet = sheetById(wb, spec.sheetId);
   if (!sheet) return null;
   let block: Area | null = null;
+  const regions: Area[] = [];
   for (const ref of ownRanges(spec)) {
     const a = normArea(ref);
-    const table = wb.tables.find((t) => t.sheetId === spec.sheetId && a.r0 >= t.area.r0 && a.r0 <= t.area.r1 && a.c0 >= t.area.c0 && a.c0 <= t.area.c1);
-    for (const b of [a, currentRegion(sheet, a.r0, a.c0), ...(table ? [table.area] : [])]) {
-      block = block ? { r0: Math.min(block.r0, b.r0), c0: Math.min(block.c0, b.c0), r1: Math.max(block.r1, b.r1), c1: Math.max(block.c1, b.c1) } : { ...b };
+    block = union(block, a);
+    // A range that starts in a block of filled cells found already lies in that same block (it is
+    // bounded by empty cells all round): a logger's 20 000 rows are walked once, not per series.
+    if (!regions.some((g) => inArea(a.r0, a.c0, g))) {
+      const g = currentRegion(sheet, a.r0, a.c0);
+      regions.push(g);
+      block = union(block, g);
     }
+    const table = wb.tables.find((t) => t.sheetId === spec.sheetId && inArea(a.r0, a.c0, t.area));
+    if (table) block = union(block, table.area);
   }
   return block;
 }
@@ -80,7 +91,9 @@ function belowData(spec: ChartSpec, view: ChartViewport, data: Area, filled: (ro
  * and data are then both in view, and on a narrower screen more of the chart shows. On a grid so
  * narrow that not even half of it would show beside the data (a phone), it goes below the data
  * when `below` says where the data is and which cells are taken: there it is as wide as the screen
- * allows, and scrolling down shows it.
+ * allows, and scrolling down shows it. Settings opening beside the grid don't count for that: they
+ * take its room only for a while, and the chart below the data would cover the rows where more
+ * measurements go.
  */
 export function placeInView(
   spec: ChartSpec,
@@ -98,7 +111,8 @@ export function placeInView(
   const beside = nearer ? { ...spec, at: { ...spec.at, col: spec.at.col - 1, dx: CLOSE_GAP } } : spec;
   const x = nearer ? close : usual;
   if (x + width <= right) return beside;
-  const shown = (from: number) => Math.max(0, Math.min(1, (right - Math.max(from, view.left)) / width));
+  // How much of the chart shows from `from` on, once settings beside the grid are closed again.
+  const shown = (from: number) => Math.max(0, Math.min(1, (view.right - Math.max(from, view.left)) / width));
   if (below && shown(x) < BESIDE_MIN) {
     const low = belowData(spec, view, below.data, below.filled);
     if (low && shown(view.colX(low.at.col)) >= shown(x) + 0.25) return low;

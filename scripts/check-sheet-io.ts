@@ -1198,6 +1198,10 @@ async function readingSafely() {
   const [nestedRead, nestedMs] = await timed(() => readSheetBytes(nested, "namen.xlsx", "de"));
   eq("a name that uses names 50 times each, four deep (6 million references): its value, listed", "error" in nestedRead ? nestedRead : [nestedRead.workbook.sheets[0].cells["0,0"], nestedRead.skipped], [{ v: 7 }, ["1 Formel mit mehr als 8.192 Zeichen (ihr Ergebnis steht als Wert in der Zelle)"]]);
   ok("…at once", nestedMs < 2000, `${Math.round(nestedMs)} ms`);
+  const nestedMany = await patchXlsx(nested, { "xl/worksheets/sheet1.xml": sheetData(100, () => "<c><f>NA</f><v>7</v></c>".repeat(100)) });
+  const [manyRead, manyMs] = await timed(() => readSheetBytes(nestedMany, "namen.xlsx", "de"));
+  eq("…in 10,000 cells: too big, before reading them all", "error" in manyRead ? manyRead.error : manyRead.skipped, "tooBig");
+  ok("…soon", manyMs < 4000, `${Math.round(manyMs)} ms`);
   const longText = await patchXlsx(numCell, { "xl/worksheets/sheet1.xml": sheetData(1, () => `<c r="A1"><f>${"1+".repeat(1_000_000)}1</f><v>5</v></c><c r="B1" t="e"><v>#${"X".repeat(100_000)}</v></c>`) });
   const [longRead, longMs] = await timed(() => readSheetBytes(longText, "riesig.xlsx", "de"));
   eq("a 2-megabyte formula: its value, listed; a 100,000-character error: text", "error" in longRead ? longRead : [longRead.workbook.sheets[0].cells["0,0"], longRead.workbook.sheets[0].cells["0,1"]?.v?.toString().length, longRead.skipped.length], [{ v: 5 }, 32_767, 1]);
@@ -1211,6 +1215,11 @@ async function readingSafely() {
   const [lines, linesMs] = await timed(() => readSheetBytes(enc.encode("a\n".repeat(1_000_000)), "zeilen.csv", "de"));
   eq("a CSV of a million lines: a sheet's worth, and it says so", "error" in lines ? lines : [Object.keys(lines.workbook.sheets[0].cells).length, lines.cutRows], [20_000, 20_000]);
   ok("…at once", linesMs < 3000, `${Math.round(linesMs)} ms`);
+  t0 = performance.now();
+  const pastedLines = parseClipboard({ text: "a;b\n".repeat(1_000_000) });
+  ms = performance.now() - t0;
+  eq("a pasted text of a million lines: a sheet's rows", pastedLines?.length, 20_000);
+  ok("…at once", ms < 2000, `${Math.round(ms)} ms`);
   const wide = await readSheetBytes(enc.encode(`a${";b".repeat(1_000_000)}\n`), "breit.csv", "de");
   eq("a CSV line of a million values: 200 columns", "error" in wide ? wide : Object.keys(wide.workbook.sheets[0].cells).length, 200);
   t0 = performance.now();
@@ -1254,7 +1263,12 @@ async function fileKinds() {
   eq("…and one written with a tag, \"<b>Probe</b>\"", cellsOf(await read("<b>Probe</b>\tWert\nA\t1\n", "werte.csv")), { "0,0": { v: "<b>Probe</b>" }, "0,1": { v: "Wert" }, "1,0": { v: "A" }, "1,1": { v: 1 } });
   // Excel's "Web page" (and tools that write like it): the <html> tag over several lines.
   const webPage = `<html xmlns:v="urn:schemas-microsoft-com:vml"\nxmlns:o="urn:schemas-microsoft-com:office:office"\nxmlns:x="urn:schemas-microsoft-com:office:excel"\nxmlns="http://www.w3.org/TR/REC-html40">\n\n<head>\n<meta name=ProgId content=Excel.Sheet>\n</head>\n<body>\n<table>\n <tr><td>Probe</td><td>Extinktion</td></tr>\n <tr><td>S1</td><td x:num="0.10437">0,104</td></tr>\n</table>\n</body>\n</html>\n`;
-  eq("Excel's web page as .xls: its rows, with the full numbers", cellsOf(await read(webPage, "Laborexport.xls")), { "0,0": { v: "Probe" }, "0,1": { v: "Extinktion" }, "1,0": { v: "S1" }, "1,1": { v: 0.10437 } });
+  eq("Excel's web page as .xls: its rows, with the full numbers shown as the page shows them", cellsOf(await read(webPage, "Laborexport.xls")), {
+    "0,0": { v: "Probe" },
+    "0,1": { v: "Extinktion" },
+    "1,0": { v: "S1" },
+    "1,1": { v: 0.10437, s: { fmt: { kind: "number", decimals: 3 } } },
+  });
   const utf16 = "Probe\tµg\nS1\t0,5\n";
   const u16 = new Uint8Array(2 + utf16.length * 2);
   u16.set([0xff, 0xfe]);
@@ -1373,6 +1387,8 @@ function clipboardNumbers() {
     html: '<google-sheets-html-origin><table data-sheets-root="1"><tr><td data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:0.123456}" data-sheets-numberformat="{&quot;1&quot;:2,&quot;2&quot;:&quot;0.000&quot;,&quot;3&quot;:1}">0,123</td></tr></table>',
   });
   eq("from Google Sheets: its number format", gFmt["0,0"], { v: 0.123456, s: { fmt: { kind: "number", decimals: 3 } } });
+  const noStyles = paste(fresh({}, "clip-nostyles"), { text: "0,12", html: '<table xmlns:x="urn:schemas-microsoft-com:office:excel"><tr><td class=xl65 x:num="0.123456789">0,12</td></tr></table>' });
+  eq("from Excel's HTML without its styles: the decimals the text shows", noStyles["0,0"], { v: 0.123456789, s: { fmt: { kind: "number", decimals: 2 } } });
 
   // Copying: numbers without their unit (Excel, LibreOffice and Google Sheets take them as numbers),
   // and Excel's full value and format (with the unit) in the HTML.
@@ -1405,6 +1421,10 @@ function clipboardNumbers() {
   const other = paste(fresh({}, "copy-third"), { text: copied.text, html: copied.html });
   eq("Blob to another tab: the full numbers", [other["0,0"]?.v, other["0,1"]?.v, other["0,3"]?.v], [2.0001, 0.0523285714, 4.0002]);
   eq("…with their formats, unit included (the text leaves it out)", [other["0,0"]?.s?.fmt, other["0,1"]?.s?.fmt, other["0,3"]?.s?.fmt], [{ kind: "number", decimals: 1, unit: "mg/L" }, { kind: "number", decimals: 4, unit: "L/mg" }, { kind: "number", decimals: 1, unit: "mg/L" }]);
+  // A browser's clipboard may hand over HTML without its styles (Chrome's "Einfügen" from the menu):
+  // Blob's formats come along as attributes.
+  const unstyled = paste(fresh({}, "copy-unstyled"), { text: copied.text, html: copied.html.replace(/ style='[^']*'/g, "") });
+  eq("…also from HTML without its styles", unstyled["0,0"], { v: 2.0001, s: { fmt: { kind: "number", decimals: 1, unit: "mg/L" } } });
   const ownFormat = paste(fresh({ "0,0": { s: { fmt: { kind: "number", decimals: 3 } } } }, "copy-own-format"), { text: copied.text, html: copied.html });
   eq("…a cell's own format stays", ownFormat["0,0"], { v: 2.0001, s: { fmt: { kind: "number", decimals: 3 } } });
   // "Werte einfügen" into another spreadsheet doesn't use Blob's own copy either.

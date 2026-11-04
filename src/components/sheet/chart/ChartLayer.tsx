@@ -15,7 +15,8 @@
 // keyboard is: when it goes back into the cells, the chart is let go of.
 //
 // Opening the settings scrolls the chart into view without pushing the cells it is made from out
-// of view, and closing them scrolls back; what can't be seen, the panel shows itself (inView).
+// of view, and closing them scrolls back (not for a new chart: it stays in view); what can't be
+// seen, the panel shows itself (inView, decided before the panel is first painted).
 
 import { Copy, ImageDown, Settings2, Trash2, TrendingUp } from "lucide-react";
 import {
@@ -200,8 +201,6 @@ function measureViewport(store: SheetStore, geom: GridGeometry): ChartViewport |
   return {
     left: grid.scrollLeft + frozen.w,
     right: grid.scrollLeft + grid.clientWidth - (cells?.offsetLeft ?? 0),
-    top: grid.scrollTop + frozen.h,
-    bottom: grid.scrollTop + grid.clientHeight - (cells?.offsetTop ?? 0),
     colX: (col) => geom.rect(0, col).x,
     rowY: (row) => geom.rect(row, 0).y,
     zoom: geom.zoom > 0 ? geom.zoom : 1,
@@ -257,6 +256,10 @@ export function ChartLayer({ store, geom }: { store: SheetStore; geom: GridGeome
       const t = e.target;
       if (t instanceof Element && t.closest("[data-chart-card],[data-chart-panel],[data-sheet-panel],[role=dialog],[role=menu],[role=listbox]")) return;
       selectChart(store, null);
+      // The keyboard leaves the chart let go of, for the cells: toolbar buttons keep it where it is
+      // (Fett, Rückgängig), and typing after them goes into the cells, as before the chart came.
+      // What takes the keyboard itself (a field, a link) still gets it, after this.
+      if (document.activeElement?.closest("[data-chart-card]")) focusSheetGrid();
     };
     const onFocus = (e: FocusEvent) => {
       const t = e.target;
@@ -348,21 +351,22 @@ function ChartCard({
   /** Tell the panel whether the chart can be seen while its settings are open (it shows a copy when not). */
   const setInView = useEffectEvent((shown: boolean) => {
     const cur = chartUi(store).inView;
-    if (shown && cur !== spec.id) setChartUi(store, { inView: spec.id });
-    else if (!shown && cur === spec.id) setChartUi(store, { inView: null });
+    if (cur?.id !== spec.id || cur.shown !== shown) setChartUi(store, { inView: { id: spec.id, shown } });
   });
 
-  // Scroll the chart into view (see revealScroll), as `settings` (its settings are opening) or
-  // `show` (the chart itself is wanted). Says where the grid was and goes to, whether there was
-  // room at all (docked settings can cover nearly all of the grid) and how much of the chart
-  // shows once there; null when the chart isn't in a grid on screen.
-  const revealNow = useEffectEvent((mode: "settings" | "show") => {
+  // Where to scroll the grid so the chart shows (see revealScroll), as `settings` (its settings
+  // are opening) or `show` (the chart itself is wanted): where the grid is and would go, whether
+  // there is room at all (docked settings can cover nearly all of the grid) and how much of the
+  // chart would show there; null when the chart isn't in a grid on screen.
+  const planReveal = useEffectEvent((mode: "settings" | "show") => {
     const el = cardRef.current;
     const grid = el?.closest<HTMLElement>("[data-sheet-grid]");
     const overlay = el?.closest<HTMLElement>("[data-grid-overlay]");
     if (!el || !grid || !overlay) return null;
     const from = { left: grid.scrollLeft, top: grid.scrollTop };
-    const room = roomNow(mode === "settings");
+    // Docked settings that are open cover the grid (also another chart's, when this one is
+    // duplicated); ones sliding away after closing don't.
+    const room = roomNow(mode === "settings" || !!store.get().focus);
     const card = rectOf(el);
     const block = chartDataBlock(store.get().workbook, spec);
     const origin = overlay.getBoundingClientRect();
@@ -382,18 +386,22 @@ function ChartCard({
           scroll: { ...from, maxLeft: grid.scrollWidth - grid.clientWidth, maxTop: grid.scrollHeight - grid.clientHeight },
         })
       : null;
-    if (!room || !to) return { from, to: from, room: false, shown: 0 };
+    if (!room || !to) return { grid, from, to: from, room: false, shown: 0 };
     const dx = to.left - from.left;
     const dy = to.top - from.top;
-    if (dx || dy) grid.scrollTo({ ...to, behavior: scrollBehavior() });
-    return { from, to, room: true, shown: shownShare({ left: card.left - dx, right: card.right - dx, top: card.top - dy, bottom: card.bottom - dy }, room) };
+    return { grid, from, to, room: true, shown: shownShare({ left: card.left - dx, right: card.right - dx, top: card.top - dy, bottom: card.bottom - dy }, room) };
   });
 
-  // The settings opened: the panel shows a copy of the chart unless it can be seen, and the
-  // scroll they made is kept for closing them (from where the grid was before other settings
-  // scrolled it, when these took their place).
+  /** Scroll the chart into view (see planReveal), and say how. */
+  const revealNow = useEffectEvent((mode: "settings" | "show") => {
+    const r = planReveal(mode);
+    if (r && (r.to.left !== r.from.left || r.to.top !== r.from.top)) r.grid.scrollTo({ ...r.to, behavior: scrollBehavior() });
+    return r;
+  });
+
+  // The settings opened: the scroll they made is kept for closing them (from where the grid was
+  // before other settings scrolled it, when these took their place).
   const settingsOpened = useEffectEvent((r: ReturnType<typeof revealNow>) => {
-    setInView(!!r && inViewNext(null, r.shown));
     if (!r) return;
     const prev = settingsScroll.get(store);
     const from = prev && Math.abs(prev.to.left - r.from.left) <= 2 && Math.abs(prev.to.top - r.from.top) <= 2 ? prev.from : r.from;
@@ -414,12 +422,27 @@ function ChartCard({
     if (Math.abs(grid.scrollLeft - left) <= 2 && Math.abs(grid.scrollTop - top) <= 2) grid.scrollTo({ ...memo.from, behavior: scrollBehavior() });
   });
 
+  // Whether the settings that open show a copy of the chart: decided before they are first
+  // painted (the side panel or the dock is in place by then), from where the chart will be once
+  // they have scrolled it into view, so the copy never flashes up for a chart that can be seen.
+  // Still open while the chart leaves the screen: it can't be seen.
+  useLayoutEffect(() => {
+    if (!panelOpen) return;
+    const r = planReveal("settings");
+    setInView(!!r?.room && inViewNext(null, r.shown));
+    return () => {
+      const open = store.get().focus;
+      if (open?.kind === "chart" && open.id === spec.id) setInView(false);
+      else if (chartUi(store).inView?.id === spec.id) setChartUi(store, { inView: null });
+    };
+  }, [panelOpen, store, spec.id]);
+
   // A chart just inserted, duplicated or opened from a note scrolls into view and gets the
   // keyboard (so Delete removes it, never the cells it was made from). A chart whose settings
   // open scrolls into view as far as its data allows (docked at the bottom on narrow screens,
-  // they would cover it), and back when they close. A new chart the docked settings left no room
-  // for comes into view when they close. Measured a frame later, when the panel that opens with
-  // it has taken its place.
+  // they would cover it), and back when they close; a new chart stays where it was shown. A new
+  // chart the docked settings left no room for comes into view when they close. A frame later,
+  // after whatever else the click or key did with the keyboard.
   const revealed = useRef({ reveal: 0, panel: false, pending: false });
   useEffect(() => {
     const done = revealed.current;
@@ -431,7 +454,6 @@ function ChartCard({
       done.reveal = reveal;
       done.panel = panelOpen;
       if (closed) {
-        setInView(false);
         const pending = done.pending;
         done.pending = false;
         // Closed for good (not switched over to other settings).
@@ -445,7 +467,9 @@ function ChartCard({
       if (asked || opened) {
         const r = revealNow(panelOpen ? "settings" : "show");
         if (asked) done.pending = panelOpen && !!r && (!r.room || !inViewNext(null, r.shown));
-        if (opened) settingsOpened(r);
+        // Closing a new chart's settings scrolls nothing back: it would take the chart away again.
+        if (opened && asked) settingsScroll.delete(store);
+        else if (opened) settingsOpened(r);
       }
       if (asked) {
         // Done: coming back to this sheet later doesn't scroll to the chart again.
@@ -464,7 +488,8 @@ function ChartCard({
     const el = cardRef.current;
     if (!el) return;
     const room = roomNow();
-    setInView(inViewNext(chartUi(store).inView === spec.id, room ? shownShare(rectOf(el), room) : 0));
+    const was = chartUi(store).inView;
+    setInView(inViewNext(was?.id === spec.id ? was.shown : null, room ? shownShare(rectOf(el), room) : 0));
   });
   useEffect(() => {
     if (!panelOpen) return;
@@ -489,19 +514,32 @@ function ChartCard({
     };
   }, [panelOpen]);
 
-  // Gone from the screen (deleted, another sheet shown): its open settings show the copy again,
-  // and closing them scrolls nothing back.
+  // Gone from the screen (deleted, another sheet shown): closing its settings scrolls nothing back.
   useEffect(() => {
     const done = revealed.current;
     return () => {
-      if (chartUi(store).inView === spec.id) setChartUi(store, { inView: null });
       if (done.panel) settingsScroll.delete(store);
     };
   }, [store, spec.id]);
 
+  // Gone while it had the keyboard (undone from the toolbar, deleted by someone working on the
+  // spreadsheet at the same time): the keyboard goes back to the cells, not nowhere. Checked
+  // while the card is still on the page.
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    const editor = el?.closest("[data-sheet-editor]");
+    return () => {
+      if (!el?.contains(document.activeElement)) return;
+      requestAnimationFrame(() => {
+        const now = document.activeElement;
+        if (editor?.isConnected && (!now || now === document.body)) focusSheetGrid();
+      });
+    };
+  }, []);
+
   // The action bar stays where a finger reaches it: inside the cells on screen while the chart
-  // shows there (a chart wider than a phone, or half scrolled away). Moved directly on the
-  // element, as the grid scrolls.
+  // shows there (a chart wider than a phone, or half scrolled away), but never over a chart whose
+  // settings are open. Moved directly on the element, as the grid scrolls.
   const placeBar = useEffectEvent(() => {
     const bar = barRef.current;
     const el = cardRef.current;
@@ -510,7 +548,7 @@ function ChartCard({
     const sy = Number(bar.dataset.sy) || 0;
     const r = rectOf(bar);
     const room = roomNow(!!store.get().focus);
-    const s = room ? barShift({ left: r.left - sx, right: r.right - sx, top: r.top - sy, bottom: r.bottom - sy }, rectOf(el), room) : { x: 0, y: 0 };
+    const s = room ? barShift({ left: r.left - sx, right: r.right - sx, top: r.top - sy, bottom: r.bottom - sy }, rectOf(el), room, !panelOpen) : { x: 0, y: 0 };
     if (s.x === sx && s.y === sy) return;
     bar.dataset.sx = String(s.x);
     bar.dataset.sy = String(s.y);

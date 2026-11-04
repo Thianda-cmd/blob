@@ -1388,9 +1388,15 @@ async function readWorkbook(zip: ZipReader, locale: Locale, maxSheets: number): 
     const shared = new Map<string, { row: number; col: number; formula: string | null; problem?: FormulaProblem }>();
     const ctxBase = { tables: fileTables, names: definedNames, sheet: part.name, tableAt };
     // A formula's text far too long to be one Blob keeps isn't read at all (renaming sheets in it
-    // would already take long).
-    const readFormula = (text: string, row: number, col: number): ImportedFormula =>
-      text.length > MAX_FORMULA_WORK ? { problem: "long" } : importFormula(renameSheets(text, renames), { ...ctxBase, row, col });
+    // would already take long). One that grew too long while reading (names that use names) took
+    // all the work one may take, the slowest kind: it counts four times that against the text
+    // budget, so a file of many such cells stops after about 60.
+    const readFormula = (text: string, row: number, col: number): ImportedFormula => {
+      if (text.length > MAX_FORMULA_WORK) return { problem: "long" };
+      const imported = importFormula(renameSheets(text, renames), { ...ctxBase, row, col });
+      if ("problem" in imported && imported.problem === "long") spend(4 * MAX_FORMULA_WORK);
+      return imported;
+    };
     let maxRow = -1;
     let maxCol = -1;
     let nextRow = 0;

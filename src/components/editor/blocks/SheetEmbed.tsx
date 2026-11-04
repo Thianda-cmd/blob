@@ -18,13 +18,22 @@ import "./sheetEmbed.css";
 type View = LazyExoticComponent<ComponentType<ReactNodeViewProps>>;
 
 // React keeps a lazy component that failed to load failed for good: after a failure, the next
-// block (or the next try) gets a new one, which loads the code again.
+// block (or the next try) gets a new one, which loads the code again. Once one block has loaded
+// it, the others that failed show too.
 let loadFailed = false;
+/** The blocks on screen (their "try again"), so the one that loads the view can show the rest. */
+const blocks = new Set<() => void>();
 const load = () =>
-  import("./SheetEmbedView").catch((e: unknown) => {
-    loadFailed = true;
-    throw e;
-  });
+  import("./SheetEmbedView").then(
+    (view) => {
+      queueMicrotask(() => blocks.forEach((retry) => retry()));
+      return view;
+    },
+    (e: unknown) => {
+      loadFailed = true;
+      throw e;
+    },
+  );
 let current: View = lazy(load);
 
 /** The view to render: the one already loaded (or loading), or a new try after a failure. */
@@ -80,10 +89,12 @@ class SheetEmbedNode extends Component<ReactNodeViewProps, { View: View; failed:
   }
 
   componentDidMount() {
+    blocks.add(this.retry);
     window.addEventListener("online", this.retry);
   }
 
   componentWillUnmount() {
+    blocks.delete(this.retry);
     window.removeEventListener("online", this.retry);
   }
 

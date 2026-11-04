@@ -99,10 +99,11 @@ export function toHtmlTable(rows: string[][], styles?: (HtmlCellLook | null)[][]
         if (look?.bold) css += ";font-weight:bold";
         if (look?.fmt) css += `;mso-number-format:${cssString(look.fmt)}`;
         const num = look?.num !== undefined && Number.isFinite(look.num) ? ` x:num="${excelNum(look.num)}"` : "";
-        const named = look?.style ? ` data-blob-style="${escHtml(look.style)}"` : "";
+        // Blob's own reading of the format: an attribute, which a browser's clipboard keeps where it drops styles.
+        const own = `${look?.fmt ? ` data-blob-format="${escHtml(look.fmt)}"` : ""}${look?.style ? ` data-blob-style="${escHtml(look.style)}"` : ""}`;
         const inner = escHtml(text).replace(/\r\n|\r|\n/g, "<br>");
         // In single quotes like Excel's own, so the format's double quotes need no entities.
-        return `<td${num}${named} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
+        return `<td${num}${own} style='${css.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;")}'>${look?.bold ? `<b>${inner}</b>` : inner}</td>`;
       });
       return `<tr>${cells.join("")}</tr>`;
     })
@@ -222,7 +223,8 @@ function looksNumeric(s: string): boolean {
 function csvishSeparator(plain: string): string | null {
   const body = plain.replace(/\n$/, "");
   if (!body.includes("\n")) return null;
-  const lines = body.split("\n").filter((l) => l.trim() !== "");
+  // The first lines tell (a pasted text can have millions).
+  const lines = body.split("\n", 50).filter((l) => l.trim() !== "");
   if (lines.length < 2) return null;
   for (const sep of [";", ","]) {
     const counts = countsPerLine(lines.join("\n"), sep);
@@ -357,9 +359,9 @@ const BLOCK = new Set(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "pr
 
 /**
  * The number format a spreadsheet's HTML gives a cell: an Excel format code (Excel and Blob write
- * mso-number-format, Google Sheets data-sheets-numberformat), true when it gives one in another
- * form (LibreOffice's are written in the language of whoever copied: the text shows it), or null
- * for none (General).
+ * mso-number-format, Google Sheets data-sheets-numberformat); true when the text has to show it
+ * (LibreOffice writes its codes in the language of whoever copied, and some copies carry no
+ * formats at all); or null for none (General).
  */
 export type CopiedFormat = string | true | null;
 
@@ -454,21 +456,28 @@ function attrValue(attrs: string, name: string): string | null {
 
 /**
  * Where a spreadsheet's HTML gives number formats (looked up once for the whole copy, so cells
- * skip what it doesn't have): mso-number-format on cells or by class, Google Sheets' or
- * LibreOffice's attributes.
+ * skip what it doesn't have): mso-number-format on cells or by class, Blob's data-blob-format,
+ * Google Sheets' or LibreOffice's attributes. `known`: the HTML says which cells have none.
+ * Without that (a browser's clipboard can hand over HTML without its styles), the text says it.
  */
-type FormatSources = { inline: boolean; classes: Map<string, string> | null; google: boolean; libre: boolean };
+type FormatSources = { inline: boolean; blob: boolean; classes: Map<string, string> | null; google: boolean; libre: boolean; known: boolean };
 
 function formatSources(html: string): FormatSources {
   const mso = html.includes("mso-number-format");
   const classes = mso ? classFormats(html) : null;
-  return { inline: mso, classes: classes?.size ? classes : null, google: html.includes("data-sheets-numberformat"), libre: html.includes("sdnum") };
+  const blob = html.includes("data-blob-format");
+  const google = html.includes("data-sheets-numberformat");
+  const libre = html.includes("sdnum");
+  return { inline: mso, blob, classes: classes?.size ? classes : null, google, libre, known: mso || blob || google || libre || html.includes("data-blob-sheet") };
 }
 
 /** The number format a cell of a spreadsheet's HTML declares (see CopiedFormat). */
 function formatOf(attrs: string, sources: FormatSources): CopiedFormat {
+  if (!sources.known) return true;
   const style = sources.inline ? attrValue(attrs, "style") : null;
   let code = style ? msoNumberFormat(style) : null;
+  // Blob's own, also as an attribute: a browser's clipboard keeps those where it drops styles.
+  if (code === null && sources.blob) code = attrValue(attrs, "data-blob-format") || null;
   if (code === null && sources.classes) {
     for (const name of (attrValue(attrs, "class") ?? "").toLowerCase().split(/\s+/)) {
       code = sources.classes.get(name) ?? null;
