@@ -56,6 +56,7 @@ import type { Locale } from "@/i18n/config";
 import { sheetGridText } from "@/i18n/messages/sheetGrid";
 import { sheetIoText } from "@/i18n/messages/sheetIo";
 import { chartData } from "@/sheet/chart/data";
+import { zeroLabel } from "@/sheet/chart/probe";
 import { equationText, isFitError, r2Text } from "@/sheet/chart/regression";
 import { workbookPreview } from "@/sheet/doc";
 import { addToNoteHref, embedFromParam, embedFromToken, embedTableMarkdown, embedTableModel, embedTarget, forgetEmbedToken, isEmbedToken, itemFromParam, readEmbedAttrs, readEmbedItem, sameItem, sheetItemHref, usedArea } from "@/sheet/embed";
@@ -72,7 +73,7 @@ import { crc32, deflateRaw, inflateRaw, makeZip, readZip, ZipError } from "@/she
 import { copyArea, deleteRows, insertRows, pasteClip, sortArea } from "@/sheet/ops";
 import { filteredRows, setTableFilter, sortTable } from "@/sheet/table/model";
 import { SHEET_TEMPLATES } from "@/sheet/templates";
-import type { Cell, ChartSpec, FilterSpec, Sheet, Workbook } from "@/sheet/types";
+import type { Cell, ChartSpec, FilterSpec, Sheet, TrendlineSpec, Workbook } from "@/sheet/types";
 
 const problems: string[] = [];
 let checks = 0;
@@ -2342,6 +2343,17 @@ async function roundTrips() {
     return /<c:intercept val="([^"]*)"\/>/.exec(xml)?.[1] ?? null;
   };
   eq("intercepts written: exp 0 no, exp 0.05 yes, a line through 0 yes, none none", [await interceptXml("exponential", 0), await interceptXml("exponential", 0.05), await interceptXml("linear", 0), await interceptXml("exponential", null)], [null, "0.05", "0", null]);
+  // Blob's zero crossing on the chart ("Nullstelle im Diagramm anzeigen") has no place in Excel's
+  // trendline label: the file is the same without it, and a file read back has it off.
+  const zeroFile = async (showZero?: boolean) => {
+    const trendline: TrendlineSpec = { type: "linear", order: 2, period: 2, intercept: null, showEquation: true, showR2: true, forward: 0, backward: 0, name: "", ...(showZero === undefined ? {} : { showZero }) };
+    const chart: ChartSpec = { id: "z", sheetId: "s1", at: { row: 0, col: 3, dx: 0, dy: 0 }, size: { w: 480, h: 300 }, kind: "scatter", title: "", x: rr(0), series: [{ id: "a", name: "OD", nameRef: null, y: rr(1), x: null, color: null, marker: "circle", line: "none", labels: false, errorBars: null, trendline }], xAxis: { title: "", min: null, max: null, log: false, grid: false, decimals: null }, yAxis: { title: "", min: null, max: null, log: false, grid: true, decimals: null }, legend: "none" };
+    const file = await xlsxOf(book([sheet("s1", "Blatt 1", growth)], { charts: [chart] }));
+    return { xml: (await readZip(file).text("xl/charts/chart1.xml")) ?? "", back: (await importXlsx(file, "de")).workbook.charts[0]?.series[0]?.trendline };
+  };
+  const [zeroOn, zeroOff] = [await zeroFile(true), await zeroFile()];
+  ok("zero crossing on the chart: not in the .xlsx", zeroOn.xml === zeroOff.xml && zeroOn.xml.includes("<c:dispEq val=\"1\"/>"), zeroOn.xml.slice(zeroOn.xml.indexOf("<c:trendline>"), zeroOn.xml.indexOf("</c:trendline>")));
+  ok("…and off when read back", !!zeroOn.back && zeroOn.back.type === "linear" && !("showZero" in zeroOn.back), JSON.stringify(zeroOn.back));
 }
 
 // Adding to a note, and exports -------------------------------------------------------------------
@@ -2408,6 +2420,14 @@ async function embedRequests() {
   forWord.done();
   const wordXml = (await readZip(new Uint8Array(await word.arrayBuffer())).text("word/document.xml")) ?? "";
   ok("Word: the line as text to copy", wordXml.includes(r2Text(fit.r2!, "de")), wordXml.slice(0, 300));
+  // With "Nullstelle im Diagramm anzeigen" the line ends in the zero crossing, as the chart's label
+  // writes it (this calibration line crosses 0 just below the blank).
+  const zeroWb = book([sheet("s1", "Blatt 1", data)], { charts: [{ ...spec, id: "k3", series: [{ ...spec.series[0], trendline: { ...trend, showZero: true } }] }] });
+  const zero = zeroLabel(fit, trend, "de");
+  const zeroNote = { type: "doc", content: [{ type: "sheetEmbed", attrs: { pageId: page, item: { kind: "chart", chartId: "k3" }, size: "m", caption: "" } }] };
+  const zeroMd = noteToMarkdown((await withSheetEmbeds(zeroNote, "markdown", "de", async () => ({ wb: zeroWb, title: "Kalibrierung" }))).doc, { locale: "de", title: "Notiz", pageHref: (id) => `https://blob.test/p/${id}` });
+  ok("export: the zero crossing after equation and R²", !!zero && zero.startsWith("Nullstelle: x = -0,0284") && zeroMd.includes(`\n\n${line} · ${zero}`), `${zero}\n${zeroMd}`);
+  ok("…not where the switch is off", !md.includes("Nullstelle"), md);
 }
 
 // Files in: CSV language, web pages, odd text, sizes, pickers ---------------------------------------

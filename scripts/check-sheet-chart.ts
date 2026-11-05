@@ -19,7 +19,9 @@
 // the SVG, wrapped when long, forecasts on category charts, log axes with values ≤ 0, notes under
 // the plot and in the aria label), and the chart on the screen (how far opening its settings
 // scrolls, when and how big the panel shows a copy of it, its action bar on a phone and under its
-// data, "Probe berechnen" above the keyboard, reduced motion) with the panel's words.
+// data, "Probe berechnen" above the keyboard, reduced motion) with the panel's words. Last, where
+// a trendline crosses y = 0 ("Nullstelle", for every model, in the panel and on the chart) and
+// the warning when a fixed intercept ("Schnittpunkt festlegen") contradicts the measurements.
 // Problems make the script exit with 1.
 
 import { readFileSync } from "node:fs";
@@ -35,10 +37,11 @@ import { chartFromAreas, chartSourceAreas, currentRegion } from "@/sheet/chart/c
 import { chartData, firstNumberCell } from "@/sheet/chart/data";
 import { chartSvg } from "@/sheet/chart/export";
 import { formatCoefficient, formatFromLn, formatGeneral, formatR2, formatSignificant, isCalendarFormat, parseChartNumber, r2Decimals } from "@/sheet/chart/format";
-import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe, titleUnit } from "@/sheet/chart/probe";
-import { aOutOfRange, equationParts, equationText, fitTrendline, isFitError, perHour, r2Text, realRoots, solveForX, type Fit, type FitError } from "@/sheet/chart/regression";
-import { buildChartScene, textWidth, wrapEquation, type SvgNode } from "@/sheet/chart/scene";
+import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe, titleUnit, trendZeros, ZERO_MAX, zeroLabel } from "@/sheet/chart/probe";
+import { aOutOfRange, equationParts, equationText, fitTrendline, interceptConflict, isFitError, perHour, r2Text, realRoots, solveForX, zeroCrossings, type Fit, type FitError } from "@/sheet/chart/regression";
+import { buildChartScene, textWidth, wrapEquation, wrapList, wrapZero, type SvgNode } from "@/sheet/chart/scene";
 import { createCalc, formatValue, formatWithCode, type Calc, type CellValue } from "@/sheet/engine";
+import { linearFit } from "@/sheet/engine/functions/regression";
 import { trendLabelFormat } from "@/sheet/io/xlsxCharts";
 import { deleteRows } from "@/sheet/ops";
 import { SHEET_TEMPLATES } from "@/sheet/templates";
@@ -1767,6 +1770,333 @@ const trendPaths = (nodes: SvgNode[]) => scenePaths(nodes, (a) => a.strokeDashar
   // where it was (TCH2-5): that scroll is kept like the one opening them made.
   const layer = readFileSync(join(process.cwd(), "src/components/sheet/chart/ChartLayer.tsx"), "utf8");
   check("settings made low: their scroll is kept for closing them", /if \(nowLow && !low\) settingsOpened\(revealNow\("settings"\)\)/.test(layer));
+}
+
+// ----------------------------------------------------------------------------------------------
+// Where a trendline crosses y = 0 ("Nullstelle"): in the panel always, on the chart (and in a
+// note's export) when asked, with the numbers "Probe berechnen" gives for 0. And "Schnittpunkt
+// festlegen", which a student took for "find that point": a warning when the fixed intercept
+// clearly contradicts the measurements. The data: an osmosis series (weight change of plant
+// tissue in g against sucrose in mol/L) whose falling line crosses 0 at the isotonic point.
+
+/** The attributes of every element of a scene with this tag. */
+function sceneAttrs(nodes: (SvgNode | string)[], tag: string, out: NonNullable<SvgNode["attrs"]>[] = []): NonNullable<SvgNode["attrs"]>[] {
+  for (const n of nodes) {
+    if (typeof n === "string") continue;
+    if (n.tag === tag && n.attrs) out.push(n.attrs);
+    if (n.children) sceneAttrs(n.children, tag, out);
+  }
+  return out;
+}
+const sceneCircles = (nodes: (SvgNode | string)[]) => sceneAttrs(nodes, "circle");
+
+{
+  const osX = [0, 0.1, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6];
+  const osY = [0.15, 0.142, 0.102, 0.098, 0.027, 0.003, -0.048, -0.048, -0.078, -0.082, -0.088];
+  const free = fit("osmosis", osX, osY, spec("linear"));
+  const origin = fit("osmosis through the origin", osX, osY, spec("linear", { intercept: 0 }));
+  const tb = textbookLine(osX, osY);
+  const tl0 = { forward: 0, backward: 0 };
+  // What was there stays as it was: both lines' equations and R² (Excel's R² through the origin).
+  eq("osmosis: the free line and the one through the origin", [equationText(free, "de"), r2Text(free.r2!, "de"), equationText(origin, "de"), r2Text(origin.r2!, "de")], ["y = -0,4764x + 0,1764", "R² = 0,9413", "y = -0,06841x", "R² = 0,0845"]);
+
+  // Lines: −b/m, the x "Probe berechnen" gives for 0; through the origin exactly 0, never −0.
+  close("zero of a line: −b/m (textbook sums)", zeroCrossings(free)[0], -tb.b / tb.m);
+  eq("…the x Probe berechnen gives for 0", zeroCrossings(free), [solveForX(free, 0)]);
+  const z0 = zeroCrossings(origin);
+  check("a fixed intercept of 0: x = 0, not −0 (falling line)", z0.length === 1 && Object.is(z0[0], 0), z0);
+  const risingOrigin = fit("rising through the origin", [1, 2, 3], [0.11, 0.19, 0.31], spec("linear", { intercept: 0 }));
+  check("…and rising", Object.is(zeroCrossings(risingOrigin)[0], 0), zeroCrossings(risingOrigin));
+  eq("…written as 0", [zeroLabel(origin, tl0, "de"), zeroLabel(origin, tl0, "en", null, "Sucrose (mol/L)")], ["Nullstelle: x = 0", "Zero crossing: x = 0 mol/L"]);
+  eq("…its worked line", probeSteps(origin, 0, z0[0], "de").line, "x = 0 / -0,0684063 = 0");
+  const flat = fit("flat", [1, 2, 3, 4], [0.5, 0.5, 0.5, 0.5], spec("linear"));
+  eq("a horizontal line: none, no label", [zeroCrossings(flat), zeroLabel(flat, tl0, "de")], [[], null]);
+
+  // The panel's readout: the probe's result and worked line for y = 0, with the x axis's unit.
+  const read = trendZeros(free, tl0, "de", null, "Saccharose (mol/L)");
+  eq("osmosis readout", read, { zeros: [{ x: zeroCrossings(free)[0], text: "0,37033 mol/L", outside: false }], more: false });
+  eq("osmosis label (de, en)", [zeroLabel(free, tl0, "de", null, "Saccharose (mol/L)"), zeroLabel(free, tl0, "en", null, "Sucrose [mol/L]")], ["Nullstelle: x = 0,37033 mol/L", "Zero crossing: x = 0.37033 mol/L"]);
+  eq("osmosis worked line, as Probe berechnen writes it for 0", probeSteps(free, 0, read.zeros[0].x, "de").line, "x = (0 − 0,17641) / -0,476355 = 0,37033");
+  eq("no unit without one in the axis title", trendZeros(free, tl0, "de", null, "Saccharose").zeros[0].text, "0,37033");
+  // A zero beyond the measured x values is still shown, and said (a calibration line below its blank).
+  const calib = fit("calibration zero", [0, 2, 4, 6, 8, 10], [0.002, 0.105, 0.209, 0.311, 0.418, 0.52], spec("linear"));
+  eq("calibration line: crosses 0 below the blank, outside the measurements", trendZeros(calib, tl0, "de", null, "Konzentration (mg/L)").zeros.map((z) => [z.text, z.outside]), [[`${probeResultText(solveForX(calib, 0)!, "de")} mg/L`, true]]);
+  // Dates as x: the zero is a date as the x column shows it, without a unit.
+  const dates = fit("dates zero", [46325, 46326, 46327, 46328], [3, 2, 1, 0], spec("linear"));
+  eq("dates: the zero as a date", trendZeros(dates, tl0, "de", { kind: "date", style: "short" }, "Datum (d)").zeros.map((z) => z.text), ["02.11.2026"]);
+
+  // Polynomials: the real roots where the curve is drawn, in x order.
+  const px = [-3, -2, -1, 0, 1, 2, 3];
+  const parabola = fit("x² − 4", px, px.map((x) => x * x - 4), spec("polynomial"));
+  const roots = zeroCrossings(parabola);
+  check("parabola: both roots, in x order", roots.length === 2 && near(roots[0], -2) && near(roots[1], 2), roots);
+  eq("…written with \"; \"", zeroLabel(parabola, tl0, "de", null, "c (mM)"), "Nullstellen: x = -2 mM; 2 mM");
+  eq("a parabola above 0: none", zeroCrossings(fit("x² + 1", px, px.map((x) => x * x + 1), spec("polynomial"))), []);
+  const qx = [0, 0.5, 1, 1.5, 2, 2.5, 3];
+  const q = fit("(x − 1)(x − 5)", qx, qx.map((x) => (x - 1) * (x - 5)), spec("polynomial"));
+  const drawn = zeroCrossings(q, 0, 3);
+  check("a root beyond the drawn curve doesn't count", drawn.length === 1 && near(drawn[0], 1), drawn);
+  eq("…a forecast reaching it does (outside the measurements)", trendZeros(q, { forward: 3, backward: 0 }, "de").zeros.map((z) => [z.text, z.outside]), [["1", false], ["5", true]]);
+  const polyOrigin = fit("parabola through the origin", [0, 1, 2, 3, 4], [0, -0.9, -1.1, 0.1, 2.1], spec("polynomial", { intercept: 0 }));
+  const po = zeroCrossings(polyOrigin);
+  check("a parabola through the origin: exactly 0 (no 1E-61, no −0), then the other root", po.length === 2 && Object.is(po[0], 0) && Math.abs(polyOrigin.predict(po[1])) < 1e-9 && po[1] > 2, po);
+  // A curve that only touches 0 (a double root) has that zero once: fitted to exact data, its
+  // rounding noise (−1E-16) dips it a hair below 0, where realRoots finds the turning point and a
+  // root 1E-8 on either side of it. Three for one would push the next zero out behind "…".
+  const touching: [string, number[], (x: number) => number, number, number[]][] = [
+    ["x² on −1 … 4", [-1, 0, 1, 2, 3, 4], (x) => x * x, 2, [0]],
+    ["x²(x − 3) on −1 … 4", [-1, 0, 1, 2, 3, 4], (x) => x * x * (x - 3), 3, [0, 3]],
+    ["(x − 1)²(x − 4) on 0 … 5", [0, 1, 2, 3, 4, 5], (x) => (x - 1) ** 2 * (x - 4), 3, [1, 4]],
+    ["(x + 2)²(x − 1) on −4 … 2", [-4, -3, -2, -1, 0, 1, 2], (x) => (x + 2) ** 2 * (x - 1), 3, [-2, 1]],
+    ["(x − 2,5)² on 0 … 5", [0, 1, 2, 3, 4, 5], (x) => (x - 2.5) ** 2, 2, [2.5]],
+  ];
+  for (const [name, xs, f, order, want] of touching) {
+    const z = zeroCrossings(fit(name, xs, xs.map(f), spec("polynomial", { order })));
+    check(`touching 0: ${name} has ${want.join(" and ")}`, z.length === want.length && z.every((x, i) => Math.abs(x - want[i]) < 1e-6) && !z.some((x) => Object.is(x, -0)), z);
+  }
+  const cubicTouch = fit("(x − 1)²(x − 4)", [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5].map((x) => (x - 1) ** 2 * (x - 4)), spec("polynomial", { order: 3 }));
+  eq("…written once, the next zero after it", [zeroLabel(cubicTouch, tl0, "de"), zeroLabel(fit("x²", [-1, 0, 1, 2, 3, 4], [1, 0, 1, 4, 9, 16], spec("polynomial")), tl0, "de")], ["Nullstellen: x = 1; 4", "Nullstelle: x = 0"]);
+  let touchOnce = 0;
+  let touchAll = 0;
+  for (const a of [0.37, 2, -1.25, 12.5, 0.007, 1234.5])
+    for (const k of [1, -0.02, 50, 3e5])
+      for (const order of [2, 3])
+        for (const grid of [
+          [0, 1, 2, 3, 4],
+          [-1, 0, 0.5, 1, 2, 3, 4, 5],
+        ]) {
+          const xs = grid.map((g) => a + (g - 2) * Math.max(0.05, Math.abs(a) * 0.1));
+          const z = zeroCrossings(fit(`${k}(x − ${a})²`, xs, xs.map((x) => k * (x - a) ** 2), spec("polynomial", { order })));
+          touchAll++;
+          if (z.length === 1 && Math.abs(z[0] - a) <= 1e-6 * Math.max(1, Math.abs(a))) touchOnce++;
+        }
+  eq(`exact k(x − a)² (${touchAll} of them): the zero once, at a`, touchOnce, touchAll);
+  const closeXs = [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const twoClose = zeroCrossings(fit("(x − 1)² − 0,0001", closeXs, closeXs.map((x) => (x - 1) ** 2 - 1e-4), spec("polynomial")));
+  check("two roots close together (0,99 and 1,01) stay two", twoClose.length === 2 && near(twoClose[0], 0.99, 1e-6) && near(twoClose[1], 1.01, 1e-6), twoClose);
+
+  // Logarithmic curves: e^(−b/a), worked out like the probe.
+  const lx = [0.5, 1, 2, 4, 8];
+  const logFit = fit("2 ln x − 1", lx, lx.map((x) => 2 * Math.log(x) - 1), spec("logarithmic"));
+  close("logarithmic: e^(−b/a)", zeroCrossings(logFit)[0], Math.exp(0.5));
+  eq("…its worked line", probeSteps(logFit, 0, zeroCrossings(logFit)[0], "en").line, "x = e^((0 + 1) / 2) = 1.6487");
+  // It never reaches x = 0: a tiny zero is the number it is (not "rounding noise next to 0"), and
+  // one beyond what a number holds is none.
+  const lx5 = [1, 2, 4, 8, 10];
+  const tinyLog = fit("0,01 ln x + 1", lx5, lx5.map((x) => 0.01 * Math.log(x) + 1), spec("logarithmic"));
+  close("logarithmic zero e^(−100): kept, not made 0", zeroCrossings(tinyLog)[0], Math.exp(-100), 1e-6);
+  eq("…written as that number, outside the measurements", trendZeros(tinyLog, tl0, "de").zeros.map((z) => [z.text, z.outside]), [[probeResultText(Math.exp(-100), "de"), true]]);
+  check("…which isn't 0", !/^0$|^-?0,0*$/.test(probeResultText(Math.exp(-100), "de")), probeResultText(Math.exp(-100), "de"));
+  eq("logarithmic zero e^1000 (beyond a number): none", zeroCrossings(fit("-0,001 ln x + 1", lx5, lx5.map((x) => -0.001 * Math.log(x) + 1), spec("logarithmic"))), []);
+
+  // Moving averages: where the averaged points reach or cross 0, at most ZERO_MAX ("; …" for more).
+  const ma = fit("moving average zero", [1, 2, 3, 4, 5, 6], [3, 1, -1, -3, -1, 1], spec("movingAverage"));
+  eq("moving average: where the averages are 0, in x order", zeroCrossings(ma), [3, 6]);
+  const crossing = fit("moving average crossing", [1, 2, 3, 4], [4, 2, -2, -4], spec("movingAverage"));
+  eq("…between two averages, read off the straight piece", zeroCrossings(crossing), [3]);
+  const wiggle = fit("moving average wiggle", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [2, 2, -2, -2, 2, 2, -2, -2, 2, 2], spec("movingAverage"));
+  eq(`at most ${ZERO_MAX}`, zeroCrossings(wiggle), [3, 5, 7]);
+  eq("…the label says there are more", zeroLabel(wiggle, tl0, "de"), "Nullstellen: x = 3; 5; 7; …");
+
+  // Exponential and power curves never reach 0.
+  const growth = fit("growth zero", [0, 1, 2, 3, 4], [0.05, 0.09, 0.21, 0.38, 0.81], spec("exponential"));
+  const power = fit("power zero", [1, 2, 3, 5, 8], [3.1, 5.6, 7.1, 10.9, 15.2], spec("power"));
+  eq("exponential and power: none", [zeroCrossings(growth), zeroCrossings(power), zeroLabel(growth, tl0, "de")], [[], [], null]);
+
+  // "Schnittpunkt festlegen" at 0 for the osmosis series: the free line crosses the y axis 11,7
+  // standard errors above it. SE(b) as LINEST's statistics give it (the formula engine's own fit).
+  const conflict = interceptConflict(origin);
+  const linest = linearFit(
+    osX.map((x) => [x]),
+    osY,
+    true,
+  );
+  check("osmosis through the origin: the warning, with the free line's b and R²", !!conflict && near(conflict.b, tb.b) && near(conflict.r2, tb.r2), conflict);
+  check("…SE(b) as LINEST gives it", !!conflict && "seIntercept" in linest && near(conflict.se, linest.seIntercept), [conflict?.se, "seIntercept" in linest ? linest.seIntercept : linest]);
+  const clean = fit("clean calibration through the origin", [0, 1, 2, 4, 6, 8], [0.002, 0.101, 0.199, 0.402, 0.598, 0.801], spec("linear", { intercept: 0 }));
+  eq("a clean calibration line through the origin: no warning", interceptConflict(clean), null);
+  eq("the lab's calibration line through the origin (its b is 1,7 SE): none either", interceptConflict(fit("lab through the origin", [0, 2, 4, 6, 8, 10], [0.002, 0.105, 0.209, 0.311, 0.418, 0.52], spec("linear", { intercept: 0 }))), null);
+  check("Bradford's blank of 0,025 forced through 0: the warning", interceptConflict(fit("bradford through the origin", [0, 125, 250, 500, 750, 1000], [0.0247, 0.1472, 0.2587, 0.5007, 0.7317, 0.9737], spec("linear", { intercept: 0 }))) !== null);
+  eq("no fixed intercept: nothing to warn about", interceptConflict(free), null);
+  eq("two points: no standard error, no warning", interceptConflict(fit("two through the origin", [1, 2], [1, 3], spec("linear", { intercept: 0 }))), null);
+  eq("a polynomial's fixed intercept: no warning (lines only)", interceptConflict(fit("poly fixed", [0, 1, 2, 3, 4], [1, 2, 5, 10, 17], spec("polynomial", { intercept: 0 }))), null);
+  // Points exactly on a line (SE(b) = 0) contradict an intercept they miss, not one they meet up to rounding.
+  eq("exactly on y = 2x + 1, fixed at 0: the warning", interceptConflict(fit("exact", [0, 1, 2], [1, 3, 5], spec("linear", { intercept: 0 })))?.b, 1);
+  eq("exactly on y = 0,3x (rounding noise), fixed at 0: none", interceptConflict(fit("exact through the origin", [0.1, 0.2, 0.3, 0.7], [0.1, 0.2, 0.3, 0.7].map((x) => 0.3 * x), spec("linear", { intercept: 0 }))), null);
+  eq("all y 0,5, fixed at 0: the warning (b = 0,5)", interceptConflict(fit("flat fixed at 0", [1, 2, 3], [0.5, 0.5, 0.5], spec("linear", { intercept: 0 })))?.b, 0.5);
+  // A correct blank-corrected calibration with three or four standards (what the switch's hint
+  // says it is for) gets no warning: so few points scatter a lot (a t test at 1 %, not a flat 3 SE,
+  // which warned about one such set in five), and rounded readings that happen to lie on one line
+  // have an SE(b) of rounding noise (4E-17), so an offset under 2 % of the y span doesn't count.
+  eq("three rounded readings exactly on a line (b = 0,001): none", interceptConflict(fit("collinear standards", [1, 2, 3], [0.052, 0.103, 0.154], spec("linear", { intercept: 0 }))), null);
+  eq("three standards within ±0,002 of 0,052x (b 4,3 SE off): none", interceptConflict(fit("three standards", [2, 4, 6], [0.102, 0.206, 0.311], spec("linear", { intercept: 0 }))), null);
+  eq("four standards within ±0,002 of 0,052x (b 5,3 SE off): none", interceptConflict(fit("four standards", [2, 4, 6, 8], [0.102, 0.206, 0.31, 0.415], spec("linear", { intercept: 0 }))), null);
+  for (const xs of [
+    [2, 4, 6],
+    [2, 4, 6, 8],
+  ]) {
+    // Every 3-decimal reading within ±0,002 of the true line 0,052x.
+    let sets = 0;
+    let warned = 0;
+    const each = (i: number, ys: number[]) => {
+      if (i === xs.length) {
+        sets++;
+        if (interceptConflict(fit("readings", xs, ys, spec("linear", { intercept: 0 })))) warned++;
+        return;
+      }
+      for (const e of [-0.002, -0.001, 0, 0.001, 0.002]) each(i + 1, [...ys, Math.round((0.052 * xs[i] + e) * 1000) / 1000]);
+    };
+    each(0, []);
+    eq(`all ${sets} such readings at x = ${xs.join(", ")}: no warning`, warned, 0);
+  }
+  eq("data on y = 2x + 1,00001 fixed at 1: none (\"not through 1 … at 1\")", interceptConflict(fit("almost 1", [0, 1, 2, 3], [0, 1, 2, 3].map((x) => 2 * x + 1.00001), spec("linear", { intercept: 1 }))), null);
+
+  // The panel's words.
+  const de = sheetChartText.de;
+  const en = sheetChartText.en;
+  eq(
+    "the warning (de)",
+    conflict && de.interceptConflict(formatCoefficient(0, "de", 6), formatCoefficient(conflict.b, "de"), r2Text(conflict.r2, "de")),
+    "Deine Messwerte gehen bei x = 0 nicht durch 0: Ohne festen Schnittpunkt schneidet die Linie die y-Achse bei 0,1764 (R² = 0,9413). Schalte „Schnittpunkt festlegen“ aus, wenn du den Wert bei x = 0 nicht sicher kennst.",
+  );
+  eq("the warning (en)", en.interceptConflict("0", "0.1764", "R² = 0.9413"), "Your measurements don't go through 0 at x = 0: without a fixed intercept, the line crosses the y axis at 0.1764 (R² = 0.9413). Turn off “Set intercept” unless you know the value at x = 0 for sure.");
+  check("…without an R² (all y equal): none in brackets", !de.interceptConflict("0", "0,5", null).includes("(") && !en.interceptConflict("0", "0.5", null).includes("("));
+  const about = [de.interceptAbout(true), en.interceptAbout(true)];
+  check(
+    "the switch's hint says what it does and where the zero is, by the readout's name",
+    about[0].startsWith("Legt fest, welchen y-Wert die Linie bei x = 0 hat.") && about[0].includes(`„${de.zeroAt(1).split(":")[0]}“`) && about[1].startsWith("Sets the y value") && about[1].includes(`“${en.zeroAt(1).split(":")[0]}”`),
+    about,
+  );
+  const aboutNone = [de.interceptAbout(false), en.interceptAbout(false)];
+  check("…without a zero crossing shown above, it points to none", about.every((s, i) => s.startsWith(aboutNone[i]) && s.length > aboutNone[i].length) && !/Nullstelle|zero/i.test(aboutNone.join(" ")), aboutNone);
+  check("…an exponential curve's doesn't point to a zero it can't have", !/Nullstelle|zero/i.test(de.interceptAboutExp + en.interceptAboutExp));
+  const fixedNote = [de.r2Fixed, en.r2Fixed];
+  check("R² with a fixed intercept: one short sentence, not to be compared", fixedNote.every((s) => s.split("R²").length === 3 && s.endsWith(".") && !s.slice(0, -1).includes(". ") && s.split(" ").length <= 20), fixedNote);
+  eq("switch and outside words", [de.showZero, en.showZero, de.zeroOutside, en.zeroOutside], ["Nullstelle im Diagramm anzeigen", "Show zero crossing on chart", "(außerhalb deiner Messwerte)", "(outside your measurements)"]);
+  eq("no zero where the trendline is drawn: said under that switch", [de.zeroNone, en.zeroNone], ["Diese Trendlinie erreicht y = 0 hier nicht.", "This trendline doesn't reach y = 0 here."]);
+
+  // On the chart: one more line in the trendline's label, drawn like the equation and R², a ring
+  // on the line where it crosses 0, the same words in the aria label. Off (missing in older
+  // workbooks, or false), the chart is the same as before.
+  const osmosis = workbook([["Saccharose (mol/L)", "Massenänderung (g)"], ...osX.map((x, i) => [x, osY[i]])]);
+  const osCalc = fakeCalc(osmosis);
+  const osAxis = { title: "Saccharose (mol/L)", min: null, max: null, log: false, grid: false, decimals: null };
+  const osChart = (tl: Partial<TrendlineSpec>, extra: Partial<ChartSpec> = {}) => chart("scatter", ref(1, 0, 11, 0), [series("o", ref(1, 1, 11, 1), { nameRef: ref(0, 1, 0, 1), trendline: { ...linearTl, ...tl } })], { title: "Osmose", xAxis: osAxis, ...extra });
+  const svgOf = (c: ChartSpec, locale: "de" | "en" = "de") => chartSvg(c, chartData(c, osCalc, locale), locale);
+  const sceneOf = (c: ChartSpec, locale: "de" | "en" = "de") => buildChartScene(c, chartData(c, osCalc, locale), { width: 480, height: 300, locale });
+  const offSvg = svgOf(osChart({}));
+  eq("switch off or missing: the chart as before", svgOf(osChart({ showZero: false })), offSvg);
+  check("…no zero, no ring", !offSvg.includes("Nullstelle") && !offSvg.includes("<circle"));
+  const on = osChart({ showZero: true });
+  const scene = sceneOf(on);
+  const texts = sceneTexts(scene.nodes);
+  const at = (s: string) => texts.indexOf(s);
+  check("switch on: the zero under the equation and R²", at("y = -0,4764x + 0,1764") >= 0 && at("R² = 0,9413") === at("y = -0,4764x + 0,1764") + 1 && at("Nullstelle: x = 0,37033 mol/L") === at("R² = 0,9413") + 1, texts);
+  check("…in the file too", svgOf(on).includes(">Nullstelle: x = 0,37033 mol/L<") && svgOf(on, "en").includes(">Zero crossing: x = 0.37033 mol/L<"));
+  // Its letters run wider than textWidth's averages at the label's weight (a browser drew this line
+  // 113.9 px wide where the estimate said 108.1): the box is sized for them as semibold.
+  const labelSize = Math.round(scene.fontSize * 0.92 * 10) / 10;
+  const labelBox = sceneAttrs(scene.nodes, "rect").find((a) => a.rx === 6);
+  check(
+    "…its box keeps the padding right of the zero line's letters",
+    !!labelBox && Number(labelBox.width) >= textWidth("Nullstelle: x = 0,37033 mol/L", labelSize, 600) + 2 * labelSize * 0.6 - 0.02,
+    [labelBox, textWidth("Nullstelle: x = 0,37033 mol/L", labelSize, 600)],
+  );
+  const offBox = sceneAttrs(sceneOf(osChart({})).nodes, "rect").find((a) => a.rx === 6);
+  check("…the box without the zero line as before (sized by the equation)", !!offBox && Number(offBox.width) < Number(labelBox?.width), [offBox, labelBox]);
+  check("…and in the aria label, after R²", scene.label.includes("R² = 0,9413, Nullstelle: x = 0,37033 mol/L") && !sceneOf(osChart({})).label.includes("Nullstelle"), scene.label);
+  const [p0, p1] = pathCoords(trendPaths(scene.nodes)[0] ?? "");
+  const along = zeroCrossings(free)[0] / 0.6;
+  const rings = sceneCircles(scene.nodes);
+  check(
+    "…a ring on the line where it crosses 0",
+    rings.length === 1 && !!p0 && !!p1 && Math.abs(Number(rings[0].cx) - (p0.x + (p1.x - p0.x) * along)) < 0.6 && Math.abs(Number(rings[0].cy) - (p0.y + (p1.y - p0.y) * along)) < 0.6 && rings[0].fill === scene.palette.bg,
+    { rings, p0, p1 },
+  );
+  // A zero beyond the drawn line is in the label only; a backward forecast reaching it brings the ring.
+  const calChart = (tl: Partial<TrendlineSpec>) => chart("scatter", ref(1, 0, 6, 0), [series("e", ref(1, 1, 6, 1), { trendline: { ...linearTl, showZero: true, ...tl } })]);
+  const calScene = (c: ChartSpec) => buildChartScene(c, chartData(c, calc, "de"), { width: 480, height: 300, locale: "de" });
+  const beyond = calScene(calChart({}));
+  check("a zero beyond the drawn line: in the label, no ring", sceneTexts(beyond.nodes).some((s) => s.startsWith("Nullstelle: x = -0,0284")) && sceneCircles(beyond.nodes).length === 0, sceneTexts(beyond.nodes));
+  check("…with a backward forecast reaching it: the ring too", sceneCircles(calScene(calChart({ backward: 1 })).nodes).length === 1);
+  const expScene = calScene(calChart({ type: "exponential" }));
+  check("an exponential curve with the switch on: nothing to show", !sceneTexts(expScene.nodes).some((s) => s.includes("Nullstelle")) && sceneCircles(expScene.nodes).length === 0);
+  const maScene = sceneOf(osChart({ type: "movingAverage", showZero: true }));
+  check("a moving average: its zero alone in the label", sceneTexts(maScene.nodes).some((s) => s.startsWith("Nullstelle: x = ")) && !sceneTexts(maScene.nodes).some((s) => s.startsWith("y = ")), sceneTexts(maScene.nodes));
+  const linY = calScene(calChart({ backward: 1 }));
+  const logYScene = buildChartScene({ ...calChart({ backward: 1 }), yAxis: { title: "", min: null, max: null, log: true, grid: true, decimals: null } }, chartData(calChart({ backward: 1 }), calc, "de"), { width: 480, height: 300, locale: "de" });
+  check("a log y axis has no 0: the label, no ring", sceneCircles(linY.nodes).length === 1 && sceneCircles(logYScene.nodes).length === 0 && sceneTexts(logYScene.nodes).some((s) => s.startsWith("Nullstelle")));
+  // Several zeros on a narrow chart: broken after "; ", lined up after "= ".
+  const list = "Nullstellen: x = 0,12345 mol/L; 0,56789 mol/L; 1,2345 mol/L";
+  const first = textWidth("Nullstellen: x = 0,12345 mol/L;", 12);
+  const wrapped = wrapList(list, first + 4, 12);
+  check(
+    "a long list wraps after \"; \"",
+    wrapped.length === 3 && wrapped.map((l) => l.parts[0].text).join(" ") === list && wrapped[0].indent === 0 && wrapped.slice(1).every((l) => l.indent === textWidth("Nullstellen: x = ", 12) && l.indent + textWidth(l.parts[0].text, 12) <= first + 4),
+    wrapped,
+  );
+  eq("…a short one stays on its line", wrapList("Nullstelle: x = 0,37033", 400, 12), [{ parts: [{ text: "Nullstelle: x = 0,37033" }], indent: 0 }]);
+  const two = "Nullstellen: x = -2 mM; 2 mM";
+  eq("…measured at the weight asked for (semibold: 6 % wider)", [wrapList(two, textWidth(two, 12) + 1, 12).length, wrapList(two, textWidth(two, 12) + 1, 12, 600).length], [1, 2]);
+  eq("split after its words: \"Nullstelle:\", then the value", wrapZero("Nullstelle: x = 0,37033 mol/L", 400, 12, true), [{ parts: [{ text: "Nullstelle:" }], indent: 0 }, { parts: [{ text: "x = 0,37033 mol/L" }], indent: 0 }]);
+  eq("…not split: as wrapList", wrapZero(list, first + 4, 12), wrapList(list, first + 4, 12));
+
+  // A small chart (the copy in the settings on a phone, about 276 px wide): where the zero on one
+  // line widens the label over measured points, "Nullstelle:" gets a line of its own (a box as wide
+  // as the equation, in the corner the label had without it).
+  const markersUnder = (nodes: SvgNode[]) => {
+    const box = sceneAttrs(nodes, "rect").find((a) => a.rx === 6);
+    if (!box) return -1;
+    const [x, y, w, h] = [box.x, box.y, box.width, box.height].map(Number);
+    let n = 0;
+    for (const d of scenePaths(nodes, () => true))
+      for (const m of d.matchAll(/M(-?[\d.]+) (-?[\d.]+)a([\d.]+) [\d.]+ 0 1 0/g)) {
+        const [mx, my, r] = [+m[1] + +m[3], +m[2], +m[3]];
+        if (mx + r > x && mx - r < x + w && my + r > y && my - r < y + h) n++;
+      }
+    return n;
+  };
+  for (const locale of ["de", "en"] as const)
+    for (const [w, h] of [
+      [320, 200],
+      [300, 190],
+      [276, 172],
+    ]) {
+      const c = osChart({ showZero: true });
+      const small = buildChartScene(c, chartData(c, osCalc, locale), { width: w, height: h, locale });
+      const lines = sceneTexts(small.nodes);
+      const zeroAt = lines.findIndex((s) => s.startsWith(locale === "de" ? "Nullstelle:" : "Zero crossing:"));
+      check(`osmosis ${w}×${h} (${locale}) with its zero: no measured point under the label`, markersUnder(small.nodes) === 0 && zeroAt > 0 && lines.slice(zeroAt, zeroAt + 2).join(" ").endsWith(locale === "de" ? "x = 0,37033 mol/L" : "x = 0.37033 mol/L"), [markersUnder(small.nodes), lines]);
+    }
+  // Two trendlines on a small chart: with their zeros the label is taller than the plot. The
+  // equations and R² stay (as without the switch), only the zero lines are left out.
+  const os2 = fakeCalc(workbook([["Saccharose (mol/L)", "Massenänderung (g)", "Kontrolle (g)"], ...osX.map((x, i) => [x, osY[i], osY[i] * 0.8 + 0.01])]));
+  const twoTrends = (showZero: boolean) => chart("scatter", ref(1, 0, 11, 0), [1, 2].map((col) => series(`s${col}`, ref(1, col, 11, col), { nameRef: ref(0, col, 0, col), trendline: { ...linearTl, showZero } })), { title: "Osmose", xAxis: osAxis, legend: "bottom" });
+  const twoLines = (showZero: boolean, w: number, h: number) =>
+    sceneTexts(buildChartScene(twoTrends(showZero), chartData(twoTrends(showZero), os2, "de"), { width: w, height: h, locale: "de" }).nodes).filter((s) => /^(y = |R² = |Nullstelle)/.test(s));
+  const tight = twoLines(true, 300, 190);
+  check("two trendlines at 300×190 with their zeros: the equations and R² as without them", tight.length === 4 && JSON.stringify(tight) === JSON.stringify(twoLines(false, 300, 190)), [tight, twoLines(false, 300, 190)]);
+  check("…with room (480×300): the zeros too", twoLines(true, 480, 300).filter((s) => s.startsWith("Nullstelle")).length === 2, twoLines(true, 480, 300));
+  // A curve touching 0 on the chart: one ring there and one at the next zero, the label as in the panel.
+  const cubicCalc = fakeCalc(workbook([["x", "y"], ...[0, 1, 2, 3, 4, 5].map((x) => [x, (x - 1) ** 2 * (x - 4)])]));
+  const cubicChart = chart("scatter", ref(1, 0, 6, 0), [series("k", ref(1, 1, 6, 1), { trendline: { ...linearTl, type: "polynomial", order: 3, showZero: true } })]);
+  const cubicScene = buildChartScene(cubicChart, chartData(cubicChart, cubicCalc, "de"), { width: 480, height: 300, locale: "de" });
+  check("touching 0 on the chart: a ring there and at the next zero, each written once", sceneCircles(cubicScene.nodes).length === 2 && sceneTexts(cubicScene.nodes).includes("Nullstellen: x = 1; 4"), [sceneCircles(cubicScene.nodes), sceneTexts(cubicScene.nodes)]);
+
+  // The panel. "Nullstelle im Diagramm anzeigen" turned off leaves the key out (not false): on and
+  // off again is no change, which a merge with someone's edit of the trendline would take for one.
+  const trendSrc = readFileSync(join(process.cwd(), "src/components/sheet/chart/TrendSection.tsx"), "utf8");
+  check("zero switch off: the key left out", /delete next\.showZero/.test(trendSrc) && !/showZero: v\b|showZero: false/.test(trendSrc));
+  // "Schnittpunkt festlegen": nothing above it changes height as it is pressed (the R² remark is
+  // under it, the switch kept in place), and its warning comes right under its hint, in a status
+  // region (spoken as it comes), describing the switch and the field.
+  const pos = (s: string) => trendSrc.indexOf(s);
+  check(
+    "intercept switch: R² remark and warning under it",
+    pos("label={t.setIntercept}") > 0 && pos("{t.r2Fixed}") > pos("label={t.setIntercept}") && pos("id={interceptHintId}") < pos('role="status"') && pos('role="status"') < pos("id={warnId}") && pos("id={warnId}") < pos("label={t.interceptValue}"),
+  );
+  check("…the warning describes the switch and the field", /describedBy=\{conflictText \? `\$\{interceptHintId\} \$\{warnId\}` : interceptHintId\}/.test(trendSrc) && /describedBy=\{conflictText \? warnId : undefined\}/.test(trendSrc));
+  check("…the switch kept where it was pressed, the warning brought into view", /box\.scrollTop \+= moved/.test(trendSrc) && /revealUnder\(warn\.getBoundingClientRect\(\), row\.getBoundingClientRect\(\), view\)/.test(trendSrc));
 }
 
 const failed = problems.length;

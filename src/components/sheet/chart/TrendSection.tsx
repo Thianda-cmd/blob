@@ -1,25 +1,26 @@
 "use client";
 
 // The trendline part of the chart panel: the model (like Excel's "Trendlinie formatieren"),
-// its options, the fitted equation and R² read out live, and "Probe berechnen": type a measured
-// value and get x back (the concentration of a sample from its absorbance).
+// its options, the fitted equation and R² read out live with where the line crosses y = 0
+// ("Nullstelle"), and "Probe berechnen": type a measured value and get x back (the concentration
+// of a sample from its absorbance).
 
 import { Calculator, Check, ClipboardCopy, Clock, Info, Lightbulb, TriangleAlert } from "lucide-react";
-import { useEffect, useEffectEvent, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui/Segmented";
 import type { Locale } from "@/i18n/config";
 import type { SheetChartText } from "@/i18n/messages/sheetChart";
 import { cn } from "@/lib/utils";
 import type { ChartSeriesData } from "@/sheet/chart/data";
 import { formatCoefficient, isCalendarFormat, isDateFormat } from "@/sheet/chart/format";
-import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe } from "@/sheet/chart/probe";
-import { aOutOfRange, equationParts, equationText, isFitError, perHour, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
+import { probeAdvice, probeRange, probeResultText, probeSteps, readProbe, trendZeros } from "@/sheet/chart/probe";
+import { aOutOfRange, equationParts, equationText, interceptConflict, isFitError, perHour, r2Text, solveForX, type Fit } from "@/sheet/chart/regression";
 import { trendlineName } from "@/sheet/chart/scene";
 import type { ChartSpec, NumberFormat, SeriesSpec, TrendlineSpec } from "@/sheet/types";
 import type { SheetStore } from "../store";
 import { LINEAR_TRENDLINE, updateChart } from "./actions";
 import { Chips, Field, fieldClass, HINT_TEXT, Note, NumberField, TextField, Toggle } from "./PanelParts";
-import { probeScroll, scrollBehavior } from "./reveal";
+import { probeScroll, revealUnder, scrollBehavior } from "./reveal";
 
 /** A pause in typing (ms) after which an unfinished number ("1e-") counts as typed: Probe berechnen then says what is wrong. */
 const PROBE_PAUSE = 1200;
@@ -134,12 +135,62 @@ export function TrendSection({
   const fit = data?.fit ?? null;
   const [more, setMore] = useState(false);
   const moreHintId = useId();
+  const interceptHintId = useId();
+  const warnId = useId();
+  const zeroHintId = useId();
+  // "Schnittpunkt festlegen" changes the read-out above it (the equation, where the line crosses
+  // 0, how that is worked out): the switch stays where it was, under the pointer or with the
+  // keyboard's focus, so pressing it again undoes it instead of hitting the switch that moved
+  // there. The warning that may come with it (or with a new value) is brought into view under it,
+  // the switch still in view, as "Probe berechnen" does with its result (see revealUnder).
+  const interceptBlock = useRef<HTMLDivElement>(null);
+  const interceptSwitch = () => interceptBlock.current?.querySelector<HTMLElement>('[role="switch"]') ?? null;
+  const warnBox = useRef<HTMLDivElement>(null);
+  const pending = useRef<{ top: number | null; at: number } | null>(null);
+  useLayoutEffect(() => {
+    const was = pending.current;
+    pending.current = null;
+    const row = interceptSwitch();
+    if (!was || !row || performance.now() - was.at > 1000) return;
+    let box = row.parentElement;
+    while (box && !/auto|scroll/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+    if (!box) return;
+    if (was.top !== null) {
+      const moved = row.getBoundingClientRect().top - was.top;
+      if (Math.abs(moved) >= 0.5) box.scrollTop += moved;
+    }
+    const warn = warnBox.current;
+    if (!warn) return;
+    const room = box.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const view = { top: Math.max(room.top, vv?.offsetTop ?? 0), bottom: Math.min(room.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight) };
+    const dy = revealUnder(warn.getBoundingClientRect(), row.getBoundingClientRect(), view);
+    if (dy > 0) box.scrollBy({ top: dy, behavior: scrollBehavior() });
+  });
   if (spec.kind === "pie") return <Note icon={<Info />}>{t.noTrendPie}</Note>;
 
   const set = (patch: Partial<TrendlineSpec> | null) =>
     updateChart(store, spec.id, t.undo.trend, (c) => ({
       ...c,
       series: c.series.map((s) => (s.id === series.id ? { ...s, trendline: patch === null ? null : { ...(s.trendline ?? LINEAR_TRENDLINE), ...patch } } : s)),
+    }));
+  /** Before the fixed intercept changes: where its switch is when it was pressed (`pressed`), for the layout effect above. */
+  const keepIntercept = (pressed: boolean) => {
+    pending.current = { top: pressed ? (interceptSwitch()?.getBoundingClientRect().top ?? null) : null, at: performance.now() };
+  };
+  // Off leaves the key out, as before it was first turned on (not false): on and off again is no
+  // change, which a merge with someone's edit of the same trendline (its type, say) could take for
+  // one and so undo theirs.
+  const setShowZero = (on: boolean) =>
+    updateChart(store, spec.id, t.undo.trend, (c) => ({
+      ...c,
+      series: c.series.map((s) => {
+        if (s.id !== series.id) return s;
+        const next: TrendlineSpec = { ...(s.trendline ?? LINEAR_TRENDLINE) };
+        if (on) next.showZero = true;
+        else delete next.showZero;
+        return { ...s, trendline: next };
+      }),
     }));
   // The fixed intercept stays as it is when the type changes: logarithmic, power and moving
   // averages don't use one, and exponential ignores one at or below 0 (the panel says so), so a
@@ -159,6 +210,24 @@ export function TrendSection({
   // Times as x (0:00, 0:30 … or durations) count in days, as in Excel and in formulas like
   // STEIGUNG: the slope of a line or a growth rate is per day. The note works it out per hour.
   const timeTip = spec.kind === "scatter" && !!fitted && fitted.type !== "movingAverage" && xFormat?.kind === "time";
+  // Where the trendline crosses y = 0 ("Nullstelle"), always: what a student looks for on a falling
+  // line (the isotonic point of an osmosis series) and may think "Schnittpunkt festlegen" finds.
+  // One zero with a formula (a line, a logarithmic curve) is worked out as "Probe berechnen" would
+  // for y = 0, so it can go into the lab report as it is.
+  const zeros = fitted && tl ? trendZeros(fitted, tl, locale, xFormat, spec.kind === "scatter" ? spec.xAxis.title : "") : null;
+  const zeroLine = fitted && zeros?.zeros.length === 1 ? probeSteps(fitted, 0, zeros.zeros[0].x, locale, xFormat).line : null;
+  // Exponential and power curves never reach 0: no switch for showing it on the chart. One that
+  // doesn't cross 0 where it is drawn says so under the switch (on, it would show nothing).
+  const zeroType = !!tl && tl.type !== "exponential" && tl.type !== "power";
+  const noZero = !!zeros && zeros.zeros.length === 0;
+  // A fixed intercept (as used: an exponential curve ignores one ≤ 0) changes what R² means, and a
+  // line's may plainly contradict the measurements.
+  const fixed = fitted && fitted.intercept !== null && fitted.intercept !== undefined ? fitted.intercept : null;
+  const conflict = fitted ? interceptConflict(fitted) : null;
+  const conflictText =
+    conflict && fixed !== null
+      ? t.interceptConflict(formatCoefficient(fixed, locale, 6), formatCoefficient(conflict.b, locale), Number.isFinite(conflict.r2) ? r2Text(conflict.r2, locale) : null)
+      : null;
 
   return (
     <div className="space-y-3.5">
@@ -230,6 +299,24 @@ export function TrendSection({
                     </p>
                   </>
                 )}
+                {/* Where it crosses y = 0, as text (screen readers read it in this order), and
+                    beyond the measured x values said so, like a sample outside the standards. */}
+                {!!zeros?.zeros.length && (
+                  <div className="mt-2 space-y-0.5 border-t border-line pt-2" data-trend-zero>
+                    <p className="break-words tabular-nums text-[13.5px] text-ink-2">
+                      {t.zeroAt(zeros.zeros.length)}
+                      {zeros.zeros.map((z, i) => (
+                        <Fragment key={i}>
+                          {i > 0 && "; "}
+                          <span className="font-medium text-ink">{z.text}</span>
+                          {z.outside && ` ${t.zeroOutside}`}
+                        </Fragment>
+                      ))}
+                      {zeros.more && "; …"}
+                    </p>
+                    {zeroLine && <p className={cn(HINT_TEXT, "break-words font-mono")}>{zeroLine}</p>}
+                  </div>
+                )}
               </>
             ) : null}
           </div>
@@ -242,27 +329,73 @@ export function TrendSection({
 
           {fitted && <Probe fit={fitted} spec={spec} locale={locale} t={t} seriesName={seriesName} xFormat={xFormat} />}
 
-          {tl.type !== "movingAverage" && (
+          {(tl.type !== "movingAverage" || zeroType) && (
             <div className="space-y-1">
-              <Toggle label={t.showEquation} checked={tl.showEquation} disabled={readOnly} onChange={(v) => set({ showEquation: v })} />
-              <Toggle label={t.showR2} checked={tl.showR2} disabled={readOnly} onChange={(v) => set({ showR2: v })} />
+              {tl.type !== "movingAverage" && (
+                <>
+                  <Toggle label={t.showEquation} checked={tl.showEquation} disabled={readOnly} onChange={(v) => set({ showEquation: v })} />
+                  <Toggle label={t.showR2} checked={tl.showR2} disabled={readOnly} onChange={(v) => set({ showR2: v })} />
+                </>
+              )}
+              {zeroType && <Toggle label={t.showZero} checked={!!tl.showZero} disabled={readOnly} describedBy={noZero ? zeroHintId : undefined} onChange={setShowZero} />}
+              {zeroType && noZero && (
+                <p id={zeroHintId} className={HINT_TEXT}>
+                  {t.zeroNone}
+                </p>
+              )}
             </div>
           )}
 
           {canIntercept ? (
-            <div className="space-y-2">
+            <div ref={interceptBlock} className="space-y-2">
               <Toggle
                 label={t.setIntercept}
                 checked={tl.intercept !== null}
                 disabled={readOnly}
-                onChange={(v) => set({ intercept: v ? (tl.type === "exponential" ? fittedA : 0) : null })}
+                describedBy={conflictText ? `${interceptHintId} ${warnId}` : interceptHintId}
+                onChange={(v) => {
+                  keepIntercept(true);
+                  set({ intercept: v ? (tl.type === "exponential" ? fittedA : 0) : null });
+                }}
               />
+              {/* What it does, also while off: "Schnittpunkt" reads like "find where it crosses",
+                  which is the Nullstelle above (pointed to when there is one). */}
+              <p id={interceptHintId} className={cn(HINT_TEXT, "-mt-1")}>
+                {tl.type === "exponential" ? t.interceptAboutExp : t.interceptAbout(!!zeros?.zeros.length)}
+              </p>
+              {/* A value the measurements plainly don't go through (a line's only): the free line's
+                  intercept and R² say how far off it is. Right under the switch, where it shows as
+                  she turns it on; spoken as it comes (the status region is there before it, taking
+                  no room while empty) and with the switch and the field. */}
+              <div role="status" className="empty:mb-0">
+                {conflictText && (
+                  <div id={warnId} ref={warnBox}>
+                    <Note tone="warn" icon={<TriangleAlert />}>
+                      {conflictText}
+                    </Note>
+                  </div>
+                )}
+              </div>
               {/* The switch names the choice, the field the value: y at x = 0 (b of a line, a of an exponential curve). */}
               {tl.intercept !== null && (
-                <Field label={t.interceptValue} hint={tl.type === "exponential" ? t.interceptHintExp : t.interceptHint}>
-                  <NumberField locale={locale} value={tl.intercept} onCommit={(v) => v !== null && set({ intercept: v })} label={t.interceptValue} className="w-32" />
+                <Field label={t.interceptValue} hint={tl.type === "exponential" ? t.interceptHintExp : undefined}>
+                  <NumberField
+                    locale={locale}
+                    value={tl.intercept}
+                    onCommit={(v) => {
+                      if (v === null) return;
+                      keepIntercept(false);
+                      set({ intercept: v });
+                    }}
+                    label={t.interceptValue}
+                    describedBy={conflictText ? warnId : undefined}
+                    className="w-32"
+                  />
                 </Field>
               )}
+              {/* Excel's R² with a fixed intercept isn't the usual one: said while one is used, here
+                  where it is set (under R² above, it would push this switch down as it comes). */}
+              {fitted && fitted.r2 !== null && fixed !== null && <p className={HINT_TEXT}>{t.r2Fixed}</p>}
             </div>
           ) : tl.type !== "movingAverage" ? (
             <p className={HINT_TEXT}>{t.interceptNotHere}</p>

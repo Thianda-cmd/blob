@@ -486,6 +486,22 @@ function solvePolynomial(fit: Fit, y: number): number | null {
   );
 }
 
+/**
+ * Where a moving average reaches y: the x of each averaged point at y and of each crossing between
+ * two of them (read off the straight pieces between the points), in the data's order, each once.
+ */
+function averageCrossings(pts: { x: number; y: number }[], y: number): number[] {
+  const hits: number[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    if (a.y === y) hits.push(a.x);
+    else if ((a.y - y) * (b.y - y) < 0) hits.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x));
+  }
+  if (pts.length && pts[pts.length - 1].y === y) hits.push(pts[pts.length - 1].x);
+  return [...new Set(hits)];
+}
+
 /** ln a of an exponential or power fit (from the fit itself where a is 0 or ∞ as a number). */
 export const lnOfA = (fit: Fit) => fit.lnA ?? Math.log(fit.coefficients[0]);
 
@@ -519,21 +535,133 @@ export function solveForX(fit: Fit, y: number): number | null {
     case "power":
       x = c[1] === 0 || !(y > 0) ? null : Math.exp((Math.log(y) - lnOfA(fit)) / c[1]);
       break;
-    case "movingAverage": {
-      const pts = fit.points ?? [];
-      const hits: number[] = [];
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1];
-        const b = pts[i];
-        if (a.y === y) hits.push(a.x);
-        else if ((a.y - y) * (b.y - y) < 0) hits.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x));
-      }
-      if (pts.length && pts[pts.length - 1].y === y) hits.push(pts[pts.length - 1].x);
-      x = pickByData([...new Set(hits)], fit, y);
+    case "movingAverage":
+      x = pickByData(averageCrossings(fit.points ?? [], y), fit, y);
       break;
-    }
   }
   return x !== null && Number.isFinite(x) ? x : null;
+}
+
+// ----------------------------------------------------------------------------------------------
+// Where the trendline crosses y = 0, and whether a fixed intercept fits the data
+
+/**
+ * Where a trendline crosses y = 0 (its zeros, "Nullstellen"), in x order, at most `max`: the panel
+ * shows them under the equation and R² (the isotonic point of an osmosis series, where a falling
+ * line runs out), without the student having to know that "Probe berechnen" with 0 gives the same.
+ * - linear: −b/m, as solveForX(fit, 0) works it out (none for a horizontal line);
+ * - logarithmic: e^(−b/a);
+ * - polynomial: the real roots between `from` and `to`, where the trendline is drawn (the data's x
+ *   range and the forecast); further out a curve fitted to the data means nothing. A curve that
+ *   only touches 0 (a double root, like x² at 0) has it once (see touchingOnce);
+ * - moving average: where the averaged points reach or cross 0 (as solveForX finds them);
+ * - exponential and power: none (a·e^(bx) and a·x^b never reach 0).
+ * A line's or a logarithmic curve's zero may lie outside the measured x range, also outside `from`
+ * … `to` (the panel says so: probeRange). Rounding noise next to 0 counts as 0, and 0 is never −0:
+ * a line through the origin (a fixed intercept of 0) crosses at x = 0. Not for a logarithmic
+ * curve, which never reaches x = 0: its e^(−b/a) stays the tiny number it is (3,7201E-44).
+ */
+export function zeroCrossings(fit: Fit, from = fit.xMin ?? -Infinity, to = fit.xMax ?? Infinity, max = 3): number[] {
+  let xs: number[] = [];
+  switch (fit.type) {
+    case "linear": {
+      const x = solveForX(fit, 0);
+      if (x !== null) xs = [x];
+      break;
+    }
+    case "logarithmic": {
+      // Above 0 however small; one too small for a number (0) or too big (∞) is no crossing.
+      const x = solveForX(fit, 0);
+      return x !== null && x > 0 && max > 0 ? [x] : [];
+    }
+    case "polynomial": {
+      const basis = fit.basis ?? { center: 0, scale: 1, d: fit.coefficients };
+      const lo = Math.min(from, to);
+      const hi = Math.max(from, to);
+      const tol = Number.isFinite(hi - lo) ? 1e-9 * Math.max(hi - lo, Math.abs(lo), Math.abs(hi)) : 0;
+      xs = touchingOnce(realRoots(basis.d))
+        .map((t) => basis.center + basis.scale * t)
+        .filter((x) => x >= lo - tol && x <= hi + tol);
+      break;
+    }
+    case "movingAverage":
+      xs = averageCrossings(fit.points ?? [], 0).sort((a, b) => a - b);
+      break;
+  }
+  // A root bisected to 1E-61 where the curve goes through the origin is 0 (and so is −0).
+  const size = Math.max(Math.abs(fit.xMin ?? 0), Math.abs(fit.xMax ?? 0));
+  return xs.map((x) => (Math.abs(x) <= 1e-12 * size ? 0 : x)).slice(0, Math.max(0, max));
+}
+
+/**
+ * A polynomial's roots (realRoots, in t of its basis, ascending) with each root the curve only
+ * touches counted once. Fitted to exact data such as x² or (x − 1)²(x − 4), the curve's lowest
+ * coefficient carries rounding noise (−1E-16): where that dips the curve a hair below 0, realRoots
+ * finds the turning point and a root 1E-8 on either side of it, three for one, which would push
+ * the real next root out of the "at most 3". Roots closer than 1E-6 (in t, where the data spans
+ * about −1 … 1) are one: the middle one of them, the turning point. Two real roots that close
+ * would read the same with the 5 digits shown anyway. realRoots itself stays as it is, so
+ * "Probe berechnen" gives the numbers it gave.
+ */
+function touchingOnce(ts: number[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < ts.length; ) {
+    let j = i;
+    while (j + 1 < ts.length && ts[j + 1] - ts[j] <= 1e-6 * (1 + Math.abs(ts[j + 1]))) j++;
+    out.push(ts[i + ((j - i + 1) >> 1)]);
+    i = j + 1;
+  }
+  return out;
+}
+
+/**
+ * Two-sided 99 % quantiles of Student's t for 1, 2 … 13 degrees of freedom; from 14 on they are
+ * below 3, and interceptConflict asks for 3 standard errors anyway.
+ */
+const T99 = [63.657, 9.925, 5.841, 4.604, 4.032, 3.707, 3.499, 3.355, 3.25, 3.169, 3.106, 3.055, 3.012];
+
+/**
+ * Whether a line's fixed intercept b₀ ("Schnittpunkt festlegen") clearly contradicts the data, so
+ * the panel warns: the line fitted freely to the same points crosses the y axis far from b₀, both
+ * - beyond chance: more standard errors of its intercept away than a t test at 1 % allows (n − 2
+ *   degrees of freedom, at least 3), SE(b) = s·√(1/n + x̄²/Sxx) with s = √(SSE/(n − 2)), as LINEST's
+ *   statistics give it, so it takes 3 points or more. Three or four standards scatter a lot (3 SE
+ *   would warn about one correct blank-corrected calibration in five);
+ * - and big enough to matter: more than 2 % of the measured y span. Rounded readings that happen
+ *   to lie exactly on a line (0,052; 0,103; 0,154) have an SE(b) of rounding noise (4E-17), which
+ *   says nothing about a b of 0,001; points exactly on y = 2x + 1 contradict b₀ = 0 all the same.
+ * Returns the free line's intercept b, its R² and SE(b) for the warning; null when there is nothing
+ * to warn about, too few points, or no line with a fixed intercept.
+ */
+export function interceptConflict(fit: Fit): { b: number; r2: number; se: number } | null {
+  const b0 = fit.intercept;
+  if (fit.type !== "linear" || b0 === null || b0 === undefined || !Number.isFinite(b0)) return null;
+  const xs = fit.xs ?? [];
+  const ys = fit.ys ?? [];
+  const n = Math.min(xs.length, ys.length);
+  if (n < 3) return null;
+  const free = lineCore(xs.slice(0, n), ys.slice(0, n), null);
+  if ("error" in free) return null;
+  const mx = mean(xs.slice(0, n));
+  let sxx = 0;
+  let sse = 0;
+  let size = Math.abs(b0);
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  for (let i = 0; i < n; i++) {
+    sxx += (xs[i] - mx) ** 2;
+    const e = ys[i] - (free.m * xs[i] + free.b);
+    sse += e * e;
+    size = Math.max(size, Math.abs(ys[i]));
+    yMin = Math.min(yMin, ys[i]);
+    yMax = Math.max(yMax, ys[i]);
+  }
+  const se = Math.sqrt(sse / (n - 2)) * Math.sqrt(1 / n + (mx * mx) / sxx);
+  const off = Math.abs(free.b - b0);
+  if (!Number.isFinite(se) || !Number.isFinite(off)) return null;
+  const t = Math.max(3, T99[n - 3] ?? 0);
+  // (All y equal: no span, but a b₀ beside them is still off by more than rounding noise.)
+  return off > t * se && off > 0.02 * (yMax - yMin) && off > 1e-9 * size ? { b: free.b, r2: free.r2, se } : null;
 }
 
 // ----------------------------------------------------------------------------------------------

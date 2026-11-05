@@ -73,13 +73,14 @@ export function Field({ label, htmlFor, hint, error, action, children }: { label
   );
 }
 
-/** An on/off switch with its label, the whole row tappable. */
-export function Toggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+/** An on/off switch with its label, the whole row tappable. `describedBy`: the id of a hint under it, read out with the switch. */
+export function Toggle({ label, checked, onChange, disabled, describedBy }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; describedBy?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-describedby={describedBy}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className="flex min-h-8 w-full items-center gap-3 rounded-lg text-left text-[13px] text-ink-2 disabled:opacity-50 [@media(hover:none)]:min-h-10"
@@ -138,6 +139,7 @@ export function NumberField({
   max,
   integer,
   className,
+  describedBy,
 }: {
   id?: string;
   value: number | null;
@@ -150,6 +152,8 @@ export function NumberField({
   max?: number;
   integer?: boolean;
   className?: string;
+  /** The id of a note about the value (a warning), read out with the field. */
+  describedBy?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = value === null || !Number.isFinite(value) ? "" : formatSignificant(value, locale, 10);
@@ -171,6 +175,7 @@ export function NumberField({
       id={id}
       aria-label={label}
       aria-invalid={bad || undefined}
+      aria-describedby={describedBy}
       inputMode="decimal"
       value={draft ?? shown}
       placeholder={placeholder}

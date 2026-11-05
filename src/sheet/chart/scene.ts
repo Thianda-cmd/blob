@@ -14,7 +14,8 @@ import type { AxisSpec, ChartSpec, NumberFormat, SeriesSpec, SheetColor, Trendli
 import { axisFraction, linearAxis, logAxis, logTickLabel, logTicksScientific, type AxisScale } from "./axis";
 import type { ChartData, ChartPoint, ChartSeriesData } from "./data";
 import { formatChartNumber, formatFixed, isDateFormat } from "./format";
-import { equationParts, equationText, isFitError, r2Text, type EqPart, type Fit } from "./regression";
+import { zeroLabel } from "./probe";
+import { equationParts, equationText, isFitError, r2Text, zeroCrossings, type EqPart, type Fit } from "./regression";
 import { linePath, smoothPath, type Pt } from "./smooth";
 
 // ----------------------------------------------------------------------------------------------
@@ -369,7 +370,7 @@ function withFont(nodes: SvgNode[], fontFamily: string | undefined, pal: Palette
   return [{ tag: "g", attrs: { fontFamily, fill: pal.ink }, children: nodes }];
 }
 
-/** What the label says after the kind and title: how many series, each trendline with its equation and R². */
+/** What the label says after the kind and title: how many series, each trendline with its equation and R² (and where it crosses 0 when the chart shows that). */
 function ariaDetails(ctx: Ctx): string {
   const { t, data, spec, locale } = ctx;
   const n = spec.kind === "pie" ? Math.min(1, data.series.length) : data.series.length;
@@ -377,16 +378,21 @@ function ariaDetails(ctx: Ctx): string {
   data.series.forEach((s, i) => {
     const tl = spec.series[i]?.trendline;
     if (!tl || !s.fit || isFitError(s.fit) || spec.kind === "pie") return;
+    const zero = tl.showZero ? zeroText(ctx, s.fit, tl) : null;
     if (s.fit.type === "movingAverage") {
-      parts.push(`${t.ariaTrend} ${trendlineName(tl, s.name, locale)}`);
+      parts.push(`${t.ariaTrend} ${trendlineName(tl, s.name, locale)}${zero ? `, ${zero}` : ""}`);
       return;
     }
     let piece = `${t.ariaTrend} ${equationText(s.fit, locale)}`;
     if (s.fit.r2 !== null) piece += `, ${r2Text(s.fit.r2, locale)}`;
+    if (zero) piece += `, ${zero}`;
     parts.push(piece);
   });
   return parts.join(", ");
 }
+
+/** Where a trendline crosses y = 0 as its label on the chart writes it ("Nullstelle: x = 0,37033 mol/L"); null when it doesn't. */
+const zeroText = (ctx: Ctx, fit: Fit, tl: TrendlineSpec) => zeroLabel(fit, tl, ctx.locale, ctx.data.xFormat, ctx.spec.kind === "scatter" ? ctx.spec.xAxis.title : "");
 
 function emptyState(ctx: Ctx, frame: Box): SvgNode[] {
   const { pal, fs, t } = ctx;
@@ -1009,6 +1015,8 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
 
   // Trendlines.
   const trends: TrendDraw[] = [];
+  // With "Nullstelle im Diagramm anzeigen": a small ring on the line where it crosses y = 0.
+  const zeroRings: SvgNode[] = [];
   for (const { s, fit, tl, x0, x1 } of trendExt) {
     // Fit x → screen: scatter x as is; category charts count 1, 2, 3 … (category index + 1).
     const toScreen = (x: number, y: number): Pt | null => {
@@ -1040,6 +1048,16 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
       }
     }
     trends.push({ s, fit, tl, samples });
+    if (tl.showZero) {
+      // Only on the line as drawn (a line's zero beyond it is in the label only) and in the plot.
+      const tol = 1e-9 * Math.max(Math.abs(x1 - x0), Math.abs(x0), Math.abs(x1));
+      for (const zx of zeroCrossings(fit, x0, x1)) {
+        const pt = zx >= x0 - tol && zx <= x1 + tol ? toScreen(zx, 0) : null;
+        if (!pt || pt.x < P.x - 0.5 || pt.x > P.x + P.w + 0.5 || pt.y < P.y - 0.5 || pt.y > P.y + P.h + 0.5) continue;
+        const dimmed = ctx.selected && ctx.selected !== s.id ? 0.28 : undefined;
+        zeroRings.push({ tag: "circle", attrs: { cx: rnd(pt.x), cy: rnd(pt.y), r: rnd(Math.max(3, fs * 0.3)), fill: pal.bg, stroke: pal.trend(s.color), strokeWidth: rnd(Math.max(1.5, fs * 0.13)), opacity: dimmed } });
+      }
+    }
   }
   const trendNodes: SvgNode[] = trends.map(({ s, samples }) => {
     const runs: Pt[][] = [[]];
@@ -1058,7 +1076,10 @@ function cartesianScene(ctx: Ctx, area: Box): { nodes: SvgNode[]; plot: Box; hit
     };
   });
 
-  nodes.push(...trendNodes.filter((n) => n.attrs?.d), ...seriesNodes, ...labelNodes);
+  nodes.push(...trendNodes.filter((n) => n.attrs?.d));
+  // Like the points: inside the plot's padded clip, under the data's own markers.
+  if (zeroRings.length) nodes.push({ tag: "g", attrs: { clipPath: `url(#${clipId})` }, children: zeroRings });
+  nodes.push(...seriesNodes, ...labelNodes);
   nodes.push(...equationBoxes(ctx, P, trends, pointsOnScreen));
   // A log axis with nothing above 0 to show says why the chart is empty (Excel warns too).
   const empty = logSkipped > 0 && drawable === 0;
@@ -1143,7 +1164,41 @@ export function wrapEquation(parts: EqPart[], maxW: number, size: number): { par
   return lines;
 }
 
-/** Equation and R² labels, stacked in the corner of the plot with the least data under it. */
+/**
+ * A list after a label ("Nullstellen: x = 0,1; 0,5; 0,9") in lines no wider than `maxW`, broken
+ * after "; ", the lines after the first lined up after "= ". `weight`: as textWidth measures it.
+ */
+export function wrapList(s: string, maxW: number, size: number, weight = 400): { parts: EqPart[]; indent: number }[] {
+  if (textWidth(s, size, weight) <= maxW) return [{ parts: [{ text: s }], indent: 0 }];
+  const items = s.split("; ");
+  const indent = Math.min(textWidth(s.slice(0, s.indexOf("= ") + 2), size, weight), maxW / 2);
+  const lines: { parts: EqPart[]; indent: number }[] = [];
+  let line = items[0];
+  for (const item of items.slice(1)) {
+    if (textWidth(`${line}; ${item}`, size, weight) > (lines.length ? maxW - indent : maxW)) {
+      lines.push({ parts: [{ text: `${line};` }], indent: lines.length ? indent : 0 });
+      line = item;
+    } else line = `${line}; ${item}`;
+  }
+  lines.push({ parts: [{ text: line }], indent: lines.length ? indent : 0 });
+  return lines;
+}
+
+/**
+ * Where a trendline crosses 0 as its label writes it ("Nullstelle: x = 0,37033 mol/L", zeroLabel)
+ * in lines no wider than `maxW` (wrapList); `split`: the words before ": " on a line of their own
+ * ("Nullstelle:", then "x = 0,37033 mol/L"), a box no wider than the equation over it.
+ */
+export function wrapZero(s: string, maxW: number, size: number, split = false, weight = 400): { parts: EqPart[]; indent: number }[] {
+  const cut = s.indexOf(": ");
+  if (!split || cut < 0) return wrapList(s, maxW, size, weight);
+  return [{ parts: [{ text: s.slice(0, cut + 1) }], indent: 0 }, ...wrapList(s.slice(cut + 2), maxW, size, weight)];
+}
+
+/**
+ * Equation and R² labels (and where the line crosses 0, when asked), stacked in the corner of the
+ * plot with the least data under it.
+ */
 function equationBoxes(ctx: Ctx, P: Box, trends: TrendDraw[], points: Pt[]): SvgNode[] {
   const { fs, pal, locale } = ctx;
   const size = Math.round(fs * 0.92 * 10) / 10;
@@ -1152,43 +1207,74 @@ function equationBoxes(ctx: Ctx, P: Box, trends: TrendDraw[], points: Pt[]): Svg
   const padY = size * 0.42;
   const blockGap = size * 0.35;
   const inset = Math.max(4, fs * 0.5);
-  type Line = { parts: EqPart[]; color: string; indent: number };
-  const blocks: Line[][] = [];
-  for (const { s, fit, tl } of trends) {
-    if (fit.type === "movingAverage") continue;
-    const lines: Line[] = [];
-    const color = pal.trend(s.color);
-    if (tl.showEquation) for (const l of wrapEquation(equationParts(fit, locale), P.w - 2 * (inset + padX), size)) lines.push({ ...l, color });
-    if (tl.showR2 && fit.r2 !== null) lines.push({ parts: [{ text: r2Text(fit.r2, locale) }], color, indent: 0 });
-    if (lines.length) blocks.push(lines);
-  }
-  if (!blocks.length) return [];
-  const lines = blocks.flat();
-  const w = Math.min(P.w, Math.max(...lines.map((l) => l.indent + partsWidth(l.parts, size))) + 2 * padX);
-  const h = lines.length * lh + (blocks.length - 1) * blockGap + 2 * padY;
-  if (h > P.h + 4) return [];
-  const corners = {
-    tl: { x: P.x + inset, y: P.y + inset },
-    tr: { x: P.x + P.w - inset - w, y: P.y + inset },
-    br: { x: P.x + P.w - inset - w, y: P.y + P.h - inset - h },
-    bl: { x: P.x + inset, y: P.y + P.h - inset - h },
+  const maxW = P.w - 2 * (inset + padX);
+  // `w`: the line's width where partsWidth's estimate isn't enough.
+  type Line = { parts: EqPart[]; color: string; indent: number; w?: number };
+  const zeros = trends.map(({ fit, tl }) => (tl.showZero ? zeroText(ctx, fit, tl) : null));
+  /**
+   * A block of lines per trendline: its equation and R², and where it crosses 0 (`zero`): "line"
+   * on as few lines as fit, "split" with "Nullstelle:" on a line of its own, "none" left out.
+   */
+  const blocksWith = (zero: "line" | "split" | "none"): Line[][] => {
+    const blocks: Line[][] = [];
+    trends.forEach(({ s, fit, tl }, i) => {
+      const lines: Line[] = [];
+      const color = pal.trend(s.color);
+      // A moving average has no equation or R², but may cross 0.
+      if (fit.type !== "movingAverage") {
+        if (tl.showEquation) for (const l of wrapEquation(equationParts(fit, locale), maxW, size)) lines.push({ ...l, color });
+        if (tl.showR2 && fit.r2 !== null) lines.push({ parts: [{ text: r2Text(fit.r2, locale) }], color, indent: 0 });
+      }
+      // Mostly letters, which run about 5 % wider at the label's weight (500) than textWidth's
+      // averages (digits don't): measured as semibold, so the text keeps the box's padding.
+      const text = zero === "none" ? null : zeros[i];
+      if (text) for (const l of wrapZero(text, maxW, size, zero === "split", 600)) lines.push({ ...l, color, w: textWidth(l.parts[0].text, size, 600) });
+      if (lines.length) blocks.push(lines);
+    });
+    return blocks;
   };
   // Prefer the empty corner: rising lines leave the top left free, falling ones the top right.
   const firstLine = trends[0]?.samples.filter((p) => !Number.isNaN(p.x)) ?? [];
   const rising = firstLine.length > 1 ? firstLine[firstLine.length - 1].y < firstLine[0].y : true;
-  const order: (keyof typeof corners)[] = rising ? ["tl", "tr", "br", "bl"] : ["tr", "tl", "bl", "br"];
+  const order = rising ? (["tl", "tr", "br", "bl"] as const) : (["tr", "tl", "bl", "br"] as const);
   const obstacles = [...points, ...trends.flatMap((tr) => tr.samples.filter((_, i) => i % 4 === 0))];
-  const score = (c: { x: number; y: number }) => obstacles.filter((p) => p.x >= c.x - 4 && p.x <= c.x + w + 4 && p.y >= c.y - 4 && p.y <= c.y + h + 4).length;
-  let best = order[0];
-  let bestScore = Infinity;
-  for (const k of order) {
-    const sc = score(corners[k]);
-    if (sc < bestScore) {
-      bestScore = sc;
-      best = k;
+  /** The box for these blocks in the corner with the least under it (`score`: how much); null when it is taller than the plot. */
+  const place = (blocks: Line[][]) => {
+    if (!blocks.length) return null;
+    const lines = blocks.flat();
+    const w = Math.min(P.w, Math.max(...lines.map((l) => l.indent + (l.w ?? partsWidth(l.parts, size)))) + 2 * padX);
+    const h = lines.length * lh + (blocks.length - 1) * blockGap + 2 * padY;
+    if (h > P.h + 4) return null;
+    const corners = {
+      tl: { x: P.x + inset, y: P.y + inset },
+      tr: { x: P.x + P.w - inset - w, y: P.y + inset },
+      br: { x: P.x + P.w - inset - w, y: P.y + P.h - inset - h },
+      bl: { x: P.x + inset, y: P.y + P.h - inset - h },
+    };
+    const covered = (c: { x: number; y: number }) => obstacles.filter((p) => p.x >= c.x - 4 && p.x <= c.x + w + 4 && p.y >= c.y - 4 && p.y <= c.y + h + 4).length;
+    let at = corners[order[0]];
+    let score = Infinity;
+    for (const k of order) {
+      const sc = covered(corners[k]);
+      if (sc < score) {
+        score = sc;
+        at = corners[k];
+      }
     }
+    return { blocks, w, h, at, score };
+  };
+  // The zero crossing on one line where a corner has room for that; else "Nullstelle:" on a line
+  // of its own when that narrower box covers less (a small chart, the panel's copy on a phone).
+  // Too tall for the plot with it (two trendlines on a small chart): the equations and R² still
+  // show, without it (its ring is on the line), rather than no label at all.
+  let label = place(blocksWith("line"));
+  if (label && label.score > 0 && zeros.some(Boolean)) {
+    const split = place(blocksWith("split"));
+    if (split && split.score < label.score) label = split;
   }
-  const at = corners[best];
+  label ??= place(blocksWith("none"));
+  if (!label) return [];
+  const { blocks, w, h, at } = label;
   const out: SvgNode[] = [{ tag: "rect", attrs: { x: rnd(at.x), y: rnd(at.y), width: rnd(w), height: rnd(h), rx: 6, fill: pal.bg, fillOpacity: 0.92, stroke: pal.grid, strokeWidth: 1 } }];
   let y = at.y + padY;
   blocks.forEach((block, bi) => {

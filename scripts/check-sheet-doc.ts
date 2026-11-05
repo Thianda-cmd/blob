@@ -77,7 +77,7 @@ import { copyTies, mergeWorkbooks, ownVersion, sameJson, tiedCopy } from "@/shee
 import { cutText, isBlankWorkbook, isUnreadableWorkbook, newWorkbook, normalizeWorkbook, previewLook, readSheetPreview, storable, storableWork, workbookPlainText, workbookPreview } from "@/sheet/doc";
 import { createCalc } from "@/sheet/engine";
 import { deleteRows, deleteSheet, insertRows, setCells } from "@/sheet/ops";
-import { MAX_COLS, MAX_ROWS, type Cell, type ChartSpec, type SeriesSpec, type Sheet, type TableSpec, type Workbook } from "@/sheet/types";
+import { MAX_COLS, MAX_ROWS, type Cell, type ChartSpec, type SeriesSpec, type Sheet, type TableSpec, type TrendlineSpec, type Workbook } from "@/sheet/types";
 
 let passed = 0;
 const problems: string[] = [];
@@ -259,6 +259,7 @@ function validate(wb: unknown): string[] {
         const t = s.trendline as Record<string, unknown>;
         if (!isObj(t) || !["linear", "polynomial", "exponential", "logarithmic", "power", "movingAverage"].includes(t.type as string) || !isInt(t.order, 2, 6) || !isInt(t.period, 2, 100000)) bad("trendline");
         else if ((t.intercept !== null && typeof t.intercept !== "number") || typeof t.showEquation !== "boolean" || typeof t.showR2 !== "boolean" || typeof t.forward !== "number" || typeof t.backward !== "number" || typeof t.name !== "string") bad("trendline fields");
+        else if ("showZero" in t && typeof t.showZero !== "boolean") bad("trendline showZero");
       }
       if (s.errorBars !== null) {
         const e = s.errorBars as Record<string, unknown>;
@@ -505,6 +506,31 @@ section("repairs", () => {
   times.sheets[0].cells["21,0"] = { v: 1.5, s: { fmt: { kind: "time", seconds: true, duration: "yes" } } };
   const read = normalizeWorkbook(clone(times), "de").sheets[0].cells;
   check("duration kept when read again", sameJson([read["20,0"]?.s?.fmt, read["21,0"]?.s?.fmt], [{ kind: "time", seconds: false, duration: true }, { kind: "time", seconds: true }]), [read["20,0"], read["21,0"]]);
+});
+
+section("trendline: the zero crossing on the chart (showZero, optional)", () => {
+  const base = labWorkbook();
+  const c0 = base.charts[0];
+  const s = c0.series[0];
+  const withZero = (showZero: unknown): Workbook => ({ ...base, charts: [{ ...c0, series: [{ ...s, trendline: { ...s.trendline!, showZero } as TrendlineSpec }] }] });
+  check("older content without it: valid, stays the same object", !("showZero" in s.trendline!) && normalizeWorkbook(base, "de") === base);
+  for (const v of [true, false]) {
+    const wb = withZero(v);
+    const n = normalizeWorkbook(wb, "de");
+    check(`showZero ${v}: valid, kept, the same object`, validate(wb).length === 0 && n === wb && n.charts[0].series[0].trendline?.showZero === v, n.charts[0].series[0].trendline);
+    check(`showZero ${v}: survives JSON`, sameJson(normalizeWorkbook(clone(wb), "de"), wb));
+  }
+  for (const v of ["yes", 1, null, { on: true }]) {
+    const n = normalizeWorkbook(clone(withZero(v)), "de");
+    const tl = n.charts[0].series[0].trendline;
+    check(`showZero ${JSON.stringify(v)}: left out, the rest kept`, validate(n).length === 0 && !!tl && !("showZero" in tl) && sameJson({ ...tl, showZero: v }, withZero(v).charts[0].series[0].trendline), tl);
+  }
+  // Merging (a series field by field, its trendline as one): I show the zero, they change the colour.
+  const mine = withZero(true);
+  const theirs: Workbook = clone({ ...base, charts: [{ ...c0, series: [{ ...s, color: "red" }] }] });
+  const m = mergeWorkbooks(base, mine, theirs);
+  check("merge: showZero from me, the colour from them", m.charts[0].series[0].trendline?.showZero === true && m.charts[0].series[0].color === "red", m.charts[0].series[0]);
+  check("merge: …and the other way round", mergeWorkbooks(base, theirs, mine).charts[0].series[0].trendline?.showZero === true);
 });
 
 section("fuzz: random JSON never throws, always valid", () => {

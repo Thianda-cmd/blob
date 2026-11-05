@@ -2,14 +2,15 @@
 // trendline (solveForX), written the way a lab report needs it: the result, the formula and the
 // line that shows how it was worked out (with numbers that give that result on a calculator) and
 // where it lies against the standards. What the student typed is read here too, with a reason
-// when it isn't a number. Pure, so the check script tests it.
+// when it isn't a number. And the probe for y = 0 that needs no typing: where the trendline crosses
+// 0 ("Nullstelle"), as the panel and the chart's label write it. Pure, so the check script tests it.
 
 import type { Locale } from "@/i18n/config";
 import { sheetChartText } from "@/i18n/messages/sheetChart";
 import { formatValue } from "../engine/format";
-import type { NumberFormat } from "../types";
+import type { NumberFormat, TrendlineSpec } from "../types";
 import { formatCoefficient, isDateFormat, parseChartNumber } from "./format";
-import { aOutOfRange, lnOfA, type Fit } from "./regression";
+import { aOutOfRange, lnOfA, zeroCrossings, type Fit } from "./regression";
 
 /**
  * The date or time a result stands for, as the x column (`xFormat`) shows it; null without a date
@@ -172,4 +173,40 @@ export function probeAdvice(fit: Fit, range: "above" | "below" | "negative", loc
   const lo = fit.xMin ?? NaN;
   if (isDateFormat(xFormat)) return range === "above" ? t.probeAfter(probeResultText(hi, locale, xFormat)) : t.probeBefore(probeResultText(lo, locale, xFormat));
   return range === "above" ? t.probeAbove(formatCoefficient(hi, locale)) : range === "below" ? t.probeBelow(formatCoefficient(lo, locale)) : t.probeNegative;
+}
+
+/** At most this many zero crossings are written out; a curve that crosses 0 more often ends in "; …". */
+export const ZERO_MAX = 3;
+
+/**
+ * Where a trendline crosses y = 0 ("Nullstelle", zeroCrossings), as the panel and the chart's label
+ * write it: each x like a probe's result (probeResultText: 5 significant digits; with dates or times
+ * as x, the date or time as the x column shows it) with the unit in brackets at the end of the x
+ * axis's title (`xTitle`; none for dates and times, which say what they are): "0,37033 mol/L".
+ * `outside`: beyond the measured x range (probeRange), which the panel says. A polynomial's zeros
+ * are looked for where the trendline is drawn, its forecast (`tl`) included. `more`: it crosses 0
+ * more than ZERO_MAX times.
+ */
+export function trendZeros(fit: Fit, tl: Pick<TrendlineSpec, "forward" | "backward">, locale: Locale, xFormat?: NumberFormat | null, xTitle = ""): { zeros: { x: number; text: string; outside: boolean }[]; more: boolean } {
+  const lo = fit.xMin ?? -Infinity;
+  const hi = fit.xMax ?? Infinity;
+  // Moving averages have no forecast (like the drawn trendline: scene.ts trendSpan).
+  const forecast = fit.type !== "movingAverage";
+  const back = forecast ? Math.max(0, tl.backward || 0) : 0;
+  const ahead = forecast ? Math.max(0, tl.forward || 0) : 0;
+  const all = zeroCrossings(fit, lo - back, hi + ahead, ZERO_MAX + 1);
+  const unit = isDateFormat(xFormat) ? null : titleUnit(xTitle);
+  const zeros = all.slice(0, ZERO_MAX).map((x) => ({ x, text: unit ? `${probeResultText(x, locale, xFormat)} ${unit}` : probeResultText(x, locale, xFormat), outside: probeRange(fit, x) !== null }));
+  return { zeros, more: all.length > ZERO_MAX };
+}
+
+/**
+ * The line "Nullstelle im Diagramm anzeigen" adds to the trendline's label on the chart (and to the
+ * chart's lines in a note's export): "Nullstelle: x = 0,37033 mol/L", several joined with "; ".
+ * null when the trendline doesn't cross 0.
+ */
+export function zeroLabel(fit: Fit, tl: Pick<TrendlineSpec, "forward" | "backward">, locale: Locale, xFormat?: NumberFormat | null, xTitle = ""): string | null {
+  const { zeros, more } = trendZeros(fit, tl, locale, xFormat, xTitle);
+  if (!zeros.length) return null;
+  return sheetChartText[locale].zeroAt(zeros.length) + [...zeros.map((z) => z.text), ...(more ? ["…"] : [])].join("; ");
 }

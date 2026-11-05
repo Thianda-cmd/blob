@@ -112,14 +112,44 @@ export const sheetChartText = defineMessages({
     order: "Order",
     period: "Period",
     setIntercept: "Set intercept",
+    /**
+     * Under "Set intercept", on or off: what it does (it doesn't find where the line crosses the x
+     * axis, which a student may expect from the German "Schnittpunkt"), and where that is, when
+     * the panel shows a zero crossing above (`zero`).
+     */
+    interceptAbout: (zero: boolean) =>
+      `Sets the y value the line has at x = 0. Use it only if you know that value for sure, e.g. 0 for a calibration line with a blank.${zero ? " Where the line crosses the x axis is shown above, under “Zero crossing”." : ""}`,
+    /** The same for an exponential curve, which never crosses the x axis. */
+    interceptAboutExp: "Sets the value the curve has at x = 0. Use it only if you know that value for sure.",
     /** The field for the fixed intercept (b of a line, a of an exponential curve, c₀ of a polynomial: always y at x = 0). */
     interceptValue: "Intercept (y at x = 0)",
-    interceptHint: "e.g. 0 for a calibration line through the origin",
     interceptHintExp: "The value at x = 0 (a in y = a·e^(bx)), e.g. the starting OD. It must be above 0.",
     interceptIgnored: (v: string) => `An exponential trendline needs a fixed intercept above 0 (a in y = a·e^(bx)), so your ${v} doesn't apply here: Blob fits the curve to the points freely. For linear and polynomial trendlines it applies again.`,
     interceptNotHere: "Logarithmic and power trendlines can't have a fixed intercept (as in Excel).",
+    /**
+     * A line's fixed intercept that the measurements clearly don't go through (regression.ts
+     * interceptConflict): `b0` the fixed value, `b` and `r2` ("R² = 0.9413", null when there is
+     * none) of the line fitted freely.
+     */
+    interceptConflict: (b0: string, b: string, r2: string | null) =>
+      `Your measurements don't go through ${b0} at x = 0: without a fixed intercept, the line crosses the y axis at ${b}${r2 ? ` (${r2})` : ""}. Turn off “Set intercept” unless you know the value at x = 0 for sure.`,
+    /**
+     * Under the fixed intercept while it is used, one short sentence: Excel's R² of such a fit is
+     * worked out against y = b₀, not the mean (regression.ts), so it isn't the usual one.
+     */
+    r2Fixed: "With a fixed intercept, Blobxcel works out R² differently (as Excel does), so don't compare it with R² without one.",
+    /**
+     * Where the trendline crosses y = 0, before its x values ("Zero crossing: x = 0.37033 mol/L",
+     * several joined with "; "): in the panel under R², and on the chart with showZero.
+     */
+    zeroAt: (n: number): string => (n === 1 ? "Zero crossing: x = " : "Zero crossings: x = "),
+    /** After a zero crossing beyond the measured x values (in the panel). */
+    zeroOutside: "(outside your measurements)",
     showEquation: "Display equation on chart",
     showR2: "Display R-squared value on chart",
+    showZero: "Show zero crossing on chart",
+    /** Under that switch when the trendline doesn't cross y = 0 where it is drawn (the switch would show nothing). */
+    zeroNone: "This trendline doesn't reach y = 0 here.",
     forecast: "Forecast",
     forward: "Forward",
     backward: "Backward",
@@ -342,13 +372,22 @@ export const sheetChartText = defineMessages({
     order: "Grad",
     period: "Periode",
     setIntercept: "Schnittpunkt festlegen",
+    interceptAbout: (zero) =>
+      `Legt fest, welchen y-Wert die Linie bei x = 0 hat. Nur, wenn du ihn sicher kennst, z. B. 0 bei einer Kalibriergerade mit Blindwert.${zero ? " Wo die Linie die x-Achse schneidet, steht oben bei „Nullstelle“." : ""}`,
+    interceptAboutExp: "Legt fest, welchen Wert die Kurve bei x = 0 hat. Nur, wenn du ihn sicher kennst.",
     interceptValue: "y-Achsenabschnitt (y bei x = 0)",
-    interceptHint: "z. B. 0 für eine Kalibriergerade durch den Ursprung",
     interceptHintExp: "Der Wert bei x = 0 (a in y = a·e^(bx)), z. B. die Start-OD. Er muss über 0 liegen.",
     interceptIgnored: (v) => `Bei einer exponentiellen Trendlinie muss ein fester Schnittpunkt über 0 liegen (a in y = a·e^(bx)). Dein Wert ${v} gilt hier also nicht: Blob passt die Kurve frei an die Punkte an. Bei einer linearen oder Polynom-Trendlinie gilt er wieder.`,
     interceptNotHere: "Logarithmische und Potenz-Trendlinien haben keinen festen Schnittpunkt (wie in Excel).",
+    interceptConflict: (b0, b, r2) =>
+      `Deine Messwerte gehen bei x = 0 nicht durch ${b0}: Ohne festen Schnittpunkt schneidet die Linie die y-Achse bei ${b}${r2 ? ` (${r2})` : ""}. Schalte „Schnittpunkt festlegen“ aus, wenn du den Wert bei x = 0 nicht sicher kennst.`,
+    r2Fixed: "Mit festem Schnittpunkt rechnet Blobxcel R² wie Excel anders aus: Vergleiche es nicht mit dem R² ohne festen Schnittpunkt.",
+    zeroAt: (n) => (n === 1 ? "Nullstelle: x = " : "Nullstellen: x = "),
+    zeroOutside: "(außerhalb deiner Messwerte)",
     showEquation: "Formel im Diagramm anzeigen",
     showR2: "Bestimmtheitsmaß (R²) im Diagramm anzeigen",
+    showZero: "Nullstelle im Diagramm anzeigen",
+    zeroNone: "Diese Trendlinie erreicht y = 0 hier nicht.",
     forecast: "Prognose",
     forward: "Vorwärts",
     backward: "Rückwärts",

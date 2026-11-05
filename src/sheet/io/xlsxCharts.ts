@@ -119,6 +119,7 @@ function trendlineXml(tl: TrendlineSpec, color: string, labelFormat: string): st
     // An exponential curve's a has to be above 0 (Blob fits it freely otherwise, see regression.ts):
     // a 0 left over from "through the origin" would give Excel a curve it can't draw.
     if (tl.intercept !== null && Number.isFinite(tl.intercept) && (tl.type === "linear" || tl.type === "polynomial" || (tl.type === "exponential" && tl.intercept > 0))) x += `<c:intercept val="${tl.intercept}"/>`;
+    // Excel's label has the equation and R² only: Blob's zero crossing (showZero) is left out.
     x += `<c:dispRSqr val="${tl.showR2 ? 1 : 0}"/><c:dispEq val="${tl.showEquation ? 1 : 0}"/>`;
     if (tl.showR2 || tl.showEquation) x += `<c:trendlineLbl><c:numFmt formatCode="${escAttr(labelFormat)}" sourceLinked="0"/></c:trendlineLbl>`;
   }
@@ -400,6 +401,7 @@ export function chartFromXml(
         intercept: numAttr(child(tl, "intercept"), "val") ?? null,
         showEquation: boolAttr(child(tl, "dispEq"), "val"),
         showR2: boolAttr(child(tl, "dispRSqr"), "val"),
+        // No showZero: Excel has no such label, so it is off.
         forward: numAttr(child(tl, "forward"), "val") ?? 0,
         backward: numAttr(child(tl, "backward"), "val") ?? 0,
         name: textOf(child(tl, "name")).trim(),

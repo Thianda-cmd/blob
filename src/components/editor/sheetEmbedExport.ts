@@ -15,10 +15,10 @@ import { privateSheets, setSheetLocale } from "./blocks/sheetEmbedData";
 //   Word      a chart → its picture (PNG); a table or cells → a real Word table
 //   Markdown  a chart → "[Diagramm: Titel](link)"; a table or cells → a Markdown table
 //   text      the same as Markdown
-// A chart with a trendline also gets a line per series with its equation and R², as the chart
-// shows them ("Standards: y = 0,0519x + 0,0015 · R² = 0,99997"), so the result of a calibration
-// can be copied from any export. The caption comes under it all. PDF needs nothing: it prints
-// the note as it is on screen.
+// A chart with a trendline also gets a line per series with its equation and R² (and where it
+// crosses 0, when the chart shows that), as the chart shows them ("Standards: y = 0,0519x + 0,0015
+// · R² = 0,99997"), so the result of a calibration can be copied from any export. The caption
+// comes under it all. PDF needs nothing: it prints the note as it is on screen.
 //
 // Charts, tables and the calculation load only with an export that has such a block.
 
@@ -29,14 +29,15 @@ type Shown =
 
 /** What reading an embed needs: the chart's data and picture, its fits, the table, the calculation. */
 const loadKit = async () => {
-  const [data, picture, regression, embed, calc] = await Promise.all([
+  const [data, picture, regression, probe, embed, calc] = await Promise.all([
     import("@/sheet/chart/data"),
     import("@/sheet/chart/export"),
     import("@/sheet/chart/regression"),
+    import("@/sheet/chart/probe"),
     import("@/sheet/embed"),
     import("./blocks/sheetEmbedCalc"),
   ]);
-  return { chartData: data.chartData, chartPng: picture.chartPng, ...regression, ...embed, calcOf: calc.calcOf };
+  return { chartData: data.chartData, chartPng: picture.chartPng, ...regression, zeroLabel: probe.zeroLabel, ...embed, calcOf: calc.calcOf };
 };
 type Kit = Awaited<ReturnType<typeof loadKit>>;
 
@@ -91,12 +92,19 @@ function shown(kit: Kit, pageId: string, item: SheetEmbedItem, wb: Workbook, she
       } catch {
         // Exported as a link only (the picture can't be drawn either).
       }
-      // Each trendline's equation and R², as the chart's label writes them (the same formatter).
+      // Each trendline's equation, R² and zero crossing, as the chart's label writes them (the same
+      // formatters). A moving average has no equation or R², but may cross 0.
       const trends: string[] = [];
+      const xFormat = data?.xFormat;
       for (const s of data?.series ?? []) {
         const tl = spec.series.find((x) => x.id === s.id)?.trendline;
-        if (!tl || !s.fit || kit.isFitError(s.fit) || s.fit.type === "movingAverage") continue;
-        const parts = [tl.showEquation ? kit.equationText(s.fit, locale) : null, tl.showR2 && s.fit.r2 !== null ? kit.r2Text(s.fit.r2, locale) : null].filter(Boolean);
+        if (!tl || !s.fit || kit.isFitError(s.fit)) continue;
+        const line = s.fit.type !== "movingAverage";
+        const parts = [
+          line && tl.showEquation ? kit.equationText(s.fit, locale) : null,
+          line && tl.showR2 && s.fit.r2 !== null ? kit.r2Text(s.fit.r2, locale) : null,
+          tl.showZero ? kit.zeroLabel(s.fit, tl, locale, xFormat, spec.kind === "scatter" ? spec.xAxis.title : "") : null,
+        ].filter(Boolean);
         if (parts.length) trends.push(`${s.name}: ${parts.join(" · ")}`);
       }
       return {

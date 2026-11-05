@@ -200,6 +200,11 @@ export type TrendlineSpec = {
   intercept: number | null;
   showEquation: boolean;
   showR2: boolean;
+  /**
+   * Also write where the trendline crosses y = 0 ("Nullstelle") on the chart, under the equation
+   * and R². Missing (older workbooks, .xlsx files, which have no such label): off.
+   */
+  showZero?: boolean;
   /** Extend the line beyond the data, in x units (forward = to the right). */
   forward: number;
   backward: number;

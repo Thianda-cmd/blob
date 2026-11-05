@@ -664,6 +664,8 @@ function normTrend(x: unknown): TrendlineSpec | null {
     intercept: finite(x.intercept) ? x.intercept : null,
     showEquation: x.showEquation === true,
     showR2: x.showR2 === true,
+    // Optional: kept when it is a boolean, left out otherwise (older content has none).
+    ...(typeof x.showZero === "boolean" ? { showZero: x.showZero } : {}),
     forward: finite(x.forward) ? Math.max(0, x.forward) : 0,
     backward: finite(x.backward) ? Math.max(0, x.backward) : 0,
     name: text(x.name, MAX_NAME),
