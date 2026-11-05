@@ -10,7 +10,7 @@ import { CopyField } from "@/components/oauth/Copy";
 import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { developersText } from "@/i18n/messages/developers";
 import { getMessages } from "@/i18n/server";
-import { dataEndpoint, endpoints, issuer, SCOPES } from "@/lib/oauth/config";
+import { currentIssuer, dataEndpoint, endpoints, SCOPES } from "@/lib/oauth/config";
 import { authorizeExample, curlExchange, sdkFullExample, sdkQuickStart, tokenResponse } from "@/lib/oauth/snippets";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,7 +28,8 @@ const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_en
 /** Public docs for "Sign in with Blob" (linked from the discovery document's service_documentation). */
 export default async function DevelopersPage() {
   const t = await getMessages(developersText);
-  const iss = issuer();
+  // The address this Blob is reached at (as the discovery document says), not a fallback.
+  const iss = await currentIssuer();
   const urls = { ...endpoints(iss), blob_data_endpoint: dataEndpoint(iss) };
   const discovery = `${iss}/.well-known/openid-configuration`;
   const vars = { issuer: iss, clientId: "YOUR_CLIENT_ID", redirectUri: t.example.redirect };

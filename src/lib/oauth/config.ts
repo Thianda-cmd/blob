@@ -18,7 +18,12 @@ export const ID_TOKEN_TTL = 60 * 60;
 export const REFRESH_TOKEN_TTL = 60 * 60 * 24 * 30; // 30 days, renewed on every use
 export const CODE_TTL = 2 * 60;
 
-/** The public address of this Blob (the token issuer). Must not change once apps rely on it. */
+/**
+ * The public address of this Blob (the token issuer). Must not change once apps rely on it.
+ * Without a request there is no address to go by but the configured one, else
+ * http://localhost:3000: pages and server actions use currentIssuer() (the site's own pages
+ * showed localhost addresses on the live site that way).
+ */
 export function issuer(request?: Request): string {
   const configured = process.env.BLOB_ISSUER || process.env.NEXT_PUBLIC_SITE_URL;
   if (configured && !/localhost|127\.0\.0\.1/.test(configured)) return configured.replace(/\/+$/, "");
