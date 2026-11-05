@@ -41,21 +41,21 @@ permissions:
 
 env:
   RELEASE_BODY: |
-    Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, calendar, projects, CV and the learning centre.
+    Blob for desktop and Android: the app version of [blob.bojes.org](https://blob.bojes.org), with Blob, your notes, Blobxcel spreadsheets, calendar, projects, CV and the learning centre.
 
     **New in this version**
-    - **Handwritten notes**: a new kind of note to write and draw on with a pen (the S Pen, an Apple Pencil, any stylus), a finger or the mouse, like a paper notebook. Pens that follow your pressure (ballpoint, fountain pen, pencil, calligraphy pen), a highlighter that stays under the ink, an eraser for whole strokes or just a part, quick colours and your own.
-    - **Paper as in a notebook**: lined, narrow lines, squared, dotted, graph paper, Cornell notes and music staves, on white, cream, grey or dark paper, for one page or all of them. As many pages as you like, to reorder, duplicate or remove in the page overview.
-    - **Lasso, shapes, text and pictures**: circle what you wrote to move it, make it bigger, turn it, change its colour, copy or delete it. Hold the pen still at the end of a line, circle or box and it becomes a clean shape. Type text boxes and add pictures anywhere.
-    - **Feels like paper**: your hand can rest on the screen while you write, the S Pen's button erases while you hold it, two fingers tap to undo and three to redo, pinch to zoom and scroll with a finger. In the app, a stroke can start right at the edge of the screen without swiping back a page.
-    - **Everywhere you are**: saved as you write (on the device while you're offline), shared notes change live while others write, previews in your lists, and export as PDF or as a picture.
+    - **A new look**: every page now matches the calendar and Blobxcel. Calm pages on paper with clear cards, one violet button for making something new, Blob instead of empty dashed boxes, and the same header everywhere, in light and dark, on computers, tablets and phones.
+    - **Blobxcel, Blob's spreadsheets**: formulas like in Excel (in German or English), smart tables with filters and a totals row, charts with trendline, equation, R² and error bars, lab templates, Excel and CSV files in and out, and charts and cells that stay up to date inside your notes.
+    - **The zero crossing at a glance**: Blobxcel shows where your trendline crosses zero, with the working, and can put it on the chart. "Set intercept" now explains itself and warns you when your measurements don't go through that point.
+    - **Easier to find**: a "+" next to the search makes a note, a Blobxcel spreadsheet, handwriting or a presentation. Blobxcel has its own place in the sidebar, Notes has a tab for each kind of page, and the search finds "my spreadsheets".
+    - **Tablets and narrow windows** get a navigation rail, and shortcuts show "Ctrl" on Windows and Linux.
 
     **Neu in dieser Version**
-    - **Handschriftliche Notizen**: eine neue Art Notiz zum Schreiben und Zeichnen mit dem Stift (S Pen, Apple Pencil, jeder Eingabestift), dem Finger oder der Maus, wie in einem Heft. Stifte, die deinem Druck folgen (Kugelschreiber, Füller, Bleistift, Kalligrafiestift), ein Textmarker, der unter der Schrift bleibt, ein Radierer für ganze Striche oder nur ein Stück, schnelle Farben und deine eigenen.
-    - **Papier wie im Heft**: liniert, eng liniert, kariert, gepunktet, Millimeterpapier, Cornell-Notizen und Notenpapier, auf weißem, cremefarbenem, grauem oder dunklem Papier, für eine Seite oder alle. So viele Seiten, wie du willst, in der Seitenübersicht zum Umsortieren, Duplizieren oder Löschen.
-    - **Lasso, Formen, Text und Bilder**: Kreise ein, was du geschrieben hast, und verschiebe es, mach es größer, dreh es, ändere die Farbe, kopiere oder lösche es. Halt den Stift am Ende einer Linie, eines Kreises oder Rechtecks still, und es wird eine saubere Form. Tippe Textfelder und füge Bilder ein, wo du willst.
-    - **Fühlt sich an wie Papier**: Deine Hand darf beim Schreiben auf dem Bildschirm liegen, die Taste des S Pen radiert, solange du sie drückst, zwei Finger tippen rückgängig und drei wiederholen, zwei Finger zoomen und ein Finger scrollt. In der App kann ein Strich direkt am Bildschirmrand beginnen, ohne eine Seite zurückzuwischen.
-    - **Überall, wo du bist**: gespeichert, während du schreibst (offline auf dem Gerät), geteilte Notizen ändern sich live, während andere schreiben, Vorschauen in deinen Listen, und Export als PDF oder als Bild.
+    - **Ein neuer Look**: Jede Seite passt jetzt zum Kalender und zu Blobxcel. Ruhige Seiten auf Papier mit klaren Karten, ein violetter Knopf zum Anlegen, Blob statt leerer gestrichelter Kästen und überall dieselbe Kopfzeile, hell und dunkel, auf Computer, Tablet und Handy.
+    - **Blobxcel, Blobs Tabellen**: Formeln wie in Excel (auf Deutsch oder Englisch), intelligente Tabellen mit Filtern und Ergebniszeile, Diagramme mit Trendlinie, Gleichung, R² und Fehlerbalken, Laborvorlagen, Excel- und CSV-Dateien rein und raus, und Diagramme und Zellen, die in deinen Notizen aktuell bleiben.
+    - **Die Nullstelle auf einen Blick**: Blobxcel zeigt, wo deine Trendlinie die x-Achse schneidet, mit Rechenweg, auf Wunsch auch im Diagramm. „Schnittpunkt festlegen“ erklärt sich jetzt selbst und warnt dich, wenn deine Messwerte nicht durch diesen Punkt gehen.
+    - **Schneller gefunden**: Ein „+“ neben der Suche legt eine Notiz, eine Blobxcel-Tabelle, Handschrift oder eine Präsentation an. Blobxcel hat einen eigenen Platz in der Seitenleiste, die Notizen haben einen Reiter für jede Art von Seite, und die Suche findet „meine Tabellen“.
+    - **Tablets und schmale Fenster** bekommen eine Navigationsleiste, und Kürzel zeigen unter Windows und Linux „Strg“.
 
     **Install**
     - **Windows**: `Blob_…_x64-setup.exe` (or the `.msi`). Windows may warn that the publisher is unknown: *More info → Run anyway*.
