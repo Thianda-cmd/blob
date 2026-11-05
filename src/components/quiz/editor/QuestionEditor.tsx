@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { inputClass } from "@/components/ui/Input";
 import { Segmented } from "@/components/ui/Segmented";
+import { midTone } from "@/components/ui/surfaces";
+import { okFill } from "@/learn/components/tones";
 import type { QuizText } from "@/i18n/messages/quiz";
 import { cn } from "@/lib/utils";
 import { LIMITS, issuesOf, newId, type Choice, type Margin, type Question } from "@/quiz/model";
@@ -20,7 +22,8 @@ export function QuestionEditor({ question: q, index, onChange, userId, t }: { qu
   const set = (patch: Partial<Question>) => onChange({ ...q, ...patch });
   const issues = issuesOf(q);
   return (
-    <div className="mx-auto flex w-full max-w-[920px] flex-col gap-4">
+    // Its columns follow its own width, not the window's (the sidebar or the settings column can leave it narrow).
+    <div className="@container/question mx-auto flex w-full max-w-[920px] flex-col gap-4">
       <QuestionText key={q.id} value={q.text} index={index} onChange={(text) => set({ text })} t={t} />
       <ImageBlock image={q.image} onChange={(image) => set({ image })} userId={userId} t={t} />
       {(q.type === "quiz" || q.type === "poll" || q.type === "truefalse") && <ChoicesEditor q={q} onChange={onChange} t={t} />}
@@ -31,8 +34,8 @@ export function QuestionEditor({ question: q, index, onChange, userId, t }: { qu
         {issues.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap justify-center gap-2">
             {issues.map((i) => (
-              <span key={i} className="flex items-center gap-1.5 rounded-full bg-[#fff4e0] px-3 py-1 text-[12.5px] font-medium text-[#9a5b00] dark:bg-[#3a2a10] dark:text-[#f0b860]">
-                <TriangleAlert className="size-3.5" /> {t.editor.issues[i]}
+              <span key={i} className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium bg-[var(--sheet-yellow-fill)] text-[color-mix(in_srgb,var(--sheet-yellow)_55%,var(--ink))]">
+                <TriangleAlert className="size-3.5 text-[var(--sheet-yellow)]" /> {t.editor.issues[i]}
               </span>
             ))}
           </motion.div>
@@ -51,18 +54,18 @@ function QuestionText({ value, index, onChange, t }: { value: string; index: num
     el.style.height = `${el.scrollHeight}px`;
   }, [value]);
   return (
-    <div className="relative rounded-3xl bg-raised px-5 pb-4 pt-5 shadow-card">
-      <span className="absolute -top-3 left-5 rounded-full bg-blob px-2.5 py-0.5 text-[12px] font-bold text-white shadow-card">{index + 1}</span>
+    <div className="relative rounded-2xl bg-raised px-5 pb-4 pt-5 shadow-card">
+      <span className="absolute -top-3 left-5 rounded-full bg-blob px-2.5 py-0.5 text-[12px] font-bold text-white shadow-card dark:bg-blob-deep">{index + 1}</span>
       <textarea
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value.slice(0, LIMITS.text))}
         rows={1}
         placeholder={t.editor.questionPlaceholder}
-        className="w-full resize-none bg-transparent text-center font-display text-[clamp(20px,2.4vw,30px)] font-bold leading-snug tracking-[-0.01em] text-ink outline-none placeholder:text-ink-3/70"
+        className="w-full resize-none bg-transparent text-center font-display text-[clamp(20px,4.2cqw,30px)] font-bold leading-snug tracking-[-0.01em] text-ink outline-none placeholder:text-ink-3"
         aria-label={t.editor.questionPlaceholder}
       />
-      <span className="absolute bottom-2 right-4 text-[11px] tabular-nums text-ink-3">{LIMITS.text - value.length}</span>
+      <span className={cn("absolute bottom-2 right-4 text-[11px] tabular-nums", midTone)}>{LIMITS.text - value.length}</span>
     </div>
   );
 }
@@ -102,7 +105,7 @@ function ImageBlock({ image, onChange, userId, t }: { image: string | null; onCh
         setOver(false);
         void upload(e.dataTransfer.files[0]);
       }}
-      className={cn("group relative mx-auto flex w-full max-w-[560px] items-center justify-center overflow-hidden rounded-3xl transition-colors", image ? "bg-surface" : "aspect-[16/7] border-2 border-dashed", over ? "border-blob bg-blob-soft/60" : "border-line-2")}
+      className={cn("group relative mx-auto flex w-full max-w-[560px] items-center justify-center overflow-hidden rounded-2xl transition-colors", image ? "bg-surface" : "aspect-[16/7] border-2 border-dashed", over ? "border-blob bg-blob-soft/60" : "border-line-2")}
     >
       <input ref={input} type="file" accept={IMAGE_TYPES.join(",")} className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
       {image ? (
@@ -118,7 +121,7 @@ function ImageBlock({ image, onChange, userId, t }: { image: string | null; onCh
           </div>
         </>
       ) : (
-        <button type="button" onClick={() => input.current?.click()} className="flex size-full flex-col items-center justify-center gap-2 text-[13.5px] font-medium text-ink-3 hover:text-blob-ink">
+        <button type="button" onClick={() => input.current?.click()} className="flex size-full flex-col items-center justify-center gap-2 text-[13.5px] font-medium text-ink-2 hover:text-blob-ink">
           <ImagePlus className="size-7" />
           {busy ? t.editor.uploading : t.editor.addImage}
         </button>
@@ -138,7 +141,8 @@ function ChoicesEditor({ q, onChange, t }: { q: Question; onChange: (q: Question
   };
   return (
     <div className="flex flex-col gap-3">
-      <div className={cn("grid gap-3", q.choices.length > 4 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+      {/* Two answers side by side once each has room for its words, three when there are more than four. */}
+      <div className={cn("grid gap-3 @min-[520px]/question:grid-cols-2", q.choices.length > 4 && "@min-[720px]/question:grid-cols-3")}>
         <AnimatePresence initial={false}>
           {q.choices.map((c, i) => {
             const style = styleAt(i);
@@ -165,7 +169,7 @@ function ChoicesEditor({ q, onChange, t }: { q: Question; onChange: (q: Question
                   <button
                     type="button"
                     onClick={() => toggleRight(c.id)}
-                    className={cn("grid size-9 shrink-0 place-items-center rounded-full border-[3px] transition-all", c.correct ? "border-white bg-ok text-white" : "border-white/70 text-transparent hover:border-white hover:text-white/60")}
+                    className={cn("grid size-9 shrink-0 place-items-center rounded-full border-[3px] transition-all", c.correct ? cn("border-white", okFill) : "border-white/70 text-transparent hover:border-white hover:text-white/60")}
                     aria-pressed={c.correct}
                     aria-label={t.editor.markCorrect}
                     title={t.editor.markCorrect}
@@ -184,7 +188,7 @@ function ChoicesEditor({ q, onChange, t }: { q: Question; onChange: (q: Question
         </AnimatePresence>
       </div>
       {!fixed && q.choices.length < LIMITS.choices && (
-        <button type="button" onClick={() => onChange({ ...q, choices: [...q.choices, { id: newId(), text: "", correct: false }] })} className="mx-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ink-3 hover:bg-hover hover:text-ink">
+        <button type="button" onClick={() => onChange({ ...q, choices: [...q.choices, { id: newId(), text: "", correct: false }] })} className="mx-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:bg-hover hover:text-ink">
           <Plus className="size-4" /> {t.editor.addChoice}
         </button>
       )}
@@ -195,7 +199,7 @@ function ChoicesEditor({ q, onChange, t }: { q: Question; onChange: (q: Question
 function AcceptedEditor({ q, onChange, t }: { q: Question; onChange: (q: Question) => void; t: T }) {
   const list = q.accepted.length ? q.accepted : [""];
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-2 rounded-3xl bg-raised p-4 shadow-card">
+    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-2 rounded-2xl bg-raised p-4 shadow-card">
       <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
         <Check className="size-4 text-ok" strokeWidth={3} /> {t.editor.acceptedLabel}
       </span>
@@ -215,11 +219,11 @@ function AcceptedEditor({ q, onChange, t }: { q: Question; onChange: (q: Questio
         </div>
       ))}
       {list.length < LIMITS.accepted && (
-        <button type="button" onClick={() => onChange({ ...q, accepted: [...list, ""] })} className="flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-ink-3 hover:bg-hover hover:text-ink">
+        <button type="button" onClick={() => onChange({ ...q, accepted: [...list, ""] })} className="flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-ink-2 hover:bg-hover hover:text-ink">
           <Plus className="size-4" /> {t.editor.addChoice}
         </button>
       )}
-      <p className="flex items-start gap-1.5 text-[12px] text-ink-3">
+      <p className={cn("flex items-start gap-1.5 text-[12px]", midTone)}>
         <Lightbulb className="mt-px size-3.5 shrink-0" /> {t.editor.acceptedHint}
       </p>
     </div>
@@ -229,7 +233,7 @@ function AcceptedEditor({ q, onChange, t }: { q: Question; onChange: (q: Questio
 function PuzzleEditor({ q, onChange, t }: { q: Question; onChange: (q: Question) => void; t: T }) {
   return (
     <div className="mx-auto flex w-full max-w-[620px] flex-col gap-2">
-      <p className="flex items-start justify-center gap-1.5 text-center text-[12.5px] text-ink-3">
+      <p className={cn("flex items-start justify-center gap-1.5 text-center text-[12.5px]", midTone)}>
         <Lightbulb className="mt-px size-3.5 shrink-0" /> {t.editor.puzzleHint}
       </p>
       <SortableList
@@ -260,7 +264,7 @@ function PuzzleEditor({ q, onChange, t }: { q: Question; onChange: (q: Question)
         }}
       />
       {q.choices.length < LIMITS.choices && (
-        <button type="button" onClick={() => onChange({ ...q, choices: [...q.choices, { id: newId(), text: "", correct: true }] })} className="mx-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ink-3 hover:bg-hover hover:text-ink">
+        <button type="button" onClick={() => onChange({ ...q, choices: [...q.choices, { id: newId(), text: "", correct: true }] })} className="mx-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:bg-hover hover:text-ink">
           <Plus className="size-4" /> {t.editor.addChoice}
         </button>
       )}
@@ -290,8 +294,8 @@ function SliderEditor({ q, onChange, t }: { q: Question; onChange: (q: Question)
   );
   const share = (s.value - s.min) / (s.max - s.min || 1);
   return (
-    <div className="mx-auto flex w-full max-w-[620px] flex-col gap-4 rounded-3xl bg-raised p-4 shadow-card">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="mx-auto flex w-full max-w-[620px] flex-col gap-4 rounded-2xl bg-raised p-4 shadow-card">
+      <div className="grid grid-cols-2 gap-3 @min-[520px]/question:grid-cols-4">
         {num(t.editor.slider.min, s.min, "min")}
         {num(t.editor.slider.max, s.max, "max")}
         {num(t.editor.slider.step, s.step, "step")}
@@ -299,7 +303,7 @@ function SliderEditor({ q, onChange, t }: { q: Question; onChange: (q: Question)
       </div>
       <div className="relative h-4 rounded-full bg-line">
         <div className="absolute inset-y-0 left-0 rounded-full bg-blob/30" style={{ width: `${Math.max(0, Math.min(1, share)) * 100}%` }} />
-        <div className="absolute top-1/2 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-ok text-white shadow-card" style={{ left: `${Math.max(0, Math.min(1, share)) * 100}%` }}>
+        <div className={cn("absolute top-1/2 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-card", okFill)} style={{ left: `${Math.max(0, Math.min(1, share)) * 100}%` }}>
           <Check className="size-4" strokeWidth={3} />
         </div>
       </div>

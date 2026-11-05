@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMessages } from "@/i18n/client";
+import { midTone } from "@/components/ui/surfaces";
 import { settingsText } from "@/i18n/messages/settings";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,7 @@ export function Section({
         <h2 id={`settings-${id}-title`} className="font-display text-[17px] font-semibold tracking-[-0.015em]">
           {title}
         </h2>
-        {description && <p className="mt-0.5 text-[13px] text-ink-3">{description}</p>}
+        {description && <p className={cn("mt-0.5 text-[13px]", midTone)}>{description}</p>}
       </div>
       <div className="space-y-3">{children}</div>
     </section>
@@ -76,7 +77,7 @@ export function Row({
     <div className={cn("flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6", className)}>
       <div className="min-w-0">
         <div className="text-[13.5px] font-medium text-ink">{title}</div>
-        {description && <div className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{description}</div>}
+        {description && <div className="mt-0.5 text-[12.5px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{description}</div>}
       </div>
       {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
     </div>

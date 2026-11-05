@@ -56,13 +56,13 @@ export function BlobSection() {
                 <label htmlFor="blob-tips" className="text-[13.5px] font-medium">
                   {t.show}
                 </label>
-                <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{t.showHint}</p>
+                <p className="mt-0.5 text-[12.5px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.showHint}</p>
               </div>
               <Switch id="blob-tips" checked={on} onChange={toggle} label={t.show} />
             </div>
             <ul className="mt-4 space-y-1.5">
               {t.perks.map((perk) => (
-                <li key={perk} className={cn("flex items-center gap-2 text-[13px] transition-colors", on ? "text-ink-2" : "text-ink-3")}>
+                <li key={perk} className={cn("flex items-center gap-2 text-[13px] transition-colors", on ? "text-ink-2" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>
                   <span
                     className={cn(
                       "grid size-4 place-items-center rounded-full transition-colors",
@@ -109,7 +109,7 @@ export function BlobSection() {
                 onClick={() => (on ? react("love", t.tickles) : react("surprised", t.huh, 1400))}
               />
             </motion.div>
-            <span className="relative text-[11.5px] text-ink-3">{on ? t.awake : t.napping}</span>
+            <span className="relative text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{on ? t.awake : t.napping}</span>
           </div>
         </div>
       </Card>

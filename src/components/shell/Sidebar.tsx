@@ -6,13 +6,10 @@ import {
   BookMarked,
   ChevronRight,
   Ellipsis,
-  FilePlus2,
   FileText,
-  FileUp,
   FileUser,
   Folder,
   FolderOpen,
-  FolderPlus,
   GraduationCap,
   House,
   ListChecks,
@@ -36,26 +33,28 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { useImporter } from "@/components/notes/useImporter";
 import { useShareInfo } from "@/components/notes/useShared";
 import { Avatar } from "@/components/share/Avatar";
 import { applyTheme } from "@/components/theme";
-import { Kbd } from "@/components/ui/Kbd";
-import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { MenuItem, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { groupLabel } from "@/components/ui/surfaces";
+import { ModKey, useModKey } from "@/components/ui/ModKey";
 import { PageMenuArea } from "@/components/notes/PageMenuArea";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import { NewPageMenu, type NewKind } from "@/components/shell/NewPageMenu";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { useLocale, useMessages } from "@/i18n/client";
 import { adminText } from "@/i18n/messages/admin";
+import { newPageText } from "@/i18n/messages/newPage";
 import { shellText } from "@/i18n/messages/shell";
-import { transferText } from "@/i18n/messages/transfer";
 import { subjectColor } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/client";
-import type { PageKind, PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
+import type { PageMeta, Subject, SubjectKind, Theme } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 import { forgetDevice } from "@/lib/offline/device";
 import { isNetworkError, isOnline, reportNetworkError } from "@/lib/offline/net";
@@ -68,6 +67,19 @@ import { showSignedOut } from "@/components/shell/SignedOut";
 const TOUCH_ROW = "[@media(hover:none)]:h-9";
 const TOUCH_ICON = "[@media(hover:none)]:size-8";
 const TOUCH_SHOW = "focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+
+// A row of the sidebar (a place, a page, a favourite). The one you're on is a raised chip with its
+// icon in violet, like the chosen tab of the calendar and the spreadsheet; the others light up grey.
+const ROW = "rounded-lg text-[13.5px] transition-colors";
+const ROW_ON = "bg-raised font-medium text-ink shadow-card";
+const ROW_OFF = "text-ink-2 hover:bg-hover hover:text-ink";
+const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-blob";
+/** Small text that says something (an empty section): lighter than ink-2, still 4.5:1. */
+const MID = "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]";
+
+/** The violet "+" that makes a page (next to the search, and in the tablet rail); add its size and radius. */
+export const NEW_PAGE_BUTTON =
+  "grid shrink-0 place-items-center bg-blob text-white shadow-card transition-[background-color,transform] duration-150 hover:bg-blob-deep active:scale-[0.96] aria-expanded:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)] dark:aria-expanded:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob focus-visible:ring-offset-2 focus-visible:ring-offset-paper motion-reduce:transition-none motion-reduce:active:scale-100";
 
 function useStoredSet(key: string) {
   const [set, setSet] = useState<Set<string>>(() => new Set());
@@ -118,15 +130,99 @@ export function SubjectIcon({ subject, className }: { subject: Pick<Subject, "em
   return <span className={cn("size-2 rounded-full", className)} style={{ background: subjectColor(subject.color) }} />;
 }
 
-type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink" | "sheet">;
+/** Makes a page of a kind and opens it (the sidebar's "+", the tablet rail's "+"). The workspace guards against a double click. */
+export function useNewPage() {
+  const router = useRouter();
+  const { createPage } = useWorkspace();
+  return async (kind: NewKind, extra: { subject_id?: string | null; parent_id?: string | null } = {}) => {
+    const page = await createPage({ kind, ...extra });
+    if (page) router.push(`/p/${page.id}`);
+    return page;
+  };
+}
 
-export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse: () => void; onSearch: () => void; isAdmin?: boolean }) {
+type NavItem = { href: string; label: string; icon: ReactNode; active: boolean };
+
+/**
+ * The main places, in the sidebar and the tablet rail. "Blobxcel" (your spreadsheets: Notizen with
+ * the kind "sheet") sits under "Notizen" and is the one lit there, not "Notizen". `kind` is the
+ * address's ?kind=. The rail has no tree: on a page it lights where the page belongs (a
+ * spreadsheet Blobxcel, the other pages Notizen), as the phone tabs do.
+ */
+function useMainNav(kind: string | null, rail: boolean): NavItem[] {
+  const pathname = usePathname();
+  const { pages } = useWorkspace();
+  const t = useMessages(shellText).sidebar;
+  // A CV keeps "Lebenslauf" lit (CVs are not in the tree).
+  const openPage = pathname.startsWith("/p/") ? pages.find((p) => p.id === pathname.slice(3)) : undefined;
+  const inPage = rail && !!openPage && openPage.kind !== "cv";
+  const sheets = (pathname === "/notes" && kind === "sheet") || (inPage && openPage.kind === "sheet");
+  const notes = ((pathname === "/notes" || pathname.startsWith("/notes/")) && !sheets) || (inPage && openPage.kind !== "sheet");
+  return [
+    { href: "/home", label: t.home, icon: <House />, active: pathname === "/home" },
+    { href: "/notes", label: t.notesHome, icon: <NotebookPen />, active: notes },
+    { href: "/notes?kind=sheet", label: t.blobxcel, icon: <SheetIcon />, active: sheets },
+    { href: "/learn", label: t.learn, icon: <GraduationCap />, active: pathname.startsWith("/learn") },
+    { href: "/tasks", label: t.tasks, icon: <ListChecks />, active: pathname === "/tasks" },
+    { href: "/calendar", label: t.calendar, icon: <CalendarDays />, active: pathname === "/calendar" },
+    { href: "/projects", label: t.projects, icon: <SquareKanban />, active: pathname === "/projects" || pathname.startsWith("/projects/") },
+    { href: "/cv", label: t.cv, icon: <FileUser />, active: pathname === "/cv" || openPage?.kind === "cv" },
+    { href: "/quiz", label: t.quiz, icon: <BadgeQuestionMark />, active: pathname === "/quiz" || pathname.startsWith("/quiz/") },
+    { href: "/blob", label: t.blob, icon: <BlobMark />, active: pathname === "/blob" },
+  ];
+}
+
+function MainNavLinks({ variant, kind }: { variant: "list" | "rail"; kind: string | null }) {
+  const items = useMainNav(kind, variant === "rail");
+  return items.map((item) =>
+    variant === "rail" ? (
+      <RailLink key={item.href} {...item} />
+    ) : (
+      <NavLink key={item.href} href={item.href} icon={item.icon} active={item.active}>
+        {item.label}
+      </NavLink>
+    ),
+  );
+}
+
+function MainNavHere({ variant }: { variant: "list" | "rail" }) {
+  const kind = useSearchParams().get("kind");
+  return <MainNavLinks variant={variant} kind={kind} />;
+}
+
+/**
+ * The main places as links: rows in the sidebar, icons in the tablet rail. (The address's query
+ * is read under Suspense, as Next.js asks: a page rendered ahead of time shows the links with
+ * "Notizen" lit on /notes until it is known.)
+ */
+export function MainNav({ variant }: { variant: "list" | "rail" }) {
+  return (
+    <Suspense fallback={<MainNavLinks variant={variant} kind={null} />}>
+      <MainNavHere variant={variant} />
+    </Suspense>
+  );
+}
+
+export function Sidebar({
+  onCollapse,
+  onSearch,
+  isAdmin = false,
+  drawer = false,
+}: {
+  onCollapse: () => void;
+  onSearch: () => void;
+  isAdmin?: boolean;
+  /** In the drawer on phones and tablets: its button closes the menu. */
+  drawer?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
-  const { pages, subjects, createPage, profile, email, setProfile, userId, sharedIds } = useWorkspace();
+  const { pages, subjects, createPage, userId, sharedIds } = useWorkspace();
   const importer = useImporter();
   const locale = useLocale();
   const t = useMessages(shellText).sidebar;
+  const tn = useMessages(newPageText);
+  const mod = useModKey();
   const adminLabel = useMessages(adminText).nav;
   // Subjects start expanded; we remember the ones you fold.
   const [folded, toggleFolded] = useStoredSet("blob-folded-subjects");
@@ -163,8 +259,6 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   );
   const schoolSubjects = subjects.filter((s) => s.kind !== "notebook");
   const notebooks = subjects.filter((s) => s.kind === "notebook");
-  // The page open right now (a CV keeps "CV" highlighted, since CVs are not in the tree).
-  const openPage = pathname.startsWith("/p/") ? pages.find((p) => p.id === pathname.slice(3)) : undefined;
   // Favourites are your own: someone else's star on a shared page isn't yours.
   const favorites = pages.filter((p) => p.is_favorite && p.user_id === userId).sort((a, b) => a.title.localeCompare(b.title));
   const unfiled = mineRoots.filter((p) => !p.subject_id || !subjects.some((s) => s.id === p.subject_id));
@@ -198,11 +292,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
       <div key={page.id}>
         <div
           data-page-id={page.id}
-          className={cn(
-            "group relative flex h-7 items-center gap-1.5 rounded-md pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
-            TOUCH_ROW,
-            active && "bg-hover font-medium text-ink",
-          )}
+          className={cn("group relative flex h-7 items-center gap-1.5 pr-1", ROW, TOUCH_ROW, active ? ROW_ON : ROW_OFF)}
           style={{ paddingLeft: 6 + depth * 14 }}
         >
           <button
@@ -217,7 +307,12 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
-          <Link href={`/p/${page.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={title}>
+          <Link
+            href={`/p/${page.id}`}
+            aria-current={active ? "page" : undefined}
+            className={cn("flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-md focus-visible:ring-inset", FOCUS, active && "[&>svg:first-child]:text-blob-ink")}
+            title={title}
+          >
             <PageIcon page={page} open={folder && open} />
             <span className="truncate">{title}</span>
             {sharedMark && <Users className="size-3 shrink-0 text-ink-3" aria-label={t.sharedByYou} />}
@@ -227,7 +322,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
             (folder ? (
               <AddMenu
                 label={t.addInside}
-                className={cn("opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [&:has([aria-expanded=true])]:opacity-100", TOUCH_SHOW)}
+                className={cn("opacity-0 focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100", TOUCH_SHOW)}
                 onPick={(kind) => newPage(kind, { parent_id: page.id, subject_id: page.subject_id })}
                 onImport={() => importer.pick({ parentId: page.id })}
               />
@@ -254,7 +349,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
               {kids.length ? (
                 kids.map((k) => renderPage(k, depth + 1))
               ) : (
-                <div className={cn("flex h-7 items-center text-[12.5px] text-ink-3", TOUCH_ROW)} style={{ paddingLeft: 30 + depth * 14 }}>
+                <div className={cn("flex h-7 items-center text-[12.5px]", MID, TOUCH_ROW)} style={{ paddingLeft: 30 + depth * 14 }}>
                   {folder ? t.emptyFolder : t.noPagesInside}
                 </div>
               )}
@@ -272,13 +367,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
     const notebook = subject.kind === "notebook";
     return (
       <div key={subject.id}>
-        <div
-          className={cn(
-            "group flex h-7 items-center gap-1.5 rounded-md pl-1.5 pr-1 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink",
-            TOUCH_ROW,
-            active && "bg-hover font-medium text-ink",
-          )}
-        >
+        <div className={cn("group flex h-7 items-center gap-1.5 pl-1.5 pr-1", ROW, TOUCH_ROW, active ? ROW_ON : ROW_OFF)}>
           <button
             onClick={() => toggleFolded(subject.id)}
             className={cn("grid size-4 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON)}
@@ -287,7 +376,12 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           >
             <ChevronRight className={cn("size-3 transition-transform duration-200", open && "rotate-90")} />
           </button>
-          <Link href={`/subjects/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-2 self-stretch" title={subject.name}>
+          <Link
+            href={`/subjects/${subject.id}`}
+            aria-current={active ? "page" : undefined}
+            className={cn("flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-md focus-visible:ring-inset", FOCUS)}
+            title={subject.name}
+          >
             <span className="grid size-4 shrink-0 place-items-center">
               <SubjectIcon subject={subject} />
             </span>
@@ -313,7 +407,7 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
               ) : (
                 <button
                   onClick={() => newPage("note", { subject_id: subject.id })}
-                  className={cn("flex h-7 w-full items-center gap-2 rounded-md pl-[34px] text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ROW)}
+                  className={cn("flex h-7 w-full items-center gap-2 rounded-lg pl-[34px] text-[12.5px] hover:bg-hover hover:text-ink", MID, FOCUS, TOUCH_ROW)}
                 >
                   <Plus className="size-3.5" /> {t.addNote}
                 </button>
@@ -328,91 +422,80 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
   return (
     <nav className="flex h-full w-full flex-col" aria-label={t.label}>
       <div className="flex h-12 shrink-0 items-center gap-2 px-3">
-        <Link href="/home" className="flex min-w-0 items-center gap-2 rounded-md [@media(hover:none)]:h-9">
+        <Link href="/home" className={cn("flex min-w-0 items-center gap-2 rounded-md [@media(hover:none)]:h-9", FOCUS)}>
           <BlobMark size={22} />
           <span className="font-display text-[17px] font-bold tracking-[-0.03em]">Blob</span>
         </Link>
         <button
           onClick={onCollapse}
-          className="ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9"
-          aria-label={t.hide}
-          title={t.hideTitle}
+          className={cn("ml-auto grid size-7 place-items-center rounded-md text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9", FOCUS)}
+          aria-label={drawer ? t.closeMenu : t.hide}
+          title={drawer ? t.closeMenu : t.hideTitle(mod)}
         >
           <PanelLeftClose className="size-4" />
         </button>
       </div>
 
       <div className="space-y-0.5 px-2">
-        <button
-          onClick={onSearch}
-          className="mb-1.5 flex h-8 w-full items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink-3 shadow-card transition-colors hover:border-line-2 hover:text-ink-2"
-        >
-          <Search className="size-3.5" />
-          {t.search}
-          <span className="ml-auto flex gap-0.5 [@media(hover:none)]:hidden">
-            <Kbd>⌘</Kbd>
-            <Kbd>K</Kbd>
-          </span>
-        </button>
-        <NavLink href="/home" icon={<House />} active={pathname === "/home"}>
-          {t.home}
-        </NavLink>
-        <NavLink href="/notes" icon={<NotebookPen />} active={pathname === "/notes" || pathname.startsWith("/notes/")}>
-          {t.notesHome}
-        </NavLink>
-        <NavLink href="/learn" icon={<GraduationCap />} active={pathname.startsWith("/learn")}>
-          {t.learn}
-        </NavLink>
-        <NavLink href="/tasks" icon={<ListChecks />} active={pathname === "/tasks"}>
-          {t.tasks}
-        </NavLink>
-        <NavLink href="/calendar" icon={<CalendarDays />} active={pathname === "/calendar"}>
-          {t.calendar}
-        </NavLink>
-        <NavLink href="/projects" icon={<SquareKanban />} active={pathname === "/projects" || pathname.startsWith("/projects/")}>
-          {t.projects}
-        </NavLink>
-        <NavLink href="/cv" icon={<FileUser />} active={pathname === "/cv" || openPage?.kind === "cv"}>
-          {t.cv}
-        </NavLink>
-        <NavLink href="/quiz" icon={<BadgeQuestionMark />} active={pathname === "/quiz" || pathname.startsWith("/quiz/")}>
-          {t.quiz}
-        </NavLink>
-        <NavLink href="/blob" icon={<BlobMark />} active={pathname === "/blob"}>
-          {t.blob}
-        </NavLink>
+        {/* Search and, beside it, the violet "+": every kind of page, with what it is for. */}
+        <div className="mb-1.5 flex gap-1.5">
+          <button
+            onClick={onSearch}
+            title={t.searchTitle(mod)}
+            className={cn(
+              "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] shadow-card transition-colors hover:border-line-2 hover:text-ink-2 [@media(hover:none)]:h-9",
+              MID,
+              FOCUS,
+            )}
+          >
+            <Search className="size-3.5 shrink-0 text-ink-3" />
+            <span className="min-w-0 flex-1 truncate text-left">{t.search}</span>
+            <ModKey k="K" className="flex shrink-0 gap-0.5 [@media(hover:none)]:hidden" />
+          </button>
+          <NewPageMenu
+            align="start"
+            onPick={(kind) => newPage(kind)}
+            onImport={() => importer.pick()}
+            trigger={({ ref, ...p }) => (
+              <button ref={ref} {...p} type="button" aria-label={tn.label} title={tn.title} className={cn(NEW_PAGE_BUTTON, "size-8 rounded-lg [@media(hover:none)]:size-9")}>
+                <Plus className="size-4" strokeWidth={2.4} aria-hidden />
+              </button>
+            )}
+          />
+        </div>
+        <MainNav variant="list" />
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         <PageMenuArea>
           {favorites.length > 0 && (
             <Section title={t.favorites} {...sectionProps("favorites", favorites.length)}>
-              {favorites.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/p/${p.id}`}
-                  data-page-id={p.id}
-                  title={pageTitle(p.title, p.kind, locale)}
-                  className={cn(
-                    "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 hover:bg-hover hover:text-ink",
-                    TOUCH_ROW,
-                    pathname === `/p/${p.id}` && "bg-hover font-medium text-ink",
-                  )}
-                >
-                  <Star className="size-3.5 shrink-0 fill-blob text-blob" />
-                  <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
-                </Link>
-              ))}
+              {favorites.map((p) => {
+                const active = pathname === `/p/${p.id}`;
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/p/${p.id}`}
+                    data-page-id={p.id}
+                    aria-current={active ? "page" : undefined}
+                    title={pageTitle(p.title, p.kind, locale)}
+                    className={cn("flex h-7 items-center gap-2 px-1.5", ROW, FOCUS, TOUCH_ROW, active ? ROW_ON : ROW_OFF)}
+                  >
+                    <Star className="size-3.5 shrink-0 fill-blob text-blob" />
+                    <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
+                  </Link>
+                );
+              })}
             </Section>
           )}
 
           <Section title={t.subjects} action={<NewSubjectButton kind="subject" />} {...sectionProps("subjects", schoolSubjects.length)}>
-            {schoolSubjects.length === 0 && <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noSubjects}</p>}
+            {schoolSubjects.length === 0 && <p className={cn("px-1.5 py-1 text-[12.5px] leading-snug", MID)}>{t.noSubjects}</p>}
             {schoolSubjects.map(renderSubject)}
           </Section>
 
           <Section title={t.notebooks} action={<NewSubjectButton kind="notebook" />} {...sectionProps("notebooks", notebooks.length)}>
-            {notebooks.length === 0 && <p className="px-1.5 py-1 text-[12.5px] leading-snug text-ink-3">{t.noNotebooks}</p>}
+            {notebooks.length === 0 && <p className={cn("px-1.5 py-1 text-[12.5px] leading-snug", MID)}>{t.noNotebooks}</p>}
             {notebooks.map(renderSubject)}
           </Section>
 
@@ -432,42 +515,12 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
           )}
 
           <Section title={t.notes} {...sectionProps("notes", unfiled.length)}>
-            {unfiled.length === 0 ? <p className="px-1.5 py-1 text-[12.5px] text-ink-3">{t.noNotes}</p> : unfiled.map((p) => renderPage(p, 0))}
+            {unfiled.length === 0 ? <p className={cn("px-1.5 py-1 text-[12.5px] leading-snug", MID)}>{t.noNotes}</p> : unfiled.map((p) => renderPage(p, 0))}
           </Section>
         </PageMenuArea>
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-line px-2 py-2">
-        {/* New pages: a note first (the most used), then handwriting, a spreadsheet and a presentation. */}
-        <div className="mb-1 grid grid-cols-2 gap-1">
-          <button
-            onClick={() => newPage("note")}
-            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-ink text-[12.5px] font-medium text-paper transition-transform hover:bg-ink/88 active:scale-[0.97] [@media(hover:none)]:h-9"
-          >
-            <FilePlus2 className="size-3.5 shrink-0" /> <span className="truncate">{t.newNote}</span>
-          </button>
-          <button
-            onClick={() => newPage("ink")}
-            title={t.newInkTitle}
-            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
-          >
-            <Signature className="size-3.5 shrink-0" /> <span className="truncate">{t.newInk}</span>
-          </button>
-          <button
-            onClick={() => newPage("sheet")}
-            title={t.newSheetTitle}
-            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
-          >
-            <SheetIcon className="size-3.5 shrink-0" /> <span className="truncate">{t.newSheet}</span>
-          </button>
-          <button
-            onClick={() => newPage("deck")}
-            title={t.newDeckTitle}
-            className="flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface text-[12.5px] font-medium text-ink-2 transition-transform hover:text-ink active:scale-[0.97] [@media(hover:none)]:h-9"
-          >
-            <Presentation className="size-3.5 shrink-0" /> <span className="truncate">{t.newDeck}</span>
-          </button>
-        </div>
         {isAdmin && (
           <NavLink href="/admin" icon={<ShieldCheck />} active={pathname === "/admin" || pathname.startsWith("/admin/")}>
             {adminLabel}
@@ -476,53 +529,32 @@ export function Sidebar({ onCollapse, onSearch, isAdmin = false }: { onCollapse:
         <NavLink href="/trash" icon={<Trash2 />} active={pathname === "/trash"}>
           {t.trash}
         </NavLink>
-        <AccountMenu name={profile.full_name} email={email} theme={profile.theme} onTheme={(t) => setProfile({ theme: t })} />
+        <AccountMenu />
       </div>
     </nav>
   );
 }
 
-/** "+" with a small menu: new note, handwritten note, spreadsheet, presentation or folder. */
+/** The small "+" of a subject or a folder in the tree: the create menu, for that place. */
 function AddMenu({ label, onPick, onImport, className }: { label: string; onPick: (kind: NewKind) => void; onImport?: () => void; className?: string }) {
-  const t = useMessages(shellText).sidebar;
-  const ti = useMessages(transferText).import;
   return (
-    <Popover
+    <NewPageMenu
       align="start"
-      trigger={(props) => (
-        <button {...props} className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink", TOUCH_ICON, className)} aria-label={label} title={label}>
+      onPick={onPick}
+      onImport={onImport}
+      trigger={({ ref, ...p }) => (
+        <button
+          ref={ref}
+          {...p}
+          type="button"
+          className={cn("grid size-5 shrink-0 place-items-center rounded text-ink-3 hover:bg-line hover:text-ink aria-expanded:bg-line aria-expanded:text-ink", FOCUS, TOUCH_ICON, className)}
+          aria-label={label}
+          title={label}
+        >
           <Plus className="size-3.5" />
         </button>
       )}
-    >
-      {(close) => (
-        <>
-          <MenuItem icon={<FileText />} onSelect={() => (close(), onPick("note"))}>
-            {t.note}
-          </MenuItem>
-          <MenuItem icon={<Signature />} onSelect={() => (close(), onPick("ink"))}>
-            {t.ink}
-          </MenuItem>
-          <MenuItem icon={<SheetIcon />} onSelect={() => (close(), onPick("sheet"))}>
-            {t.sheet}
-          </MenuItem>
-          <MenuItem icon={<Presentation />} onSelect={() => (close(), onPick("deck"))}>
-            {t.presentation}
-          </MenuItem>
-          <MenuItem icon={<FolderPlus />} onSelect={() => (close(), onPick("folder"))}>
-            {t.folder}
-          </MenuItem>
-          {onImport && (
-            <>
-              <MenuSeparator />
-              <MenuItem icon={<FileUp />} onSelect={() => (close(), onImport())}>
-                {ti.action}
-              </MenuItem>
-            </>
-          )}
-        </>
-      )}
-    </Popover>
+    />
   );
 }
 
@@ -551,10 +583,10 @@ function Section({
           onClick={onToggle}
           aria-expanded={!folded}
           title={toggleLabel}
-          className="flex h-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-ink-3 transition-colors hover:text-ink-2"
+          className={cn("flex h-full items-center gap-1 rounded-md px-1 transition-colors hover:text-ink-2", groupLabel, FOCUS)}
         >
           {title}
-          {folded && count > 0 && <span className="tabular-nums text-ink-3/80">{count}</span>}
+          {folded && count > 0 && <span className="tabular-nums">{count}</span>}
           <ChevronRight
             className={cn(
               "size-3 transition-[transform,opacity] duration-200",
@@ -573,14 +605,36 @@ function NavLink({ href, icon, active, children }: { href: string; icon: ReactNo
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-7 items-center gap-2 rounded-md px-1.5 text-[13.5px] text-ink-2 transition-colors hover:bg-hover hover:text-ink [&_svg]:size-4 [&_svg]:text-ink-3",
+        "flex h-7 items-center gap-2 px-1.5 [&_svg]:size-4",
+        ROW,
+        FOCUS,
         TOUCH_ROW,
-        active && "bg-hover font-medium text-ink [&_svg]:text-ink",
+        active ? cn(ROW_ON, "[&_svg]:text-blob-ink") : cn(ROW_OFF, "[&_svg]:text-ink-3"),
       )}
     >
       {icon}
       {children}
+    </Link>
+  );
+}
+
+/** A place in the tablet rail: its icon, its name as the tooltip and for screen readers. */
+function RailLink({ href, label, icon, active }: NavItem) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "grid size-10 shrink-0 place-items-center rounded-xl transition-colors [&_svg]:size-[18px]",
+        FOCUS,
+        active ? "bg-raised text-blob-ink shadow-card" : "text-ink-3 hover:bg-hover hover:text-ink",
+      )}
+    >
+      {icon}
     </Link>
   );
 }
@@ -598,7 +652,7 @@ export function NewSubjectButton({ kind }: { kind: SubjectKind }) {
     <Popover
       align="end"
       trigger={(props) => (
-        <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink", TOUCH_ICON)} aria-label={label} title={label}>
+        <button {...props} className={cn("grid size-5 place-items-center rounded text-ink-3 hover:bg-hover hover:text-ink", FOCUS, TOUCH_ICON)} aria-label={label} title={label}>
           <Plus className="size-3.5" />
         </button>
       )}
@@ -623,7 +677,7 @@ export function NewSubjectButton({ kind }: { kind: SubjectKind }) {
             onChange={(e) => setName(e.target.value)}
             placeholder={notebook ? t.notebookPlaceholder : t.subjectPlaceholder}
             maxLength={60}
-            className="h-8 w-full rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
+            className="h-8 w-full rounded-lg border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
           />
         </form>
       )}
@@ -631,15 +685,23 @@ export function NewSubjectButton({ kind }: { kind: SubjectKind }) {
   );
 }
 
-function AccountMenu({ name, email, theme, onTheme }: { name: string | null; email: string; theme: Theme; onTheme: (t: Theme) => void }) {
+/**
+ * You: the theme, the settings and signing out. A row with your name at the bottom of the sidebar,
+ * or (`variant="avatar"`) just your initial at the bottom of the tablet rail, opening to its right.
+ */
+export function AccountMenu({ variant = "row" }: { variant?: "row" | "avatar" }) {
   const router = useRouter();
   const guard = useSignOutGuard();
+  const { profile, email, setProfile } = useWorkspace();
   const t = useMessages(shellText).sidebar;
+  const name = profile.full_name;
+  const theme = profile.theme;
   const initial = (name || email || "?").trim()[0]?.toUpperCase();
+  const rail = variant === "avatar";
 
   function pick(t: Theme) {
     applyTheme(t);
-    onTheme(t);
+    setProfile({ theme: t });
   }
 
   async function signOut() {
@@ -670,28 +732,49 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
     }
   }
 
+  // (White on the dark theme's lighter violet is under 4.5:1: the deeper one there.)
+  const dot = "grid shrink-0 place-items-center rounded-full bg-blob font-semibold text-white dark:bg-blob-deep";
+
   return (
     <>
       <Popover
-        side="top"
+        side={rail ? "right" : "top"}
         align="start"
         className="w-[244px]"
-        trigger={(props) => (
-          <button {...props} data-account-menu="" className="flex h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-hover">
-            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-blob text-[11.5px] font-semibold text-white">{initial}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
-              <span className="block truncate text-[11.5px] leading-tight text-ink-3" title={email}>
-                {email}
+        trigger={(props) =>
+          rail ? (
+            <button
+              {...props}
+              data-account-menu=""
+              aria-label={t.account}
+              title={name ? `${name} · ${email}` : email}
+              className={cn("grid size-10 shrink-0 place-items-center rounded-xl hover:bg-hover aria-expanded:bg-hover", FOCUS)}
+            >
+              <span className={cn(dot, "size-7 text-[12px]")}>{initial}</span>
+            </button>
+          ) : (
+            <button {...props} data-account-menu="" className={cn("flex h-9 w-full items-center gap-2 rounded-lg px-1.5 text-left hover:bg-hover aria-expanded:bg-hover", FOCUS)}>
+              <span className={cn(dot, "size-6 text-[11.5px]")}>{initial}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium leading-tight">{name || t.you}</span>
+                <span className={cn("block truncate text-[11.5px] leading-tight", MID)} title={email}>
+                  {email}
+                </span>
               </span>
-            </span>
-            <Ellipsis className="size-4 text-ink-3" />
-          </button>
-        )}
+              <Ellipsis className="size-4 text-ink-3" />
+            </button>
+          )
+        }
       >
         {(close) => (
           <>
-            <MenuLabel>{t.theme}</MenuLabel>
+            {rail && (
+              <div className="px-2 pb-1.5 pt-1">
+                <span className="block truncate text-[13px] font-medium leading-tight text-ink">{name || t.you}</span>
+                <span className={cn("block truncate text-[11.5px] leading-tight", MID)}>{email}</span>
+              </div>
+            )}
+            <div className={cn("px-2 pb-1 pt-1.5", groupLabel)}>{t.theme}</div>
             <div className="mx-1 mb-1 grid grid-cols-3 gap-0.5 rounded-lg bg-paper p-0.5">
               {(
                 [
@@ -703,9 +786,10 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
                 <button
                   key={value}
                   onClick={() => pick(value)}
+                  aria-pressed={theme === value}
                   className={cn(
-                    "flex h-7 items-center justify-center gap-1 rounded-md text-[12px] text-ink-3 transition-colors [&_svg]:size-3.5",
-                    theme === value ? "bg-raised font-medium text-ink shadow-card" : "hover:text-ink",
+                    "flex h-7 items-center justify-center gap-1 rounded-md text-[12px] transition-colors [&_svg]:size-3.5",
+                    theme === value ? "bg-raised font-medium text-ink shadow-card" : "text-ink-2 hover:text-ink",
                   )}
                 >
                   {icon}
@@ -719,7 +803,8 @@ function AccountMenu({ name, email, theme, onTheme }: { name: string | null; ema
             </MenuItem>
             {/* (The menu closes first: what signing out asks is then the only thing open, and the
                 keyboard comes back to the account button once it is answered. The button whose
-                menu is open: on narrow screens the drawer has its own, the sidebar's is hidden.) */}
+                menu is open: on narrow screens the drawer and the tablet rail have their own, the
+                sidebar's is hidden.) */}
             <MenuItem
               icon={<LogOut />}
               onSelect={() => {

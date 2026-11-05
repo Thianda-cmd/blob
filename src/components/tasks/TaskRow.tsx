@@ -75,13 +75,13 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
   const dueLabel = due ? (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">{dueText}</span>
-      {showTime && !done && !narrow && <span className="hidden shrink-0 font-normal text-ink-3 sm:inline">{formatTime(due, locale)}</span>}
+      {showTime && !done && !narrow && <span className="hidden shrink-0 font-normal text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] sm:inline">{formatTime(due, locale)}</span>}
     </span>
   ) : null;
 
   const dueClass = cn(
     "tabular-nums",
-    done ? "text-ink-3" : tone === "late" ? "text-danger" : tone === "today" ? "font-medium text-blob-ink" : tone === "soon" ? "text-ink-2" : "text-ink-3",
+    done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" : tone === "late" ? "text-danger" : tone === "today" ? "font-medium text-blob-ink" : tone === "soon" ? "text-ink-2" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
   );
 
   return (
@@ -125,7 +125,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
               // a title cut to two words is no use. Done tasks and widget rows stay on one line.
               done || dense ? "truncate" : narrow ? "line-clamp-2 break-words" : "truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words",
               dense ? "text-[13.5px]" : "text-[14px]",
-              done ? "text-ink-3" : "text-ink",
+              done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" : "text-ink",
               editable && "cursor-text",
             )}
             title={task.title}
@@ -153,7 +153,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
       {dense ? (
         <div className="flex shrink-0 items-center gap-2 pl-1 text-[12.5px]">
           {!hideSubject && subject && (
-            <span className="flex max-w-[110px] items-center gap-1.5 text-ink-3" title={subject.name}>
+            <span className="flex max-w-[110px] items-center gap-1.5 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" title={subject.name}>
               <SubjectDot subject={subject} />
               <span className="hidden truncate @min-[400px]:inline">{subject.name}</span>
             </span>
@@ -176,13 +176,18 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                   {...props}
                   className={cn(
                     "flex h-7 w-[34px] items-center gap-1.5 rounded-md px-2 text-left transition-colors hover:bg-hover hover:text-ink sm:w-[132px] [@media(hover:none)]:h-9",
-                    subject ? "text-ink-2" : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
-                    // Only dim a real subject: on an empty one this would undo the opacity-0 above.
-                    done && subject && "opacity-70",
+                    // (Done: the mid-tone, lighter and still 4.5:1; only its dot fades.)
+                    subject
+                      ? done
+                        ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
+                        : "text-ink-2"
+                      : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                   )}
                   title={subject ? t.subjectIs(subject.name) : t.addSubject}
                 >
-                  <SubjectDot subject={subject} />
+                  <span className={cn("contents", done && subject && "[&>*]:opacity-70")}>
+                    <SubjectDot subject={subject} />
+                  </span>
                   <span className="hidden truncate sm:inline">{subject ? subject.name : t.subject}</span>
                 </button>
               )}
@@ -198,7 +203,7 @@ export function TaskRow({ task, now, subjects, onToggle, onUpdate, onDelete, hid
                 className={cn(
                   "flex h-7 items-center justify-end gap-1 rounded-md px-2 text-right transition-colors hover:bg-hover [@media(hover:none)]:h-9",
                   narrow ? "min-w-[60px] max-w-[140px]" : "w-[84px] sm:w-[150px]",
-                  due ? dueClass : "text-ink-3 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
+                  due ? dueClass : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 aria-expanded:opacity-100",
                 )}
                 title={due ? formatDueLong(due, locale) : t.addDueDate}
               >

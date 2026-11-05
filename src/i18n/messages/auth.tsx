@@ -24,11 +24,20 @@ export const authText = defineMessages({
         subject: "Biology",
         note: "Photosynthesis",
         task: "Math worksheet p. 42",
-        slide: "The French Revolution",
-        slideKind: "History presentation",
+        sheet: "Calibration",
+        r2: "R² = 0.9998",
         exam: "Exam · Fri",
         examTitle: "Chemistry, chapter 4",
       },
+    },
+    /** Above the form when the sign-in page was opened from an invite link (/join/…). */
+    invite: {
+      title: "You've been invited",
+      signIn: "Sign in and you're in right away.",
+      signUp: "Create your account, then open the invite link again to join.",
+      blob: "Ooh, an invite! You're nearly in.",
+      /** Blob on the sign-up page: in only after the account (and the link again), as the banner says. */
+      blobSignUp: "Ooh, an invite! Make your account first, then you're in.",
     },
     common: {
       email: "Email",
@@ -73,7 +82,7 @@ export const authText = defineMessages({
     } as Record<string, string>,
     signup: {
       title: "Create your Blob",
-      subtitle: "Notes, presentations, homework, lessons and your CV, all in one place.",
+      subtitle: "Notes, Blobxcel spreadsheets, presentations, homework, lessons and your CV, all in one place.",
       hello: "Ooh, a new friend! Let's make your space.",
       niceToMeet: (name: string) => `Nice to meet you, ${name}!`,
       nameLabel: "Your name",
@@ -121,7 +130,7 @@ export const authText = defineMessages({
       submit: "Save password",
     },
     checkEmail: {
-      title: "Confirm your email",
+      title: "Check your inbox",
       say: "I sent you a little letter. Click the link inside!",
       sentAgain: "Sent another one!",
       sentTo: (email: ReactNode): ReactNode => <>We sent a confirmation link to {email}. Open it on this device to finish signing up.</>,
@@ -216,11 +225,18 @@ export const authText = defineMessages({
         subject: "Biologie",
         note: "Fotosynthese",
         task: "Mathe-Arbeitsblatt S. 42",
-        slide: "Die Französische Revolution",
-        slideKind: "Präsentation in Geschichte",
+        sheet: "Kalibrierung",
+        r2: "R² = 0,9998",
         exam: "Klassenarbeit · Fr",
         examTitle: "Chemie, Kapitel 4",
       },
+    },
+    invite: {
+      title: "Du wurdest eingeladen",
+      signIn: "Melde dich an, dann bist du gleich dabei.",
+      signUp: "Erstell dein Konto und öffne danach den Einladungslink nochmal, dann bist du dabei.",
+      blob: "Oh, eine Einladung! Gleich bist du dabei.",
+      blobSignUp: "Oh, eine Einladung! Erst dein Konto, dann bist du dabei.",
     },
     common: {
       email: "E-Mail",
@@ -264,7 +280,7 @@ export const authText = defineMessages({
     },
     signup: {
       title: "Erstelle deinen Blob",
-      subtitle: "Notizen, Präsentationen, Hausaufgaben, Lektionen und dein Lebenslauf an einem Ort.",
+      subtitle: "Notizen, Blobxcel-Tabellen, Präsentationen, Hausaufgaben, Lektionen und dein Lebenslauf an einem Ort.",
       hello: "Oh, jemand Neues! Lass uns deinen Bereich einrichten.",
       niceToMeet: (name) => `Schön, dich kennenzulernen, ${name}!`,
       nameLabel: "Dein Name",
@@ -312,7 +328,7 @@ export const authText = defineMessages({
       submit: "Passwort speichern",
     },
     checkEmail: {
-      title: "Bestätige deine E-Mail-Adresse",
+      title: "Schau in dein Postfach",
       say: "Ich hab dir einen kleinen Brief geschickt. Klick auf den Link darin!",
       sentAgain: "Ich hab dir noch einen geschickt!",
       sentTo: (email) => <>Wir haben einen Bestätigungslink an {email} geschickt. Öffne ihn auf diesem Gerät, um die Registrierung abzuschließen.</>,
@@ -325,11 +341,11 @@ export const authText = defineMessages({
     },
     confirm: {
       kinds: {
-        signup: { title: "Bestätige deine E-Mail-Adresse", subtitle: "Ein Klick und dein Blob-Bereich ist bereit.", button: "Bestätigen und weiter", blob: "Fast geschafft! Nur noch ein Klick." },
-        email: { title: "Bestätige deine E-Mail-Adresse", subtitle: "Ein Klick und du bist drin.", button: "Weiter zu Blob", blob: "Willkommen! Klick auf den Button und los geht's." },
+        signup: { title: "Bestätige deine E-Mail", subtitle: "Ein Klick und dein Blob-Bereich ist bereit.", button: "Bestätigen und weiter", blob: "Fast geschafft! Nur noch ein Klick." },
+        email: { title: "Bestätige deine E-Mail", subtitle: "Ein Klick und du bist drin.", button: "Weiter zu Blob", blob: "Willkommen! Klick auf den Button und los geht's." },
         magiclink: { title: "Bei Blob anmelden", subtitle: "Melde dich mit diesem einmaligen Link an.", button: "Anmelden", blob: "Dein Anmeldelink ist bereit!" },
         recovery: { title: "Passwort zurücksetzen", subtitle: "Weiter, um ein neues Passwort festzulegen.", button: "Neues Passwort festlegen", blob: "Zeit für ein frisches Passwort." },
-        email_change: { title: "Bestätige deine neue E-Mail-Adresse", subtitle: "Bestätige, um den Wechsel deiner E-Mail-Adresse abzuschließen.", button: "Neue E-Mail-Adresse bestätigen", blob: "Neue Adresse, derselbe Blob." },
+        email_change: { title: "Bestätige deine neue E-Mail", subtitle: "Bestätige, um den Wechsel deiner E-Mail-Adresse abzuschließen.", button: "Neue E-Mail-Adresse bestätigen", blob: "Neue Adresse, derselbe Blob." },
         invite: { title: "Du bist eingeladen", subtitle: "Nimm die Einladung an, um deinen Blob-Bereich zu erstellen.", button: "Einladung annehmen", blob: "Oh, jemand hat dich eingeladen!" },
       },
       incompleteSay: "Hmm, dieser Link sieht unvollständig aus.",

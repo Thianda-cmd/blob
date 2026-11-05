@@ -1,13 +1,17 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { Sheet as SheetIcon } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { TypedText, useTypewriter } from "@/components/blob/speech";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { buttonClass } from "@/components/ui/Button";
+import { midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { authText } from "@/i18n/messages/auth";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 type AuthBlob = {
@@ -96,14 +100,16 @@ export function AuthShell({ children }: { children: ReactNode }) {
               {children}
             </div>
           </div>
-          <p className="text-[12px] text-ink-3">{t.privacy}</p>
+          <p className={cn("text-[12px]", midTone)}>{t.privacy}</p>
         </div>
 
-        <div className="relative hidden overflow-hidden bg-paper lg:block">
+        {/* Exactly one window tall and pinned while a long form scrolls (short windows, the invite
+            banner), so the cards in the corners and Blob always stay in view. */}
+        <div className="relative hidden overflow-hidden bg-paper lg:sticky lg:top-0 lg:block lg:h-dvh lg:self-start">
           <div className="bg-dots absolute inset-0 opacity-60" />
           <FloatingCards />
           <div className="absolute inset-0 grid place-items-center">
-            <div className="relative" style={{ marginTop: "4vh" }}>
+            <div className="relative mt-[4vh] [@media(max-height:660px)]:mt-0">
               <AnimatePresence mode="wait">
                 {speech && (
                   <motion.div
@@ -120,7 +126,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <Blob ref={blobRef} size={300} mood={mood} look={gaze} talking={typing} />
+              {/* A little smaller on narrow or short stages, so the cards in the corners never touch it
+                  (the height steps exclude each other, so the smallest one applies). */}
+              <div className="lg:max-xl:scale-[0.88] [@media(min-height:661px)_and_(max-height:780px)]:scale-[0.85] [@media(max-height:660px)]:scale-[0.78]">
+                <Blob ref={blobRef} size={300} mood={mood} look={gaze} talking={typing} />
+              </div>
             </div>
           </div>
         </div>
@@ -129,11 +139,21 @@ export function AuthShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Around Blob, in the corners: a note, a spreadsheet's chart (Blobxcel), a ticked-off task and an
+// exam, tilted a little (at most 3°). On narrower stages (lg, 1024–1279 px) and short ones (a window
+// up to 660 px tall; the stage is exactly as tall as the window) only the note and the chart fit
+// around Blob and its speech bubble without touching them or each other: the chart then sits bottom
+// right. On wide, tall stages it moves to the top right and the task and the exam join.
 const CARDS = [
-  { className: "left-[9%] top-[13%] rotate-[-6deg]", delay: 0, kind: "note" as const },
-  { className: "right-[10%] top-[18%] rotate-[5deg]", delay: 0.8, kind: "task" as const },
-  { className: "left-[14%] bottom-[14%] rotate-[4deg]", delay: 1.6, kind: "slide" as const },
-  { className: "right-[13%] bottom-[16%] rotate-[-4deg]", delay: 2.2, kind: "exam" as const },
+  { className: "left-[6%] top-[7%] rotate-[-3deg]", delay: 0, kind: "note" as const },
+  {
+    className:
+      "right-[5%] bottom-[4%] rotate-[2deg] [@media(min-width:80rem)_and_(min-height:661px)]:right-[6%] [@media(min-width:80rem)_and_(min-height:661px)]:top-[6%] [@media(min-width:80rem)_and_(min-height:661px)]:bottom-auto [@media(min-width:80rem)_and_(min-height:661px)]:rotate-[3deg]",
+    delay: 0.8,
+    kind: "chart" as const,
+  },
+  { className: "left-[8%] bottom-[8%] rotate-[2deg] hidden [@media(min-width:80rem)_and_(min-height:661px)]:block", delay: 1.6, kind: "task" as const },
+  { className: "right-[8%] bottom-[11%] rotate-[-2deg] hidden [@media(min-width:80rem)_and_(min-height:661px)]:block", delay: 2.2, kind: "exam" as const },
 ];
 
 function FloatingCards() {
@@ -142,7 +162,7 @@ function FloatingCards() {
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {CARDS.map((card, i) => (
         <motion.div
-          key={i}
+          key={card.kind}
           className={`absolute ${card.className}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: [0, -10, 0] }}
@@ -158,7 +178,54 @@ function FloatingCards() {
   );
 }
 
-function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; text: (typeof authText)["en"]["stage"]["cards"] }) {
+// The chart card: the lab template "Kalibriergerade" (six standards, absorbance against
+// concentration) with its trendline, drawn in the spreadsheet's own colours. The numbers are the
+// template's: y = 0.05233x + 0.00119, R² = 0.9998. Drawn here, so the sign-in pages load nothing
+// of the spreadsheet itself.
+const POINTS: [number, number][] = [
+  [0, 0.003],
+  [2, 0.104],
+  [4, 0.207],
+  [6, 0.318],
+  [8, 0.423],
+  [10, 0.522],
+];
+const chartX = (v: number) => 10 + (v / 10) * 182;
+const chartY = (v: number) => 70 - (v / 0.53) * 62;
+const TREND = "color-mix(in oklab, var(--sheet-blue) 68%, var(--ink))";
+
+function ChartCard({ title, r2 }: { title: string; r2: string }) {
+  return (
+    <div className="w-[230px] rounded-xl border border-line bg-raised p-3.5 shadow-card">
+      <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
+        <SheetIcon className="size-3.5" />
+        {title}
+      </div>
+      <svg viewBox="0 0 200 76" className="mt-2 block h-[76px] w-full overflow-visible">
+        {[24, 47].map((y) => (
+          <line key={y} x1="4" x2="198" y1={y} y2={y} stroke="var(--line)" strokeWidth="1" />
+        ))}
+        <path d="M4 72H198M4 2V72" fill="none" stroke="var(--line-2)" strokeWidth="1.2" />
+        <line
+          x1={chartX(0)}
+          y1={chartY(0.00119)}
+          x2={chartX(10)}
+          y2={chartY(0.52449)}
+          stroke={TREND}
+          strokeWidth="1.5"
+          strokeDasharray="4 2.6"
+          strokeLinecap="round"
+        />
+        {POINTS.map(([x, y]) => (
+          <circle key={x} cx={chartX(x)} cy={chartY(y)} r="3" fill="var(--sheet-blue)" stroke="var(--raised)" strokeWidth="1" />
+        ))}
+      </svg>
+      <div className="mt-2 w-fit rounded-md bg-blob-soft px-1.5 py-px text-[11px] font-semibold tabular-nums text-blob-ink">{r2}</div>
+    </div>
+  );
+}
+
+function MiniCard({ kind, text }: { kind: "note" | "task" | "chart" | "exam"; text: (typeof authText)["en"]["stage"]["cards"] }) {
   if (kind === "note") {
     return (
       <div className="w-[220px] rounded-xl border border-line bg-raised p-3.5 shadow-card">
@@ -177,7 +244,7 @@ function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; te
   if (kind === "task") {
     return (
       <div className="flex w-[210px] items-center gap-2.5 rounded-xl border border-line bg-raised px-3 py-2.5 shadow-card">
-        <span className="grid size-4 place-items-center rounded-[5px] bg-blob">
+        <span className="grid size-4 place-items-center rounded-[5px] bg-blob dark:bg-blob-deep">
           <svg viewBox="0 0 12 12" className="size-2.5 text-white">
             <path d="M2.5 6.2 5 8.5 9.5 3.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
           </svg>
@@ -186,29 +253,17 @@ function MiniCard({ kind, text }: { kind: "note" | "task" | "slide" | "exam"; te
       </div>
     );
   }
-  if (kind === "slide") {
-    return (
-      <div className="w-[230px] rounded-xl border border-line bg-raised p-2 shadow-card">
-        <div className="grid aspect-video place-items-center rounded-lg bg-ink px-4 text-center">
-          <div>
-            <div className="font-display text-[15px] font-bold text-paper">{text.slide}</div>
-            <div className="mt-1 text-[10px] text-paper/60">{text.slideKind}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (kind === "chart") return <ChartCard title={text.sheet} r2={text.r2} />;
   return (
     <div className="w-[190px] rounded-xl border border-line bg-raised px-3 py-2.5 shadow-card">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{text.exam}</div>
+      <div className="text-[11.5px] font-medium text-blob-ink">{text.exam}</div>
       <div className="mt-0.5 text-[13.5px] font-medium">{text.examTitle}</div>
     </div>
   );
 }
 
-/** A link that looks like the primary large button (a button inside a link is not valid HTML). */
-export const authLinkButton =
-  "flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-ink px-4.5 text-[14.5px] font-medium text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-[background,transform] duration-150 hover:bg-ink/88 active:scale-[0.97]";
+/** A link that looks like the forms' violet large button (a button inside a link is not valid HTML). */
+export const authLinkButton = buttonClass("blob", "lg", "w-full");
 
 /** Small animated heading block shared by the auth pages. */
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
@@ -216,7 +271,7 @@ export function AuthHeading({ title, subtitle }: { title: string; subtitle?: Rea
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mb-7">
       <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em] text-balance">{title}</h1>
       {/* Long email addresses break anywhere instead of running out of the column. */}
-      {subtitle && <p className="mt-1.5 text-[14px] text-ink-2 [overflow-wrap:anywhere]">{subtitle}</p>}
+      {subtitle && <p className="mt-1.5 text-pretty text-[14px] text-ink-2 [overflow-wrap:anywhere]">{subtitle}</p>}
     </motion.div>
   );
 }

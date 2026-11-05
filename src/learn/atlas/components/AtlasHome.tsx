@@ -3,12 +3,16 @@
 import { motion } from "motion/react";
 import { ArrowRight, BookOpenCheck, Check, GraduationCap, Layers, Map as MapIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
+import { card, cardLift, midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { atlasText } from "@/i18n/messages/atlas";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import { Ring } from "@/learn/components/Ring";
+import { okFill } from "@/learn/components/tones";
 import { DAILY_GOAL, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useTodayXp } from "@/learn/session";
 import { cn } from "@/lib/utils";
@@ -32,60 +36,29 @@ export function AtlasHome({ stats, progress, days }: { stats: AtlasStats[]; prog
     <>
       <TopBar
         crumbs={[
-          { label: l.learn, href: "/learn", icon: <GraduationCap className="size-3.5" /> },
-          { label: t.atlas, icon: <MapIcon className="size-3.5" /> },
+          { label: l.learn, href: "/learn", icon: <GraduationCap className="size-3.5 text-ink-3" /> },
+          { label: t.atlas, icon: <MapIcon className="size-3.5 text-ink-3" /> },
         ]}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-16 pt-2 sm:px-8">
-          <header className="relative overflow-hidden rounded-3xl border border-line bg-raised p-5 shadow-card sm:p-7">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_120%_at_100%_0%,color-mix(in_oklab,var(--blob)_14%,transparent),transparent_60%)]" aria-hidden />
-            <div className="bg-dots pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-25 [mask-image:linear-gradient(to_left,black,transparent)]" aria-hidden />
-            <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                  <MapIcon className="size-3.5" /> {t.eyebrow}
-                </div>
-                <h1 className="mt-1 font-display text-[32px] font-bold leading-none tracking-[-0.02em] sm:text-[38px]">{t.atlas}</h1>
-                <p className="mt-3 max-w-[560px] text-[15px] leading-relaxed text-ink-2">{t.intro}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="flex h-14 items-center gap-3 rounded-2xl border border-line bg-surface/80 pl-2.5 pr-4">
-                  <Ring value={totalItems ? seenItems / totalItems : 0} size={40} stroke={4.5}>
-                    <Layers className="size-4 text-blob" />
-                  </Ring>
-                  <div className="leading-tight">
-                    <div className="text-[15px] font-semibold tabular-nums">
-                      {seenItems}
-                      <span className="font-normal text-ink-3"> / {totalItems}</span>
-                    </div>
-                    <div className="text-[11.5px] text-ink-3">{t.seen}</div>
-                  </div>
-                </div>
-                <div className="flex h-14 items-center gap-3 rounded-2xl border border-line bg-surface/80 pl-2.5 pr-4">
-                  <Ring value={today.xp / DAILY_GOAL} size={40} stroke={4.5}>
-                    <BookOpenCheck className="size-4 text-blob" />
-                  </Ring>
-                  <div className="leading-tight">
-                    <div className="text-[15px] font-semibold tabular-nums">
-                      {today.xp}
-                      <span className="font-normal text-ink-3"> / {DAILY_GOAL} XP</span>
-                    </div>
-                    <div className="text-[11.5px] text-ink-3">{l.dailyGoal}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </header>
+      <PageBody>
+        {/* The title, and how far you are beside it (below it on phones). */}
+        <div className="flex flex-wrap items-end justify-between gap-x-8">
+          <PageHeader className="min-w-0 flex-1 basis-64" title={t.atlas} meta={t.tagline} />
+          <div className="mb-5 flex flex-wrap gap-2 sm:mb-6">
+            <Stat ring={totalItems ? seenItems / totalItems : 0} icon={<Layers className="size-3.5 text-blob" />} value={seenItems} of={totalItems} label={t.seen} />
+            <Stat ring={today.xp / DAILY_GOAL} icon={<BookOpenCheck className="size-3.5 text-blob" />} value={today.xp} of={`${DAILY_GOAL} XP`} label={l.dailyGoal} />
+          </div>
+        </div>
 
+        <div className="space-y-9">
           {areas.map((area) => {
             const models = ATLAS.filter((m) => m.area === area);
             if (!models.length) return null;
             return (
-              <section key={area} className="mt-9">
+              <section key={area}>
                 <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                  <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em]">{tt(ATLAS_AREAS[area].title)}</h2>
-                  <span className="text-[13px] text-ink-3">{tt(ATLAS_AREAS[area].blurb)}</span>
+                  <h2 className="font-display text-[17px] font-semibold tracking-[-0.01em] text-ink">{tt(ATLAS_AREAS[area].title)}</h2>
+                  <span className={cn("text-[13px]", midTone)}>{tt(ATLAS_AREAS[area].blurb)}</span>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.5rem),1fr))] gap-4">
                   {models.map((m, i) => (
@@ -96,8 +69,26 @@ export function AtlasHome({ stats, progress, days }: { stats: AtlasStats[]; prog
             );
           })}
         </div>
-      </div>
+      </PageBody>
     </>
+  );
+}
+
+/** A number with a ring for how far it is, in a small raised card (the Atlas's "entdeckt" and the daily goal; also on a model's page). */
+export function Stat({ ring, icon, value, of, label, color, title }: { ring: number; icon: ReactNode; value: number; of: number | string; label: string; color?: string; title?: string }) {
+  return (
+    <div className={cn(card, "flex h-12 items-center gap-2.5 pl-2 pr-3.5")} title={title}>
+      <Ring value={ring} size={34} stroke={4} color={color}>
+        {icon}
+      </Ring>
+      <div className="leading-tight">
+        <div className="text-[14px] font-semibold tabular-nums">
+          {value}
+          <span className={cn("font-normal", midTone)}> / {of}</span>
+        </div>
+        <div className={cn("text-[11.5px]", midTone)}>{label}</div>
+      </div>
+    </div>
   );
 }
 
@@ -116,24 +107,22 @@ export function ModelCard({ meta, stats, seen, progress, delay = 0, compact = fa
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, type: "spring", stiffness: 340, damping: 30 }}>
       <Link
         href={atlasHref(meta.slug)}
-        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-card transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2 hover:shadow-pop"
+        className={cn(card, cardLift, "group flex h-full flex-col overflow-hidden")}
       >
-        <div className={cn("relative overflow-hidden bg-surface", compact ? "px-6 pt-3" : "px-8 pt-5")}>
-          <div className="bg-dots pointer-events-none absolute inset-0 opacity-25" aria-hidden />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_70%_at_50%_100%,color-mix(in_oklab,var(--blob)_10%,transparent),transparent_70%)]" aria-hidden />
-          <AtlasArt slug={meta.slug} className="relative mx-auto max-w-[300px] transition-transform duration-300 group-hover:scale-[1.04]" />
+        <div className={cn("relative overflow-hidden border-b border-line bg-surface", compact ? "px-6 pt-3" : "px-8 pt-5")}>
+          <AtlasArt slug={meta.slug} className="relative mx-auto max-w-[300px] transition-transform duration-300 motion-safe:group-hover:scale-[1.04]" />
           {done && (
-            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-ok px-2 py-0.5 text-[11px] font-semibold text-white shadow-card">
+            <span className={cn("absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold shadow-card", okFill)}>
               <Check className="size-3" strokeWidth={3} /> {t.allExplored}
             </span>
           )}
         </div>
         <div className="flex flex-1 flex-col p-4">
           <div className="hyphens-auto font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] break-words">{tt(meta.title)}</div>
-          <div className="mt-0.5 text-[13px] leading-snug text-ink-3">{tt(meta.subtitle)}</div>
+          <div className={cn("mt-0.5 text-[13px] leading-snug", midTone)}>{tt(meta.subtitle)}</div>
           {!compact && <p className="mt-2 line-clamp-3 text-[13.5px] leading-relaxed text-ink-2">{tt(meta.blurb)}</p>}
           <div className="mt-auto pt-4">
-            <div className="flex items-center justify-between gap-2 text-[12px] text-ink-3">
+            <div className={cn("flex items-center justify-between gap-2 text-[12px]", midTone)}>
               <span className="truncate">{counts}</span>
               {progress && progress.attempts > 0 && <span className="shrink-0 font-medium text-blob-ink">{t.quizScore(l.pct(progress.mastery))}</span>}
             </div>
@@ -147,7 +136,7 @@ export function ModelCard({ meta, stats, seen, progress, delay = 0, compact = fa
                 />
               </div>
               <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-ink-2 transition-colors group-hover:text-blob-ink">
-                {t.explore} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                {t.explore} <ArrowRight className="size-3.5 transition-transform motion-safe:group-hover:translate-x-0.5" />
               </span>
             </div>
           </div>

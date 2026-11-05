@@ -12,6 +12,7 @@ import {
   Hash,
   House,
   Keyboard,
+  Lightbulb,
   Map as MapIcon,
   ListChecks,
   CalendarDays,
@@ -26,7 +27,6 @@ import {
   Sheet as SheetIcon,
   SquareKanban,
   SquarePlus,
-  Sun,
   Trash2,
 } from "lucide-react";
 import { BlobMark } from "@/components/blob/BlobMark";
@@ -34,10 +34,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { applyTheme } from "@/components/theme";
+import { useModalFocus } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
+import { groupLabel } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale, useMessages } from "@/i18n/client";
+import { newPageText } from "@/i18n/messages/newPage";
 import { shellText } from "@/i18n/messages/shell";
 import { resolveText } from "@/i18n/text";
 import { CATALOG, SUBJECTS, topicHref } from "@/learn/catalog";
@@ -51,11 +54,17 @@ import { useImporter } from "@/components/notes/useImporter";
 import {
   CALENDAR_WORDS,
   CV_WORDS,
+  DECKS_LIST_ID,
+  DECK_WORDS,
   FOLDER_WORDS,
+  INKS_LIST_ID,
+  INK_LIST_WORDS,
   INK_WORDS,
+  LIST_WORDS,
   NOTEBOOK_WORDS,
   NOTES_WORDS,
   PROJECT_WORDS,
+  SHEETS_LIST_ID,
   SHEET_WORDS,
   findPages,
   newPageFor,
@@ -63,12 +72,14 @@ import {
   type NewKind,
   type PaletteEntry,
 } from "./paletteNew";
+import { KIND_LOOK } from "./NewPageMenu";
 import { usePanes } from "./Panes";
 import { PageIcon, SubjectIcon } from "./Sidebar";
 
 /** The id, label, keywords and (new pages) rank and title decide the item's place (paletteOrder). */
 type Item = PaletteEntry & {
   group: "actions" | "pages" | "found" | "subjects" | "tags" | "learn";
+  /** What an action is for (left out on phones, where its label needs the room), or where a page or topic is. */
   hint?: string;
   icon: ReactNode;
   run: () => void;
@@ -93,12 +104,13 @@ function snippet(text: string, q: string) {
   return (start > 0 ? "…" : "") + text.slice(start, i + q.length + 50).replace(/\s+/g, " ");
 }
 
-export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** `returnFocus`: where the keyboard goes when the palette closes and what opened it is gone (the drawer's "Suchen…"). */
+export function CommandPalette({ open, onClose, returnFocus }: { open: boolean; onClose: () => void; returnFocus?: () => void }) {
   if (typeof document === "undefined") return null;
-  return createPortal(<AnimatePresence>{open && <Palette onClose={onClose} />}</AnimatePresence>, document.body);
+  return createPortal(<AnimatePresence>{open && <Palette onClose={onClose} returnFocus={returnFocus} />}</AnimatePresence>, document.body);
 }
 
-function Palette({ onClose }: { onClose: () => void }) {
+function Palette({ onClose, returnFocus }: { onClose: () => void; returnFocus?: () => void }) {
   const router = useRouter();
   const { pages, subjects, createPage, createSubject, userId } = useWorkspace();
   const { openBeside, showShortcuts } = usePanes();
@@ -107,6 +119,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   const importer = useImporter();
   const locale = useLocale();
   const t = useMessages(shellText).palette;
+  const tn = useMessages(newPageText).kinds;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [found, setFound] = useState<{ id: string; title: string; kind: PageKind; icon: string | null; text: string }[]>([]);
@@ -161,14 +174,16 @@ function Palette({ onClose }: { onClose: () => void }) {
 
     // A new page is called what was typed ("Neue Notiz „Mitochondrien“"), unless the query names the
     // kind of page: "Tabelle" makes a spreadsheet without a name, first in the list (paletteNew.ts).
-    const newPage = (kind: NewKind, bare: string, named: (q: string) => string, icon: ReactNode, keywords?: string): Item => {
+    // Its icon in the kind's colour and what it is for, as in the create menu (NewPageMenu.tsx).
+    const newPage = (kind: NewKind, bare: string, named: (q: string) => string, Icon: typeof FilePlus2, keywords?: string): Item => {
       const { rank, title } = newPageFor(kind, q, bare, keywords);
       return {
         id: `new-${kind}`,
         group: "actions",
         label: title ? named(title) : bare,
+        hint: tn[kind].hint,
         keywords,
-        icon,
+        icon: <Icon style={{ color: KIND_LOOK[kind].fg }} />,
         rank,
         title,
         run: async () => {
@@ -179,11 +194,12 @@ function Palette({ onClose }: { onClose: () => void }) {
       };
     };
 
+    // (The kinds in the order of every create menu: note, Blobxcel spreadsheet, handwriting, presentation.)
     const actions: Item[] = [
-      newPage("note", t.newNote, t.newNoteNamed, <FilePlus2 />),
-      newPage("ink", t.newInk, t.newInkNamed, <Signature />, INK_WORDS),
-      newPage("sheet", t.newSheet, t.newSheetNamed, <SheetIcon />, SHEET_WORDS),
-      newPage("deck", t.newDeck, t.newDeckNamed, <Presentation />),
+      newPage("note", t.newNote, t.newNoteNamed, FilePlus2),
+      newPage("sheet", t.newSheet, t.newSheetNamed, SheetIcon, SHEET_WORDS),
+      newPage("ink", t.newInk, t.newInkNamed, Signature, INK_WORDS),
+      newPage("deck", t.newDeck, t.newDeckNamed, Presentation),
       { id: "new-task", group: "actions", label: t.addTask, hint: t.addTaskHint, icon: <ListPlus />, run: () => go("/tasks?new=1") },
       { id: "new-event", group: "actions", label: t.newEvent, hint: t.newEventHint, keywords: CALENDAR_WORDS, icon: <CalendarPlus />, run: () => go("/calendar?new=1") },
       // Not "new-…": these only show when they match what was typed.
@@ -213,6 +229,19 @@ function Palette({ onClose }: { onClose: () => void }) {
       },
       { id: "project-new", group: "actions", label: t.newProject, hint: t.newProjectHint, keywords: PROJECT_WORDS, icon: <SquarePlus />, run: () => go("/projects?new=1") },
       { id: "notes", group: "actions", label: t.goNotes, hint: t.goNotesHint, keywords: NOTES_WORDS, icon: <NotebookPen />, run: () => go("/notes") },
+      // Your spreadsheets: first for "meine Tabellen", "Tabellen", "my spreadsheets" (paletteOrder).
+      {
+        id: SHEETS_LIST_ID,
+        group: "actions",
+        label: t.goSheets,
+        hint: t.goSheetsHint,
+        keywords: `${SHEET_WORDS} ${LIST_WORDS}`,
+        icon: <SheetIcon />,
+        run: () => go("/notes?kind=sheet"),
+      },
+      // The same for presentations and handwriting ("Präsentationen", "meine Handschriften").
+      { id: DECKS_LIST_ID, group: "actions", label: t.goDecks, hint: t.goDecksHint, keywords: `${DECK_WORDS} ${LIST_WORDS}`, icon: <Presentation />, run: () => go("/notes?kind=deck") },
+      { id: INKS_LIST_ID, group: "actions", label: t.goInks, hint: t.goInksHint, keywords: `${INK_LIST_WORDS} ${LIST_WORDS}`, icon: <Signature />, run: () => go("/notes?kind=ink") },
       { id: "projects", group: "actions", label: t.goProjects, keywords: PROJECT_WORDS, icon: <SquareKanban />, run: () => go("/projects") },
       // Not "new-…": a CV gets no name from the search, so it only shows when it matches.
       { id: "cv-new", group: "actions", label: t.newCv, hint: t.newCvHint, keywords: CV_WORDS, icon: <FileUser />, run: () => go("/cv?new=1") },
@@ -368,7 +397,7 @@ function Palette({ onClose }: { onClose: () => void }) {
     // names a kind of page ("Tabelle", "Notiz zur Zellatmung") moves making one up (paletteNew.ts).
     return paletteOrder(q, { actions, pages: pageItems, results: [...contentItems, ...tagItems, ...subjectItems, ...topicItems, ...atlasItems] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, pages, subjects, found, locale, t, tp, tt, userId, openBeside, showShortcuts, importer, atlas]);
+  }, [q, pages, subjects, found, locale, t, tn, tp, tt, userId, openBeside, showShortcuts, importer, atlas]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the selection on the first result while typing
@@ -379,7 +408,27 @@ function Palette({ onClose }: { onClose: () => void }) {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  function onKeyDown(e: React.KeyboardEvent) {
+  // A modal: Tab stays in it, and closing gives the keyboard back to where it was (the note you were
+  // typing in, the search button), unless what was picked opened something else. The keyboard
+  // starts in the field (also after React's dev mode runs the effects twice, which hands it back
+  // to the opener once).
+  const panel = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const focus = useModalFocus(true, panel, returnFocus);
+  useEffect(() => {
+    input.current?.focus({ preventScroll: true });
+  }, []);
+  // Escape closes it wherever the keyboard is (in it, Escape is handled below and goes no further).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    focus.onKeyDown(e);
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((a) => Math.min(items.length - 1, a + 1));
@@ -392,6 +441,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       if (e.shiftKey && item?.beside) item.beside();
       else item?.run();
     } else if (e.key === "Escape") {
+      e.preventDefault();
       onClose();
     }
   }
@@ -407,8 +457,11 @@ function Palette({ onClose }: { onClose: () => void }) {
         onClick={onClose}
       />
       <motion.div
+        ref={panel}
         role="dialog"
+        aria-modal="true"
         aria-label={t.label}
+        onFocus={focus.onFocus}
         initial={{ opacity: 0, scale: 0.94, y: -10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
@@ -419,11 +472,12 @@ function Palette({ onClose }: { onClose: () => void }) {
         <div className="flex h-13 shrink-0 items-center gap-3 border-b border-line px-4">
           <Search className="size-4.5 text-ink-3" />
           <input
+            ref={input}
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.placeholder}
-            className="h-full flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-3"
+            className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
@@ -435,13 +489,13 @@ function Palette({ onClose }: { onClose: () => void }) {
         </div>
 
         <div ref={listRef} id="palette-list" role="listbox" className="overflow-y-auto p-1.5">
-          {items.length === 0 && <div className="px-3 py-8 text-center text-[13px] text-ink-3">{t.nothing(q)}</div>}
+          {items.length === 0 && <div className="px-3 py-8 text-center text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.nothing(q)}</div>}
           {items.map((item, i) => {
             // A heading above the first item of each group (paletteOrder keeps a group together).
             const header = item.group !== items[i - 1]?.group ? item.group : null;
             return (
               <div key={item.id}>
-                {header && <div className="px-2.5 pb-1 pt-2.5 text-[11.5px] font-medium text-ink-3">{t.groups[header]}</div>}
+                {header && <div className={cn("px-2.5 pb-1 pt-2.5", groupLabel)}>{t.groups[header]}</div>}
                 <button
                   id={`palette-${item.id}`}
                   role="option"
@@ -465,7 +519,10 @@ function Palette({ onClose }: { onClose: () => void }) {
                     {item.label}
                   </span>
                   {item.hint && (
-                    <span className="relative ml-auto min-w-0 max-w-[55%] shrink-[4] truncate text-[12px] text-ink-3" title={item.hint}>
+                    <span
+                      className={cn("relative ml-auto min-w-0 max-w-[55%] shrink-[4] truncate text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]", item.group === "actions" && "max-sm:hidden")}
+                      title={item.hint}
+                    >
                       {item.hint}
                     </span>
                   )}
@@ -476,7 +533,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           })}
         </div>
 
-        <div className="flex h-9 shrink-0 items-center gap-4 border-t border-line px-4 text-[11.5px] text-ink-3">
+        <div className="flex h-9 shrink-0 items-center gap-4 border-t border-line px-4 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
           <span className="flex items-center gap-1 [@media(hover:none)]:hidden">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> {t.move}
@@ -491,7 +548,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           )}
           {/* On touch screens the key hints go away and the tip takes the whole footer. */}
           <span className="ml-auto hidden min-w-0 items-center gap-1.5 sm:flex [@media(hover:none)]:ml-0 [@media(hover:none)]:flex">
-            <Sun className="size-3 shrink-0" /> <span className="truncate">{t.tip}</span>
+            <Lightbulb className="size-3 shrink-0" aria-hidden /> <span className="truncate">{t.tip}</span>
           </span>
         </div>
       </motion.div>

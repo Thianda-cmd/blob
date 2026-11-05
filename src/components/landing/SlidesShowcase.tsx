@@ -108,7 +108,7 @@ export function SlidesShowcase() {
 
   return (
     <div ref={root} className="grid gap-6 lg:grid-cols-12 lg:gap-8">
-      <div className="lg:order-2 lg:col-span-7">
+      <div className="lg:col-span-7">
         <div role="group" aria-label={t.stage.label} className="@container relative aspect-video overflow-hidden rounded-xl bg-ink shadow-pop ring-1 ring-line">
           <LayoutGroup id="landing-deck">
             <AnimatePresence initial={false} custom={pos.enter}>
@@ -148,7 +148,7 @@ export function SlidesShowcase() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:order-1 lg:col-span-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:col-span-5">
         <Spec title={t.specs.layouts.title(LAYOUTS.length)} body={t.specs.layouts.body}>
           <div className="grid grid-cols-6 gap-1">
             {LAYOUTS.map((l) => (
@@ -182,7 +182,7 @@ export function SlidesShowcase() {
                 key={e}
                 className={cn(
                   "rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-colors duration-300",
-                  e === pos.enter && build === 0 ? "bg-ink text-paper" : e === pos.enter ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2",
+                  e === pos.enter && build === 0 ? "bg-blob text-white dark:bg-blob-deep" : e === pos.enter ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2",
                 )}
               >
                 {t.transitions[e]}

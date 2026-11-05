@@ -298,7 +298,7 @@ export function BoardView({
           <div className="w-[288px] rotate-[1deg] rounded-xl border border-line-2 bg-paper/95 p-3 shadow-pop">
             <div className="flex items-center gap-2 text-[13px] font-semibold">
               <ColumnDot column={activeColumn} /> {activeColumn.title}
-              <span className="text-ink-3">{(grouped.get(activeColumn.id) ?? []).length}</span>
+              <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{(grouped.get(activeColumn.id) ?? []).length}</span>
             </div>
           </div>
         ) : null}
@@ -412,7 +412,7 @@ function BoardColumn({
           </h3>
         )}
         {!renaming && (
-          <span className="shrink-0 rounded-full px-1 text-[12px] tabular-nums text-ink-3" title={t.cardCount(total)}>
+          <span className="shrink-0 rounded-full px-1 text-[12px] tabular-nums text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" title={t.cardCount(total)}>
             {total}
           </span>
         )}
@@ -464,7 +464,7 @@ function BoardColumn({
           <div
             className={cn(
               "grid h-16 place-items-center rounded-[10px] border border-dashed text-[12px] transition-colors",
-              dragging ? "border-blob/50 bg-blob-soft/40 text-blob-ink" : "border-line-2 text-ink-3",
+              dragging ? "border-blob/50 bg-blob-soft/40 text-blob-ink" : "border-line-2 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
             )}
           >
             {readOnly ? "" : t.dropHere}
@@ -477,7 +477,7 @@ function BoardColumn({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mx-2 mb-2 mt-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-ink-3 transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-10"
+          className="mx-2 mb-2 mt-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] transition-colors hover:bg-hover hover:text-ink [@media(hover:none)]:h-10"
         >
           <Plus className="size-4" /> {t.addCard}
         </button>
@@ -551,7 +551,7 @@ function ColumnOptions({ column, index, count, board, onRename }: { column: Proj
             >
               <span className="flex flex-col leading-tight">
                 {t.doneColumn}
-                <span className="text-[11px] text-ink-3">{t.doneColumnHint}</span>
+                <span className="text-[11px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.doneColumnHint}</span>
               </span>
             </MenuItem>
             <MenuSeparator />
@@ -735,10 +735,10 @@ function CardComposer({ board, columnId, onClose, listRef }: { board: Board; col
               submit();
               onClose();
             }}
-            className="block w-full resize-none bg-transparent text-[13.5px] leading-[1.4] text-ink outline-none placeholder:text-ink-3"
+            className="block w-full resize-none bg-transparent text-[13.5px] leading-[1.4] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
           />
           <div className="mt-1 flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] text-ink-3 [@media(hover:none)]:hidden">{t.addCardHint}</span>
+            <span className="truncate text-[11px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] [@media(hover:none)]:hidden">{t.addCardHint}</span>
             <Button
               size="xs"
               variant="blob"
@@ -767,7 +767,7 @@ function AddColumn({ board }: { board: Board }) {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex h-11 w-[240px] shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-line-2 px-3 text-[13px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink max-sm:snap-center"
+        className="flex h-11 w-[240px] shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-line-2 px-3 text-[13px] text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink max-sm:snap-center"
       >
         <Plus className="size-4" /> {t.addColumn}
       </button>

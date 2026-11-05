@@ -25,8 +25,6 @@ export const learnText = defineMessages({
     backToTopic: "Back to topic",
 
     home: {
-      eyebrow: "Learning center",
-      intro: "Short lessons with Blob, practice that adapts to you, and a cheat sheet for every topic.",
       goalReached: "Goal reached!",
       totalXp: "Total XP",
       subjects: "Subjects",
@@ -262,8 +260,6 @@ export const learnText = defineMessages({
     backToTopic: "Zurück zum Thema",
 
     home: {
-      eyebrow: "Lernzentrum",
-      intro: "Kurze Lektionen mit Blob, Übungen, die sich an dich anpassen, und ein Spickzettel für jedes Thema.",
       goalReached: "Ziel erreicht!",
       totalXp: "XP gesamt",
       subjects: "Fächer",

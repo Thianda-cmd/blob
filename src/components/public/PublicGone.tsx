@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Blob } from "@/components/blob/Blob";
+import { buttonClass } from "@/components/ui/Button";
 import { publicText } from "@/i18n/messages/public";
 import { getMessages } from "@/i18n/server";
 
@@ -16,7 +17,7 @@ export async function PublicGone() {
         <Blob size={140} mood="worried" />
         <h1 className="mt-2 font-display text-[26px] font-bold tracking-[-0.03em] text-balance">{t.title}</h1>
         <p className="mt-1.5 text-[14px] text-ink-2">{t.text}</p>
-        <Link href="/" className="mt-6 flex h-10 items-center rounded-lg bg-ink px-4 text-[13.5px] font-medium text-paper hover:bg-ink/88">
+        <Link href="/" className={buttonClass("blob", "lg", "mt-6")}>
           {t.home}
         </Link>
       </div>

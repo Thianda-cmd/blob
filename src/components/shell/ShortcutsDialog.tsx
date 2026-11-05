@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useRef } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
+import { useModKey } from "@/components/ui/ModKey";
 import { useIsMac } from "@/components/ui/useMediaQuery";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import type { Locale } from "@/i18n/config";
@@ -18,7 +19,7 @@ type Group = keyof (typeof panesText)["en"]["shortcuts"]["groups"];
 type SheetItem = keyof (typeof sheetText)["en"]["shortcuts"]["items"];
 type SheetGroup = keyof (typeof sheetText)["en"]["shortcuts"]["groups"];
 
-/** Keys as written in the list: "mod" and "shift" become ⌘ ⇧ on a Mac, Ctrl and Shift elsewhere. */
+/** Keys as written in the list: "mod" and "shift" become ⌘ ⇧ on a Mac, Strg/Ctrl and Umschalt/Shift elsewhere. */
 const GROUPS: { group: Group; items: [Item, string[][]][] }[] = [
   {
     group: "general",
@@ -126,12 +127,14 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
   const t = useMessages(panesText).shortcuts;
   const ts = useMessages(sheetText).shortcuts;
   const mac = useIsMac();
+  // (The same Ctrl key as everywhere else: ⌘ on a Mac, "Strg" on German keyboards, else "Ctrl".)
+  const mod = useModKey();
   const locale = useLocale();
   const { pages } = useWorkspace();
   const here = pageIdOfPath(usePathname());
   const inSheet = !!here && pages.some((p) => p.id === here && p.kind === "sheet");
   const name = (k: string) =>
-    k === "mod" ? (mac ? "⌘" : locale === "de" ? "Strg" : "Ctrl") : k === "shift" ? (mac ? "⇧" : locale === "de" ? "Umschalt" : "Shift") : k === "alt" ? (mac ? "⌥" : "Alt") : k;
+    k === "mod" ? mod : k === "shift" ? (mac ? "⇧" : locale === "de" ? "Umschalt" : "Shift") : k === "alt" ? (mac ? "⌥" : "Alt") : k;
   const app = GROUPS.map(({ group, items }) => ({ id: group, title: t.groups[group], items: items.map(([item, combos]) => ({ id: item, label: t.items[item], combos })) }));
   const sheet = sheetGroups(mac, locale).map(({ group, items }) => ({
     id: `sheet-${group}`,
@@ -168,7 +171,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
       >
         {sections.map(({ id, title, items }) => (
           <section key={id}>
-            <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{title}</h3>
+            <h3 className="mb-1.5 text-[12px] font-semibold text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{title}</h3>
             <dl className="space-y-1">
               {items.map(({ id: item, label, combos }) => (
                 <div key={item} className="flex items-center justify-between gap-3 py-0.5 text-[13px]">

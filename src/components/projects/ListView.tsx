@@ -61,11 +61,12 @@ export function ListView({
   ];
   const grid = "md:grid md:grid-cols-[minmax(0,1fr)_150px_112px_104px_96px_minmax(0,170px)] md:items-center md:gap-3";
 
-  if (!cards.length) return <p className="px-4 py-10 text-center text-[13.5px] text-ink-3 sm:px-8">{t.list.empty}</p>;
+  if (!cards.length) return <p className="px-4 py-10 text-center text-[13.5px] text-ink-2 sm:px-8">{t.list.empty}</p>;
 
   return (
     <div className="h-full overflow-y-auto px-4 pb-24 sm:px-8 lg:px-10" role="table" aria-label={board.project.title}>
-      <div role="row" className={cn("sticky top-0 z-10 hidden h-9 border-b border-line bg-surface text-[12px] font-medium text-ink-3", grid)}>
+      {/* On the board's paper (ProjectBoard): the sticky header is paper too, so rows slide under it. */}
+      <div role="row" className={cn("sticky top-0 z-10 hidden h-9 border-b border-line bg-paper text-[12px] font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]", grid)}>
         {header.map((h) => {
           const active = sort?.key === h.key;
           return (
@@ -83,7 +84,7 @@ export function ListView({
           );
         })}
       </div>
-      {rows.length === 0 && <p className="py-10 text-center text-[13.5px] text-ink-3">{t.nothingMatches}</p>}
+      {rows.length === 0 && <p className="py-10 text-center text-[13.5px] text-ink-2">{t.nothingMatches}</p>}
       <div role="rowgroup">
         {rows.map((card) => {
           const column = columns.find((c) => c.id === card.column_id) ?? columns[0];
@@ -110,13 +111,13 @@ export function ListView({
                 openId === card.id && "bg-blob-soft/50 hover:bg-blob-soft/60",
               )}
             >
-              <span role="cell" className={cn("flex min-w-0 items-center gap-2 text-[13.5px]", done ? "text-ink-3" : "text-ink")}>
+              <span role="cell" className={cn("flex min-w-0 items-center gap-2 text-[13.5px]", done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" : "text-ink")}>
                 {done && <Check className="size-3.5 shrink-0 text-ok" strokeWidth={2.6} />}
                 <span className="truncate font-medium" title={card.title}>
                   {card.title}
                 </span>
                 {progress.total > 0 && (
-                  <span className={cn("shrink-0 text-[11.5px] tabular-nums text-ink-3", progress.done === progress.total && "text-ok")}>
+                  <span className={cn("shrink-0 text-[11.5px] tabular-nums text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]", progress.done === progress.total && "text-ok")}>
                     {progress.done}/{progress.total}
                   </span>
                 )}
@@ -128,10 +129,10 @@ export function ListView({
                   <span className="truncate">{column?.title}</span>
                 </span>
                 <span role="cell" className={cn("flex min-w-0 items-center", !assignees.length && "max-md:hidden")}>
-                  {assignees.length > 0 ? <AvatarStack people={assignees} size={22} max={4} /> : <span className="text-ink-3">–</span>}
+                  {assignees.length > 0 ? <AvatarStack people={assignees} size={22} max={4} /> : <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">–</span>}
                 </span>
                 <span role="cell" className={cn("flex min-w-0 items-center", !card.due_at && "max-md:hidden")}>
-                  {card.due_at ? <DueChip due={card.due_at} now={now} done={done} className="-ml-1.5" /> : <span className="text-ink-3">–</span>}
+                  {card.due_at ? <DueChip due={card.due_at} now={now} done={done} className="-ml-1.5" /> : <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">–</span>}
                 </span>
                 <span role="cell" className={cn("flex min-w-0 items-center gap-1.5", card.priority === 0 && "max-md:hidden")} title={t.priorityNames[card.priority]}>
                   {card.priority > 0 ? (
@@ -140,14 +141,14 @@ export function ListView({
                       <span className="hidden truncate lg:inline">{t.priorityNames[card.priority]}</span>
                     </>
                   ) : (
-                    <span className="text-ink-3">–</span>
+                    <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">–</span>
                   )}
                 </span>
                 <span role="cell" className={cn("flex min-w-0 flex-wrap gap-1 overflow-hidden md:h-5", !labels.length && "max-md:hidden")}>
                   {labels.slice(0, 3).map((l) => (
                     <LabelChip key={l.raw} label={l} />
                   ))}
-                  {labels.length > 3 && <span className="text-[11px] text-ink-3">+{labels.length - 3}</span>}
+                  {labels.length > 3 && <span className="text-[11px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">+{labels.length - 3}</span>}
                 </span>
               </span>
             </div>

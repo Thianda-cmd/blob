@@ -16,7 +16,8 @@ import { useTopic } from "@/learn/topics";
 import { LEVELS, type Exercise, type Feedback, type Level, type Topic } from "@/learn/types";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent, type ExerciseResult } from "./ExerciseCard";
-import { SessionEnd, StudyButton, StudyTopBar, type SegmentState } from "./StudyChrome";
+import { groupLabel } from "@/components/ui/surfaces";
+import { okFill, SessionEnd, StudyButton, studyLabel, StudyTopBar, type SegmentState } from "./StudyChrome";
 import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
 
@@ -207,13 +208,13 @@ export function PracticePlayer({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 18 }}
-                className="flex items-center gap-4 rounded-2xl border border-line bg-raised p-4 shadow-card"
+                className="flex items-center gap-4 rounded-xl border border-line bg-raised p-4 shadow-card"
               >
-                <span className={cn("grid size-16 place-items-center rounded-2xl font-display text-[34px] font-bold text-white", g <= 2 ? "bg-ok" : g <= 4 ? "bg-blob" : "bg-ink-3")}>
+                <span className={cn("grid size-16 place-items-center rounded-2xl font-display text-[34px] font-bold text-white", g <= 2 ? okFill : g <= 4 ? "bg-blob dark:bg-blob-deep" : "bg-ink-3")}>
                   {g}
                 </span>
                 <div>
-                  <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.practice.grade}</div>
+                  <div className={groupLabel}>{t.practice.grade}</div>
                   <div className="font-display text-[22px] font-semibold">{t.grades[g - 1]}</div>
                   <div className="text-[13px] text-ink-2">{t.practice.correctPct(t.pct(Math.round(pct * 100)))}</div>
                 </div>
@@ -254,9 +255,9 @@ export function PracticePlayer({
           <Tutor say={say} mood={mood} blobRef={blobRef} size={170} side="auto" />
         </aside>
         <main className="min-w-0">
-          <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
+          <div className={cn("mb-3 flex items-center gap-2", studyLabel)}>
             <span>{t.practice.taskOf(index + 1, total)}</span>
-            <span className="text-line-2">·</span>
+            <span aria-hidden>·</span>
             <span className="text-blob-ink">{test ? `${t.practice.test} · ${levelName}` : levelName}</span>
           </div>
           <AnimatePresence mode="wait" initial={false}>

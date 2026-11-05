@@ -107,7 +107,7 @@ export function ThemePicker({
               <div className="min-w-0 flex-1">
                 <div className={cn("truncate font-medium leading-tight text-ink", size === "lg" ? "text-[14px]" : "text-[13px]")}>{label}</div>
                 {/* Hints may wrap: three cards side by side are narrow on phones. */}
-                {size === "lg" && <div className="text-pretty text-[12px] leading-tight text-ink-3">{hint}</div>}
+                {size === "lg" && <div className="text-pretty text-[12px] leading-tight text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{hint}</div>}
               </div>
               <span
                 className={cn(

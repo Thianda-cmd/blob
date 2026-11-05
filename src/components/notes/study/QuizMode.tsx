@@ -8,7 +8,8 @@ import { useMessages } from "@/i18n/client";
 import { studyText } from "@/i18n/messages/study";
 import { Confetti } from "@/learn/components/Confetti";
 import { Ring } from "@/learn/components/Ring";
-import { CountUp, StudyButton } from "@/learn/components/StudyChrome";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
+import { CountUp, okFill, okText, StudyButton, studyLabel, studyPrimary } from "@/learn/components/StudyChrome";
 import { Tutor } from "@/learn/components/Tutor";
 import { docText, plain, type Line } from "@/notes/doc";
 import type { Card } from "@/notes/study/cards";
@@ -135,9 +136,9 @@ export function QuizMode({
             <Tutor say={say ?? verdict} mood={pct >= 70 ? "excited" : "happy"} accessory="cap" size={150} side="left" blobRef={blobRef} />
           </div>
           <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.quiz.title}</div>
+            <div className={studyLabel}>{t.quiz.title}</div>
             <h1 className="mt-1 font-display text-[30px] font-bold leading-tight tracking-[-0.02em] sm:text-[34px]">{verdict}</h1>
-            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-line bg-raised p-4 shadow-card">
+            <div className="mt-4 flex items-center gap-4 rounded-xl border border-line bg-raised p-4 shadow-card">
               <Ring value={pct / 100} from={0} size={76} stroke={8} delay={0.2}>
                 <span className="text-[17px] font-bold tabular-nums">
                   <CountUp value={pct} from={0} delay={0.25} />%
@@ -145,7 +146,7 @@ export function QuizMode({
               </Ring>
               <div>
                 <div className="font-display text-[22px] font-semibold text-ink">{t.quiz.score(right, questions.length)}</div>
-                <div className="text-[13px] text-ink-3">
+                <div className={cn("text-[13px]", midTone)}>
                   {t.quiz.correctStat} {right} · {t.quiz.wrongStat} {questions.length - right}
                 </div>
               </div>
@@ -154,7 +155,7 @@ export function QuizMode({
               <StudyButton onClick={restart} variant="blob">
                 <RotateCcw className="size-4" /> {t.quiz.newQuiz}
               </StudyButton>
-              <StudyButton onClick={onCards} variant="ink">
+              <StudyButton onClick={onCards} variant="secondary">
                 <Layers className="size-4" /> {t.quiz.studyCards}
               </StudyButton>
               <StudyButton href={`/p/${pageId}`} variant="ghost">
@@ -168,18 +169,18 @@ export function QuizMode({
           <h2 className="mb-3 font-display text-[19px] font-semibold tracking-[-0.01em]">{wrong.length ? t.quiz.review : t.quiz.allRight}</h2>
           <ul className="space-y-2">
             {wrong.map(({ q: wq, g }) => (
-              <li key={wq.id} className="rounded-2xl border border-line bg-raised p-4 shadow-card">
-                <div className="text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-3">{wq.card.context}</div>
+              <li key={wq.id} className="rounded-xl border border-line bg-raised p-4 shadow-card">
+                <div className={groupLabel}>{wq.card.context}</div>
                 <div className="mt-1 text-[14.5px] font-medium text-ink">
                   {wq.column && <span className="mr-1.5 text-[12.5px] font-semibold text-blob-ink">{t.quiz.ask.column(wq.column)}</span>}
                   <RichLines lines={wq.prompt} />
                 </div>
-                <div className="mt-1.5 flex items-start gap-2 text-[14px] text-ok">
+                <div className={cn("mt-1.5 flex items-start gap-2 text-[14px]", okText)}>
                   <Check className="mt-0.5 size-4 shrink-0" strokeWidth={2.6} />
                   <RichLines lines={rightAnswer(wq)} />
                 </div>
                 {g && g.answer && (
-                  <div className="mt-1 flex items-start gap-2 text-[13px] text-ink-3">
+                  <div className={cn("mt-1 flex items-start gap-2 text-[13px]", midTone)}>
                     <X className="mt-0.5 size-4 shrink-0 text-danger" /> <span className="line-through decoration-danger/50">{g.answer}</span>
                   </div>
                 )}
@@ -197,12 +198,12 @@ export function QuizMode({
         <Tutor say={say} mood={mood} blobRef={blobRef} size={150} side="auto" accessory="glasses" />
       </aside>
       <div className="min-w-0 max-w-[760px]">
-        <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
-          <span className="tabular-nums">{t.quiz.question(index + 1, questions.length)}</span>
+        <div className={cn("mb-3 flex items-center gap-2", studyLabel)}>
+          <span className="shrink-0 tabular-nums">{t.quiz.question(index + 1, questions.length)}</span>
           {q.card.context && (
             <>
-              <span className="text-line-2">·</span>
-              <span className="truncate normal-case tracking-normal">{q.card.context}</span>
+              <span aria-hidden>·</span>
+              <span className="truncate">{q.card.context}</span>
             </>
           )}
         </div>
@@ -264,7 +265,7 @@ function Answer({ q, current, onAnswer }: { q: Question; current: Given | null; 
               <span
                 className={cn(
                   "grid size-7 shrink-0 place-items-center rounded-lg border text-[12.5px] font-semibold",
-                  right ? "border-ok bg-ok text-white" : wrong ? "border-danger bg-danger text-white" : "border-line bg-surface text-ink-3",
+                  right ? cn("border-transparent", okFill) : wrong ? "border-danger bg-danger text-white" : "border-line bg-surface text-ink-2",
                 )}
               >
                 {right ? <Check className="size-4" strokeWidth={3} /> : wrong ? <X className="size-4" strokeWidth={3} /> : i + 1}
@@ -297,13 +298,13 @@ function Answer({ q, current, onAnswer }: { q: Question; current: Given | null; 
               onClick={() => onAnswer({ correct: o.value === q.truth, answer: o.label })}
               className={cn(
                 "flex h-14 items-center justify-center gap-2 rounded-2xl border text-[15px] font-semibold shadow-card transition-[border-color,background,transform] active:scale-[0.99]",
-                right ? "border-ok bg-ok/10 text-ok" : wrong ? "border-danger/60 bg-danger/8 text-danger-ink" : "border-line bg-raised text-ink hover:border-blob/40",
+                right ? cn("border-ok bg-ok/10", okText) : wrong ? "border-danger/60 bg-danger/8 text-danger-ink" : "border-line bg-raised text-ink hover:border-blob/40",
                 current && !right && !wrong && "opacity-55",
               )}
             >
               {o.value ? <Check className="size-4.5" strokeWidth={2.6} /> : <X className="size-4.5" strokeWidth={2.6} />}
               {o.label}
-              <kbd className="hidden rounded-md border border-line px-1.5 text-[11px] font-medium text-ink-3 pointer-fine:inline">{o.key}</kbd>
+              <kbd className={cn("hidden rounded-md border border-line px-1.5 text-[11px] font-medium pointer-fine:inline", midTone)}>{o.key}</kbd>
             </button>
           );
         })}
@@ -331,13 +332,13 @@ function Answer({ q, current, onAnswer }: { q: Question; current: Given | null; 
         autoCapitalize="off"
         spellCheck={false}
         className={cn(
-          "h-13 min-w-0 flex-1 rounded-2xl border bg-raised px-4 text-[16px] text-ink shadow-card outline-none transition-[border,box-shadow] placeholder:text-ink-3/80 focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)]",
+          "h-13 min-w-0 flex-1 rounded-2xl border bg-raised px-4 text-[16px] text-ink shadow-card outline-none transition-[border,box-shadow] placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] focus:border-blob focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_18%,transparent)]",
           current ? (current.correct ? "border-ok" : "border-danger/60") : "border-line",
         )}
       />
       {!current && (
         <div className="flex gap-2">
-          <button type="submit" disabled={!typed.trim()} className="h-13 flex-1 rounded-2xl bg-ink px-5 text-[15px] font-semibold text-paper transition-[transform,opacity] hover:bg-ink/88 active:scale-[0.98] disabled:opacity-40 sm:flex-none">
+          <button type="submit" disabled={!typed.trim()} className={cn("h-13 flex-1 rounded-2xl px-5 text-[15px] font-semibold transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40 sm:flex-none", studyPrimary)}>
             {t.quiz.check}
           </button>
           <button type="button" onClick={() => onAnswer({ correct: false, answer: "" })} className="h-13 rounded-2xl px-4 text-[14px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
@@ -372,7 +373,7 @@ function Feedback({ q, given, onNext, last }: { q: Question; given: Given; onNex
       className={cn("mt-4 rounded-2xl border p-4", given.correct ? "border-ok/40 bg-ok/[0.07]" : "border-danger/30 bg-danger/[0.05]")}
       role="status"
     >
-      <div className={cn("flex items-center gap-2 text-[15px] font-semibold", given.correct ? "text-ok" : "text-danger")}>
+      <div className={cn("flex items-center gap-2 text-[15px] font-semibold", given.correct ? okText : "text-danger-ink")}>
         {given.correct ? <Check className="size-4.5" strokeWidth={2.6} /> : <X className="size-4.5" strokeWidth={2.6} />}
         {given.correct ? (given.close ? t.quiz.close : t.quiz.right[0]) : t.quiz.wrong}
       </div>
@@ -385,7 +386,7 @@ function Feedback({ q, given, onNext, last }: { q: Question; given: Given; onNex
         </div>
       )}
       <div className="mt-3 flex justify-end">
-        <StudyButton onClick={onNext} variant={given.correct ? "blob" : "ink"} buttonRef={nextRef}>
+        <StudyButton onClick={onNext} variant="blob" buttonRef={nextRef}>
           {last ? t.quiz.results : t.quiz.next} <ArrowRight className="size-4" />
         </StudyButton>
       </div>

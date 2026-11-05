@@ -11,6 +11,7 @@ import { orderStart } from "@/learn/engine/arrange";
 import { parseFormula } from "@/learn/chemistry/formula";
 import { parse, toDisplay } from "@/learn/engine/expr";
 import type { AnswerSpec, Text } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { MatchField, OrderField } from "./ArrangeInputs";
 import { MathView } from "./MathView";
@@ -143,14 +144,14 @@ export function MathField({
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0 }}
-                  className="ml-auto flex items-center gap-2 text-[12px] text-ink-3"
+                  className={cn("ml-auto flex items-center gap-2 text-[12px]", midTone)}
                 >
                   {t.readsAs}
                   <MathView src={shown} size="sm" animate={false} className="text-ink" />
                 </motion.div>
               )}
               {parsed && !parsed.ok && (
-                <motion.div key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ml-auto text-[12px] text-ink-3">
+                <motion.div key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("ml-auto text-[12px]", midTone)}>
                   {tt(parsed.error)}
                 </motion.div>
               )}
@@ -364,7 +365,7 @@ export function AnswerInput({
                 aria-label={t.ops[o]}
                 className={cn(
                   "h-10 w-11 rounded-lg text-[22px] transition-all [font-family:var(--font-math)]",
-                  op === o ? "bg-blob text-white shadow-card" : "text-ink-2 hover:bg-hover",
+                  op === o ? "bg-blob text-white shadow-card dark:bg-blob-deep" : "text-ink-2 hover:bg-hover",
                 )}
                 aria-pressed={op === o}
               >
@@ -398,7 +399,7 @@ export function AnswerInput({
                   wrong && "border-danger bg-danger/10",
                 )}
               >
-                <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[12px] font-semibold", picked ? "border-blob bg-blob text-white" : "border-line-2 text-ink-3")}>
+                <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[12px] font-semibold", picked ? "border-blob bg-blob text-white dark:border-blob-deep dark:bg-blob-deep" : "border-line-2 text-ink-2")}>
                   {String.fromCharCode(65 + i)}
                 </span>
                 <span className="min-w-0 break-words">
@@ -412,7 +413,7 @@ export function AnswerInput({
     case "multi":
       return (
         <div className="space-y-2">
-          <div className="text-[12.5px] text-ink-3">{t.selectAll}</div>
+          <div className={cn("text-[12.5px]", midTone)}>{t.selectAll}</div>
           <div className="grid gap-2 sm:grid-cols-2">
             {spec.options.map((opt, i) => {
               const on = picked.includes(i);
@@ -435,7 +436,7 @@ export function AnswerInput({
                     wrong && "border-danger bg-danger/10",
                   )}
                 >
-                  <span className={cn("grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors", on ? "border-blob bg-blob text-white" : "border-line-2")}>
+                  <span className={cn("grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors", on ? "border-blob bg-blob text-white dark:border-blob-deep dark:bg-blob-deep" : "border-line-2")}>
                     {on && (
                       <svg viewBox="0 0 12 12" className="size-3" aria-hidden>
                         <path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -516,7 +517,7 @@ export function AnswerInput({
             <span className="px-2 text-[22px] text-ink-2">→</span>
             {species(right, left.length)}
           </div>
-          <div className="text-[12.5px] text-ink-3">{t.balanceHint}</div>
+          <div className={cn("text-[12.5px]", midTone)}>{t.balanceHint}</div>
         </div>
       );
     }
@@ -594,7 +595,7 @@ function FormulaField({
             </button>
           ))}
         </div>
-        <div className="flex min-h-8 items-center gap-2 text-[12.5px] text-ink-3">
+        <div className={cn("flex min-h-8 items-center gap-2 text-[12.5px]", midTone)}>
           {parsed?.ok ? (
             <>
               {t.readsAs} <MathView src={`\\ce{${parsed.species.text}}`} size="md" animate={false} className="text-ink" />

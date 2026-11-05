@@ -9,6 +9,8 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { formatNumber } from "@/i18n/format";
 import { studyText } from "@/i18n/messages/study";
 import { MathView } from "@/learn/components/MathView";
+import { midTone } from "@/components/ui/surfaces";
+import { okFill, okText, studyLabel, studyPrimary } from "@/learn/components/StudyChrome";
 import { summaryNote } from "@/notes/convert";
 import { insertNote } from "@/notes/pages";
 import type { Card } from "@/notes/study/cards";
@@ -59,7 +61,7 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
       <div className="mx-auto flex max-w-[560px] flex-col items-center px-5 py-20 text-center">
         <Blob size={120} mood="sleepy" track={false} />
         <p className="mt-3 text-[15px] text-ink-2">{t.summary.empty}</p>
-        <Link href={`/p/${page.id}`} className="mt-5 inline-flex h-10 items-center rounded-xl bg-ink px-4 text-[14px] font-semibold text-paper hover:bg-ink/88">
+        <Link href={`/p/${page.id}`} className={cn("mt-5 inline-flex h-10 items-center rounded-xl px-4 text-[14px] font-semibold", studyPrimary)}>
           {t.back}
         </Link>
       </div>
@@ -70,9 +72,9 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
     <div className="mx-auto w-full max-w-[860px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10 print:max-w-none print:p-0">
       {/* Actions */}
       <div className="mb-6 flex flex-wrap items-center gap-2 print:hidden">
-        <div className="mr-auto text-[12.5px] text-ink-3">
+        <div className={cn("mr-auto text-[12.5px]", midTone)}>
           {words}
-          {shorter > 0 && <span className="ml-1.5 rounded-full bg-ok/12 px-1.5 py-px font-semibold text-ok">{t.summary.shorter(shorter)}</span>}
+          {shorter > 0 && <span className={cn("ml-1.5 rounded-full bg-ok/12 px-1.5 py-px font-semibold", okText)}>{t.summary.shorter(shorter)}</span>}
         </div>
         <button onClick={() => window.print()} className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
           <Printer className="size-4" /> {t.summary.print}
@@ -81,14 +83,14 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
           <Layers className="size-4" /> {t.summary.studyCards}
         </button>
         {saved ? (
-          <Link href={`/p/${saved}`} className="flex h-9 items-center gap-1.5 rounded-xl bg-ok px-3 text-[13px] font-semibold text-white shadow-card">
+          <Link href={`/p/${saved}`} className={cn("flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold shadow-card", okFill)}>
             <Check className="size-4" strokeWidth={2.6} /> {t.summary.saved} · {t.summary.open} <ArrowUpRight className="size-3.5" />
           </Link>
         ) : (
           <button
             onClick={save}
             disabled={saving === "saving"}
-            className="flex h-9 items-center gap-1.5 rounded-xl bg-blob px-3 text-[13px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep disabled:opacity-60"
+            className={cn("flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold disabled:opacity-60", studyPrimary)}
           >
             <FilePlus2 className="size-4" /> {saving === "saving" ? t.summary.saving : t.summary.save}
           </button>
@@ -100,23 +102,23 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
         </p>
       )}
 
-      <motion.article initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-line bg-raised px-5 py-7 shadow-card sm:px-10 sm:py-10 print:rounded-none print:border-0 print:p-0 print:shadow-none">
-        <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.summary.title}</div>
+      <motion.article initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-line bg-raised px-5 py-7 shadow-card sm:px-10 sm:py-10 print:rounded-none print:border-0 print:p-0 print:shadow-none">
+        <div className={studyLabel}>{t.summary.title}</div>
         <h1 className="mt-1 text-balance font-display text-[28px] font-bold leading-tight tracking-[-0.02em] sm:text-[34px]">
           {page.icon && <span className="mr-2">{page.icon}</span>}
           {title}
         </h1>
-        <p className="mt-2 text-[13.5px] text-ink-3 print:hidden">{t.summary.intro}</p>
+        <p className={cn("mt-2 text-[13.5px] print:hidden", midTone)}>{t.summary.intro}</p>
 
         {summary.gist.length > 0 && (
-          <section className="mt-6 rounded-2xl border border-blob/25 bg-blob-soft/40 px-4 py-4 sm:px-5 print:break-inside-avoid">
-            <h2 className="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-blob-ink">
+          <section className="mt-6 rounded-xl border border-blob/25 bg-blob-soft/40 px-4 py-4 sm:px-5 print:break-inside-avoid">
+            <h2 className="flex items-center gap-1.5 text-[14px] font-semibold text-blob-ink">
               <Lightbulb className="size-4" /> {t.summary.gist}
             </h2>
             <ol className="mt-2.5 space-y-2">
               {summary.gist.map((l, i) => (
                 <li key={i} className="flex gap-3 text-[15px] leading-relaxed text-ink">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-blob text-[11px] font-bold text-white">{i + 1}</span>
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-blob text-[11px] font-bold text-white dark:bg-blob-deep">{i + 1}</span>
                   <RichLine line={l} />
                 </li>
               ))}
@@ -184,7 +186,7 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {summary.formulas.map((f, i) => (
                 <div key={i} className="overflow-x-auto rounded-xl border border-line bg-surface px-4 py-3">
-                  {f.label && <div className="mb-1.5 text-[12.5px] font-medium text-ink-3">{f.label}</div>}
+                  {f.label && <div className={cn("mb-1.5 text-[12.5px] font-medium", midTone)}>{f.label}</div>}
                   <MathView src={f.src} size="sm" animate={false} />
                 </div>
               ))}
@@ -192,7 +194,7 @@ export function SummaryMode({ page, title, cards, userId, role, onCards }: { pag
           </section>
         )}
 
-        <p className="mt-9 border-t border-line pt-4 text-[12px] text-ink-3">
+        <p className={cn("mt-9 border-t border-line pt-4 text-[12px]", midTone)}>
           {t.summary.source(title)} · {words}
         </p>
       </motion.article>
@@ -204,7 +206,7 @@ function PointView({ point, label }: { point: Point; label?: string }) {
   if (point.kind === "math") {
     return (
       <div className="overflow-x-auto rounded-xl bg-surface px-4 py-3">
-        {label && <div className="mb-1 text-[12px] font-medium text-ink-3">{label}</div>}
+        {label && <div className={cn("mb-1 text-[12px] font-medium", midTone)}>{label}</div>}
         <MathView src={point.src} size="sm" animate={false} />
       </div>
     );

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { resetBoot } from "@/components/blob/BlobBoot";
 import { Button } from "@/components/ui/Button";
+import { midTone } from "@/components/ui/surfaces";
 import { Field, Input, PasswordInput } from "@/components/ui/Input";
 import { useLocale, useMessages } from "@/i18n/client";
 import { authText } from "@/i18n/messages/auth";
@@ -17,7 +18,7 @@ import { callbackUrl } from "@/lib/auth/redirect";
 import { forgetSignedOut } from "@/lib/offline/device";
 import { blobApp, openOutside } from "@/lib/native";
 import { createClient } from "@/lib/supabase/client";
-import { safeNext } from "@/lib/utils";
+import { cn, safeNext } from "@/lib/utils";
 import { AuthHeading } from "./AuthStage";
 import { FormError } from "./FormError";
 import { useFieldReactions } from "./useFieldReactions";
@@ -214,7 +215,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
         </div>
         <AuthHeading title={ab.waitingTitle} subtitle={ab.waitingSubtitle} />
         <div className="space-y-2.5">
-          <Button variant="primary" size="lg" className="w-full" onClick={() => void openOutside(browserUrl)}>
+          <Button variant="blob" size="lg" className="w-full" onClick={() => void openOutside(browserUrl)}>
             {ab.openAgain} <ArrowRight className="size-4" />
           </Button>
           <Button variant="secondary" size="lg" className="w-full" onClick={stopBrowser}>
@@ -269,7 +270,7 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
                 label={common.password}
                 htmlFor="password"
                 action={
-                  <Link href="/forgot-password" className="-my-1.5 py-1.5 text-[12.5px] text-ink-3 hover:text-ink">
+                  <Link href="/forgot-password" className={cn("-my-1.5 py-1.5 text-[12.5px] hover:text-ink", midTone)}>
                     {t.forgot}
                   </Link>
                 }
@@ -296,13 +297,13 @@ export function LoginForm({ next, initialError, notice }: { next: string; initia
           )}
         </FormError>
 
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
+        <Button type="submit" variant="blob" size="lg" className="w-full" loading={loading}>
           {mode === "password" ? t.submit : t.submitMagic}
           <ArrowRight className="size-4" />
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-3 text-[12px] text-ink-3">
+      <div className={cn("my-5 flex items-center gap-3 text-[12px]", midTone)}>
         <span className="h-px flex-1 bg-line" /> {t.or} <span className="h-px flex-1 bg-line" />
       </div>
 

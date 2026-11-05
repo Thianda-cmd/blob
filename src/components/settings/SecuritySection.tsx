@@ -130,7 +130,7 @@ function EmailRow() {
             />
           </Field>
           <FormError message={error} />
-          <Button type="submit" variant="primary" size="sm" loading={loading} disabled={!value.trim()}>
+          <Button type="submit" variant="blob" size="sm" loading={loading} disabled={!value.trim()}>
             {t.sendConfirmation}
           </Button>
         </form>
@@ -232,7 +232,7 @@ function PasswordRow() {
             </Field>
           </div>
           <FormError message={error} />
-          <Button type="submit" variant="primary" size="sm" loading={loading} disabled={!current || !next}>
+          <Button type="submit" variant="blob" size="sm" loading={loading} disabled={!current || !next}>
             {t.updatePassword}
           </Button>
         </form>

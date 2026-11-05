@@ -93,7 +93,7 @@ export function ForgotForm() {
           />
         </Field>
         <FormError message={error} />
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
+        <Button type="submit" variant="blob" size="lg" className="w-full" loading={loading}>
           {t.submit} <ArrowRight className="size-4" />
         </Button>
       </form>

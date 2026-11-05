@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useActionState, useEffect, useSyncExternalStore } from "react";
 import { confirmEmail } from "@/app/(auth)/auth/confirm/actions";
 import { Button } from "@/components/ui/Button";
+import { midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { blobApp } from "@/lib/native";
+import { cn } from "@/lib/utils";
 import { authText, type ConfirmKind } from "@/i18n/messages/auth";
 import { AuthHeading, authLinkButton } from "./AuthStage";
 import { FormError } from "./FormError";
@@ -79,13 +81,13 @@ export function ConfirmCard({ tokenHash, type, next }: { tokenHash: string; type
             </Link>
           )}
         </FormError>
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={pending} autoFocus>
+        <Button type="submit" variant="blob" size="lg" className="w-full" loading={pending} autoFocus>
           {copy.button} <ArrowRight className="size-4" />
         </Button>
       </form>
-      <p className="mt-5 text-[12.5px] text-ink-3">{t.scanners}</p>
+      <p className={cn("mt-5 text-[12.5px]", midTone)}>{t.scanners}</p>
       {!inApp && (
-        <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-ink-3">
+        <p className={cn("mt-3 flex flex-wrap items-center gap-x-1.5 text-[12.5px]", midTone)}>
           <AppWindow className="size-3.5" /> {t.inApp}{" "}
           <a href={appLink} className="font-medium text-blob-ink underline underline-offset-2">
             {t.openApp}

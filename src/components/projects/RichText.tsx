@@ -120,7 +120,7 @@ export function RichText({ text, onToggle, className }: { text: string; onToggle
                     onClick={(e) => e.stopPropagation()}
                     className="mt-[5px] size-3.5 shrink-0 accent-[var(--blob)]"
                   />
-                  <span className={cn(it.done && "text-ink-3 line-through")}>{inline(it.text, `${key}-${it.line}`)}</span>
+                  <span className={cn(it.done && "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] line-through")}>{inline(it.text, `${key}-${it.line}`)}</span>
                 </li>
               ))}
             </ul>

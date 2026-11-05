@@ -21,7 +21,7 @@ export function DueChip({ due, now, done, className }: { due: string; now: numbe
     <span
       className={cn(
         "inline-flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium tabular-nums leading-none",
-        done ? "text-ink-3" : tone === "late" ? "bg-danger/10 text-danger" : tone === "today" ? "bg-blob-soft text-blob-ink" : tone === "soon" ? "text-ink-2" : "text-ink-3",
+        done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" : tone === "late" ? "bg-danger/10 text-danger" : tone === "today" ? "bg-blob-soft text-blob-ink" : tone === "soon" ? "text-ink-2" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
         className,
       )}
       title={formatDueLong(d, locale)}

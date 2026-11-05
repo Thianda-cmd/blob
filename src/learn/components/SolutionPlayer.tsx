@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import type { Frame } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { MathView, type MathSize } from "./MathView";
 import { Inline } from "./Rich";
@@ -69,7 +70,7 @@ export function SolutionPlayer({
             >
               <ChevronLeft className="size-4" />
             </button>
-            <span className="w-10 text-center text-[11.5px] tabular-nums text-ink-3">
+            <span className={cn("w-10 text-center text-[11.5px] tabular-nums", midTone)}>
               {i + 1}/{frames.length}
             </span>
             <button
@@ -112,7 +113,7 @@ export function SolutionPlayer({
                 setI(n);
               }}
             >
-              <span className={cn("mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold", n <= i ? "bg-blob text-white" : "bg-hover text-ink-3")}>{n + 1}</span>
+              <span className={cn("mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold", n <= i ? "bg-blob text-white dark:bg-blob-deep" : "bg-hover text-ink-2")}>{n + 1}</span>
               <span>
                 <Inline text={f.note} />
               </span>

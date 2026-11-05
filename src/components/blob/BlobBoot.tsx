@@ -170,7 +170,7 @@ function BootSequence({ ready, greeting, onDone }: { ready: boolean; greeting?: 
           ))}
         </motion.div>
 
-        <div className="mt-3 h-5 text-[13px] text-ink-3">
+        <div className="mt-3 h-5 text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
           <AnimatePresence mode="wait">
             <motion.span
               key={greeting && phase !== "rain" ? "greeting" : message}

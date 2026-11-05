@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { midTone } from "@/components/ui/surfaces";
 import type { Strength } from "@/lib/auth/password";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ export function StrengthMeter({ strength, show }: { strength: Strength; show: bo
           </div>
         ))}
       </div>
-      <span className="w-[74px] text-right text-[11.5px] text-ink-3">{strength.label}</span>
+      <span className={cn("w-[74px] text-right text-[11.5px]", midTone)}>{strength.label}</span>
     </div>
   );
 }

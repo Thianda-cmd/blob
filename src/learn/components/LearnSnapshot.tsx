@@ -2,6 +2,7 @@
 
 import { ArrowRight, Flame, Target } from "lucide-react";
 import Link from "next/link";
+import { card, cardLift, midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
 import { resolveText } from "@/i18n/text";
@@ -29,7 +30,7 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
   return (
     <Link
       href={topicHref(next)}
-      className="group block overflow-hidden rounded-2xl border border-line bg-raised shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
+      className={cn(card, cardLift, "group block overflow-hidden")}
     >
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
         <Ring value={today.xp / DAILY_GOAL} size={34} stroke={4}>
@@ -37,12 +38,12 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
         </Ring>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[13.5px] font-semibold tabular-nums">
-            {today.xp} <span className="font-normal text-ink-3">{t.snapshot.xpToday(DAILY_GOAL)}</span>
+            {today.xp} <span className={cn("font-normal", midTone)}>{t.snapshot.xpToday(DAILY_GOAL)}</span>
           </div>
-          <div className="text-[12px] text-ink-3">{today.xp >= DAILY_GOAL ? t.snapshot.goalReached : t.snapshot.goalHint}</div>
+          <div className={cn("text-[12px]", midTone)}>{today.xp >= DAILY_GOAL ? t.snapshot.goalReached : t.snapshot.goalHint}</div>
         </div>
         <span
-          className={cn("flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold", today.streak > 0 ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-3")}
+          className={cn("flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold", today.streak > 0 ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2")}
           title={t.dayStreak}
         >
           <Flame className="size-3.5" />
@@ -51,16 +52,16 @@ export function LearnSnapshot({ progress, days }: { progress: Record<string, Top
       </div>
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{started ? t.snapshot.keepPractising : t.snapshot.upNext(resolveText(SUBJECTS.find((x) => x.slug === next.subject)!.title, locale))}</div>
+          <div className="text-[12.5px] font-medium text-blob-ink">{started ? t.snapshot.keepPractising : t.snapshot.upNext(resolveText(SUBJECTS.find((x) => x.slug === next.subject)!.title, locale))}</div>
           <div className="mt-0.5 truncate text-[15px] font-semibold">{names.title}</div>
-          <div className="truncate text-[12.5px] text-ink-3">
+          <div className={cn("truncate text-[12.5px]", midTone)}>
             {names.school ?? names.area} · {masteryLabel(mastery, locale)}
           </div>
         </div>
-        <div className="grid h-14 w-24 shrink-0 place-items-center rounded-xl bg-surface transition-colors group-hover:bg-blob-soft/60">
+        <div className="grid h-14 w-24 shrink-0 place-items-center rounded-lg bg-surface transition-colors group-hover:bg-blob-soft/60">
           <TopicGlyph topic={next} size="sm" />
         </div>
-        <ArrowRight className="size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+        <ArrowRight className="size-4 shrink-0 text-ink-3 transition-transform group-hover:text-ink motion-safe:group-hover:translate-x-0.5" />
       </div>
     </Link>
   );

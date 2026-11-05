@@ -418,9 +418,9 @@ function Switcher({
             aria-label={t.label}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-medium text-ink-3">{t.label}</div>
+            <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.label}</div>
             {state.list.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-ink-3">{t.empty}</p>
+              <p className="px-4 py-6 text-center text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.empty}</p>
             ) : (
               <ul className="max-h-[50vh] overflow-y-auto p-1.5">
                 {state.list.map((p, i) => {
@@ -432,7 +432,7 @@ function Switcher({
                         <button type="button" onClick={() => onPick(p)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left">
                           <PageIcon page={p} className="size-4 shrink-0" />
                           <span className={cn("min-w-0 flex-1 truncate text-[13.5px]", on ? "font-medium text-blob-ink" : "text-ink")}>{pageTitle(p.title, p.kind, locale)}</span>
-                          <span className="shrink-0 text-[11.5px] text-ink-3">{p.id === current ? t.current : p.id === side ? t.beside : subject?.name}</span>
+                          <span className="shrink-0 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{p.id === current ? t.current : p.id === side ? t.beside : subject?.name}</span>
                         </button>
                         {p.kind === "note" && p.id !== current && p.id !== side && (
                           <button
@@ -451,7 +451,7 @@ function Switcher({
                 })}
               </ul>
             )}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[11.5px] text-ink-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
               <span>{t.hint(mac ? "⌘" : "Ctrl")}</span>
               <span className="flex items-center gap-1">
                 <Kbd>↵</Kbd> {t.keys.open}

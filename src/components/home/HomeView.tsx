@@ -1,40 +1,51 @@
 "use client";
 
 import { format } from "date-fns";
-import { motion } from "motion/react";
-import { ArrowUpRight, FilePlus2, FileUser, ListPlus, Plus, Presentation, Search, Sheet as SheetIcon, Signature } from "lucide-react";
+import { ArrowRight, ArrowUpRight, House, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { RecentCvCard } from "@/components/cv/home/RecentCvCard";
 import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
 import { useShell } from "@/components/shell/AppShell";
+import { CreateCards, NewPageButton, type NewKind } from "@/components/shell/NewPageMenu";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
-import { InkCard, NoteCard, SheetCard, SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
-import { PageIcon } from "@/components/shell/Sidebar";
+import { subjectCounts } from "@/components/subjects/counts";
+import { PageCard, type PagePreview } from "@/components/subjects/PageCards";
 import type { ProjectSummary } from "@/components/projects/load";
 import { UpcomingTasks } from "@/components/tasks/UpcomingTasks";
 import { useNow } from "@/components/tasks/useNow";
-import { Kbd } from "@/components/ui/Kbd";
+import { IconButton } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Segmented } from "@/components/ui/Segmented";
+import { addTile, card, cardLift, midTone, panel } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { homeText } from "@/i18n/messages/home";
+import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import { LearnSnapshot } from "@/learn/components/LearnSnapshot";
 import type { LearnDay, TopicProgress } from "@/learn/progress";
 import type { AssignedCard } from "@/lib/tasks";
-import type { CalEvent, PageMeta, Task } from "@/lib/types";
+import type { CalEvent, PageKind, Task } from "@/lib/types";
 import { cn, firstName, greeting, pageTitle } from "@/lib/utils";
-import { formatDistanceStrict } from "date-fns";
 import { ProjectsBlock } from "./ProjectsBlock";
 import { TodaySchedule } from "./TodaySchedule";
 
-const rise = {
-  hidden: { opacity: 0, y: 10 },
-  shown: (i: number) => ({ opacity: 1, y: 0, transition: { delay: 0.04 * i, type: "spring" as const, stiffness: 420, damping: 32 } }),
-};
+/** Which pages "Zuletzt bearbeitet" shows; remembered in this browser. */
+type RecentKind = "all" | "notes" | "sheets" | "decks";
+const RECENT_KEY = "blob-home-recent";
+const RECENT_KINDS: readonly RecentKind[] = ["all", "notes", "sheets", "decks"];
+/** Handwritten notes are notes too. */
+const KINDS_OF: Record<Exclude<RecentKind, "all">, PageKind[]> = { notes: ["note", "ink"], sheets: ["sheet"], decks: ["deck"] };
+/** What "+ Neu…" makes when a kind has nothing yet. */
+const CREATES: Record<Exclude<RecentKind, "all">, NewKind> = { notes: "note", sheets: "sheet", decks: "deck" };
+/** "Alle ansehen": the notes page with that kind (Notizen and Handschrift are two tabs there, so all of them). */
+const SEE_ALL: Record<RecentKind, string> = { all: "/notes", notes: "/notes", sheets: "/notes?kind=sheet", decks: "/notes?kind=deck" };
+const RECENT_COUNT = 6;
 
 export function HomeView({
   tasks,
@@ -66,232 +77,217 @@ export function HomeView({
   const { profile, pages, subjects, createPage } = useWorkspace();
   const locale = useLocale();
   const t = useMessages(homeText);
+  const ts = useMessages(subjectsText);
   const blobRef = useRef<BlobHandle>(null);
-  const [busy, setBusy] = useState<"note" | "deck" | "ink" | "sheet" | null>(null);
+  const [busy, setBusy] = useState<NewKind | null>(null);
+  const [kind, setKind] = useState<RecentKind>("all");
   // Back from a page you just edited: fetch the previews (and CV thumbnails) again instead of Next's old copy.
   useRefreshOnBack();
 
-  const recent = [...pages].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 6);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(RECENT_KEY) as RecentKind | null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore the choice after mount
+      if (saved && saved !== "all" && RECENT_KINDS.includes(saved)) setKind(saved);
+    } catch {}
+  }, []);
+
+  const choose = (next: RecentKind) => {
+    setKind(next);
+    try {
+      localStorage.setItem(RECENT_KEY, next);
+    } catch {}
+  };
+
+  const recent = pages
+    .filter((p) => kind === "all" || KINDS_OF[kind].includes(p.kind))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, RECENT_COUNT);
   const name = firstName(profile.full_name);
 
-  async function create(kind: "note" | "deck" | "ink" | "sheet") {
-    setBusy(kind);
-    const page = await createPage({ kind });
+  async function create(next: NewKind) {
+    if (busy) return;
+    setBusy(next);
+    const page = await createPage({ kind: next });
     setBusy(null);
     if (page) router.push(`/p/${page.id}`);
   }
 
+  // (It switches what the section shows: tabs, one Tab stop, the arrows choose.)
+  const switcher = (className?: string) => (
+    <Segmented
+      size="sm"
+      kind="tabs"
+      value={kind}
+      onChange={choose}
+      label={t.recentKinds.label}
+      className={className}
+      options={RECENT_KINDS.map((k) => ({ value: k, label: t.recentKinds[k] }))}
+    />
+  );
+
   return (
     <>
-      <TopBar crumbs={[{ label: t.title }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-24 pt-4 sm:px-8 sm:pb-16 lg:px-10">
-          {/* Greeting */}
-          <motion.section initial="hidden" animate="shown" className="flex flex-wrap items-end gap-x-6 gap-y-4">
-            <motion.div variants={rise} custom={0} className="-mb-2 -ml-3 hidden sm:block">
-              <Blob ref={blobRef} size={104} mood="happy" onClick={() => blobRef.current?.jump(1)} title="Blob" />
-            </motion.div>
-            <motion.div variants={rise} custom={1} className="min-w-[min(100%,360px)] flex-1 pb-1">
-              <p className="h-5 text-[13px] text-ink-3" suppressHydrationWarning>
-                {now ? format(now, t.dateFormat, { locale: dateLocale(locale) }) : ""}
-              </p>
-              <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.03em]">
+      <TopBar
+        crumbs={[{ label: t.title, icon: <House className="size-3.5 text-ink-3" aria-hidden /> }]}
+        actions={
+          // Without the sidebar (tablets, phones) or on a touch screen: the search, which has no key there.
+          <IconButton size="bar" label={t.search} onClick={openSearch} className="[@media(min-width:64rem)_and_(hover:hover)]:hidden">
+            <Search className="size-4" />
+          </IconButton>
+        }
+      />
+      <PageBody width="wide">
+        {/* Greeting */}
+        <div className="flex items-center gap-5">
+          <div className="mb-5 hidden shrink-0 sm:mb-6 sm:block">
+            <Blob ref={blobRef} size={80} mood="happy" onClick={() => blobRef.current?.jump(1)} title="Blob" />
+          </div>
+          <PageHeader
+            size="hero"
+            className="min-w-0 flex-1"
+            label={<span suppressHydrationWarning>{now ? format(now, t.dateFormat, { locale: dateLocale(locale) }) : " "}</span>}
+            title={
+              <>
                 {now ? greeting(new Date(now), locale) : t.hello}
                 {name ? `, ${name}` : ""}
-              </h1>
-              <p className="mt-0.5 text-[14px] text-ink-2">
-                {openTotal === 0 ? t.nothingOpen : t.openTasks(openTotal)}
-              </p>
-            </motion.div>
-            {/* One swipeable row on phones instead of three wrapped rows of buttons. */}
-            <motion.div
-              variants={rise}
-              custom={2}
-              className="flex gap-1.5 pb-1 max-sm:-mx-4 max-sm:w-[calc(100%+2rem)] max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none] sm:flex-wrap max-sm:[&::-webkit-scrollbar]:hidden"
-            >
-              <QuickAction icon={<FilePlus2 />} onClick={() => create("note")} busy={busy === "note"} primary>
-                {t.newNote}
-              </QuickAction>
-              <QuickAction icon={<Signature />} onClick={() => create("ink")} busy={busy === "ink"}>
-                {t.newInk}
-              </QuickAction>
-              <QuickAction icon={<SheetIcon />} onClick={() => create("sheet")} busy={busy === "sheet"}>
-                {t.newSheet}
-              </QuickAction>
-              <QuickAction icon={<Presentation />} onClick={() => create("deck")} busy={busy === "deck"}>
-                {t.newDeck}
-              </QuickAction>
-              <QuickAction icon={<ListPlus />} onClick={() => router.push("/tasks?new=1")}>
-                {t.addTask}
-              </QuickAction>
-              {/* Your CVs, or straight to a new one if there are none yet. */}
-              <QuickAction icon={<FileUser />} onClick={() => router.push(pages.some((p) => p.kind === "cv") ? "/cv" : "/cv?new=1")}>
-                {t.cv}
-              </QuickAction>
-              <QuickAction icon={<Search />} onClick={openSearch}>
-                {t.search}
-                <span className="ml-1 flex gap-0.5 [@media(hover:none)]:hidden">
-                  <Kbd>⌘</Kbd>
-                  <Kbd>K</Kbd>
-                </span>
-              </QuickAction>
-            </motion.div>
-          </motion.section>
-
-          <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
-            {/* Recent pages */}
-            <motion.section initial="hidden" animate="shown" variants={rise} custom={3} className="min-w-0">
-              <SectionTitle>{t.recent}</SectionTitle>
-              {recent.length === 0 ? (
-                <EmptyRecent onCreate={() => create("note")} />
-              ) : (
-                // A swipeable shelf on phones (like the recents in Notion's app); a grid from tablets up.
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 max-sm:-mx-4 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
-                  {recent.map((page, i) => (
-                    <motion.div key={page.id} variants={rise} custom={4 + i} initial="hidden" animate="shown" className="max-sm:w-[78%] max-sm:max-w-[280px] max-sm:shrink-0 max-sm:snap-start">
-                      {page.kind === "deck" ? (
-                        <RecentDeck page={page} preview={previews[page.id]} now={now} />
-                      ) : page.kind === "cv" ? (
-                        <RecentCvCard page={page} content={cvs[page.id]} now={now} />
-                      ) : page.kind === "ink" ? (
-                        <InkCard page={page} preview={previews[page.id]} now={now} />
-                      ) : page.kind === "sheet" ? (
-                        <SheetCard page={page} preview={previews[page.id]} now={now} />
-                      ) : (
-                        <NoteCard page={page} preview={previews[page.id]} parent={pages.find((p) => p.id === page.parent_id)} now={now} fixed />
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-              <div className="mt-8">
-                <ProjectsBlock projects={projects} assigned={assigned} title={(children, action) => <SectionTitle action={action}>{children}</SectionTitle>} />
-              </div>
-            </motion.section>
-
-            {/* Today in the calendar, then what is due soon */}
-            <motion.section initial="hidden" animate="shown" variants={rise} custom={4} className="min-w-0">
-              <TodaySchedule events={events} now={now} title={(children, action) => <SectionTitle action={action}>{children}</SectionTitle>} />
-              <SectionTitle>{t.comingUp}</SectionTitle>
-              <UpcomingTasks initialTasks={tasks} limit={7} days={7} />
-              <div className="mt-7">
-                <SectionTitle
-                  action={
-                    <Link href="/learn" className="text-[12.5px] font-medium text-ink-3 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2">
-                      {t.allTopics}
-                    </Link>
-                  }
-                >
-                  {t.keepLearning}
-                </SectionTitle>
-                <LearnSnapshot progress={learn.progress} days={learn.days} />
-              </div>
-            </motion.section>
-          </div>
-
-          {/* Subjects (two columns on phones, so 15 of them stay a short list) */}
-          <motion.section initial="hidden" animate="shown" variants={rise} custom={6} className="mt-10">
-            <SectionTitle>{t.subjects}</SectionTitle>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3">
-              {subjects.map((s, i) => {
-                const inside = pages.filter((p) => p.subject_id === s.id);
-                const counts = [
-                  // Handwritten notes are notes too.
-                  { n: inside.filter((p) => p.kind === "note" || p.kind === "ink").length, text: t.notes },
-                  { n: inside.filter((p) => p.kind === "sheet").length, text: t.sheets },
-                  { n: inside.filter((p) => p.kind === "deck").length, text: t.decks },
-                ];
-                // What the subject holds, most first and kinds it has none of left out, on one line that
-                // a narrow card (two per row on a phone) cuts at the end: the main thing stays readable.
-                const holds =
-                  counts
-                    .filter((c) => c.n > 0)
-                    .sort((a, b) => b.n - a.n)
-                    .map((c) => c.text(c.n))
-                    .join(" · ") || t.notes(0);
-                const open = openTasks[s.id] ?? 0;
-                return (
-                  <motion.div key={s.id} variants={rise} custom={7 + i} initial="hidden" animate="shown">
-                    <Link
-                      href={`/subjects/${s.id}`}
-                      className="group relative flex h-[92px] flex-col overflow-hidden rounded-xl border border-line bg-raised p-3.5 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
-                    >
-                      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: subjectColor(s.color) }} />
-                      <div className="flex items-center gap-2">
-                        <span className="text-[16px] leading-none">{s.emoji ?? "📚"}</span>
-                        <span className="truncate text-[14px] font-medium" title={s.name}>
-                          {s.name}
-                        </span>
-                        <ArrowUpRight className="ml-auto size-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
-                      </div>
-                      <div className="mt-auto flex gap-3 text-[12px] text-ink-3">
-                        <span className="min-w-0 truncate" title={holds}>
-                          {holds}
-                        </span>
-                        <span className={cn("shrink-0", open > 0 && "font-medium text-blob-ink")}>{t.open(open)}</span>
-                      </div>
-                    </Link>
-                  </motion.div>
-                );
-              })}
-              <AddSubjectCard />
-            </div>
-          </motion.section>
+              </>
+            }
+            // One line that may wrap on a phone.
+            meta={<span className="whitespace-normal text-[14px] text-ink-2">{openTotal === 0 ? t.nothingOpen : t.openTasks(openTotal)}</span>}
+          />
         </div>
-      </div>
+
+        {/* New: a note, a Blobxcel spreadsheet, handwriting, a presentation */}
+        <CreateCards onPick={create} busy={busy !== null} />
+
+        <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_380px]">
+          {/* Recent pages */}
+          <section className="min-w-0" aria-labelledby="home-recent">
+            <SectionHeader
+              id="home-recent"
+              title={t.recent}
+              action={
+                <span className="flex items-center gap-3">
+                  {switcher("max-sm:hidden")}
+                  <Link
+                    href={SEE_ALL[kind]}
+                    className="flex items-center gap-1 whitespace-nowrap font-medium text-ink-2 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2"
+                  >
+                    {t.seeAll} <ArrowRight className="size-3" aria-hidden />
+                  </Link>
+                </span>
+              }
+            />
+            {/* Phones: the switch on its own line under the heading. */}
+            {switcher("mb-3 sm:hidden")}
+            {recent.length === 0 ? (
+              kind === "all" ? (
+                <EmptyRecent />
+              ) : (
+                <NoneOfKind kind={kind} onPick={create} busy={busy === CREATES[kind]} />
+              )
+            ) : (
+              // A swipeable shelf on phones (like the recents in Notion's app); a grid from tablets up.
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 max-sm:-mx-4 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
+                {recent.map((page) => {
+                  const inside = page.kind === "folder" ? pages.filter((c) => c.parent_id === page.id) : [];
+                  return (
+                    <div key={page.id} className="h-full min-w-0 max-sm:w-[72%] max-sm:max-w-[260px] max-sm:shrink-0 max-sm:snap-start">
+                      {page.kind === "cv" ? (
+                        <RecentCvCard page={page} content={cvs[page.id]} now={now} />
+                      ) : (
+                        <PageCard
+                          page={page}
+                          preview={previews[page.id]}
+                          parent={page.parent_id ? pages.find((p) => p.id === page.parent_id) : undefined}
+                          inside={{ count: inside.length, titles: inside.slice(0, 3).map((c) => pageTitle(c.title, c.kind, locale)) }}
+                          now={now}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-10">
+              <ProjectsBlock projects={projects} assigned={assigned} title={(children, action) => <SectionHeader title={children} action={action} />} />
+            </div>
+          </section>
+
+          {/* Today in the calendar, then what is due soon */}
+          <section className="min-w-0">
+            <TodaySchedule events={events} now={now} title={(children, action) => <SectionHeader title={children} action={action} />} />
+            <SectionHeader title={t.comingUp} />
+            <UpcomingTasks initialTasks={tasks} limit={7} days={7} />
+            <div className="mt-8">
+              <SectionHeader
+                title={t.keepLearning}
+                action={
+                  <Link href="/learn" className="font-medium text-ink-2 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2">
+                    {t.allTopics}
+                  </Link>
+                }
+              />
+              <LearnSnapshot progress={learn.progress} days={learn.days} />
+            </div>
+          </section>
+        </div>
+
+        {/* Subjects (two columns on phones, so 15 of them stay a short list) */}
+        <section className="mt-10" aria-labelledby="home-subjects">
+          <SectionHeader id="home-subjects" title={t.subjects} />
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3">
+            {subjects.map((s) => {
+              // What the subject holds, counted as its own page counts it (one line, cut at the end
+              // on a narrow card; the whole of it in the tooltip).
+              const holds = subjectCounts(
+                pages.filter((p) => p.subject_id === s.id),
+                ts,
+              ).join(" · ");
+              const open = openTasks[s.id] ?? 0;
+              return (
+                <Link key={s.id} href={`/subjects/${s.id}`} className={cn(card, cardLift, "group relative flex h-[92px] flex-col overflow-hidden p-3.5")}>
+                  <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: subjectColor(s.color) }} aria-hidden />
+                  <span className="flex items-center gap-2">
+                    <span className="text-[16px] leading-none" aria-hidden>
+                      {s.emoji ?? "📚"}
+                    </span>
+                    <span className="truncate text-[14px] font-medium text-ink" title={s.name}>
+                      {s.name}
+                    </span>
+                    <ArrowUpRight className="ml-auto size-3.5 shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                  </span>
+                  <span className={cn("mt-auto flex gap-3 text-[12px]", midTone)}>
+                    <span className="min-w-0 truncate" title={holds}>
+                      {holds}
+                    </span>
+                    <span className={cn("shrink-0", open > 0 && "font-medium text-blob-ink")}>{t.open(open)}</span>
+                  </span>
+                </Link>
+              );
+            })}
+            <AddSubjectCard />
+          </div>
+        </section>
+      </PageBody>
     </>
   );
 }
 
-function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="font-display text-[17px] font-semibold tracking-[-0.01em]">{children}</h2>
-      {action}
-    </div>
-  );
+/** No pages at all yet: the create cards above are what to do. */
+function EmptyRecent() {
+  const t = useMessages(homeText);
+  return <EmptyState size="sm" art={<Blob size={72} mood="sleepy" track={false} />} title={t.quiet} body={t.quietHint} />;
 }
 
-function QuickAction({
-  icon,
-  children,
-  onClick,
-  busy,
-  primary,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-  onClick: () => void;
-  busy?: boolean;
-  primary?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      className={cn(
-        "flex h-8.5 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-[background,transform,border] active:scale-[0.97] disabled:opacity-60 [&>svg]:size-4",
-        primary ? "bg-ink text-paper hover:bg-ink/88" : "border border-line bg-raised text-ink-2 shadow-card hover:border-line-2 hover:text-ink",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-function EmptyRecent({ onCreate }: { onCreate: () => void }) {
+/** None of this kind yet: say so, and make the first one. */
+function NoneOfKind({ kind, onPick, busy }: { kind: Exclude<RecentKind, "all">; onPick: (kind: NewKind) => void; busy: boolean }) {
   const t = useMessages(homeText);
   return (
-    <div className="flex h-[150px] items-center justify-center gap-5 rounded-xl border border-dashed border-line-2 px-6">
-      <Blob size={84} mood="sleepy" track={false} />
-      <div>
-        <p className="font-medium">{t.quiet}</p>
-        <p className="text-[13px] text-ink-2">{t.quietHint}</p>
-        <button onClick={onCreate} className="mt-2 text-[13px] font-medium text-blob-ink hover:underline">
-          {t.firstNote}
-        </button>
-      </div>
+    <div className={cn(panel, "flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-4")}>
+      <p className="text-[13.5px] text-ink-2">{t.recentNone[kind]}</p>
+      <NewPageButton kind={CREATES[kind]} split={false} onPick={onPick} busy={busy} labelOnPhones />
     </div>
   );
 }
@@ -303,17 +299,14 @@ function AddSubjectCard() {
   const [name, setName] = useState("");
   if (!editing) {
     return (
-      <button
-        onClick={() => setEditing(true)}
-        className="flex h-[92px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 text-[13px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink"
-      >
-        <Plus className="size-4" /> {t.addSubject}
+      <button type="button" onClick={() => setEditing(true)} className={cn(addTile, "flex h-[92px] items-center justify-center gap-1.5 text-[13px] font-medium")}>
+        <Plus className="size-4" aria-hidden /> {t.addSubject}
       </button>
     );
   }
   return (
     <form
-      className="flex h-[92px] flex-col justify-center gap-2 rounded-xl border border-blob/60 bg-raised p-3"
+      className={cn(card, "flex h-[92px] flex-col justify-center gap-2 border-blob/60 p-3")}
       onSubmit={async (e) => {
         e.preventDefault();
         if (!name.trim()) return setEditing(false);
@@ -330,35 +323,11 @@ function AddSubjectCard() {
         onBlur={() => !name.trim() && setEditing(false)}
         onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
         placeholder={t.subjectName}
+        aria-label={t.subjectName}
         maxLength={60}
-        className="h-8 rounded-md border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
+        className="h-8 rounded-lg border border-line bg-surface px-2 text-[13px] outline-none focus:border-blob"
       />
-      <span className="text-[11.5px] text-ink-3">{t.enterToAdd}</span>
+      <span className={cn("text-[11.5px]", midTone)}>{t.enterToAdd}</span>
     </form>
-  );
-}
-
-/** Same footprint as a NoteCard so the grid stays even. */
-function RecentDeck({ page, preview, now }: { page: PageMeta; preview?: PagePreview; now: number | null }) {
-  const locale = useLocale();
-  const name = pageTitle(page.title, page.kind, locale);
-  return (
-    <Link
-      href={`/p/${page.id}`}
-      className="group flex h-[150px] flex-col rounded-xl border border-line bg-raised p-2 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
-    >
-      <div className="min-h-0 flex-1 overflow-hidden rounded-lg">
-        <SlideThumb title={preview?.slideTitle?.trim() || name} theme={preview?.theme ?? null} className="h-full w-full rounded-lg [aspect-ratio:auto]" />
-      </div>
-      <div className="flex min-w-0 items-center gap-2 px-1.5 pt-2">
-        <PageIcon page={page} className="size-3.5" />
-        <span className="truncate text-[13.5px] font-medium" title={name}>
-          {name}
-        </span>
-        <span className="ml-auto shrink-0 text-[11.5px] text-ink-3" suppressHydrationWarning>
-          {now ? formatDistanceStrict(new Date(page.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }) : ""}
-        </span>
-      </div>
-    </Link>
   );
 }

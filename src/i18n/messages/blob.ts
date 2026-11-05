@@ -13,9 +13,10 @@ export const blobText = defineMessages({
     addTask: "Add homework or exam",
     dressUp: "Dress me up",
     anotherTip: "Another tip →",
-    tips: [
+    // `mod`: the platform's Ctrl key (⌘ on Apple keyboards, "Ctrl" elsewhere).
+    tips: (mod: string) => [
       "Type / in a note to add headings, checklists, quotes and more.",
-      "Press ⌘K (Ctrl K) to jump to any note in a second.",
+      `Press ${mod} K to jump to any note in a second.`,
       "Select text in a note to make it bold, highlighted or a link.",
       "Add homework on the Tasks page. Try “Essay due friday”.",
       "Presentations have a Present button. Use the arrow keys to move through slides.",
@@ -44,9 +45,9 @@ export const blobText = defineMessages({
     addTask: "Hausaufgabe oder Test eintragen",
     dressUp: "Zieh mich an",
     anotherTip: "Noch ein Tipp →",
-    tips: [
+    tips: (mod) => [
       "Tippe / in einer Notiz für Überschriften, Checklisten, Zitate und mehr.",
-      "Drück ⌘K (Strg K), um blitzschnell zu jeder Notiz zu springen.",
+      `Drück ${mod} K, um blitzschnell zu jeder Notiz zu springen.`,
       "Markiere Text in einer Notiz, um ihn fett, hervorgehoben oder zum Link zu machen.",
       "Trag Hausaufgaben auf der Aufgaben-Seite ein. Probier mal „Aufsatz bis Freitag“.",
       "Präsentationen haben einen Präsentieren-Button. Mit den Pfeiltasten gehst du durch die Folien.",

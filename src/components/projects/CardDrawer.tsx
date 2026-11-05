@@ -247,7 +247,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
           )}
         />
         {watchers.length > 0 && (
-          <span className="ml-1 flex items-center gap-1 text-[12px] text-ink-3" title={d.lookingToo(watchers.map((w) => w.name).join(", "))}>
+          <span className="ml-1 flex items-center gap-1 text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" title={d.lookingToo(watchers.map((w) => w.name).join(", "))}>
             {watchers.slice(0, 3).map((w) => (
               <Avatar key={w.key} person={w} size={20} ring />
             ))}
@@ -318,7 +318,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
                       ))}
                     </span>
                   ) : (
-                    <span className="text-ink-3">{readOnly ? d.nobody : d.assign}</span>
+                    <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{readOnly ? d.nobody : d.assign}</span>
                   )}
                 </PropButton>
               )}
@@ -332,7 +332,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
               onChange={(due_at) => update({ due_at })}
               trigger={(props) => (
                 <PropButton {...props} disabled={readOnly} title={card.due_at ? formatDueLong(card.due_at, locale) : undefined}>
-                  {card.due_at ? <DueChip due={card.due_at} now={now} done={card.done} className="-ml-1.5" /> : <span className="text-ink-3">{d.noDue}</span>}
+                  {card.due_at ? <DueChip due={card.due_at} now={now} done={card.done} className="-ml-1.5" /> : <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{d.noDue}</span>}
                 </PropButton>
               )}
             />
@@ -344,7 +344,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
               trigger={(props) => (
                 <PropButton {...props} disabled={readOnly}>
                   <PriorityIcon priority={card.priority} />
-                  <span className={cn(card.priority === 0 && "text-ink-3")}>{t.priorityNames[card.priority]}</span>
+                  <span className={cn(card.priority === 0 && "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>{t.priorityNames[card.priority]}</span>
                 </PropButton>
               )}
             />
@@ -367,7 +367,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
                   trigger={(props) => (
                     <button
                       {...props}
-                      className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink aria-expanded:bg-hover [@media(hover:none)]:h-8"
+                      className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink aria-expanded:bg-hover [@media(hover:none)]:h-8"
                     >
                       <Plus className="size-3.5" /> {labels.length ? "" : d.addLabel}
                       {labels.length > 0 && <span className="sr-only">{d.addLabel}</span>}
@@ -375,7 +375,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
                   )}
                 />
               )}
-              {readOnly && !labels.length && <span className="px-1.5 text-ink-3">–</span>}
+              {readOnly && !labels.length && <span className="px-1.5 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">–</span>}
             </div>
           </Prop>
         </dl>
@@ -388,7 +388,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
 
         <Attachments ref={uploader} card={card} projectId={board.project.id} readOnly={readOnly} onChange={(change) => board.changeAttachments(card.id, change)} />
 
-        <footer className="mt-8 space-y-0.5 border-t border-line pt-3 text-[11.5px] text-ink-3" suppressHydrationWarning>
+        <footer className="mt-8 space-y-0.5 border-t border-line pt-3 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" suppressHydrationWarning>
           <p>{d.created(creator ? personName(creator, d.someone) : d.someone, format(new Date(card.created_at), "PPp", { locale: dateLocale(locale) }))}</p>
           {now && card.updated_at !== card.created_at && (
             <p>
@@ -423,7 +423,7 @@ function CardDetails({ board, card, onClose, readOnly, now, meId }: { board: Boa
 function Prop({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="flex h-8 items-center gap-2 self-start text-ink-3">
+      <dt className="flex h-8 items-center gap-2 self-start text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
         <Icon className="size-3.5 shrink-0" />
         <span className="truncate">{label}</span>
       </dt>
@@ -530,7 +530,7 @@ function TitleField({ card, readOnly, onSave }: { card: Task; readOnly: boolean;
         }
       }}
       className={cn(
-        "-mx-1.5 block w-[calc(100%+12px)] resize-none overflow-hidden rounded-lg bg-transparent px-1.5 py-1 font-display text-[21px] font-bold leading-snug tracking-[-0.015em] text-ink outline-none transition-colors placeholder:text-ink-3",
+        "-mx-1.5 block w-[calc(100%+12px)] resize-none overflow-hidden rounded-lg bg-transparent px-1.5 py-1 font-display text-[21px] font-bold leading-snug tracking-[-0.015em] text-ink outline-none transition-colors placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
         !readOnly && "hover:bg-hover/60 focus:bg-hover/60",
         card.done && "text-ink-2",
       )}
@@ -548,7 +548,7 @@ function DescriptionField({ card, readOnly, onSave }: { card: Task; readOnly: bo
   if (!draft.editing) {
     if (!remote.trim()) {
       return readOnly ? (
-        <p className="text-[13px] text-ink-3">–</p>
+        <p className="text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">–</p>
       ) : (
         <button
           type="button"
@@ -556,7 +556,7 @@ function DescriptionField({ card, readOnly, onSave }: { card: Task; readOnly: bo
             draft.start();
             requestAnimationFrame(() => ref.current?.focus());
           }}
-          className="-mx-1.5 flex min-h-16 w-[calc(100%+12px)] items-start rounded-lg px-1.5 py-1.5 text-left text-[13.5px] text-ink-3 transition-colors hover:bg-hover/60"
+          className="-mx-1.5 flex min-h-16 w-[calc(100%+12px)] items-start rounded-lg px-1.5 py-1.5 text-left text-[13.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] transition-colors hover:bg-hover/60"
         >
           {t.descriptionPlaceholder}
         </button>
@@ -601,9 +601,9 @@ function DescriptionField({ card, readOnly, onSave }: { card: Task; readOnly: bo
             e.currentTarget.blur();
           }
         }}
-        className="-mx-1.5 block min-h-20 w-[calc(100%+12px)] resize-none overflow-hidden rounded-lg border border-blob/60 bg-surface px-2 py-1.5 text-[13.5px] leading-[1.6] text-ink outline-none shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_14%,transparent)] placeholder:text-ink-3"
+        className="-mx-1.5 block min-h-20 w-[calc(100%+12px)] resize-none overflow-hidden rounded-lg border border-blob/60 bg-surface px-2 py-1.5 text-[13.5px] leading-[1.6] text-ink outline-none shadow-[0_0_0_3px_color-mix(in_oklab,var(--blob)_14%,transparent)] placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
       />
-      <p className="mt-1 font-mono text-[11px] text-ink-3">{t.formatHint}</p>
+      <p className="mt-1 font-mono text-[11px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.formatHint}</p>
     </div>
   );
 }
@@ -648,7 +648,7 @@ function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean
       aside={
         total > 0 && (
           <span className="flex flex-1 items-center gap-2">
-            <span className={cn("text-[11.5px] tabular-nums", done === total ? "text-ok" : "text-ink-3")}>
+            <span className={cn("text-[11.5px] tabular-nums", done === total ? "text-ok" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>
               {done}/{total}
             </span>
             <span className="h-1 flex-1 overflow-hidden rounded-full bg-hover">
@@ -695,7 +695,7 @@ function Checklist({ card, readOnly, onChange }: { card: Task; readOnly: boolean
             onBlur={add}
             placeholder={t.addItem}
             aria-label={t.addItem}
-            className="h-full min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-ink-3"
+            className="h-full min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
           />
         </div>
       )}
@@ -760,7 +760,7 @@ function ChecklistRow({
             e.currentTarget.blur();
           }
         }}
-        className={cn("h-8 min-w-0 flex-1 bg-transparent text-[13.5px] outline-none transition-colors", item.done ? "text-ink-3 line-through decoration-ink-3/60" : "text-ink")}
+        className={cn("h-8 min-w-0 flex-1 bg-transparent text-[13.5px] outline-none transition-colors", item.done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] line-through decoration-ink-3/60" : "text-ink")}
       />
       {!readOnly && (
         <button
@@ -856,7 +856,7 @@ function Attachments({
 
   if (readOnly && !list.length) return null;
   return (
-    <Section title={t.attachments} aside={list.length > 0 && <span className="text-[11.5px] tabular-nums text-ink-3">{list.length}</span>}>
+    <Section title={t.attachments} aside={list.length > 0 && <span className="text-[11.5px] tabular-nums text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{list.length}</span>}>
       {list.length > 0 && (
         <ul className="space-y-1.5">
           {list.map((a) => (
@@ -1001,7 +1001,7 @@ function AttachmentRow({ attachment: a, readOnly, onRemove }: { attachment: Atta
         <span className="block truncate text-[13px] font-medium text-ink" title={title}>
           {title}
         </span>
-        {meta && <span className="block truncate text-[11.5px] text-ink-3">{meta}</span>}
+        {meta && <span className="block truncate text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{meta}</span>}
       </span>
       <span className="relative flex shrink-0 items-center">
         {a.type === "file" && (
@@ -1081,7 +1081,7 @@ function PagePicker({ exclude, onPick }: { exclude: Set<string>; onPick: (page: 
                 <span className="truncate">{pageTitle(p.title, p.kind, locale)}</span>
               </button>
             ))}
-            {list.length === 0 && <p className="px-2 py-1.5 text-[12.5px] text-ink-3">{t.noPages}</p>}
+            {list.length === 0 && <p className="px-2 py-1.5 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.noPages}</p>}
           </div>
         </div>
       )}
@@ -1152,7 +1152,7 @@ function LinkForm({ onAdd }: { onAdd: (url: string, title: string) => void }) {
           <button
             type="submit"
             disabled={!clean}
-            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-blob text-[13px] font-medium text-white transition-colors hover:bg-blob-deep disabled:opacity-50"
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-blob text-[13px] font-medium text-white transition-colors hover:bg-blob-deep disabled:opacity-50 dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]"
           >
             <Plus className="size-3.5" /> {t.add}
           </button>

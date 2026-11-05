@@ -2,27 +2,22 @@ import { defineMessages } from "../define";
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** Subject pages, page cards and subject colours. */
+/** Subject pages (their sections, counts and tasks) and subject colours. */
 export const subjectsText = defineMessages({
   en: {
     notFound: "Not found",
     notes: "Notes",
-    inks: "Handwritten",
+    inks: "Handwriting",
     sheets: "Spreadsheets",
     presentations: "Presentations",
     tasks: "Tasks",
     allTasks: "All tasks",
-    newNote: "New note",
-    newInk: "New handwritten note",
-    newSheet: "New spreadsheet",
-    newDeck: "New presentation",
-    newFolder: "New folder",
     folders: "Folders",
     folderCount: (n: number) => count(n, "folder", "folders"),
-    pagesInside: (n: number) => count(n, "page", "pages"),
     noteCount: (n: number) => count(n, "note", "notes"),
     deckCount: (n: number) => count(n, "presentation", "presentations"),
     sheetCount: (n: number) => count(n, "spreadsheet", "spreadsheets"),
+    inkCount: (n: number) => count(n, "handwritten note", "handwritten notes"),
     openTaskCount: (n: number) => `${n} open ${n === 1 ? "task" : "tasks"}`,
     nextExam: (when: string) => `Next exam ${when}`,
     today: "today",
@@ -39,10 +34,6 @@ export const subjectsText = defineMessages({
     addTaskFor: (subject: string) => `Add a task for ${subject}…`,
     noTasksFor: (subject: string) => `No tasks for ${subject}.`,
     noTasksHint: "Add homework or a test date above.",
-    // Page cards
-    editedJustNow: "Edited just now",
-    edited: (ago: string) => `Edited ${ago}`,
-    emptyNote: "Empty note. Click to start writing.",
     colors: { ink: "Ink", clay: "Clay", moss: "Moss", sky: "Sky", plum: "Plum", sand: "Sand", rose: "Rose", teal: "Teal" },
   },
   de: {
@@ -53,17 +44,12 @@ export const subjectsText = defineMessages({
     presentations: "Präsentationen",
     tasks: "Aufgaben",
     allTasks: "Alle Aufgaben",
-    newNote: "Neue Notiz",
-    newInk: "Neue Handschrift",
-    newSheet: "Neue Tabelle",
-    newDeck: "Neue Präsentation",
-    newFolder: "Neuer Ordner",
     folders: "Ordner",
     folderCount: (n) => count(n, "Ordner", "Ordner"),
-    pagesInside: (n) => count(n, "Seite", "Seiten"),
     noteCount: (n) => count(n, "Notiz", "Notizen"),
     deckCount: (n) => count(n, "Präsentation", "Präsentationen"),
     sheetCount: (n) => count(n, "Tabelle", "Tabellen"),
+    inkCount: (n) => (n === 1 ? "1 Handschrift" : `${n} Handschriften`),
     openTaskCount: (n) => (n === 1 ? "1 offene Aufgabe" : `${n} offene Aufgaben`),
     nextExam: (when) => `Nächster Test ${when}`,
     today: "heute",
@@ -78,9 +64,6 @@ export const subjectsText = defineMessages({
     addTaskFor: (subject) => `Aufgabe für ${subject} hinzufügen…`,
     noTasksFor: (subject) => `Keine Aufgaben für ${subject}.`,
     noTasksHint: "Trag oben Hausaufgaben oder einen Testtermin ein.",
-    editedJustNow: "Gerade bearbeitet",
-    edited: (ago) => `Bearbeitet ${ago}`,
-    emptyNote: "Leere Notiz. Klick hier und schreib los.",
     colors: { ink: "Tinte", clay: "Ton", moss: "Moos", sky: "Himmel", plum: "Pflaume", sand: "Sand", rose: "Rosé", teal: "Petrol" },
   },
 });

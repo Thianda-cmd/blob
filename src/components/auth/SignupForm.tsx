@@ -19,8 +19,12 @@ import { FormError } from "./FormError";
 import { StrengthMeter } from "./StrengthMeter";
 import { useFieldReactions } from "./useFieldReactions";
 
-/** `next`: where to go once the account exists (e.g. back into "Sign in with Blob"); default onboarding. */
-export function SignupForm({ next }: { next?: string }) {
+/**
+ * `next`: where to go once the account exists (e.g. back into "Sign in with Blob"); default onboarding.
+ * `signInNext`: where the links to the sign-in page lead after signing in (default `next`): an invite
+ * (/join/…) stays with them, although signing up itself goes on to the setup.
+ */
+export function SignupForm({ next, signInNext = next }: { next?: string; signInNext?: string }) {
   const router = useRouter();
   const locale = useLocale();
   const all = useMessages(authText);
@@ -36,6 +40,7 @@ export function SignupForm({ next }: { next?: string }) {
   const [pwFocused, setPwFocused] = useState(false);
   const strength = passwordStrength(password, locale);
   const greeted = useRef("");
+  const signInHref = signInNext ? `/login?next=${encodeURIComponent(signInNext)}` : "/login";
 
   useEffect(() => {
     blob.setMood("happy");
@@ -172,20 +177,20 @@ export function SignupForm({ next }: { next?: string }) {
 
         <FormError message={error}>
           {exists && (
-            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="mt-1 inline-block font-medium underline underline-offset-2">
+            <Link href={signInHref} className="mt-1 inline-block font-medium underline underline-offset-2">
               {t.signInInstead}
             </Link>
           )}
         </FormError>
 
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
+        <Button type="submit" variant="blob" size="lg" className="w-full" loading={loading}>
           {t.submit} <ArrowRight className="size-4" />
         </Button>
       </form>
 
       <p className="mt-7 text-center text-[13.5px] text-ink-2">
         {t.haveAccount}{" "}
-        <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="-my-1.5 inline-block py-1.5 font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+        <Link href={signInHref} className="-my-1.5 inline-block py-1.5 font-medium text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
           {t.signIn}
         </Link>
       </p>

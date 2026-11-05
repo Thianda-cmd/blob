@@ -84,7 +84,7 @@ function Body({ credentials, onClose }: { credentials: Credentials; onClose: () 
           <div className="mt-4">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[12.5px] font-medium text-ink-2">{s.clientId}</span>
-              <span className="text-[11.5px] text-ink-3">{s.clientIdHint}</span>
+              <span className="text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{s.clientIdHint}</span>
             </div>
             <div className="mt-1.5 flex items-center gap-1 rounded-lg border border-line bg-surface py-0.5 pl-3 pr-0.5">
               <code className="min-w-0 flex-1 truncate font-mono text-[13px]">{clientId}</code>
@@ -130,7 +130,8 @@ function Body({ credentials, onClose }: { credentials: Credentials; onClose: () 
               {s.closeAnyway}
             </Button>
           )}
-          <Button variant="primary" onClick={tryClose} autoFocus={!secret}>
+          {/* The dialog's one main button: violet, like the app's other dialogs (the calendar, the CV's). */}
+          <Button variant="blob" onClick={tryClose} autoFocus={!secret}>
             {kind === "created" ? s.next : s.done}
           </Button>
         </div>

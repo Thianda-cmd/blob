@@ -2,12 +2,17 @@
 
 import { addWeeks, differenceInCalendarDays, format, startOfWeek } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
-import { LayoutList, SquareKanban, X } from "lucide-react";
+import { LayoutList, ListChecks, Plus, SquareKanban, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
-import { Kbd } from "@/components/ui/Kbd";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
+import { TopBar } from "@/components/shell/TopBar";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Segmented } from "@/components/ui/Segmented";
+import { chipOn, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
@@ -32,7 +37,8 @@ const VIEW_KEY = "blob-tasks-view";
 
 /**
  * The full Tasks page: quick add + grouped list (or the board: To do, Doing, Done) on the left,
- * calendar, filters and cards assigned to you in projects on the right.
+ * calendar, filters and cards assigned to you in projects on the right. The top bar holds the view
+ * switch and the violet "+ Neue Aufgabe" (it puts the cursor into the quick add, like "n" does).
  */
 export function TasksView({ initialTasks, assigned = [] }: { initialTasks: Task[]; assigned?: AssignedCard[] }) {
   const t = useMessages(tasksText);
@@ -132,216 +138,237 @@ export function TasksView({ initialTasks, assigned = [] }: { initialTasks: Task[
   if (filters.kind) chips.push({ key: "kind", label: t.kindPlural[filters.kind] });
   if (filters.subject) chips.push({ key: "subject", label: filters.subject === "none" ? t.noSubject : (filterSubject?.name ?? t.subject) });
 
+  const counts = view ? (
+    <>
+      {t.open(view.open)}
+      {view.dueToday > 0 && (
+        <>
+          {" · "}
+          <span className="text-blob-ink">{t.dueToday(view.dueToday)}</span>
+        </>
+      )}
+      {view.overdue > 0 && (
+        <>
+          {" · "}
+          <span className="text-danger">{t.overdue(view.overdue)}</span>
+        </>
+      )}
+    </>
+  ) : (
+    // Same height before the counts are known (they need the time of day): no jump.
+    "\u00a0"
+  );
+
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      {/* grid-cols-1 (a minmax(0, 1fr) track): a long subject name in the filters must not widen the page. */}
-      <div className="mx-auto grid max-w-[1320px] grid-cols-1 gap-x-10 gap-y-8 px-4 pb-28 pt-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-10 lg:pt-7">
-        <section className="min-w-0">
-          <header className="mb-4 flex items-end gap-3">
-            <div className="min-w-0">
-              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.025em]">{t.title}</h1>
-              <p className="mt-0.5 h-5 text-[13px] text-ink-3">
-                {view && (
-                  <>
-                    {t.open(view.open)}
-                    {view.dueToday > 0 && <> · <span className="text-blob-ink">{t.dueToday(view.dueToday)}</span></>}
-                    {view.overdue > 0 && <> · <span className="text-danger">{t.overdue(view.overdue)}</span></>}
-                  </>
-                )}
-              </p>
-            </div>
-            <span className="ml-auto flex items-center gap-3 pb-1">
-              <span className="hidden items-center gap-1.5 text-[11.5px] text-ink-3 xl:flex [@media(hover:none)]:hidden">
-                {t.pressBefore} <Kbd>N</Kbd> {t.pressAfter}
-              </span>
-              <span className="flex shrink-0 rounded-lg bg-hover p-0.5" role="tablist" aria-label={t.view}>
-                {(
-                  [
-                    ["list", t.viewList, LayoutList],
-                    ["board", t.viewBoard, SquareKanban],
-                  ] as const
-                ).map(([v, label, Icon]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === v}
-                    onClick={() => chooseMode(v)}
-                    className={cn(
-                      "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors [@media(hover:none)]:h-8",
-                      mode === v ? "bg-raised text-ink shadow-card dark:bg-white/10" : "text-ink-3 hover:text-ink",
-                    )}
-                  >
-                    <Icon className="size-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </span>
-            </span>
-          </header>
-
-          <QuickAdd
-            ref={quick}
-            onAdd={store.add}
-            subjects={subjects}
-            defaultSubjectId={filterSubject?.id ?? null}
-            defaultDay={filterDay}
-            autoFocus={wantsNew}
-          />
-
-          <AnimatePresence initial={false}>
-            {filtered && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                className="overflow-hidden"
-              >
-                <div className="flex flex-wrap items-center gap-1.5 pt-3">
-                  <span className="text-[12px] text-ink-3">{t.showing}</span>
-                  {chips.map((c) => (
-                    <button
-                      key={c.key}
-                      onClick={() => setFilters((f) => ({ ...f, [c.key]: null }))}
-                      className="group inline-flex h-6 items-center gap-1 rounded-md bg-ink pl-2 pr-1 text-[12px] font-medium text-paper"
-                    >
-                      {c.label}
-                      <X className="size-3 opacity-60 group-hover:opacity-100" />
-                    </button>
-                  ))}
-                  <button onClick={() => setFilters(NO_FILTERS)} className="ml-1 text-[12px] text-ink-3 hover:text-ink">
-                    {t.clear}
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence initial={false}>
-            {view && view.clearedToday && !filtered && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-blob-soft/60 py-2 pl-2 pr-4">
-                  <Blob size={44} mood="happy" track={false} />
-                  <div className="min-w-0">
-                    <p className="text-[13.5px] font-medium text-ink">{t.allClearToday}</p>
-                    <p className="truncate text-[12.5px] text-ink-2">
-                      {view.nextUp && now ? (
-                        <>
-                          {t.nextUp} {view.nextUp.title} <span className="text-ink-3">· {formatDue(view.nextUp.due_at!, now, locale)}</span>
-                        </>
-                      ) : (
-                        t.nothingElse
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {mode === "board" && tasks.length > 0 ? (
-            <div className="mt-5">
-              <PersonalBoard store={store} tasks={view?.visible ?? tasks} subjects={subjects} now={now} />
-            </div>
-          ) : (
-            <TaskBoard
-              className="mt-5"
-              store={store}
-              tasks={view?.visible ?? tasks}
-              subjects={subjects}
-              empty={
-                tasks.length === 0 ? (
-                  <EmptyState onExample={(text) => quick.current?.fill(text)} />
-                ) : (
-                  <div className="mt-10 flex flex-col items-center text-center">
-                    <p className="text-[13.5px] text-ink-2">{t.nothingMatches}</p>
-                    <button onClick={() => setFilters(NO_FILTERS)} className="mt-1 text-[13px] font-medium text-blob-ink hover:underline">
-                      {t.clearFilters}
-                    </button>
-                  </div>
-                )
-              }
+    <>
+      <TopBar
+        crumbs={[{ label: t.title, icon: <ListChecks className="size-3.5 text-ink-3" /> }]}
+        actions={
+          <>
+            <Segmented
+              kind="tabs"
+              compact
+              value={mode}
+              onChange={chooseMode}
+              label={t.view}
+              options={[
+                { value: "list", label: t.viewList, icon: <LayoutList /> },
+                { value: "board", label: t.viewBoard, icon: <SquareKanban /> },
+              ]}
             />
-          )}
-        </section>
+            <Button variant="blob" size="bar" className="ml-1" onClick={() => quick.current?.focus()} title={`${t.newTask} (N)`} aria-keyshortcuts="N">
+              <Plus className="size-4" strokeWidth={2.4} aria-hidden />
+              <span className="max-sm:sr-only">{t.newTask}</span>
+            </Button>
+          </>
+        }
+      />
+      <PageBody>
+        {/* grid-cols-1 (a minmax(0, 1fr) track): a long subject name in the filters must not widen the page. */}
+        <div className="grid grid-cols-1 gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_288px]">
+          <section className="min-w-0">
+            <PageHeader title={t.title} meta={counts} />
 
-        {/* Tablets: calendar on the left, filters on the right instead of three screen-wide panels.
-            Desktop: a sticky column that scrolls on its own once many subjects make it taller than the screen. */}
-        <aside className="grid min-w-0 grid-cols-1 content-start gap-3 md:grid-cols-2 lg:sticky lg:top-7 lg:max-h-[calc(100dvh-7.5rem)] lg:grid-cols-1 lg:self-start lg:overflow-y-auto lg:[scrollbar-width:thin]">
-          {view && now ? (
-            <>
-              <Panel className="md:row-span-2 md:self-start lg:row-span-1" title={t.nextTwoWeeks} action={<span className="text-[11.5px] text-ink-3">{format(now, t.monthFormat, { locale: dateLocale(locale) })}</span>}>
-                <CalendarHeat
-                  tasks={view.heatTasks}
-                  now={now}
-                  selected={filters.day}
-                  overdue={view.overdue}
-                  onSelect={(day) => setFilters((f) => ({ ...f, day }))}
-                />
-                {view.weekTotal > 0 && (
-                  <div className="mt-3.5 border-t border-line pt-3">
-                    <WeekProgress done={view.weekDone} total={view.weekTotal} />
+            <QuickAdd
+              ref={quick}
+              onAdd={store.add}
+              subjects={subjects}
+              defaultSubjectId={filterSubject?.id ?? null}
+              defaultDay={filterDay}
+              autoFocus={wantsNew}
+              shortcut="N"
+            />
+
+            <AnimatePresence initial={false}>
+              {filtered && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap items-center gap-1.5 pt-3">
+                    <span className={cn("text-[12.5px]", midTone)}>{t.showing}</span>
+                    {chips.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setFilters((f) => ({ ...f, [c.key]: null }))}
+                        aria-label={t.removeFilter(c.label)}
+                        title={t.removeFilter(c.label)}
+                        className={cn(
+                          "group inline-flex h-7 max-w-full items-center gap-1 rounded-full border pl-2.5 pr-1.5 text-[12.5px] font-medium transition-colors hover:border-blob/70 [@media(hover:none)]:h-8",
+                          chipOn,
+                        )}
+                      >
+                        <span className="truncate">{c.label}</span>
+                        <X className="size-3.5 shrink-0 opacity-70 group-hover:opacity-100" aria-hidden />
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFilters(NO_FILTERS)}
+                      className="ml-0.5 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
+                    >
+                      {t.clear}
+                    </button>
                   </div>
-                )}
-              </Panel>
-              <Panel title={t.byType}>
-                <KindFilter counts={view.kindCounts} value={filters.kind} onChange={(kind) => setFilters((f) => ({ ...f, kind }))} />
-              </Panel>
-              <Panel title={t.subjects}>
-                <SubjectFilter
-                  subjects={subjects}
-                  counts={view.subjectCounts}
-                  noSubject={view.noSubject}
-                  value={filters.subject}
-                  onChange={(subject) => setFilters((f) => ({ ...f, subject }))}
-                />
-              </Panel>
-              <Panel
-                title={t.fromProjects}
-                action={
-                  <Link href="/projects" className="text-[11.5px] text-ink-3 hover:text-ink">
-                    {t.allProjects}
-                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence initial={false}>
+              {view && view.clearedToday && !filtered && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-blob/25 bg-blob-soft/60 py-2 pl-2 pr-4">
+                    <Blob size={44} mood="happy" track={false} />
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-medium text-ink">{t.allClearToday}</p>
+                      <p className="truncate text-[12.5px] text-ink-2">
+                        {view.nextUp && now ? (
+                          <>
+                            {t.nextUp} {view.nextUp.title} <span className={midTone}>· {formatDue(view.nextUp.due_at!, now, locale)}</span>
+                          </>
+                        ) : (
+                          t.nothingElse
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {mode === "board" && tasks.length > 0 ? (
+              <div className="mt-5">
+                <PersonalBoard store={store} tasks={view?.visible ?? tasks} subjects={subjects} now={now} />
+              </div>
+            ) : (
+              <TaskBoard
+                className="mt-5"
+                store={store}
+                tasks={view?.visible ?? tasks}
+                subjects={subjects}
+                empty={
+                  tasks.length === 0 ? (
+                    <NothingYet onExample={(text) => quick.current?.fill(text)} />
+                  ) : (
+                    <EmptyState
+                      size="sm"
+                      className="mt-4"
+                      title={t.nothingMatches}
+                      actions={
+                        <Button variant="secondary" size="sm" onClick={() => setFilters(NO_FILTERS)}>
+                          {t.clearFilters}
+                        </Button>
+                      }
+                    />
+                  )
                 }
-              >
-                <FromProjects initial={assigned} />
-              </Panel>
-            </>
-          ) : (
-            <div className="h-[420px] rounded-xl border border-line md:col-span-2 lg:col-span-1" aria-hidden />
-          )}
-        </aside>
-      </div>
+              />
+            )}
+          </section>
+
+          {/* Wide screens: a quiet rail beside the list, like the calendar's (a hairline, no boxes), sticky,
+              scrolling on its own once many subjects make it taller than the screen. Below 1280 px the
+              list needs the width (its rows keep room for subject and date): the boxes go under it,
+              calendar on the left, filters on the right. Phones: one column. */}
+          <aside className="grid min-w-0 grid-cols-1 content-start gap-3 md:grid-cols-2 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-7.5rem)] xl:grid-cols-1 xl:gap-7 xl:self-start xl:overflow-y-auto xl:border-l xl:border-line xl:pl-6 xl:[scrollbar-width:thin]">
+            {view && now ? (
+              <>
+                <Panel
+                  className="md:row-span-2 md:self-start xl:row-span-1"
+                  title={t.nextTwoWeeks}
+                  action={<span className={cn("text-[11.5px]", midTone)}>{format(now, t.monthFormat, { locale: dateLocale(locale) })}</span>}
+                >
+                  <CalendarHeat
+                    tasks={view.heatTasks}
+                    now={now}
+                    selected={filters.day}
+                    overdue={view.overdue}
+                    onSelect={(day) => setFilters((f) => ({ ...f, day }))}
+                  />
+                  {view.weekTotal > 0 && (
+                    <div className="mt-3.5 border-t border-line pt-3">
+                      <WeekProgress done={view.weekDone} total={view.weekTotal} />
+                    </div>
+                  )}
+                </Panel>
+                <Panel title={t.byType}>
+                  <KindFilter counts={view.kindCounts} value={filters.kind} onChange={(kind) => setFilters((f) => ({ ...f, kind }))} />
+                </Panel>
+                <Panel title={t.subjects}>
+                  <SubjectFilter
+                    subjects={subjects}
+                    counts={view.subjectCounts}
+                    noSubject={view.noSubject}
+                    value={filters.subject}
+                    onChange={(subject) => setFilters((f) => ({ ...f, subject }))}
+                  />
+                </Panel>
+                <Panel
+                  title={t.fromProjects}
+                  action={
+                    <Link href="/projects" className={cn("rounded-md px-1 py-0.5 text-[11.5px] font-medium hover:bg-hover hover:text-ink", midTone)}>
+                      {t.allProjects}
+                    </Link>
+                  }
+                >
+                  <FromProjects initial={assigned} />
+                </Panel>
+              </>
+            ) : (
+              <div className="h-[420px] rounded-xl border border-line md:col-span-2 xl:col-span-1 xl:border-0" aria-hidden />
+            )}
+          </aside>
+        </div>
+      </PageBody>
       <UndoToast store={store} />
-    </div>
+    </>
   );
 }
 
-function EmptyState({ onExample }: { onExample: (text: string) => void }) {
+/** No tasks at all: Blob, what to do, and examples that fill the quick add. */
+function NothingYet({ onExample }: { onExample: (text: string) => void }) {
   const t = useMessages(tasksText);
   return (
-    <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 pb-9 pt-7 text-center">
-      <Blob size={96} mood="sleepy" />
-      <h2 className="mt-2 font-display text-[18px] font-semibold tracking-[-0.01em]">{t.emptyTitle}</h2>
-      <p className="mt-1 max-w-[400px] text-[13.5px] text-ink-2">{t.emptyBody}</p>
-      <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-        {t.examples.map((ex) => (
-          <button
-            key={ex}
-            onClick={() => onExample(ex)}
-            className={cn("h-7 rounded-lg border border-line bg-raised px-2.5 text-[12.5px] text-ink-2 shadow-card transition-colors hover:border-line-2 hover:text-ink")}
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
-    </div>
+    <EmptyState
+      className="mt-2"
+      art={<Blob size={88} mood="sleepy" />}
+      title={t.emptyTitle}
+      body={t.emptyBody}
+      actions={t.examples.map((ex) => (
+        <button key={ex} type="button" onClick={() => onExample(ex)} className="blob-chip">
+          {ex}
+        </button>
+      ))}
+    />
   );
 }

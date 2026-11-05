@@ -6,11 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
 import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
+import { midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { CV_TEMPLATES } from "@/cv/catalog";
 import { cvPlainText, cvTitle, normalizeCv } from "@/cv/model";
@@ -18,6 +20,7 @@ import type { Cv } from "@/cv/types";
 import { useLocale, useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { CvCard, NewCvCard, type CvItem } from "./CvCard";
 import { CvTips } from "./CvTips";
 import { NewCvDialog } from "./NewCvDialog";
@@ -27,11 +30,6 @@ import { useRefreshOnBack } from "./useRefreshOnBack";
 export type { CvItem };
 
 const time = (iso: string) => Date.parse(iso) || 0;
-
-const rise = {
-  hidden: { opacity: 0, y: 10 },
-  shown: (i: number) => ({ opacity: 1, y: 0, transition: { delay: 0.04 * i, type: "spring" as const, stiffness: 420, damping: 32 } }),
-};
 
 /** /cv: the student's CVs as cards, a friendly start when there are none, and tips for a good CV. */
 export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
@@ -99,72 +97,61 @@ export function CvHome({ initialItems }: { initialItems: CvItem[] }) {
 
   return (
     <>
-      <TopBar crumbs={[{ label: t.title, icon: <FileUser className="size-3.5 text-ink-3" /> }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-28 pt-3 sm:px-8 lg:px-10 lg:pt-5">
-          <motion.header initial="hidden" animate="shown" className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-            <motion.div variants={rise} custom={0} className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <FileUser className="size-3.5" /> {t.eyebrow}
-              </div>
-              <h1 className="mt-1 font-display text-[32px] font-bold leading-none tracking-[-0.02em]">{t.title}</h1>
-              <p className="mt-2 max-w-[720px] text-[14.5px] leading-relaxed text-ink-2">{t.intro}</p>
-            </motion.div>
-            {items.length > 0 && (
-              <motion.div variants={rise} custom={1}>
-                <Button variant="blob" size="lg" onClick={() => setCreating(true)}>
-                  <Plus className="size-4" /> {t.newCv}
-                </Button>
-              </motion.div>
-            )}
-          </motion.header>
+      <TopBar
+        crumbs={[{ label: t.title, icon: <FileUser className="size-3.5 text-ink-3" /> }]}
+        actions={
+          <Button variant="blob" size="bar" onClick={() => setCreating(true)}>
+            <Plus className="size-4" strokeWidth={2.4} />
+            <span className="max-sm:sr-only">{t.newCv}</span>
+          </Button>
+        }
+      />
+      <PageBody>
+        <PageHeader title={t.title} meta={items.length > 0 ? t.count(items.length) : t.intro} />
 
-          <div className="mt-7 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="min-w-0">
-              {items.length === 0 ? (
-                <EmptyHero onStart={() => setCreating(true)} />
-              ) : (
-                <section aria-labelledby="cv-list-title">
-                  <div className="mb-3 flex items-baseline gap-3">
-                    <h2 id="cv-list-title" className="font-display text-[19px] font-semibold tracking-[-0.01em]">
-                      {t.yours}
-                    </h2>
-                    <span className="text-[13px] text-ink-3">{t.count(items.length)}</span>
-                  </div>
-                  {/* Three across beside the tips on a laptop, so ten CVs stay a few rows, not a long scroll. */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      {items.map((item, i) => (
-                        <motion.div
-                          key={item.id}
-                          layout
-                          initial={{ opacity: 0, scale: 0.94 }}
-                          animate={{ opacity: 1, scale: 1, transition: { type: "spring", stiffness: 420, damping: 32, delay: Math.min(i, 8) * 0.04 } }}
-                          exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.16 } }}
-                        >
-                          <CvCard
-                            item={item}
-                            now={now}
-                            onRename={(cv) => setRenaming({ item, cv })}
-                            onDuplicate={() => duplicate(item)}
-                            onTrash={() => trashPage(item.id)}
-                          />
-                        </motion.div>
-                      ))}
-                      <motion.div key="new" layout>
-                        <NewCvCard onClick={() => setCreating(true)} />
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
+            {items.length === 0 ? (
+              <EmptyHero onStart={() => setCreating(true)} />
+            ) : (
+              <section aria-labelledby="cv-list-title">
+                {/* The count is in the page's header already; the heading is for screen readers. */}
+                <h2 id="cv-list-title" className="sr-only">
+                  {t.yours}
+                </h2>
+                {/* Three across beside the tips on a laptop, so ten CVs stay a few rows, not a long scroll. */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {items.map((item, i) => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1, transition: { type: "spring", stiffness: 420, damping: 32, delay: Math.min(i, 8) * 0.04 } }}
+                        exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.16 } }}
+                      >
+                        <CvCard
+                          item={item}
+                          now={now}
+                          onRename={(cv) => setRenaming({ item, cv })}
+                          onDuplicate={() => duplicate(item)}
+                          onTrash={() => trashPage(item.id)}
+                        />
                       </motion.div>
-                    </AnimatePresence>
-                  </div>
-                </section>
-              )}
-            </div>
-            <motion.aside initial="hidden" animate="shown" variants={rise} custom={3} className="xl:sticky xl:top-5 xl:self-start">
-              <CvTips />
-            </motion.aside>
+                    ))}
+                    <motion.div key="new" layout>
+                      <NewCvCard onClick={() => setCreating(true)} />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </section>
+            )}
           </div>
+          <aside className="xl:sticky xl:top-6 xl:self-start">
+            <CvTips />
+          </aside>
         </div>
-      </div>
+      </PageBody>
 
       <NewCvDialog open={creating} onClose={() => setCreating(false)} />
       <Dialog open={Boolean(renaming)} onClose={() => setRenaming(null)} labelledBy="cv-rename-title">
@@ -192,21 +179,16 @@ function EmptyHero({ onStart }: { onStart: () => void }) {
     const id = window.setTimeout(() => ref.current?.wave(), 900);
     return () => window.clearTimeout(id);
   }, []);
+  // The start screen: what you get and the one button, beside three example CVs on a desk.
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="relative overflow-hidden rounded-3xl border border-line bg-raised shadow-card"
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_0%_0%,color-mix(in_oklab,var(--blob)_14%,transparent),transparent_60%)]" />
-      <div className="bg-dots pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30 [mask-image:linear-gradient(to_left,black,transparent)]" />
-      <div className="relative grid items-center gap-4 p-5 sm:p-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8">
-        <div className="relative order-2 md:order-1">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.emptyEyebrow}</div>
-          <h2 className="mt-1 font-display text-[26px] font-bold leading-tight tracking-[-0.015em] text-balance">{t.emptyTitle}</h2>
-          <p className="mt-2 max-w-[520px] text-[14.5px] leading-relaxed text-ink-2">{t.emptyBody}</p>
-          <Button variant="blob" size="lg" className="mt-5 max-sm:w-full" onClick={onStart} onPointerEnter={() => ref.current?.jump(0.5)}>
+    <section aria-labelledby="cv-start-title" className="rounded-2xl border border-line bg-raised p-5 shadow-card sm:p-6">
+      <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8">
+        <div className="order-2 min-w-0 md:order-1">
+          <h2 id="cv-start-title" className="text-balance font-display text-[24px] font-bold leading-tight tracking-[-0.02em] text-ink">
+            {t.emptyTitle}
+          </h2>
+          <p className="mt-2 max-w-[520px] text-pretty text-[14px] leading-relaxed text-ink-2">{t.emptyBody}</p>
+          <Button variant="blob" size="md" className="mt-5 max-sm:w-full" onClick={onStart} onPointerEnter={() => ref.current?.jump(0.5)}>
             <Plus className="size-4" /> {t.emptyCta}
           </Button>
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-ink-2">
@@ -217,14 +199,14 @@ function EmptyHero({ onStart }: { onStart: () => void }) {
             ))}
           </ul>
         </div>
-        <div className="relative order-1 md:order-2">
-          <SampleFan lang={locale} designs={["modern", "classic", "creative"]} maxPaper={180} className="mx-auto w-full max-w-[420px]" />
-          <div className="absolute -bottom-2 left-0 z-10 sm:left-[4%]">
-            <Blob ref={ref} size={92} mood="happy" />
+        <div className="relative order-1 rounded-xl border border-line bg-surface px-3 pb-3 pt-4 md:order-2">
+          <SampleFan lang={locale} designs={["modern", "classic", "creative"]} maxPaper={170} className="mx-auto w-full max-w-[400px]" />
+          <div className="absolute bottom-1 left-1 z-10 sm:left-3">
+            <Blob ref={ref} size={80} mood="happy" />
           </div>
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -256,12 +238,12 @@ function RenameForm({ target, onClose, onSave }: { target: { item: CvItem; cv: C
           className="h-10 text-[16px] sm:text-[14px]"
         />
       </label>
-      <p className="mt-2 text-[12.5px] leading-snug text-ink-3">{t.renameHint}</p>
+      <p className={cn("mt-2 text-[12.5px] leading-snug", midTone)}>{t.renameHint}</p>
       <div className="mt-5 flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onClose}>
           {t.cancel}
         </Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="blob">
           {t.save}
         </Button>
       </div>

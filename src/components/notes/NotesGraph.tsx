@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { PageIcon } from "@/components/shell/Sidebar";
+import { buttonClass } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { card as cardSurface, chipOff, chipOn, midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
 import { CATALOG, topicHref } from "@/learn/catalog";
@@ -217,25 +220,18 @@ export function NotesGraph({
   const cardPage = card?.kind === "page" ? pages.find((p) => p.id === card.id) : undefined;
 
   if (!graph.nodes.length || !graph.edges.length) {
-    return (
-      <div className="mt-2 flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 py-14 text-center">
-        <Blob size={104} mood="thinking" track={false} />
-        <h2 className="mt-2 font-display text-[19px] font-semibold tracking-[-0.015em]">{t.emptyTitle}</h2>
-        <p className="mt-1 max-w-[420px] text-[13.5px] text-ink-2">{t.emptyText}</p>
-      </div>
-    );
+    return <EmptyState art={<Blob size={88} mood="thinking" track={false} />} title={t.emptyTitle} body={t.emptyText} />;
   }
 
   return (
     <div
       ref={wrap}
-      className="relative mt-2 h-[calc(100dvh-19rem)] min-h-[420px] touch-none select-none overflow-hidden rounded-2xl border border-line bg-raised shadow-card"
+      className={cn(cardSurface, "relative h-[calc(100dvh-19rem)] min-h-[420px] touch-none select-none overflow-hidden")}
       onPointerDown={(e) => onPointerDown(e, null)}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      <div className="bg-dots pointer-events-none absolute inset-0 opacity-40" />
       <svg width={size.w} height={size.h} className="relative block" role="img" aria-label={t.label}>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {graph.edges.map((e, i) => {
@@ -327,7 +323,7 @@ export function NotesGraph({
       </div>
 
       {/* Legend and hint */}
-      <div className="pointer-events-none absolute bottom-2.5 left-3 right-3 flex flex-col items-start gap-1.5 text-[11px] text-ink-3">
+      <div className={cn("pointer-events-none absolute bottom-2.5 left-3 right-3 flex flex-col items-start gap-1.5 text-[11px]", midTone)}>
         <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-raised/85 px-2 py-1 backdrop-blur-sm">
           <Legend dash={undefined} label={t.legendLink} />
           <Legend dash="4 3" label={t.legendChild} />
@@ -352,13 +348,10 @@ export function NotesGraph({
               {cardPage ? <PageIcon page={cardPage} /> : card.kind === "tag" ? <Hash className="size-4 text-blob-ink" /> : <GraduationCap className="size-4 text-ok" />}
               <span className="min-w-0 truncate text-[13.5px] font-semibold text-ink">{card.label}</span>
             </div>
-            <div className="mt-1 text-[12px] text-ink-3">{t.connections(neighbors[graph.index.get(card.id)!].size)}</div>
+            <div className={cn("mt-1 text-[12px]", midTone)}>{t.connections(neighbors[graph.index.get(card.id)!].size)}</div>
             {(touch || selected !== null) && (
-              <button
-                onClick={() => open(card)}
-                className="mt-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-ink text-[13px] font-medium text-paper hover:bg-ink/88"
-              >
-                {card.kind === "page" ? t.open : card.kind === "tag" ? t.showNotes : t.openTopic} <ArrowUpRight className="size-3.5" />
+              <button type="button" onClick={() => open(card)} className={buttonClass("secondary", "sm", "mt-2.5 w-full [@media(hover:none)]:h-9")}>
+                {card.kind === "page" ? t.open : card.kind === "tag" ? t.showNotes : t.openTopic} <ArrowUpRight className="size-3.5" aria-hidden />
               </button>
             )}
           </motion.div>
@@ -389,7 +382,7 @@ function Toggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void
       aria-pressed={on}
       className={cn(
         "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium shadow-card transition-colors [&_svg]:size-3.5 [@media(hover:none)]:h-9",
-        on ? "border-blob/40 bg-blob-soft text-blob-ink" : "border-line bg-raised text-ink-3 hover:text-ink",
+        on ? chipOn : chipOff,
       )}
     >
       {icon}

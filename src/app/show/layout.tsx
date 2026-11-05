@@ -7,6 +7,8 @@ import { showText } from "@/i18n/messages/show";
 import { getMessages } from "@/i18n/server";
 import { PATH_HEADER } from "@/lib/path-header";
 import { getUser } from "@/lib/supabase/server";
+import { midTone } from "@/components/ui/surfaces";
+import { cn } from "@/lib/utils";
 
 /** Public pages with lesson pictures: anyone can open them, signed in or not. */
 export default async function ShowLayout({ children }: LayoutProps<"/show">) {
@@ -50,7 +52,7 @@ export default async function ShowLayout({ children }: LayoutProps<"/show">) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="flex items-center justify-center gap-1 border-t border-line/60 py-3 text-[12.5px] text-ink-3">
+      <footer className={cn("flex items-center justify-center gap-1 border-t border-line/60 py-3 text-[12.5px]", midTone)}>
         <Link href="/show" className="flex h-10 items-center px-2 hover:text-ink">
           {t.gallery}
         </Link>

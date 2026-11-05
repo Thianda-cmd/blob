@@ -22,8 +22,10 @@ import { blob } from "@/components/blob/bus";
 import { AppMark } from "@/components/oauth/AppMark";
 import { ConfirmDialog } from "@/components/oauth/ConfirmDialog";
 import { CopyButton } from "@/components/oauth/Copy";
+import { pageTitleClass } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/Button";
+import { midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { formatBytes } from "@/i18n/format";
 import { adminText } from "@/i18n/messages/admin";
@@ -78,16 +80,16 @@ export function AppView({ app, stats, events, connections, people, issuer, endpo
         ]}
       />
       <AdminPage>
-        <motion.header initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex items-start gap-4">
-          <AppMark app={app} size={56} className={cn(app.disabled && "opacity-50 grayscale")} />
+        <header className="flex items-start gap-4">
+          <AppMark app={app} size={48} className={cn(app.disabled && "opacity-50 grayscale")} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <h1 className="min-w-0 break-words font-display text-[26px] font-bold leading-tight tracking-[-0.03em]">{app.name}</h1>
+              <h1 className={cn(pageTitleClass, "min-w-0 break-words")}>{app.name}</h1>
               {app.trusted && <TrustedBadge />}
               {app.disabled && <DisabledBadge />}
             </div>
             {app.description && <p className="mt-0.5 text-[13.5px] text-ink-2">{app.description}</p>}
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px] text-ink-3">
+            <div className={cn("mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px]", midTone)}>
               <span className="flex min-w-0 max-w-full items-center gap-0.5 rounded-lg bg-hover/70 py-0.5 pl-2 pr-0.5">
                 <code className="min-w-0 truncate font-mono text-[12px] text-ink-2">{app.client_id}</code>
                 <CopyButton value={app.client_id} label={t.copyWhat(t.secret.clientId)} copiedLabel={t.copied} className="size-6" />
@@ -101,7 +103,7 @@ export function AppView({ app, stats, events, connections, people, issuer, endpo
               <span suppressHydrationWarning>{t.detail.created(shortDate(app.created_at, locale))}</span>
             </div>
           </div>
-        </motion.header>
+        </header>
 
         <div role="tablist" aria-label={t.detail.tabsLabel} className="-mx-1 mt-7 flex gap-0.5 overflow-x-auto border-b border-line px-1 sm:gap-1">
           {APP_TABS.map((id) => {
@@ -183,24 +185,24 @@ function Overview({
     <div className="space-y-3">
       <div className={cn("grid grid-cols-2 gap-3", storage ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
         <StatTile icon={<Users />} label={t.detail.people} value={connected} sub={t.detail.peopleSub} />
-        <StatTile icon={<LogIn />} label={t.stats.signIns} value={stats.today} sub={t.stats.signInsSub(stats.week)} delay={0.04} />
+        <StatTile icon={<LogIn />} label={t.stats.signIns} value={stats.today} sub={t.stats.signInsSub(stats.week)} />
         {storage && (
           <StatTile
             icon={<Database />}
             label={t.detail.storage}
             value={formatBytes(storage.bytes, locale)}
             sub={t.detail.storageSub(storage.people, storage.keys)}
-            delay={0.06}
+           
           />
         )}
         <div className={cn(!storage && "col-span-2 lg:col-span-1")}>
-          <StatTile icon={<TriangleAlert />} label={t.stats.errors} value={stats.errors} sub={<ErrorsNote count={stats.errors} />} delay={0.08} />
+          <StatTile icon={<TriangleAlert />} label={t.stats.errors} value={stats.errors} sub={<ErrorsNote count={stats.errors} />} />
         </div>
       </div>
       <SignInChart series={stats.series} />
       <Panel title={t.events.title} className="!mt-6">
         {events.length === 0 ? (
-          <p className="px-4 pb-5 pt-1 text-[13px] text-ink-3 sm:px-5">{t.events.empty}</p>
+          <p className={cn("px-4 pb-5 pt-1 text-[13px] sm:px-5", midTone)}>{t.events.empty}</p>
         ) : (
           <ul className="mt-2 divide-y divide-line border-t border-line">
             {events.map((e) => {
@@ -224,18 +226,18 @@ function Overview({
                         {person ? (
                           <>
                             {person.name || person.email}
-                            {person.name && person.email && <span className="text-ink-3"> · {person.email}</span>}
+                            {person.name && person.email && <span className={midTone}> · {person.email}</span>}
                           </>
                         ) : e.user_id ? (
                           t.people.unknown
                         ) : (
-                          <span className="text-ink-3">{t.events.noPerson}</span>
+                          <span className={midTone}>{t.events.noPerson}</span>
                         )}
                       </span>
                     </div>
-                    {e.detail && <div className="mt-0.5 text-[12px] leading-snug text-ink-3">{t.events.details[e.detail] ?? e.detail}</div>}
+                    {e.detail && <div className={cn("mt-0.5 text-[12px] leading-snug", midTone)}>{t.events.details[e.detail] ?? e.detail}</div>}
                   </div>
-                  <time dateTime={e.created_at} title={dateTime(e.created_at, locale)} className="shrink-0 pt-0.5 text-[12px] text-ink-3" suppressHydrationWarning>
+                  <time dateTime={e.created_at} title={dateTime(e.created_at, locale)} className={cn("shrink-0 pt-0.5 text-[12px]", midTone)} suppressHydrationWarning>
                     {ago(e.created_at, locale)}
                   </time>
                 </li>
@@ -294,7 +296,7 @@ function PeopleList({
         <div className="flex flex-col items-center px-6 pb-8 pt-4 text-center">
           <Blob size={84} mood="sleepy" />
           <p className="mt-2 text-[14px] font-medium">{t.people.empty}</p>
-          <p className="mt-0.5 text-[12.5px] text-ink-3">{t.people.emptyBody}</p>
+          <p className={cn("mt-0.5 text-[12.5px]", midTone)}>{t.people.emptyBody}</p>
         </div>
       ) : (
         <ul className="mt-2 border-t border-line">
@@ -313,8 +315,8 @@ function PeopleList({
                   <Avatar name={nameOf(c)} src={p?.avatar ?? null} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13.5px] font-medium">{nameOf(c)}</div>
-                    {p?.email && p.email !== nameOf(c) && <div className="truncate text-[12.5px] text-ink-3">{p.email}</div>}
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
+                    {p?.email && p.email !== nameOf(c) && <div className={cn("truncate text-[12.5px]", midTone)}>{p.email}</div>}
+                    <div className={cn("mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]", midTone)}>
                       <span suppressHydrationWarning>
                         {t.people.since(shortDate(c.created_at, locale))} · {c.last_used_at ? t.people.lastUsed(ago(c.last_used_at, locale)) : t.people.neverUsed}
                       </span>

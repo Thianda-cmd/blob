@@ -4,7 +4,9 @@ import { motion } from "motion/react";
 import { BellRing, FileArchive, Link2, MonitorDown, Palette, Settings, ShieldCheck, TriangleAlert, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
+import { chipOff, chipOn } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { settingsText } from "@/i18n/messages/settings";
 import { blobApp, isPhoneApp } from "@/lib/native";
@@ -135,92 +137,89 @@ export function SettingsView({ connectedApps }: { connectedApps: ConnectedApp[] 
   return (
     <>
       <TopBar crumbs={[{ label: t.title, icon: <Settings className="size-3.5 text-ink-3" /> }]} />
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1080px] px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
-          <motion.header
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-4 md:mb-8 md:pl-[232px]"
-          >
-            <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.title}</h1>
-            <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
-          </motion.header>
+      <PageBody width="default" scrollRef={scroller}>
+        {/* In line with the sections, right of the nav (216 px + the 32 px gap). */}
+        <PageHeader title={t.title} meta={t.intro} className="md:pl-[248px]" />
 
-          {/* Phones and small tablets: the sections as a sticky, swipeable row of chips. */}
-          <nav
-            ref={chips}
-            aria-label={t.navLabel}
-            className="sticky top-0 z-10 -mx-4 mb-4 flex gap-1.5 overflow-x-auto bg-surface/95 px-4 py-2 backdrop-blur-sm [scrollbar-width:none] sm:-mx-8 sm:px-8 md:hidden [&::-webkit-scrollbar]:hidden"
-          >
-            {sections.map((s) => {
-              const current = active === s.id;
-              return (
-                <button
-                  key={s.id}
-                  data-section={s.id}
-                  onClick={() => go(s.id)}
-                  aria-current={current ? "location" : undefined}
-                  className={cn(
-                    "flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] transition-colors [&_svg]:size-3.5 [&_svg]:shrink-0",
-                    current ? "border-ink bg-ink font-medium text-paper" : s.id === "danger" ? "border-line bg-raised text-danger" : "border-line bg-raised text-ink-2",
-                  )}
-                >
-                  {s.icon}
-                  {t.nav[s.id]}
-                </button>
-              );
-            })}
+        {/* Phones and small tablets: the sections as a sticky, swipeable row of chips. */}
+        <nav
+          ref={chips}
+          aria-label={t.navLabel}
+          className="sticky top-0 z-10 -mx-4 mb-4 flex gap-1.5 overflow-x-auto bg-paper/95 px-4 py-2 backdrop-blur-sm [scrollbar-width:none] sm:-mx-6 sm:px-6 md:hidden [&::-webkit-scrollbar]:hidden"
+        >
+          {sections.map((s) => {
+            const current = active === s.id;
+            return (
+              <button
+                key={s.id}
+                data-section={s.id}
+                onClick={() => go(s.id)}
+                aria-current={current ? "location" : undefined}
+                className={cn(
+                  "flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] transition-colors [&_svg]:size-3.5 [&_svg]:shrink-0",
+                  // On: violet-soft like every chip that's on (red for the danger zone), never black.
+                  s.id === "danger"
+                    ? current
+                      ? "border-danger/40 bg-danger/[0.08] font-medium text-danger"
+                      : "border-line bg-raised text-danger hover:border-danger/40"
+                    : current
+                      ? cn(chipOn, "font-medium")
+                      : chipOff,
+                )}
+              >
+                {s.icon}
+                {t.nav[s.id]}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex gap-8">
+          <nav aria-label={t.navLabel} className="sticky top-6 hidden w-[216px] shrink-0 self-start pt-0.5 md:block">
+            <ul className="space-y-0.5">
+              {sections.map((s) => {
+                const current = active === s.id;
+                return (
+                  <li key={s.id}>
+                    <button
+                      onClick={() => go(s.id)}
+                      aria-current={current ? "location" : undefined}
+                      className={cn(
+                        "relative flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors [&_svg]:size-4 [&_svg]:shrink-0",
+                        current ? "font-medium text-ink" : "text-ink-2 hover:bg-hover/60 hover:text-ink",
+                        s.id === "danger" && (current ? "text-danger" : "text-ink-2 hover:text-danger"),
+                      )}
+                    >
+                      {/* The current section: a raised row with a violet icon, like the sidebar's. */}
+                      {current && (
+                        <motion.span
+                          layoutId="settings-nav-pill"
+                          className="absolute inset-0 rounded-lg bg-raised shadow-card"
+                          transition={{ type: "spring", stiffness: 520, damping: 40 }}
+                        />
+                      )}
+                      <span className={cn("relative", current ? (s.id === "danger" ? "text-danger" : "text-blob-ink") : "text-ink-3")}>{s.icon}</span>
+                      <span className="relative truncate">{t.nav[s.id]}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </nav>
 
-          <div className="flex gap-8">
-            <nav aria-label={t.navLabel} className="sticky top-6 hidden w-[200px] shrink-0 self-start pt-0.5 md:block">
-              <ul className="space-y-0.5">
-                {sections.map((s) => {
-                  const current = active === s.id;
-                  return (
-                    <li key={s.id}>
-                      <button
-                        onClick={() => go(s.id)}
-                        aria-current={current ? "location" : undefined}
-                        className={cn(
-                          "relative flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors [&_svg]:size-4 [&_svg]:shrink-0",
-                          current ? "font-medium text-ink" : "text-ink-2 hover:bg-hover/60 hover:text-ink",
-                          s.id === "danger" && (current ? "text-danger" : "text-ink-2 hover:text-danger"),
-                        )}
-                      >
-                        {current && (
-                          <motion.span
-                            layoutId="settings-nav-pill"
-                            className="absolute inset-0 rounded-lg bg-hover"
-                            transition={{ type: "spring", stiffness: 520, damping: 40 }}
-                          >
-                            <span className={cn("absolute inset-y-2 left-0 w-[3px] rounded-full", s.id === "danger" ? "bg-danger" : "bg-blob")} />
-                          </motion.span>
-                        )}
-                        <span className={cn("relative", current ? (s.id === "danger" ? "text-danger" : "text-ink") : "text-ink-3")}>{s.icon}</span>
-                        <span className="relative truncate">{t.nav[s.id]}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-
-            <div className="min-w-0 max-w-[760px] flex-1 space-y-10">
-              <ProfileSection />
-              <AppearanceSection />
-              <SecuritySection />
-              <ConnectedAppsSection apps={connectedApps} />
-              <RemindersSection />
-              {desktopApp && <AppSection />}
-              <DataSection />
-              <BlobSection />
-              <DangerSection />
-            </div>
+          <div className="min-w-0 max-w-[760px] flex-1 space-y-10">
+            <ProfileSection />
+            <AppearanceSection />
+            <SecuritySection />
+            <ConnectedAppsSection apps={connectedApps} />
+            <RemindersSection />
+            {desktopApp && <AppSection />}
+            <DataSection />
+            <BlobSection />
+            <DangerSection />
           </div>
         </div>
-      </div>
+      </PageBody>
     </>
   );
 }

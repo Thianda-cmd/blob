@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { BadgeQuestionMark, BarChart3, ChevronRight, Copy, GripVertical, Keyboard, LayoutGrid, ListOrdered, Play, Plus, Settings2, SlidersHorizontal, ToggleLeft, Trash2, TriangleAlert, Vote, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { SaveIndicator } from "@/components/page/SaveIndicator";
 import { useAutosave } from "@/components/page/useAutosave";
@@ -14,6 +14,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { inputClass } from "@/components/ui/Input";
 import { Popover } from "@/components/ui/Menu";
 import { Segmented } from "@/components/ui/Segmented";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { quizText, type QuizText } from "@/i18n/messages/quiz";
@@ -26,6 +27,9 @@ import { QuestionEditor } from "./QuestionEditor";
 import { SortableList, type Handle } from "./Sortable";
 
 type T = QuizText;
+
+/** Placeholders in the mid-tone, like the search fields (they say what goes there). */
+const placeholderTone = "placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]";
 
 export type GameSummary = { id: string; pin: string; phase: string; createdAt: string; endedAt: string | null; questions: number; players: number };
 
@@ -109,78 +113,90 @@ export function QuizEditor({ initial, games }: { initial: Quiz; games: GameSumma
         actions={
           <>
             <SaveIndicator state={autosave.state} />
-            <Button variant="ghost" size="sm" onClick={() => setOptions(true)} title={t.editor.settings}>
-              <Settings2 className="size-4" /> <span className="max-sm:hidden">{t.editor.settings}</span>
+            <Button variant="ghost" size="bar" onClick={() => setOptions(true)} title={t.editor.settings}>
+              <Settings2 className="size-4" /> <span className="max-sm:sr-only">{t.editor.settings}</span>
             </Button>
-            <Button variant="blob" size="sm" onClick={() => void host()} loading={hosting} disabled={!ready}>
+            <Button variant="blob" size="bar" onClick={() => void host()} loading={hosting} disabled={!ready}>
               <Play className="size-4" /> {t.editor.host}
             </Button>
           </>
         }
       />
 
-      <div className="flex min-h-0 flex-1 max-lg:flex-col">
-        {/* The questions */}
-        <aside className="flex shrink-0 flex-col border-line max-lg:border-b lg:w-[264px] lg:border-r">
-          <div className="flex flex-col gap-1.5 px-3 pb-2 pt-3 max-lg:hidden">
-            <input value={quiz.title} onChange={(e) => update({ title: e.target.value.slice(0, LIMITS.title) })} placeholder={t.editor.titlePlaceholder} className="w-full rounded-lg bg-transparent px-1.5 py-1 font-display text-[18px] font-bold tracking-[-0.01em] text-ink outline-none placeholder:text-ink-3 hover:bg-hover/60 focus:bg-hover/60" aria-label={t.editor.titlePlaceholder} />
-            <textarea value={quiz.description} onChange={(e) => update({ description: e.target.value.slice(0, LIMITS.description) })} placeholder={t.editor.descriptionPlaceholder} rows={2} className="w-full resize-none rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] text-ink-2 outline-none placeholder:text-ink-3 hover:bg-hover/60 focus:bg-hover/60" aria-label={t.editor.descriptionPlaceholder} />
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:overflow-x-auto max-lg:py-2">
-            <div className="max-lg:hidden">
-              <SortableList
-                items={quiz.questions}
-                onMove={setQuestions}
-                className="flex flex-col gap-1.5"
-                render={(q, i, handle) => <RailItem q={q} i={i} active={q.id === current?.id} onClick={() => setSelected(q.id)} dragRef={handle.ref} dragProps={handle.props} dragging={handle.dragging} t={t} />}
-              />
+      {/*
+        The columns follow the editor's own width, not the window's: the sidebar, the navigation
+        rail or a note opened beside it take their share. From 700 px the questions sit in a rail on
+        the left; from 1080 px the question's settings get their own column on the right. Narrower,
+        the questions are a row of numbers on top and the settings sit under the question.
+      */}
+      <div className="@container/quiz flex min-h-0 flex-1 flex-col border-t border-line">
+        {/* The title is a field; screen readers still get the page's heading. */}
+        <h1 className="sr-only">{quiz.title.trim() || t.untitled}</h1>
+        <div className="flex min-h-0 flex-1 flex-col @min-[700px]/quiz:flex-row">
+          {/* The questions */}
+          <aside className="flex shrink-0 flex-col border-line @max-[700px]/quiz:border-b @min-[700px]/quiz:w-[240px] @min-[700px]/quiz:border-r @min-[1080px]/quiz:w-[264px]">
+            <div className="flex flex-col gap-1.5 px-3 pb-2 pt-3 @max-[700px]/quiz:hidden">
+              <input value={quiz.title} onChange={(e) => update({ title: e.target.value.slice(0, LIMITS.title) })} placeholder={t.editor.titlePlaceholder} className={cn("w-full rounded-lg bg-transparent px-1.5 py-1 font-display text-[18px] font-bold tracking-[-0.01em] text-ink outline-none hover:bg-hover/60 focus:bg-hover/60", placeholderTone)} aria-label={t.editor.titlePlaceholder} />
+              <textarea value={quiz.description} onChange={(e) => update({ description: e.target.value.slice(0, LIMITS.description) })} placeholder={t.editor.descriptionPlaceholder} rows={2} className={cn("w-full resize-none rounded-lg bg-transparent px-1.5 py-1 text-[12.5px] text-ink-2 outline-none hover:bg-hover/60 focus:bg-hover/60", placeholderTone)} aria-label={t.editor.descriptionPlaceholder} />
             </div>
-            <div className="flex gap-1.5 lg:hidden">
-              {quiz.questions.map((q, i) => (
-                <button key={q.id} type="button" onClick={() => setSelected(q.id)} className={cn("relative grid size-10 shrink-0 place-items-center rounded-xl text-[14px] font-bold", q.id === current?.id ? "bg-blob text-white" : "bg-raised text-ink-2 shadow-card")}>
-                  {i + 1}
-                  {issuesOf(q).length > 0 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-paper bg-[#d99000]" />}
-                </button>
-              ))}
-            </div>
-            <AddQuestion onAdd={add} t={t} compact={false} disabled={quiz.questions.length >= LIMITS.questions} />
-          </div>
-          {notReady > 0 && (
-            <p className="mx-3 mb-3 flex items-start gap-1.5 rounded-xl bg-[#fff4e0] px-2.5 py-2 text-[11.5px] font-medium text-[#9a5b00] max-lg:hidden dark:bg-[#3a2a10] dark:text-[#f0b860]">
-              <TriangleAlert className="mt-px size-3.5 shrink-0" /> {t.editor.notReady(notReady)}
-            </p>
-          )}
-        </aside>
-
-        {/* The question */}
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[radial-gradient(90%_60%_at_50%_0%,color-mix(in_oklab,var(--blob-soft)_70%,transparent),transparent)] px-4 py-6 sm:px-8">
-          <div className="mb-4 flex flex-col gap-1 lg:hidden">
-            <input value={quiz.title} onChange={(e) => update({ title: e.target.value.slice(0, LIMITS.title) })} placeholder={t.editor.titlePlaceholder} className="w-full bg-transparent font-display text-[20px] font-bold text-ink outline-none placeholder:text-ink-3" />
-          </div>
-          <AnimatePresence mode="wait">
-            {current ? (
-              <motion.div key={current.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }} transition={{ type: "spring", stiffness: 420, damping: 34 }}>
-                <QuestionEditor question={current} index={index} onChange={changeQuestion} userId={userId} t={t} />
-                <div className="mx-auto mt-6 max-w-[920px] lg:hidden">
-                  <Panel q={current} onChange={changeQuestion} onDuplicate={() => duplicate(current)} onDelete={quiz.questions.length > 1 ? () => remove(current) : undefined} t={t} words={words} />
-                </div>
-              </motion.div>
-            ) : (
-              <div className="grid place-items-center gap-3 py-24 text-center text-ink-3">
-                <p>{t.editor.empty}</p>
-                <AddQuestion onAdd={add} t={t} compact={false} />
+            <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 @max-[700px]/quiz:flex @max-[700px]/quiz:items-center @max-[700px]/quiz:gap-2 @max-[700px]/quiz:overflow-x-auto @max-[700px]/quiz:py-2">
+              <div className="@max-[700px]/quiz:hidden">
+                <SortableList
+                  items={quiz.questions}
+                  onMove={setQuestions}
+                  className="flex flex-col gap-1.5"
+                  render={(q, i, handle) => <RailItem q={q} i={i} active={q.id === current?.id} onClick={() => setSelected(q.id)} dragRef={handle.ref} dragProps={handle.props} dragging={handle.dragging} t={t} />}
+                />
               </div>
+              <div className="flex gap-1.5 @min-[700px]/quiz:hidden">
+                {quiz.questions.map((q, i) => (
+                  <button key={q.id} type="button" onClick={() => setSelected(q.id)} aria-pressed={q.id === current?.id} className={cn("relative grid size-10 shrink-0 place-items-center rounded-xl text-[14px] font-bold", q.id === current?.id ? "bg-blob text-white dark:bg-blob-deep" : "bg-raised text-ink-2 shadow-card")}>
+                    {i + 1}
+                    {issuesOf(q).length > 0 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-paper bg-[var(--sheet-yellow)]" />}
+                  </button>
+                ))}
+              </div>
+              <AddQuestion onAdd={add} t={t} compact={false} disabled={quiz.questions.length >= LIMITS.questions} />
+            </div>
+            {notReady > 0 && (
+              <p className="mx-3 mb-3 flex items-start gap-1.5 rounded-lg bg-[var(--sheet-yellow-fill)] px-2.5 py-2 text-[11.5px] font-medium text-[color-mix(in_srgb,var(--sheet-yellow)_55%,var(--ink))] @max-[700px]/quiz:hidden">
+                <TriangleAlert className="mt-px size-3.5 shrink-0 text-[var(--sheet-yellow)]" /> {t.editor.notReady(notReady)}
+              </p>
             )}
-          </AnimatePresence>
-        </main>
-
-        {/* Its settings */}
-        {current && (
-          <aside className="hidden w-[284px] shrink-0 overflow-y-auto border-l border-line px-4 py-4 lg:block">
-            <Panel q={current} onChange={changeQuestion} onDuplicate={() => duplicate(current)} onDelete={quiz.questions.length > 1 ? () => remove(current) : undefined} t={t} words={words} />
-            <Results games={games} t={t} locale={locale} />
           </aside>
-        )}
+
+          {/* The question */}
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-paper px-4 py-6 @min-[560px]/quiz:px-8">
+            <div className="mb-4 flex flex-col gap-1 @min-[700px]/quiz:hidden">
+              <input value={quiz.title} onChange={(e) => update({ title: e.target.value.slice(0, LIMITS.title) })} placeholder={t.editor.titlePlaceholder} aria-label={t.editor.titlePlaceholder} className={cn("w-full bg-transparent font-display text-[20px] font-bold text-ink outline-none", placeholderTone)} />
+            </div>
+            <AnimatePresence mode="wait">
+              {current ? (
+                <motion.div key={current.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }} transition={{ type: "spring", stiffness: 420, damping: 34 }}>
+                  <QuestionEditor question={current} index={index} onChange={changeQuestion} userId={userId} t={t} />
+                  {/* The settings under the question until there's room for their own column (the results with them). */}
+                  <div className="mx-auto mt-6 max-w-[920px] @min-[1080px]/quiz:hidden">
+                    <Panel q={current} onChange={changeQuestion} onDuplicate={() => duplicate(current)} onDelete={quiz.questions.length > 1 ? () => remove(current) : undefined} t={t} words={words} />
+                    <Results games={games} t={t} locale={locale} />
+                  </div>
+                </motion.div>
+              ) : (
+                <div className={cn("grid place-items-center gap-3 py-24 text-center", midTone)}>
+                  <p>{t.editor.empty}</p>
+                  <AddQuestion onAdd={add} t={t} compact={false} />
+                </div>
+              )}
+            </AnimatePresence>
+          </main>
+
+          {/* Its settings */}
+          {current && (
+            <aside className="hidden w-[284px] shrink-0 overflow-y-auto border-l border-line px-4 py-4 @min-[1080px]/quiz:block">
+              <Panel q={current} onChange={changeQuestion} onDuplicate={() => duplicate(current)} onDelete={quiz.questions.length > 1 ? () => remove(current) : undefined} t={t} words={words} />
+              <Results games={games} t={t} locale={locale} />
+            </aside>
+          )}
+        </div>
       </div>
 
       <OptionsDialog open={options} onClose={() => setOptions(false)} settings={quiz.settings} onChange={(settings) => update({ settings })} subjectId={quiz.subject_id} subjects={subjects.filter((s) => s.kind !== "notebook")} onSubject={(subject_id) => update({ subject_id })} t={t} />
@@ -192,18 +208,19 @@ function RailItem({ q, i, active, onClick, dragRef, dragProps, dragging, t }: { 
   const Icon = TYPE_ICONS[q.type];
   const issues = issuesOf(q);
   return (
-    <div className={cn("group flex items-stretch gap-1 rounded-2xl border p-1.5 transition-colors", active ? "border-blob/50 bg-blob-soft/60" : "border-transparent hover:bg-hover/70", dragging && "bg-raised shadow-pop")}>
-      <button type="button" ref={dragRef} {...dragProps} className="grid w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-ink-3 opacity-0 hover:bg-line group-hover:opacity-100 active:cursor-grabbing" aria-label={t.editor.moveUp}>
+    <div className={cn("group flex items-stretch gap-1 rounded-xl border p-1.5 transition-colors", active ? "border-blob/50 bg-blob-soft/60" : "border-transparent hover:bg-hover/70", dragging && "bg-raised shadow-pop")}>
+      {/* Shown on touch screens too, where there's no hover to reveal it. */}
+      <button type="button" ref={dragRef} {...dragProps} className="grid w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-ink-3 opacity-0 hover:bg-line focus-visible:opacity-100 group-hover:opacity-100 active:cursor-grabbing [@media(hover:none)]:opacity-100" aria-label={t.editor.moveUp}>
         <GripVertical className="size-3.5" />
       </button>
       <button type="button" onClick={onClick} className="flex min-w-0 flex-1 flex-col gap-1.5 text-left">
-        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-3">
-          <span className={cn("grid size-5 place-items-center rounded-md text-[11px] font-bold", active ? "bg-blob text-white" : "bg-line text-ink-2")}>{i + 1}</span>
-          <Icon className="size-3.5" /> {t.types[q.type]}
-          <span className="ml-auto tabular-nums">{t.seconds(q.time)}</span>
-          {issues.length > 0 && <TriangleAlert className="size-3.5 text-[#d99000]" aria-label={t.editor.issues[issues[0]]} />}
+        <span className={cn("flex min-w-0 items-center gap-1.5 text-[11.5px] font-medium", midTone)}>
+          <span className={cn("grid size-5 shrink-0 place-items-center rounded-md text-[11px] font-bold", active ? "bg-blob text-white dark:bg-blob-deep" : "bg-line text-ink-2")}>{i + 1}</span>
+          <Icon className="size-3.5 shrink-0" /> <span className="truncate">{t.types[q.type]}</span>
+          <span className="ml-auto shrink-0 tabular-nums">{t.seconds(q.time)}</span>
+          {issues.length > 0 && <TriangleAlert className="size-3.5 shrink-0 text-[var(--sheet-yellow)]" aria-label={t.editor.issues[issues[0]]} />}
         </span>
-        <span className={cn("line-clamp-2 text-[13px] font-medium leading-snug", q.text ? "text-ink" : "text-ink-3")}>{q.text || t.editor.questionPlaceholder}</span>
+        <span className={cn("line-clamp-2 text-[13px] font-medium leading-snug", q.text ? "text-ink" : midTone)}>{q.text || t.editor.questionPlaceholder}</span>
         {(q.type === "quiz" || q.type === "poll" || q.type === "truefalse" || q.type === "puzzle") && (
           <span className="flex gap-1">
             {q.choices.map((c, k) => (
@@ -223,7 +240,7 @@ function AddQuestion({ onAdd, t, disabled }: { onAdd: (type: QuestionType) => vo
     <Popover
       label={t.editor.addType}
       trigger={(props) => (
-        <button {...props} type="button" disabled={disabled} className="mt-2 flex w-full shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line-2 px-3 py-2.5 text-[13px] font-semibold text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink disabled:opacity-40 max-lg:mt-0 max-lg:w-auto max-lg:whitespace-nowrap">
+        <button {...props} type="button" disabled={disabled} className="mt-2 flex w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-2 px-3 py-2.5 text-[13px] font-semibold text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink disabled:opacity-40 @max-[700px]/quiz:mt-0 @max-[700px]/quiz:w-auto @max-[700px]/quiz:whitespace-nowrap">
           <Plus className="size-4" /> {t.editor.add}
         </button>
       )}
@@ -248,7 +265,7 @@ function AddQuestion({ onAdd, t, disabled }: { onAdd: (type: QuestionType) => vo
                 </span>
                 <span className="min-w-0">
                   <span className="block text-[13.5px] font-semibold text-ink">{t.types[type]}</span>
-                  <span className="block text-[12px] leading-snug text-ink-3">{t.typeHints[type]}</span>
+                  <span className={cn("block text-[12px] leading-snug", midTone)}>{t.typeHints[type]}</span>
                 </span>
               </button>
             );
@@ -262,16 +279,18 @@ function AddQuestion({ onAdd, t, disabled }: { onAdd: (type: QuestionType) => vo
 const POINTS: PointsMode[] = ["standard", "double", "none"];
 
 function Panel({ q, onChange, onDuplicate, onDelete, t, words }: { q: Question; onChange: (q: Question) => void; onDuplicate: () => void; onDelete?: () => void; t: T; words: { true: string; false: string } }) {
+  // The panel shows twice (under the question and in its own column, one of them hidden): an id of its own each.
+  const explainId = useId();
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">{t.editor.changeType}</h3>
+        <h2 className={groupLabel}>{t.editor.changeType}</h2>
         <div className="grid grid-cols-2 gap-1.5">
           {QUESTION_TYPES.map((type, i) => {
             const Icon = TYPE_ICONS[type];
             const on = q.type === type;
             return (
-              <button key={type} type="button" onClick={() => onChange(convertQuestion(q, type, words))} aria-pressed={on} title={t.typeHints[type]} className={cn("flex items-center gap-2 rounded-xl border px-2 py-2 text-left text-[12px] font-semibold leading-tight transition-colors", on ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover")} style={on ? { background: styleAt(i).color } : undefined}>
+              <button key={type} type="button" onClick={() => onChange(convertQuestion(q, type, words))} aria-pressed={on} title={t.typeHints[type]} className={cn("flex items-center gap-2 rounded-xl border px-2 py-2 text-left text-[12px] font-semibold leading-tight transition-colors", on ? "border-transparent text-white" : "border-line text-ink-2 hover:bg-hover")} style={on ? { background: styleAt(i).deep } : undefined}>
                 <Icon className="size-4 shrink-0" />
                 <span className="min-w-0">{t.types[type]}</span>
               </button>
@@ -281,10 +300,10 @@ function Panel({ q, onChange, onDuplicate, onDelete, t, words }: { q: Question; 
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">{t.editor.time}</h3>
+        <h2 className={groupLabel}>{t.editor.time}</h2>
         <div className="flex flex-wrap gap-1.5">
           {TIME_OPTIONS.map((s) => (
-            <button key={s} type="button" onClick={() => onChange({ ...q, time: s })} aria-pressed={q.time === s} className={cn("h-8 rounded-full px-3 text-[12.5px] font-semibold tabular-nums transition-colors", q.time === s ? "bg-ink text-paper" : "bg-hover text-ink-2 hover:bg-line")}>
+            <button key={s} type="button" onClick={() => onChange({ ...q, time: s })} aria-pressed={q.time === s} className={cn("h-8 rounded-full px-3 text-[12.5px] font-semibold tabular-nums transition-colors", q.time === s ? "bg-blob-soft text-blob-ink" : "bg-hover text-ink-2 hover:bg-line")}>
               {t.seconds(s)}
             </button>
           ))}
@@ -293,7 +312,7 @@ function Panel({ q, onChange, onDuplicate, onDelete, t, words }: { q: Question; 
 
       {q.type !== "poll" && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">{t.editor.pointsLabel}</h3>
+          <h2 className={groupLabel}>{t.editor.pointsLabel}</h2>
           <Segmented value={q.points} onChange={(points) => onChange({ ...q, points })} label={t.editor.pointsLabel} options={POINTS.map((p) => ({ value: p, label: t.pointsShort[p], title: t.points[p] }))} size="sm" className="self-start" />
         </section>
       )}
@@ -303,14 +322,16 @@ function Panel({ q, onChange, onDuplicate, onDelete, t, words }: { q: Question; 
           <input type="checkbox" checked={q.multi} onChange={(e) => onChange({ ...q, multi: e.target.checked })} className="mt-0.5 size-4 accent-[var(--blob)]" />
           <span>
             <span className="block text-[13px] font-semibold text-ink">{t.editor.multi}</span>
-            <span className="block text-[11.5px] text-ink-3">{t.editor.multiHint}</span>
+            <span className={cn("block text-[11.5px]", midTone)}>{t.editor.multiHint}</span>
           </span>
         </label>
       )}
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">{t.editor.explain}</h3>
-        <textarea value={q.explain} onChange={(e) => onChange({ ...q, explain: e.target.value.slice(0, LIMITS.explain) })} rows={3} placeholder={t.editor.explainPlaceholder} className={cn(inputClass, "resize-none py-2 text-[13px]")} />
+        <label htmlFor={explainId} className={groupLabel}>
+          {t.editor.explain}
+        </label>
+        <textarea id={explainId} value={q.explain} onChange={(e) => onChange({ ...q, explain: e.target.value.slice(0, LIMITS.explain) })} rows={3} placeholder={t.editor.explainPlaceholder} className={cn(inputClass, "resize-none py-2 text-[13px]")} />
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -331,11 +352,11 @@ function Results({ games, t, locale }: { games: GameSummary[]; t: T; locale: str
   const fmt = new Intl.DateTimeFormat(locale === "de" ? "de-DE" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
   return (
     <section className="mt-8 flex flex-col gap-2 border-t border-line pt-5">
-      <h3 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-ink-3">
+      <h2 className={cn("flex items-center gap-1.5", groupLabel)}>
         <BarChart3 className="size-3.5" /> {t.editor.results}
-      </h3>
+      </h2>
       {games.length === 0 ? (
-        <p className="text-[12.5px] text-ink-3">{t.editor.noResults}</p>
+        <p className={cn("text-[12.5px]", midTone)}>{t.editor.noResults}</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
           {games.map((g) => (
@@ -386,19 +407,19 @@ function OptionsDialog({
         <h2 id="quiz-options" className="flex-1 font-display text-[17px] font-semibold">
           {t.editor.settings}
         </h2>
-        <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label="×">
+        <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9" aria-label={t.editor.close} title={t.editor.close}>
           <X className="size-4" />
         </button>
       </div>
       <div className="flex flex-col gap-1 px-3 py-3">
-        <p className="px-2 pb-1 text-[12px] text-ink-3">{t.editor.settingsHint}</p>
+        <p className={cn("px-2 pb-1 text-[12px]", midTone)}>{t.editor.settingsHint}</p>
         {rows.map((r) => {
           const on = r.key === "names" ? settings.names === "blob" : (settings[r.key] as boolean);
           return (
             <label key={r.key} className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-hover/60">
               <span className="min-w-0 flex-1">
                 <span className="block text-[13.5px] font-medium text-ink">{r.label}</span>
-                {r.hint && <span className="block text-[12px] leading-snug text-ink-3">{r.hint}</span>}
+                {r.hint && <span className={cn("block text-[12px] leading-snug", midTone)}>{r.hint}</span>}
               </span>
               <input type="checkbox" className="peer sr-only" checked={on} onChange={(e) => onChange({ ...settings, [r.key]: r.key === "names" ? (e.target.checked ? "blob" : "free") : e.target.checked })} />
               <span className={cn("relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-blob", on ? "bg-blob" : "bg-line-2")} aria-hidden>

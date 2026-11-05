@@ -28,7 +28,7 @@ export function EmptyNote({ pageId, title, text }: { pageId: string; title?: str
           ))}
         </ul>
         <div className="mt-6">
-          <StudyButton href={`/p/${pageId}`} variant="ink">
+          <StudyButton href={`/p/${pageId}`} variant="blob">
             <ArrowLeft className="size-4" /> {t.toNote}
           </StudyButton>
         </div>

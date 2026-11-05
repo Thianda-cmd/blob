@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/i18n/client";
 import { atlasText } from "@/i18n/messages/atlas";
 import { useText } from "@/i18n/useText";
+import { studyPrimary } from "@/learn/components/StudyChrome";
 import { cn } from "@/lib/utils";
 import type { StepsView } from "../types";
 
@@ -94,7 +95,7 @@ export function StepsStage({
                     className="group flex w-full flex-col items-stretch gap-1.5 rounded-lg px-1 pb-1 pt-1.5 text-left"
                   >
                     <span className={cn("h-1.5 rounded-full transition-colors duration-300", on ? "bg-blob" : i < step ? "bg-blob/45" : done ? "bg-blob/25" : "bg-line group-hover:bg-line-2")} />
-                    <span className={cn("truncate px-0.5 text-[11.5px] font-semibold leading-tight", on ? "text-ink" : "text-ink-3 group-hover:text-ink-2")}>
+                    <span className={cn("truncate px-0.5 text-[11.5px] font-semibold leading-tight", on ? "text-ink" : "text-ink-2 group-hover:text-ink")}>
                       <span className="tabular-nums">{i + 1}</span>
                       <span className="max-sm:hidden"> {tt(s.short)}</span>
                     </span>
@@ -124,7 +125,7 @@ export function StepsStage({
               onStep(Math.min(n - 1, step + 1));
             }}
             disabled={step === n - 1}
-            className="grid size-10 shrink-0 place-items-center rounded-xl bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[background,opacity] hover:bg-blob-deep disabled:opacity-40"
+            className={cn("grid size-10 shrink-0 place-items-center rounded-xl transition-[background,opacity] disabled:opacity-40", studyPrimary)}
             aria-label={t.next}
           >
             <ChevronRight className="size-4" />

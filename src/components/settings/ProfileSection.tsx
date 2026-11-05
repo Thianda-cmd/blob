@@ -62,21 +62,21 @@ export function ProfileSection() {
         <Card
           footer={
             <>
-              <p className="mr-auto text-[12.5px] text-ink-3">{t.footer}</p>
+              <p className="mr-auto text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.footer}</p>
               <SavedBadge show={saved && !dirty} />
               {dirty && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setForm(fromProfile())} disabled={saving}>
                   {all.cancel}
                 </Button>
               )}
-              <Button type="submit" variant="primary" size="sm" disabled={!dirty} loading={saving}>
+              <Button type="submit" variant="blob" size="sm" disabled={!dirty} loading={saving}>
                 {t.save}
               </Button>
             </>
           }
         >
           <div className="flex items-center gap-4 px-5 pt-5">
-            <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-blob text-white shadow-[inset_0_-3px_0_rgb(0_0_0/0.12),inset_0_2px_0_rgb(255_255_255/0.25)]">
+            <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-blob text-white shadow-[inset_0_-3px_0_rgb(0_0_0/0.12),inset_0_2px_0_rgb(255_255_255/0.25)] dark:bg-blob-deep">
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.span
                   key={initial}
@@ -92,7 +92,7 @@ export function ProfileSection() {
             </div>
             <div className="min-w-0">
               <div className="truncate font-display text-[16px] font-semibold tracking-[-0.01em]">{form.full_name.trim() || t.yourName}</div>
-              <div className="truncate text-[12.5px] text-ink-3">{meta || email}</div>
+              <div className="truncate text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{meta || email}</div>
             </div>
           </div>
           <div className="grid gap-4 px-5 pb-5 pt-5 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.2fr_0.8fr]">

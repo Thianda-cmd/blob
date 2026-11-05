@@ -37,12 +37,12 @@ export const tasksText = defineMessages({
     open: (n: number) => `${n} open`,
     dueToday: (n: number) => `${n} due today`,
     overdue: (n: number) => `${n} overdue`,
-    pressBefore: "Press",
-    pressAfter: "to add",
 
     // Filters
     showing: "Showing",
     clear: "Clear",
+    /** A filter chip's name for screen readers: clicking it removes the filter. */
+    removeFilter: (label: string) => `Remove filter “${label}”`,
     dueOn: (day: string) => `Due ${day}`,
     filterDayFormat: "EEE, MMM d",
     noSubject: "No subject",
@@ -215,11 +215,10 @@ export const tasksText = defineMessages({
     open: (n) => `${n} offen`,
     dueToday: (n) => `${n} heute fällig`,
     overdue: (n) => `${n} überfällig`,
-    pressBefore: "Drück",
-    pressAfter: "für eine neue Aufgabe",
 
     showing: "Filter:",
     clear: "Zurücksetzen",
+    removeFilter: (label) => `Filter „${label}“ entfernen`,
     dueOn: (day) => `Fällig am ${day}`,
     filterDayFormat: "EEE, d. MMM",
     noSubject: "Kein Fach",

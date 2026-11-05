@@ -4,9 +4,10 @@ import { defineMessages } from "../define";
 export const blobCornerText = defineMessages({
   en: {
     title: "Blob's corner",
-    kicker: "Your Blob",
-    intro: "Play with Blob, teach him tricks and dress him up. Learning unlocks new hats, glasses and colours.",
+    intro: "Learning unlocks new hats, glasses and colours.",
     unlocked: (a: number, b: number) => `${a} of ${b} unlocked`,
+    // Under the wardrobe's tabs on phones: the chosen kind ("Hats: 8 of 16 unlocked").
+    slotUnlocked: (kind: string, a: number, b: number) => `${kind}: ${a} of ${b} unlocked`,
     stats: { xp: "XP", lessons: "Lessons", streak: "Best streak", days: "Days learnt" },
     tricksTitle: "Tricks",
     facesTitle: "Faces",
@@ -104,9 +105,9 @@ export const blobCornerText = defineMessages({
   },
   de: {
     title: "Blobs Ecke",
-    kicker: "Dein Blob",
-    intro: "Spiel mit Blob, bring ihm Tricks bei und zieh ihn an. Lernen schaltet neue Hüte, Brillen und Farben frei.",
+    intro: "Lernen schaltet neue Hüte, Brillen und Farben frei.",
     unlocked: (a, b) => `${a} von ${b} freigeschaltet`,
+    slotUnlocked: (kind, a, b) => `${kind}: ${a} von ${b} freigeschaltet`,
     stats: { xp: "XP", lessons: "Lektionen", streak: "Beste Serie", days: "Lerntage" },
     tricksTitle: "Tricks",
     facesTitle: "Gesichter",

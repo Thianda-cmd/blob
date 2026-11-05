@@ -1,6 +1,7 @@
 "use client";
 
 import { AtSign, FileText, History, Lightbulb, PenLine, Quote, SpellCheck } from "lucide-react";
+import { card, midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { cvHomeText } from "@/i18n/messages/cvHome";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,7 @@ const ICONS = [FileText, History, PenLine, Quote, AtSign, SpellCheck];
 export function CvTips({ className }: { className?: string }) {
   const t = useMessages(cvHomeText);
   return (
-    <section className={cn("rounded-2xl border border-line bg-raised p-4 shadow-card sm:p-5", className)} aria-labelledby="cv-tips-title">
+    <section className={cn(card, "p-4 sm:p-5", className)} aria-labelledby="cv-tips-title">
       <div className="flex items-center gap-2">
         <span className="grid size-7 place-items-center rounded-lg bg-blob-soft text-blob-ink">
           <Lightbulb className="size-4" />
@@ -21,7 +22,7 @@ export function CvTips({ className }: { className?: string }) {
           {t.tipsTitle}
         </h2>
       </div>
-      <p className="mt-1.5 text-[12.5px] text-ink-3">{t.tipsIntro}</p>
+      <p className={cn("mt-1.5 text-[12.5px]", midTone)}>{t.tipsIntro}</p>
       <ol className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
         {t.tips.map((tip, i) => {
           const Icon = ICONS[i] ?? Lightbulb;

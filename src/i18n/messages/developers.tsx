@@ -237,7 +237,7 @@ export const developersText = defineMessages({
     },
     hero: {
       eyebrow: "Mit Blob anmelden",
-      title: "Lass Leute sich mit ihrem Blob-Konto anmelden",
+      title: "Lass Leute sich mit Blob anmelden",
       body: "Blob ist ein OpenID-Connect-Anbieter. Bau einen Button in deine Website ein, und Schülerinnen und Schüler melden sich mit dem Konto an, das sie schon für Notizen und Lektionen nutzen. Du siehst und speicherst nie ein Passwort.",
       start: "Schnellstart",
       discovery: "Discovery-Dokument",

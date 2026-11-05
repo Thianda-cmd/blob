@@ -7,6 +7,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Blob, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { Button } from "@/components/ui/Button";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { nativeText } from "@/i18n/messages/native";
 import { blobApp, isPhoneApp, openOutside } from "@/lib/native";
@@ -44,6 +45,33 @@ const MOODS: Partial<Record<UpdatePhase, BlobMood>> = {
 const QUIET = /^\/(present|embed)(\/|$)/;
 
 /**
+ * What the update takes of the bottom-right corner, where Blob's helper (BlobHelper) sits too: the
+ * card, or its round button while it downloads, and how tall it is (px, from its bottom edge 16 px
+ * above the window's). The helper makes room: it waits below the edge while the card shows (the
+ * card has its own Blob) and comes back above it when it has something to say, and it sits on top
+ * of the round button.
+ */
+export type UpdateCorner = { kind: "card" | "pill" | null; height: number };
+const FREE: UpdateCorner = { kind: null, height: 0 };
+/** The round button's size (size-13). */
+const PILL = 52;
+let corner = FREE;
+const cornerListeners = new Set<() => void>();
+function setCorner(next: UpdateCorner) {
+  if (next.kind === corner.kind && next.height === corner.height) return;
+  corner = next;
+  cornerListeners.forEach((l) => l());
+}
+const subscribeCorner = (l: () => void) => {
+  cornerListeners.add(l);
+  return () => void cornerListeners.delete(l);
+};
+/** The bottom-right corner as the update card leaves it (nothing there outside the desktop app). */
+export function useUpdateCorner() {
+  return useSyncExternalStore(subscribeCorner, () => corner, () => FREE);
+}
+
+/**
  * Blob for computers tells you when there's a new version: a card in the corner with what's new,
  * and on "Update now" the app fetches it (a jelly progress bar, which can fold into a round button
  * in the corner), then restarts as the new version when you say so. Apps from before they could
@@ -57,6 +85,7 @@ export function AppUpdater() {
   const locale = useLocale();
   const pathname = usePathname();
   const blobRef = useRef<BlobHandle>(null);
+  const cardRef = useRef<HTMLElement>(null);
 
   // Look a little after starting (the page first), then every few hours while Blob stays open.
   useEffect(() => {
@@ -76,6 +105,23 @@ export function AppUpdater() {
 
   const update = s.update;
   const show = desktop && !!update && !s.hidden && !QUIET.test(pathname) && s.phase !== "checking";
+
+  // Tell Blob's helper what the corner holds (the card's height follows its phase and notes).
+  const shownAs = show ? (s.tucked ? "pill" : "card") : null;
+  useEffect(() => {
+    if (shownAs !== "card") {
+      setCorner(shownAs === "pill" ? { kind: "pill", height: PILL } : FREE);
+      return;
+    }
+    const el = cardRef.current;
+    if (!el) return;
+    const measure = () => setCorner({ kind: "card", height: Math.ceil(el.offsetHeight) });
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [shownAs]);
+  useEffect(() => () => setCorner(FREE), []);
   const mb = (bytes: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: bytes < 10 * 1048576 ? 1 : 0 }).format(bytes / 1048576);
   const pct = s.total > 0 ? Math.min(100, Math.round((s.downloaded / s.total) * 100)) : 0;
   const notes = update ? whatsNew(update.notes, locale) : [];
@@ -114,6 +160,7 @@ export function AppUpdater() {
       {show && update && !s.tucked && (
         <motion.aside
           key="card"
+          ref={cardRef}
           role="dialog"
           aria-labelledby="app-update-title"
           initial={{ opacity: 0, y: 24, scale: 0.94 }}
@@ -129,13 +176,13 @@ export function AppUpdater() {
               <Blob ref={blobRef} size={96} mood={MOODS[s.phase] ?? "happy"} arms track />
             </div>
             <div className="relative mb-6 flex items-center gap-1.5 text-[12px] font-medium tabular-nums">
-              <span className="rounded-full border border-line bg-raised/80 px-2.5 py-0.5 text-ink-3">{update.current}</span>
+              <span className={cn("rounded-full border border-line bg-raised/80 px-2.5 py-0.5", midTone)}>{update.current}</span>
               <ArrowRight className="size-3.5 text-ink-3" />
               <motion.span
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.25, type: "spring", stiffness: 500, damping: 18 }}
-                className="rounded-full bg-blob px-2.5 py-0.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
+                className="rounded-full bg-blob px-2.5 py-0.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.3)] dark:bg-blob-deep"
               >
                 {update.version}
               </motion.span>
@@ -172,7 +219,7 @@ export function AppUpdater() {
                     </p>
                     {notes.length > 0 && (
                       <div className="mt-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.whatsNew}</div>
+                        <div className={groupLabel}>{t.whatsNew}</div>
                         <ul className="mt-1.5 space-y-1.5">
                           {notes.slice(0, 3).map((n, i) => (
                             <motion.li
@@ -221,7 +268,7 @@ export function AppUpdater() {
                   <>
                     <p className="mt-0.5 text-[13px] text-ink-2">{t.downloadingBody}</p>
                     <JellyBar pct={pct} />
-                    <div className="mt-1.5 flex justify-between text-[12px] tabular-nums text-ink-3">
+                    <div className={cn("mt-1.5 flex justify-between text-[12px] tabular-nums", midTone)}>
                       <span>{pct} %</span>
                       <span>{t.progress(mb(s.downloaded), mb(s.total))}</span>
                     </div>
@@ -259,7 +306,7 @@ export function AppUpdater() {
                 {s.phase === "error" && (
                   <>
                     <p className="mt-0.5 text-[13px] text-ink-2">{t.errorBody}</p>
-                    {s.error && <p className="mt-1.5 line-clamp-2 font-mono text-[11.5px] text-ink-3">{s.error}</p>}
+                    {s.error && <p className={cn("mt-1.5 line-clamp-2 font-mono text-[11.5px]", midTone)}>{s.error}</p>}
                     <div className="mt-4 flex items-center justify-end gap-2">
                       <Button variant="ghost" size="md" onClick={page}>
                         {t.downloadPage}

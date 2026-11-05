@@ -1,4 +1,4 @@
-import { ArrowRight, Download, FileJson, ShieldCheck } from "lucide-react";
+import { ArrowRight, Download, FileJson, LogIn, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
@@ -7,6 +7,7 @@ import { SignInPreview } from "@/components/developers/SignInPreview";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { CodeBlock } from "@/components/oauth/CodeBlock";
 import { CopyField } from "@/components/oauth/Copy";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { developersText } from "@/i18n/messages/developers";
 import { getMessages } from "@/i18n/server";
 import { dataEndpoint, endpoints, issuer, SCOPES } from "@/lib/oauth/config";
@@ -16,6 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const { meta } = await getMessages(developersText);
   return { title: { absolute: meta.title }, description: meta.description };
 }
+
+/** The one primary colour of the public pages (as on the landing page): violet, the deeper one in the dark theme. */
+const violet =
+  "bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]";
 
 const SECTIONS = ["how", "quick", "popup", "sdk", "scopes", "endpoints", "server", "tokens", "security"] as const;
 const ENDPOINT_ORDER = ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "revocation_endpoint", "jwks_uri", "blob_data_endpoint"] as const;
@@ -41,7 +46,7 @@ export default async function DevelopersPage() {
           <span className="text-[14px] font-medium text-ink-2">{t.header.docs}</span>
           <div className="ml-auto flex items-center gap-2">
             <LanguageSwitch compact />
-            <Link href="/home" className="hidden h-8.5 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-[13.5px] font-medium text-paper hover:bg-ink/88 sm:flex">
+            <Link href="/home" className={`hidden h-8.5 items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-medium sm:flex ${violet}`}>
               {t.header.open} <ArrowRight className="size-4" />
             </Link>
           </div>
@@ -53,11 +58,14 @@ export default async function DevelopersPage() {
           <div className="bg-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_70%_40%,#000_25%,transparent_75%)]" />
           <div className="relative mx-auto grid max-w-[1160px] items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.15fr_1fr] lg:py-16">
             <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.hero.eyebrow}</p>
+              <p className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-raised pl-2 pr-2.5 text-[12.5px] font-medium text-ink-2 shadow-card">
+                <LogIn className="size-3.5 text-blob-ink" aria-hidden />
+                {t.hero.eyebrow}
+              </p>
               <h1 className="mt-3 font-display text-[clamp(34px,4.6vw,54px)] font-bold leading-[1.02] tracking-[-0.04em] text-balance">{t.hero.title}</h1>
               <p className="mt-5 max-w-[560px] text-[16px] leading-relaxed text-ink-2">{t.hero.body}</p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <a href="#quick" className="flex h-10 items-center gap-2 rounded-xl bg-ink px-4.5 text-[14.5px] font-medium text-paper hover:bg-ink/88">
+                <a href="#quick" className={`flex h-10 items-center gap-2 rounded-xl px-4.5 text-[14.5px] font-medium ${violet}`}>
                   {t.hero.start} <ArrowRight className="size-4" />
                 </a>
                 <a
@@ -77,7 +85,7 @@ export default async function DevelopersPage() {
         <div className="mx-auto grid max-w-[1160px] gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:py-16">
           <nav aria-label={t.toc.label} className="hidden lg:block">
             <div className="sticky top-24">
-              <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-3">{t.toc.label}</div>
+              <div className={`mb-2 ${groupLabel}`}>{t.toc.label}</div>
               <ul className="space-y-0.5 border-l border-line">
                 {SECTIONS.map((id) => (
                   <li key={id}>
@@ -132,7 +140,7 @@ export default async function DevelopersPage() {
                 <Step n={3} title={t.quick.sdk}>
                   <p>{t.quick.sdkBody}</p>
                   <CodeBlock className="mt-3" code={`<button id="login">${t.notes.login}</button>\n\n${sdkQuickStart(vars)}`} lang="html" title="index.html" {...copy} />
-                  <p className="mt-2 text-[12.5px] text-ink-3">{t.quick.placeholderNote}</p>
+                  <p className={`mt-2 text-[12.5px] ${midTone}`}>{t.quick.placeholderNote}</p>
                 </Step>
               </ol>
               <div className="mt-10">
@@ -234,7 +242,7 @@ export default async function DevelopersPage() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-[1160px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-5 text-[12.5px] text-ink-3 sm:px-6">
+        <div className={`mx-auto flex max-w-[1160px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-5 text-[12.5px] sm:px-6 ${midTone}`}>
           <span className="flex items-center gap-2">
             <BlobMark size={16} /> Blob · {t.footer.tagline}
           </span>
@@ -282,7 +290,7 @@ function Term({ children }: { children: ReactNode }) {
 function Rows({ head, rows, cols }: { head: string[]; rows: ReactNode[][]; cols: string }) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-raised shadow-card" role="table">
-      <div role="row" className={`hidden gap-4 border-b border-line bg-surface px-4 py-2 text-[12px] font-medium text-ink-3 sm:grid ${cols}`}>
+      <div role="row" className={`hidden gap-4 border-b border-line bg-surface px-4 py-2 text-[12px] font-medium sm:grid ${cols} ${midTone}`}>
         {head.map((h) => (
           <div key={h} role="columnheader">
             {h}
@@ -320,7 +328,7 @@ async function FlowStrip() {
               {i === 1 && <BlobMark size={16} />}
               {s.label}
             </div>
-            <div className={`text-[11.5px] text-ink-3 ${i < steps.length - 1 ? "font-mono" : ""}`}>{s.sub}</div>
+            <div className={`text-[11.5px] ${midTone} ${i < steps.length - 1 ? "font-mono" : ""}`}>{s.sub}</div>
           </div>
           {i < steps.length - 1 && <ArrowRight className="size-4 shrink-0 text-ink-3" aria-hidden />}
         </li>

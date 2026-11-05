@@ -2,7 +2,7 @@ import { defineMessages } from "../define";
 
 /**
  * Projects and the rest of Blob: the cards a page is on, "Add to project", a project's materials and
- * shared note, the projects of a subject, and today's calendar on Home.
+ * its shared note and Blobxcel spreadsheet, the projects of a subject, and today's calendar on Home.
  */
 export const projectLinksText = defineMessages({
   en: {
@@ -29,8 +29,8 @@ export const projectLinksText = defineMessages({
     // A project's materials
     materials: "Materials",
     materialsTitle: "Everything attached to the cards",
-    materialsEmpty: "Nothing attached yet. Notes, presentations, files and links you add to cards show up here.",
-    groups: { pages: "Notes and presentations", files: "Files", links: "Links" },
+    materialsEmpty: "Nothing attached yet. Notes, spreadsheets, presentations, files and links you add to cards show up here.",
+    groups: { pages: "Pages", files: "Files", links: "Links" },
     onCard: (card: string) => `on “${card}”`,
     noAccess: "Not shared with you",
     newNote: "New shared note",
@@ -39,6 +39,12 @@ export const projectLinksText = defineMessages({
     noteCard: "Shared notes",
     noteMade: "Here is your shared note. Everyone in the project can work on it.",
     noteMadeAlone: "Here is your project note. Invite people to the project and they can work on it too.",
+    newSheet: "New shared Blobxcel spreadsheet",
+    newSheetHint: "For results, lists and costs, for everyone in the project",
+    sheetTitle: (project: string) => `${project}: spreadsheet`,
+    sheetCard: "Shared spreadsheet",
+    sheetMade: "Here is your shared spreadsheet. Everyone in the project can work in it.",
+    sheetMadeAlone: "Here is your project spreadsheet. Invite people to the project and they can work in it too.",
 
     // A subject's projects
     projects: "Projects",
@@ -74,8 +80,8 @@ export const projectLinksText = defineMessages({
 
     materials: "Unterlagen",
     materialsTitle: "Alles, was an den Karten hängt",
-    materialsEmpty: "Noch hängt nichts an den Karten. Notizen, Präsentationen, Dateien und Links von Karten erscheinen hier.",
-    groups: { pages: "Notizen und Präsentationen", files: "Dateien", links: "Links" },
+    materialsEmpty: "Noch hängt nichts an den Karten. Notizen, Tabellen, Präsentationen, Dateien und Links von Karten erscheinen hier.",
+    groups: { pages: "Seiten", files: "Dateien", links: "Links" },
     onCard: (card: string) => `an „${card}“`,
     noAccess: "Nicht mit dir geteilt",
     newNote: "Neue gemeinsame Notiz",
@@ -84,6 +90,12 @@ export const projectLinksText = defineMessages({
     noteCard: "Gemeinsame Notizen",
     noteMade: "Hier ist eure gemeinsame Notiz. Alle im Projekt können daran arbeiten.",
     noteMadeAlone: "Hier ist deine Projektnotiz. Lädst du Leute ins Projekt ein, können sie mitschreiben.",
+    newSheet: "Neue gemeinsame Blobxcel-Tabelle",
+    newSheetHint: "Für Messwerte, Listen und Kosten, für alle im Projekt",
+    sheetTitle: (project: string) => `${project}: Tabelle`,
+    sheetCard: "Gemeinsame Tabelle",
+    sheetMade: "Hier ist eure gemeinsame Tabelle. Alle im Projekt können darin rechnen.",
+    sheetMadeAlone: "Hier ist deine Projekttabelle. Lädst du Leute ins Projekt ein, können sie mitrechnen.",
 
     projects: "Projekte",
     newProjectFor: "Neues Projekt",

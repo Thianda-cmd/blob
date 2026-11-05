@@ -6,16 +6,22 @@ import type { ReactNode } from "react";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { tasksText } from "@/i18n/messages/tasks";
+import { chipOn, groupLabel, midTone, panel } from "@/components/ui/surfaces";
 import { TASK_KINDS, dayKey } from "@/lib/tasks";
 import type { Subject, Task, TaskKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { KIND_ICON, SubjectDot } from "./pickers";
 
+/**
+ * One group in the Tasks page's side column: a quiet box under the list (tablets, phones, laptops
+ * below 1280 px); on wide screens the column is a rail like the calendar's (a hairline beside the
+ * list), so the boxes go.
+ */
 export function Panel({ title, action, children, className }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-xl border border-line bg-raised/50 p-3.5 dark:bg-raised/40", className)}>
+    <section className={cn(panel, "xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:dark:bg-transparent", className)}>
       <div className="mb-2.5 flex h-5 items-center">
-        <h2 className="text-[12px] font-semibold text-ink-2">{title}</h2>
+        <h2 className={groupLabel}>{title}</h2>
         <span className="ml-auto">{action}</span>
       </div>
       {children}
@@ -60,7 +66,7 @@ export function CalendarHeat({
     <div>
       <div className="grid grid-cols-7 gap-1 pb-1">
         {t.weekdayInitials.map((d, i) => (
-          <span key={i} className={cn("text-center text-[10.5px] font-medium text-ink-3", i >= 5 && "opacity-70")}>
+          <span key={i} className={cn("text-center text-[10.5px] font-medium", midTone, i >= 5 && "opacity-75")}>
             {d}
           </span>
         ))}
@@ -83,22 +89,23 @@ export function CalendarHeat({
               title={t.dayTitle(format(d, t.dayTitleFormat, { locale: dateLocale(locale) }), total, c?.exams ?? 0)}
               aria-pressed={active}
               className={cn(
-                "relative flex h-[42px] flex-col items-center justify-center rounded-lg text-[12.5px] tabular-nums transition-colors",
-                active ? "bg-ink text-paper" : past ? "text-ink-3/70 hover:bg-hover" : "text-ink-2 hover:bg-hover",
+                "relative flex h-[42px] flex-col items-center justify-center rounded-lg text-[12.5px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob",
+                // The chosen day (a filter) is on like every filter: violet, with a ring so it stands out from the heat.
+                active ? "bg-blob-soft font-semibold text-blob-ink ring-2 ring-inset ring-blob" : past ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover" : "text-ink-2 hover:bg-hover",
                 isToday && !active && "font-semibold text-ink ring-[1.5px] ring-inset ring-ink/70",
               )}
               style={!active && heat ? { background: `color-mix(in oklab, var(--blob) ${past ? heat / 2 : heat}%, transparent)` } : undefined}
             >
               <span className="leading-none">{format(d, "d")}</span>
-              <span className={cn("mt-1 h-3 text-[10px] font-medium leading-3", active ? "text-paper/75" : total ? "text-ink-2" : "text-transparent")}>
+              <span className={cn("mt-1 h-3 text-[10px] font-medium leading-3", active ? "text-blob-ink/80" : total ? "text-ink-2" : "text-transparent")}>
                 {total || "·"}
               </span>
-              {!!c?.exams && <span className={cn("absolute right-1 top-1 size-1.5 rounded-full", active ? "bg-blob" : "bg-ink")} />}
+              {!!c?.exams && <span className={cn("absolute right-1 top-1 size-1.5 rounded-full", active ? "bg-blob-ink" : "bg-ink")} />}
             </motion.button>
           );
         })}
       </div>
-      <div className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-3">
+      <div className={cn("mt-2.5 flex items-center gap-2 text-[11px]", midTone)}>
         {overdue > 0 ? (
           <button
             onClick={() => onSelect(selected === "overdue" ? null : "overdue")}
@@ -131,7 +138,7 @@ export function WeekProgress({ done, total }: { done: number; total: number }) {
         <span className="text-ink-2">
           <span className="font-semibold text-ink tabular-nums">{done}</span> {t.weekOf} <span className="tabular-nums">{total}</span> {t.weekDone}
         </span>
-        <span className="tabular-nums text-ink-3">{pct}%</span>
+        <span className={cn("tabular-nums", midTone)}>{pct}%</span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-hover">
         <motion.div
@@ -158,17 +165,17 @@ export function KindFilter({ counts, value, onChange }: { counts: Record<TaskKin
             onClick={() => onChange(active ? null : k)}
             aria-pressed={active}
             className={cn(
-              "flex h-[52px] flex-col justify-between rounded-lg border px-2.5 py-2 text-left transition-colors",
-              active ? "border-ink bg-ink text-paper" : "border-line hover:border-line-2 hover:bg-hover/60",
+              "flex h-[52px] flex-col justify-between rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob",
+              active ? chipOn : "border-line bg-raised/60 hover:border-line-2 hover:bg-hover/60",
             )}
           >
             <span className="flex items-center justify-between">
-              <Icon className={cn("size-3.5", active ? "text-paper/80" : k === "exam" ? "text-blob-ink" : "text-ink-3")} />
-              <span className={cn("text-[15px] font-semibold leading-none tabular-nums", active ? "text-paper" : counts[k] ? "text-ink" : "text-ink-3")}>
+              <Icon className={cn("size-3.5", active || k === "exam" ? "text-blob-ink" : "text-ink-3")} />
+              <span className={cn("text-[15px] font-semibold leading-none tabular-nums", active ? "text-blob-ink" : counts[k] ? "text-ink" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>
                 {counts[k]}
               </span>
             </span>
-            <span className={cn("text-[11.5px] leading-none", active ? "text-paper/80" : "text-ink-3")}>{t.kindPlural[k]}</span>
+            <span className={cn("text-[11.5px] leading-none", active ? "text-blob-ink" : midTone)}>{t.kindPlural[k]}</span>
           </button>
         );
       })}
@@ -198,15 +205,15 @@ export function SubjectFilter({
         onClick={() => onChange(active ? null : id)}
         aria-pressed={active}
         className={cn(
-          "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px] transition-colors",
-          active ? "bg-hover font-medium text-ink" : "text-ink-2 hover:bg-hover/70 hover:text-ink",
+          "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob [@media(hover:none)]:h-9",
+          active ? "bg-blob-soft font-medium text-blob-ink" : "text-ink-2 hover:bg-hover/70 hover:text-ink",
         )}
       >
         <span className="grid size-4 place-items-center">{icon}</span>
         <span className="min-w-0 flex-1 truncate" title={typeof label === "string" ? label : undefined}>
           {label}
         </span>
-        <span className={cn("text-[11.5px] tabular-nums", count ? "text-ink-3" : "text-ink-3/50")}>{count}</span>
+        <span className={cn("text-[11.5px] tabular-nums", active ? "text-blob-ink/80" : count ? midTone : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>{count}</span>
       </button>
     );
   };
@@ -215,8 +222,8 @@ export function SubjectFilter({
       {subjects.map((s) =>
         row(s.id, s.name, s.emoji ? <span className="text-[12.5px] leading-none">{s.emoji}</span> : <SubjectDot subject={s} />, counts.get(s.id) ?? 0),
       )}
-      {noSubject > 0 && row("none", <span className="text-ink-3">{t.noSubject}</span>, <SubjectDot subject={null} />, noSubject)}
-      {subjects.length === 0 && <p className="px-1.5 text-[12.5px] text-ink-3">{t.addSubjectsHint}</p>}
+      {noSubject > 0 && row("none", <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.noSubject}</span>, <SubjectDot subject={null} />, noSubject)}
+      {subjects.length === 0 && <p className={cn("px-1.5 text-[12.5px] leading-snug", midTone)}>{t.addSubjectsHint}</p>}
     </div>
   );
 }

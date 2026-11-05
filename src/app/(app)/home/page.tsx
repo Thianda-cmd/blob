@@ -24,16 +24,17 @@ function snippet(text: string | null) {
   return flat.length > 200 ? `${flat.slice(0, 200).replace(/\s+\S*$/, "")}…` : flat;
 }
 
+const PREVIEW_COLUMNS = "id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview";
+
 export default async function HomePage() {
   const [supabase, user] = await Promise.all([createClient(), getUser()]);
-  const [tasks, recentRes, openRes, learn, cvRes, projects, assigned, events] = await Promise.all([
+  // "Zuletzt bearbeitet" shows the six newest pages of one kind too (Notizen with handwriting, Tabellen,
+  // Präsentationen): their previews, beyond the newest of all.
+  const newest = (kinds: PageKind[]) =>
+    supabase.from("pages").select(PREVIEW_COLUMNS).is("trashed_at", null).in("kind", kinds).order("updated_at", { ascending: false }).limit(6);
+  const [tasks, recentRes, openRes, learn, cvRes, projects, assigned, events, ...byKind] = await Promise.all([
     loadUpcomingTasks(supabase, 7),
-    supabase
-      .from("pages")
-      .select("id, kind, plain_text, slide_title:content->slides->0->>title, deck_theme:content->>theme, deck_custom:content->custom, ink_preview:content->preview")
-      .is("trashed_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(8),
+    supabase.from("pages").select(PREVIEW_COLUMNS).is("trashed_at", null).order("updated_at", { ascending: false }).limit(8),
     // Your own tasks (project cards are counted on their boards).
     supabase.from("tasks").select("subject_id").is("project_id", null).eq("done", false),
     loadLearnState(),
@@ -43,10 +44,14 @@ export default async function HomePage() {
     user ? loadAssignedCards(supabase, user.id, 6) : [],
     // Today's events, worked out in the browser (the student's day, not the server's).
     loadEvents(supabase),
+    newest(["note", "ink"]),
+    newest(["sheet"]),
+    newest(["deck"]),
   ]);
 
   const previews: Record<string, PagePreview> = {};
-  for (const row of (recentRes.data ?? []) as unknown as PreviewRow[]) {
+  for (const row of [recentRes, ...byKind].flatMap((res) => (res.data ?? []) as unknown as PreviewRow[])) {
+    if (previews[row.id]) continue;
     previews[row.id] = {
       snippet: row.kind === "note" ? snippet(row.plain_text) : "",
       slideTitle: row.kind === "deck" ? row.slide_title : null,

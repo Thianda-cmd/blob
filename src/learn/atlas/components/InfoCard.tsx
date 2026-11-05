@@ -7,6 +7,7 @@ import { useMessages } from "@/i18n/client";
 import { atlasText } from "@/i18n/messages/atlas";
 import type { Text } from "@/i18n/text";
 import { Inline } from "@/learn/components/Rich";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 
 export type InfoContent = {
@@ -47,7 +48,7 @@ export function InfoCard({
   return (
     <section className={cn("relative overflow-hidden rounded-2xl border border-line bg-raised shadow-card", className)} aria-live="polite">
       <div className="flex items-center gap-1 border-b border-line/70 px-4 py-2">
-        <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold uppercase tracking-[0.09em] text-blob-ink">{content.eyebrow}</span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-blob-ink">{content.eyebrow}</span>
         {onPrev && (
           <button type="button" onClick={onPrev} className="grid size-8 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-hover hover:text-ink" aria-label={t.back} title={t.back}>
             <ChevronLeft className="size-4" />
@@ -89,7 +90,7 @@ function Body({ content }: { content: InfoContent }) {
         <Inline text={content.title} />
       </h2>
       {content.aka && (
-        <p className="mt-0.5 text-[13.5px] leading-snug text-ink-3">
+        <p className={cn("mt-0.5 text-[13.5px] leading-snug", midTone)}>
           <Inline text={content.aka} />
         </p>
       )}
@@ -110,7 +111,7 @@ function Body({ content }: { content: InfoContent }) {
       )}
       {content.lead && (
         <div className="mt-4">
-          {content.leadLabel && <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{content.leadLabel}</div>}
+          {content.leadLabel && <div className={groupLabel}>{content.leadLabel}</div>}
           <p className="mt-1 text-[15px] font-medium leading-relaxed text-ink">
             <Inline text={content.lead} />
           </p>
@@ -118,7 +119,7 @@ function Body({ content }: { content: InfoContent }) {
       )}
       {!!content.facts?.length && (
         <div className="mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.facts}</div>
+          <div className={groupLabel}>{t.facts}</div>
           <ul className="mt-1.5 space-y-1.5">
             {content.facts.map((f, i) => (
               <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed text-ink-2">

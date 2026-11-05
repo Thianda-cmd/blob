@@ -14,8 +14,11 @@ import { ShareDialog } from "@/components/share/ShareDialog";
 import { TopBar } from "@/components/shell/TopBar";
 import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Kbd } from "@/components/ui/Kbd";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { Segmented } from "@/components/ui/Segmented";
+import { fieldClass, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
@@ -26,6 +29,7 @@ import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { deleteProject, leaveProject, setArchived } from "./actions";
 import { BoardView } from "./BoardView";
+import { ToolbarButton, ToolbarCard, ToolbarDivider } from "./BoardToolbar";
 import { DueChip } from "./CardFace";
 import { CardDrawer } from "./CardDrawer";
 import { CardMenuArea } from "./CardMenu";
@@ -155,14 +159,16 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
     return (
       <>
         <TopBar crumbs={[{ label: t.projects, href: "/projects", icon: <FolderKanban className="size-3.5 text-ink-3" /> }]} />
-        <div className="grid flex-1 place-items-center px-4">
-          <div className="flex flex-col items-center text-center">
-            <Blob size={110} mood="worried" />
-            <h1 className="mt-2 font-display text-[20px] font-semibold">{board.gone === "removed" ? t.removedFromProject : t.projectGone}</h1>
-            <Button variant="primary" className="mt-4" onClick={() => router.push("/projects")}>
-              <FolderKanban className="size-4" /> {t.projects}
-            </Button>
-          </div>
+        <div className="grid min-h-0 flex-1 place-items-center border-t border-line bg-paper px-4">
+          <EmptyState
+            art={<Blob size={96} mood="worried" />}
+            title={board.gone === "removed" ? t.removedFromProject : t.projectGone}
+            actions={
+              <Button variant="secondary" size="sm" onClick={() => router.push("/projects")}>
+                <FolderKanban className="size-4" aria-hidden /> {t.projects}
+              </Button>
+            }
+          />
         </div>
       </>
     );
@@ -279,7 +285,8 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
         }
       />
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* The board on paper under a hairline, like the spreadsheet: its title row, the toolbar card, the columns. */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border-t border-line bg-paper">
         <Header board={board} readOnly={readOnly} title={title}>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-ink-2">
             {progress.total > 0 ? (
@@ -296,10 +303,11 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
                 <span className="tabular-nums">{t.progress(progress.done, progress.total)}</span>
               </span>
             ) : (
-              <span className="text-ink-3">{t.noCards}</span>
+              <span className={midTone}>{t.noCards}</span>
             )}
             {project.due_at && (
-              <span className="flex items-center gap-1" title={formatDueLong(project.due_at, locale)}>
+              // The long date in the tooltip follows the browser's time zone, not the server's.
+              <span className="flex items-center gap-1" title={formatDueLong(project.due_at, locale)} suppressHydrationWarning>
                 <DueChip due={project.due_at} now={now} done={progress.total > 0 && progress.done === progress.total} />
               </span>
             )}
@@ -324,7 +332,7 @@ export function ProjectBoard({ initial }: { initial: BoardData }) {
         </Header>
 
         {(role === "viewer" || project.archived_at) && (
-          <div className="mx-4 mb-2 flex items-center gap-2 rounded-xl bg-hover/70 px-3 py-2 text-[12.5px] text-ink-2 sm:mx-8 lg:mx-10">
+          <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl border border-line bg-raised/60 px-3 py-2 text-[12.5px] text-ink-2 sm:mx-8 lg:mx-10">
             {project.archived_at ? <ArchiveRestore className="size-4 shrink-0 text-ink-3" /> : <Eye className="size-4 shrink-0 text-ink-3" />}
             <span className="min-w-0 flex-1">{project.archived_at ? t.archivedBanner : t.viewerBanner}</span>
             {project.archived_at && owner && (
@@ -454,10 +462,10 @@ function Header({ board, readOnly, title, children }: { board: ReturnType<typeof
   }, [descValue]);
 
   return (
-    <header className="shrink-0 px-4 pb-3 pt-2 sm:px-8 lg:px-10 lg:pt-3">
-      <div className="flex items-center gap-3">
-        <ProjectIcon project={project} size={44} className="max-sm:hidden" />
-        <ProjectIcon project={project} size={36} className="sm:hidden" />
+    // The spreadsheet's title row: a 20 px title you rename in place (Enter keeps it, Escape goes back).
+    <header className="shrink-0 px-4 pb-3 pt-3 sm:px-8 lg:px-10">
+      <div className="flex items-start gap-2.5">
+        <ProjectIcon project={project} size={32} className="mt-px" />
         <div className="min-w-0 flex-1">
           <input
             value={name ?? project.title}
@@ -479,7 +487,7 @@ function Header({ board, readOnly, title, children }: { board: ReturnType<typeof
               }
             }}
             className={cn(
-              "-ml-1.5 w-full truncate rounded-lg bg-transparent px-1.5 font-display text-[26px] font-bold leading-tight tracking-[-0.025em] text-ink outline-none placeholder:text-ink max-sm:text-[22px]",
+              "-ml-1.5 h-[34px] w-full truncate rounded-lg bg-transparent px-1.5 font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none placeholder:text-ink max-sm:text-[18px]",
               !readOnly && "hover:bg-hover/60 focus:bg-hover/60",
             )}
           />
@@ -505,7 +513,7 @@ function Header({ board, readOnly, title, children }: { board: ReturnType<typeof
                 }
               }}
               className={cn(
-                "-ml-1.5 mt-0.5 block max-h-[120px] w-full resize-none overflow-y-auto rounded-md bg-transparent px-1.5 py-0.5 text-[13.5px] leading-snug text-ink-2 outline-none placeholder:text-ink-3/80",
+                "-ml-1.5 block max-h-[120px] w-full resize-none overflow-y-auto rounded-md bg-transparent px-1.5 py-0.5 text-[13px] leading-snug text-ink-2 outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
                 !readOnly && "hover:bg-hover/60 focus:bg-hover/60",
               )}
             />
@@ -543,162 +551,151 @@ function Toolbar({
   searchRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const t = useMessages(projectsText);
-  const chip = (on: boolean) =>
-    cn(
-      "flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors [@media(hover:none)]:h-9",
-      on ? "border-blob/50 bg-blob-soft text-blob-ink" : "border-line bg-raised text-ink-2 hover:border-line-2 hover:text-ink aria-expanded:border-line-2",
-    );
   return (
-    <div className="flex shrink-0 items-center gap-2 px-4 pb-3 max-sm:overflow-x-auto max-sm:[scrollbar-width:none] sm:px-8 lg:px-10 max-sm:[&::-webkit-scrollbar]:hidden">
-      <div className="flex shrink-0 rounded-lg bg-hover p-0.5" role="tablist" aria-label={t.views}>
-        {(
-          [
-            ["board", t.viewBoard, SquareKanban],
-            ["list", t.viewList, LayoutList],
-          ] as const
-        ).map(([v, label, Icon]) => (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={view === v}
-            onClick={() => onView(v)}
-            className={cn(
-              "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors [@media(hover:none)]:h-8",
-              view === v ? "bg-raised text-ink shadow-card dark:bg-white/10" : "text-ink-3 hover:text-ink",
-            )}
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <label className="relative flex h-8 min-w-[150px] shrink-0 items-center sm:w-[220px] [@media(hover:none)]:h-9">
-        <Search className="pointer-events-none absolute left-2.5 size-3.5 text-ink-3" />
-        <input
-          ref={searchRef}
-          value={filters.q}
-          onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setFilters((f) => ({ ...f, q: "" }));
-              e.currentTarget.blur();
-            }
-          }}
-          placeholder={t.search}
-          aria-label={t.search}
-          className="h-full w-full rounded-lg border border-line bg-raised pl-8 pr-7 text-[12.5px] text-ink outline-none transition-[border] placeholder:text-ink-3 hover:border-line-2 focus:border-blob"
+    // One raised card across the page, like the spreadsheet's toolbar: the search field takes what the
+    // tools leave; on phones the card scrolls sideways.
+    <div className="flex shrink-0 px-4 pb-3 sm:px-8 lg:px-10">
+      <ToolbarCard label={t.toolbar} className="w-full">
+        <Segmented
+          kind="tabs"
+          compact
+          value={view}
+          onChange={onView}
+          label={t.views}
+          options={[
+            { value: "board", label: t.viewBoard, icon: <SquareKanban /> },
+            { value: "list", label: t.viewList, icon: <LayoutList /> },
+          ]}
+          className="shrink-0"
         />
-        {filters.q ? (
-          <button type="button" onClick={() => setFilters((f) => ({ ...f, q: "" }))} className="absolute right-1 grid size-6 place-items-center rounded text-ink-3 hover:text-ink" aria-label={t.clearSearch}>
-            <X className="size-3.5" />
-          </button>
-        ) : (
-          <Kbd className="absolute right-2 [@media(hover:none)]:hidden">/</Kbd>
-        )}
-      </label>
+        <ToolbarDivider />
 
-      <button type="button" aria-pressed={filters.mine} onClick={() => setFilters((f) => ({ ...f, mine: !f.mine }))} className={chip(filters.mine)}>
-        {filters.mine && <Check className="size-3.5" />}
-        {t.mine}
-      </button>
-
-      <Popover
-        align="start"
-        className="w-[230px]"
-        role="dialog"
-        label={t.labels}
-        trigger={(props) => (
-          <button type="button" {...props} className={chip(filters.labels.length > 0)}>
-            {t.labels}
-            {filters.labels.length > 0 && <span className="rounded bg-blob/15 px-1 tabular-nums">{filters.labels.length}</span>}
-          </button>
-        )}
-      >
-        <div className="max-h-[280px] overflow-y-auto">
-          {labels.length === 0 && <p className="px-2 py-1.5 text-[12.5px] text-ink-3">{t.drawer.noLabels}</p>}
-          {labels.map((l) => {
-            const key = l.name.toLowerCase();
-            const on = filters.labels.includes(key);
-            return (
-              <PickRow
-                key={l.raw}
-                multi
-                active={on}
-                onClick={() => setFilters((f) => ({ ...f, labels: on ? f.labels.filter((x) => x !== key) : [...f.labels, key] }))}
-                icon={<span className="size-2.5 rounded-full" style={{ background: boardColor(l.color) }} />}
-              >
-                {l.name}
-              </PickRow>
-            );
-          })}
-        </div>
-      </Popover>
-
-      <Popover
-        align="start"
-        className="w-[200px]"
-        trigger={(props) => (
-          <button type="button" {...props} className={chip(filters.priority !== null)}>
-            {filters.priority !== null && <PriorityIcon priority={filters.priority} className="-ml-0.5" />}
-            {filters.priority !== null ? t.priorityNames[filters.priority] : t.priority}
-          </button>
-        )}
-      >
-        {(close) =>
-          PRIORITIES.map((p) => (
-            <PickRow
-              key={p}
-              active={filters.priority === p}
-              icon={<PriorityIcon priority={p} />}
-              onClick={() => {
-                setFilters((f) => ({ ...f, priority: f.priority === p ? null : p }));
-                close();
-              }}
-            >
-              {t.priorityNames[p]}
-            </PickRow>
-          ))
-        }
-      </Popover>
-
-      <Popover
-        align="start"
-        className="w-[210px]"
-        trigger={(props) => (
-          <button type="button" {...props} className={chip(filters.due !== null)}>
-            <CalendarDays className="size-3.5" />
-            {filters.due ? t.dueFilter[filters.due] : t.due}
-          </button>
-        )}
-      >
-        {(close) =>
-          (["overdue", "week", "none"] as const).map((d) => (
-            <PickRow
-              key={d}
-              active={filters.due === d}
-              onClick={() => {
-                setFilters((f) => ({ ...f, due: f.due === d ? null : d }));
-                close();
-              }}
-            >
-              {t.dueFilter[d]}
-            </PickRow>
-          ))
-        }
-      </Popover>
-
-      <AnimatePresence initial={false}>
-        {filtered && (
-          <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex shrink-0 items-center gap-2 pl-1 text-[12px] text-ink-3">
-            <span className="tabular-nums">{t.showing(shown, total)}</span>
-            <button type="button" onClick={() => setFilters(() => NO_FILTERS)} className="rounded-md px-1.5 py-1 font-medium text-ink-2 hover:bg-hover hover:text-ink">
-              {t.clearFilters}
+        <label className="relative flex h-8 min-w-[150px] max-w-[280px] flex-1 items-center [@media(hover:none)]:h-9">
+          <Search className="pointer-events-none absolute left-2.5 size-3.5 text-ink-3" aria-hidden />
+          <input
+            ref={searchRef}
+            value={filters.q}
+            onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setFilters((f) => ({ ...f, q: "" }));
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder={t.search}
+            aria-label={t.search}
+            aria-keyshortcuts="/"
+            className={cn(fieldClass, "h-full w-full pl-8 pr-7")}
+          />
+          {filters.q ? (
+            <button type="button" onClick={() => setFilters((f) => ({ ...f, q: "" }))} className="absolute right-1 grid size-6 place-items-center rounded text-ink-3 hover:text-ink" aria-label={t.clearSearch}>
+              <X className="size-3.5" />
             </button>
-          </motion.span>
-        )}
-      </AnimatePresence>
+          ) : (
+            <Kbd className="absolute right-2 [@media(hover:none)]:hidden">/</Kbd>
+          )}
+        </label>
+        <ToolbarDivider />
+
+        <ToolbarButton pressed={filters.mine} onClick={() => setFilters((f) => ({ ...f, mine: !f.mine }))}>
+          {filters.mine && <Check aria-hidden />}
+          {t.mine}
+        </ToolbarButton>
+
+        <Popover
+          align="start"
+          className="w-[230px]"
+          role="dialog"
+          label={t.labels}
+          trigger={(props) => (
+            <ToolbarButton {...props} on={filters.labels.length > 0}>
+              {t.labels}
+              {filters.labels.length > 0 && <span className="rounded bg-blob/15 px-1 text-[12px] tabular-nums">{filters.labels.length}</span>}
+            </ToolbarButton>
+          )}
+        >
+          <div className="max-h-[280px] overflow-y-auto">
+            {labels.length === 0 && <p className={cn("px-2 py-1.5 text-[12.5px]", midTone)}>{t.drawer.noLabels}</p>}
+            {labels.map((l) => {
+              const key = l.name.toLowerCase();
+              const on = filters.labels.includes(key);
+              return (
+                <PickRow
+                  key={l.raw}
+                  multi
+                  active={on}
+                  onClick={() => setFilters((f) => ({ ...f, labels: on ? f.labels.filter((x) => x !== key) : [...f.labels, key] }))}
+                  icon={<span className="size-2.5 rounded-full" style={{ background: boardColor(l.color) }} />}
+                >
+                  {l.name}
+                </PickRow>
+              );
+            })}
+          </div>
+        </Popover>
+
+        <Popover
+          align="start"
+          className="w-[200px]"
+          trigger={(props) => (
+            <ToolbarButton {...props} on={filters.priority !== null}>
+              {filters.priority !== null && <PriorityIcon priority={filters.priority} className="-ml-0.5" />}
+              {filters.priority !== null ? t.priorityNames[filters.priority] : t.priority}
+            </ToolbarButton>
+          )}
+        >
+          {(close) =>
+            PRIORITIES.map((p) => (
+              <PickRow
+                key={p}
+                active={filters.priority === p}
+                icon={<PriorityIcon priority={p} />}
+                onClick={() => {
+                  setFilters((f) => ({ ...f, priority: f.priority === p ? null : p }));
+                  close();
+                }}
+              >
+                {t.priorityNames[p]}
+              </PickRow>
+            ))
+          }
+        </Popover>
+
+        <Popover
+          align="start"
+          className="w-[210px]"
+          trigger={(props) => (
+            <ToolbarButton {...props} on={filters.due !== null}>
+              <CalendarDays aria-hidden />
+              {filters.due ? t.dueFilter[filters.due] : t.due}
+            </ToolbarButton>
+          )}
+        >
+          {(close) =>
+            (["overdue", "week", "none"] as const).map((d) => (
+              <PickRow
+                key={d}
+                active={filters.due === d}
+                onClick={() => {
+                  setFilters((f) => ({ ...f, due: f.due === d ? null : d }));
+                  close();
+                }}
+              >
+                {t.dueFilter[d]}
+              </PickRow>
+            ))
+          }
+        </Popover>
+
+        <AnimatePresence initial={false}>
+          {filtered && (
+            <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
+              <span className={cn("px-1.5 text-[12.5px] tabular-nums", midTone)}>{t.showing(shown, total)}</span>
+              <ToolbarButton onClick={() => setFilters(() => NO_FILTERS)}>{t.clearFilters}</ToolbarButton>
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </ToolbarCard>
     </div>
   );
 }

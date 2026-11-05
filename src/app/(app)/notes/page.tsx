@@ -11,8 +11,10 @@ import { snippet } from "@/notes/snippet";
 import { createClient } from "@/lib/supabase/server";
 import type { Attachment, PageKind, Project } from "@/lib/types";
 
-export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await getMessages(notesText)).metaTitle };
+export async function generateMetadata({ searchParams }: PageProps<"/notes">): Promise<Metadata> {
+  const [t, params] = await Promise.all([getMessages(notesText), searchParams]);
+  // The spreadsheets alone (the sidebar's "Blobxcel") under the feature's name.
+  return { title: one(params.kind) === "sheet" ? t.sheetTitle : t.metaTitle };
 }
 
 type Row = { id: string; kind: PageKind; plain_text: string | null; links: string[] | null; slide_title: string | null; deck_theme: string | null; deck_custom: unknown; ink_preview: unknown };
@@ -72,5 +74,8 @@ export default async function NotesPage({ searchParams }: PageProps<"/notes">) {
     sort: one(params.sort),
     view: one(params.view),
   };
-  return <NotesHome previews={previews} links={links} due={due} initialQuery={query} projects={projects} pageProjects={pageProjects} />;
+  // A link to other filters (the sidebar's Notizen and Blobxcel, Start's "Alle ansehen") starts the
+  // page afresh. (The filters themselves NotesHome reads from the address: it also has the ones
+  // chosen on the page since, which Next.js's copy of this page doesn't know when Back brings it back.)
+  return <NotesHome key={JSON.stringify(query)} previews={previews} links={links} due={due} projects={projects} pageProjects={pageProjects} />;
 }

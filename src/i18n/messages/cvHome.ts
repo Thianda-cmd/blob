@@ -4,8 +4,8 @@ import { defineMessages } from "../define";
 export const cvHomeText = defineMessages({
   en: {
     title: "CV",
-    eyebrow: "Applications",
-    intro: "For your internship, apprenticeship or side job. Done in about 20 minutes and saved as a PDF.",
+    /** The page's meta line while there's no CV yet. */
+    intro: "For your internship, apprenticeship or side job.",
     newCv: "New CV",
     yours: "Your CVs",
     count: (n: number) => (n === 1 ? "1 CV" : `${n} CVs`),
@@ -32,9 +32,8 @@ export const cvHomeText = defineMessages({
     save: "Save",
     cancel: "Cancel",
     // No CV yet
-    emptyEyebrow: "Your first CV",
     emptyTitle: "Let's write your CV together",
-    emptyBody: "Pick a design and fill in the form step by step. Blob helps with tips and examples. Or start with Lena's finished example and simply write over it.",
+    emptyBody: "Pick a design and fill in the form step by step. Blob helps with tips and examples. Or start with Lena's finished example and simply write over it. You'll be done in about 20 minutes.",
     emptyCta: "Start my CV",
     // The number of designs comes from the catalogue, so a new design shows up here by itself.
     emptyPoints: (designs: number) => [`${designs} designs`, "German or English", "PDF in one click"],
@@ -69,8 +68,7 @@ export const cvHomeText = defineMessages({
   },
   de: {
     title: "Lebenslauf",
-    eyebrow: "Bewerbung",
-    intro: "Für dein Praktikum, die Ausbildung oder den Nebenjob. In etwa 20 Minuten fertig und als PDF gespeichert.",
+    intro: "Für dein Praktikum, die Ausbildung oder den Nebenjob.",
     newCv: "Neuer Lebenslauf",
     yours: "Deine Lebensläufe",
     count: (n) => (n === 1 ? "1 Lebenslauf" : `${n} Lebensläufe`),
@@ -94,9 +92,8 @@ export const cvHomeText = defineMessages({
     renameHint: "Den Namen siehst nur du. Lässt du das Feld leer, heißt er wieder automatisch „Lebenslauf – Vorname Nachname“.",
     save: "Speichern",
     cancel: "Abbrechen",
-    emptyEyebrow: "Dein erster Lebenslauf",
     emptyTitle: "Lass uns deinen Lebenslauf schreiben",
-    emptyBody: "Such dir ein Design aus und füll Schritt für Schritt das Formular aus. Blob hilft dir mit Tipps und Beispielen. Oder starte mit Lenas fertigem Beispiel und überschreib es einfach.",
+    emptyBody: "Such dir ein Design aus und füll Schritt für Schritt das Formular aus. Blob hilft dir mit Tipps und Beispielen. Oder starte mit Lenas fertigem Beispiel und überschreib es einfach. In etwa 20 Minuten bist du fertig.",
     emptyCta: "Lebenslauf anfangen",
     emptyPoints: (designs) => [`${designs} Designs`, "Deutsch oder Englisch", "PDF mit einem Klick"],
     dialog: {

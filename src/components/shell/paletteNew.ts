@@ -5,23 +5,51 @@
 
 import type { PageKind } from "@/lib/types";
 
-/** The words that name a kind of page itself, in both languages ("Tabelle" means "make a spreadsheet"). */
+/**
+ * The words that name a kind of page itself, in both languages ("Tabelle" means "make a spreadsheet").
+ * Spreadsheets are made with Blobxcel, so "Blobxcel" names them too.
+ */
 export const KIND_NAMES = {
   note: "notiz note",
-  ink: "handschrift handwriting",
-  sheet: "tabelle tabellen spreadsheet sheet excel tabellenkalkulation",
-  deck: "präsentation praesentation presentation folien slides",
+  ink: "handschrift handschriften handwriting",
+  sheet: "tabelle tabellen spreadsheet spreadsheets sheet sheets excel blobxcel tabellenkalkulation",
+  deck: "präsentation präsentationen praesentation praesentationen presentation presentations folien slides",
 } as const;
+
+/** "Neue Tabelle", "new spreadsheet": the word for new before a kind's name still just names the kind. */
+const NEW_WORDS = ["neue", "new"];
 
 // Extra words that find an action besides its label, in both languages.
 export const CV_WORDS = "cv lebenslauf resume résumé bewerbung application praktikum internship ausbildung apprenticeship";
 export const FOLDER_WORDS = "ordner folder";
 export const INK_WORDS = "handschrift handwriting stift pen zeichnen draw drawing skizze sketch tablet s pen";
-export const SHEET_WORDS = "tabelle tabellen spreadsheet sheet excel tabellenkalkulation calc rechnen formel formula diagramm chart kalibrierung kalibriergerade calibration messreihe messwerte mittelwert trendlinie";
+export const SHEET_WORDS = "tabelle tabellen spreadsheet sheet excel blobxcel tabellenkalkulation calc rechnen formel formula diagramm chart kalibrierung kalibriergerade calibration messreihe messwerte mittelwert trendlinie";
 export const NOTEBOOK_WORDS = "notizbuch notebook heft privat";
 export const PROJECT_WORDS = "projekt project board kanban gruppenarbeit gruppenprojekt referat klassenfahrt team";
 export const NOTES_WORDS = "notizen notes wissensnetz graph tags karteikarten";
 export const CALENDAR_WORDS = "kalender calendar termin event stundenplan timetable schedule geburtstag birthday woche week monat month";
+/** Words that ask for a list of your pages of a kind ("meine Tabellen", "all spreadsheets"). */
+export const LIST_WORDS = "meine my alle all liste list übersicht overview";
+
+/** Words that find the lists of presentations and of handwritten notes (with LIST_WORDS). */
+export const DECK_WORDS = "präsentation präsentationen praesentation praesentationen presentation presentations folien slides";
+export const INK_LIST_WORDS = "handschrift handschriften handwriting handwritten";
+
+/** The palette's action that lists your spreadsheets (/notes?kind=sheet): "Alle Tabellen". */
+export const SHEETS_LIST_ID = "sheets";
+/** … your presentations (/notes?kind=deck) and your handwritten notes (/notes?kind=ink). */
+export const DECKS_LIST_ID = "decks";
+export const INKS_LIST_ID = "inks";
+/** A plural kind word alone asks for the list of that kind first, then a new one ("Tabellen", "Präsentationen"). */
+const LIST_KIND_WORDS = new Map([
+  ["tabellen", SHEETS_LIST_ID],
+  ["spreadsheets", SHEETS_LIST_ID],
+  ["sheets", SHEETS_LIST_ID],
+  ["präsentationen", DECKS_LIST_ID],
+  ["praesentationen", DECKS_LIST_ID],
+  ["presentations", DECKS_LIST_ID],
+  ["handschriften", INKS_LIST_ID],
+]);
 
 export type NewKind = keyof typeof KIND_NAMES;
 
@@ -32,11 +60,14 @@ export type NewKind = keyof typeof KIND_NAMES;
  * its way to one of those words ("tab"), the page has no name either; on its way to one of
  * the related `keywords` ("kalib"), it keeps the query as its name (rank 1 for both: up among the new
  * pages, the first kind ahead of the second).
- * `bare` is the action's own label ("Neue Tabelle"); `q` the query as typed (trimmed).
+ * `bare` is the action's own label ("Neue Blobxcel-Tabelle"); `q` the query as typed (trimmed).
  */
 export function newPageFor(kind: NewKind, q: string, bare: string, keywords?: string): { rank: 0 | 1 | 2; title: string } {
   const lower = q.toLowerCase();
-  const names = [bare.toLowerCase(), ...KIND_NAMES[kind].split(" ")].sort((a, b) => b.length - a.length);
+  const words = KIND_NAMES[kind].split(" ");
+  // (The action's own label, the kind's names, and those after "neue"/"new": "neue Tabelle" still
+  // makes a spreadsheet now that its action says "Neue Blobxcel-Tabelle".)
+  const names = [bare.toLowerCase(), ...words, ...NEW_WORDS.flatMap((n) => words.map((w) => `${n} ${w}`))].sort((a, b) => b.length - a.length);
   const kindName = names.find((name) => lower === name || lower.startsWith(`${name} `));
   if (kindName) return { rank: 2, title: q.length === lower.length ? q.slice(kindName.length).trim() : "" };
   if (lower.length > 1 && names.some((name) => name.startsWith(lower))) return { rank: 1, title: "" };
@@ -156,14 +187,25 @@ export type PaletteEntry = {
  *   - the kind and a name ("Notiz zur Zellatmung"): right after the pages found, so Enter still opens
  *     the page "Notiz zur Zellatmung" instead of making a note "zur Zellatmung"; first when no page
  *     is found.
+ * A plural on its own ("Tabellen", "spreadsheets", "Präsentationen", "Handschriften") asks for the
+ * list first ("Alle Tabellen"), then a new one. An action is found by its label, by a keyword the query starts, or by each word of a
+ * query of several ("meine Tabellen", "my spreadsheets": "Alle Tabellen").
  */
 export function paletteOrder<T extends PaletteEntry>(q: string, { actions, pages, results }: { actions: T[]; pages: T[]; results: T[] }): T[] {
   if (!q) return [...actions.slice(0, 3), ...pages];
   const lower = q.toLowerCase();
   const isNew = (a: T) => a.id.startsWith("new");
-  const hit = (a: T) => a.label.toLowerCase().includes(lower) || (lower.length > 1 && Boolean(a.keywords?.split(" ").some((w) => w.startsWith(lower))));
+  const words = lower.split(/\s+/).filter((w) => w.length > 1);
+  const keys = (a: T) => a.keywords?.split(" ") ?? [];
+  const hit = (a: T) =>
+    a.label.toLowerCase().includes(lower) ||
+    (lower.length > 1 && keys(a).some((w) => w.startsWith(lower))) ||
+    (words.length > 1 && words.every((w) => a.label.toLowerCase().includes(w) || keys(a).some((k) => k.startsWith(w))));
   const matching = actions.filter((a) => !isNew(a) && hit(a));
   const asked = actions.filter((a) => isNew(a) && a.rank === 2);
+  const listId = LIST_KIND_WORDS.get(lower);
+  const list = listId ? matching.filter((a) => a.id === listId) : [];
+  if (list.length) return [...list, ...asked, ...matching.filter((a) => !list.includes(a)), ...pages, ...results];
   if (asked.some((a) => !a.title)) return [...asked, ...matching, ...pages, ...results];
   if (asked.length) return [...pages, ...asked, ...matching, ...results];
   // Rank 1 without a name: on its way to the kind itself; with one (the query): to a word of it.

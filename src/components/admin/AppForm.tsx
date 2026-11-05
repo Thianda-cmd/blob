@@ -15,6 +15,7 @@ import { useMessages } from "@/i18n/client";
 import { adminText } from "@/i18n/messages/admin";
 import { oauthText } from "@/i18n/messages/oauth";
 import { DEFAULT_SCOPES, SCOPE_NAMES, type AdminApp, type AppErrors, type AppField, type AppInput, type SaveResult, type ScopeName } from "@/lib/oauth/admin-types";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { createApp, updateApp } from "@/app/(app)/admin/actions";
 
@@ -290,12 +291,12 @@ export function AppForm({ app, onSaved, saved, after }: { app?: AdminApp; onSave
                           transition={{ type: "spring", stiffness: 520, damping: 38 }}
                         />
                       )}
-                      <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", on ? "bg-blob text-white" : "bg-hover text-ink-2")}>
+                      <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", on ? "bg-blob text-white dark:bg-blob-deep" : "bg-hover text-ink-2")}>
                         <Icon className="size-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[13.5px] font-medium text-ink">{confidential ? t.confidential : t.public}</span>
-                        <span className="mt-0.5 block text-[12px] leading-snug text-ink-3">{confidential ? t.confidentialSub : t.publicSub}</span>
+                        <span className={cn("mt-0.5 block text-[12px] leading-snug", midTone)}>{confidential ? t.confidentialSub : t.publicSub}</span>
                       </span>
                     </button>
                   );
@@ -350,7 +351,7 @@ export function AppForm({ app, onSaved, saved, after }: { app?: AdminApp; onSave
                 <label htmlFor="app-trusted" className="block text-[13.5px] font-medium text-ink">
                   {t.trusted}
                 </label>
-                <p className="mt-0.5 text-[12px] leading-snug text-ink-3">{t.trustedHint}</p>
+                <p className={cn("mt-0.5 text-[12px] leading-snug", midTone)}>{t.trustedHint}</p>
               </div>
               <Switch id="app-trusted" checked={values.trusted} onChange={(v) => set("trusted", v)} label={t.trusted} />
             </div>
@@ -375,7 +376,7 @@ export function AppForm({ app, onSaved, saved, after }: { app?: AdminApp; onSave
                       aria-hidden
                       className={cn(
                         "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-[5px] border transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blob",
-                        on ? "border-blob bg-blob text-white" : "border-line-2 bg-raised",
+                        on ? "border-blob bg-blob text-white dark:border-blob-deep dark:bg-blob-deep" : "border-line-2 bg-raised",
                         scope === "openid" && "opacity-60",
                       )}
                     >
@@ -383,7 +384,7 @@ export function AppForm({ app, onSaved, saved, after }: { app?: AdminApp; onSave
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[13.5px] font-medium text-ink">{t.scopes[scope].title}</span>
-                      <span className="block text-[12px] leading-snug text-ink-3">{t.scopes[scope].body}</span>
+                      <span className={cn("block text-[12px] leading-snug", midTone)}>{t.scopes[scope].body}</span>
                     </span>
                   </label>
                 );
@@ -442,7 +443,7 @@ function ConsentPreview({
   const list: ScopeName[] = shown.length ? shown : ["openid"];
   return (
     <div>
-      <div className="mb-2 px-0.5 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-3">{t.form.preview}</div>
+      <div className={cn("mb-2 px-0.5", groupLabel)}>{t.form.preview}</div>
       <div className="rounded-2xl border border-line bg-raised p-4 shadow-card" aria-hidden>
         <div className="text-center text-[10px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{consent.eyebrow}</div>
         <div className="relative mx-auto mt-1 flex h-[64px] max-w-[190px] items-center justify-between">
@@ -451,7 +452,7 @@ function ConsentPreview({
           <span className={cn("relative transition-opacity", placeholder && "opacity-45")}>
             <AppMark app={app} size={40} />
             {trusted && (
-              <span className="absolute -bottom-1 -right-1 grid size-4 place-items-center rounded-full border-2 border-raised bg-blob text-white">
+              <span className="absolute -bottom-1 -right-1 grid size-4 place-items-center rounded-full border-2 border-raised bg-blob text-white dark:bg-blob-deep">
                 <Check className="size-2.5" strokeWidth={3} />
               </span>
             )}
@@ -476,11 +477,11 @@ function ConsentPreview({
         </ul>
         <div className="mt-4 grid grid-cols-2 gap-2 text-[12px] font-medium">
           <span className="grid h-7 place-items-center rounded-lg border border-line">{consent.cancel}</span>
-          <span className="grid h-7 place-items-center rounded-lg bg-blob text-white">{consent.allow}</span>
+          <span className="grid h-7 place-items-center rounded-lg bg-blob text-white dark:bg-blob-deep">{consent.allow}</span>
         </div>
       </div>
       {trusted && (
-        <p className="mt-2.5 flex gap-1.5 px-0.5 text-[12px] leading-snug text-ink-3">
+        <p className={cn("mt-2.5 flex gap-1.5 px-0.5 text-[12px] leading-snug", midTone)}>
           <BadgeCheck className="mt-0.5 size-3.5 shrink-0 text-blob-ink" /> {t.form.trustedHint}
         </p>
       )}

@@ -10,8 +10,7 @@ export function Layout({ stage, panel, panelFirst, single }: { stage: ReactNode;
   if (single || !stage) return <div className="mx-auto w-full max-w-[640px]">{panel}</div>;
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-5">
-      <div className="relative min-w-0 overflow-hidden rounded-3xl border border-line bg-raised p-3 shadow-card sm:p-5 lg:sticky lg:top-3">
-        <div className="bg-dots pointer-events-none absolute inset-0 opacity-[0.18]" aria-hidden />
+      <div className="relative min-w-0 overflow-hidden rounded-2xl border border-line bg-raised p-3 shadow-card sm:p-5 lg:sticky lg:top-3">
         <div className="relative">{stage}</div>
       </div>
       <div className={cn("min-w-0", panelFirst && "max-lg:order-first")}>{panel}</div>

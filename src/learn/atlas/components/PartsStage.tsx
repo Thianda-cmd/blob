@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Check, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useText } from "@/i18n/useText";
+import { okFill } from "@/learn/components/tones";
 import { cn } from "@/lib/utils";
 import type { PartsView } from "../types";
 
@@ -138,7 +139,7 @@ export function PartsStage({
               className={cn(
                 "absolute z-10 -translate-y-1/2 whitespace-nowrap rounded-full border px-2 py-[3px] text-[11.5px] font-semibold leading-none shadow-card transition-[background,color,border-color,opacity] duration-200",
                 side === "l" ? "-translate-x-full" : side === "c" ? "-translate-x-1/2" : "",
-                on ? "border-blob bg-blob text-white" : "border-line bg-raised/95 text-ink hover:border-blob/60",
+                on ? "border-blob bg-blob text-white dark:border-blob-deep dark:bg-blob-deep" : "border-line bg-raised/95 text-ink hover:border-blob/60",
                 focus && !on && "opacity-45",
               )}
             >
@@ -179,19 +180,19 @@ export function PartsStage({
               className={cn(
                 "relative grid place-items-center rounded-full font-bold tabular-nums shadow-[0_1px_3px_rgb(0_0_0/0.25)] transition-[width,height,background,border-color,transform] duration-200 group-hover:scale-110 group-focus-visible:ring-2 group-focus-visible:ring-blob group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-raised",
                 mark === "right"
-                  ? "size-6 border-2 border-white bg-ok text-white"
+                  ? cn("size-6 border-2 border-white", okFill)
                   : mark === "wrong"
                     ? "size-6 border-2 border-white bg-danger text-white"
                     : isAsk
-                      ? "size-6 border-2 border-white bg-blob text-[12px] text-white"
+                      ? "size-6 border-2 border-white bg-blob text-[12px] text-white dark:bg-blob-deep"
                       : on
                         ? pills
                           ? "size-3.5 border-2 border-white bg-blob"
-                          : "size-[22px] border-[3px] border-white bg-blob text-[11px] text-white"
+                          : "size-[22px] border-[3px] border-white bg-blob text-[11px] text-white dark:bg-blob-deep"
                         : pills
                           ? cn("size-2.5 border-2", done ? "border-white bg-blob" : "border-blob bg-raised")
                           : numbers
-                          ? cn("size-5 border-[1.5px] text-[10.5px]", done ? "border-white bg-blob text-white" : "border-blob bg-raised text-ink")
+                          ? cn("size-5 border-[1.5px] text-[10.5px]", done ? "border-white bg-blob text-white dark:bg-blob-deep" : "border-blob bg-raised text-ink")
                           : cn("size-3.5 border-2", done ? "border-white bg-blob" : "border-blob bg-raised"),
               )}
             >

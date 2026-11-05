@@ -109,7 +109,7 @@ export function NoteStudy({
                 aria-current={mode === tab.mode ? "page" : undefined}
                 className={cn(
                   "relative flex h-8 items-center gap-1.5 rounded-[10px] px-2.5 text-[13px] font-medium transition-colors [&_svg]:size-4 sm:px-3 [@media(hover:none)]:h-9",
-                  mode === tab.mode ? "text-ink" : "text-ink-3 hover:text-ink",
+                  mode === tab.mode ? "text-ink" : "text-ink-2 hover:text-ink",
                 )}
               >
                 {mode === tab.mode && (

@@ -8,10 +8,13 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { MenuItem, Popover } from "@/components/ui/Menu";
+import { addTile, card, midTone, searchOnPaper } from "@/components/ui/surfaces";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
@@ -112,43 +115,37 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
 
   return (
     <>
-      <TopBar crumbs={[{ label: t.nav, icon: <BadgeQuestionMark className="size-3.5 text-ink-3" /> }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-28 pt-3 sm:px-8 lg:px-10 lg:pt-5">
-          <motion.header initial="hidden" animate="shown" className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-            <motion.div variants={rise} custom={0} className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <BadgeQuestionMark className="size-3.5" /> {t.title}
-              </div>
-              <h1 className="mt-1 font-display text-[32px] font-bold leading-none tracking-[-0.02em]">{t.home.heading}</h1>
-              <p className="mt-2 max-w-[680px] text-[14.5px] leading-relaxed text-ink-2">{t.home.intro}</p>
-            </motion.div>
-            <motion.div variants={rise} custom={1} className="flex flex-wrap gap-2">
-              <a href="/play" target="_blank" rel="noopener" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-raised px-4 text-[14px] font-medium text-ink shadow-card hover:bg-hover/60">
-                <Smartphone className="size-4" /> {t.home.join}
-              </a>
-              <Button variant="secondary" size="lg" onClick={() => setPicking(true)}>
-                <NotebookText className="size-4" /> {t.fromNote.button}
-              </Button>
-              <Button variant="blob" size="lg" onClick={() => void create()} loading={busy === "new"}>
-                <Plus className="size-4" /> {t.home.create}
-              </Button>
-            </motion.div>
-          </motion.header>
+      <TopBar
+        crumbs={[{ label: t.nav, icon: <BadgeQuestionMark className="size-3.5 text-ink-3" /> }]}
+        actions={
+          // The page's one violet button: a new quiz (the label hides on phones, the + stays).
+          <Button variant="blob" size="bar" onClick={() => void create()} loading={busy === "new"} title={t.home.create}>
+            <Plus className="size-4" strokeWidth={2.4} />
+            <span className="max-sm:sr-only">{t.home.create}</span>
+          </Button>
+        }
+      />
+      <PageBody>
+        <PageHeader title={t.home.heading} meta={quizzes.length ? t.home.count(quizzes.length) : undefined}>
+          <Button variant="secondary" size="md" className="shrink-0" onClick={() => setPicking(true)}>
+            <NotebookText className="size-4" /> {t.fromNote.button}
+          </Button>
+          <a href="/play" target="_blank" rel="noopener" className={buttonClass("secondary", "md", "shrink-0")}>
+            <Smartphone className="size-4" /> {t.home.join}
+          </a>
+        </PageHeader>
 
-          <HowItWorks />
-
-          {quizzes.length === 0 ? (
-            <EmptyHero onNew={() => void create()} onExample={() => void create(true)} busy={busy} />
-          ) : (
-            <section className="mt-7">
-              {quizzes.length > 6 && (
-                <label className="mb-4 flex h-10 max-w-[360px] items-center gap-2 rounded-xl border border-line bg-raised px-3 shadow-card focus-within:border-blob">
-                  <Search className="size-4 text-ink-3" />
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.home.search} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-3" />
-                </label>
-              )}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+        {quizzes.length === 0 ? (
+          <EmptyStart onNew={() => void create()} onExample={() => void create(true)} busy={busy} />
+        ) : (
+          <section>
+            {quizzes.length > 6 && (
+              <label className="relative mb-4 flex max-w-[360px] items-center">
+                <Search className="pointer-events-none absolute left-3 size-4 text-ink-3" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.home.search} aria-label={t.home.search} className={cn(searchOnPaper, "w-full pl-9")} />
+              </label>
+            )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {shown.map((quiz, i) => (
                     <QuizCard key={quiz.id} quiz={quiz} index={i} busy={busy === quiz.id} onHost={() => void host(quiz)} onDuplicate={() => void duplicate(quiz)} onDelete={() => void remove(quiz)} />
@@ -158,7 +155,7 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
                     layout
                     type="button"
                     onClick={() => void create(true)}
-                    className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-line-2 text-[13.5px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink"
+                    className={cn(addTile, "flex min-h-[220px] flex-col items-center justify-center gap-2 text-[13.5px] font-medium")}
                   >
                     <Blob size={64} mood="happy" interactive={false} />
                     {t.home.example}
@@ -167,8 +164,7 @@ export function QuizHome({ initial }: { initial: Quiz[] }) {
               </div>
             </section>
           )}
-        </div>
-      </div>
+      </PageBody>
       <NotePicker open={picking} onClose={() => setPicking(false)} busy={busy} onPick={(id) => void fromNote(id)} />
     </>
   );
@@ -204,7 +200,7 @@ function NotePicker({ open, onClose, busy, onPick }: { open: boolean; onClose: (
         </label>
       </div>
       <ul className="mt-2 max-h-[min(380px,50vh)] overflow-y-auto px-2 pb-3">
-        {notes.length === 0 && <li className="px-3 py-6 text-center text-[13.5px] text-ink-3">{t.fromNote.none}</li>}
+        {notes.length === 0 && <li className={cn("px-3 py-6 text-center text-[13.5px]", midTone)}>{t.fromNote.none}</li>}
         {notes.map((p) => {
           const loading = busy === `note:${p.id}`;
           return (
@@ -227,57 +223,68 @@ function NotePicker({ open, onClose, busy, onPick }: { open: boolean; onClose: (
   );
 }
 
+/** The three steps of a live quiz, on the start screen. */
 function HowItWorks() {
   const t = useMessages(quizText);
   const icons = [Pencil, Tv, Smartphone];
   return (
-    <motion.ol initial="hidden" animate="shown" className="mt-6 grid gap-3 sm:grid-cols-3">
+    <ol className="grid gap-3 sm:grid-cols-3">
       {t.home.how.map((text, i) => {
         const Icon = icons[i];
         const style = styleAt(i);
         return (
-          <motion.li key={i} variants={rise} custom={2 + i} className="flex items-start gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: style.color }}>
+          <li key={i} className={cn(card, "flex items-start gap-3 px-4 py-3")}>
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg text-white" style={{ background: style.color }}>
               <Icon className="size-4.5" />
             </span>
             <span className="text-[13.5px] leading-snug text-ink-2">
               <b className="mr-1 font-display text-ink">{i + 1}.</b>
               {text}
             </span>
-          </motion.li>
+          </li>
         );
       })}
-    </motion.ol>
+    </ol>
   );
 }
 
-function EmptyHero({ onNew, onExample, busy }: { onNew: () => void; onExample: () => void; busy: string | null }) {
+/** No quizzes yet: what a live quiz is, an example to try, and how it works. */
+function EmptyStart({ onNew, onExample, busy }: { onNew: () => void; onExample: () => void; busy: string | null }) {
   const t = useMessages(quizText);
   return (
-    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="relative mt-8 overflow-hidden rounded-[28px] border border-line bg-[radial-gradient(120%_100%_at_0%_0%,var(--blob-soft),var(--surface))] px-6 py-10 sm:px-10">
-      <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:text-left">
-        <Blob size={150} mood="excited" />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[24px] font-bold tracking-[-0.01em]">{t.home.empty}</h2>
-          <p className="mt-1.5 max-w-[520px] text-[14.5px] text-ink-2">{t.home.emptyHint}</p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
-            <Button variant="blob" size="lg" onClick={onExample} loading={busy === "example"}>
+    <>
+      <EmptyState
+        art={
+          <div className="flex items-end gap-3" aria-hidden>
+            <Blob size={96} mood="excited" />
+            {/* The game's four answer shapes, in their colours. */}
+            <div className="mb-3 grid grid-cols-2 gap-1.5">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className="grid size-9 place-items-center rounded-lg shadow-card" style={{ background: styleAt(i).color }}>
+                  <Shape shape={styleAt(i).shape} className="size-4.5" />
+                </span>
+              ))}
+            </div>
+          </div>
+        }
+        title={t.home.empty}
+        body={t.home.intro}
+        actions={
+          <>
+            <Button variant="blob" size="md" onClick={onExample} loading={busy === "example"}>
               <Play className="size-4" /> {t.home.example}
             </Button>
-            <Button variant="secondary" size="lg" onClick={onNew} loading={busy === "new"}>
+            <Button variant="secondary" size="md" onClick={onNew} loading={busy === "new"}>
               <Plus className="size-4" /> {t.home.create}
             </Button>
-          </div>
-        </div>
-        <div className="hidden grid-cols-2 gap-2 lg:grid" aria-hidden>
-          {[0, 1, 2, 3].map((i) => (
-            <motion.span key={i} animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 2.4, delay: i * 0.3 }} className="grid size-16 place-items-center rounded-2xl shadow-card" style={{ background: styleAt(i).color }}>
-              <Shape shape={styleAt(i).shape} className="size-8" />
-            </motion.span>
-          ))}
-        </div>
-      </div>
-    </motion.section>
+          </>
+        }
+      />
+      <section aria-labelledby="quiz-how">
+        <SectionHeader id="quiz-how" title={t.home.howTitle} />
+        <HowItWorks />
+      </section>
+    </>
   );
 }
 
@@ -290,14 +297,15 @@ function QuizCard({ quiz, index, busy, onHost, onDuplicate, onDelete }: { quiz: 
   const style = styleAt(index);
   const ready = quiz.questions.filter((q) => !issuesOf(q).length).length;
   return (
-    <motion.article layout variants={rise} initial="hidden" animate="shown" custom={index} exit={{ opacity: 0, scale: 0.95 }} className="group relative flex flex-col overflow-hidden rounded-3xl border border-line bg-raised shadow-card transition-shadow hover:shadow-pop">
-      <Link href={`/quiz/${quiz.id}`} className="relative block h-[118px] overflow-hidden" style={{ background: cover ? undefined : `linear-gradient(135deg, ${style.color}, ${style.deep})` }}>
+    <motion.article layout variants={rise} initial="hidden" animate="shown" custom={index} exit={{ opacity: 0, scale: 0.95 }} className={cn(card, "group relative flex flex-col overflow-hidden transition-[box-shadow,border-color] hover:border-line-2 hover:shadow-pop")}>
+      {/* No picture: the card's game colour, flat (no gradients on app pages). */}
+      <Link href={`/quiz/${quiz.id}`} className="relative block h-[118px] overflow-hidden" style={{ background: cover ? undefined : style.color }}>
         {cover ? (
-          <img src={cover} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img src={cover} alt="" className="size-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-105" />
         ) : (
           <div className="flex h-full items-center justify-center gap-2 opacity-90" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
-              <span key={i} className="transition-transform duration-300 group-hover:-translate-y-1" style={{ transitionDelay: `${i * 40}ms` }}>
+              <span key={i} className="transition-transform duration-300 motion-safe:group-hover:-translate-y-1" style={{ transitionDelay: `${i * 40}ms` }}>
                 <Shape shape={styleAt(i).shape} className="size-9" fill="rgb(255 255 255 / 0.85)" />
               </span>
             ))}
@@ -313,7 +321,7 @@ function QuizCard({ quiz, index, busy, onHost, onDuplicate, onDelete }: { quiz: 
           <Popover
             align="end"
             trigger={(props) => (
-              <button {...props} type="button" className="-mr-1.5 grid size-7 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink" aria-label="…">
+              <button {...props} type="button" className="-mr-1.5 grid size-7 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:size-9" aria-label={t.home.options(title)} title={t.home.options(title)}>
                 <Ellipsis className="size-4" />
               </button>
             )}
@@ -353,7 +361,7 @@ function QuizCard({ quiz, index, busy, onHost, onDuplicate, onDelete }: { quiz: 
           </Popover>
         </div>
         {quiz.description && <p className="line-clamp-2 text-[13px] text-ink-2">{quiz.description}</p>}
-        <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-[12px] text-ink-3">
+        <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
           <span>{t.home.updated(formatDistanceToNow(new Date(quiz.updated_at), { addSuffix: true, locale: dateLocale(locale) }))}</span>
           {quiz.plays > 0 && (
             <span className="flex items-center gap-1">
@@ -361,7 +369,8 @@ function QuizCard({ quiz, index, busy, onHost, onDuplicate, onDelete }: { quiz: 
             </span>
           )}
         </p>
-        <Button variant="blob" size="md" className={cn("mt-3", !ready && "opacity-60")} onClick={onHost} loading={busy}>
+        {/* Plain, not violet: the page keeps one violet button (making a quiz). */}
+        <Button variant="secondary" size="md" className={cn("mt-3", !ready && "opacity-60")} onClick={onHost} loading={busy}>
           <Play className="size-4" /> {t.home.host}
         </Button>
       </div>

@@ -1,18 +1,18 @@
 "use client";
 
-import { formatDistanceStrict } from "date-fns";
-import { motion } from "motion/react";
 import { ArrowUpRight, Check, FilePlus2, NotebookPen, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { PageIcon } from "@/components/shell/Sidebar";
+import { editedLabel } from "@/components/subjects/PageCards";
 import { useNow } from "@/components/tasks/useNow";
+import { Button, buttonClass } from "@/components/ui/Button";
+import { card, cardLift, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
-import { dateLocale } from "@/i18n/format";
 import { learnText } from "@/i18n/messages/learn";
 import { notesText } from "@/i18n/messages/notes";
 import { resolveText, type Text } from "@/i18n/text";
@@ -44,8 +44,7 @@ function cheatSheetPage(topic: TopicRef, level: Level, blocks: SummaryBlock[], l
 
 /** "Deine Notizen zu diesem Thema" on a topic page: notes linked to the topic, a new one, the cheat sheet as a note. */
 export function TopicNotes({ topic, level, summary }: { topic: TopicRef; level: Level; summary: SummaryBlock[] }) {
-  const all = useMessages(notesText);
-  const t = all.topic;
+  const t = useMessages(notesText).topic;
   const locale = useLocale();
   const router = useRouter();
   const now = useNow();
@@ -70,43 +69,35 @@ export function TopicNotes({ topic, level, summary }: { topic: TopicRef; level: 
 
   return (
     <section className="mt-8 print:hidden" aria-labelledby="topic-notes">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h2 id="topic-notes" className="font-display text-[19px] font-semibold tracking-[-0.01em]">
+          <h2 id="topic-notes" className="font-display text-[17px] font-semibold tracking-[-0.01em] text-ink">
             {t.title}
           </h2>
-          <p className="max-w-[640px] text-[13px] text-ink-3">{notes.length ? t.text : t.empty}</p>
+          <p className="mt-0.5 max-w-[640px] text-[13px] text-ink-2">{notes.length ? t.text : t.empty}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {summary.length > 0 && <SaveCheatSheet topic={topic} level={level} summary={summary} compact />}
-          <button
-            onClick={create}
-            disabled={busy}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3 text-[13px] font-medium text-paper transition-[transform,opacity] hover:bg-ink/88 active:scale-[0.97] disabled:opacity-60"
-          >
-            <FilePlus2 className="size-4" /> {t.newNote}
-          </button>
+          {/* (Secondary: the topic page's one violet button is "Lektion starten".) */}
+          <Button variant="secondary" size="md" onClick={create} loading={busy} className="[@media(hover:none)]:h-9">
+            <FilePlus2 className="size-4" aria-hidden /> {t.newNote}
+          </Button>
         </div>
       </div>
       {notes.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {notes.slice(0, 9).map((p, i) => (
-            <motion.div key={p.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }}>
-              <Link
-                href={`/p/${p.id}`}
-                className="flex min-w-0 items-center gap-2.5 rounded-xl border border-line bg-raised px-3 py-2.5 shadow-card transition-colors hover:border-line-2"
-              >
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface">
-                  <PageIcon page={p} />
+          {notes.slice(0, 9).map((p) => (
+            <Link key={p.id} href={`/p/${p.id}`} className={cn(card, cardLift, "flex min-w-0 items-center gap-2.5 px-3 py-2.5")}>
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface">
+                <PageIcon page={p} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-medium text-ink">{pageTitle(p.title, p.kind, locale)}</span>
+                <span className={cn("block truncate text-[12px]", midTone)} suppressHydrationWarning>
+                  {editedLabel(p.updated_at, now, locale)}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-medium text-ink">{pageTitle(p.title, p.kind, locale)}</span>
-                  <span className="block truncate text-[12px] text-ink-3" suppressHydrationWarning>
-                    {!now ? " " : now - Date.parse(p.updated_at) < 60_000 ? all.editedJustNow : all.edited(formatDistanceStrict(new Date(p.updated_at), now, { addSuffix: true, locale: dateLocale(locale) }))}
-                  </span>
-                </span>
-              </Link>
-            </motion.div>
+              </span>
+            </Link>
           ))}
         </div>
       )}
@@ -170,24 +161,30 @@ export function LessonCheatSheet({ topic, level, summary }: { topic: TopicRef; l
 
 function SaveButton({ saved, busy, onSave, compact, big }: { saved: string | null; busy: boolean; onSave: () => void; compact?: boolean; big?: boolean }) {
   const t = useMessages(notesText).topic;
-  const size = big ? "h-11 rounded-xl px-5 text-[14.5px] font-semibold" : "h-9 rounded-lg px-3 text-[13px] font-medium";
+  // Big at the end of a lesson; beside "Neue Notiz zu diesem Thema" on a topic page, a secondary button of the same size.
+  const size = big ? "h-11 rounded-xl px-5 text-[14.5px] font-semibold" : "h-8.5 rounded-lg px-3.5 text-[13.5px] font-medium [@media(hover:none)]:h-9";
   if (saved) {
     return (
       <Link href={`/p/${saved}`} className={cn("flex items-center justify-center gap-1.5 bg-ok/12 text-ok transition-colors hover:bg-ok/20", size)}>
-        <Check className="size-4" strokeWidth={2.6} /> {t.saved} · {t.open} <ArrowUpRight className="size-3.5" />
+        <Check className="size-4" strokeWidth={2.6} aria-hidden /> {t.saved} · {t.open} <ArrowUpRight className="size-3.5" aria-hidden />
       </Link>
     );
   }
   return (
     <button
+      type="button"
       onClick={onSave}
       disabled={busy}
-      className={cn(
-        "flex items-center justify-center gap-1.5 border border-line bg-raised text-ink shadow-card transition-[transform,border-color,opacity] hover:border-line-2 active:scale-[0.97] disabled:opacity-60",
-        size,
-      )}
+      className={
+        big
+          ? cn(
+              "flex items-center justify-center gap-1.5 border border-line bg-raised text-ink shadow-card transition-[transform,border-color,opacity] hover:border-line-2 active:scale-[0.97] disabled:opacity-60",
+              size,
+            )
+          : buttonClass("secondary", "md", "[@media(hover:none)]:h-9")
+      }
     >
-      {compact ? <ScrollText className="size-4" /> : <NotebookPen className="size-4" />} {busy ? t.saving : t.saveCheat}
+      {compact ? <ScrollText className="size-4" aria-hidden /> : <NotebookPen className="size-4" aria-hidden />} {busy ? t.saving : t.saveCheat}
     </button>
   );
 }

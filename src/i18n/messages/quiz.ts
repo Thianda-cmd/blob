@@ -10,7 +10,7 @@ const ordinalEn = (n: number) => {
 /** Live quizzes: the library (/quiz), the editor, the big screen (/live), the phones (/play) and reports. */
 export const quizText = defineMessages({
   en: {
-    nav: "Quiz",
+    nav: "Live quiz",
     title: "Live quiz",
     metaPlay: "Join a quiz · Blob",
     metaHost: (title: string) => `${title} · Live`,
@@ -29,8 +29,9 @@ export const quizText = defineMessages({
     points: { standard: "Standard", double: "Double points", none: "No points" },
     pointsShort: { standard: "Standard", double: "Double", none: "None" },
     seconds: (n: number) => (n >= 60 && n % 60 === 0 ? `${n / 60} min` : `${n} s`),
-    questions: (n: number) => `${n} ${plural(n, "question", "questions")}`,
-    players: (n: number) => `${n} ${plural(n, "player", "players")}`,
+    // A non-breaking space: a line never breaks between the number and its noun.
+    questions: (n: number) => `${n}\u00a0${plural(n, "question", "questions")}`,
+    players: (n: number) => `${n}\u00a0${plural(n, "player", "players")}`,
     plays: (n: number) => `Played ${n} ${plural(n, "time", "times")}`,
 
     home: {
@@ -38,14 +39,15 @@ export const quizText = defineMessages({
       intro: "Make a quiz, put it on the big screen and let the class play along on their phones. No account needed to join.",
       create: "New quiz",
       join: "Join a game",
+      count: (n: number) => (n === 1 ? "1 quiz" : `${n} quizzes`),
       empty: "No quizzes yet",
-      emptyHint: "Start with a blank quiz or one of the examples. Blob helps along the way.",
       example: "Try an example",
       search: "Search quizzes",
       host: "Host live",
       edit: "Edit",
       duplicate: "Duplicate",
       delete: "Delete",
+      options: (title: string) => `Options for “${title}”`,
       deleteConfirm: (title: string) => `Delete “${title}”? Its results go too.`,
       deleted: "Quiz deleted",
       updated: (when: string) => `Edited ${when}`,
@@ -73,7 +75,7 @@ export const quizText = defineMessages({
 
     editor: {
       back: "Quizzes",
-      titlePlaceholder: "Name your quiz",
+      titlePlaceholder: "Quiz name",
       descriptionPlaceholder: "What is it about? (optional)",
       saved: "Saved",
       saving: "Saving…",
@@ -115,6 +117,7 @@ export const quizText = defineMessages({
       ready: "Ready to play",
       host: "Host live",
       settings: "Game options",
+      close: "Close",
       settingsHint: "These are the defaults; you can change them before every game.",
       empty: "This quiz has no questions yet.",
       results: "Results",
@@ -271,7 +274,7 @@ export const quizText = defineMessages({
     errors: { empty: "Add at least one finished question first.", failed: "That didn't work. Try again." },
   },
   de: {
-    nav: "Quiz",
+    nav: "Live-Quiz",
     title: "Live-Quiz",
     metaPlay: "Quiz beitreten · Blob",
     metaHost: (title) => `${title} · Live`,
@@ -290,8 +293,8 @@ export const quizText = defineMessages({
     points: { standard: "Normal", double: "Doppelte Punkte", none: "Ohne Punkte" },
     pointsShort: { standard: "Normal", double: "Doppelt", none: "Keine" },
     seconds: (n) => (n >= 60 && n % 60 === 0 ? `${n / 60} Min.` : `${n} s`),
-    questions: (n) => `${n} ${plural(n, "Frage", "Fragen")}`,
-    players: (n) => `${n} ${plural(n, "Spieler:in", "Spieler:innen")}`,
+    questions: (n) => `${n}\u00a0${plural(n, "Frage", "Fragen")}`,
+    players: (n) => `${n}\u00a0${plural(n, "Spieler:in", "Spieler:innen")}`,
     plays: (n) => `${n}-mal gespielt`,
 
     home: {
@@ -299,14 +302,15 @@ export const quizText = defineMessages({
       intro: "Bau ein Quiz, zeig es auf dem großen Bildschirm und lass die Klasse mit dem Handy mitspielen. Zum Mitmachen braucht niemand ein Konto.",
       create: "Neues Quiz",
       join: "Einem Spiel beitreten",
+      count: (n) => (n === 1 ? "1 Quiz" : `${n} Quizze`),
       empty: "Noch keine Quizze",
-      emptyHint: "Fang mit einem leeren Quiz an oder probier ein Beispiel. Blob hilft dir dabei.",
       example: "Beispiel ausprobieren",
       search: "Quizze durchsuchen",
       host: "Live spielen",
       edit: "Bearbeiten",
       duplicate: "Duplizieren",
       delete: "Löschen",
+      options: (title) => `Optionen für „${title}“`,
       deleteConfirm: (title) => `„${title}“ löschen? Die Ergebnisse gehen mit.`,
       deleted: "Quiz gelöscht",
       updated: (when) => `Bearbeitet ${when}`,
@@ -334,7 +338,7 @@ export const quizText = defineMessages({
 
     editor: {
       back: "Quizze",
-      titlePlaceholder: "Gib deinem Quiz einen Namen",
+      titlePlaceholder: "Name des Quiz",
       descriptionPlaceholder: "Worum geht es? (optional)",
       saved: "Gespeichert",
       saving: "Speichert…",
@@ -376,6 +380,7 @@ export const quizText = defineMessages({
       ready: "Bereit zum Spielen",
       host: "Live spielen",
       settings: "Spieloptionen",
+      close: "Schließen",
       settingsHint: "Das sind die Voreinstellungen; vor jedem Spiel kannst du sie ändern.",
       empty: "Dieses Quiz hat noch keine Fragen.",
       results: "Ergebnisse",

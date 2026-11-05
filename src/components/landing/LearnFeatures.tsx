@@ -24,23 +24,19 @@ export function LearnStages({ className }: { className?: string }) {
   return (
     <ol className={cn("flex flex-col justify-between", className)}>
       {t.stages.map((stage, i) => (
-        <motion.li
+        <li
           key={stage.kicker}
-          initial={{ opacity: 0, x: 12 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true, amount: 0.5 }}
-          transition={{ duration: 0.5, delay: i * 0.06, ease }}
-          className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-4 border-t border-line py-3.5 first:border-t-0 first:pt-0 last:pb-0 lg:py-3"
+          className="reveal grid grid-cols-[72px_minmax(0,1fr)] items-center gap-4 border-t border-line py-3.5 first:border-t-0 first:pt-0 last:pb-0 lg:py-3"
         >
           <div aria-hidden className="grid h-[58px] w-[72px] place-items-center overflow-hidden rounded-xl border border-line bg-raised shadow-card">
             {visuals[i]}
           </div>
           <div className="min-w-0">
-            <p className="text-[11.5px] font-medium uppercase tracking-wider text-blob-ink">{stage.kicker}</p>
+            <p className="text-[12.5px] font-medium text-blob-ink">{stage.kicker}</p>
             <h3 className="mt-0.5 text-[15px] font-semibold leading-snug tracking-[-0.01em]">{stage.title}</h3>
             <p className="mt-0.5 text-[13.5px] leading-snug text-ink-2">{stage.body}</p>
           </div>
-        </motion.li>
+        </li>
       ))}
     </ol>
   );
@@ -155,24 +151,8 @@ function Streak() {
   );
 }
 
-/** Rows of tiles shown before "Show all", per breakpoint: 3 rows at 2, 3 and 6 columns. */
-const CAP = { phone: 6, tablet: 9, desktop: 12 };
-
-/** Hides tiles past the cap of each breakpoint until the list is opened. */
-function capClass(i: number) {
-  if (i >= CAP.desktop) return "hidden";
-  if (i >= CAP.tablet) return "max-lg:hidden";
-  if (i >= CAP.phone) return "max-sm:hidden";
-  return undefined;
-}
-
-/** Where "Show all" is needed: wherever the subject has more topics than that breakpoint shows. */
-function toggleClass(n: number) {
-  if (n > CAP.desktop) return "flex";
-  if (n > CAP.tablet) return "flex lg:hidden";
-  if (n > CAP.phone) return "flex sm:hidden";
-  return "hidden";
-}
+/** Tiles shown before "Show all": one row of six on desktops, two rows of three on tablets, three of two on phones. */
+const CAP = 6;
 
 /** Each subject's topics as compact tiles with their glyphs and levels; subjects come from the catalog. */
 export function TopicGrid() {
@@ -213,7 +193,7 @@ export function TopicGrid() {
                   subject === s.slug ? "text-white" : "text-ink-2 hover:text-ink",
                 )}
               >
-                {subject === s.slug && <motion.span layoutId={`${scope}-subject`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+                {subject === s.slug && <motion.span layoutId={`${scope}-subject`} className="absolute inset-0 rounded-lg bg-blob dark:bg-blob-deep" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
                 <span className="relative">{resolveText(s.title, locale)}</span>
                 <span className={cn("relative text-[12px] tabular-nums", subject === s.slug ? "text-white/75" : "text-ink-3")}>{subjectCatalog(s.slug).length}</span>
               </button>
@@ -232,8 +212,8 @@ export function TopicGrid() {
               whileInView={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
               viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.45, delay: (i % 6) * 0.04 + Math.floor((i % CAP.desktop) / 6) * 0.08, ease }}
-              className={open ? undefined : capClass(i)}
+              transition={{ duration: 0.45, delay: (i % CAP) * 0.04, ease }}
+              className={open || i < CAP ? undefined : "hidden"}
             >
               <TopicTile topic={topic} />
             </motion.li>
@@ -246,7 +226,7 @@ export function TopicGrid() {
         aria-expanded={open}
         className={cn(
           "mx-auto mt-4 h-9 items-center gap-1.5 rounded-lg border border-line bg-raised px-3.5 text-[13.5px] font-medium text-ink-2 shadow-card transition-colors hover:text-ink",
-          toggleClass(catalog.length),
+          catalog.length > CAP ? "flex" : "hidden",
         )}
       >
         {open ? t.less : t.more(catalog.length)}
@@ -296,7 +276,7 @@ function PicturesLink() {
         <Share2 className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11.5px] font-medium uppercase tracking-wider text-blob-ink">{t.kicker}</span>
+        <span className="block text-[12.5px] font-medium text-blob-ink">{t.kicker}</span>
         <span className="mt-0.5 block text-[15px] font-semibold leading-snug tracking-[-0.01em]">{t.title}</span>
         <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{t.body}</span>
       </span>

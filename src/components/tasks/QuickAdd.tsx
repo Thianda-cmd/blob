@@ -59,6 +59,7 @@ export function QuickAdd({
   autoFocus,
   size = "md",
   placeholder,
+  shortcut,
   className,
   ref,
 }: {
@@ -71,6 +72,8 @@ export function QuickAdd({
   autoFocus?: boolean;
   size?: "md" | "sm";
   placeholder?: string;
+  /** The key that puts the cursor here from anywhere on the page ("N" on /tasks): a key cap in the empty box, for keyboards. */
+  shortcut?: string;
   className?: string;
   ref?: Ref<QuickAddHandle>;
 }) {
@@ -216,7 +219,7 @@ export function QuickAdd({
             "relative grid shrink-0 place-items-center rounded-full transition-colors",
             "[@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-2 [@media(hover:none)]:after:content-['']",
             sm ? "size-[18px]" : "size-5",
-            title ? "bg-blob text-white" : "border-[1.5px] border-dashed border-line-2 text-ink-3",
+            title ? "bg-blob text-white dark:bg-blob-deep" : "border-[1.5px] border-dashed border-line-2 text-ink-3",
           )}
           aria-label={t.addTask}
         >
@@ -292,7 +295,7 @@ export function QuickAdd({
             placeholder={placeholder ?? (sm ? t.placeholderShort : t.placeholder)}
             maxLength={240}
             className={cn(
-              "relative h-9 w-full bg-transparent text-ink caret-blob outline-none placeholder:text-ink-3/90",
+              "relative h-9 w-full bg-transparent text-ink caret-blob outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
               sm ? "text-[13.5px]" : "text-[14.5px]",
             )}
             aria-label={t.newTask}
@@ -316,7 +319,7 @@ export function QuickAdd({
               exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.1 } }}
               transition={{ type: "spring", stiffness: 600, damping: 30 }}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg bg-blob font-medium text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep active:scale-95",
+                "flex shrink-0 items-center gap-1.5 rounded-lg bg-blob font-medium text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep active:scale-95 dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]",
                 sm ? "h-7 px-2 text-[12px]" : "h-8 px-2.5 text-[12.5px]",
               )}
             >
@@ -326,9 +329,12 @@ export function QuickAdd({
           )}
         </AnimatePresence>
         {!title && !sm && focused && (
-          <span className="hidden shrink-0 items-center gap-1 text-[11.5px] text-ink-3 sm:flex">
+          <span className="hidden shrink-0 items-center gap-1 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] sm:flex">
             <Kbd>#</Kbd> {t.hashSubject}
           </span>
+        )}
+        {shortcut && !text && !expanded && (
+          <Kbd className="mr-0.5 shrink-0 max-sm:hidden [@media(hover:none)]:hidden">{shortcut}</Kbd>
         )}
       </div>
 
@@ -399,7 +405,7 @@ export function QuickAdd({
                 />
               )}
               {!text && !sm && (
-                <span className="ml-auto hidden truncate text-[11.5px] text-ink-3 md:block">
+                <span className="ml-auto hidden truncate text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] md:block">
                   {t.tryBefore}{" "}
                   {t.quickExamples.slice(0, 2).map((ex, i) => (
                     <span key={ex}>
@@ -437,7 +443,7 @@ export function QuickAdd({
             id={listId}
             aria-label={t.subjectsLabel}
           >
-            <div className="px-2 pb-1 pt-1 text-[11px] font-medium text-ink-3">{t.subject}</div>
+            <div className="px-2 pb-1 pt-1 text-[11.5px] font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.subject}</div>
             {suggestions.map((s, i) => (
               <button
                 key={s.id}
@@ -475,7 +481,7 @@ function Chip({
         "inline-flex h-6 max-w-[180px] items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-colors [&_svg]:size-3.5 [&_svg]:shrink-0",
         source === "parsed" && "border-transparent bg-blob-soft text-blob-ink",
         (source === "manual" || source === "preset") && "border-line bg-surface text-ink-2 hover:border-line-2 hover:text-ink",
-        source === "none" && "border-dashed border-line-2 font-normal text-ink-3 hover:border-ink-3 hover:text-ink-2",
+        source === "none" && "border-dashed border-line-2 font-normal text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:border-ink-3 hover:text-ink-2",
         "aria-expanded:border-blob/60",
       )}
     >

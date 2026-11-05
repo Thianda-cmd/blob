@@ -169,7 +169,7 @@ function GroupHeader({
   return (
     <div className={cn("flex h-8 items-end gap-2 pb-1.5 pl-2 pr-2", !first && "mt-4")}>
       {isDone ? (
-        <button onClick={onToggleDone} className="-ml-1 flex items-center gap-1 rounded-md px-1 text-[12.5px] font-semibold text-ink-3 hover:text-ink" aria-expanded={doneOpen}>
+        <button onClick={onToggleDone} className="-ml-1 flex items-center gap-1 rounded-md px-1 text-[12.5px] font-semibold text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:text-ink" aria-expanded={doneOpen}>
           <ChevronDown className={cn("size-3.5 transition-transform duration-200", !doneOpen && "-rotate-90")} />
           {label}
         </button>
@@ -178,16 +178,16 @@ function GroupHeader({
           {label}
         </span>
       )}
-      <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium tabular-nums leading-[18px] text-ink-3">{group.tasks.length}</span>
-      {sub && <span className="text-[12px] text-ink-3">{sub}</span>}
+      <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium tabular-nums leading-[18px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{group.tasks.length}</span>
+      {sub && <span className="text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{sub}</span>}
       <span className="ml-auto" />
       {group.key === "overdue" && (
-        <button onClick={onMoveToToday} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
+        <button onClick={onMoveToToday} className="rounded-md px-1.5 py-0.5 text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
           {t.moveToToday}
         </button>
       )}
       {isDone && doneOpen && hidden > 0 && (
-        <button onClick={onShowAll} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
+        <button onClick={onShowAll} className="rounded-md px-1.5 py-0.5 text-[12px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink [@media(hover:none)]:py-1.5">
           {t.showMore(hidden)}
         </button>
       )}
@@ -235,7 +235,7 @@ export function UndoToast({ store }: { store: TaskStore }) {
           {/* The title shrinks, "Deleted" / "gelöscht" stays readable. */}
           <span className="flex min-w-0 max-w-[260px] items-baseline gap-1">
             {t.deletedBefore && <span className="shrink-0">{t.deletedBefore}</span>}
-            <span className="min-w-0 truncate text-ink-3">{t.quote(removed.title)}</span>
+            <span className="min-w-0 truncate text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.quote(removed.title)}</span>
             {t.deletedAfter && <span className="shrink-0">{t.deletedAfter}</span>}
           </span>
           <button onClick={undoRemove} className="ml-2 flex h-7 items-center gap-1.5 rounded-lg px-2 font-medium text-blob-ink hover:bg-blob-soft">

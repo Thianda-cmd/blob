@@ -4,8 +4,7 @@ import { defineMessages } from "../define";
 export const atlasText = defineMessages({
   en: {
     atlas: "Atlas",
-    eyebrow: "Learn by looking",
-    intro: "Interactive models. Tap any structure to see what it is called, what it does and what the exam wants to know.",
+    tagline: "Tap a structure to see what it does.",
     structures: (n: number) => (n === 1 ? "1 structure" : `${n} structures`),
     steps: (n: number) => (n === 1 ? "1 step" : `${n} steps`),
     milestones: (n: number) => (n === 1 ? "1 milestone" : `${n} milestones`),
@@ -98,8 +97,7 @@ export const atlasText = defineMessages({
   },
   de: {
     atlas: "Atlas",
-    eyebrow: "Lernen mit Modellen",
-    intro: "Interaktive Modelle. Tippe auf jede Struktur und sieh, wie sie heißt, was sie tut und was in der Prüfung drankommt.",
+    tagline: "Tippe eine Struktur an und sieh, was sie tut.",
     structures: (n) => (n === 1 ? "1 Struktur" : `${n} Strukturen`),
     steps: (n) => (n === 1 ? "1 Schritt" : `${n} Schritte`),
     milestones: (n) => (n === 1 ? "1 Meilenstein" : `${n} Meilensteine`),

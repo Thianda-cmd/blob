@@ -16,12 +16,13 @@ import { studyHref, topicHref } from "@/learn/catalog";
 import { showItems } from "@/learn/showcase";
 import { useTopic } from "@/learn/topics";
 import { LEVELS, type Feedback, type LessonStep, type Level } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { earnedXp, ExerciseCard, type ExerciseEvent } from "./ExerciseCard";
 import { MathView } from "./MathView";
 import { Inline, Rich } from "./Rich";
 import { ShareVisual } from "./ShareVisual";
-import { SessionEnd, StudyButton, StudyTopBar } from "./StudyChrome";
+import { SessionEnd, StudyButton, studyLabel, StudyTopBar } from "./StudyChrome";
 import { topicNames } from "./topicNames";
 import { Tutor } from "./Tutor";
 
@@ -178,7 +179,7 @@ export function LessonPlayer({
             <Dumbbell className="size-4" /> {t.lesson.practiceNow}
           </StudyButton>
           {nextLevel && (
-            <StudyButton href={studyHref(topic, "lesson", nextLevel)} variant="ink">
+            <StudyButton href={studyHref(topic, "lesson", nextLevel)} variant="secondary">
               <BookOpen className="size-4" /> {t.lesson.nextLevel(t.level(nextLevel))}
             </StudyButton>
           )}
@@ -204,9 +205,9 @@ export function LessonPlayer({
         </aside>
 
         <main className="min-w-0">
-          <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
+          <div className={cn("mb-3 flex items-center gap-2", studyLabel)}>
             <span>{t.lesson.stepOf(index + 1, steps.length)}</span>
-            <span className="text-line-2">·</span>
+            <span aria-hidden>·</span>
             <span className="text-blob-ink">{step.type === "check" ? t.lesson.kindCheck : step.type === "widget" ? t.lesson.kindWidget : t.lesson.kindExplain}</span>
           </div>
           <AnimatePresence mode="wait" custom={dir} initial={false}>
@@ -291,7 +292,7 @@ export function LessonPlayer({
                   )}
 
                   <div className="flex items-center gap-2 pt-1">
-                    <StudyButton onClick={next} variant={frames.length && frame < frames.length - 1 ? "ink" : "blob"}>
+                    <StudyButton onClick={next} variant="blob">
                       {frames.length && frame < frames.length - 1 ? t.lesson.next : index === steps.length - 1 ? t.lesson.finish : t.lesson.continue}
                       <ArrowRight className="size-4" />
                     </StudyButton>
@@ -301,7 +302,7 @@ export function LessonPlayer({
                       </StudyButton>
                     )}
                     {/* Keyboard hints only where there is a mouse (and so most likely a keyboard). */}
-                    <span className="ml-auto hidden text-[12px] text-ink-3 pointer-fine:sm:block">{t.lesson.keys}</span>
+                    <span className={cn("ml-auto hidden text-[12px] pointer-fine:sm:block", midTone)}>{t.lesson.keys}</span>
                   </div>
                 </>
               )}

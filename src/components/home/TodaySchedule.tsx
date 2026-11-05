@@ -8,6 +8,7 @@ import { buildItems } from "@/calendar/items";
 import { ymd } from "@/calendar/time";
 import { fmtRange } from "@/components/calendar/describe";
 import { ItemIcon } from "@/components/calendar/ItemViews";
+import { card, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { projectLinksText } from "@/i18n/messages/projectLinks";
@@ -53,18 +54,18 @@ export function TodaySchedule({ events, now, title }: { events: CalEvent[]; now:
     <div className="mb-7">
       {title(
         next ? t.tomorrow : t.today,
-        <Link href={link} className="flex items-center gap-1 text-[12.5px] font-medium text-ink-3 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2">
-          {t.calendar} <ArrowRight className="size-3" />
+        <Link href={link} className="flex items-center gap-1 font-medium text-ink-2 hover:text-ink [@media(hover:none)]:-my-2 [@media(hover:none)]:py-2">
+          {t.calendar} <ArrowRight className="size-3" aria-hidden />
         </Link>,
       )}
-      <ul className="overflow-hidden rounded-xl border border-line bg-raised shadow-card">
+      <ul className={cn(card, "overflow-hidden")}>
         {shown.map((item) => {
           const past = !item.allDay && item.end.getTime() <= now;
           const current = !item.allDay && item.start.getTime() <= now && item.end.getTime() > now;
           return (
             <li key={item.key} className="border-b border-line last:border-b-0">
               <Link href={`${link}&event=${item.occurrence?.series.id ?? item.id}`} className={cn("flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-hover/60", past && "opacity-55")}>
-                <span className="w-[86px] shrink-0 text-[12px] tabular-nums text-ink-3">
+                <span className={cn("w-[86px] shrink-0 text-[12px] tabular-nums", midTone)}>
                   {item.allDay ? t.allDay : fmtRange(item.start, item.end, locale)}
                 </span>
                 <span className="h-8 w-[3px] shrink-0 rounded-full" style={{ background: item.color }} aria-hidden />
@@ -74,8 +75,8 @@ export function TodaySchedule({ events, now, title }: { events: CalEvent[]; now:
                     <span className="truncate">{item.title}</span>
                   </span>
                   {item.event?.location && (
-                    <span className="mt-0.5 flex items-center gap-1 text-[12px] text-ink-3">
-                      <MapPin className="size-3 shrink-0" />
+                    <span className={cn("mt-0.5 flex items-center gap-1 text-[12px]", midTone)}>
+                      <MapPin className="size-3 shrink-0" aria-hidden />
                       <span className="truncate">{item.event.location}</span>
                     </span>
                   )}
@@ -87,7 +88,7 @@ export function TodaySchedule({ events, now, title }: { events: CalEvent[]; now:
         })}
       </ul>
       {more > 0 && (
-        <Link href={link} className="mt-1.5 block px-1 text-[12px] font-medium text-ink-3 hover:text-ink">
+        <Link href={link} className="mt-1.5 block px-1 text-[12px] font-medium text-ink-2 hover:text-ink">
           {t.more(more)}
         </Link>
       )}

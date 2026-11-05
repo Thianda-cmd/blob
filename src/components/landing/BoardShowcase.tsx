@@ -1,12 +1,11 @@
 "use client";
 
-import { CalendarDays, Check, CheckSquare, Link2, ListTodo, Paperclip, PenLine, Rows3, SquareKanban, UserPlus, Users } from "lucide-react";
-import { AnimatePresence, LayoutGroup, motion, useInView } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { CalendarDays, Check, CheckSquare, Paperclip, Rows3, SquareKanban, UserPlus } from "lucide-react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { cn } from "@/lib/utils";
-import { PointList } from "./Points";
+import { DemoControl, useDemoPlayer } from "./DemoPlayer";
 import { useReducedAfterMount } from "./useTyping";
 
 type Who = "me" | "lena" | "jonas";
@@ -47,109 +46,105 @@ const FRAMES: Frame[] = [
   { cols: MOVED, who: JONAS, lift: "sources", ticked: 3, ms: 550 },
   { cols: DONE, who: JONAS, lift: "sources", ticked: 3, ms: 950 },
   { cols: DONE, who: JONAS, ticked: 3, ms: 900 },
-  { cols: DONE, ticked: 3, ms: 2800 },
+  { cols: DONE, ticked: 3, ms: 0 }, // all moved: where it stays
 ];
+const DURATIONS = FRAMES.map((f) => f.ms);
 /** With reduced motion the board holds still on Lena looking at her card. */
 const STILL = 1;
 
 const spring = { type: "spring", stiffness: 260, damping: 30 } as const;
 
-/** A project board where two classmates move cards while you watch; the round starts over with a fade. */
+/** A project board where two classmates move cards while you watch, once; playing it again starts over with a fade. */
 export function BoardShowcase({ className }: { className?: string }) {
-  const t = useMessages(landingText).together.board;
-  const ref = useRef<HTMLDivElement>(null);
-  const visible = useInView(ref, { amount: 0.35 });
+  const all = useMessages(landingText);
+  const t = all.together.board;
   const reduce = useReducedAfterMount();
-  const [state, setState] = useState({ round: 0, i: 0 });
-  const frame = FRAMES[reduce ? STILL : state.i];
+  const { ref, i, round, player } = useDemoPlayer(DURATIONS, { still: reduce });
+  const frame = FRAMES[reduce ? STILL : i];
   const done = frame.cols[2].length;
   const total = frame.cols.flat().length;
 
-  useEffect(() => {
-    if (!visible || reduce) return;
-    const timer = setTimeout(
-      () => setState((s) => (s.i + 1 < FRAMES.length ? { round: s.round, i: s.i + 1 } : { round: s.round + 1, i: 0 })),
-      FRAMES[state.i].ms,
-    );
-    return () => clearTimeout(timer);
-  }, [visible, reduce, state.i]);
-
   return (
-    <div ref={ref} role="img" aria-label={t.label} className={cn("overflow-hidden rounded-2xl border border-line bg-surface shadow-card", className)}>
-      <div className="flex h-12 items-center gap-2.5 border-b border-line bg-raised px-3 sm:px-4">
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-line bg-surface text-[15px]">🎤</span>
-        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em]">{t.project}</span>
-        <span className="flex shrink-0 items-center">
-          <Face who="me" name={t.people.me} size={22} />
-          <Face who="lena" name={t.people.lena} size={22} here className="-ml-1" />
-          <Face who="jonas" name={t.people.jonas} size={22} here className="-ml-1" />
-        </span>
-        <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[12.5px] font-medium text-ink-2 shadow-card">
-          <UserPlus className="size-3.5" />
-          <span className="max-sm:hidden">{t.share}</span>
-        </span>
-      </div>
-      <div className="flex items-center gap-3 px-3 pt-3 sm:px-4">
-        <span className="flex rounded-lg bg-hover/70 p-0.5 text-[12px]">
-          <span className="flex h-6 items-center gap-1 rounded-md bg-raised px-2 font-medium text-ink shadow-card">
-            <SquareKanban className="size-3" />
-            {t.views.board}
+    <div className={className}>
+      <div ref={ref} role="img" aria-label={t.label} className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        <div className="flex h-12 items-center gap-2.5 border-b border-line bg-raised px-3 sm:px-4">
+          <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-line bg-surface text-[15px]">🎤</span>
+          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em]">{t.project}</span>
+          <span className="flex shrink-0 items-center">
+            <Face who="me" name={t.people.me} size={22} />
+            <Face who="lena" name={t.people.lena} size={22} here className="-ml-1" />
+            <Face who="jonas" name={t.people.jonas} size={22} here className="-ml-1" />
           </span>
-          <span className="flex h-6 items-center gap-1 px-2 text-ink-3">
-            <Rows3 className="size-3" />
-            {t.views.list}
+          <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[12.5px] font-medium text-ink-2 shadow-card">
+            <UserPlus className="size-3.5" />
+            <span className="max-sm:hidden">{t.share}</span>
           </span>
-        </span>
-        <span className="ml-auto flex min-w-0 items-center gap-2 text-[12px] text-ink-3">
-          <span className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-line sm:w-16">
-            <motion.span className="block h-full rounded-full bg-ink-2" initial={false} animate={{ width: `${(done / total) * 100}%` }} transition={{ duration: 0.5 }} />
+        </div>
+        <div className="flex items-center gap-3 px-3 pt-3 sm:px-4">
+          <span className="flex rounded-lg bg-hover/70 p-0.5 text-[12px]">
+            <span className="flex h-6 items-center gap-1 rounded-md bg-raised px-2 font-medium text-ink shadow-card">
+              <SquareKanban className="size-3" />
+              {t.views.board}
+            </span>
+            <span className="flex h-6 items-center gap-1 px-2 text-ink-3">
+              <Rows3 className="size-3" />
+              {t.views.list}
+            </span>
           </span>
-          <span className="truncate tabular-nums">{t.progress(done, total)}</span>
-        </span>
-      </div>
-      {/* A fixed height, so the page never moves while cards travel. */}
-      <div className="h-[300px] p-3 sm:h-[312px] sm:p-4">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={state.round}
-            className="grid h-full grid-cols-3 gap-2 sm:gap-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.4 } }}
-            exit={{ opacity: 0, transition: { duration: 0.3 } }}
-          >
-            <LayoutGroup id={`landing-board-${state.round}`}>
-              {COLUMNS.map((col, c) => (
-                <div key={col} className="@container flex min-w-0 flex-col rounded-xl bg-hover/45 p-1.5 dark:bg-hover/35">
-                  {/* Narrow columns (phones) tighten the header so "In Arbeit" still fits. */}
-                  <div className="flex h-8 shrink-0 items-center gap-1 px-1 text-[12px] @min-[150px]:gap-1.5 @min-[150px]:px-1.5 @min-[150px]:text-[12.5px]">
-                    {col === "done" ? (
-                      <span className="grid size-3 shrink-0 place-items-center rounded-full bg-ink text-paper @min-[150px]:size-3.5">
-                        <Check className="size-2 @min-[150px]:size-2.5" strokeWidth={3.5} />
-                      </span>
-                    ) : (
-                      <span className="size-3 shrink-0 rounded-full border-[1.5px] border-ink @min-[150px]:size-3.5" />
-                    )}
-                    <span className="min-w-0 truncate font-semibold">{t.columns[col]}</span>
-                    <span className="tabular-nums text-ink-3">{frame.cols[c].length}</span>
+          <span className="ml-auto flex min-w-0 items-center gap-2 text-[12px] text-ink-3">
+            <span className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-line sm:w-16">
+              <motion.span className="block h-full rounded-full bg-ink-2" initial={false} animate={{ width: `${(done / total) * 100}%` }} transition={{ duration: 0.5 }} />
+            </span>
+            <span className="truncate tabular-nums">{t.progress(done, total)}</span>
+          </span>
+        </div>
+        {/* A fixed height, so the page never moves while cards travel. */}
+        <div className="h-[300px] p-3 sm:h-[312px] sm:p-4">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={round}
+              className="grid h-full grid-cols-3 gap-2 sm:gap-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.4 } }}
+              exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            >
+              <LayoutGroup id={`landing-board-${round}`}>
+                {COLUMNS.map((col, c) => (
+                  <div key={col} className="@container flex min-w-0 flex-col rounded-xl bg-hover/45 p-1.5 dark:bg-hover/35">
+                    {/* Narrow columns (phones) tighten the header so "In Arbeit" still fits. */}
+                    <div className="flex h-8 shrink-0 items-center gap-1 px-1 text-[12px] @min-[150px]:gap-1.5 @min-[150px]:px-1.5 @min-[150px]:text-[12.5px]">
+                      {col === "done" ? (
+                        <span className="grid size-3 shrink-0 place-items-center rounded-full bg-ink text-paper @min-[150px]:size-3.5">
+                          <Check className="size-2 @min-[150px]:size-2.5" strokeWidth={3.5} />
+                        </span>
+                      ) : (
+                        <span className="size-3 shrink-0 rounded-full border-[1.5px] border-ink @min-[150px]:size-3.5" />
+                      )}
+                      <span className="min-w-0 truncate font-semibold">{t.columns[col]}</span>
+                      <span className="tabular-nums text-ink-3">{frame.cols[c].length}</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      {frame.cols[c].map((key) => (
+                        <BoardCard
+                          key={key}
+                          id={`${round}-${key}`}
+                          card={key}
+                          done={col === "done"}
+                          ticked={frame.ticked}
+                          lifted={frame.lift === key}
+                          watcher={frame.who?.card === key ? frame.who.who : undefined}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 sm:gap-2">
-                    {frame.cols[c].map((key) => (
-                      <BoardCard
-                        key={key}
-                        id={`${state.round}-${key}`}
-                        card={key}
-                        done={col === "done"}
-                        ticked={frame.ticked}
-                        lifted={frame.lift === key}
-                        watcher={frame.who?.card === key ? frame.who.who : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </LayoutGroup>
-          </motion.div>
-        </AnimatePresence>
+                ))}
+              </LayoutGroup>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <DemoControl player={player} name={all.features.tiles.together.title} />
       </div>
     </div>
   );
@@ -250,22 +245,5 @@ function Priority({ value, className }: { value: 0 | 1 | 2 | 3; className?: stri
         <rect key={i} x={2.5 + i * 4} y={10 - i * 3.5} width={3} height={3.5 + i * 3.5} rx={1} fill={i < value ? color : "currentColor"} opacity={i < value ? 1 : 0.22} />
       ))}
     </svg>
-  );
-}
-
-/** Sharing, presence, writing together, boards and your tasks, next to the board. */
-export function TogetherPoints({ className }: { className?: string }) {
-  const t = useMessages(landingText).together.points;
-  return (
-    <PointList
-      className={className}
-      points={[
-        { key: "share", Icon: Link2, ...t.share },
-        { key: "presence", Icon: Users, ...t.presence },
-        { key: "live", Icon: PenLine, ...t.live },
-        { key: "boards", Icon: SquareKanban, ...t.boards },
-        { key: "tasks", Icon: ListTodo, ...t.tasks },
-      ]}
-    />
   );
 }

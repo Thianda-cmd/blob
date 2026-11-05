@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { useLocale } from "@/i18n/client";
 import { useText } from "@/i18n/useText";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import type { TimelineView } from "../types";
 import { EventIcon } from "./EventIcon";
@@ -50,7 +51,7 @@ export function TimelineStage({
   return (
     <ol ref={list} className="relative">
       {/* The line. */}
-      <span className="pointer-events-none absolute bottom-3 left-[23px] top-3 w-0.5 rounded-full bg-gradient-to-b from-blob/15 via-blob/40 to-blob/15" aria-hidden />
+      <span className="pointer-events-none absolute bottom-3 left-[23px] top-3 w-0.5 rounded-full bg-blob/30" aria-hidden />
       {view.events.map((e, i) => {
         const c = centuries[i];
         const head = i === 0 || c !== centuries[i - 1];
@@ -60,7 +61,7 @@ export function TimelineStage({
           <Fragment key={e.id}>
             {head && (
               <li className="relative pb-2 pl-14 pt-4 first:pt-0" aria-hidden>
-                <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-3">{c}</span>
+                <span className={groupLabel}>{c}</span>
               </li>
             )}
             <li data-event={e.id} className="relative pb-2">
@@ -76,12 +77,12 @@ export function TimelineStage({
                 <span
                   className={cn(
                     "relative z-10 grid size-[34px] shrink-0 place-items-center rounded-full border-2 transition-colors",
-                    on ? "border-blob bg-blob text-white" : done ? "border-blob/50 bg-raised text-blob-ink" : "border-line-2 bg-raised text-ink-2 group-hover:border-blob/50",
+                    on ? "border-blob bg-blob text-white dark:border-blob-deep dark:bg-blob-deep" : done ? "border-blob/50 bg-raised text-blob-ink" : "border-line-2 bg-raised text-ink-2 group-hover:border-blob/50",
                   )}
                 >
                   <EventIcon kind={e.icon} className="size-4" />
                   {done && !on && (
-                    <span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-blob text-white ring-2 ring-paper">
+                    <span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-blob text-white ring-2 ring-paper dark:bg-blob-deep">
                       <Check className="size-2.5" strokeWidth={3.5} />
                     </span>
                   )}
@@ -89,7 +90,7 @@ export function TimelineStage({
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">
                     <span className={cn("shrink-0 font-display text-[15px] font-bold tabular-nums", on ? "text-blob-ink" : "text-ink")}>{e.when ? tt(e.when) : e.year}</span>
-                    <span className="truncate text-[12.5px] text-ink-3">{tt(e.who)}</span>
+                    <span className={cn("truncate text-[12.5px]", midTone)}>{tt(e.who)}</span>
                   </span>
                   <span className="block text-[14px] font-medium leading-snug text-ink-2 group-hover:text-ink">{tt(e.title)}</span>
                 </span>

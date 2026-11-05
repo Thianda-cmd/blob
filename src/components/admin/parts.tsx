@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, Globe, Power, Server } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { PageBody } from "@/components/shell/PageHeader";
+import { card, midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { formatNumber } from "@/i18n/format";
 import { adminText } from "@/i18n/messages/admin";
@@ -10,31 +12,22 @@ import type { DayCount } from "@/lib/oauth/admin-types";
 import { cn } from "@/lib/utils";
 import { axisDay, chartDay } from "./format";
 
-/** The scrolling page frame every admin screen uses (inside the app shell, under the TopBar). */
+/** The scrolling page frame every admin screen uses (inside the app shell, under the TopBar): the shared page on paper. */
 export function AdminPage({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[1080px] px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">{children}</div>
-    </div>
-  );
+  return <PageBody width="default">{children}</PageBody>;
 }
 
-export function StatTile({ label, value, sub, icon, delay = 0 }: { label: string; value: number | string; sub?: ReactNode; icon: ReactNode; delay?: number }) {
+export function StatTile({ label, value, sub, icon }: { label: string; value: number | string; sub?: ReactNode; icon: ReactNode }) {
   const locale = useLocale();
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 380, damping: 32, delay }}
-      className="h-full min-w-0 rounded-xl border border-line bg-raised p-4 shadow-card"
-    >
-      <div className="flex items-start gap-1.5 text-[12.5px] leading-tight text-ink-3 [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
+    <div className={cn(card, "h-full min-w-0 p-4")}>
+      <div className={cn("flex items-start gap-1.5 text-[12.5px] leading-tight [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-ink-3", midTone)}>
         {icon}
         <span className="min-w-0">{label}</span>
       </div>
-      <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.025em] text-ink">{typeof value === "number" ? formatNumber(value, locale) : value}</div>
-      {sub && <div className="mt-2 flex items-center gap-1 text-[12px] leading-snug text-ink-3">{sub}</div>}
-    </motion.div>
+      <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.025em] text-ink tabular-nums">{typeof value === "number" ? formatNumber(value, locale) : value}</div>
+      {sub && <div className={cn("mt-2 flex items-center gap-1 text-[12px] leading-snug", midTone)}>{sub}</div>}
+    </div>
   );
 }
 
@@ -60,13 +53,13 @@ export function SignInChart({ series, className }: { series: DayCount[]; classNa
   const hovered = hover === null ? null : series[hover];
 
   return (
-    <section className={cn("rounded-xl border border-line bg-raised p-4 shadow-card sm:p-5", className)} aria-labelledby="signin-chart-title">
+    <section className={cn(card, "p-4 sm:p-5", className)} aria-labelledby="signin-chart-title">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <h2 id="signin-chart-title" className="text-[14px] font-semibold text-ink">
             {t.title}
           </h2>
-          <p className="text-[12px] text-ink-3">{t.sub}</p>
+          <p className={cn("text-[12px]", midTone)}>{t.sub}</p>
         </div>
         <div className="text-[12.5px] text-ink-2">{t.total(total)}</div>
       </div>
@@ -104,7 +97,7 @@ export function SignInChart({ series, className }: { series: DayCount[]; classNa
                 );
               })}
             </div>
-            {max === 0 && <div className="absolute inset-x-0 top-[38%] text-center text-[12.5px] text-ink-3">{t.empty}</div>}
+            {max === 0 && <div className={cn("absolute inset-x-0 top-[38%] text-center text-[12.5px]", midTone)}>{t.empty}</div>}
             <AnimatePresence>
               {hovered && hover !== null && (
                 <motion.div
@@ -119,7 +112,7 @@ export function SignInChart({ series, className }: { series: DayCount[]; classNa
                   )}
                   style={{ left: `${((hover + 0.5) / n) * 100}%`, bottom: `${Math.max((hovered.count / top) * 100, 0)}%` }}
                 >
-                  <div className="text-[11.5px] text-ink-3">{hover === n - 1 ? t.today : chartDay(hovered.day, locale)}</div>
+                  <div className={cn("text-[11.5px]", midTone)}>{hover === n - 1 ? t.today : chartDay(hovered.day, locale)}</div>
                   <div className="text-[13px] font-semibold text-ink">{t.count(hovered.count)}</div>
                 </motion.div>
               )}
@@ -203,12 +196,12 @@ export function Avatar({ name, src, size = 36 }: { name: string; src: string | n
 /** A titled card used across the admin screens. */
 export function Panel({ title, sub, action, children, className, id }: { title?: ReactNode; sub?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={cn("overflow-hidden rounded-xl border border-line bg-raised shadow-card", className)}>
+    <section id={id} className={cn(card, "overflow-hidden", className)}>
       {(title || action) && (
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 pb-1 pt-4 sm:px-5">
           <div className="min-w-0">
             {title && <h2 className="text-[14px] font-semibold text-ink">{title}</h2>}
-            {sub && <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{sub}</p>}
+            {sub && <p className={cn("mt-0.5 text-[12.5px] leading-snug", midTone)}>{sub}</p>}
           </div>
           {action}
         </div>

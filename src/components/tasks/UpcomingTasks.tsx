@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
+import { card, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { tasksText } from "@/i18n/messages/tasks";
@@ -63,11 +64,11 @@ export function UpcomingTasks({
   }
 
   return (
-    <section className={cn("flex flex-col rounded-2xl border border-line bg-raised shadow-card", className)} aria-label={t.upcomingLabel}>
+    <section className={cn(card, "flex flex-col", className)} aria-label={t.upcomingLabel}>
       <header className="flex h-12 shrink-0 items-center gap-2 pl-4 pr-2">
         <h2 className="text-[13.5px] font-semibold text-ink">{t.upcoming}</h2>
         {now && (overdue > 0 || today > 0) && (
-          <span className="text-[12px] text-ink-3">
+          <span className={cn("text-[12px]", midTone)}>
             {overdue > 0 && <span className="text-danger">{t.overdue(overdue)}</span>}
             {overdue > 0 && today > 0 && " · "}
             {today > 0 && <span className="text-blob-ink">{t.todayCount(today)}</span>}
@@ -83,7 +84,7 @@ export function UpcomingTasks({
           >
             {adding ? <X className="size-4" /> : <Plus className="size-4" />}
           </button>
-          <Link href="/tasks" className="flex h-7 items-center gap-1 rounded-lg px-2 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:h-9">
+          <Link href="/tasks" className={cn("flex h-7 items-center gap-1 rounded-lg px-2 text-[12.5px] font-medium hover:bg-hover hover:text-ink [@media(hover:none)]:h-9", midTone)}>
             {t.viewAll} <ArrowRight className="size-3.5" />
           </Link>
         </span>
@@ -120,7 +121,7 @@ export function UpcomingTasks({
             <Blob size={52} mood={store.tasks.length ? "happy" : "sleepy"} track={false} />
             <div className="min-w-0 text-[13px] leading-snug">
               <p className="font-medium text-ink">{store.tasks.length ? t.allClearWeek : t.nothingSoon}</p>
-              <p className="text-ink-3">{store.tasks.length ? t.allClearWeekBody : t.nothingSoonBody}</p>
+              <p className={midTone}>{store.tasks.length ? t.allClearWeekBody : t.nothingSoonBody}</p>
             </div>
           </div>
         ) : (
@@ -152,7 +153,7 @@ export function UpcomingTasks({
           </ul>
         )}
         {more > 0 && (
-          <Link href="/tasks" className="ml-1.5 mt-0.5 inline-flex h-7 items-center rounded-md px-1.5 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink">
+          <Link href="/tasks" className={cn("ml-1.5 mt-0.5 inline-flex h-7 items-center rounded-md px-1.5 text-[12.5px] hover:bg-hover hover:text-ink", midTone)}>
             {t.moreThisWeek(more)}
           </Link>
         )}

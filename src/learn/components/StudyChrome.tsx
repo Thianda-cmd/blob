@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { Blob, type BlobAccessory, type BlobHandle } from "@/components/blob/Blob";
 import { useLocale, useMessages } from "@/i18n/client";
 import { learnText } from "@/i18n/messages/learn";
+import { card, groupLabel, midTone } from "@/components/ui/surfaces";
 import { masteryLabel } from "@/learn/progress";
 import { cn } from "@/lib/utils";
 import { Confetti } from "./Confetti";
@@ -190,9 +191,9 @@ export function SessionEnd({
               initial={{ opacity: 0, y: 14, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.25 + i * 0.08, type: "spring", stiffness: 380, damping: 26 }}
-              className="flex flex-col justify-between rounded-2xl border border-line bg-raised px-3 py-2.5 shadow-card sm:px-4 sm:py-3"
+              className={cn(card, "flex flex-col justify-between px-3 py-2.5 sm:px-4 sm:py-3")}
             >
-              <div className="text-[10.5px] font-semibold uppercase leading-snug tracking-[0.08em] text-ink-3 sm:text-[11.5px]">{s.label}</div>
+              <div className={cn(groupLabel, "leading-snug")}>{s.label}</div>
               <div className={cn("mt-0.5 whitespace-nowrap font-display text-[22px] font-bold tabular-nums sm:text-[28px]", s.tone === "blob" ? "text-blob" : s.tone === "ok" ? "text-ok" : "text-ink")}>
                 <CountUp value={s.value} from={0} delay={0.35 + i * 0.08} duration={0.9} />
                 {s.suffix}
@@ -204,7 +205,7 @@ export function SessionEnd({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="grid gap-4 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
+          className="grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
         >
           <div>
             <div className="flex items-baseline justify-between text-[13px]">
@@ -251,26 +252,39 @@ function subscribeRoomy(onChange: () => void) {
   return () => query.removeEventListener("change", onChange);
 }
 
-/** Big pill buttons used in the study screens. */
+/**
+ * The violet of the study screens' one main button (white on the deeper violet in the dark theme,
+ * where white on the lighter one falls under 4.5:1). Also for their hand-made buttons ("Prüfen").
+ */
+export const studyPrimary =
+  "bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]";
+
+/** The green for right answers and finished things (see ./tones). */
+export { okFill, okText } from "./tones";
+
+/** The small line above a study screen's title or question ("Karteikarten", "Schritt 2 von 11 · Lernen"): sentence case, never violet capitals. */
+export const studyLabel = cn("text-[12.5px] font-medium", midTone);
+
+/** Big buttons used in the study screens: one violet (`blob`) for what comes next, `secondary` for the other ways on. */
 export function StudyButton({
   children,
   onClick,
   href,
-  variant = "ink",
+  variant = "secondary",
   className,
   buttonRef,
 }: {
   children: ReactNode;
   onClick?: () => void;
   href?: string;
-  variant?: "ink" | "blob" | "ghost";
+  variant?: "blob" | "secondary" | "ghost";
   className?: string;
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   const cls = cn(
-    "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-[14.5px] font-semibold transition-[transform,background] active:scale-[0.97]",
-    variant === "ink" && "bg-ink text-paper hover:bg-ink/88 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]",
-    variant === "blob" && "bg-blob text-white hover:bg-blob-deep shadow-[inset_0_1px_0_rgb(255_255_255/0.25)]",
+    "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-[14.5px] font-semibold transition-[transform,background,border-color] active:scale-[0.97]",
+    variant === "blob" && studyPrimary,
+    variant === "secondary" && "border border-line bg-raised text-ink shadow-card hover:border-line-2 hover:bg-hover/60",
     variant === "ghost" && "text-ink-2 hover:bg-hover hover:text-ink",
     className,
   );

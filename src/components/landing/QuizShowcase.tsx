@@ -1,8 +1,7 @@
 "use client";
 
-import { ArrowUp, BarChart3, Check, Flame, ListChecks, NotebookText, SpellCheck, Smartphone, Tv } from "lucide-react";
-import { AnimatePresence, LayoutGroup, motion, useInView } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUp, Check, Flame } from "lucide-react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { MiniBlob } from "@/components/quiz/MiniBlob";
 import { QR } from "@/components/quiz/QR";
@@ -12,7 +11,7 @@ import { intlLocale } from "@/i18n/format";
 import { landingText } from "@/i18n/messages/landing";
 import type { Look } from "@/quiz/views";
 import { cn } from "@/lib/utils";
-import { PointList } from "./Points";
+import { DemoControl, useDemoPlayer } from "./DemoPlayer";
 import { useReducedAfterMount } from "./useTyping";
 
 type T = (typeof landingText)["en"]["quiz"]["demo"];
@@ -52,8 +51,9 @@ const FRAMES: Frame[] = [
   { ...base, scene: "question", left: 15, answered: 5, tapped: true, ms: 800 },
   { ...base, scene: "reveal", tapped: true, ms: 3000 },
   { ...base, scene: "board", tapped: true, ms: 1000 },
-  { ...base, scene: "board", tapped: true, moved: true, ms: 2800 },
+  { ...base, scene: "board", tapped: true, moved: true, ms: 0 }, // Mia on top: where it stays
 ];
+const DURATIONS = FRAMES.map((f) => f.ms);
 /** With reduced motion: the answer, revealed. */
 const STILL = 11;
 
@@ -61,50 +61,48 @@ const spring = { type: "spring", stiffness: 380, damping: 28 } as const;
 
 /** A live quiz on the landing page: the big screen and a phone, playing one question by themselves. */
 export function QuizShowcase({ className }: { className?: string }) {
-  const t = useMessages(landingText).quiz.demo;
-  const ref = useRef<HTMLDivElement>(null);
-  const visible = useInView(ref, { amount: 0.35 });
+  const all = useMessages(landingText).quiz;
+  const t = all.demo;
   const reduce = useReducedAfterMount();
-  const [i, setI] = useState(0);
+  // Plays the question once when it scrolls into view and stays on the scoreboard (DemoPlayer).
+  const { ref, i, player } = useDemoPlayer(DURATIONS, { still: reduce });
   const frame = FRAMES[reduce ? STILL : i];
 
-  useEffect(() => {
-    if (!visible || reduce) return;
-    const timer = setTimeout(() => setI((n) => (n + 1) % FRAMES.length), FRAMES[i].ms);
-    return () => clearTimeout(timer);
-  }, [visible, reduce, i]);
-
   return (
-    <div ref={ref} role="img" aria-label={t.label} className={cn("relative pb-12 pr-[90px] sm:pb-10 sm:pr-[140px]", className)}>
-      {/* The big screen. */}
-      <div className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
-        <div className="flex h-10 items-center gap-2 border-b border-line px-3 sm:px-4">
-          <BlobMark size={18} />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink-2">{t.title}</span>
-          {frame.scene !== "lobby" && (
-            <span className="rounded-full bg-hover px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-ink-2">
-              {t.pin} {PIN}
-            </span>
-          )}
+    <div className={cn("relative", className)}>
+      <div ref={ref} role="img" aria-label={t.label} className="relative pb-12 pr-[90px] sm:pb-10 sm:pr-[140px]">
+        {/* The big screen. */}
+        <div className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
+          <div className="flex h-10 items-center gap-2 border-b border-line px-3 sm:px-4">
+            <BlobMark size={18} />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink-2">{t.title}</span>
+            {frame.scene !== "lobby" && (
+              <span className="rounded-full bg-hover px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-ink-2">
+                {t.pin} {PIN}
+              </span>
+            )}
+          </div>
+          <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(110%_90%_at_50%_0%,color-mix(in_oklab,var(--blob)_12%,var(--paper)),var(--paper))]">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={frame.scene} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }} transition={spring} className="absolute inset-0 flex flex-col p-[3.5%]">
+                {frame.scene === "lobby" && <Lobby t={t} joined={frame.joined} />}
+                {frame.scene === "question" && <Question t={t} frame={frame} />}
+                {frame.scene === "reveal" && <Reveal t={t} />}
+                {frame.scene === "board" && <Board t={t} moved={frame.moved} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
-        <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(110%_90%_at_50%_0%,color-mix(in_oklab,var(--blob)_12%,var(--paper)),var(--paper))]">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={frame.scene} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }} transition={spring} className="absolute inset-0 flex flex-col p-[3.5%]">
-              {frame.scene === "lobby" && <Lobby t={t} joined={frame.joined} />}
-              {frame.scene === "question" && <Question t={t} frame={frame} />}
-              {frame.scene === "reveal" && <Reveal t={t} />}
-              {frame.scene === "board" && <Board t={t} moved={frame.moved} />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
 
-      {/* Mia's phone. */}
-      <div className="absolute bottom-0 right-0 w-[104px] rounded-[22px] border border-black/10 bg-[#14121c] p-[4px] shadow-pop dark:border-white/15 sm:w-[176px] sm:rounded-[26px] sm:p-[5px]">
-        <div className="relative aspect-[9/18] overflow-hidden rounded-[18px] sm:rounded-[21px]">
-          <Phone t={t} frame={frame} />
+        {/* Mia's phone. */}
+        <div className="absolute bottom-0 right-0 w-[92px] rounded-[20px] border border-black/10 bg-[#14121c] p-[4px] shadow-pop dark:border-white/15 sm:w-[176px] sm:rounded-[26px] sm:p-[5px]">
+          <div className="relative aspect-[9/18] overflow-hidden rounded-[16px] sm:rounded-[21px]">
+            <Phone t={t} frame={frame} />
+          </div>
         </div>
       </div>
+      {/* In the free corner under the big screen, left of the phone. */}
+      <DemoControl player={player} name={all.kicker} className="absolute bottom-0 left-0" />
     </div>
   );
 }
@@ -119,7 +117,7 @@ function Lobby({ t, joined }: { t: T; joined: number }) {
             blob.bojes.org/<span className="text-blob-ink">play</span>
           </span>
         </div>
-        <div className="flex flex-col justify-center rounded-xl bg-blob px-[4%] py-[1%] text-white">
+        <div className="flex flex-col justify-center rounded-xl bg-blob px-[4%] py-[1%] text-white dark:bg-blob-deep">
           <span className="text-[clamp(7px,1.2vw,11px)] font-semibold text-white/80">{t.pin}</span>
           <span className="whitespace-nowrap font-display text-[clamp(16px,3.6vw,32px)] font-bold leading-none tabular-nums tracking-[0.04em]">
             {PIN.slice(0, 3)} {PIN.slice(3)}
@@ -255,7 +253,7 @@ function Board({ t, moved }: { t: T; moved: boolean }) {
           {rows.map((r, place) => {
             const first = moved && place === 0;
             return (
-              <motion.li layout key={r.k} transition={{ type: "spring", stiffness: 260, damping: 28 }} className={cn("flex items-center gap-[3%] rounded-lg px-[3%] py-[1.2%] shadow-card transition-colors duration-500", first ? "bg-blob text-white" : "bg-raised text-ink")}>
+              <motion.li layout key={r.k} transition={{ type: "spring", stiffness: 260, damping: 28 }} className={cn("flex items-center gap-[3%] rounded-lg px-[3%] py-[1.2%] shadow-card transition-colors duration-500", first ? "bg-blob text-white dark:bg-blob-deep" : "bg-raised text-ink")}>
                 <span className="w-[1.5ch] font-display text-[clamp(9px,1.8vw,16px)] font-bold tabular-nums">{place + 1}</span>
                 <MiniBlob look={r.look} size={26} bounce={false} className="size-[clamp(14px,2.8vw,26px)]" />
                 <span className="min-w-0 flex-1 truncate text-[clamp(9px,1.8vw,16px)] font-bold">{t.names[r.k]}</span>
@@ -284,7 +282,7 @@ function Phone({ t, frame }: { t: T; frame: Frame }) {
   return (
     <div className={cn("flex size-full flex-col transition-colors duration-500", tone)}>
       <div className={cn("flex items-center gap-1 px-2 pb-1 pt-2.5", answering ? "text-ink" : "text-white")}>
-        <MiniBlob look={me} size={16} bounce={false} />
+        <MiniBlob look={me} size={16} bounce={false} className="max-sm:hidden" />
         <span className="flex-1 truncate text-[9px] font-bold">{t.names[0]}</span>
         <span className={cn("rounded-full px-1.5 text-[8px] font-bold tabular-nums", answering ? "bg-raised shadow-card" : "bg-white/20")}>{score.toLocaleString(locale)}</span>
       </div>
@@ -337,22 +335,5 @@ function Phone({ t, frame }: { t: T; frame: Frame }) {
         </motion.div>
       </AnimatePresence>
     </div>
-  );
-}
-
-export function QuizPoints({ className }: { className?: string }) {
-  const t = useMessages(landingText).quiz.points;
-  return (
-    <PointList
-      className={className}
-      points={[
-        { key: "join", Icon: Smartphone, ...t.join },
-        { key: "types", Icon: ListChecks, ...t.types },
-        { key: "notes", Icon: NotebookText, ...t.notes },
-        { key: "fair", Icon: SpellCheck, ...t.fair },
-        { key: "show", Icon: Tv, ...t.show },
-        { key: "results", Icon: BarChart3, ...t.results },
-      ]}
-    />
   );
 }

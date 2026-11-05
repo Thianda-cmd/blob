@@ -13,6 +13,7 @@ import { studyHref, SUBJECTS } from "@/learn/catalog";
 import { showHref, showItems, showTopicHref, type ShowItem } from "@/learn/showcase";
 import { useTopic } from "@/learn/topics";
 import { LEVELS, type Level, type Topic } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { LevelBars } from "./LevelBars";
 import { Inline, Rich } from "./Rich";
@@ -56,7 +57,7 @@ function TopicHeader({ topic, small }: { topic: Topic; small?: boolean }) {
         <TopicGlyph topic={topic} size="sm" className="max-w-full" />
       </div>
       <div className="min-w-0">
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
+        <div className="truncate text-[12.5px] font-medium text-blob-ink">
           {subject ? tt(subject.title) : ""} · {names.area}
         </div>
         <Link
@@ -92,7 +93,7 @@ export function ShowTopicList({ slug }: { slug: string }) {
           <TopicGlyph topic={topic} size="lg" className="relative max-w-full max-sm:hidden" />
         </div>
         <div className="min-w-0 sm:self-end">
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-blob-ink sm:text-[12px]">
+          <div className="text-[12.5px] font-medium text-blob-ink sm:text-[13px]">
             {tt(SUBJECTS.find((s) => s.slug === topic.subject)!.title)} · {names.area}
           </div>
           <h1 className="mt-0.5 hyphens-auto break-words font-display text-[24px] font-bold leading-tight tracking-[-0.02em] sm:mt-1 sm:text-[30px]">{names.title}</h1>
@@ -111,20 +112,20 @@ export function ShowTopicList({ slug }: { slug: string }) {
             >
               <LevelBars level={level} className="text-blob-ink" />
               {levels[level]}
-              <span className="tabular-nums text-ink-3">{list.length}</span>
+              <span className={cn("tabular-nums", midTone)}>{list.length}</span>
             </a>
           ))}
         </nav>
       )}
 
-      {items.length === 0 && <p className="mt-8 rounded-2xl border border-dashed border-line-2 p-6 text-[14.5px] text-ink-3">{t.noItems}</p>}
+      {items.length === 0 && <p className={cn("mt-8 text-[14.5px]", midTone)}>{t.noItems}</p>}
 
       {groups.map(({ level, list }) => (
         <section key={level} id={`level-${level}`} className="mt-8 scroll-mt-20 sm:mt-10">
           <h2 className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 font-display text-[18px] font-semibold tracking-[-0.01em] sm:text-[19px]">
             <LevelBars level={level} className="self-center text-blob-ink" />
             {levels[level]}
-            <span className="text-[13px] font-normal text-ink-3">{tt(topic.levels[level].depth)}</span>
+            <span className={cn("text-[13px] font-normal", midTone)}>{tt(topic.levels[level].depth)}</span>
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {list.map((item, i) => (
@@ -139,7 +140,7 @@ export function ShowTopicList({ slug }: { slug: string }) {
                   </span>
                   <span className="mt-2 font-display text-[16px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-blob-ink sm:text-[16.5px]">{tt(item.title)}</span>
                   {item.body && (
-                    <span className="mt-1 line-clamp-2 text-[13.5px] leading-snug text-ink-3 sm:line-clamp-3">
+                    <span className={cn("mt-1 line-clamp-2 text-[13.5px] leading-snug sm:line-clamp-3", midTone)}>
                       <Inline text={item.body} />
                     </span>
                   )}
@@ -167,7 +168,7 @@ function LearnCard({ topic, level }: { topic: Topic; level?: Level }) {
       </div>
       <Link
         href={studyHref(topic, "lesson", level)}
-        className="flex h-10 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white hover:bg-blob/90 sm:w-auto"
+        className="flex h-10 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white hover:bg-blob-deep sm:w-auto dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]"
       >
         <BookOpen className="size-4" /> {t.learnCta}
       </Link>
@@ -217,7 +218,7 @@ export function ShowVisual({ slug, level, id }: { slug: string; level: Level; id
         <div className="mt-8 rounded-2xl border border-dashed border-line-2 p-6">
           <h1 className="font-display text-[22px] font-bold">{t.notFoundTitle}</h1>
           <p className="mt-1 text-[14.5px] text-ink-2">{t.notFoundText}</p>
-          <Link href={showTopicHref(topic)} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-[13.5px] font-medium text-paper">
+          <Link href={showTopicHref(topic)} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13.5px] font-medium bg-blob text-white hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]">
             {t.allOfTopic} <ArrowRight className="size-4" />
           </Link>
         </div>
@@ -371,7 +372,7 @@ export function EmbedVisual({ slug, level, id }: { slug: string; level: Level; i
         href={item ? showHref(topic, level, id) : showTopicHref(topic)}
         target="_blank"
         rel="noopener"
-        className="-my-1 flex h-8 items-center gap-1.5 self-end rounded-lg px-2 text-[12.5px] font-medium text-ink-3 hover:text-blob-ink"
+        className="-my-1 flex h-8 items-center gap-1.5 self-end rounded-lg px-2 text-[12.5px] font-medium text-ink-2 hover:text-blob-ink"
       >
         <BlobMark size={16} /> {t.openOnBlob} <ExternalLink className="size-3" />
       </a>

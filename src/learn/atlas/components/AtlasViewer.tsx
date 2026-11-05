@@ -5,14 +5,16 @@ import { BookOpenCheck, Check, Clock, GraduationCap, Layers, ListOrdered, Map as
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { Segmented } from "@/components/ui/Segmented";
+import { card as cardSurface, chipOff, chipOn, midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { atlasText } from "@/i18n/messages/atlas";
 import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
-import { Ring } from "@/learn/components/Ring";
+import { okFill, studyPrimary } from "@/learn/components/StudyChrome";
 import { DAILY_GOAL, type LearnDay, type TopicProgress } from "@/learn/progress";
 import { useStudySession, useTodayXp, useWide } from "@/learn/session";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,7 @@ import { useAtlasModel } from "../models";
 import { EXPLORE_XP } from "../quiz";
 import { markSeen, useSeen } from "../seen";
 import type { AtlasView, PartsView, StepsView, TimelineView } from "../types";
+import { Stat } from "./AtlasHome";
 import { InfoCard, type InfoContent } from "./InfoCard";
 import { Layout } from "./Layout";
 import { PartsStage } from "./PartsStage";
@@ -142,53 +145,39 @@ function Viewer({ slug, progress, days, fresh }: ViewerProps & { fresh: boolean 
     <>
       <TopBar
         crumbs={[
-          { label: l.learn, href: "/learn", icon: <GraduationCap className="size-3.5" /> },
-          { label: t.atlas, href: "/learn/atlas", icon: <MapIcon className="size-3.5" /> },
+          { label: l.learn, href: "/learn", icon: <GraduationCap className="size-3.5 text-ink-3" /> },
+          { label: t.atlas, href: "/learn/atlas", icon: <MapIcon className="size-3.5 text-ink-3" /> },
           { label: tt(meta.title) },
         ]}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-16 pt-2 sm:px-8">
-          <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <MapIcon className="size-3.5" /> {t.atlas} · {tt(ATLAS_AREAS[meta.area].title)}
-              </div>
-              <h1 className="mt-1 hyphens-auto font-display text-[28px] font-bold leading-tight tracking-[-0.02em] break-words sm:text-[32px]">{tt(meta.title)}</h1>
-              <p className="mt-1 max-w-[640px] text-[14.5px] leading-relaxed text-ink-2">{tt(meta.subtitle)}</p>
+      {/* On paper under a hairline, with the same header as the Atlas home: the area above the title, the subtitle as the meta line, how far you are beside it. */}
+      <PageBody>
+          <div className="flex flex-wrap items-end justify-between gap-x-8">
+            <PageHeader
+              className="min-w-0 flex-1 basis-64"
+              label={`${t.atlas} · ${tt(ATLAS_AREAS[meta.area].title)}`}
+              title={<span className="hyphens-auto">{tt(meta.title)}</span>}
+              meta={tt(meta.subtitle)}
+              wrapMeta
+            />
+            <div className="mb-5 flex flex-wrap gap-2 sm:mb-6">
+              <Stat
+                ring={total.length ? seenCount / total.length : 0}
+                color={seenCount === total.length ? "var(--ok)" : undefined}
+                icon={seenCount === total.length ? <Check className="size-3.5 text-ok" strokeWidth={3} /> : <Layers className="size-3.5 text-blob" />}
+                value={seenCount}
+                of={total.length}
+                label={t.seen}
+                title={t.explored(seenCount, total.length)}
+              />
+              <Stat ring={session.todayXp / DAILY_GOAL} icon={<BookOpenCheck className="size-3.5 text-blob" />} value={session.todayXp} of={`${DAILY_GOAL} XP`} label={l.dailyGoal} />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-12 items-center gap-2.5 rounded-xl border border-line bg-raised pl-2 pr-3.5 shadow-card" title={t.explored(seenCount, total.length)}>
-                <Ring value={total.length ? seenCount / total.length : 0} size={34} stroke={4} color={seenCount === total.length ? "var(--ok)" : "var(--blob)"}>
-                  {seenCount === total.length ? <Check className="size-3.5 text-ok" strokeWidth={3} /> : <Layers className="size-3.5 text-blob" />}
-                </Ring>
-                <div className="leading-tight">
-                  <div className="text-[14px] font-semibold tabular-nums">
-                    {seenCount}
-                    <span className="font-normal text-ink-3"> / {total.length}</span>
-                  </div>
-                  <div className="text-[11.5px] text-ink-3">{t.seen}</div>
-                </div>
-              </div>
-              <div className="flex h-12 items-center gap-2.5 rounded-xl border border-line bg-raised pl-2 pr-3.5 shadow-card" title={l.dailyGoal}>
-                <Ring value={session.todayXp / DAILY_GOAL} size={34} stroke={4}>
-                  <BookOpenCheck className="size-3.5 text-blob" />
-                </Ring>
-                <div className="leading-tight">
-                  <div className="text-[14px] font-semibold tabular-nums">
-                    {session.todayXp}
-                    <span className="font-normal text-ink-3"> / {DAILY_GOAL} XP</span>
-                  </div>
-                  <div className="text-[11.5px] text-ink-3">{l.dailyGoal}</div>
-                </div>
-              </div>
-            </div>
-          </header>
+          </div>
 
           {/* Views and mode. */}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
             {model.views.length > 1 ? (
-              <nav className="-mx-1 flex min-w-0 max-w-full gap-1.5 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t.views_}>
+              <nav className="-m-1 flex min-w-0 max-w-full gap-1.5 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t.views_}>
                 {model.views.map((v) => {
                   const on = v.id === view.id;
                   const share = viewSeen(v);
@@ -199,13 +188,14 @@ function Viewer({ slug, progress, days, fresh }: ViewerProps & { fresh: boolean 
                       onClick={() => chooseView(v.id)}
                       aria-current={on ? "page" : undefined}
                       className={cn(
-                        "relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13.5px] font-medium transition-colors",
-                        on ? "border-ink bg-ink text-paper" : "border-line bg-raised text-ink-2 hover:border-line-2 hover:text-ink",
+                        // The view you're on is violet-soft, like every chosen chip (never a black pill).
+                        "relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors [@media(hover:none)]:h-9",
+                        on ? chipOn : chipOff,
                       )}
                     >
                       {kindIcon(v)}
                       {tt(v.title)}
-                      {share === 1 && <Check className={cn("size-3.5", on ? "text-paper" : "text-ok")} strokeWidth={3} />}
+                      {share === 1 && <Check className="size-3.5 text-ok" strokeWidth={3} />}
                     </button>
                   );
                 })}
@@ -260,8 +250,7 @@ function Viewer({ slug, progress, days, fresh }: ViewerProps & { fresh: boolean 
               <ExploreTimeline key={view.id} view={view} item={item} setItem={setItem} seen={seen} />
             )}
           </div>
-        </div>
-      </div>
+      </PageBody>
 
       <AnimatePresence>
         {celebrate && (
@@ -272,7 +261,7 @@ function Viewer({ slug, progress, days, fresh }: ViewerProps & { fresh: boolean 
             className="fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-line bg-raised p-4 shadow-pop"
             role="status"
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ok text-white">
+            <span className={cn("grid size-10 shrink-0 place-items-center rounded-full", okFill)}>
               <PartyPopper className="size-5" />
             </span>
             <div className="min-w-0">
@@ -375,10 +364,10 @@ function ExploreParts({
           ) : (
             <IntroCard view={view} count={t.structures(n)} hint={t.tapHint} onStart={() => setItem(view.parts[0].id)} onQuiz={onQuiz} />
           )}
-          <section className="rounded-2xl border border-line bg-raised p-3 shadow-card">
+          <section className={cn(cardSurface, "p-3")}>
             <div className="flex items-baseline justify-between px-1.5 pb-2">
               <h3 className="text-[13px] font-semibold">{t.structuresList}</h3>
-              <span className="text-[12px] tabular-nums text-ink-3">{t.explored(seenHere.size, n)}</span>
+              <span className={cn("text-[12px] tabular-nums", midTone)}>{t.explored(seenHere.size, n)}</span>
             </div>
             <ol className="grid gap-0.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               {view.parts.map((p, i) => {
@@ -393,7 +382,7 @@ function ExploreParts({
                       <span
                         className={cn(
                           "grid size-5 shrink-0 place-items-center rounded-full text-[10.5px] font-bold tabular-nums",
-                          on ? "bg-blob text-white" : seenHere.has(p.id) ? "bg-blob/15 text-blob-ink" : "border border-line-2 text-ink-3",
+                          on ? "bg-blob text-white dark:bg-blob-deep" : seenHere.has(p.id) ? "bg-blob/15 text-blob-ink" : "border border-line-2 text-ink-2",
                         )}
                       >
                         {i + 1}
@@ -416,22 +405,21 @@ function IntroCard({ view, count, hint, onStart, onQuiz }: { view: AtlasView; co
   const t = useMessages(atlasText);
   const tt = useText();
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-line bg-raised p-5 shadow-card">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(110%_80%_at_100%_0%,color-mix(in_oklab,var(--blob)_12%,transparent),transparent_60%)]" aria-hidden />
-      <div className="relative">
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-blob-ink">{count}</div>
+    <section className={cn(cardSurface, "p-5")}>
+      <div>
+        <div className={cn("text-[12.5px] font-medium", midTone)}>{count}</div>
         <h2 className="mt-1 font-display text-[22px] font-bold leading-tight tracking-[-0.015em]">{tt(view.title)}</h2>
         <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">{tt(view.intro)}</p>
-        <p className="mt-2 text-[13px] text-ink-3">{hint}</p>
+        <p className={cn("mt-2 text-[13px]", midTone)}>{hint}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onStart}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[background,transform] hover:bg-blob-deep active:scale-[0.97]"
+            className={cn("inline-flex h-10 items-center gap-2 rounded-xl px-4 text-[14px] font-semibold transition-[background,transform] active:scale-[0.97] [@media(hover:none)]:h-11", studyPrimary)}
           >
             <Route className="size-4" /> {t.startTour}
           </button>
-          <button type="button" onClick={onQuiz} className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-raised px-4 text-[14px] font-medium text-ink transition-colors hover:bg-hover">
+          <button type="button" onClick={onQuiz} className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-raised px-4 text-[14px] font-medium text-ink shadow-card transition-colors hover:border-line-2 hover:bg-hover/60 [@media(hover:none)]:h-11">
             {t.startQuiz}
           </button>
         </div>
@@ -466,7 +454,7 @@ function ExploreSteps({ view, item, setItem, seen }: { view: StepsView; item: st
       panel={
         <div className="space-y-4">
           <InfoCard content={content} onPrev={step > 0 ? () => by(-1) : undefined} onNext={step < n - 1 ? () => by(1) : undefined} />
-          <p className="px-1 text-[12.5px] leading-relaxed text-ink-3">{tt(view.intro)}</p>
+          <p className={cn("px-1 text-[12.5px] leading-relaxed", midTone)}>{tt(view.intro)}</p>
         </div>
       }
     />

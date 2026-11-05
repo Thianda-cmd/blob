@@ -238,8 +238,8 @@ function Column({
       <header className="flex h-11 shrink-0 items-center gap-2 pl-3 pr-1.5">
         <ColumnDot column={{ color: COLORS[status], done: status === "done" }} />
         <h3 className="text-[13px] font-semibold text-ink">{t.status[status]}</h3>
-        <span className="text-[12px] tabular-nums text-ink-3">{ids.length}</span>
-        {status === "done" && <span className="truncate text-[11.5px] text-ink-3 max-lg:hidden">· {t.doneBoardHint}</span>}
+        <span className="text-[12px] tabular-nums text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{ids.length}</span>
+        {status === "done" && <span className="truncate text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] max-lg:hidden">· {t.doneBoardHint}</span>}
         {status !== "done" && (
           <button
             type="button"
@@ -263,7 +263,7 @@ function Column({
           </div>
         </SortableContext>
         {ids.length > shown.length && (
-          <button type="button" onClick={() => setAll(true)} className="mt-2 h-8 w-full rounded-lg text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink">
+          <button type="button" onClick={() => setAll(true)} className="mt-2 h-8 w-full rounded-lg text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink">
             {t.showOlderDone(ids.length - shown.length)}
           </button>
         )}
@@ -271,7 +271,7 @@ function Column({
           <div
             className={cn(
               "grid h-16 place-items-center rounded-[10px] border border-dashed text-[12px] transition-colors",
-              dragging ? "border-blob/50 bg-blob-soft/40 text-blob-ink" : "border-line-2 text-ink-3",
+              dragging ? "border-blob/50 bg-blob-soft/40 text-blob-ink" : "border-line-2 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]",
             )}
           >
             {t.dropHere}
@@ -317,7 +317,7 @@ function InlineAdd({ status, store, subjects, onClose, first }: { status: TaskSt
           submit();
           onClose();
         }}
-        className="h-7 w-full bg-transparent text-[13.5px] text-ink outline-none placeholder:text-ink-3"
+        className="h-7 w-full bg-transparent text-[13.5px] text-ink outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"
       />
     </div>
   );
@@ -355,7 +355,7 @@ function PersonalCardFace({
           {controls?.due ?? (task.due_at && <DueChip due={task.due_at} now={now} done={task.done} className="-ml-0.5" />)}
           {controls?.subject ??
             (subject && (
-              <span className="flex min-w-0 items-center gap-1.5 text-ink-3">
+              <span className="flex min-w-0 items-center gap-1.5 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
                 <SubjectDot subject={subject} />
                 <span className="truncate">{subject.name}</span>
               </span>
@@ -445,7 +445,7 @@ const SortableTask = memo(function SortableTask({ task, store, subjects, now }: 
                     <DueChip due={task.due_at} now={now} done={task.done} />
                   </button>
                 ) : (
-                  <button {...props} {...stop} className="hidden h-5 items-center rounded-md px-1 text-ink-3 hover:bg-hover hover:text-ink group-hover/card:flex aria-expanded:flex [@media(hover:none)]:flex">
+                  <button {...props} {...stop} className="hidden h-5 items-center rounded-md px-1 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink group-hover/card:flex aria-expanded:flex [@media(hover:none)]:flex">
                     {t.date}
                   </button>
                 )
@@ -463,7 +463,7 @@ const SortableTask = memo(function SortableTask({ task, store, subjects, now }: 
                   {...props}
                   {...stop}
                   className={cn(
-                    "flex h-5 min-w-0 max-w-[140px] items-center gap-1.5 rounded-md px-1 text-ink-3 hover:bg-hover hover:text-ink",
+                    "flex h-5 min-w-0 max-w-[140px] items-center gap-1.5 rounded-md px-1 text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover hover:text-ink",
                     !subject && "hidden group-hover/card:flex aria-expanded:flex [@media(hover:none)]:flex",
                   )}
                   title={subject ? t.subjectIs(subject.name) : t.addSubject}

@@ -1,9 +1,9 @@
 "use client";
 
-import { motion } from "motion/react";
 import { ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
 import { useMessages } from "@/i18n/client";
 import { adminText } from "@/i18n/messages/admin";
@@ -27,10 +27,7 @@ export function NewAppView() {
         ]}
       />
       <AdminPage>
-        <motion.header initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mb-7">
-          <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.form.newTitle}</h1>
-          <p className="mt-1 text-[13.5px] text-ink-2">{t.form.newIntro}</p>
-        </motion.header>
+        <PageHeader title={t.form.newTitle} meta={t.form.newIntro} />
         <AppForm
           onSaved={(r) => setCreated({ kind: "created", appName: r.name, clientId: r.clientId, secret: r.secret, id: r.id })}
         />

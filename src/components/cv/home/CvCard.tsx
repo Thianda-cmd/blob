@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useMemo } from "react";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { card, cardLift, midTone } from "@/components/ui/surfaces";
 import { templateMeta } from "@/cv/catalog";
 import { CvThumbnail } from "@/cv/CvDocument";
 import { cvProgress, letterHasContent, normalizeCv } from "@/cv/model";
@@ -70,7 +71,7 @@ export function CvCard({
     <div className="group relative h-full">
       <Link
         href={`/p/${item.id}`}
-        className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-2 hover:shadow-[0_1px_1px_rgb(28_27_24/0.04),0_10px_24px_-10px_rgb(28_27_24/0.22)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blob active:translate-y-0"
+        className={cn(card, cardLift, "flex h-full flex-col overflow-hidden")}
       >
         <div
           ref={desk}
@@ -79,7 +80,7 @@ export function CvCard({
         >
           {width > 0 && (
             <div
-              className="absolute transition-transform duration-300 ease-out group-hover:-translate-y-1"
+              className="absolute transition-transform duration-300 ease-out group-hover:-translate-y-1 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0"
               style={{ left: inset, top: inset, width: width - 2 * inset }}
             >
               {loaded ? (
@@ -93,10 +94,10 @@ export function CvCard({
         <div className="flex min-w-0 flex-1 flex-col px-3 pb-3 pt-2.5">
           <span className="line-clamp-2 text-[14px] font-medium leading-snug text-ink [overflow-wrap:anywhere]">{title}</span>
           {/* Two lines, so neither gets cut off on a phone. */}
-          <span className="mt-0.5 block truncate text-[12px] text-ink-3">
+          <span className={cn("mt-0.5 block truncate text-[12px]", midTone)}>
             {loaded ? [tt(templateMeta(cv.design.template).name), letterHasContent(cv.letter) ? t.withLetter : ""].filter(Boolean).join(" · ") : " "}
           </span>
-          <span className="block truncate text-[12px] text-ink-3" suppressHydrationWarning>
+          <span className={cn("block truncate text-[12px]", midTone)} suppressHydrationWarning>
             {edited(item.updated_at, now, locale)}
           </span>
           {!loaded ? (
@@ -104,7 +105,7 @@ export function CvCard({
               <span className="block h-1.5 rounded-full bg-hover" />
             </span>
           ) : sample ? (
-            <span className="mt-auto flex items-center gap-1.5 pt-2 text-[11.5px] font-medium text-ink-3" title={t.sampleHint}>
+            <span className={cn("mt-auto flex items-center gap-1.5 pt-2 text-[11.5px] font-medium", midTone)} title={t.sampleHint}>
               <BookOpenCheck className="size-3.5 shrink-0" />
               <span className="truncate">{t.sample}</span>
             </span>
@@ -118,7 +119,7 @@ export function CvCard({
                   transition={{ type: "spring", stiffness: 90, damping: 20, delay: 0.15 }}
                 />
               </span>
-              <span className={cn("flex shrink-0 items-center gap-0.5 text-[11.5px] font-medium tabular-nums", done ? "text-ok" : "text-ink-3")}>
+              <span className={cn("flex shrink-0 items-center gap-0.5 text-[11.5px] font-medium tabular-nums", done ? "text-ok" : midTone)}>
                 {done && <Check className="size-3" strokeWidth={3} />}
                 {locale === "de" ? `${progress} %` : `${progress}%`}
               </span>
@@ -170,10 +171,11 @@ export function NewCvCard({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-dashed border-line-2 text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blob"
+      // The add tile's look (surfaces.addTile), with the darker text so its label reads well.
+      className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-dashed border-line-2 text-ink-2 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blob focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
     >
       <span className="relative block aspect-[1/1.06] w-full shrink-0">
-        <span className="absolute inset-x-[10%] bottom-0 top-[10%] grid place-items-center rounded-t-[4px] border border-b-0 border-dashed border-line-2 transition-[border-color,transform] duration-300 ease-out group-hover:-translate-y-1 group-hover:border-blob/50">
+        <span className="absolute inset-x-[10%] bottom-0 top-[10%] grid place-items-center rounded-t-[4px] border border-b-0 border-dashed border-line-2 transition-[border-color,transform] duration-300 ease-out group-hover:-translate-y-1 group-hover:border-blob/50 motion-reduce:group-hover:translate-y-0">
           <span className="grid size-11 place-items-center rounded-xl bg-blob-soft text-blob-ink transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
             <Plus className="size-5" />
           </span>

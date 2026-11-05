@@ -9,12 +9,14 @@ import { resolveText } from "@/i18n/text";
 import { useText } from "@/i18n/useText";
 import { answerDisplay, check, type AnswerValue } from "@/learn/engine/answers";
 import { LEVELS, type AnswerSpec, type Exercise, type Feedback } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 import { Blob } from "@/components/blob/Blob";
 import { AnswerInput, type AnswerStatus } from "./AnswerInput";
 import { MathView } from "./MathView";
 import { Inline, Rich } from "./Rich";
 import { SolutionPlayer } from "./SolutionPlayer";
+import { okFill, studyPrimary } from "./StudyChrome";
 
 export type ExerciseResult = {
   correct: boolean;
@@ -118,7 +120,7 @@ export function ExerciseCard({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <span className="min-w-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-blob-ink">{tt(exercise.instruction)}</span>
+        <span className="min-w-0 text-[13px] font-medium text-ink-2">{tt(exercise.instruction)}</span>
         {level && (
           <span className="flex shrink-0 gap-0.5" title={m.level(level)}>
             {LEVELS.map((n) => (
@@ -167,9 +169,9 @@ export function ExerciseCard({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => submit()}
-            className="flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.97]"
+            className={cn("flex h-11 items-center gap-2 rounded-xl px-5 text-[14.5px] font-semibold transition-transform active:scale-[0.97]", studyPrimary)}
           >
-            {t.check} <span className="hidden text-[11px] font-normal opacity-60 pointer-fine:inline">{t.enter}</span>
+            {t.check} <span className="hidden text-[11px] font-normal opacity-80 pointer-fine:inline">{t.enter}</span>
           </button>
           {mode !== "test" && exercise.hint && !hint && (
             <button
@@ -219,7 +221,7 @@ export function ExerciseCard({
                 initial={{ scale: 0, rotate: -30 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 520, damping: 14 }}
-                className={cn("grid size-9 shrink-0 place-items-center rounded-full text-white", status === "correct" ? "bg-ok" : "bg-ink-3")}
+                className={cn("grid size-9 shrink-0 place-items-center rounded-full text-white", status === "correct" ? okFill : "bg-ink-3")}
               >
                 {status === "correct" ? <Check className="size-5" strokeWidth={3} /> : <X className="size-5" strokeWidth={3} />}
               </motion.span>
@@ -237,7 +239,7 @@ export function ExerciseCard({
                   initial={{ opacity: 0, y: 8, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.15, type: "spring", stiffness: 500, damping: 20 }}
-                  className="shrink-0 rounded-full bg-blob px-3 py-1 text-[13px] font-semibold text-white"
+                  className="shrink-0 rounded-full bg-blob px-3 py-1 text-[13px] font-semibold text-white dark:bg-blob-deep"
                 >
                   +{earned} XP
                 </motion.span>
@@ -245,7 +247,7 @@ export function ExerciseCard({
               <button
                 ref={continueRef}
                 onClick={() => onDone(result)}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-5 text-[14.5px] font-semibold text-paper transition-transform hover:bg-ink/88 active:scale-[0.97] max-sm:w-full"
+                className={cn("flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-[14.5px] font-semibold transition-transform active:scale-[0.97] max-sm:w-full", studyPrimary)}
               >
                 {t.continue} <ArrowRight className="size-4" />
               </button>
@@ -296,11 +298,11 @@ function BlobNotice({ feedback, fallback }: { feedback: Feedback; fallback: stri
         <Blob size={46} mood={close ? "thinking" : "worried"} interactive={false} />
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className={cn("text-[13.5px] font-semibold", close ? "text-blob-ink" : "text-danger")}>
+        <div className={cn("text-[13.5px] font-semibold", close ? "text-blob-ink" : "text-danger-ink")}>
           {feedback.title ? tt(feedback.title) : t.notQuite}
         </div>
         {feedback.mark && (
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-ink-3">
+          <div className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]", midTone)}>
             <span>{t.yourAnswer}</span>
             <MathView src={feedback.mark} size="md" animate={false} className="text-ink" />
           </div>

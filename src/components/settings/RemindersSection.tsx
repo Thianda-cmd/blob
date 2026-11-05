@@ -56,7 +56,7 @@ export function RemindersSection() {
       </Card>
       <Card
         footer={
-          <p className="flex items-center gap-2 text-[12.5px] text-ink-3">
+          <p className="flex items-center gap-2 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
             <BellRing className="size-3.5 shrink-0" />
             {!app ? t.browser : permission === "denied" ? t.blocked : !isPhoneApp(app) ? t.desktopNote : permission === "granted" ? t.allowed : t.intro}
           </p>

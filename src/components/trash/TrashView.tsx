@@ -8,10 +8,12 @@ import { useMemo, useState } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { deletePagesForever } from "@/components/files/deleteForever";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
-import { Button, IconButton } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button, buttonClass, IconButton } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { card, midTone, searchOnPaper } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
@@ -184,70 +186,54 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
 
   const pending = confirm?.kind === "one" ? confirm.item : null;
   const pendingCount = pending ? withTrashedDescendants(trash, pending.ids).length - 1 : 0;
+  // One line under the title: how many there are (or found), newest first; empty: what the trash is for.
+  const meta = items.length
+    ? `${visible.length === items.length ? t.items(items.length) : t.filtered(visible.length, items.length)} · ${t.newestFirst}`
+    : t.intro;
 
   return (
     <>
       <TopBar crumbs={[{ label: t.title, icon: <Trash2 className="size-3.5 text-ink-3" /> }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[920px] px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pt-10">
-          <motion.header
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-6 flex flex-wrap items-end justify-between gap-4"
-          >
-            <div>
-              <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.03em]">{t.title}</h1>
-              <p className="mt-1 text-[13.5px] text-ink-2">{t.intro}</p>
-            </div>
+      <PageBody width="narrow">
+          <PageHeader title={t.title} meta={meta}>
             {items.length > 0 && (
-              <div className="flex w-full items-center gap-2 sm:w-auto">
-                {/* Full width on phones, so the placeholder isn't cut off next to the button. */}
-                <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none">
-                  <Input
-                    icon={<Search />}
+              <>
+                {/* Grows on phones, so the placeholder isn't cut off next to the button. */}
+                <label className="relative flex min-w-0 flex-1 items-center sm:max-w-[320px]">
+                  <Search className="pointer-events-none absolute left-3 size-4 text-ink-3" />
+                  <input
+                    type="search"
                     placeholder={t.search}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="h-8 text-[13px]"
+                    onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+                    className={cn(searchOnPaper, "w-full min-w-[9rem] pl-9 [&::-webkit-search-cancel-button]:hidden")}
                     aria-label={t.search}
                   />
-                </div>
-                <Button variant="secondary" size="md" className="h-8 text-danger" onClick={() => setConfirm({ kind: "all" })}>
-                  <Trash2 className="size-3.5" /> {t.empty}
+                </label>
+                {/* "Leeren" on phones, so the search keeps room for its placeholder. */}
+                <Button variant="secondary" size="md" className="shrink-0 text-danger [@media(hover:none)]:h-10" onClick={() => setConfirm({ kind: "all" })} aria-label={t.empty}>
+                  <Trash2 className="size-3.5" /> <span className="sm:hidden">{t.emptyShort}</span>
+                  <span className="max-sm:hidden">{t.empty}</span>
                 </Button>
-              </div>
+              </>
             )}
-          </motion.header>
+          </PageHeader>
 
           {items.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 24 }}
-              className="flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 py-16 text-center"
-            >
-              <Blob size={128} mood="happy" />
-              <h2 className="mt-2 font-display text-[20px] font-semibold tracking-[-0.015em]">{t.emptyTitle}</h2>
-              <p className="mt-1 max-w-[340px] text-[13.5px] text-ink-2">
-                {t.emptyHint}
-              </p>
-              <Link
-                href="/home"
-                className="mt-5 inline-flex h-8 items-center rounded-lg border border-line bg-raised px-3 text-[13px] font-medium text-ink shadow-card hover:border-line-2"
-              >
-                {t.backHome}
-              </Link>
-            </motion.div>
+            <EmptyState
+              art={<Blob size={96} mood="happy" />}
+              title={t.emptyTitle}
+              body={t.emptyHint}
+              actions={
+                <Link href="/home" className={buttonClass("secondary", "sm")}>
+                  {t.backHome}
+                </Link>
+              }
+            />
           ) : (
             <>
-              <div className="mb-2 flex items-center justify-between px-1 text-[12px] text-ink-3">
-                <span>
-                  {visible.length === items.length ? t.items(items.length) : t.filtered(visible.length, items.length)}
-                </span>
-                <span className="hidden sm:inline">{t.newestFirst}</span>
-              </div>
-              <div className="overflow-hidden rounded-xl border border-line bg-raised shadow-card">
+              <div className={cn(card, "overflow-hidden")}>
                 <ul className="relative">
                   <AnimatePresence mode="popLayout" initial={false} custom={exit}>
                     {visible.map((item, index) => (
@@ -263,13 +249,12 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
                   </AnimatePresence>
                 </ul>
                 {visible.length === 0 && (
-                  <div className="px-4 py-10 text-center text-[13px] text-ink-3">{t.noMatch(query.trim())}</div>
+                  <div className={cn("px-4 py-10 text-center text-[13px]", midTone)}>{t.noMatch(query.trim())}</div>
                 )}
               </div>
             </>
           )}
-        </div>
-      </div>
+      </PageBody>
 
       <ConfirmDialog
         open={confirm?.kind === "one"}
@@ -293,6 +278,11 @@ export function TrashView({ initialPages }: { initialPages: PageMeta[] }) {
       </ConfirmDialog>
     </>
   );
+}
+
+/** What kind of page a row is ("Tabelle", "Handschrift" …). */
+function kindLabel(kind: PageMeta["kind"], t: (typeof trashText)["en"]) {
+  return kind === "deck" ? t.presentation : kind === "cv" ? t.cv : kind === "folder" ? t.folder : kind === "sheet" ? t.sheet : kind === "ink" ? t.ink : t.note;
 }
 
 const rowVariants = {
@@ -340,14 +330,16 @@ function TrashRow({
           <span className="block truncate text-[13.5px] font-medium text-ink group-hover:underline group-hover:decoration-line-2 group-hover:underline-offset-4">
             {title}
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-ink-3">
-            {subject ? (
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="size-1.5 shrink-0 rounded-full" style={{ background: subjectColor(subject.color) }} />
-                <span className="truncate">{subject.name}</span>
-              </span>
-            ) : (
-              <span>{root.kind === "deck" ? t.presentation : root.kind === "cv" ? t.cv : root.kind === "folder" ? t.folder : root.kind === "sheet" ? t.sheet : t.note}</span>
+          <span className={cn("flex min-w-0 items-center gap-1.5 text-[12px]", midTone)}>
+            <span className="shrink-0">{kindLabel(root.kind, t)}</span>
+            {subject && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: subjectColor(subject.color) }} />
+                  <span className="truncate">{subject.name}</span>
+                </span>
+              </>
             )}
             {inside > 0 && (
               <>
@@ -355,17 +347,15 @@ function TrashRow({
                 <span className="shrink-0">{t.inside(inside)}</span>
               </>
             )}
-            <span aria-hidden className="sm:hidden">
-              ·
-            </span>
-            <span className="truncate sm:hidden" suppressHydrationWarning>
-              {deletedAgo(root.trashed_at!, locale)}
-            </span>
+          </span>
+          {/* Phones: when it was deleted gets a line of its own (beside the kind it was cut off). */}
+          <span className={cn("block truncate text-[12px] sm:hidden", midTone)} suppressHydrationWarning>
+            {deletedAgo(root.trashed_at!, locale)}
           </span>
         </span>
       </Link>
       <span
-        className="hidden w-[150px] shrink-0 text-right text-[12.5px] text-ink-3 sm:block"
+        className={cn("hidden w-[150px] shrink-0 text-right text-[12.5px] sm:block", midTone)}
         title={format(new Date(root.trashed_at!), "PPp", { locale: dateLocale(locale) })}
         suppressHydrationWarning
       >

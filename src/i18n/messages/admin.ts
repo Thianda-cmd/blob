@@ -7,9 +7,9 @@ const personen = (n: number) => (n === 1 ? "1 Person" : `${n} Personen`);
 export const adminText = defineMessages({
   en: {
     nav: "Admin",
-    eyebrow: "Admin",
     title: "Apps & APIs",
-    intro: "Websites where people sign in with their Blob account. Only admins see this.",
+    /** The page's meta line. */
+    intro: "Websites where people sign in with Blob.",
     newApp: "New app",
     docs: "Developer docs",
     copy: "Copy",
@@ -250,9 +250,8 @@ export const adminText = defineMessages({
   },
   de: {
     nav: "Admin",
-    eyebrow: "Admin",
     title: "Apps und APIs",
-    intro: "Websites, auf denen man sich mit dem Blob-Konto anmeldet. Nur Admins sehen das.",
+    intro: "Websites, auf denen man sich mit Blob anmeldet.",
     newApp: "Neue App",
     docs: "Doku für Entwickler",
     copy: "Kopieren",

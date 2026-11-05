@@ -166,7 +166,7 @@ function DueField({ value, onChange }: { value: string | null; onChange: (v: str
           className="flex h-9.5 w-full items-center gap-2 rounded-lg border border-line bg-raised px-3 text-left text-[14px] text-ink hover:border-line-2 aria-expanded:border-blob"
         >
           <CalendarDays className="size-4 text-ink-3" />
-          <span className={cn("truncate", !value && "text-ink-3")}>{value ? formatDueLong(value, locale) : t.noDue}</span>
+          <span className={cn("truncate", !value && "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]")}>{value ? formatDueLong(value, locale) : t.noDue}</span>
         </button>
       )}
     />
@@ -299,14 +299,14 @@ function NewProjectForm({ onClose, initialTemplate, initialSubject }: { onClose:
           </div>
           {/* What you'll get: the columns, like little board headers. */}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5 rounded-xl bg-hover/50 px-2.5 py-2 text-[12px] text-ink-2">
-            <span className="mr-0.5 font-medium text-ink-3">{d.columns}:</span>
+            <span className="mr-0.5 font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{d.columns}:</span>
             {spec.columns.map((c) => (
               <span key={c.key} className="flex items-center gap-1 rounded-md bg-raised px-1.5 py-0.5 shadow-card">
                 <span className="size-2 rounded-full" style={{ background: boardColor(c.color) }} />
                 {words.columns[c.key]}
               </span>
             ))}
-            {spec.cards.length > 0 && <span className="ml-auto text-ink-3">{d.cards(spec.cards.length)}</span>}
+            {spec.cards.length > 0 && <span className="ml-auto text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{d.cards(spec.cards.length)}</span>}
           </div>
         </fieldset>
 
@@ -468,20 +468,20 @@ function SettingsForm({
           {owner ? (
             <div className="mt-2 space-y-2">
               <div className="flex items-center gap-3">
-                <p className="min-w-0 flex-1 text-[12.5px] text-ink-3">{s.archiveHint}</p>
+                <p className="min-w-0 flex-1 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{s.archiveHint}</p>
                 <Button type="button" size="sm" onClick={onArchive}>
                   {project.archived_at ? t.unarchive : t.archiveAction}
                 </Button>
               </div>
               <div className="flex items-center gap-3">
-                <p className="min-w-0 flex-1 text-[12.5px] text-ink-3">{s.deleteHint}</p>
+                <p className="min-w-0 flex-1 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{s.deleteHint}</p>
                 <Button type="button" size="sm" variant="danger" onClick={onDelete}>
                   {t.delete}
                 </Button>
               </div>
             </div>
           ) : (
-            <p className="mt-1 text-[12.5px] text-ink-3">{s.ownerOnly}</p>
+            <p className="mt-1 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{s.ownerOnly}</p>
           )}
         </section>
       </div>
@@ -489,7 +489,7 @@ function SettingsForm({
         <Button type="button" variant="ghost" onClick={onClose}>
           {s.cancel}
         </Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="blob">
           {s.save}
         </Button>
       </footer>

@@ -10,7 +10,8 @@ import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { studyText, type StudyText } from "@/i18n/messages/study";
 import { Confetti } from "@/learn/components/Confetti";
-import { CountUp, StudyButton } from "@/learn/components/StudyChrome";
+import { card as cardSurface, groupLabel, midTone } from "@/components/ui/surfaces";
+import { CountUp, okFill, okText, StudyButton, studyLabel, studyPrimary } from "@/learn/components/StudyChrome";
 import { Tutor } from "@/learn/components/Tutor";
 import { plain, type Line } from "@/notes/doc";
 import type { Card } from "@/notes/study/cards";
@@ -163,7 +164,7 @@ export function CardsMode({
             <Dumbbell className="size-4" /> {t.cards.repeatWrong}
           </StudyButton>
         )}
-        <StudyButton onClick={onQuiz} variant={missed.length ? "ink" : "blob"}>
+        <StudyButton onClick={onQuiz} variant={missed.length ? "secondary" : "blob"}>
           <ListChecks className="size-4" /> {t.cards.takeQuiz}
         </StudyButton>
         <StudyButton onClick={stop} variant="ghost">
@@ -176,15 +177,15 @@ export function CardsMode({
   const stats: { key: CardState; label: string; n: number; tone: string }[] = [
     { key: "due", label: t.cards.stats.due, n: count("due"), tone: "text-blob" },
     { key: "new", label: t.cards.stats.new, n: count("new"), tone: "text-ink" },
-    { key: "later", label: t.cards.stats.later, n: count("later"), tone: "text-ok" },
-    { key: "off", label: t.cards.stats.off, n: count("off"), tone: "text-ink-3" },
+    { key: "later", label: t.cards.stats.later, n: count("later"), tone: okText },
+    { key: "off", label: t.cards.stats.off, n: count("off"), tone: "text-ink-2" },
   ];
 
   return (
     <div className="mx-auto w-full max-w-[920px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
       <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="min-w-0">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">{t.cards.title}</div>
+          <div className={studyLabel}>{t.cards.title}</div>
           <h1 className="mt-1 text-balance font-display text-[28px] font-bold leading-tight tracking-[-0.02em] sm:text-[34px]">{title}</h1>
           <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-ink-2">{t.cards.intro}</p>
         </div>
@@ -195,14 +196,14 @@ export function CardsMode({
 
       <div className="mt-6 grid grid-cols-4 gap-2 sm:gap-2.5">
         {stats.map((s) => (
-          <div key={s.key} className="rounded-2xl border border-line bg-raised px-3 py-2.5 shadow-card sm:px-4 sm:py-3">
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ink-3 sm:text-[11.5px]">{s.label}</div>
-            <div className={cn("mt-0.5 font-display text-[22px] font-bold tabular-nums sm:text-[28px]", s.n ? s.tone : "text-ink-3/60")}>{day ? s.n : "–"}</div>
+          <div key={s.key} className={cn(cardSurface, "px-3 py-2.5 sm:px-4 sm:py-3")}>
+            <div className={cn(groupLabel, "truncate")}>{s.label}</div>
+            <div className={cn("mt-0.5 font-display text-[22px] font-bold tabular-nums sm:text-[28px]", s.n ? s.tone : midTone)}>{day ? s.n : "–"}</div>
           </div>
         ))}
       </div>
 
-      <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center">
+      <div className="mt-5 flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           {roundSize > 0 ? (
             <StudyButton onClick={() => start(false)} variant="blob" className="w-full sm:w-auto">
@@ -221,12 +222,12 @@ export function CardsMode({
             <ArrowLeftRight className="size-4 text-ink-3" />
             {t.cards.reverse}
           </label>
-          <StudyButton onClick={() => start(true)} variant={roundSize > 0 ? "ghost" : "ink"}>
+          <StudyButton onClick={() => start(true)} variant={roundSize > 0 ? "ghost" : "blob"}>
             <Dumbbell className="size-4" /> {t.cards.practiceAll}
           </StudyButton>
         </div>
       </div>
-      {roundSize === 0 && <p className="mt-2 px-1 text-[12.5px] text-ink-3">{t.cards.practiceHint}</p>}
+      {roundSize === 0 && <p className={cn("mt-2 px-1 text-[12.5px]", midTone)}>{t.cards.practiceHint}</p>}
       {saveError && (
         <p className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[13px] text-danger" role="alert">
           {t.cards.saveFailed}
@@ -292,9 +293,9 @@ function Round({ session, title, onAnswer, onStop }: { session: Session; title: 
 
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col px-4 pb-10 pt-5 sm:px-6 sm:pt-8">
-      <div className="mb-3 flex items-center justify-between gap-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">
-        <span className="tabular-nums">{t.cards.progress(Math.min(answered + (seenBefore ? 0 : 1), session.total), session.total)}</span>
-        <span className="flex min-w-0 items-center gap-2 normal-case tracking-normal">
+      <div className={cn("mb-3 flex items-center justify-between gap-3", studyLabel)}>
+        <span className="shrink-0 tabular-nums">{t.cards.progress(Math.min(answered + (seenBefore ? 0 : 1), session.total), session.total)}</span>
+        <span className="flex min-w-0 items-center gap-2">
           {seenBefore && <span className="rounded-full bg-hover px-2 py-0.5 text-[11.5px] font-medium text-ink-2">{t.cards.again}</span>}
           <span className="truncate font-medium" title={title}>
             {card.context}
@@ -312,11 +313,11 @@ function Round({ session, title, onAnswer, onStop }: { session: Session; title: 
               className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-line bg-raised text-[15px] font-semibold text-ink shadow-card transition-[transform,border-color] hover:border-danger/40 active:scale-[0.98]"
             >
               <X className="size-4.5 text-danger" /> {t.cards.didntKnow}
-              <kbd className="ml-1 hidden rounded-md border border-line px-1.5 text-[11px] font-medium text-ink-3 pointer-fine:inline">1</kbd>
+              <kbd className={cn("ml-1 hidden rounded-md border border-line px-1.5 text-[11px] font-medium pointer-fine:inline", midTone)}>1</kbd>
             </button>
             <button
               onClick={() => onAnswer(true)}
-              className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-ok text-[15px] font-semibold text-white shadow-card transition-transform hover:brightness-105 active:scale-[0.98]"
+              className={cn("flex h-14 items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold shadow-card transition-transform hover:brightness-110 active:scale-[0.98]", okFill)}
             >
               <Check className="size-4.5" strokeWidth={2.6} /> {t.cards.knew}
               <kbd className="ml-1 hidden rounded-md border border-white/40 px-1.5 text-[11px] font-medium text-white/85 pointer-fine:inline">2</kbd>
@@ -325,13 +326,13 @@ function Round({ session, title, onAnswer, onStop }: { session: Session; title: 
         ) : (
           <button
             onClick={() => setFlipped(true)}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-transform hover:bg-ink/88 active:scale-[0.99]"
+            className={cn("flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold transition-transform active:scale-[0.99]", studyPrimary)}
           >
             <Undo2 className="size-4.5 -scale-x-100" /> {t.cards.flip}
-            <kbd className="ml-1 hidden rounded-md border border-paper/30 px-1.5 text-[11px] font-medium text-paper/80 pointer-fine:inline">{t.cards.flipHint}</kbd>
+            <kbd className="ml-1 hidden rounded-md border border-white/40 px-1.5 text-[11px] font-medium text-white/85 pointer-fine:inline">{t.cards.flipHint}</kbd>
           </button>
         )}
-        <p className="mt-3 text-center text-[12px] text-ink-3">
+        <p className={cn("mt-3 text-center text-[12px]", midTone)}>
           <span className="hidden pointer-fine:inline">{t.cards.keys}</span>
           <span className="pointer-fine:hidden">{flipped ? t.cards.swipe : ""}</span>
         </p>
@@ -383,7 +384,7 @@ function FlipCard({ card, flipped, reversed, onFlip, onAnswer }: { card: Card; f
         <Face back className={cn(!flipped && "pointer-events-none")}>
           <FaceHead card={card} prompt={null} />
           {card.source !== "cloze" && (
-            <div className="mx-auto mt-1 max-w-[560px] text-center text-[13.5px] leading-snug text-ink-3">
+            <div className={cn("mx-auto mt-1 max-w-[560px] text-center text-[13.5px] leading-snug", midTone)}>
               <RichLines lines={front.slice(0, 2)} />
             </div>
           )}
@@ -394,7 +395,7 @@ function FlipCard({ card, flipped, reversed, onFlip, onAnswer }: { card: Card; f
         </Face>
       </motion.div>
       {/* Swipe hints */}
-      <motion.span style={{ opacity: good }} className="pointer-events-none absolute right-4 top-4 rounded-full bg-ok px-3 py-1 text-[13px] font-semibold text-white shadow-pop">
+      <motion.span style={{ opacity: good }} className={cn("pointer-events-none absolute right-4 top-4 rounded-full px-3 py-1 text-[13px] font-semibold shadow-pop", okFill)}>
         {t.cards.knew}
       </motion.span>
       <motion.span style={{ opacity: bad }} className="pointer-events-none absolute left-4 top-4 rounded-full bg-danger px-3 py-1 text-[13px] font-semibold text-white shadow-pop">
@@ -408,12 +409,12 @@ function Face({ back, className, children }: { back?: boolean; className?: strin
   return (
     <div
       className={cn(
-        "relative flex min-h-[min(56dvh,380px)] flex-col rounded-3xl border border-line bg-raised p-5 shadow-[0_1px_1px_rgb(28_27_24/0.04),0_14px_34px_-12px_rgb(28_27_24/0.22)] [backface-visibility:hidden] [grid-area:1/1] sm:p-7",
+        // The lifted card shadow token (it stays visible in the dark theme too).
+        "relative flex min-h-[min(56dvh,380px)] flex-col rounded-2xl border border-line bg-raised p-5 shadow-pop [backface-visibility:hidden] [grid-area:1/1] sm:p-7",
         back && "[transform:rotateY(180deg)]",
         className,
       )}
     >
-      <span className="bg-dots pointer-events-none absolute inset-0 rounded-3xl opacity-25" />
       <div className="relative flex flex-1 flex-col">{children}</div>
     </div>
   );
@@ -423,7 +424,7 @@ function FaceHead({ card, prompt }: { card: Card; prompt: string | null }) {
   const t = useMessages(studyText);
   return (
     <div className="flex items-center gap-2">
-      <span className="rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{sourceLabel(card, t)}</span>
+      <span className="rounded-full bg-hover px-2 py-0.5 text-[11.5px] font-medium text-ink-2">{sourceLabel(card, t)}</span>
       {prompt && <span className="rounded-full bg-blob-soft px-2.5 py-0.5 text-[12.5px] font-semibold text-blob-ink">{prompt}</span>}
     </div>
   );
@@ -487,7 +488,7 @@ function Done({
             {title}
           </motion.h1>
           <p className="mt-1.5 text-[15px] text-ink-2">{text}</p>
-          {note && <p className="mt-1 text-[13.5px] text-ink-3">{note}</p>}
+          {note && <p className={cn("mt-1 text-[13.5px]", midTone)}>{note}</p>}
         </div>
         <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
           {stats.map((s, i) => (
@@ -496,10 +497,10 @@ function Done({
               initial={{ opacity: 0, y: 14, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2 + i * 0.08, type: "spring", stiffness: 380, damping: 26 }}
-              className="rounded-2xl border border-line bg-raised px-3 py-2.5 shadow-card sm:px-4 sm:py-3"
+              className={cn(cardSurface, "px-3 py-2.5 sm:px-4 sm:py-3")}
             >
-              <div className="text-[10.5px] font-semibold uppercase leading-snug tracking-[0.08em] text-ink-3 sm:text-[11.5px]">{s.label}</div>
-              <div className={cn("mt-0.5 font-display text-[24px] font-bold tabular-nums sm:text-[28px]", s.tone === "ok" ? "text-ok" : s.tone === "blob" ? "text-blob" : "text-ink")}>
+              <div className={cn(groupLabel, "leading-snug")}>{s.label}</div>
+              <div className={cn("mt-0.5 font-display text-[24px] font-bold tabular-nums sm:text-[28px]", s.tone === "ok" ? okText : s.tone === "blob" ? "text-blob" : "text-ink")}>
                 <CountUp value={s.value} from={0} delay={0.3 + i * 0.08} />
               </div>
             </motion.div>
@@ -567,7 +568,7 @@ function Preview({
     <section className="mt-10">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <h2 className="font-display text-[19px] font-semibold tracking-[-0.01em]">
-          {t.cards.preview} <span className="font-medium text-ink-3">· {cards.length}</span>
+          {t.cards.preview} <span className={cn("font-medium", midTone)}>· {cards.length}</span>
         </h2>
         <label className="relative w-full sm:w-[240px]">
           <span className="sr-only">{t.cards.search}</span>
@@ -576,16 +577,16 @@ function Preview({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.cards.search}
-            className="h-9 w-full rounded-xl border border-line bg-raised pl-9 pr-3 text-[13.5px] outline-none placeholder:text-ink-3/80 focus:border-blob"
+            className="h-9 w-full rounded-lg border border-line bg-raised pl-9 pr-3 text-[13.5px] shadow-card outline-none placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:border-line-2 focus:border-blob [@media(hover:none)]:h-10"
           />
         </label>
       </div>
-      {!shown.length && <p className="rounded-xl border border-dashed border-line-2 px-4 py-8 text-center text-[13px] text-ink-3">{t.cards.noMatch}</p>}
+      {!shown.length && <p className={cn("px-4 py-8 text-center text-[13px]", midTone)}>{t.cards.noMatch}</p>}
       <div className="space-y-5">
         {groups.map((g, gi) => (
           <div key={`${g.context}-${gi}`}>
-            {g.context && <h3 className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">{g.context}</h3>}
-            <ul className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
+            {g.context && <h3 className={cn("mb-1.5 px-1", groupLabel)}>{g.context}</h3>}
+            <ul className={cn(cardSurface, "overflow-hidden")}>
               {g.cards.map((c, i) => (
                 <PreviewRow
                   key={c.id}
@@ -651,11 +652,11 @@ function PreviewRow({
       <li className={cn("space-y-2 bg-surface px-4 py-3.5", !first && "border-t border-line")}>
         <div className="text-[12px] font-semibold text-ink-2">{t.cards.editing}</div>
         <label className="block">
-          <span className="text-[11.5px] font-medium text-ink-3">{t.cards.front}</span>
+          <span className={cn("text-[11.5px] font-medium", midTone)}>{t.cards.front}</span>
           <textarea value={front} onChange={(e) => setFront(e.target.value)} rows={2} className="mt-0.5 w-full resize-y rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[14px] outline-none focus:border-blob" />
         </label>
         <label className="block">
-          <span className="text-[11.5px] font-medium text-ink-3">{t.cards.back}</span>
+          <span className={cn("text-[11.5px] font-medium", midTone)}>{t.cards.back}</span>
           <textarea value={back} onChange={(e) => setBack(e.target.value)} rows={3} className="mt-0.5 w-full resize-y rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[14px] outline-none focus:border-blob" />
         </label>
         <div className="flex flex-wrap items-center gap-2">
@@ -664,7 +665,7 @@ function PreviewRow({
               edits.set(card.id, { front, back });
               onDone();
             }}
-            className="h-8 rounded-lg bg-ink px-3 text-[13px] font-medium text-paper hover:bg-ink/88"
+            className={cn("h-8 rounded-lg px-3 text-[13px] font-medium", studyPrimary)}
           >
             {t.cards.save}
           </button>
@@ -677,12 +678,12 @@ function PreviewRow({
                 edits.reset(card.id);
                 onDone();
               }}
-              className="ml-auto flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] text-ink-3 hover:bg-hover hover:text-ink"
+              className="ml-auto flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] text-ink-2 hover:bg-hover hover:text-ink"
             >
               <RotateCcw className="size-3.5" /> {t.cards.reset}
             </button>
           )}
-          <span className="w-full text-[11.5px] text-ink-3">{t.cards.editedHint}</span>
+          <span className={cn("w-full text-[11.5px]", midTone)}>{t.cards.editedHint}</span>
         </div>
       </li>
     );
@@ -699,9 +700,9 @@ function PreviewRow({
           {card.source === "cloze" ? <span className="font-medium text-blob-ink">{card.answer}</span> : <RichLines lines={card.back} />}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-3">{sourceLabel(original, t)}</span>
-          <span className={cn("rounded-full px-1.5 py-px font-medium", state === "due" ? "bg-blob/15 text-blob-ink" : state === "later" ? "bg-ok/12 text-ok" : "bg-hover text-ink-3")}>{chip}</span>
-          {edited && <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-3">{t.cards.edited}</span>}
+          <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-2">{sourceLabel(original, t)}</span>
+          <span className={cn("rounded-full px-1.5 py-px font-medium", state === "due" ? "bg-blob/15 text-blob-ink" : state === "later" ? cn("bg-ok/12", okText) : "bg-hover text-ink-2")}>{chip}</span>
+          {edited && <span className="rounded-full bg-hover px-1.5 py-px font-medium text-ink-2">{t.cards.edited}</span>}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">

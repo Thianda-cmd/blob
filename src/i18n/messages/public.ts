@@ -27,6 +27,14 @@ export const publicText = defineMessages({
       shared: "Shared with Blob",
       try: "Try Blob",
       tryLong: "Write your own notes with Blob",
+      /** The footer's invitation, by what the page is (tryLong for the rest). */
+      tryFor: {
+        note: "Write your own notes with Blob",
+        sheet: "Make your own spreadsheets with Blobxcel",
+        deck: "Build your own presentations with Blob",
+        ink: "Write by hand in Blob",
+        cv: "Build your CV with Blob",
+      } as Partial<Record<string, string>>,
       openApp: "Open in Blob",
       updated: (date: string) => `Updated ${date}`,
       dateFormat: "MMM d, yyyy",
@@ -78,6 +86,13 @@ export const publicText = defineMessages({
       shared: "Geteilt mit Blob",
       try: "Blob ausprobieren",
       tryLong: "Schreib deine eigenen Notizen mit Blob",
+      tryFor: {
+        note: "Schreib deine eigenen Notizen mit Blob",
+        sheet: "Mach deine eigenen Tabellen mit Blobxcel",
+        deck: "Bau deine eigenen Präsentationen mit Blob",
+        ink: "Schreib mit der Hand in Blob",
+        cv: "Bau deinen Lebenslauf mit Blob",
+      },
       openApp: "In Blob öffnen",
       updated: (date) => `Aktualisiert am ${date}`,
       dateFormat: "d. MMMM yyyy",

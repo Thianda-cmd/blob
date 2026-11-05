@@ -152,15 +152,15 @@ function Row({ app, size, onRemove, onDeleteData }: { app: ConnectedApp; size: s
           {app.connected ? (
             <>
               <div className="mt-0.5 text-[12.5px] text-pretty text-ink-2">
-                <span className="text-ink-3">{t.can}:</span> {can.join(", ")}
+                <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.can}:</span> {can.join(", ")}
               </div>
-              <div className="mt-0.5 text-[12px] text-pretty text-ink-3" suppressHydrationWarning>
+              <div className="mt-0.5 text-[12px] text-pretty text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]" suppressHydrationWarning>
                 {t.since(since)}
                 {lastUsed && ` · ${t.lastUsed(lastUsed)}`}
               </div>
             </>
           ) : (
-            <div className="mt-0.5 text-[12.5px] text-ink-3">{t.noAccess}</div>
+            <div className="mt-0.5 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.noAccess}</div>
           )}
           {app.data && (
             <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-2">

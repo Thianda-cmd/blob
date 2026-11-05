@@ -48,7 +48,7 @@ export function AppIntegration({ app, issuer, endpoints }: { app: AdminApp; issu
           </dd>
           <Term>{i.redirects}</Term>
           <dd className="min-w-0 space-y-1.5">
-            {app.redirect_uris.length ? app.redirect_uris.map((uri) => <CopyField key={uri} value={uri} {...copy} />) : <p className="text-[13px] text-ink-3">{i.noRedirect}</p>}
+            {app.redirect_uris.length ? app.redirect_uris.map((uri) => <CopyField key={uri} value={uri} {...copy} />) : <p className="text-[13px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{i.noRedirect}</p>}
           </dd>
         </dl>
       </Panel>

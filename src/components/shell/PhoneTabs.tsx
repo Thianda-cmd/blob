@@ -12,10 +12,18 @@ import { cn } from "@/lib/utils";
 type Tab = { href: string; label: string; icon: LucideIcon; active: (path: string) => boolean };
 
 /**
- * Phones: the places you go most, at the bottom where a thumb reaches them, like a phone app.
- * "More" opens the full sidebar (subjects, pages, settings). Hidden while the keyboard is open.
+ * The icon gives a little under the finger (CSS on the tab's own press: a gesture on the icon would
+ * make it a stop of its own for the keyboard, a nameless one, and the drawer would hand the
+ * keyboard back to it).
  */
-export function PhoneTabs({ onMore }: { onMore: () => void }) {
+const PRESS = "inline-block transition-transform duration-150 ease-out group-active:scale-[0.86] motion-reduce:transition-none motion-reduce:group-active:scale-100";
+
+/**
+ * Phones: the places you go most, at the bottom where a thumb reaches them, like a phone app.
+ * "More" opens the full sidebar (subjects, pages, settings) as a drawer (`moreOpen`: it is open).
+ * Hidden while the keyboard is open. (Tablets have the rail instead: NavRail.tsx.)
+ */
+export function PhoneTabs({ onMore, moreOpen = false }: { onMore: () => void; moreOpen?: boolean }) {
   const t = useMessages(shellText).sidebar;
   const path = usePathname();
   const keyboard = useKeyboard();
@@ -40,7 +48,11 @@ export function PhoneTabs({ onMore }: { onMore: () => void }) {
               key={tab.href}
               href={tab.href}
               aria-current={on ? "page" : undefined}
-              className={cn("relative flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium transition-colors", on ? "text-blob-ink" : "text-ink-3 active:text-ink-2")}
+              className={cn(
+                "group relative flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blob",
+                // (Not on: the mid-tone, lighter than ink-2 and still 4.5:1 for the small labels.)
+                on ? "text-blob-ink" : "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] active:text-ink-2",
+              )}
             >
               {on && (
                 <motion.span
@@ -49,17 +61,25 @@ export function PhoneTabs({ onMore }: { onMore: () => void }) {
                   transition={{ type: "spring", stiffness: 520, damping: 38 }}
                 />
               )}
-              <motion.span className="relative" whileTap={{ scale: 0.86 }}>
+              <span className={cn("relative", PRESS)}>
                 <Icon className="size-[22px]" strokeWidth={on ? 2.3 : 1.9} />
-              </motion.span>
+              </span>
               <span className="relative">{tab.label}</span>
             </Link>
           );
         })}
-        <button type="button" onClick={onMore} className="flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium text-ink-3 active:text-ink-2">
-          <motion.span whileTap={{ scale: 0.86 }}>
+        <button
+          type="button"
+          onClick={onMore}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          aria-controls={moreOpen ? "app-drawer" : undefined}
+          data-drawer-opener="tabs"
+          className="group flex flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blob active:text-ink-2"
+        >
+          <span className={PRESS}>
             <Menu className="size-[22px]" strokeWidth={1.9} />
-          </motion.span>
+          </span>
           {t.more}
         </button>
       </div>

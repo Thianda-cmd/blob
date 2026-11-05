@@ -1,9 +1,10 @@
 "use client";
 
 import { FileDown, Languages, LayoutTemplate, Lightbulb } from "lucide-react";
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { SampleFan } from "@/components/cv/home/SampleFan";
+import { chipOff, chipOn } from "@/components/ui/surfaces";
 import { CV_TEMPLATES } from "@/cv/catalog";
 import { useLocale, useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
@@ -18,7 +19,7 @@ const POINTS = [
 ] as const;
 const IDS = CV_TEMPLATES.map((m) => m.id);
 
-/** The CV builder on the landing page: the example CV fanned out, cycling through every design, and what it does. */
+/** The CV builder on the landing page: what it does, and the example CV fanned out (right from lg), cycling through every design. */
 export function CvShowcase() {
   const t = useMessages(landingText).cv;
   const locale = useLocale();
@@ -51,7 +52,7 @@ export function CvShowcase() {
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setFocused(true)}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setFocused(false)}
-        className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8 lg:col-span-7"
+        className="relative overflow-hidden rounded-2xl border border-line bg-raised p-5 shadow-card sm:p-8 lg:order-2 lg:col-span-7"
       >
         <div className="bg-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_50%_45%,#000_20%,transparent_75%)]" />
         <div className="relative" role="img" aria-label={t.label(n)}>
@@ -69,7 +70,7 @@ export function CvShowcase() {
               }}
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors",
-                i === front ? "border-ink bg-ink font-medium text-paper" : "border-line bg-raised text-ink-2 hover:border-line-2 hover:text-ink",
+                i === front ? cn(chipOn, "font-medium") : chipOff,
               )}
             >
               <span className="size-2 rounded-full ring-1 ring-ink/25" style={{ background: m.accent }} />
@@ -79,19 +80,12 @@ export function CvShowcase() {
         </div>
       </div>
 
-      <ul className="grid gap-5 sm:grid-cols-2 lg:col-span-5 lg:flex lg:flex-col lg:justify-center">
-        {POINTS.map(({ key, Icon }, i) => {
+      <ul className="grid gap-5 sm:grid-cols-2 lg:order-1 lg:col-span-5 lg:flex lg:flex-col lg:justify-center">
+        {POINTS.map(({ key, Icon }) => {
           const point = t.points[key];
           const title = typeof point.title === "function" ? point.title(n) : point.title;
           return (
-            <motion.li
-              key={key}
-              initial={{ opacity: 0, x: 12 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, amount: 0.5 }}
-              transition={{ duration: 0.5, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
-              className="flex gap-4"
-            >
+            <li key={key} className="reveal flex gap-4">
               <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-raised text-blob-ink shadow-card">
                 <Icon className="size-5" />
               </span>
@@ -99,7 +93,7 @@ export function CvShowcase() {
                 <h3 className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{title}</h3>
                 <p className="mt-0.5 text-[13.5px] leading-snug text-ink-2">{point.body}</p>
               </div>
-            </motion.li>
+            </li>
           );
         })}
       </ul>

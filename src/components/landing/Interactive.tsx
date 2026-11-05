@@ -1,7 +1,7 @@
 "use client";
 
-import { GraduationCap, Hash, Search } from "lucide-react";
-import { AnimatePresence, motion, useInView } from "motion/react";
+import { GraduationCap, Hash, Search, Sheet } from "lucide-react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Blob, type BlobAccessory, type BlobHandle, type BlobMood } from "@/components/blob/Blob";
 import { TypedText } from "@/components/blob/speech";
@@ -12,25 +12,45 @@ import { useReducedAfterMount, useTyping } from "./useTyping";
 
 type Mood = { key: string; mood: BlobMood; accessory?: BlobAccessory; gesture?: "wave" | "celebrate" | "point" };
 
+// "sheet" points at the spreadsheet's chart card (top right); "squish" stays last (a click jumps to it).
 const MOODS: Mood[] = [
   { key: "hello", mood: "happy", gesture: "wave" },
-  { key: "maths", mood: "thinking", accessory: "glasses", gesture: "point" },
+  { key: "sheet", mood: "proud", accessory: "glasses", gesture: "point" },
   { key: "exam", mood: "happy" },
+  { key: "maths", mood: "thinking", accessory: "glasses", gesture: "point" },
   { key: "done", mood: "excited", accessory: "cap", gesture: "celebrate" },
   { key: "squish", mood: "love" },
 ];
 
-/** The big hero Blob: follows the cursor, cycles moods, jiggles when clicked. */
+/** The trendline's colour in the app's charts: the series blue, darkened towards the ink. */
+const TREND = "color-mix(in oklab, var(--sheet-blue) 68%, var(--ink))";
+/** The calibration measurements on the hero card (132 × 64): x 0…10 mg/L, y 0…0.53. */
+const CARD_POINTS = [
+  [6, 57.7],
+  [30, 47.8],
+  [54, 37.7],
+  [78, 26.8],
+  [102, 16.5],
+  [126, 6.8],
+];
+
+/**
+ * The big hero Blob: follows the cursor, goes once through its moods and lines and then rests on
+ * the last one ("Drück mich mal"), so nothing keeps changing beside the text (WCAG 2.2.2); with
+ * reduced motion it stays on hello. Jiggles when clicked.
+ */
 export function HeroBlob() {
   const t = useMessages(landingText).hero;
   const people = useMessages(landingText).together.board.people;
   const ref = useRef<BlobHandle>(null);
+  const reduce = useReducedMotion();
   const [i, setI] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setI((n) => (n + 1) % MOODS.length), 3800);
-    return () => clearInterval(timer);
-  }, []);
+    if (reduce || i >= MOODS.length - 1) return;
+    const timer = setTimeout(() => setI((n) => Math.min(n + 1, MOODS.length - 1)), 3800);
+    return () => clearTimeout(timer);
+  }, [reduce, i]);
 
   const current = MOODS[i];
   const line = t.lines[current.key as keyof typeof t.lines];
@@ -48,8 +68,9 @@ export function HeroBlob() {
 
   return (
     // From sm up the cards float around Blob; the top two sit above the speech bubble's band (top padding), never under it.
-    <div className="relative mx-auto grid h-[340px] w-full max-w-[540px] place-items-center sm:h-[460px] sm:pt-16 lg:h-[520px]">
-      <FloatCard className="left-0 top-[2%] -rotate-6" delay={0}>
+    // Phones show Blob and the bubble only, small enough to fit in the first screen under the hero text.
+    <div className="relative mx-auto grid h-[300px] w-full max-w-[540px] place-items-center sm:h-[460px] sm:pt-16 lg:h-[520px]">
+      <FloatCard className="left-0 top-[2%] -rotate-3" delay={0}>
         <div className="text-[11px] text-ink-3">{t.cards.subject}</div>
         <div className="font-display text-[15px] font-semibold">{t.cards.note}</div>
         {/* A shared note: two classmates have it open (their colours, as in the app). */}
@@ -71,13 +92,24 @@ export function HeroBlob() {
           </span>
         </div>
       </FloatCard>
-      <FloatCard className="right-0 top-[7%] rotate-6" delay={0.8}>
-        <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{t.cards.exam}</div>
-        <div className="text-[13.5px] font-medium">{t.cards.examTitle}</div>
+      {/* A spreadsheet's chart: the calibration line from the Blobxcel section. */}
+      <FloatCard className="right-0 top-[7%] rotate-3" delay={0.8}>
+        <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
+          <Sheet className="size-3.5" />
+          {t.cards.sheet}
+        </div>
+        <svg viewBox="0 0 132 64" className="mt-1.5 block h-16 w-[132px] overflow-visible">
+          <path d="M4 60H128M4 2V60" stroke="var(--line-2)" fill="none" />
+          <line x1={6} y1={57.9} x2={126} y2={6.5} stroke={TREND} strokeWidth={1.4} strokeDasharray="4 2.6" strokeLinecap="round" />
+          {CARD_POINTS.map(([x, y]) => (
+            <circle key={x} cx={x} cy={y} r={2.7} fill="var(--sheet-blue)" stroke="var(--raised)" strokeWidth={1} />
+          ))}
+        </svg>
+        <div className="mt-1.5 w-fit rounded-md bg-blob-soft px-1.5 text-[11px] font-semibold leading-[18px] tabular-nums text-blob-ink">{t.cards.r2}</div>
       </FloatCard>
-      <FloatCard className="bottom-[10%] left-[4%] rotate-3" delay={1.6}>
+      <FloatCard className="bottom-[10%] left-[4%] rotate-2" delay={1.6}>
         <div className="flex items-center gap-2 text-[13px]">
-          <span className="grid size-4 place-items-center rounded-[5px] bg-blob text-white">
+          <span className="grid size-4 place-items-center rounded-[5px] bg-blob text-white dark:bg-blob-deep">
             <svg viewBox="0 0 12 12" className="size-2.5" aria-hidden>
               <path d="M2.5 6.2 5 8.5 9.5 3.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
             </svg>
@@ -85,8 +117,8 @@ export function HeroBlob() {
           <span className="text-ink-3 line-through">{t.cards.task}</span>
         </div>
       </FloatCard>
-      <FloatCard className="bottom-[5%] right-[3%] -rotate-3" delay={2.4}>
-        <div className="text-[11px] font-medium uppercase tracking-wide text-blob-ink">{t.cards.goal}</div>
+      <FloatCard className="bottom-[5%] right-[3%] -rotate-2" delay={2.4}>
+        <div className="text-[11.5px] font-medium text-blob-ink">{t.cards.goal}</div>
         <div className="mt-1.5 flex items-center gap-2">
           <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
             <motion.div
@@ -117,7 +149,7 @@ export function HeroBlob() {
         <Blob
           ref={ref}
           size={340}
-          className="max-sm:h-[290px] max-sm:w-[290px]"
+          className="max-sm:h-[240px] max-sm:w-[240px]"
           mood={current.mood}
           accessory={current.accessory ?? null}
           talking={typing}
@@ -132,55 +164,61 @@ export function HeroBlob() {
   );
 }
 
+/** A card floating next to Blob (from sm up). Shown from the first paint (server HTML too), then it bobs. */
 function FloatCard({ children, className, delay }: { children: React.ReactNode; className: string; delay: number }) {
   return (
     <motion.div
       aria-hidden
       className={`absolute hidden rounded-xl border border-line bg-raised px-3.5 py-2.5 shadow-card sm:block ${className}`}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: [0, -10, 0] }}
-      transition={{ opacity: { delay: 0.3 + delay / 4, duration: 0.5 }, y: { duration: 6, repeat: Infinity, ease: "easeInOut", delay } }}
+      initial={{ y: 0 }}
+      animate={{ y: [0, -10, 0] }}
+      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay }}
     >
       {children}
     </motion.div>
   );
 }
 
-/** Fades a block up the first time it scrolls into view. */
-export function Reveal({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+/** Blob above the closing call to action: waves once when it scrolls into view. */
+export function CtaBlob() {
+  const ref = useRef<HTMLDivElement>(null);
+  const blob = useRef<BlobHandle>(null);
+  const seen = useInView(ref, { once: true, amount: 0.8 });
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!seen || reduce) return;
+    const timer = setTimeout(() => blob.current?.wave(), 350);
+    return () => clearTimeout(timer);
+  }, [seen, reduce]);
+
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "0px 0px -60px 0px" }}
-      transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
+    <div ref={ref} className="grid size-[112px] place-items-center">
+      <Blob ref={blob} size={112} mood="happy" />
+    </div>
   );
 }
 
-/** Types a quick-add phrase and shows what Blob understood. */
+/** Types a quick-add phrase and shows what Blob understood: once each time it scrolls into view (about 3 s), then it stays. */
 export function QuickAddDemo() {
   const t = useMessages(landingText).homework.demo;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
+  const gone = !useInView(ref);
   const reduce = useReducedAfterMount();
   const phrase = t.input;
   const [typed, setTyped] = useState({ phrase, count: 0 });
 
-  // A new language restarts the demo (derived-state reset during render).
-  if (typed.phrase !== phrase) setTyped({ phrase, count: 0 });
+  // A new language, or the demo out of sight, starts it over (derived-state reset during render).
+  if (typed.phrase !== phrase || (gone && typed.count > 0)) setTyped({ phrase, count: 0 });
   const count = reduce ? phrase.length : typed.count;
   const text = phrase.slice(0, count);
   const parsed = count >= phrase.length;
 
   useEffect(() => {
-    if (!visible || reduce) return;
-    const done = typed.count >= phrase.length;
-    const delay = typed.count === 0 ? 600 : done ? 2800 : 70 + ((typed.count * 37) % 60);
-    const timer = setTimeout(() => setTyped((s) => ({ phrase: s.phrase, count: done ? 0 : s.count + 1 })), delay);
+    if (!visible || reduce || typed.count >= phrase.length) return;
+    const delay = typed.count === 0 ? 600 : 70 + ((typed.count * 37) % 60);
+    const timer = setTimeout(() => setTyped((s) => ({ phrase: s.phrase, count: s.count + 1 })), delay);
     return () => clearTimeout(timer);
   }, [visible, reduce, typed.count, phrase.length]);
 
@@ -261,13 +299,19 @@ const EDGES: { a: number; b: number; kind: "link" | "child" | "tag" }[] = [
 /** The node each search query finds. */
 const FINDS = [1, 5];
 
-/** The notes home: a search types itself and the knowledge graph lights up what it finds. */
+/**
+ * The notes home: a search types itself and the knowledge graph lights up what it finds. Both
+ * searches once each time it scrolls into view (under five seconds), then the last find stays.
+ */
 export function KnowledgeDemo() {
   const t = useMessages(landingText).organize.demo;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
+  const gone = !useInView(ref);
   const reduce = useReducedAfterMount();
   const [typed, setTyped] = useState({ q: 0, count: 0 });
+  // Out of sight, it starts over (derived-state reset during render).
+  if (gone && (typed.q > 0 || typed.count > 0)) setTyped({ q: 0, count: 0 });
   // The graph spreads out on wider cards (up to a point) while the labels keep their size.
   const svg = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(320);
@@ -286,12 +330,12 @@ export function KnowledgeDemo() {
   const lit = focus === null ? null : new Set([focus, ...EDGES.flatMap((e) => (e.a === focus ? [e.b] : e.b === focus ? [e.a] : []))]);
 
   useEffect(() => {
-    if (!visible || reduce) return;
     const done = typed.count >= query.length;
-    const delay = typed.count === 0 ? 700 : done ? 2800 : 110;
-    const timer = setTimeout(() => setTyped((s) => (done ? { q: (s.q + 1) % FINDS.length, count: 0 } : { q: s.q, count: s.count + 1 })), delay);
+    if (!visible || reduce || (done && typed.q === FINDS.length - 1)) return;
+    const delay = typed.count === 0 ? 700 : done ? 1700 : 110;
+    const timer = setTimeout(() => setTyped((s) => (done ? { q: s.q + 1, count: 0 } : { q: s.q, count: s.count + 1 })), delay);
     return () => clearTimeout(timer);
-  }, [visible, reduce, typed.count, query.length]);
+  }, [visible, reduce, typed.count, typed.q, query.length]);
 
   const color = (n: GraphNode) => (n.kind === "tag" ? "var(--blob)" : n.kind === "topic" ? "var(--ok)" : "var(--subject-moss)");
 

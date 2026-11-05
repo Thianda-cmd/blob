@@ -9,10 +9,12 @@ import { Blob, type BlobHandle } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { useRefreshOnBack } from "@/components/cv/home/useRefreshOnBack";
 import { AvatarStack } from "@/components/share/Avatar";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
 import { useNow } from "@/components/tasks/useNow";
 import { Button } from "@/components/ui/Button";
 import { MenuItem, Popover } from "@/components/ui/Menu";
+import { addTile, card, cardLift, featured, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
@@ -25,14 +27,12 @@ import type { ProjectSummary } from "./load";
 import { TEMPLATES, TEMPLATE_IDS, boardColor, type TemplateId } from "./model";
 import { ConfirmDialog, NewProjectDialog, ProjectIcon } from "./ProjectDialogs";
 
-const rise = {
-  hidden: { opacity: 0, y: 10 },
-  shown: (i: number) => ({ opacity: 1, y: 0, transition: { delay: 0.04 * i, type: "spring" as const, stiffness: 420, damping: 32 } }),
-};
-
 const isTemplate = (v: string | null): v is TemplateId => !!v && (TEMPLATE_IDS as readonly string[]).includes(v);
 
-/** /projects: your projects and the ones you're in, a friendly start with templates, and the archive. */
+/**
+ * /projects: your projects and the ones you're in, and the archive. With none yet, a start screen
+ * in the look of the spreadsheet's template picker: "Leeres Board" first, then the templates.
+ */
 export function ProjectsHome({ initial }: { initial: ProjectSummary[] }) {
   const t = useMessages(projectsText);
   const now = useNow();
@@ -71,86 +71,71 @@ export function ProjectsHome({ initial }: { initial: ProjectSummary[] }) {
     blob.say(next.archived_at ? t.archived : t.restored, { mood: "happy" });
   }
 
+  const meta = all.length ? [t.count(active.length), ...(archived.length ? [t.archivedCount(archived.length)] : [])].join(" · ") : undefined;
+
   return (
     <>
-      <TopBar crumbs={[{ label: t.title, icon: <FolderKanban className="size-3.5 text-ink-3" /> }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-28 pt-3 sm:px-8 lg:px-10 lg:pt-5">
-          <motion.header initial="hidden" animate="shown" className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-            <motion.div variants={rise} custom={0} className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <FolderKanban className="size-3.5" /> {t.eyebrow}
-              </div>
-              <h1 className="mt-1 font-display text-[32px] font-bold leading-none tracking-[-0.02em]">{t.title}</h1>
-              <p className="mt-2 max-w-[680px] text-[14.5px] leading-relaxed text-ink-2">{t.intro}</p>
-            </motion.div>
-            {all.length > 0 && (
-              <motion.div variants={rise} custom={1}>
-                <Button variant="blob" size="lg" onClick={() => setCreating({})}>
-                  <Plus className="size-4" /> {t.newProject}
-                </Button>
-              </motion.div>
-            )}
-          </motion.header>
+      <TopBar
+        crumbs={[{ label: t.title, icon: <FolderKanban className="size-3.5 text-ink-3" /> }]}
+        actions={
+          <Button variant="blob" size="bar" onClick={() => setCreating({})} title={t.newProject}>
+            <Plus className="size-4" strokeWidth={2.4} aria-hidden />
+            <span className="max-sm:sr-only">{t.newProject}</span>
+          </Button>
+        }
+      />
+      <PageBody>
+        <PageHeader title={t.title} meta={meta} />
 
-          {all.length === 0 ? (
-            <EmptyHero onStart={(template) => setCreating({ template })} />
-          ) : (
-            <>
-              {active.length > 0 && (
-                <section className="mt-7" aria-labelledby="projects-yours">
-                  <div className="mb-3 flex items-baseline gap-3">
-                    <h2 id="projects-yours" className="font-display text-[19px] font-semibold tracking-[-0.01em]">
-                      {t.yours}
-                    </h2>
-                    <span className="text-[13px] text-ink-3">{t.count(active.length)}</span>
-                  </div>
-                  <Grid>
-                    {active.map((p, i) => (
+        {active.length === 0 ? (
+          <StartScreen fresh={all.length === 0} onStart={(template) => setCreating({ template })} />
+        ) : (
+          // "Deine Projekte" only says something when the archive below is there too.
+          <section aria-labelledby={archived.length ? "projects-yours" : undefined} aria-label={archived.length ? undefined : t.yours}>
+            {archived.length > 0 && <SectionHeader id="projects-yours" title={t.yours} count={active.length} />}
+            <Grid>
+              {active.map((p, i) => (
+                <ProjectCard key={p.id} project={p} index={i} now={now} me={userId} onArchive={() => archive(p)} onConfirm={(kind) => setConfirm({ kind, project: p })} />
+              ))}
+              <motion.button
+                key="new"
+                layout
+                type="button"
+                onClick={() => setCreating({})}
+                className={cn(addTile, "flex min-h-[168px] flex-col items-center justify-center gap-1.5 text-[13.5px] font-medium max-sm:min-h-12 max-sm:flex-row")}
+              >
+                <Plus className="size-5 max-sm:size-4" aria-hidden />
+                {t.newProject}
+              </motion.button>
+            </Grid>
+          </section>
+        )}
+
+        {archived.length > 0 && (
+          <section className="mt-8">
+            <button
+              type="button"
+              onClick={() => setShowArchive((v) => !v)}
+              aria-expanded={showArchive}
+              className="-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink [@media(hover:none)]:py-2"
+            >
+              <ChevronDown className={cn("size-4 transition-transform", !showArchive && "-rotate-90")} aria-hidden />
+              {showArchive ? t.hideArchived : t.showArchived(archived.length)}
+            </button>
+            <AnimatePresence initial={false}>
+              {showArchive && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <Grid className="pt-3 opacity-80">
+                    {archived.map((p, i) => (
                       <ProjectCard key={p.id} project={p} index={i} now={now} me={userId} onArchive={() => archive(p)} onConfirm={(kind) => setConfirm({ kind, project: p })} />
                     ))}
-                    <motion.button
-                      key="new"
-                      layout
-                      type="button"
-                      onClick={() => setCreating({})}
-                      className="flex min-h-[168px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line-2 text-[13.5px] text-ink-3 transition-colors hover:border-blob/60 hover:bg-blob-soft/40 hover:text-blob-ink"
-                    >
-                      <Plus className="size-5" />
-                      {t.newProject}
-                    </motion.button>
                   </Grid>
-                </section>
+                </motion.div>
               )}
-
-              {archived.length > 0 && (
-                <section className="mt-8">
-                  <button
-                    type="button"
-                    onClick={() => setShowArchive((v) => !v)}
-                    aria-expanded={showArchive}
-                    className="-ml-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
-                  >
-                    <ChevronDown className={cn("size-4 transition-transform", !showArchive && "-rotate-90")} />
-                    {showArchive ? t.hideArchived : t.showArchived(archived.length)}
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {showArchive && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <Grid className="pt-3 opacity-80">
-                          {archived.map((p, i) => (
-                            <ProjectCard key={p.id} project={p} index={i} now={now} me={userId} onArchive={() => archive(p)} onConfirm={(kind) => setConfirm({ kind, project: p })} />
-                          ))}
-                        </Grid>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </section>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+            </AnimatePresence>
+          </section>
+        )}
+      </PageBody>
 
       <NewProjectDialog open={!!creating} onClose={() => setCreating(null)} template={creating?.template} subject={creating?.subject} />
       <ConfirmDialog
@@ -227,10 +212,7 @@ function ProjectCard({
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
       className="group relative"
     >
-      <Link
-        href={`/projects/${p.id}`}
-        className="flex min-h-[168px] flex-col rounded-2xl border border-line bg-raised p-4 shadow-card transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-2 hover:shadow-[0_1px_1px_rgb(28_27_24/0.04),0_8px_20px_-8px_rgb(28_27_24/0.18)]"
-      >
+      <Link href={`/projects/${p.id}`} className={cn(card, cardLift, "flex min-h-[168px] flex-col p-4")}>
         <div className="flex items-start gap-3 pr-7">
           <ProjectIcon project={p} size={40} />
           <div className="min-w-0 flex-1">
@@ -238,12 +220,12 @@ function ProjectCard({
               {title}
             </h3>
             {p.role !== "owner" && owner ? (
-              <p className="mt-0.5 truncate text-[12px] text-ink-3">
+              <p className={cn("mt-0.5 truncate text-[12px]", midTone)}>
                 {t.sharedBy(owner.full_name || s.someone)}
                 {p.role === "viewer" && ` · ${t.viewOnly}`}
               </p>
             ) : (
-              p.description && <p className="mt-0.5 truncate text-[12.5px] text-ink-3">{p.description}</p>
+              p.description && <p className={cn("mt-0.5 truncate text-[12.5px]", midTone)}>{p.description}</p>
             )}
             {subject && (
               <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-hover/80 px-2 py-0.5 text-[11.5px] font-medium text-ink-2">
@@ -254,7 +236,7 @@ function ProjectCard({
           </div>
         </div>
         <div className="mt-auto pt-4">
-          <div className="flex items-center justify-between text-[12px] text-ink-3">
+          <div className={cn("flex items-center justify-between text-[12px]", midTone)}>
             <span className="tabular-nums">{p.total ? t.progress(p.done, p.total) : t.noCards}</span>
             {p.total > 0 && <span className="tabular-nums">{pct}%</span>}
           </div>
@@ -331,7 +313,8 @@ function ProjectCard({
   );
 }
 
-function EmptyHero({ onStart }: { onStart: (template: TemplateId) => void }) {
+/** No projects (or none that aren't archived): where to start, like the spreadsheet's template picker. */
+function StartScreen({ fresh, onStart }: { fresh: boolean; onStart: (template: TemplateId) => void }) {
   const t = useMessages(projectsText);
   const ref = useRef<BlobHandle>(null);
   useEffect(() => {
@@ -339,40 +322,42 @@ function EmptyHero({ onStart }: { onStart: (template: TemplateId) => void }) {
     return () => window.clearTimeout(id);
   }, []);
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="relative mt-7 overflow-hidden rounded-3xl border border-line bg-raised shadow-card"
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_0%_0%,color-mix(in_oklab,var(--blob)_14%,transparent),transparent_60%)]" />
-      <div className="bg-dots pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30 [mask-image:linear-gradient(to_left,black,transparent)]" />
-      <div className="relative grid gap-6 p-6 sm:p-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-        <div className="min-w-0">
-          <h2 className="font-display text-[24px] font-bold tracking-[-0.02em]">{t.emptyTitle}</h2>
-          <p className="mt-1.5 max-w-[520px] text-[14px] leading-relaxed text-ink-2">{t.emptyBody}</p>
-          <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.quickStart}</p>
-          <div className="mt-2 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-3">
-            {TEMPLATE_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onStart(id)}
-                className="group flex items-center gap-3 rounded-xl border border-line bg-raised p-2.5 text-left shadow-card transition-[transform,border-color] hover:-translate-y-0.5 hover:border-line-2"
-              >
-                <ProjectIcon project={{ icon: TEMPLATES[id].icon, color: TEMPLATES[id].color }} size={36} />
-                <span className="min-w-0">
-                  <span className="block truncate text-[13.5px] font-semibold text-ink">{t.templates[id].name}</span>
-                  <span className="block truncate text-[12px] text-ink-3">{t.templates[id].blurb}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+    <section aria-labelledby="projects-start">
+      <div className="flex items-start gap-6">
+        <div className="min-w-0 flex-1">
+          {fresh && <p className="text-[12.5px] font-medium text-ink-2">{t.emptyTitle}</p>}
+          <h2 id="projects-start" className="mt-1 font-display text-[24px] font-bold leading-tight tracking-[-0.02em] text-ink">
+            {t.startTitle}
+          </h2>
+          <p className="mt-2 max-w-[640px] text-pretty text-[14px] leading-relaxed text-ink-2">{t.startBody}</p>
         </div>
-        <div className="hidden justify-center md:flex">
-          <Blob ref={ref} size={150} mood="happy" />
+        <div className="-my-2 hidden shrink-0 sm:block">
+          <Blob ref={ref} size={96} mood="happy" />
         </div>
       </div>
-    </motion.section>
+
+      <button type="button" onClick={() => onStart("blank")} className={cn(featured, "mt-6 flex w-full items-center gap-3.5 p-3.5 text-left")}>
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blob text-white shadow-card dark:bg-blob-deep">
+          <Plus className="size-5" strokeWidth={2.4} aria-hidden />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[16.5px] font-semibold leading-tight text-ink">{t.templates.blank.name}</span>
+          <span className="mt-0.5 block text-[13px] leading-snug text-ink-2">{t.templates.blank.blurb}</span>
+        </span>
+      </button>
+
+      <SectionHeader title={t.templatesTitle} className="mt-8" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+        {TEMPLATE_IDS.filter((id) => id !== "blank").map((id) => (
+          <button key={id} type="button" onClick={() => onStart(id)} className={cn(card, cardLift, "flex items-start gap-3 p-3.5 text-left")}>
+            <ProjectIcon project={{ icon: TEMPLATES[id].icon, color: TEMPLATES[id].color }} size={36} />
+            <span className="min-w-0">
+              <span className="block text-[14px] font-semibold leading-tight text-ink">{t.templates[id].name}</span>
+              <span className="mt-1 block text-[12.5px] leading-snug text-ink-2">{t.templates[id].blurb}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

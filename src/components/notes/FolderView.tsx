@@ -6,34 +6,42 @@ import {
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { motion } from "motion/react";
-import { ArrowUpFromLine, Ellipsis, Eye, FilePlus2, Folder, FolderInput, FolderPlus, GripVertical, Presentation, Sheet as SheetIcon, Signature, Trash2 } from "lucide-react";
+import { ArrowUpFromLine, Ellipsis, Eye, Folder, FolderInput, GripVertical, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState, type KeyboardEventHandler, type MouseEventHandler, type ReactNode, type TouchEventHandler } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { SCHOOL_EMOJIS } from "@/components/editor/IconPicker";
 import { PageTopBar } from "@/components/page/PageTopBar";
+import { KIND_LOOK, NewPageButton, type NewKind } from "@/components/shell/NewPageMenu";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { PageIcon } from "@/components/shell/Sidebar";
-import { DeckCard, InkCard, NoteCard, SheetCard, type PagePreview } from "@/components/subjects/PageCards";
+import { PageCard, type PagePreview } from "@/components/subjects/PageCards";
 import { useNow } from "@/components/tasks/useNow";
-import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { MenuItem, MenuLabel, MenuSeparator, Popover } from "@/components/ui/Menu";
+import { card, midTone } from "@/components/ui/surfaces";
 import { PageMenuArea } from "./PageMenuArea";
+import { useImporter } from "./useImporter";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { notesText } from "@/i18n/messages/notes";
-import type { AccessRole, Member, Page, PageKind, PageMeta } from "@/lib/types";
+import type { AccessRole, Member, Page, PageMeta } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
 
-type NewKind = Extract<PageKind, "note" | "deck" | "folder" | "ink" | "sheet">;
+/** The cards of a section: two columns on a phone, as many as fit from tablets up. */
+const GRID = "grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-3";
 
 /** A folder: the pages inside it as cards, new pages inside, and drag (or a menu) to move them. */
 export function FolderView({ page: initial, role, members, previews }: { page: Page; role: AccessRole; members: Member[]; previews: Record<string, PagePreview> }) {
@@ -42,6 +50,7 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
   const router = useRouter();
   const now = useNow();
   const { pages, createPage, updatePage, trashPage, userId } = useWorkspace();
+  const importer = useImporter();
   const page = pages.find((p) => p.id === initial.id) ?? initial;
   const canEdit = role !== "viewer";
   const [title, setTitle] = useState(page.title);
@@ -120,155 +129,132 @@ export function FolderView({ page: initial, role, members, previews }: { page: P
     }
   };
 
-  const card = (p: PageMeta) => (
-    <Item key={p.id} page={p} draggable={canEdit} droppable={canEdit && p.kind === "folder"} dragging={dragging?.id === p.id}>
-      {p.kind === "folder" ? (
-        <FolderCard page={p} count={pages.filter((c) => c.parent_id === p.id).length} titles={pages.filter((c) => c.parent_id === p.id).slice(0, 2).map((c) => pageTitle(c.title, c.kind, locale))} />
-      ) : p.kind === "deck" ? (
-        <DeckCard page={p} preview={previews[p.id]} now={now} />
-      ) : p.kind === "ink" ? (
-        <InkCard page={p} preview={previews[p.id]} now={now} />
-      ) : p.kind === "sheet" ? (
-        <SheetCard page={p} preview={previews[p.id]} now={now} />
-      ) : (
-        <NoteCard page={p} preview={previews[p.id]} now={now} />
-      )}
-      {canEdit && (
-        <MoveMenu
-          item={p}
-          folders={folders.filter((f) => f.id !== p.id)}
-          canUp
-          canTrash={p.user_id === userId}
-          onMove={(target) => move(p, target)}
-          onTrash={() => trashPage(p.id)}
-        />
-      )}
-    </Item>
+  const tile = (p: PageMeta) => {
+    const inside = p.kind === "folder" ? pages.filter((c) => c.parent_id === p.id) : [];
+    return (
+      <Item key={p.id} page={p} draggable={canEdit} droppable={canEdit && p.kind === "folder"} dragging={dragging?.id === p.id}>
+        <PageCard page={p} preview={previews[p.id]} inside={{ count: inside.length, titles: inside.slice(0, 3).map((c) => pageTitle(c.title, c.kind, locale)) }} now={now} />
+        {canEdit && (
+          <MoveMenu
+            item={p}
+            folders={folders.filter((f) => f.id !== p.id)}
+            canUp
+            canTrash={p.user_id === userId}
+            onMove={(target) => move(p, target)}
+            onTrash={() => trashPage(p.id)}
+          />
+        )}
+      </Item>
+    );
+  };
+
+  // (Its ▾ also imports a file into the folder, as the sidebar's "+" on the folder does.)
+  const newPage = (onPhones?: boolean) => (
+    <NewPageButton kind="note" onPick={create} onImport={() => importer.pick({ parentId: page.id })} busy={busy !== null} labelOnPhones={onPhones} />
   );
 
   return (
     <PageMenuArea>
-      <PageTopBar pageId={page.id} saveState="saved" role={role} members={members} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1100px] px-4 pb-28 pt-5 sm:px-8 lg:px-10 lg:pt-8">
-          <header className="flex flex-wrap items-end gap-x-4 gap-y-4">
-            <div className="flex min-w-0 flex-1 basis-full items-center gap-3.5 sm:basis-auto">
-              <FolderIcon icon={page.icon} editable={canEdit} onChange={(icon) => updatePage(page.id, { icon })} />
-              <div className="min-w-0 flex-1">
-                <div className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-3">{t.label}</div>
-                {canEdit ? (
-                  <input
-                    value={title}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      void updatePage(page.id, { title: e.target.value }, { local: true });
-                    }}
-                    onBlur={saveTitle}
-                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                    placeholder={t.namePlaceholder}
-                    aria-label={t.nameLabel}
-                    // A brand-new folder asks for its name right away.
-                    autoFocus={!initial.title}
-                    maxLength={300}
-                    className="block w-full truncate bg-transparent font-display text-[28px] font-bold leading-tight tracking-[-0.025em] text-ink outline-none placeholder:text-ink-3/50"
-                  />
-                ) : (
-                  <h1 className="truncate font-display text-[28px] font-bold leading-tight tracking-[-0.025em]">{pageTitle(page.title, "folder", locale)}</h1>
-                )}
-                <p className="mt-0.5 text-[13px] text-ink-3">{t.count(children.length)}</p>
-              </div>
-            </div>
-            {canEdit && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" onClick={() => create("note")} loading={busy === "note"}>
-                  <FilePlus2 className="size-4" /> {t.newNote}
-                </Button>
-                <Button variant="secondary" onClick={() => create("ink")} loading={busy === "ink"}>
-                  <Signature className="size-4" /> <span className="max-sm:sr-only">{t.newInk}</span>
-                </Button>
-                <Button variant="secondary" onClick={() => create("sheet")} loading={busy === "sheet"}>
-                  <SheetIcon className="size-4" /> <span className="max-sm:sr-only">{t.newSheet}</span>
-                </Button>
-                <Button variant="secondary" onClick={() => create("deck")} loading={busy === "deck"}>
-                  <Presentation className="size-4" /> <span className="max-sm:sr-only">{t.newDeck}</span>
-                </Button>
-                <Button variant="secondary" onClick={() => create("folder")} loading={busy === "folder"}>
-                  <FolderPlus className="size-4" /> <span className="max-sm:sr-only">{t.newFolder}</span>
-                </Button>
-              </div>
-            )}
-          </header>
+      <PageTopBar pageId={page.id} saveState="saved" role={role} members={members} actions={canEdit ? newPage() : undefined} />
+      <PageBody width="default">
+        <PageHeader
+          icon={<FolderIcon icon={page.icon} editable={canEdit} onChange={(icon) => updatePage(page.id, { icon })} />}
+          label={t.label}
+          title={
+            canEdit ? (
+              <input
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  void updatePage(page.id, { title: e.target.value }, { local: true });
+                }}
+                onBlur={saveTitle}
+                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                placeholder={t.namePlaceholder}
+                aria-label={t.nameLabel}
+                // A brand-new folder asks for its name right away.
+                autoFocus={!initial.title}
+                maxLength={300}
+                className="-mx-1.5 block w-[calc(100%+0.75rem)] truncate rounded-lg bg-transparent px-1.5 outline-none transition-colors placeholder:text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] hover:bg-hover/60 focus:bg-hover/60"
+              />
+            ) : (
+              pageTitle(page.title, "folder", locale)
+            )
+          }
+          meta={t.count(children.length)}
+        />
 
-          {!canEdit && (
-            <div className="mt-5 flex items-center gap-2 rounded-xl border border-line bg-raised px-3.5 py-2.5 text-[13px] text-ink-2 shadow-card" role="status">
-              <Eye className="size-4 shrink-0 text-ink-3" /> {t.readOnly}
+        {!canEdit && (
+          <div className={cn(card, "mb-6 flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-ink-2")} role="status">
+            <Eye className="size-4 shrink-0 text-ink-3" aria-hidden /> {t.readOnly}
+          </div>
+        )}
+
+        <DndContext id={dndId} sensors={sensors} collisionDetection={dropTarget} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+          {children.length === 0 ? (
+            <EmptyState
+              art={<Blob size={88} mood="sleepy" track={false} />}
+              title={t.emptyTitle}
+              body={canEdit ? t.emptyText : undefined}
+              actions={canEdit ? newPage(true) : undefined}
+            />
+          ) : (
+            <div className="space-y-9">
+              {folders.length > 0 && (
+                <Section title={t.folders} count={folders.length} hint={canEdit && children.length > folders.length ? t.dragHint : undefined}>
+                  <div className={GRID}>{folders.map(tile)}</div>
+                </Section>
+              )}
+              {notes.length > 0 && (
+                <Section title={t.notes} count={notes.length}>
+                  <div className={GRID}>{notes.map(tile)}</div>
+                </Section>
+              )}
+              {sheets.length > 0 && (
+                <Section title={t.sheets} count={sheets.length}>
+                  <div className={GRID}>{sheets.map(tile)}</div>
+                </Section>
+              )}
+              {inks.length > 0 && (
+                <Section title={t.inks} count={inks.length}>
+                  <div className={GRID}>{inks.map(tile)}</div>
+                </Section>
+              )}
+              {decks.length > 0 && (
+                <Section title={t.decks} count={decks.length}>
+                  <div className={GRID}>{decks.map(tile)}</div>
+                </Section>
+              )}
             </div>
           )}
 
-          <DndContext id={dndId} sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
-            {children.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-8 flex flex-col items-center rounded-2xl border border-dashed border-line-2 px-6 py-14 text-center"
-              >
-                <Blob size={104} mood="sleepy" track={false} />
-                <h2 className="mt-2 font-display text-[19px] font-semibold tracking-[-0.015em]">{t.emptyTitle}</h2>
-                {canEdit && <p className="mt-1 max-w-[340px] text-[13.5px] text-ink-2">{t.emptyText}</p>}
-              </motion.div>
-            ) : (
-              <div className="mt-8 space-y-8">
-                {folders.length > 0 && (
-                  <Section
-                    title={t.folders}
-                    count={folders.length}
-                    hint={canEdit && children.length > folders.length ? t.dragHint : undefined}
-                  >
-                    <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">{folders.map(card)}</div>
-                  </Section>
-                )}
-                {notes.length > 0 && (
-                  <Section title={t.notes} count={notes.length}>
-                    <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">{notes.map(card)}</div>
-                  </Section>
-                )}
-                {inks.length > 0 && (
-                  <Section title={t.inks} count={inks.length}>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">{inks.map(card)}</div>
-                  </Section>
-                )}
-                {sheets.length > 0 && (
-                  <Section title={t.sheets} count={sheets.length}>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">{sheets.map(card)}</div>
-                  </Section>
-                )}
-                {decks.length > 0 && (
-                  <Section title={t.decks} count={decks.length}>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">{decks.map(card)}</div>
-                  </Section>
-                )}
+          {/* While dragging: a place to drop that takes the page up one level. */}
+          {dragging && <UpTarget label={parent ? `${t.moveUp} · ${pageTitle(parent.title, parent.kind, locale)}` : t.moveUp} />}
+          <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
+            {dragging && (
+              <div className="flex max-w-[260px] items-center gap-2 rounded-xl border border-blob/40 bg-raised px-3 py-2.5 text-[13.5px] font-medium text-ink shadow-pop">
+                <PageIcon page={dragging} />
+                <span className="truncate">{pageTitle(dragging.title, dragging.kind, locale)}</span>
               </div>
             )}
-
-            {/* While dragging: a place to drop that takes the page up one level. */}
-            {dragging && <UpTarget label={parent ? `${t.moveUp} · ${pageTitle(parent.title, parent.kind, locale)}` : t.moveUp} />}
-            <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
-              {dragging && (
-                <div className="flex max-w-[260px] items-center gap-2 rounded-xl border border-blob/40 bg-raised px-3 py-2.5 text-[13.5px] font-medium text-ink shadow-pop">
-                  <PageIcon page={dragging} />
-                  <span className="truncate">{pageTitle(dragging.title, dragging.kind, locale)}</span>
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        </div>
-      </div>
+          </DragOverlay>
+        </DndContext>
+      </PageBody>
     </PageMenuArea>
   );
 }
 
 /** When the last drag ended: the click that ends a drag must not open the card. */
 let lastDrop = 0;
+
+/**
+ * Where a dragged page lands: under the pointer (the little chip that follows it sits above the
+ * pointer by as much as you grabbed the card below its top); with the keyboard, where the chip is.
+ */
+const dropTarget: CollisionDetection = (args) => {
+  const under = pointerWithin(args);
+  return under.length ? under : rectIntersection(args);
+};
 
 /** A card that can be dragged (all of it with a mouse or a long press; the grip with keys), and folders dropped onto. */
 function Item({ page, draggable, droppable, dragging, children }: { page: PageMeta; draggable: boolean; droppable: boolean; dragging: boolean; children: ReactNode }) {
@@ -293,9 +279,9 @@ function Item({ page, draggable, droppable, dragging, children }: { page: PageMe
       // No native link dragging or long-press menu: the card itself moves.
       onDragStart={(e) => e.preventDefault()}
       className={cn(
-        "group/item relative rounded-xl transition-[opacity,box-shadow,transform] duration-150 [-webkit-touch-callout:none]",
+        "group/item relative h-full min-w-0 rounded-xl transition-[opacity,box-shadow,transform] duration-150 [-webkit-touch-callout:none]",
         dragging && "opacity-40",
-        isOver && "scale-[1.02] shadow-[0_0_0_2px_var(--blob)]",
+        isOver && "scale-[1.02] ring-2 ring-blob motion-reduce:scale-100",
       )}
     >
       {children}
@@ -311,7 +297,7 @@ function Item({ page, draggable, droppable, dragging, children }: { page: PageMe
         </button>
       )}
       {isOver && (
-        <span className="pointer-events-none absolute inset-x-0 -bottom-3 z-[3] mx-auto w-fit rounded-full bg-blob px-2.5 py-0.5 text-[11.5px] font-medium text-white shadow-pop">
+        <span className="pointer-events-none absolute inset-x-0 -bottom-3 z-[3] mx-auto w-fit rounded-full bg-blob px-2.5 py-0.5 text-[11.5px] font-medium text-white shadow-pop dark:bg-blob-deep">
           {t.moveHere}
         </span>
       )}
@@ -333,29 +319,6 @@ function UpTarget({ label }: { label: string }) {
     >
       <ArrowUpFromLine className="size-4" /> {label}
     </motion.div>
-  );
-}
-
-function FolderCard({ page, count, titles }: { page: PageMeta; count: number; titles: string[] }) {
-  const t = useMessages(notesText);
-  const locale = useLocale();
-  const router = useRouter();
-  const name = pageTitle(page.title, page.kind, locale);
-  return (
-    <button
-      onClick={() => router.push(`/p/${page.id}`)}
-      className="flex w-full items-center gap-3 rounded-xl border border-line bg-raised p-3.5 text-left shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
-    >
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blob-soft text-blob-ink">
-        {page.icon ? <span className="text-[18px] leading-none">{page.icon}</span> : <Folder className="size-5" strokeWidth={1.8} />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-medium text-ink" title={name}>
-          {name}
-        </span>
-        <span className="block truncate text-[12px] text-ink-3">{count ? [t.pagesInside(count), ...titles].join(" · ") : t.emptyFolder}</span>
-      </span>
-    </button>
   );
 }
 
@@ -424,12 +387,11 @@ function MoveMenu({
   );
 }
 
-/** The folder's icon: a folder, or an emoji you pick. */
+/** The folder's icon (in the header's tile): a folder, or an emoji you pick. */
 function FolderIcon({ icon, editable, onChange }: { icon: string | null; editable: boolean; onChange: (icon: string | null) => void }) {
   const t = useMessages(notesText).folder;
-  const face = icon ? <span className="text-[28px] leading-none">{icon}</span> : <Folder className="size-7 text-blob-ink" strokeWidth={1.7} />;
-  const box = "grid size-14 shrink-0 place-items-center rounded-2xl border border-line bg-raised shadow-card";
-  if (!editable) return <div className={box}>{face}</div>;
+  const face = icon ? <span className="text-[20px] leading-none">{icon}</span> : <Folder strokeWidth={1.8} style={{ color: KIND_LOOK.folder.fg }} aria-hidden />;
+  if (!editable) return face;
   return (
     <Popover
       align="start"
@@ -437,7 +399,7 @@ function FolderIcon({ icon, editable, onChange }: { icon: string | null; editabl
       role="dialog"
       label={t.icon}
       trigger={(props) => (
-        <button {...props} className={cn(box, "transition-[transform,border-color] hover:border-line-2 active:scale-95")} aria-label={t.icon} title={t.icon}>
+        <button {...props} type="button" className="grid size-full place-items-center rounded-[11px] transition-[background,transform] hover:bg-hover active:scale-95" aria-label={t.icon} title={t.icon}>
           {face}
         </button>
       )}
@@ -472,11 +434,7 @@ function FolderIcon({ icon, editable, onChange }: { icon: string | null; editabl
 function Section({ title, count, hint, children }: { title: string; count: number; hint?: string; children: ReactNode }) {
   return (
     <section>
-      <div className="mb-3 flex h-6 items-center gap-2">
-        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-        <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium leading-[18px] tabular-nums text-ink-3">{count}</span>
-        {hint && <span className="ml-auto truncate text-[12px] text-ink-3 [@media(hover:none)]:hidden">{hint}</span>}
-      </div>
+      <SectionHeader title={title} count={count} action={hint ? <span className={cn("block truncate text-[12px] [@media(hover:none)]:hidden", midTone)}>{hint}</span> : undefined} />
       {children}
     </section>
   );

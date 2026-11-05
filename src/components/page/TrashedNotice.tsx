@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Blob } from "@/components/blob/Blob";
@@ -46,14 +46,14 @@ export function TrashedNotice({ page }: { page: Page }) {
 
   return (
     <>
-      <TopBar crumbs={[{ label: t.trash, href: "/trash" }, { label: title }]} />
+      <TopBar crumbs={[{ label: t.trash, href: "/trash", icon: <Trash2 className="size-3.5 text-ink-3" aria-hidden /> }, { label: title }]} />
       <div className="grid flex-1 place-items-center">
         <div className="flex flex-col items-center text-center">
           <Blob size={120} mood="worried" />
-          <h1 className="mt-2 max-w-[min(560px,calc(100vw-32px))] text-balance px-4 font-display text-[22px] font-semibold">{t.inTrash(title)}</h1>
+          <h1 className="mt-2 max-w-[min(560px,calc(100vw-32px))] text-balance px-4 font-display text-[22px] font-semibold tracking-[-0.02em] text-ink">{t.inTrash(title)}</h1>
           <p className="mt-1 px-4 text-[13.5px] text-ink-2">{t.restoreHint}</p>
-          <Button variant="primary" className="mt-5" onClick={restore} loading={loading}>
-            <RotateCcw className="size-4" /> {t.restore}
+          <Button variant="blob" className="mt-5" onClick={restore} loading={loading}>
+            <RotateCcw className="size-4" aria-hidden /> {t.restore}
           </Button>
         </div>
       </div>

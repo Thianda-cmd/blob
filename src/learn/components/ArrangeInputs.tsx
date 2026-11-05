@@ -9,7 +9,9 @@ import { learnText } from "@/i18n/messages/learn";
 import { useText } from "@/i18n/useText";
 import { matchOptions, matchShown } from "@/learn/engine/arrange";
 import type { AnswerSpec } from "@/learn/types";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
+import { okFill } from "./tones";
 import type { AnswerStatus } from "./AnswerInput";
 import { MathView } from "./MathView";
 import { Inline } from "./Rich";
@@ -52,7 +54,7 @@ export function OrderField({
   };
   return (
     <div className="space-y-2">
-      <div className="text-[12.5px] text-ink-3">{spec.label ? tt(spec.label) : t.orderHint}</div>
+      <div className={cn("text-[12.5px]", midTone)}>{spec.label ? tt(spec.label) : t.orderHint}</div>
       <Reorder.Group axis="y" values={order} onReorder={disabled ? () => {} : onChange} className="space-y-2">
         {order.map((item, pos) => (
           <OrderRow
@@ -115,7 +117,7 @@ function OrderRow({
       >
         <GripVertical className="size-4" />
       </span>
-      <span className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold", state === "ok" ? "bg-ok text-white" : "bg-hover text-ink-2")}>
+      <span className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold", state === "ok" ? okFill : "bg-hover text-ink-2")}>
         {pos + 1}
       </span>
       <span className="min-w-0 flex-1 py-1 leading-snug">
@@ -177,7 +179,7 @@ export function MatchField({
 
   return (
     <div className="space-y-2">
-      <div className="text-[12.5px] text-ink-3">{spec.label ? tt(spec.label) : t.matchHint}</div>
+      <div className={cn("text-[12.5px]", midTone)}>{spec.label ? tt(spec.label) : t.matchHint}</div>
       <ul className="space-y-2">
         {spec.pairs.map(([left], row) => {
           const chosen = picks[row];

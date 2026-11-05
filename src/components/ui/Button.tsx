@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import type { ButtonHTMLAttributes, Ref } from "react";
 
 type Variant = "primary" | "blob" | "secondary" | "ghost" | "danger";
-type Size = "xs" | "sm" | "md" | "lg";
+/** bar: the calendar's top-bar button (28 px, 36 on touch screens): a page's create button and its neighbours. */
+type Size = "xs" | "sm" | "md" | "lg" | "bar";
 
 const variants: Record<Variant, string> = {
   primary: "bg-ink text-paper hover:bg-ink/88 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]",
@@ -18,7 +19,16 @@ const sizes: Record<Size, string> = {
   sm: "h-7 px-2.5 text-[13px] gap-1.5 rounded-lg [@media(hover:none)]:h-8",
   md: "h-8.5 px-3.5 text-[13.5px] gap-2 rounded-lg",
   lg: "h-10 px-4.5 text-[14.5px] gap-2 rounded-xl",
+  bar: "h-7 px-2.5 text-[12.5px] gap-1.5 rounded-lg [@media(hover:none)]:h-9 [@media(hover:none)]:px-3",
 };
+
+const base =
+  "relative inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-[background,color,border,transform,opacity] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50";
+
+/** A Button's classes, for a link that should look like one (`<Link className={buttonClass("blob", "bar")}>`). */
+export function buttonClass(variant: Variant = "secondary", size: Size = "md", className?: string) {
+  return cn(base, variants[variant], sizes[size], className);
+}
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -31,12 +41,7 @@ export function Button({ variant = "secondary", size = "md", loading, className,
   return (
     <button
       ref={ref}
-      className={cn(
-        "relative inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-[background,color,border,transform,opacity] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={buttonClass(variant, size, className)}
       disabled={disabled || loading}
       {...props}
     >
@@ -63,8 +68,15 @@ export function IconButton({
   label,
   size = "sm",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; size?: "xs" | "sm" | "md"; ref?: Ref<HTMLButtonElement> }) {
-  const s = size === "xs" ? "size-6 rounded-md" : size === "sm" ? "size-7 rounded-lg [@media(hover:none)]:size-8" : "size-8.5 rounded-lg";
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; size?: "xs" | "sm" | "md" | "bar"; ref?: Ref<HTMLButtonElement> }) {
+  const s =
+    size === "xs"
+      ? "size-6 rounded-md"
+      : size === "sm"
+        ? "size-7 rounded-lg [@media(hover:none)]:size-8"
+        : size === "bar"
+          ? "size-7 rounded-lg [@media(hover:none)]:size-9"
+          : "size-8.5 rounded-lg";
   return (
     <button
       aria-label={label}

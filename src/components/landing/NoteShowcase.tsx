@@ -1,15 +1,15 @@
 "use client";
 
-import { ALargeSmall, ArrowLeft, BadgeQuestionMark, BookOpen, BookOpenCheck, ChartSpline, Check, ChevronDown, ChevronRight, FileDown, FilePlus2, FileText, Folder, GraduationCap, Layers, Leaf, Lightbulb, Link2, ListChecks, Network, Paperclip, PenTool, Pin, Play, Presentation, Printer, RotateCw, Sigma, Table2, Undo2, Workflow, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BadgeQuestionMark, BookOpen, BookOpenCheck, ChartScatter, ChartSpline, Check, ChevronDown, ChevronRight, FilePlus2, FileText, Folder, GraduationCap, Layers, Leaf, Lightbulb, ListChecks, Network, Paperclip, PenTool, Play, Presentation, Printer, RotateCw, Sigma, Table2, Undo2, Workflow, X, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { landingText } from "@/i18n/messages/landing";
 import { LevelBars } from "@/learn/components/LevelBars";
 import { MathView } from "@/learn/components/MathView";
 import { TopicGlyph } from "@/learn/components/TopicGlyph";
 import { cn } from "@/lib/utils";
-import { PointList } from "./Points";
 import { useReducedAfterMount, useTyping } from "./useTyping";
 
 type Mode = "note" | "cards" | "quiz" | "summary";
@@ -22,8 +22,9 @@ const ME = "#6d3df5";
 const ease = [0.22, 1, 0.36, 1] as const;
 
 /**
- * The autoplay script: which view shows, what happens in it (`beat`) and for how long. `lead` frames
- * open the Learn menu on the way to the flashcards; they are skipped while someone holds a view.
+ * The autoplay script: which view shows, what happens in it (`beat`) and for how long. It plays once,
+ * when the note scrolls into view, and stays on the summary. `lead` frames open the Learn menu on the
+ * way to the flashcards; they are skipped while someone holds a view.
  */
 const FRAMES: { mode: Mode; beat: number; ms: number; lead?: boolean }[] = [
   { mode: "note", beat: 0, ms: 2800 },
@@ -41,13 +42,16 @@ const FRAMES: { mode: Mode; beat: number; ms: number; lead?: boolean }[] = [
 /** With reduced motion nothing plays: each view shows its most telling moment (answer turned over, quiz answered). */
 const STILL_BEAT: Record<Mode, number> = { note: 0, cards: 2, quiz: 1, summary: 0 };
 
-/** The next frame: on through the script, or round the beats of the current view while it is held. */
-function nextFrame(i: number, hold: boolean) {
-  if (!hold) return (i + 1) % FRAMES.length;
-  const mode = FRAMES[i].mode;
+/**
+ * The next frame, or null where it stops: on through the script to its end; while someone holds a
+ * view, through that view's beats once (from the Learn menu back to the note), then it stays.
+ */
+function nextFrame(i: number, hold: boolean): number | null {
+  const frame = FRAMES[i];
   const next = FRAMES[i + 1];
-  if (next && next.mode === mode && !next.lead) return i + 1;
-  return FRAMES.findIndex((f) => f.mode === mode);
+  if (!hold) return next ? i + 1 : null;
+  if (frame.lead) return FRAMES.findIndex((f) => f.mode === frame.mode);
+  return next && next.mode === frame.mode && !next.lead ? i + 1 : null;
 }
 
 /** A note on photosynthesis with a formula, a callout and a flashcard, and what the Learn menu makes of it. */
@@ -68,12 +72,14 @@ export function NoteShowcase({ className }: { className?: string }) {
   const hold = picked || hovered || focused;
   const frame = FRAMES[i];
   const beat = still ? STILL_BEAT[frame.mode] : frame.beat;
+  const next = nextFrame(i, hold);
 
+  // One beat at a time while in view; nothing loops (WCAG 2.2.2), the view buttons show any of it again.
   useEffect(() => {
-    if (!visible || still) return;
-    const timer = setTimeout(() => setI((n) => nextFrame(n, hold)), FRAMES[i].ms);
+    if (!visible || still || next === null) return;
+    const timer = setTimeout(() => setI(next), FRAMES[i].ms);
     return () => clearTimeout(timer);
-  }, [i, visible, still, hold]);
+  }, [i, next, visible, still]);
 
   const pick = (mode: Mode) => {
     setPicked(true);
@@ -131,7 +137,7 @@ export function NoteShowcase({ className }: { className?: string }) {
                 on ? "text-white" : "text-ink-2 hover:text-ink",
               )}
             >
-              {on && <motion.span layoutId={`${scope}-mode`} className="absolute inset-0 rounded-lg bg-blob" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
+              {on && <motion.span layoutId={`${scope}-mode`} className="absolute inset-0 rounded-lg bg-blob dark:bg-blob-deep" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
               <Icon className="relative size-3.5 max-sm:hidden" />
               <span className="relative">{t.modes[m]}</span>
             </button>
@@ -385,7 +391,7 @@ function CardsView({ beat }: { beat: number }) {
           >
             <motion.div className="relative h-full transform-3d" animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.6, ease }}>
               <StudyFace>
-                <span className="w-fit rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{card.source}</span>
+                <span className="w-fit rounded-full bg-hover px-2 py-0.5 text-[11.5px] font-medium text-ink-2">{card.source}</span>
                 <span className="my-auto text-balance px-2 pb-6 text-center font-display text-[20px] font-semibold leading-snug">{card.q}</span>
               </StudyFace>
               <StudyFace back>
@@ -422,7 +428,7 @@ function CardsView({ beat }: { beat: number }) {
             </span>
           </div>
         ) : (
-          <span className="flex h-full items-center justify-center gap-2 rounded-xl bg-ink text-[14px] font-semibold text-paper">
+          <span className="flex h-full items-center justify-center gap-2 rounded-xl bg-blob text-[14px] font-semibold text-white dark:bg-blob-deep">
             <Undo2 className="size-4 -scale-x-100" />
             {t.flip}
           </span>
@@ -452,7 +458,7 @@ function QuizView({ beat }: { beat: number }) {
   return (
     <div className="flex h-full flex-col px-4 pt-4 sm:px-8 sm:pt-5">
       <Progress label={t.progress(3, 8)} value={(answered ? 3 : 2) / 8} />
-      <p className="mt-6 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">{t.ask}</p>
+      <p className={cn("mt-6 text-[12.5px] font-medium", midTone)}>{t.ask}</p>
       <p className="mt-1 text-balance font-display text-[20px] font-semibold leading-snug">{t.prompt}</p>
       <div className="mt-5 grid grid-cols-2 gap-2">
         {t.options.map((option, k) => {
@@ -499,7 +505,7 @@ function QuizView({ beat }: { beat: number }) {
 function SummaryView() {
   const d = useMessages(landingText).notes.demo;
   const t = d.summary;
-  const kicker = "text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink-3";
+  const kicker = cn("text-[12.5px] font-medium", midTone);
   return (
     <div className="flex h-full flex-col overflow-hidden px-4 pb-4 pt-4 sm:px-8 sm:pb-5 sm:pt-5">
       <div className="flex items-center justify-between gap-3">
@@ -540,7 +546,7 @@ function SummaryView() {
         </div>
       </div>
       <div className="mt-auto flex gap-2 pt-4 text-[13px] font-medium">
-        <span className="flex h-9 items-center gap-1.5 rounded-xl bg-ink px-3.5 text-paper">
+        <span className="flex h-9 items-center gap-1.5 rounded-xl bg-blob px-3.5 text-white dark:bg-blob-deep">
           <FilePlus2 className="size-4" />
           {t.save}
         </span>
@@ -556,6 +562,7 @@ function SummaryView() {
 const BLOCKS: { key: keyof (typeof landingText)["en"]["notes"]["blocks"]["items"]; Icon: LucideIcon }[] = [
   { key: "formula", Icon: Sigma },
   { key: "table", Icon: Table2 },
+  { key: "sheetChart", Icon: ChartScatter },
   { key: "mindmap", Icon: Network },
   { key: "diagram", Icon: Workflow },
   { key: "sketch", Icon: PenTool },
@@ -568,59 +575,52 @@ const BLOCKS: { key: keyof (typeof landingText)["en"]["notes"]["blocks"]["items"
   { key: "lesson", Icon: GraduationCap },
 ];
 
-/** The blocks a note can hold (like the "/" menu), then what a note does beyond them. */
-export function NoteFeatures({ className }: { className?: string }) {
+/** The blocks a note can hold, like the "/" menu: a highlight runs down them once when they scroll into view. */
+export function NoteBlocks({ className }: { className?: string }) {
   const t = useMessages(landingText).notes;
   const ref = useRef<HTMLDivElement>(null);
   const visible = useInView(ref, { amount: 0.5 });
   const reduce = useReducedMotion();
   const [lit, setLit] = useState(0);
 
-  // The highlight walks through the blocks like a finger down the "/" menu.
+  // Like a finger down the "/" menu: down the blocks once (under five seconds, nothing loops) and
+  // back to the first, where a menu starts; again the next time they scroll into view.
   useEffect(() => {
     if (!visible || reduce) return;
-    const timer = setInterval(() => setLit((n) => (n + 1) % BLOCKS.length), 1100);
+    let n = 0;
+    const timer = setInterval(() => {
+      n += 1;
+      setLit(n % BLOCKS.length);
+      if (n >= BLOCKS.length) clearInterval(timer);
+    }, 360);
     return () => clearInterval(timer);
   }, [visible, reduce]);
 
   return (
-    <div className={cn("flex flex-col gap-6", className)}>
-      <div ref={ref} className="rounded-2xl border border-line bg-raised p-4 shadow-card">
-        <div className="flex gap-3">
-          <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-lg border border-line bg-surface font-mono text-[14px] font-semibold text-blob-ink">
-            /
-          </span>
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{t.blocks.title}</h3>
-            <p className="mt-0.5 text-[13.5px] leading-snug text-ink-2">{t.blocks.body}</p>
-          </div>
+    <div ref={ref} className={cn("rounded-2xl border border-line bg-raised p-4 shadow-card", className)}>
+      <div className="flex gap-3">
+        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-lg border border-line bg-surface font-mono text-[14px] font-semibold text-blob-ink">
+          /
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold leading-snug tracking-[-0.01em]">{t.blocks.title}</h3>
+          <p className="mt-0.5 text-[13.5px] leading-snug text-ink-2">{t.blocks.body}</p>
         </div>
-        <ul aria-hidden className="mt-3.5 flex flex-wrap gap-1.5">
-          {BLOCKS.map(({ key, Icon }, i) => (
-            <li
-              key={key}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[12.5px] transition-colors duration-300",
-                i === lit ? "border-blob/40 bg-blob-soft text-blob-ink" : "border-line bg-surface text-ink-2",
-              )}
-            >
-              <Icon className="size-3.5" />
-              {t.blocks.items[key]}
-            </li>
-          ))}
-        </ul>
       </div>
-      <PointList
-        className="sm:grid-cols-2 lg:grid-cols-1"
-        points={[
-          { key: "callouts", Icon: Pin, ...t.points.callouts },
-          { key: "learn", Icon: GraduationCap, ...t.points.learn },
-          { key: "links", Icon: Link2, ...t.points.links },
-          { key: "lessons", Icon: BookOpen, ...t.points.lessons },
-          { key: "style", Icon: ALargeSmall, ...t.points.style },
-          { key: "export", Icon: FileDown, ...t.points.export },
-        ]}
-      />
+      <ul aria-hidden className="mt-3.5 flex flex-wrap gap-1.5">
+        {BLOCKS.map(({ key, Icon }, i) => (
+          <li
+            key={key}
+            className={cn(
+              "flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[12.5px] transition-colors duration-300",
+              i === lit ? "border-blob/40 bg-blob-soft text-blob-ink" : "border-line bg-surface text-ink-2",
+            )}
+          >
+            <Icon className="size-3.5" />
+            {t.blocks.items[key]}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

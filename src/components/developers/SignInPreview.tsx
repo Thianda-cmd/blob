@@ -23,7 +23,7 @@ export function SignInPreview() {
   return (
     <div className="relative overflow-hidden rounded-[22px] border border-line bg-raised p-5 shadow-pop sm:p-6">
       <div className="flex items-center justify-between">
-        <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-ink-3">{t.preview}</span>
+        <span className="text-[11.5px] font-medium text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.preview}</span>
         <span className="flex gap-1" aria-hidden>
           <span className="size-2 rounded-full bg-line-2" />
           <span className="size-2 rounded-full bg-line-2" />

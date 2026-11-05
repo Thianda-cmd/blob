@@ -6,6 +6,7 @@ import { useState } from "react";
 import { blob } from "@/components/blob/bus";
 import { DueChip } from "@/components/projects/CardFace";
 import { STEP, boardColor } from "@/components/projects/model";
+import { midTone } from "@/components/ui/surfaces";
 import { useMessages } from "@/i18n/client";
 import { projectsText } from "@/i18n/messages/projects";
 import { tasksText } from "@/i18n/messages/tasks";
@@ -71,7 +72,7 @@ export function FromProjects({ initial, limit = 8, compact }: { initial: Assigne
     }, SETTLE_MS);
   }
 
-  if (!cards.length) return <p className="text-[12.5px] leading-snug text-ink-3">{t.noProjectCards}</p>;
+  if (!cards.length) return <p className={cn("text-[12.5px] leading-snug", midTone)}>{t.noProjectCards}</p>;
   return (
     <ul className={cn("-mx-1.5", compact ? "space-y-0" : "space-y-0.5")}>
       <AnimatePresence initial={false}>
@@ -94,10 +95,10 @@ export function FromProjects({ initial, limit = 8, compact }: { initial: Assigne
                 )}
               </span>
               <Link href={`/projects/${card.project.id}?card=${card.id}`} className="min-w-0 flex-1">
-                <span className={cn("block truncate text-[13.5px] leading-snug", done ? "text-ink-3 line-through" : "text-ink")} title={card.title}>
+                <span className={cn("block truncate text-[13.5px] leading-snug", done ? "text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))] line-through" : "text-ink")} title={card.title}>
                   {card.title}
                 </span>
-                <span className="mt-0.5 flex min-w-0 items-center gap-2 text-[11.5px] text-ink-3">
+                <span className="mt-0.5 flex min-w-0 items-center gap-2 text-[11.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">
                   <span className="flex min-w-0 items-center gap-1">
                     <span className="size-1.5 shrink-0 rounded-full" style={{ background: boardColor(card.project.color) }} />
                     <span className="truncate">

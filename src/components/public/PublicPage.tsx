@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { buttonClass } from "@/components/ui/Button";
+import { midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { dateLocale } from "@/i18n/format";
 import { publicText } from "@/i18n/messages/public";
@@ -52,7 +54,7 @@ export function PublicPage({ token, view }: { token: string; view: PublicView })
               <LanguageSwitch compact />
               <Link
                 href="/signup"
-                className="flex h-9 items-center gap-1.5 rounded-xl bg-ink px-3.5 text-[13.5px] font-medium text-paper transition-colors hover:bg-ink/88"
+                className={buttonClass("blob", "md")}
               >
                 {t.try}
               </Link>
@@ -79,7 +81,7 @@ export function PublicPage({ token, view }: { token: string; view: PublicView })
             {page.icon && <span className="mt-1 text-[34px] leading-none sm:text-[40px]">{page.icon}</span>}
             <h1 className="min-w-0 break-words font-display text-[32px] font-bold leading-[1.15] tracking-[-0.025em] text-ink sm:text-[40px]">{title}</h1>
           </div>
-          <p className="mt-1.5 text-[12.5px] text-ink-3">{t.updated(updated)}</p>
+          <p className={cn("mt-1.5 text-[12.5px]", midTone)}>{t.updated(updated)}</p>
 
           <div className="mt-8">
             {browser &&
@@ -127,7 +129,7 @@ export function PublicPage({ token, view }: { token: string; view: PublicView })
               <BlobMark size={20} /> {t.madeWith}
             </span>
             <Link href="/signup" className="flex items-center gap-1 text-[13px] font-medium text-blob-ink hover:underline">
-              {t.tryLong} <ArrowRight className="size-3.5" />
+              {t.tryFor[page.kind] ?? t.tryLong} <ArrowRight className="size-3.5" />
             </Link>
           </div>
         </footer>

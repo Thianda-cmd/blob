@@ -115,7 +115,7 @@ function SharePanel({ topic, level, id, name }: { topic: Pick<TopicMeta, "subjec
     // data-own-keys and data-share-panel: while it is open, arrow keys and Enter don't move the lesson on.
     <div data-own-keys data-share-panel className="p-3.5 text-[13.5px]">
       <div className="font-semibold text-ink">{t.shareTitle}</div>
-      <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{t.shareText}</p>
+      <p className="mt-0.5 text-[12.5px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.shareText}</p>
       <div className="mt-3 flex items-center gap-1.5">
         <input
           ref={field}
@@ -128,7 +128,7 @@ function SharePanel({ topic, level, id, name }: { topic: Pick<TopicMeta, "subjec
         <button
           type="button"
           onClick={() => copyIt("link")}
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3 text-[12.5px] font-medium text-paper hover:bg-ink/88"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium bg-blob text-white hover:bg-blob-deep dark:bg-blob-deep dark:hover:bg-[color-mix(in_srgb,var(--blob-deep)_88%,white)]"
         >
           {done === "link" ? <Check className="size-3.5" strokeWidth={3} /> : <Copy className="size-3.5" />}
           <span aria-live="polite">{done === "link" ? t.copied : t.copyLink}</span>
@@ -163,7 +163,7 @@ function SharePanel({ topic, level, id, name }: { topic: Pick<TopicMeta, "subjec
       </div>
       {showCode && (
         <div className="mt-3 space-y-2">
-          <p className="text-[12px] leading-snug text-ink-3">{t.embedHint}</p>
+          <p className="text-[12px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.embedHint}</p>
           <textarea
             readOnly
             value={code}
@@ -175,7 +175,7 @@ function SharePanel({ topic, level, id, name }: { topic: Pick<TopicMeta, "subjec
           <button
             type="button"
             onClick={() => copyIt("code")}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[12.5px] font-medium text-paper hover:bg-ink/88"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-3 text-[12.5px] font-medium text-ink shadow-card hover:border-line-2 hover:bg-hover/60"
           >
             {done === "code" ? <Check className="size-3.5" strokeWidth={3} /> : <Copy className="size-3.5" />}
             <span aria-live="polite">{done === "code" ? t.copied : t.copyEmbed}</span>

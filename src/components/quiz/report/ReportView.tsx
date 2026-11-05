@@ -3,13 +3,17 @@
 import { motion } from "motion/react";
 import { ArrowLeft, BadgeQuestionMark, Check, Download, Medal, Minus, Trophy, X } from "lucide-react";
 import Link from "next/link";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
+import { Button } from "@/components/ui/Button";
+import { card, midTone } from "@/components/ui/surfaces";
 import { useLocale, useMessages } from "@/i18n/client";
 import { intlLocale } from "@/i18n/format";
 import { quizText } from "@/i18n/messages/quiz";
 import { cn } from "@/lib/utils";
 import { isRight } from "@/quiz/score";
 import type { Report } from "@/quiz/server";
+import { okFill } from "@/learn/components/tones";
 import { MiniBlob } from "../MiniBlob";
 import { TYPE_ICONS } from "../editor/QuizEditor";
 
@@ -45,34 +49,34 @@ export function ReportView({ report }: { report: Report }) {
           { label: t.report.title },
         ]}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-3 sm:px-8">
-          <header className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              {report.quizId && (
-                <Link href={`/quiz/${report.quizId}`} className="mb-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-3 hover:text-ink">
+      <PageBody width="default">
+          <PageHeader
+            label={
+              report.quizId ? (
+                <Link href={`/quiz/${report.quizId}`} className="inline-flex items-center gap-1 rounded-md hover:text-ink">
                   <ArrowLeft className="size-3.5" /> {t.report.back}
                 </Link>
-              )}
-              <h1 className="font-display text-[30px] font-bold leading-tight tracking-[-0.02em]">{report.title || t.untitled}</h1>
-              <p className="mt-1 text-[13.5px] text-ink-3">
-                {t.report.played(fmt.format(new Date(report.createdAt)))} · {t.players(report.players.length)} · {t.questions(qs.length)}
-              </p>
-            </div>
-            {report.players.length > 0 && (
-              <button type="button" onClick={csv} className="flex h-9 items-center gap-2 rounded-xl border border-line bg-raised px-3 text-[13px] font-medium text-ink shadow-card hover:bg-hover/60">
-                <Download className="size-4" /> {t.report.download}
-              </button>
-            )}
-          </header>
+              ) : undefined
+            }
+            title={report.title || t.untitled}
+            meta={`${t.report.played(fmt.format(new Date(report.createdAt)))} · ${t.players(report.players.length)} · ${t.questions(qs.length)}`}
+            wrapMeta
+            actions={
+              report.players.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={csv} title={t.report.download}>
+                  <Download className="size-4" /> <span className="max-sm:sr-only">{t.report.download}</span>
+                </Button>
+              )
+            }
+          />
 
           {report.players.length === 0 ? (
-            <p className="mt-10 text-center text-ink-3">{t.report.none}</p>
+            <p className={cn("mt-10 text-center", midTone)}>{t.report.none}</p>
           ) : (
             <>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 {report.players.slice(0, 3).map((p, i) => (
-                  <motion.div key={p.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={cn("flex items-center gap-3 rounded-3xl border px-4 py-3", i === 0 ? "border-transparent bg-blob text-white" : "border-line bg-raised")}>
+                  <motion.div key={p.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={cn("flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-card", i === 0 ? "border-transparent bg-blob text-white dark:bg-blob-deep" : "border-line bg-raised")}>
                     <MiniBlob look={p.look} size={54} />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 text-[12px] font-semibold opacity-80">
@@ -93,11 +97,11 @@ export function ReportView({ report }: { report: Report }) {
               )}
 
               <section className="mt-8">
-                <h2 className="mb-3 font-display text-[19px] font-semibold">{t.report.players}</h2>
-                <div className="overflow-x-auto rounded-2xl border border-line bg-raised">
+                <SectionHeader title={t.report.players} />
+                <div className={cn(card, "overflow-x-auto")}>
                   <table className="w-full min-w-[520px] text-[13px]">
                     <thead>
-                      <tr className="border-b border-line text-left text-[11.5px] font-semibold uppercase tracking-wide text-ink-3">
+                      <tr className={cn("border-b border-line text-left text-[12px] font-medium", midTone)}>
                         <th className="px-3 py-2">{t.report.rank}</th>
                         <th className="px-3 py-2">{t.report.name}</th>
                         <th className="px-3 py-2 text-right">{t.report.score}</th>
@@ -136,17 +140,17 @@ export function ReportView({ report }: { report: Report }) {
               </section>
 
               <section className="mt-8">
-                <h2 className="mb-3 font-display text-[19px] font-semibold">{t.report.questions}</h2>
+                <SectionHeader title={t.report.questions} />
                 <ol className="flex flex-col gap-2">
                   {qs.map((q) => {
                     const Icon = TYPE_ICONS[q.question.type];
                     const pct = Math.round(share(q) * 100);
                     return (
-                      <li key={q.index} className="flex items-center gap-3 rounded-2xl border border-line bg-raised px-4 py-3">
+                      <li key={q.index} className={cn(card, "flex items-center gap-3 px-4 py-3")}>
                         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-blob-soft text-[13px] font-bold text-blob-ink">{q.index + 1}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[14px] font-medium text-ink">{q.question.text}</p>
-                          <p className="flex items-center gap-2 text-[12px] text-ink-3">
+                          <p className={cn("flex items-center gap-2 text-[12px]", midTone)}>
                             <Icon className="size-3.5" /> {t.types[q.question.type]}
                             {q.averageMs !== null && <span>{t.report.averageTime((q.averageMs / 1000).toFixed(1))}</span>}
                           </p>
@@ -155,7 +159,7 @@ export function ReportView({ report }: { report: Report }) {
                           <div className="flex w-[140px] shrink-0 flex-col items-end gap-1">
                             <span className="text-[12.5px] font-semibold tabular-nums text-ink-2">{t.report.accuracy(pct)}</span>
                             <span className="h-2 w-full overflow-hidden rounded-full bg-line">
-                              <span className={cn("block h-full rounded-full", pct >= 70 ? "bg-ok" : pct >= 40 ? "bg-[#d99000]" : "bg-danger")} style={{ width: `${pct}%` }} />
+                              <span className={cn("block h-full rounded-full", pct >= 70 ? "bg-ok" : pct >= 40 ? "bg-[var(--sheet-yellow)]" : "bg-danger")} style={{ width: `${pct}%` }} />
                             </span>
                           </div>
                         )}
@@ -166,8 +170,7 @@ export function ReportView({ report }: { report: Report }) {
               </section>
             </>
           )}
-        </div>
-      </div>
+      </PageBody>
     </>
   );
 }
@@ -175,17 +178,18 @@ export function ReportView({ report }: { report: Report }) {
 function Cell({ a, poll, title }: { a: { fraction: number | null; points: number } | null; poll: boolean; title: string }) {
   if (!a) return <Minus className="mx-auto size-3.5 text-ink-3" aria-label={title} />;
   if (poll) return <Check className="mx-auto size-3.5 text-ink-3" aria-label={title} />;
-  if (isRight(a.fraction)) return <span title={title} className="mx-auto grid size-5 place-items-center rounded-full bg-ok text-white"><Check className="size-3" strokeWidth={3.4} /></span>;
-  if (a.fraction && a.fraction > 0) return <span title={title} className="mx-auto grid size-5 place-items-center rounded-full bg-[#d99000] text-[10px] font-bold text-white">½</span>;
+  if (isRight(a.fraction)) return <span title={title} className={cn("mx-auto grid size-5 place-items-center rounded-full", okFill)}><Check className="size-3" strokeWidth={3.4} /></span>;
+  // Half right: the spreadsheet's yellow, with dark text on it (white on it is only 3.2:1).
+  if (a.fraction && a.fraction > 0) return <span title={title} className="mx-auto grid size-5 place-items-center rounded-full bg-[var(--sheet-yellow)] text-[10px] font-bold text-ink dark:text-[var(--sheet-yellow-fill)]">½</span>;
   return <span title={title} className="mx-auto grid size-5 place-items-center rounded-full bg-danger text-white"><X className="size-3" strokeWidth={3.4} /></span>;
 }
 
 function Highlight({ label, text, pct, tone, t }: { label: string; text: string; pct: number; tone: "hard" | "easy"; t: (typeof quizText)["en"] }) {
   return (
-    <div className={cn("rounded-2xl border px-4 py-3", tone === "hard" ? "border-danger/25 bg-danger/5" : "border-ok/25 bg-ok/5")}>
-      <p className={cn("text-[11.5px] font-semibold uppercase tracking-wide", tone === "hard" ? "text-danger" : "text-ok")}>{label}</p>
+    <div className={cn("rounded-xl border px-4 py-3", tone === "hard" ? "border-danger/25 bg-danger/5" : "border-ok/25 bg-ok/5")}>
+      <p className={cn("text-[12.5px] font-medium", tone === "hard" ? "text-danger-ink" : "text-[color-mix(in_srgb,var(--ok)_75%,var(--ink))]")}>{label}</p>
       <p className="mt-0.5 line-clamp-2 text-[14px] font-medium text-ink">{text}</p>
-      <p className="mt-1 text-[12.5px] text-ink-3">{t.report.accuracy(pct)}</p>
+      <p className={cn("mt-1 text-[12.5px]", midTone)}>{t.report.accuracy(pct)}</p>
     </div>
   );
 }

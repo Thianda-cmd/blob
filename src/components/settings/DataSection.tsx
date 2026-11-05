@@ -43,7 +43,7 @@ export function DataSection() {
         <div className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div className="min-w-0">
             <div className="text-[13.5px] font-medium">{t.export.backup}</div>
-            <div className="mt-0.5 text-[12.5px] text-ink-3">{t.export.blobHint}</div>
+            <div className="mt-0.5 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.export.blobHint}</div>
           </div>
           <Button size="sm" onClick={() => void backup()} loading={busy}>
             <FileArchive className="size-3.5" /> {t.export.backupButton}
@@ -52,7 +52,7 @@ export function DataSection() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-5">
           <div className="min-w-0">
             <div className="text-[13.5px] font-medium">{t.import.action}</div>
-            <div className="mt-0.5 text-[12.5px] text-ink-3">{t.import.actionHint}</div>
+            <div className="mt-0.5 text-[12.5px] text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.import.actionHint}</div>
           </div>
           <Button size="sm" onClick={() => pick()}>
             <FileUp className="size-3.5" /> {t.import.label}

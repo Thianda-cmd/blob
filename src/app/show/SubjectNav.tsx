@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { midTone } from "@/components/ui/surfaces";
 import { cn } from "@/lib/utils";
 
 /** `hint` spells the count out ("15 topics") for the tooltip and screen readers. */
@@ -73,7 +74,7 @@ export function SubjectNav({ label, items, className }: { label: string; items: 
             )}
           >
             {s.title}
-            <span className="text-[12px] font-normal tabular-nums text-ink-3">{s.count}</span>
+            <span className={cn("text-[12px] font-normal tabular-nums", midTone)}>{s.count}</span>
             {s.id === active && <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-blob" />}
           </a>
         ))}

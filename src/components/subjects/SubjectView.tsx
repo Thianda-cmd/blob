@@ -1,21 +1,25 @@
 "use client";
 
 import { differenceInCalendarDays, format, isSameYear } from "date-fns";
-import { ArrowRight, FilePlus2, Folder, FolderPlus, Plus, Presentation } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { Blob } from "@/components/blob/Blob";
 import { blob } from "@/components/blob/bus";
 import { ProjectRow } from "@/components/home/ProjectsBlock";
+import { useImporter } from "@/components/notes/useImporter";
 import type { ProjectSummary } from "@/components/projects/load";
+import { NewPageButton, type NewKind } from "@/components/shell/NewPageMenu";
+import { PageBody, PageHeader, SectionHeader } from "@/components/shell/PageHeader";
 import { SubjectMenu } from "@/components/shell/SubjectMenu";
 import { TopBar } from "@/components/shell/TopBar";
 import { QuickAdd } from "@/components/tasks/QuickAdd";
 import { TaskBoard, UndoToast } from "@/components/tasks/TaskBoard";
 import { useNow } from "@/components/tasks/useNow";
 import { useTaskStore, type NewTask } from "@/components/tasks/useTaskStore";
-import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { panel } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
@@ -24,10 +28,16 @@ import { projectLinksText } from "@/i18n/messages/projectLinks";
 import { subjectsText } from "@/i18n/messages/subjects";
 import { subjectColor } from "@/lib/subjects";
 import type { PageKind, Subject, Task } from "@/lib/types";
-import { pageTitle } from "@/lib/utils";
-import { DeckCard, InkCard, NewCard, NoteCard, SheetCard, type PagePreview } from "./PageCards";
+import { cn, pageTitle } from "@/lib/utils";
+import { subjectCounts } from "./counts";
+import { DeckCard, FolderCard, InkCard, NewCard, NoteCard, SheetCard, type PagePreview } from "./PageCards";
 
-/** Everything for one subject: notes, presentations, its projects and its tasks. */
+/**
+ * Everything for one subject: its notes and spreadsheets (always, each with its add tile), its
+ * handwriting, presentations, folders (the order of every create menu) and projects when it has
+ * some, and its tasks beside them.
+ * The top bar's violet "+ Neue Notiz" makes a note here; its ▾ the other kinds (or imports a file).
+ */
 export function SubjectView({
   subject: initial,
   previews,
@@ -42,6 +52,7 @@ export function SubjectView({
 }) {
   const router = useRouter();
   const { subjects, pages, createPage } = useWorkspace();
+  const importer = useImporter();
   const locale = useLocale();
   const t = useMessages(subjectsText);
   const tl = useMessages(projectLinksText);
@@ -78,6 +89,7 @@ export function SubjectView({
     setCreating(null);
     if (page) router.push(`/p/${page.id}`);
   }
+  const pick = (kind: NewKind) => void create(kind);
 
   function addTask(task: NewTask) {
     store.add(task);
@@ -87,192 +99,162 @@ export function SubjectView({
     }
   }
 
-  const icon = subject.emoji ? (
-    <span className="text-[12px] leading-none">{subject.emoji}</span>
+  const color = subjectColor(subject.color);
+  const crumbIcon = subject.emoji ? <span className="text-[12px] leading-none">{subject.emoji}</span> : <span className="size-2 rounded-full" style={{ background: color }} />;
+  // The emoji on its tile with the subject's colour as a dot at the corner; without an emoji, the colour itself.
+  const headerIcon = subject.emoji ? (
+    <span className="relative -m-px grid size-10 place-items-center">
+      <span className="leading-none">{subject.emoji}</span>
+      <span aria-hidden className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full ring-2 ring-paper" style={{ background: color }} />
+    </span>
   ) : (
-    <span className="size-2 rounded-full" style={{ background: subjectColor(subject.color) }} />
+    <span aria-hidden className="size-3.5 rounded-full" style={{ background: color }} />
   );
 
-  const stats = [
-    t.noteCount(notes.length),
-    ...(sheets.length ? [t.sheetCount(sheets.length)] : []),
-    t.deckCount(decks.length),
-    ...(folders.length ? [t.folderCount(folders.length)] : []),
-    t.openTaskCount(open.length),
-  ];
+  // What's in it, only what there is, counted as Start's subject cards count it: "2 Notizen ·
+  // 1 Tabelle · 1 Handschrift", then the tasks: "3 offene Aufgaben · Nächster Test morgen". On phones
+  // only the tasks part when there is one (each section shows its own count), so the line stays short.
+  const pageStats = subjectCounts([...notes, ...sheets, ...inks, ...decks, ...folders], t);
+  const exam = nextExam && now ? t.nextExam(examWhen(nextExam.due_at!, now, locale)) : null;
+  const taskInfo = open.length > 0 || !!exam;
+  const meta = (
+    // The line may wrap (wrapMeta) instead of losing its end: the next test is the part that matters most.
+    <span>
+      <span className={cn(taskInfo && "max-sm:hidden")}>{pageStats.join(" · ")}</span>
+      {taskInfo && <span className="max-sm:hidden"> · </span>}
+      {open.length > 0 && t.openTaskCount(open.length)}
+      {exam && (
+        <>
+          {open.length > 0 && " · "}
+          <span className="text-blob-ink">{exam}</span>
+        </>
+      )}
+    </span>
+  );
+
+  const parentOf = (parentId: string | null) => (parentId ? byId.get(parentId) : undefined);
 
   return (
     <>
-      <TopBar crumbs={[{ label: subject.name, icon }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1320px] px-4 pb-28 pt-5 sm:px-8 lg:px-10 lg:pt-7">
-          <header className="flex flex-wrap items-center gap-x-4 gap-y-4">
-            <div className="relative grid size-14 shrink-0 place-items-center rounded-2xl border border-line bg-raised shadow-card">
-              {subject.emoji ? (
-                <span className="text-[28px] leading-none">{subject.emoji}</span>
-              ) : (
-                <span className="size-5 rounded-full" style={{ background: subjectColor(subject.color) }} />
-              )}
-              {subject.emoji && (
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full ring-2 ring-surface"
-                  style={{ background: subjectColor(subject.color) }}
-                />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start gap-1">
-                {/* Long names wrap onto a second line instead of losing their end. */}
-                <h1 className="line-clamp-2 min-w-0 break-words font-display text-[28px] font-bold leading-tight tracking-[-0.025em]" title={subject.name}>
-                  {subject.name}
-                </h1>
-                <span className="mt-[3px] shrink-0">
-                  <SubjectMenu key={subject.id} subject={subject} trigger="button" />
-                </span>
-              </div>
-              <p className="mt-0.5 text-[13px] text-ink-3">
-                {stats.join(" · ")}
-                {nextExam && now && (
-                  <>
-                    {" · "}
-                    <span className="text-blob-ink">{t.nextExam(examWhen(nextExam.due_at!, now, locale))}</span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => create("note")} loading={creating === "note"}>
-                <FilePlus2 className="size-4" /> {t.newNote}
-              </Button>
-              <Button variant="secondary" onClick={() => create("deck")} loading={creating === "deck"}>
-                <Presentation className="size-4" /> {t.newDeck}
-              </Button>
-              <Button variant="secondary" onClick={() => create("folder")} loading={creating === "folder"} aria-label={t.newFolder} title={t.newFolder}>
-                <FolderPlus className="size-4" />
-              </Button>
-            </div>
-          </header>
+      <TopBar
+        crumbs={[{ label: subject.name, icon: crumbIcon }]}
+        actions={<NewPageButton kind="note" onPick={pick} onImport={() => importer.pick({ subjectId: subject.id })} busy={creating !== null} />}
+      />
+      <PageBody>
+        <PageHeader
+          icon={headerIcon}
+          title={<span title={subject.name}>{subject.name}</span>}
+          meta={meta}
+          wrapMeta
+          actions={<SubjectMenu key={subject.id} subject={subject} trigger="button" />}
+        />
 
-          <div className="mt-8 grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="min-w-0 space-y-9">
-              {folders.length > 0 && (
-                <Section title={t.folders} count={folders.length}>
-                  <div className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 xl:grid-cols-3">
-                    {folders.map((f) => {
-                      const inside = pages.filter((p) => p.parent_id === f.id).length;
-                      return (
-                        <Link
-                          key={f.id}
-                          href={`/p/${f.id}`}
-                          className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-raised p-3 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-2"
-                        >
-                          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
-                            {f.icon ? <span className="text-[16px] leading-none">{f.icon}</span> : <Folder className="size-4.5" strokeWidth={1.8} />}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-[14px] font-medium text-ink">{pageTitle(f.title, f.kind, locale)}</span>
-                            <span className="block text-[12px] text-ink-3">{t.pagesInside(inside)}</span>
-                          </span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </Section>
-              )}
-              <Section title={t.notes} count={notes.length}>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
-                  {notes.map((p) => (
-                    <NoteCard key={p.id} page={p} preview={previews[p.id]} parent={p.parent_id ? byId.get(p.parent_id) : undefined} now={now} />
-                  ))}
-                  <NewCard kind="note" onClick={() => create("note")} busy={creating === "note"} alone={notes.length === 0} />
-                </div>
-              </Section>
+        {/* The tasks beside the pages from 1280 px; below, the cards need the width (two columns at least). */}
+        <div className="grid grid-cols-1 gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 space-y-9">
+            <Section id="subject-notes" title={t.notes} count={notes.length}>
+              <CardGrid>
+                {notes.map((p) => (
+                  <NoteCard key={p.id} page={p} preview={previews[p.id]} parent={parentOf(p.parent_id)} now={now} />
+                ))}
+                <NewCard kind="note" onClick={() => pick("note")} busy={creating === "note"} alone={notes.length === 0} />
+              </CardGrid>
+            </Section>
 
-              <Section title={t.inks} count={inks.length}>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+            <Section id="subject-sheets" title={t.sheets} count={sheets.length}>
+              <CardGrid>
+                {sheets.map((p) => (
+                  <SheetCard key={p.id} page={p} preview={previews[p.id]} now={now} />
+                ))}
+                <NewCard kind="sheet" onClick={() => pick("sheet")} busy={creating === "sheet"} alone={sheets.length === 0} />
+              </CardGrid>
+            </Section>
+
+            {inks.length > 0 && (
+              <Section id="subject-inks" title={t.inks} count={inks.length}>
+                <CardGrid>
                   {inks.map((p) => (
                     <InkCard key={p.id} page={p} preview={previews[p.id]} now={now} />
                   ))}
-                  <NewCard kind="ink" onClick={() => create("ink")} busy={creating === "ink"} alone={inks.length === 0} />
-                </div>
+                  <NewCard kind="ink" onClick={() => pick("ink")} busy={creating === "ink"} />
+                </CardGrid>
               </Section>
+            )}
 
-              <Section title={t.sheets} count={sheets.length}>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
-                  {sheets.map((p) => (
-                    <SheetCard key={p.id} page={p} preview={previews[p.id]} now={now} />
-                  ))}
-                  <NewCard kind="sheet" onClick={() => create("sheet")} busy={creating === "sheet"} alone={sheets.length === 0} />
-                </div>
-              </Section>
-
-              <Section title={t.presentations} count={decks.length}>
-                {/* Two slide thumbnails side by side on phones instead of one screen-wide picture each. */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
+            {decks.length > 0 && (
+              <Section id="subject-decks" title={t.presentations} count={decks.length}>
+                <CardGrid>
                   {decks.map((p) => (
                     <DeckCard key={p.id} page={p} preview={previews[p.id]} now={now} />
                   ))}
-                  <NewCard kind="deck" onClick={() => create("deck")} busy={creating === "deck"} alone={decks.length === 0} />
-                </div>
+                  <NewCard kind="deck" onClick={() => pick("deck")} busy={creating === "deck"} />
+                </CardGrid>
               </Section>
+            )}
 
-              {projects.length > 0 && (
-                <Section
-                  title={tl.projects}
-                  count={projects.length}
-                  action={
-                    <Link
-                      href={`/projects?new=1&subject=${subject.id}`}
-                      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2"
-                    >
-                      <Plus className="size-3" /> {tl.newProjectFor}
-                    </Link>
-                  }
-                >
-                  <div className="grid grid-cols-1 gap-2.5 min-[720px]:grid-cols-2">
-                    {projects.map((p) => (
-                      <ProjectRow key={p.id} project={p} />
-                    ))}
-                  </div>
-                </Section>
-              )}
-            </div>
+            {folders.length > 0 && (
+              <Section id="subject-folders" title={t.folders} count={folders.length}>
+                <CardGrid>
+                  {folders.map((f) => {
+                    const inside = pages.filter((p) => p.parent_id === f.id);
+                    return <FolderCard key={f.id} page={f} inside={{ count: inside.length, titles: inside.slice(0, 3).map((c) => pageTitle(c.title, c.kind, locale)) }} now={now} />;
+                  })}
+                  <NewCard kind="folder" onClick={() => pick("folder")} busy={creating === "folder"} />
+                </CardGrid>
+              </Section>
+            )}
 
-            <aside className="min-w-0 rounded-2xl border border-line bg-raised/50 p-3.5 lg:sticky lg:top-7 lg:self-start dark:bg-raised/40">
+            {projects.length > 0 && (
               <Section
-                title={t.tasks}
-                count={open.length}
+                id="subject-projects"
+                title={tl.projects}
+                count={projects.length}
                 action={
-                  <Link href="/tasks" className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-ink-3 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2">
-                    {t.allTasks} <ArrowRight className="size-3" />
+                  <Link
+                    href={`/projects?new=1&subject=${subject.id}`}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-ink-2 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2"
+                  >
+                    <Plus className="size-3.5" aria-hidden /> {tl.newProjectFor}
                   </Link>
                 }
               >
-                <QuickAdd size="sm" onAdd={addTask} subjects={subjects} defaultSubjectId={subject.id} placeholder={t.addTaskFor(subject.name)} />
-                <TaskBoard
-                  className="mt-3"
-                  store={store}
-                  tasks={tasks}
-                  subjects={subjects}
-                  hideSubject
-                  narrow
-                  doneLimit={3}
-                  empty={
-                    <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-line-2 px-3 py-3">
-                      <Blob size={48} mood="sleepy" track={false} />
-                      <p className="text-[12.5px] leading-snug text-ink-2">
-                        {t.noTasksFor(subject.name)}
-                        <br />
-                        <span className="text-ink-3">{t.noTasksHint}</span>
-                      </p>
-                    </div>
-                  }
-                />
+                <div className="grid grid-cols-1 gap-2.5 min-[720px]:grid-cols-2">
+                  {projects.map((p) => (
+                    <ProjectRow key={p.id} project={p} />
+                  ))}
+                </div>
               </Section>
-            </aside>
+            )}
           </div>
+
+          <aside aria-labelledby="subject-tasks" className={cn(panel, "min-w-0 xl:sticky xl:top-6 xl:self-start")}>
+            <SectionHeader
+              id="subject-tasks"
+              title={t.tasks}
+              count={open.length}
+              action={
+                <Link
+                  href="/tasks"
+                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-ink-2 hover:bg-hover hover:text-ink [@media(hover:none)]:-my-1.5 [@media(hover:none)]:py-2"
+                >
+                  {t.allTasks} <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              }
+            />
+            <QuickAdd size="sm" onAdd={addTask} subjects={subjects} defaultSubjectId={subject.id} placeholder={t.addTaskFor(subject.name)} />
+            <TaskBoard
+              className="mt-3"
+              store={store}
+              tasks={tasks}
+              subjects={subjects}
+              hideSubject
+              narrow
+              doneLimit={3}
+              empty={<EmptyState size="sm" art={<Blob size={56} mood="sleepy" track={false} />} title={t.noTasksFor(subject.name)} body={t.noTasksHint} />}
+            />
+          </aside>
         </div>
-      </div>
+      </PageBody>
       <UndoToast store={store} />
     </>
   );
@@ -290,15 +272,16 @@ function examWhen(due: string, now: number, locale: Locale) {
   return t.onDate(format(d, isSameYear(d, now) ? t.dateFormat : t.dateYearFormat, opts));
 }
 
-function Section({ title, count, action, children }: { title: string; count: number; action?: ReactNode; children: ReactNode }) {
+function Section({ id, title, count, action, children }: { id: string; title: string; count: number; action?: ReactNode; children: ReactNode }) {
   return (
-    <section>
-      <div className="mb-3 flex h-6 items-center gap-2">
-        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-        <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium leading-[18px] tabular-nums text-ink-3">{count}</span>
-        <span className="ml-auto">{action}</span>
-      </div>
+    <section aria-labelledby={id}>
+      <SectionHeader id={id} title={title} count={count} action={action} />
       {children}
     </section>
   );
+}
+
+/** The page cards of a section: two columns on phones, as many as fit from tablets up (cards line up in height). */
+function CardGrid({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-3">{children}</div>;
 }

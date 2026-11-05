@@ -9,6 +9,8 @@ import { TopicGlyph } from "@/learn/components/TopicGlyph";
 import { showTopicHref } from "@/learn/showcase";
 import { manifestItems } from "@/learn/showManifest";
 import { AREAS } from "@/learn/types";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
+import { cn } from "@/lib/utils";
 import { SubjectNav } from "./SubjectNav";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -57,16 +59,16 @@ export default async function ShowGallery() {
         <section key={info.slug} id={info.slug} className="mt-8 scroll-mt-[112px] [contain-intrinsic-size:auto_1200px] [content-visibility:auto] sm:mt-10">
           <h2 className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 font-display text-[22px] font-bold tracking-[-0.015em] sm:mb-4 sm:text-[24px]">
             {resolveText(info.title, locale)}
-            <span className="text-[13px] font-normal text-ink-3">
+            <span className={cn("text-[13px] font-normal", midTone)}>
               {t.galleryCount(topics.length)} · {t.pictureCount(pictures)}
             </span>
           </h2>
           <div className="gap-3 sm:columns-2 lg:columns-3">
             {groups.map(({ area, topics: list }) => (
               <div key={area} className="mb-3 break-inside-avoid rounded-2xl border border-line bg-raised p-1.5 shadow-card">
-                <h3 className="flex items-baseline justify-between gap-2 px-2.5 pb-1 pt-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-3">
+                <h3 className={cn("flex items-baseline justify-between gap-2 px-2.5 pb-1 pt-2", groupLabel)}>
                   {resolveText(AREAS[area].title, locale)}
-                  <span className="font-medium normal-case tracking-normal tabular-nums">{list.length}</span>
+                  <span className="tabular-nums">{list.length}</span>
                 </h3>
                 <ul>
                   {list.map((topic) => {
@@ -89,7 +91,7 @@ export default async function ShowGallery() {
                                 </span>
                               )}
                             </span>
-                            <span className="mt-0.5 line-clamp-1 text-[12.5px] leading-snug text-ink-3 sm:line-clamp-2">{resolveText(topic.blurb, locale)}</span>
+                            <span className={cn("mt-0.5 line-clamp-1 text-[12.5px] leading-snug sm:line-clamp-2", midTone)}>{resolveText(topic.blurb, locale)}</span>
                           </span>
                         </Link>
                       </li>

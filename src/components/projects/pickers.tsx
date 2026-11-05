@@ -158,12 +158,12 @@ export function AssigneeMenu({
               onClick={() => onChange(on ? value.filter((id) => id !== m.user_id) : [...value, m.user_id])}
             >
               {personName(m, someone)}
-              {m.user_id === me && <span className="text-ink-3"> ({t.you})</span>}
+              {m.user_id === me && <span className="text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]"> ({t.you})</span>}
             </PickRow>
           );
         })}
       </div>
-      {members.length < 2 && <p className="border-t border-line px-2 pb-1 pt-2 text-[11.5px] leading-snug text-ink-3">{t.drawer.onlyMembers}</p>}
+      {members.length < 2 && <p className="border-t border-line px-2 pb-1 pt-2 text-[11.5px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.drawer.onlyMembers}</p>}
     </Popover>
   );
 }
@@ -267,7 +267,7 @@ export function LabelMenu({
             {l.name}
           </PickRow>
         ))}
-        {!q && known.length === 0 && <p className="px-2 py-1.5 text-[12px] leading-snug text-ink-3">{t.drawer.noLabels}</p>}
+        {!q && known.length === 0 && <p className="px-2 py-1.5 text-[12px] leading-snug text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{t.drawer.noLabels}</p>}
       </div>
       {q && !exists && (
         <div className="mt-1 border-t border-line pt-1.5">

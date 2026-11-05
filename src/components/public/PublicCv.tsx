@@ -32,7 +32,7 @@ export function PublicCv({ content }: { content: unknown }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button variant="primary" onClick={() => setPrinting(true)} loading={printing}>
+        <Button variant="blob" onClick={() => setPrinting(true)} loading={printing}>
           <FileDown className="size-4" /> {t.download}
         </Button>
       </div>

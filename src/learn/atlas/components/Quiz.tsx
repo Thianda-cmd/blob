@@ -12,6 +12,8 @@ import { useText } from "@/i18n/useText";
 import { Inline } from "@/learn/components/Rich";
 import { Ring } from "@/learn/components/Ring";
 import type { StudySession } from "@/learn/session";
+import { groupLabel, midTone } from "@/components/ui/surfaces";
+import { okFill, studyPrimary } from "@/learn/components/StudyChrome";
 import { cn } from "@/lib/utils";
 import { itemOf, makeRound, QUIZ_XP, stepLabel, type QuizQuestion } from "../quiz";
 import type { AtlasView, PartsView, StepsView, TimelineView } from "../types";
@@ -139,7 +141,7 @@ export function Quiz({
   const header = (
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-blob-ink">{t.question(index + 1, round.length)}</div>
+        <div className="text-[12.5px] font-medium text-blob-ink">{t.question(index + 1, round.length)}</div>
         <div className="mt-1.5 flex gap-1" aria-hidden>
           {round.map((_, i) => {
             const r = results[i];
@@ -253,7 +255,7 @@ function Prompt({
     case "find":
       return (
         <div>
-          <div className="text-[13px] font-medium text-ink-3">{t.tapOn}</div>
+          <div className={cn("text-[13px] font-medium", midTone)}>{t.tapOn}</div>
           <div className="mt-0.5 hyphens-auto font-display text-[24px] font-bold leading-tight tracking-[-0.015em] break-words">
             <Inline text={partName(q.part)} />
           </div>
@@ -263,7 +265,7 @@ function Prompt({
       const part = (view as PartsView).parts.find((p) => p.id === q.part)!;
       return (
         <div>
-          <div className="text-[13px] font-medium text-ink-3">{t.tapThat} …</div>
+          <div className={cn("text-[13px] font-medium", midTone)}>{t.tapThat} …</div>
           <p className="mt-1 text-[17px] font-semibold leading-snug text-ink">
             … <Inline text={part.info.clue!} />
           </p>
@@ -356,7 +358,7 @@ function EventLead({ icon, top, title }: { icon: TimelineView["events"][number][
         <EventIcon kind={icon} className="size-5" />
       </span>
       <div className="min-w-0">
-        <div className="text-[12px] font-semibold text-ink-3">{top}</div>
+        <div className={cn("text-[12px] font-semibold", midTone)}>{top}</div>
         <div className="text-[15px] font-semibold leading-snug">
           <Inline text={title} />
         </div>
@@ -408,7 +410,7 @@ function Options({
               <span
                 className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-md text-[11.5px] font-bold",
-                  state === "right" ? "bg-ok text-white" : state === "wrong" ? "bg-danger text-white" : "bg-hover text-ink-3",
+                  state === "right" ? okFill : state === "wrong" ? "bg-danger text-white" : "bg-hover text-ink-2",
                 )}
               >
                 {state === "right" ? <Check className="size-3.5" strokeWidth={3} /> : state === "wrong" ? <X className="size-3.5" strokeWidth={3} /> : i + 1}
@@ -463,12 +465,12 @@ function Ordered({
                 placed ? "border-ok/60 bg-ok/10 text-ink" : shake === o.value ? "border-danger bg-danger/10" : "border-line bg-raised text-ink hover:border-blob/50 hover:bg-blob-soft/40",
               )}
             >
-              <span className={cn("grid size-6 shrink-0 place-items-center rounded-md text-[12px] font-bold tabular-nums", placed ? "bg-ok text-white" : place ? "bg-hover text-ink-2" : "border border-dashed border-line-2 text-transparent")}>
+              <span className={cn("grid size-6 shrink-0 place-items-center rounded-md text-[12px] font-bold tabular-nums", placed ? okFill : place ? "bg-hover text-ink-2" : "border border-dashed border-line-2 text-transparent")}>
                 {place ?? "·"}
               </span>
               <span className="min-w-0">
                 <Inline text={o.label} />
-                {o.sub && <span className="block text-[12px] font-normal text-ink-3">{o.sub}</span>}
+                {o.sub && <span className={cn("block text-[12px] font-normal", midTone)}>{o.sub}</span>}
               </span>
             </motion.button>
           );
@@ -505,11 +507,11 @@ function Feedback({ view, q, answer, onNext, last }: { view: AtlasView; q: QuizQ
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("mt-4 rounded-xl border px-3.5 py-3", answer.correct ? "border-ok/40 bg-ok/[0.07]" : "border-danger/40 bg-danger/[0.06]")}>
       <div className="flex items-center gap-2">
-        <span className={cn("grid size-6 place-items-center rounded-full text-white", answer.correct ? "bg-ok" : "bg-danger")}>
+        <span className={cn("grid size-6 place-items-center rounded-full text-white", answer.correct ? okFill : "bg-danger")}>
           {answer.correct ? <Check className="size-3.5" strokeWidth={3.5} /> : <X className="size-3.5" strokeWidth={3.5} />}
         </span>
         <span className="text-[15px] font-semibold">{answer.correct ? t.right : t.wrong}</span>
-        {answer.correct && <span className="ml-auto rounded-full bg-blob px-2 py-0.5 text-[11.5px] font-bold text-white">{t.xpPlus(QUIZ_XP)}</span>}
+        {answer.correct && <span className="ml-auto rounded-full bg-blob px-2 py-0.5 text-[11.5px] font-bold text-white dark:bg-blob-deep">{t.xpPlus(QUIZ_XP)}</span>}
       </div>
       {(wrongWas || rightIs) && (
         <div className="mt-1.5 space-y-0.5 text-[13.5px]">
@@ -526,7 +528,7 @@ function Feedback({ view, q, answer, onNext, last }: { view: AtlasView; q: QuizQ
         type="button"
         onClick={onNext}
         autoFocus
-        className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[background,transform] hover:bg-blob-deep active:scale-[0.97]"
+        className={cn("mt-3 inline-flex h-10 items-center gap-1.5 rounded-xl px-4 text-[14px] font-semibold transition-[background,transform] active:scale-[0.97]", studyPrimary)}
       >
         {last ? t.finish : t.continue} <ArrowRight className="size-4" />
       </button>
@@ -593,7 +595,7 @@ function ResultCard({
             <span className="font-semibold tabular-nums">{t.score(right, total)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="grid size-4 place-items-center rounded-full bg-blob text-[8px] font-bold text-white">XP</span>
+            <span className="grid size-4 place-items-center rounded-full bg-blob text-[8px] font-bold text-white dark:bg-blob-deep">XP</span>
             <span>
               <span className="font-semibold tabular-nums">{xp}</span> {t.xpEarned}
             </span>
@@ -602,7 +604,7 @@ function ResultCard({
       </div>
       {looks.length > 0 && (
         <div className="mt-5 text-left">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.lookAgain}</div>
+          <div className={groupLabel}>{t.lookAgain}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {looks.map((l) => (
               <button key={l.id} type="button" onClick={() => onLook(l.id)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:border-blob/50 hover:text-ink">
@@ -614,7 +616,7 @@ function ResultCard({
       )}
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {onMistakes && (
-          <button type="button" onClick={onMistakes} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blob px-4 text-[14px] font-semibold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[background,transform] hover:bg-blob-deep active:scale-[0.97]">
+          <button type="button" onClick={onMistakes} className={cn("inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-semibold transition-[background,transform] active:scale-[0.97]", studyPrimary)}>
             <Target className="size-4" /> {t.practiseMistakes}
           </button>
         )}
@@ -623,7 +625,7 @@ function ResultCard({
           onClick={onAgain}
           className={cn(
             "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-semibold transition-[background,transform] active:scale-[0.97]",
-            onMistakes ? "border border-line bg-raised text-ink hover:bg-hover" : "bg-blob text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-blob-deep",
+            onMistakes ? "border border-line bg-raised text-ink hover:bg-hover" : studyPrimary,
           )}
         >
           <RotateCcw className="size-4" /> {t.again}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { authText } from "@/i18n/messages/auth";
 import { getMessages } from "@/i18n/server";
+import { InviteBanner } from "@/components/auth/InviteBanner";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { OAuthBanner } from "@/components/oauth/OAuthBanner";
 import { oauthAppForNext } from "@/lib/oauth/context";
@@ -18,7 +19,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const app = await oauthAppForNext(next);
   return (
     <>
-      {app && <OAuthBanner app={app} mode="signin" />}
+      {app ? <OAuthBanner app={app} mode="signin" /> : next.startsWith("/join/") && <InviteBanner mode="signin" />}
       <LoginForm next={next} initialError={error} notice={notice} />
     </>
   );

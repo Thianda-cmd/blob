@@ -1,10 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Dices, Lock, Shirt } from "lucide-react";
+import { Check, Dices, Lock } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BlobMark } from "@/components/blob/BlobMark";
+import { PageBody, PageHeader } from "@/components/shell/PageHeader";
 import { TopBar } from "@/components/shell/TopBar";
+import { Button } from "@/components/ui/Button";
+import { Segmented } from "@/components/ui/Segmented";
+import { card, chipOff, chipOn, groupLabel, midTone, panel } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { blobCornerText } from "@/i18n/messages/blobCorner";
@@ -29,6 +33,10 @@ const TRICKS = [
 const FACES: BlobMood[] = ["happy", "excited", "love", "silly", "proud", "laughing", "surprised", "thinking", "shy", "worried", "sleepy", "dizzy"];
 
 type Trick = (typeof TRICKS)[number][0];
+
+/** A trick or a face: a chip like everywhere else, violet-soft while it's on. */
+const chip = "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-[background,border-color,color,transform] motion-safe:active:scale-[0.97] [@media(hover:none)]:h-9";
+const chipIdle = `${chipOff} hover:bg-hover`;
 
 /** Play with Blob, teach him tricks and dress him up; learning unlocks the wardrobe. */
 export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }) {
@@ -127,21 +135,20 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
   }
 
   const tabItems = items.filter((i) => i.item.slot === tab);
+  /** How many things of a kind there are, and how many of them are unlocked. */
+  const count = (slot: Slot) => {
+    const all = items.filter((i) => i.item.slot === slot);
+    return { open: all.filter((i) => i.open).length, all: all.length };
+  };
 
   return (
     <>
       <TopBar crumbs={[{ label: t.title, icon: <BlobMark size={14} /> }]} />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1040px] px-5 pb-20 pt-4 sm:px-8">
-          <header className="flex flex-wrap items-end justify-between gap-4">
-            <div className="min-w-0 max-w-[560px]">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-blob-ink">
-                <BlobMark size={14} /> {t.kicker}
-              </div>
-              <h1 className="mt-1 font-display text-[30px] font-bold leading-tight tracking-[-0.02em]">{t.title}</h1>
-              <p className="mt-1.5 text-[14.5px] text-ink-2">{t.intro}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+      <PageBody width="default">
+          {/* The title, and what Blob has learnt with you beside it (below it on phones). */}
+          <div className="flex flex-wrap items-end justify-between gap-x-8">
+            <PageHeader className="min-w-0 flex-1 basis-64" title={t.title} meta={t.intro} />
+            <dl className={cn(card, "mb-5 grid w-full grid-cols-4 divide-x divide-line sm:mb-6 sm:w-auto")}>
               {(
                 [
                   [t.stats.xp, stats.xp],
@@ -150,16 +157,16 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
                   [t.stats.days, stats.activeDays],
                 ] as const
               ).map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-line bg-raised px-3 py-1.5 shadow-card">
-                  <div className="text-[16px] font-bold tabular-nums">{value}</div>
-                  <div className="text-[11.5px] text-ink-3">{label}</div>
+                <div key={label} className="flex min-w-0 flex-col-reverse px-3 py-1.5 sm:px-3.5">
+                  <dt className={cn("truncate text-[11.5px]", midTone)}>{label}</dt>
+                  <dd className="text-[16px] font-semibold tabular-nums">{value}</dd>
                 </div>
               ))}
-            </div>
-          </header>
+            </dl>
+          </div>
 
           {/* The stage: Blob in his little room. */}
-          <section className="mt-6 overflow-hidden rounded-3xl border border-line bg-raised shadow-card">
+          <section className="overflow-hidden rounded-2xl border border-line bg-raised shadow-card">
             <div className="relative h-[300px] sm:h-[340px]" style={{ background: "linear-gradient(180deg, color-mix(in oklab, var(--blob) 16%, var(--raised)) 0%, var(--raised) 78%)" }}>
               <div className="bg-dots absolute inset-0 opacity-40" aria-hidden />
               <div className="absolute inset-x-0 bottom-0 h-16 border-t border-line bg-surface" aria-hidden />
@@ -193,35 +200,26 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
                 />
               </div>
             </div>
-            <div className="space-y-3 border-t border-line p-4 sm:p-5">
+            <div className="space-y-4 border-t border-line p-4 sm:p-5">
               <div>
-                <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.tricksTitle}</h2>
-                <div className="flex flex-wrap gap-2">
+                <h2 id="blob-tricks" className={cn(groupLabel, "mb-2")}>
+                  {t.tricksTitle}
+                </h2>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="blob-tricks">
                   {TRICKS.map(([name, emoji]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => trick(name)}
-                      className="flex h-9 items-center gap-1.5 rounded-xl border border-line bg-paper px-3 text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-2 hover:bg-hover hover:text-ink active:translate-y-px"
-                    >
+                    <button key={name} type="button" onClick={() => trick(name)} className={cn(chip, chipIdle)}>
                       <span aria-hidden>{emoji}</span> {t.tricks[name]}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">{t.facesTitle}</h2>
-                <div className="flex flex-wrap gap-1.5">
+                <h2 id="blob-faces" className={cn(groupLabel, "mb-2")}>
+                  {t.facesTitle}
+                </h2>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="blob-faces">
                   {FACES.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => face(m, 3000)}
-                      className={cn(
-                        "h-8 rounded-full border px-3 text-[13px] font-medium transition-colors",
-                        mood === m ? "border-blob bg-blob-soft text-blob-ink" : "border-line bg-paper text-ink-2 hover:bg-hover hover:text-ink",
-                      )}
-                    >
+                    <button key={m} type="button" onClick={() => face(m, 3000)} aria-pressed={mood === m} className={cn(chip, mood === m ? chipOn : chipIdle)}>
                       {t.moods[m as keyof typeof t.moods]}
                     </button>
                   ))}
@@ -231,41 +229,31 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
           </section>
 
           {/* The wardrobe. */}
-          <section className="mt-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="flex items-center gap-2 font-display text-[22px] font-semibold">
-                  <Shirt className="size-5 text-blob-ink" /> {t.wardrobe}
+          <section className="mt-8" aria-labelledby="blob-wardrobe">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <div className="min-w-0">
+                <h2 id="blob-wardrobe" className="font-display text-[17px] font-semibold tracking-[-0.01em] text-ink">
+                  {t.wardrobe}
                 </h2>
-                <p className="mt-0.5 text-[13.5px] text-ink-3">{t.unlocked(openCount, items.length)}</p>
+                <p className={cn("text-[13px]", midTone)}>{t.unlocked(openCount, items.length)}</p>
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={surprise} className="flex h-9 items-center gap-1.5 rounded-xl bg-blob px-3.5 text-[13.5px] font-semibold text-white shadow-[0_3px_0_var(--blob-deep)] active:translate-y-px active:shadow-none">
+                <Button variant="blob" size="sm" onClick={surprise}>
                   <Dices className="size-4" /> {t.surprise}
-                </button>
-                <button type="button" onClick={undress} className="h-9 rounded-xl border border-line bg-raised px-3.5 text-[13.5px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
+                </Button>
+                <Button variant="secondary" size="sm" onClick={undress}>
                   {t.undress}
-                </button>
+                </Button>
               </div>
             </div>
-            {failed && <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-[13.5px] text-danger">{t.saveError}</p>}
+            {failed && <p className="mb-3 rounded-lg bg-danger/10 px-3 py-2 text-[13.5px] text-danger">{t.saveError}</p>}
 
-            <div className="mt-4 flex max-w-full overflow-x-auto rounded-xl border border-line bg-surface p-1 [scrollbar-width:none]" role="tablist">
-              {SLOTS.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === slot}
-                  onClick={() => setTab(slot)}
-                  className={cn("h-9 flex-1 shrink-0 whitespace-nowrap rounded-lg px-4 text-[13.5px] font-medium", tab === slot ? "bg-raised text-ink shadow-card" : "text-ink-2 hover:text-ink")}
-                >
-                  {t.tabs[slot]} <span className="ml-1 text-[12px] text-ink-3">{items.filter((i) => i.item.slot === slot && i.open).length}/{items.filter((i) => i.item.slot === slot).length}</span>
-                </button>
-              ))}
-            </div>
+            {/* Phones: four short tabs that fit one line, and the chosen one's count under them. Wider: the counts in the tabs. */}
+            <Segmented kind="tabs" fill className="sm:hidden" label={t.wardrobe} value={tab} onChange={setTab} options={SLOTS.map((slot) => ({ value: slot, label: t.tabs[slot], title: t.unlocked(count(slot).open, count(slot).all) }))} />
+            <Segmented kind="tabs" fill className="max-sm:hidden" label={t.wardrobe} value={tab} onChange={setTab} options={SLOTS.map((slot) => ({ value: slot, label: `${t.tabs[slot]} ${count(slot).open}/${count(slot).all}` }))} />
+            <p className={cn("mt-2 text-[12.5px] sm:hidden", midTone)}>{t.slotUnlocked(t.tabs[tab], count(tab).open, count(tab).all)}</p>
 
-            <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <ul className="mt-3 grid sm:mt-4 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {tabItems.map(({ item, open, have, goal }) => {
                 const on = worn(item);
                 const need = item.need;
@@ -285,8 +273,12 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
                       onClick={() => toggle(item)}
                       aria-pressed={on}
                       className={cn(
-                        "flex h-full w-full flex-col items-center rounded-2xl border-2 px-3 pb-3 pt-2 text-center transition-[border-color,transform]",
-                        on ? "border-blob bg-blob-soft" : open ? "border-line bg-raised hover:-translate-y-0.5 hover:border-line-2" : "cursor-default border-dashed border-line-2 bg-surface",
+                        "flex h-full w-full flex-col items-center rounded-xl border px-3 pb-3 pt-2 text-center transition-[border-color,transform,box-shadow]",
+                        on
+                          ? "border-blob bg-blob-soft shadow-card"
+                          : open
+                            ? "border-line bg-raised shadow-card hover:border-line-2 hover:shadow-pop motion-safe:hover:-translate-y-0.5"
+                            : "cursor-default border-dashed border-line-2 bg-surface",
                       )}
                     >
                       <div className={cn("relative", !open && "opacity-55 grayscale")}>
@@ -297,13 +289,13 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
                         {t.items[item.id] ?? item.id}
                       </div>
                       {on ? (
-                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blob px-2 py-0.5 text-[11.5px] font-semibold text-white">
+                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blob px-2 py-0.5 text-[11.5px] font-semibold text-white dark:bg-blob-deep">
                           <Check className="size-3" strokeWidth={3} /> {t.wearing}
                         </span>
                       ) : open ? (
-                        <span className="mt-1 text-[12px] text-ink-3">{t.putOn}</span>
+                        <span className={cn("mt-1 text-[12px]", midTone)}>{t.putOn}</span>
                       ) : (
-                        <span className="mt-1 w-full text-[11.5px] leading-snug text-ink-3">
+                        <span className={cn("mt-1 w-full text-[11.5px] leading-snug", midTone)}>
                           {needText}
                           {goal > 1 && (
                             <span className="mx-auto mt-1.5 block h-1.5 w-full max-w-[120px] overflow-hidden rounded-full bg-line">
@@ -319,14 +311,13 @@ export function BlobCorner({ stats, month }: { stats: BlobStats; month: number }
             </ul>
 
             {!secrets.includes("disco") && (
-              <p className="mt-6 rounded-2xl border border-dashed border-line-2 px-4 py-3 text-[13px] text-ink-3">
+              <p className={cn(panel, "mt-6 px-4 py-3 text-[13px] text-ink-2")}>
                 <span aria-hidden>🤫 </span>
                 {t.secretHint}
               </p>
             )}
           </section>
-        </div>
-      </div>
+      </PageBody>
     </>
   );
 }

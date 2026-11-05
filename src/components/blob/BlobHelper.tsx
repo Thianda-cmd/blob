@@ -10,6 +10,8 @@ import { cleanLook, seasonalHat, type BlobHat } from "./look";
 import { useBlobLook } from "./LookContext";
 import { KONAMI } from "./wardrobe";
 import { TypedText, useTypewriter } from "./speech";
+import { useUpdateCorner } from "@/components/AppUpdater";
+import { useModKey } from "@/components/ui/ModKey";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useMessages } from "@/i18n/client";
 import { blobText } from "@/i18n/messages/blob";
@@ -23,11 +25,15 @@ export function BlobHelper() {
   const { profile, setProfile, createPage } = useWorkspace();
   const t = useMessages(blobText);
   const corner = useMessages(blobCornerText);
+  // The shortcut key in the tips: ⌘ on Apple keyboards, Strg or Ctrl elsewhere.
+  const mod = useModKey();
   const look = useBlobLook();
   const ref = useRef<BlobHandle>(null);
   const [heldMood, setHeldMood] = useState<BlobMood | null>(null);
   const [flashMood, setFlashMood] = useState<BlobMood | null>(null);
   const { speech, say, end: endSpeech, hold: holdSpeech } = useSpeech();
+  // The desktop app's update card (or its round button) in the same corner.
+  const update = useUpdateCorner();
   const [open, setOpen] = useState(false);
   const [sleepy, setSleepy] = useState(false);
   const [tip, setTip] = useState(0);
@@ -200,8 +206,11 @@ export function BlobHelper() {
   // Typed out in Blob's bubble only (the plain card shows the words at once).
   const { shown, typing } = useTypewriter(profile.blob_tips && speech && !open ? speech.text : null);
 
+  // Above the update card or its round button, when one is in the corner (px from the window's bottom: its 16 px, it, 8 px).
+  const above = update.kind ? 16 + update.height + 8 : 0;
+
   // Tips switched off: no Blob, but what went wrong and what needs a look still shows.
-  if (!profile.blob_tips) return <SpeechCard speech={speech} away={away} closeLabel={t.messageClose} onClose={endSpeech} onHold={holdSpeech} />;
+  if (!profile.blob_tips) return <SpeechCard speech={speech} away={away} above={above} closeLabel={t.messageClose} onClose={endSpeech} onHold={holdSpeech} />;
   // On learning pages Blob is already on screen as the tutor; one Blob at a time.
   if (pathname.startsWith("/learn") || pathname === "/blob") return null;
 
@@ -210,8 +219,12 @@ export function BlobHelper() {
 
   const mood: BlobMood = flashMood ?? heldMood ?? (sleepy ? "sleepy" : open ? "happy" : "idle");
   // Keyboard and drag-and-drop tips are no use on a phone. (The panel only renders after a tap, so no hydration mismatch.)
-  const tips = open && window.matchMedia("(hover: none)").matches ? t.touchTips : t.tips;
+  const tips = open && window.matchMedia("(hover: none)").matches ? t.touchTips : t.tips(mod);
   const name = firstName(profile.full_name);
+  // The update card has its own Blob: this one waits below the edge, and comes up above the card to say something.
+  const makeRoom = update.kind === "card" && !open && !speech;
+  // Below the screen's edge: out of sight, so out of the keyboard's way too (Tab skips it).
+  const hidden = (away || makeRoom) && !open && !speech;
 
   async function newPage(kind: "note" | "deck") {
     setOpen(false);
@@ -222,11 +235,13 @@ export function BlobHelper() {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-2 z-40 flex flex-col items-end transition-transform duration-300 ease-out sm:bottom-[calc(12px+env(safe-area-inset-bottom))] sm:right-4",
+        "pointer-events-none fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-2 z-40 flex flex-col items-end transition-[transform,bottom] duration-300 ease-out motion-reduce:transition-none sm:bottom-[calc(12px+env(safe-area-inset-bottom))] sm:right-4",
         tucked && !open && !speech && "max-sm:translate-y-[calc(100%+12px)]",
         // Below the screen's edge (on phones, below the tab bar too).
-        away && !open && !speech && "translate-y-[calc(100%+160px)]",
+        hidden && "translate-y-[calc(100%+160px)]",
       )}
+      style={above && !makeRoom ? { bottom: `calc(${above}px + env(safe-area-inset-bottom))` } : undefined}
+      inert={hidden}
     >
       <AnimatePresence>
         {open && (
@@ -273,7 +288,7 @@ export function BlobHelper() {
                 {t.dressUp}
               </HelperAction>
             </div>
-            <button onClick={() => setTip((t) => t + 1)} className="mt-2 text-[12px] text-ink-3 hover:text-ink">
+            <button onClick={() => setTip((t) => t + 1)} className="mt-2 text-[12px] text-ink-2 hover:text-ink">
               {t.anotherTip}
             </button>
           </motion.div>
@@ -404,12 +419,15 @@ function useSpeech() {
 function SpeechCard({
   speech,
   away,
+  above,
   closeLabel,
   onClose,
   onHold,
 }: {
   speech: Speech | null;
   away: boolean;
+  /** Above the desktop app's update card in the corner (px from the window's bottom), 0 when there is none. */
+  above: number;
   closeLabel: string;
   onClose: (id: number) => void;
   onHold: (id: number, held: boolean) => void;
@@ -441,6 +459,7 @@ function SpeechCard({
           ? "bottom-[calc(128px+env(safe-area-inset-bottom))] sm:bottom-[calc(72px+env(safe-area-inset-bottom))]"
           : "bottom-[calc(64px+env(safe-area-inset-bottom))] sm:bottom-[calc(16px+env(safe-area-inset-bottom))]",
       )}
+      style={above ? { bottom: `calc(${above}px + env(safe-area-inset-bottom))` } : undefined}
     >
       {/* A new element for each message, so the same words twice in a row are said twice. */}
       <div role="status" className="sr-only">

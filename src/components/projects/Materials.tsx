@@ -1,12 +1,14 @@
 "use client";
 
-import { ExternalLink, FilePlus2, FileText, Globe, Lock, Paperclip } from "lucide-react";
+import { ExternalLink, FileText, Globe, Lock, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { blob } from "@/components/blob/bus";
+import { KindTile } from "@/components/shell/NewPageMenu";
 import { PageIcon } from "@/components/shell/Sidebar";
 import { Popover } from "@/components/ui/Menu";
+import { addTile, groupLabel, midTone } from "@/components/ui/surfaces";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useLocale, useMessages } from "@/i18n/client";
 import { projectLinksText } from "@/i18n/messages/projectLinks";
@@ -38,9 +40,10 @@ function materials(cards: Task[]) {
 }
 
 /**
- * The project's materials: the notes, presentations, files and links on its cards in one list,
- * each with the card it is on (a click opens the card). Editors can start a shared note, which
- * gets its own card and is shared with everyone in the project.
+ * The project's materials: the pages (notes, spreadsheets, presentations…), files and links on its
+ * cards in one list, each with the card it is on (a click opens the card). Editors can start a
+ * shared note or a shared Blobxcel spreadsheet, which gets its own card and is shared with everyone
+ * in the project; the spreadsheet opens on its templates.
  */
 export function MaterialsButton({ board, readOnly, onOpenCard }: { board: ReturnType<typeof useBoard>; readOnly: boolean; onOpenCard: (id: string) => void }) {
   const t = useMessages(projectLinksText);
@@ -48,26 +51,28 @@ export function MaterialsButton({ board, readOnly, onOpenCard }: { board: Return
   const locale = useLocale();
   const router = useRouter();
   const { pages, userId, createPage } = useWorkspace();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Shared | null>(null);
   const { project, members } = board;
   const groups = materials(board.cards);
   const count = groups.pages.length + groups.files.length + groups.links.length;
 
-  async function newNote(close: () => void) {
+  async function make(kind: Shared, close: () => void) {
     if (busy) return;
-    setBusy(true);
+    setBusy(kind);
+    const sheet = kind === "sheet";
     const projectName = project.title.trim() || tp.untitled;
-    const page = await createPage({ kind: "note", subject_id: project.subject_id, title: t.noteTitle(projectName) });
-    const card = page && (await addPageToProject(page, { id: project.id, members }, { title: t.noteCard, share: true, me: userId }));
-    setBusy(false);
+    const page = await createPage({ kind, subject_id: project.subject_id, title: sheet ? t.sheetTitle(projectName) : t.noteTitle(projectName) });
+    const card = page && (await addPageToProject(page, { id: project.id, members }, { title: sheet ? t.sheetCard : t.noteCard, share: true, me: userId }));
+    setBusy(null);
     if (!page || !card) return void blob.say(t.failed, { mood: "worried" });
     close();
-    blob.say(members.some((m) => m.user_id !== userId) ? t.noteMade : t.noteMadeAlone, { mood: "happy" });
+    const together = members.some((m) => m.user_id !== userId);
+    blob.say(sheet ? (together ? t.sheetMade : t.sheetMadeAlone) : together ? t.noteMade : t.noteMadeAlone, { mood: "happy" });
     router.push(`/p/${page.id}`);
   }
 
   const cardsLine = (row: Row, close: () => void) => (
-    <span className="flex min-w-0 flex-wrap gap-x-1 text-[11.5px] text-ink-3">
+    <span className={cn("flex min-w-0 flex-wrap gap-x-1 text-[11.5px]", midTone)}>
       {row.cards.map((card, i) => (
         <button
           key={card.id}
@@ -99,31 +104,22 @@ export function MaterialsButton({ board, readOnly, onOpenCard }: { board: Return
         >
           <Paperclip className="size-3.5" />
           {t.materials}
-          {count > 0 && <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium leading-[18px] tabular-nums text-ink-3">{count}</span>}
+          {count > 0 && <span className="rounded-full bg-hover px-1.5 text-[11px] font-medium leading-[18px] tabular-nums text-[color-mix(in_srgb,var(--ink-2)_45%,var(--ink-3))]">{count}</span>}
         </button>
       )}
     >
       {(close) => (
         <div className="p-1">
           <div className="px-1.5 pb-2 pt-1 text-[12.5px] font-semibold text-ink">{t.materialsTitle}</div>
+          {/* Only people who can change the project make pages for it. */}
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => void newNote(close)}
-              disabled={busy}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-xl border border-dashed border-line-2 px-2.5 py-2 text-left transition-colors hover:border-blob/50 hover:bg-blob-soft/50 disabled:opacity-60"
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
-                <FilePlus2 className="size-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13px] font-medium text-ink">{t.newNote}</span>
-                <span className="block truncate text-[11.5px] text-ink-3">{t.newNoteHint}</span>
-              </span>
-            </button>
+            <div className="mb-2.5 space-y-1.5">
+              <MakeButton kind="note" label={t.newNote} hint={t.newNoteHint} busy={busy} onClick={() => void make("note", close)} />
+              <MakeButton kind="sheet" label={t.newSheet} hint={t.newSheetHint} busy={busy} onClick={() => void make("sheet", close)} />
+            </div>
           )}
           {count === 0 ? (
-            <p className="px-1.5 pb-1.5 text-[12.5px] leading-snug text-ink-3">{t.materialsEmpty}</p>
+            <p className={cn("px-1.5 pb-1.5 text-[12.5px] leading-snug", midTone)}>{t.materialsEmpty}</p>
           ) : (
             <div className="max-h-[min(60vh,420px)] space-y-3 overflow-y-auto pb-1">
               {groups.pages.length > 0 && (
@@ -139,7 +135,7 @@ export function MaterialsButton({ board, readOnly, onOpenCard }: { board: Return
                             {name}
                           </Link>
                         ) : (
-                          <span className="block truncate text-[13px] text-ink-3" title={t.noAccess}>
+                          <span className={cn("block truncate text-[13px]", midTone)} title={t.noAccess}>
                             {name} · {t.noAccess}
                           </span>
                         )}
@@ -204,10 +200,31 @@ export function MaterialsButton({ board, readOnly, onOpenCard }: { board: Return
   );
 }
 
+type Shared = "note" | "sheet";
+
+/** "Neue gemeinsame Notiz" / "… Blobxcel-Tabelle": a dashed add tile with the kind's coloured tile. */
+function MakeButton({ kind, label, hint, busy, onClick }: { kind: Shared; label: string; hint: string; busy: Shared | null; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy !== null}
+      aria-busy={busy === kind}
+      className={cn(addTile, "flex w-full items-center gap-2.5 px-2.5 py-2 text-left disabled:pointer-events-none disabled:opacity-60")}
+    >
+      <KindTile kind={kind} size="sm" />
+      <span className="min-w-0">
+        <span className="block text-[13px] font-medium leading-snug text-ink">{label}</span>
+        <span className={cn("block text-[11.5px] leading-snug", midTone)}>{hint}</span>
+      </span>
+    </button>
+  );
+}
+
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="px-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-ink-3">{title}</h3>
+      <h3 className={cn("px-1.5 pb-1", groupLabel)}>{title}</h3>
       <ul className="space-y-0.5">{children}</ul>
     </section>
   );

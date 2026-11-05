@@ -96,7 +96,7 @@ export function AppApproveCard({ email, challenge, state, device }: { email: str
       <FormError message={error} />
       {valid && (
         <div className="mt-4 space-y-2.5">
-          <Button variant="primary" size="lg" className="w-full" loading={pending} onClick={approve} autoFocus>
+          <Button variant="blob" size="lg" className="w-full" loading={pending} onClick={approve} autoFocus>
             {t.approve} <ArrowRight className="size-4" />
           </Button>
           <Button variant="secondary" size="lg" className="w-full" disabled={pending} onClick={() => setStep("denied")}>

@@ -1,27 +1,16 @@
 "use client";
 
-import { formatDistanceStrict } from "date-fns";
-import { CornerDownRight, Folder, Layers, TextSearch } from "lucide-react";
+import { CornerDownRight, Layers, TextSearch } from "lucide-react";
 import Link from "next/link";
-import { InkThumb } from "@/components/ink/InkThumb";
-import { SheetThumb } from "@/components/sheet/SheetThumb";
 import { Avatar, type Person } from "@/components/share/Avatar";
 import { PageIcon, SubjectIcon } from "@/components/shell/Sidebar";
-import { SlideThumb, type PagePreview } from "@/components/subjects/PageCards";
+import { CardTitle, PageThumb, editedLabel, pageCardClass, type PagePreview } from "@/components/subjects/PageCards";
+import { midTone } from "@/components/ui/surfaces";
+import { usePhone } from "@/components/ui/useMediaQuery";
 import { useLocale, useMessages } from "@/i18n/client";
-import type { Locale } from "@/i18n/config";
-import { dateLocale } from "@/i18n/format";
 import { notesText } from "@/i18n/messages/notes";
 import type { PageMeta, Subject } from "@/lib/types";
 import { cn, pageTitle } from "@/lib/utils";
-
-function edited(updatedAt: string, now: number | null, locale: Locale) {
-  if (!now) return " ";
-  const t = notesText[locale];
-  const d = new Date(updatedAt);
-  if (now - d.getTime() < 60_000) return t.editedJustNow;
-  return t.edited(formatDistanceStrict(d, now, { addSuffix: true, locale: dateLocale(locale) }));
-}
 
 type TileProps = {
   page: PageMeta;
@@ -37,9 +26,6 @@ type TileProps = {
   onTag: (tag: string) => void;
 };
 
-const tileBase =
-  "group relative flex min-w-0 flex-col rounded-xl border border-line bg-raised shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-line-2 hover:shadow-[0_1px_1px_rgb(28_27_24/0.04),0_8px_20px_-8px_rgb(28_27_24/0.18)] [content-visibility:auto] [contain-intrinsic-size:auto_170px]";
-
 /** Tag chips (they filter by their tag). */
 function Tags({ tags, onTag, max = 3 }: { tags: string[]; onTag: (tag: string) => void; max?: number }) {
   if (!tags.length) return null;
@@ -48,6 +34,7 @@ function Tags({ tags, onTag, max = 3 }: { tags: string[]; onTag: (tag: string) =
       {tags.slice(0, max).map((tag) => (
         <button
           key={tag}
+          type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -58,7 +45,7 @@ function Tags({ tags, onTag, max = 3 }: { tags: string[]; onTag: (tag: string) =
           #{tag}
         </button>
       ))}
-      {tags.length > max && <span className="px-0.5 text-[11px] text-ink-3">+{tags.length - max}</span>}
+      {tags.length > max && <span className={cn("px-0.5 text-[11px]", midTone)}>+{tags.length - max}</span>}
     </span>
   );
 }
@@ -68,7 +55,7 @@ function InText() {
   const t = useMessages(notesText);
   return (
     <span className="pointer-events-none flex items-center gap-1 text-[11px] font-medium text-blob-ink">
-      <TextSearch className="size-3" /> {t.inText}
+      <TextSearch className="size-3" aria-hidden /> {t.inText}
     </span>
   );
 }
@@ -77,21 +64,21 @@ function Meta({ page, subject, parent, owner, shared, due, now }: Pick<TileProps
   const locale = useLocale();
   const t = useMessages(notesText);
   return (
-    <span className="flex min-w-0 items-center gap-2 text-[11.5px] text-ink-3">
+    <span className={cn("flex min-w-0 items-center gap-2 text-[11.5px]", midTone)}>
       {parent ? (
-        <span className="flex min-w-0 items-center gap-1" title={pageTitle(parent.title, parent.kind, locale)}>
-          <CornerDownRight className="size-3 shrink-0" />
+        <span className="flex min-w-0 items-center gap-1 overflow-hidden" title={pageTitle(parent.title, parent.kind, locale)}>
+          <CornerDownRight className="size-3 shrink-0" aria-hidden />
           <span className="truncate">{pageTitle(parent.title, parent.kind, locale)}</span>
         </span>
       ) : subject ? (
-        <span className="flex min-w-0 items-center gap-1.5" title={subject.name}>
+        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" title={subject.name}>
           <span className="grid size-3.5 shrink-0 place-items-center [&_svg]:size-3">
             <SubjectIcon subject={subject} className="text-[11px]" />
           </span>
           <span className="truncate">{subject.name}</span>
         </span>
       ) : null}
-      {shared && (owner ? <Avatar person={owner} size={16} title={t.sharedBy(owner.full_name || "?")} /> : <span className="shrink-0 text-ink-3">{t.shared}</span>)}
+      {shared && (owner ? <Avatar person={owner} size={16} title={t.sharedBy(owner.full_name || "?")} /> : <span className="shrink-0">{t.shared}</span>)}
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
         {due > 0 && (
           <Link
@@ -99,100 +86,36 @@ function Meta({ page, subject, parent, owner, shared, due, now }: Pick<TileProps
             onClick={(e) => e.stopPropagation()}
             className="relative z-[1] flex items-center gap-1 rounded-full bg-blob/15 px-1.5 py-px text-[11px] font-semibold text-blob-ink hover:bg-blob/25"
           >
-            <Layers className="size-3" /> {t.due(due)}
+            <Layers className="size-3" aria-hidden /> {t.due(due)}
           </Link>
         )}
-        <span suppressHydrationWarning>{edited(page.updated_at, now, locale)}</span>
+        <span suppressHydrationWarning>{editedLabel(page.updated_at, now, locale)}</span>
       </span>
     </span>
   );
 }
 
 /**
- * A page in the grid: a note with its first lines, a presentation with its first slide, a
- * handwritten note or a spreadsheet with a picture of its start, a folder with what's inside.
+ * A page in the grid, in the same card as everywhere (Start, folders, subjects): its picture (a
+ * note's first lines, a spreadsheet's first cells, a slide, a handwritten page, a folder's pages),
+ * its title, why it was found, its tags and where it lives. The whole card opens the page; the tags
+ * and the due cards are buttons of their own above it.
  */
 export function PageTile(props: TileProps & { childCount: number; childTitles: string[] }) {
   const { page, preview, inText, onTag, childCount, childTitles } = props;
   const locale = useLocale();
-  const t = useMessages(notesText);
+  // Two columns on a phone: room for two tags.
+  const phone = usePhone();
   const title = pageTitle(page.title, page.kind, locale);
-
-  if (page.kind === "deck") {
-    return (
-      <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
-        <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
-        <SlideThumb title={preview?.slideTitle?.trim() || title} theme={preview?.theme ?? null} className="pointer-events-none transition-transform duration-300 group-hover:scale-[1.012]" />
-        <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
-          <PageIcon page={page} className="size-3.5" />
-          <span className="truncate text-[13.5px] font-medium text-ink" title={title}>
-            {title}
-          </span>
-        </div>
-        <div className="mt-1.5 space-y-1.5 px-1.5 pb-0.5">
-          {inText && <InText />}
-          <Tags tags={page.tags} onTag={onTag} />
-          <Meta {...props} />
-        </div>
-      </div>
-    );
-  }
-
-  if (page.kind === "ink" || page.kind === "sheet") {
-    return (
-      <div className={cn(tileBase, "p-2")} data-page-id={page.id}>
-        <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
-        {page.kind === "sheet" ? (
-          <SheetThumb preview={preview?.sheet} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012] dark:ring-white/[0.08]" />
-        ) : (
-          <InkThumb preview={preview?.ink} crop={0.5} className="pointer-events-none rounded-lg ring-1 ring-inset ring-black/[0.06] transition-transform duration-300 group-hover:scale-[1.012]" />
-        )}
-        <div className="pointer-events-none flex min-w-0 items-center gap-2 px-1.5 pt-2.5">
-          <PageIcon page={page} className="size-3.5" />
-          <span className="truncate text-[13.5px] font-medium text-ink" title={title}>
-            {title}
-          </span>
-        </div>
-        <div className="mt-1.5 space-y-1.5 px-1.5 pb-0.5">
-          {inText && <InText />}
-          <Tags tags={page.tags} onTag={onTag} />
-          <Meta {...props} />
-        </div>
-      </div>
-    );
-  }
-
-  const snippet = page.kind === "folder" ? "" : preview?.snippet?.trim();
   return (
-    <div className={cn(tileBase, "min-h-[150px] p-3.5")} data-page-id={page.id}>
-      <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl" aria-label={title} />
-      <div className="pointer-events-none flex min-w-0 items-start gap-2">
-        {page.kind === "folder" ? (
-          <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-blob-soft text-blob-ink">
-            {page.icon ? <span className="text-[14px] leading-none">{page.icon}</span> : <Folder className="size-4" strokeWidth={1.9} />}
-          </span>
-        ) : (
-          <PageIcon page={page} className="mt-0.5" />
-        )}
-        <span className={cn("line-clamp-2 min-w-0 text-[14px] font-medium leading-snug text-ink", page.kind === "folder" && "mt-1")} title={title}>
-          {title}
-        </span>
-      </div>
-      {page.kind === "folder" ? (
-        <div className="pointer-events-none mt-2.5 space-y-1">
-          <div className="text-[12px] text-ink-3">{childCount ? t.pagesInside(childCount) : t.emptyFolder}</div>
-          {childTitles.map((c, i) => (
-            <div key={i} className="truncate border-l-2 border-line pl-2 text-[12px] text-ink-2">
-              {c}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={cn("pointer-events-none mt-2 line-clamp-3 text-[12.5px] leading-[1.55]", snippet ? "text-ink-3" : "italic text-ink-3/70")}>{snippet || t.emptyNote}</p>
-      )}
-      <div className="mt-auto space-y-2 pt-2.5">
+    <div className={cn(pageCardClass, "[contain-intrinsic-size:auto_230px] [content-visibility:auto]")} data-page-id={page.id}>
+      {/* The outline inside the card: content-visibility clips what is drawn outside it. */}
+      <Link href={`/p/${page.id}`} className="absolute inset-0 rounded-xl focus-visible:outline-offset-[-2px]" aria-label={title} />
+      <PageThumb page={page} preview={preview} title={title} inside={page.kind === "folder" ? { count: childCount, titles: childTitles } : undefined} className="pointer-events-none" />
+      <CardTitle page={page} title={title} className="pointer-events-none" />
+      <div className="mt-auto space-y-1.5 px-1.5 pb-0.5 pt-1.5">
         {inText && <InText />}
-        <Tags tags={page.tags} onTag={onTag} />
+        <Tags tags={page.tags} onTag={onTag} max={phone ? 2 : 3} />
         <Meta {...props} />
       </div>
     </div>
@@ -210,7 +133,7 @@ export function PageRow(props: TileProps & { first: boolean }) {
       data-page-id={page.id}
       className={cn("group relative flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-hover/50 sm:px-4 [content-visibility:auto] [contain-intrinsic-size:auto_56px]", !first && "border-t border-line")}
     >
-      <Link href={`/p/${page.id}`} className="absolute inset-0" aria-label={title} />
+      <Link href={`/p/${page.id}`} className="absolute inset-0 focus-visible:outline-offset-[-2px]" aria-label={title} />
       <span className="pointer-events-none grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-surface">
         <PageIcon page={page} />
       </span>
@@ -219,7 +142,7 @@ export function PageRow(props: TileProps & { first: boolean }) {
           <span className="truncate text-[13.5px] font-medium text-ink">{title}</span>
           {inText && <TextSearch className="size-3 shrink-0 text-blob-ink" aria-label={t.inText} />}
         </span>
-        {page.kind === "note" && preview?.snippet && <span className="mt-0.5 block truncate text-[12px] text-ink-3 max-sm:hidden">{preview.snippet}</span>}
+        {page.kind === "note" && preview?.snippet && <span className={cn("mt-0.5 block truncate text-[12px] max-sm:hidden", midTone)}>{preview.snippet}</span>}
       </span>
       <span className="hidden max-w-[220px] shrink-0 md:block">
         <Tags tags={page.tags} onTag={onTag} max={2} />
