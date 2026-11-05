@@ -248,35 +248,58 @@ try {
   await sleep(1500);
   await tapLink("/developers");
   await sleep(2000);
-  const mid = String(Math.round(screenH / 2));
+  // The swipe crosses the page along a line with nothing to tap near it. Now and then the emulator
+  // hands an injected swipe to the page instead of taking it as the gesture, and a link on the line,
+  // or within a finger's reach of it (Chromium moves a tap onto a link that close), then opens: a
+  // link to another site puts the browser in front, and the swipes after it never reach the app.
+  const swipeLine = async () => {
+    if (!bounds) return String(Math.round(screenH / 2));
+    const y = await dt
+      .js(`(() => {
+        const near = 32, reach = innerWidth * 0.65 + near;
+        const rects = [...document.querySelectorAll("a[href], button, input, select, textarea, summary, label, [role=button], [role=link], [role=tab], [tabindex]:not([tabindex='-1'])")]
+          .map((el) => el.getBoundingClientRect())
+          .filter((r) => r.width > 0 && r.height > 0 && r.left < reach);
+        const clear = (y) => rects.every((r) => r.bottom < y - near || r.top > y + near);
+        const mid = innerHeight / 2;
+        for (let d = 0; d <= innerHeight * 0.3; d += 4) for (const y of [mid + d, mid - d]) if (clear(y)) return y;
+        return mid;
+      })()`)
+      .catch(() => null);
+    return String(Math.round(typeof y === "number" ? bounds[1] + y * page.dpr : screenH / 2));
+  };
+  let mid = await swipeLine();
   const edgeSwipe = () => adb("shell", "input", "swipe", "2", mid, String(Math.round(screenW * 0.65)), mid, "350");
-  // What the swipe starts from, what the page saw of it, and the system's log of it, to tell why a
-  // swipe didn't go back: not taken as the gesture, taken as a tap on the page, the app put in the
-  // background (no page to go back to), or another app in front. (All quick: the swipe comes as
-  // soon after the page opened as it always did.)
-  const before = await dt
-    .js(`(() => { const seen = (window.__e2eSeen = []);
-      for (const type of ["pointerdown", "pointerup", "pointercancel", "click"]) addEventListener(type, (e) => {
-        const a = e.target && e.target.closest && e.target.closest("a, button");
-        seen.push([type, Math.round(e.clientX), Math.round(e.clientY), a ? (a.getAttribute("href") || a.tagName) : e.target && e.target.tagName]);
-      }, true);
-      const links = [...document.querySelectorAll("main a, main button")].map((a) => [a.getAttribute("href") || a.tagName, ...["left", "top", "right", "bottom"].map((k) => Math.round(a.getBoundingClientRect()[k]))]).filter((l) => l[2] < innerHeight && l[4] > 0);
-      return JSON.stringify({ history: history.length, fonts: document.fonts.status, links }); })()`)
-    .catch((e) => String(e));
+  // What the page saw of the swipe (kept in sessionStorage, which outlives going back), and the
+  // system's log of it, to tell why a swipe didn't go back: not taken as the gesture, taken as a tap
+  // on the page, the app put in the background (no page to go back to), or another app in front.
+  const watchPage = () =>
+    dt
+      .js(`(() => { sessionStorage.setItem("e2e-seen", "[]");
+        for (const type of ["pointerdown", "pointerup", "pointercancel", "click"]) addEventListener(type, (e) => {
+          const a = e.target && e.target.closest && e.target.closest("a, button");
+          const seen = JSON.parse(sessionStorage.getItem("e2e-seen") || "[]");
+          seen.push([type, Math.round(e.clientX), Math.round(e.clientY), a ? a.getAttribute("href") || a.tagName : e.target && e.target.tagName]);
+          sessionStorage.setItem("e2e-seen", JSON.stringify(seen));
+        }, true);
+        return JSON.stringify({ history: history.length, fonts: document.fonts.status }); })()`)
+      .catch((e) => String(e));
+  const pageSaw = () => dt.js(`sessionStorage.getItem("e2e-seen")`).catch((e) => String(e));
+  const before = await watchPage();
   adbQuiet("logcat", "-c");
   edgeSwipe();
   let swiped = await until(() => path(dt), (p) => p === first, 8000);
   if (swiped !== first) {
     // An injected swipe is sometimes not taken as the gesture by the emulator; one more try.
-    const seen = await dt.js("JSON.stringify(window.__e2eSeen || null)").catch((e) => String(e));
-    console.log(`info the first edge swipe wasn't taken as Back, swiping again (before: ${before}; the page saw: ${seen}; now in front: ${resumed()})`);
+    console.log(`info the first edge swipe (at y ${mid}) wasn't taken as Back, swiping again (page before: ${before}; the page saw: ${await pageSaw()}; in front: ${resumed()})`);
     shot("edge-swipe");
     writeFileSync(join(out, "logcat-edge-swipe.txt"), adbQuiet("logcat", "-d"));
     edgeSwipe();
     swiped = await until(() => path(dt), (p) => p === first, 12000);
-    if (swiped !== first) console.log(`info after the second edge swipe, in front: ${resumed()}`);
+    if (swiped !== first) console.log(`info after the second edge swipe, the page saw: ${await pageSaw()}; in front: ${resumed()}`);
+  } else {
+    console.log(`info the edge swipe (at y ${mid}) went back (page before: ${before}; the page saw: ${await pageSaw()})`);
   }
-  if (swiped === first) console.log(`info the edge swipe went back (before: ${before})`);
   check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
   // Back on the first page for the next check, whatever happened above.
   const backToFirst = async () => {
@@ -293,6 +316,7 @@ try {
   if (bounds && swiped === first) {
     await tapLink("/developers");
     await sleep(2000);
+    mid = await swipeLine();
     const y = Number(mid) - bounds[1];
     const kept = await dt.js(`(() => { if (!window.BlobInk) return "no bridge"; window.BlobInk.postMessage(JSON.stringify([[0, ${y} - 100 * devicePixelRatio, 48 * devicePixelRatio, 200 * devicePixelRatio]])); return "kept"; })()`);
     await sleep(500);
