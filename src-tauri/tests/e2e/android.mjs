@@ -250,13 +250,21 @@ try {
   await sleep(2000);
   const mid = String(Math.round(screenH / 2));
   const edgeSwipe = () => adb("shell", "input", "swipe", "2", mid, String(Math.round(screenW * 0.65)), mid, "350");
+  // What the swipe starts from, and the system's log of it, to tell why a swipe didn't go back:
+  // not taken as the gesture, the app put in the background (no page to go back to), or another
+  // app in front.
+  const before = { history: await dt.js("history.length").catch((e) => String(e)), front: resumed() };
+  adbQuiet("logcat", "-c");
   edgeSwipe();
   let swiped = await until(() => path(dt), (p) => p === first, 8000);
   if (swiped !== first) {
     // An injected swipe is sometimes not taken as the gesture by the emulator; one more try.
-    console.log("info the first edge swipe wasn't taken as Back, swiping again");
+    console.log(`info the first edge swipe wasn't taken as Back, swiping again (before: ${JSON.stringify(before)}; now in front: ${resumed()})`);
+    shot("edge-swipe");
+    writeFileSync(join(out, "logcat-edge-swipe.txt"), adbQuiet("logcat", "-d"));
     edgeSwipe();
     swiped = await until(() => path(dt), (p) => p === first, 12000);
+    if (swiped !== first) console.log(`info after the second edge swipe, in front: ${resumed()}`);
   }
   check("the back swipe from the screen edge goes back a page", swiped === first, swiped);
   // Back on the first page for the next check, whatever happened above.
