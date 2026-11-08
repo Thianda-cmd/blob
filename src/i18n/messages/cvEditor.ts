@@ -16,7 +16,7 @@ export const cvEditorText = defineMessages({
     views: "View",
     modes: { edit: "Edit", design: "Design", preview: "Preview" } satisfies Record<Mode, string>,
     pdf: "PDF",
-    pdfTitle: (keys: string) => `Save as PDF (${keys})`,
+    pdfTitle: (keys: string) => `Download as PDF (${keys})`,
     form: "Your CV details",
     previewLabel: "Preview of your CV",
     zoom: "Zoom",
@@ -41,8 +41,10 @@ export const cvEditorText = defineMessages({
     tooLongShow: "Show me",
     tooManyPages: (n: number) => `${n} pages: one or two are plenty for a school CV.`,
     cheer: "Wow, your CV is complete! Now save it as a PDF.",
-    printTip: "Tip: use the PDF button at the top. Then only your CV gets printed, without the app around it.",
-    printNote: "To print your CV, use the PDF button in the CV editor. Then only the CV ends up on the paper.",
+    printTip: "Tip: the PDF button at the top saves your CV as a file, without the app around it.",
+    printNote: "To get your CV as a PDF, use the PDF button in the CV editor. It saves just the CV as a file.",
+    pdfSaved: "Done! Your PDF is in your downloads.",
+    pdfFailed: "The PDF file couldn't be made just now. You can save it through the print window instead.",
 
     // Design panel
     panel: "Design and checklist",
@@ -190,7 +192,7 @@ export const cvEditorText = defineMessages({
     views: "Ansicht",
     modes: { edit: "Bearbeiten", design: "Design", preview: "Vorschau" },
     pdf: "PDF",
-    pdfTitle: (keys) => `Als PDF speichern (${keys})`,
+    pdfTitle: (keys) => `Als PDF herunterladen (${keys})`,
     form: "Angaben für deinen Lebenslauf",
     previewLabel: "Vorschau deines Lebenslaufs",
     zoom: "Zoom",
@@ -215,8 +217,10 @@ export const cvEditorText = defineMessages({
     tooLongShow: "Zeigen",
     tooManyPages: (n) => `${n} Seiten: Für einen Lebenslauf aus der Schule reichen ein bis zwei.`,
     cheer: "Wow, dein Lebenslauf ist komplett! Jetzt nur noch als PDF speichern.",
-    printTip: "Tipp: Nimm den PDF-Knopf oben. Dann wird nur dein Lebenslauf gedruckt, ohne die App drumherum.",
-    printNote: "Drucke deinen Lebenslauf über den PDF-Knopf im Lebenslauf-Editor. Dann kommt nur der Lebenslauf aufs Papier.",
+    printTip: "Tipp: Der PDF-Knopf oben speichert deinen Lebenslauf als Datei, ohne die App drumherum.",
+    printNote: "Deinen Lebenslauf als PDF bekommst du über den PDF-Knopf im Lebenslauf-Editor. Er speichert nur den Lebenslauf als Datei.",
+    pdfSaved: "Fertig! Dein PDF liegt in deinen Downloads.",
+    pdfFailed: "Die PDF-Datei ließ sich gerade nicht erstellen. Du kannst sie stattdessen über das Druckfenster speichern.",
 
     // Design panel
     panel: "Design und Checkliste",

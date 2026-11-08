@@ -315,15 +315,61 @@ export function CvThumbnail({ cv, width, className }: { cv: Cv; width: number; c
 }
 
 /**
- * Prints the CV (the browser's print dialog, where "Save as PDF" makes the file). While it is
- * mounted, printing shows only the CV pages at real size on A4 without margins. `parts` adds the
- * cover letter, before the CV, or prints only the letter. `onDone` runs after the dialog closes.
+ * The CV (and with `parts` the cover letter, before it) at real size, one A4 sheet per page. Off
+ * screen but laid out; in print (and in the PDF the server makes, src/app/api/cv/pdf) it is the
+ * only thing on the paper. `onReady` runs once every document is laid out with its fonts loaded,
+ * and again after any later re-measure.
+ */
+export function CvSheets({ cv, parts = "cv", onReady }: { cv: Cv; parts?: CvPdfParts; onReady: () => void }) {
+  const docs = parts === "both" ? (["letter", "cv"] as const) : [parts];
+  const [laidOut, setLaidOut] = useState<{ docs: string[]; version: number }>({ docs: [], version: 0 });
+  const ready = docs.every((d) => laidOut.docs.includes(d));
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+  const done = useRef(onReady);
+  useEffect(() => {
+    done.current = onReady;
+  });
+
+  useEffect(() => {
+    let live = true;
+    void document.fonts.ready.then(() => live && setFontsLoaded(true));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // A moment after the last layout, so a re-measure for a late font is in (both effects re-run then).
+  useEffect(() => {
+    if (!ready || !fontsLoaded) return;
+    const timer = window.setTimeout(() => done.current(), 250);
+    return () => window.clearTimeout(timer);
+  }, [ready, fontsLoaded, laidOut.version]);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="cv-print" style={{ position: "fixed", left: -100000, top: 0, visibility: "hidden" }} aria-hidden>
+      <style>{PRINT_CSS}</style>
+      {docs.map((d) => (
+        <CvDocument
+          key={d}
+          cv={cv}
+          template={d === "letter" ? letterTemplate : undefined}
+          scale={1}
+          gap={0}
+          onLayout={() => setLaidOut((l) => ({ docs: l.docs.includes(d) ? l.docs : [...l.docs, d], version: l.version + 1 }))}
+        />
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Prints the CV with the browser's print dialog: the way to paper (the PDF button downloads a file,
+ * see src/app/api/cv/pdf). `onDone` runs once the dialog has closed.
  */
 export function CvPrint({ cv, fileName, parts = "cv", onDone }: { cv: Cv; fileName: string; parts?: CvPdfParts; onDone: () => void }) {
-  const docs = parts === "both" ? (["letter", "cv"] as const) : [parts];
-  // Printed once every document has been laid out.
-  const [laidOut, setLaidOut] = useState<string[]>([]);
-  const ready = docs.every((d) => laidOut.includes(d));
+  const [ready, setReady] = useState(false);
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
@@ -340,14 +386,14 @@ export function CvPrint({ cv, fileName, parts = "cv", onDone }: { cv: Cv; fileNa
       document.title = title;
       done.current();
     };
-    window.addEventListener("afterprint", finish, { once: true });
-    // Let the pages paint (and their fonts settle) before the dialog takes its snapshot.
+    // Phones return from print() and send afterprint while the print preview is still being made:
+    // the sheets stay until the next tap in the page, else the preview would lose the CV.
+    const touch = matchMedia("(pointer: coarse)").matches;
+    if (!touch) window.addEventListener("afterprint", finish, { once: true });
     const timer = window.setTimeout(() => {
       window.print();
-      // Some browsers return from print() while the dialog is still open and never send afterprint:
-      // the next tap or click in the page means it has closed.
       window.addEventListener("pointerdown", finish, { once: true });
-    }, 350);
+    }, 100);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", finish);
@@ -356,24 +402,7 @@ export function CvPrint({ cv, fileName, parts = "cv", onDone }: { cv: Cv; fileNa
     };
   }, [ready, fileName]);
 
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    // Off screen but laid out (the pages are measured); in print it is the only thing on the paper.
-    <div className="cv-print" style={{ position: "fixed", left: -100000, top: 0, visibility: "hidden" }} aria-hidden>
-      <style>{PRINT_CSS}</style>
-      {docs.map((d) => (
-        <CvDocument
-          key={d}
-          cv={cv}
-          template={d === "letter" ? letterTemplate : undefined}
-          scale={1}
-          gap={0}
-          onLayout={() => setLaidOut((l) => (l.includes(d) ? l : [...l, d]))}
-        />
-      ))}
-    </div>,
-    document.body,
-  );
+  return <CvSheets cv={cv} parts={parts} onReady={() => setReady(true)} />;
 }
 
 const PRINT_CSS = `

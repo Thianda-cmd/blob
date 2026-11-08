@@ -5,19 +5,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CvDocument, CvPrint, PAGE_W } from "@/cv/CvDocument";
 import { cvFileName, normalizeCv } from "@/cv/model";
+import { savePdf } from "@/components/cv/editor/savePdf";
 import { useLocale, useMessages } from "@/i18n/client";
 import { publicText } from "@/i18n/messages/public";
 
 const PX_PER_MM = 96 / 25.4;
 
-/** A CV as anyone with its public link sees it: its pages, as wide as the screen allows, and "Save as PDF". */
-export function PublicCv({ content }: { content: unknown }) {
+/**
+ * A CV as anyone with its public link sees it: its pages, as wide as the screen allows, and a PDF
+ * download (made by the server from the shared CV; the print window if that fails).
+ */
+export function PublicCv({ content, token, pageId }: { content: unknown; token: string; pageId: string | null }) {
   const t = useMessages(publicText).view.cv;
   const locale = useLocale();
   const cv = useMemo(() => normalizeCv(content, locale), [content, locale]);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
+
+  const download = async () => {
+    setBusy(true);
+    const saved = await savePdf({ share: { token, page: pageId } }, "cv", cvFileName(cv));
+    setBusy(false);
+    if (!saved) setPrinting(true);
+  };
 
   useEffect(() => {
     const el = box.current;
@@ -32,7 +44,7 @@ export function PublicCv({ content }: { content: unknown }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button variant="blob" onClick={() => setPrinting(true)} loading={printing}>
+        <Button variant="blob" onClick={() => void download()} loading={busy || printing}>
           <FileDown className="size-4" /> {t.download}
         </Button>
       </div>

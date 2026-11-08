@@ -90,7 +90,7 @@ export function PublicPage({ token, view }: { token: string; view: PublicView })
               ) : page.kind === "deck" ? (
                 <PublicDeck content={page.content} />
               ) : page.kind === "cv" ? (
-                <PublicCv content={page.content} />
+                <PublicCv content={page.content} token={token} pageId={page.id === view.root ? null : page.id} />
               ) : page.kind === "ink" ? (
                 <PublicInk token={token} pageId={page.id} />
               ) : page.kind === "sheet" ? (

@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The CV's PDF (src/app/api/cv/pdf): a headless Chrome. Loaded as-is from node_modules, with its
+  // compressed browser files, which a trace of the code alone would leave out.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+  outputFileTracingIncludes: { "/api/cv/pdf": ["./node_modules/@sparticuz/chromium/bin/**"] },
   async headers() {
     return [
       {

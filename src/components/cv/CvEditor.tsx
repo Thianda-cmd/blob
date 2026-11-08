@@ -25,9 +25,10 @@ import type { LengthIssue } from "./editor/Checklist";
 import { addSection, checkTarget, revealPart } from "./editor/jump";
 import { LayoutProbe } from "./editor/LayoutProbe";
 import { longestPart, type LongPart } from "./editor/overflow";
-import { PdfDialog, pdfExplained } from "./editor/PdfDialog";
+import { PdfDialog } from "./editor/PdfDialog";
 import { PreviewPane, type Zoom } from "./editor/PreviewPane";
 import { ProgressRing } from "./editor/ProgressRing";
+import { savePdf } from "./editor/savePdf";
 import { Segmented } from "./editor/Segmented";
 import { useIsMac, useMediaQuery } from "./editor/useMedia";
 import { LetterForm } from "./letter/LetterForm";
@@ -112,7 +113,7 @@ function Editor({ page }: { page: Page }) {
   const [zoom, setZoom] = useState<Zoom>("fit");
   const [layout, setLayout] = useState<CvLayoutInfo | null>(null);
   const [letterLayout, setLetterLayout] = useState<CvLayoutInfo | null>(null);
-  const [pdf, setPdf] = useState<"idle" | "explain" | "print">("idle");
+  const [pdf, setPdf] = useState<"idle" | "making" | "explain" | "print">("idle");
   const [parts, setParts] = useState<CvPdfParts>("cv");
   const hasLetter = letterHasContent(cv.letter);
   const progress = cvProgress(cv);
@@ -202,26 +203,47 @@ function Editor({ page }: { page: Page }) {
   useEffect(() => {
     culpritRef.current = culprit;
   });
-  // Straight to printing only for those who know the way and when nothing is cut off: otherwise the
-  // dialog, with its warning, every time. Without a choice, a started letter goes in with the CV.
+  const lengthText = (c: LongPart) => (c.what.type === "profile" ? t.tooLongProfile : c.what.type === "untitled" ? t.tooLongUntitled(c.what.section) : t.tooLong(c.what.name));
+  const tRef = useRef(t);
+  const lengthTextRef = useRef(lengthText);
+  useEffect(() => {
+    tRef.current = t;
+    lengthTextRef.current = lengthText;
+  });
+
+  // The PDF button downloads the file the server makes from these very pages. Only if that fails,
+  // the print window is the way (the dialog explains it). Without a choice, a started letter goes
+  // in with the CV. Something cut off is said again once the file is saved.
   const pdfBusy = useRef(false);
   useEffect(() => {
     pdfBusy.current = pdf !== "idle";
   }, [pdf]);
-  const startPdf = useCallback((choice?: CvPdfParts) => {
-    if (pdfBusy.current) return;
-    const next = choice ?? (letterHasContent(cvRef.current.letter) ? "both" : "cv");
-    pdfBusy.current = true;
-    setParts(next);
-    setPdf(pdfExplained() && !(next !== "letter" && culpritRef.current) ? "print" : "explain");
-  }, []);
+  const startPdf = useCallback(
+    async (choice?: CvPdfParts) => {
+      if (pdfBusy.current) return;
+      const current = cvRef.current;
+      const next = choice ?? (letterHasContent(current.letter) ? "both" : "cv");
+      pdfBusy.current = true;
+      setParts(next);
+      setPdf("making");
+      const saved = await savePdf({ cv: current }, next, cvFileName(current, next));
+      if (!saved) {
+        setPdf("explain");
+        return;
+      }
+      setPdf("idle");
+      const cut = next !== "letter" && culpritRef.current;
+      blob.say(cut ? `${tRef.current.pdfSaved} ${lengthTextRef.current(cut)}` : tRef.current.pdfSaved, { mood: cut ? "thinking" : "happy" });
+    },
+    [],
+  );
 
-  // Ctrl/Cmd+P prints the CV, not the editor around it.
+  // Ctrl/Cmd+P saves the CV as a PDF, not the editor around it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        startPdf();
+        void startPdf();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -238,7 +260,6 @@ function Editor({ page }: { page: Page }) {
   }, [pdf, t.printTip]);
 
   const pdfKeys = mac ? "⌘P" : locale === "de" ? "Strg+P" : "Ctrl+P";
-  const lengthText = (c: LongPart) => (c.what.type === "profile" ? t.tooLongProfile : c.what.type === "untitled" ? t.tooLongUntitled(c.what.section) : t.tooLong(c.what.name));
   const showCulprit = (c: LongPart) => reveal(c.part, undefined, c.entry);
   const issue: LengthIssue | null = culprit
     ? { text: lengthText(culprit), onShow: () => showCulprit(culprit) }
@@ -251,14 +272,14 @@ function Editor({ page }: { page: Page }) {
     const props = {
       variant: "primary" as const,
       size: big ? ("lg" as const) : ("sm" as const),
-      loading: pdf === "print",
+      loading: pdf === "making" || pdf === "print",
       title: t.pdfTitle(pdfKeys),
       className: cn("shrink-0", big && "max-[400px]:px-3.5"),
     };
     const icon = <FileDown className={big ? "size-4" : "size-3.5"} />;
     if (!hasLetter)
       return (
-        <Button {...props} onClick={() => startPdf("cv")}>
+        <Button {...props} onClick={() => void startPdf("cv")}>
           {icon} {t.pdf}
         </Button>
       );
@@ -283,7 +304,7 @@ function Editor({ page }: { page: Page }) {
                 icon={choice === "cv" ? <FileText /> : choice === "letter" ? <Mail /> : <FileDown />}
                 onSelect={() => {
                   close();
-                  startPdf(choice);
+                  void startPdf(choice);
                 }}
               >
                 <span className="min-w-0 truncate">{tl.pdfParts[choice]}</span>
@@ -491,15 +512,20 @@ function Editor({ page }: { page: Page }) {
         onClose={() => setPdf("idle")}
         onPrint={() => setPdf("print")}
         warning={
-          culprit &&
-          parts !== "letter" && (
-            <p className="mt-3 flex gap-2 rounded-lg bg-danger/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
-              <TriangleAlert className="mt-px size-4 shrink-0 text-danger" />
-              <span>
-                {lengthText(culprit)} {t.tooLongHint}
-              </span>
+          <>
+            <p className="mt-3 flex gap-2 rounded-lg bg-hover/60 px-3 py-2 text-[12.5px] leading-snug text-ink">
+              <TriangleAlert className="mt-px size-4 shrink-0 text-ink-3" />
+              <span>{t.pdfFailed}</span>
             </p>
-          )
+            {culprit && parts !== "letter" && (
+              <p className="mt-3 flex gap-2 rounded-lg bg-danger/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
+                <TriangleAlert className="mt-px size-4 shrink-0 text-danger" />
+                <span>
+                  {lengthText(culprit)} {t.tooLongHint}
+                </span>
+              </p>
+            )}
+          </>
         }
       />
       {pdf === "print" ? (
