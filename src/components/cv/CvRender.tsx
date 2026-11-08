@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CvSheets } from "@/cv/CvDocument";
 import { normalizeCv, type CvPdfParts } from "@/cv/model";
+import { sampleCv } from "@/cv/samples";
 import type { Cv } from "@/cv/types";
 
 declare global {
@@ -24,7 +25,10 @@ export function CvRender() {
     window.__blobRenderCv = (raw, parts, title) => {
       window.__blobCvReady = false;
       document.title = title;
-      setJob({ cv: normalizeCv(raw), parts: parts === "letter" || parts === "both" ? parts : "cv" });
+      // { sample: "de" | "en" }: Blob's example CV (the server's self-check).
+      const sample = (raw as { sample?: unknown } | null)?.sample;
+      const cv = sample === "de" || sample === "en" ? sampleCv(sample) : normalizeCv(raw);
+      setJob({ cv, parts: parts === "letter" || parts === "both" ? parts : "cv" });
     };
     return () => {
       delete window.__blobRenderCv;

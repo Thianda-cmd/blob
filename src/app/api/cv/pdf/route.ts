@@ -8,7 +8,8 @@ import { createClient, getUser } from "@/lib/supabase/server";
 // lets the editor's own layout engine draw the A4 pages and saves them as a PDF with real text.
 // POST { cv, parts: "cv" | "letter" | "both", fileName } (signed in: the CV being edited), or
 // { share: { token, page }, fileName } (anyone: a CV opened through its public link, read here)
-// → application/pdf.
+// → application/pdf. GET (?lang=en) gives Blob's example CV, no account needed: it shows the
+// whole chain works on a deployment.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -82,8 +83,16 @@ export async function POST(request: Request) {
   if (!cv || typeof cv !== "object") return fail(400, "bad_request");
   // A shared CV is only the CV: its cover letter stays with its author.
   const parts: CvPdfParts = body.share ? "cv" : body.parts === "letter" || body.parts === "both" ? body.parts : "cv";
-  const name = safeName(body.fileName);
+  return render(request, cv as Record<string, unknown>, parts, safeName(body.fileName));
+}
 
+export async function GET(request: Request) {
+  const lang = new URL(request.url).searchParams.get("lang") === "en" ? "en" : "de";
+  return render(request, { sample: lang }, "cv", lang === "en" ? "CV_example" : "Lebenslauf_Beispiel");
+}
+
+/** Lays the CV out on /render/cv in the headless browser and answers with the PDF. */
+async function render(request: Request, cv: Record<string, unknown>, parts: CvPdfParts, name: string) {
   const origin = new URL(request.url).origin;
   // A preview deployment behind Vercel's login lets the headless browser in with the same pass.
   const vercelPass = request.headers
@@ -122,7 +131,7 @@ export async function POST(request: Request) {
       (cv, p, title) => {
         window.__blobRenderCv?.(cv, p, title);
       },
-      cv as Record<string, unknown>,
+      cv,
       parts,
       name,
     );
